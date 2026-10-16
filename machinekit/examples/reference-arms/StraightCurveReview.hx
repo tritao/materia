@@ -13,8 +13,9 @@ class StraightCurveReview {
     return result.toString();
   }
   public static function run():Void {
-    var directory = ReferenceAssetLocation.DIRECTORY + "/../../zeroerr-arm/build/straight";
-    var artifactPath = directory + "/zeroerr5-straight80.mtrg";
+    var original=Sys.args().indexOf("--original-reference")>=0;
+    var directory = ReferenceAssetLocation.DIRECTORY + "/../../zeroerr-arm/build"+(original ? "" : "/straight");
+    var artifactPath = directory + (original ? "/zeroerr5.mtrg" : "/zeroerr5-straight80.mtrg");
     var bytes = sys.io.File.getBytes(artifactPath);
     var scene = SceneArtifact.decode(bytes);
     // Omitting savedState deliberately compiles source-zero coordinates, matching
@@ -25,7 +26,7 @@ class StraightCurveReview {
     var arm = new Manipulator(converted.model,converted.model.links[0].id,frames[0].id);
     if (arm.group.count() != 6) throw "Straight arm needs six joints";
     for (i in 0...6) if (arm.group.jointIds[i] != 'j${i+1}') throw "Unexpected cycle joint order";
-    var configPath = directory + "/../../revised-engineering-config.json";
+    var configPath = original ? directory+"/../original-comparison-config.json" : directory + "/../../revised-engineering-config.json";
     var config:Dynamic = haxe.Json.parse(sys.io.File.getContent(configPath));
     var rows:Array<Array<Float>> = config.missionStudy.waypointsRad;
     var speed:Float = config.application.jointSpeedDegS;

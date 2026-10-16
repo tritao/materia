@@ -18,8 +18,11 @@ def main():
     parser.add_argument('inputs', nargs='+', type=Path)
     parser.add_argument('--required', type=Path)
     parser.add_argument('--straight', action='store_true')
+    parser.add_argument('--original', action='store_true')
     parser.add_argument('--output', type=Path, default=HERE/'build/revised/motion-report.json')
     args = parser.parse_args()
+    if args.original and args.straight:
+        parser.error('Choose original or straight geometry')
     observations = {}
     for path in args.inputs:
         for row in json.loads(path.read_text()):
@@ -37,6 +40,9 @@ def main():
     digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
     layout = HERE/'revised-layout.json'
     engineering = HERE/'build/revised/engineering-input.json'
+    if args.original:
+        layout = HERE/'reference-layout.json'
+        engineering = HERE/'build/engineering-input.json'
     if args.straight:
         current = json.loads((HERE/'build/straight/current.json').read_text())
         layout = Path(current['layoutPath'])
@@ -49,7 +55,9 @@ def main():
                 raise ValueError('Changed prepared probe file: '+name)
     result = dict(status='incomplete' if missing else 'complete_with_exclusions' if any(
             r['overlaps'] or r['indeterminatePairs'] for r in rows) else 'sampled_structures_clear',
-        scope=('29 structural solids including adapters/covers' if args.straight else '25 structural solids')+' at discrete exploratory poses, including six output spigots. '
+        scope=('22 original structural solids and three output spigots already included' if args.original else
+               '29 structural solids including adapters/covers and six output spigots' if args.straight else
+               '25 structural solids including six output spigots')+' at discrete exploratory poses. '
               'Not swept clearance, all detail fasteners, cable clearance, hardware travel, or real cell reach.',
         uniqueRequiredPoses=len(required),uniqueObservedPoses=len(rows),missingPosesRad=missing,
         clearPoses=sum(not r['overlaps'] and not r['indeterminatePairs'] for r in rows),
@@ -58,7 +66,7 @@ def main():
         inputSha256={str(p):digest(p) for p in args.inputs},
         layoutSha256=digest(layout),
         engineeringInputSha256=digest(engineering),
-        provenance='Current straight-variant checkpoint files.' if args.straight else 'Collected within this review. Completed legacy clear rows can originate from the '
+        provenance='Current original-reference checkpoint files.' if args.original else 'Current straight-variant checkpoint files.' if args.straight else 'Collected within this review. Completed legacy clear rows can originate from the '
                    'fail-closed initial logs; positive and failed witnesses are rechecked for pair details.',
         observations=rows)
     args.output.write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')

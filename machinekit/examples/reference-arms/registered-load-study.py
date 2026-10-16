@@ -6,6 +6,7 @@ No executed tending cycle, thermal rating or hardware qualification is inferred.
 import hashlib
 import importlib.util
 import json
+import sys
 from pathlib import Path
 import numpy as np
 
@@ -51,6 +52,11 @@ def placed(body, frame):
 
 
 def main():
+    original = '--original-reference' in sys.argv
+    unrestricted = '--unrestricted-modified-reference' in sys.argv
+    if original and unrestricted:
+        raise ValueError('Choose one reference study')
+    prefix = 'original-' if original else 'unrestricted-' if unrestricted else ''
     fixture_path = DIRECTORY/'fixtures.json'
     fixtures = json.loads(fixture_path.read_text())
     registration_config = ROOT/'tending-registration-config.json'
@@ -60,35 +66,38 @@ def main():
     properties = json.loads(props_path.read_text())
     if properties['fixtureSha256'] != digest(fixture_path):
         raise ValueError('Stale tool properties')
-    current = json.loads((ARM/'build/straight/current.json').read_text())
+    current = (dict(layoutPath=str(ARM/'reference-layout.json')) if original else
+               json.loads((ARM/'build/straight/current.json').read_text()))
     layout_path = Path(current['layoutPath'])
     layout = json.loads(layout_path.read_text())
-    prepared = json.loads(Path(current['preparationPath']).read_text())
-    for key, filename in [('configSha256', 'straight-link-config.json'), ('generatorSha256', 'straight-link.cpp'),
-                          ('preparerSha256', 'prepare-straight.py'), ('baselineLayoutSha256', 'revised-layout.json')]:
+    prepared = {} if original else json.loads(Path(current['preparationPath']).read_text())
+    for key, filename in ([] if original else [('configSha256', 'straight-link-config.json'), ('generatorSha256', 'straight-link.cpp'),
+                          ('preparerSha256', 'prepare-straight.py'), ('baselineLayoutSha256', 'revised-layout.json')]):
         if prepared['inputs'][key] != digest(ARM/filename):
             raise ValueError('Stale prepared arm: '+key)
-    geometry_path = ARM/'build/straight/engineering-input.json'
+    geometry_path = ARM/('build/engineering-input.json' if original else 'build/straight/engineering-input.json')
     geometry = json.loads(geometry_path.read_text())
     if geometry['layoutSha256'] != digest(layout_path):
         raise ValueError('Stale arm geometry')
-    config_path = ARM/'build/straight/engineering-config.json'
+    config_path = ARM/('original-comparison-config.json' if original else 'build/straight/engineering-config.json')
     config = json.loads(config_path.read_text())
-    if config['straightVariant']['baselineConfigSha256'] != digest(ARM/'revised-engineering-config.json') or config['straightVariant']['overrideSha256'] != digest(ARM/'straight-engineering-overrides.json'):
+    if not original and (config['straightVariant']['baselineConfigSha256'] != digest(ARM/'revised-engineering-config.json') or config['straightVariant']['overrideSha256'] != digest(ARM/'straight-engineering-overrides.json')):
         raise ValueError('Changed arm load assumptions')
-    sizing = json.loads((ARM/'build/straight/sizing-report.json').read_text())
+    sizing = json.loads((ARM/('build/sizing-report.json' if original else 'build/straight/sizing-report.json')).read_text())
     if sizing['configSha256'] != digest(config_path) or sizing['geometrySha256'] != digest(geometry_path):
         raise ValueError('Stale arm load basis')
-    report_path = DIRECTORY/'registration-planned.json'
+    report_path = DIRECTORY/(prefix+'registration-planned.json')
     registration = json.loads(report_path.read_text())
     if registration['fixtureSha256'] != digest(fixture_path) or registration['configSha256'] != digest(registration_config):
         raise ValueError('Stale candidate registration')
-    original = json.loads((DIRECTORY/'registration-review.json').read_text())
-    model = next(m for m in registration['models'] if m['model']=='zeroerr')
-    baseline = next(m for m in original['models'] if m['model']=='zeroerr')
+    scan = json.loads((DIRECTORY/(prefix+'registration-review.json')).read_text())
+    model_id = 'zeroerr-original' if original else 'zeroerr-unrestricted' if unrestricted else 'zeroerr'
+    model = next(m for m in registration['models'] if m['model']==model_id)
+    baseline = next(m for m in scan['models'] if m['model']==model_id)
     if model['sourceFingerprint'] != baseline['sourceFingerprint']:
         raise ValueError('Changed registered prototype')
-    if model['sourceFingerprint'] != digest(ARM/'build/straight/zeroerr5-straight80.mtrg'):
+    source_path = DIRECTORY/(model_id+'-study-source.mtrg') if original or unrestricted else ARM/'build/straight/zeroerr5-straight80.mtrg'
+    if model['sourceFingerprint'] != digest(source_path):
         raise ValueError('Changed prototype artifact')
     candidate = model['candidates'][0]
     poses = [np.array(p['q']) for p in candidate['poses'] if p['q'] is not None]
@@ -146,7 +155,7 @@ def main():
                             maxHeavyAccelerationEnvelopeWithDesignFactorNm=envelope.tolist(),ratioToCatalogRated=(envelope/rated).tolist()))
     result = dict(status='preliminary_registered_configuration_load_screen',configurations=len(poses),baseWorldMetres=candidate['baseWorldMetres'],
                   stockMassKg=stock['massKg'],states=results,
-                  inputs={str(p.relative_to(ROOT.parent)):digest(p) for p in (fixture_path, props_path, report_path, geometry_path, config_path, layout_path)},
+                  inputs={str(p.relative_to(ROOT.parent)):digest(p) for p in (fixture_path, props_path, report_path, geometry_path, config_path, layout_path, source_path)},
                   analysisSha256=digest(Path(__file__)),
                   limitations=['Configurations are evaluated poses/path vertices, not an executable or thermally qualified cycle.',
                                'Arm module internals retain the catalog-mass/exterior-volume inertia surrogate.',
@@ -154,7 +163,7 @@ def main():
                                'Zero-speed acceleration envelope; no velocity coupling, friction, efficiency, cable drag or fatigue.',
                                'Generic tool adapter fit, grasp force, physical travel and full tending clearance remain unqualified.',
                                'The separate full-workspace 5 kg benchmark and unresolved shoulder decision still apply.'])
-    (DIRECTORY/'registered-load-report.json').write_text(json.dumps(result, indent=2, allow_nan=False)+'\n')
+    (DIRECTORY/(prefix+'registered-load-report.json')).write_text(json.dumps(result, indent=2, allow_nan=False)+'\n')
     print(json.dumps({'configurations':len(poses),'toolMassKg':results[0]['toolMassKg'],'stockMassKg':stock['massKg'],
                       'doubleHeldLoadKg':results[-1]['flangeLoadKg'],'worstShoulderRatio':max(r['ratioToCatalogRated'][1] for r in results)},indent=2))
 

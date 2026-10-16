@@ -321,3 +321,11 @@ This verifies artifact integrity and expected review coverage and writes
 `build/completion-audit.json`. It preserves explicit false flags for physical
 qualification, complete tending-cycle feasibility and a full-target shoulder
 selection; a passing artifact audit does not change those engineering findings.
+
+## Original ZeroErr reference comparison
+
+See the [unchanged supplier evaluation](../zeroerr-arm/ORIGINAL-EVALUATION.md)
+for matched original/modified loads, all nine base searches, a numerical-only
+IK control and reproduction commands. `--original-reference` and
+`--unrestricted-modified-reference` use isolated reports and projects; the
+standard three-arm comparison and modified planning restrictions remain intact.

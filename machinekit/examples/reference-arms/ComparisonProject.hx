@@ -19,6 +19,23 @@ class ComparisonProject {
     return output;
   }
   public static function source(id:String):SceneArtifactData {
+    if(id=="zeroerr-unrestricted") {
+      var scene=source("zeroerr"),definition:AssemblyDefinition=scene.assemblyDefinition;
+      for(j in definition.joints) if(j.type=="revolute") {j.limits.lower=null;j.limits.upper=null;}
+      return scene;
+    }
+    if (id == "zeroerr-original") {
+      var directory=ROOT+"/../../zeroerr-arm",stem=directory+"/build/zeroerr5";
+      var bytes=sys.io.File.getBytes(stem+".mtrg");
+      var record:Dynamic=haxe.Json.parse(sys.io.File.getContent(stem+".provenance.json"));
+      var hash=haxe.crypto.Sha256.make(bytes),hex=new StringBuf();
+      for(i in 0...hash.length) hex.add(StringTools.hex(hash.get(i),2).toLowerCase());
+      if(Std.string(record.artifactSha256)!=hex.toString() ||
+         Std.string(record.layoutSha256)!=haxe.crypto.Sha256.encode(sys.io.File.getContent(directory+"/reference-layout.json")) ||
+         Std.string(record.exporterSha256)!=haxe.crypto.Sha256.encode(sys.io.File.getContent(directory+"/ZeroErrArmPreview.hx")) ||
+         record.planningWindowSha256!=null) throw "Original supplier arm is stale or carries modified-arm restrictions";
+      return SceneArtifact.decode(bytes);
+    }
     if (id == "zeroerr") {
       var directory = ROOT+"/../../zeroerr-arm";
       var stem = directory+"/build/straight/zeroerr5-straight80";

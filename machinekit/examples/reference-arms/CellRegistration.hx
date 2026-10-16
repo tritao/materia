@@ -122,7 +122,8 @@ class CellRegistration {
   public static function previews():Void {
     var fixtureText=sys.io.File.getContent(ROOT+"/fixtures.json"),data:Dynamic=haxe.Json.parse(fixtureText);
     var configText=sys.io.File.getContent(ReferenceAssetLocation.DIRECTORY+"/../tending-registration-config.json"),config:Dynamic=haxe.Json.parse(configText);
-    var report:Dynamic=haxe.Json.parse(sys.io.File.getContent(ROOT+"/registration-planned.json"));
+    var prefix=Sys.args().indexOf("--original-reference")>=0 ? "original-" : Sys.args().indexOf("--unrestricted-modified-reference")>=0 ? "unrestricted-" : "";
+    var report:Dynamic=haxe.Json.parse(sys.io.File.getContent(ROOT+"/"+prefix+"registration-planned.json"));
     if(Std.string(report.fixtureSha256)!=haxe.crypto.Sha256.encode(fixtureText) || Std.string(report.configSha256)!=haxe.crypto.Sha256.encode(configText))
       throw "Stale registered cell review";
     var models:Array<Dynamic> = report.models,seats:Array<Dynamic> = data.traySeats;
@@ -132,7 +133,7 @@ class CellRegistration {
       var candidates:Array<Dynamic> = model.candidates;
       var candidate=candidates[0],poses:Array<Dynamic> = candidate.poses;
       var stage=[for(p in poses) if(Std.string(p.name)=="outside staging" && Std.string(p.channel)=="A" && p.q!=null) p];
-      var q:Array<Float> = stage.length>0 ? stage[0].q : id=="zeroerr" ? [0.2,-0.8,1.0,0.1,-0.6,0.2] : [0.0,-1.0,1.3,-1.5,-1.0,0.0];
+      var q:Array<Float> = stage.length>0 ? stage[0].q : StringTools.startsWith(id,"zeroerr") ? [0.2,-0.8,1.0,0.1,-0.6,0.2] : [0.0,-1.0,1.3,-1.5,-1.0,0.0];
       RegisteredCellPreview.save(id,readFrame(candidate.baseWorldMetres),q,readFrame(data.frames.toolMountZ),readFrame(data.frames.toolA),
         (cast config.pedestalWidthMm:Float)/1000,seats);
     }
@@ -158,11 +159,23 @@ class CellRegistration {
     return {clear:true,queries:queries,failedWorld:-1,failedSpan:-1,violation:null,error:null};
   }
   public static function run():Void {
+    var original=Sys.args().indexOf("--original-reference")>=0;
+    var unrestricted=Sys.args().indexOf("--unrestricted-modified-reference")>=0;
+    var numericOnly=Sys.args().indexOf("--numeric-only")>=0;
+    var candidateIndex:Null<Int> = null;
+    for(arg in Sys.args()) if(StringTools.startsWith(arg,"--plan-candidate-index=")) {
+      candidateIndex=Std.parseInt(arg.substr(23));
+      if(candidateIndex==null || candidateIndex<0 || candidateIndex>8 || !original) throw "Original candidate index must be 0..8";
+    }
+    if(numericOnly && !original) throw "Numeric control is isolated to the original reference";
+    if(original && unrestricted) throw "Choose one isolated reference study";
+    var reportStem=original ? (numericOnly ? "/original-numeric-registration" : "/original-registration") : unrestricted ? "/unrestricted-registration" : "/registration";
     var rawText = sys.io.File.getContent(ROOT+"/fixtures.json"), data:Dynamic = haxe.Json.parse(rawText);
     var configText = sys.io.File.getContent(ReferenceAssetLocation.DIRECTORY+"/../tending-registration-config.json");
     if (Std.string(data.configSha256)!=haxe.crypto.Sha256.encode(configText)) throw "Changed candidate registration inputs; rerun fixture export";
     var config:Dynamic = haxe.Json.parse(configText);
     var planning=Sys.args().indexOf("--plan-transfers")>=0;
+    if(candidateIndex!=null && (!planning || numericOnly)) throw "Candidate workers require ordinary original transfer planning";
     var candidateCount=1;
     for(arg in Sys.args()) if(StringTools.startsWith(arg,"--plan-candidate-count=")) {
       var parsed=Std.parseInt(arg.substr(23));
@@ -172,6 +185,7 @@ class CellRegistration {
     var selected:Null<String> = null,reused:Dynamic=null;
     for(arg in Sys.args()) if(StringTools.startsWith(arg,"--registration-model=")) selected=arg.substr(21);
     if(selected!=null) {
+      if(original || unrestricted) throw "Reference studies use isolated reports; omit --registration-model";
       if(["zeroerr","ur5e","fairino5_v6"].indexOf(selected)<0) throw "Unknown registration model";
       reused=haxe.Json.parse(sys.io.File.getContent(ROOT+(planning ? "/registration-planned.json" : "/registration-review.json")));
       if(Std.string(reused.fixtureSha256)!=haxe.crypto.Sha256.encode(rawText) || Std.string(reused.configSha256)!=haxe.crypto.Sha256.encode(configText))
@@ -179,7 +193,7 @@ class CellRegistration {
     }
     var previous:Dynamic=null;
     if(planning) {
-      previous=haxe.Json.parse(sys.io.File.getContent(ROOT+"/registration-review.json"));
+      previous=haxe.Json.parse(sys.io.File.getContent(ROOT+reportStem+"-review.json"));
       if(Std.string(previous.fixtureSha256)!=haxe.crypto.Sha256.encode(rawText) || Std.string(previous.configSha256)!=haxe.crypto.Sha256.encode(configText))
         throw "Run the current candidate registration scan before transfer planning";
     }
@@ -225,8 +239,9 @@ class CellRegistration {
     var candidates:Array<Array<Float>> = config.baseCandidatesMm;
     var transfers:Array<Dynamic> = data.transfers;
     var reports:Array<Dynamic> = [];
-    for (id in ["zeroerr","ur5e","fairino5_v6"]) {
+    for (id in (original ? ["zeroerr-original"] : unrestricted ? ["zeroerr-unrestricted"] : ["zeroerr","ur5e","fairino5_v6"])) {
       var source = ComparisonProject.source(id), sourceHash = ComparisonReview.fingerprint(source);
+      if((original || unrestricted) && candidateIndex==null) sys.io.File.saveBytes(ROOT+"/"+id+"-study-source.mtrg",SceneArtifact.encode(source));
       if(selected!=null && selected!=id) {
         var oldModels:Array<Dynamic> = reused.models;
         var old=[for(m in oldModels) if(Std.string(m.model)==id) m];
@@ -241,9 +256,11 @@ class CellRegistration {
       var flangePose:AssemblyFrame = {x:flange.position[0],y:flange.position[1],z:flange.position[2],
         qx:flange.rotation[0],qy:flange.rotation[1],qz:flange.rotation[2],qw:flange.rotation[3]};
       var arms:Map<String,Manipulator> = [],solvers:Map<String,ReferenceKinematics> = [];
+      var numerical:Map<String,motionkit.robot.ManipulatorKinematics> = [];
       for (c in ["A","B"]) {
         var arm = new Manipulator(converted.model,converted.model.links[0].id,flange.id,transform(tcp.get(c)));
         arms.set(c,arm);solvers.set(c,new ReferenceKinematics(arm));
+        if(numericOnly) numerical.set(c,new motionkit.robot.ManipulatorKinematics(arm));
       }
       var modelReports:Array<Dynamic> = [];
       var scanCandidates=candidates;
@@ -262,7 +279,8 @@ class CellRegistration {
         }
         choices.sort((a,b) -> score(b)-score(a));
         scanCandidates=[];
-        for(choice in choices.slice(0,candidateCount)) {
+        var first=candidateIndex==null ? 0 : candidateIndex;
+        for(choice in choices.slice(first,candidateIndex==null ? candidateCount : first+1)) {
           var base=readFrame(choice.baseWorldMetres);
           scanCandidates.push([base.x*1000,base.y*1000,base.z*1000]);
         }
@@ -271,7 +289,7 @@ class CellRegistration {
         var yaw:Float = config.baseYawRad;
         var base = {x:candidate[0]/1000,y:candidate[1]/1000,z:candidate[2]/1000,qx:0.0,qy:0.0,qz:Math.sin(yaw/2),qw:Math.cos(yaw/2)};
         var baseInverse = AssemblyFrames.inverse(base);
-        var reference = id=="zeroerr" ? [0.2,-0.8,1.0,0.1,-0.6,0.2] : [0.0,-1.0,1.3,-1.5,-1.0,0.0];
+        var reference = StringTools.startsWith(id,"zeroerr") ? [0.2,-0.8,1.0,0.1,-0.6,0.2] : [0.0,-1.0,1.3,-1.5,-1.0,0.0];
         var worlds:Map<String,robotkit.collision.CollisionClearance> = [];
         var rigidContacts:Array<Dynamic> = [];
         // Physical worlds include open/loaded jaws, both possible payloads, and
@@ -325,7 +343,9 @@ class CellRegistration {
         }
         var solved:Array<RegisteredPose> = [];
         for (target in targets) for (c in ["A","B"]) {
-          var solver:ReferenceKinematics=solvers.get(c);
+          var available:ReferenceKinematics=solvers.get(c);
+          var solver:motionkit.robot.ManipulatorKinematics=numericOnly ? numerical.get(c) : available;
+          var exact:Null<motionkit.robot.EaikKinematics> = numericOnly ? null : available.exact;
           var selected:Null<Array<Float>> = null,reason="unreachable_from_study_seeds",witness:Dynamic=null;
           var selectedYaw=0.0;
           for (roll in [0.0,Math.PI/2,Math.PI,3*Math.PI/2]) {
@@ -334,8 +354,8 @@ class CellRegistration {
             var rolled={x:target.frame.x,y:target.frame.y,z:target.frame.z,qx:orientation.qx,qy:orientation.qy,qz:orientation.qz,qw:orientation.qw};
             var wanted=pose(AssemblyFrames.compose(baseInverse,rolled));
             var tolerance=new IkTolerance(1e-6,1e-6,400,0.005);
-            var options:Array<Array<Float>> = solver.exact==null ? solver.sampleCandidates(wanted,8,tolerance) :
-              [for(branch in solver.exact.branches(wanted,reference)) branch.q];
+            var options:Array<Array<Float>> = exact==null ? solver.sampleCandidates(wanted,8,tolerance) :
+              [for(branch in exact.branches(wanted,reference)) branch.q];
             if(options.length==0) for(seed in [reference,[1.7,0.6,0.5,2.6,-1.57,1.4],[-1.7,0.6,0.5,2.6,-1.57,-1.4]]) {
               var q=solver.solvePose(wanted,seed,tolerance);if(q!=null) options.push(q);
             }
@@ -400,7 +420,7 @@ class CellRegistration {
           clearPoses:[for(p in solved) if(p.q!=null) p].length,totalPoses:solved.length,
           reviewedRoutes:[for(r in routes) if(r.status=="sampled_joint_route_reviewed") r].length};
         modelReports.push(report);
-        sys.io.File.saveContent(ROOT+"/"+id+(planning ? "-planned-progress.json" : "-registration-progress.json"),haxe.Json.stringify({model:id,sourceFingerprint:sourceHash,
+        sys.io.File.saveContent(ROOT+"/"+id+(numericOnly ? "-numeric" : "")+(candidateIndex==null ? "" : "-candidate"+candidateIndex)+(planning ? "-planned-progress.json" : "-registration-progress.json"),haxe.Json.stringify({model:id,sourceFingerprint:sourceHash,
           fixtureSha256:haxe.crypto.Sha256.encode(rawText),configSha256:haxe.crypto.Sha256.encode(configText),candidates:modelReports},null,"  "));
         Sys.println(id+" registration base "+candidate+": "+report.clearPoses+"/"+report.totalPoses+" target poses; "+report.reviewedRoutes+"/"+routes.length+" sampled routes");Sys.stdout().flush();
       }
@@ -416,12 +436,15 @@ class CellRegistration {
         modelReports=[modelReports[0]];
         var best=modelReports[0],poses:Array<RegisteredPose> = cast best.poses;
         var stage=[for(p in poses) if(p.name=="outside staging" && p.channel=="A" && p.q!=null) p];
-        var visible=stage.length>0 ? stage[0].q : id=="zeroerr" ? [0.2,-0.8,1.0,0.1,-0.6,0.2] : [0.0,-1.0,1.3,-1.5,-1.0,0.0];
-        RegisteredCellPreview.save(id,readFrame(best.baseWorldMetres),visible,mount,frameA,(cast config.pedestalWidthMm:Float)/1000,seats);
+        var visible=stage.length>0 ? stage[0].q : StringTools.startsWith(id,"zeroerr") ? [0.2,-0.8,1.0,0.1,-0.6,0.2] : [0.0,-1.0,1.3,-1.5,-1.0,0.0];
+        if(candidateIndex==null) RegisteredCellPreview.save(id,readFrame(best.baseWorldMetres),visible,mount,frameA,(cast config.pedestalWidthMm:Float)/1000,seats);
       }
-      reports.push({model:id,sourceFingerprint:sourceHash,candidates:modelReports,examinedCandidates:examined});
+      var selectedSolver:ReferenceKinematics=solvers.get("A");
+      reports.push({model:id,sourceFingerprint:sourceHash,candidates:modelReports,examinedCandidates:examined,
+        solverMode:numericOnly ? "numeric_only_control" : selectedSolver.exact==null ? "numeric_fallback" : "analytic_with_numeric_fallback",
+        unsupportedDiagnostic:selectedSolver.unsupportedDiagnostic});
     }
-    sys.io.File.saveContent(ROOT+(planning ? "/registration-planned.json" : "/registration-review.json"),haxe.Json.stringify({status:"candidate_review_not_cell_certificate",
+    sys.io.File.saveContent(ROOT+reportStem+(candidateIndex==null ? "" : "-candidate"+candidateIndex)+(planning ? "-planned.json" : "-review.json"),haxe.Json.stringify({status:"candidate_review_not_cell_certificate",
       fixtureSha256:haxe.crypto.Sha256.encode(rawText),configSha256:haxe.crypto.Sha256.encode(configText),models:reports,
       scope:"Current CAD fixtures and dual gripper; nine proposed bases, or best per model for planning; source 23 transfer requests; empty/A/B/AB jaw and payload states. 33 quintic route samples; optional continuous proof and bounded RRT. Standard articulation exclusions. All tray pockets and mill stock conservatively present. No physical mount qualification, contact insertion, thermal or hardware qualification."},null,"  "));
   }

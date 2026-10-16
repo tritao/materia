@@ -94,8 +94,27 @@ class ReferenceArmsApplicationTests {
       }
       registeredModels.push(id);
     }
+    var originalChecked=false;
+    if(Sys.args().indexOf("--original-reference")>=0) {
+      var original=ProjectSourceLoader.load(root+"/../zeroerr-arm/build/zeroerr5.mtrg");
+      check(original.objects.length==127,"Original supplier project must retain 127 occurrences");
+      var definition:materia.assembly.AssemblyDefinition=original.assemblyDefinition;
+      var moving=[for(j in definition.joints) if(j.type=="revolute") j];
+      check(moving.length==6,"Original supplier project needs six joints");
+      for(j in moving) check(j.passive==true && j.limits.lower==null && j.limits.upper==null,
+        "Original supplier project must remain passive without modified-arm limits");
+      var cell=ProjectSourceLoader.load(root+"/build/cell-registration/zeroerr-original-cell.mtrg");
+      var cellDefinition:materia.assembly.AssemblyDefinition=cell.assemblyDefinition;
+      var cellMoving=[for(j in cellDefinition.joints) if(j.type=="revolute") j];
+      check(cell.objects.length>127 && cellMoving.length==6,"Original registered cell must import fixtures and six arm joints");
+      for(j in cellMoving) check(j.passive==true,"Original registered arm must remain passive");
+      originalChecked=true;
+    }
     var text = haxe.Json.stringify({scope:"source selection and 200 actual simulator steps for UR5e/FR5; static comparison and registered-cell imports; no hardware qualification",robots:reports,
       comparisonMountings:comparisonMountings,registeredModels:registeredModels,
+      originalReferenceChecked:originalChecked,
+      originalArtifactSha256:originalChecked ? digest(root+"/../zeroerr-arm/build/zeroerr5.mtrg") : null,
+      originalCellArtifactSha256:originalChecked ? digest(root+"/build/cell-registration/zeroerr-original-cell.mtrg") : null,
       prototypeArtifactSha256:digest(root+"/../zeroerr-arm/build/straight/zeroerr5-straight80.mtrg"),
       prototypePlanningWindowSha256:digest(root+"/../zeroerr-arm/straight-planning-window.json")},null,"  ");
     File.saveContent(root+"/build/application-validation.json",text);

@@ -233,30 +233,35 @@ review than the current synthetic +/-90 degree screen.
 
 ## Screening result and configuration decision
 
-With the current 5 kg total/150 mm CoG assumption, 270 poses give the following
+The matched original-arm rerun uses `original-comparison-config.json`; its
+application and cycle exactly match the modified arm. Ratios/order codes remain
+unconfirmed supplier assumptions. With 5 kg total/150 mm CoG, 270 poses give the following
 sampled nominal gravity moments before the 1.2 design factor:
 
 | Axis | Estimated gravity moment | Catalog rated torque | Decision |
 | --- | --- | --- | --- |
-| J2 | 120.02 Nm | 87 Nm | Shoulder candidate fails this screen |
-| J3 | 48.53 Nm | 87 Nm | No overload identified by this screen |
-| J4 | 12.21 Nm | 10 Nm | Wrist candidate fails this screen |
-| J5 | 11.07 Nm | 10 Nm | Wrist candidate fails this screen |
+| J2 | 119.75 Nm | 87 Nm | Shoulder candidate fails this screen |
+| J3 | 48.09 Nm | 87 Nm | No overload identified by this screen |
+| J4 | 12.31 Nm | 10 Nm | Wrist candidate fails this screen |
+| J5 | 11.06 Nm | 10 Nm | Wrist candidate fails this screen |
 
 The estimated arm mass is 23.512 kg. The +25% arm-mass sensitivity raises the
-J2 estimate to 138.00 Nm. These are surrogate-mass estimates, not measured
-joint demands. More decisively, the sampled tool/payload-only J4/J5 moments
-are 11.59/10.91 Nm: their overload is present even before arm-mass uncertainty
+J2 estimate to 137.40 Nm. These are surrogate-mass estimates, not measured
+joint demands. The sampled tool/payload-only J4/J5 moments
+are 11.65/10.90 Nm: their overload is present even before arm-mass uncertainty
 or the design factor. These observations apply to the assumed 150 mm combined
 CoG and sampled poses; they are not a proof that every 5 kg application fails.
 Generate a visual comparison with
 `python3 machinekit/examples/zeroerr-arm/plot-sizing.py` (matplotlib required).
 
 Do not freeze the reference's 110T/70T BOM as a UR5e/FR5-equivalent arm. The
-preferred next wrist bench candidate is **eRob80T nominal 100, brake + EtherCAT,
+earlier prototype work selected **eRob80T nominal 100, brake + EtherCAT,
 HM feedback requested**, subject to exact revision confirmation. Its product
 page lists 31 Nm rated and 30 rpm, but it is a different mounting envelope;
-no 80T replacement has been inserted into the 70T CAD or treated as a fit.
+the later 80T revision below changed the wrist geometry rather than providing
+a drop-in fit. The [original evaluation](ORIGINAL-EVALUATION.md) now supports
+retaining the supplier chain while resolving the exact drive/load specification
+before repeating that enlargement.
 The previous 80H100I V6 bench reference remains valid only for its separate
 communications/actuator study, not as a validation of these T-module mounts.
 
@@ -534,3 +539,12 @@ extreme collision witnesses remain recorded outside the window. Pose and
 continuous-motion checks remain necessary within it. Exact non-cover pair
 observations are reused only after byte-identical STEP geometry and unchanged
 tree/placement verification; every cover pair is freshly checked at all 60 poses.
+
+## Unchanged supplier comparison
+
+The [original-arm evaluation](ORIGINAL-EVALUATION.md) compares the unchanged
+110T/70T supplier geometry with our modified straight arm using identical load,
+cell and planner assumptions. It retains separate original, unrestricted
+modified diagnostic and restricted modified reports, plus a numerical-only IK
+control. Earlier modified-arm findings do not establish failure of the supplier
+architecture.

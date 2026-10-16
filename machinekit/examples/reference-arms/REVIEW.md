@@ -1,5 +1,12 @@
 # Robot model implementation and design review
 
+The subsequent [unchanged supplier evaluation](../zeroerr-arm/ORIGINAL-EVALUATION.md)
+separates the original 110T/70T assembly from our enlarged-wrist prototype.
+The prototype results below must not be generalized to the supplier architecture.
+The original now reaches 80/82 targets and 17/23 continuously checked transfers
+after all nine base searches; the unrestricted modified control reaches 26/82
+and 5/23. Its original actual-tool load screen still leaves shoulder sizing open.
+
 The agreed software/model study is implemented. This is a prototype review,
 not a manufacturing, procurement, hardware-performance or complete tending-cell
 release. Negative results below are retained as engineering findings.
