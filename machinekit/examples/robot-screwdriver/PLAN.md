@@ -3231,3 +3231,30 @@ cycle, and `sd-cases-sd15-interruption-full1` for stop/retry during actual screw
 rotation followed by the full unload. The latter is also in the default
 acceptance case. Their outcomes remain open. The both-backend physical-cycle
 scope question remains unanswered; the plan's requirement is unchanged.
+
+### SD15a outfeed measurement and main rebase (2026-10-16)
+
+Rebased the 26 SD15 follow-on commits onto local main `bc3658a91` without
+conflicts; range-diff confirmed unchanged patches. The backup branch
+`backup/screwdriving-before-sd15-main-sync-20261016` preserves the old history.
+The feature branch remains separate from main, whose unrelated working changes
+were preserved. Rebuilt project-source and editor tests after the rebase;
+the editor test executable passed. The two-arm example now appears in the
+example browser (`8f1319348`).
+
+The `sd15-full6` MuJoCo run completed all four required screws and both robot
+programs, including unload, but failed the final 1 mm outfeed position check.
+The isolated unload diagnostic now applies that same check and prints its
+measured error (`5be2e616a`). `sd15-outfeed1` reproduced a 7.398 mm error:
+plate origin (-150.489, -847.047, 257.234) mm against the measured pocket datum
+(-150.000, -850.000, 264.000) mm, with about 7.3 degrees of roll. Program
+completion and presence alone therefore do not establish correct seating.
+Optional contact tracing has been extended through placement for diagnosis.
+
+The `sd15-interruption-full1` run also remains failed: the first screw timed
+out after targeted stop/retry and displaced the loose workpieces. Inspection
+shows mission retry reconstructs the screw invocation, whose ordinary runner
+starts from pickup. The interaction with an already engaged screw needs a
+qualified recovery path; the fixed-plate interruption pass is not evidence of
+full-cell recovery. Both acceptance items and the deterministic-backend force
+dynamics gap remain open. No tolerance or acceptance threshold was relaxed.
