@@ -8,8 +8,7 @@ import motionkit.path.PoseMath;
 import materia.assembly.AssemblyFrames;
 
 class ReferenceArmsPreview {
-  static final ROOT:String = sys.FileSystem.exists("machinekit/examples/reference-arms/build") ?
-    "machinekit/examples/reference-arms/build/" : "build/";
+  static final ROOT:String = ReferenceAssetLocation.DIRECTORY + "/";
   static function check(value:Bool, message:String):Void {if (!value) throw message;}
   public static function main():Void {
     var models = [for (arg in Sys.args()) if (!StringTools.startsWith(arg,"--")) arg];
@@ -20,6 +19,7 @@ class ReferenceArmsPreview {
       // Exercise the exact saved format consumed by the application.
       var bytes = SceneArtifact.encode(source.scene);
       sys.io.File.saveBytes(ROOT+id+"/"+id+".scene",bytes);
+      sys.io.File.saveBytes(ROOT+id+"/"+id+".mtrg",bytes);
       var scene = SceneArtifact.decode(bytes);
       var converted = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition,AssemblyPhysicalPartView.fromSceneArtifact(scene));
       var planningWindows:Array<String> = [];
@@ -52,7 +52,7 @@ class ReferenceArmsPreview {
           for (i in 0...9) check(Math.abs(a[i]-b[i])<1e-8,"Source link orientation differs");
         }
         var target = numeric.forward(q);
-        var f = probe.tip;
+        var f = source.manifest.flangeOffset == null ? probe.tip : AssemblyFrames.compose(probe.tip,source.manifest.flangeOffset);
         var independent = new motionkit.kinematics.Pose3(f.x,f.y,f.z,f.qx,f.qy,f.qz,f.qw);
         check(PoseMath.distance(target,independent)<1e-8 && PoseMath.angle(target,independent)<1e-7,
           '$id: source URDF FK differs at sample $sample');
@@ -86,6 +86,9 @@ class ReferenceArmsPreview {
         sceneBytes:bytes.length,tipStatus:source.manifest.tipStatus,hardwareConnected:false};
       sys.io.File.saveContent(ROOT+id+"/validation.json",haxe.Json.stringify(report,null,"  "));
       Sys.println(haxe.Json.stringify(report));
+      if (Sys.args().indexOf("--cartesian")>=0) ReferenceCartesianReview.run(id);
+      var review = ReferenceArmsProject.artifact(id);
+      sys.io.File.saveBytes(ROOT+id+"/"+id+"-review.mtrg",review);
     }
   }
 }

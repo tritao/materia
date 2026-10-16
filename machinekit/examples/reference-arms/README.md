@@ -21,6 +21,8 @@ to the Haxe example to export/check other prepared descriptions.
 Each model directory below `build/` contains the expanded `robot.urdf`, hashed binary
 visual/collision mesh streams, a readable `manifest.json`, its generated typed wire
 representation, a `<model>.scene`, and `validation.json` after successful checking.
+`<model>.mtrg` is the prebuilt extension the application opens; `.scene` is also kept
+as the binary validation export. `<model>-review.mtrg` starts in a review pose.
 The typed wire representation is derived from the Haxe consumer schema, not separately
 maintained field IDs. Scene files use metres and import through the same assembly bridge
 as our authored CAD robots. Massless fixed URDF frames are retained as transforms on the
@@ -53,9 +55,15 @@ mesh volume is retained only as geometric metadata; its placeholder density must
 used for material or load sizing. The imported URDF effort values are not verified drive
 torque curves, and there are no invented motors or actuator capabilities.
 
-UR uses the vendor `tool0` frame. Standard FAIRINO descriptions end at the vendor wrist3
-origin; its physical flange/TCP relationship still needs checking against matching CAD.
+UR uses the vendor `tool0` frame. FAIRINO descriptions end at the vendor wrist3
+origin. For FR5, `interfaces.json` maps that origin to the nominal flange with a
+100 mm local +Z offset, checked against the official overall drawing and V6.0 STEP.
+The FR5 ROS mesh ends at 99 mm, 1 mm short of the nominal face; that discrepancy is
+reported and retained. Other FAIRINO flange mappings still require model-specific review.
 Source rounded angles are preserved without snapping them to perfect right angles.
+The importer also reports source centres of mass outside visual mesh bounds by more
+than 5 mm. Several FAIRINO source links trigger this diagnostic; their inertias must
+not be treated as qualified dynamic reference data.
 
 For source continuous joints, the checker uses an explicit +/-pi planning window for
 finite IK turn enumeration; the saved scene retains the continuous source joint.
@@ -81,5 +89,47 @@ python3 machinekit/examples/reference-arms/render-preview.py
 
 This produces `build/reference-preview.png`; it compares scale in illustrative
 configurations, not identical TCP poses or task performance.
+
+## Application model selection and Cartesian review
+
+After preparing the models, open **UR and FAIRINO reference arms** under Robotics &
+handling on the application's Start page. Its 22 jobs switch robots at the same base
+mount through the existing job selector. The project declares every generated mesh
+stream as a cache input. Preparation also generates an absolute asset-location module
+under ignored `build/assets/`; rerun preparation after moving the checkout.
+
+```sh
+./app/run-built.sh --project=machinekit/examples/reference-arms/materia.project.json
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --cartesian
+python3 machinekit/examples/reference-arms/render-preview.py --cartesian
+./app/run-built.sh --project=machinekit/examples/reference-arms/build/ur5e/ur5e-cartesian.mtrg
+```
+
+The Cartesian review uses the same synthetic downward-facing TCP target for UR5e and
+FR5, a 150 mm extension from each mapped flange, and a 20 mm straight line sampled
+every millimetre. Existing EAIK/DLS and `PathRequest` solve it, with explicit residual,
+joint-limit and jump checks. Source collision hulls are checked at all 21 configurations;
+the initial review has no observed violations. This is sampled clearance with the
+existing articulation pair policy, not a continuous swept proof, tool collision check
+or registration to a real tending cell.
+
+Press Play in the Cartesian prebuilt artifact to run a slow forward/return illustration.
+Its joint keys are relative to the saved starting pose, as the application runtime
+requires. Linear key playback is not a jerk-limited hardware trajectory. The orange
+line in `build/cartesian-preview.png` marks the common TCP extension; it is not a
+physical gripper or collision body.
+
+The prepared-asset application test exercises source job selection, prebuilt motion
+loading, and 200 actual simulator steps for each arm:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/tests/reference-arms/haxeon.json
+```
+
+It writes `build/application-validation.json` with observed joint motion and tracking
+error. These are simulator observations with source mass/inertia, not physical-arm
+performance results. Run `python3 machinekit/examples/reference-arms/prepare-cad.py`
+to fetch the pinned 12-model FAIRINO STEP archive and FR5 drawings into `build/cad/`.
+UR's current STEP download page requires login; its STEP archive has not been fetched.
 
 The remaining work and completion gates are tracked in [PLAN.md](PLAN.md).

@@ -65,6 +65,8 @@ import materia.project.SceneArtifact.SceneArtifactPart;
   @:id(9) var links:Array<ReferenceLink>;
   @:id(10) var joints:Array<ReferenceJoint>;
   @:id(11) var probes:Array<ReferenceProbe>;
+  @:id(12) @:optional var flangeOffset:AssemblyFrame;
+  @:id(13) @:optional var sourceWarnings:Array<String>;
 }
 
 /** Official URDF compiled to the same scene/assembly path as authored CAD robots.
@@ -136,7 +138,8 @@ class ReferenceRobot {
         connectors: [{name: "origin", frame: AssemblyFrames.identity()}]};
       var hulls:Array<Array<Float>> = [];
       if (link.id == tipOccurrence) {
-        component.connectors.push({name: "tip", frame: tipAnchor.offset});
+        var flange = manifest.flangeOffset == null ? AssemblyFrames.identity() : manifest.flangeOffset;
+        component.connectors.push({name: "tip", frame: AssemblyFrames.compose(tipAnchor.offset,flange)});
         component.robotFlangeConnector = "tip";
       }
       for (joint in manifest.joints) if (joint.type != "fixed" && anchorOf(joint.parent).id == link.id) {
@@ -188,5 +191,6 @@ class ReferenceRobot {
     AssemblyDefinitionCodec.validate(definition);
     scene = {lengthUnit: "m", metresPerUnit: 1, parts: parts, assemblyDefinition: definition,
       recipeDiagnostics: [manifest.tipStatus, "Collision geometry uses enclosing convex hulls of source collision meshes; dynamics not qualified."]};
+    if (manifest.sourceWarnings != null) for (warning in manifest.sourceWarnings) scene.recipeDiagnostics.push(warning);
   }
 }

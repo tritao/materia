@@ -189,7 +189,7 @@ def compile_model(family, model):
     destination = ROOT / "build" / model
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "robot.urdf").write_text(xml)
-    links, joints = [], []
+    links, joints, source_warnings = [], [], []
     names = [e.attrib["name"] for e in robot.findall("link")]
     if len(names) != len(set(names)):
         raise ValueError("Duplicate link")
@@ -255,8 +255,11 @@ def compile_model(family, model):
         visuals = element.findall("visual")
         # One part per link, preserving per-visual colors in the mesh records.
         meshes = []
+        visual_low, visual_high = np.full(3, np.inf), np.full(3, -np.inf)
         for i, visual in enumerate(visuals):
             mesh = geometry(visual, package, spec["package"])
+            visual_low = np.minimum(visual_low, mesh.vertices.min(0))
+            visual_high = np.maximum(visual_high, mesh.vertices.max(0))
             stem = f"{name}-{i}"
             mesh.vertices.astype("<f8").tofile(destination / (stem + ".vertices"))
             normals = np.zeros_like(mesh.vertices)
@@ -273,6 +276,9 @@ def compile_model(family, model):
                            "color": color, "volume": max(abs(float(mesh.volume)), 1e-12),
                            "sha256": {ext: digest(destination / (stem + "." + ext))
                                       for ext in ("vertices", "normals", "indices")}})
+        if meshes and mass is not None and (np.any(np.array(center) < visual_low - 0.005) or
+                                           np.any(np.array(center) > visual_high + 0.005)):
+            source_warnings.append(f"{name}: source declared centre of mass is outside visual mesh bounds by more than 5 mm; review inertia/frame correspondence before dynamic use.")
         # Keep source collision meshes separate. Convex reduction is the host's responsibility.
         collisions = []
         for i, collision in enumerate(element.findall("collision")):
@@ -321,7 +327,16 @@ def compile_model(family, model):
     result = {"schema": 1, "id": model, "family": family, "root": root, "tip": tip,
               "tipStatus": "vendor tool0" if family == "ur" else f"vendor {tip} origin; flange alignment needs CAD verification",
               "metresPerUnit": 1, "source": spec, "sourceFiles": used,
-              "urdfSha256": digest(destination / "robot.urdf"), "links": links, "joints": ordered, "probes": probes}
+              "urdfSha256": digest(destination / "robot.urdf"), "links": links, "joints": ordered,
+              "probes": probes, "sourceWarnings": source_warnings}
+    interfaces = json.loads((ROOT / "interfaces.json").read_text())
+    if model in interfaces:
+        interface = interfaces[model]
+        transform = np.eye(4)
+        transform[:3, 3] = interface["flangeOffsetMetres"]
+        result["flangeOffset"] = frame(transform)
+        result["tipStatus"] = interface["basis"] + " " + interface["meshDiscrepancy"]
+        result["interfaceReview"] = interface
     temporary = destination / "manifest.json.partial"
     temporary.write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
     temporary.replace(destination / "manifest.json")
@@ -334,6 +349,11 @@ if __name__ == "__main__":
     parser.add_argument("models", nargs="*", default=["ur5e", "fairino5_v6"])
     parser.add_argument("--all", action="store_true")
     args = parser.parse_args()
+    location = ROOT / "build/assets/ReferenceAssetLocation.hx"
+    location.parent.mkdir(parents=True, exist_ok=True)
+    content = 'class ReferenceAssetLocation { public static inline var DIRECTORY:String = ' + json.dumps(str(ROOT / "build")) + '; }\n'
+    if not location.exists() or location.read_text() != content:
+        location.write_text(content)
     requested = [m for family in ("ur", "fairino") for m in SOURCES[family]["models"]] if args.all else args.models
     results = []
     for model in requested:

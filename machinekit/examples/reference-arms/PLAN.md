@@ -44,6 +44,20 @@ redistribution permission is unresolved. UR mesh terms vary by model.
   undeclared tool_Link. These are source gaps, not accepted scenes.
 - Official files and binary streams are hashed, vendor assets stay ignored,
   and five focused importer tests pass. A shared-scale static preview exists.
-- Still pending: actual application comparison/jogging workflow, Cartesian
-  trajectories, common tool/task registration, STEP correspondence, straight-link
-  CAD redesign and subsequent engineering/clearance/bench deliverables.
+- Application selection now exposes 22 source-project jobs. UR5e and FR5 load
+  through the actual app source loader and each complete 200 simulator steps
+  with observed motion and no fault. Playback is relative to the saved starting
+  pose; the app test checks the no-jump initial coordinate.
+- Both solve the same 20 mm Cartesian TCP line with a 150 mm flange extension:
+  21 configurations each, checked limits/residuals/jumps and no sampled hull
+  violations. Prebuilt playback and a common-target PNG are available. No
+  continuous swept or jerk-limited trajectory claim is made.
+- The official FAIRINO 12-model V6.0 STEP archive and FR5 mounting drawings are
+  hash-pinned and fetched. FR5's flange is 100 mm along local +Z from its URDF
+  wrist3 origin; its ROS mesh face is 1 mm short of that nominal face. UR STEP
+  access requires login; official URDF geometry is available without it.
+- Source mass/frame diagnostics identify several FAIRINO centres of mass outside
+  their mesh bounds. Those source inertias remain unqualified.
+- Still pending: combined scene with our arm, a physical common tool and actual
+  task/fixture registration, wider STEP correspondence, straight-link CAD redesign,
+  stiffness/load/continuous-clearance review, and updated bench deliverables.

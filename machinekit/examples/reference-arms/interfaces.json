@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "fairino5_v6": {
+    "flangeOffsetMetres": [0, 0, 0.1],
+    "basis": "Official FR5 overall drawing: wrist output axis to flange face 100 mm; compatible with downloaded V6.0 STEP. The source wrist3 origin is on the output axis behind the flange.",
+    "archiveSha256": "26dedb01518855a40bf33ec8de1618eb326d25fe7aa3424df247d6bdab175e1d",
+    "drawing": "FR5 Drawings/FR5 Ontology Drawing.jpg",
+    "drawingSha256": "2f5f2e30f5a3787698906fc7cf2ae5c8c5a868397873506e5b8fe02f31f621cc",
+    "sourcePage": "https://www.fairino.com/DOWNLOAD2",
+    "meshDiscrepancy": "ROS wrist3 visual/collision mesh ends at local Z=99 mm, 1 mm short of the nominal drawing/STEP face; retained and reported, not silently stretched.",
+    "mount": {"outerDiameterMm": 63, "pilotRecessDiameterMm": 31.5, "pilotRecessDepthMm": 6.2, "boltCircleMm": 50, "bolts": "4 x M6", "threadDepthMm": 12.5, "pinHoleDiameterMm": 6, "pinHoleDepthMm": 6},
+    "massStatus": "Source link mass/inertia data not dynamically qualified; multiple declared centres of mass lie outside source mesh bounds."
+  }
+}

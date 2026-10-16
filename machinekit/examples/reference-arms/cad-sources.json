@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "checked": "2026-10-16",
+  "archives": [
+    {
+      "id": "fairino-v6-step",
+      "url": "https://fairino-doc-en.readthedocs.io/latest/_downloads/49cdf31534d0899683fd176e86a223d1/FRCobots-V6.0%20STEP%20Models.zip",
+      "sha256": "1f6f28e7a62bfb70eab7066733c0f7bad0695a943597dcdda70261a0a4d0f392",
+      "sourcePage": "https://www.fairino.com/DOWNLOAD2",
+      "status": "Official V6.0 geometry; correspondence to each ROS description needs checking"
+    },
+    {
+      "id": "fr5-drawings",
+      "url": "https://fairino-doc-en.readthedocs.io/latest/_downloads/d0aec4a78c7e5520e502d33d18425649/FR5%20Drawings.zip",
+      "sha256": "26dedb01518855a40bf33ec8de1618eb326d25fe7aa3424df247d6bdab175e1d",
+      "sourcePage": "https://www.fairino.com/DOWNLOAD2",
+      "status": "FR5 mounting, flange and overall dimensional images"
+    }
+  ],
+  "urStep": {
+    "sourcePage": "https://www.universal-robots.com/download/mechanical-e-series/ur5eur7e/robot-step-file-ur5eur7e-e-series/",
+    "status": "Official page requires login; STEP not obtained. Use official URDF meshes for simulation.",
+    "terms": "https://www.universal-robots.com/legal/terms-and-conditions/terms_and_conditions_for_use_of_graphical_documentation.txt"
+  }
+}

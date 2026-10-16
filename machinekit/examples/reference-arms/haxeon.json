@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-reference-arms"},
   "entry": "ReferenceArmsPreview",
-  "sourceRoots": ["."],
+  "sourceRoots": [".", "build/assets"],
   "dependencies": {
     "projectkit": {"path": "../../../projectkit"},
     "cadbridge": {"path": "../../../robotkit/cadbridge"},

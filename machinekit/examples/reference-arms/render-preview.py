@@ -18,8 +18,9 @@ def transform(vertices, frame):
     return vertices + 2 * np.cross(q, np.cross(q, vertices) + w * vertices) + np.array([frame[k] for k in "xyz"])
 
 
-def review_poses(manifest):
-    q = [0, -1, 1.3, -1.5, -1, 0] if manifest["family"] == "ur" else [np.pi, -1, 1.3, -1.5, -1, 0]
+def review_poses(manifest, q=None):
+    if q is None:
+        q = [0, -1, 1.3, -1.5, -1, 0]
     poses = {manifest["root"]: np.eye(4)}
     index = 0
     for joint in manifest["joints"]:
@@ -42,13 +43,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("models", nargs="*", default=["ur5e", "fairino5_v6"])
     parser.add_argument("--probe", type=int)
+    parser.add_argument("--cartesian", action="store_true")
     args = parser.parse_args()
+    if args.cartesian and args.probe is not None:
+        parser.error("Choose either --cartesian or --probe")
     all_models = []
     light = np.array([-.3, -.6, 1]); light /= np.linalg.norm(light)
     for name in args.models:
         directory = ROOT / "build" / name
         manifest = json.loads((directory / "manifest.json").read_text())
-        poses = review_poses(manifest) if args.probe is None else {
+        cartesian = json.loads((directory / "cartesian-report.json").read_text()) if args.cartesian else None
+        poses = review_poses(manifest, cartesian["samples"][0] if cartesian else None) if args.probe is None else {
             row["id"]: row["pose"] for row in manifest["probes"][args.probe]["links"]}
         triangles, colors = [], []
         for link in manifest["links"]:
@@ -63,25 +68,37 @@ def main():
                 shade = .45 + .55 * np.abs(normals @ light)
                 triangles.append(tri)
                 colors.append(np.array(mesh["color"][:3])[None, :] * shade[:, None])
-        all_models.append((name, np.concatenate(triangles), np.concatenate(colors)))
-    points = np.concatenate([tri.reshape(-1, 3) for _, tri, _ in all_models])
+        tip = poses[manifest["tip"]]
+        if args.cartesian and "flangeOffset" in manifest:
+            tip = tip.copy()
+            offset = manifest["flangeOffset"]
+            tip[:3, 3] += tip[:3, :3] @ np.array([offset[k] for k in "xyz"])
+        all_models.append((name, np.concatenate(triangles), np.concatenate(colors), tip))
+    points = np.concatenate([tri.reshape(-1, 3) for _, tri, _, _ in all_models])
     low, high = points.min(0), points.max(0)
     midpoint = (low + high) / 2; span = max(high - low) * .58
     fig = plt.figure(figsize=(7 * len(all_models), 8), facecolor="#edf0f3")
-    for i, (name, triangles, colors) in enumerate(all_models):
+    for i, (name, triangles, colors, tip) in enumerate(all_models):
         ax = fig.add_subplot(1, len(all_models), i + 1, projection="3d")
         ax.set_facecolor("#edf0f3")
         ax.add_collection3d(Poly3DCollection(triangles, facecolors=colors, edgecolors="none"))
+        if args.cartesian:
+            start = tip @ [0, 0, 0, 1]
+            end = tip @ [0, 0, 0.15, 1]
+            ax.plot([start[0],end[0]],[start[1],end[1]],[start[2],end[2]],color="#e6a24c",linewidth=3)
+            ax.scatter([end[0]],[end[1]],[end[2]],color="#bf6627",s=25)
         ax.set(xlim=(midpoint[0]-span, midpoint[0]+span), ylim=(midpoint[1]-span, midpoint[1]+span),
                zlim=(midpoint[2]-span, midpoint[2]+span))
         ax.set_box_aspect((1, 1, 1)); ax.set_proj_type("ortho"); ax.view_init(elev=20, azim=-65)
         ax.set_axis_off(); ax.set_title(name, fontsize=18)
     fig.suptitle("Official robot descriptions · shared scale", fontsize=21)
     label = "Illustrative configurations; joint coordinates differ" if args.probe is None else f"Independent source-FK pose {args.probe}"
+    if args.cartesian:
+        label = "Common synthetic TCP target; 150 mm model-frame offset; sampled clearance only"
     fig.text(.5, .035, f"{label} · shared scale · reference geometry, not a dynamics qualification",
              ha="center", color="#44515c", fontsize=10)
     fig.subplots_adjust(left=0, right=1, bottom=.05, top=.9, wspace=0)
-    path = ROOT / "build/reference-preview.png"
+    path = ROOT / ("build/cartesian-preview.png" if args.cartesian else "build/reference-preview.png")
     fig.savefig(path, dpi=150)
     print(path)
 

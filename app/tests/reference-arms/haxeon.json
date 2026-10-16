@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "reference-arms-application-checks"},
+  "entry": "ReferenceArmsApplicationTests",
+  "sourceRoots": ["."],
+  "dependencies": {"app": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}
