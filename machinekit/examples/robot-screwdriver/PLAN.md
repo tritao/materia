@@ -4052,3 +4052,32 @@ original failure logs and captured stacks are retained. Two consecutive
 corrected runs pass (`sd15-stop-setup-green-1.log` and `-2.log`): Stop returns
 in 0.108/0.231 ms and the slowest shutdown frames are 10.9/13.8 ms. Both
 complete retirement and restart. The fresh complete gate remains pending.
+
+### Complete baseline gate and shared-runtime rebase (2026-10-16)
+
+The frozen `sd15-final-main861-1` gate at `6d631f963` completed all 62
+default project-source cases: 60 passed. All 14 independently scheduled
+two-arm cell cases passed, along with all ten staged fastening scenarios,
+both-backend assembly/replacement, twelve blow-feed scenarios, feeder jam
+recovery, touch registration, lost-screw recovery, required fastening,
+physical threads and force search. Staged portable-export assertions passed.
+Native suites, CADKit, ProjectKit, MachineKit, editor and interactive Stop
+checks passed. Final source and runner fingerprint checks both passed.
+
+The only project-source failures were tending's previously measured
+utilization shortfall and printer-cube-short's operation 23, layer 3
+`path.time` error -6. The printer failed at G-code line 455 rather than
+the earlier line 444; this is a matching error signature, not an exact-text
+reproduction. Both logs and that distinction are retained for final review.
+
+Local main advanced to `db8f3ee86`, including MuJoCo instability rejection,
+foreground playback fault handling, zero-mass pieces within positive-mass
+bodies, and brake-held bootstrap behavior. All 68 feature commits rebased
+without conflicts; range-diff reports identical patches. The combined head
+is `1ff09a208`, preserved alongside the pre-rebase safety branch.
+All five focused RobotKit/session/MuJoCo native executables pass, including
+the new forced-instability regression. The rebased exporter generated the
+brake-held and slow-move reference scenes from a source-verified geometry
+fixture. Application reference checks and a fresh complete frozen gate on
+the combined code remain pending. SD15a final acceptance and local-main
+integration remain open.
