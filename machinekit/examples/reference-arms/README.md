@@ -66,9 +66,10 @@ and four source colors (including blue and black). FR5's raw URDF declares pale 
 `fairino5-appearance.json` overrides it with white housings, coral-red annular
 cover trim and a metallic flange, approximating the supplied product photo.
 The profile clips paint boundaries across the existing triangle surfaces in
-link-local coordinates, using 128-sided circular clipping boundaries (less than
-18 µm radial error at these cover radii). New vertices stay within the original
-triangles; surface area, volume and bounds are preserved. It produces 13 visual pieces while preserving all seven physical
+link-local coordinates, following the existing polygonal cover rim for the inner paint edge and using
+128-sided clipping for the outer radius. Aluminium covers the entire terminal
+head link up to its existing part seam. New vertices stay within the original
+triangles; surface area, volume and bounds are preserved. It produces 12 visual pieces while preserving all seven physical
 links, six joints, source mass/inertia and collision shapes. Its basis and hash
 are recorded in the manifest diagnostics; it is not claimed as vendor material
 data. Neither model's current assets contain image textures.

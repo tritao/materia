@@ -49,6 +49,28 @@ def clip_polygon(polygon, normal, offset):
             np.array(outside) if len(outside) >= 3 else None)
 
 
+def mesh_ring_planes(mesh, ring):
+    """Use the existing polygonal cover rim, including its source tessellation."""
+    axis = ring['axis']
+    radial_axes = [i for i in range(3) if i != axis]
+    vertices = mesh.vertices
+    radial = vertices[:, radial_axes] - np.array(ring['center'])[radial_axes]
+    match = ((np.abs(np.linalg.norm(radial, axis=1)-ring['radius'][0]) < 1e-7) &
+             (vertices[:, axis] >= ring['axial'][0]) & (vertices[:, axis] <= ring['axial'][1]))
+    points = np.unique(np.round(radial[match], 8), axis=0)
+    if len(points) < 8:
+        raise ValueError('Appearance cover rim does not match the pinned source mesh')
+    points = points[np.argsort(np.arctan2(points[:, 1], points[:, 0]))]
+    planes = []
+    for a, b in zip(points, np.roll(points, -1, axis=0)):
+        edge = b-a
+        normal = np.zeros(3); normal[radial_axes] = [edge[1], -edge[0]]
+        normal /= np.linalg.norm(normal)
+        offset = normal[radial_axes] @ a + normal @ ring['center']
+        planes.append((normal, offset))
+    return planes
+
+
 def ring_parts(polygon, ring):
     """Partition a triangle by an annular slab with 128-plane circular boundaries."""
     axis = ring['axis']
@@ -59,8 +81,10 @@ def ring_parts(polygon, ring):
     minimum = np.linalg.norm(nearest)
     maximum = np.linalg.norm(radial, axis=1).max()
     inner, outer = ring['radius']
+    inner_planes = ring.get("_innerPlanes")
+    inner_minimum = inner if inner_planes is None else min(offset-normal @ ring["center"] for normal, offset in inner_planes)
     axial = polygon[:, axis]
-    if axial.max() < ring['axial'][0] or axial.min() > ring['axial'][1] or minimum > outer or maximum < inner:
+    if axial.max() < ring['axial'][0] or axial.min() > ring['axial'][1] or minimum > outer or maximum < inner_minimum:
         return [polygon], []
     if axial.min() >= ring['axial'][0] and axial.max() <= ring['axial'][1] and minimum >= inner and maximum <= outer:
         return [], [polygon]
@@ -80,9 +104,13 @@ def ring_parts(polygon, ring):
         if outside is not None: white.append(outside)
         if remaining is None: return white, red
     # The complement of the inner disk forms the red annulus.
-    for direction in directions:
-        normal = np.zeros(3); normal[radial_axes] = direction
-        remaining, outside = clip_polygon(remaining, normal, inner + normal @ ring['center'])
+    if inner_planes is None:
+        inner_planes = []
+        for direction in directions:
+            normal = np.zeros(3); normal[radial_axes] = direction
+            inner_planes.append((normal, inner + normal @ ring['center']))
+    for normal, offset in inner_planes:
+        remaining, outside = clip_polygon(remaining, normal, offset)
         if outside is not None: red.append(outside)
         if remaining is None: return white, red
     white.append(remaining)
@@ -94,9 +122,13 @@ def paint_regions(link, regions, profile):
     for mesh, _, _, _ in regions:
         triangles = np.concatenate((mesh.triangles, mesh.vertex_normals[mesh.faces]), axis=2)
         buckets = [[], [], []]
+        rings = [dict(ring) for ring in profile['rings'].get(link, [])]
+        for ring in rings:
+            if ring.get('innerAtMeshEdge'):
+                ring['_innerPlanes'] = mesh_ring_planes(mesh, ring)
         for triangle in triangles:
             white = [triangle]
-            for ring in profile['rings'].get(link, []):
+            for ring in rings:
                 pending = []
                 for polygon in white:
                     rest, red = ring_parts(polygon, ring)
@@ -104,7 +136,9 @@ def paint_regions(link, regions, profile):
                 white = pending
             flange = profile['flange']
             for polygon in white:
-                if link == flange['link']:
+                if link == flange['link'] and flange.get('wholeLink'):
+                    buckets[2].append(polygon)
+                elif link == flange['link']:
                     normal = np.eye(3)[flange['axis']]
                     body, metal = clip_polygon(polygon, normal, flange['minimum'])
                     if body is not None: buckets[0].append(body)

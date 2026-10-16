@@ -108,6 +108,30 @@ class ImportChecks(unittest.TestCase):
         self.assertGreater(np.count_nonzero(np.abs(radius-0.05)<2e-5), 100)
         np.testing.assert_allclose(joined.vertex_normals, np.tile([0, 0, 1], (len(joined.vertices), 1)), atol=1e-12)
 
+    def test_paint_boundary_uses_the_actual_mesh_rim_polygon(self):
+        from visual_finishes import mesh_ring_planes
+        mesh = prepare.trimesh.creation.annulus(r_min=0.03, r_max=0.05, height=0.002, sections=12)
+        ring = {"axis": 2, "center": [0, 0, 0], "axial": [-0.002, 0.002], "radius": [0.03, 0.05]}
+        planes = mesh_ring_planes(mesh, ring)
+        self.assertEqual(len(planes), 12)
+        # A coarse source rim is a polygon, whose edges lie inside the ideal circle.
+        np.testing.assert_allclose([offset for _, offset in planes], 0.03*np.cos(np.pi/12), atol=1e-8)
+        points = mesh.vertices[np.abs(np.linalg.norm(mesh.vertices[:, :2], axis=1)-0.03)<1e-7]
+        for normal, offset in planes:
+            self.assertLessEqual(np.max(points @ normal-offset), 1e-8)
+            self.assertGreaterEqual(np.count_nonzero(np.abs(points @ normal-offset)<1e-8), 4)
+
+    def test_whole_head_finish_reaches_the_existing_part_boundary(self):
+        mesh = prepare.smooth_stl(prepare.trimesh.creation.box())
+        white = {"color": [1, 1, 1, 1], "metallic": 0, "roughness": 0.4}
+        silver = {"color": [0.7, 0.7, 0.7, 1], "metallic": 0.85, "roughness": 0.28}
+        profile = {"rings": {}, "flange": {"link": "head", "wholeLink": True},
+                   "white": white, "red": white, "silver": silver}
+        regions = prepare.paint_reference_regions("head", [(mesh, None, 0, 0)], profile)
+        self.assertEqual(len(regions), 1)
+        self.assertEqual(regions[0][1], silver['color'])
+        np.testing.assert_array_equal(regions[0][0].triangles, mesh.triangles)
+
     def test_wire_fields_come_from_consumer_schema(self):
         value = {"schema": 1, "id": "test", "family": "ur", "root": "base", "tip": "tip",
                  "tipStatus": "test", "metresPerUnit": 1, "urdfSha256": "hash",
