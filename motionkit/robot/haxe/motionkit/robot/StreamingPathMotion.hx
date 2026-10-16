@@ -118,6 +118,15 @@ class StreamingPathMotion {
     var clocks = [for (i in 0...steps+1) Math.min(Int64.toFloat(end)*1e-9,Math.max(0.0,begin+duration*i/steps-lag))];
     var sampled = [for (distance in laws.timesToDistances(clocks)) Math.max(0.0,Math.min(path.length(),distance))];
     if (candidate.finalChunk) sampled[sampled.length-1] = path.length();
+    // A chunk may lie wholly between authored samples. Its progress map still
+    // needs both clock boundaries: an empty map reports path distance zero and
+    // can label an executing cutting move as the operation's initial rapid.
+    if (times.length==0 || times[0]>0.0) {
+      distances.unshift(sampled[0]);times.unshift(0.0);
+    }
+    if (times[times.length-1]<duration) {
+      distances.push(sampled[sampled.length-1]);times.push(duration);
+    }
     var selected:Array<TimedEvent> = [];
     for (event in events) if (Int64.compare(event.timeNs,candidate.startNs) >= 0 &&
         (Int64.compare(event.timeNs,candidate.endNs) < 0 || candidate.finalChunk && Int64.compare(event.timeNs,candidate.endNs) == 0))

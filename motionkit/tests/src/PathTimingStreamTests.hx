@@ -258,6 +258,12 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     }
     check(firstReady >= 0 && firstReady < steps-1,"compiler publishes before the full path finishes");
     var plans = blocks.blocks[0].plans;
+    for (i in 0...plans.length) {
+      var times=blocks.blocks[0].pathTimes[i],distances=blocks.blocks[0].pathDistances[i];
+      check(times.length>=2 && times.length==distances.length,"every streaming chunk locates progress between source samples");
+      near(times[0],0.0,"streamed progress starts at the chunk clock boundary",1e-12);
+      near(times[times.length-1],plans[i].durationSeconds,"streamed progress ends at the chunk clock boundary",1e-12);
+    }
     check(plans.length > 1,"compiler emits bounded continuous windows");
     var elapsed=0.0, events=0;
     var previous:motionkit.trajectory.TrajectoryState = null;
