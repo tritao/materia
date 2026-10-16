@@ -22,6 +22,7 @@ class MissionStepPresentation {
       case "stow": "Return arm";
       case "screw": step.screw == null ? "Drive screw" : switch step.screw {
         case Single(_): "Drive screw";
+		case Required(_): "Drive screw";
         case Snug(_,_): "Snug screw";
         case Final(_): "Final tightening";
       };

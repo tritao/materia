@@ -12,4 +12,5 @@ enum abstract MissionAlarmCode(Int) from Int to Int {
   var RecoveryTimeout = 2008;
   var MotionFailure = 2009;
   var ViseFailure = 2010;
+  var FasteningFailure = 2011;
 }

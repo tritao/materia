@@ -8,6 +8,8 @@ import materia.project.SceneArtifact.SceneArtifactMissionStep;
 	@:id(1) Single(job:SceneScrew);
 	@:id(2) Snug(job:SceneScrew, slot:Int);
 	@:id(3) Final(fastening:String);
+	/** Single pass whose exhausted NOK stops the controller program before downstream handling. */
+	@:id(4) Required(job:SceneScrew);
 }
 
 /** Resolve stage identity without duplicating geometry, qualification or replacement supply. */
@@ -15,7 +17,7 @@ class SceneScrewInvocation {
 	public static function job(value:Null<ScrewInvocation>, steps:Array<SceneArtifactMissionStep>):Null<SceneScrew> {
 		if (value == null) return null;
 		return switch value {
-			case Single(job), Snug(job,_): job;
+			case Single(job), Required(job), Snug(job,_): job;
 			case Final(name):
 				var found:Null<SceneScrew> = null;
 				for (step in steps) if (step.screw != null) switch step.screw {
@@ -35,7 +37,7 @@ class SceneScrewInvocation {
 		var canonical:Dynamic = Reflect.field(haxe.Json.parse(haxeon.wire.JsonWire.encode(value)),"value");
 		var arguments = SceneWireJson.enumArguments(raw,canonical);
 		switch value {
-			case Single(job), Snug(job,_): SceneScrewDefinition.validateWireIntegers(arguments[0],job);
+			case Single(job), Required(job), Snug(job,_): SceneScrewDefinition.validateWireIntegers(arguments[0],job);
 			case _: {}
 		}
 		return value;
@@ -55,7 +57,7 @@ class SceneScrewInvocation {
 				case Final(name):
 					if (!snug.exists(name) || finalPass.exists(name)) throw 'Final fastening "$name" needs one preceding unmatched snug pass';
 					finalPass.set(name,true); finalStarted = true;
-				case Single(job), Snug(job,_):
+				case Single(job), Required(job), Snug(job,_):
 					if (job == null) throw "Screw invocation has no qualified CAD job";
 					if (job.fastening == null || job.fastening.length == 0) throw "Screw invocation has no fastening identity";
 					if (names.exists(job.fastening)) throw 'Fastening "${job.fastening}" has more than one qualified job';

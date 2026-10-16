@@ -156,11 +156,20 @@ class SceneScrewTests {
       "Wire IDs retain distinct snug/final slots and one replacement definition");
     check(SceneScrewInvocation.job(staged[1].screw,staged) == qualified,
       "Final resolves the exact canonical snug job without another geometry or supply copy");
+    var required:ScrewInvocation = Required(qualified);
+    restored = SceneScrewInvocation.decode(haxeon.wire.JsonWire.encode(required));
+    check(switch restored {case Required(job):job.fastening == qualified.fastening && job.recovery != null; case _:false;},
+      "Required fastening success has its own wire constructor and retains the exact recovery supply");
+    var requiredSteps:Array<SceneArtifactMissionStep> = [{kind:"screw",screw:required}];
+    SceneScrewInvocation.validate(requiredSteps);
+    check(SceneScrewInvocation.job(required,requiredSteps) == qualified,
+      "A required single pass resolves its original CAD job");
     function refused(steps:Array<SceneArtifactMissionStep>):Void {
       var failed = false; try SceneScrewInvocation.validate(steps) catch (_:Dynamic) failed = true;
       check(failed,"Invalid stage or supply ownership must be rejected");
     }
     refused([staged[1]]);
+    refused([requiredSteps[0],{kind:"screw",screw:Single(qualified)}]);
     refused([staged[0]]);
     refused([staged[0],staged[1],staged[1]]);
     refused([staged[1],staged[0]]);

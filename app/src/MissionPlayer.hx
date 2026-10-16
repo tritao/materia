@@ -1696,6 +1696,18 @@ class MissionPlayer implements SessionMember {
     case Succeeded:
       recordScrewResult();
       var completedStep = mission.steps[stepIndex];
+      if (completedStep.kind == "screw" && completedStep.screw != null) switch completedStep.screw {
+        case Required(job):
+          var report = screwRun == null ? null : screwRun.runReport();
+          var result = screwing == null ? null : screwing.tighteningResult;
+          var accepted = report != null ? report.finished && !report.failed && report.installed() != null
+            : result != null && result.outcome == robotkit.tool.ScrewdriverContract.OK;
+          if (!accepted) {
+            failMission('Required fastening "${job.fastening}" failed after its qualified recovery attempts', MissionAlarmCode.FasteningFailure);
+            return;
+          }
+        case _: {}
+      }
       if (completedStep.kind == "pick" || completedStep.kind == "place") {
         var channel = handlingToolChannel(completedStep);
         if (completedStep.kind == "pick") {
@@ -1860,7 +1872,7 @@ class MissionPlayer implements SessionMember {
     screwRun = null;
     var job = materia.project.SceneScrewInvocation.job(invocation,mission.steps);
     if (job == null) throw "Screw invocation lost its qualified CAD job";
-    var pass:FasteningPass = switch invocation {case Single(_):SinglePass; case Snug(_,_):SnugPass; case Final(_):FinalPass;};
+    var pass:FasteningPass = switch invocation {case Single(_),Required(_):SinglePass; case Snug(_,_):SnugPass; case Final(_):FinalPass;};
     var stopAtSeat = pass == SnugPass;
     var slot = switch invocation {case Snug(_,slot):slot; case _:job.slot;};
     var prior:Null<FasteningRunReport> = null;
