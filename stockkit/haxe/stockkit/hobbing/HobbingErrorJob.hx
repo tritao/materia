@@ -19,6 +19,15 @@ class HobbingErrorJob {
     this.threads=threads;
     this.spec=spec;this.hob=hob;this.at=at;this.passes=passes.copy();this.sources=sources.copy();
     this.motionKnots=motionKnots==null?null:motionKnots.copy();
+    if(this.motionKnots!=null){for(t in this.motionKnots)if(!Math.isFinite(t))throw "motion knots must be finite";
+      // Large measured traces must not use the SDK's insertion-sort lowering.
+      var a=this.motionKnots,b=a.copy(),width=1,n=a.length;
+      while(width<n){var start=0;
+        while(start<n){var middle=Std.int(Math.min(start+width,n)),end=Std.int(Math.min(start+2*width,n)),i=start,j=middle,k=start;
+          while(k<end){if(i<middle&&(j>=end||a[i]<=a[j]))b[k++]=a[i++];else b[k++]=a[j++];}start=end;}
+        var swap=a;a=b;b=swap;width*=2;
+      }
+      for(i in 0...n)this.motionKnots[i]=a[i];}
     this.wall=wall;this.radialStep=radialStep;this.axialStep=axialStep;
     this.firstTooth=firstTooth;this.lastTooth=lastTooth;this.tolerance=tolerance;this.inspection=inspection;
     var ids:Array<String> = [];for(source in sources){if(ids.indexOf(source.id)>=0)throw "duplicate hobbing error source";ids.push(source.id);}
@@ -35,7 +44,15 @@ class HobbingErrorJob {
     var started=Sys.time();
     try {
       sweep=new HobbingSweep(hob,firstTooth,lastTooth,tolerance,warp);
-      for(pass in passes)sweep.cutPass(stock,motion,pass,tolerance/16,0.001,motionKnots);
+      var done=0;
+      for(pass in passes){
+        var local:Null<Array<Float>> = null;
+        if(motionKnots!=null){var lo=0,hi=motionKnots.length;
+          while(lo<hi){var mid=(lo+hi)>>1;if(motionKnots[mid]<=pass.start)lo=mid+1;else hi=mid;}
+          local=[];while(lo<motionKnots.length&&motionKnots[lo]<pass.end){local.push(motionKnots[lo]);lo++;}}
+        sweep.cutPass(stock,motion,pass,tolerance/16,0.001,local);done++;
+        if(done%100==0){Sys.println("HOBBING_ERROR_PROGRESS "+haxe.Json.stringify({sources:enabled,windows:done,total:passes.length,wallSeconds:Sys.time()-started}));Sys.stdout().flush();}}
+
       var measured=GearMeasurement.fromRings(stock,spec,inspection);
       Sys.println("HOBBING_ERROR_RESULT "+haxe.Json.stringify({sources:enabled,threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,windows:passes.length,wallSeconds:Sys.time()-started,isoClass:measured.isoClass,scope:"physical source cut; grading tolerance unchanged"}));
       sweep.dispose();stock.dispose();return measured;

@@ -25,7 +25,28 @@ class HobbingErrorTests {
       profileFormUm:budget.combined.value("ffalpha"),additive:budget.additive,scope:"m1 z20 face2 coarse physical source budget; no ISO qualification"}));
     Sys.println('Physical hobbing errors: $checks assertions passed');
   }
+  static function knotParity():Void {
+    var spec=new GearSpec(1,20,2,20*Math.PI/180),hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),1,32,4);
+    var ideal=new IdealHobbingJob(spec,hob,3000,1.1,0,1),inspection=new GearInspection(spec,spec.pitchRadius());
+    var knots=[1.0,0.23,-1,0.17,0.23,0.0,ideal.duration];
+    var source=HobbingErrorSource.measuredSync("test runtime",t->t<0.17?t*0.0001:t<0.23?0.000017-(t-0.17)*0.0002:0.000005,"piecewise linear measured residual with exact knots");
+    var stock=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2);stock.setThreads(4);
+    var passes=ideal.schedule(stock.grid),sweep=new HobbingSweep(hob,-6,6,0.0001);
+    var direct:GearMeasurement;
+    try{for(pass in passes)sweep.cutPass(stock,t->source.apply(t,ideal.axesAt(t)),pass,0.0001/16,0.001,knots);
+      direct=GearMeasurement.fromRings(stock,spec,inspection);
+    }catch(e:Dynamic){sweep.dispose();stock.dispose();throw e;}sweep.dispose();stock.dispose();
+    var job=new HobbingErrorJob(spec,hob,ideal.axesAt,passes,[source],0.6,0.1,0.2,-6,6,0.0001,inspection,knots,4);
+    var localized=job.run([source.id]);
+    for(k in direct.values.keys())check(direct.value(k)==localized.value(k),'localized motion knots preserve $k exactly');
+    for(pair in [{a:direct.profiles,b:localized.profiles},{a:direct.helices,b:localized.helices}])
+      for(i in 0...pair.a.length)for(j in 0...pair.a[i].filtered.length)
+        if(pair.a[i].filtered[j]!=pair.b[i].filtered[j])throw "localized knots change a measured trace";
+    check(true,"localized unsorted/duplicate/outside knots preserve every profile and lead trace");
+    Sys.println('Motion knot parity: $checks assertions passed');
+  }
   public static function main():Void {
+    if(Sys.args().indexOf("knot-parity")>=0){knotParity();return;}
     if(Sys.args().indexOf("physical-fine")>=0){physical(0.000025,8);return;}
     if(Sys.args().indexOf("physical")>=0){physical();return;}
     var axis=new HobbingAxes(46,0,4,0,0,0),e=0.004;

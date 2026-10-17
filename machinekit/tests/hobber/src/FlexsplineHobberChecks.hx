@@ -138,7 +138,7 @@ class FlexsplineHobberChecks {
     Sys.println("WALL_CUT_SENSITIVITY "+haxe.Json.stringify({rows:rows,forceN:force,
       scope:"m1 z20 face2 coarse integration fixture using reference support estimates; constant conservative force; not reference inspection or complete budget"}));
   }
-  static function installedSupport(machine:FlexsplineHobber):MandrelRadialSupport {
+  public static function installedSupport(machine:FlexsplineHobber):MandrelRadialSupport {
     var model=new AssemblyModel("mm");machine.addTo(model,"");var state=model.initialState();state.forwardKinematics();
     var pose=F.compose(F.inverse(state.worldPose("mandrel")),state.worldPose("blank"));
     var blank:TablePlaten=cast machine.components().filter(m->m.id=="blank")[0].component;
@@ -244,6 +244,7 @@ class FlexsplineHobberChecks {
     Sys.println('Reference load ratings: $assertions checks passed');
   }
   public static function main():Void {
+    if(Sys.args().length>0&&Sys.args()[0]=="reference-budget"){FlexsplineHobberBudget.run(Sys.args().slice(1));return;}
     if(Sys.args().length==1&&Sys.args()[0]=="wall-cuts"){wallCuts();return;}
     if(Sys.args().length==1&&Sys.args()[0]=="support-sensitivity"){supportSensitivity(100*Math.tan(20*Math.PI/180),100*Math.tan(20*Math.PI/180),100*Math.tan(20*Math.PI/180),"provisional assumed Fc=100 N design load; not a safe bound on the running cut; radial components conditional on this assumption",false,null,false);return;}
     if(Sys.args().length==2&&Sys.args()[0]=="reference-loads"){referenceLoads(Sys.args()[1]);return;}

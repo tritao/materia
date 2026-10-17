@@ -1442,3 +1442,44 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   HB4 continues unmodified. The completion helper gates the optimized full result
   on short-cut convergence, regenerates rating/wall reports and writes result.json.
   Fine full-stroke comparison is explicitly recorded as not performed.
+
+### HB11 reference-source study runner
+
+- `check-reference-budget.sh all` runs the complete HB8 reference feed stroke
+  for the baseline, each of the **13 installed-part sources**, and all combined.
+  It uses **8 threads, 0.000025 mm sweep tolerance, 0.0000015625 mm path tolerance,
+  0.0015 mm radial / 0.04 mm axial spacing**. The force-only coarse tolerance is
+  never used for these inspections. Every case starts from a fresh annular blank.
+- Evidence is in `build/flexspline-reference-budget/`: frozen binaries and input
+  hashes, settings, progress every 100 windows, per-source inspection JSON, final
+  `budget.txt` and `result.json`, exit status and resource timings. Select `pilot`,
+  `baseline`, an individual source id, or `combined` for a separate study. `all`
+  retains each completed inspection before advancing; it does not silently reuse
+  old source results. The entry pilot is a timing check, not tooth acceptance or
+  a full-run timing prediction. **Full reference-source results remain pending.**
+- The source replay uses the completed, accepted HB10 baseline radial history.
+  Since its window means have discontinuous jumps, an explicitly assumed centred
+  linear ramp regularizes each jump over at most 10% of either neighbouring
+  interval. The reconstructed time mean and peak must agree within **0.1%**;
+  currently both agree to numerical roundoff. Loads are frozen baseline values:
+  changed stock, force/compliance feedback, contact dynamics and modal response
+  are not solved. The previously reported stiffness x0.3/x1/x3 wall-allocation
+  screen remains separate from the nominal-stiffness combined physical cut.
+- HB7 sync observations are regenerated using the native `ElectronicGear` code,
+  the installed 20-bit B encoder, 4 kHz sampling, assumed 1 ms transport delay and
+  assumed 200 Hz critically damped unloaded servo, warmed for one second. The
+  exporter independently runs prediction enabled/disabled: peak residuals are
+  **0.00220 / 322.290 arcsec** at the reference speed. These are simulated plant
+  observations, not loaded full-machine or hardware measurements. Constant-speed
+  disabled prediction gives a phase lag; it does not establish varying pitch error.
+- The SDK lowers `Array.sort` to insertion sort. The roughly one million merged
+  motion knots therefore use merge sort once, then binary-search the local knots
+  for each gash. This preserves exact sampling while avoiding quadratic setup and
+  repeated full-trace scans. Regression against unsorted/duplicate/outside knots
+  preserves every measured profile/lead trace and parameter exactly: **10 parity,
+  24 error-model and 264 machine assertions pass**.
+- The first batch attempt was stopped during timestamp sorting, before cutting;
+  the corrected batch is running. HB4 remains untouched. Its metrology result,
+  completed source signatures/superposition, coverage warnings, and the assumed
+  servo/load/contact qualifications must be reviewed before HB11/HB12 acceptance.
+  At module 0.3 the numerical grades remain extrapolated, never ISO certification.

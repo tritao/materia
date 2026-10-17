@@ -218,3 +218,26 @@ combined-source budget is not established by this wall-only screen.
 The `physical-fine` integration fixture runs the baseline, three sources and
 combined cut at the reference **0.000025 mm sweep tolerance / 8 threads**, in
 **51.92 s** total. Its stock sampling remains diagnostic, not ISO-qualified.
+
+### Complete hobber reference study
+
+`machinekit/examples/flexspline-hobber/check-reference-budget.sh all` runs baseline,
+13 installed sources and combined cuts on the HB8 feed trajectory, at 8 threads,
+0.000025 mm sweep / 0.0000015625 mm path tolerances, 0.0015 mm radial / 0.04 mm
+axial sampling. Each completed inspection is saved before the next case. Progress,
+settings and binary/input hashes are retained under `build/flexspline-reference-budget`.
+The study is running; no completed reference budget is claimed yet.
+
+The native HB7 gearbox exports independently regenerated prediction enabled and
+disabled observations through its assumed 200 Hz unloaded servo plant. Installed
+B encoder resolution is checked by the assembly consumer. This does not replace
+loaded full-machine observations. The frozen HB10 radial window history uses
+centred continuous ramps at jumps; integral and peak must stay within 0.1% of the
+original statistics. This regularization is explicitly assumed, with no modal or
+force/compliance feedback claim. Nominal support uses the assembled rim coverage
+check and the existing assumed sleeve/contact design estimate.
+
+`HobbingErrorJob` sorts input motion knots in O(n log n), then binary-searches each
+pass's local knots. The SDK's insertion-sort lowering must not process a large
+concatenated trace. A physical regression checks exact parameter/profile/lead
+agreement against direct sweeps with unsorted, duplicate and outside-run knots.
