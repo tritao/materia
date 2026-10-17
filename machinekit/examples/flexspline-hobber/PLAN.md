@@ -566,8 +566,8 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 
 | Step | State | Commits |
 |---|---|---|
-| HB0 | blocked: baseline waiting for heavy-run slot; scaffold tested | this commit |
-| HB1 | planned | |
+| HB0 | blocked: baseline waiting for heavy-run slot; scaffold tested | d403e0295 |
+| HB1 | done: non-undercut geometry; internal rack-limit restrictions below | this commit |
 | HB2 | planned | |
 | HB3 | planned | |
 | HB4 | planned | |
@@ -598,3 +598,71 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
   --workspace build/flexspline-hb0/baseline.workspace.json --jobs 2 --compilers 1`.
 - Existing vendor symlinks and dirty `haxeon` submodule were present before work began and
   remain untouched; the gate therefore measures this local environment, not a pristine clone.
+
+### HB1 geometry (2026-10-17)
+
+Implemented in dependency-free `gearkit/haxe/gearkit/`:
+
+- `GearSpec`: external/internal normal-system spur gears, profile shift, explicit cutter-tip
+  and tooth-tip radii, and geometric evaluation windows. Defaults are a 0.38-module cutter
+  radius and a 0.05-module tip radius, both **assumed design choices**. The default evaluation
+  range covers the unrounded flank and full face; it makes no ISO compliance claim (HB4).
+- `ToothProfile`: analytic involutes, a rounded-rack rolling root envelope, tangent circular
+  tip rounding, derivatives and a sampled closed one-pitch tooth patch. Low tooth counts,
+  excessive shift, pointed teeth, overlapping fillets and undercut roots are rejected.
+- `ConjugateRack.of`: solves normal contact by 64-step bisection at each sampled point.
+  It recovers the straight flank and rounded cutter tip from tooth coordinates and derivatives,
+  removes the profile shift, and retains the cutter-root blend conjugate to the tooth-tip
+  rounding. A sharp tooth tip is handled through its normal cone. Sample count is configurable;
+  the sampled curved edges are not an exact B-rep or an HB3 sweep-tolerance guarantee.
+- `ConjugateRack.envelopeAt`: generates a gear from the recovered rack's sampled slope, without
+  using the target involute formula. It can generate a different tooth count and shift.
+- `HobDesign`: right-hand, normal-module hob; starts, OD, gashes, rake; pitch diameter,
+  lead angle, axial pitch and lead; closed rake-plane regions per gash/thread/axial turn.
+  Gash regions include helical phasing and the rounded tip and root. The spindle axis is +Z.
+  Axial length clipping, relief and sharpening allowances are not modelled in HB1.
+
+Conventions and derivation for review:
+
+- In a rack frame with tangent coordinate `u`, outward coordinate `v` and signed pitch radius
+  `q` (negative for internal gears), rolling maps a point through
+  `P = sign(q) R(phi) (u + q phi, q + v)`. For a smooth rack `u(v)`, normal contact gives
+  `u + q phi = -v / (du/dv)`. The rounded cutter tip is enveloped through the same transform;
+  no circular blend is substituted at the gear root.
+- Internal teeth use the signed rack-limit construction. A physical pinion-shaped cutter's
+  internal root depends on that cutter's tooth count and is **not** modelled here. The formal
+  internal rack root also has an undercut limit; for example the unshifted 202-tooth reference
+  circle is supported, while a 40-tooth internal gear with the default corner is rejected.
+  Some internal tip roundings give a folded conjugate cutter root: flank conjugacy is available,
+  but `HobDesign` rejects the folded cutter region. This does not assert internal hobbing feasibility.
+- Normal module and the recovered cutter-tip height determine the hob pitch diameter:
+  `d_p = OD - 2 h_tip`, `sin(gamma) = starts*m/d_p`,
+  `p_axial = pi*m/cos(gamma)`, `lead = starts*p_axial`.
+- Geometry references: Douglas Wright, [UWA machine-element notes, Appendix B](https://danotes.mech.uwa.edu.au/DANotes.pdf),
+  and [Fetvaci and Senturk, rack-cutter/trochoid generation study (2024)](https://www.jstage.jst.go.jp/article/jamdsm/18/8/18_2024jamdsm0098/_article/-char/en).
+  The implementation uses the coordinate conventions above and independently derived equations.
+
+Validation:
+
+- Haxeon host: **532,368 geometry assertions + 18 baseline dimension/validation assertions**.
+- Pinned reference Haxe interpreter: same assertions and results.
+- Maximum measured straight-rack error: **1.33e-14 mm** (required <= 1e-9 mm).
+- Maximum measured involute re-envelope error: **2.51e-14 mm** (required <= 1e-6 mm).
+- Checked root/flank/root-circle and tip/flank/tip-circle tangency, independent finite-difference
+  root derivatives, external/internal and shifted gears, cross-gear rack generation, sharp tips,
+  explicit evaluation windows, positive/negative rake, multi-start phase and rake-plane membership.
+- `haxeon package check --project=gearkit/tests/haxeon.json`: dependency graph valid, no native deps.
+- Local formatter diagnosis: directory inputs crash its HashLink file reader; with explicit
+  files it splits scientific literals (`1e-12` into `1 e - 12`) and the shift operator (`>>`).
+  Those rewrites were repaired and both compiler runs above were repeated successfully. No
+  formatter/runtime changes were made in the existing dirty `haxeon` submodule.
+- HB0's full workspace baseline remains queued through heavy-run, with no test counts available.
+  No workspace pass is claimed. Existing vendor/submodule changes remain untouched.
+
+Reproduce the focused checks:
+
+```sh
+./haxeon/scripts/haxeon run --project=gearkit/tests/haxeon.json
+./haxeon/.tools/haxe/haxe -cp gearkit/haxe -cp gearkit/tests/src --run GearKitTests
+./haxeon/scripts/haxeon package check --project=gearkit/tests/haxeon.json
+```
