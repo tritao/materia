@@ -1526,3 +1526,24 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   Profiling/benchmark evidence: `build/flexspline-reference-budget/engaged-profile.txt`
   and `build/flexspline-clipping-speed/{old,new,cross}/engaged.json`, plus
   `validation.json`. HB4 remains on its frozen original binary/library.
+
+### HB11 saved-result review
+
+- `review-reference-budget.py build/flexspline-reference-budget-fast --watch`
+  updates `review.json` and `review.md` as completed inspections appear, and exits
+  when the batch exit status appears. It starts no cuts and changes no running
+  inputs or libraries. Without `--watch`, it produces a single current review.
+- The numerical summary requires all 15 inspections, the final budget, successful
+  process exit, class-6 parameter limits and trace superposition. Partial writes,
+  missing cases, failed processes and nonlinear interactions cannot earn a pass.
+  Source rankings are provisional until all cases finish; the completed report
+  uses ErrorBudget's authoritative dominant-source ids.
+- Reports retain coverage warnings, sampling counts, source values/grades and
+  mean thickness changes relative to baseline. Assumed support/contact and servo
+  inputs qualify the result; they do not automatically fail the supported-wall
+  acceptance already granted on an assumed-stiffness basis. Module 0.3 remains
+  an engineering extrapolation. HB12 comparisons/cycle reporting remain separate.
+- Review gates were checked with incomplete and partially written artifacts,
+  successful/failed process exits, class-limit failure, superposition failure and
+  qualified numerical success. The watcher is active; no completed reference
+  inspection was available when it was installed, so actual acceptance is pending.
