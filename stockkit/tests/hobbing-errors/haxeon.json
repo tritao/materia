@@ -1,0 +1,1 @@
+{"version":1,"package":{"name":"hobbing-error-tests"},"entry":"HobbingErrorTests","sourceRoots":["src","../../../gearkit/tests/src"],"dependencies":{"stockkit":{"path":"../.."}},"target":"host","outputDir":"build"}

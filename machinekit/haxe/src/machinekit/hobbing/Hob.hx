@@ -15,14 +15,14 @@ class Hob extends PrecisionPart {
     P.count("teeth",200),P.length("faceWidth",8),P.scalar("pressureAngle",20*Math.PI/180,0.000001),
     P.scalar("profileShift",0),P.length("cutterTipRadius",0.114),P.length("tipFilletRadius",0.015),
     P.count("starts",1),P.count("gashes",12),P.scalar("rake",0),P.scalar("rootHeight",0.3),
-    P.length("radialRunout",0.002),P.length("axialRunout",0.002)]);
+    P.length("radialRunout",0.002),P.length("axialRunout",0.002),P.length("profileError",0.001)]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
     if(recipe==null)recipe=new ComponentType("machinekit.hobbing.hob",parameters(),v -> new Hob(v));return recipe;
   }
   public function new(?overrides:ComponentValues) {
     var v=PrecisionPart.resolve(parameters(),overrides);
-    super("HOB-32-12-1","Conjugate rack hob blank envelope","carbide",v,true,[{name:"radialRunout",unit:"mm"},{name:"axialRunout",unit:"mm"}]);
+    super("HOB-32-12-1","Conjugate rack hob blank envelope","carbide",v,true,[{name:"radialRunout",unit:"mm"},{name:"axialRunout",unit:"mm"},{name:"profileError",unit:"mm"}]);
     target=new GearSpec(n("module"),count("teeth"),n("faceWidth"),n("pressureAngle"),false,n("profileShift"),n("cutterTipRadius"),n("tipFilletRadius"));
     design=new HobDesign(ConjugateRack.of(new ToothProfile(target)),count("starts"),n("outside"),count("gashes"),n("rake"),n("rootHeight"));
     if(n("bore")>=design.pitchDiameter-2*design.rootHeight)throw "hob bore breaks into cutter roots";

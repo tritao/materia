@@ -13,6 +13,13 @@ class FlexsplineHobberChecks {
     var machine=new FlexsplineHobber();machine.validate();
     var cam=FlexsplineHobberCam.job(machine);
     check(cam.passes.length==1&&cam.tableRpm>0,"HB8 CAM fits installed travel and drive limits");
+    var ring=new stockkit.hobbing.RingCompliance(machine.spec.rootRadius()-0.3,0.6,machine.spec.faceWidth,210000,1000,"explicit test fixture stiffness");
+    var sync=new stockkit.hobbing.HobbingErrorSource("sync","runtime observations","test zero measured following error",(t,a)->a);
+    var errors=FlexsplineHobberErrors.sources(machine,t->20,ring,sync);
+    check(errors.length==13,"HB11 installed parts expose independently selectable error sources");
+    var mandrelError=errors.filter(e->e.id=="mandrel")[0];
+    near(mandrelError.apply(0,new HobbingAxes(46,0,4,0,0,0)).pose().get_translation(0),46-machine.mandrel.eccentricity,1e-12,"part eccentricity controls physical work offset");
+    check(errors.filter(e->e.id=="wall")[0].basis.indexOf("explicit test fixture stiffness")>=0,"wall support assumption stays in budget provenance");
     var forceStock=stockkit.RingStock.annulus(new stockkit.RingGrid(29,30,0,1,1,1));
     var forces=new stockkit.hobbing.HobbingForces(forceStock,30,20*Math.PI/180,1);
     try {

@@ -18,8 +18,15 @@ class HobbingMotion {
     while(j-i>1){var middle=(i+j)>>1;if(frames[middle].time<=time)i=middle;else j=middle;}
     var a=frames[i],b=frames[j],t=(time-a.time)/(b.time-a.time);
     function mix(x:Float,y:Float):Float return x+(y-x)*t;
+    var offset:Null<HobbingPoseOffset> = null;
+    if(a.axes.offset!=null||b.axes.offset!=null){
+      var oa=a.axes.offset==null?new HobbingPoseOffset():a.axes.offset;
+      var ob=b.axes.offset==null?new HobbingPoseOffset():b.axes.offset;
+      offset=new HobbingPoseOffset();offset.workX=mix(oa.workX,ob.workX);offset.workY=mix(oa.workY,ob.workY);offset.workZ=mix(oa.workZ,ob.workZ);
+      offset.toolX=mix(oa.toolX,ob.toolX);offset.toolY=mix(oa.toolY,ob.toolY);offset.toolZ=mix(oa.toolZ,ob.toolZ);
+    }
     return new HobbingAxes(mix(a.axes.x,b.axes.x),mix(a.axes.y,b.axes.y),mix(a.axes.z,b.axes.z),
-      mix(a.axes.a,b.axes.a),mix(a.axes.b,b.axes.b),mix(a.axes.c,b.axes.c));
+      mix(a.axes.a,b.axes.a),mix(a.axes.b,b.axes.b),mix(a.axes.c,b.axes.c),offset);
   }
   /** Monotone measured master; extrapolation only locates the centres of partial
       engagement windows outside the run, never poses outside sampled time. */

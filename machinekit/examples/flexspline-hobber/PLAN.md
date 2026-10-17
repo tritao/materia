@@ -609,7 +609,7 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB8 | done: geometry-derived hobbing CAM, revolution feeds, shifts/crown, installed limits and compiled cycle checks | this commit |
 | HB9 | implemented; app acceptance queued | Measured-state sweep, worker preview and report; ideal differential and native regressions pass. |
 | HB10 | implemented; full reference-force acceptance pending | Interval-derived Kienzle window loads, rating adapter and PlanCheck efforts; focused checks pass. |
-| HB11 | planned | |
+| HB11 | framework implemented; physical/source acceptance pending | Part-derived motion/tool errors, ring compliance and per-source trace budget; supported wall stiffness and runtime source studies remain open. |
 | HB12 | planned | |
 | Phase D | later | |
 | HB13–HB16 | optional, later (class 3) | |
@@ -1232,3 +1232,38 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   checks** pass. The measured stream still matches HB3 at **0 µm**, with callback
   chip volume equal to the independent total stock difference. The app compiler
   passes **2,667 sources**. No new native binaries were needed for these checks.
+
+
+### HB11 implementation — physical/source acceptance pending
+
+- `HobbingErrorSource` perturbs actual work/tool frames and rake geometry before
+  cutting. `FlexsplineHobberErrors` reads installed mandrel, table bearing/encoder,
+  arbor, hob and outboard inputs. Runout fields explicitly mean TIR; eccentricity
+  means offset amplitude. Harmonic shapes/phases are assumptions. The hob now has
+  an assumed 1 µm peak profile-error field; its sample waveform is zero-rake only.
+- `HobbingErrorJob` repeats fresh-blank rake sweeps and HB4 inspection per source
+  and all sources. Motion knots and independent measured C are preserved.
+  `gearkit.ErrorBudget` reports signed parameter deltas and dominant parts, and
+  checks trace superposition (0.1 µm + 25% of summed absolute trace envelope per
+  channel), rather than adding ISO grades or peak-to-peak scalar metrics.
+- Sync accepts HB7 measured C-minus-baseline error. Runtime source-disable studies
+  must actually regenerate the observations; diagnostic latency is not a substitute
+  for a servo run. Constant speed plus constant latency produces a fixed phase
+  offset, not cumulative pitch variation; changing speed produces varying error.
+- `RingCompliance` derives n=2 stiffness from geometry and stated modulus, with
+  explicit support stiffness in parallel. Clamping pressure alone cannot supply
+  that stiffness. Local quasistatic recession uses a stated HB10 radial-load
+  history; contact, higher modes, dynamics and force/compliance feedback are open.
+  Unsupported-ring diagnostics do not represent the expanding mandrel installation.
+- Focused model/metrology checks and the machine adapter pass. Native profile-warp
+  construction is checked. The coarse physical source-cut mode is separate and
+  pending; full reference-budget signatures, HB7 source studies and supported-wall
+  calibration remain required before HB12. No physical ISO budget is claimed.
+- Details: `stockkit/HOBBING_ERRORS.md`. Logs:
+  `/tmp/flexspline-hb11-{tests,machine,stream,app-build,physical}.log`.
+  HB9/HB10 acceptance artifacts are left unchanged.
+
+- Validation: **24 focused error/metrology checks**, **251 mechanical/adapter checks**
+  pass; the app compiles **2,672 sources**. The stock-stream regression still
+  matches HB3 at **0 µm** (169 windows, 15 peak buffered samples). The separate
+  physical source-cut acceptance is queued from the frozen test artifact.

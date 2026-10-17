@@ -14,7 +14,7 @@ class HobbingSweep {
   final owner:Ownedsk_rake_tool_handle;
   final probes:Array<Point3>;
   var disposed=false;
-  public function new(hob:HobDesign,firstTooth:Int,lastTooth:Int,tolerance:Float=0.00005) {
+  public function new(hob:HobDesign,firstTooth:Int,lastTooth:Int,tolerance:Float=0.00005,?warp:Point3->Point3) {
     if(firstTooth>lastTooth||lastTooth-firstTooth>256||!Math.isFinite(tolerance)||tolerance<=0)
       throw "invalid hob sweep extent/tolerance";
     this.hob=hob;this.tolerance=tolerance;
@@ -24,6 +24,8 @@ class HobbingSweep {
       var thread=tooth%hob.starts;if(thread<0)thread+=hob.starts;
       var turn=Std.int((tooth-thread)/hob.starts);
       var raw=hob.rakeFaceRegion(gash,thread,turn);
+      if(warp!=null)raw=[for(p in raw){var q=warp(p);
+        if(!Math.isFinite(q.x)||!Math.isFinite(q.y)||!Math.isFinite(q.z))throw "non-finite rake profile error";q;}];
       // Keep polygon error below the swept-path convergence tolerance.
       var points=simplify(raw,tolerance/8);
       var region=new sk_rake_region();region.set_struct_size(sk_rake_region.size());

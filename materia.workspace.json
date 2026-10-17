@@ -26,6 +26,7 @@
 		{ "path": "robotkit/cadbridge/tests/haxeon.json", "name": "cadbridge", "tags": ["cadkit"] },
 		{ "path": "stockkit/tests/hobbing-stream/haxeon.json", "name": "hobbing-stream" },
 		{ "path": "stockkit/tests/hobbing-forces/haxeon.json", "name": "hobbing-forces" },
+		{ "path": "stockkit/tests/hobbing-errors/haxeon.json", "name": "hobbing-errors" },
 		{ "path": "stockkit/tests/haxeon.json", "name": "stockkit", "tags": ["cadkit"], "shards": 4 },
 		{ "path": "toolpathkit/tests/haxeon.json", "name": "toolpathkit" },
 		{ "path": "toolpathkit/motion/tests/haxeon.json", "name": "toolpathkit-motion" },
