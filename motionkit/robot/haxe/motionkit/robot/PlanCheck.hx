@@ -26,6 +26,10 @@ class PlanCheckOptions {
       Programs must ramp to steady speed before engaging, or supply the actual envelope. */
   public var processAccelerations:Map<String, Float> = new Map();
   public var margin:Float = 1.0;
+  /** Explicit nonnegative resisting joint loads (N for sliding, Nm for rotary),
+      conservatively present throughout this check, including rapid moves.
+      Process-only spindles absent from the plan need a separate power/rating check. */
+  public var resistingEfforts:Map<String, Float> = new Map();
   /** Gravity and friction on the axes, which planning with `RobotModel.coupledLimits(id, steady)` also honours. */
   public var steady:SteadyLoads = new SteadyLoads();
   /** A cutting force allowance in N, added against the motion of an axis on feed moves; 0 means none. */
@@ -44,6 +48,7 @@ class PlanCheckOptions {
   public function copy():PlanCheckOptions {
     var result = new PlanCheckOptions();
     result.margin = margin;
+    for(id => effort in resistingEfforts)result.resistingEfforts.set(id,effort);
     for (id => value in processAccelerations) result.processAccelerations.set(id, value);
     result.steady = steady.copy();
     result.cuttingForce = cuttingForce;
@@ -87,6 +92,9 @@ class PlanCheck {
     gears = new GearCheckState(model);
     this.jointIds = jointIds.copy();
     this.options = options == null ? new PlanCheckOptions() : options.copy();
+    for(id => effort in this.options.resistingEfforts) {
+      if(jointIds.indexOf(id)<0||!Math.isFinite(effort)||effort<0)throw 'Invalid resisting effort for planned joint $id';
+    }
     for (load in DriveLoads.of(model, this.options.steady, jointIds)) {
       var index = jointIds.indexOf(load.axis);
       if (index < 0) continue;
@@ -109,6 +117,10 @@ class PlanCheck {
       }
       motorSlots.push(slots);
     }
+  }
+
+  function resistingEffort(id:String):Float {
+    var effort=options.resistingEfforts.get(id);return effort==null?0:effort;
   }
 
   /** A check for another planning thread: the same machine, with no memory of earlier plans. */
@@ -239,7 +251,7 @@ class PlanCheck {
         for (slot in 0...motorCount) { torques[slot] = 0.0; speeds[slot] = 0.0; drags[slot] = 0.0; }
         for (axis in 0...loads.length) {
           var load = loads[axis], coefficient = c[axis];
-          var resisting = load.friction + (cutting && load.sliding ? options.cuttingForce : 0.0);
+          var resisting = load.friction + resistingEffort(load.axis) + (cutting && load.sliding ? options.cuttingForce : 0.0);
           var velocity = 0.0, acceleration = 0.0;
           for (power in 1...degree + 1) {
             velocity += power * coefficient[power] * Math.pow(tau, power - 1);
@@ -290,12 +302,12 @@ class PlanCheck {
           if (slotOver[slot]) over[slot]++;
         }
         var forces = [for (axis in 0...loads.length) loads[axis].force(velocities[axis], accelerations[axis],
-          loads[axis].friction + (cutting && loads[axis].sliding ? options.cuttingForce : 0.0))];
+          loads[axis].friction + resistingEffort(loads[axis].axis) + (cutting && loads[axis].sliding ? options.cuttingForce : 0.0))];
         var elastic = loads.length > 0 && loads[0].elastic != null ? loads[0].elastic.deflections(forces) : [];
         for (axis in 0...loads.length) {
           var load = loads[axis];
           var velocity = velocities[axis], acceleration = accelerations[axis];
-          var resisting = load.friction + (cutting && load.sliding ? options.cuttingForce : 0.0);
+          var resisting = load.friction + resistingEffort(load.axis) + (cutting && load.sliding ? options.cuttingForce : 0.0);
           var direction = velocity > 1e-9 ? 1.0 : velocity < -1e-9 ? -1.0 : 0.0;
           var losing = load.motors.length > 0;
           for (index in 0...load.motors.length) {

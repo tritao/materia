@@ -13,6 +13,19 @@ class FlexsplineHobberChecks {
     var machine=new FlexsplineHobber();machine.validate();
     var cam=FlexsplineHobberCam.job(machine);
     check(cam.passes.length==1&&cam.tableRpm>0,"HB8 CAM fits installed travel and drive limits");
+    var forceStock=stockkit.RingStock.annulus(new stockkit.RingGrid(29,30,0,1,1,1));
+    var forces=new stockkit.hobbing.HobbingForces(forceStock,30,20*Math.PI/180,1);
+    try {
+      forceStock.cutRegion([new stockkit.RingCut(0,0,1,0,0.001,0,0)]);
+      forces.afterPass(new stockkit.hobbing.GashPass(0,0,0,0.5,1),new HobbingAxes(46,0,0,0,0,0),new HobbingAxes(46,0,0,0,0.625,0),16);
+      check(FlexsplineHobberLoads.fits(machine,cam,forces),"HB10 installed ratings accept modest measured chip load with reserve");
+      var options=FlexsplineHobberLoads.planOptions(forces);
+      check(options.resistingEfforts.get("X")==forces.maxRadial,"radial load reaches PlanCheck");
+      check(options.resistingEfforts.get(FlexsplineHobber.C)==forces.maxTableTorqueBound,"table reaction reaches PlanCheck");
+      forceStock.cutRegion([new stockkit.RingCut(0,0,1,0.001,1,0,1)]);
+      forces.afterPass(new stockkit.hobbing.GashPass(0,1,1,1.5,2),new HobbingAxes(46,0,0,0,0,0),new HobbingAxes(46,0,0,0,0.625,0),16);
+      check(!FlexsplineHobberLoads.fits(machine,cam,forces),"HB10 installed ratings reject heavy measured chip load");
+    }catch(e:Dynamic){forces.dispose();forceStock.dispose();throw e;}forces.dispose();forceStock.dispose();
     var model=new AssemblyModel("mm");machine.addTo(model,"");var state=model.initialState();
     var parts=new PosedParts();
     try {

@@ -14,6 +14,7 @@ class HobbingStock {
   public final stock:RingStock;
   public final sweep:HobbingSweep;
   public final stream:HobbingStream;
+  public final forces:HobbingForces;
   public final preview:RingPreviewWorker;
   public var measurement(default,null):Null<GearMeasurement> = null;
   public var measurementFailure(default,null):Null<String> = null;
@@ -38,7 +39,10 @@ class HobbingStock {
     var distance=spec.pitchRadius()+hob.pitchDiameter/2;
     var half=Math.acos(Math.max(-1,Math.min(1,(distance-stock.grid.radiusMax)/(config.outside/2))))+Math.abs(hob.rake)+0.01;
     stream=new HobbingStream(stock,sweep,Math.min(Math.PI/2-1e-6,half));
-    preview=new RingPreviewWorker(stock);maxBytes=stock.bytes();
+    // HB10 assumed effective edge width; changing it requires force calibration.
+    forces=new HobbingForces(stock,spec.pitchRadius(),spec.pressureAngle,1);
+    stream.onPass=(pass,start,end)->{forces.afterPass(pass,start,end,config.outside/2);};
+    preview=new RingPreviewWorker(stock);maxBytes=stock.bytes()+forces.retainedBytes();
   }
   public function follow(time:Float,axes:HobbingAxes):Void {
     if(!streamStopped){
@@ -46,18 +50,22 @@ class HobbingStock {
       else stream.push(time,axes);
       lastMaster=axes.b;
     }
-    maxBytes=Math.max(maxBytes,stock.bytes());
+    maxBytes=Math.max(maxBytes,stock.bytes()+forces.retainedBytes());
     // Independent circular fixture separating planes, evaluated at measured coordinates.
     if(axes.x-config.outside/2<spec.rootRadius()-config.wall-0.025)collisions++;
     var lowest=axes.z-Math.abs(axes.y*Math.sin(axes.a))-config.length/2*Math.abs(Math.sin(axes.a))-config.outside/2*Math.abs(Math.cos(axes.a));
     if(lowest < -55)collisions++;
   }
   public function finish(seconds:Float,sync:Float):Void {
-    stream.finish();finalPreview=true;maxBytes=Math.max(maxBytes,stock.bytes());
+    stream.finish();finalPreview=true;maxBytes=Math.max(maxBytes,stock.bytes()+forces.retainedBytes());
     try{measurement=GearMeasurement.fromRings(stock,spec);}catch(e:Dynamic){measurementFailure=Std.string(e);}
     var m=measurement;
     report='Cycle ${Math.round(seconds*1000)/1000} s · sync ${Math.round(sync*648000/Math.PI*1000)/1000} arcsec · fixture contacts $collisions\n'
       +'${stream.passes} gash windows · ${stream.poses} poses · peak ${stream.peakFrames} buffered samples · ${Math.round(maxBytes/1024)} KiB stock';
+    report+='\nAssumed Kienzle window loads: ${Math.round(forces.maxTangential)} N cutting, ${Math.round(forces.maxRadial)} N radial; '
+      +'${Math.round(forces.maxPower)} W; B ${Math.round(forces.maxHobTorque*1000)/1000} Nm; '
+      +'C bound ${Math.round(forces.maxTableTorqueBound*1000)/1000} Nm\n'+forces.material.basis
+      +'; effective edge width 1 mm assumed; overlap summed, instantaneous peaks unresolved';
     if(m==null)report+='\nInspection incomplete: '+measurementFailure;
     else {
       report+='\nCandidate grade ${m.overallGrade==null?"worse than 11 / incomplete":Std.string(m.overallGrade)}; ISO class ${m.isoClass==null?"not qualified":Std.string(m.isoClass)}\n'+m.warnings.concat(m.extrapolation).join("\n");
@@ -80,5 +88,5 @@ class HobbingStock {
     g.setBounds(-stock.grid.radiusMax/1000-center[0],-stock.grid.radiusMax/1000-center[1],stock.grid.zMin/1000-center[2],
       stock.grid.radiusMax/1000-center[0],stock.grid.radiusMax/1000-center[1],stock.grid.zMax/1000-center[2]);return g;
   }
-  public function dispose():Void{if(disposed)return;disposed=true;preview.dispose();sweep.dispose();stock.dispose();}
+  public function dispose():Void{if(disposed)return;disposed=true;preview.dispose();forces.dispose();sweep.dispose();stock.dispose();}
 }

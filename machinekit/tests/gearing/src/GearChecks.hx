@@ -50,6 +50,17 @@ class GearChecks {
     var still = new ArrayStreamSegments([{timeFromStartNs:Int64.ofInt(0),durationNs:Int64.ofInt(1000000000),coefficients:[[0.0,0.0]]}]);
     var good = checker.checkSegments(still,0,0,events(1/200));
     check(good.diagnostics.length == 0,"15 rpm geared table passes");
+    options.resistingEfforts.set("table/C",100);
+    var loadedChecker=new PlanCheck(m,["table/C"],options);
+    options.resistingEfforts.set("table/C",0);
+    var loaded=loadedChecker.checkSegments(still,0,0,events(1/200));
+    check(loaded.diagnostics.filter(d -> d.kind == PlanDiagnosticKind.ServoPeakTorque).length>0,
+      "explicit cutting reaction overloads geared C; checker owns copied effort map");
+    check(new PlanCheck(m,["table/C"],options).checkSegments(still,0,0,events(1/200)).diagnostics.length==0,
+      "zero reaction retains existing geared behavior");
+    options.resistingEfforts.set("missing",1);var badEffort=false;
+    try{new PlanCheck(m,["table/C"],options);}catch(e:Dynamic){badEffort=true;}
+    check(badEffort,"unknown effort joint rejected");options.resistingEfforts.remove("missing");
     var fast = checker.checkSegments(still,1,0,events(1/20));
     var speed = fast.diagnostics.filter(d -> d.kind == PlanDiagnosticKind.GearSpeed);
     check(speed.length == 1 && speed[0].axis == "table/C","overspeed names the table joint");

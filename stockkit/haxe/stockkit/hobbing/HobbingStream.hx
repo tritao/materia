@@ -13,6 +13,7 @@ class HobbingStream {
   public var peakFrames(default,null):Int=0;
   public var lastTime(default,null):Float=0;
   final frames:Array<HobbingKeyframe> = [];
+  public var onPass:Null<(GashPass,HobbingAxes,HobbingAxes)->Void> = null;
   var next:Int=0;
   var first:Int=0;
   var initialized=false;
@@ -49,7 +50,9 @@ class HobbingStream {
       var start=Math.max(frames[0].time,motion.timeAtMaster(phase-halfAngle));
       var end=Math.min(last.time,motion.timeAtMaster(phase+halfAngle));
       if(start<end){var gash=(-next)%sweep.hob.gashes;if(gash<0)gash+=sweep.hob.gashes;
-        poses+=sweep.cutPass(stock,motion.at,new GashPass(gash,next-first,start,motion.timeAtMaster(phase),end),sweep.tolerance/16,0.001,motion.times());passes++;}
+        var pass=new GashPass(gash,next-first,start,motion.timeAtMaster(phase),end);
+        poses+=sweep.cutPass(stock,motion.at,pass,sweep.tolerance/16,0.001,motion.times());passes++;
+        if(onPass!=null)onPass(pass,motion.at(start),motion.at(end));}
       next++;
     }
     var keep=next*step-halfAngle;

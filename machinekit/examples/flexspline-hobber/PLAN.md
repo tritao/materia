@@ -608,7 +608,7 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB7 | done: measured-master gearbox, timed events, additive C drive checks and reference sync tests | a71f86f61 |
 | HB8 | done: geometry-derived hobbing CAM, revolution feeds, shifts/crown, installed limits and compiled cycle checks | this commit |
 | HB9 | implemented; app acceptance queued | Measured-state sweep, worker preview and report; ideal differential and native regressions pass. |
-| HB10 | planned | |
+| HB10 | implemented; full reference-force acceptance pending | Interval-derived Kienzle window loads, rating adapter and PlanCheck efforts; focused checks pass. |
 | HB11 | planned | |
 | HB12 | planned | |
 | Phase D | later | |
@@ -1200,3 +1200,35 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   retained ring stock and measured samples, not cumulative GC allocation.
 - Logs: `/tmp/flexspline-hb9-{stream,artifact,native-tests,app-build,app}.log`.
   HB4/HB6 pending runs are left undisturbed. CT0–CT10 remains separate.
+
+
+### HB10 implementation — full reference-force acceptance pending
+
+- `stockkit.hobbing.HobbingForces` derives chip volume from native removed ring
+  intervals after each gash; chip area is volume / peripheral cutter travel.
+  Effective edge width is explicit (app: 1 mm assumed). `KienzleMaterial` marks
+  40CrNiMo at 38–42 HRC kc1.1=2400 N/mm² and mc=0.25 as uncalibrated assumptions.
+- Outputs are mean gash force, hob torque/power, assumed radial separating force
+  and a conservative table-torque magnitude bound. Overlapping mean-load windows
+  are summed with bounded retained storage. Instantaneous tooth peaks and signed
+  force directions are unresolved; these limits carry into HB11.
+- `HobbingStream.onPass` connects measured sweeps to the observer. The app reports
+  loads and assumptions, including the previous-stock view in retained memory.
+  `FlexsplineHobberLoads` reads installed continuous motor ratings with 20% reserve
+  and supplies X/C joint efforts to PlanCheck; process B gets a separate scalar
+  spindle check. These are load-informed recheck APIs, not applied physics loads.
+- Focused tests check exact sector-volume removal, no double counting, air cuts,
+  feed^(1-mc), overlapping loads and energy/torque units. The real mid-face virgin
+  stock plunge is deliberately rejected: about **4.45 kN / 22.2 kW**, not a normal
+  HB8 entry. This makes the trajectory distinction explicit rather than tuning
+  coefficients to force a tens-of-newtons result.
+- Full HB8 reference entry/feed validation (tens of N and spindle reserve) remains
+  pending in the standalone force test's `reference` mode. HB9's queued app source
+  is unchanged. No full reference force or loaded app acceptance is claimed.
+- Details and assumptions: `stockkit/HOBBING_FORCES.md`. Logs:
+  `/tmp/flexspline-hb10-{tests,gearing,machine,stream,app-build,reference}.log`.
+
+- Validation: **18 force checks**, **19 gearbox/PlanCheck checks** and **248 machine
+  checks** pass. The measured stream still matches HB3 at **0 µm**, with callback
+  chip volume equal to the independent total stock difference. The app compiler
+  passes **2,667 sources**. No new native binaries were needed for these checks.
