@@ -187,6 +187,37 @@ Surveyed 2026-10-17 on branch `flexspline-hobber` (a71f86f61) and local main 73b
 
 **CT-D11. Generic names in code;** vendors appear only as sources in docs.
 
+**CT-D12. Replication jigs replicate relationships, not single faces.**
+- Inserts are poured low (as-cast band, CT-D1). After cure, a **replication jig** puts a
+  release-coated **master** exactly where each finished surface must be. Replication epoxy fills
+  the gap (0.5–2 mm) between insert and master. The cured layer is a copy of the master.
+- Masters are ground bars or straightedges (rail seats), ground plates (table and column seats)
+  and granite squares (right angles).
+- The jig holds the masters in their **design relationship** on one rigid reference frame (a
+  granite beam or a ground, stress-relieved steel frame). Each master stands on three-point
+  supports with fine-thread or differential jack screws and locks.
+- **Axis masters:** where a relationship involves a machine axis, the jig carries a physical
+  master for it. For the hobber, a ground cylinder or arbor stands on the C-axis line, so the
+  column's Z-rail seats are replicated parallel to C and the table seat square to it. Nothing is
+  shimmed later.
+- Relationships come from the machine design, not from the casting: coplanar, parallel,
+  perpendicular, a distance between datums, each with its tolerance. The casting's inserts carry
+  references to them.
+- Metrology is part of the jig. Per relationship: the instrument and method (electronic level,
+  indicators against the axis master, autocollimator or laser for long straightness) and the
+  stated uncertainty. The measurement chain must fit the relationship's tolerance.
+- Simpler finishes remain available per insert:
+  - **rail as master**: the real rail, release-coated, aligned on jack screws;
+  - **self-levelling**: gravity reference, one plane only;
+  - **surface-plate replication**: face-down against a granite plate.
+
+  The jig generator chooses only among the finishes the insert allows.
+- Accuracy expectation: replication reproduces the master to a few µm. The master tolerance and
+  the alignment measurement set the limit, not the epoxy (assumed; check against the resin
+  datasheet).
+- **Rejected:** grinding large castings (needs a large precision grinder, which defeats the
+  process); shimming each rail after assembly (slow, and it drifts).
+
 ## Reference numbers (assumed until checked against a datasheet or a measurement)
 
 | Quantity | Value | Source |
@@ -279,14 +310,35 @@ Surveyed 2026-10-17 on branch `flexspline-hobber` (a71f86f61) and local main 73b
   - printed pieces fit the build volume;
   - provenance links back to the pieces.
 
-**CT7. Pour plan and replication (CT-D8, CT-D1).**
-- Volume, mass, mix, batches, pour and vent points, trapped-air diagnostics, exotherm,
-  compaction and cure.
-- For Replicated inserts: the dam, reference bar or plate, layer thickness and resin quantity.
+**CT7. Pour plan and replication jig (CT-D8, CT-D1, CT-D12).**
+- Pour plan: volume, mass, mix, batches, pour and vent points, trapped-air diagnostics,
+  exotherm, compaction and cure.
+- Replication jig: generated per CT-D12 for every Replicated insert, as a `ReplicationJig`
+  assembly. It contains:
+  - masters;
+  - the reference frame;
+  - three-point adjusters;
+  - the axis master, where a relation names a machine axis;
+  - dams, injection ports and vents;
+  - a measurement setup per relation.
+- Jig outputs: master and frame drawings (ground parts, bought or made); dam outlines (router or
+  print); replication resin quantity from gap volume plus waste allowance; the alignment and
+  measurement steps for the instruction document (CT8).
 - Tests:
-  - volume matches the CAD casting volume to 0.1 %;
+  - pour volume matches the CAD casting volume to 0.1 %;
   - the cable-channel block's vent is required;
-  - a deliberately thick section fails the exotherm check.
+  - a deliberately thick section fails the exotherm check;
+  - the hobber bed jig creates one master per Replicated insert, and its relations include X-rail
+    coplanarity and parallelism and table-seat squareness to the C-axis master;
+  - the hobber column jig relates its Z-rail seats to the same C-axis master. Parallelism to C is
+    replicated, not shimmed;
+  - every master's adjuster range covers the as-cast insert position band (from CT-D1) plus the
+    gap band;
+  - a layer thinner than the minimum gap anywhere in the band is rejected, naming the insert;
+  - the jig fits on the cured casting without interference, and every master can be lifted off
+    after cure (CT-D6 removal check applied to the jig);
+  - the stated measurement chain (instrument uncertainties and master tolerances) fits inside
+    each relation's tolerance. Otherwise it is reported, naming the dominant term.
 
 **CT8. Instruction document (CT-D10).**
 - Generated, ordered steps from CT3–CT7, with quantities and checks, as HTML/Markdown.
