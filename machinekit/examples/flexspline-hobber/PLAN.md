@@ -477,10 +477,20 @@ r 30 mm. HB7 and HB11 must show this.
 - A cheaper specification (2¹⁸-count encoder, 10 µm mandrel, 4 kHz loop without feedforward)
   fails class 6. The report names the causes in the right order.
 - The comparison part (m 0.5, z 100) with tightened parts reaches class ≤ 3, as a plausibility
-  check against the published class-1 result. Cycle time for the reference part is ≤ 2 min.
+  check against the published class-1 result.
+- Total measured cycle time for the reference part is **≤ 3 min** for the prototype target.
+  The HB9 report states the measured breakdown: positioning, spindle ramps, infeed passes
+  and feed. HB8 gives 154.4 s for feed alone at the assumed 300 m/min, including 4.6 mm
+  engagement overrun per end of the 8 mm face.
 - A short report of the numbers in this plan, with every assumed value listed.
 
 ### Phase D: later
+
+- Reference-part total cycle time **≤ 2 min** remains a later goal. Candidate levers:
+  higher cutting speed with a carbide hob (e.g. up to the GE15FRplus 800 m/min class),
+  a two-start hob, coarser roughing feed with a finishing pass, and shorter overrun
+  from a smaller hob OD. Each must be checked against HB11's error budget; none is
+  assumed to preserve accuracy for free.
 
 - Casting process model and structural/modal analysis (external FEA), first use: hobber bed modes vs gash frequency.
 - Double-circular-arc and S-tooth flexsplines; crowning and longitudinal modification.
