@@ -4248,12 +4248,21 @@ class ProjectSourceTests {
     var simulation=new ApplicationSimulation(new RobotWorld());simulation.setBackend(ApplicationSimulation.MUJOCO);
     try {
       check(simulation.rebuild(session.sensors,session.scene,session),"hobber MuJoCo build: "+simulation.error);
-      simulation.step();var start=simulation.snapshot().robots()[0].positions.toArray();
-      for(_ in 0...200)simulation.step();
-      var finish=simulation.snapshot().robots()[0].positions;
-      for(i in 0...model.joints.length){var type=model.joints[i].type;
-        var tolerance=type==JointType.Prismatic?0.0005:0.002;
-        check(Math.isFinite(finish.get(i))&&Math.abs(finish.get(i)-start[i])<=tolerance,'hobber holds zero-command pose on ${model.joints[i].id}');}
+      var player=simulation.hobbingPlayer();if(player==null)throw "hobber cutting job was not installed";
+      var guard=0;
+      while(!player.completed&&player.failure==null&&guard++<240000)simulation.step();
+      check(player.failure==null,"hobber cut failed: "+player.failure);
+      check(player.completed,"hobber cut did not complete in 60 simulated seconds");
+      check(player.stock.stream.passes>0,"measured gash windows cut the stock");
+      check(player.stock.stock.intervalCount()>player.stock.stock.grid.radialCount*player.stock.stock.grid.axialCount,"actual teeth emerge from the annular stock");
+      check(player.stock.collisions==0,"hob cutter clears mandrel and table fixture envelopes");
+      check(player.stock.maxBytes<128*1024*1024&&player.stock.stream.peakFrames<4096,"hobber stock/window allocation budget");
+      check(player.stock.measurement!=null,"HB4 inspection completed: "+player.stock.measurementFailure);
+      check(player.elapsed>player.job.cuttingSeconds&&Math.isFinite(player.syncError),"measured total cycle and synchronization are reported");
+      Sys.println("HOBBER_ACCEPTANCE "+haxe.Json.stringify({cycleSeconds:player.elapsed,cuttingSeconds:player.job.cuttingSeconds,
+        syncArcsec:player.syncError*648000/Math.PI,grade:player.stock.measurement==null?null:player.stock.measurement.overallGrade,
+        isoClass:player.stock.measurement==null?null:player.stock.measurement.isoClass,collisions:player.stock.collisions,
+        stockBytes:player.stock.maxBytes,bufferedSamples:player.stock.stream.peakFrames,gashWindows:player.stock.stream.passes}));
     }catch(e:Dynamic){simulation.dispose();session.dispose();throw e;}
     simulation.dispose();session.dispose();
   }

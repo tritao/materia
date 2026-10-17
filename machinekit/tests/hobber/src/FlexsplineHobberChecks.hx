@@ -65,8 +65,11 @@ class FlexsplineHobberChecks {
     Sys.println('FlexsplineHobberChecks: $assertions assertions passed');
   }
   public static function main():Void {
-    if(Sys.args().length>0&&Sys.args()[0]=="scene"){
-      var data=materia.project.SceneArtifact.decode(FlexsplineHobberPreview.hobber());
+    if(Sys.args().length>0&&(Sys.args()[0]=="scene"||Sys.args()[0]=="cutting")){
+      var cutting=Sys.args()[0]=="cutting";
+      var data=materia.project.SceneArtifact.decode(cutting?FlexsplineHobberPreview.cutting():FlexsplineHobberPreview.hobber());
+      if(cutting){var moving=data.machineMotion;if(moving==null||moving.hobbing==null)throw "cutting job missing from artifact";
+        check(moving.hobbing.teeth==40&&moving.hobbing.gashes==4,"coarse cutting job round-trips typed wire metadata");}
       var definition=data.assemblyDefinition;if(definition==null)throw "preview missing definition";
       var actuators=definition.actuators;if(actuators==null)throw "missing preview drives";
       check(actuators.length==6&&data.parts.length>30,"project preview exports complete mechanical scene and drives");

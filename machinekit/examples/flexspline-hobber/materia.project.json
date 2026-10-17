@@ -1,6 +1,28 @@
 {
-  "format": "materia.project", "version": 1, "name": "Flexspline hobber",
-  "defaultEntrypoint": "hobber",
-  "build": {"system": "haxeon", "manifest": "haxeon.json"},
-  "entrypoints": {"hobber": {"kind": "cad-preview", "module": "FlexsplineHobberPreview", "function": "hobber", "cache": {"inputs": []}}}
+  "format": "materia.project",
+  "version": 1,
+  "name": "Flexspline hobber",
+  "defaultEntrypoint": "cutting",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
+  "entrypoints": {
+    "hobber": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "hobber",
+      "cache": {
+        "inputs": []
+      }
+    },
+    "cutting": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "cutting",
+      "cache": {
+        "inputs": []
+      }
+    }
+  }
 }

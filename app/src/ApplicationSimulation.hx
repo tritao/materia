@@ -86,6 +86,7 @@ class ApplicationSimulation {
   /** The battery model of a CAD mobile power system, when present. */
   var power:Null<SimulatedMobilePower> = null;
   var cnc:Null<CncProgramPlayer> = null;
+  var hobbing:Null<HobbingProgramPlayer> = null;
   /** Robot zone monitors own native collision worlds; they go with their simulation. */
   var zoneMonitors:Array<SimulatedRobotZoneAdapter> = [];
   var print:Null<PrintProgramPlayer> = null;
@@ -175,6 +176,7 @@ class ApplicationSimulation {
     if (tools != null) members.push(tools);
     if (power != null) members.push(power);
     if (cnc != null) members.push(cnc);
+    if (hobbing != null) members.push(hobbing);
     if (print != null) members.push(print);
     if (machineProgram != null) members.push(machineProgram);
     if (digitalProgram != null) members.push(digitalProgram);
@@ -202,6 +204,7 @@ class ApplicationSimulation {
     var candidateAssemblyParts:Array<AssemblyVisual> = [];
     var candidateWarnings:Array<String> = [];
     var candidateCnc:Null<CncProgramPlayer> = null;
+    var candidateHobbing:Null<HobbingProgramPlayer> = null;
     var candidatePrint:Null<PrintProgramPlayer> = null;
     var pendingCnc:Null<{job:CncJob, robot:AssemblyRobot,
       input:Null<String->Null<EventValue>>, interfaceManaged:Bool}> = null;
@@ -234,6 +237,8 @@ class ApplicationSimulation {
         if (existing != null && simulatedIds.indexOf(id) < 0)
           throw 'Robot "$id" is remote and read-only';
       }
+      var hobbingConfig=session==null||session.machineMotion==null?null:session.machineMotion.hobbing;
+      if(hobbingConfig!=null)timestep=1/hobbingConfig.controllerHz;
       var createdSpace = SimulationSpace.create(backend, timestep);
       candidateSpace = createdSpace;
       candidate = Simulation.inSpace(createdSpace);
@@ -452,6 +457,10 @@ class ApplicationSimulation {
             cncParts.get("project:" + stock).excludeContactWith(cutter.robotIndex, cutter.linkIndex);
         }
       }
+      if(hobbingConfig!=null){
+        if(candidateAssembly==null||session==null)throw "Hobbing needs its simulated assembly";
+        candidateHobbing=new HobbingProgramPlayer(hobbingConfig,candidateAssembly,candidate,createdSpace.session,session);
+      }
       var freeObjects = [for (entry in candidateObjects) entry.object];
       for (index in 0...candidateBlueprints.length) {
         var hasPresenceInput = false;
@@ -636,6 +645,7 @@ class ApplicationSimulation {
       power = candidatePower;
       workforce = candidateWorkforce;
       if (cnc != null) cnc.dispose();
+      if (hobbing != null) hobbing.dispose();
       if (print != null) print.dispose();
       for (visual in beltVisuals) visual.reset();
       beltVisuals = candidateBelts;
@@ -646,6 +656,7 @@ class ApplicationSimulation {
       if (pressBrake != null) pressBrake.beforeReset();
       pressBrake = candidatePress;
       cnc = candidateCnc;
+      hobbing = candidateHobbing;
       var previousZones = zoneMonitors;
       zoneMonitors = candidateZones;
       print = candidatePrint;
@@ -676,6 +687,7 @@ class ApplicationSimulation {
       error = Std.string(failure);
       if (environmentTopologyOpen && candidateSpace != null)
         try candidateSpace.session.endTopologyUpdate() catch (_:Dynamic) {}
+      if (candidateHobbing != null) candidateHobbing.dispose();
       if (candidateWorkforce != null) candidateWorkforce.dispose();
       if (candidateSpace != null && candidateSpace != space)
         releaseSpace(candidateSpace, candidate);
@@ -737,6 +749,7 @@ class ApplicationSimulation {
     tools = prepared.tools;
     power = prepared.power;
     cnc = prepared.cnc;
+    hobbing = prepared.hobbing;
     zoneMonitors = prepared.zoneMonitors;
     print = prepared.print;
     beltVisuals = prepared.beltVisuals;
@@ -925,6 +938,7 @@ class ApplicationSimulation {
   public function printFailure():Null<String> return print == null ? null : print.failure;
 
   /** The project's CNC program player, or null when the project has no CNC job. */
+  public function hobbingPlayer():Null<HobbingProgramPlayer> return hobbing;
   public function cncPlayer():Null<CncProgramPlayer> return cnc;
   /** The project's print job player, or null when the project has none. */
   public function printPlayer():Null<PrintProgramPlayer> return print;
@@ -1272,6 +1286,7 @@ class ApplicationSimulation {
     }
     workforce = null; motions = null; tools = null; power = null;
     if (cnc != null) cnc.dispose(releases);
+    if (hobbing != null) { var retiredHobbing=hobbing;release(()->retiredHobbing.dispose());hobbing=null; }
     if (print != null) print.dispose(releases);
     if (beads != null) beads.dispose();
     for (visual in beltVisuals) visual.reset();

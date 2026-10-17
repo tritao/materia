@@ -859,7 +859,8 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
                 if (bound > 0.0 &&
                     std::abs(state_.position[joint] - commanded_position_[joint]) > bound)
                     return RK_ERROR_FOLLOWING_ERROR;
-                anchor_position[joint] = commanded_position_[joint];
+                anchor_position[joint] = joint < RK_MAX_SERVO_JOINTS && control_.gears.relations[joint].active
+                    ? control_.gear_additive_position[joint] : commanded_position_[joint];
             }
         } else {
             const RuntimeTrajectoryPoint *anchor = &queue.front();
@@ -2223,8 +2224,19 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             current = state_;
         }
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-            if (!control_.active[joint])
+            if (!control_.active[joint]) {
+                // A process master keeps turning across program barriers and drained chunks.
+                // Keep its follower alive in additive coordinates instead of holding physical C.
+                if (joint < RK_MAX_SERVO_JOINTS && control_.gears.relations[joint].active) {
+                    const double planned = control_.gear_additive_position[joint];
+                    output.targets[active_count] = {joint, RK_TARGET_SERVO, planned, 0.0, blueprint_.joints[joint].max_effort};
+                    output.servos[active_count] = {0.0, blueprint_.joint_servo[joint].stiffness, blueprint_.joint_servo[joint].damping, 0.0};
+                    output.reference_end_position[active_count] = planned;
+                    output.reference_end_velocity[active_count] = 0.0;
+                    ++active_count;
+                }
                 continue;
+            }
             auto target = control_.targets[joint];
             const auto &compiled_joint = blueprint_.joints[joint];
             if (target.mode == RK_TARGET_VELOCITY && (compiled_joint.limit_flags & RK_LIMIT_VELOCITY))
@@ -2381,6 +2393,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 return RK_ERROR_INVALID_STATE;
             const double offset = control_.gears.offset(joint, current, age);
             const double velocity = control_.gears.velocity(joint, current);
+            control_.gear_additive_position[joint] = output.reference_duration > 0 ? output.reference_end_position[i] : target.target;
             target.target += offset;
             output.servos[i].velocity += velocity;
             output.reference_end_position[i] += offset + velocity * output.reference_duration;

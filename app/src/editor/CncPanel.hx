@@ -30,6 +30,18 @@ class CncPanel {
   /** The line the operator picked to restart at; 0 for none. */
   public var selectedLine(default, null):Int = 0;
   var followedLine = 0;
+  var plottedGear:Null<gearkit.GearMeasurement> = null;
+  var profilePlot=new haxeon.ui.plotting.PlotModel();
+  var leadPlot=new haxeon.ui.plotting.PlotModel();
+  function gearPlot(traces:Array<gearkit.GearTrace>):haxeon.ui.plotting.PlotModel {
+    var model=new haxeon.ui.plotting.PlotModel();
+    for(trace in traces.slice(0,2)){
+      var series=new haxeon.ui.plotting.PlotSeries('flank-${trace.flank}','Tooth ${trace.tooth}, flank ${trace.flank}',
+        trace.flank==0?Color.rgba(0.2,0.6,0.95,1):Color.rgba(0.2,0.8,0.5,1));
+      series.setPoints([for(i in 0...trace.x.length)new haxeon.ui.plotting.PlotPoint(trace.x[i],trace.filtered[i])]);model.addSeries(series);
+    }
+    return model;
+  }
 
   public function new() {}
 
@@ -39,6 +51,23 @@ class CncPanel {
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
     style.childGap = 8.0;
     style.background = tokens.surface;
+    var hobbing=simulation.hobbingPlayer();
+    if(hobbing!=null){
+      var title=new KeyedView("hobbing-title",new Text("HOBBING · GEAR REPORT",null,tokens.textSecondary));
+      var status=hobbing.failure!=null?'Stopped: ${hobbing.failure}':hobbing.completed?hobbing.stock.report:
+        'Cutting · ${Math.round(hobbing.elapsed*100)/100} s · ${hobbing.stock.stream.passes} gash windows';
+      var children:Array<KeyedView> = [title,new KeyedView("hobbing-report",new Text(status))];
+      var measured=hobbing.stock.measurement;
+      if(measured!=null){
+        if(plottedGear!=measured){plottedGear=measured;profilePlot=gearPlot(measured.profiles);leadPlot=gearPlot(measured.helices);}
+        var plotStyle=new LayoutStyle();plotStyle.width=LayoutAxis.grow();plotStyle.height=LayoutAxis.fixed(120);
+        children.push(new KeyedView("profile-label",new Text("Profile · roll [mm] / deviation [µm] · both flanks")));
+        children.push(new KeyedView("profile-plot",new haxeon.ui.widgets.plotting.PlotView("hob-profile",profilePlot,plotStyle,"Gear profile traces")));
+        children.push(new KeyedView("lead-label",new Text("Lead · axial position [mm] / deviation [µm] · both flanks")));
+        children.push(new KeyedView("lead-plot",new haxeon.ui.widgets.plotting.PlotView("hob-lead",leadPlot,plotStyle,"Gear lead traces")));
+      }
+      return new Column("hobbing-panel",children,style);
+    }
     var player = simulation.toolpathPlayer();
     var heading = new KeyedView("heading", new Text(player == null ? "CNC PROGRAM" : player.title(), null, tokens.textSecondary,
       TextStyleOverride.text(11.0, 0.8)));

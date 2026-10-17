@@ -24,6 +24,7 @@
 		{ "path": "robotkit/tests/integration/haxeon.json", "name": "robotkit-integration", "tags": ["peer"], "cache": false },
 		{ "path": "robotkit/tests/excavator/haxeon.json", "name": "robotkit-excavator" },
 		{ "path": "robotkit/cadbridge/tests/haxeon.json", "name": "cadbridge", "tags": ["cadkit"] },
+		{ "path": "stockkit/tests/hobbing-stream/haxeon.json", "name": "hobbing-stream" },
 		{ "path": "stockkit/tests/haxeon.json", "name": "stockkit", "tags": ["cadkit"], "shards": 4 },
 		{ "path": "toolpathkit/tests/haxeon.json", "name": "toolpathkit" },
 		{ "path": "toolpathkit/motion/tests/haxeon.json", "name": "toolpathkit-motion" },

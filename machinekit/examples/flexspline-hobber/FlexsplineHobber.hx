@@ -31,10 +31,10 @@ class FlexsplineHobber extends MachineAssembly {
   public final precisionMounts:Array<{name:String,parent:String}> = [];
   final zero:Map<String,AssemblyFrame> = [];
   var driverNumber=0;
-  public function new(?spec:GearSpec){
+  public function new(?spec:GearSpec,gashes:Int=12){
     super();this.spec=spec==null?new GearSpec(0.3,200,8,20*Math.PI/180):spec;
     if(this.spec.internal)throw "external hobbing machine requires external gear";
-    var profile=new ToothProfile(this.spec);hob=Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),1,32,12),this.spec);
+    var profile=new ToothProfile(this.spec);hob=Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),1,32,gashes),this.spec);
     bed=new MineralCastBed();column=new MineralCastColumn();
     includeAt("bed",bed,F.identity());
     var tableMotor=new TorqueMotor(new ComponentValues().setNumber("torqueConstant",2).setNumber("backEmfConstant",2/Math.sqrt(3)));
@@ -47,6 +47,8 @@ class FlexsplineHobber extends MachineAssembly {
     mandrel=new ExpandingMandrel(new ComponentValues().setNumber("outside",diameter-0.05).setNumber("workSeat",75).setNumber("height",90));
     fixAt("mandrel",mandrel,F.translation(0,-160,248),"table/platen");
     workOrigin=F.translation(0,-160,323);
+    var blank=new TablePlaten(new ComponentValues().setNumber("outside",2*this.spec.tipRadius()).setNumber("bore",2*(this.spec.rootRadius()-0.6)).setNumber("height",this.spec.faceWidth));
+    fixAt("blank",blank,workOrigin,"mandrel");
     var minX=Math.max(30,mandrel.n("outside")/2+hob.design.outsideDiameter/2+0.2);
     var centre=this.spec.pitchRadius()+hob.design.pitchDiameter/2+this.spec.profileShift*this.spec.module;
     if(centre<minX||centre>100)throw "gear/fixture exceeds radial machine capacity";

@@ -140,6 +140,29 @@ typedef SceneArtifactProjectMotion = {
   @:id(5) @:optional var digitalProgram:SceneArtifactDigitalProgram;
   /** Feedback-driven press controller, independent of the robot mission. */
   @:id(6) @:optional var pressBrake:SceneArtifactPressBrake;
+  @:id(7) @:optional var hobbing:SceneArtifactHobbing;
+}
+
+/** Gear/hob lengths in mm, angles radians, process speed m/min. */
+@:wire typedef SceneArtifactHobbing = {
+  @:id(1) var module:Float;
+  @:id(2) var teeth:Int;
+  @:id(3) var width:Float;
+  @:id(4) var pressureAngle:Float;
+  @:id(5) var starts:Int;
+  @:id(6) var gashes:Int;
+  @:id(7) var outside:Float;
+  @:id(8) var length:Float;
+  @:id(9) var wall:Float;
+  @:id(10) var radialStep:Float;
+  @:id(11) var axialStep:Float;
+  @:id(12) var tolerance:Float;
+  @:id(13) var feed:Float;
+  @:id(14) var cuttingSpeed:Float;
+  /** X,Y,Z,A,B,C in assembly joint order chosen by the author. */
+  @:id(15) var axes:Array<String>;
+  @:id(16) var stock:String;
+  @:id(17) var controllerHz:Float;
 }
 
 /** Press travel and gauge setup use millimetres; axis planning converts to SI once. */
@@ -1073,6 +1096,20 @@ class SceneArtifact {
     var definition = AssemblyDefinitionFlattener.flattenView(source);
     var occurrences = [for (value in definition.occurrences) value.id];
     var joints = [for (value in definition.joints) value.id];
+    var hobbing=motion.hobbing;
+    if(hobbing!=null){
+      if(motion.program!=null||motion.digitalProgram!=null||motion.pressBrake!=null||motion.virtualDevice==true||data.machining!=null||data.printing!=null||data.missions!=null)
+        throw "Hobbing requires exclusive machine-program ownership";
+      if(hobbing.axes==null||hobbing.axes.length!=6||occurrences.indexOf(hobbing.stock)<0)throw "Hobbing needs six joints and a stock occurrence";
+      for(i in 0...6)if(joints.indexOf(hobbing.axes[i])<0||hobbing.axes.indexOf(hobbing.axes[i])!=i)throw "Invalid hobbing joint bindings";
+      for(v in [hobbing.module,hobbing.width,hobbing.outside,hobbing.length,hobbing.wall,hobbing.radialStep,hobbing.axialStep,hobbing.tolerance,hobbing.feed,hobbing.cuttingSpeed,hobbing.controllerHz])
+        if(!Math.isFinite(v)||v<=0)throw "Invalid hobbing dimensions or timing";
+      if(hobbing.teeth<3||hobbing.starts<1||hobbing.gashes<2||hobbing.gashes>128||hobbing.teeth>2000||hobbing.starts>16||hobbing.controllerHz<1||hobbing.controllerHz>20000||!Math.isFinite(hobbing.pressureAngle)||hobbing.pressureAngle<=0||hobbing.pressureAngle>=Math.PI/2)
+        throw "Invalid hobbing gear or controller";
+      var circles=Math.ceil((2.25*hobbing.module+hobbing.wall)/hobbing.radialStep)*Math.ceil(hobbing.width/hobbing.axialStep);
+      if(!Math.isFinite(circles)||circles>250000||hobbing.module*hobbing.teeth/2-1.25*hobbing.module-hobbing.wall<=0)
+        throw "Hobbing stock exceeds the retained allocation budget";
+    }
     for (belt in motion.belts) {
       if (occurrences.indexOf(belt.occurrence) < 0 || joints.indexOf(belt.driverJoint) < 0 ||
           belt.wraps == null || belt.wraps.length < 2 || belt.wraps.length > 128 ||

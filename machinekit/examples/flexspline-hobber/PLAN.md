@@ -597,7 +597,7 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB6 | mechanics/scene tested; blocked: Start-page/project-load/MuJoCo acceptance queued | 45dd31967 |
 | HB7 | done: measured-master gearbox, timed events, additive C drive checks and reference sync tests | a71f86f61 |
 | HB8 | done: geometry-derived hobbing CAM, revolution feeds, shifts/crown, installed limits and compiled cycle checks | this commit |
-| HB9 | planned | |
+| HB9 | implemented; app acceptance queued | Measured-state sweep, worker preview and report; ideal differential and native regressions pass. |
 | HB10 | planned | |
 | HB11 | planned | |
 | HB12 | planned | |
@@ -1162,3 +1162,31 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   machine-tending worktree; native MotionKit sources were unchanged here.
   HB4 and HB6 acceptance remain queued and were not interrupted. CT0–CT10 remains
   a separate plan; HB8 makes no casting or insert-layout changes.
+
+
+### HB9 implementation — full app acceptance pending
+
+- The default `cutting` entry point is a deliberately coarse m1, z40, 4 mm face
+  job with four gashes. The original reference machine remains selectable as
+  `hobber`. Typed scene metadata carries the job through the artifact round-trip.
+- `HobbingProgramPlayer` lowers HB8 CAM against the installed machine and reads
+  real B/C and XYZ/A simulation observations. Loaded joint-coordinate offsets are
+  accounted for explicitly. Startup, at-speed and stopped barriers use measured
+  signals; the native EGB now continues across empty queues and anchors subsequent
+  plans in additive C coordinates. Native cache inputs include the runtime headers.
+- `HobbingStock` streams measured poses through complete gash windows with exact
+  crossing times. `RingPreviewWorker` contours immutable snapshots off-thread.
+  The panel presents HB4 profile/lead traces, candidate grade and qualification
+  warnings after the cut. A coarse demo result does not establish an ISO class.
+- Focused validation passes: ideal streaming versus the HB3 sweep differs by
+  **0 µm** (criterion 0.1 µm), with 169 windows, a peak of 15 buffered samples and
+  64,024 retained stock bytes. Worker contouring, cutting artifact round-trip,
+  three native runtime/gear/brake tests and the 2,664-source app compiler check pass.
+- The full MuJoCo `checkFlexsplineHobber` acceptance is queued through `heavy-run`
+  from this commit's archived sources. It checks completion, measured cycle/sync,
+  gear measurement and retained memory. No end-to-end app pass is claimed yet.
+  Its collision check covers conservative cutter/mandrel/table fixture envelopes;
+  a full-machine interference audit remains open. The memory criterion bounds
+  retained ring stock and measured samples, not cumulative GC allocation.
+- Logs: `/tmp/flexspline-hb9-{stream,artifact,native-tests,app-build,app}.log`.
+  HB4/HB6 pending runs are left undisturbed. CT0–CT10 remains separate.

@@ -318,6 +318,7 @@ private:
     };
     struct ControlState {
         ElectronicGear gears;
+        double gear_additive_position[RK_MAX_SERVO_JOINTS]{};
         bool gear_invalid = false;
         rk_joint_target targets[RK_MAX_JOINTS]{};
         rk_joint_servo servos[RK_MAX_SERVO_JOINTS]{}; // Terms of RK_TARGET_SERVO targets, by joint.

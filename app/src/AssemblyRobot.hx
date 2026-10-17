@@ -514,6 +514,14 @@ class AssemblyRobot {
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
     if (channels != null) for (channel in channels) blueprint.addChannel(channel);
+    var hobbing=machine==null?null:machine.hobbing;
+    if(hobbing!=null){
+      if(control!=null)throw "Hobbing currently needs a single assembly controller";
+      var index=[for(i in 0...converted.model.joints.length)if(converted.model.joints[i].id==hobbing.axes[5])i];
+      if(index.length!=1)throw "Hobbing table joint is missing";
+      blueprint.addChannel(robotkit.execution.GearEvents.declaration(index[0]));
+      blueprint.ownerPeriodNs=haxe.Int64.ofInt(Std.int(Math.round(1e9/hobbing.controllerHz)));
+    }
     // Each robot tool brings its own channels with the stop policy it needs (RobotKit's `ToolChannels`): a suction tool
     // keeps holding through a commanded stop, as when its base arrives somewhere carrying a part; a torch's arc and wire
     // go off on any stop. A declaration made above that disagrees with the tool is refused.

@@ -154,5 +154,19 @@ int main() {
     auto invalid_spec = std::make_unique<rk_robot_runtime_blueprint>(*spec);
     invalid_spec->channels[0].safe_value = value("gear.engage");
     assert(rk_robot_runtime_blueprint_validate(invalid_spec.get()) == RK_ERROR_INVALID_ARGUMENT);
+    // A drained position plan still has an independently running measured master.
+    auto barrier_encoders = std::make_shared<Encoders>(); barrier_encoders->follower = .2;
+    auto barrier = std::make_unique<robotkit::RobotRuntime>(*spec, barrier_encoders, std::chrono::microseconds(250));
+    assert(barrier->publish_sample(1'000'000) == RK_OK);
+    auto short_plan = plan; short_plan.ends_at_rest = true;
+    short_plan.segments.segments[0].duration_ns = 10'000'000;
+    assert(barrier->submit_plan(short_plan) == RK_OK);
+    for (uint64_t tick = 5; tick < 100; ++tick) {
+        assert(barrier->apply_pending_commands(tick * 250000) == RK_OK);
+        assert(std::abs(barrier_encoders->follower - .2 - ratio * omega * tick / 4000.0) < arcsec);
+        assert(barrier->publish_sample(tick * 250000) == RK_OK);
+    }
+    short_plan.sequence = 2; short_plan.plan_id = 2;
+    assert(barrier->submit_plan(short_plan) == RK_OK); // additive anchor, despite physical C advancing
     std::cout << "Electronic gear: encoder prediction worst " << worst / arcsec << " arcsec; uncompensated " << lag * .03 * 1e6 << " um; owner events and per-tick trace passed\n";
 }
