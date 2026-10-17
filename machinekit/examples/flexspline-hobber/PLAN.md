@@ -593,8 +593,8 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB2 | done: native ring stock, Haxe API, contour and GearSpec comparison | 94f246a1e |
 | HB3 | done: actual rake sweep, ideal driver and slice acceptance; flat-count correction below | 2ec3bdd45 |
 | HB4 | metrology implemented/tested; blocked: full-face rake acceptance waiting for heavy-run slot | 0d5a47f3f |
-| HB5 | done: reference parts plus ribbed mineral-cast foundations and separate steel inserts | 13358ee07 + this commit |
-| HB6 | planned | |
+| HB5 | done: reference parts plus ribbed mineral-cast foundations and separate steel inserts | 13358ee07 + f59fcf695 |
+| HB6 | mechanics/scene tested; blocked: Start-page/project-load/MuJoCo acceptance queued | this commit |
 | HB7 | planned | |
 | HB8 | planned | |
 | HB9 | planned | |
@@ -1015,3 +1015,52 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   inertia, separate BOMs, description persistence and the new assumed material inputs.
   Log `/tmp/flexspline-foundation-tests.log`; compile log
   `/tmp/flexspline-foundation-build.log`. HB4 has not been touched.
+
+
+### HB6 six-axis machine (2026-10-17)
+
+- Added `FlexsplineHobber extends MachineAssembly`, its project manifest/preview and
+  a Gear cutting Start-page card. Mechanical axes use package-preserving paths
+  `table/C`, `spindle/B`, `swivel/A`, and top-level `X`, `Y`, `Z`; C is continuous
+  for multi-revolution hobbing. The B process-velocity drive is independent of C.
+  No electronic gearbox has been substituted with a mechanical coupling.
+- Three ball-screw/nut/servo drives use existing transmission/support resolution,
+  couplings with two-sided engagement and separate rotating motor shafts, fixed/
+  floating supports, and 0.1 micrometre linear scales. Six drivers and a rectifier
+  use typed electrical ratings and existing power checks. A's separate 100 N m
+  spring-applied clamp has release/feedback metadata; EGB/clamp sequencing is HB7.
+- Mounted the column, table and Z rails on the revised foundation steel inserts.
+  Added a paired-face coplanarity check, rejecting opposite 0.009 mm offsets that
+  individually pass 0.01 mm but together exceed the pair tolerance. Foundation
+  body recesses move with the table plate's forward placement at Y=-160 mm.
+- Fixture dimensions and soft travel derive from the selected reference gear's
+  cup/root band and tool size. Raised work shoulder and outboard bearing placement
+  clear the table during end feed/tilt. Installed A is limited to +/-15 degrees;
+  the generic swivel's default remains +/-45. X upper=100 mm, Y=+/-10 mm,
+  Z=-10..60 mm. These travel/layout choices are assumed design values, not catalogue
+  specifications. Full structural/mount/contact validation remains Phase D.
+- `hobToWork(state)` returns the solved mechanical chain, with CAD/work axes rather
+  than the connector-axis convention. Native checks compare all translation and
+  rotation components against the independent HB3 transform at X/Y/Z/A travel
+  corners with nonzero B/C. Conservative native bounding planes prove hob clearance
+  from mandrel and platen there. Small/demo and comparison fixtures reach full depth.
+- Fixed a real scene-export failure: screw follower defaults must equal the leader's
+  initial coordinate times the resolved lead ratio. Setting X at cutting depth with
+  screw angle zero failed the assembly state's coupling invariant. Startup coordinates
+  now agree, and scene export/decoding succeeds with all six drives and 47 definitions.
+- Validation: 243 mechanical assertions pass, plus scene generation/decoding.
+  Updated part/foundation regression checks pass 955 assertions. The integrated
+  MachineKit smoke project is compiler-checked; no full workspace pass is claimed.
+  Logs: `/tmp/flexspline-hb6-checks.log`, `/tmp/flexspline-hb6-scene.log`,
+  `/tmp/flexspline-hb6-parts.log`, `/tmp/flexspline-hb6-smoke-build.log`.
+  Reused a current native CadKit library from the machine-tending worktree and the
+  existing HB3 StockKit library; no native source modification was needed.
+- Added StartPageTests coverage and `ProjectSourceTests.checkFlexsplineHobber`, which
+  loads the actual project, checks derived rates/acceleration and process ownership,
+  and performs a 200-tick zero-command MuJoCo hold. **Acceptance is pending** the
+  shared heavy-run queue, not reported as passing. The HB6 app runner executes
+  Start-page and the focused project-source case from an archived source commit,
+  label `flexspline-hb6-app`, log `/tmp/flexspline-hb6-app.log`, with 16 GiB cap /
+  8 GiB availability requirement and one native compiler at a time. Runner/source
+  live under `build/flexspline-hb6/`. HB4's existing run was not interrupted; HB0
+  still holds a slot waiting for memory and HB4 still waits for a slot.

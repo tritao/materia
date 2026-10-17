@@ -5,7 +5,7 @@ import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
 /** Static rotary clamp. Reference row is Assumed; dimensions are simplified envelopes. */
-class RotaryClamp extends PrecisionPart {
+class RotaryClamp extends PrecisionPart implements machinekit.motion.MotorBrakeSpec {
   public static function parameters():Array<ComponentParameter>return PrecisionPart.common().concat([
     PrecisionPart.quantity("outside",150,"mm"),
     PrecisionPart.quantity("bore",120,"mm"),
@@ -25,7 +25,9 @@ class RotaryClamp extends PrecisionPart {
     if(n("holdingTorque")<=0)throw "clamp needs holding torque";
   }
   override public function componentType():Null<ComponentType>return recipeType();
-  public var holdingTorque(get,never):Float;
-  function get_holdingTorque():Float return n("holdingTorque");
+  override public function motorBrakeSpec():Null<machinekit.motion.MotorBrakeSpec>return this;
+  public function holdingTorque():Float return n("holdingTorque");
+  public function releaseDelaySeconds():Float return n("releaseTime");
+  public function applicationDelaySeconds():Float return n("releaseTime");
 
 }

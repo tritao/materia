@@ -2622,6 +2622,7 @@ class MachineKitSmoke {
 			{name: "MotorBrakeTests.run", run: () -> MotorBrakeTests.run(), weight: 0.5},
 			{name: "CobotArmPreview.CobotArmChecks.run", run: () -> CobotArmPreview.CobotArmChecks.run(), weight: 1.0},
 			{name: "MobileWelderChecks.run", run: () -> MobileWelderChecks.run(false), weight: 1.0},
+			{name: "FlexsplineHobberChecks.run", run: () -> FlexsplineHobberChecks.run(), weight: 0.1},
 			{name: "HobberPartTests.run", run: () -> HobberPartTests.run(), weight: 0.1},
 			{name: "MillPartTests.run", run: () -> MillPartTests.run(), weight: 1.0},
 			{name: "PneumaticPartTests.run", run: () -> PneumaticPartTests.run(), weight: 1.0},

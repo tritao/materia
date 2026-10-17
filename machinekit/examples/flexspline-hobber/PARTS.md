@@ -100,3 +100,44 @@ Build with `./haxeon/scripts/haxeon build --compiler-only
 --project=machinekit/tests/hobbing/haxeon.json`, then run the produced host `main.hl`
 with a current CadKit library, OCCT and HashLink runtime on `LD_LIBRARY_PATH`.
 Full workspace/native builds and heavy suites use the repository heavy-run wrapper.
+
+## HB6 machine integration
+
+`FlexsplineHobber` is the six-axis reference assembly. X is radial centre distance,
+Y shifts along the tilted hob axis, Z feeds along the vertical work axis, A tilts
+about the negative world X direction, and B/C rotate the hob/table independently.
+The package-preserving IDs are `X`, `Y`, `Z`, `swivel/A`, `spindle/B`, `table/C`.
+B has process-velocity ownership, C has a position servo, and A has a spring-applied
+100 N m static clamp with release/feedback channels. Electronic gearing and the
+program that releases/reapplies A remain HB7 work; there is no B/C mechanical coupling.
+
+Three SFU1605 ball-screw/nut drives carry 400 W servos, fixed/floating supports,
+couplings and separate rotating shafts. The lead and support critical speed enter
+the existing transmission resolver. Linear scales provide 10,000 counts/mm
+(0.1 micrometre resolution). Six 20 A phase-RMS drives share an assumed 400 V
+three-phase rectifier/bus; explicit winding ratings are checked by the existing
+motor/driver power model. Ratings, fixtures and travel are design assumptions.
+
+The reference's work shoulder is 75 mm above the table platen, allowing end feed
+and tilted-tool clearance. Its mandrel is sized from the cup's inner root/wall
+geometry; other reference parts rebuild the fixture to match. X's lower soft bound
+also accounts for that fixture radius. X ends at 100 mm, Y is ±10 mm, Z is
+−10..60 mm relative to the work shoulder. A's installed range is ±15°; the generic
+swivel package still supports its original ±45° envelope. The table mounting insert
+is forward at Y=−160 mm so the horizontal spindle clears the column.
+
+`hobToWork(state)` exports the actual solved mechanical frame in the hob designer's
+CAD axes and the workpiece's cylindrical axes. It strips the connector convention
+(+Y is the joint axis) rather than accidentally returning that connector rotation.
+It is checked against HB3's independent `HobbingAxes.pose()` at all X/Y/Z/A corners
+with nonzero B/C. The native bounds establish separating planes from the mandrel
+and platen at the same corners. Scene export checks coupled startup coordinates,
+separate part masses and all six drives. Precision foundation mounts identify their
+steel insert parents. Paired rail faces are also checked directly for coplanarity,
+including the case where each face passes its individual position tolerance.
+
+Open `materia.project.json` in this directory, or the **Gear cutting** Start-page
+card. It currently opens the mechanical twin; the cutting program is HB8 work.
+`machinekit/tests/hobber/haxeon.json` runs the mechanical checks; `scene` also exports
+and decodes the scene artifact. The registered app `flexspline-hobber` project-source
+case checks project loading, source-derived axis limits and a short MuJoCo pose hold.

@@ -64,7 +64,7 @@ class HobberPartTests {
     check(spindle.interfaceName()==spindle.arbor.interfaceName(),"HSK-E gauge interface identity");
     var a=head.definition().joints.filter(j->j.id=="A")[0];
     check(a.limits.lower==-Math.PI/4&&a.limits.upper==Math.PI/4,"swivel range");
-    near(head.clamp.holdingTorque,100,0,"stationary clamp rating separate from drive effort");
+    near(head.clamp.holdingTorque(),100,0,"stationary clamp rating separate from drive effort");
     var hob=new Hob(),rebuilt:Hob=cast hob.componentType().create(hob.values());
     var original=hob.design.rakeFaceRegion(3);
     var copied=rebuilt.design.rakeFaceRegion(3);
@@ -97,10 +97,22 @@ class HobberPartTests {
       check(foundation.body.bom.description.indexOf(" kg")>=0,"casting BOM shows purchasing weight");
       var bad=FoundationIntegrity.checkMounts(foundation,[{name:"bad rail mount",parent:"casting"}]);
       check(bad.hasErrors()&&bad.items[0].subject=="bad rail mount","bad precision mount named");
-      check(!FoundationIntegrity.checkMounts(foundation,[{name:"rail mount",parent:"railLeft"}]).hasErrors(),"precision rail mount lands on steel");
+      var fixture=new MachineAssembly();fixture.include("foundation",foundation);
+      fixture.addComponent("rail",LinearRail.metric("HGR15",200));
+      fixture.addMate("rail mount","fixed","foundation/railLeft","top","rail","base");
+      check(!FoundationIntegrity.checkMounts(fixture,[{name:"rail mount",parent:"foundation/railLeft"}]).hasErrors(),"precision rail mount actually lands on steel");
+      fixture.addComponent("rogueRail",LinearRail.metric("HGR15",200));
+      fixture.addMate("rogue rail mount","fixed","foundation/casting","top","rogueRail","base");
+      check(FoundationIntegrity.checkMounts(fixture,[]).items.filter(i->i.subject=="rogue rail mount").length==1,"unlisted precision mount on casting is detected");
       var poses=foundation.solvedPoses(),pose=poses.get("railLeft");if(pose==null)throw "missing rail insert";
       poses.set("railLeft",materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.translation(0,0,0.03),pose));
       check(FoundationIntegrity.check(foundation,poses).hasErrors(),"insert out of position tolerance rejected");
+      var pair=foundation.solvedPoses(),left=pair.get("railLeft"),right=pair.get("railRight");
+      if(left==null||right==null)throw "missing paired inserts";
+      var normal=materia.assembly.AssemblyFrames.transformVector(left,0,0,1);
+      pair.set("railLeft",materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.translation(0.009*normal.x,0.009*normal.y,0.009*normal.z),left));
+      pair.set("railRight",materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.translation(-0.009*normal.x,-0.009*normal.y,-0.009*normal.z),right));
+      check(FoundationIntegrity.check(foundation,pair).items.filter(i->i.code=="foundation.insert-coplanarity").length==1,"pair coplanarity checked even when each insert is individually within tolerance");
       var rebuilt=MachineAssembly.decode(foundation.encode(),registry);
       check(rebuilt.components().length==foundation.components().length,"foundation child parts saved separately");
     }

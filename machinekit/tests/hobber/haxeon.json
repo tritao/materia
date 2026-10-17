@@ -1,0 +1,7 @@
+{
+  "version": 1, "package": {"name": "machinekit-hobber-checks"},
+  "entry": "FlexsplineHobberChecks",
+  "sourceRoots": ["src", "../../examples/flexspline-hobber"],
+  "dependencies": {"machinekit": {"path": "../.."}, "stockkit": {"path": "../../../stockkit"}},
+  "target": "host", "outputDir": "build"
+}

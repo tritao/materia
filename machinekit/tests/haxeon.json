@@ -2,8 +2,9 @@
 	"version": 1,
 	"package": { "name": "machinekit-tests" },
 	"entry": "MachineKitSmoke",
-	"sourceRoots": ["src", "hobbing/src", "../examples/press-brake", "../examples", "../examples/robot-arm", "../examples/cnc-router", "../examples/mobile-base", "../examples/robot-welder", "../examples/corexy", "../examples/printer", "../examples/bench-mill", "../examples/cobot-arm", "../examples/machine-tending", "mobile-welder/src", "../examples/gantry-picker", "../examples/track-arm", "../examples/overhead-arm", "../examples/robot-screwdriver"],
+	"sourceRoots": ["src", "hobbing/src", "hobber/src", "../examples/flexspline-hobber", "../examples/press-brake", "../examples", "../examples/robot-arm", "../examples/cnc-router", "../examples/mobile-base", "../examples/robot-welder", "../examples/corexy", "../examples/printer", "../examples/bench-mill", "../examples/cobot-arm", "../examples/machine-tending", "mobile-welder/src", "../examples/gantry-picker", "../examples/track-arm", "../examples/overhead-arm", "../examples/robot-screwdriver"],
 	"dependencies": {
+		"stockkit": {"path": "../../stockkit"},
 		"collisionkit-native": {"path": "../../collisionkit/native"},
 		"motionkit-robot": { "path": "../../motionkit/robot" },
 		"processkit": { "path": "../../processkit" },

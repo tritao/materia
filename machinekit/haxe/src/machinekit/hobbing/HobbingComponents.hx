@@ -4,6 +4,7 @@ import machinekit.component.ComponentRegistry;
 
 class HobbingComponents {
   public static function register(registry:ComponentRegistry):Void {
+    registry.register(HobberBracket.recipeType());
     registry.register(HobArbor.recipeType());registry.register(OutboardSupport.recipeType());
     registry.register(Hob.recipeType());registry.register(ExpandingMandrel.recipeType());
     registry.register(RotaryClamp.recipeType());registry.register(TablePlaten.recipeType());

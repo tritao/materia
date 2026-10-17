@@ -63,6 +63,11 @@ class StartPageTests {
     var presses = [for (family in machining) if (family.id == "press-brake") family];
     check(presses.length == 1 && presses[0].examples.length == 1 && presses[0].examples[0].id == "press-brake",
       "the press brake remains directly accessible in its own machining card");
+    browser.selectCategory("Gear cutting");
+    var gears=browser.filtered(all);
+    check(gears.length==1&&gears[0].examples[0].id=="flexspline-hobber","hobber is directly accessible under Gear cutting");
+    var hobber=ExampleCatalog.find("flexspline-hobber");
+    check(hobber!=null&&FileSystem.exists("machinekit/examples/flexspline-hobber/materia.project.json"),"hobber project exists");
     browser.selectCategory("All");
 
     // A partial installation still groups only the variants that are actually available.

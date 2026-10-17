@@ -10,8 +10,8 @@ class SwivelHead extends MachineAssembly {
   public final motor:TorqueMotor;
   public final clamp:RotaryClamp;
   public final bearing:machinekit.motion.CrossedRollerBearing;
-  public function new(?motor:TorqueMotor,?clamp:RotaryClamp) {
-    super();this.motor=motor==null?new TorqueMotor(new ComponentValues().setNumber("ratedSpeed",Math.PI/12).setNumber("maxSpeed",Math.PI/6)):motor;
+  public function new(?motor:TorqueMotor,?clamp:RotaryClamp,maxTilt:Float=Math.PI/4) {
+    super();if(!Math.isFinite(maxTilt)||maxTilt<=0||maxTilt>Math.PI/4)throw "invalid swivel tilt range";this.motor=motor==null?new TorqueMotor(new ComponentValues().setNumber("ratedSpeed",Math.PI/12).setNumber("maxSpeed",Math.PI/6)):motor;
     this.clamp=clamp==null?new RotaryClamp():clamp;
     if(this.motor.n("outside")>150||this.motor.n("height")>45)throw "swivel motor exceeds reference housing seat";
     bearing=new machinekit.motion.CrossedRollerBearing();
@@ -19,7 +19,7 @@ class SwivelHead extends MachineAssembly {
     addComponent("head",new TablePlaten(new ComponentValues().setNumber("outside",180).setNumber("bore",100)));
     addMemberConnector("housing","swivel",Solids.axial(0,0,90));
     addMateOnAxis("A",Revolute,"housing","swivel","head","axis",{x:0,y:1,z:0},0,
-      {lower:-Math.PI/4,upper:Math.PI/4,velocity:this.motor.maxSpeed,effort:this.motor.peakTorque,
+      {lower:-maxTilt,upper:maxTilt,velocity:this.motor.maxSpeed,effort:this.motor.peakTorque,
        assumptions:this.motor.ratingsBasis==Assumed?[{quantity:"speed limit",label:"assumed direct motor rating"},{quantity:"effort limit",label:"assumed peak motor torque"}]:null});
     exposeConnector("mount","housing","mount");exposeConnector("head","head","top");
   }

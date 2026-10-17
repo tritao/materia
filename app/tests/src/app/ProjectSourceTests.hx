@@ -4230,6 +4230,34 @@ class ProjectSourceTests {
     }
   }
 
+  /** HB6 acceptance: generation, derived drives and a short zero-command MuJoCo hold. */
+  static function checkFlexsplineHobber(root:String):Void {
+    var manifest=FileSystem.fullPath(root+"/machinekit/examples/flexspline-hobber/materia.project.json");
+    var generated=MateriaProjectRunner.loadProject(manifest);
+    var definition=generated.assemblyDefinition;if(definition==null)throw "hobber has no assembly definition";
+    var model=AssemblySimulationBridge.toRobotModel(definition,generated.physical).model;
+    check(model.actuators.length==6,"hobber exports six independently driven axes");
+    for(axis in ["X","Y","Z"]){var limits=model.coupledLimits(axis,new SteadyLoads());
+      check(limits.requireVelocity()>0&&limits.requireAcceleration()>0,'hobber $axis limits derive from screw/motor/load');}
+    var blueprint=RobotRuntimeCompiler.compile(model,new robotkit.profile.RobotProfile());
+    var process=blueprint.processJoints();
+    for(i in 0...model.joints.length){var id=Std.string(model.joints[i].id);
+      if(id=="spindle/B")check(process[i],"hob B is process velocity owned");
+      if(id=="table/C")check(!process[i],"table C remains servo controlled before EGB");}
+    var session=new ProjectDocumentSession(null,false);session.openGeneratedProject(generated,manifest);
+    var simulation=new ApplicationSimulation(new RobotWorld());simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors,session.scene,session),"hobber MuJoCo build: "+simulation.error);
+      simulation.step();var start=simulation.snapshot().robots()[0].positions.toArray();
+      for(_ in 0...200)simulation.step();
+      var finish=simulation.snapshot().robots()[0].positions;
+      for(i in 0...model.joints.length){var type=model.joints[i].type;
+        var tolerance=type==JointType.Prismatic?0.0005:0.002;
+        check(Math.isFinite(finish.get(i))&&Math.abs(finish.get(i)-start[i])<=tolerance,'hobber holds zero-command pose on ${model.joints[i].id}');}
+    }catch(e:Dynamic){simulation.dispose();session.dispose();throw e;}
+    simulation.dispose();session.dispose();
+  }
+
   /** The moving-table mill machines its single-tool bearing block in the shared backend. */
   static function checkBenchMill(root:String,dt:Float = 0.01):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.project.json");
@@ -7266,6 +7294,7 @@ class ProjectSourceTests {
       suite("clearance", root -> { checkJointSceneClearance(root); checkHeldJointSceneClearance(root); checkHeldJointSceneClearance(root,true); }),
       suite("welder", checkRobotWelder),
       suite("mates", checkMates),
+      suite("flexspline-hobber", checkFlexsplineHobber),
       suite("bench-mill", root -> checkBenchMill(root)),
       focused("bench-mill-fine", root -> checkBenchMill(root,0.005)),
       suite("enclosed-mill", checkEnclosedMillProject),

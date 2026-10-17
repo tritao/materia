@@ -14,7 +14,7 @@ class FoundationLayout {
     function add(id:String,role:String,w:Float,d:Float,h:Float,x:Float,y:Float,z:Float):Void
       out.push({id:id,role:role,width:w,depth:d,height:h,pose:F.translation(x,y,z)});
     if(kind=="bed"){
-      add("tablePlate","table plate",180,180,20,0,-100,110);
+      add("tablePlate","table plate",180,180,20,0,-160,110);
       add("columnPlate","column plate",220,180,20,0,180,110);
       for(side in [-1,1])add(side<0?"railLeft":"railRight","rail seat",35,400,20,side*200,0,110);
       for(x in [-1,1])for(y in [-1,1])add('bush${x<0?"L":"R"}${y<0?"F":"B"}',"threaded bush",20,20,20,x*275,y*210,110);
