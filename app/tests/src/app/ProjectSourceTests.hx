@@ -4262,10 +4262,10 @@ class ProjectSourceTests {
       check(player.stock.maxBytes<128*1024*1024&&player.stock.stream.peakFrames<4096,"hobber stock/window allocation budget");
       check(player.stock.measurement!=null,"HB4 inspection completed: "+player.stock.measurementFailure);
       check(player.elapsed>player.job.cuttingSeconds&&Math.isFinite(player.syncError),"measured total cycle and synchronization are reported");
-      // Coarse end-to-end smoke bound: two 4 kHz owner periods plus two table encoder quanta.
+      // Clock-alignment regression: two table encoder quanta, with no owner-tick allowance.
       // The precision error budget has its own much tighter acceptance.
-      var syncBudget=2*player.job.tableRpm*2*Math.PI/60/4000+2*2*Math.PI/8388608;
-      check(player.syncError<=syncBudget,"cutting synchronization exceeds two owner periods plus encoder quantization");
+      var syncBudget=2*2*Math.PI/8388608;
+      check(player.syncError<=syncBudget,"cutting synchronization exceeds two table encoder quanta");
       Sys.println("HOBBER_ACCEPTANCE "+haxe.Json.stringify({cycleSeconds:player.elapsed,cuttingSeconds:player.job.cuttingSeconds,
         syncArcsec:player.syncError*648000/Math.PI,grade:player.stock.measurement==null?null:player.stock.measurement.overallGrade,
         isoClass:player.stock.measurement==null?null:player.stock.measurement.isoClass,collisions:player.stock.collisions,

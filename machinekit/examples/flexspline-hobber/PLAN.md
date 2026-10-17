@@ -1296,10 +1296,14 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   It completes **924 windows in 5.5535 simulated seconds**, with about **946 KiB**
   retained stock, no fixture-envelope contacts and a finite gear report (ISO class
   unqualified). Observed wall time is about **32–34 s** with generated geometry cached.
-- App measured cutting sync is **402.865 arcsec**, within the smoke bound of two
-  4 kHz owner periods plus two table encoder quanta. This is about one owner period
-  of phase lead; precision clock/phase alignment remains open for HB11/HB12.
-  Passing this smoke must not be described as meeting the precision error budget.
+- App measured cutting sync is **0.003962 arcsec** after correcting the simulation
+  command epoch (previously **402.865 arcsec**, one 4 kHz tick ahead). The session
+  labels steps by their end time; commands now use the start time and feedback
+  retains the end time. Explicit zero is a valid owner epoch; only omitted time
+  requests next-sample prediction. Regression acceptance is now two table encoder
+  quanta (about **0.309 arcsec**), with no owner-tick allowance. The coarse cut and
+  three native runtime/gear/brake checks pass. This resolves the clock lead, but
+  does not establish the full HB11 reference error budget or HB12 precision grade.
 - Execution fixes: explicitly wire B/C encoders to their outer drives; state
   assumed A/C positioning accelerations; compile physical hold gains for braked
   servos; enable the hobbing table's assumed drive-default physical servo gains so

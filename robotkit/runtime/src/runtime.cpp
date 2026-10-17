@@ -1278,7 +1278,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         current = state_;
         safety = state_.safety;
     }
-    if (owner_time_ns == 0)
+    if (owner_time_ns == UINT64_MAX)
         owner_time_ns = current.source_timestamp_ns +
             static_cast<uint64_t>(std::max<int64_t>(0, period_.count()));
     current_owner_time_ns_ = owner_time_ns;

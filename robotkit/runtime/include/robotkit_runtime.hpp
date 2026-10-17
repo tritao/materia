@@ -291,8 +291,9 @@ public:
         double control_acceleration[RK_MAX_TRAJECTORY_JOINTS]{};
     };
 
-    /** Internal phases used by Simulation to coordinate multiple runtimes. */
-    rk_result apply_pending_commands(uint64_t owner_time_ns = 0);
+    /** Internal phases used by Simulation to coordinate multiple runtimes.
+     * Explicit zero is the simulation origin; omitted time uses the next sample epoch. */
+    rk_result apply_pending_commands(uint64_t owner_time_ns = UINT64_MAX);
     rk_result publish_sample(uint64_t timestamp_ns);
     rk_result publish_presampled(uint64_t timestamp_ns, const rk_robot_state &sample,
                                 rk_result sample_result = RK_OK);

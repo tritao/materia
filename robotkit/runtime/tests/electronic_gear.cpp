@@ -102,6 +102,14 @@ int main() {
     for (auto v : {value("gear.begin"), value("gear.loop", 4000), value("gear.term/0/1000000/1", ratio), value("gear.quantum", 2 * std::numbers::pi / 8388608), value("gear.engage")}) {
         rk_timed_event event{}; std::strcpy(event.channel, "motion.gear/1"); event.value = v; plan.events.push_back(event);
     }
+    // Simulation's first command epoch is genuinely zero, not an unspecified
+    // clock request. Keep transport-delay compensation without adding a tick.
+    auto zero_encoders = std::make_shared<Encoders>(); zero_encoders->follower = .2;
+    auto zero_runtime = std::make_unique<robotkit::RobotRuntime>(*spec, zero_encoders, std::chrono::microseconds(250));
+    assert(zero_runtime->publish_sample(1'000'000) == RK_OK);
+    assert(zero_runtime->submit_plan(plan) == RK_OK);
+    assert(zero_runtime->apply_pending_commands(0) == RK_OK);
+    assert(std::abs(zero_encoders->follower - .2 - ratio * omega * .001) < arcsec);
     assert(runtime->submit_plan(plan) == RK_OK);
     for (uint64_t tick = 5; tick < 405; ++tick) {
         assert(runtime->apply_pending_commands(tick * 250000) == RK_OK);

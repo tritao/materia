@@ -2469,7 +2469,10 @@ rk_result Simulation::prepare(const nksim_tick &tick) {
     // apply theirs and the tick goes ahead. Rejecting the whole tick would let
     // one robot, for instance a fallen humanoid whose policy keeps commanding
     // it, stop every machine that shares the session.
-    const auto simulation_ns = tick.step_index * static_cast<std::uint64_t>(period_.count());
+    // The session labels the step by its end epoch. Commands and their
+    // interpolated references start before that physics step; publishing below
+    // uses its end epoch. Predicting to the end here advances geared masters twice.
+    const auto simulation_ns = (tick.step_index - 1) * static_cast<std::uint64_t>(period_.count());
     for (std::size_t index = 0; index < runtimes_.size(); ++index) {
         if (runtimes_[index]->apply_pending_commands(simulation_ns) != RK_OK)
             runtimes_[index]->fail_tick();
