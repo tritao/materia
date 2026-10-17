@@ -17,18 +17,23 @@ class HobbingForceTests {
     try {
       var passes=job.schedule(stock.grid);
       for(pass in passes){sweep.cutPass(stock,job.axesAt,pass,sweep.tolerance/16);
-        load.afterPass(pass,job.axesAt(pass.start),job.axesAt(pass.end),16);}
+        load.afterPass(pass,job.axesAt(pass.start),job.axesAt(pass.end),16);
+        if(full&&load.passes%100==0){Sys.println('REFERENCE_PROGRESS ${load.passes}/${passes.length} windows; peak ${load.maxTangential} N');Sys.stdout().flush();}}
       near(load.volume,initial.compareStock(stock).leftoverVolume(),"gash chip volumes telescope to stock difference");
       check(load.volume>0&&load.maxTangential>0,"physical reference rake sweep gives nonzero loads");
+      Sys.println('REFERENCE_FORCE '+haxe.Json.stringify({seconds:job.duration,volumeMm3:load.volume,
+        forceN:load.maxTangential,radialN:load.maxRadial,energyJ:load.energy,
+        meanRadialN:load.energy/(cam.rpm*2*Math.PI/60*0.016*job.duration)*Math.tan(spec.pressureAngle),
+        radialRangeBoundN:load.maxRadial,meanBasis:"time mean over complete feed stroke including air entry/exit; energy / constant peripheral speed / duration; rectangular overlapping gash-window model",
+        radialRangeBasis:"conservative 0..measured peak envelope; not a measured minimum or tooth peak",
+        torqueNm:load.maxHobTorque,
+        tableTorqueBoundNm:load.maxTableTorqueBound,powerW:load.maxPower,windows:load.passes,
+        scope:full?"complete ideal HB8 reference feed stroke, coarse ring grid":"short mid-face initial engagement; not a full reference cycle"}));
       if(full){
         check(load.maxTangential>=10&&load.maxTangential<100,"full reference overlapping-window loads in tens of N");
         check(load.maxPower<1500*0.8&&load.maxHobTorque<(1500/(4000*2*Math.PI/60))*0.8,"full reference spindle 20% reserve");
       }else check(load.maxPower>1500*0.8||load.maxHobTorque>(1500/(4000*2*Math.PI/60))*0.8,"mid-face plunge correctly exposes overload");
       check(load.peakActiveWindows<32,"overlap accumulator bounded");
-      Sys.println('REFERENCE_FORCE '+haxe.Json.stringify({seconds:job.duration,volumeMm3:load.volume,
-        forceN:load.maxTangential,radialN:load.maxRadial,torqueNm:load.maxHobTorque,
-        tableTorqueBoundNm:load.maxTableTorqueBound,powerW:load.maxPower,windows:load.passes,
-        scope:full?"complete ideal HB8 reference feed stroke, coarse ring grid":"short mid-face initial engagement; not a full reference cycle"}));
     }catch(e:Dynamic){initial.dispose();load.dispose();sweep.dispose();stock.dispose();throw e;}
     initial.dispose();load.dispose();sweep.dispose();stock.dispose();
   }

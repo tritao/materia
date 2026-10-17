@@ -30,6 +30,19 @@ class FlexsplineHobberChecks {
     check(compiled.joints[tilt].servoStiffness>0,"uncoupled braked swivel gets physical hold gains");
     var cam=FlexsplineHobberCam.job(machine);
     check(cam.passes.length==1&&cam.tableRpm>0,"HB8 CAM fits installed travel and drive limits");
+    var support=new MandrelRadialSupport(machine.mandrel,machine.spec.faceWidth);
+    check(support.stiffness>0&&support.stiffness<support.sleeveStiffness&&support.stiffness<support.contactStiffness,"sleeve/contact series stiffness below each constituent");
+    var installed=installedSupport(machine);
+    check(installed.supportsRim&&installed.bandStart>=installed.sleeveStart&&installed.bandEnd<=installed.sleeveEnd,"assembled toothed band lies entirely on designed expansion sleeve");
+    near(installed.radialGap,0.025,1e-9,"assembled bore/sleeve radial clearance matches design");
+    var unsupported=new MandrelRadialSupport(machine.mandrel,machine.spec.faceWidth,0);
+    check(!unsupported.supportsRim&&unsupported.stiffness==0,"rim outside sleeve gets no mandrel radial stiffness");
+    var wide=new MandrelRadialSupport(machine.mandrel,20);
+    check(!wide.supportsRim&&wide.stiffness==0,"rim wider than sleeve also falls back to wall stiffness");
+    var oilValues=machine.mandrel.values().copy();oilValues.setNumber("oilBulkModulus",3000);
+    var oilSupport=new MandrelRadialSupport(new ExpandingMandrel(oilValues),machine.spec.faceWidth);
+    near(oilSupport.stiffness,support.stiffness,1e-9,"oil bulk modulus does not stiffen first-order ovalisation");
+    near(oilSupport.uniformOilStiffness,2*support.uniformOilStiffness,1e-6,"uniform oil compression scales with bulk modulus");
     var ring=new stockkit.hobbing.RingCompliance(machine.spec.rootRadius()-0.3,0.6,machine.spec.faceWidth,210000,1000,"explicit test fixture stiffness");
     var sync=new stockkit.hobbing.HobbingErrorSource("sync","runtime observations","test zero measured following error",(t,a)->a);
     var errors=FlexsplineHobberErrors.sources(machine,t->20,ring,sync);
@@ -101,7 +114,113 @@ class FlexsplineHobberChecks {
     }
     Sys.println('FlexsplineHobberChecks: $assertions assertions passed');
   }
+  /** Small physical integration fixture, separate from reference-budget acceptance. */
+  static function wallCuts():Void {
+    var machine=new FlexsplineHobber(),support=new MandrelRadialSupport(machine.mandrel,machine.spec.faceWidth);
+    var spec=new GearSpec(1,20,2,20*Math.PI/180);
+    var hob=new gearkit.HobDesign(gearkit.ConjugateRack.of(new gearkit.ToothProfile(spec)),1,32,4);
+    var motion=new stockkit.hobbing.IdealHobbingJob(spec,hob,3000,1.1,0,1);
+    var grid=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2);
+    var passes=motion.schedule(grid.grid);grid.dispose();
+    var force=100*Math.tan(spec.pressureAngle);
+    var rows:Array<{factor:Float,thicknessChangeUm:Float,profileUm:Float}> = [];
+    var inspection=new gearkit.GearInspection(spec,spec.pitchRadius());
+    var baseline=new stockkit.hobbing.HobbingErrorJob(spec,hob,motion.axesAt,passes,[],0.6,0.1,0.2,-6,6,0.0001,inspection).run([]);
+    for(factor in [0.3,1.0,3.0]){
+      var ring=new stockkit.hobbing.RingCompliance(machine.spec.rootRadius()-0.3,0.6,machine.spec.faceWidth,210000,support.stiffness*factor,support.basis);
+      var job=new stockkit.hobbing.HobbingErrorJob(spec,hob,motion.axesAt,passes,[ring.source("assumed reference support",t->force)],0.6,0.1,0.2,-6,6,0.0001,inspection);
+      var measured=job.run(["wall"]),delta=0.0;
+      for(i in 0...measured.thickness.length)delta=Math.max(delta,Math.abs(measured.thickness[i]-baseline.thickness[i])*1000);
+      check(measured.thickness.length==spec.teeth&&delta>0,"physical wall-source cut changes thickness");
+      rows.push({factor:factor,thicknessChangeUm:delta,profileUm:measured.value("Falpha")});
+    }
+    check(rows[0].thicknessChangeUm>rows[1].thicknessChangeUm&&rows[1].thicknessChangeUm>rows[2].thicknessChangeUm,"physical support sensitivity decreases thickness error");
+    Sys.println("WALL_CUT_SENSITIVITY "+haxe.Json.stringify({rows:rows,forceN:force,
+      scope:"m1 z20 face2 coarse integration fixture using reference support estimates; constant conservative force; not reference inspection or complete budget"}));
+  }
+  static function installedSupport(machine:FlexsplineHobber):MandrelRadialSupport {
+    var model=new AssemblyModel("mm");machine.addTo(model,"");var state=model.initialState();state.forwardKinematics();
+    var pose=F.compose(F.inverse(state.worldPose("mandrel")),state.worldPose("blank"));
+    var blank:TablePlaten=cast machine.components().filter(m->m.id=="blank")[0].component;
+    // The authored annular blank and mandrel share +Z and the table axis.
+    check(Math.abs(pose.x)+Math.abs(pose.y)<1e-8,"rim and mandrel axes coincide");
+    return new MandrelRadialSupport(machine.mandrel,machine.spec.faceWidth,pose.z,blank.n("bore")/2);
+  }
+  static function supportSensitivity(meanForceBound:Float,rangeForceBound:Float,peakForce:Float,basis:String,meanMeasured:Bool):Void {
+    var machine=new FlexsplineHobber(),estimate=installedSupport(machine);
+    var s=machine.spec,profileLimit=gearkit.Iso1328.tolerance(s,"Falpha",6),pitchLimit=gearkit.Iso1328.tolerance(s,"fp",6);
+    // Explicit physical design allocations. Numerical HB3 tolerance is unrelated.
+    var profileBudget=profileLimit*0.2,pitchBudget=pitchLimit*0.2,thicknessTolerance=5.0;
+    var bare=new stockkit.hobbing.RingCompliance(s.rootRadius()-0.3,0.6,s.faceWidth,210000,0,"unsupported reference ring");
+    var seated=estimate.supportsRim&&estimate.contactPressure>peakForce/(Math.PI*(machine.mandrel.n("outside")/2)*s.faceWidth);
+    var rows=[];
+    for(factor in [0.3,1.0,3.0]){
+      var support=seated?estimate.stiffness*factor:0;
+      var ring=new stockkit.hobbing.RingCompliance(bare.radius,0.6,s.faceWidth,210000,support,estimate.basis);
+      var mean=ring.deflection(meanForceBound)*1000,variation=ring.deflection(rangeForceBound)*1000;
+      var profile=2*variation,pitch=2*Math.tan(s.pressureAngle)*variation,thickness=2*Math.tan(s.pressureAngle)*mean;
+      rows.push({factor:factor,supportNPerMm:support,meanDeflectionUm:mean,varyingDeflectionRangeBoundUm:variation,
+        meanThicknessErrorBoundUm:thickness,xCompensationMagnitudeUm:mean,
+        varyingProfileBoundUm:profile,varyingPitchBoundUm:pitch,
+        passes:thickness<=thicknessTolerance&&profile<=profileBudget&&pitch<=pitchBudget});
+    }
+    var requiredTotal=Math.max(meanForceBound*1000*2*Math.tan(s.pressureAngle)/thicknessTolerance,
+      Math.max(rangeForceBound*2000/profileBudget,rangeForceBound*1000*2*Math.tan(s.pressureAngle)/pitchBudget));
+    var required=Math.max(0,requiredTotal-bare.ringStiffness);
+    Sys.println("MANDREL_SENSITIVITY "+haxe.Json.stringify({basis:estimate.basis,forceBasis:basis,
+      meanRadialForceN:meanMeasured?meanForceBound:null,meanRadialForceUpperBoundN:meanForceBound,
+      varyingRadialRangeBoundN:rangeForceBound,peakRadialN:peakForce,
+      supportsToothedRim:estimate.supportsRim,bandStartMm:estimate.bandStart,bandEndMm:estimate.bandEnd,
+      sleeveStartMm:estimate.sleeveStart,sleeveEndMm:estimate.sleeveEnd,actualRadialFitGapMm:estimate.radialGap,
+      supportApplied:seated,seatingScreen:seated,unsupportedRingNPerMm:bare.ringStiffness,
+      estimatedNPerMm:estimate.stiffness,profileAllocationUm:profileBudget,pitchAllocationUm:pitchBudget,
+      toothThicknessTolerancePlusMinusUm:thicknessTolerance,thicknessBasis:"Assumed physical flexspline tolerance +/-5 um; mean compensable by X infeed; no ISO thickness class",
+      varyingBasis:"geometry bounds on the load range about its time mean, in the 20 percent wall share of HB11 class-6 profile and single-pitch limits",
+      outsideIsoScope:gearkit.Iso1328.outsideScope(s),rows:rows,
+      sufficientEffectiveSupportNPerMm:required,sufficientNominalFor03RangeNPerMm:required/0.3,
+      acceptance:rows.filter(r->!r.passes).length==0?"wall allocation passed, dependent on assumed support/contact and force bounds":"open: sufficient stiffness requirement; justify design or measure stiffness",
+      scope:"wall-only quasistatic mean/variation bounds; full HB11 combined-source budget and physical reference inspection remain open"}));
+    check(rows.length==3,"three stiffness sensitivity factors reported");
+    if(seated)check(rows[0].meanDeflectionUm>rows[1].meanDeflectionUm&&rows[1].meanDeflectionUm>rows[2].meanDeflectionUm,"support sensitivity decreases mean deflection");
+    else check(rows[0].supportNPerMm==0&&rows[2].supportNPerMm==0,"unseated or unsupported rim uses only cup wall ring stiffness");
+  }
+  /** Recheck the measured full-stroke envelope against installed continuous ratings.
+      This is a static process-load reserve check, not a loaded dynamics simulation. */
+  static function referenceLoads(path:String):Void {
+    var report:Dynamic=haxe.Json.parse(sys.io.File.getContent(path));
+    function number(key:String):Float {
+      var value:Dynamic=Reflect.field(report,key);
+      if(value==null||!Math.isFinite(value)||value<0)throw 'invalid reference load $key';
+      return value;
+    }
+    var machine=new FlexsplineHobber(),cam=FlexsplineHobberCam.job(machine),reserve=0.8;
+    check(report.scope=="complete ideal HB8 reference feed stroke, coarse ring grid","loads came from full reference stroke");
+    near(number("seconds"),cam.cuttingSeconds,1e-6,"load stroke matches reference CAM duration");
+    var mean:Dynamic=Reflect.field(report,"meanRadialN");
+    var meanKnown=mean!=null&&Math.isFinite(mean)&&mean>=0;
+    supportSensitivity(meanKnown?mean:number("radialN"),number("radialN"),number("radialN"),
+      meanKnown?Std.string(report.meanBasis):"legacy peak-only report: mean and varying range conservatively bounded by peak; actual mean unavailable",meanKnown);
+    var b=machine.spindle.motor,c=machine.table.motor;
+    var bTorque=b.continuousTorque*reserve,bPower=b.continuousTorque*b.ratedSpeed*reserve;
+    var cTorque=c.continuousTorque*reserve;
+    check(cam.rpm*2*Math.PI/60<=b.maxSpeed&&cam.tableRpm*2*Math.PI/60<=c.maxSpeed,"reference process speeds within installed limits");
+    check(number("torqueNm")<=bTorque&&number("powerW")<=bPower,"measured reference spindle loads retain 20 percent reserve");
+    check(number("tableTorqueBoundNm")<=cTorque,"measured reference table torque bound retains 20 percent reserve");
+    var members=machine.components();
+    var motor:machinekit.motion.ServoMotor=cast members.filter(m->m.id=="Xmotor")[0].component;
+    var screw:machinekit.motion.BallScrew=cast members.filter(m->m.id=="Xscrew")[0].component;
+    var nut:machinekit.motion.BallNut=cast members.filter(m->m.id=="Xnut")[0].component;
+    var xForce=motor.rating.ratedTorque*2*Math.PI/(screw.thread.lead*0.001)*nut.efficiency()*reserve;
+    check(number("radialN")<=xForce,"measured reference radial load retains X continuous thrust reserve");
+    Sys.println("REFERENCE_RATINGS "+haxe.Json.stringify({spindleTorqueLimitNm:bTorque,spindlePowerLimitW:bPower,
+      tableTorqueLimitNm:cTorque,xThrustLimitN:xForce,reserve:0.2,
+      scope:"installed assumed continuous ratings; static process loads only, inertia/gravity and tooth peaks excluded"}));
+    Sys.println('Reference load ratings: $assertions checks passed');
+  }
   public static function main():Void {
+    if(Sys.args().length==1&&Sys.args()[0]=="wall-cuts"){wallCuts();return;}
+    if(Sys.args().length==1&&Sys.args()[0]=="support-sensitivity"){supportSensitivity(100*Math.tan(20*Math.PI/180),100*Math.tan(20*Math.PI/180),100*Math.tan(20*Math.PI/180),"conservative HB10 acceptance envelope Fc<=100 N; mean and varying range separately bounded, not measured",false);return;}
+    if(Sys.args().length==2&&Sys.args()[0]=="reference-loads"){referenceLoads(Sys.args()[1]);return;}
     if(Sys.args().length>0&&(Sys.args()[0]=="scene"||Sys.args()[0]=="cutting")){
       var cutting=Sys.args()[0]=="cutting";
       var data=materia.project.SceneArtifact.decode(cutting?FlexsplineHobberPreview.cutting():FlexsplineHobberPreview.hobber());

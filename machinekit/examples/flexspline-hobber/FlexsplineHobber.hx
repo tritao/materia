@@ -44,7 +44,7 @@ class FlexsplineHobber extends MachineAssembly {
     includeAt("column",column,F.translation(0,180,140));
     fixed("column-mount","bed/columnPlate","top","column/basePlate","mount");precisionMounts.push({name:"column-mount",parent:"bed/columnPlate"});
     var diameter=2*(this.spec.rootRadius()-0.6);
-    mandrel=new ExpandingMandrel(new ComponentValues().setNumber("outside",diameter-0.05).setNumber("workSeat",75).setNumber("height",90));
+    mandrel=new ExpandingMandrel(new ComponentValues().setNumber("outside",diameter-0.05).setNumber("workSeat",75).setNumber("height",90).setNumber("sleeveStart",71));
     fixAt("mandrel",mandrel,F.translation(0,-160,248),"table/platen");
     workOrigin=F.translation(0,-160,323);
     var blank=new TablePlaten(new ComponentValues().setNumber("outside",2*this.spec.tipRadius()).setNumber("bore",2*(this.spec.rootRadius()-0.6)).setNumber("height",this.spec.faceWidth));

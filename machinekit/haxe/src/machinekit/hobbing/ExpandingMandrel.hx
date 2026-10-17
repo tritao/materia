@@ -12,6 +12,15 @@ class ExpandingMandrel extends PrecisionPart {
     PrecisionPart.quantity("height",50,"mm"),
     PrecisionPart.quantity("workSeat",30,"mm"),
     PrecisionPart.quantity("expansion",0.05,"mm"),
+    PrecisionPart.quantity("sleeveWall",1.5,"mm"),
+    PrecisionPart.quantity("sleeveLength",16,"mm"),
+    PrecisionPart.quantity("sleeveStart",26,"mm"),
+    PrecisionPart.quantity("sleeveYoungs",210000,"N/mm²"),
+    PrecisionPart.quantity("sleevePoisson",0.3,""),
+    PrecisionPart.quantity("oilCavity",0.5,"mm"),
+    PrecisionPart.quantity("oilBulkModulus",1500,"N/mm²"),
+    PrecisionPart.quantity("contactStiffnessFactor",1,""),
+    PrecisionPart.quantity("radialFitGap",0.025,"mm"),
     PrecisionPart.quantity("clampingPressure",10000000,"Pa"),
     PrecisionPart.quantity("maxPressure",15000000,"Pa"),
     PrecisionPart.quantity("eccentricity",0.004,"mm"),
@@ -27,6 +36,10 @@ class ExpandingMandrel extends PrecisionPart {
     var v=PrecisionPart.resolve(parameters(),overrides);
     super("HYDRAULIC-MANDREL-59","Hydraulic expanding mandrel (reference envelope)","steel",v,true,[{name:"eccentricity",unit:"mm"},{name:"clampingDistortion",unit:"mm"}]);
     if(n("clampingPressure")<=0||n("clampingPressure")>n("maxPressure")||n("workSeat")>=n("height")||n("expansion")<=0)throw "invalid mandrel ratings";
+    for(key in ["sleeveWall","sleeveLength","sleeveYoungs","oilCavity","oilBulkModulus","contactStiffnessFactor"])
+      if(n(key)<=0)throw 'invalid mandrel support $key';
+    if(n("sleeveStart")+n("sleeveLength")>n("height")||n("sleeveWall")>=n("outside")/2||n("radialFitGap")<0
+      ||n("sleevePoisson")<=0||n("sleevePoisson")>=0.5)throw "invalid sleeve/contact design";
     addConnector("work",Mount,Solids.axial(0,0,n("workSeat")));
   }
   override public function componentType():Null<ComponentType>return recipeType();

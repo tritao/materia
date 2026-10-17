@@ -74,3 +74,28 @@ Measured here: 391 windows, 10.5614 mm³ removed, 72.13 N overlapping window mea
 360.66 W and 1.154 Nm hob torque. It passes the 20% spindle reserve check and
 chip-volume conservation in about 5 seconds using 113 MiB. This small-part
 smoke check complements the pending full reference-stroke acceptance.
+
+The complete reference-stroke and installed-rating check can be run with:
+
+```sh
+machinekit/examples/flexspline-hobber/check-reference-force.sh
+```
+
+This uses the existing native dependencies (the same `HOBBER_NATIVE_CACHE` and
+`HOBBER_STOCK_NATIVE` overrides as the quick runner), compiles only the two Haxe
+checks, caps the cut at 4 GiB, and saves provenance, progress, the force report and
+installed-rating results under `build/flexspline-reference-force/`. It runs the
+entire reference feed stroke; it is substantially slower than the quick fixture.
+The force report is printed before acceptance assertions so a failing cut still
+retains its measured loads. The machine check reads the report and checks B
+power/torque, C torque and X screw thrust against installed continuous ratings
+with 20% reserve. X thrust uses the installed screw lead and nut efficiency.
+These are static process-load checks with assumed ratings, not an inertia/gravity
+or instantaneous tooth-load validation.
+
+The full-stroke report separates mean and varying load for HB11: time-mean radial
+force is energy divided by the constant peripheral speed and total feed-stroke
+duration, times tan(pressure angle), including air entry and exit. The varying
+range is conservatively bounded by 0..measured peak. It is not an observed minimum
+or an instantaneous tooth-force peak. HB11 reports the mean thickness shift and
+X compensation separately from varying profile/pitch contributions.

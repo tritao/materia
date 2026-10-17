@@ -1320,3 +1320,54 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   **three native runtime/gear/brake regressions** pass, including a zero-gain
   computed-torque follower draining its trajectory queue. Console summary:
   `/tmp/flexspline-quick-all.log`; per-case evidence: `build/flexspline-quick/logs/`.
+
+### Reference-force follow-up
+
+- `check-reference-force.sh` runs the full ideal reference stroke and checks its
+  report against installed B continuous power/torque, C continuous torque and X
+  continuous screw thrust, each with 20% reserve. Reports are retained on failure;
+  progress is emitted every 100 windows. X conversion uses installed screw lead
+  and nut efficiency. This checks static process loads; loaded dynamics, gravity
+  and instantaneous tooth peaks remain separate.
+- Current focused recheck: 18 force, 264 machine/adapter and 24 HB11 model assertions
+  pass. The full reference cut is running directly under a 4 GiB cap, replacing
+  the old queued waiter. Acceptance remains open until its report and installed
+  rating checks finish. Evidence: `/tmp/flexspline-hb10-reference-mean.log` and
+  `build/flexspline-reference-force/`. HB4 is undisturbed.
+- HB11 now estimates support from assumed sleeve/cavity/contact design, rather
+  than blocking on calibration. `MandrelRadialSupport` derives an n=2 sleeve mode
+  and conforming-steel contact in series; uniform oil compression is reported
+  separately, with no first-order oil restoring term for volume-preserving n=2.
+  The reference estimate is **84.6 kN/mm**, with 1.5 mm sleeve wall and 16 mm end
+  span over the 8 mm band. These dimensions describe an assumed design, not
+  resolved sleeve CAD or measured hardware. All inputs/derivation remain in the report.
+- HB3's 0.2 um value is a numerical simulation tolerance, **not** a physical
+  deflection budget. Split mean deflection from load variation. Judge the mean
+  thickness shift against an **assumed +/-5 um flexspline thickness tolerance**;
+  report the mean displacement as compensable X infeed. Allocate 20% of class-6
+  Falpha and single-pitch fp to the varying wall contribution inside HB11. These
+  ISO formulas are engineering extrapolations at m0.3, not an ISO qualification.
+- The reference sleeve region is explicitly 71..87 mm in mandrel coordinates.
+  Assembly transforms place the toothed band at 75..83 mm, radial bore clearance
+  0.025 mm. The model checks axial coverage, expansion travel and provisional
+  seating pressure. Without rim support/seated contact it sets mandrel stiffness
+  to zero and uses the cup wall ring stiffness. Sleeve/cavity dimensions are an
+  assumed design; the current blank CAD is an annular rim, not a detailed cup.
+- Keep the x0.3/x1/x3 stiffness sweep and the sufficient stiffness requirements.
+  The standalone force envelope bounds mean and varying range separately; it
+  does not invent a measured mean. The full-stroke force report records energy,
+  a time-mean radial force (including air entry/exit), and a conservative varying
+  range bound. Recompute the report from measured force when the full cut ends.
+  Full combined-source HB11 acceptance remains open.
+
+- Corrected reference envelope screen: mean thickness shift <=1.04/0.31/0.10 um
+  for support x0.3/x1/x3, all inside the assumed +/-5 um tolerance. Varying profile
+  bounds are <=2.86/0.86/0.29 um; x0.3 does not establish the allocated 1.9 um
+  profile budget. A sufficient effective support is **38.3 kN/mm**, or nominal
+  **127.6 kN/mm** across x0.3 uncertainty. Recompute with the measured full-cut
+  force statistics. This conservative screen leaves wall acceptance open.
+- Rechecks: **264 machine/adapter**, **18 force**, **24 HB11 model** assertions pass.
+  The four small physical wall-source cuts (baseline and three stiffnesses) pass
+  thickness-response checks, with changes **1.043/0.313/0.104 um**. This is an m1
+  integration fixture, not the m0.3 reference inspection. Evidence:
+  `/tmp/flexspline-hb11-{support-split,machine-split,wall-cuts}.log`.

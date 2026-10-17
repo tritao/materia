@@ -109,3 +109,69 @@ The full reference-part source budget, measured HB7 source-disable studies and
 supported wall calibration remain pending. The coarse mode is not an ISO
 certification or proof that a part meets HB12. HB10's full-reference queued
 artifact remains separate.
+
+### Assumed installed-mandrel support sensitivity
+
+`machinekit.hobbing.MandrelRadialSupport` estimates radial support from explicit
+assumed design parameters on `ExpandingMandrel`: sleeve wall 1.5 mm, end-ring span
+16 mm, 8 mm tooth band, steel E=210000 N/mm² and nu=0.3, oil cavity 0.5 mm and
+bulk modulus 1500 N/mm². The envelope CAD does not resolve this sleeve or cavity.
+
+For w=d cos(pi z/L) cos(2 theta), integrating isotropic shell bending energy gives
+k_s = D pi R [pi^4/(2L^3) + 9L/(2R^4) + (4-nu)pi²/(R²L)], where
+D=Et³/[12(1-nu²)]. This is an assumed simply supported mode, not a calibrated
+finite-shell solution. Membrane prestress, actual end restraint and local modes
+are omitted. Fully seated steel contact uses harmonic half-space tangent
+c=E q/[4(1-nu²)], q=sqrt(4/R²+pi²/L²), and
+k_c=c pi R integral_band cos²(pi z/L) dz. Combine sleeve/contact compliance in
+series. The half-space approximation and conforming contact are assumptions;
+roughness, contact lift-off and finite wall effects need verification. The
+[periodic elastic-contact treatment](https://www.frontiersin.org/journals/mechanical-engineering/articles/10.3389/fmech.2020.00045/full)
+(section “Sinusoidal Profile”, reduced modulus for two contacting bodies)
+supports the harmonic pressure/displacement scaling. Applying it to this finite
+sleeve/contact is an engineering approximation.
+
+A uniform fluid pressure cannot restore a first-order volume-preserving n=2
+ovalisation: its integrated volume change is zero. The separate uniform oil
+compression diagnostic k=K 2piRL/cavity is **not** added to n=2 support. A hoop-only
+pressure-to-close-fit estimate checks seating provisionally; it omits end
+restraint and does not prove full contact.
+
+The sleeve's axial region is now explicit. The reference sleeve spans 71..87 mm
+in mandrel coordinates; assembly transforms place the toothed band at 75..83 mm,
+with a 0.025 mm radial fit gap. The report checks actual assembled blank placement
+and bore radius, the available diametral expansion, and a provisional pressure
+screen. These are assumed design dimensions, not a measurement of hardware. If
+the band is outside the sleeve or contact is not seated, mandrel stiffness is
+zero and the cup wall's own RingCompliance governs. The reference blank currently
+models the annular toothed rim, not a detailed cup-bottom structure.
+
+Run `machinekit/tests/hobber/build/host/main.hl support-sensitivity` with the
+HashLink/native environment from the quick runner, or use the reference-force
+runner for a report driven by its measured load statistics. The standalone case
+uses the explicit conservative HB10 envelope Fc<=100 N, Fr<=36.4 N: it separately
+bounds the unknown mean and varying range, rather than presenting these as
+measured statistics. Support factors remain 0.3, 1, 3. The full-stroke force report
+computes the time mean from energy / constant peripheral speed / stroke duration,
+including air entry/exit. Variation uses a conservative 0..measured-peak envelope;
+it is a range bound, not a measured minimum, instantaneous tooth peak or a
+reconstructed force waveform.
+
+Mean deflection is checked against an **assumed physical tooth-thickness tolerance
+of +/-5 um**, and its magnitude is reported as an X-infeed compensation. HB3's
+0.2 um figure is solely a numerical simulation tolerance. It is not a physical
+deflection budget. Mean thickness change is 2 tan(alpha) times mean displacement.
+The varying displacement range gets conservative profile/pitch geometry bounds
+of twice the radial range and 2 tan(alpha) times the radial range respectively.
+The wall is explicitly allocated 20% of class-6 Falpha and single-pitch fp limits
+inside the eventual HB11 budget. At m0.3 these ISO formulas are engineering
+extrapolations. Passing this wall allocation does not establish the combined
+error budget or an ISO class.
+
+The report retains sufficient effective and nominal (including x0.3 uncertainty)
+stiffness requirements. If its bounds do not meet the allocations, acceptance
+stays open pending a justified design or measured stiffness. A conservative
+bound exceeding an allocation is not proof that an inspected cut fails.
+`wall-cuts` also runs baseline and three physical source cuts in a small
+m1/z20/2 mm integration fixture. It verifies the stiffness-to-thickness response;
+that fixture is separate from the full reference budget and uses a constant load.
