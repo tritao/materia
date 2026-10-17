@@ -5,14 +5,14 @@ class HobbingErrorTests {
   static var checks=0;
   static function check(ok:Bool,label:String):Void {checks++;if(!ok)throw label;}
   static function near(a:Float,b:Float,tol:Float,label:String):Void check(Math.abs(a-b)<=tol,'$label: $a / $b');
-  static function physical():Void {
+  static function physical(tolerance:Float=0.0001,threads:Int=4):Void {
     var spec=new GearSpec(1,20,2,20*Math.PI/180),hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),1,32,4);
     var ideal=new IdealHobbingJob(spec,hob,3000,1.1,0,1);
     var stock=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2);
     var passes=ideal.schedule(stock.grid);stock.dispose();
     var sources=[HobbingErrorSource.workEccentricity("mandrel","mandrel",0.004),
       HobbingErrorSource.hobRadial("arbor",0.004),HobbingErrorSource.hobAxial("arbor",0.004)];
-    var job=new HobbingErrorJob(spec,hob,ideal.axesAt,passes,sources,0.6,0.1,0.2,-6,6,0.0001,new GearInspection(spec,spec.pitchRadius()));
+    var job=new HobbingErrorJob(spec,hob,ideal.axesAt,passes,sources,0.6,0.1,0.2,-6,6,tolerance,new GearInspection(spec,spec.pitchRadius()),null,threads);
     var budget=job.budget();
     Sys.println(budget.report());
     check(budget.contributions.length==3,"physical sweep per source and all-source inspection");
@@ -21,11 +21,12 @@ class HobbingErrorTests {
     var axial=budget.contributions.filter(row->row.source.id=="hob-axial")[0].measurement;
     check(Math.abs(axial.value("ffalpha")-budget.baseline.value("ffalpha"))>0.00001,"axial hob error changes measured profile form");
     check(budget.additive,"physical small-error traces meet 25% + 0.1 um superposition criterion");
-    Sys.println("QUICK_ERRORS "+haxe.Json.stringify({runoutUm:budget.combined.value("Fr"),pitchUm:budget.combined.value("Fp"),
+    Sys.println("QUICK_ERRORS "+haxe.Json.stringify({threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,runoutUm:budget.combined.value("Fr"),pitchUm:budget.combined.value("Fp"),
       profileFormUm:budget.combined.value("ffalpha"),additive:budget.additive,scope:"m1 z20 face2 coarse physical source budget; no ISO qualification"}));
     Sys.println('Physical hobbing errors: $checks assertions passed');
   }
   public static function main():Void {
+    if(Sys.args().indexOf("physical-fine")>=0){physical(0.000025,8);return;}
     if(Sys.args().indexOf("physical")>=0){physical();return;}
     var axis=new HobbingAxes(46,0,4,0,0,0),e=0.004;
     var mandrel=HobbingErrorSource.workEccentricity("mandrel","mandrel",e);

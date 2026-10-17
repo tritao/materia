@@ -1,5 +1,6 @@
 #include "stockkit.h"
 #include <cmath>
+#include <cstring>
 #include <cstdio>
 #include <stdexcept>
 #include <vector>
@@ -82,6 +83,26 @@ void rotational_convergence() {
     sk_rake_tool_destroy(toolHandle);
 }
 
+void thread_identical(unsigned threads) {
+    sk_ring_grid g{sizeof(sk_ring_grid),32,8,1,3,-1,1};sk_ring_stock_handle one{},many{};
+    check(sk_ring_stock_create(&g,&one)==0&&sk_ring_stock_create(&g,&many)==0,"parallel rake stocks");
+    check(sk_ring_stock_set_threads(one,1)==0&&sk_ring_stock_set_threads(many,threads)==0,"parallel rake thread settings");
+    auto t=tool({0.3,-4,0,1.2,-4,0,1.2,4,0,0.3,4,0});
+    for(unsigned pass=0;pass<3;++pass) {
+        std::vector<sk_rake_pose> poses;
+        for(unsigned k=0;k<17;++k){auto p=pose(-1.5+3.0*k/16);double a=0.2*pass+0.3*k/16;
+            p.rotation[0]=p.rotation[4]=std::cos(a);p.rotation[1]=-std::sin(a);p.rotation[3]=std::sin(a);poses.push_back(p);}
+        check(sk_ring_stock_sweep_rake(one,t,0,pass,poses.data(),poses.size())==0,"serial rotating/translating rake");
+        check(sk_ring_stock_sweep_rake(many,t,0,pass,poses.data(),poses.size())==0,"parallel rotating/translating rake");
+        for(unsigned z=0;z<8;++z)for(unsigned r=0;r<32;++r){auto a=read(one,r,z),b=read(many,r,z);
+            check(a.size()==b.size(),"parallel rake topology identical");
+            for(size_t k=0;k<a.size();++k){
+                check(std::memcmp(&a[k].lo,&b[k].lo,sizeof(double))==0&&std::memcmp(&a[k].hi,&b[k].hi,sizeof(double))==0,"parallel rake endpoints bit identical");
+                check(a[k].lo_gash==b[k].lo_gash&&a[k].hi_gash==b[k].hi_gash&&a[k].lo_pass==b[k].lo_pass&&a[k].hi_pass==b[k].hi_pass,"parallel rake provenance identical");}}
+    }
+    sk_rake_tool_destroy(t);sk_ring_stock_destroy(one);sk_ring_stock_destroy(many);
 }
-int main() {try{analytic();concave();rotational_convergence();}catch(const std::exception&e){std::printf("FAIL after %d checks: %s\n",checks,e.what());return 1;}
+
+}
+int main() {try{analytic();concave();rotational_convergence();thread_identical(4);thread_identical(8);}catch(const std::exception&e){std::printf("FAIL after %d checks: %s\n",checks,e.what());return 1;}
 std::printf("Rake sweep: %d checks passed\n",checks);return 0;}

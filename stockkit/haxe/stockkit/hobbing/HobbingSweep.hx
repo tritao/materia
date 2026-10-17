@@ -90,13 +90,13 @@ class HobbingSweep {
   function sample(at:Float->HobbingAxes,start:Float,end:Float,center:Float,tol:Float,maxStep:Float,knots:Null<Array<Float>>):Array<sk_rake_pose> {
     var result:Array<sk_rake_pose> =[];
     var a=at(start);result.push(a.pose());
-    function split(t0:Float,s0:HobbingAxes,t1:Float,s1:HobbingAxes,depth:Int):Void {
+    function split(t0:Float,s0:HobbingAxes,p0:Array<Float>,t1:Float,s1:HobbingAxes,p1:Array<Float>,depth:Int):Void {
       if(depth>24||result.length>1000000)throw "sweep path refinement exceeded limit";
-      var tm=(t0+t1)/2,sm=at(tm),p0=s0.pose(),p1=s1.pose(),pm=sm.pose(),error=0.0;
-      // Read each pose coefficient once. The eight spatial probes share this
-      // affine error transform; no per-probe FFI getters or temporary vectors.
-      var dr=[for(j in 0...9)pm.get_rotation(j)-(p0.get_rotation(j)+p1.get_rotation(j))/2];
-      var dt=[for(k in 0...3)pm.get_translation(k)-(p0.get_translation(k)+p1.get_translation(k))/2];
+      var tm=(t0+t1)/2,sm=at(tm),pm=sm.poseValues(),error=0.0;
+      // Endpoints are cached through recursion. Identical affine arithmetic and
+      // refinement tests, without reconstructing three native poses per node.
+      var dr=[for(j in 0...9)pm[j]-(p0[j]+p1[j])/2];
+      var dt=[for(k in 0...3)pm[9+k]-(p0[9+k]+p1[9+k])/2];
       for(v in probes) {
         var dx=dt[0]+dr[0]*v.x+dr[1]*v.y+dr[2]*v.z;
         var dy=dt[1]+dr[3]*v.x+dr[4]*v.y+dr[5]*v.z;
@@ -104,8 +104,8 @@ class HobbingSweep {
         error=Math.max(error,Math.sqrt(dx*dx+dy*dy+dz*dz));
       }
       var angle=Math.max(Math.abs(s1.b-s0.b),Math.max(Math.abs(s1.c-s0.c),Math.abs(s1.a-s0.a)));
-      if(t1-t0>maxStep||angle>0.04||error>tol){split(t0,s0,tm,sm,depth+1);split(tm,sm,t1,s1,depth+1);}
-      else result.push(p1);
+      if(t1-t0>maxStep||angle>0.04||error>tol){split(t0,s0,p0,tm,sm,pm,depth+1);split(tm,sm,pm,t1,s1,p1,depth+1);}
+      else result.push(HobbingAxes.nativePose(p1));
     }
     var times=[start,end];
     if(center>start&&center<end)times.push(center);
@@ -114,7 +114,10 @@ class HobbingSweep {
       if(t>start&&t<end)times.push(t);
     }
     times.sort((a,b)->a<b?-1:a>b?1:0);
-    for(k in 1...times.length)if(times[k]>times[k-1])split(times[k-1],at(times[k-1]),times[k],at(times[k]),0);
+    for(k in 1...times.length)if(times[k]>times[k-1]){
+      var s0=at(times[k-1]),s1=at(times[k]);
+      split(times[k-1],s0,s0.poseValues(),times[k],s1,s1.poseValues(),0);
+    }
     return result;
   }
   static function simplify(raw:Array<Point3>,tolerance:Float):Array<Point3> {

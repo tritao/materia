@@ -107,9 +107,21 @@ void sweep_rake(RingStock &stock,const RakeTool &tool,uint32_t gash,uint32_t pas
     const auto &mesh=tool.gashes[gash];const auto &g=stock.grid;
     std::vector<std::vector<Arc>> removed(size_t(g.radial_count)*g.axial_count);
     const double dr=(g.radius_max-g.radius_min)/g.radial_count,dz=(g.z_max-g.z_min)/g.axial_count;
+    if(pose_count<2)return;
+    // A worker owns a contiguous range of pose segments, including all transforms,
+    // culling and circle intersections. No interval or floating reduction is shared.
+    // Every resulting arc is sorted by the existing union below, so chunk order
+    // cannot change endpoints or gash/pass provenance.
+    const unsigned jobs=std::min<unsigned>(stock.pool.size(),pose_count-1);
+    struct CutArc { size_t bin; Arc arc; };
+    std::vector<std::vector<CutArc>> results(jobs);
+    stock.pool.run(jobs,[&](unsigned job) {
+    const uint32_t first=1+uint64_t(pose_count-1)*job/jobs;
+    const uint32_t last=1+uint64_t(pose_count-1)*(job+1)/jobs;
+    auto &result=results[job];
     std::vector<RakePoint> previous,current(mesh.vertices.size());
-    for(size_t k=0;k<mesh.vertices.size();++k)current[k]=transform(mesh.vertices[k],poses[0]);
-    for(uint32_t pose=1;pose<pose_count;++pose) {
+    for(size_t k=0;k<mesh.vertices.size();++k)current[k]=transform(mesh.vertices[k],poses[first-1]);
+    for(uint32_t pose=first;pose<last;++pose) {
         previous.swap(current);current.resize(mesh.vertices.size());
         for(size_t k=0;k<mesh.vertices.size();++k)current[k]=transform(mesh.vertices[k],poses[pose]);
         double allMinZ=std::numeric_limits<double>::infinity(),allMaxZ=-allMinZ;
@@ -148,10 +160,15 @@ void sweep_rake(RingStock &stock,const RakeTool &tool,uint32_t gash,uint32_t pas
                 int r0=int(std::clamp(std::ceil((rmin-g.radius_min)/dr-0.5),0.0,double(g.radial_count))),r1=int(std::clamp(std::floor((rmax-g.radius_min)/dr-0.5),-1.0,double(g.radial_count)-1));
                 for(int r=r0;r<=r1;++r) {
                     auto arcs=circle_inside(polygon,g.radius_min+(r+0.5)*dr);
-                    auto &bin=removed[size_t(z)*g.radial_count+r];bin.insert(bin.end(),arcs.begin(),arcs.end());
+                    for(auto arc:arcs)result.push_back({size_t(z)*g.radial_count+r,arc});
                 }
             }
         }
+    }
+    });
+    for(auto &result:results) {
+        for(const auto &cut:result)removed[cut.bin].push_back(cut.arc);
+        std::vector<CutArc>().swap(result);
     }
     std::vector<sk_ring_cut> cuts;
     for(uint32_t z=0;z<g.axial_count;++z)for(uint32_t r=0;r<g.radial_count;++r) {

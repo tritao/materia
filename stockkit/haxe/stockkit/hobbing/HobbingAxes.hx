@@ -15,24 +15,30 @@ class HobbingAxes {
   }
   /** Hob +X faces the work centre; hob +Z points along the tilted -Y axis.
       The final inverse C rotation expresses the cut in the workpiece frame. */
-  public function pose():sk_rake_pose {
+  public function poseValues():Array<Float> {
     var ca=Math.cos(a),sa=Math.sin(a),cb=Math.cos(b),sb=Math.sin(b),cc=Math.cos(c),sc=Math.sin(c);
     var r=[-cb,-sa*sb,-ca*sb,sb,-sa*cb,-ca*cb,0.0,-ca,sa]; // columns
-    var p=new sk_rake_pose();p.set_struct_size(sk_rake_pose.size());
+    var values=[for(i in 0...12)0.0];
     for(j in 0...3) {
-      p.set_rotation(j,cc*r[3*j]+sc*r[3*j+1]);
-      p.set_rotation(3+j,-sc*r[3*j]+cc*r[3*j+1]);
-      p.set_rotation(6+j,r[3*j+2]);
+      values[j]=cc*r[3*j]+sc*r[3*j+1];
+      values[3+j]=-sc*r[3*j]+cc*r[3*j+1];
+      values[6+j]=r[3*j+2];
     }
-    p.set_translation(0,cc*x-sc*y*ca);
-    p.set_translation(1,-sc*x-cc*y*ca);
-    p.set_translation(2,z+y*sa);
+    values[9]=cc*x-sc*y*ca;values[10]=-sc*x-cc*y*ca;values[11]=z+y*sa;
     if(offset!=null){
       var tool=[offset.toolX,offset.toolY,offset.toolZ],work=[offset.workX,offset.workY,offset.workZ];
-      for(i in 0...3){var delta=-work[i];for(j in 0...3)delta+=p.get_rotation(3*i+j)*tool[j];
+      for(i in 0...3){var delta=-work[i];for(j in 0...3)delta+=values[3*i+j]*tool[j];
         if(!Math.isFinite(delta))throw "non-finite hobbing pose error";
-        p.set_translation(i,p.get_translation(i)+delta);}
+        values[9+i]+=delta;}
     }
+    return values;
+  }
+  /** Materialize only accepted samples; midpoint error checks stay in Haxe. */
+  public static function nativePose(values:Array<Float>):sk_rake_pose {
+    var p=new sk_rake_pose();p.set_struct_size(sk_rake_pose.size());
+    for(j in 0...9)p.set_rotation(j,values[j]);
+    for(i in 0...3)p.set_translation(i,values[9+i]);
     return p;
   }
+  public function pose():sk_rake_pose return nativePose(poseValues());
 }

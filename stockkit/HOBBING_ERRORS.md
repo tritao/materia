@@ -149,7 +149,8 @@ models the annular toothed rim, not a detailed cup-bottom structure.
 Run `machinekit/tests/hobber/build/host/main.hl support-sensitivity` with the
 HashLink/native environment from the quick runner, or use the reference-force
 runner for a report driven by its measured load statistics. The standalone case
-uses the explicit conservative HB10 envelope Fc<=100 N, Fr<=36.4 N: it separately
+uses a provisional assumed design load Fc=100 N, Fr=36.4 N: this is not a safe
+bound on the running cut. It separately
 bounds the unknown mean and varying range, rather than presenting these as
 measured statistics. Support factors remain 0.3, 1, 3. The full-stroke force report
 computes the time mean from energy / constant peripheral speed / stroke duration,
@@ -175,3 +176,45 @@ bound exceeding an allocation is not proof that an inspected cut fails.
 `wall-cuts` also runs baseline and three physical source cuts in a small
 m1/z20/2 mm integration fixture. It verifies the stiffness-to-thickness response;
 that fixture is separate from the full reference budget and uses a constant load.
+
+
+### Parallel source sweeps and force provenance
+
+`HobbingErrorJob` accepts an explicit thread count (default 4); the reference
+`FlexsplineHobberErrors.budget` adapter defaults to 8. The sweep tolerance is
+unchanged: force-only tolerance selection never propagates into metrology.
+Every source run logs its thread count, sweep/path tolerance, stock spacing,
+source ids and elapsed time. Native rake workers own complete pose-segment
+chunks; their arcs are sorted before interval union, with no parallel floating
+reduction. Tests compare endpoints bit-for-bit and preserve provenance at 1, 4
+and 8 threads; force tests additionally compare every gash load and final stock.
+The sampler caches affine endpoints without changing arithmetic or refinement
+criteria; pre/post stock and per-pass load hashes are checked on two fixtures.
+
+`HobbingForceHistory` optionally records every radial/tangential gash-window mean
+and supports a radial history callback for wall sweeps. Its time-weighted mean,
+standard deviation and range describe the sum of overlapping rectangular windows.
+Successive per-pass maximum/RMS steps describe individual gash means, a different
+quantity. The wall report identifies which radial statistic drives each mean,
+peak, varying-range and per-pass displacement. Fc is never substituted for Fr.
+
+The original fine force cut was deliberately stopped by the user at 40,400 windows,
+without a completed report. The optimized complete stroke is the authorized HB10
+reference, with a CSV/settings sidecar and short-cut tolerance convergence below
+1%. No fine full-stroke comparison or missing fine variation is claimed.
+The combined reference-source budget still requires its own physical validation;
+no full-reference per-source runtime target is claimed from the small fixture.
+
+With the optimized complete force history, engaged-time mean Fr=4.9563 N drives
+mean X recession; peak Fr=16.990 N drives seating and the varying radial range.
+The separately reported whole-stroke mean Fr=3.0357 N includes air and is used for
+energy/full-run comparison, not the mean tooth-thickness compensation. The x0.3
+case bounds mean thickness shift at 0.142 um and varying profile/pitch at
+1.337/0.487 um, inside the assumed +/-5 um and allocated 1.9/1.5 um limits.
+These wall-allocation checks **pass dependent on the assumed support/contact
+model** and the short-cut force convergence basis. The full HB11
+combined-source budget is not established by this wall-only screen.
+
+The `physical-fine` integration fixture runs the baseline, three sources and
+combined cut at the reference **0.000025 mm sweep tolerance / 8 threads**, in
+**51.92 s** total. Its stock sampling remains diagnostic, not ISO-qualified.

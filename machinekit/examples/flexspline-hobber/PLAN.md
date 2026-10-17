@@ -608,8 +608,8 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB7 | done: measured-master gearbox, timed events, additive C drive checks and reference sync tests | a71f86f61 |
 | HB8 | done: geometry-derived hobbing CAM, revolution feeds, shifts/crown, installed limits and compiled cycle checks | this commit |
 | HB9 | coarse app smoke passed; precision acceptance open | Headless cut, inspection, fixture envelope, bounded stock and coarse sync checks pass. |
-| HB10 | quick force cut passed; full reference-force acceptance pending | Complete small cut, interval-derived loads and spindle reserve pass. |
-| HB11 | quick physical sources passed; reference budget pending | Eccentricity, hob errors and combined coarse cuts pass; runtime source studies and supported compliance remain open. |
+| HB10 | full threaded reference force and static ratings passed | Complete small cut, interval-derived loads and spindle reserve pass. |
+| HB11 | quick physical sources passed; reference budget pending | Eccentricity, hob errors and combined coarse cuts pass; full reference source studies remain open; assumed-support wall allocation passes. |
 | HB12 | planned | |
 | Phase D | later | |
 | HB13–HB16 | optional, later (class 3) | |
@@ -1202,7 +1202,7 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   HB4/HB6 pending runs are left undisturbed. CT0–CT10 remains separate.
 
 
-### HB10 implementation — full reference-force acceptance pending
+### HB10 implementation — full reference force and static ratings passed
 
 - `stockkit.hobbing.HobbingForces` derives chip volume from native removed ring
   intervals after each gash; chip area is volume / peripheral cutter travel.
@@ -1222,9 +1222,9 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   stock plunge is deliberately rejected: about **4.45 kN / 22.2 kW**, not a normal
   HB8 entry. This makes the trajectory distinction explicit rather than tuning
   coefficients to force a tens-of-newtons result.
-- Full HB8 reference entry/feed validation (tens of N and spindle reserve) remains
-  pending in the standalone force test's `reference` mode. HB9's archived source
-  remains unchanged; its obsolete waiter is superseded by the quick runner. No full reference force or loaded app acceptance is claimed.
+- Full HB8 reference entry/feed validation passed with the threaded force runner
+  (results below). HB9's archived source remains unchanged. Loaded app acceptance
+  remains separate from these static process-load checks.
 - Details and assumptions: `stockkit/HOBBING_FORCES.md`. Logs:
   `/tmp/flexspline-hb10-{tests,gearing,machine,stream,app-build,reference}.log`.
 
@@ -1354,13 +1354,13 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   to zero and uses the cup wall ring stiffness. Sleeve/cavity dimensions are an
   assumed design; the current blank CAD is an annular rim, not a detailed cup.
 - Keep the x0.3/x1/x3 stiffness sweep and the sufficient stiffness requirements.
-  The standalone force envelope bounds mean and varying range separately; it
+  The standalone provisional assumed load case bounds mean and varying range separately; it
   does not invent a measured mean. The full-stroke force report records energy,
   a time-mean radial force (including air entry/exit), and a conservative varying
   range bound. Recompute the report from measured force when the full cut ends.
   Full combined-source HB11 acceptance remains open.
 
-- Corrected reference envelope screen: mean thickness shift <=1.04/0.31/0.10 um
+- Provisional assumed-load screen (not a safe bound on the running cut): mean thickness shift <=1.04/0.31/0.10 um
   for support x0.3/x1/x3, all inside the assumed +/-5 um tolerance. Varying profile
   bounds are <=2.86/0.86/0.29 um; x0.3 does not establish the allocated 1.9 um
   profile budget. A sufficient effective support is **38.3 kN/mm**, or nominal
@@ -1371,3 +1371,74 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   thickness-response checks, with changes **1.043/0.313/0.104 um**. This is an m1
   integration fixture, not the m0.3 reference inspection. Evidence:
   `/tmp/flexspline-hb11-{support-split,machine-split,wall-cuts}.log`.
+
+
+### Force throughput and radial statistics follow-up
+
+- The original fine force run was intentionally stopped by the user at 40,400
+  windows; no completed report was produced. HB4 remains untouched. Tangential Fc
+  and radial Fr are different components: Fr=Fc*tan(20 degrees) in this assumed
+  force model. The previous 36.4 N radial case assumed Fc=100 N; it is **not** a
+  measured or safe bound on the current cut. Recompute from completed reports.
+- Native rake geometry now parallelizes complete pose-segment chunks (transforms,
+  broad phase and circle clipping), merging arcs before deterministic union.
+  Endpoints/provenance are bit-identical at 1/4/8 threads; short force cuts also
+  assert identical stock and every gash load at 1/4 threads. Running libraries are
+  untouched; optimized builds live in a separate directory.
+- Force-only tolerance gate: two short reference-geometry fixtures compare fine
+  0.00005 mm sweeps against coarser candidates. Choose only when peak/mean force
+  and radial variation signatures each differ by <1%. The initial selected force
+  tolerance is **0.002 mm**, 4 threads; max observed peak/mean changes are
+  **0.100% / 0.050%**, per-pass RMS variation **0.461%**. The user authorized
+  the completed optimized full stroke as HB10 authority after stopping the fine
+  run; no fine full-stroke comparison is claimed.
+- Record tolerance and thread count in every new force/source/metrology report.
+  `HobbingErrorJob` defaults to 4 threads, the reference adapter to 8; all metrology
+  sweep tolerances remain fine. Cached pose arithmetic preserves the old stock
+  and per-pass load hashes. Full-reference HB11 per-source timing is still to be
+  measured; do not extrapolate acceptance from a coarse source fixture.
+- New full force runs retain per-pass radial/tangential history and time-weighted
+  radial mean, peak, range, standard deviation and successive-pass max/RMS steps.
+  Mean thickness/X compensation uses mean Fr, seating uses peak Fr, varying
+  profile/pitch use the radial range, per-pass recession uses the saved Fr history.
+  The stopped original run has only partial peak observations, no completed
+  mean or per-pass history; it is not an acceptance result. Global peak/mean
+  agreement alone is not pointwise history convergence.
+- Offline band study uses entry, two mid-face table turns and exit from a complete
+  history. It must meet the stated 1% criterion before a reduced statistics model
+  is used; skipping physical preparation or changing error sources invalidates
+  a reused stock checkpoint. No grading shortcut is enabled.
+- Commands: `check-reference-force.sh [benchmark|run]`; comparison/band/completion
+  helpers alongside it. Evidence: `build/flexspline-reference-force-fast/` and
+  `/tmp/flexspline-force-{fast-full,final-validation}.log`. Target full-force wall
+  time is 5–10 minutes; report measured completion time rather than claiming it
+  from a short benchmark. Full HB11 source budget remains separate.
+
+- Optimized full-stroke measurement: **92,151 windows in 360.50 s wall (6:00.50)**,
+  4 threads, 0.002 mm force sweep tolerance, 0.000125 mm path tolerance, about
+  **182 MiB** peak RSS. Tangential peak **46.679 N**, radial peak **16.990 N**,
+  whole-stroke mean radial **3.0357 N**, material-engaged mean radial **4.9563 N**.
+  Successive per-pass radial max/RMS steps are **5.8012 / 0.7285 N**. All installed
+  continuous-rating checks retain the declared 20% reserve. These remain assumed
+  Kienzle/window-mean process loads, not measured machine tooth-force peaks.
+- X compensation/thickness use the material-engaged mean radial force; the
+  whole-stroke radial mean is retained separately for energy/fine-run comparison.
+  At stiffness x0.3/x1/x3, mean recession is **0.1951/0.0586/0.0195 um**, and the
+  varying profile bounds are **1.3373/0.4016/0.1339 um**. All wall allocations fit
+  this optimized force result; sufficient nominal support over x0.3 is **59.5
+  kN/mm**, versus the assumed 84.6 kN/mm design estimate. Wall allocation acceptance **passes dependent on assumed stiffness/contact**
+  and the short-cut force convergence basis; the combined HB11 budget stays open.
+- The band approximation is rejected: entry + two mid-face turns + exit differs
+  from full history by **20.375% in weighted mean radial force** and **3.723% in
+  peak radial force**. Do not enable this shortcut.
+- Regression evidence: native rake/ring/core suites pass; **27 force**, **24 error
+  model**, **264 machine/adapter** and **11 ring-metrology** checks pass. Stream vs
+  monolithic HB3 remains **0 um** (169 windows). The small five-cut source study
+  at **0.000025 mm tolerance / 8 threads** passes in **51.92 s** (9.7–10.9 s per
+  cut), while preserving its diagnostic stock grid and unqualified ISO status.
+  It is not a timing claim for the complete reference error budget.
+- The original force run and waiter were deliberately stopped, not failed. Its
+  partial log is `build/flexspline-reference-force/force-partial-stopped.log`.
+  HB4 continues unmodified. The completion helper gates the optimized full result
+  on short-cut convergence, regenerates rating/wall reports and writes result.json.
+  Fine full-stroke comparison is explicitly recorded as not performed.

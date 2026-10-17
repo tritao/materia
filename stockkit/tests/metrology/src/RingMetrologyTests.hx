@@ -25,7 +25,8 @@ class RingMetrologyTests {
     var spec=new GearSpec(0.3,200,8,20*Math.PI/180),p=new ToothProfile(spec);
     var lo=p.rootJoinRadius+0.002,hi=p.tipJoinRadius-0.002;
     var grid=new RingGrid(lo,hi,-0.02,8.02,(hi-lo)/185,0.04);
-    var stock=RingStock.annulus(grid);
+    var stock=RingStock.annulus(grid);stock.setThreads(8);
+    Sys.println("RING_METROLOGY_SETTINGS "+haxe.Json.stringify({threads:8,sweepToleranceMm:0.00005,radialStepMm:(hi-lo)/185,axialStepMm:0.04,scope:"fine full-profile grading; sweep convergence tolerance unchanged"}));
     var hob=new HobDesign(ConjugateRack.of(p),1,32,12);
     var job=new IdealHobbingJob(spec,hob,3000,1.1,0,4);
     var sweep=new HobbingSweep(hob,-28,28,0.00005),began=Sys.time();
@@ -38,7 +39,7 @@ class RingMetrologyTests {
     }
     check(report.overallGrade!=null&&report.overallGrade<=3,"reference overall extrapolated grade <=3");
     check(report.isoClass==null&&report.extrapolation.length>0,"module 0.3 cannot be ISO-certified");
-    Sys.println('reference convergence_mm=${convergence.maxArcChange} time_s=${Sys.time()-began} warnings=${report.warnings}');
+    Sys.println('reference threads=8 sweep_tolerance_mm=0.00005 path_tolerance_mm=${0.00005/(4*Math.pow(4,convergence.refinement))} convergence_mm=${convergence.maxArcChange} time_s=${Sys.time()-began} warnings=${report.warnings}');
     sweep.dispose();stock.dispose();
   }
   public static function main():Void {

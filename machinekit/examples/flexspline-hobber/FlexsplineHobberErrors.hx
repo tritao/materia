@@ -44,9 +44,9 @@ class FlexsplineHobberErrors {
   public static function budget(machine:FlexsplineHobber,at:Float->stockkit.hobbing.HobbingAxes,
       passes:Array<stockkit.hobbing.GashPass>,radialForce:Float->Float,wall:RingCompliance,sync:HobbingErrorSource,
       radialStep:Float=0.005,axialStep:Float=0.1,tolerance:Float=0.000025,
-      ?inspection:gearkit.GearInspection,?motionKnots:Array<Float>):gearkit.ErrorBudget {
+      ?inspection:gearkit.GearInspection,?motionKnots:Array<Float>,threads:Int=8):gearkit.ErrorBudget {
     var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
     return new stockkit.hobbing.HobbingErrorJob(machine.spec,machine.hob.design,at,passes,
-      sources(machine,radialForce,wall,sync),wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,motionKnots).budget();
+      sources(machine,radialForce,wall,sync),wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,motionKnots,threads).budget();
   }
 }

@@ -146,7 +146,7 @@ class FlexsplineHobberChecks {
     check(Math.abs(pose.x)+Math.abs(pose.y)<1e-8,"rim and mandrel axes coincide");
     return new MandrelRadialSupport(machine.mandrel,machine.spec.faceWidth,pose.z,blank.n("bore")/2);
   }
-  static function supportSensitivity(meanForceBound:Float,rangeForceBound:Float,peakForce:Float,basis:String,meanMeasured:Bool):Void {
+  static function supportSensitivity(meanForceBound:Float,rangeForceBound:Float,peakForce:Float,basis:String,meanMeasured:Bool,?history:Dynamic,forceValidated:Bool=true,?forceSettings:Dynamic):Void {
     var machine=new FlexsplineHobber(),estimate=installedSupport(machine);
     var s=machine.spec,profileLimit=gearkit.Iso1328.tolerance(s,"Falpha",6),pitchLimit=gearkit.Iso1328.tolerance(s,"fp",6);
     // Explicit physical design allocations. Numerical HB3 tolerance is unrelated.
@@ -161,15 +161,20 @@ class FlexsplineHobberChecks {
       var profile=2*variation,pitch=2*Math.tan(s.pressureAngle)*variation,thickness=2*Math.tan(s.pressureAngle)*mean;
       rows.push({factor:factor,supportNPerMm:support,meanDeflectionUm:mean,varyingDeflectionRangeBoundUm:variation,
         meanThicknessErrorBoundUm:thickness,xCompensationMagnitudeUm:mean,
+        peakRadialDeflectionUm:ring.deflection(peakForce)*1000,
+        radialStdDevDeflectionUm:history==null?null:ring.deflection(history.radialStdDevN)*1000,
+        perPassMaxStepDeflectionUm:history==null?null:ring.deflection(history.perPassRadialMaxStepN)*1000,
+        perPassRmsStepDeflectionUm:history==null?null:ring.deflection(history.perPassRadialRmsStepN)*1000,
         varyingProfileBoundUm:profile,varyingPitchBoundUm:pitch,
         passes:thickness<=thicknessTolerance&&profile<=profileBudget&&pitch<=pitchBudget});
     }
     var requiredTotal=Math.max(meanForceBound*1000*2*Math.tan(s.pressureAngle)/thicknessTolerance,
       Math.max(rangeForceBound*2000/profileBudget,rangeForceBound*1000*2*Math.tan(s.pressureAngle)/pitchBudget));
     var required=Math.max(0,requiredTotal-bare.ringStiffness);
-    Sys.println("MANDREL_SENSITIVITY "+haxe.Json.stringify({basis:estimate.basis,forceBasis:basis,
+    Sys.println("MANDREL_SENSITIVITY "+haxe.Json.stringify({basis:estimate.basis,forceBasis:basis,forceSettings:forceSettings,
       meanRadialForceN:meanMeasured?meanForceBound:null,meanRadialForceUpperBoundN:meanForceBound,
-      varyingRadialRangeBoundN:rangeForceBound,peakRadialN:peakForce,
+      varyingRadialRangeBoundN:rangeForceBound,peakRadialN:peakForce,radialStatistics:history,forceValidated:forceValidated,
+      forceComponents:"all displacement/stiffness inputs are radial N; tangential Fc is used only for cutting load/power checks",
       supportsToothedRim:estimate.supportsRim,bandStartMm:estimate.bandStart,bandEndMm:estimate.bandEnd,
       sleeveStartMm:estimate.sleeveStart,sleeveEndMm:estimate.sleeveEnd,actualRadialFitGapMm:estimate.radialGap,
       supportApplied:seated,seatingScreen:seated,unsupportedRingNPerMm:bare.ringStiffness,
@@ -178,7 +183,7 @@ class FlexsplineHobberChecks {
       varyingBasis:"geometry bounds on the load range about its time mean, in the 20 percent wall share of HB11 class-6 profile and single-pitch limits",
       outsideIsoScope:gearkit.Iso1328.outsideScope(s),rows:rows,
       sufficientEffectiveSupportNPerMm:required,sufficientNominalFor03RangeNPerMm:required/0.3,
-      acceptance:rows.filter(r->!r.passes).length==0?"wall allocation passed, dependent on assumed support/contact and force bounds":"open: sufficient stiffness requirement; justify design or measure stiffness",
+      acceptance:!forceValidated?"provisional: force-study acceptance or measured force data pending":rows.filter(r->!r.passes).length==0?"wall allocation passed, dependent on assumed support/contact and force bounds":"open: sufficient stiffness requirement; justify design or measure stiffness",
       scope:"wall-only quasistatic mean/variation bounds; full HB11 combined-source budget and physical reference inspection remain open"}));
     check(rows.length==3,"three stiffness sensitivity factors reported");
     if(seated)check(rows[0].meanDeflectionUm>rows[1].meanDeflectionUm&&rows[1].meanDeflectionUm>rows[2].meanDeflectionUm,"support sensitivity decreases mean deflection");
@@ -198,8 +203,29 @@ class FlexsplineHobberChecks {
     near(number("seconds"),cam.cuttingSeconds,1e-6,"load stroke matches reference CAM duration");
     var mean:Dynamic=Reflect.field(report,"meanRadialN");
     var meanKnown=mean!=null&&Math.isFinite(mean)&&mean>=0;
-    supportSensitivity(meanKnown?mean:number("radialN"),number("radialN"),number("radialN"),
-      meanKnown?Std.string(report.meanBasis):"legacy peak-only report: mean and varying range conservatively bounded by peak; actual mean unavailable",meanKnown);
+    var history:Dynamic=Reflect.field(report,"radialVariation"),range=number("radialN");
+    if(history!=null){var measuredRange:Dynamic=Reflect.field(history,"radialRangeN");
+      if(measuredRange==null||!Math.isFinite(measuredRange)||measuredRange<0)throw "invalid measured radial variation";
+      range=measuredRange;
+    }
+    // X compensation concerns the material-engaged mean. Retain the whole-stroke
+    // mean separately for energy/global comparison, including entry/exit air.
+    var thicknessMean:Dynamic=mean,thicknessMeanBasis=Std.string(report.meanBasis);
+    if(history!=null){var activeMean:Dynamic=Reflect.field(history,"activeMeanRadialN");
+      if(activeMean==null||!Math.isFinite(activeMean)||activeMean<0)throw "invalid active radial mean";
+      thicknessMean=activeMean;thicknessMeanBasis="radial time mean over material-engaged windows; full-stroke mean including air retained separately";
+    }
+    var tolerance:Dynamic=Reflect.field(report,"sweepToleranceMm");
+    var validated=(tolerance!=null&&tolerance<=0.00005)||Reflect.field(report,"fineFullStrokeValidated")==true
+      ||(Reflect.field(report,"referenceForceAccepted")==true&&Reflect.field(report,"forceToleranceValidated")==true);
+    var settings={threads:Reflect.field(report,"threads"),sweepToleranceMm:tolerance,pathToleranceMm:Reflect.field(report,"pathToleranceMm"),
+      historyCsv:Reflect.field(report,"historyCsv"),fineFullStrokeValidated:Reflect.field(report,"fineFullStrokeValidated")==true,forceStudyValidated:validated,acceptanceBasis:Reflect.field(report,"acceptanceBasis")};
+    Sys.println("REFERENCE_FORCE_INPUTS "+haxe.Json.stringify({peakTangentialN:number("forceN"),peakRadialN:number("radialN"),
+      meanRadialN:meanKnown?mean:null,meanForThicknessRadialN:meanKnown?thicknessMean:null,meanForThicknessBasis:thicknessMeanBasis,radialVariation:history,
+      variationBasis:history==null?"legacy run has no per-pass record: retain conservative 0..peak radial range":"measured radial window statistics and successive per-gash steps",
+      sweepToleranceMm:tolerance,threads:Reflect.field(report,"threads"),fineFullStrokeValidated:Reflect.field(report,"fineFullStrokeValidated")==true,forceStudyValidated:validated,acceptanceBasis:Reflect.field(report,"acceptanceBasis")}));
+    supportSensitivity(meanKnown?thicknessMean:number("radialN"),range,number("radialN"),
+      meanKnown?thicknessMeanBasis:"legacy peak-only report: mean and varying range conservatively bounded by radial peak; actual mean unavailable",meanKnown,history,validated,settings);
     var b=machine.spindle.motor,c=machine.table.motor;
     var bTorque=b.continuousTorque*reserve,bPower=b.continuousTorque*b.ratedSpeed*reserve;
     var cTorque=c.continuousTorque*reserve;
@@ -213,13 +239,13 @@ class FlexsplineHobberChecks {
     var xForce=motor.rating.ratedTorque*2*Math.PI/(screw.thread.lead*0.001)*nut.efficiency()*reserve;
     check(number("radialN")<=xForce,"measured reference radial load retains X continuous thrust reserve");
     Sys.println("REFERENCE_RATINGS "+haxe.Json.stringify({spindleTorqueLimitNm:bTorque,spindlePowerLimitW:bPower,
-      tableTorqueLimitNm:cTorque,xThrustLimitN:xForce,reserve:0.2,
+      tableTorqueLimitNm:cTorque,xThrustLimitN:xForce,reserve:0.2,forceSettings:settings,
       scope:"installed assumed continuous ratings; static process loads only, inertia/gravity and tooth peaks excluded"}));
     Sys.println('Reference load ratings: $assertions checks passed');
   }
   public static function main():Void {
     if(Sys.args().length==1&&Sys.args()[0]=="wall-cuts"){wallCuts();return;}
-    if(Sys.args().length==1&&Sys.args()[0]=="support-sensitivity"){supportSensitivity(100*Math.tan(20*Math.PI/180),100*Math.tan(20*Math.PI/180),100*Math.tan(20*Math.PI/180),"conservative HB10 acceptance envelope Fc<=100 N; mean and varying range separately bounded, not measured",false);return;}
+    if(Sys.args().length==1&&Sys.args()[0]=="support-sensitivity"){supportSensitivity(100*Math.tan(20*Math.PI/180),100*Math.tan(20*Math.PI/180),100*Math.tan(20*Math.PI/180),"provisional assumed Fc=100 N design load; not a safe bound on the running cut; radial components conditional on this assumption",false,null,false);return;}
     if(Sys.args().length==2&&Sys.args()[0]=="reference-loads"){referenceLoads(Sys.args()[1]);return;}
     if(Sys.args().length>0&&(Sys.args()[0]=="scene"||Sys.args()[0]=="cutting")){
       var cutting=Sys.args()[0]=="cutting";
