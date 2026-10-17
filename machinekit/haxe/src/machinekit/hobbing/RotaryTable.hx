@@ -21,8 +21,8 @@ class RotaryTable extends MachineAssembly {
     attach("motor",this.motor,0);attach("bearing",this.bearing,45);attach("clamp",this.clamp,80);attach("encoder",this.encoder,90);
     addComponent("platen",new TablePlaten());addMemberConnector("housing","platenSeat",Solids.axial(0,0,98));
     addMateOnAxis("C",Continuous,"housing","platenSeat","platen","axis",{x:0,y:1,z:0},0,
-      {lower:null,upper:null,velocity:this.motor.maxSpeed,effort:this.motor.peakTorque,
-       assumptions:this.motor.ratingsBasis==Assumed?[{quantity:"speed limit",label:"assumed direct motor rating"},{quantity:"effort limit",label:"assumed peak motor torque"}]:null});
+      {lower:null,upper:null,velocity:this.motor.maxSpeed,effort:this.motor.peakTorque,acceleration:10,
+       assumptions:(this.motor.ratingsBasis==Assumed?[{quantity:"speed limit",label:"assumed direct motor rating"},{quantity:"effort limit",label:"assumed peak motor torque"}]:[]).concat([{quantity:"acceleration limit",label:"assumed table positioning limit 10 rad/s²"}])});
     addEncoder("table-angle","C","encoder");
     exposeConnector("mount","housing","mount");exposeConnector("work","platen","top");
   }

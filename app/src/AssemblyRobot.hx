@@ -346,7 +346,11 @@ class AssemblyRobot {
       var surface = SimulationContactSurfaces.gripperFinger(gripper.fingerPadFrictionCoefficient);
       for (member in gripper.padMembers) fingerPadSurfaces.set(member, surface);
     }
+    var hobbingStock=session.machineMotion==null||session.machineMotion.hobbing==null?null:session.machineMotion.hobbing.stock;
     for (hull in cadbridge.AssemblySimulationBridge.shapes(converted.model)) {
+      // RingStock owns removal for this workpiece. Its uncut convex envelope
+      // would otherwise resist the cutter as an indestructible solid. Keep mass/inertia.
+      if(hobbingStock!=null&&hull.shape.name==hobbingStock)continue;
       var record = sceneParts.get("project:" + hull.shape.name);
       if (record != null && record.collisionEnabled && !rolling.exists(hull.link)) {
         var simulationShape = hull.shape;
@@ -503,6 +507,18 @@ class AssemblyRobot {
           : Math.min(acceleration, MissionPlayer.ARM_ACCELERATION);
       }
     }
+    var hobbing=machine==null?null:machine.hobbing;
+    if(hobbing!=null)for(actuator in converted.model.actuators)switch actuator.transmission {
+      case SimpleTransmission(id,_,_) if(id==hobbing.axes[5]):
+        var drive=actuator.drive==null?null:actuator.drive.servo();
+        if(drive==null)throw "Hobbing table needs a servo drive";
+        // Measured-master velocity feedforward requires a physical servo target;
+        // a position-only computed-torque target has a steady moving-reference lag.
+        if(actuator.servoStiffness<=0)actuator.servoStiffness=drive.defaultStiffness();
+        if(actuator.servoDamping<=0)actuator.servoDamping=robotkit.model.ActuatorDrive.ServoDrive.defaultDamping(actuator.servoStiffness);
+        actuator.assumptions.push({quantity:"servo gains",label:"assumed drive-default table stiffness and 10 ms damping time"});
+      case _:
+    }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, converted.profile, revision);
     blueprint.linkCollisionShapes.resize(0);
     for (source in simulationShapes) blueprint.linkCollisionShapes.push(source);
@@ -514,7 +530,6 @@ class AssemblyRobot {
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
     if (channels != null) for (channel in channels) blueprint.addChannel(channel);
-    var hobbing=machine==null?null:machine.hobbing;
     if(hobbing!=null){
       if(control!=null)throw "Hobbing currently needs a single assembly controller";
       var index=[for(i in 0...converted.model.joints.length)if(converted.model.joints[i].id==hobbing.axes[5])i];

@@ -94,8 +94,18 @@ and reporting, not a full physical error acceptance.
 
 The standalone `stockkit/tests/hobbing-errors/haxeon.json` has a separate
 `physical` mode: baseline, mandrel, radial/axial hob and combined coarse gear
-cuts, with measured Fr, profile-form and trace-superposition checks. Run that
-mode through `heavy-run`. Its acceptance is **pending**, as are the full
-reference-part source budget, measured HB7 source-disable studies, and supported
-wall calibration. The coarse mode is not an ISO certification or proof that a
-part meets HB12. HB9/HB10 queued artifacts remain unchanged.
+cuts, with measured Fr, profile-form and trace-superposition checks. The fast
+m1/z20/2 mm case uses four gashes and an explicit pitch-to-tip diagnostic
+inspection. Its grid covers the lead evaluation window. It **passes**: combined
+Fr=7.896 µm for 4 µm mandrel eccentricity, Fp=8.505 µm, profile form=3.889 µm,
+and trace superposition within the stated tolerance. Runtime is about 51–55 s,
+using 126 MiB. Run it with:
+
+```
+machinekit/examples/flexspline-hobber/check-quick.sh errors
+```
+
+The full reference-part source budget, measured HB7 source-disable studies and
+supported wall calibration remain pending. The coarse mode is not an ISO
+certification or proof that a part meets HB12. HB10's full-reference queued
+artifact remains separate.

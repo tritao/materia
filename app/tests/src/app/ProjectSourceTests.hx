@@ -4251,6 +4251,9 @@ class ProjectSourceTests {
       var player=simulation.hobbingPlayer();if(player==null)throw "hobber cutting job was not installed";
       var guard=0;
       while(!player.completed&&player.failure==null&&guard++<240000)simulation.step();
+      Sys.println("HOBBER_DIAGNOSTIC "+haxe.Json.stringify({completed:player.completed,failure:player.failure,
+        cycleSeconds:player.elapsed,syncArcsec:player.syncError*648000/Math.PI,
+        windows:player.stock.stream.passes,inspectionFailure:player.stock.measurementFailure}));
       check(player.failure==null,"hobber cut failed: "+player.failure);
       check(player.completed,"hobber cut did not complete in 60 simulated seconds");
       check(player.stock.stream.passes>0,"measured gash windows cut the stock");
@@ -4259,6 +4262,10 @@ class ProjectSourceTests {
       check(player.stock.maxBytes<128*1024*1024&&player.stock.stream.peakFrames<4096,"hobber stock/window allocation budget");
       check(player.stock.measurement!=null,"HB4 inspection completed: "+player.stock.measurementFailure);
       check(player.elapsed>player.job.cuttingSeconds&&Math.isFinite(player.syncError),"measured total cycle and synchronization are reported");
+      // Coarse end-to-end smoke bound: two 4 kHz owner periods plus two table encoder quanta.
+      // The precision error budget has its own much tighter acceptance.
+      var syncBudget=2*player.job.tableRpm*2*Math.PI/60/4000+2*2*Math.PI/8388608;
+      check(player.syncError<=syncBudget,"cutting synchronization exceeds two owner periods plus encoder quantization");
       Sys.println("HOBBER_ACCEPTANCE "+haxe.Json.stringify({cycleSeconds:player.elapsed,cuttingSeconds:player.job.cuttingSeconds,
         syncArcsec:player.syncError*648000/Math.PI,grade:player.stock.measurement==null?null:player.stock.measurement.overallGrade,
         isoClass:player.stock.measurement==null?null:player.stock.measurement.isoClass,collisions:player.stock.collisions,

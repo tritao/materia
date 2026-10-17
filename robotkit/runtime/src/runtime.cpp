@@ -2229,7 +2229,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 // Keep its follower alive in additive coordinates instead of holding physical C.
                 if (joint < RK_MAX_SERVO_JOINTS && control_.gears.relations[joint].active) {
                     const double planned = control_.gear_additive_position[joint];
-                    output.targets[active_count] = {joint, RK_TARGET_SERVO, planned, 0.0, blueprint_.joints[joint].max_effort};
+                    const auto mode = blueprint_.joint_servo[joint].stiffness > 0.0 ? RK_TARGET_SERVO : RK_TARGET_POSITION;
+                    output.targets[active_count] = {joint, mode, planned, 0.0, blueprint_.joints[joint].max_effort};
                     output.servos[active_count] = {0.0, blueprint_.joint_servo[joint].stiffness, blueprint_.joint_servo[joint].damping, 0.0};
                     output.reference_end_position[active_count] = planned;
                     output.reference_end_velocity[active_count] = 0.0;

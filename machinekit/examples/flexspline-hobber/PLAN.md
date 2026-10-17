@@ -607,9 +607,9 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB6 | mechanics/scene tested; blocked: Start-page/project-load/MuJoCo acceptance queued | 45dd31967 |
 | HB7 | done: measured-master gearbox, timed events, additive C drive checks and reference sync tests | a71f86f61 |
 | HB8 | done: geometry-derived hobbing CAM, revolution feeds, shifts/crown, installed limits and compiled cycle checks | this commit |
-| HB9 | implemented; app acceptance queued | Measured-state sweep, worker preview and report; ideal differential and native regressions pass. |
-| HB10 | implemented; full reference-force acceptance pending | Interval-derived Kienzle window loads, rating adapter and PlanCheck efforts; focused checks pass. |
-| HB11 | framework implemented; physical/source acceptance pending | Part-derived motion/tool errors, ring compliance and per-source trace budget; supported wall stiffness and runtime source studies remain open. |
+| HB9 | coarse app smoke passed; precision acceptance open | Headless cut, inspection, fixture envelope, bounded stock and coarse sync checks pass. |
+| HB10 | quick force cut passed; full reference-force acceptance pending | Complete small cut, interval-derived loads and spindle reserve pass. |
+| HB11 | quick physical sources passed; reference budget pending | Eccentricity, hob errors and combined coarse cuts pass; runtime source studies and supported compliance remain open. |
 | HB12 | planned | |
 | Phase D | later | |
 | HB13–HB16 | optional, later (class 3) | |
@@ -1174,7 +1174,7 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   a separate plan; HB8 makes no casting or insert-layout changes.
 
 
-### HB9 implementation — full app acceptance pending
+### HB9 implementation — coarse app smoke passed
 
 - The default `cutting` entry point is a deliberately coarse m1, z40, 4 mm face
   job with four gashes. The original reference machine remains selectable as
@@ -1192,9 +1192,9 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   **0 µm** (criterion 0.1 µm), with 169 windows, a peak of 15 buffered samples and
   64,024 retained stock bytes. Worker contouring, cutting artifact round-trip,
   three native runtime/gear/brake tests and the 2,664-source app compiler check pass.
-- The full MuJoCo `checkFlexsplineHobber` acceptance is queued through `heavy-run`
-  from this commit's archived sources. It checks completion, measured cycle/sync,
-  gear measurement and retained memory. No end-to-end app pass is claimed yet.
+- The MuJoCo `checkFlexsplineHobber` coarse end-to-end smoke now passes (see quick
+  checks below). Its original archived waiter was superseded after execution
+  exposed missing feedback wiring, rotary limits and physical servo configuration.
   Its collision check covers conservative cutter/mandrel/table fixture envelopes;
   a full-machine interference audit remains open. The memory criterion bounds
   retained ring stock and measured samples, not cumulative GC allocation.
@@ -1223,8 +1223,8 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   HB8 entry. This makes the trajectory distinction explicit rather than tuning
   coefficients to force a tens-of-newtons result.
 - Full HB8 reference entry/feed validation (tens of N and spindle reserve) remains
-  pending in the standalone force test's `reference` mode. HB9's queued app source
-  is unchanged. No full reference force or loaded app acceptance is claimed.
+  pending in the standalone force test's `reference` mode. HB9's archived source
+  remains unchanged; its obsolete waiter is superseded by the quick runner. No full reference force or loaded app acceptance is claimed.
 - Details and assumptions: `stockkit/HOBBING_FORCES.md`. Logs:
   `/tmp/flexspline-hb10-{tests,gearing,machine,stream,app-build,reference}.log`.
 
@@ -1234,7 +1234,7 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   passes **2,667 sources**. No new native binaries were needed for these checks.
 
 
-### HB11 implementation — physical/source acceptance pending
+### HB11 implementation — quick physical sources passed; reference studies pending
 
 - `HobbingErrorSource` perturbs actual work/tool frames and rake geometry before
   cutting. `FlexsplineHobberErrors` reads installed mandrel, table bearing/encoder,
@@ -1266,4 +1266,53 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
 - Validation: **24 focused error/metrology checks**, **251 mechanical/adapter checks**
   pass; the app compiles **2,672 sources**. The stock-stream regression still
   matches HB3 at **0 µm** (169 windows, 15 peak buffered samples). The separate
-  physical source-cut acceptance is queued from the frozen test artifact.
+  physical source-cut acceptance now passes in its smaller quick fixture.
+
+
+### Quick checks — run directly with cached native dependencies
+
+```
+machinekit/examples/flexspline-hobber/check-quick.sh
+```
+
+- Optional selector: `force`, `errors` or `app`. Only these three headless cases
+  run. The script compiles Haxe only, rebuilds RobotKit's matching runtime in an
+  isolated build directory, and reuses CAD/MuJoCo/other native libraries read-only.
+  It uses one native compiler and memory-capped scopes, with no heavy-suite queue.
+  Logs, times and native provenance are in `build/flexspline-quick/`.
+- On this workspace native providers are discovered from the app build or the
+  sibling machine-tending cache. Override `HOBBER_NATIVE_CACHE` (the directory
+  containing `app`, `cadkit`, etc.) and `HOBBER_STOCK_NATIVE` if needed. A missing
+  cache is reported; the runner does not silently launch a full dependency build.
+- Force smoke: complete m0.3/z40/1 mm cut, 391 windows, **72.13 N**, **360.66 W**,
+  **1.154 Nm** hob torque; 20% spindle reserve and volume conservation pass in
+  about **5 s**. This is a small-part check, not the m0.3/z200 reference acceptance.
+- Error smoke: m1/z20/2 mm baseline, three isolated sources and all combined;
+  **Fr 7.896 µm**, **Fp 8.505 µm**, **ffalpha 3.889 µm**. Four physical signature/
+  superposition checks pass in about **51–55 s**. Sampling is diagnostic, not ISO
+  qualified; the lead grid covers the evaluation interval.
+- App smoke: the m1/z40/4 mm demo uses a **0.1 mm radial grid, 1 µm sweep tolerance**,
+  and 5 mm/s below-face air infeed. Pitch-to-tip inspection is explicitly partial.
+  It completes **924 windows in 5.5535 simulated seconds**, with about **946 KiB**
+  retained stock, no fixture-envelope contacts and a finite gear report (ISO class
+  unqualified). Observed wall time is about **32–34 s** with generated geometry cached.
+- App measured cutting sync is **402.865 arcsec**, within the smoke bound of two
+  4 kHz owner periods plus two table encoder quanta. This is about one owner period
+  of phase lead; precision clock/phase alignment remains open for HB11/HB12.
+  Passing this smoke must not be described as meeting the precision error budget.
+- Execution fixes: explicitly wire B/C encoders to their outer drives; state
+  assumed A/C positioning accelerations; compile physical hold gains for braked
+  servos; enable the hobbing table's assumed drive-default physical servo gains so
+  velocity feedforward is used. Keep computed-torque gear holds in position mode
+  instead of emitting a zero-gain servo. Exclude the virtual stock's intact convex
+  collider while retaining its mass/inertia; RingStock owns removal and fixture
+  checks remain active. No native cutting-force/contact-load feedback is claimed.
+- HB4 is undisturbed. Full reference force validation, HB7 source-disable studies,
+  supported-wall calibration and reference-grade acceptance remain separate.
+
+- Final runner verification: **force, errors and app all pass** in one invocation
+  (4.48 s, 54.12 s and 33.78 s execution respectively, plus compilation).
+  Peak RSS is about 113 MiB, 126 MiB and 470 MiB. **256 machine regressions** and
+  **three native runtime/gear/brake regressions** pass, including a zero-gain
+  computed-torque follower draining its trajectory queue. Console summary:
+  `/tmp/flexspline-quick-all.log`; per-case evidence: `build/flexspline-quick/logs/`.

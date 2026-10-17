@@ -9,8 +9,25 @@ class FlexsplineHobberChecks {
   static var assertions=0;
   static function check(ok:Bool,label:String):Void{assertions++;if(!ok)throw label;}
   static function near(a:Float,b:Float,e:Float,label:String):Void check(Math.abs(a-b)<=e,'$label: $a vs $b');
+  static function modelForRuntime(machine:FlexsplineHobber):robotkit.model.RobotModel {
+    var model=new AssemblyModel("mm");machine.addTo(model,"");
+    var physical:cadbridge.AssemblySimulationBridge.AssemblyPhysicalData={metresPerUnit:0.001,
+      parts:[for(part in machine.components()){id:part.id,materialId:"steel",volume:1000.0,centerOfMass:[0.0,0,0],
+        inertia:[100000.0,0,0,0,100000.0,0,0,0,100000.0],density:7850.0}]};
+    return cadbridge.AssemblySimulationBridge.toRobotModel(model.definition("hobber"),physical).model;
+  }
   public static function run():Void {
     var machine=new FlexsplineHobber();machine.validate();
+    var runtimeModel=modelForRuntime(machine);
+    for(joint in [FlexsplineHobber.B,FlexsplineHobber.C]){
+      var drive=runtimeModel.actuators.filter(a->switch a.transmission{case SimpleTransmission(id,_,_):id==joint;})[0];
+      check(runtimeModel.encoderFor(drive)!=null&&drive.positionLoopRate==4000,"hobber gear drive has explicitly bound installed encoder and loop rate");
+    }
+    for(joint in [FlexsplineHobber.A,FlexsplineHobber.C])
+      check(runtimeModel.coupledLimits(joint).requireAcceleration()>0,"auxiliary rotary positioning acceleration is stated");
+    var compiled=robotkit.runtime.RobotRuntimeCompiler.compile(runtimeModel,new robotkit.profile.RobotProfile());
+    var tilt=[for(i in 0...runtimeModel.joints.length)if(runtimeModel.joints[i].id==FlexsplineHobber.A)i][0];
+    check(compiled.joints[tilt].servoStiffness>0,"uncoupled braked swivel gets physical hold gains");
     var cam=FlexsplineHobberCam.job(machine);
     check(cam.passes.length==1&&cam.tableRpm>0,"HB8 CAM fits installed travel and drive limits");
     var ring=new stockkit.hobbing.RingCompliance(machine.spec.rootRadius()-0.3,0.6,machine.spec.faceWidth,210000,1000,"explicit test fixture stiffness");

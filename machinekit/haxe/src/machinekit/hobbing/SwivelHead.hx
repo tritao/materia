@@ -19,8 +19,8 @@ class SwivelHead extends MachineAssembly {
     addComponent("head",new TablePlaten(new ComponentValues().setNumber("outside",180).setNumber("bore",100)));
     addMemberConnector("housing","swivel",Solids.axial(0,0,90));
     addMateOnAxis("A",Revolute,"housing","swivel","head","axis",{x:0,y:1,z:0},0,
-      {lower:-maxTilt,upper:maxTilt,velocity:this.motor.maxSpeed,effort:this.motor.peakTorque,
-       assumptions:this.motor.ratingsBasis==Assumed?[{quantity:"speed limit",label:"assumed direct motor rating"},{quantity:"effort limit",label:"assumed peak motor torque"}]:null});
+      {lower:-maxTilt,upper:maxTilt,velocity:this.motor.maxSpeed,effort:this.motor.peakTorque,acceleration:Math.PI/2,
+       assumptions:(this.motor.ratingsBasis==Assumed?[{quantity:"speed limit",label:"assumed direct motor rating"},{quantity:"effort limit",label:"assumed peak motor torque"}]:[]).concat([{quantity:"acceleration limit",label:"assumed swivel positioning limit pi/2 rad/s²"}])});
     exposeConnector("mount","housing","mount");exposeConnector("head","head","top");
   }
   function attach(id:String,part:MachineComponent,z:Float):Void {

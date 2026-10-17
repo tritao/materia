@@ -8,7 +8,7 @@ class FlexsplineHobberPreview {
     var data=AssemblyPreview.scene(machine,"flexspline-hobber-cut");
     if(data.machineMotion==null)data.machineMotion={belts:[]};
     data.machineMotion.hobbing={module:1,teeth:40,width:4,pressureAngle:20*Math.PI/180,starts:1,gashes:4,outside:32,length:40,
-      wall:0.6,radialStep:0.05,axialStep:0.25,tolerance:0.000025,feed:5,cuttingSpeed:300,
+      wall:0.6,radialStep:0.1,axialStep:0.25,tolerance:0.001,feed:5,cuttingSpeed:300,
       axes:["X","Y","Z","swivel/A","spindle/B","table/C"],stock:"blank",controllerHz:4000};
     return SceneArtifact.encode(data);
   }

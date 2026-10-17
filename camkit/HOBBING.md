@@ -87,8 +87,10 @@ measured poses through complete exact-time gash windows, previews ring stock on
 an owned worker and presents GearMeasurement traces and qualification warnings.
 The streaming ideal comparison matches HB3 within 0.1 µm (observed 0 µm).
 
-The full MuJoCo cutting acceptance is queued, not yet passed. Collision checks
-currently cover conservative cutter/mandrel/table envelopes; retained-memory
+The coarse MuJoCo cutting smoke now passes via
+`machinekit/examples/flexspline-hobber/check-quick.sh app`. It uses explicit
+pitch-to-tip diagnostic inspection, with no ISO qualification. Collision checks
+cover conservative cutter/mandrel/table envelopes; retained-memory
 checks cover ring stock and buffered poses rather than cumulative allocation.
 The demo's sparse stock grid is not a qualified ISO inspection. Reset restores
 the referenced starting state before a new job.

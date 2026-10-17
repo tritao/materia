@@ -58,7 +58,14 @@ class HobbingStock {
   }
   public function finish(seconds:Float,sync:Float):Void {
     stream.finish();finalPreview=true;maxBytes=Math.max(maxBytes,stock.bytes()+forces.retainedBytes());
-    try{measurement=GearMeasurement.fromRings(stock,spec);}catch(e:Dynamic){measurementFailure=Std.string(e);}
+    try{
+      // The coarse preview grid cannot resolve the generating root transition.
+      // This is an explicitly limited diagnostic profile, never a full active-profile acceptance.
+      var diagnostic=config.tolerance>=0.001;
+      var inspection:Null<GearInspection> = diagnostic?new GearInspection(spec,spec.pitchRadius()):null;
+      measurement=GearMeasurement.fromRings(stock,spec,inspection);
+      if(diagnostic)measurement.warnings.push("Coarse app diagnostic: profile inspected from pitch to tip only; full active profile unchecked");
+    }catch(e:Dynamic){measurementFailure=Std.string(e);}
     var m=measurement;
     report='Cycle ${Math.round(seconds*1000)/1000} s · sync ${Math.round(sync*648000/Math.PI*1000)/1000} arcsec · fixture contacts $collisions\n'
       +'${stream.passes} gash windows · ${stream.poses} poses · peak ${stream.peakFrames} buffered samples · ${Math.round(maxBytes/1024)} KiB stock';

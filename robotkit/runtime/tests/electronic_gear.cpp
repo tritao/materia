@@ -25,7 +25,10 @@ public:
     rk_result apply(const rk_robot_command &command) override {
         last = command;
         if (command.kind == RK_COMMAND_JOINT_TARGETS) for (unsigned i = 0; i < command.target_count; ++i)
-            if (command.targets[i].joint == 1) { follower = command.targets[i].target; follower_velocity = command.servos[i].velocity; }
+            if (command.targets[i].joint == 1) {
+                if (command.targets[i].mode == RK_TARGET_SERVO && command.servos[i].stiffness <= 0 && command.servos[i].damping <= 0) continue;
+                follower = command.targets[i].target; follower_velocity = command.servos[i].velocity;
+            }
         return RK_OK;
     }
     rk_result sample(uint64_t t, rk_robot_state &state) override {
@@ -168,5 +171,18 @@ int main() {
     }
     short_plan.sequence = 2; short_plan.plan_id = 2;
     assert(barrier->submit_plan(short_plan) == RK_OK); // additive anchor, despite physical C advancing
+    // A computed-torque follower has no physical PD gains. Empty-queue gear
+    // following must retain position mode rather than create a zero-gain servo.
+    auto computed_spec=std::make_unique<rk_robot_runtime_blueprint>(*spec);computed_spec->joint_servo[1]={};
+    auto computed_encoders=std::make_shared<Encoders>();computed_encoders->follower=.2;
+    auto computed=std::make_unique<robotkit::RobotRuntime>(*computed_spec,computed_encoders,std::chrono::microseconds(250));
+    assert(computed->publish_sample(1'000'000)==RK_OK);
+    short_plan.sequence=1;short_plan.plan_id=1;assert(computed->submit_plan(short_plan)==RK_OK);
+    for(uint64_t tick=5;tick<100;++tick){
+      assert(computed->apply_pending_commands(tick*250000)==RK_OK);
+      assert(std::abs(computed_encoders->follower-.2-ratio*omega*tick/4000.0)<arcsec);
+      assert(computed->publish_sample(tick*250000)==RK_OK);
+    }
+    assert(computed_encoders->last.targets[0].mode==RK_TARGET_POSITION);
     std::cout << "Electronic gear: encoder prediction worst " << worst / arcsec << " arcsec; uncompensated " << lag * .03 * 1e6 << " um; owner events and per-tick trace passed\n";
 }

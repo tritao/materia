@@ -32,7 +32,7 @@ class HobbingErrorJob {
       sweep=new HobbingSweep(hob,firstTooth,lastTooth,tolerance,warp);
       for(pass in passes)sweep.cutPass(stock,motion,pass,tolerance/16,0.001,motionKnots);
       var measured=GearMeasurement.fromRings(stock,spec,inspection);sweep.dispose();stock.dispose();return measured;
-    }catch(e:Dynamic){if(sweep!=null)sweep.dispose();stock.dispose();throw e;}
+    }catch(e:Dynamic){if(sweep!=null)sweep.dispose();stock.dispose();throw 'hobbing error run [${enabled.length==0?"baseline":enabled.join(",")}] failed: ${Std.string(e)}';}
   }
   public function budget(relativeTolerance:Float=0.25,absoluteTolerance:Float=0.1):ErrorBudget
     return new ErrorBudget([for(source in sources){id:source.id,part:source.part,basis:source.basis}],run,relativeTolerance,absoluteTolerance);

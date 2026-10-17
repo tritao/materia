@@ -124,15 +124,15 @@ class RobotRuntimeCompiler {
           }
         case _:
       }
-      // Coupled servos carry their followers. An uncoupled drive with explicit
-      // physical gains uses the same position loop; unspecified gains retain
+      // Coupled and braked servos need physical hold gains. An uncoupled drive
+      // with explicit gains uses the same position loop; other drives retain
       // the existing computed-torque model. Stepper following is unchanged.
       for (actuator in robot.actuators) switch actuator.transmission {
         case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id):
           var drive = actuator.drive;
           var servo = drive == null ? null : drive.servo();
           if (actuator.processVelocity == null && servo != null &&
-              (inCoupling.exists(joint.id) || actuator.servoStiffness > 0.0 || actuator.servoDamping > 0.0)) {
+              (inCoupling.exists(joint.id) || robot.brakes.filter(brake->brake.joint==joint.id).length>0 || actuator.servoStiffness > 0.0 || actuator.servoDamping > 0.0)) {
           var stiffness = actuator.servoStiffness > 0.0 ? actuator.servoStiffness : servo.defaultStiffness();
           var damping = actuator.servoDamping > 0.0 ? actuator.servoDamping : ServoDrive.defaultDamping(stiffness);
           compiled.servoStiffness += stiffness * ratio * ratio;

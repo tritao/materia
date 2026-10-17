@@ -35,6 +35,8 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   var started=false;
   var startTime=0.0;
   var disposed=false;
+  final trace:Bool=Sys.getEnv("HOBBER_TRACE")=="1";
+  var traceTime=-1.0;
   public function new(config:SceneArtifactHobbing,robot:AssemblyRobot,simulation:Simulation,session:SimSession,project:ProjectDocumentSession) {
     this.config=config;this.robot=robot;this.simulation=simulation;this.session=session;this.project=project;
     indices=[for(id in config.axes)[for(j in 0...robot.model.joints.length)if(robot.model.joints[j].id==id)j][0]];
@@ -46,6 +48,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     var spec=new GearSpec(config.module,config.teeth,config.width,config.pressureAngle);
     var hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),config.starts,config.outside,config.gashes);
     var settings=new HobbingSettings();settings.feedPerRevolution=config.feed;settings.cuttingSpeed=config.cuttingSpeed;
+    if(config.tolerance>=0.001)settings.infeed=5; // coarse smoke: faster below-face air approach, mm/s
     settings.xAxis=config.axes[0];settings.yAxis=config.axes[1];settings.zAxis=config.axes[2];settings.tiltJoint=config.axes[3];settings.hobJoint=config.axes[4];settings.tableJoint=config.axes[5];
     job=new HobbingJob(spec,hob,config.length,settings);
     var binding=new MachineBinding("hobber-axes",config.axes[0],config.axes[1],config.axes[2],0.02,new ToolpathChannels("","hob"));
@@ -84,8 +87,16 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
       var q=robot.robot.snapshot().positions;
       var axes=new HobbingAxes((q.get(indices[0])+offsets[0])*1000,(q.get(indices[1])+offsets[1])*1000,(q.get(indices[2])+offsets[2])*1000,q.get(indices[3])+offsets[3],q.get(indices[4])+offsets[4],q.get(indices[5])+offsets[5]);
       stock.follow(Int64.toFloat(timestamp)*1e-9,axes);
+      if(trace&&session.simulationTime()-traceTime>=0.25){traceTime=session.simulationTime();
+        var contactCount=-1;
+        try{contactCount=simulation.robotContacts(robot.runtime).length;}catch(ignored:Dynamic){}
+        Sys.println("HOBBER_TRACE "+haxe.Json.stringify({t:traceTime,x:axes.x,z:axes.z,b:axes.b,c:axes.c,
+          cSet:robot.robot.snapshot().setpointPositions.get(indices[5])+offsets[5],contacts:contactCount,
+          expected:axes.b*config.starts/config.teeth+job.passes[0].tablePhase,
+          removed:stock.forces.last==null?0:stock.forces.last.removedVolume}));
+      }
       // Compare measured phase only while the material feed is underway (A and C datum already positioned).
-      if(axes.x<job.safeX-0.1&&axes.b>1){var phase=job.passes[0].tablePhase;
+      if(stock.forces.last!=null&&stock.forces.last.removedVolume>0&&axes.b>1){var phase=job.passes[0].tablePhase;
         syncError=Math.max(syncError,Math.abs(axes.c-axes.b*config.starts/config.teeth-phase));}
       elapsed=session.simulationTime()-startTime;
       if(stock.maxBytes>128*1024*1024||stock.stream.peakFrames>4096)throw "Hobbing allocation budget exceeded";

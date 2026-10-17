@@ -65,3 +65,12 @@ the planned tens-of-newtons target and 20% spindle reserve. Its coarse radial
 prediction or ISO inspection. **This full-stroke acceptance is pending.** Run it
 through the shared `heavy-run` queue; focused compiler/native checks need no new
 native libraries. Ring-stock/rake native sources are unchanged.
+
+## Fast smoke cut
+
+`machinekit/examples/flexspline-hobber/check-quick.sh force` runs a complete
+m0.3/z40/1 mm ideal cut at 5 mm/work rev, with four gashes and a coarse grid.
+Measured here: 391 windows, 10.5614 mm³ removed, 72.13 N overlapping window mean,
+360.66 W and 1.154 Nm hob torque. It passes the 20% spindle reserve check and
+chip-volume conservation in about 5 seconds using 113 MiB. This small-part
+smoke check complements the pending full reference-stroke acceptance.

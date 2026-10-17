@@ -98,6 +98,9 @@ class FlexsplineHobber extends MachineAssembly {
     drive("Z","column/railRight","Zplate",[0.0,0,1],F.translation(85,60,443),350);
     drive("Y","swivel/head","Yplate",[0.0,-1,0],F.translation(90,-160,373),250);
     bind("table-drive",C,"table/motor");bind("swivel-drive",A,"swivel/motor");bind("hob-drive",B,"spindle/motor",true);
+    // Feedback belongs to the outer drives; the cartridge encoders are also exposed as sensors.
+    addEncoder("table-feedback",C,"table/encoder","table-drive");
+    addEncoder("hob-master",B,"spindle/encoder","hob-drive");
     bindMotorBrake("swivel-drive","swivel/clamp","swivel.clampRelease","swivel.clampReleased",1000,30);
     FoundationIntegrity.check(bed).throwIfErrors();FoundationIntegrity.check(column).throwIfErrors();FoundationIntegrity.checkMounts(this,precisionMounts).throwIfErrors();
     exposeConnector("work","mandrel","work");exposeConnector("hobCentre","hob","centre");

@@ -32,7 +32,29 @@ class HobbingForceTests {
     }catch(e:Dynamic){initial.dispose();load.dispose();sweep.dispose();stock.dispose();throw e;}
     initial.dispose();load.dispose();sweep.dispose();stock.dispose();
   }
+  static function quickCut():Void {
+    var spec=new GearSpec(0.3,40,1,20*Math.PI/180),hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),1,32,4);
+    var settings=new camkit.HobbingSettings();settings.feedPerRevolution=5;
+    var cam=new camkit.HobbingJob(spec,hob,40,settings),path=cam.passes[0];
+    var motion=new IdealHobbingJob(spec,hob,cam.rpm,path.revolutions,5,path.zStart);
+    var stock=RingStock.fromGearBlank(spec,0.6,0.075,0.5);stock.setThreads(1);
+    var initial=RingStock.annulus(stock.grid),sweep=new HobbingSweep(hob,-10,10,0.0001);
+    var loads=new HobbingForces(stock,spec.pitchRadius(),spec.pressureAngle,1);
+    try {
+      for(pass in motion.schedule(stock.grid)){sweep.cutPass(stock,motion.axesAt,pass,sweep.tolerance/16);
+        loads.afterPass(pass,motion.axesAt(pass.start),motion.axesAt(pass.end),16);}
+      Sys.println("QUICK_FORCE "+haxe.Json.stringify({cycleSeconds:motion.duration,windows:loads.passes,
+        volumeMm3:loads.volume,forceN:loads.maxTangential,radialN:loads.maxRadial,powerW:loads.maxPower,
+        hobTorqueNm:loads.maxHobTorque,scope:"m0.3 z40 width1 coarse complete ideal cut, feed5; not reference acceptance"}));
+      check(loads.volume>0&&Math.isFinite(loads.maxPower),"complete quick cut gives finite nonzero loads");
+      near(loads.volume,initial.compareStock(stock).leftoverVolume(),"quick cut chip volume conservation");
+      check(loads.maxPower<1200&&loads.maxHobTorque<1500/(4000*2*Math.PI/60)*0.8,"quick cut 20% spindle reserve");
+    }catch(e:Dynamic){loads.dispose();sweep.dispose();initial.dispose();stock.dispose();throw e;}
+    loads.dispose();sweep.dispose();initial.dispose();stock.dispose();
+    Sys.println('Quick hobbing force cut: $checks checks passed');
+  }
   public static function main():Void {
+    if(Sys.args().indexOf("quick")>=0){quickCut();return;}
     if(Sys.args().indexOf("reference")>=0){referenceSweep(true);return;}
     var material=KienzleMaterial.referenceSteel();
     near(material.force(0,1),0,"air cut is zero");
