@@ -196,7 +196,7 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
   - tooth thickness (span or over-pins equivalent).
 - Evaluation ranges follow the standard (profile evaluation range, helix evaluation range).
 - Each parameter is graded separately and the overall class is the worst.
-- ISO 1328-1 covers module ≥ 0.5. Below that we extrapolate its formulas and say so in the report.
+- ISO 1328-1 covers module ≥ 0.5. Below that we report experimental extrapolated formula grades, never an ISO class.
   DIN 58405 (fine-pitch gears) is noted as the alternative.
 - Formulas used (√2 step between classes A):
   `fp = (0.001d + 0.4m + 5)·√2^(A−5)` µm, `Fp = (0.002d + 0.55√d + 0.7m + 12)·√2^(A−5)` µm.
@@ -350,8 +350,10 @@ r 30 mm. HB7 and HB11 must show this.
   - a perfect synthetic gear grades class ≤ 1 everywhere;
   - injected eccentricity e gives `Fr ≈ 2e` and a once-per-revolution sinusoid in pitch;
   - an injected profile slope gives `fHα`;
-  - the HB3 ideal cut of the reference part reaches class ≤ 3 (only flats and feed marks remain);
-  - tolerance values match the standard's tables at m 0.5 (check against the text).
+  - the HB3 ideal cut of the reference part reaches experimental extrapolated grade ≤ 3
+    (only flats and feed marks remain; module 0.3 is outside ISO scope);
+  - tolerance values match independently calculated m 0.5 fixtures against the 2013 equations
+    (the standard supplies formulas, not a numeric table for this fixture).
 
 ### Phase B: the machine and its control
 
@@ -571,8 +573,8 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB0 | blocked: baseline waiting for heavy-run slot; scaffold tested | d403e0295 |
 | HB1 | done: non-undercut geometry; internal rack-limit restrictions below | 647b62f66 |
 | HB2 | done: native ring stock, Haxe API, contour and GearSpec comparison | 94f246a1e |
-| HB3 | done: actual rake sweep, ideal driver and slice acceptance; flat-count correction below | this commit |
-| HB4 | planned | |
+| HB3 | done: actual rake sweep, ideal driver and slice acceptance; flat-count correction below | 2ec3bdd45 |
+| HB4 | metrology implemented/tested; blocked: full-face rake acceptance waiting for heavy-run slot | this commit |
 | HB5 | planned | |
 | HB6 | planned | |
 | HB7 | planned | |
@@ -846,3 +848,58 @@ ctest --test-dir build/flexspline-hb3/native --output-on-failure
 LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$PWD/haxeon/out${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
   ./haxeon/.tools/hashlink/hl stockkit/tests/hobbing/build/host/main.hl
 ```
+
+
+### HB4 metrology (2026-10-17)
+
+- Added pure-Haxe `GearRings`, `GearInspection`, `GearMeasurement`, `GearTrace` and
+  `Iso1328`. `RingStock` implements the read-only sampling interface. No StockKit or
+  MachineKit dependency enters GearKit. The same report supplies application/test
+  traces, all nine HB-D6 deviations, per-parameter candidate grades, circular tooth
+  thickness, reconstructed virtual-ball runout radii and over/under-balls dimensions.
+- Every tooth and both flanks are evaluated, preserving the specified datum axis.
+  Pitch uses measurement-circle arc distance; profile/helix use the transverse base
+  tangent. Residual interpolation uses roll distance/axial position. Sorted circle
+  boundaries are searched by binary search, rejecting missing/ambiguous flanks.
+- Explicit profile control is a designer input, since an active range needs a mating
+  gear. The default geometric control is visibly assumed and cannot qualify a class.
+  The inspection applies 95% roll profile evaluation, helix end exclusions,
+  least-squares form/slope separation, tip/full-face slope extrapolation and end
+  excess-material envelopes. Gaussian 50% cutoff filtering retains raw traces and
+  discloses its linear endpoint convention. Sparse source data, unfiltered traces,
+  missing face endpoints and incomplete coverage cannot earn `isoClass`.
+- Pinned 2013 formulas (including unrounded total-deviation combination), class steps,
+  rounding and Annex E virtual-ball construction against ISO-authored primary text.
+  References, units, candidate-grade semantics and limits are in
+  `gearkit/METROLOGY.md`. Tooth size has no ISO flank grade. Over/under-balls
+  equivalents use reconstructed involutes rather than physical probe simulation.
+  Helix trace slope signs are material-positive
+  by flank; the aggregate grading uses magnitude, not a signed helix-angle claim.
+- Corrected two plan assertions: ISO disallows assigning its classes outside scope;
+  module 0.3 therefore gets experimental extrapolated grades and `isoClass=null`.
+  Also, the 2013 standard supplies equations rather than a numeric m 0.5 fixture
+  table. Tests use independently calculated decimal equation fixtures.
+- Validation: 246 metrology assertions pass with both the project compiler/HashLink
+  and pinned reference Haxe interpreter. Existing 532,368 geometry and 18 GearSpec
+  assertions pass on the project host. Native RingStock metrology adapter: 11
+  assertions, including numerical class 1 for every parameter of a perfect gear.
+  Existing ring suite: 345 assertions pass. Integrated StockKit test project compiles
+  (454 sources); the full CAD/workspace suite was not run here.
+  Metrology covers external/internal ideal gears, actual 5 micrometre translated
+  involutes (`Fr` about 10 micrometres and the pitch harmonic/amplitude), injected
+  profile/helix slopes, Gaussian cutoff transmission, end excess/relief, invalid
+  settings, sparse/incomplete data and out-of-scope module.
+- **Still pending:** actual full-profile/full-face reference rake acceptance. Added
+  `RingMetrologyTests reference`, which cuts 185 radial by 201 axial samples and
+  checks every HB-D6 candidate grade <= 3. It uses actual rake geometry through
+  `HobbingSweep`, not a synthetic error/surface substitution. The machine's heavy
+  slots remain occupied, so this run is queued through `heavy-run`, label
+  `flexspline-hb4-reference`, 8 GiB limit / 4 GiB availability requirement. Log:
+  `/tmp/flexspline-hb4-reference.log`; frozen executable:
+  `build/flexspline-hb4/reference-main.hl`. No full-face grade is claimed until it
+  finishes. HB0 baseline is independently still queued behind the same slots.
+- Validation logs: `/tmp/flexspline-hb4-gearkit-tests.log`,
+  `/tmp/flexspline-hb4-reference-haxe.log`,
+  `/tmp/flexspline-hb4-native-adapter-tests.log`,
+  `/tmp/flexspline-hb4-ring-tests.log`, and
+  `/tmp/flexspline-hb4-integrated-build.log`.

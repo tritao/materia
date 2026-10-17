@@ -5,7 +5,7 @@ import gearkit.GearSpec;
 
 /** Circumferential stock for gear cutting. Millimetres, radians; unlike Cartesian Stock's metres.
     Exact angular interval endpoints at cell-centred (r,z) samples. No angle raster. */
-class RingStock {
+class RingStock implements gearkit.GearRings {
   public final grid:RingGrid;
   final owner:Ownedsk_ring_stock_handle;
   var disposed = false;
@@ -32,6 +32,13 @@ class RingStock {
     return annulus(new RingGrid(inner, outer, 0, spec.faceWidth, radialSpacing, axialSpacing));
   }
 
+  public function radii():Array<Float> return [for(i in 0...grid.radialCount)grid.radius(i)];
+  public function axialPositions():Array<Float> return [for(i in 0...grid.axialCount)grid.z(i)];
+  public function boundaries(radial:Int,axial:Int):Array<Float> {
+    var result:Array<Float> = [];
+    for(a in circle(radial,axial)){result.push(a.lo);result.push(a.hi);}
+    return result;
+  }
   public function setThreads(threads:Int):Void {
     alive();
     if (threads < 0 || threads > 128) throw "ring thread count must be in [0,128]";

@@ -305,3 +305,12 @@ automatically (see the CadKit README), so the Haxe tests run with:
 ```sh
 ./haxeon/scripts/haxeon run --project stockkit/tests/haxeon.json
 ```
+
+### Gear metrology
+
+`RingStock` implements GearKit's read-only `GearRings` interface. Use
+`gearkit.GearMeasurement.fromRings(stock, spec, inspection)` for tooth/flank traces,
+virtual-ball runout, circular thickness and per-parameter numerical grading.
+See [evaluation settings, units and qualification rules](../gearkit/METROLOGY.md).
+The native adapter test is `stockkit/tests/metrology/haxeon.json`; its `reference`
+argument runs the heavy full-face hobbing acceptance case.

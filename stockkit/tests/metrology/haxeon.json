@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "stockkit-metrology-tests"},
+  "entry": "RingMetrologyTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"stockkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}
