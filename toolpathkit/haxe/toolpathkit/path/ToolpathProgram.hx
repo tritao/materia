@@ -21,6 +21,17 @@ class ToolpathProgram {
     for (index in 0...ops.length) {
       var op = ops[index];
       switch op {
+        case ElectronicGear(follower, terms, _):
+          if (follower == null || follower.length == 0 || terms == null || terms.length == 0 || terms.length > 8)
+            throw 'toolpath op $index: electronic gear needs a follower and one to eight masters';
+          var masters:Array<String> = [];
+          for (term in terms) {
+            if (term == null || term.master == follower || masters.indexOf(term.master) >= 0)
+              throw 'toolpath op $index: invalid electronic gear master';
+            masters.push(term.master);
+          }
+        case ReleaseGear(follower, _):
+          if (follower == null || follower.length == 0) throw 'toolpath op $index: release gear needs a follower';
         case SetSetup(id, _):
           if (!ids.exists(id)) throw 'toolpath program names unknown setup $id';
         case _: PrinterOps.validate(op, index);

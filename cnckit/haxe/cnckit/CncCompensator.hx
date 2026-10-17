@@ -339,6 +339,7 @@ class CncCompensator {
   static function opSpan(op:ToolpathOp):Provenance return switch op {
     case Move(_, _, _, _, span), MachineMove(_, _, _, _, span),
         SetSetup(_, span): span;
+    case ElectronicGear(_, _, span), ReleaseGear(_, span): span;
     case Dwell(_, span), Spindle(_, _, span), Coolant(_, _, span),
         ToolChange(_, span), ToolLengthOffset(_, _, span), OptionalStop(span),
         ProgramStop(span), End(span): span;

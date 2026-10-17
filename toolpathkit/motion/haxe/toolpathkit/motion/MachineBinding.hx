@@ -4,6 +4,10 @@ import toolpathkit.setup.TravelEnvelope;
 
 /** Machine axes and execution limits, independent of a G-code controller. */
 class MachineBinding {
+  /** Installed runtime joint order and explicitly declared encoder timing (SI). */
+  public var gearFollowers:Array<String> = [];
+  public var gearJointIds:Array<String> = [];
+  public var gearEncoders:Map<String, GearEncoderTiming> = new Map();
   public final channels:ToolpathChannels;
   public final frameId:String;
   public final xAxisId:String;
@@ -64,3 +68,6 @@ class MachineBinding {
 
   public function setPrinter(value:Null<PrinterBinding>):Void printer = value;
 }
+
+/** Extra encoder delay excludes delay already carried in the observation timestamp. */
+typedef GearEncoderTiming = { var latencyNs:Int; var quantum:Float; var loopHz:Float; }

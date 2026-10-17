@@ -86,6 +86,15 @@ rk_result RobotRuntime::write_output(const char *channel, const rk_event_value &
 
 void RobotRuntime::record_event(uint32_t channel_index, const rk_event_value &value,
     uint64_t plan_id, uint64_t scheduled_ns, uint64_t owner_ns, rk_event_cause cause) {
+    const int follower = ElectronicGear::follower(blueprint_.channels[channel_index].id);
+    if (follower >= 0 && std::strncmp(value.command, "gear.", 5) == 0) {
+        if (endpoint_->executes_trajectory_queue() ||
+            !control_.gears.event(follower, value, blueprint_.joint_count, scheduled_ns))
+            control_.gear_invalid = true;
+        if (control_.gears.relations[follower].active &&
+            period_.count() * control_.gears.relations[follower].loop_hz > 1e9 + 0.5)
+            control_.gear_invalid = true;
+    }
     control_.channel_values[channel_index] = value;
     channel_outputs_[channel_index] = value;
     rk_event_record record{};
@@ -777,6 +786,11 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         return RK_ERROR_UNSUPPORTED;
     if (validate_plan_for_blueprint(plan, blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
+    for (const auto &event : plan.events) if (ElectronicGear::follower(event.channel) >= 0) {
+        if (endpoint_->executes_trajectory_queue()) return RK_ERROR_UNSUPPORTED;
+        if (!std::strcmp(event.value.command, "gear.loop") && period_.count() * event.value.argument > 1e9 + 0.5)
+            return RK_ERROR_LIMIT;
+    }
     if ((plan.required_capabilities & ~(RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
             RK_PLAN_CAPABILITY_EVENTS)) != 0 ||
         !supports_trajectory_queue())
@@ -1569,7 +1583,16 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         return std::pair<uint64_t, bool>{
             static_cast<uint64_t>(std::ceil(duration_seconds * 1'000'000'000.0)), ramp_hits_limit};
     };
+    auto has_gears = [&]() {
+        return std::any_of(control_.gears.relations.begin(), control_.gears.relations.end(),
+            [](const auto &relation) { return relation.active; });
+    };
     auto start_stop_ramp = [&](const double *positions, const double *velocities) {
+        if (has_gears()) {
+            // Queue underflow must stop from physical motion, not the additive path's rest point.
+            positions = current.position; velocities = current.velocity;
+            safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE, false, true);
+        }
         const auto bounds = stop_ramp_bounds(positions, velocities);
         control_.stop_ramp_hits_limit = bounds.second;
         control_.stop_ramp_duration_ns = bounds.first;
@@ -1705,6 +1728,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             }
 
             if (value.kind == RK_COMMAND_STOP) {
+                const bool geared = has_gears();
                 safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE, false, true);
                 if (endpoint_->executes_trajectory_queue()) {
                     // The device owns its queued path and deceleration. A host
@@ -1715,6 +1739,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                         pending_device_stop_source_ = state_.source_timestamp_ns;
                     }
                     controlled_stop = false;
+                } else if (geared) {
+                    start_stop_ramp(current.position, current.velocity); controlled_stop = true;
                 } else controlled_stop = begin_controlled_stop();
                 safety = RK_SAFETY_READY;
                 if (has_later_effective_command) {
@@ -1726,7 +1752,12 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             }
 
             if (value.kind == RK_COMMAND_ABORT) {
+                const bool geared = has_gears();
                 safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE, false, true);
+                if (geared) {
+                    start_stop_ramp(current.position, current.velocity);
+                    controlled_stop = true; safety = RK_SAFETY_READY; continue;
+                }
                 if (control_.trajectory_active && !trajectory_.empty()) {
                     refresh_trajectory_progress();
                     double positions[RK_MAX_TRAJECTORY_JOINTS]{};
@@ -1964,6 +1995,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 }
         }
     }
+
+    if (control_.gear_invalid) { latch_fault(); return RK_ERROR_INVALID_ARGUMENT; }
 
     const bool lifecycle_command = has_command && lifecycle_kind(final_kind);
 
@@ -2334,6 +2367,38 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             }
             output.reference_end_position[i] = target.target;
             output.reference_end_velocity[i] = 0.0;
+        }
+    }
+    // The trajectory remains additive. Never overwrite its stored coefficients or references.
+    if (output.kind == RK_COMMAND_JOINT_TARGETS && !control_.stop_ramp_active && brakes_motion_ready_) {
+        const double age = owner_time_ns >= current.source_timestamp_ns
+            ? (owner_time_ns - current.source_timestamp_ns) * 1e-9 : 0.0;
+        for (uint32_t i = 0; i < output.target_count; ++i) {
+            auto &target = output.targets[i];
+            const unsigned joint = target.joint;
+            if (joint >= control_.gears.relations.size() || !control_.gears.relations[joint].active) continue;
+            if ((target.mode != RK_TARGET_SERVO && target.mode != RK_TARGET_POSITION) || i >= RK_MAX_SERVO_JOINTS)
+                return RK_ERROR_INVALID_STATE;
+            const double offset = control_.gears.offset(joint, current, age);
+            const double velocity = control_.gears.velocity(joint, current);
+            target.target += offset;
+            output.servos[i].velocity += velocity;
+            output.reference_end_position[i] += offset + velocity * output.reference_duration;
+            output.reference_end_velocity[i] += velocity;
+            const auto &limit = blueprint_.joints[joint];
+            if (!std::isfinite(target.target) ||
+                ((limit.limit_flags & RK_LIMIT_VELOCITY) && std::abs(output.servos[i].velocity) > limit.max_velocity) ||
+                (target.target < limit.lower_limit || target.target > limit.upper_limit)) {
+                latch_fault(); return RK_ERROR_LIMIT;
+            }
+            // Every owner tick records the measured follower residual at the sample epoch.
+            rk_event_value sync{}; sync.kind = RK_EVENT_PROCESS;
+            std::strcpy(sync.command, "sync");
+            const double planned = target.target - offset - (output.servos[i].velocity - velocity) * age;
+            sync.argument = current.position[joint] - (planned + control_.gears.offset(joint, current, 0.0));
+            for (unsigned ch = 0; ch < blueprint_.channel_count; ++ch)
+                if (ElectronicGear::follower(blueprint_.channels[ch].id) == static_cast<int>(joint))
+                    record_event(ch, sync, control_.active_plan_id, control_.trajectory_time_ns, owner_time_ns, RK_EVENT_CONTROLLER);
         }
     }
     output.sequence = ++endpoint_command_sequence_;

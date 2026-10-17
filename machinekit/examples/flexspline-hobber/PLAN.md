@@ -594,8 +594,8 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB3 | done: actual rake sweep, ideal driver and slice acceptance; flat-count correction below | 2ec3bdd45 |
 | HB4 | metrology implemented/tested; blocked: full-face rake acceptance waiting for heavy-run slot | 0d5a47f3f |
 | HB5 | done: reference parts plus ribbed mineral-cast foundations and separate steel inserts | 13358ee07 + f59fcf695 |
-| HB6 | mechanics/scene tested; blocked: Start-page/project-load/MuJoCo acceptance queued | this commit |
-| HB7 | planned | |
+| HB6 | mechanics/scene tested; blocked: Start-page/project-load/MuJoCo acceptance queued | 45dd31967 |
+| HB7 | done: measured-master gearbox, timed events, additive C drive checks and reference sync tests | this commit |
 | HB8 | planned | |
 | HB9 | planned | |
 | HB10 | planned | |
@@ -1064,3 +1064,48 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   8 GiB availability requirement and one native compiler at a time. Runner/source
   live under `build/flexspline-hb6/`. HB4's existing run was not interrupted; HB0
   still holds a slot waiting for memory and HB4 still waits for a slot.
+
+
+### HB7 — electronic gearbox
+
+- RobotKit's host-owned runtime now installs a programmable follow relation with
+  `target = planned + Σ ratio × measured_encoder_prediction`. Masters use count
+  quantisation and measured velocity, with sample age plus explicitly declared
+  additional encoder latency. Driver/controller loop data is required; a runtime
+  slower than the declared gear loop rejects the plan. No mechanical coupling,
+  model rebuild or RobotModel wire-version change is involved.
+- ToolpathKit `ElectronicGear` / `ReleaseGear` lower named joints to atomic timed
+  process-event groups. `GearBinding.install` reads the installed encoders and
+  driver position loops, takes controller timing and extra latency explicitly,
+  and returns safe-release channel declarations for the requested independent
+  followers. MotionKit continues to plan the additive coordinate. Unsupported
+  CNC/printer exporters refuse gearbox operations explicitly.
+- PlanCheck reads the same event groups, including both sides of changes between
+  ordinary sampling instants. It includes geared velocity and acceleration in C
+  speed, motor torque, RMS torque and elastic-load checks. Process masters need a
+  stated acceleration in `PlanCheckOptions.processAccelerations` (zero only for
+  settled speed). Excess speed names `table/C`; missing acceleration is an error.
+- Per-owner-tick `sync` process records expose measured follower residual in SI
+  units through the existing bounded event buffer and overflow flag. Feed hold
+  stops additive feed while C follows a continuing spindle. Stop/abort/underflow
+  release gearing and stop from the measured physical pose/velocity. Brake
+  interlocks gate outgoing motion. Endpoint-owned device queues remain explicitly
+  unsupported; a device-side EGB needs its own implementation.
+- Validation: all four targeted native suites pass (electronic gear, runtime,
+  blueprint validation and brakes). The native owner test covers measured rather
+  than planned B, an additive C phase, per-tick records, feed hold, physical stop,
+  multiple masters, cycles, incomplete packets and an underspeed owner rejection.
+  With 2^23 encoder counts/rev, 4 kHz driver/owner, B at 3000 rpm, ratio 1/200 and
+  1 ms extra encoder delay, maximum prediction error is 0.000309 arcsec. An assumed
+  .02 kg m², 200 Hz critically damped servo stays below 1 arcsec in the steady
+  15 rpm interval (0.000020 arcsec). Disabling prediction gives the expected
+  47.124 µm at 30 mm radius. These assumed reference checks omit HB10/HB11 loads,
+  cogging/eccentricity and structural effects; they are not measured machine accuracy.
+- The standalone `machinekit/tests/gearing/haxeon.json` has 16 passing checks for
+  lowering, ratio changes without rebuilding, release, combined speed, torque,
+  short event intervals, trajectory masters and missing process acceleration.
+  It is registered as `hobber-gearing` in the workspace. ToolpathKit's 149 core
+  assertions pass; the broader ToolpathMotion project compiles. Protocol, timing
+  semantics and limitations: `robotkit/runtime/ELECTRONIC_GEAR.md`.
+- Logs: `/tmp/flexspline-hb7-{ctest,native,gearing,gearing-build,toolpath-core,build}.log`.
+  HB4 and HB6 heavy acceptance runs remain queued and were not interrupted.

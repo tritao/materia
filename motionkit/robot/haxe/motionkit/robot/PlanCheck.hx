@@ -22,6 +22,9 @@ import robotkit.model.SteadyLoads;
  */
 class PlanCheckOptions {
   /** Share of a drive's torque-speed curve a motor may use: 1 allows the curve itself. */
+  /** Declared signed acceleration (rad/s²) of a geared process spindle during this plan.
+      Programs must ramp to steady speed before engaging, or supply the actual envelope. */
+  public var processAccelerations:Map<String, Float> = new Map();
   public var margin:Float = 1.0;
   /** Gravity and friction on the axes, which planning with `RobotModel.coupledLimits(id, steady)` also honours. */
   public var steady:SteadyLoads = new SteadyLoads();
@@ -41,6 +44,7 @@ class PlanCheckOptions {
   public function copy():PlanCheckOptions {
     var result = new PlanCheckOptions();
     result.margin = margin;
+    for (id => value in processAccelerations) result.processAccelerations.set(id, value);
     result.steady = steady.copy();
     result.cuttingForce = cuttingForce;
     result.cuttingFeedLimit = cuttingFeedLimit;
@@ -63,8 +67,10 @@ class PlanCheckOptions {
  */
 class PlanCheck {
   public final options:PlanCheckOptions;
+  final gears:GearCheckState;
   final loads:Array<AxisLoad> = [];
   final planJoint:Array<Int> = [];
+  final modelJoint:Array<Int> = [];
   final slotActuators:Array<Actuator> = [];
   /** The first axis each actuator serves, which names it in diagnostics. */
   final slotAxes:Array<String> = [];
@@ -78,6 +84,7 @@ class PlanCheck {
   public function new(model:RobotModel, jointIds:Array<String>, ?options:PlanCheckOptions) {
     if (model == null || jointIds == null) throw "A plan check needs a model and its joint ids";
     this.model = model;
+    gears = new GearCheckState(model);
     this.jointIds = jointIds.copy();
     this.options = options == null ? new PlanCheckOptions() : options.copy();
     for (load in DriveLoads.of(model, this.options.steady, jointIds)) {
@@ -85,6 +92,7 @@ class PlanCheck {
       if (index < 0) continue;
       loads.push(load);
       planJoint.push(index);
+      modelJoint.push([for (joint in model.joints) joint.id].indexOf(load.axis));
     }
     lastDirection = [for (_ in loads) 0.0];
     // One slot per actuator, in order of first use: a motor that serves several axes has one.
@@ -114,15 +122,21 @@ class PlanCheck {
 
   /** Checks `plan`, made from op `opIndex` at programmed speed `feed` (m/s, 0 when not a path move). */
   public function check(plan:ExecutionPlan, opIndex:Int, feed:Float):PlanCheckResult {
-    return checkSegments(new CheckedPlanSegments(plan), opIndex, feed);
+    return checkSegments(new CheckedPlanSegments(plan), opIndex, feed, plan.events);
   }
 
   /** Direct moves and live servo chunks use the same drive and accuracy checks as programs. */
   public function checkTrajectory(trajectory:Trajectory, ?opIndex:Int = -1, ?feed:Float = 0.0):PlanCheckResult
     return checkSegments(new ArrayStreamSegments(trajectory.segments()), opIndex, feed);
 
-  public function checkSegments(segments:StreamSegments, ?opIndex:Int = -1, ?feed:Float = 0.0):PlanCheckResult {
+  public function checkSegments(segments:StreamSegments, ?opIndex:Int = -1, ?feed:Float = 0.0, ?events:Array<motionkit.event.TimedEvent>):PlanCheckResult {
     if (segments.jointCount() != jointIds.length) throw "Plan check joint count mismatch";
+    var ordered = events == null ? [] : events.copy();
+    // Stable order is essential for atomic begin/term/engage groups at one timestamp.
+    for (i in 1...ordered.length) if (haxe.Int64.compare(ordered[i - 1].timeNs, ordered[i].timeNs) > 0)
+      throw "Plan check needs ordered process events";
+    var eventIndex = 0;
+    var gearSpeedWorst:Map<String, PlanDiagnostic> = new Map();
     var count = segments.count();
     var stride = ExecutionPlan.COEFFICIENT_STRIDE;
     var cutting = options.cuttingFeedLimit > 0.0 && feed > 0.0 && feed <= options.cuttingFeedLimit;
@@ -165,10 +179,63 @@ class PlanCheck {
         for (power in 0...degree + 1)
           c[axis][power] = segments.coefficient(segment, planJoint[axis], power);
       }
-      for (sample in 0...steps + 1) {
-        var tau = step * sample;
-        // End points belong to two segments: weight them half so the RMS counts each moment once.
-        var weight = (sample == 0 || sample == steps) ? 0.5 * step : step;
+      var times = [for (i in 0...steps + 1) step * i];
+      // Check both sides of every gear/process event, including short intervals between grid samples.
+      for (event in ordered) {
+        var time = Int64.toFloat(event.timeNs) * 1e-9 - begin;
+        if (time >= 0 && time <= length) {
+          times.push(time);
+          if (time > 0) times.push(Math.max(0, time - 1e-10));
+        }
+      }
+      times.sort(Reflect.compare);
+      var samples:Array<Float> = [];
+      for (time in times) if (samples.length == 0 || time > samples[samples.length - 1]) samples.push(time);
+      for (sample in 0...samples.length) {
+        var tau = samples[sample];
+        var weight = ((sample > 0 ? tau - samples[sample - 1] : 0) +
+          (sample + 1 < samples.length ? samples[sample + 1] - tau : 0)) * 0.5;
+        while (eventIndex < ordered.length && Int64.toFloat(ordered[eventIndex].timeNs) * 1e-9 <= begin + tau + 1e-15) {
+          var event = ordered[eventIndex++]; gears.observe(event.channel, event.value);
+        }
+        // Physical velocity/acceleration include the measured-master contribution. The polynomial
+        // remains the additive part; this does not turn a programmable relation into a model coupling.
+        var gearV:Map<Int, Float> = new Map(), gearA:Map<Int, Float> = new Map();
+        var masterCache:Map<Int, {velocity:Float, acceleration:Float}> = new Map();
+        function masterMotion(joint:Int):{velocity:Float, acceleration:Float} {
+          var cached = masterCache.get(joint);
+          if (cached != null) return cached;
+          var v = 0.0, a = 0.0;
+          var process = gears.processVelocity(joint);
+          if (process != null) {
+            var id = model.joints[joint].id, alpha = options.processAccelerations.get(id);
+            if (alpha == null || !Math.isFinite(alpha)) throw 'Electronic gear master $id needs a declared process acceleration';
+            v = process; a = alpha;
+          } else {
+            var master = jointIds.indexOf(model.joints[joint].id);
+            if (master < 0) throw 'Electronic gear master ${model.joints[joint].id} is absent from the plan';
+            for (power in 1...degree + 1) {
+              var coefficient = segments.coefficient(segment, master, power);
+              v += power * coefficient * Math.pow(tau, power - 1);
+              if (power >= 2) a += power * (power - 1) * coefficient * Math.pow(tau, power - 2);
+            }
+          }
+          var terms = gears.active.get(joint);
+          if (terms != null) for (term in terms) {
+            var motion = masterMotion(term.master);
+            v += term.ratio * motion.velocity; a += term.ratio * motion.acceleration;
+          }
+          var result = {velocity:v, acceleration:a}; masterCache.set(joint, result); return result;
+        }
+        for (follower => terms in gears.active) {
+          var v = 0.0, a = 0.0;
+          for (term in terms) {
+            var motion = masterMotion(term.master);
+            v += term.ratio * motion.velocity; a += term.ratio * motion.acceleration;
+          }
+          if (jointIds.indexOf(model.joints[follower].id) < 0) throw 'Electronic gear follower ${model.joints[follower].id} is absent from the additive plan';
+          gearV.set(follower, v); gearA.set(follower, a);
+        }
         for (slot in 0...motorCount) { torques[slot] = 0.0; speeds[slot] = 0.0; drags[slot] = 0.0; }
         for (axis in 0...loads.length) {
           var load = loads[axis], coefficient = c[axis];
@@ -177,6 +244,18 @@ class PlanCheck {
           for (power in 1...degree + 1) {
             velocity += power * coefficient[power] * Math.pow(tau, power - 1);
             if (power >= 2) acceleration += power * (power - 1) * coefficient[power] * Math.pow(tau, power - 2);
+          }
+          var joint = modelJoint[axis];
+          var extraV = gearV.get(joint), extraA = gearA.get(joint);
+          if (extraV != null && extraA != null) {
+            velocity += extraV; acceleration += extraA;
+            var limit = model.coupledLimits(load.axis, options.steady).requireVelocity();
+            if (Math.abs(velocity) > limit * (1 + 1e-6)) {
+              var previous = gearSpeedWorst.get(load.axis);
+              if (previous == null || Math.abs(velocity) > previous.value)
+                gearSpeedWorst.set(load.axis, new PlanDiagnostic(PlanDiagnosticKind.GearSpeed, opIndex,
+                  load.axis, load.axis, begin + tau, Math.abs(velocity), limit, 1));
+            }
           }
           velocities[axis] = velocity;
           accelerations[axis] = acceleration;
@@ -302,6 +381,7 @@ class PlanCheck {
       }
       if (lastSeen[axis] != 0.0) lastDirection[axis] = lastSeen[axis];
     }
+    for (diagnostic in gearSpeedWorst) diagnostics.push(diagnostic);
     for (diagnostic in diagnostics) {
       var labels:Array<String> = [];
       for (load in loads) {

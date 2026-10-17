@@ -192,6 +192,7 @@ class StockSimulationSession {
   static function provenanceOf(op:ToolpathOp):toolpathkit.path.Provenance
     return switch op {
       case SetSetup(_, provenance), Move(_, _, _, _, provenance), MachineMove(_, _, _, _, provenance),
+          ElectronicGear(_, _, provenance), ReleaseGear(_, provenance),
           Dwell(_, provenance), Spindle(_, _, provenance), Coolant(_, _, provenance),
           ToolChange(_, provenance), ToolLengthOffset(_, _, provenance), OptionalStop(provenance),
           ProgramStop(provenance), End(provenance), Deposit(_, _, _, provenance), DepositOff(provenance),

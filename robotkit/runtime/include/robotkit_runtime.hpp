@@ -2,6 +2,7 @@
 #define ROBOTKIT_RUNTIME_HPP
 
 #include "robotkit_runtime.h"
+#include "electronic_gear.hpp"
 #include "trajectory_core.hpp"
 #include "brake_release_interlock.hpp"
 
@@ -316,6 +317,8 @@ private:
         rk_timed_event event{};
     };
     struct ControlState {
+        ElectronicGear gears;
+        bool gear_invalid = false;
         rk_joint_target targets[RK_MAX_JOINTS]{};
         rk_joint_servo servos[RK_MAX_SERVO_JOINTS]{}; // Terms of RK_TARGET_SERVO targets, by joint.
         double position_reference[RK_MAX_JOINTS]{};

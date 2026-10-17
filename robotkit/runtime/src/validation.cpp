@@ -112,6 +112,16 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             channel.kind != channel.safe_value.kind || !valid_event_value(channel.safe_value) ||
             (channel.stop_policy != RK_CHANNEL_SAFE_ON_STOP && channel.stop_policy != RK_CHANNEL_KEEP_ON_STOP))
             return RK_ERROR_INVALID_ARGUMENT;
+        if (std::strncmp(channel.id, "motion.gear/", 12) == 0) {
+            const int follower = robotkit::ElectronicGear::follower(channel.id);
+            if (follower < 0 || static_cast<unsigned>(follower) >= blueprint->joint_count ||
+                channel.kind != RK_EVENT_PROCESS || std::strcmp(channel.safe_value.command, "gear.release") ||
+                channel.stop_policy != RK_CHANNEL_SAFE_ON_STOP)
+                return RK_ERROR_INVALID_ARGUMENT;
+            for (unsigned c = 0; c < blueprint->coupling_count; ++c)
+                if (blueprint->couplings[c].follower == static_cast<unsigned>(follower) ||
+                    blueprint->couplings[c].leader == static_cast<unsigned>(follower)) return RK_ERROR_INVALID_ARGUMENT;
+        }
         for (uint32_t j = 0; j < i; ++j)
             if (std::strcmp(channel.id, blueprint->channels[j].id) == 0)
                 return RK_ERROR_INVALID_ARGUMENT;
@@ -459,6 +469,7 @@ rk_result validate_plan_for_blueprint(const PlanRequest &plan,
     if (plan.events.size() > RK_MAX_TRAJECTORY_QUEUE_POINTS ||
         (!plan.events.empty() && (plan.required_capabilities & RK_PLAN_CAPABILITY_EVENTS) == 0))
         return RK_ERROR_INVALID_ARGUMENT;
+    robotkit::ElectronicGear gears;
     uint64_t previous = 0;
     for (std::size_t i = 0; i < plan.events.size(); ++i) {
         const auto &event = plan.events[i];
@@ -471,10 +482,16 @@ rk_result validate_plan_for_blueprint(const PlanRequest &plan,
             if (std::strcmp(event.channel, blueprint.channels[j].id) == 0 &&
                 event.value.kind == blueprint.channels[j].kind) declared = true;
         if (!declared) return RK_ERROR_INVALID_ARGUMENT;
+        const int follower = ElectronicGear::follower(event.channel);
+        if (follower >= 0 && (event.hold_policy != RK_EVENT_KEEP ||
+            !gears.event(follower, event.value, blueprint.joint_count, event.time_ns)))
+            return RK_ERROR_INVALID_ARGUMENT;
         for (uint32_t j = 0; j < blueprint.brake_count; ++j)
             if (std::strcmp(event.channel, blueprint.channels[blueprint.brakes[j].release_channel].id) == 0)
                 return RK_ERROR_INVALID_ARGUMENT; // controller output, never a program event
     }
+    for (unsigned joint = 0; joint < gears.staged.size(); ++joint)
+        if (gears.staged[joint].staging) return RK_ERROR_INVALID_ARGUMENT;
     return RK_OK;
 }
 

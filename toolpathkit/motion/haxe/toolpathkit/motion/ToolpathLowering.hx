@@ -82,6 +82,31 @@ class ToolpathLowering {
           // The hotend melts so much filament a second: a bead is laid no faster than that.
           addMove(primitive(geometry), Math.min(speed, printer.maxFlow / bead), blend, span, printer.radiansPerMetre(bead));
         } else addMove(primitive(geometry), speed, blend, span);
+      case ElectronicGear(follower, terms, span):
+        flush(); drainQueued();
+        var index = machine.gearJointIds.indexOf(follower);
+        if (index < 0 || machine.gearFollowers.indexOf(follower) < 0) throw 'Unknown electronic gear follower $follower';
+        var followerEncoder = machine.gearEncoders.get(follower);
+        if (followerEncoder == null || followerEncoder.loopHz <= 0) throw 'Electronic gear follower $follower needs installed servo/controller timing';
+        var loopHz = followerEncoder.loopHz;
+        var resolved:Array<robotkit.execution.GearTerm> = [];
+        for (term in terms) {
+          var master = machine.gearJointIds.indexOf(term.master);
+          var encoder = machine.gearEncoders.get(term.master);
+          if (master < 0 || encoder == null || !Math.isFinite(encoder.loopHz) || encoder.loopHz <= 0)
+            throw 'Electronic gear master ${term.master} needs installed encoder and controller timing';
+          loopHz = Math.min(loopHz, encoder.loopHz);
+          resolved.push(new robotkit.execution.GearTerm(master, term.ratio, encoder.latencyNs, encoder.quantum));
+        }
+        for (value in robotkit.execution.GearEvents.engage(index, resolved, loopHz)) switch value {
+          case Process(command, argument): add(MotionOp.SetOutput(robotkit.execution.GearEvents.channel(index), EventValue.Process(command, argument)), span);
+          case _: throw "Unexpected gear event";
+        }
+      case ReleaseGear(follower, span):
+        flush(); drainQueued();
+        var index = machine.gearJointIds.indexOf(follower);
+        if (index < 0 || machine.gearFollowers.indexOf(follower) < 0) throw 'Unknown electronic gear follower $follower';
+        add(MotionOp.SetOutput(robotkit.execution.GearEvents.channel(index), EventValue.Process("gear.release", 0)), span);
       case Dwell(seconds, span):
         flush(); drainQueued(); add(MotionOp.Dwell(seconds), span);
       case Spindle(direction, rpm, span):

@@ -26,6 +26,7 @@
 		{ "path": "stockkit/tests/haxeon.json", "name": "stockkit", "tags": ["cadkit"], "shards": 4 },
 		{ "path": "toolpathkit/tests/haxeon.json", "name": "toolpathkit" },
 		{ "path": "toolpathkit/motion/tests/haxeon.json", "name": "toolpathkit-motion" },
+		{ "path": "machinekit/tests/gearing/haxeon.json", "name": "hobber-gearing" },
 		{ "path": "visionkit/tests/haxeon.json", "name": "visionkit", "tags": ["opencv"] },
 		{ "path": "robotkit/tests/mujoco/haxeon.json", "name": "robotkit-mujoco", "tags": ["mujoco"] },
 		{ "path": "robotkit/cadbridge/tests/mujoco/haxeon.json", "name": "cadbridge-mujoco", "tags": ["mujoco", "cadkit"] }

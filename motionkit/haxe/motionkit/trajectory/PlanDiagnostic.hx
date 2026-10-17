@@ -10,6 +10,7 @@ enum abstract PlanDiagnosticKind(String) from String to String {
   var ServoRatedTorque = "servo-rated-torque";
   /** The axis's drive stretches or lags by more than the tolerance. */
   var Accuracy = "accuracy";
+  var GearSpeed = "electronic-gear-speed";
 
 }
 
@@ -21,6 +22,7 @@ enum abstract PlanDiagnosticKind(String) from String to String {
 class PlanDiagnostic {
   /** Quantities used by each finding's calculation. */
   public static function quantities(kind:PlanDiagnosticKind):Array<String> return switch kind {
+    case PlanDiagnosticKind.GearSpeed: ["motor curve", "driver rate", "controller rate"];
     case PlanDiagnosticKind.Accuracy: ["stiffness", "backlash", "drag", "steady loads"];
     case _: ["motor curve", "inertia", "efficiency", "drag"];
   };
@@ -65,6 +67,7 @@ class PlanDiagnostic {
     var where = (line > 0 ? 'line $line, ' : '') + 'op $opIndex' + (pathDistance >= 0.0 ? ' at ${round(pathDistance * 1000.0)} mm' : '') +
       ' (${round(timeSeconds)} s into the plan)';
     var description = switch kind {
+      case GearSpeed: '$where: electronic gear axis $axis needs ${round(value)} joint units/s against ${round(limit)} joint units/s permitted';
       case Accuracy: '$where: axis $axis deviates ${round(value * 1000.0)} mm against a tolerance of ${round(limit * 1000.0)} mm';
       case ServoRatedTorque: '$where: motor $subject on $axis runs at ${round(value)} N m RMS against ${round(limit)} N m rated';
       case _: '$where: motor $subject on $axis needs ${round(value)} N m against ${round(limit)} N m available' +

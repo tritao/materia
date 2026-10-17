@@ -1,0 +1,5 @@
+{
+  "version":1, "package":{"name":"hobber-gearing-checks"}, "entry":"GearChecks",
+  "sourceRoots":["src"], "dependencies":{"toolpathkit-motion":{"path":"../../../toolpathkit/motion"}},
+  "target":"host", "outputDir":"build"
+}

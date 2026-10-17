@@ -18,6 +18,9 @@ enum ToolpathOp {
   /** A move of the controlled point in absolute machine coordinates. */
   MachineMove(kind:MoveKind, geometry:PathGeometry, feed:Float,
     tolerance:Float, provenance:Provenance);
+  /** Add measured master motion to the follower's independently planned motion. */
+  ElectronicGear(follower:String, terms:Array<GearTerm>, provenance:Provenance);
+  ReleaseGear(follower:String, provenance:Provenance);
   Dwell(seconds:Float, span:Provenance);
   Spindle(direction:SpindleDirection, rpm:Float, provenance:Provenance);
   Coolant(mist:Bool, flood:Bool, provenance:Provenance);

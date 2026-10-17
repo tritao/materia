@@ -120,6 +120,7 @@ class CncWriter {
       case OptionalStop(_): lines.push("M1");
       case ProgramStop(_): lines.push("M0");
       case End(_): lines.push("M2");
+      case ElectronicGear(_, _, _), ReleaseGear(_, _): throw "Controller has no electronic gearbox export binding";
       case Spindle(direction, rpm, _):
         switch direction {
           case Off: lines.push("M5");
