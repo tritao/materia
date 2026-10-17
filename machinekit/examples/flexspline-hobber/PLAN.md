@@ -371,11 +371,27 @@ r 30 mm. HB7 and HB11 must show this.
   - `Hob`: the part from a `gearkit.HobDesign`.
   - `ExpandingMandrel`: hydraulic, runout, clamping pressure.
   - `SwivelHead`: servo with worm or direct drive, plus a clamp.
-  - `MineralCastBed`, `Column`.
+  - `mineral-cast` material in `projectkit` `MaterialLibrary`: density ≈ 2400 kg/m³,
+    Young's modulus ≈ 35 GPa, plus loss factor (damping, ≈ 6–10× cast iron), thermal
+    expansion (≈ 12–16 µm/m/K) and conductivity, all marked assumed. If `MaterialDef`
+    has no damping/thermal expansion fields, add optional physical fields used only
+    where a check reads them.
+  - `MineralCastBed` and `MineralCastColumn`: designed bodies with thick walls and ribs,
+    and cast-in steel inserts as child parts (rail seats, table mounting plate,
+    threaded bushes, lifting points). Rails, the rotary table and the column mount on
+    inserts, never on the casting body. Each insert carries a stated position tolerance
+    and a "ground after casting" finish note. BOM: mineral casting by weight, inserts
+    listed separately.
 - Catalogue rows are marked Catalog or Assumed. Error-source fields default to the reference
   numbers.
 - Tests: part geometry valid; BOM rows; `jointTorque` and limits from ratings; error-source fields
-  carried into the assembly description.
+  carried into the assembly description; mass and inertia from volume × density;
+  every precision mount lands on an insert (an `AssemblyIntegrity` style check naming
+  the offending mount); insert faces are coplanar or parallel within stated tolerance.
+- Out of scope here: a general casting process model (walls, draft, cores, mould design)
+  and structural/modal analysis requiring an external FEA solver such as CalculiX.
+  Bed/column modes versus the ≈ 600 Hz gash frequency remain an open Phase D check.
+  HB14 covers bed thermal behaviour as a lumped thermal mass.
 
 **HB6. The machine.**
 - `FlexsplineHobber extends MachineAssembly`:
@@ -465,6 +481,8 @@ r 30 mm. HB7 and HB11 must show this.
 - A short report of the numbers in this plan, with every assumed value listed.
 
 ### Phase D: later
+
+- Casting process model and structural/modal analysis (external FEA), first use: hobber bed modes vs gash frequency.
 - Double-circular-arc and S-tooth flexsplines; crowning and longitudinal modification.
 - Thermal growth (spindle and table heat, bed); hob wear and shift strategy.
 - G-code: a Fanuc-style EGB dialect in CncKit (writer and reader).
@@ -575,7 +593,7 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB2 | done: native ring stock, Haxe API, contour and GearSpec comparison | 94f246a1e |
 | HB3 | done: actual rake sweep, ideal driver and slice acceptance; flat-count correction below | 2ec3bdd45 |
 | HB4 | metrology implemented/tested; blocked: full-face rake acceptance waiting for heavy-run slot | 0d5a47f3f |
-| HB5 | done: recipe-backed reference parts and rotary packages; assumed envelopes/ratings | this commit |
+| HB5 | reference parts done; mineral-cast insert/material amendment outstanding | 13358ee07 |
 | HB6 | planned | |
 | HB7 | planned | |
 | HB8 | planned | |
@@ -960,3 +978,16 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   with `/home/joao/dev/materia-cache/occt-f1dc4efb-release/lib`; no native source build
   or broad heavy test was needed for these checks. HB0 holds a queue slot waiting for
   memory; HB4 full-face acceptance remains queued, with no full-face grade claimed.
+
+
+### Plan amendment: mineral-cast foundations (2026-10-17)
+
+- User amendment: mineral-cast precision foundations use cast-in steel inserts with
+  stated position tolerances and ground-after-casting finish. Casting bodies are not
+  machined precision mounts. Added ribbed bed/column, separate insert BOMs, material
+  properties and mount/face checks to HB5; generic process modelling and external FEA
+  remain Phase D, with the ≈ 600 Hz gash-frequency modal question explicitly open.
+- Current HB5 code already supplies density-only mineral cast, a solid bed and a
+  solid `Column`. It does not yet satisfy the newly added insert/material requirements;
+  HB5 status is reopened for that amendment. HB6 must use the amended foundations.
+- HB4 full-face acceptance is unchanged and has not been interrupted.
