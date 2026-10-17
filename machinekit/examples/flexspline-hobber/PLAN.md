@@ -574,8 +574,8 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB1 | done: non-undercut geometry; internal rack-limit restrictions below | 647b62f66 |
 | HB2 | done: native ring stock, Haxe API, contour and GearSpec comparison | 94f246a1e |
 | HB3 | done: actual rake sweep, ideal driver and slice acceptance; flat-count correction below | 2ec3bdd45 |
-| HB4 | metrology implemented/tested; blocked: full-face rake acceptance waiting for heavy-run slot | this commit |
-| HB5 | planned | |
+| HB4 | metrology implemented/tested; blocked: full-face rake acceptance waiting for heavy-run slot | 0d5a47f3f |
+| HB5 | done: recipe-backed reference parts and rotary packages; assumed envelopes/ratings | this commit |
 | HB6 | planned | |
 | HB7 | planned | |
 | HB8 | planned | |
@@ -903,3 +903,60 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   `/tmp/flexspline-hb4-native-adapter-tests.log`,
   `/tmp/flexspline-hb4-ring-tests.log`, and
   `/tmp/flexspline-hb4-integrated-build.log`.
+
+
+### HB5 machine parts (2026-10-17)
+
+- Added `machinekit.motion.TorqueMotor`, `AngularContactBearing`,
+  `CrossedRollerBearing`, `RotaryEncoderRing`, plus reusable `PrecisionPart` and
+  `PrecisionErrors` support. Motors/encoders use the existing typed `MotorDrive`
+  and `EncoderPart` interfaces. Motor curves, winding, inertia, pole count/cogging,
+  bearing precision/stiffness/runout, encoder counts/accuracy/eccentricity and their
+  provenance are recipe values. CAD is mm; torque/speed/inertia are SI; angular
+  error is rad. Runout is TIR, eccentricity/cogging are amplitudes, not waveforms.
+- Added hobbing leaves: `Hob`, `HobArbor`, `OutboardSupport`, `ExpandingMandrel`,
+  `RotaryClamp`, `MineralCastBed`, `Column`, and table/spindle/swivel envelope parts.
+  All are in the normal component registry with BOM identities and save/load recipes.
+  Reference catalogues for the four motion parts explicitly say Assumed, Unverified,
+  GenericApproximation with no verified-field claims. Catalog provenance requires a
+  source and is independent for ratings and errors.
+- `RotaryTable`, `HobSpindle`, `SwivelHead` are real `MachineAssembly` packages,
+  preserving their individual members and BOMs. C/B are continuous, A is bounded,
+  effort/speed limits originate in installed motor ratings and retain assumption
+  labels. Encoders read their local joints. The spindle has two opposed instances
+  of one bearing BOM item; bearing orientation is a mate, not another catalogue row.
+  Static clamp holding torque is separate from drive effort. Drivers, supplies,
+  clamp control and hydraulic services are HB6/HB7 integration, not claimed here.
+- The spindle reference is 1.5 kW at 4000 rpm / 8000 rpm maximum, with an explicitly
+  assumed winding. Default table feedback is 2^23 counts and 2 arcseconds angular
+  bound; bearing radial/axial TIR is 0.002 mm; mandrel eccentricity amplitude 0.004 mm.
+  Stiffnesses, envelopes and every supplied performance number remain Assumed.
+  Housing bores have steps for bearing/motor seats and reject incompatible motors.
+- `Hob.fromDesign` captures generating geometry and reconstructs GearKit's actual
+  rack/rake regions; it rejects a mismatched generating target. Physical preview is
+  a bored blank, not helical tooth/relief/sharpening geometry. HSK-E25 is a gauge
+  interface identity only; no conforming taper/drawbar geometry is claimed. These
+  limits and the primary interface-name references are in `PARTS.md` beside this plan.
+- Error bounds live on physical component facets and round-trip through existing
+  assembly recipe descriptions, without adding a second wire format. Stable sorted
+  path-qualified discovery works after decode, including edited values and ValueBasis.
+  ProjectKit's flattened geometry-only definition does not yet export runtime errors.
+- Added assumed mineral-cast and carbide materials (2400 / 14500 kg/m^3), keeping the
+  bed/column/tool BOM and mass models from silently using steel density. MachineKit
+  now depends on the pure-Haxe GearKit for the tool recipe.
+- Validation: `HobberPartTests` passes 931 assertions; the native-CAD `geometry` mode
+  passes 61 assertions. Checks cover every leaf's recipe, registry, BOM and error
+  round-trip, three package descriptions, modified error provenance, torque and speed
+  limits, motor replacement, encoder quantum, spindle power/winding loss coherence,
+  opposed-bearing BOM quantity, recreated rake points, invalid inputs/fit, positive
+  single-solid geometry, mineral-cast density and housing-seat interference.
+  The group is registered in MachineKit smoke. The integrated smoke project compiles
+  (2,135 sources); the full smoke/workspace run was not repeated.
+- Standalone manifest: `machinekit/tests/hobbing/haxeon.json`; no argument runs part
+  checks, `geometry` runs native CAD checks. Logs: `/tmp/flexspline-hb5-build.log`,
+  `/tmp/flexspline-hb5-parts.log`, `/tmp/flexspline-hb5-geometry.log`,
+  `/tmp/flexspline-hb5-smoke-build.log`. Used the existing CadKit shared library at
+  `/home/joao/dev/materia-cache/claude-scratch/am-quick/klipper/build/host/native/cadkit`
+  with `/home/joao/dev/materia-cache/occt-f1dc4efb-release/lib`; no native source build
+  or broad heavy test was needed for these checks. HB0 holds a queue slot waiting for
+  memory; HB4 full-face acceptance remains queued, with no full-face grade claimed.

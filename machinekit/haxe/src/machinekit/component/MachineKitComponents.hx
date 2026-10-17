@@ -13,6 +13,7 @@ class MachineKitComponents {
 		machinekit.robotics.RoboticsComponents.register(registry);
 		machinekit.pneumatic.PneumaticComponents.register(registry);
 		machinekit.milling.MillingComponents.register(registry);
+		machinekit.hobbing.HobbingComponents.register(registry);
 		machinekit.pressbrake.PressBrakeComponents.register(registry);
 		machinekit.printing.PrintingComponents.register(registry);
 		machinekit.assembly.AssemblyComponents.register(registry);

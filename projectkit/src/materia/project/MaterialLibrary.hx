@@ -36,6 +36,7 @@ class MaterialLibrary {
     toolingEPS(),
     toolingBoard(),
     mineralCast(),
+    material("carbide", "Cemented carbide", [0.45, 0.46, 0.47], 0.7, 0.35, 14500, "carbide"),
     material("cast-iron", "Cast iron", [0.35, 0.37, 0.39], 0.60, 0.55, 7200, "cast iron"),
     material("bronze", "Bronze", [0.55, 0.38, 0.20], 0.70, 0.38, 8800, "bronze"),
     material("brass", "Brass", [0.69, 0.55, 0.29], 0.75, 0.34, 8500, "brass"),

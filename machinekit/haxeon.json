@@ -7,7 +7,8 @@
 		"projectkit": { "path": "../projectkit" },
 		"manufacturingkit": { "path": "../manufacturingkit" },
 		"cadkit": { "path": "../cadkit" },
-		"collisionkit-native": { "path": "../collisionkit/native" }
+		"collisionkit-native": { "path": "../collisionkit/native" },
+		"gearkit": { "path": "../gearkit" }
 	},
 	"target": "host"
 }

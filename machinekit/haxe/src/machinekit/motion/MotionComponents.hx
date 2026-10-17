@@ -5,6 +5,10 @@ import machinekit.component.ComponentRegistry;
 /** The motion package's component recipes. */
 class MotionComponents {
 	public static function register(registry:ComponentRegistry):Void {
+		registry.register(TorqueMotor.recipeType());
+		registry.register(AngularContactBearing.recipeType());
+		registry.register(CrossedRollerBearing.recipeType());
+		registry.register(RotaryEncoderRing.recipeType());
 		registry.register(LinearBearing.recipeType());
 		registry.register(PillowBlock.recipeType());
 		registry.register(LinearRail.recipeType());
