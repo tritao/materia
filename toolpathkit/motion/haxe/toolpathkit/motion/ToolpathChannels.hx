@@ -12,12 +12,13 @@ class ToolpathChannels {
   public final heaterPrefix:String;
   public final fanPrefix:String;
 
-  public function new(scope:String) {
+  public function new(scope:String, spindleName:String = "spindle") {
     if (scope == null || StringTools.endsWith(scope, "/")) throw "CNC channel scope must omit its trailing slash";
+    if (spindleName == null || spindleName.length == 0) throw "Spindle channels need a name";
     var prefix = scope.length == 0 ? "" : scope + "/";
-    spindleDirection = prefix + "spindle.direction";
-    spindleSpeed = prefix + "spindle.speed";
-    spindleAtSpeed = prefix + "spindle.at_speed";
+    spindleDirection = prefix + spindleName + ".direction";
+    spindleSpeed = prefix + spindleName + ".speed";
+    spindleAtSpeed = prefix + spindleName + ".at_speed";
     coolantMist = prefix + "coolant.mist";
     coolantFlood = prefix + "coolant.flood";
     operatorResume = prefix + "cnc.operator.resume";

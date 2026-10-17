@@ -110,6 +110,17 @@ class ToolpathMotionBinding {
       jump[extruder] = 0.1;
       printer.bind(extruder);
     }
+    // Explicit auxiliary positioning (hob swivel and additive table phase) needs installed limits,
+    // while the process spindle remains outside position planning.
+    for (id in machine.auxiliaryJoints) {
+      var joint = [for (j in blueprint.model.joints) j.id].indexOf(id);
+      if (joint < 0 || id == machine.spindleJointId || velocity[joint] > 0) continue;
+      if (heldJoints != null && heldJoints.indexOf(id) >= 0 && machine.gearFollowers.indexOf(id) < 0) continue;
+      var own = blueprint.model.coupledLimits(id, new robotkit.model.SteadyLoads());
+      if (own.velocity == null || own.maxAcceleration == null) continue;
+      velocity[joint] = own.requireVelocity(); acceleration[joint] = own.requireAcceleration();
+      jerk[joint] = acceleration[joint] * 25; jump[joint] = 0.1;
+    }
     // A joint that follows several axes (a CoreXY motor's pulley) belongs to none, and the plan times it as a column of
     // its own. It moves at most as fast as its terms add up to when the axes run at their limits, and no faster than its
     // own drive allows: the motor's rate bounds the axes through it (on a CoreXY a diagonal turns one motor at the sum of

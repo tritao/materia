@@ -53,6 +53,11 @@ class ToolpathLowering {
   var queuedEvents:Array<PendingOutputEvent> = [];
   var pendingBlend:Float = 0.0;
   var spindleOn:Bool = false;
+  var spindleRpm:Float = 0;
+  var gearRatios:Map<String, Float> = new Map();
+  var revolutionFeed:Float = 0;
+  var revolutionMaster:String = "";
+  var revolutionAxis:String = "";
   var stops:Map<String, Int> = new Map();
 
   public function new(machine:MachineBinding) {
@@ -66,7 +71,7 @@ class ToolpathLowering {
     pending = []; pendingSpans = []; pendingTolerances = []; pendingSpeeds = []; pendingRates = [];
     pendingEvents = []; queuedEvents = []; spindleOn = false; bead = 0.0;
     pendingBlend = 0.0;
-    stops = new Map();
+    stops = new Map(); spindleRpm = 0; gearRatios = new Map(); revolutionFeed = 0;
     for (op in ops) switch op {
       case SetSetup(_, _):
         flush();
@@ -77,11 +82,23 @@ class ToolpathLowering {
         if (machine.rapidsAtFeed) addMove(primitive(geometry), Math.min(speed, machine.rapidSpeed), blend, span);
         else addMove(primitive(geometry), machine.rapidSpeed, 0.0, span);
       case Move(kind, geometry, speed, blend, span):
+        if (kind == Cut && revolutionFeed > 0) speed = revolutionSpeed(geometry);
         var printer = machine.printer;
         if (printer != null && kind == toolpathkit.path.MoveKind.Cut && bead > 0.0) {
           // The hotend melts so much filament a second: a bead is laid no faster than that.
           addMove(primitive(geometry), Math.min(speed, printer.maxFlow / bead), blend, span, printer.radiansPerMetre(bead));
         } else addMove(primitive(geometry), speed, blend, span);
+      case PositionJoint(joint, position, span):
+        flush(); drainQueued();
+        var index = machine.gearJointIds.indexOf(joint);
+        if (index < 0 || joint == machine.spindleJointId) throw 'Unknown or process-owned auxiliary joint $joint';
+        add(MotionOp.MoveJ(MoveTarget.JointPosition(index, position), new MotionOptions(), Blend.ExactStop), span);
+      case WaitSignal(channel, expected, timeout, span):
+        flush(); drainQueued(); add(MotionOp.WaitInput(channel, InputPredicate.Equals(EventValue.Digital(expected)), timeout), span);
+      case FeedPerRevolution(master, axis, distance, span):
+        flush(); drainQueued();
+        if (axis != machine.xAxisId && axis != machine.yAxisId && axis != machine.zAxisId) throw 'Unknown revolution-feed axis $axis';
+        revolutionFeed = distance; revolutionMaster = master; revolutionAxis = axis;
       case ElectronicGear(follower, terms, span):
         flush(); drainQueued();
         var index = machine.gearJointIds.indexOf(follower);
@@ -98,11 +115,14 @@ class ToolpathLowering {
           loopHz = Math.min(loopHz, encoder.loopHz);
           resolved.push(new robotkit.execution.GearTerm(master, term.ratio, encoder.latencyNs, encoder.quantum));
         }
+        if (terms.length == 1 && terms[0].master == machine.spindleJointId) gearRatios.set(follower, terms[0].ratio);
+        else gearRatios.remove(follower);
         for (value in robotkit.execution.GearEvents.engage(index, resolved, loopHz)) switch value {
           case Process(command, argument): add(MotionOp.SetOutput(robotkit.execution.GearEvents.channel(index), EventValue.Process(command, argument)), span);
           case _: throw "Unexpected gear event";
         }
       case ReleaseGear(follower, span):
+        gearRatios.remove(follower);
         flush(); drainQueued();
         var index = machine.gearJointIds.indexOf(follower);
         if (index < 0 || machine.gearFollowers.indexOf(follower) < 0) throw 'Unknown electronic gear follower $follower';
@@ -110,6 +130,7 @@ class ToolpathLowering {
       case Dwell(seconds, span):
         flush(); drainQueued(); add(MotionOp.Dwell(seconds), span);
       case Spindle(direction, rpm, span):
+        spindleRpm = direction == Off ? 0 : rpm;
         var directionValue = EventValue.Analog(switch direction {
           case Off: 0.0;
           case Clockwise: 1.0;
@@ -331,6 +352,17 @@ class ToolpathLowering {
   function add(op:MotionOp, span:Provenance):Void {
     sourceMap.add(motionOps.length, 0.0, 0.0, span);
     motionOps.push(op);
+  }
+
+  function revolutionSpeed(geometry:PathGeometry):Float {
+    var ratio:Null<Float> = revolutionMaster == machine.spindleJointId ? 1.0 : gearRatios.get(revolutionMaster);
+    if (ratio == null || spindleRpm <= 0) throw 'Revolution feed master $revolutionMaster needs an active spindle and gear relation';
+    var delta = switch geometry {
+      case Line(a, b): revolutionAxis == machine.xAxisId ? b.x - a.x : revolutionAxis == machine.yAxisId ? b.y - a.y : b.z - a.z;
+      case _: throw "Revolution feed currently requires axial line segments";
+    };
+    if (Math.abs(delta) < 1e-15) throw "Revolution feed line does not advance its axial coordinate";
+    return revolutionFeed * Math.abs(ratio) * spindleRpm / 60 * toolpathkit.path.GeometryTools.length(geometry) / Math.abs(delta);
   }
 
   static function primitive(geometry:PathGeometry):PathPrimitive return switch geometry {

@@ -5,6 +5,9 @@ import toolpathkit.setup.TravelEnvelope;
 /** Machine axes and execution limits, independent of a G-code controller. */
 class MachineBinding {
   /** Installed runtime joint order and explicitly declared encoder timing (SI). */
+  /** Process spindle joint used to resolve per-work-revolution feeds. */
+  public var auxiliaryJoints:Array<String> = [];
+  public var spindleJointId:String = "";
   public var gearFollowers:Array<String> = [];
   public var gearJointIds:Array<String> = [];
   public var gearEncoders:Map<String, GearEncoderTiming> = new Map();

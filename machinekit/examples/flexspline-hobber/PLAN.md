@@ -275,7 +275,7 @@ they neither implement HB7 nor establish an ISO grade.
 | Cutting speed | 300 m/min → hob ≈ 3000 rpm | assumed for prototypes (GE15FRplus runs 800 m/min) |
 | Table speed in gear | 3000 / 200 = 15 rpm | derived |
 | Axial feed | 0.5 mm per work revolution | GE15FRplus example |
-| Single-cut time | (8 + ≈ 4 overrun) mm / 0.5 → 24 rev → ≈ 96 s | derived |
+| Single-cut feed time | (8 + 2 × 4.599 engagement overrun + 2 × 1 clearance) mm / 0.5 → 38.396 rev → 154.398 s nominal (154.408 s planned) | HB8 cylinder envelope and MotionKit S-curve; excludes positioning/settling |
 | Feed-mark depth | δ ≈ f²·sin α/(4·d_a0) ≈ 0.7 µm | standard hobbing estimate, check |
 | Cutting force | tens of N | GE15FRplus paper |
 | Hob spindle | direct drive, 8000 rpm max, ≈ 1.5 kW | assumed |
@@ -595,8 +595,8 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB4 | metrology implemented/tested; blocked: full-face rake acceptance waiting for heavy-run slot | 0d5a47f3f |
 | HB5 | done: reference parts plus ribbed mineral-cast foundations and separate steel inserts | 13358ee07 + f59fcf695 |
 | HB6 | mechanics/scene tested; blocked: Start-page/project-load/MuJoCo acceptance queued | 45dd31967 |
-| HB7 | done: measured-master gearbox, timed events, additive C drive checks and reference sync tests | this commit |
-| HB8 | planned | |
+| HB7 | done: measured-master gearbox, timed events, additive C drive checks and reference sync tests | a71f86f61 |
+| HB8 | done: geometry-derived hobbing CAM, revolution feeds, shifts/crown, installed limits and compiled cycle checks | this commit |
 | HB9 | planned | |
 | HB10 | planned | |
 | HB11 | planned | |
@@ -1109,3 +1109,56 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   semantics and limitations: `robotkit/runtime/ELECTRONIC_GEAR.md`.
 - Logs: `/tmp/flexspline-hb7-{ctest,native,gearing,gearing-build,toolpath-core,build}.log`.
   HB4 and HB6 heavy acceptance runs remain queued and were not interrupted.
+
+### HB8 — hobbing CAM
+
+- `camkit.HobbingJob` produces ToolpathKit operations from GearSpec, HobDesign,
+  usable hob length, settings and optional installed limits. It derives hob rpm
+  from cutting speed/OD and work rpm from starts/teeth, uses axial feed per work
+  revolution, validates increasing radial passes through final tooth depth,
+  supports climb/conventional feed, static shifts per pass and parabolic X(Z)
+  crowning. GearKit inputs are mm/radians; ToolpathKit output is SI.
+- Approach/exit overrun and active hob-axis length come from the continuous
+  tilted-cylinder intersection with the blank, not a fixed distance allowance.
+  Concave scalar maximisation includes radial-domain endpoints and outward
+  roundoff allowance. The finite hob must cover this active interval at every
+  shift. The table's additive phase compensates -shift*cos(gamma)/pitch radius,
+  keeping the HB3 tooth registration. Shift and phase changes happen retracted.
+- New ToolpathKit `PositionJoint`, `WaitSignal` and modal `FeedPerRevolution`:
+  absolute A/C positioning lowers through MotionKit's `JointPosition`; revolution
+  feed is resolved from the programmed spindle rpm and active EGB ratio, including
+  the axial projection of crown chords. The radial approach retains its explicit
+  infeed speed. Unsupported CNC/printer exports reject these operations.
+- `FlexsplineHobberCam.job` reads the HB6 tool length, travel, installed swivel
+  range and spindle/table speed ratings. A startup measured-signal barrier requires
+  a ready machine with referenced B=0 and released EGB. Gearing engages before B
+  starts, cutting waits for spindle-at-speed, and the final radial withdrawal is
+  followed by spindle-off and a bounded measured-stop barrier. The stopped B/C
+  relation remains engaged to retain phase; releasing it requires rebasing additive
+  C. Actual app signal production, restart/referencing and stock execution are HB9.
+- The reference geometry gives **4.598932 mm engagement overrun per end**. Including
+  1 mm extra clearance at each end, the axial stroke is 19.197864 mm or 38.395729
+  work revolutions. At 300 m/min / OD 32, B is 2984.155 rpm and C is 14.920776 rpm.
+  Nominal feed time is **154.398386 s**; the real MotionKit S-curve and the complete
+  lowered program's cutting plan both give **154.408360 s**, within 0.007%.
+  This corrects the earlier 96 s estimate in the reference table. It excludes
+  positioning, spindle ramps and barrier waits; total measured cycle time is HB9.
+- Crown chord error and MotionKit corner blending each receive half the supplied
+  tolerance. X(Z) is a programmed head trajectory, not an assertion that the
+  resulting tooth has that exact crown after finite cutter engagement. HB9/HB11
+  inspect the physical result. Feed/revolution conversion is nominal at the settled
+  programmed spindle speed; Z is not an additional encoder follower.
+- Validation: **80,046 CAM assertions** pass, including independent cylinder-boundary
+  samples, the 1% cycle criterion, complete lowered-program compilation from nonzero
+  A/C coordinates, finite-length/shift rejection, rough/finish passes, multi-start
+  and tooth-count changes, profile shift, crown chord bounds and machine-limit
+  rejection. **244 mechanical/CAM adapter checks**, **149 ToolpathKit core checks**
+  and **16 existing gearbox checks** pass. The broader ToolpathMotion project
+  compiles; no full CAD/workspace/app run is claimed.
+- The standalone manifest `camkit/tests/hobbing/haxeon.json` is registered as
+  `hobbing-cam` in the workspace. Details: `camkit/HOBBING.md`. Logs:
+  `/tmp/flexspline-hb8-{tests,build,machine,machine-build,core,gearing,motion-build}.log`.
+  The cycle test reused the existing native MotionKit library read-only from the
+  machine-tending worktree; native MotionKit sources were unchanged here.
+  HB4 and HB6 acceptance remain queued and were not interrupted. CT0–CT10 remains
+  a separate plan; HB8 makes no casting or insert-layout changes.

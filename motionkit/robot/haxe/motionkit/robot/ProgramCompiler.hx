@@ -458,9 +458,10 @@ class ProgramCompiler {
           var jerk = effective(maxJerk, options.maxJerk);
           // The limits of a joint offset are its driven joint's: what moves with it is held in proportion.
           switch target {
-            case JointOffset(driven, delta):
+            case JointPosition(driven, _), JointOffset(driven, _):
+              var delta = goal[driven] - q[driven];
               for (joint in 0...goal.length) {
-                var share = Math.abs(goal[joint] - q[joint]) / Math.abs(delta);
+                var share = delta == 0 ? 0.0 : Math.abs(goal[joint] - q[joint]) / Math.abs(delta);
                 if (share <= 0.0) continue;
                 if (options.maxVelocity > 0.0) velocity[joint] = Math.min(maxVelocity[joint], options.maxVelocity * share);
                 if (options.maxAcceleration > 0.0) acceleration[joint] = Math.min(maxAcceleration[joint], options.maxAcceleration * share);
@@ -1000,6 +1001,9 @@ class ProgramCompiler {
         if (joints.length != solver.jointCount())
           throw 'Motion program op $index joint count mismatch';
         joints.copy();
+      case JointPosition(joint, position):
+        if (joint >= start.length) throw 'Motion program op $index joint position names a joint the machine does not have';
+        var moved = start.copy(); moved[joint] = position; completeCoupled(moved); moved;
       case JointOffset(joint, delta):
         if (joint >= start.length) throw 'Motion program op $index joint offset names a joint the machine does not have';
         var moved = start.copy();

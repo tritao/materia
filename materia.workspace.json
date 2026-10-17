@@ -5,6 +5,7 @@
 		{ "path": "animkit/tests/haxeon.json", "name": "animkit" },
 		{ "path": "automationkit/tests/haxeon.json", "name": "automationkit" },
 		{ "path": "camkit/tests/haxeon.json", "name": "camkit", "tags": ["cadkit"] },
+		{ "path": "camkit/tests/hobbing/haxeon.json", "name": "hobbing-cam" },
 		{ "path": "cnckit/tests/haxeon.json", "name": "cnckit" },
 		{ "path": "gearkit/tests/haxeon.json", "name": "gearkit" },
 		{ "path": "haxeon/packages/editor/tests/haxeon.json", "name": "haxeon-editor" },

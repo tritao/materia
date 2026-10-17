@@ -11,6 +11,8 @@ class FlexsplineHobberChecks {
   static function near(a:Float,b:Float,e:Float,label:String):Void check(Math.abs(a-b)<=e,'$label: $a vs $b');
   public static function run():Void {
     var machine=new FlexsplineHobber();machine.validate();
+    var cam=FlexsplineHobberCam.job(machine);
+    check(cam.passes.length==1&&cam.tableRpm>0,"HB8 CAM fits installed travel and drive limits");
     var model=new AssemblyModel("mm");machine.addTo(model,"");var state=model.initialState();
     var parts=new PosedParts();
     try {

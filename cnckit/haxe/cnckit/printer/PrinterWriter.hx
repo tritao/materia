@@ -118,7 +118,7 @@ class PrinterWriter {
           }
         case MachineMove(_, _, _, _, _): throw "printer G-code has no machine coordinates";
         case Dwell(seconds, _): lines.push('G4 P${CncWriter.number(seconds * 1000.0)}');
-        case ElectronicGear(_, _, _), ReleaseGear(_, _): throw "Printer has no electronic gearbox export binding";
+        case PositionJoint(_, _, _), WaitSignal(_, _, _, _), FeedPerRevolution(_, _, _, _), ElectronicGear(_, _, _), ReleaseGear(_, _): throw "Printer has no electronic gearbox export binding";
         case Spindle(_, _, _): throw "printer G-code has no spindle";
         case Coolant(_, _, _): throw "printer G-code has no coolant";
         case ToolChange(_, _), ToolLengthOffset(_, _, _): throw "printer G-code has no tool changes or length offsets";

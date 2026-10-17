@@ -1,0 +1,5 @@
+{
+  "version":1,"package":{"name":"hobbing-cam-tests"},"entry":"HobbingCamTests",
+  "sourceRoots":["src"],"dependencies":{"camkit":{"path":"../.."},"toolpathkit-motion":{"path":"../../../toolpathkit/motion"}},
+  "target":"host","outputDir":"build"
+}

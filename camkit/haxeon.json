@@ -6,7 +6,8 @@
   "dependencies": {
     "toolpathkit": { "path": "../toolpathkit" },
     "cadkit": { "path": "../cadkit" },
-    "manufacturingkit": { "path": "../manufacturingkit" }
+    "manufacturingkit": { "path": "../manufacturingkit" },
+    "gearkit": { "path": "../gearkit" }
   },
   "target": "host"
 }

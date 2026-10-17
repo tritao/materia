@@ -19,6 +19,12 @@ enum ToolpathOp {
   MachineMove(kind:MoveKind, geometry:PathGeometry, feed:Float,
     tolerance:Float, provenance:Provenance);
   /** Add measured master motion to the follower's independently planned motion. */
+  /** Absolute auxiliary joint position, SI units; independent planned coordinate when geared. */
+  PositionJoint(joint:String, position:Float, provenance:Provenance);
+  /** Digital barrier; the machine binding supplies the measured signal. */
+  WaitSignal(channel:String, expected:Bool, timeoutSeconds:Float, provenance:Provenance);
+  /** Modal axial feed in metres/work revolution on Cut lines; distance=0 restores explicit feeds. */
+  FeedPerRevolution(master:String, axis:String, distance:Float, provenance:Provenance);
   ElectronicGear(follower:String, terms:Array<GearTerm>, provenance:Provenance);
   ReleaseGear(follower:String, provenance:Provenance);
   Dwell(seconds:Float, span:Provenance);

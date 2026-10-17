@@ -3,6 +3,6 @@
   "package": {"name": "machinekit-flexspline-hobber-example"},
   "entry": "FlexsplineHobberPreview",
   "sourceRoots": ["."],
-  "dependencies": {"machinekit": {"path": "../.."}},
+  "dependencies": {"machinekit": {"path": "../.."}, "camkit": {"path": "../../../camkit"}},
   "target": "host", "outputDir": "build"
 }

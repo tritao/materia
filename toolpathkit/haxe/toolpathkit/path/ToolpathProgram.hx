@@ -21,6 +21,13 @@ class ToolpathProgram {
     for (index in 0...ops.length) {
       var op = ops[index];
       switch op {
+        case PositionJoint(joint, position, _):
+          if (joint == null || joint.length == 0 || !Math.isFinite(position)) throw 'toolpath op $index: invalid auxiliary position';
+        case WaitSignal(channel, _, timeout, _):
+          if (channel == null || channel.length == 0 || !Math.isFinite(timeout) || timeout <= 0) throw 'toolpath op $index: invalid measured barrier';
+        case FeedPerRevolution(master, axis, distance, _):
+          if (master == null || master.length == 0 || axis == null || axis.length == 0 || !Math.isFinite(distance) || distance < 0)
+            throw 'toolpath op $index: invalid revolution feed';
         case ElectronicGear(follower, terms, _):
           if (follower == null || follower.length == 0 || terms == null || terms.length == 0 || terms.length > 8)
             throw 'toolpath op $index: electronic gear needs a follower and one to eight masters';
