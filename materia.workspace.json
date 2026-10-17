@@ -6,6 +6,7 @@
 		{ "path": "automationkit/tests/haxeon.json", "name": "automationkit" },
 		{ "path": "camkit/tests/haxeon.json", "name": "camkit", "tags": ["cadkit"] },
 		{ "path": "cnckit/tests/haxeon.json", "name": "cnckit" },
+		{ "path": "gearkit/tests/haxeon.json", "name": "gearkit" },
 		{ "path": "haxeon/packages/editor/tests/haxeon.json", "name": "haxeon-editor" },
 		{ "path": "humankit/tests/haxeon.json", "name": "humankit" },
 		{ "path": "humankit/sim/tests/haxeon.json", "name": "humankit-sim", "tags": ["mujoco"] },

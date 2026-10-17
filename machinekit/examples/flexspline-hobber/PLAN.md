@@ -566,7 +566,7 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 
 | Step | State | Commits |
 |---|---|---|
-| HB0 | planned | |
+| HB0 | blocked: baseline waiting for heavy-run slot; scaffold tested | this commit |
 | HB1 | planned | |
 | HB2 | planned | |
 | HB3 | planned | |
@@ -581,3 +581,20 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB12 | planned | |
 | Phase D | later | |
 | HB13–HB16 | optional, later (class 3) | |
+
+### HB0 start (2026-10-17)
+
+- Starting commit: `8c70c2190` (plan on top of local main `4a18a19b7`).
+- Added dependency-free `gearkit`, its workspace test entry and nominal `GearSpec` dimensions.
+  The three plan parts have pitch diameters 40, 60 and 50 mm. Detailed profile geometry and
+  evaluation ranges remain HB1 work.
+- `./haxeon/scripts/haxeon run --project=gearkit/tests/haxeon.json`: **18 assertions passed**.
+- Baseline workspace gate: **pending**, waiting for a shared heavy-run slot. No baseline
+  pass/failure counts are available yet. The starting workspace manifest is pinned under
+  `build/flexspline-hb0/baseline.workspace.json`, with absolute project paths and a separate
+  build directory. Log: `/tmp/flexspline-hb0-baseline.log`.
+- Baseline command: `/home/joao/dev/materia-cache/tools/heavy-run --mem 16G --need 8G
+  --label flexspline-hb0 -- ./haxeon/scripts/haxeon workspace test
+  --workspace build/flexspline-hb0/baseline.workspace.json --jobs 2 --compilers 1`.
+- Existing vendor symlinks and dirty `haxeon` submodule were present before work began and
+  remain untouched; the gate therefore measures this local environment, not a pristine clone.

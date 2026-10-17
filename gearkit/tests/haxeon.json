@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "gearkit-tests"
+  },
+  "entry": "GearKitTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "gearkit": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

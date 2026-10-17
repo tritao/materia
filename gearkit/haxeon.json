@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "package": {
+    "name": "gearkit"
+  },
+  "sourceRoots": [
+    "haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {},
+  "target": "host"
+}

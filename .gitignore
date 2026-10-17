@@ -44,3 +44,5 @@
 /app/web/examples/build/
 /projectkit/tests/*/build/
 __pycache__/
+
+/gearkit/tests/build/
