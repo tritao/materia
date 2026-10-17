@@ -3,27 +3,13 @@ package machinekit.hobbing;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.component.ComponentValues;
-import machinekit.structural.CastInsert;
-import machinekit.structural.CastingFeatures;
-import machinekit.structural.MineralFoundation.CastInsertPlacement;
 
 typedef InsertLocation={id:String,role:String,width:Float,depth:Float,height:Float,pose:AssemblyFrame};
 
 /** Design-specific insert layout, not a casting process model. Coordinates relative to casting body. */
 class FoundationLayout {
-  public static function dimensions(kind:String):Array<Float> return switch kind {
-    case "bed": [650.0,550,120]; case "column": [200.0,180,600];
-    default: throw "Unknown hobber foundation kind";
-  };
-  public static function bodyValues(kind:String):ComponentValues {
-    var d = dimensions(kind);
-    return new ComponentValues().setNumber("width",d[0]).setNumber("depth",d[1]).setNumber("height",d[2])
-      .setToken("voids",CastingFeatures.encode(CastingFeatures.grid(d[0],d[1],d[2],kind=="bed"?30:25,20,20,25)));
-  }
-  public static function placements(kind:String):Array<CastInsertPlacement> return
-    [for(row in inserts(kind)) {id:row.id,part:insert(row),pose:row.pose}];
+  public static function dimensions(kind:String):Array<Float>return kind=="bed"?[650.0,550,120]:[200.0,180,600];
   public static function inserts(kind:String):Array<InsertLocation>{
-    dimensions(kind);
     var out:Array<InsertLocation> = [];
     function add(id:String,role:String,w:Float,d:Float,h:Float,x:Float,y:Float,z:Float):Void
       out.push({id:id,role:role,width:w,depth:d,height:h,pose:F.translation(x,y,z)});

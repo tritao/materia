@@ -55,9 +55,15 @@ and empty verified-field lists.
 - `SwivelHead extends MachineAssembly`: direct servo, crossed-roller support, housing,
   moving head and clamp. A is ±45°, with 15°/s rated and 30°/s maximum speed.
   The static 100 N m clamp rating remains separate from the drive's joint effort.
-- `MineralCastBed`: 650 × 550 × 120 mm, table and column datums.
-- `Column`: 180 × 160 × 600 mm, 110 mm rail spacing. Mineral-cast density is assumed
-  2400 kg/m³. The hob blank's carbide density is assumed 14,500 kg/m³. Both material
+- `MineralCastBed`: 650 × 550 × 120 mm ribbed casting, with steel rail seats,
+  table/column plates, threaded bushes and lifting points as child parts.
+- `MineralCastColumn`: 200 × 180 × 600 mm ribbed casting and separate steel base,
+  rail seats, bushes and lifting inserts, 110 mm rail spacing. All precision mounts
+  are insert faces, with 0.01 mm assumed position tolerance and ground-after-casting
+  finish. Casting BOM rows show native-computed kg; inserts are separate items.
+  Optional assumed bulk inputs are 35 GPa Young modulus, loss factor 0.02 (8x an
+  assumed cast-iron 0.0025 reference), expansion 14e-6/K and conductivity 2 W/m/K.
+  Density is assumed 2400 kg/m³. The hob blank's carbide density is assumed 14,500 kg/m³. Both material
   definitions are available through ProjectKit's material library.
 
 `HSK-E25` identifies the spindle/arbor gauge interface. Type E is covered by

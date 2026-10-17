@@ -10,7 +10,7 @@ class HobberPartTests {
   static function near(a:Float,b:Float,tolerance:Float,label:String):Void check(Math.abs(a-b)<=tolerance,'$label: $a vs $b');
   static function rejects(fn:Void->Void,label:String):Void {var failed=false;try fn()catch(_:Dynamic)failed=true;check(failed,label);}
   static function members():Array<MachineComponent>return [new TorqueMotor(),new AngularContactBearing(),new CrossedRollerBearing(),new RotaryEncoderRing(),
-    new Hob(),new HobArbor(),new OutboardSupport(),new ExpandingMandrel(),new RotaryClamp(),new TablePlaten(),new TableHousing(),new SpindleHousing(),new SwivelHousing(),new MineralCastBed(),new Column()];
+    new Hob(),new HobArbor(),new OutboardSupport(),new ExpandingMandrel(),new RotaryClamp(),new TablePlaten(),new TableHousing(),new SpindleHousing(),new SwivelHousing(),new MineralCasting(),new CastInsert()];
   public static function run():Void {
     var registry=MachineKitComponents.standard(),parts=members();
     for(p in parts){
@@ -86,6 +86,27 @@ class HobberPartTests {
     rejects(()->{new ExpandingMandrel(new ComponentValues().setNumber("clampingPressure",20000000));},"mandrel overpressure rejected");
     rejects(()->{new CrossedRollerBearing(new ComponentValues().setNumber("radialRunout",-1));},"negative error bounds rejected");
     rejects(()->{new TorqueMotor(new ComponentValues().setToken("ratingsBasis","Catalog"));},"catalogue claim requires source");
+    var foundations:Array<MineralFoundation> = [new MineralCastBed(),new MineralCastColumn()];
+    for(foundation in foundations){
+      foundation.validate();check(!FoundationIntegrity.check(foundation).hasErrors(),"insert positions and face planes conform");
+      var weight=foundation.castingByWeight(),shape=foundation.body.geometry(),mass=foundation.body.massProperties();
+      near(weight.kg,shape.volume()*2400e-9,1e-8,"casting purchased by native volume/density mass");
+      var tensor=mass.inertia;if(tensor==null)throw "casting inertia absent";
+      check(tensor.xx>0&&tensor.yy>0&&tensor.zz>0,"casting inertia is volumetric");shape.close();
+      check(foundation.billOfMaterials().lines().length>4,"casting and steel inserts separately itemised");
+      check(foundation.body.bom.description.indexOf(" kg")>=0,"casting BOM shows purchasing weight");
+      var bad=FoundationIntegrity.checkMounts(foundation,[{name:"bad rail mount",parent:"casting"}]);
+      check(bad.hasErrors()&&bad.items[0].subject=="bad rail mount","bad precision mount named");
+      check(!FoundationIntegrity.checkMounts(foundation,[{name:"rail mount",parent:"railLeft"}]).hasErrors(),"precision rail mount lands on steel");
+      var poses=foundation.solvedPoses(),pose=poses.get("railLeft");if(pose==null)throw "missing rail insert";
+      poses.set("railLeft",materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.translation(0,0,0.03),pose));
+      check(FoundationIntegrity.check(foundation,poses).hasErrors(),"insert out of position tolerance rejected");
+      var rebuilt=MachineAssembly.decode(foundation.encode(),registry);
+      check(rebuilt.components().length==foundation.components().length,"foundation child parts saved separately");
+    }
+    var physical=materia.project.MaterialLibrary.require("mineral-cast").physical;
+    check(physical.youngsModulusPa==35e9&&physical.thermalExpansionPerK==14e-6&&physical.propertiesAssumed==true,"assumed bulk properties explicit");
+    check(physical.dampingLossFactor==0.02&&physical.thermalConductivityWPerMK==2,"damping and conductivity explicit");
     Sys.println('HobberPartTests: $assertions assertions passed');
   }
   static function geometry():Void {
@@ -96,7 +117,7 @@ class HobberPartTests {
         check(shape.solidCount()==1,'single valid envelope ${p.designation}');
         var bounds=shape.shape.bounds();
         check(bounds.get_max().get_z()>bounds.get_min().get_z(),'nondegenerate envelope ${p.designation}');
-        if(Std.isOfType(p,MineralCastBed)||Std.isOfType(p,Column))
+        if(Std.isOfType(p,MineralCasting))
           near(p.massProperties().mass,shape.volume()*1e-9*2400,1e-9,"mineral cast uses declared reference density");
         Sys.println('${p.designation}: volume_mm3=${shape.volume()}');
       }catch(e:Dynamic){shape.close();throw e;}

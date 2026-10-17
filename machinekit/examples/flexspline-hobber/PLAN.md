@@ -593,7 +593,7 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB2 | done: native ring stock, Haxe API, contour and GearSpec comparison | 94f246a1e |
 | HB3 | done: actual rake sweep, ideal driver and slice acceptance; flat-count correction below | 2ec3bdd45 |
 | HB4 | metrology implemented/tested; blocked: full-face rake acceptance waiting for heavy-run slot | 0d5a47f3f |
-| HB5 | reference parts done; mineral-cast insert/material amendment outstanding | 13358ee07 |
+| HB5 | done: reference parts plus ribbed mineral-cast foundations and separate steel inserts | 13358ee07 + this commit |
 | HB6 | planned | |
 | HB7 | planned | |
 | HB8 | planned | |
@@ -991,3 +991,27 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   solid `Column`. It does not yet satisfy the newly added insert/material requirements;
   HB5 status is reopened for that amendment. HB6 must use the amended foundations.
 - HB4 full-face acceptance is unchanged and has not been interrupted.
+
+
+### HB5 foundation amendment implemented (2026-10-17)
+
+- Added optional physical Young modulus, loss factor, expansion, conductivity and
+  assumed flag to `MaterialPhysical`; mineral cast explicitly supplies 35 GPa,
+  eta 0.02 (8x an assumed iron eta 0.0025), 14e-6/K and 2 W/m/K. These inputs do
+  not activate a simulation automatically. Density remains 2400 kg/m^3.
+- Replaced solid foundation leaves with `MineralCastBed`/`MineralCastColumn`
+  assemblies, ribbed `MineralCasting` bodies and separate `CastInsert` children.
+  Removed the obsolete `Column` recipe instead of retaining a compatibility alias.
+  Bodies have 20 mm end walls, 25/30 mm outer walls and a 25 mm cross rib, with
+  designed cavities and insert recesses. Casting process/core feasibility is Phase D.
+- Rail seats, table/column plates, threaded bushes and lifting inserts are steel
+  children, with 0.01 mm stated position tolerances and ground-after-casting finish.
+  Precision connectors expose steel faces. Body BOM lines include native-computed
+  kg purchasing weight; `castingByWeight()` exposes the numerical weight directly.
+- `FoundationIntegrity` checks insert position and nominal face parallelism against
+  tolerance, plus named precision mounts on steel inserts. Negative fixtures cover
+  mounting on the casting and an insert 0.03 mm outside its 0.01 mm tolerance.
+- Updated HB5 tests: 951 assertions pass, including volume-density mass, volumetric
+  inertia, separate BOMs, description persistence and the new assumed material inputs.
+  Log `/tmp/flexspline-foundation-tests.log`; compile log
+  `/tmp/flexspline-foundation-build.log`. HB4 has not been touched.
