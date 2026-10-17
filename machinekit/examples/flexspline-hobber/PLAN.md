@@ -1450,10 +1450,11 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   It uses **8 threads, 0.000025 mm sweep tolerance, 0.0000015625 mm path tolerance,
   0.0015 mm radial / 0.04 mm axial spacing**. The force-only coarse tolerance is
   never used for these inspections. Every case starts from a fresh annular blank.
-- Evidence is in `build/flexspline-reference-budget/`: frozen binaries and input
+- Evidence is now in `build/flexspline-reference-budget-fast/`: frozen binaries and input
   hashes, settings, progress every 100 windows, per-source inspection JSON, final
   `budget.txt` and `result.json`, exit status and resource timings. Select `pilot`,
-  `baseline`, an individual source id, or `combined` for a separate study. `all`
+  `baseline`, an individual source id, or `combined` for a separate study.
+  The runner builds its isolated native provider unless one is explicitly supplied. `all`
   retains each completed inspection before advancing; it does not silently reuse
   old source results. The entry pilot is a timing check, not tooth acceptance or
   a full-run timing prediction. **Full reference-source results remain pending.**
@@ -1483,3 +1484,45 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   completed source signatures/superposition, coverage warnings, and the assumed
   servo/load/contact qualifications must be reviewed before HB11/HB12 acceptance.
   At module 0.3 the numerical grades remain extrapolated, never ISO certification.
+
+
+### HB11 engaged-cut profiling and exact inspection sampling
+
+- Profiling the running dense baseline showed native rake clipping, trigonometry
+  and temporary-vector allocation dominate. Each worker now reuses polygon and
+  interval scratch buffers, and caches radius-independent edge values lazily.
+  Clipping order, arithmetic, tolerances and provenance are unchanged. The fine
+  engaged fixture takes **22.61 s vs 58.36 s** for 100 windows; whole-stock
+  endpoint/provenance hashes match. Two short reference fixtures also preserve
+  every load and stock hash, with exact scalar equality across 1/4 threads.
+- `InspectionRingStock` computes precisely the circles the current inspection
+  reads: all profile radii at profile/pitch Z, and all face samples bracketing the
+  measurement radius. Circle subtraction is independent under the explicitly
+  frozen-load model. Both strips use the same sampled poses and complete stroke.
+  Every retained radius/Z coordinate must equal the dense grid exactly; compact
+  exact domains are sought by adjusting domain bounds within a few ULPs, never
+  by moving a sample. If exact coordinates cannot be retained, use dense stock.
+  Uncomputed-circle reads fail; overlap endpoints/provenance are checked.
+- This representation supplies inspection traces, not a whole-part volume,
+  force history, mesh or force/compliance feedback model. Original full radial
+  and axial axes, filter coverage and every source are retained. The reference
+  computes **2,102 circles including duplicate overlap vs 170,200 dense circles**.
+  No target tooth boundaries or reduced force/metrology tolerances are used.
+- On the same engaged reference fixture, all retained circles match the dense
+  endpoints/provenance exactly: **5.17 s vs 22.30 s** with the optimized clipper,
+  about **11.3x** versus the original 58.36 s. A complete small baseline and
+  combined eccentricity/radial/axial/profile-warp inspection also preserves every
+  parameter, profile/lead/thickness/runout trace, grade and coverage warning:
+  **26 parity assertions** pass. These are measured fixture timings, not a claim
+  about full-stroke or 15-cut batch duration.
+- Default HB11 runner enables exact inspection sampling. Set
+  `HOBBER_BUDGET_DENSE=1` to retain dense computation. Benchmark in a separate
+  evidence directory with `check-reference-budget.sh engaged-cross`; it physically
+  cuts dense and inspected domains, and fails on any retained endpoint mismatch.
+  Each source log records actual sampling mode and computed-circle count.
+- The original dense batch was intentionally stopped during its baseline and
+  preserved in `build/flexspline-reference-budget/`, with `replacement.json`.
+  The optimized batch is running in `build/flexspline-reference-budget-fast/`.
+  Profiling/benchmark evidence: `build/flexspline-reference-budget/engaged-profile.txt`
+  and `build/flexspline-clipping-speed/{old,new,cross}/engaged.json`, plus
+  `validation.json`. HB4 remains on its frozen original binary/library.

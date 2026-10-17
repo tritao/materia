@@ -45,7 +45,35 @@ class HobbingErrorTests {
     check(true,"localized unsorted/duplicate/outside knots preserve every profile and lead trace");
     Sys.println('Motion knot parity: $checks assertions passed');
   }
+  static function crossParity():Void {
+    var spec=new GearSpec(1,20,2,20*Math.PI/180),hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),1,32,4);
+    var motion=new IdealHobbingJob(spec,hob,3000,1.1,0,1),cfg=new GearInspection(spec,spec.pitchRadius());
+    var blank=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2),cross=InspectionRingStock.create(blank.grid,cfg);
+    check(cross!=null,"exact inspection cross exists for physical source fixture");
+    var rejected=false;try{cross.boundaries(0,0);}catch(e:Dynamic){rejected=true;}
+    check(rejected,"uncomputed circles cannot be read as cut geometry");cross.dispose();
+    var passes=motion.schedule(blank.grid);blank.dispose();
+    var sources=[HobbingErrorSource.workEccentricity("mandrel","mandrel",0.004),
+      HobbingErrorSource.hobRadial("arbor",0.004),HobbingErrorSource.hobAxial("arbor",0.004),
+      HobbingErrorSource.profile("hob",0.001,hob.axialPitch)];
+    var scenarios:Array<Array<String>> = [[],[for(source in sources)source.id]];
+    for(enabled in scenarios){
+      var dense=new HobbingErrorJob(spec,hob,motion.axesAt,passes,sources,0.6,0.1,0.2,-6,6,0.000025,cfg,null,4).run(enabled);
+      var sparse=new HobbingErrorJob(spec,hob,motion.axesAt,passes,sources,0.6,0.1,0.2,-6,6,0.000025,cfg,null,4,true).run(enabled);
+      for(k in dense.values.keys())check(dense.value(k)==sparse.value(k),'inspection cross preserves $k exactly');
+      check(dense.overallGrade==sparse.overallGrade&&dense.isoClass==sparse.isoClass,"same grading qualification");
+      check(dense.warnings.join(";")==sparse.warnings.join(";"),"same coverage/filter warnings");
+      for(pair in [{a:dense.profiles,b:sparse.profiles},{a:dense.helices,b:sparse.helices}])
+        for(i in 0...pair.a.length)for(j in 0...pair.a[i].filtered.length)
+          if(pair.a[i].filtered[j]!=pair.b[i].filtered[j])throw "inspection cross changes a measured trace";
+      for(pair in [{a:dense.thickness,b:sparse.thickness},{a:dense.radialMeasurements,b:sparse.radialMeasurements}])
+        for(i in 0...pair.a.length)if(pair.a[i]!=pair.b[i])throw "inspection cross changes thickness or runout";
+      check(true,"all profile/lead/thickness/runout traces identical, baseline and combined warped cutter");
+    }
+    Sys.println('Inspection cross parity: $checks assertions passed');
+  }
   public static function main():Void {
+    if(Sys.args().indexOf("cross-parity")>=0){crossParity();return;}
     if(Sys.args().indexOf("knot-parity")>=0){knotParity();return;}
     if(Sys.args().indexOf("physical-fine")>=0){physical(0.000025,8);return;}
     if(Sys.args().indexOf("physical")>=0){physical();return;}

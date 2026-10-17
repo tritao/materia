@@ -21,7 +21,7 @@ class FlexsplineHobberBudget {
       pitch:m.cumulativePitch,runoutMm:m.radialMeasurements};
   }
   public static function run(args:Array<String>):Void {
-    if(args.length!=3)throw "reference-budget INPUTS.json OUTPUT_DIRECTORY pilot|baseline|SOURCE|all";
+    if(args.length!=3)throw "reference-budget INPUTS.json OUTPUT_DIRECTORY pilot|engaged|baseline|SOURCE|all";
     var inputs:Dynamic=haxe.Json.parse(sys.io.File.getContent(args[0]));
     var output=args[1],mode=args[2],machine=new FlexsplineHobber(),s=machine.spec,cam=FlexsplineHobberCam.job(machine),path=cam.passes[0];
     if(inputs.force.referenceForceAccepted!=true||inputs.force.forceToleranceValidated!=true)throw "HB10 accepted full-reference force inputs required";
@@ -48,6 +48,49 @@ class FlexsplineHobberBudget {
       supportStiffnessNPerMm:support.stiffness,scope:"complete HB8 feed stroke; fixed baseline HB10 load history; simulated HB7 servo, assumed plant; m0.3 ISO extrapolation only"};
     sys.io.File.saveContent(output+"/settings.json",haxe.Json.stringify(metadata));
     Sys.println("REFERENCE_BUDGET_SETTINGS "+haxe.Json.stringify(metadata));Sys.stdout().flush();
+    if(mode=="engaged"||mode=="engaged-cross"){
+      // Common pre-cut stock for a performance/equality fixture. This is NOT
+      // a substitute for the complete HB8 history or a metrology acceptance.
+      var stock=RingStock.fromGearBlank(s,wall.wall,radialStep,axialStep);stock.setThreads(threads);
+      var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
+      var seed=new HobbingSweep(machine.hob.design,-span,span,0.002);
+      var cross=mode=="engaged-cross"?InspectionRingStock.create(stock.grid,inspection):null;
+      if(mode=="engaged-cross"&&cross==null)throw "reference grid has no exact inspection cross";
+      var domains=cross==null?[stock]:[stock].concat(cross.stocks);
+      if(cross!=null)for(part in cross.stocks)part.setThreads(threads);
+      var first=8400,count=100,started=Sys.time();
+      try{for(pass in passes.slice(first-2400,first))seed.cutPassMany(domains,motion.axesAt,pass,0.002/16);
+      }catch(e:Dynamic){seed.dispose();stock.dispose();if(cross!=null)cross.dispose();throw e;}seed.dispose();
+      Sys.println("ENGAGED_SEED_SECONDS "+(Sys.time()-started));Sys.stdout().flush();
+      var sorted:Array<Float> = [],i=0,j=0;
+      while(i<sync.length||j<force.length){
+        var t=j>=force.length||(i<sync.length&&sync[i][0]<force[j][0])?sync[i++][0]:force[j++][0];
+        if(sorted.length==0||t>sorted[sorted.length-1])sorted.push(t);
+      }
+      var sweep=new HobbingSweep(machine.hob.design,-span,span,tolerance);started=Sys.time();var denseSeconds=0.0,crossSeconds=0.0;
+      try{for(pass in passes.slice(first,first+count)){
+        var lo=0,hi=sorted.length;while(lo<hi){var mid=(lo+hi)>>1;if(sorted[mid]<=pass.start)lo=mid+1;else hi=mid;}
+        var local:Array<Float> = [];while(lo<sorted.length&&sorted[lo]<pass.end){local.push(sorted[lo]);lo++;}
+        var began=Sys.time();sweep.cutPass(stock,motion.axesAt,pass,tolerance/16,0.001,local);denseSeconds+=Sys.time()-began;
+        if(cross!=null){began=Sys.time();sweep.cutPassMany(cross.stocks,motion.axesAt,pass,tolerance/16,0.001,local);crossSeconds+=Sys.time()-began;}
+      }}catch(e:Dynamic){sweep.dispose();stock.dispose();if(cross!=null)cross.dispose();throw e;}
+      var elapsed=Sys.time()-started,hashes=new StringBuf();
+      for(r in 0...stock.grid.radialCount){var row=new StringBuf();
+        for(z in 0...stock.grid.axialCount){if(cross!=null&&!cross.contains(r,z))continue;
+          var circles=stock.circle(r,z);
+          if(cross!=null){var other=cross.circle(r,z);if(circles.length!=other.length)throw "reference inspection cross topology differs";
+            for(k in 0...circles.length){var a=circles[k],b=other[k];
+              if(a.lo!=b.lo||a.hi!=b.hi||a.loGash!=b.loGash||a.hiGash!=b.hiGash||a.loPass!=b.loPass||a.hiPass!=b.hiPass)throw "reference inspection cross endpoint/provenance differs";}}
+          row.add('$z:${circles.length};');
+          for(a in circles)row.add('${a.lo},${a.hi},${a.loGash},${a.loPass},${a.hiGash},${a.hiPass};');}
+        hashes.add(haxe.crypto.Sha256.encode(row.toString()));
+      }
+      var report={firstWindow:first,windows:count,wallSeconds:elapsed,threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,
+        radialStepMm:radialStep,axialStepMm:axialStep,denseSeconds:denseSeconds,crossSeconds:crossSeconds,crossExact:cross!=null,hashScope:cross==null?"all circles":"all inspected circles verified against dense stock",stockHash:haxe.crypto.Sha256.encode(hashes.toString()),intervalCount:stock.intervalCount(),
+        scope:"common-precut entry band on full fine grid; all endpoints/provenance hashed; performance/equality fixture, not complete-stroke acceptance"};
+      sys.io.File.saveContent(output+"/engaged.json",haxe.Json.stringify(report));Sys.println("ENGAGED_RESULT "+haxe.Json.stringify(report));
+      if(cross!=null){cross.assertOverlap();cross.dispose();}sweep.dispose();stock.dispose();return;
+    }
     if(mode=="pilot"){
       // First 100 actual full-stroke windows on the SAME fine grid, no inspection
       // or source acceptance inferred from incomplete tooth coverage.
@@ -59,7 +102,8 @@ class FlexsplineHobberBudget {
       }catch(e:Dynamic){sweep.dispose();stock.dispose();throw e;}sweep.dispose();stock.dispose();return;
     }
     var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
-    var job=new HobbingErrorJob(s,machine.hob.design,motion.axesAt,passes,sources,wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,knots,threads);
+    var useCross=Sys.getEnv("HOBBER_BUDGET_DENSE")!="1";
+    var job=new HobbingErrorJob(s,machine.hob.design,motion.axesAt,passes,sources,wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,knots,threads,useCross);
     function runCut(ids:Array<String>):GearMeasurement {
       var label=ids.length==0?"baseline":ids.length==1?ids[0]:"combined",measured=job.run(ids);
       sys.io.File.saveContent(output+"/"+label+".json",haxe.Json.stringify(measurement(measured)));

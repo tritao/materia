@@ -225,7 +225,7 @@ combined cut at the reference **0.000025 mm sweep tolerance / 8 threads**, in
 13 installed sources and combined cuts on the HB8 feed trajectory, at 8 threads,
 0.000025 mm sweep / 0.0000015625 mm path tolerances, 0.0015 mm radial / 0.04 mm
 axial sampling. Each completed inspection is saved before the next case. Progress,
-settings and binary/input hashes are retained under `build/flexspline-reference-budget`.
+settings and binary/input hashes are retained under `build/flexspline-reference-budget-fast`.
 The study is running; no completed reference budget is claimed yet.
 
 The native HB7 gearbox exports independently regenerated prediction enabled and
@@ -241,3 +241,27 @@ check and the existing assumed sleeve/contact design estimate.
 pass's local knots. The SDK's insertion-sort lowering must not process a large
 concatenated trace. A physical regression checks exact parameter/profile/lead
 agreement against direct sweeps with unsorted, duplicate and outside-run knots.
+
+
+### Exact inspection-circle computation
+
+`HobbingErrorJob` has an optional `inspectionCross` flag (default false); the
+reference hobber runner enables it. `InspectionRingStock` physically cuts the
+profile/pitch axial strip and the measurement-radius strip over the complete
+stroke, using shared poses. All retained sample coordinates equal the dense
+coordinates exactly. It preserves the original axes for metrology and rejects
+any read of an uncomputed circle. Unsupported exact layouts fall back to dense
+stock. Overlapping strip circles must have identical endpoints and provenance.
+
+Independent circle subtraction makes this equivalent for the stated frozen-load
+inspection. It cannot provide full-part volume, mesh or changed-source forces.
+The inspection keeps every specified profile/face sample, filter, source and fine
+tolerance. `HOBBER_BUDGET_DENSE=1` selects dense reference computation.
+
+A complete small baseline/combined warped-tool study retains all measured values,
+traces, grades and warnings exactly (26 assertions). The reference engaged fixture
+also retains every inspected endpoint/provenance value exactly. At 8 threads and
+0.000025 mm sweep tolerance, 100 windows take 5.17 s versus 58.36 s before both
+optimizations; the native clipper alone takes 22.61 s with whole-stock hash parity.
+These timings do not establish the remaining full-study duration. Reproduce with
+`check-reference-budget.sh engaged-cross` in a separate evidence directory.

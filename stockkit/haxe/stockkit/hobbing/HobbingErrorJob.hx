@@ -12,11 +12,12 @@ class HobbingErrorJob {
   final firstTooth:Int;final lastTooth:Int;final tolerance:Float;final inspection:Null<GearInspection>;
   final motionKnots:Null<Array<Float>>;
   public final threads:Int;
+  final inspectionCross:Bool;
   public function new(spec:GearSpec,hob:HobDesign,at:Float->HobbingAxes,passes:Array<GashPass>,
       sources:Array<HobbingErrorSource>,wall:Float,radialStep:Float,axialStep:Float,
-      firstTooth:Int,lastTooth:Int,tolerance:Float,?inspection:GearInspection,?motionKnots:Array<Float>,threads:Int=4) {
+      firstTooth:Int,lastTooth:Int,tolerance:Float,?inspection:GearInspection,?motionKnots:Array<Float>,threads:Int=4,inspectionCross:Bool=false) {
     if(threads<1||threads>128)throw "hobbing error threads must be 1..128";
-    this.threads=threads;
+    this.threads=threads;this.inspectionCross=inspectionCross;
     this.spec=spec;this.hob=hob;this.at=at;this.passes=passes.copy();this.sources=sources.copy();
     this.motionKnots=motionKnots==null?null:motionKnots.copy();
     if(this.motionKnots!=null){for(t in this.motionKnots)if(!Math.isFinite(t))throw "motion knots must be finite";
@@ -38,8 +39,14 @@ class HobbingErrorJob {
     for(id in enabled){if(seen.indexOf(id)>=0)throw "duplicate enabled error";seen.push(id);var found=false;for(source in sources)if(source.id==id){selected.push(source);found=true;}if(!found)throw 'unknown hobbing error $id';}
     function warp(p:Point3):Point3 {var out=p;for(source in selected){var fn=source.warp;if(fn!=null)out=fn(out);}return out;}
     function motion(t:Float):HobbingAxes {var a=at(t);for(source in selected)a=source.apply(t,a);return a;}
-    var stock=RingStock.fromGearBlank(spec,wall,radialStep,axialStep);stock.setThreads(threads);
-    Sys.println("HOBBING_ERROR_SETTINGS "+haxe.Json.stringify({sources:enabled,threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,radialStepMm:radialStep,axialStepMm:axialStep,scope:"physical metrology source cut; grading tolerance unchanged"}));
+    var blank=RingStock.fromGearBlank(spec,wall,radialStep,axialStep);
+    var cross=inspectionCross&&inspection!=null?InspectionRingStock.create(blank.grid,inspection):null;
+    var stocks=cross==null?[blank]:cross.stocks;
+    if(cross!=null)blank.dispose();for(stock in stocks)stock.setThreads(threads);
+    var rings:GearRings=cross==null?cast blank:cast cross;
+    var sampling=cross==null?"dense":"exact inspection circles; unobserved circles omitted";
+    var computedCircles=0;for(stock in stocks)computedCircles+=stock.grid.radialCount*stock.grid.axialCount;
+    Sys.println("HOBBING_ERROR_SETTINGS "+haxe.Json.stringify({sources:enabled,threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,radialStepMm:radialStep,axialStepMm:axialStep,sampling:sampling,computedCircles:computedCircles,scope:"physical metrology source cut; grading tolerance unchanged"}));
     var sweep:Null<HobbingSweep> = null;
     var started=Sys.time();
     try {
@@ -50,13 +57,14 @@ class HobbingErrorJob {
         if(motionKnots!=null){var lo=0,hi=motionKnots.length;
           while(lo<hi){var mid=(lo+hi)>>1;if(motionKnots[mid]<=pass.start)lo=mid+1;else hi=mid;}
           local=[];while(lo<motionKnots.length&&motionKnots[lo]<pass.end){local.push(motionKnots[lo]);lo++;}}
-        sweep.cutPass(stock,motion,pass,tolerance/16,0.001,local);done++;
+        sweep.cutPassMany(stocks,motion,pass,tolerance/16,0.001,local);done++;
         if(done%100==0){Sys.println("HOBBING_ERROR_PROGRESS "+haxe.Json.stringify({sources:enabled,windows:done,total:passes.length,wallSeconds:Sys.time()-started}));Sys.stdout().flush();}}
 
-      var measured=GearMeasurement.fromRings(stock,spec,inspection);
-      Sys.println("HOBBING_ERROR_RESULT "+haxe.Json.stringify({sources:enabled,threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,windows:passes.length,wallSeconds:Sys.time()-started,isoClass:measured.isoClass,scope:"physical source cut; grading tolerance unchanged"}));
-      sweep.dispose();stock.dispose();return measured;
-    }catch(e:Dynamic){if(sweep!=null)sweep.dispose();stock.dispose();throw 'hobbing error run [${enabled.length==0?"baseline":enabled.join(",")}] failed: ${Std.string(e)}';}
+      if(cross!=null)cross.assertOverlap();
+      var measured=GearMeasurement.fromRings(rings,spec,inspection);
+      Sys.println("HOBBING_ERROR_RESULT "+haxe.Json.stringify({sources:enabled,threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,windows:passes.length,wallSeconds:Sys.time()-started,isoClass:measured.isoClass,sampling:sampling,computedCircles:computedCircles,scope:"physical source cut; grading tolerance unchanged"}));
+      sweep.dispose();for(stock in stocks)stock.dispose();return measured;
+    }catch(e:Dynamic){if(sweep!=null)sweep.dispose();for(stock in stocks)stock.dispose();throw 'hobbing error run [${enabled.length==0?"baseline":enabled.join(",")}] failed: ${Std.string(e)}';}
   }
   public function budget(relativeTolerance:Float=0.25,absoluteTolerance:Float=0.1):ErrorBudget
     return new ErrorBudget([for(source in sources){id:source.id,part:source.part,basis:source.basis}],run,relativeTolerance,absoluteTolerance);

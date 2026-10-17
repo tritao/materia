@@ -4,13 +4,17 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../../.." && pwd)
 cd "$root"
 mode=${1:-all}
-evidence=${HOBBER_BUDGET_EVIDENCE:-"$root/build/flexspline-reference-budget"}
+evidence=${HOBBER_BUDGET_EVIDENCE:-"$root/build/flexspline-reference-budget-fast"}
 force=${HOBBER_FORCE_EVIDENCE:-"$root/build/flexspline-reference-force-fast"}
-stock=${HOBBER_STOCK_NATIVE:-"$root/build/flexspline-force-parallel/native"}
+stock=${HOBBER_STOCK_NATIVE:-"$evidence/native"}
 cache=${HOBBER_NATIVE_CACHE:-"$root/../machine-tending/app/build/host/native"}
 mkdir -p "$evidence"
 exec 9>"$evidence/run.lock"
 flock -n 9 || { echo 'Reference budget is already running in this evidence directory.' >&2; exit 2; }
+if [[ -z "${HOBBER_STOCK_NATIVE:-}" ]]; then
+  cmake -S stockkit/core -B "$stock" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON > "$evidence/native-build.log" 2>&1
+  cmake --build "$stock" --target stockkit_core -j2 >> "$evidence/native-build.log" 2>&1
+fi
 export HAXEON_COMPILER_SERVER=0
 export CADKIT_OCCT_DIR=${CADKIT_OCCT_DIR:-"$HOME/dev/materia-cache/occt-f1dc4efb-release"}
 export LD_LIBRARY_PATH="$stock:$CADKIT_OCCT_DIR/lib:$root/haxeon/.tools/hashlink:$root/haxeon/out"

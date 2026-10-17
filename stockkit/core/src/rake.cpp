@@ -11,38 +11,51 @@ double cross(P2 a,P2 b,P2 c) {return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);}
 RakePoint minus(RakePoint a,RakePoint b) {return {a[0]-b[0],a[1]-b[1],a[2]-b[2]};}
 RakePoint cross3(RakePoint a,RakePoint b) {return {a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]};}
 double norm(RakePoint a) {return std::sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);}
-std::vector<P2> hull(std::vector<P2> p) {
+void hull(std::vector<P2>& p,std::vector<P2>& h) {
+    h.clear();
     std::sort(p.begin(),p.end(),[](P2 a,P2 b){return a.x<b.x || (a.x==b.x&&a.y<b.y);});
     p.erase(std::unique(p.begin(),p.end(),[](P2 a,P2 b){return a.x==b.x&&a.y==b.y;}),p.end());
-    if(p.size()<3)return {};
-    std::vector<P2> h;
+    if(p.size()<3)return;
     for(auto a:p) {while(h.size()>1 && cross(h[h.size()-2],h.back(),a)<=0)h.pop_back();h.push_back(a);}
     auto bottom=h.size();
     for(size_t k=p.size()-1;k-->0;) {auto a=p[k];while(h.size()>bottom && cross(h[h.size()-2],h.back(),a)<=0)h.pop_back();h.push_back(a);}
-    h.pop_back();return h;
+    h.pop_back();
 }
 using Arc=std::pair<double,double>;
-std::vector<Arc> circle_inside(const std::vector<P2>&p,double radius) {
-    std::vector<Arc> spans{{0,tau}};
-    for(size_t k=0;k<p.size()&&!spans.empty();++k) {
-        P2 a=p[k],b=p[(k+1)%p.size()];double nx=a.y-b.y,ny=b.x-a.x;
-        double scale=std::hypot(nx,ny),d=(nx*a.x+ny*a.y)/(scale*radius);
-        if(d>=1)return {};
+// Polygon edge arithmetic is independent of the sampled circle radius. Keep
+// the original operation order, caching only identical repeated expressions.
+struct CircleEdge { double numerator,nx,ny,scale,centre; bool scale_ready,centre_ready; };
+void circle_edges(const std::vector<P2>& polygon,std::vector<CircleEdge>& edges) {
+    edges.clear();
+    for(size_t k=0;k<polygon.size();++k) {
+        P2 a=polygon[k],b=polygon[(k+1)%polygon.size()];
+        double nx=a.y-b.y,ny=b.x-a.x;
+        edges.push_back({nx*a.x+ny*a.y,nx,ny,0,0,false,false});
+    }
+}
+void circle_inside(std::vector<CircleEdge>& edges,double radius,
+    std::vector<Arc>& spans,std::vector<Arc>& next) {
+    spans.clear();spans.push_back({0,tau});
+    for(auto &edge:edges) {
+        if(spans.empty())break;
+        if(!edge.scale_ready){edge.scale=std::hypot(edge.nx,edge.ny);edge.scale_ready=true;}
+        double d=edge.numerator/(edge.scale*radius);
+        if(d>=1){spans.clear();return;}
         if(d<=-1)continue;
-        double centre=std::atan2(ny,nx),half=std::acos(d),lo=centre-half,hi=centre+half;
+        if(!edge.centre_ready){edge.centre=std::atan2(edge.ny,edge.nx);edge.centre_ready=true;}
+        double centre=edge.centre,half=std::acos(d),lo=centre-half,hi=centre+half;
         while(lo<0){lo+=tau;hi+=tau;}
         while(lo>=tau){lo-=tau;hi-=tau;}
-        std::vector<Arc> allowed;
-        if(hi<=tau)allowed.push_back({lo,hi});
-        else {allowed.push_back({0,hi-tau});allowed.push_back({lo,tau});}
-        std::vector<Arc> next;
-        for(auto s:spans)for(auto t:allowed) {
-            double l=std::max(s.first,t.first),h=std::min(s.second,t.second);
+        std::array<Arc,2> allowed;size_t count;
+        if(hi<=tau){allowed[0]={lo,hi};count=1;}
+        else {allowed[0]={0,hi-tau};allowed[1]={lo,tau};count=2;}
+        next.clear();
+        for(auto span:spans)for(size_t i=0;i<count;++i) {
+            auto t=allowed[i];double l=std::max(span.first,t.first),h=std::min(span.second,t.second);
             if(l<h)next.push_back({l,h});
         }
         spans.swap(next);
     }
-    return spans;
 }
 RakePoint transform(RakePoint p,const sk_rake_pose &pose) {
     RakePoint out{};
@@ -119,6 +132,9 @@ void sweep_rake(RingStock &stock,const RakeTool &tool,uint32_t gash,uint32_t pas
     const uint32_t first=1+uint64_t(pose_count-1)*job/jobs;
     const uint32_t last=1+uint64_t(pose_count-1)*(job+1)/jobs;
     auto &result=results[job];
+    std::vector<P2> intersections,polygon;intersections.reserve(24);polygon.reserve(48);
+    std::vector<CircleEdge> edges;edges.reserve(24);
+    std::vector<Arc> spans,next;spans.reserve(24);next.reserve(24);
     std::vector<RakePoint> previous,current(mesh.vertices.size());
     for(size_t k=0;k<mesh.vertices.size();++k)current[k]=transform(mesh.vertices[k],poses[first-1]);
     for(uint32_t pose=first;pose<last;++pose) {
@@ -141,7 +157,7 @@ void sweep_rake(RingStock &stock,const RakeTool &tool,uint32_t gash,uint32_t pas
             if(std::hypot(closeX,closeY)>g.radius_max||std::hypot(farX,farY)<g.radius_min)continue;
             int first=int(std::clamp(std::ceil((minz-g.z_min)/dz-0.5),0.0,double(g.axial_count))),last=int(std::clamp(std::floor((maxz-g.z_min)/dz-0.5),-1.0,double(g.axial_count)-1));
             for(int z=first;z<=last;++z) {
-                double height=g.z_min+(z+0.5)*dz;std::vector<P2> intersections;
+                double height=g.z_min+(z+0.5)*dz;intersections.clear();
                 for(size_t a=0;a<6;++a) {
                     if(p[a][2]==height)intersections.push_back({p[a][0],p[a][1]});
                     for(size_t b=a+1;b<6;++b)if((p[a][2]<height&&p[b][2]>height)||(p[b][2]<height&&p[a][2]>height)) {
@@ -149,7 +165,7 @@ void sweep_rake(RingStock &stock,const RakeTool &tool,uint32_t gash,uint32_t pas
                         intersections.push_back({p[a][0]+t*(p[b][0]-p[a][0]),p[a][1]+t*(p[b][1]-p[a][1])});
                     }
                 }
-                auto polygon=hull(std::move(intersections));if(polygon.size()<3)continue;
+                hull(intersections,polygon);if(polygon.size()<3)continue;
                 double rmax=0,rmin=std::numeric_limits<double>::infinity();bool contains=true;
                 for(size_t k=0;k<polygon.size();++k) {
                     P2 a=polygon[k],b=polygon[(k+1)%polygon.size()];rmax=std::max(rmax,std::hypot(a.x,a.y));
@@ -158,9 +174,11 @@ void sweep_rake(RingStock &stock,const RakeTool &tool,uint32_t gash,uint32_t pas
                 }
                 if(contains)rmin=0;
                 int r0=int(std::clamp(std::ceil((rmin-g.radius_min)/dr-0.5),0.0,double(g.radial_count))),r1=int(std::clamp(std::floor((rmax-g.radius_min)/dr-0.5),-1.0,double(g.radial_count)-1));
+                if(r0>r1)continue;
+                circle_edges(polygon,edges);
                 for(int r=r0;r<=r1;++r) {
-                    auto arcs=circle_inside(polygon,g.radius_min+(r+0.5)*dr);
-                    for(auto arc:arcs)result.push_back({size_t(z)*g.radial_count+r,arc});
+                    circle_inside(edges,g.radius_min+(r+0.5)*dr,spans,next);
+                    for(auto arc:spans)result.push_back({size_t(z)*g.radial_count+r,arc});
                 }
             }
         }

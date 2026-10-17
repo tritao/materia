@@ -87,6 +87,15 @@ class HobbingSweep {
     check(StockKitNative.sk_ring_stock_sweep_rake(stock.borrowForSweep(),owner.borrow(),pass.gash,pass.pass,poses),"rake sweep");
     return poses.length;
   }
+  /** Identical poses for independent sampled stock domains. */
+  public function cutPassMany(stocks:Array<RingStock>,axesAt:Float->HobbingAxes,pass:GashPass,
+      pathTolerance:Float,maxTimeStep:Float=0.001,?motionKnots:Array<Float>):Int {
+    if(disposed||stocks.length==0)throw "invalid multi-stock rake sweep";
+    if(!Math.isFinite(pathTolerance)||pathTolerance<=0||!Math.isFinite(maxTimeStep)||maxTimeStep<=0)throw "invalid sweep path sampling";
+    var poses=sample(axesAt,pass.start,pass.end,pass.center,pathTolerance,maxTimeStep,motionKnots);
+    for(stock in stocks)check(StockKitNative.sk_ring_stock_sweep_rake(stock.borrowForSweep(),owner.borrow(),pass.gash,pass.pass,poses),"rake sweep");
+    return poses.length;
+  }
   function sample(at:Float->HobbingAxes,start:Float,end:Float,center:Float,tol:Float,maxStep:Float,knots:Null<Array<Float>>):Array<sk_rake_pose> {
     var result:Array<sk_rake_pose> =[];
     var a=at(start);result.push(a.pose());
