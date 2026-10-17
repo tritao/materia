@@ -64,7 +64,7 @@ extern "C" {
  * same stock. Handles are process-local, generation-checked and never zero.
  */
 
-enum { SK_API_VERSION = 4 };
+enum { SK_API_VERSION = 5 };
 
 typedef int32_t sk_result;
 enum {
@@ -563,6 +563,29 @@ SK_API sk_result SK_CALL sk_ring_stock_compare(sk_ring_stock_handle stock, sk_ri
  * The mesh is for display; metrology reads exact circle intervals. */
 SK_API sk_result SK_CALL sk_ring_stock_contour(sk_ring_stock_handle stock, double max_angle,
     sk_mesh_handle *out_mesh SK_OUT SK_OWNED);
+
+/* Planar cutting-region tool. Coordinates are hob-local; polygon loops may repeat
+ * their first vertex. Regions are triangulated once; 2 <= gashes <= 256. */
+typedef struct sk_rake_tool_handle { uint32_t id; } sk_rake_tool_handle
+    SK_HANDLE SK_HANDLE_DESTROY(sk_rake_tool_destroy);
+typedef struct sk_rake_region {
+    uint32_t struct_size SK_STRUCT_SIZE;
+    uint32_t first, count, gash;
+} sk_rake_region;
+typedef struct sk_rake_pose {
+    uint32_t struct_size SK_STRUCT_SIZE;
+    double rotation[9]; /* row-major, proper orthonormal */
+    double translation[3];
+} sk_rake_pose;
+SK_API sk_result SK_CALL sk_rake_tool_create(const double *vertices SK_IN_ARRAY(coordinate_count), uint32_t coordinate_count,
+    const sk_rake_region *regions SK_IN_ARRAY(region_count), uint32_t region_count, uint32_t gashes,
+    sk_rake_tool_handle *out_tool SK_OUT SK_OWNED);
+SK_API void SK_CALL sk_rake_tool_destroy(sk_rake_tool_handle tool);
+/* Union of convex hulls of corresponding triangles at successive rigid poses. This is a
+ * sampled-path approximation; callers refine the actual path and check convergence.
+ * No profile or feed-mark formula enters the cutter. A failed call is atomic. */
+SK_API sk_result SK_CALL sk_ring_stock_sweep_rake(sk_ring_stock_handle stock, sk_rake_tool_handle tool,
+    uint32_t gash, uint32_t pass, const sk_rake_pose *poses SK_IN_ARRAY(pose_count), uint32_t pose_count);
 
 #ifdef __cplusplus
 }

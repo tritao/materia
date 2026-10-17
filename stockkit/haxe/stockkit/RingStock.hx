@@ -122,6 +122,8 @@ class RingStock {
       mesh.close(); return result;
     } catch (error:Dynamic) { mesh.close(); throw error; }
   }
+  @:allow(stockkit.hobbing.HobbingSweep)
+  function borrowForSweep():sk_ring_stock_handle { alive(); return owner.borrow(); }
   public function dispose():Void { if (!disposed) { disposed = true; owner.close(); } }
   function alive():Void { if (disposed) throw "ring stock has been disposed"; }
   static function check(status:Int, operation:String):Void {

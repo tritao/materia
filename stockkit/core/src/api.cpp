@@ -1,5 +1,6 @@
 #include "stockkit.h"
 #include "ring.hpp"
+#include "rake.hpp"
 
 #include "mesh.hpp"
 #include "contour.hpp"
@@ -98,6 +99,7 @@ Table<Stock::Snapshot, kKindSnapshot> &snapshots() {
     return table;
 }
 
+Table<RakeTool, 7> &rake_tools() { static Table<RakeTool, 7> table; return table; }
 Table<RingStock, 5> &ring_stocks() { static Table<RingStock, 5> table; return table; }
 Table<RingSnapshot, 6> &ring_snapshots() { static Table<RingSnapshot, 6> table; return table; }
 
@@ -894,5 +896,40 @@ SK_API sk_result SK_CALL sk_ring_stock_cut_slab(sk_ring_stock_handle stock, doub
             cuts.push_back({sizeof(sk_ring_cut),r,0,s->grid.axial_count,angle-b,b-a,gash,pass});
         }
         s->cut(cuts.data(),uint32_t(cuts.size())); return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_rake_tool_create(const double *vertices,uint32_t coordinate_count,
+    const sk_rake_region *regions,uint32_t region_count,uint32_t gashes,sk_rake_tool_handle *out_tool) {
+    return guarded([&]() -> sk_result {
+        if(!out_tool) return SK_ERROR_INVALID_ARGUMENT;
+        out_tool->id=0;
+        if(coordinate_count%3)return SK_ERROR_INVALID_ARGUMENT;
+        auto tool=std::make_unique<RakeTool>();
+        if(!build_rake_tool(vertices,coordinate_count/3,regions,region_count,gashes,*tool))return SK_ERROR_INVALID_ARGUMENT;
+        auto id=rake_tools().add(std::move(tool));if(!id)return SK_ERROR_LIMIT;out_tool->id=id;return SK_OK;
+    });
+}
+SK_API void SK_CALL sk_rake_tool_destroy(sk_rake_tool_handle tool) {
+    guarded([&]() -> sk_result {rake_tools().remove(tool.id);return SK_OK;});
+}
+SK_API sk_result SK_CALL sk_ring_stock_sweep_rake(sk_ring_stock_handle stock,sk_rake_tool_handle tool,
+    uint32_t gash,uint32_t pass,const sk_rake_pose *poses,uint32_t pose_count) {
+    return guarded([&]() -> sk_result {
+        auto *s=ring_stocks().get(stock.id);auto *t=rake_tools().get(tool.id);
+        if(!s||!t)return SK_ERROR_INVALID_HANDLE;
+        if(gash>=t->gashes.size()||pass>=SK_SOURCE_NONE||!poses||pose_count<2)return SK_ERROR_INVALID_ARGUMENT;
+        for(uint32_t k=0;k<pose_count;++k) {
+            const auto &p=poses[k];if(p.struct_size!=sizeof(p)||!finite(p.rotation,9)||!finite(p.translation,3))return SK_ERROR_INVALID_ARGUMENT;
+            for(int a=0;a<3;++a)for(int b=0;b<3;++b) {
+                double dot=0;for(int c=0;c<3;++c)dot+=p.rotation[3*a+c]*p.rotation[3*b+c];
+                if(std::abs(dot-(a==b?1.0:0.0))>1e-9)return SK_ERROR_INVALID_ARGUMENT;
+            }
+            double det=p.rotation[0]*(p.rotation[4]*p.rotation[8]-p.rotation[5]*p.rotation[7])
+                -p.rotation[1]*(p.rotation[3]*p.rotation[8]-p.rotation[5]*p.rotation[6])
+                +p.rotation[2]*(p.rotation[3]*p.rotation[7]-p.rotation[4]*p.rotation[6]);
+            if(det<0)return SK_ERROR_INVALID_ARGUMENT;
+        }
+        sweep_rake(*s,*t,gash,pass,poses,pose_count);return SK_OK;
     });
 }

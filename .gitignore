@@ -48,3 +48,5 @@ __pycache__/
 /gearkit/tests/build/
 
 /stockkit/tests/ring/build/
+
+/stockkit/tests/hobbing/build/

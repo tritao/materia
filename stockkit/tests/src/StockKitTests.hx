@@ -13,6 +13,7 @@ class StockKitTests {
   public static function main():Void {
     // Each group is independent of the others, so that the workspace can run them as parallel shards.
     var groups:Array<TestGroup> = [
+      {name: "HobbingTests", run: HobbingTests.run, weight: 2},
       {name: "RingStockTests", run: RingStockTests.run, weight: 0.05},
       {name: "profiles", run: profiles, weight: 0.05},
       {name: "CutMoveTests", run: CutMoveTests.run, weight: 0.05},

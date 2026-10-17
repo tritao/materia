@@ -2,7 +2,7 @@
   "version": 1,
   "package": { "name": "stockkit-tests" },
   "entry": "StockKitTests",
-  "sourceRoots": ["src", "ring/src"],
+  "sourceRoots": ["src", "ring/src", "hobbing/src"],
   "dependencies": {
     "stockkit": { "path": ".." },
     "camkit": { "path": "../../camkit" }

@@ -333,7 +333,9 @@ r 30 mm. HB7 and HB11 must show this.
 - Geometric error sources (HB-D7) enter here as frame perturbations, all zero for now.
 - A pure-kinematics driver with ideal electronic gearing cuts the test gears without any machine.
 - Tests:
-  - the coarse demo gear: flats per flank equal `gashes × starts`, within the profile range;
+  - the coarse demo gear: generating facets follow the active flank's roll window sampled at
+    `DeltaC = 2*pi*starts/(teeth*gashes)`; more gashes refine and more starts coarsen the pattern
+    (corrected during HB3; the original `gashes * starts` assertion was not kinematically valid);
   - flat depths match the enveloping-cut oracle and feed marks match `f²·sin α/(4·d_a0)` (pin the
     formulas with a cited source);
   - tooth thickness at the reference circle is within 0.2 µm of target after full-depth infeed;
@@ -568,8 +570,8 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 |---|---|---|
 | HB0 | blocked: baseline waiting for heavy-run slot; scaffold tested | d403e0295 |
 | HB1 | done: non-undercut geometry; internal rack-limit restrictions below | 647b62f66 |
-| HB2 | done: native ring stock, Haxe API, contour and GearSpec comparison | this commit |
-| HB3 | planned | |
+| HB2 | done: native ring stock, Haxe API, contour and GearSpec comparison | 94f246a1e |
+| HB3 | done: actual rake sweep, ideal driver and slice acceptance; flat-count correction below | this commit |
 | HB4 | planned | |
 | HB5 | planned | |
 | HB6 | planned | |
@@ -742,4 +744,105 @@ build, without rebuilding unrelated CAD libraries:
 ./haxeon/scripts/haxeon build --compiler-only --project=stockkit/tests/ring/haxeon.json
 LD_LIBRARY_PATH="$PWD/build/flexspline-hb2/native:$PWD/haxeon/.tools/hashlink:$PWD/haxeon/out${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
   ./haxeon/.tools/hashlink/hl stockkit/tests/ring/build/host/main.hl
+```
+
+### HB3 ideal hobbing (2026-10-17)
+
+Implemented `stockkit.hobbing`, backed by the native rake-region sweep (C ABI **5**):
+
+- `HobbingAxes`: an explicit proper rigid chain from hob coordinates through X/Y/Z/A/B into
+  the inverse work-table C frame. Units are mm, radians and seconds; B/C are unwrapped.
+- `GashPass`: engagement windows and exact master-phase crossing times from integer phase
+  indices. Constant-speed and controller-sampled schedules include partial boundary windows.
+- `HobbingMotion`/`HobbingKeyframe`: piecewise-linear measured/controller states. Scheduling
+  solves the measured B crossing within ticks; actual C is interpolated independently. A
+  reversing master is explicitly rejected by this scheduler. Motion knots split the sweep.
+- `IdealHobbingJob`: a machine-free, positive-speed, right-hand-hob/external-spur driver. It
+  sets A to the signed lead angle, C/B to starts/teeth, the target-tooth phase, radial centre
+  distance/profile shift, optional axial feed and static hob-shift compensation. Different
+  X/Y/Z/A/C or geometric perturbations are accepted through the generic axis sampler.
+- `HobbingSweep`: obtains the real per-gash/per-thread regions from `HobDesign`, simplifies
+  their polylines below tolerance/8, and prepares a native planar cutter. Axial tooth indices
+  are explicit; physical tool-length end clipping and relief remain unmodelled, as in HB1.
+- The native cutter ear-clips the concave planar polygons. Between rigid poses it sweeps the
+  convex hull of each triangle's two endpoint positions, slices those hulls at each sampled Z,
+  and intersects their halfplanes analytically with each circle. The resulting interval union
+  removes material through HB2, retaining the scheduled gash/pass. Machine-ulp joins prevent
+  false gaps on internal triangle boundaries; endpoints are not put on an angular raster.
+  Stationary or in-plane-only face motion sweeps no volume. Input poses must be proper rigid
+  transforms. Geometry is staged before committing a pass.
+- Actual poses are sampled at engagement ends, the exact gash centre, controller knots and
+  adaptively inserted times. No target GearSpec or feed/profile-error formula is supplied to
+  the cutter. `cut` restores the initial stock, quarters the midpoint chord tolerance on
+  successive refinements (roughly halving angular steps), and compares successive results. It accepts only when the maximum
+  circle's angular symmetric difference, converted to arc length, is below tolerance. On an
+  invalid motion/pass or failed convergence, it restores the incoming stock.
+- This is **observed numerical convergence on sampled circles**, not a proof of an arbitrary
+  continuous trajectory's global error or a physical machine grade. The sampler must resolve
+  nonlinear motion with supplied knots/maximum time step. Defaults use a 0.05 micrometre arc
+  tolerance; HB3 does not claim full-face reference-job throughput or real-time playback.
+
+Acceptance correction and independent oracles:
+
+- The original `flats per flank = gashes * starts` assertion was incorrect. One gash advances
+  the table by `DeltaC = 2*pi*starts/(teeth*gashes)`. Facet count also depends on the evaluated
+  flank roll range and phase. Doubling starts reduces generating-cut density instead of
+  multiplying it. The acceptance now checks that relation and the actual source-labelled
+  facets. [Gear Technology, May 2019, generative-cuts discussion/Fig.20](https://ik.imagekit.io/agmamedia/gt/issues/0519x/gt0519.pdf)
+  gives the same dependence on gashes, starts and gear teeth.
+- The independently derived small-angle tangent-envelope oracle is
+  `delta ~= rho*DeltaC^2/8`, where the involute curvature radius at measuring radius r is
+  `rho = sqrt(r*r-r_base*r_base)`. At pitch this becomes
+  `pi^2*m*starts^2*sin(alpha)/(4*teeth*gashes^2)`.
+  References: [Kotlyar, May/June 1994, Fig.7](https://ik.imagekit.io/agmamedia/gt/issues/0594x/gt0594.pdf),
+  and [Li et al. (2023), generating-envelope definition/Fig.16](https://doi.org/10.1186/s10033-023-00930-5).
+  Tests use complete interior facets; clipped end facets and radial-sample peak undersampling
+  are not mistaken for an exact closed-form maximum.
+- The spur-gear feed-mark oracle is `delta ~= f^2*sin(alpha)/(4*OD)`. It is Eq.1 of
+  [Guba, Huesemann and Karpuschewski (2020)](https://doi.org/10.1016/j.cirpj.2020.06.005),
+  [accepted manuscript, Eq.1](https://media-api.suub.uni-bremen.de/api/core/bitstreams/3b12aea7-2fd8-42ab-a6e8-dbacf6767cdb/content).
+  This outside-diameter estimate is approximate: the simulation uses the actual finite hob
+  flank radius. It is used only as a test oracle, never to modify the tooth surface.
+
+Validation results (Release native core, pinned Haxeon host):
+
+- **1,620 Haxe hobbing assertions passed**, about 187 seconds on this machine. Tests are
+  registered in the main StockKit suite; individual `schedule`, `profile`, `reference` and
+  `feed` cases can also be selected in the focused project.
+- Coarse m1/z40 profile, 192 measuring circles, one transverse slice:
+  - one start / 4 gashes: **8 facets**, 1.643 micrometre normal peak-to-valley variation;
+  - one start / 8 gashes: **16 facets**, 0.433 micrometre variation;
+  - two starts / 4 gashes: **4 facets**, 6.543 micrometre variation.
+  Doubling gashes reduced the variation **3.80x**; doubling starts increased it **3.98x**.
+  Mean measured complete-facet depth/oracle ratios were **0.979 / 0.915 / 1.067** respectively.
+- Reference m0.3/z200, hob OD32/12 gashes, zero-feed full-depth pitch slice, three radial
+  circles around r30: every one of the **200 teeth** is within **0.2 micrometre** of nominal
+  thickness 0.471238898 mm. At this particular phase, pitch-thickness differences are at the
+  floating-point floor; this is not a physical sub-nanometre accuracy claim. Two path refinements
+  gave a maximum observed arc change **0.0471 micrometre** over the three circles.
+- Axial-feed m1/z40 case, f2 mm/work rev: a five-Z-slice acceptance measured **11.30 micrometres**
+  against **10.69 micrometres** from the outside-diameter oracle (ratio **1.057**). A preceding
+  16-slice/longer-overrun investigation measured **11.51 micrometres** (ratio **1.077**). Finite
+  hob geometry and sampled peak location are consistent with the small difference from the approximation.
+- Controller check: **8** phase events, **7** between the 4 ms controller ticks, with exact
+  phase-crossing times and independent C interpolation. Also tested varying master speed,
+  invalid/reversing schedules, the frame chain, retained endpoint sources and job rollback.
+- Native rake sweep: **329 checks passed**, including an independent translating-slab oracle,
+  a concave L-region with an uncut notch, stationary faces, stale handles/non-rigid input and
+  convergence of a rotated face to an analytic annular-sector cut.
+- Existing native suites still pass: **24,224 ring checks**, **20,906 Cartesian checks**.
+  CTest: **3/3 targets passed**. Existing Haxe ring suite: **345 assertions passed**.
+- Canonical HXI audit passes Linux x86-64, Windows x86-64, macOS x86-64 and macOS arm64.
+- HB0's full workspace baseline is still queued; no complete workspace pass is claimed.
+  Existing dirty vendor/submodule state remains untouched.
+
+Reproduce the focused checks:
+
+```sh
+cmake -S stockkit/core -B build/flexspline-hb3/native -DCMAKE_BUILD_TYPE=Release
+cmake --build build/flexspline-hb3/native -j 2
+ctest --test-dir build/flexspline-hb3/native --output-on-failure
+./haxeon/scripts/haxeon build --compiler-only --project=stockkit/tests/hobbing/haxeon.json
+LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$PWD/haxeon/out${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  ./haxeon/.tools/hashlink/hl stockkit/tests/hobbing/build/host/main.hl
 ```

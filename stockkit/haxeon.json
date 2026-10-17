@@ -21,6 +21,8 @@
         "core/include/stockkit.h",
         "core/src/api.cpp",
         "core/src/ring.cpp",
+        "core/src/rake.cpp",
+        "core/src/rake.hpp",
         "core/src/ring.hpp",
         "core/src/contour.cpp",
         "core/src/contour.hpp",

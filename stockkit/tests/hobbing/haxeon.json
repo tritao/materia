@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": { "name": "stockkit-hobbing-tests" },
+  "entry": "HobbingTests",
+  "sourceRoots": ["src"],
+  "dependencies": { "stockkit": { "path": "../.." } },
+  "target": "host",
+  "outputDir": "build"
+}

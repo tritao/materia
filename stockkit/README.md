@@ -21,7 +21,7 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
 Angles are radians about +Z from +X. Endpoint positions are double precision, with no angular
 raster; each endpoint carries the gash and pass that exposed it. The cells exactly cover the
 specified annulus and height. Native ring structs and handles are separate from Cartesian stock;
-the generated StockKit C ABI is version 4.
+the generated StockKit C ABI is version 5.
 
 ```haxe
 var spec = new gearkit.GearSpec(0.3, 200, 8, 20 * Math.PI / 180);
@@ -47,12 +47,52 @@ disposed. Restore and `compareStock` require identical grids.
 to arc lengths in mm and cell-volume estimates in cubic mm. This is a geometric comparison,
 not ISO grading. `contour` displays the piecewise radial/axial cell boundary, suppressing internal
 faces; only its angular chords approximate the arcs. Metrology reads `circle` directly.
-The hob-edge sweep is the next flexspline-hobber step, HB3.
+`stockkit.hobbing.HobbingSweep` supplies the hob-edge sweep described below.
 
 Focused ring tests are in `tests/ring/haxeon.json` and are also a group of the main StockKit
 suite. The CMake `stockkit_ring_tests` target exercises the C ABI and the reference-part memory
 and snapshot budgets. The reference case includes a continuous 0.6 mm wall below the roots,
 5 micrometre radial cells, 0.1 mm axial cells and 200 material intervals per tooth-band circle.
+
+## Ideal hobbing sweeps
+
+`stockkit.hobbing` cuts the actual HB1 rake-face polygons through the HB2 circles. It has no
+machine, rigid joint coupling, target-profile cutter shortcut, or injected scallop-depth formula.
+`HobbingAxes` supplies X/Y/Z/A/B/C as a function of time: mm, unwrapped radians and seconds.
+X is centre distance; Y is shift along the hob axis; Z is head height. The frame chain tilts the
+hob from -Y by A, rotates it by B, then applies inverse C into the work frame.
+
+```haxe
+var spec = new gearkit.GearSpec(0.3, 200, 8, 20 * Math.PI / 180);
+var hob = new gearkit.HobDesign(gearkit.ConjugateRack.of(new gearkit.ToothProfile(spec)), 1, 32, 12);
+// Fast transverse slice with three measuring circles around the 30 mm pitch radius.
+var stock = stockkit.RingStock.annulus(new stockkit.RingGrid(29.925, 30.075, 3.999999, 4.000001, 0.05, 1));
+var job = new stockkit.hobbing.IdealHobbingJob(spec, hob, 3000, 1.1, 0, 4);
+var sweep = new stockkit.hobbing.HobbingSweep(hob, -8, 8); // inclusive axial tooth indices
+var report = sweep.cut(stock, job.axesAt, job.schedule(stock.grid));
+sweep.dispose();
+stock.dispose();
+```
+
+The ideal driver supports external spur gears and right-hand hobs. It sets the lead-angle tilt,
+table ratio, static shift compensation and optional feed in mm per work revolution. General
+motion is supplied independently. `HobbingMotion` interpolates controller samples and
+`GashPass.fromMotion` locates measured-B phase crossings between ticks, preserving independent
+actual C. Pass `motion.times()` as `motionKnots` to split sweeps at every controller knot.
+
+Native rake tools triangulate simple planar regions once and intersect swept triangle-endpoint
+convex hulls with each measuring circle. `HobbingSweep.cut` samples the actual rigid path,
+includes exact event-centre times, and refines the whole job until its observed per-circle angular
+symmetric difference, expressed as arc length, meets the requested tolerance (default 0.00005 mm).
+This is numerical convergence on the sampled circles. It does not establish a machine accuracy
+class. Nonlinear motion must be resolved by the caller's time knots and sampling interval.
+A failed job restores the incoming stock; each native pass is atomic. `cutPass` exposes one
+sampling resolution for studies. Gash/pass endpoint provenance is preserved.
+
+Focused checks live in `tests/hobbing/haxeon.json` and also run as a main StockKit test group.
+They cover generating facets and their inverse-square gash-count trend, multiple starts, pitch
+thickness, axial-feed marks, controller interpolation and rollback. Their acceptance runs use
+transverse slices; full-face throughput, application playback and ISO metrology are later steps.
 
 ## Current state (phases 0–5, phase 6 under way)
 
