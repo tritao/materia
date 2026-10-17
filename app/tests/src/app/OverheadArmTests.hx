@@ -165,6 +165,7 @@ class OverheadArmTests {
         previous = last.copy();
       }
       check(motion.completed && motion.failure == null, "Overhead coordinated path: " + motion.failure);
+      Sys.println('overhead tracking: path ${worst*1000} mm, endpoint ${PoseMath.distance(solver.forward(last),stop)*1000} mm');
       check(PoseMath.distance(solver.forward(last),stop) < 0.002 && worst < 0.002, "Coordinated TCP remains within 2 mm");
       for (axis in 0...3) check(Math.abs(last[xyz[axis]]-entry[xyz[axis]]) > 0.8*Math.abs(delta[axis]),
         "Each external axis supplies most of its corresponding task travel");

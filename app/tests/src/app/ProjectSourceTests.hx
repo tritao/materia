@@ -3771,6 +3771,7 @@ class ProjectSourceTests {
     if (example == "gantry-welder" || example == "track-arm") check(wireError <= 2 * Math.PI / 180,
       '$label: work/travel directions stay within 2 degrees of the authored process wire axis ($wireError rad)');
     check(restarts == 0, '$label: the weldment is welded without losing the arc ($restarts restarts)');
+    Sys.println('$example seam tracking: ${strayed*1000} mm');
     check(strayed < 0.0015, '$label: the wire tip stayed within ${strayed * 1000} mm of the seams while the arc burned');
     if (example == "track-arm") {
       Sys.println('track weld: ${Math.abs(trackLast - (trackStart == null ? 0.0 : trackStart))} m track travel, $armMargin rad posture margin, $armJump rad maximum joint step');
