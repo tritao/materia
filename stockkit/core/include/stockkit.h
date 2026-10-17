@@ -64,7 +64,7 @@ extern "C" {
  * same stock. Handles are process-local, generation-checked and never zero.
  */
 
-enum { SK_API_VERSION = 3 };
+enum { SK_API_VERSION = 4 };
 
 typedef int32_t sk_result;
 enum {
@@ -492,6 +492,77 @@ SK_API sk_result SK_CALL sk_mesh_color_by_ray(sk_mesh_handle mesh, uint32_t axis
  */
 SK_API sk_result SK_CALL sk_mesh_color_by_deviation(sk_mesh_handle mesh, sk_stock_handle target,
     double tolerance, uint32_t on_target, uint32_t leftover, uint32_t gouge);
+
+
+/* Circumferential stock. Lengths in caller units (Haxe RingStock uses mm), angles
+ * in radians about +Z from +X. Each grid cell samples its centre circle; bounds
+ * define the exact annulus/height and the piecewise-cell contour/volume estimate.
+ * Angular endpoints are never quantised. All ring struct_size values must match.
+ * Calls on a given handle must be serialized, including destruction. */
+typedef struct sk_ring_stock_handle { uint32_t id; } sk_ring_stock_handle
+    SK_HANDLE SK_HANDLE_DESTROY(sk_ring_stock_destroy);
+typedef struct sk_ring_snapshot_handle { uint32_t id; } sk_ring_snapshot_handle
+    SK_HANDLE SK_HANDLE_DESTROY(sk_ring_snapshot_destroy);
+
+typedef struct sk_ring_grid {
+    uint32_t struct_size SK_STRUCT_SIZE;
+    uint32_t radial_count;
+    uint32_t axial_count;
+    double radius_min, radius_max, z_min, z_max;
+} sk_ring_grid;
+
+typedef struct sk_ring_interval {
+    double lo, hi;
+    uint32_t lo_gash, lo_pass, hi_gash, hi_pass;
+} sk_ring_interval;
+
+/* Remove [start,start+sweep], counterclockwise, on a radial index and axial
+ * range. start may wrap or be negative; 0 <= sweep <= 2*pi. Cuts are applied
+ * in array order, preserving the source of existing boundaries on recuts.
+ * Every entry is validated before any mutation; failures leave stock unchanged. */
+typedef struct sk_ring_cut {
+    uint32_t struct_size SK_STRUCT_SIZE;
+    uint32_t radial_index, axial_first, axial_count;
+    double start, sweep;
+    uint32_t gash, pass;
+} sk_ring_cut;
+
+typedef struct sk_ring_info {
+    uint32_t struct_size SK_STRUCT_SIZE;
+    uint32_t circle_count;
+    uint64_t interval_count, bytes;
+} sk_ring_info;
+
+typedef struct sk_ring_comparison {
+    double leftover, gouge; /* angular lengths, radians */
+} sk_ring_comparison;
+
+SK_API sk_result SK_CALL sk_ring_stock_create(const sk_ring_grid *grid,
+    sk_ring_stock_handle *out_stock SK_OUT SK_OWNED);
+SK_API void SK_CALL sk_ring_stock_destroy(sk_ring_stock_handle stock);
+SK_API sk_result SK_CALL sk_ring_stock_set_threads(sk_ring_stock_handle stock, uint32_t threads);
+SK_API sk_result SK_CALL sk_ring_stock_get_info(sk_ring_stock_handle stock, sk_ring_info *out_info SK_OUT);
+SK_API sk_result SK_CALL sk_ring_stock_read_circle(sk_ring_stock_handle stock, uint32_t radial_index,
+    uint32_t axial_index, sk_ring_interval *out_intervals SK_OUT_ARRAY(interval_capacity) SK_INITIAL_CAPACITY(8),
+    uint32_t *interval_capacity SK_INOUT);
+SK_API sk_result SK_CALL sk_ring_stock_cut_region(sk_ring_stock_handle stock,
+    const sk_ring_cut *cuts SK_IN_ARRAY(cut_count), uint32_t cut_count);
+/* Analytic intersection with offset_min <= x*cos(normal_angle)+y*sin(normal_angle)
+ * <= offset_max, over the entire axial range. */
+SK_API sk_result SK_CALL sk_ring_stock_cut_slab(sk_ring_stock_handle stock, double normal_angle,
+    double offset_min, double offset_max, uint32_t gash, uint32_t pass);
+SK_API sk_result SK_CALL sk_ring_stock_snapshot(sk_ring_stock_handle stock,
+    sk_ring_snapshot_handle *out_snapshot SK_OUT SK_OWNED);
+SK_API void SK_CALL sk_ring_snapshot_destroy(sk_ring_snapshot_handle snapshot);
+SK_API sk_result SK_CALL sk_ring_stock_restore(sk_ring_stock_handle stock, sk_ring_snapshot_handle snapshot);
+/* Same-grid comparison, axial-major, radial index fastest. */
+SK_API sk_result SK_CALL sk_ring_stock_compare(sk_ring_stock_handle stock, sk_ring_stock_handle target,
+    sk_ring_comparison *out_comparisons SK_OUT_ARRAY(comparison_count), uint32_t comparison_count);
+/* Piecewise radial/axial cell boundary surface; angular chord step <= max_angle.
+ * Stream coordinates use ring-stock units. Triangle source is a pass, or STOCK.
+ * The mesh is for display; metrology reads exact circle intervals. */
+SK_API sk_result SK_CALL sk_ring_stock_contour(sk_ring_stock_handle stock, double max_angle,
+    sk_mesh_handle *out_mesh SK_OUT SK_OWNED);
 
 #ifdef __cplusplus
 }

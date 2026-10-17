@@ -24,6 +24,12 @@ void Pool::stop() {
     start_.notify_all();
     for (std::thread &worker : workers_) worker.join();
     workers_.clear();
+    // A replacement worker starts with seen=0. Do not let it observe a previous
+    // round and dereference the completed job before run() publishes a new one.
+    round_ = 0;
+    jobs_ = pending_ = 0;
+    job_ = nullptr;
+    error_ = nullptr;
     stopping_ = false;
 }
 

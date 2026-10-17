@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": { "name": "stockkit-ring-tests" },
+  "entry": "RingStockTests",
+  "sourceRoots": ["src"],
+  "dependencies": { "stockkit": { "path": "../.." } },
+  "target": "host",
+  "outputDir": "build"
+}

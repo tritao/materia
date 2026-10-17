@@ -4,6 +4,7 @@
   "sourceRoots": ["haxe"],
   "scopeSourceRoots": false,
   "dependencies": {
+    "gearkit": { "path": "../gearkit" },
     "cadkit": { "path": "../cadkit" },
     "toolpathkit": { "path": "../toolpathkit" }
   },
@@ -19,6 +20,8 @@
         "core/CMakeLists.txt",
         "core/include/stockkit.h",
         "core/src/api.cpp",
+        "core/src/ring.cpp",
+        "core/src/ring.hpp",
         "core/src/contour.cpp",
         "core/src/contour.hpp",
         "core/src/mesh.cpp",

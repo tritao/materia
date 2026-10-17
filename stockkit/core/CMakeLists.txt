@@ -17,6 +17,7 @@ else()
 endif()
 
 add_library(stockkit_core ${SK_LIBRARY_TYPE}
+    src/ring.cpp
     src/api.cpp
     src/contour.cpp
     src/mesh.cpp
@@ -51,6 +52,11 @@ endif()
 add_library(stockkit::core ALIAS stockkit_core)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
+    add_executable(stockkit_ring_tests tests/ring_tests.cpp)
+    target_link_libraries(stockkit_ring_tests PRIVATE stockkit_core)
+    target_compile_features(stockkit_ring_tests PRIVATE cxx_std_17)
+    add_test(NAME stockkit_ring_tests COMMAND stockkit_ring_tests)
+
     add_executable(stockkit_core_tests tests/core_tests.cpp)
     target_link_libraries(stockkit_core_tests PRIVATE stockkit_core)
     target_compile_features(stockkit_core_tests PRIVATE cxx_std_17)
