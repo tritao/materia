@@ -23,8 +23,12 @@ Mineral-cast foundations use shared components in `machinekit.structural`:
 - `FoundationIntegrity`: insert position/normal checks and checks that precision
   mounts land on steel. These do not certify structural or casting-process adequacy.
 
-The mill pedestal and hobber bed/column supply machine-specific layouts to these
-shared components. All void dimensions and frames are persisted in recipe values;
+The mill pedestal, mill structural frame and hobber bed/column supply machine-specific
+layouts to these shared components. `machinekit.milling.MillFrame` uses a typed
+`MillFrameLayout` to build a ribbed base and separate column with steel mounting
+interfaces. See [the bench-mill frame study](examples/bench-mill/README.md) for
+its static full-machine preview, checks and remaining design work.
+All void dimensions and frames are persisted in recipe values;
 a saved assembly rebuilds with the standard component registry. Casting purchasing
 mass comes from actual CAD volume and the common `mineral-cast` material. Its
 2400 kg/m³ density and bulk elastic, thermal and damping inputs are explicitly assumed.
