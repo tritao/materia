@@ -26,7 +26,7 @@ class RingMetrologyTests {
     var lo=p.rootJoinRadius+0.002,hi=p.tipJoinRadius-0.002;
     var grid=new RingGrid(lo,hi,-0.02,8.02,(hi-lo)/185,0.04);
     var stock=RingStock.annulus(grid);stock.setThreads(8);
-    Sys.println("RING_METROLOGY_SETTINGS "+haxe.Json.stringify({threads:8,sweepToleranceMm:0.00005,radialStepMm:(hi-lo)/185,axialStepMm:0.04,scope:"fine full-profile grading; sweep convergence tolerance unchanged"}));
+    Sys.println("RING_METROLOGY_SETTINGS "+haxe.Json.stringify({threads:8,pairedDomains:Sys.getEnv("STOCKKIT_RAKE_BATCH_DOMAINS")=="1",sweepToleranceMm:0.00005,radialStepMm:(hi-lo)/185,axialStepMm:0.04,scope:"fine full-profile grading; sweep convergence tolerance unchanged"}));
     var hob=new HobDesign(ConjugateRack.of(p),1,32,12);
     var job=new IdealHobbingJob(spec,hob,3000,1.1,0,4);
     var sweep=new HobbingSweep(hob,-28,28,0.00005),began=Sys.time();
@@ -36,11 +36,17 @@ class RingMetrologyTests {
     stock.dispose();
     var ends=new FaceEndpointStock(cross,cross.stocks,grid,spec.faceWidth);
     for(part in ends.stocks)part.setThreads(8);
-    var convergence=sweep.cutMany(ends.stocks,job.axesAt,job.schedule(grid));cross.assertOverlap();
+    var output=Sys.getEnv("HB4_EVIDENCE");if(output==null)output="build/flexspline-hb4-accelerated";
+    var comparisons:Array<Dynamic> =[];
+    var convergence=sweep.cutMany(ends.stocks,job.axesAt,job.schedule(grid),3,0.001,function(event:Dynamic):Void {
+      Sys.println("RING_SWEEP_PROGRESS "+haxe.Json.stringify(event));Sys.stdout().flush();
+      if(event.phase=="comparison"){comparisons.push(event);
+        sys.io.File.saveContent(output+"/convergence.json",haxe.Json.stringify(comparisons));}
+    });cross.assertOverlap();
     var report=GearMeasurement.fromRings(ends,spec,cfg);
     check(report.warnings.indexOf("Face endpoints not sampled; end excess material unchecked")<0,"reference physically samples both face ends");
-    sys.io.File.saveContent("build/flexspline-hb4-accelerated/result.json",haxe.Json.stringify({
-      threads:8,sweepToleranceMm:0.00005,pathToleranceMm:0.00005/(4*Math.pow(4,convergence.refinement)),
+    sys.io.File.saveContent(output+"/result.json",haxe.Json.stringify({
+      threads:8,pairedDomains:Sys.getEnv("STOCKKIT_RAKE_BATCH_DOMAINS")=="1",sweepToleranceMm:0.00005,pathToleranceMm:0.00005/(4*Math.pow(4,convergence.refinement)),
       convergenceMm:convergence.maxArcChange,refinement:convergence.refinement,wallSeconds:Sys.time()-began,
       grades:[for(k in Iso1328.parameters){parameter:k,valueUm:report.value(k),grade:report.grades.get(k)}],
       isoClass:report.isoClass,warnings:report.warnings,extrapolation:report.extrapolation,

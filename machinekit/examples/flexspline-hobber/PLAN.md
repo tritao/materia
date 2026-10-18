@@ -1707,3 +1707,25 @@ batch after saving that case. Do not start a second batch beside the live one.
   restarts reuse saved cases, and a slower candidate is rejected without changing
   completed acceptance status. Full-reference and HB11/HB12 acceptance remain
   pending; the short benchmark does not establish an hours-scale full-batch ETA.
+
+### HB4 convergence diagnostics (2026-10-18)
+
+- The accelerated HB4 reference in `build/flexspline-hb4-accelerated/` exited
+  with status 1: the full multi-domain sweep did not converge after refinements
+  0–3. It produced no acceptance result. Its binary and logs are preserved;
+  HB4 remains open. This failure did not identify the offending circle.
+- `HobbingSweep.cutMany` now accepts an optional progress callback: per-level
+  path tolerance, window progress and pose counts, then every domain's maximum
+  symmetric-difference arc length and its physical radius/Z. HB4 persists each
+  comparison immediately in `convergence.json`, including on eventual failure.
+- The replacement diagnostic run is `build/flexspline-hb4-diagnostic/`, with
+  8 threads and the validated paired-streaming native provider. The full stroke,
+  physical face endpoints, original inspection grid, 0.00005 mm convergence
+  tolerance and refinements 0–3 are unchanged. `HB4_EVIDENCE` selects its output
+  directory. The paired-domain setting is included in settings/result reports.
+  No tolerance relaxation or additional refinement is silently accepted.
+- The short `multi-convergence` regression passes with paired domains: exact
+  stock equality against the original single-domain sweep at 1/4 threads,
+  identical refinement and maximum arc change, and complete diagnostic events.
+  HB11 cuts and their frozen binaries/libraries continue unchanged. Diagnose the
+  full-run comparison before choosing a further refinement or geometry fix.

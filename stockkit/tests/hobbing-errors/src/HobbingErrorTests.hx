@@ -115,7 +115,17 @@ class HobbingErrorTests {
     var a=stockkit.RingStock.annulus(new stockkit.RingGrid(spec.pitchRadius()-0.1,spec.pitchRadius()+0.1,0.9,1.1,0.1,0.1)),b=stockkit.RingStock.annulus(a.grid),dense=stockkit.RingStock.annulus(a.grid);
     a.setThreads(1);b.setThreads(4);dense.setThreads(4);
     var motion=new IdealHobbingJob(spec,hob,3000,1.1,0,1),passes=motion.schedule(a.grid),sweep=new HobbingSweep(hob,-6,6,0.00005);
-    var one=sweep.cut(dense,motion.axesAt,passes),many=sweep.cutMany([a,b],motion.axesAt,passes);
+    var comparisons=0,finished=0;
+    var one=sweep.cut(dense,motion.axesAt,passes),many=sweep.cutMany([a,b],motion.axesAt,passes,3,0.001,function(event:Dynamic):Void {
+      if(event.phase=="comparison"){
+        var domains:Array<Dynamic> =cast event.domains;
+        comparisons++;check(domains.length==2,"diagnostics cover every inspection domain");
+        for(domain in domains)
+          check(domain.maxArcChangeMm<=event.maxArcChangeMm,"domain change bounded by reported maximum");
+      }
+      if(event.phase=="cut"&&event.completed==passes.length)finished++;
+    });
+    check(comparisons==many.refinement&&finished==many.refinement+1,"diagnostics cover every completed refinement");
     check(one.refinement==many.refinement&&one.maxArcChange==many.maxArcChange,"shared-domain convergence matches existing dense sweep");
     for(part in [a,b]){var comparison=part.compareStock(dense);
       for(v in comparison.leftover)if(v!=0)throw "multi-domain stock differs";

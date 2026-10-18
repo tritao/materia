@@ -80,7 +80,7 @@ class HobbingSweep {
   /** Converged inspection domains: retain every sampled circle, share poses,
       and require the same arc-change bound on every domain at each refinement. */
   public function cutMany(stocks:Array<RingStock>,axesAt:Float->HobbingAxes,passes:Array<GashPass>,
-      maxRefinements:Int=3,maxTimeStep:Float=0.001):HobbingReport {
+      maxRefinements:Int=3,maxTimeStep:Float=0.001,?progress:Dynamic->Void):HobbingReport {
     if(disposed||stocks.length==0||maxRefinements<1||maxRefinements>8||!Math.isFinite(maxTimeStep)||maxTimeStep<=0)
       throw "invalid converged multi-stock sweep";
     var initial=[for(stock in stocks)stock.snapshot()],previous=[for(stock in stocks)RingStock.annulus(stock.grid)],havePrevious=false;
@@ -88,12 +88,24 @@ class HobbingSweep {
       var poses=0;
       for(level in 0...maxRefinements+1){
         for(i in 0...stocks.length)stocks[i].restore(initial[i]);poses=0;
-        var step=tolerance/(4*Math.pow(4,level));
-        for(pass in passes)poses+=cutPassMany(stocks,axesAt,pass,step,maxTimeStep);
-        if(havePrevious){var worst=0.0;
-          for(i in 0...stocks.length){var stock=stocks[i],comparison=stock.compareStock(previous[i]);
+        var step=tolerance/(4*Math.pow(4,level)),began=Sys.time(),completed=0;
+        if(progress!=null)progress({phase:"start",level:level,pathToleranceMm:step,domains:stocks.length,windows:passes.length});
+        for(pass in passes){poses+=cutPassMany(stocks,axesAt,pass,step,maxTimeStep);completed++;
+          if(progress!=null&&(completed%10000==0||completed==passes.length))
+            progress({phase:"cut",level:level,completed:completed,windows:passes.length,poses:poses,seconds:Sys.time()-began});}
+
+        if(havePrevious){var worst=0.0,worstDomain=-1,worstR=-1,worstZ=-1;var domains:Array<Dynamic> =[];
+          for(i in 0...stocks.length){var stock=stocks[i],comparison=stock.compareStock(previous[i]),domainWorst=0.0,radial=-1,axial=-1;
             for(z in 0...stock.grid.axialCount)for(r in 0...stock.grid.radialCount){var index=z*stock.grid.radialCount+r;
-              worst=Math.max(worst,(comparison.leftover[index]+comparison.gouge[index])*stock.grid.radius(r));}}
+              var change=(comparison.leftover[index]+comparison.gouge[index])*stock.grid.radius(r);
+              if(!Math.isFinite(change))throw "non-finite multi-stock convergence comparison";
+              if(change>domainWorst){domainWorst=change;radial=r;axial=z;}}
+            domains.push({domain:i,maxArcChangeMm:domainWorst,radialIndex:radial,axialIndex:axial,
+              radiusMm:radial<0?null:stock.grid.radius(radial),zMm:axial<0?null:stock.grid.z(axial)});
+            if(domainWorst>worst){worst=domainWorst;worstDomain=i;worstR=radial;worstZ=axial;}}
+          if(progress!=null)progress({phase:"comparison",level:level,pathToleranceMm:step,maxArcChangeMm:worst,
+            toleranceMm:tolerance,converged:worst<=tolerance,worstDomain:worstDomain,radialIndex:worstR,axialIndex:worstZ,
+            domains:domains,poses:poses,seconds:Sys.time()-began});
           if(worst<=tolerance){for(saved in initial)saved.dispose();for(stock in previous)stock.dispose();return new HobbingReport(passes.length,poses,level,worst);}}
         for(i in 0...stocks.length){var saved=stocks[i].snapshot();previous[i].restore(saved);saved.dispose();}havePrevious=true;
       }
