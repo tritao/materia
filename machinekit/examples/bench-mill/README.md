@@ -52,11 +52,16 @@ pedestal engagement; four M6 × 25 bolts anchor the X motor plate. These match t
 modeled reference holes, not verified supplier drawings. Complete guide/block,
 motor, nut, cover and insert drilling and fastener qualification are unfinished.
 
-Z uses 180 mm guide spacing, four blocks, a broad carriage, a central screw/nut
+Z uses 180 mm guide spacing, four blocks at 101.4 mm vertical centers, a
+234 × 182.8 × 20 mm carriage, and a central screw/nut
 inside the column channel, fixed/floating bearings, a motor stand and brake
-hardware. Its ribbed steel head carries the existing manual spindle and offset
+hardware. Its tapered steel head has a 234 mm rear flange, a 120 mm nose, two rows
+of side windows and continuous top/bottom chords. Four nominal M6 × 16 bolts
+attach the flange to blind carriage taps, with straight tool access beside the
+180 mm rear body. Spindle reach and the existing manual spindle remain fixed.
+The head carries the offset
 belt motor. Nominal structural clearance is 3 mm. The X/Y geometric overrun
-reserves are 7/5.5 mm; these are not established stopping distances.
+reserves are 7/2 mm; these are not established stopping distances.
 
 ## ATC spindle and head decision
 
@@ -183,3 +188,18 @@ Manufacturing release remains blocked until those gates have evidence. Preserve
 material-property provenance, finish-machine the precision interfaces after
 casting as specified by the chosen process, and develop moulds, curing, lifting,
 inspection and assembly instructions from the final geometry.
+
+## Z head and release-space study
+
+`mill-spindle-service-study.mtrg` shows the revised head, carriage, existing
+spindle drive and a blue **reserved space**, not installed actuator hardware.
+The project allocation is 120 mm diameter × 200 mm high, beginning 80 mm above
+the head. Those dimensions are assumptions and are not derived from a supplier
+release-force or actuator drawing. The allocation clears the existing payload
+and is swept through Z travel against the fixed structure and full XY envelope.
+It contributes no mass to the machine load study.
+
+The PMK BT30 candidate still needs a new spindle bore, release reaction bridge,
+actuator mount, gauge datum and drive layout once supplier drawings are selected.
+Current webs and flange fasteners are nominal geometry; welds, insert anchorage,
+preload, stiffness, thermal behavior and release loads require qualification.

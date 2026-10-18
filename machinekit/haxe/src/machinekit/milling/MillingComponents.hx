@@ -20,6 +20,7 @@ registry.register(MillScrewPedestal.recipeType());
 registry.register(MillServoMount.recipeType());
 		registry.register(MillZCarriage.recipeType());
 		registry.register(MillZHead.recipeType());
+		registry.register(MillSpindleMotorSupport.recipeType());
 		registry.register(MillZBearingPlate.recipeType());
 		registry.register(MillZMotorStand.recipeType());
 		registry.register(SpindleCartridge.recipeType());

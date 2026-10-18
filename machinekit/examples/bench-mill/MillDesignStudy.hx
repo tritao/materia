@@ -94,6 +94,7 @@ class MillDesignStudy {
 		cache.close();
 		// Section-only comparison of the actual deck depth and two 34x48 ribs.
 		var xy:machinekit.milling.MillXYStageLayout=frame.xyAxis;
+		var zLayout:MillZAxisLayout=frame.zAxis;
 		var depth=xy.tableDepth;
 		var area=depth*40+2*34*48, centroid=(depth*40*20+2*34*48*(-24))/area;
 		var deckI=depth*Math.pow(40,3)/12;
@@ -102,6 +103,10 @@ class MillDesignStudy {
 			assumptions:{cuttingForcePerWorldAxisN:500,payloadKg:20,payloadHeightAboveTableMm:50,accelerationEnvelopeMetresPerSecondSquared:1,guideStaticSafetyFactor:2,
 				beltCordRigidityPerWidthNPerMm:5000},
 			guideLoads:guideLoads(assembly,frame),
+			zHead:{carriageThicknessMm:zLayout.carriageThickness,guideBlockVerticalCentersMm:2*zLayout.blockSpan,
+				rearFlangeWidthMm:zLayout.carriageWidth,noseWidthMm:120,headFasteners:"4 x M6 x 16; nominal blind taps",
+				releaseSpace:{diameterMm:MillSpindleServiceSpace.DIAMETER,heightMm:MillSpindleServiceSpace.HEIGHT,
+					standoffAboveHeadMm:MillSpindleServiceSpace.STANDOFF,status:"project allocation; no actuator fitted or release load qualification"}},
 			atc:{status:"candidate study; not fitted",candidate:"PMK 100MCB30SSS short-nose BT30",housingDiameterMm:100,
 				publishedL8Mm:264,publishedMaximumRpm:12000,publishedClampingForceN:2800,
 				source:"https://pmkindia.com/datasheets/spindles_belt-driven-spindles-for-machining-center.pdf",
@@ -124,14 +129,14 @@ class MillDesignStudy {
 				{step:3,status:"concept geometry",result:"four accessible foot pockets, bored steel seats and M16 foot envelopes; anchorage/load ratings pending"},
 				{step:4,status:"concept geometry and section comparison",result:"integral table ribs replace isolated risers; full stiffness qualification pending"},
 				{step:5,status:"supplier selection required",result:"BT30 is a candidate, not an installed spindle; current ER20 cartridge remains manual"},
-				{step:6,status:"existing ribbed head retained",result:"final head bore, release reaction bridge and actuator mounting await spindle drawing"},
+				{step:6,status:"revised head and reserved release space",result:"wider block span and 20 mm carriage; tapered windowed head with bolted flange; final head bore and release mechanism await spindle drawings"},
 				{step:7,status:"partial nominal interfaces",result:"X return plate/pocket and foot bores modeled; complete drilling, fasteners and anchor calculations pending"},
 				{step:8,status:"partial protection",result:"motor hoods modeled; lubrication, way covers, cables, coolant and control interlocks specified in README but not installed"},
 				{step:9,status:"reference checks and concept STEP packet",result:"static guide admission and continuous structural sweeps; FEA, thermal/modal and manufacturing drawings pending"}],
 			releaseBlockers:["verified ATC spindle/drawbar/actuator and motor drawings", "release force, stroke, air pressure, sensor and reaction-path data",
 				"complete fastener and insert anchorage design", "foot ratings, floor support and stability", "whole-machine stiffness, thermal and modal qualification",
 				"validated lubrication/coolant/guards and controls", "material, mould, cure and post-cast machining process qualification"]};
-		sys.io.File.saveContent(folder+"/interfaces.csv", "interface,pattern,status\nBK12 and BF12 pedestal bolts,2 x M5 x 55 per housing,nominal modeled\nX motor plate anchors,4 x M6 x 25,nominal modeled\nY service hatches,4 x M4 x 10 per hatch into steel anchors,nominal modeled\nLeveling feet,M16 stem through 18 mm steel bore,concept geometry and supplier rating pending\nGuide and block screws,catalog pattern with accessible head seats,drilling and fasteners pending\nSpindle and actuator,selected supplier drawing required,unresolved\n");
+		sys.io.File.saveContent(folder+"/interfaces.csv", "interface,pattern,status\nBK12 and BF12 pedestal bolts,2 x M5 x 55 per housing,nominal modeled\nX motor plate anchors,4 x M6 x 25,nominal modeled\nY service hatches,4 x M4 x 10 per hatch into steel anchors,nominal modeled\nZ head flange,4 x M6 x 16 with counterbores and blind carriage taps,nominal modeled\nLeveling feet,M16 stem through 18 mm steel bore,concept geometry and supplier rating pending\nGuide and block screws,catalog pattern with accessible head seats,drilling and fasteners pending\nSpindle and actuator,selected supplier drawing required,unresolved\n");
 		sys.io.File.saveContent(folder+"/review.json",haxe.Json.stringify(report,null,"  "));
 		Sys.println("Mill concept design review: "+folder+"/review.json");
 	}

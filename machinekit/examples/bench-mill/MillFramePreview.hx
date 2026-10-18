@@ -3,6 +3,8 @@ import machinekit.assembly.AssemblyPreview;
 import machinekit.milling.MillFrame;
 import machinekit.milling.MillFrameLayout;
 import machinekit.milling.MillZAxis;
+import machinekit.milling.MillSpindleServiceSpace;
+import machinekit.milling.MillSpindleMotorSupport;
 import machinekit.milling.MillZAxisLayout;
 import machinekit.milling.MillZAxisIntegrity;
 import machinekit.milling.MillXYStage;
@@ -64,9 +66,16 @@ class MillFramePreview {
 		var spindleOrigin = F.translation(spindle.x, spindle.y, spindle.z + rise);
 		for (member in reference.components()) {
 			if (!spindlePart(member.id)) continue;
-			var pose:AssemblyFrame = state.get(member.id);
-			pose.z += rise;
-			spindleParts.addComponent(member.id, member.component, pose);
+			var sourcePose:AssemblyFrame = state.get(member.id);
+			var pose = F.compose(F.translation(0, 0, rise), sourcePose);
+			var component = member.component;
+			if (member.id == "spindleMotorRiser") {
+				var shelf:AssemblyFrame = state.get("spindleMotorShelf");
+				var z:MillZAxisLayout = frame.zAxis;
+				component = new MillSpindleMotorSupport(shelf.z + rise - z.headBottom - z.headHeight);
+				pose = F.translation(0, z.spindleY + 5, z.headBottom + z.headHeight);
+			}
+			spindleParts.addComponent(member.id, component, pose);
 			spindleParts.addMemberConnector(member.id, "studyOrigin", F.identity());
 			spindleIds.push(member.id);
 			if (member.id != "spindle") spindleParts.addMemberConnector("spindle", 'payload-${member.id}',
@@ -92,6 +101,27 @@ class MillFramePreview {
 	static function spindlePart(id:String):Bool return ["spindle", "holder", "tool", "spindleMotor", "spindlePulley",
 		"spindleMotorPulley", "spindleMotorShaft", "spindleBelt", "spindleMotorShelf", "spindleMotorRiser"].indexOf(id) >= 0;
 
+	static function writeServiceStudy(assembly:MachineAssembly, layout:MillZAxisLayout, directory:String):Void {
+		MillSpindleServiceSpace.checkPayload(assembly, layout).throwIfErrors();
+		var poses:Map<String,AssemblyFrame> = assembly.solvedPoses(), cache = new machinekit.assembly.PosedParts();
+		var parts:Array<materia.project.SceneArtifact.SceneArtifactPart> = [];
+		try for (member in assembly.components()) if (member.id == "zAxis/head" || member.id == "zAxis/carriage" ||
+			member.id == "frame/column/casting" || StringTools.startsWith(member.id, "spindle/"))
+			parts.push(AssemblyPreview.part(member.id, member.component.description, cache.posed(member.component, poses.get(member.id)), member.component.materialId));
+		catch(e:Dynamic) { cache.close(); throw e; }
+		cache.close();
+		var space = AssemblyPreview.part("reserved-release-space", "RESERVED release mechanism space — assumed 120 x 200 mm", MillSpindleServiceSpace.geometry(layout), "machined-steel");
+		space.appearance = null; space.red = 0.2; space.green = 0.7; space.blue = 0.9; space.physicalMassKg = 0;
+		parts.push(space);
+		// This static inspection scene carries no physics. CAD clearance is checked above and by the axis audits.
+		var model = new cadkit.modeling.AssemblyModel("mm");
+		for (part in parts) model.add(part.id);
+		var definition = model.definition("spindle-service-review");
+		for (component in definition.definitions) component.collisionHulls = [];
+		sys.io.File.saveBytes(directory + "/mill-spindle-service-study.mtrg", materia.project.SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:parts,
+			assemblyDefinition:definition,assemblyState:model.initialState("spindle-service-review").record()}));
+	}
+
 	public static function main():Void {
 		var reference = new BenchMill(false, false), l = layout(reference);
 		var z = zLayout(reference, l), xy = new MillXYStageLayout(l, z.spindleY, BenchMill.RAIL), frame = new MillFrame(l, z, xy);
@@ -107,6 +137,7 @@ class MillFramePreview {
 			sys.io.File.saveBytes(path, materia.project.SceneArtifact.encode(AssemblyPreview.scene(entry.assembly, entry.name)));
 			Sys.println('Mill frame preview: $path');
 		}
+		writeServiceStudy(concept(reference, frame), z, directory);
 		var report = {status: "mechanical XYZ concept; not qualified for manufacture", units: "mm",
 			travel: [{axis:"x",travel:2*xy.xHalfTravel},{axis:"y",travel:2*xy.yHalfTravel},{axis:"z",travel:-z.lower}],
 			base: {width: l.baseWidth, depth: l.baseDepth, height: l.baseHeight, railPlane: l.railPlane},

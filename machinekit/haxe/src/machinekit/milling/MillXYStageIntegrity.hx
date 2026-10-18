@@ -128,13 +128,15 @@ class MillXYStageIntegrity {
 			var zParts:Array<{id:String,part:Part}> = [];
 			for (member in zAxis.components()) {
 				var pose = zAxis.zeroPose(member.id), part:Part;
-				if (member.id == "carriage" || member.id == "head" || member.id == "nut" || StringTools.startsWith(member.id, "block")) {
+				if (MillZAxis.isTranslating(member.id)) {
 					var b = cache.box(member.component, pose);
 					var local = Part.box(b.maxX - b.minX, b.maxY - b.minY, b.maxZ - b.minZ - zAxis.layout.lower); owned.push(local);
 					part = local.translated(new Vector((b.minX + b.maxX)/2, (b.minY + b.maxY)/2, b.minZ + zAxis.layout.lower));
 				} else part = cache.posed(member.component, pose);
 				owned.push(part); zParts.push({id:member.id,part:part});
 			}
+			var service = MillSpindleServiceSpace.geometry(zAxis.layout, true); owned.push(service);
+			zParts.push({id:"reserved-spindle-release-space",part:service});
 			for (member in components) {
 				var part = yFixed(member.id) ? cache.posed(member.component, axis.zeroPose(member.id)) :
 					sweep(axis, member.id, tableMember(member.id) ? 2*l.xHalfTravel : 0, 2*l.yHalfTravel, owned, cache);

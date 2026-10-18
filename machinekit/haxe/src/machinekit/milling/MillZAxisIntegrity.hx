@@ -38,6 +38,14 @@ class MillZAxisIntegrity {
 			box(owned, l.block.spec.blockWidth, l.block.spec.blockHeight - l.block.spec.railHeight, l.block.spec.blockLength + travel,
 				side * f.zRailSpacing / 2, (l.carriageBack + f.columnFront - l.block.spec.railHeight) / 2,
 				l.headCentre + span - l.block.spec.blockLength / 2 + l.lower));
+		for (member in axis.components()) if (StringTools.startsWith(member.id, "headBolt")) {
+			var local = member.component.geometry(); owned.push(local);
+			var part = PosedParts.moved(local, poses.get(member.id)); owned.push(part);
+			var b = PosedParts.boxOf(part);
+			swept.push(box(owned, b.maxX-b.minX, b.maxY-b.minY, b.maxZ-b.minZ+travel,
+				(b.minX+b.maxX)/2, (b.minY+b.maxY)/2, b.minZ+l.lower));
+		}
+		var service = MillSpindleServiceSpace.geometry(l, true); owned.push(service); swept.push(service);
 		var framePoses:Map<String, AssemblyFrame> = frame.solvedPoses();
 		for (member in frame.components()) {
 			var local = member.component.geometry(); owned.push(local);

@@ -4,6 +4,7 @@ import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.Transmission;
 import machinekit.component.ComponentValues;
 import machinekit.motion.*;
+import machinekit.standard.SocketHeadCapScrew;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
@@ -58,6 +59,7 @@ class MillZAxis extends AxisBuilder {
 		carriage = new MillZCarriage(new ComponentValues().setNumber("width", l.carriageWidth).setNumber("height", l.carriageHeight)
 			.setNumber("thickness", l.carriageThickness).setNumber("nutReach", l.screwY - l.carriageBack)
 			.setNumber("nutCentreZ", l.carriageHeight / 2).setNumber("nutPlate", l.nutPlateThickness)
+			.setNumber("headBoltX", l.carriageWidth / 2 - 12)
 			.setNumber("railSpacing", f.zRailSpacing).setNumber("blockSpan", l.blockSpan).setToken("profile", l.profile));
 		var blockPoses:Array<AssemblyFrame> = [];
 		for (side in [-1, 1]) for (span in [-l.blockSpan, l.blockSpan]) blockPoses.push(
@@ -69,15 +71,23 @@ class MillZAxis extends AxisBuilder {
 		for (i in 1...names.length) attach(names[i], l.block, blockPoses[i], "carriage");
 		attach("nut", l.nut, down(0, l.screwY, l.headCentre + l.nut.bodyLength / 2), "carriage");
 		head = new MillZHead(new ComponentValues().setNumber("width", 180).setNumber("height", l.headHeight)
+			.setNumber("rearWidth", l.carriageWidth).setNumber("boltX", l.carriageWidth / 2 - 12)
 			.setNumber("reach", l.headBack - l.spindleY + SpindleCartridge.DIAMETER / 2 + 10)
 			.setNumber("spindleReach", l.headBack - l.spindleY));
 		attach("head", head, F.translation(0, l.headBack, l.headBottom), "carriage");
+		for (side in [-1, 1]) for (row in [-1, 1]) attach('headBolt$side$row', SocketHeadCapScrew.metric("M6", 16),
+			F.fromRotationMatrix(side * head.parameterNumber("boltX"), l.headBack - head.parameterNumber("rearPlate") + MillZHead.COUNTERBORE_DEPTH,
+				l.headCentre + row * head.parameterNumber("boltZ"),
+				[1,0,0, 0,0,-1, 0,1,0]), "head");
 		addTransmission("z-lead", "z", "screw-turn", Transmission.LeadScrew("screw", "nut"), screwSense("z", [0.0, 0.0, -1.0]));
 		supportScrew("z-lead", l.fixed.support, l.floating.support);
 		exposeConnector("mount", "fixedMount", "mount");
 		exposeConnector("head", "head", "mount");
 		exposeConnector("spindle", "head", "spindle");
 	}
+
+	public static function isTranslating(id:String):Bool
+		return id == "carriage" || id == "head" || id == "nut" || StringTools.startsWith(id, "block") || StringTools.startsWith(id, "headBolt");
 
 	static function down(x:Float, y:Float, z:Float):AssemblyFrame
 		return F.fromRotationMatrix(x, y, z, [-1,0,0, 0,1,0, 0,0,-1]);

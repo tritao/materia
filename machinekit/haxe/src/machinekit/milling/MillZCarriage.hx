@@ -16,6 +16,7 @@ class MillZCarriage extends MachineComponent {
 	public static function parameters():Array<ComponentParameter> return [
 			P.length("width", 234), P.length("height", 160), P.length("thickness", 16),
 			P.length("nutReach", 53), P.length("nutCentreZ", 80), P.length("nutPlate", 10),
+			P.length("headBoltX", 65), P.length("headBoltZ", 42),
 			P.length("railSpacing", 180), P.length("blockSpan", 32.7), P.text("profile", "HGR15")];
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.milling.z-carriage", parameters(), v -> new MillZCarriage(v));
@@ -52,6 +53,10 @@ class MillZCarriage extends MachineComponent {
 				for (z in [-block.spec.blockHolePitchB / 2, block.spec.blockHolePitchB / 2])
 					tools.push(Part.cylinderAlongY(2.25, -t - 1, 1, side * parameterNumber("railSpacing") / 2 + x,
 						parameterNumber("nutCentreZ") + span + z));
+		// Blind nominal M6 taps match the head flange; retain the rear face of the carriage.
+		for (x in [-parameterNumber("headBoltX"), parameterNumber("headBoltX")])
+			for (z in [h / 2 - parameterNumber("headBoltZ"), h / 2 + parameterNumber("headBoltZ")])
+				tools.push(Part.cylinderAlongY(2.5, -t - 1, -t + 12, x, z));
 		return Solids.cut(body, tools);
 	}
 }

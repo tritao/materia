@@ -37,6 +37,16 @@ class MillZAxisChecks {
 		near(pose(poses, "screw").x, 0, "screw centred between rails");
 		near(pose(poses, "motor").x, 0, "motor centred on screw");
 		near(pose(poses, "motor").y, l.screwY, "coaxial motor");
+		check(2 * l.blockSpan >= 100, "Z guide blocks have a useful vertical moment arm");
+		check(l.carriageThickness >= 20, "broad carriage retains head attachment depth");
+		var headLocal = axis.head.geometry(), headWorld = PosedParts.moved(headLocal, pose(poses, "head")); headLocal.close();
+		for (member in axis.components()) if (StringTools.startsWith(member.id, "headBolt")) {
+			var boltPose = pose(poses, member.id), local = member.component.geometry(), bolt = PosedParts.moved(local, boltPose); local.close();
+			noOverlap(headWorld, bolt, "head bolt clears flange bore and counterbore"); bolt.close();
+			var access = Part.cylinderAlongY(5.5, l.headBack - axis.head.parameterNumber("reach") - 20, l.headBack - 12, boltPose.x, boltPose.z);
+			noOverlap(headWorld, access, "outboard head bolts admit a straight tool approach"); access.close();
+		}
+		headWorld.close();
 		for (member in axis.components()) {
 			var shape = member.component.geometry();
 			check(shape.valid() && shape.solidCount() == 1, 'valid connected ${member.id}'); shape.close();
@@ -98,6 +108,11 @@ class MillZAxisChecks {
 			first.close(); second.close(); near(a.distance(b), 0, 'spindle motor support ${pair[0]}/${pair[1]}');
 			noOverlap(a, b, "spindle motor support interference"); a.close(); b.close();
 		}
+		check(!MillSpindleServiceSpace.checkPayload(study, l).hasErrors(), "spindle drive clears reserved release space");
+		var obstruction = new MachineAssembly(), obstructed = new MachineAssembly();
+		obstruction.addComponent("releaseObstruction", new MillPanel(20, 20, 20), F.translation(0, l.spindleY, MillSpindleServiceSpace.bottom(l) + 20));
+		obstructed.include("spindle", obstruction);
+		check(MillSpindleServiceSpace.checkPayload(obstructed, l).hasErrors(), "release-space check rejects an obstructed actuator allocation");
 		var upperTool = studyState.worldPose("spindle/tool").z;
 		studyState.setJoint("zAxis/z", l.lower); studyState.forwardKinematics();
 		near(studyState.worldPose("spindle/tool").z - upperTool, l.lower, "spindle payload follows real Z joint");
