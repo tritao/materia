@@ -57,6 +57,15 @@ selection, hover, dragging and cursor-anchored zoom:
 ./haxeon/scripts/haxeon run --project=app/tests/haxeon.viewport-coordinates.json
 ```
 
+Studio lighting uses a directional key with restrained fill and a darker lower
+hemisphere so recess walls read distinctly. The perspective viewport adds subtle
+screen-space ambient occlusion within 25 mm and broadens highlights with a
+studio roughness floor. The Soft preset reduces occlusion and softens highlights
+further. These are display settings; authored part materials are unchanged.
+Occlusion affects indirect light on opaque geometry, preserves transparent
+backgrounds, and ignores blended/masked surfaces as occluders. It uses visible
+depth, so hidden surfaces and subpixel recesses cannot contribute.
+
 ## Mission monitor
 
 In Simulate, projects with an authored mission open the Mission sidebar tab. It shows

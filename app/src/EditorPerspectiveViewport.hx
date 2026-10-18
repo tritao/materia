@@ -213,15 +213,17 @@ class EditorPerspectiveViewport implements View {
       }
       var directions:Array<Float> = [];
       // Coin directions point from each light into the scene; the shader needs the reverse.
-      var intensities = ViewportLook.intensities(lightingPreset);
-      var coinDirections = ViewportLook.lightDirections();
+      var intensities = EditorViewportLighting.intensities(lightingPreset);
+      var coinDirections = EditorViewportLighting.directions();
       for (index in 0...3) {
         var light = coinDirections[index];
         var direction = camera.studioDirection(-light[0], -light[1], -light[2]);
         directions.push(direction[0]); directions.push(direction[1]);
         directions.push(direction[2]); directions.push(intensities[index]);
       }
-      view.setStudioLighting(directions, ViewportLook.sky(lightingPreset), ViewportLook.ground(lightingPreset));
+      view.setStudioLighting(directions, EditorViewportLighting.sky(lightingPreset), EditorViewportLighting.ground(lightingPreset));
+      var detail = EditorViewportLighting.detail(lightingPreset);
+      view.setStudioDetail(detail[0],detail[1],detail[2],detail[3]);
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
       if (sampleCountApplied != sampleCountRequested) {
