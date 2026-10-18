@@ -5,13 +5,21 @@ import cadkit.modeling.Vector;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Solids;
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
 
 /** Generic notched retaining nut and washer, assumed dimensions, not a selected bearing locknut.
  * Local Z=0 is the motor-side face; the washer bears at Z=5. */
 class BallScrewRetainer extends MachineComponent {
 	public static inline var STATION:Float = 20;
+	static var recipe:Null<ComponentType>;
+	public static function recipeType():ComponentType {
+		if (recipe == null) recipe = new ComponentType("machinekit.motion.ballscrew-retainer", [], _ -> new BallScrewRetainer());
+		return recipe;
+	}
+	override public function componentType():Null<ComponentType> return recipeType();
 	public function new() {
-		super("BALLSCREW-D12-RETAINER-REFERENCE", "12 mm screw retaining nut and washer (assumed)", "steel", true);
+		super("BALLSCREW-D12-RETAINER-REFERENCE", "12 mm screw retaining nut and washer (assumed)", "steel", false, new ComponentValues());
 		addConnector("axis", Axis, Solids.axial(0, 0, 0));
 		addConnector("bearingFace", Mount, Solids.axial(0, 0, 5));
 	}

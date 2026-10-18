@@ -20,6 +20,7 @@ class MotionComponents {
 		registry.register(FlangeBearingHousing.recipeType());
 		registry.register(LeadScrew.recipeType());
 		registry.register(BallScrew.ballRecipeType());
+		registry.register(BallScrewRetainer.recipeType());
 		registry.register(BallNut.ballRecipeType());
 		registry.register(ScrewSupportUnit.recipeType());
 		registry.register(LeadScrewNut.recipeType());
