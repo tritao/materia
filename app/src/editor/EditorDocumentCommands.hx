@@ -11,11 +11,13 @@ import haxeon.ui.core.UiModifier;
 class EditorDocumentCommands {
   public static function install(app:ReferenceEditorApp):Void {
     app.commands.register(new Command("editor.undo", "Undo", function() {
+      if(app.machineControlPanel.dragging()) {app.machineControlPanel.cancelGesture();app.invalidateView();return;}
       if (app.scene.hasActiveSketchEdit()) app.scene.cancelSelectedSketchEdit();
       app.runSceneEdit("Could not undo", function() app.session.document.undo());
       if (app.session.scriptOwnership != null) app.refreshScriptMaterialization("Override undone");
-    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return !app.documents.blocked() && app.session.document.canUndo));
+    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return !app.documents.blocked() && (app.session.document.canUndo || app.machineControlPanel.dragging())));
     app.commands.register(new Command("editor.redo", "Redo", function() {
+      app.machineControlPanel.cancelGesture();
       app.runSceneEdit("Could not redo", function() app.session.document.redo());
       if (app.session.scriptOwnership != null) app.refreshScriptMaterialization("Override redone");
     }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return !app.documents.blocked() && app.session.document.canRedo));

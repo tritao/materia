@@ -847,6 +847,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Build the shared view tree for one host frame. */
   public function view():View {
+    if (!workspace.isOpen("machine-control")) machineControlPanel.cancelGesture();
     framePresentation = null;
     if (componentLab != null) return componentLab.view(ui);
     framePresentation = simulation.capturePresentationSnapshot();
@@ -1115,6 +1116,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Prepare without blocking transport input; install only a complete candidate on this thread. */
   public function prepareSimulation(?after:Void->Void):Void {
+    machineControlPanel.commitGesture();
     if (simulationBuild != null || simulationStop != null) return;
     #if !wasm
     if (simulation.supportsBackgroundBuild(scene)) {
@@ -2253,7 +2255,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     (perspectiveViewport == null || !perspectiveViewport.dragging());
 
   function commitActiveDrag():Void {
-    var changed = false;
+    var changed = machineControlPanel.dragging();
+    machineControlPanel.commitGesture();
     if (perspectiveViewport != null && perspectiveViewport.dragging()) {
       var pointer = perspectiveViewport.commitDrag();
       if (pointer != null) ui.pointerCancel(pointer.id, pointer.x, pointer.y);
@@ -2264,6 +2267,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function cancelActiveDrag():Void {
+    machineControlPanel.cancelGesture();
     if (scene.hasActiveSketchEdit()) {
       scene.cancelSelectedSketchEdit();
     }
@@ -2405,6 +2409,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   /** Switches dock layout and toolbar emphasis; the document, selection, and history are untouched. */
   public function switchMode(next:EditorMode):Void {
     if (next == mode) return;
+    machineControlPanel.cancelGesture();
     modeSnapshots.set(mode.id, layoutSnapshot());
     mode = next;
     // The mode's default layout backs "Reset workspace" while it is active.

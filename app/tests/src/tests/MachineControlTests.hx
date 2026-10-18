@@ -31,6 +31,61 @@ class MachineControlTests {
     session.openGeneratedScene(data,null,null,model.definition("machine-controls"),null,centers,unit=="mm" ? 0.001 : 1.0);
     return session;
   }
+  static function gestureChecks(session:ProjectDocumentSession):Void {
+    var before=MachineControlModel.axes(session).filter(a->a.id=="x")[0].value;
+    var history=session.document.history.undoCount;
+    var drag=session.beginAssemblyJointEdit("x");
+    for(value in [10.0,20.0,35.0]) {
+      drag.update(MachineControlModel.nativePosition(session,"x",value,true));
+      near(slidePosition(session),value/1000,"slider follows live preview");
+      check(session.document.history.undoCount==history,"pointer moves create no history entries");
+    }
+    check(drag.commit(),"release commits a drag");
+    check(!drag.commit(),"duplicate release is harmless");
+    check(session.document.history.undoCount==history+1,"whole drag records one undo entry");
+    session.document.undo();near(MachineControlModel.axes(session).filter(a->a.id=="x")[0].value,before,"undo restores pre-drag position");
+    session.document.redo();near(slidePosition(session),0.035,"redo restores final position");
+    history=session.document.history.undoCount;
+    var cancelled=session.beginAssemblyJointEdit("x");cancelled.update(MachineControlModel.nativePosition(session,"x",-50,true));cancelled.cancel();
+    near(slidePosition(session),0.035,"cancel restores starting position");check(session.document.history.undoCount==history,"cancel adds no undo entry");
+    var noOp=session.beginAssemblyJointEdit("x");check(!noOp.commit(),"unchanged click adds no undo entry");
+    var returned=session.beginAssemblyJointEdit("x");returned.update(MachineControlModel.nativePosition(session,"x",70,true));returned.update(MachineControlModel.nativePosition(session,"x",35,true));
+    check(!returned.commit(),"returning to starting position is a no-op");
+    refused(()->{session.beginAssemblyJointEdit("screw-turn");},"coupled target cannot begin a gesture");
+  }
+  static function sliderRouting():Void {
+    var fonts=haxeon.ui.FontCollection.create();
+    var ui=new haxeon.ui.core.UiContext(null,fonts),session=fixture("mm");
+    var edit:Null<app.ProjectJointEdit> = null;
+    var frame=new haxeon.ui.LayoutFrame(256,100);
+    function slider():app.editor.MachineControlSlider {
+      var value=MachineControlModel.axes(session).filter(a->a.id=="x")[0].value;
+      return new app.editor.MachineControlSlider("drag-test","X",value,-100,100,0.1,
+        next->{var current=edit;if(current==null)MachineControlModel.set(session,"x",next,true);else current.update(next);},
+        _->{edit=session.beginAssemblyJointEdit("x");},
+        commit->{var current=edit;edit=null;if(current!=null){if(commit)current.commit();else current.cancel();}});
+    }
+    try {
+      var view=slider(),root=ui.submit(view,frame),bounds=root.globalBounds();
+      var x=bounds.x+10,y=bounds.y+bounds.height/2,width=bounds.width-20;
+      var history=session.document.history.undoCount;
+      ui.pointerDown(x+width*0.2,y,0);
+      root=ui.submit(slider(),frame);
+      ui.pointerMove(x+width*0.8,y);
+      check(session.document.history.undoCount==history,"routed rebuilt slider does not record moves");
+      near(slidePosition(session),0.06,"rebuilt slider keeps preview gesture");
+      ui.pointerUp(x+width*0.8,y,0);
+      check(session.document.history.undoCount==history+1,"routed release commits one edit");
+      session.document.undo();near(slidePosition(session),0,"routed drag undo restores initial pose");
+      ui.submit(slider(),frame);ui.pointerDown(x+width*0.7,y,0);ui.pointerCancel(0,x,y);
+      near(slidePosition(session),0,"pointer cancellation restores pose");
+      check(session.document.history.undoCount==history,"pointer cancellation preserves history");
+      view=slider();root=ui.submit(view,frame);ui.focusWidget(root.id);
+      ui.key(haxeon.ui.core.UiEventKind.KeyDown,haxeon.ui.core.UiKey.Right);
+      check(session.document.history.undoCount==history+1,"keyboard slider edits remain immediate");
+      ui.dispose();fonts.dispose();session.dispose();
+    } catch(error:Dynamic){ui.dispose();fonts.dispose();session.dispose();throw error;}
+  }
   public static function main():Int {
     var empty=new ProjectDocumentSession(null,false);check(MachineControlModel.axes(empty).length==0,"empty documents have no axes");empty.dispose();
     for(unit in ["mm","m"]) {
@@ -57,9 +112,11 @@ class MachineControlTests {
         check(MachineControlModel.set(session,"x",100,true),"upper stop reachable");
         check(MachineControlModel.set(session,"tilt",90,true),"rotary stop reachable");
         near(MachineControlModel.axes(session).filter(a->a.id=="tilt")[0].value,90,"rotary position uses degrees");
+        gestureChecks(session);
         session.dispose();
       } catch(error:Dynamic) {session.dispose();throw error;}
     }
+    sliderRouting();
     near(MachineControlModel.parsePosition(" -1.25e2 "),-125,"numeric entry accepts scientific notation");
     for(text in ["","-","1abc","NaN","Infinity"]) refused(()->{MachineControlModel.parsePosition(text);},"invalid numeric input rejected");
     check(EditorWorkspaceLayoutTests.main()==0,"machine tab layout regression");

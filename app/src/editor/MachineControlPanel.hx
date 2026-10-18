@@ -8,7 +8,7 @@ import haxeon.ui.LayoutStyle;
 import haxeon.ui.core.View;
 import haxeon.ui.widgets.KeyedView;
 import haxeon.ui.widgets.controls.Button;
-import haxeon.ui.widgets.controls.Slider;
+import app.ProjectJointEdit;
 import haxeon.ui.widgets.layout.Column;
 import haxeon.ui.widgets.layout.Row;
 import haxeon.ui.widgets.scroll.ScrollView;
@@ -24,13 +24,31 @@ class MachineControlPanel {
   final scroll = new ScrollController();
   var generation = -1;
   var error:Null<String>;
+  var edit:Null<ProjectJointEdit>;
+  var editAxis:Null<String>;
+  var editOwner:Null<ReferenceEditorApp>;
+  var pointer:Null<{id:Int,x:Float,y:Float}>;
   public function new() {}
+  public function dragging():Bool return edit != null;
+  public function commitGesture():Void finishGesture(true);
+  public function cancelGesture():Void finishGesture(false);
+  function finishGesture(commit:Bool):Void {
+    var current=edit,owner=editOwner,captured=pointer;
+    edit=null;editAxis=null;editOwner=null;pointer=null;
+    if (current==null) return;
+    if(commit)current.commit();else current.cancel();
+    if(owner!=null) {
+      if(captured!=null)owner.ui.pointerCancel(captured.id,captured.x,captured.y);
+      owner.invalidateView();
+    }
+  }
   static function number(value:Float):String return Std.string(Math.round(value*1000)/1000);
 
   public function build(app:ReferenceEditorApp):View {
-    if (generation != app.session.generation) {generation=app.session.generation;drafts.clear();error=null;}
+    if (generation != app.session.generation) {cancelGesture();generation=app.session.generation;drafts.clear();error=null;}
     var axes = MachineControlModel.axes(app.session);
     var editable = !app.simulation.isActive() && app.session.scriptOwnership == null && !app.documents.blocked();
+    if (!editable) cancelGesture();
     var style = new LayoutStyle();style.width=LayoutAxis.grow();style.childGap=8;
     style.padding=new Insets(12,12,12,12);
     var rows:Array<KeyedView> = [new KeyedView("heading",app.sectionHeading("MACHINE CONTROL"))];
@@ -43,13 +61,29 @@ class MachineControlPanel {
         if (axis.follows != null) {linked++;continue;}
         var id=axis.id;
         var set = function(value:Float) {
-          try {MachineControlModel.set(app.session,id,value,!app.simulation.isActive() && !app.documents.blocked());error=null;drafts.remove(id);app.documentChanged();}
+          try {cancelGesture();MachineControlModel.set(app.session,id,value,!app.simulation.isActive() && !app.documents.blocked());error=null;drafts.remove(id);app.documentChanged();}
           catch (failure:Dynamic) {error=Std.string(failure);app.invalidateView();}
         };
         var controls:Array<KeyedView> = [new KeyedView("label",new Text(id+" · "+number(axis.value)+" "+axis.unit))];
         var minimum=axis.minimum,maximum=axis.maximum;
         if (minimum != null && maximum != null && maximum > minimum) {
-          var slider=new Slider("machine-axis-slider:"+id,id+" position ("+axis.unit+")",axis.value,minimum,maximum,Math.min(axis.step,(maximum-minimum)/1000),set);
+          var slider=new MachineControlSlider("machine-axis-slider:"+id,id+" position ("+axis.unit+")",axis.value,minimum,maximum,Math.min(axis.step,(maximum-minimum)/1000),
+            value -> {
+              var current=edit;
+              if(current==null || editAxis!=id) {set(value);return;}
+              try {
+                current.update(MachineControlModel.nativePosition(app.session,id,value,!app.simulation.isActive() && !app.documents.blocked()));
+                error=null;drafts.remove(id);app.invalidateView();
+              } catch(failure:Dynamic) {error=Std.string(failure);app.invalidateView();}
+            },event -> {
+              cancelGesture();
+              try {
+                edit=app.session.beginAssemblyJointEdit(id);editAxis=id;editOwner=app;
+                pointer={id:event.pointerId,x:event.x,y:event.y};app.commands.refresh();
+              } catch(failure:Dynamic) {
+                error=Std.string(failure);event.preventDefault();event.stopImmediatePropagation();app.invalidateView();
+              }
+            },commit -> {finishGesture(commit);app.commands.refresh();});
           slider.enabled=editable;controls.push(new KeyedView("slider",slider));
           controls.push(new KeyedView("range",new Text(number(minimum)+" … "+number(maximum)+" "+axis.unit)));
         }

@@ -73,7 +73,9 @@ Use a bounded axis slider or enter a position and press **Set** or Enter. **Min*
 and **Max** move to the authored travel stops; **Initial** restores that joint's
 initial coordinate. Distances display in millimetres and angles in degrees,
 independently of the assembly's source units. Unbounded rotary joints use numeric
-entry. Edits update the complete assembly and support Undo/Redo.
+entry. Edits update the complete assembly and support Undo/Redo. Slider drags
+preview live and record one undo step on mouse release; cancellation restores
+the starting position without adding history.
 
 Coupled screw/pulley joints and closure-dependent joints follow their driving axes.
 Manual editing is disabled while simulation or a script owns the machine. These

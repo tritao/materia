@@ -787,6 +787,20 @@ class ProjectDocumentSession {
       function() applyAssemblyStateRecord(before)));
   }
 
+  public function beginAssemblyJointEdit(jointId:String):ProjectJointEdit {
+    var state=assemblyRuntime;
+    if (state==null) throw "This project has no editable assembly state";
+    if (assemblyDependentJoints.exists(jointId)) throw "This joint is solved by closures";
+    var before=state.record();
+    // Validate the coordinate and reject coupling targets before starting the gesture.
+    evaluateAssemblyJointCoordinate(before,jointId,state.joint(jointId));
+    return new ProjectJointEdit(this,jointId,before);
+  }
+
+  @:allow(app.ProjectJointEdit)
+  function previewJointEdit(before:AssemblyStateRecord,jointId:String,value:Float):Void
+    applyAssemblyStateRecord(evaluateAssemblyJointCoordinate(before,jointId,value));
+
   public function assemblyJointIsDependent(jointId:String):Bool return assemblyDependentJoints.exists(jointId);
 
   /** Metres in one unit of the project's assembly. */
@@ -864,6 +878,7 @@ class ProjectDocumentSession {
 
   @:allow(app.ProjectAssemblyDrag)
   @:allow(app.ProjectMateDrag)
+  @:allow(app.ProjectJointEdit)
   function finishAssemblyDrag(label:String, before:AssemblyStateRecord, after:Null<AssemblyStateRecord>):Bool {
     if (after == null || sameAssemblyState(before, after)) {
       applyAssemblyStateRecord(before);

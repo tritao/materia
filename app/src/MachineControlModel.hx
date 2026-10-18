@@ -49,7 +49,10 @@ class MachineControlModel {
     return value;
   }
 
-  public static function set(session:ProjectDocumentSession,id:String,value:Float,editable:Bool):Bool {
+  public static function set(session:ProjectDocumentSession,id:String,value:Float,editable:Bool):Bool
+    return session.setAssemblyJointCoordinate(id,nativePosition(session,id,value,editable));
+
+  public static function nativePosition(session:ProjectDocumentSession,id:String,value:Float,editable:Bool):Float {
     if (!editable || session.scriptOwnership != null) throw "Machine controls are currently locked";
     if (!Math.isFinite(value)) throw "Enter a finite axis position";
     for (axis in axes(session)) if (axis.id == id) {
@@ -63,7 +66,7 @@ class MachineControlModel {
         if (joint.limits.lower != null) native = Math.max(native,joint.limits.lower);
         if (joint.limits.upper != null) native = Math.min(native,joint.limits.upper);
       }
-      return session.setAssemblyJointCoordinate(id,native);
+      return native;
     }
     throw 'Unknown machine axis "$id"';
   }
