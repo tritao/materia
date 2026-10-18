@@ -38,6 +38,7 @@ class SceneVisibilityTests {
   }
   public static function main():Int {
     run();
+    assemblyGrouping();
     if(Sys.args().indexOf("--regressions")>=0) {
       if(SceneAtomicityTests.main()!=0)return 1;
       SceneDocumentTests.run();
@@ -45,6 +46,27 @@ class SceneVisibilityTests {
       Sys.println("Visibility document and atomicity regressions passed");
     }
     return 0;
+  }
+  static function assemblyGrouping():Void {
+    var scene=new EditorScene(data()), authored=definition();
+    for (occurrence in authored.occurrences) occurrence.includePath=switch occurrence.id {
+      case "base", "other": "tables/infeed/upper-frame";
+      case "cover", "bracket": "tables/infeed/worktop";
+      default: null;
+    };
+    var tree=new EditorSceneTree(scene,authored);
+    var tables="parts:scene:tables", infeed="parts:scene:tables/infeed";
+    check(tree.childCount(tables)==1 && tree.childKeyAt(tables,0)==infeed,"authored assembly ownership nests root groups");
+    check(tree.visibilityMembers(tables).length==6,"assembly visibility includes rigid and moving descendants");
+    scene.select("project:bracket");
+    check(tree.selectionPath().indexOf(tables)>=0 && tree.selectionPath().indexOf("parts:parts:base:tables/infeed/worktop")>=0,
+      "selection reveals assembly and connection ancestors");
+    tree.toggleVisibility(tables);
+    check(!scene.isVisible("project:tool") && !scene.isVisible("project:other"),"assembly hide covers every descendant");
+    tree.toggleVisibility(tables);
+    check(scene.isVisible("project:tool"),"assembly visibility restores descendants");
+    tree.setFilter("worktop");
+    check(tree.childCount("parts:base")==1,"assembly labels participate in filtering");
   }
   public static function run():Void {
     var scene=new EditorScene(data()), tree=new EditorSceneTree(scene,definition());

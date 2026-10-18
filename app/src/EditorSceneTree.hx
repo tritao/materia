@@ -11,10 +11,9 @@ import materia.assembly.AssemblyBodies;
 import materia.assembly.AssemblyDefinition;
 
 /**
- * The scene hierarchy. An assembly appears as its rigid bodies, not as its raw joint tree: parts held
- * together by fixed joints share one body, and only moving joints nest a body inside another. A body
- * is shown as its root part, with its remaining parts in a collapsed "Parts" node, which opens by
- * itself when one of them is selected.
+ * The scene hierarchy preserves authored subassembly groups alongside rigid bodies. Fixed joints
+ * keep parts in one body; moving joints nest bodies under their carrier. Explicit include paths
+ * group sibling bodies and the parts inside each body without changing physical ownership.
  */
 class EditorSceneTree implements TreeViewModel {
   public var canChangeVisibility:Null<Void->Bool>;
@@ -102,6 +101,7 @@ class EditorSceneTree implements TreeViewModel {
   final partsOf:Map<String, String> = [];
   final parentOf:Map<String, String> = [];
   final partsTitles:Map<String, String> = [];
+  final authoredMembers:Map<String,Bool> = [];
   /** Body root to the kind of moving joint that carries it. */
   final jointOf:Map<String, String> = [];
   /** Assembly objects that hang below another row instead of standing at the top. */
@@ -125,14 +125,19 @@ class EditorSceneTree implements TreeViewModel {
     var item = scene.object(key);
     if (item == null) return key;
     var generated = generatedLabels.get(key);
-    if (generated != null && generated == item.label && StringTools.startsWith(key, PROJECT))
-      return AssemblyBodies.displayName(key.substr(PROJECT.length));
+    if (generated != null && generated == item.label && StringTools.startsWith(key, PROJECT)) {
+      var id=key.substr(PROJECT.length);
+      if (authoredMembers.exists(key)) id=id.substr(id.lastIndexOf("/")+1);
+      return AssemblyBodies.displayName(id);
+    }
     return item.label;
   }
   function matches(key:String):Bool {
     if (filter == "" || key == selectionKey()) return true;
     var group = children.get(key);
     if (isGroup(key)) {
+      var title=partsTitles.get(key);
+      if (title!=null && title.toLowerCase().indexOf(filter)>=0) return true;
       if (group != null) for (child in group) if (matches(child)) return true;
       return false;
     }
@@ -158,6 +163,8 @@ class EditorSceneTree implements TreeViewModel {
     if (cached != null) return cached;
     var result:Array<String> = [];
     if (parentKey == "scene") {
+      var groups=children.get("scene");
+      if (groups!=null) for (group in groups) if (matches(group)) result.push(group);
       for (item in scene.items()) if (!nested.exists(item.id) && matches(item.id)) result.push(item.id);
     } else {
       var members = children.get(parentKey);
@@ -212,10 +219,44 @@ class EditorSceneTree implements TreeViewModel {
       carrier.push(rootKey);
       nested.set(rootKey, true);
     }
-    for (parent in children.keys()) for (child in children.get(parent)) parentOf.set(child,parent);
+    // Preserve authored subassembly ownership inside each rigid body and among root bodies.
+    var ownership:Map<String,String> = [];
+    for (occurrence in definition.occurrences)
+      if (occurrence.includePath!=null && occurrence.includePath!="")
+        ownership.set(PROJECT+occurrence.id,occurrence.includePath);
+    var containers=[for (key in children.keys()) if (isGroup(key)) key];
+    for (container in containers) children.set(container,assemblyGroups(container,children.get(container),ownership));
+    var roots=[for (item in scene.items()) if (!nested.exists(item.id)) item.id];
+    var grouped=assemblyGroups("scene",roots,ownership);
+    children.set("scene",[for (key in grouped) if (isGroup(key)) key]);
+    for (parent in children.keys()) if (parent!="scene") for (child in children.get(parent)) parentOf.set(child,parent);
     var visibilityGroups:Map<String,Array<String>> = ["scene" => visibilityMembers("scene")];
     for(key in children.keys())if(visibilityGroup(key))visibilityGroups.set(key,visibilityMembers(key));
     SceneVisibility.rebind(scene,visibilityGroups);
+  }
+  /** Group only explicit include paths; slashes in arbitrary object names do not create assemblies. */
+  function assemblyGroups(container:String,members:Array<String>,ownership:Map<String,String>):Array<String> {
+    var result:Array<String> = [];
+    for (member in members) {
+      var path=ownership.get(member);
+      if (path==null) {result.push(member);continue;}
+      var parent=container, prefix="";
+      for (segment in path.split("/")) {
+        prefix+=(prefix=="" ? "" : "/")+segment;
+        var key=PARTS+container+":"+prefix;
+        if (!children.exists(key)) {
+          children.set(key,[]);
+          partsTitles.set(key,AssemblyBodies.displayName(segment));
+          if (parent==container) result.push(key); else children.get(parent).push(key);
+        }
+        parent=key;
+      }
+      children.get(parent).push(member);
+      partsOf.set(member,parent);
+      authoredMembers.set(member,true);
+      nested.set(member,true);
+    }
+    return result;
   }
   /** "Tool (6)" when every part shares one nested path such as tool/..., otherwise "Parts (n)". */
   static function partsTitle(members:Array<String>):String {
