@@ -14,11 +14,15 @@ uniform vec4 ambient_ground;
 uniform vec4 lighting_mode;
 uniform vec4 camera_position;
 uniform vec4 camera_view_direction;
+uniform mat4 ao_inverse_view_projection;
+uniform vec4 ao_params;
+uniform vec4 ao_viewport;
 uniform sampler2D base_color_texture;
 uniform sampler2D metallic_roughness_texture;
 uniform sampler2D normal_texture;
 uniform sampler2D occlusion_texture;
 uniform sampler2D emissive_texture;
+uniform sampler2D ao_depth_texture;
 in vec3 world_position;
 in vec3 vertex_normal;
 in vec2 vertex_texcoord;
@@ -37,6 +41,39 @@ vec3 linear_to_srgb(vec3 value) {
     value = max(value, vec3(0.0));
     return mix(value * 12.92, 1.055 * pow(value, vec3(1.0 / 2.4)) - 0.055,
                step(vec3(0.0031308), value));
+}
+
+// Short-range screen-space obscurance of indirect light. Mesh normals keep flat
+// faces flat; world-space range rejection prevents distant silhouettes making halos.
+float screen_occlusion(vec3 N) {
+    if (ao_params.x <= 0.0 || ao_params.y <= 0.0 || material_params.w > 1.5)
+        return 1.0;
+    vec2 pixel = gl_FragCoord.xy;
+    float world_per_pixel = max(min(length(dFdx(world_position)), length(dFdy(world_position))), 1.0e-6);
+    float radius_pixels = clamp(ao_params.x / world_per_pixel, 1.0, 32.0);
+    float occlusion = 0.0;
+    for (int direction = 0; direction < 8; ++direction) {
+        float angle = float(direction) * 0.7853981634;
+        vec2 axis = vec2(cos(angle), sin(angle));
+        for (int ring = 0; ring < 2; ++ring) {
+            float radius = ring == 0 ? 0.35 : 0.8;
+            vec2 uv = (floor(pixel + axis * radius_pixels * radius) + 0.5) * ao_viewport.xy;
+            if (uv.x <= 0.0 || uv.x >= 1.0 || uv.y <= 0.0 || uv.y >= 1.0) continue;
+            float depth = texture(ao_depth_texture, uv).r;
+            if (depth >= 1.0) continue;
+            vec2 clip_xy = uv * 2.0 - 1.0;
+            clip_xy.y *= ao_viewport.z;
+            vec4 sample_h = ao_inverse_view_projection * vec4(clip_xy, depth * 2.0 - 1.0, 1.0);
+            if (abs(sample_h.w) < 1.0e-8) continue;
+            vec3 delta = sample_h.xyz / sample_h.w - world_position;
+            float distance_to_sample = length(delta);
+            if (distance_to_sample < 1.0e-6 || distance_to_sample >= ao_params.x) continue;
+            float horizon = max(dot(N, delta / distance_to_sample) - ao_params.z, 0.0);
+            float falloff = 1.0 - distance_to_sample / ao_params.x;
+            occlusion += horizon * falloff * falloff;
+        }
+    }
+    return 1.0 - ao_params.y * clamp(3.0 * occlusion / 16.0, 0.0, 0.75);
 }
 
 void main() {
@@ -65,6 +102,7 @@ void main() {
                   srgb_to_linear(vertex_color.rgb);
     float metallic = clamp(material_params.x * metal_rough.b, 0.0, 1.0);
     float roughness = clamp(material_params.y * metal_rough.g, 0.045, 1.0);
+    if (lighting_mode.x > 0.5) roughness = max(roughness, ao_params.w);
     float alpha_ggx = roughness * roughness;
     float alpha2 = alpha_ggx * alpha_ggx;
     vec3 V = camera_position.w > 0.5
@@ -130,6 +168,7 @@ void main() {
     vec3 emissive_texel = texture(emissive_texture, vertex_texcoord).rgb;
     if (texture_flags.z > 0.5)
         emissive_texel = srgb_to_linear(emissive_texel);
+    ambient *= screen_occlusion(N);
     vec3 color = ambient + direct + srgb_to_linear(emissive.rgb) * emissive_texel;
     float alpha = base_color.a * texture_color.a * vertex_color.a;
     // Only alpha-mask materials cut out below their cutoff (mode 2). Blended

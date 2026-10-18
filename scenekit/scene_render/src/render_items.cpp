@@ -426,6 +426,7 @@ std::uint64_t view_signature(const SceneView &view) noexcept {
         for (const auto value : view.workplane_grid.right) add(std::hash<float>{}(value));
         for (const auto value : view.workplane_grid.up) add(std::hash<float>{}(value));
     }
+    for (const auto value : view.studio_lighting.surface_detail) add(std::hash<float>{}(value));
     if (view.studio_lighting.enabled) {
         for (const auto &light : view.studio_lighting.directions)
             for (const auto value : light)

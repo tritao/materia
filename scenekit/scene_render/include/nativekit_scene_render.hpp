@@ -147,6 +147,7 @@ struct PoseOverride {
 
 /** World-space directions are computed from the presentation camera by the caller. */
 struct StudioLighting {
+    std::array<float, 4> surface_detail{}; // AO radius, strength, angular bias, studio roughness floor
     bool enabled = false;
     std::array<std::array<float, 4>, 3> directions{};
     std::array<std::array<float, 4>, 3> colors{{

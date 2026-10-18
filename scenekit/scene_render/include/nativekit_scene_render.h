@@ -135,6 +135,8 @@ typedef struct nkscene_render_view {
     float workplane_grid_forward[4];
     float workplane_grid_right[4];
     float workplane_grid_up[4];
+    /** Optional studio detail: AO radius in world units, strength [0,1], angular bias [0,1], roughness floor [0,1]. */
+    float studio_surface_detail[4];
 } nkscene_render_view;
 
 /* ------------------------------------------------------------------------- */

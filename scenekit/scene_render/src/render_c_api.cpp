@@ -201,6 +201,14 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
                     output.studio_lighting.colors[light][axis] =
                         input->studio_light_colors[light * 4 + axis];
     }
+    if (input->struct_size >= offsetof(nkscene_render_view, studio_surface_detail) + sizeof(input->studio_surface_detail)) {
+        for (uint32_t axis = 0; axis < 4; ++axis) {
+            const auto value = input->studio_surface_detail[axis];
+            if (!std::isfinite(value) || value < 0.0f || (axis > 0 && value > 1.0f))
+                return NKS_ERROR_INVALID_ARGUMENT;
+            output.studio_lighting.surface_detail[axis] = value;
+        }
+    }
     if (has_workplane_grid && input->workplane_grid_enabled) {
         output.workplane_grid.enabled = true;
         for (uint32_t axis = 0; axis < 4; ++axis) {

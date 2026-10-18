@@ -105,6 +105,18 @@ class SceneView {
 		return this;
 	}
 
+	/** Display-only depth AO and highlight broadening. Radius uses scene world units; zero strength disables AO. */
+	public function setStudioDetail(radius:Float, strength:Float = 0.6, bias:Float = 0.08, roughnessFloor:Float = 0.4):SceneView {
+		for (parameter in [radius,strength,bias,roughnessFloor])
+			if (!Math.isFinite(parameter) || parameter < 0) throw "Invalid studio detail";
+		if (strength > 1 || bias > 1 || roughnessFloor > 1) throw "Invalid studio detail";
+		value.set_studio_surface_detail(0,radius);
+		value.set_studio_surface_detail(1,strength);
+		value.set_studio_surface_detail(2,bias);
+		value.set_studio_surface_detail(3,roughnessFloor);
+		return this;
+	}
+
 	/** Selects a scene camera node when no explicit matrix is set. */
 	public function setCameraNode(node:NodeId):SceneView {
 		value.set_camera_node(node.nativeValue());
