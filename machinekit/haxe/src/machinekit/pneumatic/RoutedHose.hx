@@ -148,8 +148,12 @@ class RoutedHose extends MachineComponent {
 			for (i in 0...route.length - 1) {
 				var delta = route[i + 1].subtract(route[i]);
 				var direction = delta.normalized();
-				tracked.push(Part.cylinderAlong(radius, route[i].subtract(direction.scale(radius)),
-					direction, delta.length() + 2 * radius));
+				// Overlap segments at bends, but stop flush at the authored ports.
+				// Extending the first/last end buries the hose in its connected component.
+				var before = i == 0 ? 0.0 : radius;
+				var after = i == route.length - 2 ? 0.0 : radius;
+				tracked.push(Part.cylinderAlong(radius, route[i].subtract(direction.scale(before)),
+					direction, delta.length() + before + after));
 			}
 			return Solids.union(tracked);
 		});

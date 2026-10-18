@@ -2635,6 +2635,7 @@ class MachineKitSmoke {
 			{name: "MachineAssemblyDescriptionTests.run", run: MachineAssemblyDescriptionTests.run, weight: 10.5},
 			{name: "EndEffectorTests.run", run: EndEffectorTests.run, weight: 0.05},
 			{name: "EndEffectorSetTests.run", run: EndEffectorSetTests.run, weight: 0.05},
+			{name: "GripperIntegrityTests.run", run: GripperIntegrityTests.run, weight: 1.0},
 			{name: "EndEffectorComponentTests.run", run: EndEffectorComponentTests.run, weight: 0.05},
 			{name: "EndEffectorExampleChecks.run", run: EndEffectorExampleChecks.run, weight: 0.1},
 			{name: "RobotArmChecks.run", run: RobotArmChecks.run, weight: 0.6},

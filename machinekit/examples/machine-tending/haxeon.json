@@ -23,7 +23,8 @@
 		"TendingCellRiser.hx",
 		"../bench-mill/EnclosedBenchMill.hx",
 		"../bench-mill/BenchMill.hx",
-		"../cnc-router/CncRouter.hx"
+		"../cnc-router/CncRouter.hx",
+		"TendingEndEffectorPreview.hx"
 	],
 	"sourceRoots": [
 		".",

@@ -342,3 +342,15 @@ Run the smoke tests after building CadKit's native library:
 
 Set `CADKIT_BUILD_ROOT` when CadKit was built somewhere other than
 `cadkit/build/debug`.
+
+The pneumatic gripper integrity checks cover supported jaws and cylinders,
+external valve mounting, hose connections and sampled jaw travel for single,
+dual and independently sized tools:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/tests/haxeon.gripper-integrity.json
+```
+
+These are reference envelopes: jaw synchronization is an ideal mirrored coupling,
+and hose bends and fastener details are simplified. Changes to the installed tool
+geometry require regenerating the machine-tending reach certificate.

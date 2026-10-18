@@ -25,19 +25,22 @@ class ParallelGripperBody extends MachineComponent {
 		this.spec = spec;
 		var centre = spec.openJawCentre();
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
-		addConnector("leftGuide", Axis, AssemblyFrames.alongY(-centre, 0,
-			spec.bodyLength - spec.jawHeight, 1, 0, 0));
-		addConnector("rightGuide", Axis, AssemblyFrames.alongY(centre, 0,
-			spec.bodyLength - spec.jawHeight, 1, 0, 0));
+		addConnector("leftGuide", Axis, AssemblyFrames.alongY(-centre - spec.jawWidth / 2, 0,
+			spec.cylinderAxisZ(), 1, 0, 0));
+		addConnector("rightGuide", Axis, AssemblyFrames.alongY(centre - spec.jawWidth / 2, 0,
+			spec.cylinderAxisZ(), 1, 0, 0));
 		var cylinder = spec.cylinder();
 		var cylinderAxis = AssemblyFrames.compose(AssemblyFrames.turnY(Math.PI / 2.0),
 			cylinder.connector("mount").frame);
 		addConnector("cylinderMount", Mount, AssemblyFrames.compose(
-			AssemblyFrames.translation(-centre - cylinder.bodyLength - cylinder.stemLength, 0,
-				spec.bodyLength - spec.jawHeight), cylinderAxis));
-		// Keep the valve at the wrist-side end of the housing so its envelope does
-		// not occupy the finger approach or the part-sensing zone.
-		addConnector("valveSeat", Mount, Solids.axial(spec.valveSeatX(), 0, spec.bodyLength * 0.25));
+			AssemblyFrames.translation(spec.cylinderStartX(), 0, spec.cylinderAxisZ()), cylinderAxis));
+		// Mount the valve flush on the outside -Y face, with its ports pointing away
+		// from the housing. The former internal seat buried most of the valve in solid material.
+		addConnector("valveSeat", Mount, AssemblyFrames.compose(
+			AssemblyFrames.translation(spec.valveSeatX(), -spec.bodyDepth / 2, spec.bodyLength * 0.25),
+			AssemblyFrames.compose(
+				{x: 0, y: 0, z: 0, qx: Math.sin(Math.PI / 4), qy: 0, qz: 0, qw: Math.cos(Math.PI / 4)},
+				Solids.axial(0, 0, 0))));
 		// Grasp planning uses tool +X for jaw travel and +Z for finger insertion.
 		// The mechanism's guide axes are already body +X, with fingers along +Z.
 		addConnector("tcp", Face, {x: 0, y: 0, z: spec.bodyLength + spec.fingerLength,
@@ -77,8 +80,8 @@ class ParallelGripperBody extends MachineComponent {
 	static function housingCollisionBoxes(spec:ParallelGripperSpec):Array<Array<Float>> {
 		var clearance = ParallelGripperSpec.HOUSING_SIDE_CLEARANCE;
 		var guideZ = spec.bodyLength - spec.jawHeight;
-		var reliefZ = guideZ - clearance;
-		var innerHalf = spec.openJawCentre() - spec.jawTravel() - spec.jawWidth / 2 - clearance;
+		var reliefZ = guideZ - ParallelGripperSpec.GUIDE_TONGUE_HEIGHT;
+		var innerHalf = spec.openJawCentre() - spec.jawTravel() - spec.jawWidth / 2 - spec.guideTongueReach() - clearance;
 		if (reliefZ <= 0 || innerHalf <= 0) throw "Gripper housing needs room for its swept jaw reliefs";
 		return [
 			[-spec.bodyWidth / 2, -spec.bodyDepth / 2, 0,
@@ -92,14 +95,15 @@ class ParallelGripperBody extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var clearance = ParallelGripperSpec.HOUSING_SIDE_CLEARANCE;
 		var guideZ = spec.bodyLength - spec.jawHeight;
-		var reliefZ = guideZ - clearance;
-		var innerHalf = spec.openJawCentre() - spec.jawTravel() - spec.jawWidth / 2 - clearance;
+		var reliefZ = guideZ - ParallelGripperSpec.GUIDE_TONGUE_HEIGHT;
+		var innerHalf = spec.openJawCentre() - spec.jawTravel() - spec.jawWidth / 2 - spec.guideTongueReach() - clearance;
 		if (reliefZ <= 0 || innerHalf <= 0) throw "Gripper housing needs room for its swept jaw reliefs";
 		var body = Solids.named(Part.box(spec.bodyWidth, spec.bodyDepth, spec.bodyLength), "housing");
 		var notchHeight = spec.bodyLength - reliefZ + clearance;
 		var notchDepth = spec.bodyDepth + 2 * clearance;
-		var leftMin = -spec.openJawCentre() - spec.jawWidth / 2 - clearance;
-		var leftMax = -spec.openJawCentre() + spec.jawTravel() + spec.jawWidth / 2 + clearance;
+		var leftMin = -spec.openJawCentre() - spec.jawWidth / 2 - spec.guideTongueReach() - clearance;
+		var leftMax = -spec.openJawCentre() + spec.jawTravel() + spec.jawWidth / 2 +
+			spec.guideTongueReach() + clearance;
 		var rightMin = -leftMax, rightMax = -leftMin;
 		// Give each boolean operand its design role before cutting. The housing's
 		// broad faces split around the two reliefs; unique feature tags keep those

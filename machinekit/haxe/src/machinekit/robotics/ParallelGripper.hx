@@ -2,7 +2,8 @@ package machinekit.robotics;
 
 import machinekit.assembly.MachineAssembly;
 import machinekit.pneumatic.PneumaticCylinder;
-import machinekit.pneumatic.SolenoidValve;
+import machinekit.structural.BlockBracket;
+import machinekit.component.Solids;
 import materia.assembly.AssemblyFrames;
 
 /** A complete, assumed double-acting pneumatic parallel gripper. One cylinder moves
@@ -36,12 +37,27 @@ class ParallelGripper extends MachineAssembly {
 		addCoupling("jaw-mirror", "jaw-left-slide", "jaw-right-slide", -1);
 		addMate("finger-left-mount", "fixed", "jawLeft", "fingerSeat", FINGER_LEFT, "mount");
 		addMate("finger-right-mount", "fixed", "jawRight", "fingerSeat", FINGER_RIGHT, "mount");
-		var centre = spec.openJawCentre();
 		var cylinderPose = AssemblyFrames.compose(AssemblyFrames.translation(
-			-centre - cylinder.bodyLength - cylinder.stemLength, 0, spec.bodyLength - spec.jawHeight),
+			spec.cylinderStartX(), 0, spec.cylinderAxisZ()),
 			AssemblyFrames.turnY(Math.PI / 2));
 		addComponent("cylinder", cylinder, cylinderPose);
-		addMate("cylinder-mount", "fixed", "body", "cylinderMount", "cylinder", "mount");
+		// A side bracket carries the barrel without blocking its underside air ports.
+		var supportZ = spec.cylinderAxisZ() - cylinder.bodyWidth / 2;
+		var outsideY = spec.supportSideReach();
+		var bracket = new BlockBracket("gripper cylinder support", [{
+			min: [spec.cylinderStartX(), spec.bodyDepth / 2, supportZ],
+			max: [-spec.bodyWidth / 2 + ParallelGripperSpec.CYLINDER_BRACKET_LAP, outsideY, spec.bodyLength - spec.jawHeight - ParallelGripperSpec.GUIDE_TONGUE_HEIGHT]
+		}, {
+			min: [spec.cylinderStartX(), cylinder.bodyWidth / 2, supportZ],
+			max: [spec.cylinderStartX() + cylinder.bodyLength, outsideY, spec.cylinderAxisZ() + 1]
+		}]);
+		addComponent("cylinderBracket", bracket);
+		var bracketSeat = Solids.axial(-spec.bodyWidth / 2 + ParallelGripperSpec.CYLINDER_BRACKET_LAP / 2, spec.bodyDepth / 2, supportZ + ParallelGripperSpec.CYLINDER_BRACKET_LAP);
+		addMemberConnector("body", "cylinderBracketSeat", bracketSeat);
+		addMemberConnector("cylinderBracket", "mount", bracketSeat);
+		addMemberConnector("cylinderBracket", "cylinderSeat", body.connector("cylinderMount").frame);
+		addMate("cylinder-bracket-mount", "fixed", "body", "cylinderBracketSeat", "cylinderBracket", "mount");
+		addMate("cylinder-mount", "fixed", "cylinderBracket", "cylinderSeat", "cylinder", "mount");
 		addMate("cylinder-rod-guide", "fixed", "jawLeft", "rodMount", "rod", "mount");
 		// Two routed services are connected by the valve in the tool that mounts this assembly.
 		exposePort("airA", "cylinder", "A");

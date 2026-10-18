@@ -4,6 +4,7 @@ import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
+import machinekit.component.CollisionHullFacet;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
@@ -24,6 +25,9 @@ class BlockBracket extends MachineComponent {
 		var key = [for (block in blocks) [for (i in 0...3) Dimension.format(block.min[i]) + ":" + Dimension.format(block.max[i])].join(",")].join(";");
 		super('BRACKET-${name.toUpperCase().split(" ").join("-")}-${key}', name, material, true);
 		this.blocks = [for (block in blocks) {min: block.min.copy(), max: block.max.copy()}];
+		// Preserve the space inside an L-shaped support in simulation and planning.
+		addFacet(CollisionHullFacet.fromBoxes([for (block in this.blocks)
+			[block.min[0], block.min[1], block.min[2], block.max[0], block.max[1], block.max[2]]]));
 	}
 
 	override public function hasGeometry():Bool return true;

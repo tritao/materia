@@ -6,6 +6,12 @@ package machinekit.robotics;
 class ParallelGripperSpec {
 	/** Assumed side clearance between the housing and the open-jaw envelope. */
 	public static inline var HOUSING_SIDE_CLEARANCE:Float = 1.0;
+	/** Assumed carriage tongue running on the housing's relieved guide floor. */
+	public static inline var GUIDE_TONGUE_REACH:Float = 3.0;
+	public static inline var GUIDE_TONGUE_HEIGHT:Float = 2.0;
+	/** Assumed side bracket plate thickness and attachment overlap on the housing. */
+	public static inline var CYLINDER_BRACKET_THICKNESS:Float = 3.0;
+	public static inline var CYLINDER_BRACKET_LAP:Float = 5.0;
 	/** Nominal endpoint switch window and clearance between it and width feedback, in mm. */
 	public static inline var SWITCH_EDGE_CLEARANCE:Float = 0.5;
 	/** Assumed static/kinetic rubber-to-workpiece contact coefficient for the replaceable pads. */
@@ -107,12 +113,29 @@ class ParallelGripperSpec {
 	public function overallHalfWidth():Float {
 		var cylinder = this.cylinder();
 		return Math.max(bodyWidth / 2, Math.max(openJawCentre() + jawWidth / 2,
-			openJawCentre() + cylinder.bodyLength + cylinder.stemLength));
+			openJawCentre() + jawWidth / 2 + cylinder.bodyLength + cylinder.stemLength));
 	}
 
 	/** Jaw centre distance at maximum opening, including the jaw carriage thickness. */
 	public function openJawCentre():Float
 		return expectedPartWidth / 2.0 + openingTravel / 2.0 + jawWidth / 2.0;
+
+	public function supportSideReach():Float
+		return Math.max(bodyDepth / 2, cylinder().bodyWidth / 2) + CYLINDER_BRACKET_THICKNESS;
+
+	/** Wide commissioned openings need longer guide tongues to reach the housing. */
+	public function guideTongueReach():Float
+		return Math.max(GUIDE_TONGUE_REACH,
+			openJawCentre() - jawWidth / 2 - bodyWidth / 2 + HOUSING_SIDE_CLEARANCE);
+
+	/** Rod clears the guide floor throughout closure, and meets the carriage's outside face. */
+	public function cylinderAxisZ():Float
+		return bodyLength - jawHeight + cylinder().rod / 2 + HOUSING_SIDE_CLEARANCE;
+
+	public function cylinderStartX():Float {
+		var drive = cylinder();
+		return -openJawCentre() - jawWidth / 2 - drive.bodyLength - drive.stemLength;
+	}
 
 	/** Valve mounting station in the housing's jaw-travel axis. */
 	public function valveSeatX():Float return bodyWidth / 2.0 - 30.0;

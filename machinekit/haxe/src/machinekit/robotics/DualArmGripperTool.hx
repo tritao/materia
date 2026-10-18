@@ -1,15 +1,9 @@
 package machinekit.robotics;
 
-import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
-import machinekit.pneumatic.PneumaticCylinder;
 import machinekit.pneumatic.PneumaticManifold;
-import machinekit.pneumatic.RoutedHose;
 import machinekit.pneumatic.SolenoidValve;
-import machinekit.component.PortKind;
-import machinekit.component.Solids;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Two independently valved parallel grippers mounted at right angles on one wrist plate. */
 class DualArmGripperTool implements ArmTool {
@@ -21,8 +15,6 @@ class DualArmGripperTool implements ArmTool {
 	public static inline var TOOL_CHANNEL_B:String = "arm/tool/gripperB/body.close";
 	/** Assumed free edge clearance between the two separately valved gripper envelopes. */
 	public static inline var INTER_GRIPPER_CLEARANCE_MM:Float = 15.0;
-	static inline var HOSE_OUTER_DIAMETER_MM:Float = 6.0;
-	static inline var HOSE_CLEARANCE_MM:Float = 5.0;
 
 	public final spec:ParallelGripperSpec;
 	/** B can handle a different commissioned part width from A. */
@@ -49,22 +41,20 @@ class DualArmGripperTool implements ArmTool {
 		for (grip in [spec, specB]) {
 			inwardReach = Math.max(inwardReach, Math.max(grip.openJawCentre() + grip.jawWidth / 2,
 				Math.max(grip.bodyWidth / 2, grip.valveSeatX() + valve.bodyWidth / 2)));
-			crossAxisReach = Math.max(crossAxisReach, Math.max(grip.bodyDepth / 2,
-				Math.max(grip.fingerDepth / 2, valve.bodyDepth / 2)));
+			crossAxisReach = Math.max(crossAxisReach, grip.supportSideReach());
 		}
 		// The grippers sit opposite one another on one diameter and turn 90 degrees.
 		// Their inward X projections clear by the assumed edge gap.
 		mountOffsetMm = (inwardReach + crossAxisReach + INTER_GRIPPER_CLEARANCE_MM) / 2;
-		var hoseSideEnvelope = Math.max(spec.bodyWidth, specB.bodyWidth) / 2 + HOSE_OUTER_DIAMETER_MM + HOSE_CLEARANCE_MM;
+		var hoseSideEnvelope = Math.max(GripperAirRouting.sideReach(spec), GripperAirRouting.sideReach(specB));
 		var jawAxisMin = 0.0, jawAxisMax = 0.0;
 		for (grip in [spec, specB]) {
-			var cylinder = grip.cylinder();
-			jawAxisMin = Math.min(jawAxisMin, -grip.openJawCentre() - cylinder.bodyLength - cylinder.stemLength);
+			jawAxisMin = Math.min(jawAxisMin, grip.cylinderStartX());
 			jawAxisMax = Math.max(jawAxisMax, Math.max(grip.bodyWidth / 2, Math.max(grip.openJawCentre() + grip.jawWidth / 2,
 				grip.valveSeatX() + valve.bodyWidth / 2)));
 		}
 		var sideMin = -hoseSideEnvelope;
-		var sideMax = Math.max(Math.max(spec.bodyDepth, specB.bodyDepth) / 2, Math.max(spec.fingerDepth, specB.fingerDepth) / 2);
+		var sideMax = Math.max(spec.supportSideReach(), specB.supportSideReach());
 		// A sits at -X with its cylinder outward; B sits at +X turned 90°,
 		// with its hose branch outward. Union their projected part envelopes.
 		envelopeWidthMm = 2 * mountOffsetMm + hoseSideEnvelope - jawAxisMin;
@@ -106,14 +96,12 @@ class DualArmGripperTool implements ArmTool {
 		result.addMate("manifold-mount", "fixed", "plate", "tool", "manifold", "mount");
 		result.connectPorts("manifold-valve-a", "manifold", "out1", "valveA", "P");
 		result.connectPorts("manifold-valve-b", "manifold", "out2", "valveB", "P");
-		var cylinderA:PneumaticCylinder = spec.cylinder();
-		var cylinderB:PneumaticCylinder = specB.cylinder();
 		var poses = result.solvedPoses();
 		for (name in ["A", "B"]) {
 			var valve = name == "A" ? "valveA" : "valveB";
 			var gripper = name == "A" ? "gripperA" : "gripperB";
-			var cylinder = name == "A" ? cylinderA : cylinderB;
-			for (outlet in ["A", "B"]) addAirHose(result, poses, valve, gripper + "/cylinder", cylinder, outlet);
+			for (outlet in ["A", "B"]) GripperAirRouting.add(result, poses, gripper, valve,
+				name == "A" ? spec : specB, outlet, 'airHose$valve$outlet');
 			result.addCylinder('jaw-cylinder-$name', gripper + "/jaw-left-slide", gripper + "/cylinder", valve);
 		}
 		result.exposePort("compressedAir", "manifold", "input");
@@ -122,25 +110,4 @@ class DualArmGripperTool implements ArmTool {
 		return result;
 	}
 
-	function addAirHose(result:EndEffector, poses:Map<String, AssemblyFrame>, valve:String,
-			cylinderMember:String, cylinder:PneumaticCylinder, outlet:String):Void {
-		var valvePose = poses.get(valve), cylinderPose = poses.get(cylinderMember);
-		if (valvePose == null || cylinderPose == null) throw "Dual gripper air line has no solved valve or cylinder";
-		var start = AssemblyFrames.compose(valvePose, result.memberConnectorFrame(valve, "port" + outlet));
-		var target = AssemblyFrames.compose(cylinderPose, cylinder.connector("port" + outlet).frame);
-		var hosePose = AssemblyFrames.compose(start, AssemblyFrames.inverse(Solids.axial(0, 0, 0)));
-		var localTarget = AssemblyFrames.transformPoint(AssemblyFrames.inverse(hosePose), target.x, target.y, target.z);
-		var sideOffset = spec.bodyWidth / 2 + HOSE_OUTER_DIAMETER_MM / 2 + HOSE_CLEARANCE_MM;
-		// Each branch loops around the outside of its own gripper. The two valves
-		// share the wrist area, so routing both loops inward would cross the other
-		// gripper's fingers and service envelope.
-		var route = [new Vector(0, 0, 0), new Vector(localTarget.x / 2, localTarget.y - sideOffset,
-			localTarget.z / 2), new Vector(localTarget.x, localTarget.y, localTarget.z)];
-		var hoseId = 'airHose$valve$outlet';
-		result.addComponent(hoseId, new RoutedHose('GRIPPER-6MM-$valve-$outlet', route,
-			HOSE_OUTER_DIAMETER_MM, 4, 0.03, PortKind.Pneumatic));
-		result.addMate('$hoseId-valve', "fixed", valve, "port" + outlet, hoseId, "start");
-		result.connectPorts('$valve-$outlet-hose', valve, outlet, hoseId, "input");
-		result.connectPorts('$hoseId-cylinder', hoseId, "output", cylinderMember, outlet);
-	}
 }
