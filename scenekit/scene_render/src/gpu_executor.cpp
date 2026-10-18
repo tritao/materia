@@ -893,12 +893,9 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
     depth.enabled = 1;
     depth.compare = NKGPU_COMPAREFUNC_LESS_EQUAL;
     depth.write_enabled = 0;
+    // Only resolve coplanar ties. Slope bias can pull hidden ribbons through
+    // thin foreground surfaces; the shader preserves the centerline slope.
     depth.bias = -1.0f;
-    // Strokes are screen-expanded ribbons, not surface polygons. Their depth
-    // slope can be arbitrarily steep (especially on receding short edges).
-    // Slope bias then pulls hidden edges through thin foreground surfaces.
-    // A constant depth-unit bias is enough to resolve coplanar edge ties.
-    depth.bias_slope_scale = 0.0f;
     nkgpu_blend_state blend{};
     blend.enabled = 1;
     blend.src_rgb = NKGPU_BLENDFACTOR_ONE;
@@ -1656,13 +1653,19 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
         pick_vertex_count / 3 > 0x00ffffffu)
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
     if (resource.payload->stroke_segments.size() >
-        std::numeric_limits<std::uint32_t>::max() / (6 * sizeof(StrokeVertex)))
+        std::numeric_limits<std::uint32_t>::max() / (18 * sizeof(StrokeVertex)))
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
     std::vector<StrokeVertex> stroke_vertices;
-    stroke_vertices.reserve(resource.payload->stroke_segments.size() * 6);
-    constexpr std::array<std::array<float, 2>, 6> stroke_corners{{
+    stroke_vertices.reserve(resource.payload->stroke_segments.size() * 18);
+    // Body and two caps have separate quads so cap extension cannot flatten
+    // the body's depth slope. Coordinates outside [0,1] identify the caps.
+    constexpr std::array<std::array<float, 2>, 18> stroke_corners{{
         {{0.0f, -1.0f}}, {{0.0f, 1.0f}}, {{1.0f, 1.0f}},
-        {{0.0f, -1.0f}}, {{1.0f, 1.0f}}, {{1.0f, -1.0f}}}};
+        {{0.0f, -1.0f}}, {{1.0f, 1.0f}}, {{1.0f, -1.0f}},
+        {{-1.0f, -1.0f}}, {{-1.0f, 1.0f}}, {{0.0f, 1.0f}},
+        {{-1.0f, -1.0f}}, {{0.0f, 1.0f}}, {{0.0f, -1.0f}},
+        {{1.0f, -1.0f}}, {{1.0f, 1.0f}}, {{2.0f, 1.0f}},
+        {{1.0f, -1.0f}}, {{2.0f, 1.0f}}, {{2.0f, -1.0f}}}};
     for (const auto &segment : resource.payload->stroke_segments) {
         for (const auto &corner : stroke_corners)
             stroke_vertices.push_back({segment.start, segment.end, corner});

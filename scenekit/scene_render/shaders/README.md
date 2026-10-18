@@ -22,3 +22,11 @@ The tool emits GLSL 4.10, GLSL ES 3.00, HLSL 5, and macOS Metal directly.
 The generator validates both OpenGL variants with `glslangValidator`. Desktop
 OpenGL requires a 4.1 context. Picking stores face IDs in an expanded vertex
 buffer so the same shader works on every backend.
+
+Stroke geometry uses a body quad and two cap quads. The body endpoints keep
+those of the original projected segment, preserving its depth slope. Caps
+extend depth only away from the eye, so their round coverage cannot pull a
+hidden edge through an occluding face. Keep depth interpolation in rasterization
+for per-sample MSAA depth tests; a fragment-depth override evaluates at the
+fragment center and can leak under closely spaced sloping surfaces. The stroke
+pipeline uses only a constant depth-unit bias to resolve coplanar ties.

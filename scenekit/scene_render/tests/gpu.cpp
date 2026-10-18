@@ -906,6 +906,36 @@ int main() {
             resource.edit_payload().stroke_segments = {
                 {{-0.25f, -0.4f, 0.0f}, {-0.25f, 0.4f, 0.0f}, 1}};
             assert(capture() != face_only);
+            // Parallel hidden edges under a sloping face: extending the stroke
+            // caps must also extrapolate depth, rather than flatten its ramp.
+            for (auto &vertex : resource.edit_payload().vertices)
+                vertex.position[2] = vertex.position[1] * 0.3f;
+            resource.edit_payload().stroke_segments.clear();
+            const auto sloped_face = capture();
+            for (const auto length : {0.8f, 0.2f}) {
+                const auto y = length / 2;
+                resource.edit_payload().stroke_segments = {
+                    {{-0.25f, -y, -y * 0.3f + 0.0001f},
+                     {-0.25f, y, y * 0.3f + 0.0001f}, 1},
+                    {{0.25f, y, y * 0.3f + 0.0001f},
+                     {0.25f, -y, -y * 0.3f + 0.0001f}, 1}};
+                assert(capture() == sloped_face);
+            }
+            resource.edit_payload().stroke_segments = {
+                {{0.0f, -0.4f, -0.12f}, {0.0f, 0.4f, 0.12f}, 1}};
+            const auto visible_edge = capture();
+            // Every interior row of the receding coplanar edge must remain
+            // visible, rather than fading out over part of the surface.
+            for (std::uint32_t y = 32; y < 64; ++y) {
+                bool darkened = false;
+                for (std::uint32_t x = 62; x < 66; ++x) {
+                    const auto offset = (y * options.width + x) * 4;
+                    darkened |= visible_edge[offset] + 10 < sloped_face[offset];
+                }
+                assert(darkened);
+            }
+            for (auto &vertex : resource.edit_payload().vertices)
+                vertex.position[2] = 0.0f;
         }
     }
 
