@@ -8,7 +8,8 @@
     "DhGripperPreview.hx",
     "DhGripperJaws.hx",
     "DhCustomFingers.hx",
-    "ManufacturingVariantChecks.hx"
+    "ManufacturingVariantChecks.hx",
+    "DhDualToolPreview.hx"
   ],
   "sourceRoots": [
     "."

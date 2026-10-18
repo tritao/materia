@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-dh-gripper-example"
+  },
+  "entry": "DhDualToolPreview",
+  "sources": [
+    "DhGripperPreview.hx",
+    "DhGripperJaws.hx",
+    "DhCustomFingers.hx",
+    "ManufacturingVariantChecks.hx",
+    "DhDualToolPreview.hx"
+  ],
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/dual-run"
+}

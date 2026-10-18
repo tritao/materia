@@ -37,6 +37,16 @@
           "build/vendor/PGC-140-50.step"
         ]
       }
+    },
+    "dual": {
+      "kind": "cad-preview",
+      "module": "DhDualToolPreview",
+      "function": "preview",
+      "cache": {
+        "inputs": [
+          "build/vendor/PGC-140-50.step"
+        ]
+      }
     }
   }
 }

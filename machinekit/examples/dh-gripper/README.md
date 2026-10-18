@@ -200,3 +200,60 @@ reference with no simulated grasp or commissioned mass/collision model.
 
 Variant exports live in `build/cnc-aluminium/` and `build/sls-pa12/`, so regenerating
 one variant does not overwrite the other's finger or sleeve STEP files.
+
+### Dual electric wrist reference
+
+`DhDualToolPreview` composes two checked CNC-finger references with approach axes
+90 degrees apart. A single machined aluminium L-adapter with an R3 internal root places one gripper along
++Z and the other along +X. Its wrist origin is the robot-side mounting face.
+The supplier's 50 mm bolt circle is clocked 45 degrees; its rear 31.5 mm locating
+boss enters a 2.7 mm-deep pocket. The robot-side pattern matches the existing
+`RobotFlange(50)` reference, including its raised pilot. This is that model's
+interface, not a claim that every robot with a nominal ISO pattern fits it.
+
+Two supported split-clamp concepts carry the outward electrical service loops.
+The clamps use a nominal 6.6 mm bore around the 6.4 mm cable and a 0.2 mm split;
+liners and tightening behaviour need validation. M3 clamp and M4 support holes
+are modelled, but screws, tapped threads and final screw lengths are not a released
+fastener design. Adapter M6 holes are represented at their tap-drill diameter.
+The blind pin and opposing tapped hole retain a nominal 4.8 mm axial web;
+that detail requires structural/tolerance review before manufacture.
+
+Build and inspect:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/dh-gripper/haxeon.dual.json
+./app/run-built.sh --project="$PWD/machinekit/examples/dh-gripper/build/dual/dual-electric-tool.mtrg" --perspective
+```
+
+Materia entrypoint `dual` is also available in this directory's project. The tending
+folder exposes the same isolated reference through
+`materia.electric-tool.project.json`. The active pneumatic mission and its reach
+certificate are separate; this reference does not replace them.
+
+The build checks all 121 sampled pairs of jaw positions across the 26–76 mm gap,
+including supplier housing surfaces, jaws, custom fingers, cable loops, conservative
+remote-connector boxes and held-blank envelopes. Opposing-tool clearance uses conservative
+bounds or exact CAD distance when bounds overlap. Added metal parts must be valid
+single solids without mutual volume overlap. Support clearance from gripper
+members and cable/metal interference are checked separately. The individual
+11-position jaw checks still run. These are sampled geometric checks, not a
+continuous-motion or full-cell collision certificate.
+
+Generated `build/dual/report.json` records the mass budget, assumed housing-centre
+CoGs, two 194.4 g blanks, both CNC finger pairs, CAD adapter/support masses and a
+250 g allowance for screws, liners and unweighed services. The full 1 kg planning
+allowance per gripper is retained even though original fingers are removed. This
+is conservative about removed fingers but still requires actual supplier mass,
+CoG and service measurements. The gravity-moment figure bounds arbitrary gravity
+orientation about the wrist origin. A nominal 12.5 kg Reach1300 mass comparison
+alone does not establish allowable moment, inertia or acceleration.
+
+The two grippers have independent synchronized jaw mechanisms and expose
+`grasp-a`/`grasp-b` frames at the centres of the planned blanks. Blanks remain fixed
+in their held reference poses; there is no electrical driver or simulated grasp.
+The generated scene explicitly disables collision physics, as does the single
+supplier reference. STEP files for the adapter and four clamp/support pieces are
+exported beside the scene for review. All new adapter and support geometry is a
+prototype pending mounting access, stiffness, fatigue, tolerance, cable flex and
+full tending machine/vise-access checks.

@@ -13,6 +13,7 @@ import materia.project.SceneArtifact.SceneArtifactPart;
 /** Pinned supplier reference with a separately routed electrical cable; synchronized reference jaw motion. */
 class DhGripperPreview {
   public static final DIRECTORY = "machinekit/examples/dh-gripper";
+  public static var referenceFrame(default,null):Null<{offset:Array<Float>,flange:Array<Float>,grasp:Array<Float>}>;
   static final HASH = "8803e2416e133a9ec4766dc77e85595859bfa27d91081fb9154e1e0cebbc4a7c";
   static final EXIT = new Vector(242.503081202068, -79.27830199531, 307.089453582398);
   static final TAIL = new Vector(395.503081202068, EXIT.y, EXIT.z);
@@ -20,10 +21,18 @@ class DhGripperPreview {
   public static final BEND_RADIUS_MM = 55.0;
   public static final RETURN_MM = 80.0;
   public static final DIAMETER_MM = 6.4;
-  static function directory():String {
-    return sys.FileSystem.exists(DIRECTORY + "/build/vendor/PGC-140-50.step") ? DIRECTORY : ".";
+  public static function directory():String {
+    var current=sys.FileSystem.fullPath(Sys.getCwd());
+    while(true) {
+      var candidate=current+"/"+DIRECTORY;
+      if(sys.FileSystem.exists(candidate+"/build/vendor/PGC-140-50.step")) return candidate;
+      if(sys.FileSystem.exists(current+"/build/vendor/PGC-140-50.step")) return current;
+      var parent=haxe.io.Path.directory(current);
+      if(parent==current || parent=="") throw "Run prepare-reference.py before building the DH reference";
+      current=parent;
+    }
   }
-  static function render(id:String, name:String, shape:Shape, color:Array<Float>):SceneArtifactPart {
+  public static function render(id:String, name:String, shape:Shape, color:Array<Float>):SceneArtifactPart {
     var mesh = shape.tessellate(0.15);
     return {id:id, name:name, red:color[0], green:color[1], blue:color[2],
       physicalMassKg:0, physicalMassDeclared:true,
@@ -182,6 +191,14 @@ class DhGripperPreview {
       var envelope=Shape.compound([body,leftOpen,rightOpen]);owned.push(envelope);
       var b=envelope.bounds(), lo=b.get_min(), hi=b.get_max();
       var offset = new Vector(-(lo.get_x()+hi.get_x())/2,-(lo.get_y()+hi.get_y())/2,-lo.get_z());
+      // Shared reference frame for composed tools; the annular seat is 2.5 mm
+      // ahead of the rear-most 31.5 mm centring boss in the pinned supplier STEP.
+      referenceFrame={
+        offset:[offset.x,offset.y,offset.z],
+        flange:[194.503081202068+offset.x,-100.27830199531+offset.y,307.089453582398+offset.z],
+        grasp:[194.503081202068+offset.x,60+offset.y,307.089453582398+offset.z]
+      };
+      sys.io.File.saveContent(directory()+"/build/reference-frame.json",haxe.Json.stringify(referenceFrame,null,"  "));
       var parts:Array<SceneArtifactPart> = [];
       var shapes=[body,cableShape];
       var ids=["pgc-140-50","electrical-cable","cable-end-connector"];
@@ -191,8 +208,20 @@ class DhGripperPreview {
         var displayed=shapes[i].translate(offset.native()); owned.push(displayed);
         parts.push(render(ids[i],names[i],displayed,colors[i]));
         shapes[i].exportStep(directory()+'/build/${ids[i]}.step');
+        displayed.exportStep(directory()+'/build/${ids[i]}-local.step');
       }
       parts.push(renderFaces(ids[2],names[2],tail,colors[2]));
+      // The supplier connector is invalid as a compound. Preserve its actual
+      // faces visually and export a conservative box for composed-tool checks.
+      var tlo=new Vector(1e30,1e30,1e30),thi=new Vector(-1e30,-1e30,-1e30);
+      for(face in tail) {
+        var bounds=face.bounds(),a=bounds.get_min(),b=bounds.get_max();
+        tlo=new Vector(Math.min(tlo.x,a.get_x()),Math.min(tlo.y,a.get_y()),Math.min(tlo.z,a.get_z()));
+        thi=new Vector(Math.max(thi.x,b.get_x()),Math.max(thi.y,b.get_y()),Math.max(thi.z,b.get_z()));
+      }
+      var tailBox=Part.box(thi.x-tlo.x,thi.y-tlo.y,thi.z-tlo.z,Min,Min,Min);
+      var tailReference=tailBox.shape.translate(tlo.native());tailBox.close();owned.push(tailReference);
+      tailReference.exportStep(directory()+"/build/cable-end-connector-envelope.step");
       var model=new cadkit.modeling.AssemblyModel("mm");
       for(i in 0...ids.length) {
         if(i<2) model.add(ids[i]); else {
@@ -233,6 +262,7 @@ class DhGripperPreview {
           }
         }
         var blank=DhCustomFingers.blank(),stock=blank.shape.translate(offset.native());blank.close();owned.push(stock);
+        stock.exportStep(directory()+"/build/blank-60-local.step");
         parts.push(render("blank-60","Aluminium blank 60 x 60 x 20 mm",stock,[0.55,0.67,0.78]));model.add("blank-60");
       }
       DhGripperJaws.check(model,left,right,padLeft,padRight,custom ? 26 : 0);
