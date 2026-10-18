@@ -1872,3 +1872,48 @@ batch after saving that case. Do not start a second batch beside the live one.
   scene collision filters, active simulation window, HB4/HB11 cut or frozen native
   provider was changed by this audit. Existing numerical source studies retain
   their original, narrower scope.
+
+### Mechanical redesign — physical mounts and sampled clearance (2026-10-18)
+
+- Replaced the generic overlapping carriage boxes with recipe-backed steel Z/X/Y
+  saddles, a closed-box X bridge, A yoke and separate screw/motor/scale frames.
+  Their mounting datums, load paths and remaining design assumptions are recorded
+  in `MACHINE_DESIGN.md`. Z and X have four guide blocks each; Y has two. Rail
+  alignment checks include block lengths, end margins and 5 mm overtravel.
+- Enlarged the shared mineral-cast bed/column, moved the column rearward, and added
+  a cast-in steel side insert for the Z-drive frame. Legacy HB5 casting recipes
+  retain the old footprint, insert recesses and mass; they do not silently load
+  the new layout. No general casting/tooling/process model was introduced.
+- Added a 40 mm fixture riser and raised the cutter/stage datums with it, preserving
+  cutter-to-work `HobbingAxes` transforms and mandrel support beneath the tooth band.
+  The forward outboard housing now actually carries a standard 6002 bearing on a
+  stepped Ø15 arbor nose. Its bearing recess and shaft passage are distinct; the
+  hob seat remains 60 mm from the spindle gauge line despite the longer arbor.
+- Z uses the assumed 750 W servo family, with matching shaft passage, coupling
+  space and a 60 mm screw input journal. `BallScrew` persists that dimension and
+  uses it in both its solid and axial-compliance calculation; old recipes retain
+  their 50 mm default. X/Y remain 400 W. Electrical drives now mount on a separate
+  supported backplate with 20 mm lateral gaps.
+- Physical mounting contact, connected weldments, guide alignment/overtravel,
+  full assembly persistence and the existing kinematic checks pass **731 assertions**.
+  Parts/persistence/legacy/journal checks pass **995**, cartridge geometry **60**.
+  `check-layout.sh` provides a repeatable entry point without rebuilding native
+  providers or touching the active reference studies.
+- Exact whole-machine audits cover **99 parts**, including fixed and moving-joint
+  neighbours. There are **zero unintended common volumes >0.001 mm³** at the
+  initial pose (coarse/reference: 3.94/4.43 s) and at **82 poses per configuration**
+  (initial plus the 3×3×3×3 X/Y/Z/A grid; 125.02/122.27 s). Only hob/blank cutting
+  engagement is allowed. Rigid-pair intersections are computed once and reused
+  under their invariant rigid transform, never skipped. Reports are in
+  `build/flexspline-layout/{coarse,reference,coarse-final,reference-final}/`.
+- The rebuilt application completes its headless coarse cut in **5.55875 simulated
+  seconds**, feed **3.600912 s**, **923 gash windows**, zero cutter/fixture-envelope
+  collisions, sync **0.003932 arcseconds**, and completed inspection. This coarse
+  smoke result is ungraded and is separate from whole-machine solid clearance.
+- Mechanical **sampled layout clearance is established**. Continuous swept-volume
+  proof, rotated B/C detail envelopes, tolerance stacks, fastener/retention detail,
+  structural/modal stiffness and updated full-reference drive/error qualification
+  remain open before HB12 acceptance/fabrication. Existing HB4/HB11 frozen cuts
+  keep their original geometry-independent/numerical scope; they do not qualify
+  the new steel structure, longer arbor or changed moving masses. No running
+  reference process or frozen native provider was changed.

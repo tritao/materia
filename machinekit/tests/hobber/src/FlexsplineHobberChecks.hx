@@ -18,6 +18,7 @@ class FlexsplineHobberChecks {
   }
   public static function run():Void {
     var machine=new FlexsplineHobber();machine.validate();
+    assertions+=HobberDesignChecks.run(machine);
     var runtimeModel=modelForRuntime(machine);
     for(joint in [FlexsplineHobber.B,FlexsplineHobber.C]){
       var drive=runtimeModel.actuators.filter(a->switch a.transmission{case SimpleTransmission(id,_,_):id==joint;})[0];

@@ -62,10 +62,10 @@ and empty verified-field lists.
 - `SwivelHead extends MachineAssembly`: direct servo, crossed-roller support, housing,
   moving head and clamp. A is ±45°, with 15°/s rated and 30°/s maximum speed.
   The static 100 N m clamp rating remains separate from the drive's joint effort.
-- `MineralCastBed`: 650 × 550 × 120 mm ribbed casting, with steel rail seats,
+- `MineralCastBed`: 650 × 750 × 120 mm ribbed casting, with steel rail seats,
   table/column plates, threaded bushes and lifting points as child parts.
-- `MineralCastColumn`: 200 × 180 × 600 mm ribbed casting and separate steel base,
-  rail seats, bushes and lifting inserts, 110 mm rail spacing. All precision mounts
+- `MineralCastColumn`: 200 × 180 × 850 mm ribbed casting and separate steel base,
+  rail seats, a side Z-drive seat, bushes and lifting inserts, 110 mm rail spacing. All precision mounts
   are insert faces, with 0.01 mm assumed position tolerance and ground-after-casting
   finish. Casting BOM rows show native-computed kg; inserts are separate items.
   Optional assumed bulk inputs are 35 GPa Young modulus, loss factor 0.02 (8x an
@@ -148,3 +148,13 @@ card. It currently opens the mechanical twin; the cutting program is HB8 work.
 `machinekit/tests/hobber/haxeon.json` runs the mechanical checks; `scene` also exports
 and decodes the scene artifact. The registered app `flexspline-hobber` project-source
 case checks project loading, source-derived axis limits and a short MuJoCo pose hold.
+
+## Redesigned machine structure
+
+The example now uses registered `HobberSaddle` recipes for the Z saddle, closed-box
+X bridge, A yoke, Y spindle saddle, three drive support frames and electrical rack.
+These extend `MachineComponent` directly. Designed steel weldments remain assumed;
+physical contacts, connected solids and recipe/pose round trips are checked.
+See [MACHINE_DESIGN.md](MACHINE_DESIGN.md) for datums, load paths and qualification scope.
+The generic `HobberBracket` recipe is retained for saved descriptions, but is no
+longer used to assemble the machine.

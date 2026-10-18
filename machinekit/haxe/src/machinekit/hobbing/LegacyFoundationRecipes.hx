@@ -11,10 +11,10 @@ class LegacyFoundationRecipes {
   public static function register(registry:ComponentRegistry):Void {
     registry.register(new ComponentType("machinekit.hobbing.mineral-casting-body",EngineeringMetadata.parameters().concat([
       P.choice("kind",["bed","column"],"bed"),P.length("width",650),P.length("depth",550),P.length("height",120)]),v -> {
-      var kind=v.token("kind"),dims=FoundationLayout.dimensions(kind);
+      var kind=v.token("kind"),dims=FoundationLayout.dimensions(kind,true);
       for(i in 0...3)if(v.number(["width","depth","height"][i])!=dims[i])throw "Legacy casting dimensions differ from its layout";
-      var result=FoundationLayout.bodyValues(kind),features=CastingFeatures.decode(result.token("voids"));
-      for(row in FoundationLayout.inserts(kind))features.push({id:'insert-${row.id}',width:row.width,depth:row.depth,height:row.height,pose:row.pose});
+      var result=FoundationLayout.bodyValues(kind,true),features=CastingFeatures.decode(result.token("voids"));
+      for(row in FoundationLayout.inserts(kind,true))features.push({id:'insert-${row.id}',width:row.width,depth:row.depth,height:row.height,pose:row.pose});
       result.setToken("voids",CastingFeatures.encode(features));
       if(v.get("material")!=null)result.set("material",v.get("material"));
       return new MineralCasting(result);

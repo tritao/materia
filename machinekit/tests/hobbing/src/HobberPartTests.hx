@@ -15,6 +15,12 @@ class HobberPartTests {
     new Hob(),new HobArbor(),new OutboardSupport(),new ExpandingMandrel(),new RotaryClamp(),new TablePlaten(),new TableHousing(),new SpindleHousing(),new SwivelHousing(),new MineralCasting(),new CastInsert()];
   public static function run():Void {
     var registry=MachineKitComponents.standard(),parts=members();
+    var journal=new BallScrew(200,60),rebuiltJournal:BallScrew=cast BallScrew.ballRecipeType().create(journal.values());
+    near(rebuiltJournal.inputJournalLength,60,0,"custom bearing journal survives recipe reconstruction");
+    near(journal.axialComplianceBetween(40,80),20/(200000*Math.PI*12*12/4)+20/(200000*Math.PI*13*13/4),1e-15,"axial load crosses the actual machined journal/race boundary");
+    near((cast BallScrew.ballRecipeType().create(new ComponentValues().setNumber("length",200)):BallScrew).inputJournalLength,50,0,"old screw values retain the 50 mm journal");
+    rejects(()->new BallScrew(200,24),"journal too short for bearing seat refused");
+    rejects(()->new BallScrew(200,190),"journal leaving no race refused");
     for(p in parts){
       var type=p.componentType();if(type==null)throw "missing recipe";check(registry.has(type.id),'registered ${p.designation}');
       var rebuilt=type.create(p.values());
@@ -29,7 +35,12 @@ class HobberPartTests {
     check(Std.isOfType(oldInsert,CastInsert)&&oldInsert.componentType()==CastInsert.recipeType(),"legacy insert migrates to shared recipe");
     var oldCasting=registry.byId("machinekit.hobbing.mineral-casting-body").create();
     check(Std.isOfType(oldCasting,MineralCasting)&&oldCasting.componentType()==MineralCasting.recipeType(),"legacy casting migrates to shared recipe");
-    near(oldCasting.massProperties().mass,new MineralCastBed().body.massProperties().mass,1e-8,"legacy casting keeps recesses and mass");
+    near(oldCasting.massProperties().mass,49.992,1e-8,"legacy HB5 bed keeps its original recessed casting mass");
+    near(oldCasting.parameterNumber("depth"),550,0,"legacy bed retains original footprint");
+    near(new MineralCastBed().body.parameterNumber("depth"),750,0,"current bed uses redesigned footprint");
+    var oldColumn=registry.byId("machinekit.hobbing.mineral-casting-body").create(new ComponentValues().setToken("kind","column").setNumber("width",200).setNumber("depth",180).setNumber("height",600));
+    near(oldColumn.parameterNumber("height"),600,0,"legacy column retains original height");
+    check(oldColumn.values().token("voids").indexOf("driveSeat")<0,"legacy column does not acquire a new drive insert recess");
     for(p in parts){var metadata=EngineeringMetadata.of(p);
       check((metadata==null)==(Std.isOfType(p,MineralCasting)||Std.isOfType(p,CastInsert)),"engineering provenance optional on structural parts and present on rated motion parts");
       if(metadata!=null){var rebuilt=p.componentType().create(p.values());
