@@ -20,9 +20,14 @@ class TendingCellTable extends MachineAssembly {
 		this.bankWidth = bankWidth; this.depth = depth;
 		this.topHeight = topHeight; this.bankOffsetX = bankOffsetX;
 		for (bank in [-1, 1]) {
-			var table = new TSlotTable(bankWidth, depth, topHeight, "HFS5-4040", TOP_THICKNESS, 100);
+			// Expand outwards from the central robot corridor and forward from the rear
+			// top edge. Only the low base extends; the tray and upright locations stay fixed.
+			var baseWidth=Math.max(bankWidth,Math.ceil(topHeight*0.7/10)*10);
+			var baseDepth=Math.max(depth,Math.ceil(topHeight*0.65/10)*10);
+			var table = new TSlotTable(bankWidth,depth,topHeight,"HFS5-4040",TOP_THICKNESS,100,30,220,null,true,
+				{width:baseWidth,depth:baseDepth,offsetX:bank*(baseWidth-bankWidth)/2,offsetY:(depth-baseDepth)/2});
 			tables.push(table);
-			include('bank-$bank', table, AssemblyFrames.translation(bank * bankOffsetX, 0, 0));
+			include(bank < 0 ? "left-table" : "right-table", table, AssemblyFrames.translation(bank * bankOffsetX, 0, 0));
 		}
 	}
 
@@ -30,7 +35,7 @@ class TendingCellTable extends MachineAssembly {
 		var result = [];
 		for (i in 0...tables.length) for (piece in tables[i].collisionPieces()) {
 			var bank = i == 0 ? -1 : 1;
-			result.push({id: 'bank-$bank/' + piece.id,
+			result.push({id: (bank < 0 ? "left-table/" : "right-table/") + piece.id,
 				frame: AssemblyFrames.compose(AssemblyFrames.translation(bank * bankOffsetX, 0, 0), piece.frame),
 				vertices: piece.vertices});
 		}

@@ -131,6 +131,16 @@ class TSlotExtrusion implements StructuralProfile {
 		});
 	}
 
+	/** Depth actually removed by geometry(), including its corner-web allowance. Hardware fit
+	 * must use this value rather than the nominal catalog slotDepth. Faces rotate from +X. */
+	public function modeledSlotDepth(face:Int = 0):Float {
+		if (face < 0 || face > 3) throw "Slot face must be between zero and three";
+		if (family == null) return slotDepth;
+		var faceHalf = (face % 2 == 0 ? height : size) / 2;
+		var total = Math.min(slotDepth,faceHalf-tWidth/2-0.5);
+		return Math.max(0.1,total-headDepth)+headDepth;
+	}
+
 	/** T-slot notch tool for one face, rotated 90 degrees `face` times from the +X face. */
 	function slotPoints(face:Int):Array<Vector> {
 		var half = size / 2, halfHeight = height / 2;
@@ -141,8 +151,7 @@ class TSlotExtrusion implements StructuralProfile {
 		var effectiveHeadDepth = headDepth;
 		var effectiveThroatDepth = throatDepth;
 		if (family != null) {
-			var maxDepth = faceHalf - tWidth / 2 - 0.5;
-			var totalDepth = Math.min(slotDepth, maxDepth);
+			var totalDepth = modeledSlotDepth(face);
 			effectiveThroatDepth = Math.max(0.1, totalDepth - effectiveHeadDepth);
 		}
 		var points = [

@@ -274,7 +274,7 @@ class TendingReach {
 	/** The study's own tuning, part of the stored layout's fingerprint. */
 	public static function studyConstants():String
 		return 'jointMargin=$MIN_JOINT_MARGIN approach=$APPROACH_SEARCH_ITERATIONS tray=$TRAY_PLACEMENT_ALLOWANCE_MM ' +
-			'presence=$PRESENCE_HEAD_MOUNT_ALLOWANCE_MM table=tslot4040-v1 top=10 inset=100 foot=30 lower=220';
+			'presence=$PRESENCE_HEAD_MOUNT_ALLOWANCE_MM table=tslot4040-v3 base=outward0.7-forward0.65 rearBrace=true top=10 inset=100 foot=30 lower=220';
 
 	/** Revalidate saved poses/routes, repairing routes or falling back to search; store the current fingerprint. */
 	public static function store(fresh:Bool = false, search:Bool = false):Void {
