@@ -5,7 +5,8 @@ import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
-/** T-slot table, with a recessed seat for the central X nut bracket. */
+/** T-slot table with integral longitudinal ribs and a recessed X nut bracket seat.
+ * Origin is the underside of the deck; ribs extend down to the guide blocks. */
 class MillCrossTable extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 
@@ -34,6 +35,9 @@ class MillCrossTable extends MachineComponent {
 			tools.push(Part.cylinderSpan(3.3, 11, 41, 20, y));
 			tools.push(Part.cylinderSpan(5.5, 33, 41, 20, y));
 		}
-		return Solids.cut(Part.box(400, 200, 40), tools);
+		var pieces = [Part.box(400, 200, 40)];
+		for (side in [-1, 1]) pieces.push(Part.box(400, 34, MillXYStageLayout.RISER_HEIGHT)
+			.translated(new Vector(0, side * 62, -MillXYStageLayout.RISER_HEIGHT)));
+		return Solids.cut(Solids.union(pieces), tools);
 	}
 }

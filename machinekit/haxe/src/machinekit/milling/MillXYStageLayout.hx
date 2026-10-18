@@ -79,6 +79,8 @@ class MillXYStageLayout {
 			-xHalfTravel - nut.bodyLength - nut.flangeThickness - (xFixedX + fixed.length / 2) - clearance
 		);
 		var nutRadius = nut.flangeDiameter / 2;
+		if (frame.front > frame.yRailStart - 170 - clearance || frame.baseWidth / 2 < 245 + clearance)
+			throw "XY drive packaging needs a front bay and clearance around the folded X drive";
 		if (xOvertravel <= 0 || yOvertravel <= 0 ||
 			frame.yRailSpacing / 2 - block.spec.blockWidth / 2 < 50 + clearance ||
 			xRailSpacing / 2 - block.spec.blockWidth / 2 < 42 + clearance ||

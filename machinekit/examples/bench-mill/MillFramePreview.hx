@@ -26,7 +26,7 @@ class MillFramePreview {
 		return new MillFrameLayout({yRailSpacing: reference.base.railSpacing, yRailStart: y.y, yRailLength: yRail.length,
 			columnFront: column.y - reference.column.depth / 2, columnHeight: reference.column.height + rise,
 			zRailSpacing: Math.max(180, reference.column.railSpacing),
-			zRailStart: z.z - reference.base.height, zRailLength: zRail.length + rise});
+			zRailStart: z.z - reference.base.height, zRailLength: zRail.length + rise}, {baseWidth: 520, frontExtension: 140, footPockets: true});
 	}
 
 	public static function stageRise(reference:BenchMill):Float
@@ -113,11 +113,12 @@ class MillFramePreview {
 			column: {width: l.columnWidth, depth: l.columnDepth, height: l.columnHeight, railFaceY: l.columnFront},
 			xyFullStrokeStructuralClearance: "passed conservative Cartesian-product CAD swept-volume audit",
 			zFullStrokeStructuralClearance: "passed conservative CAD swept-volume audit",
-			xy: {tableTop: xy.tableTop, saddleHeight: MillXYStageLayout.SADDLE_HEIGHT, tableRiser: MillXYStageLayout.RISER_HEIGHT, xOvertravel: xy.xOvertravel, yOvertravel: xy.yOvertravel},
+			xy: {tableTop: xy.tableTop, saddleHeight: MillXYStageLayout.SADDLE_HEIGHT, tableRibDepth: MillXYStageLayout.RISER_HEIGHT, xOvertravel: xy.xOvertravel, yOvertravel: xy.yOvertravel},
 			z: {screwX: 0, screwY: z.screwY, guideSpacing: l.zRailSpacing, lower: z.lower, upper: 0},
 			castingMassKg: {base: frame.base.castingByWeight().kg, column: frame.column.castingByWeight().kg},
-			pending: ["guide/block drilling, vendor mounting patterns and installed fasteners", "insert anchorage and strength analysis",
+			pending: ["ATC spindle/drawbar/actuator selection and head redesign", "guide/block drilling, vendor mounting patterns and installed fasteners", "insert anchorage and strength analysis",
 				"electrical brake and motor controls", "chip drainage and enclosure", "lifting and mold design", "material qualification and static/modal analysis"]};
+		MillDesignStudy.write(concept(reference, frame), frame, directory);
 		sys.io.File.saveContent(directory + "/mill-frame-concept.json", haxe.Json.stringify(report, null, "  "));
 		Sys.println(haxe.Json.stringify(report));
 	}

@@ -34,7 +34,7 @@ class MillFrame extends MachineAssembly {
 		var channels = [{x: 0.0, width: l.yRailSpacing - l.seatWidth},
 			{x: -(beamOuter + outerWidth / 2), width: outerWidth},
 			{x: beamOuter + outerWidth / 2, width: outerWidth}];
-		var pocketFront = l.front + l.wall, pocketRear = l.columnFront - l.wall;
+		var pocketFront = l.front + (l.footPockets ? 160 : l.wall), pocketRear = l.columnFront - l.wall;
 		var pocketLength = (pocketRear - pocketFront - l.wall) / 2;
 		// Open underside pockets leave full-height longitudinal rail beams and a
 		// transverse rib. The rear column support stays solid through the base.
@@ -60,12 +60,24 @@ class MillFrame extends MachineAssembly {
 				y = l.columnCentreY + sy * (l.columnDepth / 2 - l.roof);
 			baseInserts.push(insert('column$id', footWidth, footDepth, l.insertThickness, "column mounting pad",
 				F.translation(x, y - l.baseCentreY, l.railPlane - l.insertThickness)));
-			baseInserts.push(insert('foot$id', l.wall, l.wall, l.insertThickness, "foundation foot seat",
+			if (l.footPockets) {
+				var fx = sx * (l.baseWidth / 2 - l.wall), fy = (sy < 0 ? l.front + 80 : l.rear - 80) - l.baseCentreY;
+				baseVoids.push(CastingFeatures.box('foot-access-$id', 2 * l.wall + 2, 90, 100, fx, fy, 40));
+				baseVoids.push(CastingFeatures.box('foot-stem-$id', 20, 20, 42, fx, fy, -1));
+				baseInserts.push({id: 'foot$id', part: new CastInsert(new ComponentValues().setNumber("width", l.wall)
+					.setNumber("depth", l.wall).setNumber("height", l.insertThickness).setNumber("boreDiameter", 18)
+					.setToken("role", "leveling screw seat")), pose: F.translation(fx, fy, 40 - l.insertThickness)});
+			} else baseInserts.push(insert('foot$id', l.wall, l.wall, l.insertThickness, "foundation foot seat",
 				down(sx * (l.baseWidth / 2 - l.wall / 2),
 					(sy < 0 ? l.front + l.wall / 2 : l.rear - l.wall / 2) - l.baseCentreY, l.insertThickness)));
 		}
 		base = new MineralFoundation(body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids), baseInserts);
 		include("base", base, F.translation(0, l.baseCentreY, 0));
+		if (l.footPockets) for (sx in [-1, 1]) for (sy in [-1, 1]) {
+			var id = corner(sx, sy);
+			addComponent('levelingFoot$id', new MillLevelingFoot());
+			addMate('leveling-foot-$id', "fixed", 'base/foot$id', "top", 'levelingFoot$id', "mount");
+		}
 
 		var columnVoids:Array<CastingBox> = [], columnInserts:Array<CastInsertPlacement> = [];
 		var frontWeb = zAxis == null ? l.roof : Math.max(l.roof, zAxis.channelBack + l.wall - (l.columnCentreY - l.columnDepth / 2));

@@ -6,6 +6,7 @@ import machinekit.assembly.Diagnostics;
 import machinekit.assembly.PosedParts;
 import machinekit.structural.FoundationIntegrity;
 import machinekit.component.ComponentValues;
+import machinekit.component.Solids;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Continuous conservative structural sweeps. Y carries the whole X axis, and
@@ -34,9 +35,17 @@ class MillXYStageIntegrity {
 
 	static function sweep(axis:MillXYStage, id:String, dx:Float, dy:Float, owned:Array<Part>, cache:PosedParts):Part {
 		var l = axis.layout;
+		if (id == "table") {
+			// Split the swept ribbed section to preserve the central drive corridor.
+			var pieces = [Part.box(400 + dx, 200 + dy, MillXYStageLayout.TABLE_HEIGHT)];
+			for (side in [-1, 1]) pieces.push(Part.box(400 + dx, 34 + dy, MillXYStageLayout.RISER_HEIGHT)
+				.translated(new Vector(0, side * l.xRailSpacing / 2, -MillXYStageLayout.RISER_HEIGHT)));
+			var local = Solids.union(pieces); owned.push(local);
+			var moved = local.translated(new Vector(0, l.centreY, l.tableBottom)); owned.push(moved); return moved;
+		}
 		if (id == "saddle") {
 			// Extrude the saddle section and its through tunnel over the full Y interval.
-			var saddle = new MillCrossSaddle(new ComponentValues().setNumber("depth", l.saddleDepth + dy));
+			var saddle = new MillCrossSaddle(new ComponentValues().setNumber("depth", l.saddleDepth + dy).setBoolean("motorPocket", false));
 			var part = cache.posed(saddle, axis.zeroPose(id));
 			owned.push(part);
 			return part;

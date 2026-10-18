@@ -4,6 +4,10 @@ import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.Transmission;
 import machinekit.component.ComponentValues;
 import machinekit.motion.*;
+import machinekit.standard.SocketHeadCapScrew;
+import machinekit.transmission.TimingPulley;
+import machinekit.transmission.TimingBelt;
+import machinekit.assembly.Sense;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
@@ -47,7 +51,7 @@ class MillXYStage extends AxisBuilder {
 		for (i in 1...4) attach('blockY$i', l.block, yp[i], "saddle");
 		movingNut("Y", y, l.centreY + l.saddleDepth / 2 - f.yRailStart, "saddle", false);
 		var x = orient(l.xScrewStart, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]);
-		drive("X", x, l.xScrew, l.xFixedX - l.xScrewStart, l.xFloatingX - l.xScrewStart, 84, 40, "saddle");
+		foldedXDrive(x);
 		var xp:Array<AssemblyFrame> = [];
 		for (side in [-1, 1]) {
 			attach(
@@ -78,31 +82,55 @@ class MillXYStage extends AxisBuilder {
 			xp[0],
 			{x: -1, y: 0, z: 0},
 			xp.slice(1), l.xOvertravel);
-		attach(
-			"riser0",
-			new MillPanel(l.block.spec.blockLength, l.block.spec.blockWidth, MillXYStageLayout.RISER_HEIGHT),
-			F.translation(xp[0].x, xp[0].y, l.xRailPlane + l.block.spec.blockHeight),
-			"blockX0"
-		);
 		table = new MillCrossTable();
-		attach("table", table, F.translation(0, l.centreY, l.tableBottom), "riser0");
-		for (i in 1...4) {
-			attach('blockX$i', l.block, xp[i], "table");
-			attach(
-				'riser$i',
-				new MillPanel(l.block.spec.blockLength, l.block.spec.blockWidth, MillXYStageLayout.RISER_HEIGHT),
-				F.translation(xp[i].x, xp[i].y, l.xRailPlane + l.block.spec.blockHeight),
-				'blockX$i'
-			);
-		}
+		attach("table", table, F.translation(0, l.centreY, l.tableBottom), "blockX0");
+		for (i in 1...4) attach('blockX$i', l.block, xp[i], "table");
 		movingNut("X", x, -l.xScrewStart, "table", true);
 		for (a in ["X", "Y"]) {
 			var id = a.toLowerCase(), along = a == "X" ? [1.0, 0.0, 0.0] : [0.0, 1.0, 0.0];
 			addTransmission('$id-lead', id, 'screw$a-turn', Transmission.LeadScrew('screw$a', 'nut$a'), screwSense(id, along));
 			supportScrew('$id-lead', l.fixed.support, l.floating.support);
 		}
+		// Nominal bearing bolts: 43 mm housing + 12 mm pedestal engagement.
+		for (a in ["X", "Y"]) for (end in ["fixed", "floating"]) for (side in [-1, 1]) {
+			var bearing = zeroPose('${end}Bearing$a');
+			var centre = F.transformPoint(bearing, side * 23, 18, 0);
+			attach('bearingBolt$a$end$side', SocketHeadCapScrew.metric("M5", 55), F.translation(centre.x, centre.y, centre.z), '${end}Bearing$a');
+		}
+		for (side in [-1, 1]) for (height in [10, 70]) attach('motorPlateBoltX$side$height', SocketHeadCapScrew.metric("M6", 25),
+			orient(-207, l.centreY + side * 32, l.saddleBottom + height, [0,0,1], [-1,0,0]), "motorMountX");
+		attach("motorCoverY", new MillMotorCover(), F.translation(0, f.yRailStart - 60, f.baseHeight), "motorMountY");
+		attach("motorCoverX", new MillMotorCover(new ComponentValues().setNumber("width", 84).setNumber("depth", 38).setNumber("height", 142)),
+			F.fromRotationMatrix(-226, l.centreY, l.saddleBottom, [0,1,0, -1,0,0, 0,0,1]), "motorMountX");
 		exposeConnector("mount", "fixedPedestalY", "mount");
 		exposeConnector("table", "table", "top");
+	}
+
+	/** Return the X motor into the saddle instead of widening the entire base for a direct-drive motor. */
+	function foldedXDrive(shaft:AssemblyFrame):Void {
+		var l = layout;
+		for (end in ["fixed", "floating"]) {
+			var fixed = end == "fixed", bearing = fixed ? l.fixed : l.floating, x = fixed ? l.xFixedX : l.xFloatingX;
+			attach('${end}PedestalX', new MillScrewPedestal(new ComponentValues().setNumber("width", 84)
+				.setNumber("depth", bearing.length).setNumber("height", 15).setBoolean("motorAnchors", false)),
+				F.fromRotationMatrix(x, l.centreY, l.xRailPlane, [0,-1,0, 1,0,0, 0,0,1]), "saddle");
+			attach('${end}BearingX', bearing, orient(x, l.centreY, l.xScrewZ, [0,0,1], [1,0,0]), '${end}PedestalX');
+		}
+		attach("motorMountX", new MillBeltMotorPlate(), F.fromRotationMatrix(-201, l.centreY, l.saddleBottom,
+			[0,-1,0, 1,0,0, 0,0,1]), "saddle");
+		var motor = orient(-195, l.centreY, l.yScrewZ, [0,0,1], [-1,0,0]);
+		attach("motorX", l.motor, motor, "motorMountX");
+		hang("screwX", l.xScrew, shaft, "fixedBearingX");
+		addMateOnAxis("screwX-turn", "continuous", "fixedBearingX", "to-screwX", "screwX", "attach-screwX", {x:1,y:0,z:0});
+		var screwPulley = new TimingPulley(HTD5M, 20, 12, 15), motorPulley = new TimingPulley(HTD5M, 20, 14, 15);
+		attach("screwPulleyX", screwPulley, orient(-225, l.centreY, l.xScrewZ, [0,0,1], [1,0,0]), "screwX");
+		hang("motorPulleyX", motorPulley, orient(-225, l.centreY, l.yScrewZ, [0,0,1], [1,0,0]), "motorX");
+		addMateOnAxis("motorX-turn", "continuous", "motorX", "to-motorPulleyX", "motorPulleyX", "attach-motorPulleyX", {x:-1,y:0,z:0});
+		attach("motorShaftX", l.motor.shaft(), motor, "motorPulleyX");
+		var belt = TimingBelt.twoPulley(HTD5M, 20, 20, l.xScrewZ-l.yScrewZ, 15, 5000);
+		attach("beltX", belt, F.fromRotationMatrix(-225, l.centreY, l.yScrewZ, [0,0,1, 0,-1,0, 1,0,0]), "saddle");
+		addBeltPath({belt:"beltX", wraps:[{instanceId:"motorPulleyX", connectorName:"front"}, {instanceId:"screwPulleyX", connectorName:"front"}]});
+		addTransmission("x-return-belt", "screwX-turn", "motorX-turn", Transmission.BeltReduction("beltX", "screwPulleyX", "motorPulleyX"), Same);
 	}
 
 	function movingNut(a:String, axis:AssemblyFrame, face:Float, parent:String, foot:Bool):Void {

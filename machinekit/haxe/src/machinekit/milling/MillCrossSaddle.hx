@@ -1,6 +1,9 @@
 package machinekit.milling;
 
 import cadkit.modeling.Part;
+import cadkit.modeling.Vector;
+import machinekit.assembly.PosedParts;
+import materia.assembly.AssemblyFrames as F;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
@@ -12,7 +15,7 @@ class MillCrossSaddle extends MachineComponent {
 		P.length("width", 450),
 		P.length("depth", 174),
 		P.length("height", 80),
-		P.length("bore", 54)
+		P.length("bore", 54), P.flag("motorPocket", true)
 	];
 
 	public static function recipeType():ComponentType {
@@ -36,6 +39,16 @@ class MillCrossSaddle extends MachineComponent {
 		var w = parameterNumber("width"), d = parameterNumber("depth"), h = parameterNumber("height");
 		var tools = [Part.cylinderAlongY(parameterNumber("bore") / 2, -d / 2 - 1, d / 2 + 1, 0, h / 2)];
 		for (x in [-35.0, 35.0]) for (z in [-20.0, 20.0]) tools.push(Part.cylinderAlongY(2.5, d / 2 - 16, d / 2 + 1, x, h / 2 + z));
+		if (values().boolean("motorPocket")) {
+			var bore = Part.cylinderSpan(33, -226, -64);
+			tools.push(PosedParts.moved(bore, F.fromRotationMatrix(0, 0, 40, [0,0,1, 1,0,0, 0,1,0]))); bore.close();
+			tools.push(Part.box(12, 84, 82).translated(new Vector(-201, 0, -1)));
+			tools.push(Part.box(17, 40, 42).translated(new Vector(-218.5, 0, 40)));
+			for (y in [-32.0, 32.0]) for (z in [10.0, 70.0]) {
+				var hole = Part.cylinderSpan(2.5, -196, -182);
+				tools.push(PosedParts.moved(hole, F.fromRotationMatrix(0, y, z, [0,0,1, 1,0,0, 0,1,0]))); hole.close();
+			}
+		}
 		return Solids.cut(Part.box(w, d, h), tools);
 	}
 }

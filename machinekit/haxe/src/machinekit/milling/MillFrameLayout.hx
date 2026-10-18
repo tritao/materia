@@ -16,6 +16,8 @@ typedef MillFrameInterfaces = {
 
 typedef MillFrameOptions = {
 	?baseWidth:Float;
+	?frontExtension:Float;
+	?footPockets:Bool;
 	?baseHeight:Float;
 	?columnWidth:Float;
 	?columnDepth:Float;
@@ -39,6 +41,8 @@ class MillFrameLayout {
 	public final zRailStart:Float;
 	public final zRailLength:Float;
 	public final baseWidth:Float;
+	public final frontExtension:Float;
+	public final footPockets:Bool;
 	public final baseHeight:Float;
 	public final columnWidth:Float;
 	public final columnDepth:Float;
@@ -60,24 +64,25 @@ class MillFrameLayout {
 		yRailSpacing = interfaces.yRailSpacing; yRailStart = interfaces.yRailStart; yRailLength = interfaces.yRailLength;
 		columnFront = interfaces.columnFront; columnHeight = interfaces.columnHeight;
 		zRailSpacing = interfaces.zRailSpacing; zRailStart = interfaces.zRailStart; zRailLength = interfaces.zRailLength;
+		frontExtension = options.frontExtension ?? 0; footPockets = options.footPockets ?? false;
 		baseWidth = options.baseWidth ?? 520; baseHeight = options.baseHeight ?? 220;
 		columnWidth = options.columnWidth ?? 320; columnDepth = options.columnDepth ?? 260;
 		wall = options.wall ?? 40; roof = options.roof ?? 60; seatWidth = options.seatWidth ?? 40;
 		insertThickness = options.insertThickness ?? 20; seatRise = options.seatRise ?? 4;
-		for (value in [yRailSpacing, yRailStart, yRailLength, columnFront, columnHeight, zRailSpacing,
+		for (value in [frontExtension, yRailSpacing, yRailStart, yRailLength, columnFront, columnHeight, zRailSpacing,
 			zRailStart, zRailLength, baseWidth, baseHeight, columnWidth, columnDepth, wall, roof,
 			seatWidth, insertThickness, seatRise]) if (!Math.isFinite(value)) throw "Mill frame dimensions must be finite";
 		for (value in [yRailSpacing, yRailLength, columnHeight, zRailSpacing, zRailLength,
 			baseWidth, baseHeight, columnWidth, columnDepth, wall, roof, seatWidth, insertThickness])
 			if (value <= 0) throw "Mill frame dimensions must be positive";
-		if (seatRise < 0 || seatRise >= insertThickness || insertThickness >= roof ||
+		if (frontExtension < 0 || (footPockets && (baseHeight < 180 || wall < 40 || frontExtension < 120)) || seatRise < 0 || seatRise >= insertThickness || insertThickness >= roof ||
 			roof >= baseHeight || 3 * wall >= columnWidth || 2 * roof + wall >= columnHeight ||
 			columnDepth <= 3 * roof || columnWidth > baseWidth - 2 * wall ||
 			yRailSpacing <= seatWidth || yRailSpacing + seatWidth + 2 * wall >= baseWidth ||
 			zRailSpacing + seatWidth >= columnWidth || zRailStart < 0 || zRailStart + zRailLength > columnHeight ||
 			yRailStart + yRailLength > columnFront || columnFront - yRailStart <= 3 * wall)
 			throw "Mill frame interfaces leave no continuous walls, webs or insert support";
-		front = yRailStart - wall;
+		front = yRailStart - wall - frontExtension;
 		// The column's finished steel face lies seatRise ahead of its casting.
 		rear = columnFront + seatRise + columnDepth + wall;
 		baseDepth = rear - front; baseCentreY = (front + rear) / 2;

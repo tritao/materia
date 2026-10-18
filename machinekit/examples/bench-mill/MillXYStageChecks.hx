@@ -53,78 +53,21 @@ class MillXYStageChecks {
 				near(table.z, l.tableBottom, "table stays level");
 				near(saddle.x, 0, "saddle independent of X");
 				near(saddle.y, l.centreY - y, "saddle follows Y");
-				near(motorX.x, l.xScrewStart - l.motor.rating.shaftLength, "X motor independent of X");
+				near(motorX.x, -195, "X motor independent of X");
 				near(motorX.y, l.centreY - y, "X drive rides saddle");
 				near(motorY.y, f.yRailStart - l.motor.rating.shaftLength, "Y motor remains fixed");
+				near(state.joint("motorX-turn"), -state.joint("screwX-turn"), "opposed motor axis follows return belt");
 				near(state.joint("screwX-turn"), l.nut.rotationFor(-x), "X screw signed lead");
 				near(state.joint("screwY-turn"), l.nut.rotationFor(-y), "Y screw signed lead");
 			}
 		}
 		var poses:Map<String, AssemblyFrame> = axis.solvedPoses(), cache = new PosedParts();
-		var pairs = [
-			["fixedBearingY", "fixedPedestalY"],
-			["floatingBearingY", "floatingPedestalY"],
-			[
-				"motorMountY",
-				"fixedPedestalY"
-			],
-			[
-				"motorY",
-				"motorMountY"
-			],
-			[
-				"fixedBearingX",
-				"fixedPedestalX"
-			],
-			[
-				"floatingBearingX",
-				"floatingPedestalX"
-			],
-			[
-				"motorMountX",
-				"fixedPedestalX"
-			],
-			[
-				"motorX",
-				"motorMountX"
-			],
-			[
-				"nutY",
-				"nutBracketY"
-			],
-			[
-				"nutBracketY",
-				"saddle"
-			],
-			[
-				"nutX",
-				"nutBracketX"
-			],
-			[
-				"nutBracketX",
-				"table"
-			],
-			[
-				"saddle",
-				"blockY0"
-			],
-			[
-				"table",
-				"riser0"
-			],
-			[
-				"riser0",
-				"blockX0"
-			],
-			[
-				"fixedPedestalX",
-				"saddle"
-			],
-			[
-				"floatingPedestalX",
-				"saddle"
-			]
-		];
+		var pairs = [["fixedBearingY", "fixedPedestalY"], ["floatingBearingY", "floatingPedestalY"],
+			["motorMountY", "fixedPedestalY"], ["motorY", "motorMountY"], ["fixedBearingX", "fixedPedestalX"],
+			["floatingBearingX", "floatingPedestalX"], ["motorMountX", "saddle"], ["motorX", "motorMountX"],
+			["nutY", "nutBracketY"], ["nutBracketY", "saddle"], ["nutX", "nutBracketX"], ["nutBracketX", "table"],
+			["saddle", "blockY0"], ["table", "blockX0"], ["fixedPedestalX", "saddle"], ["floatingPedestalX", "saddle"],
+			["motorCoverX", "motorMountX"]];
 		for (pair in pairs) {
 			var a = cache.posed(axis.component(pair[0]), poses.get(pair[0])), b = cache.posed(
 				axis.component(pair[1]),
@@ -136,6 +79,18 @@ class MillXYStageChecks {
 			common.close();
 			a.close();
 			b.close();
+		}
+		for (id in ["motorX", "motorShaftX", "motorPulleyX", "screwPulleyX", "beltX"]) {
+			near(cache.overlap(axis.component(id), poses.get(id), axis.saddle, poses.get("saddle")), 0, 'return drive clears saddle: $id');
+		}
+		for (id in ["motorShaftX", "motorPulleyX", "screwPulleyX", "beltX", "motorMountX", "fixedBearingX"]) {
+			near(cache.overlap(axis.component(id), poses.get(id), axis.component("motorCoverX"), poses.get("motorCoverX")), 0, 'return hood clears $id');
+		}
+		for (id in ["motorX", "motorY", "motorCoverX", "motorCoverY"]) {
+			var b = cache.box(axis.component(id), poses.get(id));
+			check(b.minX >= -f.baseWidth / 2 && b.maxX <= f.baseWidth / 2, 'drive stays inside base width: $id');
+			var travel = id.indexOf("X") >= 0 ? l.yHalfTravel : 0;
+			check(b.minY - travel >= f.front && b.maxY + travel <= f.rear, 'drive stays inside base depth over full Y stroke: $id');
 		}
 		cache.close();
 		var audit = MillXYStageIntegrity.check(axis, frame);

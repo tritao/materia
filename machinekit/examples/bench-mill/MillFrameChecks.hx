@@ -50,8 +50,20 @@ class MillFrameChecks {
 				near(lower.x, upper.x, "column steel pair X"); near(lower.y, upper.y, "column steel pair Y");
 				near(lower.z, upper.z, "column steel pair Z");
 				var foot = F.transformPoint(poses.get('base/foot$id'), 0, 0, layout.insertThickness);
-				near(foot.z, 0, "floor-side steel plane");
+				near(foot.z, layout.footPockets ? 40 : 0, "foot steel plane");
 			}
+		}
+		check(frame.components().filter(m -> StringTools.startsWith(m.id, "levelingFoot")).length == 4, "four leveling feet installed");
+		for (side in ["Left", "Right"]) for (end in ["Front", "Rear"]) {
+			var id = side + end;
+			var steelLocal = frame.base.components().filter(m -> m.id == 'foot$id')[0].component.geometry();
+			var footLocal = frame.components().filter(m -> m.id == 'levelingFoot$id')[0].component.geometry();
+			var steel = PosedParts.moved(steelLocal, poses.get('base/foot$id')), foot = PosedParts.moved(footLocal, poses.get('levelingFoot$id'));
+			near(steel.distance(foot), 0, "adjusting nut bears on steel seat");
+			var common = steel.intersect(foot); near(common.volume(), 0, "stem clears bored steel seat"); common.close();
+			var casting = frame.base.body.geometry(), body = PosedParts.moved(casting, poses.get("base/casting"));
+			common = body.intersect(foot); near(common.volume(), 0, "foot clears access pocket and stem opening"); common.close();
+			body.close(); casting.close(); steel.close(); foot.close(); steelLocal.close(); footLocal.close();
 		}
 		var restored:MachineAssembly = MachineAssembly.decode(frame.encode(), MachineKitComponents.standard());
 		restored.validate();
