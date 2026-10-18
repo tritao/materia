@@ -120,7 +120,9 @@ class CosmeticThreadTests {
     for (length in [105.0,237.0,600.0]) {
       var screw = new machinekit.motion.BallScrew(length);
       var part = screw.geometry(), envelope = screw.geometry(Envelope);
-      near(part.volume(), envelope.volume(), "cosmetic ball race preserves CAD volume");
+      var outside = part.subtract(envelope);
+      near(outside.volume(), 0, "detailed shaft remains inside nominal envelope"); outside.close();
+      check(part.volume() < envelope.volume(), "turned end details remove material");
       check(Threads.ofShape(envelope.shape).length == 0, "collision envelope has no cosmetic thread");
       envelope.close();
       var threads = Threads.ofShape(part.shape);
@@ -161,6 +163,33 @@ class CosmeticThreadTests {
       var offset = pixel*4, x = normal.get(offset)/127.5-1, y = normal.get(offset+1)/127.5-1, z = normal.get(offset+2)/127.5-1;
       check(Math.abs(x*x+y*y+z*z-1)<0.02,"ball race mip normals normalized");
     }
+  }
+
+  static function ballHardware():Void {
+    var nut = new machinekit.motion.BallNut(), body = nut.geometry(), envelope = nut.geometry(Envelope);
+    var outside = body.subtract(envelope);near(outside.volume(),0,"nut fittings included in envelope");outside.close();
+    near(nut.connector("mountFace").frame.z,45,"nut mounting face retained");
+    near(nut.connector("bore").frame.z,17.5,"nut bore datum retained");
+    for (point in nut.boltPattern()) {
+      var drill = Part.cylinderSpan(2.6,34.9,45.1,point.x,point.y), common = body.intersect(drill);
+      near(common.volume(),0,"six flange holes retained");common.close();drill.close();
+    }
+    for (z in [0.1,44.9]) {
+      var tool = Part.cylinderSpan(0.2,z-0.03,z+0.03,10.2,0), common = body.intersect(tool);
+      near(common.volume(),0,"seal seat is recessed");common.close();tool.close();
+    }
+    var bore = Part.cylinderSpan(7.9,-0.1,45.1), common = body.intersect(bore);
+    near(common.volume(),0,"nut bore stays clear");common.close();bore.close();body.close();envelope.close();
+    var screw = new machinekit.motion.BallScrew(237), shaft = screw.geometry();
+    var hardware = screw.retainer(), local = hardware.geometry(), placed = local.translated(new Vector(0,0,machinekit.motion.BallScrewRetainer.STATION));local.close();
+    var overlap = shaft.intersect(placed);near(overlap.volume(),0,"retaining hardware clears shaft");overlap.close();
+    var support = machinekit.motion.ScrewSupportUnit.bk12().geometry(), bearing = support.translated(new Vector(0,0,37.5));support.close();
+    overlap = bearing.intersect(placed);near(overlap.volume(),0,"washer meets bearing without penetration");overlap.close();
+    near(screw.connector("retainer").frame.z + hardware.connector("bearingFace").frame.z,25,"retainer bears at fixed support face");
+    var pulley = new machinekit.transmission.TimingPulley(HTD5M,20,12,15).geometry();
+    var mountedPulley = pulley.translated(new Vector(0,0,5));pulley.close();
+    overlap = mountedPulley.intersect(placed);near(overlap.volume(),0,"retainer clears belt-drive screw pulley");overlap.close();mountedPulley.close();
+    shaft.close();placed.close();bearing.close();
   }
 
   static function presentation():Void {
@@ -211,7 +240,7 @@ class CosmeticThreadTests {
   }
 
   public static function main():Int {
-    mesh(); texture(); presentation(); ballRace();
+    mesh(); texture(); presentation(); ballRace(); ballHardware();
     trace('CosmeticThreadTests passed ($checks checks)');
     return 0;
   }

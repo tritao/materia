@@ -19,6 +19,7 @@ class BallScrew extends LeadScrew {
 	public function new(length:Float) {
 		super(race(), length);
 		if (length <= INPUT_JOURNAL_LENGTH + JOURNAL_LENGTH) throw "Ball screw needs a race between its journals";
+		addConnector("retainer", Mount, machinekit.component.Solids.axial(0, 0, BallScrewRetainer.STATION));
 	}
 
 	override public function axialRigidityAt(position:Float):Float {
@@ -40,9 +41,9 @@ class BallScrew extends LeadScrew {
 
 	override public function geometry(detail:machinekit.component.ComponentDetail = Preview):cadkit.modeling.Part {
 		var shaft = machinekit.component.Solids.union([
-			machinekit.component.Solids.named(cadkit.modeling.Part.cylinderSpan(JOURNAL_DIAMETER / 2, 0, INPUT_JOURNAL_LENGTH), "input-journal"),
+			machinekit.component.Solids.named(detail == Envelope ? cadkit.modeling.Part.cylinderSpan(JOURNAL_DIAMETER / 2, 0, INPUT_JOURNAL_LENGTH) : journal(0, INPUT_JOURNAL_LENGTH, false), "input-journal"),
 			machinekit.component.Solids.named(cadkit.modeling.Part.cylinderSpan(thread.screwDiameter / 2, INPUT_JOURNAL_LENGTH, totalLength - JOURNAL_LENGTH), "race"),
-			machinekit.component.Solids.named(cadkit.modeling.Part.cylinderSpan(JOURNAL_DIAMETER / 2, totalLength - JOURNAL_LENGTH, totalLength), "output-journal")]);
+			machinekit.component.Solids.named(detail == Envelope ? cadkit.modeling.Part.cylinderSpan(JOURNAL_DIAMETER / 2, totalLength - JOURNAL_LENGTH, totalLength) : journal(totalLength - JOURNAL_LENGTH, totalLength, true), "output-journal")]);
 		if (detail == Envelope) return shaft;
 		try {
 			var result = new cadkit.modeling.Part(cadkit.threads.Threads.attach(
@@ -51,6 +52,21 @@ class BallScrew extends LeadScrew {
 			return result;
 		} catch (error:Dynamic) { shaft.close(); throw error; }
 	}
+
+	/** Turned reference end details; the stiffness model retains its nominal journal section. */
+	static function journal(start:Float, end:Float, floating:Bool):cadkit.modeling.Part {
+		var section = floating ? [
+			{r:0.0,z:start}, {r:5.7,z:start}, {r:5.7,z:start+0.8}, {r:6.0,z:start+1.2},
+			{r:6.0,z:end-4.2}, {r:5.6,z:end-4.2}, {r:5.6,z:end-3.2}, {r:6.0,z:end-3.2},
+			{r:6.0,z:end-0.6}, {r:5.4,z:end}, {r:0.0,z:end}
+		] : [
+			{r:0.0,z:start}, {r:5.4,z:start}, {r:6.0,z:start+0.6},
+			{r:6.0,z:end-1.2}, {r:5.7,z:end-0.8}, {r:5.7,z:end}, {r:0.0,z:end}
+		];
+		return cadkit.modeling.Part.revolve(section);
+	}
+
+	public function retainer():BallScrewRetainer return new BallScrewRetainer();
 
 	public static function sfu1605(length:Float):BallScrew return new BallScrew(length);
 

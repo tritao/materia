@@ -129,6 +129,7 @@ class MillXYStage extends AxisBuilder {
 		var motor = orient(-195, l.centreY, l.xMotorZ, [0,0,1], [-1,0,0]);
 		attach("motorX", l.motor, motor, "motorMountX");
 		hang("screwX", l.xScrew, shaft, "fixedBearingX");
+		attach("screwRetainerX", l.xScrew.retainer(), F.compose(shaft, F.translation(0, 0, machinekit.motion.BallScrewRetainer.STATION)), "screwX");
 		addMateOnAxis("screwX-turn", "continuous", "fixedBearingX", "to-screwX", "screwX", "attach-screwX", {x:1,y:0,z:0});
 		var screwPulley = new TimingPulley(HTD5M, 20, 12, 15), motorPulley = new TimingPulley(HTD5M, 20, 14, 15);
 		attach("screwPulleyX", screwPulley, orient(-225, l.centreY, l.xScrewZ, [0,0,1], [1,0,0]), "screwX");
@@ -203,6 +204,7 @@ class MillXYStage extends AxisBuilder {
 		var along = F.transformVector(axis, 0, 0, 1);
 		addMateOnAxis('screw$a-turn', "continuous", 'fixedBearing$a', 'to-screw$a', 'screw$a', 'attach-screw$a', along);
 		attach('motorShaft$a', l.motor.shaft(), F.compose(axis, F.translation(0, 0, -l.motor.rating.shaftLength)), 'screw$a');
+		attach('screwRetainer$a', screw.retainer(), F.compose(axis, F.translation(0, 0, machinekit.motion.BallScrewRetainer.STATION)), 'screw$a');
 		attach('coupling$a', l.coupling, F.compose(axis, F.translation(0, 0, -l.coupling.length / 2)), 'screw$a');
 	}
 }

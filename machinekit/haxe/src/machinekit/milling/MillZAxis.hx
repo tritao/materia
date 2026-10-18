@@ -43,6 +43,7 @@ class MillZAxis extends AxisBuilder {
 		addMateOnAxis("screw-turn", "continuous", "fixedBearing", "to-screw", "screw", "attach-screw",
 			{x: 0, y: 0, z: -1});
 		attach("motorShaft", l.motor.shaft(), down(0, l.screwY, l.motorFace), "screw");
+		attach("screwRetainer", l.screw.retainer(), F.compose(zeroPose("screw"), F.translation(0, 0, machinekit.motion.BallScrewRetainer.STATION)), "screw");
 		attach("coupling", l.coupling, down(0, l.screwY, l.screwTop + l.coupling.length / 2), "screw");
 		var brakePose = down(0, l.screwY, l.motorFace - l.motorPlateThickness);
 		for (role in ["front", "shell", "back"]) for (sector in 0...ShaftBrakePart.sectorCount(l.brake.bore, role))

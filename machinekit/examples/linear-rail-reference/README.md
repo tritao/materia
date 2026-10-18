@@ -83,3 +83,22 @@ The reference fit checks qualify the rail/carriage interface only. They do not
 repeat the mill's complete structural swept-volume audit with the larger carriage
 exterior. Supplier CAD contains simplified internals and mixed real materials;
 CAD volume with a uniform steel density is not a verified carriage mass or inertia.
+
+## Ballscrew exterior details
+
+The generic SFU1605 nut now includes annular seal recesses, flange flats,
+shoulder relief and a radial lubrication fitting. Its bore, six mounting holes
+and flange face retain their original datums. The Envelope includes the fitting.
+Shaft previews have end chamfers, shoulder reliefs and a floating-end retaining
+groove; the nominal shaft envelope and stiffness model keep their original
+journal sections. These small details are assumed reference geometry, not a
+supplier end-machining specification or a qualification of the stiffness model.
+
+`BallScrewRetainer` is a distinct notched retaining nut/washer kit in the mechanical
+mill's scene tree and BOM. Its washer meets the input bearing face at shaft Z=25;
+the kit also clears the X belt pulley. It is not a supplier-selected locking system.
+
+The hybrid export checks added fitting material and all three retaining kits
+against the other installed parts at 27 combinations of XYZ stops/midpoints.
+This sampled check supplements the geometry tests; it does not replace a complete
+continuous swept-volume audit of the detailed mill.
