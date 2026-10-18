@@ -2,6 +2,8 @@ package machinekit.hobbing;
 
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.Diagnostics;
+import machinekit.structural.CastInsert;
+import machinekit.structural.MineralCasting;
 import materia.assembly.AssemblyFrames as F;
 
 /** Geometry/tolerance checks only. No structural, modal or process adequacy claim. */

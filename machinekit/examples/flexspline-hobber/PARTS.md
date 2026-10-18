@@ -1,12 +1,19 @@
 # Hobber reference parts (HB5)
 
-The reusable parts are in `machinekit.motion` and `machinekit.hobbing`. These are
+The reusable parts are in `machinekit.motion`, `machinekit.hobbing` and
+`machinekit.structural`. These are
 reference engineering definitions with simplified CAD envelopes. All supplied rows
 are **Assumed**, including dimensions, P4 precision targets, stiffness, runout,
 winding constants and torque-speed curves. They are not sourced product ratings.
 The reference dimensions can be edited through `ComponentValues` and the registered
 recipes. Catalogue claims require an explicit source; error bounds have their own
 `errorsBasis`, independently of `ratingsBasis`.
+
+Parts extend `MachineComponent` directly: recipe values and typed parameter access
+live there, while `ComponentEnvelopes` provides simple geometry. Engineering
+provenance is an optional `EngineeringMetadata` facet; error bounds remain a
+`PrecisionErrors` facet. Castings and inserts use the shared structural recipes.
+Old HB5 casting recipe IDs load through input migration and save with shared IDs.
 
 ## Motion components
 

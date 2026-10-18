@@ -15,6 +15,6 @@ class FlexsplineHobberCam {
     if(low==null||high==null)throw "Hobber needs installed swivel limits";
     var limits=new HobbingLimits(new Point3(x.lower,y.lower,z.lower),new Point3(x.upper,y.upper,z.upper),low,high,
       machine.spindle.motor.maxSpeed*60/(2*Math.PI),machine.table.motor.maxSpeed*60/(2*Math.PI));
-    return new HobbingJob(machine.spec,machine.hob.design,machine.hob.n("height"),settings,limits);
+    return new HobbingJob(machine.spec,machine.hob.design,machine.hob.parameterNumber("height"),settings,limits);
   }
 }

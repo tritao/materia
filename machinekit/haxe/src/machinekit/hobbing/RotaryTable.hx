@@ -14,8 +14,8 @@ class RotaryTable extends MachineAssembly {
   public function new(?motor:TorqueMotor,?bearing:CrossedRollerBearing,?encoder:RotaryEncoderRing,?clamp:RotaryClamp) {
     super();this.motor=motor==null?new TorqueMotor():motor;this.bearing=bearing==null?new CrossedRollerBearing():bearing;
     this.encoder=encoder==null?new RotaryEncoderRing():encoder;this.clamp=clamp==null?new RotaryClamp():clamp;
-    if(this.motor.n("outside")>150||this.motor.n("height")>45||this.bearing.n("outside")!=120||this.bearing.n("height")!=16
-      ||this.encoder.n("outside")>130||this.encoder.n("height")>8||this.clamp.n("height")>10)
+    if(this.motor.parameterNumber("outside")>150||this.motor.parameterNumber("height")>45||this.bearing.parameterNumber("outside")!=120||this.bearing.parameterNumber("height")!=16
+      ||this.encoder.parameterNumber("outside")>130||this.encoder.parameterNumber("height")>8||this.clamp.parameterNumber("height")>10)
       throw "rotary table reference seats do not fit installed parts";
     addComponent("housing",new TableHousing());
     attach("motor",this.motor,0);attach("bearing",this.bearing,45);attach("clamp",this.clamp,80);attach("encoder",this.encoder,90);

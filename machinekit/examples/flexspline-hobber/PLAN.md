@@ -1729,3 +1729,32 @@ batch after saving that case. Do not start a second batch beside the live one.
   identical refinement and maximum arc change, and complete diagnostic events.
   HB11 cuts and their frozen binaries/libraries continue unchanged. Diagnose the
   full-run comparison before choosing a further refinement or geometry fix.
+
+### Shared component migration after main merge (2026-10-18)
+
+- All 14 remaining motion/hobbing envelope parts now extend `MachineComponent`
+  directly, using its stored recipe inputs and typed parameter accessors with
+  `ComponentRecipeSupport.resolve`. `ComponentEnvelopes` supplies block/annular
+  geometry; optional `EngineeringMetadata` and `PrecisionErrors` facets supply
+  independent provenance and error bounds. Recipe IDs, input units, ratings,
+  generating hob geometry and physical mounting frames remain unchanged.
+- Removed `motion.PrecisionPart` and the duplicate hobbing `MineralCasting` and
+  `CastInsert` implementations. Bed/column layouts use the shared structural parts
+  and the single mineral-cast material definition. `LegacyFoundationRecipes`
+  reads saved HB5 IDs and translates their cores/recesses into structural recipe
+  inputs; subsequent saves use the shared IDs. The hobber retains its paired-face
+  and actual precision-mount attachment checks.
+- Validation: **986 parts/persistence assertions**, **60 geometry assertions**,
+  **264 hobber integration assertions**. The headless app coarse cut completes
+  **922 windows**, **zero collisions**, **5.545250 s** total simulated cycle
+  (**3.600912 s** cutting), **0.00396151 arcseconds** maximum sync error and no
+  inspection failure. This is the coarse app regression, not reference grading;
+  HB4's fine convergence acceptance and the running HB11 studies remain separate.
+- Evidence: `build/flexspline-refactor-app/validation.json` and small test logs.
+  Main's newer platform APIs require matching Haxeon packages; validation uses
+  an isolated workspace manifest pointing to main's `e32024b6d8` package sources,
+  leaving the dirty worktree Haxeon checkout unchanged. Fresh RobotKit, SimKit,
+  trajectory and MotionKit providers were built under that evidence directory;
+  old cached providers lacked new main APIs. The MuJoCo core archive was reused,
+  rebuilding both sides of SimKit's changed private backend interface. No active
+  HB11 binary or native provider was rebuilt or replaced.

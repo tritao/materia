@@ -13,7 +13,7 @@ class SwivelHead extends MachineAssembly {
   public function new(?motor:TorqueMotor,?clamp:RotaryClamp,maxTilt:Float=Math.PI/4) {
     super();if(!Math.isFinite(maxTilt)||maxTilt<=0||maxTilt>Math.PI/4)throw "invalid swivel tilt range";this.motor=motor==null?new TorqueMotor(new ComponentValues().setNumber("ratedSpeed",Math.PI/12).setNumber("maxSpeed",Math.PI/6)):motor;
     this.clamp=clamp==null?new RotaryClamp():clamp;
-    if(this.motor.n("outside")>150||this.motor.n("height")>45)throw "swivel motor exceeds reference housing seat";
+    if(this.motor.parameterNumber("outside")>150||this.motor.parameterNumber("height")>45)throw "swivel motor exceeds reference housing seat";
     bearing=new machinekit.motion.CrossedRollerBearing();
     addComponent("housing",new SwivelHousing());attach("bearing",bearing,0);attach("motor",this.motor,16);attach("clamp",this.clamp,80);
     addComponent("head",new TablePlaten(new ComponentValues().setNumber("outside",180).setNumber("bore",100)));

@@ -21,18 +21,18 @@ class MandrelRadialSupport {
   public final bandEnd:Float;
   public final radialGap:Float;
   public function new(mandrel:ExpandingMandrel,band:Float,?rimStart:Float,?rimBoreRadius:Float) {
-    sleeveStart=mandrel.n("sleeveStart");sleeveEnd=sleeveStart+mandrel.n("sleeveLength");
-    bandStart=rimStart==null?mandrel.n("workSeat"):rimStart;bandEnd=bandStart+band;
-    radialGap=rimBoreRadius==null?mandrel.n("radialFitGap"):rimBoreRadius-mandrel.n("outside")/2;
-    supportsRim=bandStart>=sleeveStart&&bandEnd<=sleeveEnd&&bandStart>=0&&bandEnd<=mandrel.n("height")
-      &&radialGap>=0&&radialGap<=mandrel.n("expansion")/2+1e-9;
-    var t=mandrel.n("sleeveWall"),length=mandrel.n("sleeveLength"),r=mandrel.n("outside")/2-t/2;
-    var e=mandrel.n("sleeveYoungs"),nu=mandrel.n("sleevePoisson"),cavity=mandrel.n("oilCavity"),bulk=mandrel.n("oilBulkModulus");
+    sleeveStart=mandrel.parameterNumber("sleeveStart");sleeveEnd=sleeveStart+mandrel.parameterNumber("sleeveLength");
+    bandStart=rimStart==null?mandrel.parameterNumber("workSeat"):rimStart;bandEnd=bandStart+band;
+    radialGap=rimBoreRadius==null?mandrel.parameterNumber("radialFitGap"):rimBoreRadius-mandrel.parameterNumber("outside")/2;
+    supportsRim=bandStart>=sleeveStart&&bandEnd<=sleeveEnd&&bandStart>=0&&bandEnd<=mandrel.parameterNumber("height")
+      &&radialGap>=0&&radialGap<=mandrel.parameterNumber("expansion")/2+1e-9;
+    var t=mandrel.parameterNumber("sleeveWall"),length=mandrel.parameterNumber("sleeveLength"),r=mandrel.parameterNumber("outside")/2-t/2;
+    var e=mandrel.parameterNumber("sleeveYoungs"),nu=mandrel.parameterNumber("sleevePoisson"),cavity=mandrel.parameterNumber("oilCavity"),bulk=mandrel.parameterNumber("oilBulkModulus");
     // Two conforming steel half spaces under a harmonic normal traction:
     // combined displacement = 4*p/(E_prime*q), E_prime=E/(1-nu²).
     // Finite sleeve geometry and surface roughness make this an estimate.
     var wave=Math.sqrt(4/(r*r)+Math.PI*Math.PI/(length*length));
-    var contact=e*wave/(4*(1-nu*nu))*mandrel.n("contactStiffnessFactor"),gap=radialGap;
+    var contact=e*wave/(4*(1-nu*nu))*mandrel.parameterNumber("contactStiffnessFactor"),gap=radialGap;
     if(band<=0||r<=t||nu<=0||nu>=0.5)throw "invalid mandrel support geometry";
     var rigidity=e*t*t*t/(12*(1-nu*nu));
     sleeveStiffness=rigidity*Math.PI*r*(Math.pow(Math.PI,4)/(2*Math.pow(length,3))
@@ -47,7 +47,7 @@ class MandrelRadialSupport {
     contactPressure=mandrel.clampingPressure/1e6-seatingPressure;
     basis='Assumed: sleeve span [$sleeveStart,$sleeveEnd] mm; toothed rim [$bandStart,$bandEnd] mm, radial gap=$radialGap mm, rim supported=$supportsRim; sleeve t=$t mm, end span L=$length mm, band=$band mm, mid-radius R=$r mm; E=$e N/mm², nu=$nu; '
       +'D=E*t^3/[12(1-nu²)]; k_s=D*pi*R*[pi^4/(2L^3)+9L/(2R^4)+(4-nu)*pi²/(R²L)]; '
-      +'conforming steel harmonic half-space contact c=E*q/[4(1-nu²)]*factor, q=sqrt(4/R²+pi²/L²), factor=${mandrel.n("contactStiffnessFactor")}, c=$contact N/mm³; '
+      +'conforming steel harmonic half-space contact c=E*q/[4(1-nu²)]*factor, q=sqrt(4/R²+pi²/L²), factor=${mandrel.parameterNumber("contactStiffnessFactor")}, c=$contact N/mm³; '
       +'k_c=c*pi*R*integral_band cos²(pi*z/L) dz; 1/k=1/k_s+1/k_c; '
       +'oil K=$bulk N/mm², cavity=$cavity mm: n=2 volume change and oil stiffness zero at first order; '
       +'uniform oil k=$uniformOilStiffness N/mm only; radial fit gap=$gap mm, hoop seating pressure=$seatingPressure MPa, '

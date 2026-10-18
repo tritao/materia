@@ -1,6 +1,8 @@
 import machinekit.motion.*;
 import machinekit.hobbing.*;
 import machinekit.component.*;
+import machinekit.structural.MineralCasting;
+import machinekit.structural.CastInsert;
 import machinekit.assembly.MachineAssembly;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 
@@ -19,14 +21,26 @@ class HobberPartTests {
       check(type.key(p.values())==type.key(rebuilt.values()),'recipe roundtrip ${p.designation}');
       check(p.bom.quantity==1&&p.bom.material!=null&&p.bom.typeId==type.id,'BOM ${p.designation}');
       var errors=PrecisionErrors.of(p),copyErrors=PrecisionErrors.of(rebuilt);
-      check(errors!=null&&copyErrors!=null&&errors.describe()==copyErrors.describe(),'error bounds roundtrip ${p.designation}');
+      if(Std.isOfType(p,MineralCasting)||Std.isOfType(p,CastInsert))
+        check(errors==null&&copyErrors==null,"structural parts have no motion error assumptions");
+      else check(errors!=null&&copyErrors!=null&&errors.describe()==copyErrors.describe(),'error bounds roundtrip ${p.designation}');
     }
+    var oldInsert=registry.byId("machinekit.hobbing.cast-in-steel-insert").create();
+    check(Std.isOfType(oldInsert,CastInsert)&&oldInsert.componentType()==CastInsert.recipeType(),"legacy insert migrates to shared recipe");
+    var oldCasting=registry.byId("machinekit.hobbing.mineral-casting-body").create();
+    check(Std.isOfType(oldCasting,MineralCasting)&&oldCasting.componentType()==MineralCasting.recipeType(),"legacy casting migrates to shared recipe");
+    near(oldCasting.massProperties().mass,new MineralCastBed().body.massProperties().mass,1e-8,"legacy casting keeps recesses and mass");
+    for(p in parts){var metadata=EngineeringMetadata.of(p);
+      check((metadata==null)==(Std.isOfType(p,MineralCasting)||Std.isOfType(p,CastInsert)),"engineering provenance optional on structural parts and present on rated motion parts");
+      if(metadata!=null){var rebuilt=p.componentType().create(p.values());
+        var copied=EngineeringMetadata.of(rebuilt);
+        check(copied!=null&&copied.describe()==metadata.describe(),"engineering metadata persists independently of geometry");}}
     var motor=new TorqueMotor(),actuator=motor.actuator("table","C",48,1);
     near(motor.jointTorque(7),7,0,"direct drive has no reduction");
     near(actuator.maxEffort,30,1e-12,"peak torque limits joint effort");
     near(actuator.maxRate,120*2*Math.PI/60,1e-12,"motor max speed limits joint speed");
     check(actuator.ratedTorque==10&&actuator.assumed!=null,"continuous and assumed ratings survive motor export");
-    check(motor.count("poleCount")==24&&motor.coggingTorque==0.03,"poles and cogging carried by motor");
+    check(motor.parameterCount("poleCount")==24&&motor.coggingTorque==0.03,"poles and cogging carried by motor");
     var encoder=new RotaryEncoderRing();
     near(encoder.quantum(),2*Math.PI/8388608,1e-16,"23-bit encoder quantum");
     near(encoder.angularAccuracy,2*Math.PI/(180*3600),1e-16,"encoder accuracy radians");

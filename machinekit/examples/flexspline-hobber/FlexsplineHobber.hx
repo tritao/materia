@@ -49,7 +49,7 @@ class FlexsplineHobber extends MachineAssembly {
     workOrigin=F.translation(0,-160,323);
     var blank=new TablePlaten(new ComponentValues().setNumber("outside",2*this.spec.tipRadius()).setNumber("bore",2*(this.spec.rootRadius()-0.6)).setNumber("height",this.spec.faceWidth));
     fixAt("blank",blank,workOrigin,"mandrel");
-    var minX=Math.max(30,mandrel.n("outside")/2+hob.design.outsideDiameter/2+0.2);
+    var minX=Math.max(30,mandrel.parameterNumber("outside")/2+hob.design.outsideDiameter/2+0.2);
     var centre=this.spec.pitchRadius()+hob.design.pitchDiameter/2+this.spec.profileShift*this.spec.module;
     if(centre<minX||centre>100)throw "gear/fixture exceeds radial machine capacity";
     travel=[{id:"X",lower:minX,upper:100,initial:centre},{id:"Y",lower:-10,upper:10,initial:0},{id:"Z",lower:-10,upper:60,initial:0}];
@@ -154,8 +154,8 @@ class FlexsplineHobber extends MachineAssembly {
     addMotor(id,joint,motor,driver,1,null,process?{speedChannel:"hob.speed",directionChannel:"hob.direction",radiansPerSpeedUnit:2*Math.PI/60}:null);
   }
   public function hobToWork(state:AssemblyState):AssemblyFrame {
-    var work=F.compose(state.worldPose("mandrel"),F.translation(0,0,mandrel.n("workSeat")));
-    var cutter=F.compose(state.worldPose("hob"),F.translation(0,0,hob.n("height")/2));
+    var work=F.compose(state.worldPose("mandrel"),F.translation(0,0,mandrel.parameterNumber("workSeat")));
+    var cutter=F.compose(state.worldPose("hob"),F.translation(0,0,hob.parameterNumber("height")/2));
     return F.compose(F.inverse(work),cutter);
   }
 }

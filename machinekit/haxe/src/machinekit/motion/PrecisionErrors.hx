@@ -28,6 +28,9 @@ class PrecisionErrors implements ComponentFacet {
     for(e in entries){if(seen.exists(e.quantity))throw "duplicate precision error";seen.set(e.quantity,true);}
   }
   public function describe():String return [for(e in entries)'${e.quantity} <= ${e.bound} ${e.unit} (${e.basis})'].join(", ");
+  public static function fromValues(values:machinekit.component.ComponentValues,errors:Array<{name:String,unit:String}>):PrecisionErrors
+    return new PrecisionErrors([for(e in errors)new PrecisionError(e.name,values.number(e.name),e.unit,
+      machinekit.component.EngineeringMetadata.basis(values.token("errorsBasis")))]);
   public static function of(component:MachineComponent):Null<PrecisionErrors> {
     for(f in component.facets())if(Std.isOfType(f,PrecisionErrors))return cast f;return null;
   }

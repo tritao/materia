@@ -31,7 +31,7 @@ class FlexsplineHobberBudget {
     for(rows in [sync,force]){if(rows.length<2||rows[0][0]>0||rows[rows.length-1][0]<cam.cuttingSeconds)throw "incomplete history";
       for(i in 0...rows.length){for(v in rows[i])if(!Math.isFinite(v))throw "non-finite history";
         if(i>0&&rows[i][0]<=rows[i-1][0])throw "history times must increase";}}
-    if(inputs.masterCounts!=machine.spindle.encoder.count("countsPerRevolution"))throw "sync trace master encoder differs from installed part";
+    if(inputs.masterCounts!=machine.spindle.encoder.parameterCount("countsPerRevolution"))throw "sync trace master encoder differs from installed part";
     var support=FlexsplineHobberChecks.installedSupport(machine);
     if(!support.supportsRim)throw "reference sleeve does not support tooth band";
     var wall=new RingCompliance(s.rootRadius()-0.3,0.6,s.faceWidth,210000,support.stiffness,"Assumed sleeve/contact estimate; supported rim checked; oil n=2 stiffness zero");
@@ -59,7 +59,7 @@ class FlexsplineHobberBudget {
       for(part in a.stocks.concat(b.stocks))part.setThreads(threads);
       var previous=Sys.getEnv("STOCKKIT_RAKE_BATCH_DOMAINS");
       Sys.putEnv("STOCKKIT_RAKE_BATCH_DOMAINS","1");
-      var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
+      var span=Std.int(Math.ceil(machine.hob.parameterNumber("height")/(2*machine.hob.design.axialPitch)))+2;
       var seed=new HobbingSweep(machine.hob.design,-span,span,0.002),first=30000,count=100,started=Sys.time();
       for(pass in passes.slice(first-2400,first))seed.cutPassMany(a.stocks,motion.axesAt,pass,0.002/16);seed.dispose();
       for(i in 0...a.stocks.length){var saved=a.stocks[i].snapshot();b.stocks[i].restore(saved);saved.dispose();}
@@ -102,7 +102,7 @@ class FlexsplineHobberBudget {
       var cross=InspectionRingStock.create(blank.grid,inspection);
       if(cross==null){blank.dispose();throw "exact reference lead sampling unavailable";}
       var leadGrid=cross.stocks[1].grid;cross.dispose();blank.dispose();
-      var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
+      var span=Std.int(Math.ceil(machine.hob.parameterNumber("height")/(2*machine.hob.design.axialPitch)))+2;
       var endJob=new HobbingErrorJob(s,machine.hob.design,motion.axesAt,passes,sources,wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,knots,threads,false,true,leadGrid);
       if(mode!="lead-ends"){
         var label=mode.substr(5),ids=label=="baseline"?[]:label=="combined"?[for(source in sources)source.id]:[label];
@@ -120,7 +120,7 @@ class FlexsplineHobberBudget {
       // Common pre-cut stock for a performance/equality fixture. This is NOT
       // a substitute for the complete HB8 history or a metrology acceptance.
       var stock=RingStock.fromGearBlank(s,wall.wall,radialStep,axialStep);stock.setThreads(threads);
-      var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
+      var span=Std.int(Math.ceil(machine.hob.parameterNumber("height")/(2*machine.hob.design.axialPitch)))+2;
       var seed=new HobbingSweep(machine.hob.design,-span,span,0.002);
       var cross=mode=="engaged-cross"?InspectionRingStock.create(stock.grid,inspection):null;
       if(mode=="engaged-cross"&&cross==null)throw "reference grid has no exact inspection cross";
@@ -169,7 +169,7 @@ class FlexsplineHobberBudget {
         Sys.println("REFERENCE_BUDGET_PILOT "+haxe.Json.stringify({windows:100,totalWindows:passes.length,wallSeconds:Sys.time()-started,scope:"timing only; entry windows; no acceptance or full-run extrapolation"}));
       }catch(e:Dynamic){sweep.dispose();stock.dispose();throw e;}sweep.dispose();stock.dispose();return;
     }
-    var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
+    var span=Std.int(Math.ceil(machine.hob.parameterNumber("height")/(2*machine.hob.design.axialPitch)))+2;
     var useCross=Sys.getEnv("HOBBER_BUDGET_DENSE")!="1";
     var job=new HobbingErrorJob(s,machine.hob.design,motion.axesAt,passes,sources,wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,knots,threads,useCross,faceEndpoints);
     function runCut(ids:Array<String>):GearMeasurement {

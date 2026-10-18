@@ -25,7 +25,7 @@ class HobSpindle extends MachineAssembly {
     this.arbor=arbor==null?new HobArbor():arbor;
     frontBearing=new AngularContactBearing();rearBearing=new AngularContactBearing();
     encoder=new RotaryEncoderRing(new ComponentValues().setNumber("outside",62).setNumber("bore",40).setNumber("height",6).setInteger("countsPerRevolution",1048576));
-    if(this.motor.n("outside")>62||this.motor.n("height")>110||this.arbor.n("outside")!=16)
+    if(this.motor.parameterNumber("outside")>62||this.motor.parameterNumber("height")>110||this.arbor.parameterNumber("outside")!=16)
       throw "spindle reference seats do not fit installed parts";
     addComponent("housing",new SpindleHousing());
     attach("motor",this.motor,40);attach("frontBearing",frontBearing,0);attach("encoder",encoder,150);

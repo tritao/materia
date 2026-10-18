@@ -144,7 +144,7 @@ class FlexsplineHobberChecks {
     var blank:TablePlaten=cast machine.components().filter(m->m.id=="blank")[0].component;
     // The authored annular blank and mandrel share +Z and the table axis.
     check(Math.abs(pose.x)+Math.abs(pose.y)<1e-8,"rim and mandrel axes coincide");
-    return new MandrelRadialSupport(machine.mandrel,machine.spec.faceWidth,pose.z,blank.n("bore")/2);
+    return new MandrelRadialSupport(machine.mandrel,machine.spec.faceWidth,pose.z,blank.parameterNumber("bore")/2);
   }
   static function supportSensitivity(meanForceBound:Float,rangeForceBound:Float,peakForce:Float,basis:String,meanMeasured:Bool,?history:Dynamic,forceValidated:Bool=true,?forceSettings:Dynamic):Void {
     var machine=new FlexsplineHobber(),estimate=installedSupport(machine);
@@ -152,7 +152,7 @@ class FlexsplineHobberChecks {
     // Explicit physical design allocations. Numerical HB3 tolerance is unrelated.
     var profileBudget=profileLimit*0.2,pitchBudget=pitchLimit*0.2,thicknessTolerance=5.0;
     var bare=new stockkit.hobbing.RingCompliance(s.rootRadius()-0.3,0.6,s.faceWidth,210000,0,"unsupported reference ring");
-    var seated=estimate.supportsRim&&estimate.contactPressure>peakForce/(Math.PI*(machine.mandrel.n("outside")/2)*s.faceWidth);
+    var seated=estimate.supportsRim&&estimate.contactPressure>peakForce/(Math.PI*(machine.mandrel.parameterNumber("outside")/2)*s.faceWidth);
     var rows=[];
     for(factor in [0.3,1.0,3.0]){
       var support=seated?estimate.stiffness*factor:0;

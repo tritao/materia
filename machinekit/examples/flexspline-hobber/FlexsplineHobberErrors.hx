@@ -12,13 +12,13 @@ class FlexsplineHobberErrors {
       throw "wall compliance does not match blank geometry";
     var table=machine.table,arbor=machine.spindle.arbor,tool=machine.hob;
     var outboard:machinekit.hobbing.OutboardSupport=cast machine.components().filter(m->m.id=="outboard")[0].component;
-    var supportRadial=HobbingErrorSource.hobRadial("outboard",outboard.n("radialRunout"));
-    var encoderRadius=(table.encoder.n("outside")+table.encoder.n("bore"))/4;
-    var radial=HobbingErrorSource.hobRadial("spindle/arbor",arbor.n("radialRunout"));
-    var toolRadial=HobbingErrorSource.hobRadial("hob",tool.n("radialRunout"));
-    var axial=HobbingErrorSource.hobAxial("spindle/arbor",arbor.n("axialRunout"));
-    var toolAxial=HobbingErrorSource.hobAxial("hob",tool.n("axialRunout"));
-    if(Math.abs(tool.design.rake)>1e-12&&tool.n("profileError")>0)throw "assumed profile waveform supports zero rake only";
+    var supportRadial=HobbingErrorSource.hobRadial("outboard",outboard.parameterNumber("radialRunout"));
+    var encoderRadius=(table.encoder.parameterNumber("outside")+table.encoder.parameterNumber("bore"))/4;
+    var radial=HobbingErrorSource.hobRadial("spindle/arbor",arbor.parameterNumber("radialRunout"));
+    var toolRadial=HobbingErrorSource.hobRadial("hob",tool.parameterNumber("radialRunout"));
+    var axial=HobbingErrorSource.hobAxial("spindle/arbor",arbor.parameterNumber("axialRunout"));
+    var toolAxial=HobbingErrorSource.hobAxial("hob",tool.parameterNumber("axialRunout"));
+    if(Math.abs(tool.design.rake)>1e-12&&tool.parameterNumber("profileError")>0)throw "assumed profile waveform supports zero rake only";
     var sources=[HobbingErrorSource.workEccentricity("mandrel","mandrel",machine.mandrel.eccentricity),
       HobbingErrorSource.workEccentricity("table-radial","table/bearing",table.bearing.radialRunout/2),
       HobbingErrorSource.tableAxial("table/bearing",table.bearing.axialRunout),
@@ -27,13 +27,14 @@ class FlexsplineHobberErrors {
       radial,axial,
       new HobbingErrorSource("tool-radial",toolRadial.part,toolRadial.basis,toolRadial.apply),
       new HobbingErrorSource("tool-axial",toolAxial.part,toolAxial.basis,toolAxial.apply),
-      HobbingErrorSource.profile("hob",tool.n("profileError"),tool.design.axialPitch),sync,
+      HobbingErrorSource.profile("hob",tool.parameterNumber("profileError"),tool.design.axialPitch),sync,
       new HobbingErrorSource("outboard-radial","outboard",supportRadial.basis+"; parallel-axis approximation, no shaft bending",supportRadial.apply),
       wall.source("blank + mandrel contact",radialForce)];
     var members=machine.components();
     return [for(source in sources){var basis=source.basis;
-      for(member in members)if(member.id==source.part&&Std.isOfType(member.component,machinekit.motion.PrecisionPart)){
-        var part:machinekit.motion.PrecisionPart=cast member.component;
+      for(member in members)if(member.id==source.part){
+        var part=machinekit.component.EngineeringMetadata.of(member.component);
+        if(part==null)continue;
         basis+='; part errors basis ${part.errorsBasis}; source ${part.source}';
       }
       new HobbingErrorSource(source.id,source.part,basis,source.apply,source.warp);
@@ -45,7 +46,7 @@ class FlexsplineHobberErrors {
       passes:Array<stockkit.hobbing.GashPass>,radialForce:Float->Float,wall:RingCompliance,sync:HobbingErrorSource,
       radialStep:Float=0.005,axialStep:Float=0.1,tolerance:Float=0.000025,
       ?inspection:gearkit.GearInspection,?motionKnots:Array<Float>,threads:Int=8):gearkit.ErrorBudget {
-    var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
+    var span=Std.int(Math.ceil(machine.hob.parameterNumber("height")/(2*machine.hob.design.axialPitch)))+2;
     return new stockkit.hobbing.HobbingErrorJob(machine.spec,machine.hob.design,at,passes,
       sources(machine,radialForce,wall,sync),wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,motionKnots,threads).budget();
   }

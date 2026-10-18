@@ -52,14 +52,18 @@ a saved assembly rebuilds with the standard component registry. Casting purchasi
 mass comes from actual CAD volume and the common `mineral-cast` material. Its
 2400 kg/m³ density and bulk elastic, thermal and damping inputs are explicitly assumed.
 
-The foundation layouts, steel-insert separation and bulk inputs were selectively
-ported from `flexspline-hobber` commit `f59fcf695` (building on `13358ee07`), without
-pulling in the gear library or `PrecisionPart`. When integrating that branch,
-use the structural casting/insert/foundation classes and retain only the hobber's
-layout adapters. Register shared structural recipes once; the old hobbing casting
-recipe ids are not aliases. Other recipe-backed hobbing parts can move their input
-storage to `MachineComponent`, resolution/quantity helpers to `ComponentRecipeSupport`,
-and geometry and engineering metadata to their own helpers or optional facets.
+The hobber keeps its layout adapters and stricter paired-plane/mount checks.
+Motion and hobbing parts extend `MachineComponent` directly, using its recipe-input
+storage and typed parameter accessors. `ComponentRecipeSupport.resolve` validates
+constructor inputs; `ComponentEnvelopes` supplies block/annular geometry only.
+Optional `EngineeringMetadata` and `PrecisionErrors` facets carry provenance and
+error bounds independently of geometry. Shared structural parts do not inherit
+motion-specific engineering assumptions.
+
+Saved HB5 casting/insert recipe IDs remain readable through
+`hobbing.LegacyFoundationRecipes`. It translates old inputs into shared structural
+parts; newly saved assemblies use the structural IDs. There is one casting/insert
+implementation and one mineral-cast material entry.
 
 Run the foundation, serialization and new component geometry checks with:
 

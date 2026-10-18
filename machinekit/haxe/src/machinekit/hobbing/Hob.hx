@@ -1,16 +1,16 @@
 package machinekit.hobbing;
 
 import gearkit.*;
-import machinekit.motion.PrecisionPart;
+import machinekit.motion.PrecisionErrors;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
 /** Physical tool envelope, generated from the same rack/HobDesign as the rake cutter.
     Preview is the bored blank, not a claim of relief/sharpening or exact helical teeth. */
-class Hob extends PrecisionPart {
+class Hob extends MachineComponent {
   public final design:HobDesign;
   public final target:GearSpec;
-  public static function parameters():Array<ComponentParameter>return PrecisionPart.common().concat([
+  public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
     P.length("outside",32),P.length("bore",16),P.length("height",40),P.scalar("module",0.3,0.000001),
     P.count("teeth",200),P.length("faceWidth",8),P.scalar("pressureAngle",20*Math.PI/180,0.000001),
     P.scalar("profileShift",0),P.length("cutterTipRadius",0.114),P.length("tipFilletRadius",0.015),
@@ -21,12 +21,19 @@ class Hob extends PrecisionPart {
     if(recipe==null)recipe=new ComponentType("machinekit.hobbing.hob",parameters(),v -> new Hob(v));return recipe;
   }
   public function new(?overrides:ComponentValues) {
-    var v=PrecisionPart.resolve(parameters(),overrides);
-    super("HOB-32-12-1","Conjugate rack hob blank envelope","carbide",v,true,[{name:"radialRunout",unit:"mm"},{name:"axialRunout",unit:"mm"},{name:"profileError",unit:"mm"}]);
-    target=new GearSpec(n("module"),count("teeth"),n("faceWidth"),n("pressureAngle"),false,n("profileShift"),n("cutterTipRadius"),n("tipFilletRadius"));
-    design=new HobDesign(ConjugateRack.of(new ToothProfile(target)),count("starts"),n("outside"),count("gashes"),n("rake"),n("rootHeight"));
-    if(n("bore")>=design.pitchDiameter-2*design.rootHeight)throw "hob bore breaks into cutter roots";
-    addConnector("centre",Axis,Solids.axial(0,0,n("height")/2));
+    var v=P.resolve(parameters(),overrides);
+    super("HOB-32-12-1","Conjugate rack hob blank envelope","carbide",false,v);
+    if(v.get("material")!=null)setMaterial(v.token("material"));
+    ComponentEnvelopes.validateAnnular(v);
+    addConnector("mount",Mount,Solids.axial(0,0,0));
+    addConnector("axis",Axis,Solids.axial(0,0,0));
+    addConnector("top",Mount,Solids.axial(0,0,parameterNumber("height")));
+    addFacet(new EngineeringMetadata(v));
+    addFacet(PrecisionErrors.fromValues(v,[{name:"radialRunout",unit:"mm"},{name:"axialRunout",unit:"mm"},{name:"profileError",unit:"mm"}]));
+    target=new GearSpec(parameterNumber("module"),parameterCount("teeth"),parameterNumber("faceWidth"),parameterNumber("pressureAngle"),false,parameterNumber("profileShift"),parameterNumber("cutterTipRadius"),parameterNumber("tipFilletRadius"));
+    design=new HobDesign(ConjugateRack.of(new ToothProfile(target)),parameterCount("starts"),parameterNumber("outside"),parameterCount("gashes"),parameterNumber("rake"),parameterNumber("rootHeight"));
+    if(parameterNumber("bore")>=design.pitchDiameter-2*design.rootHeight)throw "hob bore breaks into cutter roots";
+    addConnector("centre",Axis,Solids.axial(0,0,parameterNumber("height")/2));
   }
   /** Captures the supplied design and enough generating geometry for an exact recipe rebuild. */
   public static function fromDesign(design:HobDesign,target:GearSpec,length:Float=40,bore:Float=16):Hob {
@@ -44,4 +51,7 @@ class Hob extends PrecisionPart {
     return result;
   }
   override public function componentType():Null<ComponentType>return recipeType();
+  override public function hasGeometry():Bool return true;
+  override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
+    return ComponentEnvelopes.annular(values());
 }
