@@ -11,7 +11,7 @@ size the axis assemblies. Castings and separately itemized steel interfaces use
 shared `MineralFoundation` recipes; other machine families keep their own layouts.
 
 The reference base is 520 × 909 × 220 mm. The Y motor sits in a rear service bay beneath the column, with a continuous
-60 mm casting roof and side supports. The column is 320 × 260 × 728 mm. Guide/bearing inserts stand 4 mm proud
+60 mm casting roof and side supports. The column is 320 × 260 × 768 mm. Guide/bearing inserts stand 4 mm proud
 of the casting, with 16 mm embedded thickness. Core openings, walls, dimensions
 and materials remain design assumptions requiring process and structural review.
 
@@ -21,11 +21,12 @@ foot stations sit beneath a full-height bridge; underside cores start behind it.
 Foot supplier ratings, lateral restraint, anchoring, floor suitability and insert
 anchorage are unresolved. The shown pads/nuts are geometric concepts.
 
-Y guides carry a 450 × 174 × 80 mm saddle. A gusseted steel bridge connects the lowered Y nut to its front face.
-X guides, spaced 124 mm apart, carry a 400 × 210 × 40 mm T-slot table with
+Y guides carry a 450 × 200 × 80 mm saddle. A gusseted steel bridge connects the lowered Y nut to its front face.
+X guides, spaced 160 mm apart, carry a 400 × 210 × 40 mm T-slot table with
 48 mm integral longitudinal ribs. These replace four isolated spacers and keep
 the central drive corridor open. Table top remains 448 mm above the casting bottom.
-The spindle datum and column/guide length retain the earlier 58 mm stack increase.
+The spindle datum and column/guide length retain the earlier 58 mm stack increase; the taller Z block footprint adds another 40 mm
+to the column and Z guides.
 
 The Y screw and motor share a 124 mm shaft height above the casting bottom.
 The motor drives rearward through a coaxial coupling, with its body beneath the
@@ -52,8 +53,8 @@ pedestal engagement; four M6 × 25 bolts anchor the X motor plate. These match t
 modeled reference holes, not verified supplier drawings. Complete guide/block,
 motor, nut, cover and insert drilling and fastener qualification are unfinished.
 
-Z uses 180 mm guide spacing, four blocks at 101.4 mm vertical centers, a
-234 × 182.8 × 20 mm carriage, and a central screw/nut
+Z uses 180 mm guide spacing, four blocks at 141.4 mm vertical centers, a
+234 × 222.8 × 20 mm carriage, and a central screw/nut
 inside the column channel, fixed/floating bearings, a motor stand and brake
 hardware. Its tapered steel head has a 234 mm rear flange, a 120 mm nose, two rows
 of side windows and continuous top/bottom chords. Four nominal M6 × 16 bolts
@@ -211,7 +212,7 @@ not full spindle/service/enclosure or braking qualification.
 | 3. Base and feet | Side pockets, supported bored steel seats, foot envelopes | Ratings, anchoring, stability and casting process |
 | 4. Saddle/table | Integral ribs and section comparison | Complete drilling and assembled stiffness assessment |
 | 5. ATC spindle | Documented BT30 candidate and incompatibilities | Controlled spindle/drawbar/actuator drawings and selection |
-| 6. Head/carriage | Existing ribbed head and broad carriage retained | ATC collar, release reaction bridge, mounts and stiffness |
+| 6. Head/carriage | Taller carriage and braced, deep head root | ATC collar, release reaction bridge, mounts and stiffness |
 | 7. Interfaces | X motor plate, reference bearing bolts, foot bores | Remaining patterns, fasteners, access, welds and anchors |
 | 8. Services | Motor hoods and defined service/control requirements | Way covers, lubrication, cables, coolant, sensors and controls |
 | 9. Validation | Continuous sweeps, static guide admission, concept STEP packet | Whole-machine FEA, thermal/modal evidence, manufacturing drawings |
@@ -248,3 +249,22 @@ The PMK BT30 candidate still needs a new spindle bore, release reaction bridge,
 actuator mount, gauge datum and drive layout once supplier drawings are selected.
 Current webs and flange fasteners are nominal geometry; welds, insert anchorage,
 preload, stiffness, thermal behavior and release loads require qualification.
+
+## Reference-inspired XYZ structure
+
+The supplied machine image guides the arrangement, not dimensions or load ratings.
+Y guides now span 220 mm and support a longer four-block footprint (85.4 mm
+center spacing along Y). The saddle keeps continuous top/bottom
+chords and central nut attachment material around its shallow side pockets.
+X guides and integral table ribs share a 160 mm spacing. Rib spacing is a saved
+component parameter rather than a drawing-only adjustment.
+
+Z uses 141.4 mm block-center spacing, a taller carriage and a 190 mm deep rear
+head flange around its 130 mm spindle collar. Upper/lower triangular webs brace
+that root. The column and Z guides grow 40 mm to preserve the 250 mm Z stroke
+and guide end margins. X/Y strokes remain 250/160 mm; table height, spindle
+position, base footprint and the rear direct Y drive remain unchanged.
+
+All eight XY blocks and all four Z blocks must physically contact their carrying
+structures. Continuous CAD sweeps include the larger root, saddle and table ribs.
+This step does not select or install the pending BT30 spindle or pneumatic release.

@@ -13,7 +13,7 @@ class MillZHead extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 	public static function parameters():Array<ComponentParameter> return [
 			P.length("width", 180), P.length("reach", 204), P.length("height", 130),
-			P.length("noseWidth", 120), P.length("rearWidth", 180), P.length("rearPlate", 12), P.length("boltX", 65), P.length("boltZ", 42),
+			P.length("noseWidth", 120), P.length("rearWidth", 180), P.length("rootExtension", 0), P.length("rearPlate", 12), P.length("boltX", 65), P.length("boltZ", 42),
 			P.length("spindleReach", 159), P.length("plate", 14), P.length("wall", 12)];
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.milling.z-head", parameters(), v -> new MillZHead(v));
@@ -25,7 +25,7 @@ class MillZHead extends MachineComponent {
 			v.number("spindleReach") <= r + v.number("wall") ||
 			v.number("reach") - v.number("spindleReach") <= r || v.number("wall") <= 0 || v.number("plate") <= 0)
 			throw "Z head must surround its spindle bore and retain connected ribs";
-		if (v.number("noseWidth") <= 2 * (r + v.number("wall")) || v.number("noseWidth") > v.number("width") || v.number("rearWidth") < v.number("width") || v.number("rearPlate") < 10 ||
+		if (v.number("noseWidth") <= 2 * (r + v.number("wall")) || v.number("noseWidth") > v.number("width") || v.number("rearWidth") < v.number("width") || v.number("rearPlate") < 10 || v.number("rootExtension") < 0 || v.number("rootExtension") > v.number("height") / 2 ||
 			v.number("boltX") + 7 > v.number("rearWidth") / 2 || 2 * (v.number("boltZ") + 7) > v.number("height"))
 			throw "Head mounting flange cannot retain its bolt pattern";
 		super("MILL-Z-RIBBED-HEAD", "Ribbed fabricated spindle head", v.get("material") == null ? "steel" : v.token("material"), false, v);
@@ -66,7 +66,15 @@ class MillZHead extends MachineComponent {
 		var outline = Part.prism([new Vector(-w/2, 0), new Vector(w/2, 0), new Vector(nose/2, collarRear),
 			new Vector(nose/2, -d), new Vector(-nose/2, -d), new Vector(-nose/2, collarRear)], 0, h);
 		var tapered = raw.intersect(outline); raw.close(); outline.close();
-		var flange = Part.box(parameterNumber("rearWidth"), rearPlate, h).translated(new Vector(0, -rearPlate/2, 0));
-		return Solids.cut(Solids.union([tapered, flange]), tools);
+		var extension = parameterNumber("rootExtension");
+		var flange = Part.box(parameterNumber("rearWidth"), rearPlate, h + 2*extension).translated(new Vector(0, -rearPlate/2, -extension));
+		var root = [tapered, flange];
+		if (extension > 0) for (side in [-1, 1]) for (upper in [false, true]) {
+			var z = upper ? h : 0, outer = upper ? h + extension : -extension;
+			var rib = Part.prism([new Vector(0,z),new Vector(collarRear/2,z),new Vector(0,outer)], -wall/2, wall/2);
+			root.push(machinekit.assembly.PosedParts.moved(rib,
+				materia.assembly.AssemblyFrames.fromRotationMatrix(side*(w/2-2*wall),0,0,[0,0,1, 1,0,0, 0,1,0]))); rib.close();
+		}
+		return Solids.cut(Solids.union(root), tools);
 	}
 }

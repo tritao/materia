@@ -71,7 +71,7 @@ class MillZAxis extends AxisBuilder {
 		for (i in 1...names.length) attach(names[i], l.block, blockPoses[i], "carriage");
 		attach("nut", l.nut, down(0, l.screwY, l.headCentre + l.nut.bodyLength / 2), "carriage");
 		head = new MillZHead(new ComponentValues().setNumber("width", 180).setNumber("height", l.headHeight)
-			.setNumber("rearWidth", l.carriageWidth).setNumber("boltX", l.carriageWidth / 2 - 12)
+			.setNumber("rootExtension", l.headRootExtension).setNumber("rearWidth", l.carriageWidth).setNumber("boltX", l.carriageWidth / 2 - 12)
 			.setNumber("reach", l.headBack - l.spindleY + SpindleCartridge.DIAMETER / 2 + 10)
 			.setNumber("spindleReach", l.headBack - l.spindleY));
 		attach("head", head, F.translation(0, l.headBack, l.headBottom), "carriage");

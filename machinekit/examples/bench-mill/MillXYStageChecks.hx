@@ -27,6 +27,9 @@ class MillXYStageChecks {
 		axis.validate();
 		frame.validate();
 		near(l.tableTop, 448, "stack height");
+		near(f.yRailSpacing, 220, "broad Y guide stance");
+		near(l.xRailSpacing, 160, "X guides support separated table ribs");
+		check(2*l.yBlockSpan > 80, "Y saddle has a longer guide footprint");
 		near(l.xMotorZ, 292, "X return drive independent of lowered Y shaft");
 		near(l.yScrewZ, 124, "Y direct shaft lowered beneath column");
 		near(axis.axisOvertravel("x"), l.xOvertravel, "X bearing/guide overrun limit");
@@ -70,6 +73,7 @@ class MillXYStageChecks {
 			["nutY", "nutBracketY"], ["nutBracketY", "saddle"], ["nutX", "nutBracketX"], ["nutBracketX", "table"],
 			["saddle", "blockY0"], ["table", "blockX0"], ["fixedPedestalX", "saddle"], ["floatingPedestalX", "saddle"],
 			["motorCoverX", "motorMountX"]];
+		for (i in 1...4) { pairs.push(["saddle", "blockY"+i]); pairs.push(["table", "blockX"+i]); }
 		for (pair in pairs) {
 			var a = cache.posed(axis.component(pair[0]), poses.get(pair[0])), b = cache.posed(
 				axis.component(pair[1]),

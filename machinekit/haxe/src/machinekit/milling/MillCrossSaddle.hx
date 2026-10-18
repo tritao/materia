@@ -15,7 +15,7 @@ class MillCrossSaddle extends MachineComponent {
 		P.length("width", 450),
 		P.length("depth", 174),
 		P.length("height", 80),
-		P.length("bore", 54), P.flag("motorPocket", true)
+		P.length("bore", 54), P.flag("motorPocket", true), P.flag("sidePockets", false)
 	];
 
 	public static function recipeType():ComponentType {
@@ -26,6 +26,8 @@ class MillCrossSaddle extends MachineComponent {
 	public function new(?values:ComponentValues) {
 		var v = P.resolve(parameters(), values);
 		if (v.number("bore") + 20 > v.number("height") || v.number("bore") >= v.number("width")) throw "Saddle tunnel leaves insufficient material";
+		if (v.boolean("sidePockets") && (v.number("width") < 450 || v.number("depth") < 174 || v.number("height") < 56))
+			throw "Saddle side pockets need continuous chords and end webs";
 		super("MILL-CROSS-SADDLE", "Machined cross saddle", "cast iron", false, v);
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Face, Solids.axial(0, 0, v.number("height")));
@@ -51,6 +53,11 @@ class MillCrossSaddle extends MachineComponent {
 			}
 		}
 		for (x in [-32.0, 32.0]) tools.push(Part.cylinderAlongY(2.5, -d / 2 - 1, -d / 2 + 16, x, 12));
+		// Shallow side pockets retain continuous top/bottom chords, end webs and the central nut attachment.
+		if (values().boolean("sidePockets")) for (side in [-1, 1])
+			for (interval in [[-205.0,-115.0],[-105.0,-55.0],[55.0,130.0],[140.0,205.0]])
+				tools.push(Part.box(interval[1]-interval[0], 13, h-28)
+					.translated(new Vector((interval[0]+interval[1])/2, side*(d/2-5.5), 14)));
 		return Solids.cut(Part.box(w, d, h), tools);
 	}
 }

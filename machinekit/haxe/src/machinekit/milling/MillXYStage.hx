@@ -30,7 +30,7 @@ class MillXYStage extends AxisBuilder {
 		for (side in [-1, 1]) {
 			var rail = orient(side * f.yRailSpacing / 2, f.yRailStart, f.railPlane + l.block.spec.railHeight, [0, 0, 1], [0, 1, 0]);
 			attach('railY${side < 0 ? "Left" : "Right"}', LinearRail.metric(l.profile, f.yRailLength), rail, "fixedPedestalY");
-			for (span in [-l.blockSpan, l.blockSpan]) yp.push(orient(
+			for (span in [-l.yBlockSpan, l.yBlockSpan]) yp.push(orient(
 				side * f.yRailSpacing / 2,
 				l.centreY + span,
 				f.railPlane + l.block.spec.railHeight,
@@ -46,7 +46,7 @@ class MillXYStage extends AxisBuilder {
 			yp[0],
 			{x: 0, y: -1, z: 0},
 			yp.slice(1), l.yOvertravel);
-		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 0));
+		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 0).setNumber("depth", l.saddleDepth).setBoolean("sidePockets", true));
 		attach("saddle", saddle, F.translation(0, l.centreY, l.saddleBottom), "blockY0");
 		for (i in 1...4) attach('blockY$i', l.block, yp[i], "saddle");
 		var yFace = l.centreY - l.saddleDepth / 2;
@@ -69,7 +69,7 @@ class MillXYStage extends AxisBuilder {
 				),
 				"saddle"
 			);
-			for (span in [-l.blockSpan, l.blockSpan]) xp.push(orient(
+			for (span in [-l.xBlockSpan, l.xBlockSpan]) xp.push(orient(
 				span,
 				l.centreY + side * l.xRailSpacing / 2,
 				l.xRailPlane + l.block.spec.railHeight,
@@ -85,7 +85,7 @@ class MillXYStage extends AxisBuilder {
 			xp[0],
 			{x: -1, y: 0, z: 0},
 			xp.slice(1), l.xOvertravel);
-		table = new MillCrossTable(l.tableDepth);
+		table = new MillCrossTable(l.tableDepth, l.xRailSpacing);
 		attach("table", table, F.translation(0, l.centreY, l.tableBottom), "blockX0");
 		for (i in 1...4) attach('blockX$i', l.block, xp[i], "table");
 		movingNut("X", x, -l.xScrewStart, "table", true);

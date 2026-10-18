@@ -37,8 +37,9 @@ class MillZAxisChecks {
 		near(pose(poses, "screw").x, 0, "screw centred between rails");
 		near(pose(poses, "motor").x, 0, "motor centred on screw");
 		near(pose(poses, "motor").y, l.screwY, "coaxial motor");
-		check(2 * l.blockSpan >= 100, "Z guide blocks have a useful vertical moment arm");
+		check(2 * l.blockSpan >= 140, "Z guide blocks have a useful vertical moment arm");
 		check(l.carriageThickness >= 20, "broad carriage retains head attachment depth");
+		check(axis.head.parameterNumber("rootExtension") > 0, "head has a deep braced root");
 		var headLocal = axis.head.geometry(), headWorld = PosedParts.moved(headLocal, pose(poses, "head")); headLocal.close();
 		for (member in axis.components()) if (StringTools.startsWith(member.id, "headBolt")) {
 			var boltPose = pose(poses, member.id), local = member.component.geometry(), bolt = PosedParts.moved(local, boltPose); local.close();
@@ -87,7 +88,7 @@ class MillZAxisChecks {
 			near(foot.y, f.columnFront, "bearing foot meets backing plate");
 		}
 		near(pose(poses, "motorStand").z + l.motorStandHeight, pose(poses, "motor").z, "motor supported on stand");
-		for (pair in [["motor", "motorStand"], ["motorStand", "fixedMount"], ["fixedBearing", "fixedMount"],
+		for (pair in [["carriage", "blockLeftLower"], ["carriage", "blockLeftUpper"], ["carriage", "blockRightLower"], ["carriage", "blockRightUpper"], ["motor", "motorStand"], ["motorStand", "fixedMount"], ["fixedBearing", "fixedMount"],
 			["floatingBearing", "floatingMount"], ["nut", "carriage"], ["head", "carriage"]]) {
 			var first = axis.components().filter(member -> member.id == pair[0])[0].component.geometry();
 			var second = axis.components().filter(member -> member.id == pair[1])[0].component.geometry();

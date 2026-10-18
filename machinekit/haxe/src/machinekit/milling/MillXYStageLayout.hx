@@ -24,10 +24,11 @@ class MillXYStageLayout {
 	public final xHalfTravel:Float = 125;
 	public final yHalfTravel:Float = 80;
 	public final tableDepth:Float = 210;
-	public final xRailSpacing:Float = 124;
+	public final xRailSpacing:Float = 160;
 	public final xRailLength:Float = 440;
-	public final saddleDepth:Float = 174;
-	public final blockSpan:Float;
+	public final saddleDepth:Float = 200;
+	public final xBlockSpan:Float;
+	public final yBlockSpan:Float;
 	public final saddleBottom:Float;
 	public final xRailPlane:Float;
 	public final tableBottom:Float;
@@ -62,7 +63,8 @@ class MillXYStageLayout {
 		if (guideBlock != null && guideBlock.spec.designation != profile)
 			throw "Guide block must match the selected rail profile";
 		block = guideBlock == null ? LinearRailBlock.metric(profile) : guideBlock;
-		blockSpan = (block.spec.blockLength + 4) / 2;
+		xBlockSpan = (block.spec.blockLength + 4) / 2;
+		yBlockSpan = (block.spec.blockLength + 24) / 2;
 		saddleBottom = frame.railPlane + block.spec.blockHeight;
 		xRailPlane = saddleBottom + SADDLE_HEIGHT;
 		tableBottom = xRailPlane + block.spec.blockHeight + RISER_HEIGHT;
@@ -79,10 +81,11 @@ class MillXYStageLayout {
 		yFixedY = yScrewStart - BallScrew.INPUT_JOURNAL_LENGTH + fixed.length / 2;
 		yFloatingY = frame.yRailStart + BallScrew.JOURNAL_LENGTH / 2;
 		yScrew = new BallScrew(yScrewStart - frame.yRailStart);
-		var reach = blockSpan + block.spec.blockLength / 2 + block.spec.railEndMargin;
+		var xReach = xBlockSpan + block.spec.blockLength / 2 + block.spec.railEndMargin;
+		var yReach = yBlockSpan + block.spec.blockLength / 2 + block.spec.railEndMargin;
 		var yRailRoom = Math.min(
-			centreY - yHalfTravel - reach - frame.yRailStart,
-			frame.yRailStart + frame.yRailLength - centreY - yHalfTravel - reach
+			centreY - yHalfTravel - yReach - frame.yRailStart,
+			frame.yRailStart + frame.yRailLength - centreY - yHalfTravel - yReach
 		);
 		// Hardware, not merely rail length, limits overrun. Keep 3 mm before the nut bracket or saddle reaches an end bearing.
 		var yRoom = Math.min(yRailRoom, Math.min(
@@ -91,7 +94,7 @@ class MillXYStageLayout {
 		// Retain 1 mm geometric separation at the overrun boundary; nominal separation is 3 mm.
 		yOvertravel = Math.min(yRoom, frame.columnFront - block.spec.railHeight - (centreY + yHalfTravel + tableDepth / 2) - 1);
 		xOvertravel = Math.min(
-			xRailLength / 2 - xHalfTravel - reach,
+			xRailLength / 2 - xHalfTravel - xReach,
 			-xHalfTravel - nut.bodyLength - nut.flangeThickness - (xFixedX + fixed.length / 2) - clearance
 		);
 		if (frame.baseWidth / 2 < 245 + clearance || yMountPlane < frame.insertThickness + frame.wall ||

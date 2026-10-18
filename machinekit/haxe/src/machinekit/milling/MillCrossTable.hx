@@ -11,13 +11,13 @@ class MillCrossTable extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 
 	public static function recipeType():ComponentType {
-		if (recipe == null) recipe = new ComponentType("machinekit.milling.cross-table", [P.length("depth", 200)], v -> new MillCrossTable(v.number("depth")));
+		if (recipe == null) recipe = new ComponentType("machinekit.milling.cross-table", [P.length("depth", 200), P.length("ribSpacing", 124)], v -> new MillCrossTable(v.number("depth"), v.number("ribSpacing")));
 		return recipe;
 	}
 
-	public function new(depth:Float = 200) {
-		if (!Math.isFinite(depth) || depth < 200) throw "Table depth must retain its five slots";
-		super("MILL-CROSS-TABLE", "Ribbed 400 mm T-slot table", "cast iron", false, new ComponentValues().setNumber("depth", depth));
+	public function new(depth:Float = 200, ribSpacing:Float = 124) {
+		if (!Math.isFinite(depth) || !Math.isFinite(ribSpacing) || depth < 200 || ribSpacing < 124 || ribSpacing + 34 > depth - 12) throw "Table must retain its slots, drive corridor and rib edge margins";
+		super("MILL-CROSS-TABLE", "Ribbed 400 mm T-slot table", "cast iron", false, new ComponentValues().setNumber("depth", depth).setNumber("ribSpacing", ribSpacing));
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Face, Solids.axial(0, 0, 40));
 	}
@@ -38,7 +38,7 @@ class MillCrossTable extends MachineComponent {
 		}
 		var pieces = [Part.box(400, parameterNumber("depth"), 40)];
 		for (side in [-1, 1]) pieces.push(Part.box(400, 34, MillXYStageLayout.RISER_HEIGHT)
-			.translated(new Vector(0, side * 62, -MillXYStageLayout.RISER_HEIGHT)));
+			.translated(new Vector(0, side * parameterNumber("ribSpacing") / 2, -MillXYStageLayout.RISER_HEIGHT)));
 		return Solids.cut(Solids.union(pieces), tools);
 	}
 }

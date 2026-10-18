@@ -25,10 +25,10 @@ class MillFramePreview {
 		var yRail:LinearRail = cast reference.components().filter(row -> row.id == "railYLeft")[0].component;
 		var zRail:LinearRail = cast reference.components().filter(row -> row.id == "railZLeft")[0].component;
 		var rise = stageRise(reference);
-		return new MillFrameLayout({yRailSpacing: reference.base.railSpacing, yRailStart: y.y - 100, yRailLength: yRail.length + 80,
-			columnFront: column.y - reference.column.depth / 2, columnHeight: reference.column.height + rise,
+		return new MillFrameLayout({yRailSpacing: 220, yRailStart: y.y - 100, yRailLength: yRail.length + 80,
+			columnFront: column.y - reference.column.depth / 2, columnHeight: reference.column.height + rise + 40,
 			zRailSpacing: Math.max(180, reference.column.railSpacing),
-			zRailStart: z.z - reference.base.height, zRailLength: zRail.length + rise}, {baseWidth: 520, frontExtension: 40, footPockets: true});
+			zRailStart: z.z - reference.base.height, zRailLength: zRail.length + rise + 40}, {baseWidth: 520, frontExtension: 40, footPockets: true});
 	}
 
 	public static function stageRise(reference:BenchMill):Float

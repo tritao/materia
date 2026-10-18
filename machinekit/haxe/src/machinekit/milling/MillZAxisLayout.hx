@@ -18,6 +18,7 @@ class MillZAxisLayout {
 	public final lower:Float;
 	public final headBottom:Float;
 	public final headHeight:Float;
+	public final headRootExtension:Float = 30;
 	public final spindleY:Float;
 	public final blockSpan:Float;
 	public final carriageWidth:Float;
@@ -56,7 +57,7 @@ class MillZAxisLayout {
 		if (guideBlock != null && guideBlock.spec.designation != profile)
 			throw "Guide block must match the selected rail profile";
 		block = guideBlock == null ? LinearRailBlock.metric(profile) : guideBlock;
-		blockSpan = (block.spec.blockLength + 40) / 2;
+		blockSpan = (block.spec.blockLength + 80) / 2;
 		carriageWidth = frame.zRailSpacing + block.spec.blockWidth + 20;
 		carriageHeight = Math.max(headHeight + 30, 2 * blockSpan + block.spec.blockLength + 20);
 		carriageBack = frame.columnFront - block.spec.blockHeight;
