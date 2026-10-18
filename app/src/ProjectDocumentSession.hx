@@ -912,7 +912,10 @@ class ProjectDocumentSession {
       value:Float):AssemblyStateRecord {
     var definition = projectAssemblyDefinition;
     if (definition == null) throw "Assembly definition is unavailable";
-    var candidate = new AssemblyState(definition, stateRecord);
+    // Coordinate edits keep topology unchanged; configurations own their mutable state.
+    var runtime = assemblyRuntime;
+    var candidate = runtime == null ? new AssemblyState(definition, stateRecord) :
+      AssemblyState.fromModel(runtime.model, stateRecord);
     candidate.setJoint(jointId, value);
     return evaluateAssemblyConfigurationState(candidate, assemblyDependentJointIds());
   }
@@ -945,7 +948,10 @@ class ProjectDocumentSession {
     var centers = assemblyLocalCentersByDefinition;
     if (definition == null || centers == null)
       throw "Assembly placement data is unavailable";
-    var candidate = new AssemblyState(definition, stateRecord);
+    // Coordinate edits keep topology unchanged; configurations own their mutable state.
+    var runtime = assemblyRuntime;
+    var candidate = runtime == null ? new AssemblyState(definition, stateRecord) :
+      AssemblyState.fromModel(runtime.model, stateRecord);
     var transforms:Array<{id:String, x:Float, y:Float, z:Float, rotation:Array<Float>}> = [];
     for (occurrence in definition.occurrences) {
       var center = centers.get(occurrence.definition);

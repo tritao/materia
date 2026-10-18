@@ -42,7 +42,16 @@ class MachineControlPanel {
       owner.invalidateView();
     }
   }
-  static function number(value:Float):String return Std.string(Math.round(value*1000)/1000);
+  public static function rotaryTitle(id:String):String {
+    var path=id.split("/"),leaf=path.pop();
+    if(leaf==null)return "Rotation";
+    var stem=leaf=="rotor-turn" && path.length>0 ? path[path.length-1] : StringTools.replace(leaf,"-turn","");
+    stem=StringTools.replace(StringTools.replace(stem,"-"," "),"_"," ");
+    var title=stem.substr(0,1).toUpperCase()+stem.substr(1)+" rotation";
+    var scope=leaf=="rotor-turn" ? path.slice(0,path.length-1) : path;
+    return scope.length==0 ? title : scope.join(" / ")+" · "+title;
+  }
+  static function number(value:Float):String return Std.string(Math.fround(value*1000)/1000);
 
   public function build(app:ReferenceEditorApp):View {
     if (generation != app.session.generation) {cancelGesture();generation=app.session.generation;drafts.clear();error=null;}
@@ -64,33 +73,51 @@ class MachineControlPanel {
           try {cancelGesture();MachineControlModel.set(app.session,id,value,!app.simulation.isActive() && !app.documents.blocked());error=null;drafts.remove(id);app.documentChanged();}
           catch (failure:Dynamic) {error=Std.string(failure);app.invalidateView();}
         };
-        var controls:Array<KeyedView> = [new KeyedView("label",new Text(id+" · "+number(axis.value)+" "+axis.unit))];
+        var preview = function(value:Float) {
+          var current=edit;
+          if(current==null || editAxis!=id) {set(value);return;}
+          try {
+            current.update(MachineControlModel.nativePosition(app.session,id,value,!app.simulation.isActive() && !app.documents.blocked()));
+            error=null;drafts.remove(id);app.invalidateView();
+          } catch(failure:Dynamic) {error=Std.string(failure);app.invalidateView();}
+        };
+        var begin = function(event:haxeon.ui.core.UiEvent) {
+          cancelGesture();
+          try {
+            edit=app.session.beginAssemblyJointEdit(id);editAxis=id;editOwner=app;
+            pointer={id:event.pointerId,x:event.x,y:event.y};app.commands.refresh();
+          } catch(failure:Dynamic) {
+            error=Std.string(failure);event.preventDefault();event.stopImmediatePropagation();app.invalidateView();
+          }
+        };
+        var finish = function(commit:Bool) {finishGesture(commit);app.commands.refresh();};
+
+        var rotary=axis.unit=="deg";
+        var title=rotary ? rotaryTitle(id) : id+" · "+number(axis.value)+" "+axis.unit;
+        var controls:Array<KeyedView> = [new KeyedView("label",new Text(title))];
         var minimum=axis.minimum,maximum=axis.maximum;
-        if (minimum != null && maximum != null && maximum > minimum) {
-          var slider=new MachineControlSlider("machine-axis-slider:"+id,id+" position ("+axis.unit+")",axis.value,minimum,maximum,Math.min(axis.step,(maximum-minimum)/1000),
-            value -> {
-              var current=edit;
-              if(current==null || editAxis!=id) {set(value);return;}
-              try {
-                current.update(MachineControlModel.nativePosition(app.session,id,value,!app.simulation.isActive() && !app.documents.blocked()));
-                error=null;drafts.remove(id);app.invalidateView();
-              } catch(failure:Dynamic) {error=Std.string(failure);app.invalidateView();}
-            },event -> {
-              cancelGesture();
-              try {
-                edit=app.session.beginAssemblyJointEdit(id);editAxis=id;editOwner=app;
-                pointer={id:event.pointerId,x:event.x,y:event.y};app.commands.refresh();
-              } catch(failure:Dynamic) {
-                error=Std.string(failure);event.preventDefault();event.stopImmediatePropagation();app.invalidateView();
-              }
-            },commit -> {finishGesture(commit);app.commands.refresh();});
+        if(rotary) {
+          var dial=new MachineAngleControl("machine-angle-dial:"+id,title+" dial",axis.value,true,preview,begin,finish,minimum,maximum);
+          var scrub=new MachineAngleControl("machine-angle-scrub:"+id,title+" scrubber",axis.value,false,preview,begin,finish,minimum,maximum);
+          dial.enabled=editable;scrub.enabled=editable;scrub.style.width=LayoutAxis.fixed(120);
+          var stripStyle=new LayoutStyle();stripStyle.width=LayoutAxis.fixed(120);stripStyle.childGap=3;
+          var strip=new Column("machine-angle-strip:"+id,[new KeyedView("scrub",scrub),
+            new KeyedView("hint",new Text("Drag to turn",null,app.appearance.theme.tokens.textSecondary,
+              haxeon.ui.core.TextStyleOverride.text(11))),
+            new KeyedView("fine",new Text("Shift for fine",null,app.appearance.theme.tokens.textSecondary,
+              haxeon.ui.core.TextStyleOverride.text(11)))],stripStyle);
+          controls.push(new KeyedView("angle",new Row("machine-angle:"+id,[new KeyedView("dial",dial),new KeyedView("strip",strip)],ReferenceEditorApp.actionRowStyle())));
+          if(minimum!=null && maximum!=null)controls.push(new KeyedView("range",new Text(number(minimum)+" … "+number(maximum)+"°")));
+        } else if (minimum != null && maximum != null && maximum > minimum) {
+          var slider=new MachineControlSlider("machine-axis-slider:"+id,id+" position ("+axis.unit+")",axis.value,minimum,maximum,
+            Math.min(axis.step,(maximum-minimum)/1000),preview,begin,finish);
           slider.enabled=editable;controls.push(new KeyedView("slider",slider));
           controls.push(new KeyedView("range",new Text(number(minimum)+" … "+number(maximum)+" "+axis.unit)));
         }
         var field=new TextField("machine-axis-value:"+id,drafts.exists(id) ? drafts.get(id) : number(axis.value),
           value -> drafts.set(id,value));
         field.label="Position ("+axis.unit+")";field.enabled=editable;field.style.width=LayoutAxis.grow();
-        controls.push(new KeyedView("value",field));
+        if(!rotary) controls.push(new KeyedView("value",field));
         var buttons:Array<KeyedView> = [];
         function button(key:String,label:String,value:Float):Void {
           var b=new Button(label,null,()->set(value),"machine-axis:"+id+":"+key);b.enabled=editable;
@@ -102,10 +129,15 @@ class MachineControlPanel {
           catch (failure:Dynamic) {error=Std.string(failure);app.invalidateView();}
         };
         field.onSubmit = _ -> applyPosition();
-        var apply=new Button("Set",null,applyPosition,"machine-axis:"+id+":set");
-        apply.enabled=editable;buttons.push(new KeyedView("set",apply));
+        var apply=new Button(rotary ? "Apply" : "Set",null,applyPosition,"machine-axis:"+id+":set");
+        apply.enabled=editable;
+        if(rotary) {
+          var unitStyle=new LayoutStyle();unitStyle.padding=new Insets(0,8,0,0);
+          controls.push(new KeyedView("value",new Row("machine-angle-value:"+id,
+            [new KeyedView("field",field),new KeyedView("unit",new Text("°",unitStyle)),new KeyedView("apply",apply)],ReferenceEditorApp.actionRowStyle())));
+        } else buttons.push(new KeyedView("set",apply));
         if (minimum != null) button("min","Min",minimum);
-        button("initial","Initial",axis.initial);
+        button("initial",rotary ? "Reset" : "Initial",axis.initial);
         if (axis.initial != 0 && (minimum == null || minimum <= 0) && (maximum == null || maximum >= 0)) button("zero","Zero",0);
         if (maximum != null) button("max","Max",maximum);
         controls.push(new KeyedView("buttons",new Row("machine-axis-buttons:"+id,buttons,ReferenceEditorApp.actionRowStyle())));
