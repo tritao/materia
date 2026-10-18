@@ -1758,3 +1758,38 @@ batch after saving that case. Do not start a second batch beside the live one.
   old cached providers lacked new main APIs. The MuJoCo core archive was reused,
   rebuilding both sides of SimKit's changed private backend interface. No active
   HB11 binary or native provider was rebuilt or replaced.
+
+### HB4 convergence diagnosis and deeper reference rerun (2026-10-18)
+
+- The four-circle reproduction retains exact original sample coordinates, full
+  tool extent/probes and all 2,641 original pass times. Its first comparison
+  reproduces the full diagnostic's 0.006243577840651433 mm worst arc change exactly.
+  All four circles retain 201 material intervals. After saving levels 0/1 it was
+  deliberately stopped to avoid spending another long run on the diagnostic;
+  `build/flexspline-hb4-probe/handoff.json` records this, and both snapshots remain.
+- Endpoint source provenance reduces the lead and profile neighbourhoods to 103
+  and 111 passes. Both retain the full original tool and motion sampler and match
+  both endpoints and source passes **exactly** against full-stroke levels 0/1.
+  The six-level studies take about **88 s** and **72 s**. Their recorded fixtures
+  are in `stockkit/tests/metrology/fixtures/`; run the lead study with
+  `check-hb4-boundary.sh`, using `HB4_BOUNDARY_INPUT`/`HB4_BOUNDARY_EVIDENCE` for
+  the companion profile study.
+- Cause supported by these diagnostics: the default refinement cap of three is
+  insufficient for the aggregate **total-circle** symmetric-difference criterion.
+  At level 3 the largest individual lead boundary shift is **0.559 nm**, and the
+  profile shift is **0.408 nm**. Summing the two flank shifts and multiplying by
+  200 teeth reproduces the failed full-circle changes **0.202777841 µm** and
+  **0.163010766 µm** within **4.1e-12 mm**. Stable interval counts and unchanged
+  source passes do not indicate a topology failure in these neighbourhoods.
+- Level 4 reduces the largest local shifts to **0.00250 nm** (lead) and
+  **0.00537 nm** (profile); at level 5 they are **0.00125/0.01662 nm**. These are
+  numerical endpoint changes, not physical deflection budgets. The repeated-tooth
+  scaling diagnoses the aggregate failure; it does **not** certify other circles.
+- HB4 reference alone now permits refinements **0–5** and still stops only when
+  every computed circle satisfies the same **0.00005 mm** total-arc limit. The
+  original grid, face endpoints, tool and motion are unchanged. No native clipping
+  arithmetic or accepted tolerance was relaxed. The new full-face rerun uses
+  **8 threads**, paired domains and a frozen binary in
+  `build/flexspline-hb4-refined/`. Acceptance remains open pending its successful
+  convergence, grading result and zero exit status. HB11 continues on its frozen
+  binaries/providers. Metrology smoke regression: **11 assertions passed**.

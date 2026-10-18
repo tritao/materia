@@ -324,3 +324,22 @@ virtual-ball runout, circular thickness and per-parameter numerical grading.
 See [evaluation settings, units and qualification rules](../gearkit/METROLOGY.md).
 The native adapter test is `stockkit/tests/metrology/haxeon.json`; its `reference`
 argument runs the heavy full-face hobbing acceptance case.
+
+The HB4 reference's aggregate convergence failure has a small boundary diagnostic:
+
+```sh
+machinekit/examples/flexspline-hobber/check-hb4-boundary.sh
+```
+
+This reuses the validated native provider (`HB4_PROBE_NATIVE` overrides its path),
+compiles only the metrology entrypoint and runs 103 original gash windows at the
+exact offending radius/Z. The first two endpoint/provenance pairs must exactly
+match saved full-stroke snapshots before studying refinements 2–5. The script
+records native/binary/fixture hashes, four threads, path tolerances and timings.
+Observed time is about 88 seconds. It is a diagnostic, not full-circle convergence
+or reference grading. `HB4_BOUNDARY_INPUT` selects the companion
+`stockkit/tests/metrology/fixtures/hb4-profile-boundary.json` (111 windows); use a
+separate `HB4_BOUNDARY_EVIDENCE` directory for its results. The `convergence-probe`
+entrypoint retains the slower four-circle/full-stroke reproduction for rebuilding
+these anchors. Reference acceptance still requires all inspection circles and the
+physical face ends to satisfy the unchanged 0.00005 mm total-arc criterion.
