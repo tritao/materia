@@ -858,6 +858,58 @@ int main() {
     }
 
     {
+        // A receding edge behind a thin face must stay hidden even when its
+        // screen-space ribbon has a steep depth slope. Compare whole captures
+        // so a few leaking pixels near either endpoint cannot go unnoticed.
+        auto scene = std::make_shared<Scene>();
+        const auto geometry = scene->reserve_geometry_id();
+        auto &resource = scene->geometry_store().create(geometry);
+        resource.edit_payload().vertices = {
+            {{{-0.8f, -0.8f, 0.0f}}}, {{{0.8f, -0.8f, 0.0f}}},
+            {{{0.8f, 0.8f, 0.0f}}}, {{{-0.8f, 0.8f, 0.0f}}}};
+        resource.edit_payload().indices = {0, 1, 2, 0, 2, 3};
+        const auto material = scene->reserve_material_id();
+        auto &state = scene->material_store().create(material).edit_state();
+        state.base_color = {1.0f, 1.0f, 1.0f, 1.0f};
+        state.emissive = {1.0f, 1.0f, 1.0f};
+        const auto node = scene->reserve_node_id();
+        Transaction create(scene);
+        create.add_create(node);
+        ChangeSet changes;
+        assert(scene->commit(create, changes) == NKS_OK);
+        create.close();
+        Transaction configure(scene);
+        configure.add_geometry(node, geometry);
+        configure.add_material(node, material);
+        assert(scene->commit(configure, changes) == NKS_OK);
+        configure.close();
+        nkscene::NativeKitGpuExecutor executor(renderer);
+        const auto capture = [&] {
+            scene->publish();
+            auto plan = nkscene::compile(scene->snapshot(), nkscene::SceneView{});
+            std::vector<std::uint8_t> pixels;
+            assert(executor.capture_rgba8(plan, scene->snapshot(), options.width,
+                options.height, {0.0f, 0.0f, 0.0f, 1.0f}, pixels) == NKGPU_OK);
+            return pixels;
+        };
+        for (const auto samples : {1u, 4u}) {
+            executor.set_sample_count(samples);
+            resource.edit_payload().stroke_segments.clear();
+            const auto face_only = capture();
+            for (const auto length : {0.8f, 0.2f}) {
+                resource.edit_payload().stroke_segments = {
+                    {{-0.25f, -length / 2, 0.0001f}, {-0.25f, length / 2, 0.3f}, 1},
+                    {{0.25f, -length / 2, 0.3f}, {0.25f, length / 2, 0.0001f}, 1}};
+                assert(capture() == face_only);
+            }
+            // Coplanar authored edges still render with the constant tie bias.
+            resource.edit_payload().stroke_segments = {
+                {{-0.25f, -0.4f, 0.0f}, {-0.25f, 0.4f, 0.0f}, 1}};
+            assert(capture() != face_only);
+        }
+    }
+
+    {
         // Transparency: zero opacity draws nothing, partial opacity blends with what lies
         // behind, opaque surfaces still hide translucent ones, and translucent surfaces
         // blend far to near whatever order they were created in.

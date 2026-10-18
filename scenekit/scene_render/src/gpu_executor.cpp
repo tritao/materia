@@ -894,7 +894,11 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
     depth.compare = NKGPU_COMPAREFUNC_LESS_EQUAL;
     depth.write_enabled = 0;
     depth.bias = -1.0f;
-    depth.bias_slope_scale = -2.0f;
+    // Strokes are screen-expanded ribbons, not surface polygons. Their depth
+    // slope can be arbitrarily steep (especially on receding short edges).
+    // Slope bias then pulls hidden edges through thin foreground surfaces.
+    // A constant depth-unit bias is enough to resolve coplanar edge ties.
+    depth.bias_slope_scale = 0.0f;
     nkgpu_blend_state blend{};
     blend.enabled = 1;
     blend.src_rgb = NKGPU_BLENDFACTOR_ONE;
