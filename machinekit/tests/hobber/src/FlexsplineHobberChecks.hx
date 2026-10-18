@@ -244,6 +244,7 @@ class FlexsplineHobberChecks {
     Sys.println('Reference load ratings: $assertions checks passed');
   }
   public static function main():Void {
+    if(Sys.args().length>0&&Sys.args()[0]=="interferences"){HobberInterferenceChecks.run();return;}
     if(Sys.args().length>0&&Sys.args()[0]=="reference-budget"){FlexsplineHobberBudget.run(Sys.args().slice(1));return;}
     if(Sys.args().length==1&&Sys.args()[0]=="wall-cuts"){wallCuts();return;}
     if(Sys.args().length==1&&Sys.args()[0]=="support-sensitivity"){supportSensitivity(100*Math.tan(20*Math.PI/180),100*Math.tan(20*Math.PI/180),100*Math.tan(20*Math.PI/180),"provisional assumed Fc=100 N design load; not a safe bound on the running cut; radial components conditional on this assumption",false,null,false);return;}

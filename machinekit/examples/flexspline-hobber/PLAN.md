@@ -472,6 +472,10 @@ r 30 mm. HB7 and HB11 must show this.
     not strictly additive).
 
 **HB12. Acceptance.**
+- Whole-machine mechanical clearance: resolve non-cutting exact-solid interferences
+  at assembly pose and across the permitted axis travel. Model actual seats,
+  passages and nut mounts; do not waive overlaps through as-designed collision
+  exclusions. Intended hob/stock cutting engagement is reported separately.
 - The reference flexspline with the reference parts grades **ISO 5–6** on every parameter. The
   report shows the budget.
 - A cheaper specification (2¹⁸-count encoder, 10 µm mandrel, 4 kHz loop without feedforward)
@@ -1831,3 +1835,40 @@ batch after saving that case. Do not start a second batch beside the live one.
   `mandrel-case-review.json` and `.md`. **Individual mandrel review is complete**;
   combined budget/signature superposition, other source cases, HB4 fine reference
   acceptance and HB12 remain open. No running cut or frozen provider was changed.
+
+
+### Whole-machine interference audit — layout acceptance reopened (2026-10-18)
+
+- The user's viewport review exposed a gap in the earlier acceptance claims.
+  The amber scene overlay is a proximity display, but its collision rules exclude
+  same-rigid-body, moving-joint neighbour and as-designed contacts. It cannot
+  establish that the machine's physical solids fit. Earlier HB6/HB9 checks proved
+  hob clearance from the mandrel/table and process envelopes, not whole-machine
+  clearance; their zero-collision result must not be presented as the latter.
+- Added `FlexsplineHobberChecks interferences [reference]`, using cached exact CAD
+  shapes and native common volumes for all broad-phase candidates, including
+  fixed/mating parts. At the initial pose, **86 parts / 204 candidates** produce
+  **80 positive-volume pairs in the coarse scene** and **82 in the reference**,
+  above 0.001 mm³. The boolean audits take **3.06 / 3.69 seconds**. Raw pair lists
+  and readable reports are in `build/flexspline-interferences/{coarse,reference}/`.
+  Hob/blank intersection is expected cutting engagement; these raw counts are
+  not an assertion that every pair is an unintended collision.
+- Concrete non-cutting problems include:
+  - Each Z rail overlaps its steel insert by **112,500 mm³**, its entire envelope
+    volume. Rail poses use the axis datum where the mounting-base datum is needed.
+  - Zplate/blockZLeft and Zplate/blockZRight each share **27,138.8 mm³**; the plate
+    needs actual block interfaces rather than a box laid through the blocks.
+  - Zplate also intersects an X rail, X bridge, screws, nuts and a screw support.
+    The Y plate likewise intersects its rail, block, screw and nut. Synthetic
+    fixed mates place these parts but do not create passages or mounting brackets.
+  - Z-drive hardware intersects the spindle package; other drive hardware and
+    scales intersect column/rail seats. These routes need a mechanical layout pass.
+  - Adjacent servo-drive enclosures overlap by **270,000 mm³**; their current
+    pitch and placement do not provide a usable electrical enclosure arrangement.
+- Mechanical layout is **not accepted**. HB12 now explicitly gates on whole-machine
+  solid clearance at rest and over travel, with real interfaces and separately
+  identified cutting engagement. Next design work is stage/drive/interface layout
+  correction followed by the same exact audit and a motion sweep. No geometry,
+  scene collision filters, active simulation window, HB4/HB11 cut or frozen native
+  provider was changed by this audit. Existing numerical source studies retain
+  their original, narrower scope.
