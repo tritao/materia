@@ -72,6 +72,9 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 	@:id(4) var material:Null<String>;
 	@:id(5) @:optional var typeId:String;
 	@:id(6) @:optional var valuesKey:String;
+	@:id(7) @:optional var familyId:String;
+	@:id(8) @:optional var manufacturingVariant:String;
+	@:id(9) @:optional var manufacturingProcess:String;
 }
 
 @:wire enum SavedBomMass {

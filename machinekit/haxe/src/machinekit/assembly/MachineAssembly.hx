@@ -142,6 +142,7 @@ class MachineAssembly {
 
 	static function copyBomItem(item:BomItem):BomItem return {partNumber: item.partNumber,
 		description: item.description, quantity: item.quantity, material: item.material,
+		familyId: item.familyId, manufacturingVariant: item.manufacturingVariant, manufacturingProcess: item.manufacturingProcess,
 		typeId: item.typeId, valuesKey: item.valuesKey};
 
 	// Mechanical -------------------------------------------------------------------------------

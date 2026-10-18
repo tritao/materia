@@ -27,6 +27,8 @@ class MaterialLibrary {
     material("aluminium", "Anodized aluminium 6061", [0.68, 0.70, 0.72], 0.72, 0.42, 2700, "aluminium 6061"),
     material("rubber", "Rubber", [0.10, 0.10, 0.11], 0.0, 0.90, 1100, "rubber"),
     material("nitrile-rubber", "Nitrile rubber", [0.10, 0.10, 0.11], 0.0, 0.90, 1100, "nitrile rubber NBR"),
+    // Nominal planning density; print-lot properties must be supplied for production validation.
+    material("pa12-nylon", "PA12 nylon (nominal)", [0.68, 0.69, 0.71], 0.0, 0.85, 1000, "PA12 nylon"),
     material("plastic", "Engineering plastic", [0.28, 0.30, 0.32], 0.0, 0.55, 1200, "plastic"),
     material("polycarbonate", "Polycarbonate", [0.58, 0.74, 0.79], 0.0, 0.2, 1200, "polycarbonate"),
     material("polyurethane", "Polyurethane", [0.26, 0.34, 0.37], 0.0, 0.65, 1200, "polyurethane PU"),

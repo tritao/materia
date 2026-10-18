@@ -1,0 +1,42 @@
+{
+  "format": "materia.project",
+  "version": 1,
+  "name": "DH Robotics PGC-140-50 reference",
+  "defaultEntrypoint": "custom",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
+  "entrypoints": {
+    "gripper": {
+      "kind": "cad-preview",
+      "module": "DhGripperPreview",
+      "function": "preview",
+      "cache": {
+        "inputs": [
+          "build/vendor/PGC-140-50.step"
+        ]
+      }
+    },
+    "custom": {
+      "kind": "cad-preview",
+      "module": "DhGripperPreview",
+      "function": "previewCustom",
+      "cache": {
+        "inputs": [
+          "build/vendor/PGC-140-50.step"
+        ]
+      }
+    },
+    "sls": {
+      "kind": "cad-preview",
+      "module": "DhGripperPreview",
+      "function": "previewSls",
+      "cache": {
+        "inputs": [
+          "build/vendor/PGC-140-50.step"
+        ]
+      }
+    }
+  }
+}

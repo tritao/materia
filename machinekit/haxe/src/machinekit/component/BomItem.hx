@@ -5,6 +5,9 @@ typedef BomItem = {
 	var description:String;
 	var quantity:Int;
 	var material:Null<String>;
+	var ?familyId:String;
+	var ?manufacturingVariant:String;
+	var ?manufacturingProcess:String;
 	var ?typeId:String;
 	var ?valuesKey:String;
 }

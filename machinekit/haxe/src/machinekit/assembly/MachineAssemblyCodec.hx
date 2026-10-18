@@ -266,6 +266,7 @@ class MachineAssemblyCodec {
 			switches: [for (entry in assembly.drives.switches) DriveSystem.copySwitch(entry, id -> id)],
 			bomExtras: [for (entry in assembly.inventory.items) {item: {partNumber: entry.item.partNumber,
 				description: entry.item.description, quantity: entry.item.quantity, material: entry.item.material,
+				familyId: entry.item.familyId, manufacturingVariant: entry.item.manufacturingVariant, manufacturingProcess: entry.item.manufacturingProcess,
 				typeId: entry.item.typeId, valuesKey: entry.item.valuesKey}, quantity: entry.quantity,
 				mass: switch entry.mass {
 					case Unknown: SavedBomMass.Unknown;

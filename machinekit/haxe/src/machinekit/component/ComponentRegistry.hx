@@ -14,6 +14,10 @@ class ComponentRegistry {
 		byKey.set(type.id, type);
 	}
 
+	public function registerFamily(family:ComponentFamily):Void register(family.recipe);
+
+	public function familyForType(id:String):Null<ComponentFamily> return byId(id).manufacturingFamily;
+
 	public function has(id:String):Bool return byKey.exists(id);
 
 	public function byId(id:String):ComponentType {

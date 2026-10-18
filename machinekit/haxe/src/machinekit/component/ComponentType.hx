@@ -6,6 +6,7 @@ import materia.project.MaterialLibrary;
 /** Stable recipe for one kind of single part. */
 class ComponentType {
 	public final id:String;
+	public var manufacturingFamily(default,null):Null<ComponentFamily>;
 	/** False when a typed mechanical input already determines the material. */
 	public final materialEditable:Bool;
 	final inputs:Array<ComponentParameter>;
@@ -82,8 +83,20 @@ class ComponentType {
 		return result;
 	}
 
-	public function create(?values:ComponentValues):MachineComponent
-		return build(resolve(values));
+	public function attachFamily(family:ComponentFamily):Void {
+		if (family.recipe != this || manufacturingFamily != null) throw "Recipe already belongs to a manufacturing family";
+		manufacturingFamily=family;
+	}
+
+	public function create(?values:ComponentValues):MachineComponent {
+		var resolved=resolve(values), component=build(resolved);
+		if (manufacturingFamily != null) {
+			var variant=manufacturingFamily.variant(resolved.token(manufacturingFamily.variantParameter));
+			if(component.materialSpec()!=variant.material) throw "Component material differs from manufacturing variant";
+			component.lockManufacturingMaterial(variant.material);
+		}
+		return component;
+	}
 
 	public function valuesOf(component:MachineComponent):ComponentValues {
 		if (!matches(component)) throw 'Component is not type "$id"';

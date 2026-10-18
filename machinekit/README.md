@@ -354,3 +354,35 @@ dual and independently sized tools:
 These are reference envelopes: jaw synchronization is an ideal mirrored coupling,
 and hose bends and fastener details are simplified. Changes to the installed tool
 geometry require regenerating the machine-tending reach certificate.
+
+### Parts with manufacturing variants
+
+`ComponentFamily` groups one interface contract and one registered `ComponentType`
+recipe with explicit `ManufacturingVariant` alternatives. The variant is a normal
+choice parameter: it participates in recipe values, geometry/cache identity and BOM
+identity, and survives saved-assembly reconstruction. A family rejects variant
+choices that collapse to the same BOM key. Its recipe locks material to the selected
+variant; changing only a material is not a manufacturing-route conversion.
+
+```haxe
+var family = machinekit.robotics.OffsetGripperFinger.family();
+var inputs = new machinekit.component.ComponentValues().setToken("side", "left");
+var machined = family.create("cnc-aluminium", inputs);
+var printed = family.create("sls-pa12", inputs);
+```
+
+The offset finger family shares `OffsetFingerSpec`: mounting/contact frames, two M4
+mount locations, the 26–76 mm gap and the 60 mm workpiece interface. The CNC variant
+uses aluminium 6061. The SLS PA12 variant has thicker legs, enlarged mounting blocks,
+larger root radii and flanged metal compression sleeves. Their geometry, material,
+mass, hardware requirements, BOM identities and pending manufacturing checks differ.
+`ComponentRegistry.familyForType()` exposes the relationship; BOM lines retain the
+family, manufacturing variant and process when aggregated or saved as extras.
+
+A variant's `prototype` status is manufacturing intent, not a certification. Family
+checks must establish interface compatibility; process-specific checks establish
+what is actually validated. Both current finger variants retain pending structural
+and manufacturing checks. The PA12 material's 1000 kg/m³ density is a nominal
+planning estimate, not a supplier/print-lot certificate. Required hardware is declared
+per part; the assembly must explicitly instantiate it, rather than silently treating
+it as part of the polymer's material or mass.

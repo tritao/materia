@@ -56,6 +56,7 @@ class MachineComponent {
 	/** Tells this component from every other, including ones built from the same recipe. */
 	public final instanceId:Int;
 
+	var manufacturingMaterial:Null<String>;
 	var cachedMass:Null<MassProperties>;
 	var cachedMassMaterialId:Null<String>;
 	var declaredMass:Null<MassProperties>;
@@ -80,7 +81,16 @@ class MachineComponent {
 
 	public function materialSpec():String return MaterialLibrary.require(materialId).physical.spec;
 
+	/** Factories lock a process-specific material without changing ordinary component recipes. */
+	public function lockManufacturingMaterial(spec:String):Void {
+		if (spec == null || spec != materialSpec() || (manufacturingMaterial != null && manufacturingMaterial != spec))
+			throw "Manufacturing material lock differs from component material";
+		manufacturingMaterial=spec;
+	}
+
 	public function setMaterial(spec:String):Void {
+		if (manufacturingMaterial != null && spec != manufacturingMaterial)
+			throw "Select a manufacturing variant to change this material";
 		materialId = MaterialLibrary.fromSpec(spec);
 		cachedBom = null;
 		cachedMass = null;
@@ -95,6 +105,11 @@ class MachineComponent {
 			description: description, quantity: 1,
 			material: MaterialLibrary.require(materialId).physical.spec,
 			typeId: recipe == null ? null : recipe.id, valuesKey: valuesKey};
+		if (recipe != null && recipe.manufacturingFamily != null) {
+			var family=recipe.manufacturingFamily;
+			var variant=family.variant(values().token(family.variantParameter));
+			cachedBom.familyId=family.id;cachedBom.manufacturingVariant=variant.id;cachedBom.manufacturingProcess=variant.process;
+		}
 		return cachedBom;
 	}
 
