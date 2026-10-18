@@ -50,6 +50,17 @@ class MillSpindleChecks {
 			var p=m.component.geometry(); check(p.valid(), 'valid spindle solid ${m.id}');
 			check(p.solidCount()==(m.id=="spindle/springs"?16:1),'connected spindle part ${m.id}'); p.close();
 		}
+		var guard=new MillSpindleBeltGuard().geometry(), faceted=false;
+		for (i in 0...guard.shape.subshapeCount(CadKit.ShapeKind.Face)) {
+			var face=guard.shape.subshape(CadKit.ShapeKind.Face,i);
+			if (face.surfaceKind()==CadKit.SurfaceKind.Plane) {
+				var n=face.faceNormal();
+				if (Math.abs(n.get_z())<1e-6 && Math.abs(n.get_x())>1e-6 && Math.abs(n.get_y())>1e-6 &&
+					Math.abs(150*n.get_x()+78*n.get_y())>1e-5) faceted=true;
+			}
+			face.close();
+		}
+		check(!faceted,"guard bends use cylindrical faces, not polygonal side facets"); guard.close();
 		var probe=new MachineAssembly(),fixed=new MachineAssembly(),blocked=new MachineAssembly();
 		probe.addComponent("probe",new MillPanel(20,20,20),materia.assembly.AssemblyFrames.translation(0,l.spindleY,l.headBottom+l.headHeight+150));
 		fixed.addComponent("obstruction",new MillPanel(20,20,20),materia.assembly.AssemblyFrames.translation(0,l.spindleY,l.headBottom+l.headHeight-50));
