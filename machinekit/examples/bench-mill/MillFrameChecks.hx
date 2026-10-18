@@ -65,10 +65,23 @@ class MillFrameChecks {
 			common = body.intersect(foot); near(common.volume(), 0, "foot clears access pocket and stem opening"); common.close();
 			body.close(); casting.close(); steel.close(); foot.close(); steelLocal.close(); footLocal.close();
 		}
+		check(layout.columnFootWidth > layout.columnWidth,"column has a wider separate foot");
+		for (side in ["Left","Right"]) for (end in ["Front","Rear"]) {
+			var id = side+end;
+			var bolt:AssemblyFrame = poses.get('columnBolt$id');
+			var blank = frame.column.body.geometry(), casting = PosedParts.moved(blank,poses.get("column/casting")); blank.close();
+			var access = cadkit.modeling.Part.cylinderSpan(15,bolt.z+12,layout.railPlane+150,bolt.x,bolt.y);
+			var common = casting.intersect(access); near(common.volume(),0,"column bolt has straight tool access");
+			common.close(); access.close(); casting.close();
+			near(bolt.z,layout.railPlane+layout.insertThickness,"clamp head bears on steel sole");
+			check(bolt.z-35 < layout.railPlane && bolt.z-35 > layout.railPlane-layout.insertThickness,"clamp engages embedded steel anchor");
+		}
 		var restored:MachineAssembly = MachineAssembly.decode(frame.encode(), MachineKitComponents.standard());
 		restored.validate();
 		check(restored.components().length == frame.components().length, "frame recipe roundtrip preserves parts");
 		var restoredPoses:Map<String, AssemblyFrame> = restored.solvedPoses();
+		var originalColumn=frame.column.body.geometry(),rebuiltColumn=restored.components().filter(m->m.id=="column/casting")[0].component.geometry();
+		near(originalColumn.volume(),rebuiltColumn.volume(),"tapered foot and access wells survive recipe roundtrip"); originalColumn.close(); rebuiltColumn.close();
 		for (member in frame.components()) {
 			var original:AssemblyFrame = poses.get(member.id);
 			var rebuilt:AssemblyFrame = restoredPoses.get(member.id);

@@ -111,19 +111,20 @@ class MillZAxisChecks {
 		study.addTo(studyModel, "");
 		var studyState = new AssemblyState(studyModel.definition("mill-z-integrated"));
 		var integratedPoses:Map<String, AssemblyFrame> = study.solvedPoses();
-		for (pair in [["zAxis/head", "spindle/spindleMotorRiser"], ["spindle/spindleMotorRiser", "spindle/spindleMotorShelf"],
-			["spindle/spindleMotorShelf", "spindle/spindleMotor"]]) {
+		for (pair in [["zAxis/head", "spindle/motorCarrier"], ["spindle/motorCarrier", "spindle/motor"], ["spindle/spindle","spindle/reactionFrame"], ["spindle/reactionFrame","spindle/cylinder"]]) {
 			var first = study.components().filter(member -> member.id == pair[0])[0].component.geometry();
 			var second = study.components().filter(member -> member.id == pair[1])[0].component.geometry();
 			var a = PosedParts.moved(first, integratedPoses.get(pair[0])), b = PosedParts.moved(second, integratedPoses.get(pair[1]));
 			first.close(); second.close(); near(a.distance(b), 0, 'spindle motor support ${pair[0]}/${pair[1]}');
 			noOverlap(a, b, "spindle motor support interference"); a.close(); b.close();
 		}
-		check(!MillSpindleServiceSpace.checkPayload(study, l).hasErrors(), "spindle drive clears reserved release space");
+		var payloadAudit=MillSpindleIntegrity.checkPayload(study,l); payloadAudit.throwIfErrors();
+		check(!payloadAudit.hasErrors(), "spindle package clears itself and fixed structure");
 		var obstruction = new MachineAssembly(), obstructed = new MachineAssembly();
-		obstruction.addComponent("releaseObstruction", new MillPanel(20, 20, 20), F.translation(0, l.spindleY, MillSpindleServiceSpace.bottom(l) + 20));
+		obstruction.addComponent("releaseObstruction", new MillPanel(20, 20, 20), F.translation(0, l.spindleY, (l.headBottom+l.headHeight+80) + 20));
+		obstruction.addComponent("releaseCylinder", new MillPanel(20,20,20),F.translation(0,l.spindleY,(l.headBottom+l.headHeight+80)+20));
 		obstructed.include("spindle", obstruction);
-		check(MillSpindleServiceSpace.checkPayload(obstructed, l).hasErrors(), "release-space check rejects an obstructed actuator allocation");
+		check(MillSpindleIntegrity.checkPayload(obstructed, l).hasErrors(), "release-space check rejects an obstructed actuator allocation");
 		var upperTool = studyState.worldPose("spindle/tool").z;
 		studyState.setJoint("zAxis/z", l.lower); studyState.forwardKinematics();
 		near(studyState.worldPose("spindle/tool").z - upperTool, l.lower, "spindle payload follows real Z joint");

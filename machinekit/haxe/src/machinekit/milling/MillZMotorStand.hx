@@ -12,6 +12,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 class MillZMotorStand extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 	public static function parameters():Array<ComponentParameter> return [
+			P.flag("anchored",false), P.length("registerDiameter",0),
 			P.length("width", 100), P.length("depth", 100), P.length("height", 32.5),
 			P.length("plate", 8), P.length("leg", 12), P.length("shaftBore", 22), P.length("boltPitch", 40)];
 	public static function recipeType():ComponentType {
@@ -35,9 +36,13 @@ class MillZMotorStand extends MachineComponent {
 		var w = parameterNumber("width"), d = parameterNumber("depth"), h = parameterNumber("height"), t = parameterNumber("plate");
 		var leg = parameterNumber("leg"), pieces = [Part.box(w, d, t).translated(new Vector(0, 0, h - t))];
 		for (side in [-1, 1]) pieces.push(Part.box(leg, d, h - t).translated(new Vector(side * (w - leg) / 2, 0, 0)));
+		if (values().boolean("anchored")) pieces.push(Part.box(160,20,8).translated(new Vector(0,-35,0)));
 		var tools = [Part.cylinderSpan(parameterNumber("shaftBore") / 2, h - t - 1, h + 1)];
 		for (x in [-parameterNumber("boltPitch") / 2, parameterNumber("boltPitch") / 2])
 			for (y in [-parameterNumber("boltPitch") / 2, parameterNumber("boltPitch") / 2]) tools.push(Part.cylinderSpan(3.3, h - t - 1, h + 1, x, y));
+		if (values().boolean("anchored")) for (side in [-1,1]) tools.push(Part.cylinderAlongY(1.65,-d/2-1,-d/2+10,side*(w-leg)/2,16));
+		if (values().boolean("anchored")) for (x in [-70.0,70.0]) tools.push(Part.cylinderSpan(3.3,-1,9,x,-35));
+		if (parameterNumber("registerDiameter") > 0) tools.push(Part.cylinderSpan(parameterNumber("registerDiameter")/2,h-2,h+1));
 		return Solids.cut(Solids.union(pieces), tools);
 	}
 }

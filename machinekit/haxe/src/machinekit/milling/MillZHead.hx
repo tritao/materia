@@ -12,6 +12,7 @@ class MillZHead extends MachineComponent {
 	public static inline var COUNTERBORE_DEPTH:Float = 6.5;
 	static var recipe:Null<ComponentType>;
 	public static function parameters():Array<ComponentParameter> return [
+			P.length("spindleDiameter",70), P.flag("bt30Mounts",false),
 			P.length("width", 180), P.length("reach", 204), P.length("height", 130),
 			P.length("noseWidth", 120), P.length("rearWidth", 180), P.length("rootExtension", 0), P.length("rearPlate", 12), P.length("boltX", 65), P.length("boltZ", 42),
 			P.length("spindleReach", 159), P.length("plate", 14), P.length("wall", 12)];
@@ -20,7 +21,7 @@ class MillZHead extends MachineComponent {
 		return recipe;
 	}
 	public function new(?values:ComponentValues) {
-		var v = P.resolve(parameters(), values), r = SpindleCartridge.DIAMETER / 2;
+		var v = P.resolve(parameters(), values), r = v.number("spindleDiameter") / 2;
 		if (v.number("width") <= 2 * (r + v.number("wall")) || v.number("height") <= 3 * v.number("plate") + 8 ||
 			v.number("spindleReach") <= r + v.number("wall") ||
 			v.number("reach") - v.number("spindleReach") <= r || v.number("wall") <= 0 || v.number("plate") <= 0)
@@ -37,7 +38,7 @@ class MillZHead extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var w = parameterNumber("width"), d = parameterNumber("reach"), h = parameterNumber("height");
 		var plate = parameterNumber("plate"), wall = parameterNumber("wall"), spindle = parameterNumber("spindleReach");
-		var collar = 2 * (SpindleCartridge.DIAMETER / 2 + 10), collarRear = -spindle + collar / 2;
+		var collar = 2 * (parameterNumber("spindleDiameter") / 2 + 10), collarRear = -spindle + collar / 2;
 		var rearPlate = parameterNumber("rearPlate");
 		var pieces = [Part.box(w, collar, h).translated(new Vector(0, -spindle, 0))];
 		for (z in [0.0, h - plate]) pieces.push(Part.box(w, d, plate).translated(new Vector(0, -d / 2, z)));
@@ -47,7 +48,7 @@ class MillZHead extends MachineComponent {
 		// Two cross webs connect the side walls, top and bottom into one body.
 		for (fraction in [1.0 / 3, 2.0 / 3]) pieces.push(Part.box(w, wall, h)
 			.translated(new Vector(0, collarRear * fraction, 0)));
-		var tools = [Part.cylinderSpan(SpindleCartridge.DIAMETER / 2, -1, h + 1, 0, -spindle)];
+		var tools = [Part.cylinderSpan(parameterNumber("spindleDiameter") / 2, -1, h + 1, 0, -spindle)];
 		// Two rows of side windows leave top/bottom chords, cross webs and a middle rib.
 		for (row in 0...2) for (cell in 0...3) {
 			var rear = collarRear * cell / 3 - wall / 2 - 2;
@@ -62,6 +63,10 @@ class MillZHead extends MachineComponent {
 				tools.push(Part.cylinderAlongY(3.3, -rearPlate - 1, 1, x, z));
 				tools.push(Part.cylinderAlongY(5.5, -rearPlate - 1, -rearPlate + COUNTERBORE_DEPTH, x, z));
 			}
+		if (values().boolean("bt30Mounts")) {
+			for (y in [-spindle+58,-spindle+88]) tools.push(Part.cylinderSpan(2.5,h-12,h+1,55,y));
+			for (i in 0...6) { var a=i*Math.PI/3; tools.push(Part.cylinderSpan(2.5,-1,12,53.5*Math.cos(a),-spindle+53.5*Math.sin(a))); }
+		}
 		var raw = Solids.union(pieces), nose = parameterNumber("noseWidth");
 		var outline = Part.prism([new Vector(-w/2, 0), new Vector(w/2, 0), new Vector(nose/2, collarRear),
 			new Vector(nose/2, -d), new Vector(-nose/2, -d), new Vector(-nose/2, collarRear)], 0, h);

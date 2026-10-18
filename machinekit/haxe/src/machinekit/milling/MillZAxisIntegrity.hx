@@ -45,7 +45,6 @@ class MillZAxisIntegrity {
 			swept.push(box(owned, b.maxX-b.minX, b.maxY-b.minY, b.maxZ-b.minZ+travel,
 				(b.minX+b.maxX)/2, (b.minY+b.maxY)/2, b.minZ+l.lower));
 		}
-		var service = MillSpindleServiceSpace.geometry(l, true); owned.push(service); swept.push(service);
 		var framePoses:Map<String, AssemblyFrame> = frame.solvedPoses();
 		for (member in frame.components()) {
 			var local = member.component.geometry(); owned.push(local);
@@ -55,7 +54,7 @@ class MillZAxisIntegrity {
 				out.error("mill-z.channel-clearance", member.id, "Central nut shelf does not retain its specified casting clearance over full travel");
 			fixed.close();
 		}
-		for (id in ["fixedMount", "floatingMount", "fixedBearing", "floatingBearing", "motorStand", "motor", "railLeft", "railRight"]) {
+		for (id in ["fixedMount", "floatingMount", "fixedBearing", "floatingBearing", "motorStand", "couplingGuard", "motor", "railLeft", "railRight"]) {
 			var part = axis.components().filter(m -> m.id == id)[0].component.geometry();
 			owned.push(part);
 			var fixed = PosedParts.moved(part, poses.get(id)); owned.push(fixed); part.close();

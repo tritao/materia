@@ -39,7 +39,7 @@ The rear hatch mounts to steel anchors in the column. Allow 163 mm behind the
 column rear face for modeled motor extraction (123 mm beyond the base), plus
 cable/tool access. The front bearing is accessible from above. The former deep
 base channel and tall nut bridge are removed; only 8 mm deep seat recesses
-remain. Central underside casting cores are restored. The lower column retains
+remain at the drive stations. The rail-side fields are lowered 20 mm. Central underside casting cores are restored. The lower column retains
 side supports and a 60 mm casting roof above the motor bay. Sealing, cover edges,
 mounting fasteners and structural qualification remain unfinished.
 
@@ -67,63 +67,47 @@ inside the column channel, fixed/floating bearings, a motor stand and brake
 hardware. Its tapered steel head has a 234 mm rear flange, a 120 mm nose, two rows
 of side windows and continuous top/bottom chords. Four nominal M6 × 16 bolts
 attach the flange to blind carriage taps, with straight tool access beside the
-180 mm rear body. Spindle reach and the existing manual spindle remain fixed.
-The head carries the offset
-belt motor. Nominal structural clearance is 3 mm. The X/Y geometric overrun
+180 mm rear body. Spindle reach remains fixed. The head carries the BT30 packaging study and
+its braced rear-corner belt motor. Nominal structural clearance is 3 mm. The X/Y geometric overrun
 reserves are 7/2 mm; these are not established stopping distances.
 
-## ATC spindle and head decision
+## BT30 spindle packaging study
 
-The existing `SpindleCartridge` models a manual ER20 cartridge, not an ATC spindle.
-Adding a cylinder alone cannot establish drawbar or toolholder compatibility.
+`MillSpindleHead` now owns the cartridge, holder, drawbar, spring stack,
+gripper/pull stud, reaction frame, pneumatic cylinder/rod/piston, rear-corner
+motor, belt and motor carrier. The legacy ER20 machine keeps its independent
+motion/control example. All new parts have rebuild recipes.
 
-A candidate for dimensional review is PMK's short-nose **100MCB30SSS BT30**.
-The [manufacturer's datasheet](https://pmkindia.com/datasheets/spindles_belt-driven-spindles-for-machining-center.pdf)
-lists a 100 mm housing, L8 of 264 mm, a maximum speed of 12000 rpm and 2800 N
-clamping force for the 100 mm BT30 family. These are candidate catalog facts,
-not a purchase selection or an installation drawing. Clamping force must not
-be substituted for the actuator's required release force.
+The study targets 2.2 kW at 8000 rpm with a 1:1 HTD5M drive: 40T pulleys, a nominal 540 mm belt and 170 mm centers.
+Its stated 5000 N/mm cord rigidity per width is an assumption. Its compact motor is
+an **assumed** Ø90 × 160 mm body with a 110 mm flange; it is not the motor in the
+Automation Technology kit. The cartridge uses the DAIYA reference's Ø90 body
+and Ø125 flange, with explicitly assumed axial interfaces and mounting pattern.
+The nominal 7:24 taper is packaging geometry, not a toleranced BT30 interface.
 
-This candidate does not fit the current 70 mm head bore. Before changing the
-installed spindle model, obtain its controlled drawing, gauge datum, mass,
-bearing load limits, nose/toolholder/pull-stud specification, pulley journal and
-mounting fits. Select the matching drawbar and release actuator together, including
-release force/stroke, operating pressure, sensors and the release-force reaction
-path. Then revise the head collar, ribs, motor shelf and belt layout around them.
+The motor sits behind and to the right of the cartridge on a braced steel
+carrier bolted to the head. Four slotted mounting holes provide ±8 mm plate
+adjustment. A sliding register slot and tension screw, clearance for reaction-frame posts, actual
+mounting bolts and separate pulleys make the fit reviewable. A bolted belt guard encloses the drive. Both ±8 mm adjustment endpoints are
+checked for interference. Belt selection, cable connectors and motor removal
+still need supplier and service-envelope qualification.
 
-Reserve access above the spindle for the release assembly, hose connections and
-removal, throughout Z travel. A release reaction bridge must connect to the
-specified stationary spindle structure; do not assume a load path through the
-bearings. No actuator, ATC capability or supplier-sized keepout is presently
-claimed by the preview. The magazine/exchange mechanism follows this interface.
+The four-post release frame bears on the stationary cartridge rear housing.
+It carries an assumed double-acting cylinder with a 100 mm bore envelope,
+120 mm square end caps and 100 mm overall length. The two inspection joints
+are `spindle/drawbar-release` (4.5 mm) and `spindle/pistonRod-release` (6.5 mm,
+including a 2 mm retracted gap). These are packaging assumptions, **not** a
+matched supplier stroke/force specification. The spring stack does not deform
+in the rigid-body view, and gripper jaw opening/tool ejection is not simulated.
+Release inspection motions do not constitute an operating tool changer.
 
-The [Tormach BT30 upgrade procedure](https://knowledgebase.tormach.com/1100m/bt30-spindle-upgrade-m-to-mx-installation-manual)
-is a reference for treating spindle/drawbar hardware as a matched installation;
-its part numbers and air settings are not specifications for our candidate.
+The longer holder shifts the head and lengthens the column/Z guides while
+preserving the original tool-tip range and 250 mm Z stroke. Full-stroke CAD
+checks include the actual spindle payload against fixed structure and the
+Cartesian XYZ envelope, plus attachment clearances at the common head pose.
+Nominal threaded engagements and belt/tooth contact are named audit exclusions.
 
-## Next spindle package: architecture and supplier comparison
-
-Develop the cartridge, drawbar, release mechanism, motor mount and belt drive as
-one spindle-head package. Retain the current preview until a package has real
-mounting datums; the blue 120 × 200 mm volume remains a project allocation.
-The working target for comparison is a compact BT30 package around 2.2 kW and
-6000–8000 rpm, subject to the requested spindle speed/power choice.
-
-The preferred motor position is behind the spindle, toward the carriage, on a
-plate carried by both rear head webs and its mounting structure. A rear-corner
-position is the fallback when the actuator or column prevents a centerline fit.
-Check actual motor body, flange, connectors, cylinder fittings and maintenance
-space before deciding the offset. The present narrow collar bridge is not the
-mount for the future larger motor. Provide positive belt adjustment, a locking
-arrangement, accessible mounting bolts and a removable belt guard. Check belt
-radial loads against both spindle and motor limits.
-
-Use a spring-clamped drawbar with the selected BT30 gripper and pull stud; the
-release actuator acts through the supplier-approved reaction structure. Model
-clamped, released and rotating-clearance positions, including tool ejection and
-actuator retraction. Verify minimum inlet pressure, force versus stroke, return
-behavior, and independent clamp/release feedback. A nominal cylinder bore or
-catalog clamping force alone is not a release-system specification.
+Supplier comparison remains necessary before purchasing or making the head:
 
 | Reference | Published information | Remaining selection issue |
 | --- | --- | --- |
@@ -132,19 +116,13 @@ catalog clamping force alone is not a release-system specification.
 | [Automation Technology complete kit](https://www.automationtechnologiesinc.com/download/17588/) | 90 mm BT30 cartridge, 6000 rpm, 2.2 kW motor; drawing labels motor L=380 mm and includes release-cylinder/frame drawings | Bulky reference; current motor and blue allocation cannot represent this kit; confirm actuator force at operating pressure and ambiguous drawing units |
 | [Tormach 770MX release assembly](https://knowledgebase.tormach.com/770mx/bt30-power-drawbar-cylinder-770mx) | Two-stack double-acting 100 mm bore cylinder, 25 mm stroke, dedicated plate and standoffs | Reference for matched architecture; not interchangeable release hardware for another spindle |
 
-The complete kit drawings demonstrate why the current 1.1 kW motor envelope and
-120 × 200 mm reservation cannot simply be reused as verified BT30 geometry.
 The [Tormach head parts](https://knowledgebase.tormach.com/770mx/spindle-head-770mx)
-also distinguish the motor base/pivot plate, spindle assembly and power drawbar.
-
-Implement a dedicated spindle-package assembly with explicit gauge-line,
-cartridge-seat, pulley, motor-mount and release-reaction datums. Keep the legacy
-ER20 machine independent. Replace the preview's legacy spindle-payload extraction
-when the new package is selected, rather than accumulating special-case offsets.
-Validate full XYZ motion, release motion, belt adjustment and removal envelopes,
-then rerun guide loads using the new masses. Automatic tool exchange additionally
-requires a magazine/rack, tool forks, exchange poses and control sequencing;
-powered drawbar release alone is not a complete tool changer.
+illustrate the separate motor base, cartridge and drawbar mounting structure.
+The current study adopts that separation without claiming those parts fit.
+Actual release force versus pressure/stroke, spring preload, bearing reaction
+loads, retention, spindle orientation and independent clamp/release feedback
+remain selection gates. A magazine/rack, forks, exchange poses and sequencing
+are a later assembly.
 
 ## Services and controls to implement
 
@@ -177,6 +155,7 @@ Run these commands sequentially: the example configurations share one output dir
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.xy-stage-tests.json
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.z-axis-tests.json
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.frame-tests.json
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.spindle-tests.json
 ./haxeon/scripts/haxeon run --project=machinekit/tests/casting/haxeon.json
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.frame.json
 ./app/run-built.sh --project="$PWD/machinekit/examples/bench-mill/build/mill-frame-concept.mtrg" --perspective
@@ -187,15 +166,16 @@ Outputs under `build/`:
 - `mill-frame.mtrg`: castings, steel seats and leveling feet.
 - `mill-z-axis.mtrg`: frame and mechanical Z assembly.
 - `mill-xy-stage.mtrg`: isolated cross slide, drives, nominal bolts and hoods.
-- `mill-frame-concept.mtrg`: complete mechanical XYZ concept and existing spindle.
+- `mill-frame-concept.mtrg`: complete mechanical XYZ concept and BT30 spindle study.
 - `mill-frame-concept.json`: travel, dimensions, casting masses and audit status.
 - `design-review/review.json`: assumptions, static guide study, idealized table
   section comparison, ATC candidate, services requirements and all nine stage statuses.
 - `design-review/interfaces.csv`: modeled versus unresolved mounting interfaces.
-- `design-review/*.step`: seven local-coordinate concept parts for CAD review.
+- `design-review/*.step`: twelve local-coordinate concept parts for CAD review.
   These are not dimensioned/toleranced manufacturing drawings.
 
-The preview exposes `xyStage/x`, `xyStage/y` and `zAxis/z`. Tests cover joint
+The preview exposes `xyStage/x`, `xyStage/y`, `zAxis/z`, spindle rotation
+(`spindle/rotor-turn`) and the two release inspection joints. Tests cover joint
 motion and signed screw/belt relations before and after recipe restoration,
 connected solids, physical support contacts, foot openings, casting/steel
 partitioning, drive containment and negative collision controls.
@@ -209,7 +189,8 @@ moving motor pocket conservatively.
 The return-drive fit inside the saddle is also checked with actual CAD.
 `MillZAxisIntegrity` checks continuous moving structural envelopes against the
 frame and stationary Z hardware. These are nominal-stroke structural checks,
-not full spindle/service/enclosure or braking qualification.
+not service/enclosure or braking qualification. `MillSpindleIntegrity` adds
+actual payload and full Cartesian XYZ clearance checks.
 
 ## Nine-stage review and release gates
 
@@ -219,8 +200,8 @@ not full spindle/service/enclosure or braking qualification.
 | 2. X/Y drives | Recessed X return drive; protected Y direct drive | Verified motors, belt/tensioner, retention and life |
 | 3. Base and feet | Side pockets, supported bored steel seats, foot envelopes | Ratings, anchoring, stability and casting process |
 | 4. Saddle/table | Integral ribs and section comparison | Complete drilling and assembled stiffness assessment |
-| 5. ATC spindle | Documented BT30 candidate and incompatibilities | Controlled spindle/drawbar/actuator drawings and selection |
-| 6. Head/carriage | Taller carriage and braced, deep head root | ATC collar, release reaction bridge, mounts and stiffness |
+| 5. ATC spindle | Rebuildable BT30/drawbar/cylinder packaging study | Controlled spindle/drawbar/actuator drawings and selection |
+| 6. Head/carriage | BT30 bore, bolted reaction frame and braced motor carrier | ATC collar, release reaction bridge, mounts and stiffness |
 | 7. Interfaces | X motor plate, reference bearing bolts, foot bores | Remaining patterns, fasteners, access, welds and anchors |
 | 8. Services | Motor hoods and defined service/control requirements | Way covers, lubrication, cables, coolant, sensors and controls |
 | 9. Validation | Continuous sweeps, static guide admission, concept STEP packet | Whole-machine FEA, thermal/modal evidence, manufacturing drawings |
@@ -243,36 +224,37 @@ material-property provenance, finish-machine the precision interfaces after
 casting as specified by the chosen process, and develop moulds, curing, lifting,
 inspection and assembly instructions from the final geometry.
 
-## Z head and release-space study
+## Separate column joint and structural access
 
-`mill-spindle-service-study.mtrg` shows the revised head, carriage, existing
-spindle drive and a blue **reserved space**, not installed actuator hardware.
-The project allocation is 120 mm diameter × 200 mm high, beginning 80 mm above
-the head. Those dimensions are assumptions and are not derived from a supplier
-release-force or actuator drawing. The allocation clears the existing payload
-and is swept through Z travel against the fixed structure and full XY envelope.
-It contributes no mass to the machine load study.
+The 320 mm column now has a 440 mm wide inverted-T foot, with a 60 mm high
+sole and tapered shoulders reaching the upright at 120 mm. `MineralCasting`
+supports this optional structural foot as saved geometry; old recipes retain
+their original box bodies. Base and column remain distinct castings.
 
-The PMK BT30 candidate still needs a new spindle bore, release reaction bridge,
-actuator mount, gauge datum and drive layout once supplier drawings are selected.
-Current webs and flange fasteners are nominal geometry; welds, insert anchorage,
-preload, stiffness, thermal behavior and release loads require qualification.
+Four nominal M12 × 35 clamps sit in open access wells, each bearing on a steel
+sole pad and engaging a separate embedded steel base anchor. The pattern is
+380 mm across and 140 mm fore/aft. Machined pad pairs allow alignment/shimming;
+anchor development, joint preload/strength and permanent locating features
+remain engineering inputs. The central Y motor bay and rear extraction path
+remain open.
 
-## Reference-inspired XYZ structure
+The Y beds stand 20 mm above the lowered side and center fields, while the
+finished rail plane stays at 224 mm. A retained island supports the front
+bearing insert. Y rails span 220 mm, with 101.4 mm between block centers along
+Y. Four saddle mounting pads, relieved undersides, deep side openings, continuous
+X-guide chords/end webs and the central nut spine replace shallow cosmetic
+pockets. Sixteen M4 × 20 block bolts have top access wells; wrench clearance
+is checked with the X motor installed. The 508 mm Y rails end in explicit
+front-face reliefs in the lower Z bearing plate, retaining the plate's rear
+section and anchor stations.
 
-The supplied machine image guides the arrangement, not dimensions or load ratings.
-Y guides now span 220 mm and support a longer four-block footprint (85.4 mm
-center spacing along Y). The saddle keeps continuous top/bottom
-chords and central nut attachment material around its shallow side pockets.
-X guides and integral table ribs share a 160 mm spacing. Rib spacing is a saved
-component parameter rather than a drawing-only adjustment.
+The upper Z motor stand has a broad bolted foot, open cheeks, motor register,
+mounting bolts and removable front coupling guard. The motor can lift away
+without removing the fixed bearing. Register/pattern dimensions remain
+assumed motor interfaces, and bolt preload/welds require qualification.
 
-Z uses 141.4 mm block-center spacing, a taller carriage and a 190 mm deep rear
-head flange around its 130 mm spindle collar. Upper/lower triangular webs brace
-that root. The column and Z guides grow 40 mm to preserve the 250 mm Z stroke
-and guide end margins. X/Y strokes remain 250/160 mm; table height, spindle
-position, base footprint and the rear direct Y drive remain unchanged. Its shaft is now at the saddle underside.
-
-All eight XY blocks and all four Z blocks must physically contact their carrying
-structures. Continuous CAD sweeps include the larger root, saddle and table ribs.
-This step does not select or install the pending BT30 spindle or pneumatic release.
+`mill-spindle-service-study.mtrg` shows actual modeled spindle/release hardware
+with the head and column. It no longer displays a blue reserved cylinder.
+The preview and STEP packet remain a mechanical design study; manufacturing
+qualification and installed lubrication, way covers, sensors and controls
+remain outstanding.

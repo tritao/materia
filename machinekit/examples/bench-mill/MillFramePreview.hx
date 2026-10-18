@@ -3,8 +3,6 @@ import machinekit.assembly.AssemblyPreview;
 import machinekit.milling.MillFrame;
 import machinekit.milling.MillFrameLayout;
 import machinekit.milling.MillZAxis;
-import machinekit.milling.MillSpindleServiceSpace;
-import machinekit.milling.MillSpindleMotorSupport;
 import machinekit.milling.MillZAxisLayout;
 import machinekit.milling.MillZAxisIntegrity;
 import machinekit.milling.MillXYStage;
@@ -25,10 +23,16 @@ class MillFramePreview {
 		var yRail:LinearRail = cast reference.components().filter(row -> row.id == "railYLeft")[0].component;
 		var zRail:LinearRail = cast reference.components().filter(row -> row.id == "railZLeft")[0].component;
 		var rise = stageRise(reference);
-		return new MillFrameLayout({yRailSpacing: 220, yRailStart: y.y - 100, yRailLength: yRail.length + 80,
-			columnFront: column.y - reference.column.depth / 2, columnHeight: reference.column.height + rise + 40,
+		return new MillFrameLayout({yRailSpacing: 220, yRailStart: y.y - 100, yRailLength: yRail.length + 88,
+			columnFront: column.y - reference.column.depth / 2, columnHeight: reference.column.height + rise + 40 + spindleStackRise(reference),
 			zRailSpacing: Math.max(180, reference.column.railSpacing),
-			zRailStart: z.z - reference.base.height + 100, zRailLength: zRail.length + rise - 60}, {baseWidth: 520, frontExtension: 40, footPockets: true});
+			zRailStart: z.z - reference.base.height + 100, zRailLength: zRail.length + rise - 60 + spindleStackRise(reference)}, {baseWidth: 520, columnFootWidth: 440, frontExtension: 40, footPockets: true});
+	}
+
+	public static function spindleStackRise(reference:BenchMill):Float {
+		var poses:Map<String,AssemblyFrame> = reference.solvedPoses();
+		var head:AssemblyFrame = poses.get("head"), tool:AssemblyFrame = poses.get("tool");
+		return machinekit.milling.Bt30Cartridge.SEAT+35+reference.tool.stickout-(head.z-tool.z);
 	}
 
 	public static function stageRise(reference:BenchMill):Float
@@ -37,7 +41,7 @@ class MillFramePreview {
 	public static function zLayout(reference:BenchMill, layout:MillFrameLayout, guideBlock:Null<machinekit.motion.LinearRailBlock> = null):MillZAxisLayout {
 		var poses:Map<String, AssemblyFrame> = reference.solvedPoses();
 		var head:AssemblyFrame = poses.get("head"), spindle:AssemblyFrame = poses.get("spindle");
-		return new MillZAxisLayout(layout, head.z + layout.railPlane - reference.base.height + stageRise(reference),
+		return new MillZAxisLayout(layout, head.z + layout.railPlane - reference.base.height + stageRise(reference) + spindleStackRise(reference),
 			reference.head.height, spindle.y, reference.specs[2].lower, BenchMill.RAIL, guideBlock, layout.railPlane + machinekit.motion.LinearRailBlock.metric(BenchMill.RAIL).spec.blockHeight);
 	}
 
@@ -57,31 +61,15 @@ class MillFramePreview {
 
 	public static function concept(reference:BenchMill, frame:MillFrame):MachineAssembly {
 		var result = structure(frame);
-		var state:Map<String, AssemblyFrame> = reference.solvedPoses();
-		var rise = frame.layout.railPlane - reference.base.height + stageRise(reference);
-		var spindleParts = new MachineAssembly();
-		var spindleIds:Array<String> = [];
-
-		var spindle:AssemblyFrame = state.get("spindle");
-		var spindleOrigin = F.translation(spindle.x, spindle.y, spindle.z + rise);
-		for (member in reference.components()) {
-			if (!spindlePart(member.id)) continue;
-			var sourcePose:AssemblyFrame = state.get(member.id);
-			var pose = F.compose(F.translation(0, 0, rise), sourcePose);
-			var component = member.component;
-			if (member.id == "spindleMotorRiser") {
-				var shelf:AssemblyFrame = state.get("spindleMotorShelf");
-				var z:MillZAxisLayout = frame.zAxis;
-				component = new MillSpindleMotorSupport(shelf.z + rise - z.headBottom - z.headHeight);
-				pose = F.translation(0, z.spindleY + 5, z.headBottom + z.headHeight);
-			}
-			spindleParts.addComponent(member.id, component, pose);
-			spindleParts.addMemberConnector(member.id, "studyOrigin", F.identity());
-			spindleIds.push(member.id);
-			if (member.id != "spindle") spindleParts.addMemberConnector("spindle", 'payload-${member.id}',
-				F.compose(F.inverse(spindleOrigin), pose));
-		}
-		for (id in spindleIds) if (id != "spindle") spindleParts.addMate('payload-$id', "fixed", "spindle", 'payload-$id', id, "studyOrigin");
+		var spindleLayout:MillZAxisLayout = frame.zAxis;
+		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout);
+		var spindleOrigin = spindleParts.gauge;
+		var tool = new machinekit.milling.FlatEndMill(new machinekit.component.ComponentValues().setNumber("diameter",reference.tool.diameter)
+			.setNumber("fluteLength",reference.tool.fluteLength).setNumber("stickout",reference.tool.stickout));
+		spindleParts.addComponent("tool",tool,F.translation(0,spindleLayout.spindleY,spindleOrigin.z-35-reference.tool.stickout));
+		spindleParts.addMemberConnector("holder","toolSeat",F.translation(0,0,-35-reference.tool.stickout));
+		spindleParts.addMemberConnector("tool","seat",F.identity());
+		spindleParts.addMate("tool-in-holder","fixed","holder","toolSeat","tool","seat");
 		result.include("spindle", spindleParts);
 		if (frame.xyAxis == null) throw "Full mill concept needs XY steel drive seats";
 		var xy = new MillXYStage(frame.xyAxis);
@@ -98,11 +86,9 @@ class MillFramePreview {
 		return result;
 	}
 
-	static function spindlePart(id:String):Bool return ["spindle", "holder", "tool", "spindleMotor", "spindlePulley",
-		"spindleMotorPulley", "spindleMotorShaft", "spindleBelt", "spindleMotorShelf", "spindleMotorRiser"].indexOf(id) >= 0;
-
 	static function writeServiceStudy(assembly:MachineAssembly, layout:MillZAxisLayout, directory:String):Void {
-		MillSpindleServiceSpace.checkPayload(assembly, layout).throwIfErrors();
+
+		machinekit.milling.MillSpindleIntegrity.checkPayload(assembly,layout).throwIfErrors();
 		var poses:Map<String,AssemblyFrame> = assembly.solvedPoses(), cache = new machinekit.assembly.PosedParts();
 		var parts:Array<materia.project.SceneArtifact.SceneArtifactPart> = [];
 		try for (member in assembly.components()) if (member.id == "zAxis/head" || member.id == "zAxis/carriage" ||
@@ -110,9 +96,6 @@ class MillFramePreview {
 			parts.push(AssemblyPreview.part(member.id, member.component.description, cache.posed(member.component, poses.get(member.id)), member.component.materialId));
 		catch(e:Dynamic) { cache.close(); throw e; }
 		cache.close();
-		var space = AssemblyPreview.part("reserved-release-space", "RESERVED release mechanism space — assumed 120 x 200 mm", MillSpindleServiceSpace.geometry(layout), "machined-steel");
-		space.appearance = null; space.red = 0.2; space.green = 0.7; space.blue = 0.9; space.physicalMassKg = 0;
-		parts.push(space);
 		// This static inspection scene carries no physics. CAD clearance is checked above and by the axis audits.
 		var model = new cadkit.modeling.AssemblyModel("mm");
 		for (part in parts) model.add(part.id);
@@ -147,7 +130,7 @@ class MillFramePreview {
 			xy: {tableTop: xy.tableTop, saddleHeight: MillXYStageLayout.SADDLE_HEIGHT, tableRibDepth: MillXYStageLayout.RISER_HEIGHT, xOvertravel: xy.xOvertravel, yOvertravel: xy.yOvertravel, yScrewZ: xy.yScrewZ, yMotorFace: xy.yMotorFace, yBayRoof: l.roof, yBayLocation: "lower column", yServiceRear: xy.yServiceRear},
 			z: {screwX: 0, screwY: z.screwY, guideSpacing: l.zRailSpacing, lower: z.lower, upper: 0},
 			castingMassKg: {base: frame.base.castingByWeight().kg, column: frame.column.castingByWeight().kg},
-			pending: ["ATC spindle/drawbar/actuator selection and head redesign", "guide/block drilling, vendor mounting patterns and installed fasteners", "insert anchorage and strength analysis",
+			pending: ["BT30 study axial interfaces, release force/stroke and supplier selection", "guide/block drilling, vendor mounting patterns and installed fasteners", "insert anchorage and strength analysis",
 				"electrical brake and motor controls", "chip drainage and enclosure", "lifting and mold design", "material qualification and static/modal analysis"]};
 		MillDesignStudy.write(concept(reference, frame), frame, directory);
 		sys.io.File.saveContent(directory + "/mill-frame-concept.json", haxe.Json.stringify(report, null, "  "));

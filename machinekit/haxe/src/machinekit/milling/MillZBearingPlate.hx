@@ -10,7 +10,8 @@ import machinekit.component.ComponentRecipeSupport as P;
 class MillZBearingPlate extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 	public static function parameters():Array<ComponentParameter> return [
-			P.length("width", 220), P.length("height", 80), P.length("thickness", 20),
+			P.flag("guideRelief",false),P.length("guideSpacing",220),P.length("guideWidth",15),
+			P.flag("topAnchors",false), P.length("width", 220), P.length("height", 80), P.length("thickness", 20),
 			P.length("crossShaftZ", 0), P.length("bearingZ", 40), P.length("anchorZ", 10), P.length("anchorSpacing", 180)];
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.milling.z-bearing-plate", parameters(), v -> new MillZBearingPlate(v));
@@ -36,6 +37,9 @@ class MillZBearingPlate extends MachineComponent {
 		for (side in [-1, 1]) tools.push(Part.cylinderAlongY(3.3, -t / 2 - 1, t / 2 + 1,
 			side * parameterNumber("anchorSpacing") / 2, parameterNumber("anchorZ")));
 		if (parameterNumber("crossShaftZ") > 0) tools.push(Part.cylinderAlongY(12, -t/2-1, t/2+1, 0, parameterNumber("crossShaftZ")));
+		if (values().boolean("guideRelief")) for (side in [-1,1]) tools.push(Part.box(parameterNumber("guideWidth")+6,7,19)
+			.translated(new cadkit.modeling.Vector(side*parameterNumber("guideSpacing")/2,-t/2+2.5,-1)));
+		if (values().boolean("topAnchors")) for (x in [-70.0,70.0]) tools.push(Part.cylinderSpan(2.5,parameterNumber("height")-14,parameterNumber("height")+1,x,0));
 		return Solids.cut(Part.box(parameterNumber("width"), t, parameterNumber("height")), tools);
 	}
 }

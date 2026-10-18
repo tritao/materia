@@ -14,6 +14,7 @@ class MineralCasting extends MachineComponent {
 
 	public static function parameters():Array<ComponentParameter> return [
 		P.length("width", 650), P.length("depth", 550), P.length("height", 120),
+		P.length("footWidth", 0), P.length("footHeight", 0), P.length("footShoulder", 0),
 		P.length("cornerChamfer", 0), P.text("voids", "[]")];
 
 	public static function recipeType():ComponentType {
@@ -30,6 +31,11 @@ class MineralCasting extends MachineComponent {
 		for (name in ["width", "depth", "height"]) if (v.number(name) <= 0) throw "Casting dimensions must be positive";
 		if (2 * v.number("cornerChamfer") >= Math.min(v.number("width"), v.number("depth")))
 			throw "Casting chamfer consumes the body";
+		if (!Math.isFinite(v.number("footWidth")+v.number("footHeight")+v.number("footShoulder")) ||
+			(v.number("footWidth")==0 && (v.number("footHeight")!=0 || v.number("footShoulder")!=0))) throw "Incomplete casting foot";
+		if (v.number("footWidth") != 0 && (v.number("footWidth") <= v.number("width") ||
+			v.number("footShoulder") <= 0 || v.number("footHeight") <= v.number("footShoulder") ||
+			v.number("footHeight") >= v.number("height"))) throw "Casting foot needs a wider sole and a tapered shoulder";
 		super("MINERAL-CASTING", "Mineral casting (purchase by casting mass, kg)", "mineral cast", false, v);
 		voids = cuts;
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
@@ -49,6 +55,14 @@ class MineralCasting extends MachineComponent {
 		var body = Solids.named(c == 0 ? Part.box(2*x, 2*y, h) : Part.prism([
 			new Vector(-x+c,-y), new Vector(x-c,-y), new Vector(x,-y+c), new Vector(x,y-c),
 			new Vector(x-c,y), new Vector(-x+c,y), new Vector(-x,y-c), new Vector(-x,-y+c)], 0, h), "casting");
+		if (parameterNumber("footWidth") > 0) {
+			var f = parameterNumber("footWidth")/2, top = parameterNumber("footHeight"), shoulder = parameterNumber("footShoulder");
+			var profile = Part.prism([new Vector(-f,0),new Vector(f,0),new Vector(f,shoulder),
+				new Vector(x,top),new Vector(-x,top),new Vector(-f,shoulder)],0,2*y);
+			var foot = PosedParts.moved(profile, materia.assembly.AssemblyFrames.fromRotationMatrix(0,y,0,[1,0,0, 0,0,-1, 0,1,0]));
+			profile.close();
+			body = Solids.union([body,foot]);
+		}
 		return Solids.building([body], parts -> {
 			for (feature in voids) {
 				var tool = Part.box(feature.width, feature.depth, feature.height);

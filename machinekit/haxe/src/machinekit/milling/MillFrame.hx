@@ -44,6 +44,17 @@ class MillFrame extends MachineAssembly {
 				l.baseHeight - l.roof + 1, channel.x,
 				pocketFront + pocketLength / 2 + row * (pocketLength + l.wall) - l.baseCentreY, -1));
 		}
+		if (xyAxis != null) for (side in [-1,1]) {
+			var shoulderOuter = (l.yRailSpacing+l.seatWidth)/2+12;
+			var width = l.baseWidth/2-shoulderOuter;
+			baseVoids.push(CastingFeatures.box('guide-shoulder-outside-$side',width,l.yRailLength,21,
+				side*(shoulderOuter+width/2),l.yRailStart+l.yRailLength/2-l.baseCentreY,l.baseHeight-20));
+		}
+		if (xyAxis != null) {
+			var start = xyAxis.yFloatingY+xyAxis.floating.length/2+12, end = l.yRailStart+l.yRailLength;
+			baseVoids.push(CastingFeatures.box("between-y-shoulders",l.yRailSpacing-l.seatWidth-24,end-start,21,
+				0,(start+end)/2-l.baseCentreY,l.baseHeight-20));
+		}
 		for (side in [-1, 1]) baseInserts.push(insert(side < 0 ? "railYLeft" : "railYRight",
 			l.seatWidth, l.yRailLength, l.insertThickness, "Y guide seat",
 			F.translation(side * l.yRailSpacing / 2, l.yRailStart + l.yRailLength / 2 - l.baseCentreY,
@@ -64,12 +75,14 @@ class MillFrame extends MachineAssembly {
 		}
 
 		// Four independent steel pairs provide a broad column mounting interface.
+		var flared = l.columnFootWidth > l.columnWidth;
 		var footWidth = l.wall, footDepth = l.roof;
 		for (sx in [-1, 1]) for (sy in [-1, 1]) {
-			var id = corner(sx, sy), x = sx * (l.columnWidth / 2 - l.wall),
+			var id = corner(sx, sy), x = sx * (flared ? (l.columnWidth+l.columnFootWidth)/4 : l.columnWidth/2-l.wall),
 				y = l.columnCentreY + sy * (l.columnDepth / 2 - l.roof);
-			baseInserts.push(insert('column$id', footWidth, footDepth, l.insertThickness, "column mounting pad",
-				F.translation(x, y - l.baseCentreY, l.railPlane - l.insertThickness)));
+			baseInserts.push({id: 'column$id', part: new CastInsert(new ComponentValues().setNumber("width",footWidth).setNumber("depth",footDepth)
+				.setNumber("height",l.insertThickness).setNumber("boreDiameter",flared ? 10.2 : 0).setToken("role","column mounting anchor — nominal M12 tap drill")),
+				pose:F.translation(x,y-l.baseCentreY,l.railPlane-l.insertThickness)});
 			if (l.footPockets) {
 				var fx = sx * (l.baseWidth / 2 - l.wall), fy = (sy < 0 ? l.front + 80 : l.rear - 80) - l.baseCentreY;
 				baseVoids.push(CastingFeatures.box('foot-access-$id', 2 * l.wall + 2, 90, 100, fx, fy, 40));
@@ -128,14 +141,33 @@ class MillFrame extends MachineAssembly {
 				l.zRailStart + l.zRailLength / 2, [1,0,0, 0,0,-1, 0,1,0])));
 		for (sx in [-1, 1]) for (sy in [-1, 1]) columnInserts.push(insert('foot${corner(sx, sy)}',
 			footWidth, footDepth, l.insertThickness, "column sole pad",
-			down(sx * (l.columnWidth / 2 - l.wall), sy * (l.columnDepth / 2 - l.roof), l.insertThickness)));
-		column = new MineralFoundation(body(l.columnWidth, l.columnDepth, l.columnHeight, columnVoids), columnInserts, "footLeftFront");
+			down(sx * (flared ? (l.columnWidth+l.columnFootWidth)/4 : l.columnWidth/2-l.wall), sy * (l.columnDepth / 2 - l.roof), l.insertThickness)));
+		if (flared) for (row in columnInserts) if (StringTools.startsWith(row.id,"foot")) {
+			columnVoids.push(CastingFeatures.box('bolt-access-${row.id}',36,46,l.columnHeight+1,
+				row.pose.x,row.pose.y,l.insertThickness));
+		}
+		if (flared) {
+			columnInserts = [for (row in columnInserts) StringTools.startsWith(row.id,"foot") ? {
+				id:row.id,pose:row.pose,part:new CastInsert(new ComponentValues().setNumber("width",footWidth).setNumber("depth",footDepth)
+					.setNumber("height",l.insertThickness).setNumber("boreDiameter",13).setToken("role","column sole clamping pad"))} : row];
+		}
+		var columnValues = body(l.columnWidth,l.columnDepth,l.columnHeight,columnVoids);
+		if (flared) columnValues.setNumber("footWidth",l.columnFootWidth).setNumber("footHeight",120).setNumber("footShoulder",60);
+		column = new MineralFoundation(columnValues, columnInserts, "footLeftFront");
 		include("column", column, F.translation(0, l.columnCentreY, l.railPlane));
 		// Mating frames coincide; the physical finished faces oppose each other.
 		var first = columnInserts.filter(row -> row.id == "footLeftFront")[0];
 		addMemberConnector("column/footLeftFront", "baseSeat", F.compose(F.inverse(first.pose),
 			Solids.axial(first.pose.x, first.pose.y, 0)));
 		addMate("column-on-base", "fixed", "base/columnLeftFront", "top", "column/footLeftFront", "baseSeat");
+		if (flared) for (sx in [-1,1]) for (sy in [-1,1]) {
+			var id = corner(sx,sy), anchor = columnInserts.filter(row -> row.id == 'foot$id')[0];
+			var bolt = 'columnBolt$id';
+			addComponent(bolt,machinekit.standard.SocketHeadCapScrew.metric("M12",35));
+			addMemberConnector('column/foot$id',"boltSeat",F.compose(F.inverse(anchor.pose),F.translation(anchor.pose.x,anchor.pose.y,l.insertThickness)));
+			addMemberConnector(bolt,"seat",F.identity());
+			addMate('column-clamp-$id',"fixed",'column/foot$id',"boltSeat",bolt,"seat");
+		}
 		exposeConnector("mount", "base/casting", "mount");
 		for (id in ["railYLeft", "railYRight"]) exposeConnector(id, 'base/$id', "top");
 		for (id in ["railZLeft", "railZRight"]) exposeConnector(id, 'column/$id', "top");

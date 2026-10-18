@@ -21,6 +21,7 @@ typedef MillFrameOptions = {
 	?baseHeight:Float;
 	?columnWidth:Float;
 	?columnDepth:Float;
+	?columnFootWidth:Float;
 	?wall:Float;
 	?roof:Float;
 	?seatWidth:Float;
@@ -46,6 +47,7 @@ class MillFrameLayout {
 	public final baseHeight:Float;
 	public final columnWidth:Float;
 	public final columnDepth:Float;
+	public final columnFootWidth:Float;
 	public final wall:Float;
 	public final roof:Float;
 	public final seatWidth:Float;
@@ -67,8 +69,11 @@ class MillFrameLayout {
 		frontExtension = options.frontExtension ?? 0; footPockets = options.footPockets ?? false;
 		baseWidth = options.baseWidth ?? 520; baseHeight = options.baseHeight ?? 220;
 		columnWidth = options.columnWidth ?? 320; columnDepth = options.columnDepth ?? 260;
+		columnFootWidth = options.columnFootWidth ?? columnWidth;
 		wall = options.wall ?? 40; roof = options.roof ?? 60; seatWidth = options.seatWidth ?? 40;
 		insertThickness = options.insertThickness ?? 20; seatRise = options.seatRise ?? 4;
+		if (!Math.isFinite(columnFootWidth) || columnFootWidth < columnWidth || columnFootWidth > baseWidth-2*wall ||
+			(columnFootWidth>columnWidth && columnFootWidth<columnWidth+3*wall)) throw "Column foot must retain material around its steel clamping stations";
 		for (value in [frontExtension, yRailSpacing, yRailStart, yRailLength, columnFront, columnHeight, zRailSpacing,
 			zRailStart, zRailLength, baseWidth, baseHeight, columnWidth, columnDepth, wall, roof,
 			seatWidth, insertThickness, seatRise]) if (!Math.isFinite(value)) throw "Mill frame dimensions must be finite";

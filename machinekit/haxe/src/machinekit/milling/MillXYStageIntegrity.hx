@@ -28,9 +28,9 @@ class MillXYStageIntegrity {
 		return out;
 	}
 
-	static function tableMember(id:String):Bool return id == "table" || StringTools.startsWith(id, "riser") || StringTools.startsWith(id, "blockX") || id == "nutX" || id == "nutBracketX";
+	public static function tableMember(id:String):Bool return id == "table" || StringTools.startsWith(id, "riser") || StringTools.startsWith(id, "blockX") || id == "nutX" || id == "nutBracketX";
 
-	static function yFixed(id:String):Bool return !tableMember(id)
+	public static function yFixed(id:String):Bool return !tableMember(id)
 		&& id != "saddle" && id != "nutY" && id != "nutBracketY" && !StringTools.startsWith(id, "blockY") && id.indexOf("X") < 0;
 
 	static function sweep(axis:MillXYStage, id:String, dx:Float, dy:Float, owned:Array<Part>, cache:PosedParts):Part {
@@ -45,7 +45,7 @@ class MillXYStageIntegrity {
 		}
 		if (id == "saddle") {
 			// Extrude the saddle section over the full Y interval.
-			var saddle = new MillCrossSaddle(axis.saddle.values().setNumber("depth", l.saddleDepth + dy).setBoolean("motorPocket", false));
+			var saddle = new MillCrossSaddle(axis.saddle.values().setNumber("depth", l.saddleDepth + dy).setBoolean("motorPocket", false).setBoolean("ribbed",false));
 			var part = cache.posed(saddle, axis.zeroPose(id));
 			owned.push(part);
 			return part;
@@ -135,8 +135,6 @@ class MillXYStageIntegrity {
 				} else part = cache.posed(member.component, pose);
 				owned.push(part); zParts.push({id:member.id,part:part});
 			}
-			var service = MillSpindleServiceSpace.geometry(zAxis.layout, true); owned.push(service);
-			zParts.push({id:"reserved-spindle-release-space",part:service});
 			for (member in components) {
 				var part = yFixed(member.id) ? cache.posed(member.component, axis.zeroPose(member.id)) :
 					sweep(axis, member.id, tableMember(member.id) ? 2*l.xHalfTravel : 0, 2*l.yHalfTravel, owned, cache);

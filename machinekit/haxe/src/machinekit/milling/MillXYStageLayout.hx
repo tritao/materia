@@ -65,7 +65,7 @@ class MillXYStageLayout {
 			throw "Guide block must match the selected rail profile";
 		block = guideBlock == null ? LinearRailBlock.metric(profile) : guideBlock;
 		xBlockSpan = (block.spec.blockLength + 4) / 2;
-		yBlockSpan = (block.spec.blockLength + 24) / 2;
+		yBlockSpan = (block.spec.blockLength + 40) / 2;
 		saddleBottom = frame.railPlane + block.spec.blockHeight;
 		xRailPlane = saddleBottom + SADDLE_HEIGHT;
 		tableBottom = xRailPlane + block.spec.blockHeight + RISER_HEIGHT;

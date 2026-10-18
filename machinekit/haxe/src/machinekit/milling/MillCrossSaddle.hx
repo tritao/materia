@@ -15,6 +15,7 @@ class MillCrossSaddle extends MachineComponent {
 		P.length("width", 450),
 		P.length("depth", 174),
 		P.length("height", 80),
+		P.flag("ribbed", false), P.length("guideSpacing",220), P.length("blockSpan",50.7), P.length("blockHolePitchB",26),P.length("blockHolePitchC",26),
 		P.length("bore", 54), P.length("boreZ", 40), P.flag("motorPocket", true), P.flag("sidePockets", false)
 	];
 
@@ -26,8 +27,11 @@ class MillCrossSaddle extends MachineComponent {
 	public function new(?values:ComponentValues) {
 		var v = P.resolve(parameters(), values);
 		if (v.number("bore") + 20 > v.number("height") || v.number("bore") >= v.number("width")) throw "Saddle tunnel leaves insufficient material";
-		if (v.boolean("sidePockets") && (v.number("width") < 450 || v.number("depth") < 174 || v.number("height") < 56))
+		if ((v.boolean("sidePockets") || v.boolean("ribbed")) && (v.number("width") < 450 || v.number("depth") < 174 || v.number("height") < 56))
 			throw "Saddle side pockets need continuous chords and end webs";
+		if (v.boolean("ribbed") && (v.number("guideSpacing")<160 || v.number("guideSpacing")>v.number("width")-80 ||
+			v.number("blockHolePitchC")<=0 || v.number("blockHolePitchC")>30 || v.number("blockHolePitchB")<=0 ||
+			v.number("blockSpan")<=v.number("blockHolePitchB")/2+17)) throw "Ribbed saddle cannot retain its guide pads and bolt wells";
 		super("MILL-CROSS-SADDLE", "Machined cross saddle", "cast iron", false, v);
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Face, Solids.axial(0, 0, v.number("height")));
@@ -38,6 +42,7 @@ class MillCrossSaddle extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var guide = parameterNumber("guideSpacing")/2;
 		var w = parameterNumber("width"), d = parameterNumber("depth"), h = parameterNumber("height");
 		var tools:Array<Part> = [];
 		if (parameterNumber("bore") > 0) tools.push(Part.cylinderAlongY(parameterNumber("bore") / 2, -d / 2 - 1, d / 2 + 1, 0, parameterNumber("boreZ")));
@@ -58,6 +63,23 @@ class MillCrossSaddle extends MachineComponent {
 			for (interval in [[-205.0,-115.0],[-105.0,-55.0],[55.0,130.0],[140.0,205.0]])
 				tools.push(Part.box(interval[1]-interval[0], 13, h-28)
 					.translated(new Vector((interval[0]+interval[1])/2, side*(d/2-5.5), 14)));
+		if (values().boolean("ribbed")) {
+			// Four bottom guide pads, continuous X guide chords, transverse end
+			// webs and the central nut spine remain joined by a 14 mm sole.
+			for (side in [-1,1]) for (interval in [[-w/2+40,-guide-20],[-guide+20,-45.0],[45.0,guide-20],[guide+20,w/2-20]])
+				tools.push(Part.box(interval[1]-interval[0],d/2-28,h-28)
+					.translated(new Vector((interval[0]+interval[1])/2,side*(d/4+14),14)));
+			for (interval in [[-w/2-1,-guide-20],[-guide+20,-45.0],[45.0,guide-20],[guide+20,w/2+1]])
+				tools.push(Part.box(interval[1]-interval[0],d+2,5).translated(new Vector((interval[0]+interval[1])/2,0,-1)));
+			for (x in [-guide,guide]) tools.push(Part.box(40,24,5).translated(new Vector(x,0,-1)));
+			for (sx in [-1,1]) for (sy in [-1,1])
+				for (dx in [-parameterNumber("blockHolePitchC")/2,parameterNumber("blockHolePitchC")/2])
+				for (dy in [-parameterNumber("blockHolePitchB")/2,parameterNumber("blockHolePitchB")/2]) {
+				var x = sx*parameterNumber("guideSpacing")/2+dx, y = sy*parameterNumber("blockSpan")+dy;
+				tools.push(Part.cylinderSpan(2.25,-1,h+1,x,y));
+				tools.push(Part.cylinderSpan(5,12,h+1,x,y));
+			}
+		}
 		return Solids.cut(Part.box(w, d, h), tools);
 	}
 }

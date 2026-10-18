@@ -82,7 +82,7 @@ class MillDesignStudy {
 	public static function write(assembly:MachineAssembly, frame:MillFrame, directory:String):Void {
 		var folder=directory+"/design-review";
 		if (!sys.FileSystem.exists(folder)) sys.FileSystem.createDirectory(folder);
-		var ids=["frame/base/casting","frame/column/casting","xyStage/saddle","xyStage/table","xyStage/motorMountX","zAxis/head","zAxis/carriage"];
+		var ids=["frame/base/casting","frame/column/casting","xyStage/saddle","xyStage/table","xyStage/motorMountX","zAxis/head","zAxis/carriage","spindle/spindle","spindle/motorCarrier","spindle/reactionFrame","spindle/cylinder","spindle/beltGuard"];
 		var poses:Map<String,AssemblyFrame> = assembly.solvedPoses(), cache=new PosedParts();
 		var bounds:Array<Dynamic> = [];
 		try for (id in ids) {
@@ -107,15 +107,14 @@ class MillDesignStudy {
 				xGuideSpacingMm:xy.xRailSpacing,saddleDepthMm:xy.saddleDepth},
 			zHead:{rootExtensionMm:zLayout.headRootExtension,carriageHeightMm:zLayout.carriageHeight,carriageThicknessMm:zLayout.carriageThickness,guideBlockVerticalCentersMm:2*zLayout.blockSpan,
 				rearFlangeWidthMm:zLayout.carriageWidth,noseWidthMm:120,headFasteners:"4 x M6 x 16; nominal blind taps",
-				releaseSpace:{diameterMm:MillSpindleServiceSpace.DIAMETER,heightMm:MillSpindleServiceSpace.HEIGHT,
-					standoffAboveHeadMm:MillSpindleServiceSpace.STANDOFF,status:"project allocation; no actuator fitted or release load qualification"}},
-			atc:{status:"candidate study; not fitted",candidate:"PMK 100MCB30SSS short-nose BT30",housingDiameterMm:100,
-				publishedL8Mm:264,publishedMaximumRpm:12000,publishedClampingForceN:2800,
-				source:"https://pmkindia.com/datasheets/spindles_belt-driven-spindles-for-machining-center.pdf",
-				compatibility:"current 70 mm ER20 head bore and spindle drive must be redesigned for this candidate",
-				missing:["certified drawing and gauge datum", "release actuator dimensions, force, stroke and pressure", "release reaction path",
-					"pulley/journal fit", "mass and bearing load limits", "tool-clamped/released feedback and orientation requirements"],
-				note:"Clamping force is not the actuator release force; no actuator sized from it."},
+				releaseMechanism:{cylinderEnvelopeMm:[120,120,100],drawbarInspectionStrokeMm:4.5,rodInspectionStrokeMm:6.5,status:"modeled packaging study; all axial and release interfaces assumed"}},
+			atc:{status:"BT30 packaging study; supplier interfaces unqualified",reference:"DAIYA BT30SP exterior diameters only",housingDiameterMm:90,
+				flangeDiameterMm:125,motorPowerW:2200,motorRatedRpm:8000,beltLengthMm:540,
+				source:"https://daiya.co.jp/en/product/spindle/atc/",
+				compatibility:"axial cartridge, motor, gripper and cylinder interfaces are explicit project assumptions",
+				missing:["controlled supplier drawings and gauge datum", "release force/stroke/pressure and spring preload", "reaction-path and bearing-load qualification",
+					"pulley/journal fits and retention", "mass and bearing limits", "clamp/release feedback and orientation controls"],
+				note:"No cylinder sized from catalog clamping force; release joints are rigid inspection motions, not a tool-change simulation."},
 			services:{status:"interface requirements; hardware and controller integration pending",
 				lubrication:["fixed-base manifold", "independent moving X/Y/Z guide and screw circuits", "accessible fittings and metered flow", "protected flexible transitions"],
 				protection:["X/Y/Z way covers with compressed/extended envelopes", "separate dry drive bays and wet chip area", "removable chip tray and coolant drain", "lifting and anchoring access"],
@@ -129,16 +128,16 @@ class MillDesignStudy {
 				{step:1,status:"concept geometry",result:"250/160/250 travel; motor bays within base perimeter; service and enclosure envelope pending"},
 				{step:2,status:"concept geometry and motion checks",result:"Raised Y screw/direct saddle nut mount; rear coaxial motor in lower-column bay and bored Z support plate; X 1:1 HTD5M return into saddle; preload and belt life pending"},
 				{step:3,status:"concept geometry",result:"four accessible foot pockets, bored steel seats and M16 foot envelopes; anchorage/load ratings pending"},
-				{step:4,status:"concept geometry and section comparison",result:"integral table ribs replace isolated risers; full stiffness qualification pending"},
-				{step:5,status:"supplier selection required",result:"BT30 is a candidate, not an installed spindle; current ER20 cartridge remains manual"},
-				{step:6,status:"revised head and reserved release space",result:"wider block span and 20 mm carriage; tapered windowed head with bolted flange; final head bore and release mechanism await spindle drawings"},
-				{step:7,status:"partial nominal interfaces",result:"X return plate/pocket and foot bores modeled; complete drilling, fasteners and anchor calculations pending"},
+				{step:4,status:"concept geometry and section comparison",result:"ribbed four-pad saddle, raised guide beds and integral table ribs; full stiffness qualification pending"},
+				{step:5,status:"supplier selection required",result:"BT30 packaging study installed in concept; supplier-compatible spindle/release hardware selection pending"},
+				{step:6,status:"BT30 head and reaction-frame study",result:"wider block span and 20 mm carriage; tapered windowed head with bolted flange; 90 mm bore, separate drawbar/release frame and braced rear-corner motor; vendor interfaces remain unqualified"},
+				{step:7,status:"partial nominal interfaces",result:"Y block wells/bolts, column clamps, Z stand and spindle mounting fasteners modeled; remaining patterns and anchor calculations pending"},
 				{step:8,status:"partial protection",result:"motor hoods modeled; lubrication, way covers, cables, coolant and control interlocks specified in README but not installed"},
 				{step:9,status:"reference checks and concept STEP packet",result:"static guide admission and continuous structural sweeps; FEA, thermal/modal and manufacturing drawings pending"}],
 			releaseBlockers:["verified ATC spindle/drawbar/actuator and motor drawings", "release force, stroke, air pressure, sensor and reaction-path data",
 				"complete fastener and insert anchorage design", "foot ratings, floor support and stability", "whole-machine stiffness, thermal and modal qualification",
 				"validated lubrication/coolant/guards and controls", "material, mould, cure and post-cast machining process qualification"]};
-		sys.io.File.saveContent(folder+"/interfaces.csv", "interface,pattern,status\nBK12 and BF12 pedestal bolts,2 x M5 x 55 per housing,nominal modeled\nX motor plate anchors,4 x M6 x 25,nominal modeled\nY rear service hatch,4 x M4 x 10 into column steel anchors,nominal modeled\nZ head flange,4 x M6 x 16 with counterbores and blind carriage taps,nominal modeled\nLeveling feet,M16 stem through 18 mm steel bore,concept geometry and supplier rating pending\nGuide and block screws,catalog pattern with accessible head seats,drilling and fasteners pending\nSpindle and actuator,selected supplier drawing required,unresolved\n");
+		sys.io.File.saveContent(folder+"/interfaces.csv", "interface,pattern,status\nBK12 and BF12 pedestal bolts,2 x M5 x 55 per housing,nominal modeled\nX motor plate anchors,4 x M6 x 25,nominal modeled\nY rear service hatch,4 x M4 x 10 into column steel anchors,nominal modeled\nZ head flange,4 x M6 x 16 with counterbores and blind carriage taps,nominal modeled\nLeveling feet,M16 stem through 18 mm steel bore,concept geometry and supplier rating pending\nY saddle blocks,16 x M4 x 20 with top access wells,nominal modeled; other guide fasteners pending\nColumn clamps,4 x M12 x 35 into embedded steel pads,nominal modeled; anchorage/preload pending\nSpindle and actuator,nominal cartridge/reaction-frame/cylinder fasteners,concept only; selected supplier drawings required\n");
 		sys.io.File.saveContent(folder+"/review.json",haxe.Json.stringify(report,null,"  "));
 		Sys.println("Mill concept design review: "+folder+"/review.json");
 	}

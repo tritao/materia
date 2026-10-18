@@ -89,6 +89,13 @@ class MillXYStageChecks {
 		for (id in ["motorX", "motorShaftX", "motorPulleyX", "screwPulleyX", "beltX"]) {
 			near(cache.overlap(axis.component(id), poses.get(id), axis.saddle, poses.get("saddle")), 0, 'return drive clears saddle: $id');
 		}
+		var motorBody=cache.posed(axis.component("motorX"),poses.get("motorX"));
+		for (i in 0...4) for (hole in 1...5) {
+			var point=F.compose(poses.get('blockY$i'),l.block.connector('mount$hole').frame);
+			var tool=cadkit.modeling.Part.cylinderSpan(2.5,l.saddleBottom+16,l.xRailPlane+20,point.x,point.y);
+			var overlap=tool.intersect(motorBody); near(overlap.volume(),0,"Y block wrench clears installed X motor"); overlap.close(); tool.close();
+		}
+		motorBody.close();
 		near(cache.overlap(axis.component("nutY"), poses.get("nutY"), axis.saddle, poses.get("saddle")), 0, "nut body and fitting clear underside saddle tunnel");
 		for (id in ["motorShaftX", "motorPulleyX", "screwPulleyX", "beltX", "motorMountX", "fixedBearingX"]) {
 			near(cache.overlap(axis.component(id), poses.get(id), axis.component("motorCoverX"), poses.get("motorCoverX")), 0, 'return hood clears $id');
