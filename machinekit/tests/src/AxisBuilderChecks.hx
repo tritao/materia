@@ -74,5 +74,15 @@ class AxisBuilderChecks {
 			LinearRailBlock.metric("MGN12C"), AxisBuilder.orient(60, 0, -20, up, along), {x: 1.0, y: 0.0, z: 0.0})
 		catch (_:Dynamic) rejected = true;
 		check(rejected && builder.components().length == 6, "rail overrun is rejected before adding a carriage");
+		var multiRejected = false;
+		try builder.slide({id: "multi-overrun", lower: 0.0, upper: 100.0, initial: 0.0}, "rail", "badPair",
+			LinearRailBlock.metric("MGN12C"), AxisBuilder.orient(60, 0, -20, up, along), {x: 1.0, y: 0.0, z: 0.0},
+			[AxisBuilder.orient(250, 0, -20, up, along)]) catch (_:Dynamic) multiRejected = true;
+		check(multiRejected && builder.components().length == 6, "a trailing block overrun rejects the whole carriage atomically");
+		var pair = new AxisBuilder();
+		pair.place("rail", LinearRail.metric("MGN12C", 300), AxisBuilder.orient(0, 0, 0, up, along));
+		pair.slide({id: "x", lower: 0.0, upper: 100.0, initial: 0.0}, "rail", "first", LinearRailBlock.metric("MGN12C"),
+			AxisBuilder.orient(60, 0, 0, up, along), {x: 1.0, y: 0.0, z: 0.0}, [AxisBuilder.orient(150, 0, 0, up, along)]);
+		check(Math.abs(pair.axisOvertravel("x") - 22.65) < 1e-9, "the block nearest the far stop limits the complete carriage to 22.65 mm reserve");
 	}
 }

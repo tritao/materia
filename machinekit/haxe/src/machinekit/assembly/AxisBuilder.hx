@@ -168,10 +168,11 @@ class AxisBuilder extends MachineAssembly {
 	/**
 	 * A rail block sliding on its rail (`parent`) along a world axis; `pose` is where it sits at
 	 * coordinate zero. The axis's overtravel is the room its block has left on the rail at either end
-	 * of travel, where the rail's end stops are.
+	 * of travel, where the rail's end stops are. Additional block poses let a
+	 * rigid multi-block carriage use the most restrictive block at either end.
 	 */
 	public function slide(spec:AxisSpec, parent:String, id:String, component:MachineComponent, pose:AssemblyFrame,
-			axis:{x:Float, y:Float, z:Float}):Void {
+			axis:{x:Float, y:Float, z:Float}, ?additionalBlockPoses:Array<AssemblyFrame>):Void {
 		var rail = [for (entry in components()) if (entry.id == parent) entry.component][0];
 		if (!Std.isOfType(rail, LinearRail)) throw 'Axis ${spec.id} must slide on a rail';
 		var guide:LinearRail = cast rail;
@@ -182,6 +183,13 @@ class AxisBuilder extends MachineAssembly {
 		var reach = guide.spec.railEndMargin + guide.spec.blockLength / 2;
 		var first = alongRail(spec.lower), last = alongRail(spec.upper);
 		var room = Math.min(Math.min(first, last) - reach, guide.length - reach - Math.max(first, last));
+		if (additionalBlockPoses != null) for (blockPose in additionalBlockPoses) {
+			var low = AssemblyFrames.transformPoint(railFrame, blockPose.x + axis.x * spec.lower,
+				blockPose.y + axis.y * spec.lower, blockPose.z + axis.z * spec.lower).z;
+			var high = AssemblyFrames.transformPoint(railFrame, blockPose.x + axis.x * spec.upper,
+				blockPose.y + axis.y * spec.upper, blockPose.z + axis.z * spec.upper).z;
+			room = Math.min(room, Math.min(Math.min(low, high) - reach, guide.length - reach - Math.max(low, high)));
+		}
 		if (room < 0) throw 'Axis ${spec.id} runs its block off its rail by ${Dimension.format(-room)} mm';
 		overtravel.set(spec.id, room);
 		var length = Math.sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
