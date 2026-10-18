@@ -47,13 +47,15 @@ class MillZAxisLayout {
 	public final profile:String;
 
 	public function new(frame:MillFrameLayout, headBottom:Float, headHeight:Float, spindleY:Float,
-		lower:Float = -250, profile:String = "HGR15") {
+		lower:Float = -250, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null) {
 		if (frame == null) throw "Z axis needs frame datums";
 		for (v in [headBottom, headHeight, spindleY, lower]) if (!Math.isFinite(v)) throw "Z datums must be finite";
 		if (headHeight <= 0 || lower >= 0) throw "Z needs positive head height and negative lower stop";
 		this.frame = frame; this.headBottom = headBottom; this.headHeight = headHeight;
 		this.spindleY = spindleY; this.lower = lower; this.profile = profile;
-		block = LinearRailBlock.metric(profile);
+		if (guideBlock != null && guideBlock.spec.designation != profile)
+			throw "Guide block must match the selected rail profile";
+		block = guideBlock == null ? LinearRailBlock.metric(profile) : guideBlock;
 		blockSpan = (block.spec.blockLength + 4) / 2;
 		carriageWidth = frame.zRailSpacing + block.spec.blockWidth + 20;
 		carriageHeight = Math.max(headHeight + 30, 2 * blockSpan + block.spec.blockLength + 20);

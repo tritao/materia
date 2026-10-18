@@ -19,6 +19,7 @@ import materia.assembly.AssemblyFrames;
 /** Matching carriage block for a profile rail. Geometry is a nominal exterior envelope; the
  * two mounting locations and rail axis are exact interface data from the profile catalog. CAD
  * frame: the block is centred on z=0, with its rail-facing side at y=0. */
+@:allow(machinekit.motion.HiwinHgh15ca)
 class LinearRailBlock extends MachineComponent {
 	public final spec:LinearRailProfileSpec;
 
@@ -28,7 +29,7 @@ class LinearRailBlock extends MachineComponent {
 	public static function custom(spec:LinearRailProfileSpec):LinearRailBlock
 		return new LinearRailBlock(spec, true);
 
-	private function new(spec:LinearRailProfileSpec, codeOnly:Bool = false) {
+	private function new(spec:LinearRailProfileSpec, codeOnly:Bool = false, referenceSuffix:String = "") {
 		if (!Math.isFinite(spec.staticLoadCapacity) || !(spec.staticLoadCapacity > 0))
 			throw 'Linear rail profile "${spec.designation}" needs a finite positive static block capacity';
 		if (!(spec.blockWidth > 0) || !(spec.blockHeight > 0) || !(spec.blockLength > 0) ||
@@ -40,7 +41,7 @@ class LinearRailBlock extends MachineComponent {
 		var customName = '${spec.family}-${spec.designation}-BW${Dimension.format(spec.blockWidth)}-BH${Dimension.format(spec.blockHeight)}' +
 			'-BL${Dimension.format(spec.blockLength)}-B${Dimension.format(spec.blockHolePitchB)}' +
 			'-C${Dimension.format(spec.blockHolePitchC)}-M${spec.blockMountScrew}';
-		super(codeOnly ? customDesignation(customName) : designation,
+		super(codeOnly ? customDesignation(customName+referenceSuffix) : designation,
 			'${spec.family} ${spec.designation} carriage block', "steel", codeOnly);
 		this.spec = spec;
 		addConnector("rail", Axis, Solids.axial(0, 0, 0));

@@ -32,11 +32,11 @@ class MillFramePreview {
 	public static function stageRise(reference:BenchMill):Float
 		return MillXYStageLayout.stackHeight(BenchMill.RAIL) - (reference.tableTop - reference.base.height);
 
-	public static function zLayout(reference:BenchMill, layout:MillFrameLayout):MillZAxisLayout {
+	public static function zLayout(reference:BenchMill, layout:MillFrameLayout, guideBlock:Null<machinekit.motion.LinearRailBlock> = null):MillZAxisLayout {
 		var poses:Map<String, AssemblyFrame> = reference.solvedPoses();
 		var head:AssemblyFrame = poses.get("head"), spindle:AssemblyFrame = poses.get("spindle");
 		return new MillZAxisLayout(layout, head.z + layout.railPlane - reference.base.height + stageRise(reference),
-			reference.head.height, spindle.y, reference.specs[2].lower, BenchMill.RAIL);
+			reference.head.height, spindle.y, reference.specs[2].lower, BenchMill.RAIL, guideBlock);
 	}
 
 	/** Both the axis-only study and full concept use this same mechanical assembly. */

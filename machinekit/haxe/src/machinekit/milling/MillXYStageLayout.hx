@@ -54,12 +54,14 @@ class MillXYStageLayout {
 
 	public static function stackHeight(profile:String):Float return 2 * LinearRailBlock.metric(profile).spec.blockHeight + SADDLE_HEIGHT + RISER_HEIGHT + TABLE_HEIGHT;
 
-	public function new(frame:MillFrameLayout, centreY:Float, profile:String = "HGR15") {
+	public function new(frame:MillFrameLayout, centreY:Float, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null) {
 		if (frame == null || !Math.isFinite(centreY)) throw "XY stage needs finite matching frame datums";
 		this.frame = frame;
 		this.centreY = centreY;
 		this.profile = profile;
-		block = LinearRailBlock.metric(profile);
+		if (guideBlock != null && guideBlock.spec.designation != profile)
+			throw "Guide block must match the selected rail profile";
+		block = guideBlock == null ? LinearRailBlock.metric(profile) : guideBlock;
 		blockSpan = (block.spec.blockLength + 4) / 2;
 		saddleBottom = frame.railPlane + block.spec.blockHeight;
 		xRailPlane = saddleBottom + SADDLE_HEIGHT;

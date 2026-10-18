@@ -17,8 +17,8 @@ import machinekit.component.Solids;
 import machinekit.motion.LinearRailProfile.LinearRailProfileSpec;
 import materia.assembly.AssemblyFrames;
 
-/** A cut length of profile rail. The preview is a nominal envelope; mounting-hole locations
- * are exposed as named connectors and kept in the catalog-backed guide system. CAD frame: the
+/** A cut length of profile rail. HGR15 preview includes the HGR15R running section
+ * and bores; other profiles remain nominal. Mounting holes expose named connectors. CAD frame: the
  * rail cross-section is centred on x=0, spans y=-railHeight..0, and runs along +Z. */
 class LinearRail extends MachineComponent {
 	public final spec:LinearRailProfileSpec;
@@ -60,6 +60,8 @@ class LinearRail extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
+		if (detail == Preview && spec.designation == "HGR15" && spec.railWidth == 15 && spec.railHeight == 15)
+			return Hgr15RailGeometry.build(length, holePositions);
 		return Part.prism([
 			new Vector(-spec.railWidth / 2, -spec.railHeight),
 			new Vector(spec.railWidth / 2, -spec.railHeight),
