@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": {"name": "cadkit-refinement-tests"},
+  "entry": "RefinementTests",
+  "sources": ["RefinementTests.hx"],
+  "sourceRoots": ["."],
+  "dependencies": {"cadkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/refinement"
+}

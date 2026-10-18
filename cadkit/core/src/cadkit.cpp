@@ -2445,6 +2445,66 @@ extern "C" CADKIT_API cad_result cad_common_operation(
     return make_boolean_operation<BRepAlgoAPI_Common>(first, second, out_operation);
 }
 
+extern "C" CADKIT_API cad_result cad_shape_refine_operation(cad_shape handle, cad_operation* output) {
+    clear_error();
+    if (!output) return fail(CAD_ERROR_INVALID_ARGUMENT, "out_operation must not be null");
+    *output = 0;
+    naming::NamedShape source;
+    const auto copied = copy_named_shape(handle, source);
+    if (copied != CAD_OK) return copied;
+    try {
+        if (!BRepCheck_Analyzer(source.shape).IsValid())
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "refinement requires valid input; it is not shape repair");
+        ShapeUpgrade_UnifySameDomain unify(source.shape, true, true, false);
+        unify.SetSafeInputMode(true);
+        unify.AllowInternalEdges(false);
+        unify.Build();
+        OperationData data;
+        data.result = unify.Shape();
+        if (data.result.IsNull() || !BRepCheck_Analyzer(data.result).IsValid())
+            return fail(CAD_ERROR_OPERATION_FAILED, "refinement produced invalid topology");
+        const auto count_solids = [](const TopoDS_Shape& shape) {
+            naming::ShapeIndex solids; TopExp::MapShapes(shape, TopAbs_SOLID, solids);
+            return solids.Extent();
+        };
+        if (count_solids(source.shape) != count_solids(data.result))
+            return fail(CAD_ERROR_OPERATION_FAILED, "refinement changed the solid count");
+        const auto near = [](double a, double b) {
+            return std::isfinite(a) && std::isfinite(b) &&
+                std::abs(a-b) <= 1e-6 + 1e-9 * std::max(std::abs(a), std::abs(b));
+        };
+        Bnd_Box before, after;
+        BRepBndLib::AddOptimal(source.shape, before, false, false);
+        BRepBndLib::AddOptimal(data.result, after, false, false);
+        if (before.IsVoid() != after.IsVoid()) return fail(CAD_ERROR_OPERATION_FAILED, "refinement changed empty bounds");
+        if (!before.IsVoid()) {
+            double a[6], b[6]; before.Get(a[0],a[1],a[2],a[3],a[4],a[5]); after.Get(b[0],b[1],b[2],b[3],b[4],b[5]);
+            for (int i=0;i<6;++i) if (!near(a[i],b[i])) return fail(CAD_ERROR_OPERATION_FAILED, "refinement changed shape bounds");
+        }
+        GProp_GProps area_before, area_after, volume_before, volume_after;
+        BRepGProp::SurfaceProperties(source.shape, area_before, 1e-10); BRepGProp::SurfaceProperties(data.result, area_after, 1e-10);
+        BRepGProp::VolumeProperties(source.shape, volume_before, 1e-10); BRepGProp::VolumeProperties(data.result, volume_after, 1e-10);
+        if (!near(area_before.Mass(),area_after.Mass()) || !near(volume_before.Mass(),volume_after.Mass()))
+            return fail(CAD_ERROR_OPERATION_FAILED, "refinement changed shape area or volume");
+        // Adapt BRepTools_History's IsRemoved to the common algorithm-history API.
+        struct History {
+            Handle(BRepTools_History) history;
+            const NCollection_List<TopoDS_Shape>& Generated(const TopoDS_Shape& s) {return history->Generated(s);}
+            const NCollection_List<TopoDS_Shape>& Modified(const TopoDS_Shape& s) {return history->Modified(s);}
+            bool IsDeleted(const TopoDS_Shape& s) {return history->IsRemoved(s);}
+        } history{unify.History()};
+        if (history.history.IsNull()) return fail(CAD_ERROR_OPERATION_FAILED, "refinement lost topology history");
+        naming::AlgorithmHistory<History> naming_history(history);
+        data.result_names = naming::propagate({source}, &naming_history, data.result);
+        const auto collected = collect_operation_history(history, source.shape, nullptr, data);
+        if (collected != CAD_OK) return collected;
+        return insert_operation(std::move(data), output);
+    } catch (const Standard_Failure& error) {return fail_occt(CAD_ERROR_OPERATION_FAILED, error);}
+      catch (const std::bad_alloc& error) {return fail(CAD_ERROR_OUT_OF_MEMORY, error);}
+      catch (const std::exception& error) {return fail(CAD_ERROR_OPERATION_FAILED, error);}
+      catch (...) {return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception during refinement");}
+}
+
 extern "C" CADKIT_API cad_result cad_shape_bounds(
     cad_shape shape,
     cad_bounds* out_bounds) {

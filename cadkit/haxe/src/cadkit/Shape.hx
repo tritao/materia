@@ -59,6 +59,14 @@ class Shape {
 		CadKit.stepExportChecked(native.borrow(), path);
 	}
 
+	/** Explicit shape finalization, preserving aliases and threaded-face history.
+	 * Merges redundant same-domain topology; leaves this shape unchanged. */
+	public function refined():Shape return operationShape(refineOperation());
+
+	public function refineOperation():Operation {
+		return new Operation(CadKit.shapeRefineOperationChecked(native.borrow()), [this]);
+	}
+
 	public function cloneShape():Shape {
 		return copiedAttributes(new Shape(CadKit.shapeCloneChecked(native.borrow())));
 	}

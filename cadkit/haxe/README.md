@@ -202,3 +202,29 @@ ownership and avoids copying already-flat data. New authored topology requires a
 compiled assembly. States share that topology while owning joint coordinates, root
 pose overrides and evaluation buffers independently. `new AssemblyState(definition)`
 continues to snapshot editable input for compatibility.
+
+### Explicit shape refinement
+
+Call `Part.refined()` when a part is finished, before producing its mesh and STEP
+export. `Shape.refined()` and `Shape.refineOperation()` expose the same operation
+for lower-level callers. The input remains owned by the caller and unchanged.
+Refinement uses OCCT same-domain unification in safe-input mode; it merges redundant
+faces/edges, without repairing invalid topology or joining separate solids. The
+native operation checks validity, solid count, bounds, area and volume before
+publishing its result.
+
+Use the returned part for both preview tessellation and export. Refinement is
+explicit rather than performed after every boolean, so intermediate modeling
+history and selections remain available. Its operation history preserves merged
+face names as aliases and carries threaded-face metadata through the usual
+`Operation` path. Redundant removed edges are reported as deleted; an eliminated
+seam cannot remain a selectable edge. Named selections resolve to the merged face,
+whose extent/centroid may change. Author face-derived connector placements after
+finalization, or revalidate such placements; explicit assembly connector frames
+are not modified by this operation.
+
+Run the focused integration checks from the repository root:
+
+```sh
+./haxeon/scripts/haxeon run --project=cadkit/haxe/tests/haxeon-refinement.json
+```

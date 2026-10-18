@@ -320,6 +320,13 @@ CADKIT_API cad_result cad_shape_clone(
     cad_shape shape,
     cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
+/* Explicit finalization: merge same-domain faces/edges, preserving naming aliases
+ * through OCCT history. Does not heal invalid input or join separate solids.
+ * Rejects changes to validity, solid count, bounds, area or volume. */
+CADKIT_API cad_result cad_shape_refine_operation(
+    cad_shape shape,
+    cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
 /* Sweep a profile by a finite translation vector. */
 CADKIT_API cad_result cad_shape_extrude(
     cad_shape profile,
