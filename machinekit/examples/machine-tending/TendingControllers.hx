@@ -228,8 +228,8 @@ class TendingControllerChecks {
 		if (cellDefinition == null) throw "Tending cell layout preview has no assembly definition";
 		if (cell.cellTable.bankWidth != layout.tableWidth || cell.cellTable.depth != layout.tableDepth ||
 			cell.cellTable.topHeight != layout.tableTop ||
-			cellDefinition.occurrences.filter(item -> StringTools.startsWith(item.id, "cellTable/")).length != 10)
-			throw "Both tray banks need table tops and four floor-supported legs each";
+			cellDefinition.occurrences.filter(item -> StringTools.startsWith(item.id, "cellTable/")).length != 66)
+			throw "Both tray banks need complete extrusion tables with tops, rails, brackets and feet";
 		var state = new AssemblyState(cellDefinition, cellScene.assemblyState);
 		var baseFloor = state.worldConnector("arm/baseFlange", "floor");
 		var expectedFloor = TendingCellRiser.armFloorFrame(cell.arm, layout.armPlacement);
