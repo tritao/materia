@@ -44,7 +44,7 @@ class HierarchyPanel {
     treeStyle.childGap = 6.0;
     var treeViewport = ReferenceEditorApp.fillStyle();
     var tree = new TreeView(app.hierarchySearch == "" ? "scene-hierarchy" : "scene-hierarchy-filtered",
-      app.treeModel, treeViewport, null, 420.0, app.treeModel.selectionKey(), ["scene"], function(id) {
+      app.treeModel, treeViewport, app.treeModel.scrollController, 420.0, app.treeModel.selectionKey(), ["scene"], function(id) {
       app.treeModel.selectKey(id);
       app.log("Selected " + id);
       app.invalidateView();
@@ -56,6 +56,7 @@ class HierarchyPanel {
     }, null, null);
     app.treeModel.canChangeVisibility = function() return !app.documents.blocked();
     app.treeModel.onVisibilityChanged = function() {app.commands.refresh();app.invalidateView();};
+    tree.onStateReady = app.treeModel.synchronizeSelection;
     tree.onExpandedChanged = function(_, _) app.hierarchyExpansionRevision++;
     tree.onItemContextMenu = function(id, event) {
       app.treeModel.selectKey(id);

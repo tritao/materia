@@ -18,7 +18,11 @@ SceneKit. `src/Main.hx` composes:
 The editor starts with an empty scene in a perspective view. Use `--demo` to
 load the two starter boxes, the BIM example, and sample telemetry.
 Click an object in the viewport or hierarchy to select it; the yellow outline
-tracks selection. Edit Name, Position X/Y (metres), Width, Height, Colour
+tracks selection. Picking in 3D also highlights the corresponding Hierarchy row,
+opens its ancestor groups and scrolls it into view without moving keyboard focus.
+An active tree search is preserved, with the selected row included so it remains
+reachable. Redraws preserve scroll position and manual branch expansion.
+Edit Name, Position X/Y (metres), Width, Height, Colour
 (`#RRGGBB`), or Visible in the inspector.
 Use the eye at the right of a Hierarchy row, or press **Space** while that tree
 row has keyboard focus, to show or hide it. Hidden rows stay selectable and use

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "package": {
+    "name": "scene-editing-tests"
+  },
+  "entry": "tests.SceneTreeSelectionTests",
+  "sourceRoots": [
+    "src",
+    "../../processkit/tests/moonraker"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    },
+    "processkit": {
+      "path": "../../processkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "../build/visibility-tests"
+}

@@ -2,6 +2,7 @@ package app;
 
 import haxeon.ui.core.View;
 import haxeon.ui.widgets.collections.TreeViewModel;
+import haxeon.ui.widgets.collections.TreeView;
 import haxeon.ui.widgets.collections.TreeRootMetadata;
 import haxeon.ui.icons.IconName;
 import app.editor.SceneVisibility;
@@ -18,10 +19,35 @@ import materia.assembly.AssemblyDefinition;
 class EditorSceneTree implements TreeViewModel {
   public var canChangeVisibility:Null<Void->Bool>;
   public var onVisibilityChanged:Null<Void->Void>;
+  public final scrollController = new haxeon.ui.widgets.scroll.ScrollController();
   var selectedGroup:Null<String>;
   var groupSelectionRevision:Int = -1;
   public function selectionKey():String return selectedGroup != null && groupSelectionRevision == scene.selectionRevision
     ? selectedGroup : scene.treeSelectionKey();
+  var syncedSelectionRevision:Int = -1;
+  var syncedSelectionKey:String = "";
+  var syncedTreeKey:String = "";
+  /** Complete root-to-row path; includes every rigid-body group and a CAD feature's owning part. */
+  public function selectionPath():Array<String> {
+    var key = selectionKey();
+    if (key == "scene") return ["scene"];
+    var path = [key], cursor = key;
+    var marker = cursor.indexOf(":feature:");
+    if (marker >= 0) {cursor=cursor.substr(0,marker);path.unshift(cursor);}
+    while (parentOf.exists(cursor)) {cursor=parentOf.get(cursor);path.unshift(cursor);}
+    path.unshift("scene");
+    return path;
+  }
+  /** Called after TreeView hydrates its retained state. Never notify back or take focus from 3D. */
+  public function synchronizeSelection(tree:TreeView):Void {
+    var key = selectionKey();
+    if (syncedSelectionRevision == scene.selectionRevision && syncedSelectionKey == key && syncedTreeKey == tree.key) return;
+    var path = selectionPath();
+    for (ancestor in path.slice(0,path.length-1)) tree.setExpanded(ancestor,true);
+    tree.select(key,false);
+    tree.scrollIntoView(key);
+    syncedSelectionRevision=scene.selectionRevision;syncedSelectionKey=key;syncedTreeKey=tree.key;
+  }
   public function selectKey(key:String):Void {
     if (isGroup(key)) {
       scene.select("scene");selectedGroup=key;groupSelectionRevision=scene.selectionRevision;
@@ -74,6 +100,7 @@ class EditorSceneTree implements TreeViewModel {
   final children:Map<String, Array<String>> = [];
   /** Part to the Parts node that holds it. */
   final partsOf:Map<String, String> = [];
+  final parentOf:Map<String, String> = [];
   final partsTitles:Map<String, String> = [];
   /** Body root to the kind of moving joint that carries it. */
   final jointOf:Map<String, String> = [];
@@ -82,6 +109,7 @@ class EditorSceneTree implements TreeViewModel {
   final childCache:Map<String, Array<String>> = [];
   var cachedSceneRevision:Int = -1;
   var cachedFilterRevision:Int = -1;
+  var cachedSelectionKey:String = "";
   var filter:String = "";
   var filterRevision:Int = 0;
   var revealed:String = "";
@@ -90,7 +118,7 @@ class EditorSceneTree implements TreeViewModel {
     var next = StringTools.trim(value == null ? "" : value).toLowerCase();
     if (next != filter) { filter = next; filterRevision++; }
   }
-  /** Parts nodes group rows; they are not scene objects and cannot be selected. */
+  /** Parts rows are selectable groups rather than scene objects. */
   public function isGroup(key:String):Bool return StringTools.startsWith(key, PARTS);
   /** What the row for a scene object says: a readable name for generated parts, or the person's rename. */
   function displayLabel(key:String):String {
@@ -102,7 +130,7 @@ class EditorSceneTree implements TreeViewModel {
     return item.label;
   }
   function matches(key:String):Bool {
-    if (filter == "") return true;
+    if (filter == "" || key == selectionKey()) return true;
     var group = children.get(key);
     if (isGroup(key)) {
       if (group != null) for (child in group) if (matches(child)) return true;
@@ -120,10 +148,11 @@ class EditorSceneTree implements TreeViewModel {
     return key == "scene";
   }
   function visibleChildren(parentKey:String):Array<String> {
-    if (cachedSceneRevision != scene.revision || cachedFilterRevision != filterRevision) {
+    if (cachedSceneRevision != scene.revision || cachedFilterRevision != filterRevision || cachedSelectionKey != selectionKey()) {
       childCache.clear();
       cachedSceneRevision = scene.revision;
       cachedFilterRevision = filterRevision;
+      cachedSelectionKey = selectionKey();
     }
     var cached = childCache.get(parentKey);
     if (cached != null) return cached;
@@ -136,7 +165,7 @@ class EditorSceneTree implements TreeViewModel {
       if (!isGroup(parentKey))
         for (index in 0...scene.cadFeatureCount(parentKey)) {
           var key = parentKey + ":feature:" + index;
-          if (filter == "" || scene.cadFeatureNameAt(parentKey, index).toLowerCase().indexOf(filter) >= 0)
+          if (filter == "" || key == selectionKey() || scene.cadFeatureNameAt(parentKey, index).toLowerCase().indexOf(filter) >= 0)
             result.push(key);
         }
     }
@@ -183,6 +212,7 @@ class EditorSceneTree implements TreeViewModel {
       carrier.push(rootKey);
       nested.set(rootKey, true);
     }
+    for (parent in children.keys()) for (child in children.get(parent)) parentOf.set(child,parent);
     var visibilityGroups:Map<String,Array<String>> = ["scene" => visibilityMembers("scene")];
     for(key in children.keys())if(visibilityGroup(key))visibilityGroups.set(key,visibilityMembers(key));
     SceneVisibility.rebind(scene,visibilityGroups);
@@ -256,9 +286,9 @@ class EditorSceneTree implements TreeViewModel {
     return iconLabeledItem(key, "Scene", IconName.Hierarchy);
   }
   public function revision():Int {
-    var group = revealedGroup();
-    if (group != revealed) {
-      revealed = group;
+    var selected = selectionKey();
+    if (selected != revealed) {
+      revealed = selected;
       revealSerial++;
     }
     return scene.revision + filterRevision * 1000000 + revealSerial;
