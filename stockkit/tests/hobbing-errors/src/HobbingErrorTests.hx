@@ -106,9 +106,26 @@ class HobbingErrorTests {
     var focused=new HobbingErrorJob(spec,hob,motion.axesAt,passes,[],0.6,0.1,0.2,-6,6,0.000025,cfg,null,4,false,true,leadGrid).run([]);
     for(key in ["fp","Fp","Fr","Fbeta","ffbeta","fHbeta"])near(focused.value(key),reports[0].value(key),1e-12,'focused lead/end domain preserves $key');
     check(focused.warnings.indexOf("Face endpoints not sampled; end excess material unchecked")<0,"focused domain has actual face-end coverage");
+    var sparse=new HobbingErrorJob(spec,hob,motion.axesAt,passes,[],0.6,0.1,0.2,-6,6,0.000025,cfg,null,4,true,true).run([]);
+    for(key in reports[0].values.keys())near(sparse.value(key),reports[0].value(key),1e-12,'sparse end planes preserve $key');
     Sys.println('Face-end inspection: $checks assertions passed; baseline Fbeta=${reports[0].value("Fbeta")} um; end-excess Fbeta=${reports[1].value("Fbeta")} um');
   }
+  static function multiConvergence():Void {
+    var spec=new GearSpec(1,20,2,20*Math.PI/180),hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),1,32,4);
+    var a=stockkit.RingStock.annulus(new stockkit.RingGrid(spec.pitchRadius()-0.1,spec.pitchRadius()+0.1,0.9,1.1,0.1,0.1)),b=stockkit.RingStock.annulus(a.grid),dense=stockkit.RingStock.annulus(a.grid);
+    a.setThreads(1);b.setThreads(4);dense.setThreads(4);
+    var motion=new IdealHobbingJob(spec,hob,3000,1.1,0,1),passes=motion.schedule(a.grid),sweep=new HobbingSweep(hob,-6,6,0.00005);
+    var one=sweep.cut(dense,motion.axesAt,passes),many=sweep.cutMany([a,b],motion.axesAt,passes);
+    check(one.refinement==many.refinement&&one.maxArcChange==many.maxArcChange,"shared-domain convergence matches existing dense sweep");
+    for(part in [a,b]){var comparison=part.compareStock(dense);
+      for(v in comparison.leftover)if(v!=0)throw "multi-domain stock differs";
+      for(v in comparison.gouge)if(v!=0)throw "multi-domain stock differs";}
+    check(true,"one/four threads and shared poses preserve converged stock exactly");
+    sweep.dispose();a.dispose();b.dispose();dense.dispose();
+    Sys.println('Multi-domain convergence: $checks assertions passed');
+  }
   public static function main():Void {
+    if(Sys.args().indexOf("multi-convergence")>=0){multiConvergence();return;}
     if(Sys.args().indexOf("face-ends")>=0){faceEnds();return;}
     if(Sys.args().indexOf("cross-parity")>=0){crossParity();return;}
     if(Sys.args().indexOf("knot-parity")>=0){knotParity();return;}

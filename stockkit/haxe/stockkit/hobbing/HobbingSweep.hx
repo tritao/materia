@@ -76,6 +76,29 @@ class HobbingSweep {
       stock.restore(initial);initial.dispose();previous.dispose();throw error;
     }
   }
+  /** Converged inspection domains: retain every sampled circle, share poses,
+      and require the same arc-change bound on every domain at each refinement. */
+  public function cutMany(stocks:Array<RingStock>,axesAt:Float->HobbingAxes,passes:Array<GashPass>,
+      maxRefinements:Int=3,maxTimeStep:Float=0.001):HobbingReport {
+    if(disposed||stocks.length==0||maxRefinements<1||maxRefinements>8||!Math.isFinite(maxTimeStep)||maxTimeStep<=0)
+      throw "invalid converged multi-stock sweep";
+    var initial=[for(stock in stocks)stock.snapshot()],previous=[for(stock in stocks)RingStock.annulus(stock.grid)],havePrevious=false;
+    try{
+      var poses=0;
+      for(level in 0...maxRefinements+1){
+        for(i in 0...stocks.length)stocks[i].restore(initial[i]);poses=0;
+        var step=tolerance/(4*Math.pow(4,level));
+        for(pass in passes)poses+=cutPassMany(stocks,axesAt,pass,step,maxTimeStep);
+        if(havePrevious){var worst=0.0;
+          for(i in 0...stocks.length){var stock=stocks[i],comparison=stock.compareStock(previous[i]);
+            for(z in 0...stock.grid.axialCount)for(r in 0...stock.grid.radialCount){var index=z*stock.grid.radialCount+r;
+              worst=Math.max(worst,(comparison.leftover[index]+comparison.gouge[index])*stock.grid.radius(r));}}
+          if(worst<=tolerance){for(saved in initial)saved.dispose();for(stock in previous)stock.dispose();return new HobbingReport(passes.length,poses,level,worst);}}
+        for(i in 0...stocks.length){var saved=stocks[i].snapshot();previous[i].restore(saved);saved.dispose();}havePrevious=true;
+      }
+      throw "multi-stock hob sweep did not converge at the requested arc tolerance";
+    }catch(e:Dynamic){for(i in 0...stocks.length){stocks[i].restore(initial[i]);initial[i].dispose();previous[i].dispose();}throw e;}
+  }
   /** One resolution, useful for convergence studies. Sampling still evaluates
       true motion, including the exact pass-centre time between control ticks. */
   public function cutPass(stock:RingStock,axesAt:Float->HobbingAxes,pass:GashPass,

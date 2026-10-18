@@ -30,9 +30,21 @@ class RingMetrologyTests {
     var hob=new HobDesign(ConjugateRack.of(p),1,32,12);
     var job=new IdealHobbingJob(spec,hob,3000,1.1,0,4);
     var sweep=new HobbingSweep(hob,-28,28,0.00005),began=Sys.time();
-    var convergence=sweep.cut(stock,job.axesAt,job.schedule(grid));
     var cfg=new GearInspection(spec,lo+0.015*(hi-lo),null,4,4,hi-0.015*(hi-lo));
-    var report=GearMeasurement.fromRings(stock,spec,cfg);
+    var cross=InspectionRingStock.create(grid,cfg);
+    if(cross==null){stock.dispose();sweep.dispose();throw "exact HB4 inspection sampling unavailable";}
+    stock.dispose();
+    var ends=new FaceEndpointStock(cross,cross.stocks,grid,spec.faceWidth);
+    for(part in ends.stocks)part.setThreads(8);
+    var convergence=sweep.cutMany(ends.stocks,job.axesAt,job.schedule(grid));cross.assertOverlap();
+    var report=GearMeasurement.fromRings(ends,spec,cfg);
+    check(report.warnings.indexOf("Face endpoints not sampled; end excess material unchecked")<0,"reference physically samples both face ends");
+    sys.io.File.saveContent("build/flexspline-hb4-accelerated/result.json",haxe.Json.stringify({
+      threads:8,sweepToleranceMm:0.00005,pathToleranceMm:0.00005/(4*Math.pow(4,convergence.refinement)),
+      convergenceMm:convergence.maxArcChange,refinement:convergence.refinement,wallSeconds:Sys.time()-began,
+      grades:[for(k in Iso1328.parameters){parameter:k,valueUm:report.value(k),grade:report.grades.get(k)}],
+      isoClass:report.isoClass,warnings:report.warnings,extrapolation:report.extrapolation,
+      sampling:"exact inspection circles plus physical face endpoints; complete HB4 stroke; unchanged fine grid and convergence tolerance"}));
     for(k in Iso1328.parameters){
       var grade=report.grades.get(k);Sys.println('$k: ${report.value(k)} um, extrapolated grade $grade');
       check(grade!=null&&grade<=3,'reference $k must reach extrapolated grade <=3');
@@ -40,7 +52,7 @@ class RingMetrologyTests {
     check(report.overallGrade!=null&&report.overallGrade<=3,"reference overall extrapolated grade <=3");
     check(report.isoClass==null&&report.extrapolation.length>0,"module 0.3 cannot be ISO-certified");
     Sys.println('reference threads=8 sweep_tolerance_mm=0.00005 path_tolerance_mm=${0.00005/(4*Math.pow(4,convergence.refinement))} convergence_mm=${convergence.maxArcChange} time_s=${Sys.time()-began} warnings=${report.warnings}');
-    sweep.dispose();stock.dispose();
+    sweep.dispose();for(part in ends.stocks)part.dispose();
   }
   public static function main():Void {
     if(Sys.args().length>0&&Sys.args()[0]=="reference")reference();else run();

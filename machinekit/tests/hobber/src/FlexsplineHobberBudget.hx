@@ -40,15 +40,18 @@ class FlexsplineHobberBudget {
     var motion=new IdealHobbingJob(s,machine.hob.design,cam.rpm,path.revolutions,0.5,path.zStart);
     var profile=new ToothProfile(s),inspection=new GearInspection(s,profile.rootJoinRadius+0.01*(profile.tipJoinRadius-profile.rootJoinRadius));
     var radialStep=0.0015,axialStep=0.04,tolerance=0.000025,threads=8;
+    var configuredThreads=Sys.getEnv("HOBBER_BUDGET_THREADS");
+    if(configuredThreads!=null){var parsed=Std.parseInt(configuredThreads);if(parsed==null||parsed<1||parsed>20)throw "threads must be 1..20";threads=parsed;}
+    var faceEndpoints=Sys.getEnv("HOBBER_BUDGET_LEGACY_ENDS")!="1";
     var grid=RingStock.fromGearBlank(s,wall.wall,radialStep,axialStep),passes=motion.schedule(grid.grid);grid.dispose();
     var knots=[for(row in sync)row[0]].concat([for(row in force)row[0]]);
     var metadata={moduleMm:s.module,teeth:s.teeth,faceWidthMm:s.faceWidth,threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,
       radialStepMm:radialStep,axialStepMm:axialStep,windows:passes.length,sourceIds:[for(source in sources)source.id],
       forceSettings:inputs.force,forceInterpolation:inputs.forceInterpolation,syncBasis:inputs.syncBasis,
       supportStiffnessNPerMm:support.stiffness,scope:"complete HB8 feed stroke; fixed baseline HB10 load history; simulated HB7 servo, assumed plant; m0.3 ISO extrapolation only"};
-    sys.io.File.saveContent(output+"/settings.json",haxe.Json.stringify(metadata));
+    sys.io.File.saveContent(output+"/"+(mode=="all"?"settings":mode+"-settings")+".json",haxe.Json.stringify(metadata));
     Sys.println("REFERENCE_BUDGET_SETTINGS "+haxe.Json.stringify(metadata));Sys.stdout().flush();
-    if(mode=="lead-ends"){
+    if(mode=="lead-ends"||StringTools.startsWith(mode,"lead-")){
       // Only the two radius samples needed by lead/pitch metrology. Complete
       // stroke and source physics remain unchanged; profile is intentionally absent.
       var blank=RingStock.fromGearBlank(s,wall.wall,radialStep,axialStep);
@@ -57,6 +60,10 @@ class FlexsplineHobberBudget {
       var leadGrid=cross.stocks[1].grid;cross.dispose();blank.dispose();
       var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
       var endJob=new HobbingErrorJob(s,machine.hob.design,motion.axesAt,passes,sources,wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,knots,threads,false,true,leadGrid);
+      if(mode!="lead-ends"){
+        var label=mode.substr(5),ids=label=="baseline"?[]:label=="combined"?[for(source in sources)source.id]:[label];
+        var lead=endJob.run(ids);sys.io.File.saveContent(output+"/lead-"+label+".json",haxe.Json.stringify(measurement(lead)));return;
+      }
       var base=endJob.run([]);sys.io.File.saveContent(output+"/face-end-baseline.json",haxe.Json.stringify(measurement(base)));
       var combined=endJob.run([for(source in sources)source.id]);sys.io.File.saveContent(output+"/face-end-combined.json",haxe.Json.stringify(measurement(combined)));
       for(m in [base,combined])if(m.warnings.indexOf("Face endpoints not sampled; end excess material unchecked")>=0)throw "face-end coverage was not measured";
@@ -120,7 +127,7 @@ class FlexsplineHobberBudget {
     }
     var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
     var useCross=Sys.getEnv("HOBBER_BUDGET_DENSE")!="1";
-    var job=new HobbingErrorJob(s,machine.hob.design,motion.axesAt,passes,sources,wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,knots,threads,useCross,true);
+    var job=new HobbingErrorJob(s,machine.hob.design,motion.axesAt,passes,sources,wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,knots,threads,useCross,faceEndpoints);
     function runCut(ids:Array<String>):GearMeasurement {
       var label=ids.length==0?"baseline":ids.length==1?ids[0]:"combined",measured=job.run(ids);
       sys.io.File.saveContent(output+"/"+label+".json",haxe.Json.stringify(measurement(measured)));

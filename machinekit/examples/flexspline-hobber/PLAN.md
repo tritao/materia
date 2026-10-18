@@ -602,7 +602,7 @@ HB5 ── HB6 ── HB7 ── HB8 ──────────────�
 | HB1 | done: non-undercut geometry; internal rack-limit restrictions below | 647b62f66 |
 | HB2 | done: native ring stock, Haxe API, contour and GearSpec comparison | 94f246a1e |
 | HB3 | done: actual rake sweep, ideal driver and slice acceptance; flat-count correction below | 2ec3bdd45 |
-| HB4 | metrology implemented/tested; blocked: full-face rake acceptance waiting for heavy-run slot | 0d5a47f3f |
+| HB4 | metrology implemented/tested; accelerated full-face acceptance running | Eight threads, exact inspection domains and physical face ends; completed grades pending. |
 | HB5 | done: reference parts plus ribbed mineral-cast foundations and separate steel inserts | 13358ee07 + f59fcf695 |
 | HB6 | mechanics/scene tested; blocked: Start-page/project-load/MuJoCo acceptance queued | 45dd31967 |
 | HB7 | done: measured-master gearbox, timed events, additive C drive checks and reference sync tests | a71f86f61 |
@@ -1579,3 +1579,75 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   the corresponding full-domain measurements exactly: **16 assertions pass**.
   **26 existing inspection-parity, 24 error-model and 264 machine assertions**
   also pass. These small fixtures do not claim reference or ISO acceptance.
+
+### HB4/HB11 bounded parallel rerun (2026-10-18 morning)
+
+- Disk housekeeping by the user removed `build/flexspline-hb0`, `flexspline-hb6`
+  and `flexspline-hb9`. Historical implementation checks remain recorded above,
+  but fresh HB0/HB6/HB9 acceptance needs rebuilt artifacts. Recreate the pristine
+  HB0 archive from `8c70c2190` if required. New runs share the 50 MB input file by
+  hard link and reuse the validated native library; do not duplicate app builds.
+- At the user's request the obsolete single-threaded HB4 PID 3586429 was stopped
+  deliberately, without a completed result. Its small binary/metadata archive is
+  retained. `build/flexspline-hb4-accelerated/` now runs the complete HB4 reference
+  cut with **8 threads**, unchanged **0.00005 mm sweep convergence tolerance**,
+  and the original fine grid. `HobbingSweep.cutMany` shares poses across exact
+  inspection domains and checks the worst arc change on every computed circle
+  at each refinement. Physical Z=0/8 samples are included. Grade <=3 acceptance
+  remains pending the completed `result.json` and zero exit status.
+- The completed fine HB11 baseline and mandrel inspections stay unchanged in
+  `build/flexspline-reference-budget-fast/`. Its current table-radial case is
+  allowed to finish. The parallel scheduler then checks the old process identity
+  and stops that serial batch before further full cases; this is a deliberate
+  replacement, not a failed cut.
+- `build/flexspline-reference-budget-parallel/` is the replacement, restartable
+  batch: **four worker slots, four native threads per cut**, a **6 GiB memory cap
+  and no additional swap**. The existing table case occupies one slot until it
+  completes; three other cases start immediately. Available memory is checked
+  against estimated worker memory plus 3 GiB headroom. Reused cases retain their
+  original thread provenance; each new cut logs its settings and execution time.
+- Accepted settings are unchanged: **0.0015 mm radial / 0.04 mm axial grid,
+  0.000025 mm sweep / 0.0000015625 mm path tolerance, all 92,151 windows**, and the
+  same force/sync knots and histories. No coarser once-per-revolution grid has
+  been accepted, and no coarse/fine agreement is claimed. Overall hours-scale
+  throughput is a target pending measured engaged-case timings; short fixture
+  timings must not be presented as a completed full-batch speedup.
+- Every new source/combined inspection physically samples both face ends.
+  `FaceEndpointStock` uses only the original measurement-radius strip for end
+  planes when attached to an inspection cross; uncomputed end radii throw.
+  The full reference computes **2,106 circles**, retaining every original
+  inspected coordinate and adding four actual end circles.
+- Completed fine profiles can be reused with a separate full-stroke lead/end cut.
+  Promotion requires **exact equality** of interior fp/Fp/Fr, cumulative pitch,
+  radial measurements and tooth thickness; mismatches fail rather than silently
+  merge. Baseline lead comes from the already-running face-end supplement;
+  mandrel and table-radial get separate narrow lead/end cuts. Original artifacts
+  and their hashes are retained. The new end-inclusive traces are used for the
+  complete per-source superposition check, not just baseline/combined grading.
+- The Python assembler applies the same pointwise **0.1 um + 25% summed trace
+  envelope** criterion and source-order scalar ranking as `gearkit.ErrorBudget`.
+  It rejects inconsistent traces or missing end coverage. All case files and a
+  successful assembly are needed before the review can pass. Fingerprints bind
+  resumes to the frozen executable, native library, inputs and settings; a
+  changed executable is rejected without changing completed acceptance status.
+- Rechecks: **25 physical end-coverage/parity assertions** and **2 converged
+  multi-domain parity assertions** pass. A 100-window engaged reference fixture
+  gives the identical stock/provenance hash at **1, 2 and 4 threads**; every
+  inspected endpoint agrees with dense stock. Cross timings were 17.05/11.99/
+  12.36 s under changing concurrent load, not a controlled full-cut benchmark.
+  Scheduler checks reuse all 15 saved cases across two restarts without invoking
+  a cutter and reject changed binaries, interior mismatches, missing end coverage,
+  inconsistent sampling; nonlinear trace superposition is flagged. HB11/HB12 acceptance
+  remains open while the physical runs finish.
+
+Resume the prepared batch (completed cases are reused):
+
+```sh
+machinekit/examples/flexspline-hobber/check-reference-budget.sh parallel
+python3 machinekit/examples/flexspline-hobber/review-reference-budget.py \
+  build/flexspline-reference-budget-parallel --watch
+```
+
+While the old table case is still running, set `HOBBER_BUDGET_LEGACY_PID` to its
+verified PID when starting the scheduler so it can stop the superseded serial
+batch after saving that case. Do not start a second batch beside the live one.
