@@ -46,6 +46,17 @@ nested and filtered groups, undo, and scene/generated-project save/open:
 ./haxeon/scripts/haxeon run --project=app/tests/haxeon.visibility.json
 ```
 
+Perspective rendering uses the displayed viewport dimensions for the camera,
+overlays and pointer input. The GPU texture is capped at 2048 pixels per axis;
+that resolution limit does not change the camera aspect ratio. Window and dock
+resizes refresh the image even when the capped texture dimensions stay the same.
+The focused resize/input regression covers wide, tall and fractional layouts,
+selection, hover, dragging and cursor-anchored zoom:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/tests/haxeon.viewport-coordinates.json
+```
+
 ## Mission monitor
 
 In Simulate, projects with an authored mission open the Mission sidebar tab. It shows

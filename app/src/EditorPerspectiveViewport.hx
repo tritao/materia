@@ -43,6 +43,11 @@ class EditorPerspectiveViewport implements View {
   final style:LayoutStyle;
   var surface:Null<GraphicsSurface> = null;
   var renderedRevision:String = "";
+  // Input and overlays use layout pixels; the GPU texture can be smaller on large displays.
+  var viewportWidth:Float = 1.0;
+  var viewportHeight:Float = 1.0;
+  var renderedViewportWidth:Float = 0.0;
+  var renderedViewportHeight:Float = 0.0;
   var renderedWidth:Int = 0;
   var renderedHeight:Int = 0;
   var renderedCameraRevision:Int = -1;
@@ -159,6 +164,7 @@ class EditorPerspectiveViewport implements View {
   public function build(context:BuildContext):RenderNode {
     return context.withScope(new Key(key), function() {
       var node = new RenderNode(context.id("perspective"), LayoutVisualKind.Custom, style);
+      node.onResolved(function(geometry) { updateViewportSize(geometry.width, geometry.height); });
       node.hitTestSelf = true;
       node.focusable = true;
       node.semantics = new Semantics(AccessibilityRole.Image,
@@ -174,7 +180,13 @@ class EditorPerspectiveViewport implements View {
     });
   }
 
+  function updateViewportSize(width:Float, height:Float):Void {
+    viewportWidth = Math.max(1.0, width);
+    viewportHeight = Math.max(1.0, height);
+  }
+
   function paint(canvas:Canvas, geometry:ResolvedLayoutItem):Void {
+    updateViewportSize(geometry.width, geometry.height);
     ensureRenderer();
     var width = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.width))));
     var height = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.height))));
@@ -185,17 +197,18 @@ class EditorPerspectiveViewport implements View {
         renderedSampleCount != sampleCountRequested ||
         renderedHoverRevision != hoverRevision ||
         renderedCollisionRevision != collisionRevision ||
-        width != renderedWidth || height != renderedHeight)) {
+        width != renderedWidth || height != renderedHeight ||
+        viewportWidth != renderedViewportWidth || viewportHeight != renderedViewportHeight)) {
       var started = Sys.time();
       fitCameraClipRange();
-      var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
+      var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
         simulationActive ? simulationPoses : null, hoveredObjectId, hoveredFaceIndex,
         collisionPairs, cosmeticThreadsVisible);
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
       if (gridVisible && gridStep > 0.0) {
         var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
         view.setWorkplaneGrid(camera.eyePosition(), camera.studioDirection(0.0, 0.0, -1.0),
-          camera.studioDirection(scale * width / height, 0.0, 0.0),
+          camera.studioDirection(scale * aspect(), 0.0, 0.0),
           camera.studioDirection(0.0, scale, 0.0), gridStep, camera.distance);
       }
       var directions:Array<Float> = [];
@@ -234,6 +247,8 @@ class EditorPerspectiveViewport implements View {
       renderedSampleCount = sampleCountRequested;
       renderedHoverRevision = hoverRevision;
       renderedCollisionRevision = collisionRevision;
+      renderedViewportWidth = viewportWidth;
+      renderedViewportHeight = viewportHeight;
       renderedWidth = width;
       renderedHeight = height;
       lastRenderSeconds = Sys.time() - started;
@@ -307,6 +322,8 @@ class EditorPerspectiveViewport implements View {
   public function diagnosticState():Dynamic return {
     width: renderedWidth,
     height: renderedHeight,
+    viewportWidth: viewportWidth,
+    viewportHeight: viewportHeight,
     composition: "gpu-surface",
     renders: renderCount,
     sampleCount: sampleCountEffective,
@@ -492,7 +509,7 @@ class EditorPerspectiveViewport implements View {
   /** Starts an IK drag when the press lands on a joint-driven part; the drag plane faces the camera. */
   function beginAssemblyDrag(localX:Float, localY:Float):Bool {
     fitCameraClipRange();
-    var ray = camera.screenRay(localX, localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+    var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
     var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()), null, null, -1, null, cosmeticThreadsVisible);
     var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
       ray.directionX, ray.directionY, ray.directionZ);
@@ -509,7 +526,7 @@ class EditorPerspectiveViewport implements View {
   function updateAssemblyDrag(localX:Float, localY:Float):Void {
     var drag = assemblyDrag;
     if (drag == null) return;
-    var ray = camera.screenRay(localX, localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+    var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
     var p = assemblyDragPlane;
     var denominator = ray.directionX * p[3] + ray.directionY * p[4] + ray.directionZ * p[5];
     if (Math.abs(denominator) < 1e-9) return;
@@ -547,7 +564,7 @@ class EditorPerspectiveViewport implements View {
 
   public function pick(localX:Float, localY:Float):String {
     fitCameraClipRange();
-    var ray=camera.screenRay(localX,localY,Math.max(1,renderedWidth),Math.max(1,renderedHeight));
+    var ray=camera.screenRay(localX,localY,viewportWidth,viewportHeight);
     var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),
       simulationActive?simulationPoses:null, null, -1, null, cosmeticThreadsVisible);
     return scene.pickRayWithView(view,ray.originX,ray.originY,ray.originZ,
@@ -560,8 +577,8 @@ class EditorPerspectiveViewport implements View {
 
   function updateHover(localX:Float, localY:Float):Void {
     fitCameraClipRange();
-    var ray = camera.screenRay(localX, localY, Math.max(1, renderedWidth),
-      Math.max(1, renderedHeight));
+    var ray = camera.screenRay(localX, localY, viewportWidth,
+      viewportHeight);
     // A running simulation poses the scene, so hover must test the posed geometry, as picking does.
     var hit = simulationActive
       ? scene.hoverHitRayWithView(scene.configureRenderView(new SceneView(),
@@ -588,7 +605,7 @@ class EditorPerspectiveViewport implements View {
   }
 
   function edgeAngularTolerance(localX:Float,localY:Float):Float {
-    var width=Math.max(1,renderedWidth),height=Math.max(1,renderedHeight);
+    var width=viewportWidth,height=viewportHeight;
     var center=camera.screenRay(localX,localY,width,height);
     var offset=camera.screenRay(localX+3.0,localY,width,height);
     var dot=center.directionX*offset.directionX+center.directionY*offset.directionY+
@@ -599,7 +616,7 @@ class EditorPerspectiveViewport implements View {
   function selectAt(localX:Float,localY:Float):String {
     if(!editingEnabled()){var id=pick(localX,localY);scene.select(id);return id;}
     fitCameraClipRange();
-    var ray=camera.screenRay(localX,localY,Math.max(1,renderedWidth),Math.max(1,renderedHeight));
+    var ray=camera.screenRay(localX,localY,viewportWidth,viewportHeight);
     var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null, null, -1, null, cosmeticThreadsVisible);
     return scene.selectRayWithView(view,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
@@ -968,8 +985,7 @@ class EditorPerspectiveViewport implements View {
     renderer = SceneRenderer.createBorrowedId(host.gpuRendererId);
   }
 
-  function aspect():Float return renderedWidth <= 0 || renderedHeight <= 0
-    ? 1.0 : renderedWidth / renderedHeight;
+  function aspect():Float return viewportWidth / viewportHeight;
 
   function installNavigation(node:RenderNode):Void {
     node.on(UiEventKind.PointerDown, function(event:UiEvent) {
@@ -1033,7 +1049,7 @@ class EditorPerspectiveViewport implements View {
         if (hit != "scene"&&editingEnabled()) {
           selectAt(event.localX,event.localY);
           objectDrag = PerspectiveSceneDrag.begin(scene, camera, hit, event.localX, event.localY,
-            Math.max(1, renderedWidth), Math.max(1, renderedHeight), gridSnapEnabled, gridStep);
+            viewportWidth, viewportHeight, gridSnapEnabled, gridStep);
           if (objectDrag != null) navigationMode = 3;
           else if (beginAssemblyDrag(event.localX, event.localY)) navigationMode = 5;
         }
@@ -1058,9 +1074,9 @@ class EditorPerspectiveViewport implements View {
         flyFast = (event.modifiers & UiModifier.Shift) != 0;
         camera.look(deltaX, deltaY);
       }
-      else if (navigationMode == 2) camera.pan(deltaX, deltaY, Math.max(1, renderedHeight));
+      else if (navigationMode == 2) camera.pan(deltaX, deltaY, viewportHeight);
       else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY,
-        Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+        viewportWidth, viewportHeight);
       else if (navigationMode == 5 && assemblyDrag != null) updateAssemblyDrag(event.localX, event.localY);
       else if (navigationMode == 6 && sketchPointDragging) {
         var point = sketchPlanePoint(event.localX, event.localY);
@@ -1127,14 +1143,14 @@ class EditorPerspectiveViewport implements View {
     node.on(UiEventKind.PointerCancel, finish);
     node.on(UiEventKind.Scroll, function(event:UiEvent) {
       if (navigationPointer != null) { event.preventDefault(); event.stopPropagation(); return; }
-      var ray = camera.screenRay(event.localX, event.localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+      var ray = camera.screenRay(event.localX, event.localY, viewportWidth, viewportHeight);
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
         simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible);
       var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
         ray.directionX, ray.directionY, ray.directionZ);
       var anchor = hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z)
         ? [hit.x, hit.y, hit.z]
-        : camera.cursorAnchor(event.localX, event.localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+        : camera.cursorAnchor(event.localX, event.localY, viewportWidth, viewportHeight);
       camera.zoomAt(event.deltaY, anchor[0], anchor[1], anchor[2]);
       host.requestFrame();
       event.preventDefault(); event.stopPropagation();
@@ -1189,7 +1205,7 @@ class EditorPerspectiveViewport implements View {
     var plane = scene.sketchDraftPlane();
     if (plane == null)
       return null;
-    var ray = camera.screenRay(localX, localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+    var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
     var denominator = plane.normal.x * ray.directionX + plane.normal.y * ray.directionY +
       plane.normal.z * ray.directionZ;
     if (Math.abs(denominator) < 0.000001)
