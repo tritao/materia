@@ -6,6 +6,7 @@ import app.MachineKitRecipeProjectTests;
 class AppTests {
 	static function main():Int {
 		ProjectProcessTests.run();
+    SceneVisibilityTests.run();
     if (StartPageTests.main() != 0) return 1;
     if (MissionJobsTests.main() != 0) return 1;
 		SheetMaterialIntegrationTests.run();

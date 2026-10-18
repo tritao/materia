@@ -451,7 +451,7 @@ class EditorScene {
       candidates.push(new EditorSceneObject(item.id, item.label, item.type,
         item.width, item.height, item.depth, item.collisionEnabled, item.dynamicBody,
         item.mass, item.red, item.green, item.blue, storedCadGraph,
-        item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance, item.materialId));
+        item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance, item.materialId, item.hiddenBy));
       candidates[candidates.length - 1].worker = item.worker;
     }
     profileLoadEnd("geometryData", preparationStarted);
@@ -471,7 +471,7 @@ class EditorScene {
         var item = data[index];
         var node = transaction.createNode();
         transaction.setName(node, item.label);
-        transaction.setVisibility(node, item.visible);
+        transaction.setVisibility(node, app.editor.SceneVisibility.shown(item.visible, item.hiddenBy));
         transaction.setGeometry(node, geometries[geometryIndexes[index]]);
         transaction.setMaterial(node, materials[index]);
         transaction.setTransform(node, objectTransform(item.x, item.y, item.z, item.rotation));
@@ -2134,13 +2134,18 @@ class EditorScene {
   static inline function finiteCoordinate(value:Float):Bool
     return value == value && value - value == 0.0 && Math.abs(value) <= 1000000;
 
+  public function isVisible(id:String):Bool {
+    var item = object(id);
+    return item != null && app.editor.SceneVisibility.shown(item.visible, item.hiddenBy);
+  }
+
   public function setVisible(id:String, visible:Bool):Void {
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
     var transaction = scene.beginTransaction();
     var changes:Null<ChangeSet> = null;
     try {
-      transaction.setVisibility(runtimeFor(id).node, visible);
+      transaction.setVisibility(runtimeFor(id).node, app.editor.SceneVisibility.shown(visible, item.hiddenBy));
       changes = transaction.commitWithChanges();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
     item.visible = visible;
@@ -3109,10 +3114,11 @@ class EditorSceneObject {
   public var y:Float;
   public var z:Float;
   public var visible:Bool;
+  public var hiddenBy:Array<String>;
   public function new(id:String,label:String,kind:String,width:Float,height:Float,depth:Float,
       collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float,
       ?cadGraph:String,x:Float=0,y:Float=0,z:Float=0,visible:Bool=true,?meshSnapshot:String,
-      ?rotation:Array<Float>, ?appearance:Appearance, ?materialId:String) {
+      ?rotation:Array<Float>, ?appearance:Appearance, ?materialId:String, ?hiddenBy:Array<String>) {
     this.id = id; this.label = label; this.kind = kind;
     this.width=width;this.height=height;this.depth=depth;this.collisionEnabled=collisionEnabled;
     this.dynamicBody=dynamicBody;this.mass=mass;
@@ -3122,6 +3128,7 @@ class EditorSceneObject {
     this.meshSnapshot=meshSnapshot;
     this.rotation=rotation;
     this.x=x;this.y=y;this.z=z;this.visible=visible;
+    this.hiddenBy = app.editor.SceneVisibility.masks(hiddenBy);
   }
 }
 

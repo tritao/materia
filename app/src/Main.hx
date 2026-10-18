@@ -942,12 +942,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }
     if (hierarchyMenuVisible && documentDialog == null) {
       var objectMenu = new Menu("hierarchy-object-menu", [
-        new MenuItem("rename", "Rename (F2)", function() startRename(scene.selectedId), canEditObjects()),
+        new MenuItem("visibility", "Show / hide (Space)", function() treeModel.toggleVisibility(treeModel.selectionKey()), !documents.blocked()),
+        new MenuItem("isolate", "Isolate selected", function() treeModel.isolateSelected(), !documents.blocked()),
+        new MenuItem("show-all", "Show all", function() treeModel.showAll(), !documents.blocked()),
+        new MenuItem("rename", "Rename (F2)", function() startRename(scene.selectedId), canEditObjects() && scene.object(scene.selectedId)!=null),
         new MenuItem("duplicate", "Duplicate", function() commands.execute("scene.duplicate"),
           commands.get("scene.duplicate").isEnabled(ui.commandContext)),
         new MenuItem("delete", "Delete", function() commands.execute("scene.delete"),
           commands.get("scene.delete").isEnabled(ui.commandContext)),
-        new MenuItem("frame", "Frame selected", function() commands.execute("scene.frame-selected"))
+        new MenuItem("frame", "Frame selected", function() commands.execute("scene.frame-selected"), scene.object(scene.selectedId)!=null)
       ], hierarchyMenuX, hierarchyMenuY, function() { hierarchyMenuVisible = false; invalidateView(); });
       windowLayers.push(new StackChild("hierarchy-object-menu", objectMenu, 0.0, 0.0, 26));
     }

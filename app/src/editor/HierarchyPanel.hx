@@ -44,9 +44,8 @@ class HierarchyPanel {
     treeStyle.childGap = 6.0;
     var treeViewport = ReferenceEditorApp.fillStyle();
     var tree = new TreeView(app.hierarchySearch == "" ? "scene-hierarchy" : "scene-hierarchy-filtered",
-      app.treeModel, treeViewport, null, 420.0, app.scene.treeSelectionKey(), ["scene"], function(id) {
-      if (app.treeModel.isGroup(id)) return;
-      app.scene.selectTreeKey(id);
+      app.treeModel, treeViewport, null, 420.0, app.treeModel.selectionKey(), ["scene"], function(id) {
+      app.treeModel.selectKey(id);
       app.log("Selected " + id);
       app.invalidateView();
     }, function(id) {
@@ -55,11 +54,13 @@ class HierarchyPanel {
       app.commands.execute("scene.frame-selected");
       app.log("Framed " + id);
     }, null, null);
+    app.treeModel.canChangeVisibility = function() return !app.documents.blocked();
+    app.treeModel.onVisibilityChanged = function() {app.commands.refresh();app.invalidateView();};
     tree.onExpandedChanged = function(_, _) app.hierarchyExpansionRevision++;
     tree.onItemContextMenu = function(id, event) {
-      if (app.scene.object(id) == null) return;
+      app.treeModel.selectKey(id);
       app.hierarchyMenuX = Math.max(8.0, Math.min(app.viewportWidth - 228.0, event.x));
-      app.hierarchyMenuY = Math.max(8.0, Math.min(app.viewportHeight - 180.0, event.y));
+      app.hierarchyMenuY = Math.max(8.0, Math.min(app.viewportHeight - 280.0, event.y));
       app.hierarchyMenuVisible = true;
       app.invalidateView();
     };
@@ -83,7 +84,7 @@ class HierarchyPanel {
         }, null, "Search objects...")),
         new KeyedView(
           "tree",
-          tree
+          new HierarchyTreeView(tree, function() {if(tree.selectedKey!=null && !app.documents.blocked())app.treeModel.toggleVisibility(tree.selectedKey);})
         )
       ]),
       treeStyle

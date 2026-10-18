@@ -133,7 +133,7 @@ class SceneCodec {
       if (seen.exists(editKey) || Reflect.hasField(item, "meshSnapshot") || Reflect.hasField(item, "cadGraph"))
         throw "Invalid generated project override";
       var kind = stringField(item, "kind");
-      if (["number", "boolean", "text", "vector", "appearance"].indexOf(kind) < 0 ||
+      if (["number", "boolean", "text", "vector", "text-list", "appearance"].indexOf(kind) < 0 ||
           !Reflect.hasField(item, "value")) throw "Invalid generated project field edit";
       seen.set(editKey, true);
       overrideRecords.push({targetId: id, property: stringField(item, "property"),
@@ -159,7 +159,7 @@ class SceneCodec {
       var rawEdits:Array<Dynamic> = cast field(item, "overrides");
       for (edit in rawEdits) {
         var editKind = stringField(edit, "kind");
-        if (["number", "boolean", "text", "vector", "appearance"].indexOf(editKind) < 0 ||
+        if (["number", "boolean", "text", "vector", "text-list", "appearance"].indexOf(editKind) < 0 ||
             !Reflect.hasField(edit, "value")) throw "Invalid generated project instance edit";
         instanceEdits.push({targetId: stringField(edit, "targetId"),
           property: stringField(edit, "property"), kind: editKind,
@@ -404,6 +404,7 @@ class SceneCodec {
         appearance: appearance,
         materialId: materialId,
         visible: visibleValue,
+        hiddenBy: optionalTextArray(value, "hiddenBy", 256),
         rotation: kind == "human-worker" ? workerYawRotation(optionalRotation(value)) : optionalRotation(value),
         cadGraph: cadGraph,
         meshSnapshot: meshSnapshot,

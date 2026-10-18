@@ -1226,12 +1226,13 @@ class ProjectDocumentSession {
     return Json.stringify(first) == Json.stringify(second);
 
   static var EDITABLE_FIELDS:Array<String> = ["label", "x", "y", "z", "rotation",
-    "collisionEnabled", "dynamicBody", "mass", "materialId", "visible"];
+    "collisionEnabled", "dynamicBody", "mass", "materialId", "visible", "hiddenBy"];
   static var VISUAL_FIELDS:Array<String> = ["visual.baseColor", "visual.finish",
     "visual.metallic", "visual.roughness"];
 
   static function sameValue(property:String, a:Dynamic, b:Dynamic):Bool {
     if (property == "rotation") return sameRotation(cast a, cast b);
+    if (property == "hiddenBy") return app.editor.SceneVisibility.same(cast a, cast b);
     if (Std.isOfType(a, Float) || Std.isOfType(b, Float)) {
       var first:Float = a, second:Float = b;
       return Math.abs(first - second) < 1e-6;
@@ -1247,7 +1248,7 @@ class ProjectDocumentSession {
       if (property == "materialId" && value == null) continue;
       if (sameValue(property, value, Reflect.field(source, property))) continue;
       result.push({targetId: id, property: property,
-        kind: property == "rotation" ? "vector" :
+        kind: property == "hiddenBy" ? "text-list" : property == "rotation" ? "vector" :
           Std.isOfType(value, Bool) ? "boolean" : Std.isOfType(value, String) ? "text" : "number",
         value: value});
     }
@@ -1365,6 +1366,7 @@ class ProjectDocumentSession {
       dynamicBody: Reflect.field(value, "dynamicBody"), mass: Reflect.field(value, "mass"),
       red: Reflect.field(value, "red"), green: Reflect.field(value, "green"),
       blue: Reflect.field(value, "blue"), visible: Reflect.field(value, "visible"),
+      hiddenBy: Reflect.field(value, "hiddenBy"),
       materialId: Reflect.field(value, "materialId"), appearance: appearance,
       rotation: rotation, cadGraph: null, meshSnapshot: "_", sketchDraft: null
     };
@@ -1381,7 +1383,7 @@ class ProjectDocumentSession {
     collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
     red: item.red, green: item.green, blue: item.blue, appearance: item.appearance == null ? Appearances.neutral() : Json.parse(Json.stringify(item.appearance)),
     materialId: item.materialId,
-    visible: item.visible, rotation: item.rotation
+    visible: item.visible, hiddenBy: app.editor.SceneVisibility.masks(item.hiddenBy), rotation: item.rotation
   };
 
   static function sameRotation(left:Null<Array<Float>>, right:Null<Array<Float>>):Bool {

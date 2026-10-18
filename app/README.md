@@ -20,8 +20,27 @@ load the two starter boxes, the BIM example, and sample telemetry.
 Click an object in the viewport or hierarchy to select it; the yellow outline
 tracks selection. Edit Name, Position X/Y (metres), Width, Height, Colour
 (`#RRGGBB`), or Visible in the inspector.
-Hidden objects remain selectable in the hierarchy. Click empty viewport space
-or the Scene root to clear object selection.
+Use the eye at the right of a Hierarchy row, or press **Space** while that tree
+row has keyboard focus, to show or hide it. Hidden rows stay selectable and use
+muted labels; an open eye on a muted row means its own visibility is enabled but
+an object or parent mask is hiding it. A dash in an open group eye indicates
+that some descendants are hidden. Group changes include filtered-out and
+collapsed descendants, preserving each child's own Visible setting and nested
+group state. The search field and other text inputs keep their normal Space behavior.
+
+Right-click an object or group for **Isolate selected** or **Show all**. Isolation
+preserves hidden descendants when the selected row is a group; Show all clears
+all visibility masks and enables every object's Visible setting. These actions
+are undoable and saved with ordinary scenes and generated project overrides.
+Visibility affects rendering and picking, independently of collision or simulation.
+Click empty viewport space or the Scene root to clear object selection.
+
+The focused visibility regression suite includes routed mouse/keyboard controls,
+nested and filtered groups, undo, and scene/generated-project save/open:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/tests/haxeon.visibility.json
+```
 
 ## Mission monitor
 

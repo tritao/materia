@@ -336,7 +336,7 @@ class EditorPerspectiveViewport implements View {
     var minX = 1000000000.0, minY = 1000000000.0, minZ = 1000000000.0;
     var maxX = -1000000000.0, maxY = -1000000000.0, maxZ = -1000000000.0;
     for (item in items) {
-      if (!item.visible) continue;
+      if (!scene.isVisible(item.id)) continue;
       var transform = displayTransform(item);
       var bounds=transformedBounds(transform,item.width,item.height,item.depth);
       minX=Math.min(minX,bounds[0]);minY=Math.min(minY,bounds[1]);minZ=Math.min(minZ,bounds[2]);
@@ -630,7 +630,7 @@ class EditorPerspectiveViewport implements View {
   function fitCameraClipRange():Void {
     clipBounds.resize(0);
     for (item in scene.items()) {
-      if (!item.visible) continue;
+      if (!scene.isVisible(item.id)) continue;
       if (simulationActive) {
         var index = clipBounds.length;
         if (index == clipBoundsScratch.length) clipBoundsScratch.push([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);

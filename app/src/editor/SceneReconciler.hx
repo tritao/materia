@@ -63,9 +63,12 @@ class SceneReconciler {
     var previousFaceX=owner.selectedCadFaceX,previousFaceY=owner.selectedCadFaceY;
     var retained:Map<String, Bool> = new Map();
     var retiredThreadIds:Array<String> = [];
+    // Newly authored roots inherit a hidden Scene row as part of their creation transaction.
+    var sceneHidden = SceneVisibility.groupHidden(owner,"scene",[for(item in owner.objects)item.id]);
     try {
       for (record in data) {
         var item = existingById.get(record.id);
+        if (item == null && record.hiddenBy == null && sceneHidden) record.hiddenBy = ["scene"];
         var session = item == null || !EditorScene.isCadKind(item.kind) || item.kind != record.type || item.cadGraph != record.cadGraph
           ? null : owner.cadSessions.get(record.id);
         var storedGraph = record.cadGraph;
@@ -101,7 +104,7 @@ class SceneReconciler {
           owner.failIfInjected("prepare.new-material");
           var node = prepared.transaction.createNode();
           prepared.transaction.setName(node, record.label);
-          prepared.transaction.setVisibility(node, record.visible);
+          prepared.transaction.setVisibility(node, SceneVisibility.shown(record.visible, record.hiddenBy));
           prepared.transaction.setGeometry(node, geometry);
           prepared.transaction.setMaterial(node, material);
           prepared.transaction.setTransform(node, EditorScene.objectTransform(record.x, record.y, record.z, record.rotation));
@@ -112,7 +115,7 @@ class SceneReconciler {
             record.width, record.height, record.depth, record.collisionEnabled,
             record.dynamicBody, record.mass, record.red, record.green, record.blue,
             storedGraph,
-            record.x, record.y, record.z, record.visible, record.meshSnapshot, record.rotation, record.appearance, record.materialId);
+            record.x, record.y, record.z, record.visible, record.meshSnapshot, record.rotation, record.appearance, record.materialId, record.hiddenBy);
           item.worker = record.worker;
           prepared.objects.push(item);
           owner.failIfInjected("prepare.new-object");
@@ -121,7 +124,7 @@ class SceneReconciler {
           var runtime = prepared.bridgeEntries.get(record.id);
           if (runtime == null) throw "Missing runtime scene node: " + record.id;
           var candidate = item;
-          var objectChanged = item.label != record.label || item.visible != record.visible ||
+          var objectChanged = item.label != record.label || item.visible != record.visible || !SceneVisibility.same(item.hiddenBy, record.hiddenBy) ||
             item.x != record.x || item.y != record.y || item.z != record.z ||
             item.width != record.width || item.height != record.height || item.depth != record.depth ||
             item.kind != record.type || item.cadGraph != storedGraph ||
@@ -132,14 +135,15 @@ class SceneReconciler {
             !sameWorker(item.worker, record.worker);
           if (objectChanged) candidate = SceneModel.copyEditorSceneObject(item);
           if (item.label != record.label) prepared.transaction.setName(runtime.node, record.label);
-          if (item.visible != record.visible) prepared.transaction.setVisibility(runtime.node, record.visible);
+          if (item.visible != record.visible || !SceneVisibility.same(item.hiddenBy, record.hiddenBy))
+            prepared.transaction.setVisibility(runtime.node, SceneVisibility.shown(record.visible, record.hiddenBy));
           if (item.x != record.x || item.y != record.y || item.z != record.z ||
               !EditorScene.sameRotation(item.rotation, record.rotation)) {
             prepared.transaction.setTransform(runtime.node,
               EditorScene.objectTransform(record.x, record.y, record.z, record.rotation));
             prepared.changedBounds.push(runtime.node);
           }
-          if (item.label != record.label || item.visible != record.visible || item.x != record.x ||
+          if (item.label != record.label || item.visible != record.visible || !SceneVisibility.same(item.hiddenBy, record.hiddenBy) || item.x != record.x ||
               item.y != record.y || item.z != record.z || !EditorScene.sameRotation(item.rotation, record.rotation)) prepared.changed = true;
           if (item.width != record.width || item.height != record.height || item.depth != record.depth ||
               item.kind != record.type || item.cadGraph != storedGraph || item.meshSnapshot != record.meshSnapshot) {
@@ -188,6 +192,7 @@ class SceneReconciler {
           candidate.rotation = record.rotation;
           candidate.worker = record.worker;
           candidate.visible = record.visible;
+          candidate.hiddenBy = SceneVisibility.masks(record.hiddenBy);
           if (objectChanged) prepared.changed = true;
           prepared.objects.push(candidate);
           owner.failIfInjected("prepare.existing-object");

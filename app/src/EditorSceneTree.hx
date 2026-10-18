@@ -1,18 +1,11 @@
 package app;
 
 import haxeon.ui.core.View;
-import haxeon.ui.widgets.text.Text;
-import haxeon.ui.widgets.text.MiddleEllipsisText;
-import haxeon.ui.widgets.overlays.Tooltip;
-import haxeon.ui.widgets.Icon;
-import haxeon.ui.widgets.KeyedView;
-import haxeon.ui.widgets.layout.Row;
-import haxeon.ui.LayoutAlignmentY;
-import haxeon.ui.LayoutAxis;
-import haxeon.ui.LayoutStyle;
-import haxeon.ui.icons.IconName;
-import haxeon.ui.widgets.collections.TreeRootMetadata;
 import haxeon.ui.widgets.collections.TreeViewModel;
+import haxeon.ui.widgets.collections.TreeRootMetadata;
+import haxeon.ui.icons.IconName;
+import app.editor.SceneVisibility;
+import app.editor.SceneTreeRow;
 import materia.assembly.AssemblyBodies;
 import materia.assembly.AssemblyDefinition;
 
@@ -23,6 +16,56 @@ import materia.assembly.AssemblyDefinition;
  * itself when one of them is selected.
  */
 class EditorSceneTree implements TreeViewModel {
+  public var canChangeVisibility:Null<Void->Bool>;
+  public var onVisibilityChanged:Null<Void->Void>;
+  var selectedGroup:Null<String>;
+  var groupSelectionRevision:Int = -1;
+  public function selectionKey():String return selectedGroup != null && groupSelectionRevision == scene.selectionRevision
+    ? selectedGroup : scene.treeSelectionKey();
+  public function selectKey(key:String):Void {
+    if (isGroup(key)) {
+      scene.select("scene");selectedGroup=key;groupSelectionRevision=scene.selectionRevision;
+    } else { selectedGroup=null;scene.selectTreeKey(key); }
+  }
+  /** Resolve the whole subtree, independent of filtering and expansion. CAD features have no separate object visibility. */
+  public function visibilityMembers(key:String):Array<String> {
+    if (key=="scene") return [for(item in scene.items()) item.id];
+    var result:Array<String> = [];
+    function visit(id:String):Void {
+      if(scene.object(id)!=null && result.indexOf(id)<0) result.push(id);
+      var descendants=children.get(id);
+      if(descendants!=null)for(child in descendants)visit(child);
+    }
+    visit(key);return result;
+  }
+  public function visibilityGroup(key:String):Bool {
+    var descendants=children.get(key);
+    return key=="scene" || isGroup(key) || (descendants!=null && descendants.length>0);
+  }
+  public function toggleVisibility(key:String):Bool {
+    if (canChangeVisibility != null && !canChangeVisibility()) return false;
+    var changed=SceneVisibility.toggle(scene,key,visibilityMembers(key),visibilityGroup(key));
+    if(changed && onVisibilityChanged!=null)onVisibilityChanged();
+    return changed;
+  }
+  public function showAll():Bool {
+    if (canChangeVisibility != null && !canChangeVisibility()) return false;
+    var changed=SceneVisibility.showAll(scene);
+    if(changed && onVisibilityChanged!=null)onVisibilityChanged();return changed;
+  }
+  public function isolateSelected():Bool {
+    if (canChangeVisibility != null && !canChangeVisibility()) return false;
+    var key = selectionKey(), ancestors = ["scene", key], cursor = key;
+    var found = true;
+    while (found) {
+      found = false;
+      for (parent in children.keys()) if (children.get(parent).indexOf(cursor) >= 0) {
+        ancestors.push(parent);cursor=parent;found=true;break;
+      }
+    }
+    var changed=SceneVisibility.isolate(scene,visibilityMembers(key),ancestors,!visibilityGroup(key));
+    if(changed && onVisibilityChanged!=null)onVisibilityChanged();return changed;
+  }
   static inline var PARTS:String = "parts:";
   static inline var PROJECT:String = "project:";
   final scene:EditorScene;
@@ -140,6 +183,9 @@ class EditorSceneTree implements TreeViewModel {
       carrier.push(rootKey);
       nested.set(rootKey, true);
     }
+    var visibilityGroups:Map<String,Array<String>> = ["scene" => visibilityMembers("scene")];
+    for(key in children.keys())if(visibilityGroup(key))visibilityGroups.set(key,visibilityMembers(key));
+    SceneVisibility.rebind(scene,visibilityGroups);
   }
   /** "Tool (6)" when every part shares one nested path such as tool/..., otherwise "Parts (n)". */
   static function partsTitle(members:Array<String>):String {
@@ -180,22 +226,13 @@ class EditorSceneTree implements TreeViewModel {
   public function estimatedExtent():Float return 28.0;
   public function extentIsUniform():Bool return true;
   public function extentAt(key:String):Float return 28.0;
-  function labeledItem(key:String, label:String, ?detail:String):View {
-    var text = new MiddleEllipsisText("short-label:" + key, label);
-    var tooltip = new Tooltip("label-tooltip:" + key, text, new Text(detail == null ? label : detail));
-    tooltip.fillAnchor = true;
-    tooltip.showWhen = function() return detail != null || text.truncated;
-    return tooltip;
-  }
-  function iconLabeledItem(key:String, label:String, icon:IconName, ?detail:String):View {
-    var rowStyle = new LayoutStyle();
-    rowStyle.width = LayoutAxis.grow();
-    rowStyle.childAlignY = LayoutAlignmentY.Center;
-    rowStyle.childGap = 6.0;
-    return new Row("item-row:" + key, [
-      new KeyedView("icon", new Icon("item-icon:" + key, icon, 15.0)),
-      new KeyedView("label", labeledItem(key, label, detail))
-    ], rowStyle);
+  function iconLabeledItem(key:String,label:String,icon:IconName,?detail:String):View {
+    var members=visibilityMembers(key), shown=0;
+    for(id in members)if(scene.isVisible(id))shown++;
+    var item=scene.object(key);
+    var own=visibilityGroup(key) ? !SceneVisibility.groupHidden(scene,key,members) : item==null || item.visible;
+    return new SceneTreeRow(key,label,icon,detail,shown>0 || members.length==0,own,
+      shown>0 && shown<members.length,members.length==0 ? null : () -> {toggleVisibility(key);});
   }
   public function buildItem(key:String):View {
     if (isGroup(key)) {
@@ -208,7 +245,7 @@ class EditorSceneTree implements TreeViewModel {
       var shown = displayLabel(key);
       // The generated designation stays one hover away when the row shows a readable name.
       return iconLabeledItem(key, shown + (joint == null ? "" : " · " + joint) +
-        (item.visible ? "" : " (hidden)"), IconName.Cube, shown == item.label ? null : item.label);
+        (scene.isVisible(key) ? "" : " (hidden)"), IconName.Cube, shown == item.label ? null : item.label);
     }
     var marker=key.indexOf(":feature:");
     if(marker>=0){

@@ -22,6 +22,8 @@ typedef SceneObjectData = {
   @:optional var appearance:Appearance;
   @:optional var materialId:String;
   var visible:Bool;
+  /** Tree groups suppress rendering without overwriting this object's own visible flag. */
+  @:optional var hiddenBy:Array<String>;
   @:optional var rotation:Array<Float>;
   @:optional var cadGraph:String;
   @:optional var meshSnapshot:String;

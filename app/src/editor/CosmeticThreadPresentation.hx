@@ -106,7 +106,7 @@ class CosmeticThreadPresentation {
       var item = owner.object(id);
       var group:ThreadGroup = cast groups.get(id);
       for (entry in group.nodes) {
-        view.setVisibility(entry.node, visible && item != null && item.visible);
+        view.setVisibility(entry.node, visible && item != null && SceneVisibility.shown(item.visible, item.hiddenBy));
         var highlight = highlights.get(id);
         if (highlight != null) view.setMaterial(entry.node, highlight);
       }

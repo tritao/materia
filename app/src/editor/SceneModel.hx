@@ -165,7 +165,7 @@ class SceneModel {
   public static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
     var copy = new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
       item.depth, item.collisionEnabled, item.dynamicBody, item.mass, item.red, item.green,
-      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance, item.materialId);
+      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance, item.materialId, item.hiddenBy);
     copy.worker = item.worker;
     return copy;
   }
@@ -178,7 +178,7 @@ class SceneModel {
         width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
         dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
         appearance:item.appearance,materialId:item.materialId,
-        visible: item.visible,cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot,
+        visible: item.visible, hiddenBy: SceneVisibility.masks(item.hiddenBy),cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot,
         rotation:item.rotation, worker:item.worker});
     }
     return result;
@@ -236,7 +236,7 @@ class SceneModel {
       width: item.width, height: item.height, depth: item.depth,
       collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
       red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
-      visible: item.visible, cadGraph: item.cadGraph,
+      visible: item.visible, hiddenBy: SceneVisibility.masks(item.hiddenBy), cadGraph: item.cadGraph,
       meshSnapshot: item.meshSnapshot, rotation: item.rotation, worker: item.worker};
   }
 
@@ -254,8 +254,13 @@ class SceneModel {
     return 384 + estimatedStringBytes(record.id) + estimatedStringBytes(record.label) +
       estimatedStringBytes(record.type) + estimatedStringBytes(record.cadGraph) +
       estimatedStringBytes(record.sketchDraft) +
+      estimatedMaskBytes(record.hiddenBy) +
       (record.worker == null ? 0 : estimatedStringBytes(record.worker.asset) +
       estimatedStringBytes(record.worker.job) + record.worker.zones.length * 32);
+  }
+
+  static function estimatedMaskBytes(masks:Null<Array<String>>):Int {
+    var bytes=0;if(masks!=null)for(key in masks)bytes+=16+estimatedStringBytes(key);return bytes;
   }
 
   static function estimatedStringBytes(value:Null<String>):Int
