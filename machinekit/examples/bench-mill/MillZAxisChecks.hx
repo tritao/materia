@@ -30,7 +30,7 @@ class MillZAxisChecks {
 		AxisBuilderChecks.run();
 		Sys.println("Shared axis builder regressions passed");
 		var reference = new BenchMill(false, false), f = MillFramePreview.layout(reference);
-		var l = MillFramePreview.zLayout(reference, f), frame = new MillFrame(f, l), axis = new MillZAxis(l);
+		var l = MillFramePreview.zLayout(reference, f), frame = new MillFrame(f, l, new MillXYStageLayout(f, l.spindleY, BenchMill.RAIL)), axis = new MillZAxis(l);
 		axis.validate(); frame.validate();
 		near(axis.axisOvertravel("z"), l.overtravel, "all four blocks determine guide overtravel");
 		var poses:Map<String, AssemblyFrame> = axis.solvedPoses();
@@ -101,7 +101,7 @@ class MillZAxisChecks {
 		var upperTool = studyState.worldPose("spindle/tool").z;
 		studyState.setJoint("zAxis/z", l.lower); studyState.forwardKinematics();
 		near(studyState.worldPose("spindle/tool").z - upperTool, l.lower, "spindle payload follows real Z joint");
-		near(studyState.worldPose("reference/table").z, pose(study.solvedPoses(), "reference/table").z, "X/Y reference remains fixed");
+		near(studyState.worldPose("xyStage/table").z, pose(study.solvedPoses(), "xyStage/table").z, "Z motion leaves XY table stationary");
 		Sys.println('Central Z axis: $assertions assertions passed');
 	}
 }

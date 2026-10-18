@@ -18,13 +18,16 @@ class MillFrame extends MachineAssembly {
 	public final base:MineralFoundation;
 	public final column:MineralFoundation;
 	public final zAxis:Null<MillZAxisLayout>;
+	public final xyAxis:Null<MillXYStageLayout>;
 
-	public function new(layout:MillFrameLayout, ?zAxis:MillZAxisLayout) {
+	public function new(layout:MillFrameLayout, ?zAxis:MillZAxisLayout, ?xyAxis:MillXYStageLayout) {
 		super();
 		if (layout == null) throw "Mill frame needs a layout";
 		this.layout = layout;
 		if (zAxis != null && zAxis.frame != layout) throw "Frame and Z datums must share one layout";
 		this.zAxis = zAxis;
+		if (xyAxis != null && xyAxis.frame != layout) throw "Frame and XY datums must share one layout";
+		this.xyAxis = xyAxis;
 		var l = layout, baseVoids:Array<CastingBox> = [], baseInserts:Array<CastInsertPlacement> = [];
 		var beamOuter = (l.yRailSpacing + l.seatWidth) / 2;
 		var outerWidth = l.baseWidth / 2 - l.wall - beamOuter;
@@ -45,6 +48,11 @@ class MillFrame extends MachineAssembly {
 			l.seatWidth, l.yRailLength, l.insertThickness, "Y guide seat",
 			F.translation(side * l.yRailSpacing / 2, l.yRailStart + l.yRailLength / 2 - l.baseCentreY,
 				l.railPlane - l.insertThickness)));
+		if (xyAxis != null) for (end in ["Fixed", "Floating"]) {
+			var fixed = end == "Fixed", y = fixed ? xyAxis.yFixedY : xyAxis.yFloatingY;
+			baseInserts.push(insert('driveY$end', 100, fixed ? xyAxis.fixed.length : xyAxis.floating.length,
+				l.insertThickness, "Y drive bearing seat", F.translation(0, y - l.baseCentreY, l.railPlane - l.insertThickness)));
+		}
 		// Four independent steel pairs provide a broad column mounting interface.
 		var footWidth = l.wall, footDepth = l.roof;
 		for (sx in [-1, 1]) for (sy in [-1, 1]) {

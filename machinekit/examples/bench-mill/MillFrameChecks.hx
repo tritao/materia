@@ -17,7 +17,9 @@ class MillFrameChecks {
 		check(rejected, label);
 	}
 	public static function main():Void {
-		var reference = new BenchMill(false, false), layout = MillFramePreview.layout(reference), frame = new MillFrame(layout, MillFramePreview.zLayout(reference, layout));
+		var reference = new BenchMill(false, false), layout = MillFramePreview.layout(reference);
+		var z = MillFramePreview.zLayout(reference, layout), xy = new machinekit.milling.MillXYStageLayout(layout, z.spindleY, BenchMill.RAIL);
+		var frame = new MillFrame(layout, z, xy);
 		frame.validate();
 		var poses = frame.solvedPoses();
 		for (foundation in [frame.base, frame.column]) {
@@ -65,14 +67,10 @@ class MillFrameChecks {
 		var studyPoses:Map<String, AssemblyFrame> = study.solvedPoses();
 		var referencePoses:Map<String, AssemblyFrame> = reference.solvedPoses();
 		check(study.components().filter(m -> m.id == "reference/base" || m.id == "reference/column").length == 0, "old structural bodies omitted");
-		for (id in ["railYLeft", "saddle", "table", "screwX", "screwY"]) {
-			var expected:AssemblyFrame = referencePoses.get(id);
-			var actual:AssemblyFrame = studyPoses.get('reference/$id');
-			check(actual != null, 'reference part $id included');
-			near(actual.x - expected.x, 0,
-				"reference X retained"); near(actual.y, expected.y, "reference Y retained");
-			near(actual.z - expected.z, layout.railPlane - reference.base.height, "common datum shift");
-		}
+		for (id in ["railYLeft", "saddle", "table", "screwX", "screwY"]) check(studyPoses.exists('xyStage/$id'), 'mechanical XY part $id included');
+		var table:AssemblyFrame = studyPoses.get("xyStage/table");
+		near(table.z, xy.tableBottom, "table follows new stack datum");
+		near(table.y, z.spindleY, "table centred beneath spindle");
 		var interfaces:MillFrameInterfaces = {yRailSpacing: layout.yRailSpacing, yRailStart: layout.yRailStart,
 			yRailLength: layout.yRailLength, columnFront: layout.columnFront, columnHeight: layout.columnHeight,
 			zRailSpacing: layout.zRailSpacing, zRailStart: layout.zRailStart, zRailLength: layout.zRailLength};
