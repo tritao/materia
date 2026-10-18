@@ -22,7 +22,8 @@ class MillXYStageLayout {
 	public final xScrew = new BallScrew(455);
 	public final yScrew:BallScrew;
 	public final xHalfTravel:Float = 125;
-	public final yHalfTravel:Float = 75;
+	public final yHalfTravel:Float = 80;
+	public final tableDepth:Float = 210;
 	public final xRailSpacing:Float = 124;
 	public final xRailLength:Float = 440;
 	public final saddleDepth:Float = 174;
@@ -33,6 +34,15 @@ class MillXYStageLayout {
 	public final tableTop:Float;
 	public final yScrewZ:Float;
 	public final xScrewZ:Float;
+	public final xMotorZ:Float;
+	public final yScrewStart:Float;
+	public final yMotorFace:Float;
+	public final yMountPlane:Float;
+	public final yBayTop:Float;
+	public final yHatchLowerZ:Float;
+	public final yHatchUpperZ:Float;
+	public final yBayWidth:Float = 118;
+	public final yChannelWidth:Float = 90;
 	public final yFixedY:Float;
 	public final yFloatingY:Float;
 	public final xFixedX:Float = -192.5;
@@ -55,42 +65,46 @@ class MillXYStageLayout {
 		xRailPlane = saddleBottom + SADDLE_HEIGHT;
 		tableBottom = xRailPlane + block.spec.blockHeight + RISER_HEIGHT;
 		tableTop = tableBottom + TABLE_HEIGHT;
-		yScrewZ = saddleBottom + SADDLE_HEIGHT / 2;
+		// Keep the complete motor/cage below the column sole with a full roof above it.
+		yBayTop = frame.baseHeight - frame.roof;
+		yScrewZ = yBayTop - 33 - clearance;
+		yMountPlane = yScrewZ - 40;
+		yHatchLowerZ = yMountPlane - 10; yHatchUpperZ = yBayTop + 10;
+		xMotorZ = saddleBottom + SADDLE_HEIGHT / 2;
 		xScrewZ = xRailPlane + 40;
-		yFixedY = frame.yRailStart + BallScrew.INPUT_JOURNAL_LENGTH - fixed.length / 2;
-		// The floating journal extends 5 mm beyond the guide length, into the clear space before the column.
-		yFloatingY = frame.yRailStart + frame.yRailLength + 5 - BallScrew.JOURNAL_LENGTH / 2;
-		yScrew = new BallScrew(frame.yRailLength + 5);
+		yMotorFace = frame.columnFront + 90;
+		yScrewStart = yMotorFace - motor.rating.shaftLength;
+		yFixedY = yScrewStart - BallScrew.INPUT_JOURNAL_LENGTH + fixed.length / 2;
+		yFloatingY = frame.yRailStart + BallScrew.JOURNAL_LENGTH / 2;
+		yScrew = new BallScrew(yScrewStart - frame.yRailStart);
 		var reach = blockSpan + block.spec.blockLength / 2 + block.spec.railEndMargin;
 		var yRailRoom = Math.min(
 			centreY - yHalfTravel - reach - frame.yRailStart,
 			frame.yRailStart + frame.yRailLength - centreY - yHalfTravel - reach
 		);
 		// Hardware, not merely rail length, limits overrun. Keep 3 mm before the nut bracket or saddle reaches an end bearing.
-		yOvertravel = Math.min(
-			yRailRoom,
-			Math.min(
-				yFloatingY - floating.length / 2 - (centreY + yHalfTravel + saddleDepth / 2 + 10) - clearance,
-				centreY - yHalfTravel - saddleDepth / 2 - (yFixedY + fixed.length / 2) - clearance
-			)
-		);
+		var yRoom = Math.min(yRailRoom, Math.min(
+			centreY - yHalfTravel - saddleDepth / 2 - 12 - (yFloatingY + floating.length / 2) - clearance,
+			yFixedY - fixed.length / 2 - (centreY + yHalfTravel + saddleDepth / 2) - clearance));
+		// Retain 1 mm geometric separation at the overrun boundary; nominal separation is 3 mm.
+		yOvertravel = Math.min(yRoom, frame.columnFront - block.spec.railHeight - (centreY + yHalfTravel + tableDepth / 2) - 1);
 		xOvertravel = Math.min(
 			xRailLength / 2 - xHalfTravel - reach,
 			-xHalfTravel - nut.bodyLength - nut.flangeThickness - (xFixedX + fixed.length / 2) - clearance
 		);
-		var nutRadius = nut.flangeDiameter / 2;
-		if (frame.front > frame.yRailStart - 170 - clearance || frame.baseWidth / 2 < 245 + clearance)
-			throw "XY drive packaging needs a front bay and clearance around the folded X drive";
+		if (frame.baseWidth / 2 < 245 + clearance || yMountPlane < frame.insertThickness + frame.wall ||
+			yMotorFace + motor.rating.bodyLength + clearance > frame.rear || yBayWidth / 2 + frame.wall > frame.columnWidth / 2 - 1.5 * frame.wall)
+			throw "Rear Y drive bay leaves insufficient column support, floor or service space";
 		if (xOvertravel <= 0 || yOvertravel <= 0 ||
-			frame.yRailSpacing / 2 - block.spec.blockWidth / 2 < 50 + clearance ||
+			frame.yRailSpacing / 2 - frame.seatWidth / 2 < yChannelWidth / 2 + clearance ||
 			xRailSpacing / 2 - block.spec.blockWidth / 2 < 42 + clearance ||
-			centreY + yHalfTravel + 100 + clearance > frame.columnFront ||
-			yFloatingY + floating.length / 2 + clearance > frame.columnFront + frame.seatRise ||
-			nutRadius + clearance > 27 || xScrewZ + 33 + clearance > tableBottom ||
-			yScrewZ - 25 - frame.railPlane < 15 || block.spec.blockHeight + RISER_HEIGHT < 76)
-			throw "XY stage cannot fit its guides, central nuts and supported drives";
-		checkRace(yScrew, centreY - yHalfTravel + saddleDepth / 2 - nut.bodyLength - nut.flangeThickness - frame.yRailStart,
-			centreY + yHalfTravel + saddleDepth / 2 - frame.yRailStart);
+			centreY + yHalfTravel + tableDepth / 2 + clearance > frame.columnFront - block.spec.railHeight ||
+			yFloatingY - floating.length / 2 < frame.front ||
+			xScrewZ + 33 + clearance > tableBottom || block.spec.blockHeight + RISER_HEIGHT < 76)
+			throw "XY stage cannot fit its guides, rear direct drive and full table envelope";
+		var flangeLow = centreY - yHalfTravel - saddleDepth / 2;
+		var flangeHigh = centreY + yHalfTravel - saddleDepth / 2;
+		checkRace(yScrew, yScrewStart - flangeHigh - nut.bodyLength - nut.flangeThickness, yScrewStart - flangeLow);
 		checkRace(xScrew, -xHalfTravel - nut.bodyLength - nut.flangeThickness - xScrewStart, xHalfTravel - xScrewStart);
 	}
 

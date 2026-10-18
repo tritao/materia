@@ -23,10 +23,10 @@ class MillFramePreview {
 		var yRail:LinearRail = cast reference.components().filter(row -> row.id == "railYLeft")[0].component;
 		var zRail:LinearRail = cast reference.components().filter(row -> row.id == "railZLeft")[0].component;
 		var rise = stageRise(reference);
-		return new MillFrameLayout({yRailSpacing: reference.base.railSpacing, yRailStart: y.y, yRailLength: yRail.length,
+		return new MillFrameLayout({yRailSpacing: reference.base.railSpacing, yRailStart: y.y - 100, yRailLength: yRail.length + 80,
 			columnFront: column.y - reference.column.depth / 2, columnHeight: reference.column.height + rise,
 			zRailSpacing: Math.max(180, reference.column.railSpacing),
-			zRailStart: z.z - reference.base.height, zRailLength: zRail.length + rise}, {baseWidth: 520, frontExtension: 140, footPockets: true});
+			zRailStart: z.z - reference.base.height, zRailLength: zRail.length + rise}, {baseWidth: 520, frontExtension: 40, footPockets: true});
 	}
 
 	public static function stageRise(reference:BenchMill):Float
@@ -108,12 +108,12 @@ class MillFramePreview {
 			Sys.println('Mill frame preview: $path');
 		}
 		var report = {status: "mechanical XYZ concept; not qualified for manufacture", units: "mm",
-			travel: [for (axis in reference.specs) {axis: axis.id, travel: axis.upper - axis.lower}],
+			travel: [{axis:"x",travel:2*xy.xHalfTravel},{axis:"y",travel:2*xy.yHalfTravel},{axis:"z",travel:-z.lower}],
 			base: {width: l.baseWidth, depth: l.baseDepth, height: l.baseHeight, railPlane: l.railPlane},
 			column: {width: l.columnWidth, depth: l.columnDepth, height: l.columnHeight, railFaceY: l.columnFront},
 			xyFullStrokeStructuralClearance: "passed conservative Cartesian-product CAD swept-volume audit",
 			zFullStrokeStructuralClearance: "passed conservative CAD swept-volume audit",
-			xy: {tableTop: xy.tableTop, saddleHeight: MillXYStageLayout.SADDLE_HEIGHT, tableRibDepth: MillXYStageLayout.RISER_HEIGHT, xOvertravel: xy.xOvertravel, yOvertravel: xy.yOvertravel},
+			xy: {tableTop: xy.tableTop, saddleHeight: MillXYStageLayout.SADDLE_HEIGHT, tableRibDepth: MillXYStageLayout.RISER_HEIGHT, xOvertravel: xy.xOvertravel, yOvertravel: xy.yOvertravel, yScrewZ: xy.yScrewZ, yMotorFace: xy.yMotorFace, yBayRoof: l.baseHeight - xy.yBayTop},
 			z: {screwX: 0, screwY: z.screwY, guideSpacing: l.zRailSpacing, lower: z.lower, upper: 0},
 			castingMassKg: {base: frame.base.castingByWeight().kg, column: frame.column.castingByWeight().kg},
 			pending: ["ATC spindle/drawbar/actuator selection and head redesign", "guide/block drilling, vendor mounting patterns and installed fasteners", "insert anchorage and strength analysis",

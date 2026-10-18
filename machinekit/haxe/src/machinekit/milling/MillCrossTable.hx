@@ -11,12 +11,13 @@ class MillCrossTable extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 
 	public static function recipeType():ComponentType {
-		if (recipe == null) recipe = new ComponentType("machinekit.milling.cross-table", [], _ -> new MillCrossTable());
+		if (recipe == null) recipe = new ComponentType("machinekit.milling.cross-table", [P.length("depth", 200)], v -> new MillCrossTable(v.number("depth")));
 		return recipe;
 	}
 
-	public function new() {
-		super("MILL-CROSS-TABLE", "400 x 200 machined T-slot table", "cast iron", false, new ComponentValues());
+	public function new(depth:Float = 200) {
+		if (!Math.isFinite(depth) || depth < 200) throw "Table depth must retain its five slots";
+		super("MILL-CROSS-TABLE", "Ribbed 400 mm T-slot table", "cast iron", false, new ComponentValues().setNumber("depth", depth));
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Face, Solids.axial(0, 0, 40));
 	}
@@ -35,7 +36,7 @@ class MillCrossTable extends MachineComponent {
 			tools.push(Part.cylinderSpan(3.3, 11, 41, 20, y));
 			tools.push(Part.cylinderSpan(5.5, 33, 41, 20, y));
 		}
-		var pieces = [Part.box(400, 200, 40)];
+		var pieces = [Part.box(400, parameterNumber("depth"), 40)];
 		for (side in [-1, 1]) pieces.push(Part.box(400, 34, MillXYStageLayout.RISER_HEIGHT)
 			.translated(new Vector(0, side * 62, -MillXYStageLayout.RISER_HEIGHT)));
 		return Solids.cut(Solids.union(pieces), tools);

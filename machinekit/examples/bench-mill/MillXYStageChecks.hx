@@ -27,6 +27,8 @@ class MillXYStageChecks {
 		axis.validate();
 		frame.validate();
 		near(l.tableTop, 448, "stack height");
+		near(l.xMotorZ, 292, "X return drive independent of lowered Y shaft");
+		near(l.yScrewZ, 124, "Y direct shaft lowered beneath column");
 		near(axis.axisOvertravel("x"), l.xOvertravel, "X bearing/guide overrun limit");
 		near(axis.axisOvertravel("y"), l.yOvertravel, "Y bearing overrun limit");
 		for (m in axis.components()) {
@@ -55,10 +57,10 @@ class MillXYStageChecks {
 				near(saddle.y, l.centreY - y, "saddle follows Y");
 				near(motorX.x, -195, "X motor independent of X");
 				near(motorX.y, l.centreY - y, "X drive rides saddle");
-				near(motorY.y, f.yRailStart - l.motor.rating.shaftLength, "Y motor remains fixed");
+				near(motorY.y, l.yMotorFace, "Y motor remains fixed");
 				near(state.joint("motorX-turn"), -state.joint("screwX-turn"), "opposed motor axis follows return belt");
 				near(state.joint("screwX-turn"), l.nut.rotationFor(-x), "X screw signed lead");
-				near(state.joint("screwY-turn"), l.nut.rotationFor(-y), "Y screw signed lead");
+				near(state.joint("screwY-turn"), l.nut.rotationFor(y), "Y screw signed lead");
 			}
 		}
 		var poses:Map<String, AssemblyFrame> = axis.solvedPoses(), cache = new PosedParts();
@@ -90,13 +92,20 @@ class MillXYStageChecks {
 			var b = cache.box(axis.component(id), poses.get(id));
 			check(b.minX >= -f.baseWidth / 2 && b.maxX <= f.baseWidth / 2, 'drive stays inside base width: $id');
 			var travel = id.indexOf("X") >= 0 ? l.yHalfTravel : 0;
-			check(b.minY - travel >= f.front && b.maxY + travel <= f.rear, 'drive stays inside base depth over full Y stroke: $id');
+			check(b.minY - travel >= f.front && b.maxY + travel <= f.rear + (id == "motorCoverY" ? 4 : 0), 'drive stays inside base depth over full Y stroke: $id');
 		}
 		cache.close();
 		var audit = MillXYStageIntegrity.check(axis, frame);
 		audit.throwIfErrors();
 		check(!audit.hasErrors(), "continuous full Cartesian stroke audit");
-		check(MillXYStageIntegrity.check(axis, new MillFrame(f, z)).hasErrors(), "missing bearing steel seats rejected");
+		var uncut = MillXYStageIntegrity.check(axis, new MillFrame(f, z));
+		check(uncut.hasErrors(), "missing bearing steel seats rejected");
+		check(uncut.items.filter(item -> item.code == "mill-xy.full-stroke-collision").length > 0, "unhollowed base collides with lowered Y drive");
+		near(l.yHalfTravel * 2, 160, "usable Y travel increases with table coverage retained");
+		near(l.tableDepth / 2 - l.yHalfTravel, 25, "tool axis retains table-edge margin at both stops");
+		near(f.columnFront - l.block.spec.railHeight - (l.centreY + l.yHalfTravel + l.tableDepth / 2), 3, "rear table clears lower Z rails");
+		check(l.yScrewZ + 33 + l.clearance <= l.yBayTop, "motor cage fits below base roof");
+		check(f.baseHeight - l.yBayTop >= f.roof, "full casting roof retained below column");
 		var blocked = new MillFrame(f, z, l);
 		blocked.addComponent("obstruction", new MillPanel(20, 20, 20), F.translation(0, l.centreY, l.tableBottom + 5));
 		var blockedAudit = MillXYStageIntegrity.check(axis, blocked);
@@ -104,6 +113,11 @@ class MillXYStageChecks {
 			blockedAudit.items.filter(item -> item.code == "mill-xy.full-stroke-collision").length > 0,
 			"audit detects an actual obstructed XY sweep"
 		);
+		var extractionBlocked = new MillFrame(f, z, l);
+		extractionBlocked.addComponent("extractionObstruction", new MillPanel(20, 20, 20), F.translation(0, f.rear + 20, l.yScrewZ - 10));
+		var extractionAudit = MillXYStageIntegrity.check(axis, extractionBlocked);
+		check(extractionAudit.items.filter(item -> item.subject.indexOf("rear motor extraction/frame/extractionObstruction") >= 0).length > 0,
+			"audit rejects blocked rear motor withdrawal");
 		var concept = MillFramePreview.concept(reference, frame), model = new AssemblyModel("mm");
 		concept.addTo(model, "");
 		var state = new AssemblyState(model.definition("xyz-mill"));

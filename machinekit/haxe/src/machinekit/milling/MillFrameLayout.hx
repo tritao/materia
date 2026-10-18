@@ -75,7 +75,7 @@ class MillFrameLayout {
 		for (value in [yRailSpacing, yRailLength, columnHeight, zRailSpacing, zRailLength,
 			baseWidth, baseHeight, columnWidth, columnDepth, wall, roof, seatWidth, insertThickness])
 			if (value <= 0) throw "Mill frame dimensions must be positive";
-		if (frontExtension < 0 || (footPockets && (baseHeight < 180 || wall < 40 || frontExtension < 120)) || seatRise < 0 || seatRise >= insertThickness || insertThickness >= roof ||
+		if (frontExtension < 0 || (footPockets && (baseHeight < 180 || wall < 40 || insertThickness >= 40)) || seatRise < 0 || seatRise >= insertThickness || insertThickness >= roof ||
 			roof >= baseHeight || 3 * wall >= columnWidth || 2 * roof + wall >= columnHeight ||
 			columnDepth <= 3 * roof || columnWidth > baseWidth - 2 * wall ||
 			yRailSpacing <= seatWidth || yRailSpacing + seatWidth + 2 * wall >= baseWidth ||

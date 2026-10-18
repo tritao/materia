@@ -37,15 +37,15 @@ class MillXYStageIntegrity {
 		var l = axis.layout;
 		if (id == "table") {
 			// Split the swept ribbed section to preserve the central drive corridor.
-			var pieces = [Part.box(400 + dx, 200 + dy, MillXYStageLayout.TABLE_HEIGHT)];
+			var pieces = [Part.box(400 + dx, l.tableDepth + dy, MillXYStageLayout.TABLE_HEIGHT)];
 			for (side in [-1, 1]) pieces.push(Part.box(400 + dx, 34 + dy, MillXYStageLayout.RISER_HEIGHT)
 				.translated(new Vector(0, side * l.xRailSpacing / 2, -MillXYStageLayout.RISER_HEIGHT)));
 			var local = Solids.union(pieces); owned.push(local);
 			var moved = local.translated(new Vector(0, l.centreY, l.tableBottom)); owned.push(moved); return moved;
 		}
 		if (id == "saddle") {
-			// Extrude the saddle section and its through tunnel over the full Y interval.
-			var saddle = new MillCrossSaddle(new ComponentValues().setNumber("depth", l.saddleDepth + dy).setBoolean("motorPocket", false));
+			// Extrude the saddle section over the full Y interval.
+			var saddle = new MillCrossSaddle(axis.saddle.values().setNumber("depth", l.saddleDepth + dy).setBoolean("motorPocket", false));
 			var part = cache.posed(saddle, axis.zeroPose(id));
 			owned.push(part);
 			return part;
@@ -75,6 +75,22 @@ class MillXYStageIntegrity {
 			moving.close();
 		}
 		var poses:Map<String, AssemblyFrame> = frame.solvedPoses();
+		var frameParts:Array<{id:String,part:Part}> = [];
+		for (member in frame.components()) {
+			var part = cache.posed(member.component, poses.get(member.id)); owned.push(part);
+			frameParts.push({id: member.id, part: part});
+		}
+		// Stationary Y hardware is now inside the casting: prove the bays and shaft tunnel, too.
+		for (m in components) if (yFixed(m.id)) {
+			var part = cache.posed(m.component, axis.zeroPose(m.id)); owned.push(part);
+			for (other in frameParts) {
+				// Nominal threads intentionally engage their matching steel hatch anchor.
+				if (expectedHatchThread(m.id, other.id)) continue;
+				noOverlap(out, part, other.part, 'stationary Y ${m.id}/frame/${other.id}');
+			}
+			part.close();
+		}
+
 		for (m in components) if (!yFixed(m.id)) {
 			var moving = sweep(axis, m.id, tableMember(m.id) ? 2 * l.xHalfTravel : 0, 2 * l.yHalfTravel, owned, cache);
 			for (other in fixedY) {
@@ -83,19 +99,49 @@ class MillXYStageIntegrity {
 				noOverlap(out, moving, fixed, 'XY sweep ${m.id}/${other.id}');
 				fixed.close();
 			}
-			for (other in frame.components()) {
-				var fixed = cache.posed(other.component, poses.get(other.id));
-				owned.push(fixed);
-				noOverlap(out, moving, fixed, 'XY sweep ${m.id}/frame/${other.id}');
-				fixed.close();
-			}
+			for (other in frameParts) noOverlap(out, moving, other.part, 'XY sweep ${m.id}/frame/${other.id}');
 			if (m.id == "saddle") {
 				var shaft = cache.posed(l.yScrew, axis.zeroPose("screwY"));
 				owned.push(shaft);
-				noOverlap(out, moving, shaft, "Y shaft clears the complete saddle tunnel sweep");
+				noOverlap(out, moving, shaft, "Y shaft clears the complete saddle sweep");
 				shaft.close();
 			}
 			moving.close();
+		}
+		// Remove the rear hatch and its screws before extracting the motor along +Y.
+		var withdrawal = l.frame.rear - l.yMotorFace + l.motor.rating.shaftLength + l.clearance;
+		var extraction = [Part.cylinderAlongY(l.motor.rating.bodyDiameter / 2, l.yMotorFace,
+			l.yMotorFace + l.motor.rating.bodyLength + withdrawal, 0, l.yScrewZ),
+			Part.cylinderAlongY(l.motor.rating.shaftDiameter / 2, l.yMotorFace - l.motor.rating.shaftLength,
+				l.yMotorFace + withdrawal, 0, l.yScrewZ)];
+		for (part in extraction) {
+			owned.push(part);
+			for (other in frameParts) noOverlap(out, part, other.part, 'rear motor extraction/frame/${other.id}');
+			for (other in components) if (yFixed(other.id) && other.id != "motorY" && other.id != "motorShaftY" &&
+				other.id != "motorCoverY" && !StringTools.startsWith(other.id, "rearCoverBoltY")) {
+				var fixed = cache.posed(other.component, axis.zeroPose(other.id)); owned.push(fixed);
+				noOverlap(out, part, fixed, 'rear motor extraction/${other.id}'); fixed.close();
+			}
+		}
+		if (frame.zAxis != null) {
+			var zAxis = new MillZAxis(frame.zAxis);
+			var zParts:Array<{id:String,part:Part}> = [];
+			for (member in zAxis.components()) {
+				var pose = zAxis.zeroPose(member.id), part:Part;
+				if (member.id == "carriage" || member.id == "head" || member.id == "nut" || StringTools.startsWith(member.id, "block")) {
+					var b = cache.box(member.component, pose);
+					var local = Part.box(b.maxX - b.minX, b.maxY - b.minY, b.maxZ - b.minZ - zAxis.layout.lower); owned.push(local);
+					part = local.translated(new Vector((b.minX + b.maxX)/2, (b.minY + b.maxY)/2, b.minZ + zAxis.layout.lower));
+				} else part = cache.posed(member.component, pose);
+				owned.push(part); zParts.push({id:member.id,part:part});
+			}
+			for (member in components) {
+				var part = yFixed(member.id) ? cache.posed(member.component, axis.zeroPose(member.id)) :
+					sweep(axis, member.id, tableMember(member.id) ? 2*l.xHalfTravel : 0, 2*l.yHalfTravel, owned, cache);
+				owned.push(part);
+				for (other in zParts) noOverlap(out, part, other.part, 'XYZ structural sweep ${member.id}/zAxis/${other.id}');
+				part.close();
+			}
 		}
 		if (frame.zAxis != null && l.tableTop + l.clearance > frame.zAxis.headBottom + frame.zAxis.lower) out.error(
 			"mill-xy.z-envelope",
@@ -110,6 +156,14 @@ class MillXYStageIntegrity {
 		]);
 		for (item in mounts.items) out.add(item.severity, item.code, item.subject, item.message);
 		return out;
+	}
+
+	static function expectedHatchThread(bolt:String, insert:String):Bool {
+		for (end in ["Front", "Rear"]) for (side in [-1, 1]) for (name in ["Lower", "Upper"]) {
+			var prefix = end == "Front" ? "frontCoverBoltY" : "rearCoverBoltY";
+			if (bolt == '$prefix$side$name' && insert == 'base/hatch$end${side < 0 ? "Left" : "Right"}${name}') return true;
+		}
+		return false;
 	}
 
 	static function noOverlap(out:Diagnostics, a:Part, b:Part, subject:String):Void {

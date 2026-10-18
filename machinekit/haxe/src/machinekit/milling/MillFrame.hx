@@ -40,6 +40,7 @@ class MillFrame extends MachineAssembly {
 		// transverse rib. The rear column support stays solid through the base.
 		for (i in 0...channels.length) for (row in 0...2) {
 			var channel = channels[i];
+			if (xyAxis != null && i == 0) continue; // The lowered drive needs a continuous central sole.
 			baseVoids.push(CastingFeatures.box('underside-$i-$row', channel.width, pocketLength,
 				l.baseHeight - l.roof + 1, channel.x,
 				pocketFront + pocketLength / 2 + row * (pocketLength + l.wall) - l.baseCentreY, -1));
@@ -51,7 +52,31 @@ class MillFrame extends MachineAssembly {
 		if (xyAxis != null) for (end in ["Fixed", "Floating"]) {
 			var fixed = end == "Fixed", y = fixed ? xyAxis.yFixedY : xyAxis.yFloatingY;
 			baseInserts.push(insert('driveY$end', 100, fixed ? xyAxis.fixed.length : xyAxis.floating.length,
-				l.insertThickness, "Y drive bearing seat", F.translation(0, y - l.baseCentreY, l.railPlane - l.insertThickness)));
+				l.insertThickness, "Y drive bearing seat", F.translation(0, y - l.baseCentreY, xyAxis.yMountPlane - l.insertThickness)));
+		}
+		if (xyAxis != null) {
+			var a = xyAxis, floor = a.yMountPlane;
+			// Open-top moving bridge channel; it ends before the column support.
+			var channelEnd = l.columnFront - l.wall;
+			baseVoids.push(CastingFeatures.box("y-bridge-channel", a.yChannelWidth, channelEnd - l.yRailStart,
+				l.baseHeight - floor + 1, 0, (channelEnd + l.yRailStart) / 2 - l.baseCentreY, floor));
+			// A small shaft passage beneath the intact front cross-web joins the two bays.
+			var bayFront = a.yFixedY - a.fixed.length / 2 - a.clearance;
+			baseVoids.push(CastingFeatures.box("y-shaft-tunnel", 24, bayFront - channelEnd + 2, 24,
+				0, (bayFront + channelEnd) / 2 - l.baseCentreY, a.yScrewZ - 12));
+			baseVoids.push(CastingFeatures.box("rear-y-drive-bay", a.yBayWidth, l.rear + 1 - bayFront, a.yBayTop - floor,
+				0, (bayFront + l.rear + 1) / 2 - l.baseCentreY, floor));
+			var frontBayEnd = a.yFloatingY + a.floating.length / 2 + a.clearance;
+			baseVoids.push(CastingFeatures.box("front-y-bearing-bay", 106, frontBayEnd - l.front + 1, a.yBayTop - floor,
+				0, (frontBayEnd + l.front - 1) / 2 - l.baseCentreY, floor));
+			for (end in ["Front", "Rear"]) for (sx in [-1, 1]) for (z in [a.yHatchLowerZ, a.yHatchUpperZ]) {
+				var rear = end == "Rear", y = rear ? l.rear - 8 : l.front + 8;
+				baseInserts.push({id: 'hatch$end${sx < 0 ? "Left" : "Right"}${z == a.yHatchLowerZ ? "Lower" : "Upper"}',
+					part: new CastInsert(new ComponentValues().setNumber("width", 20).setNumber("depth", 20)
+						.setNumber("height", 10).setNumber("boreDiameter", 3.3).setToken("role", "service hatch anchor")),
+					pose: F.fromRotationMatrix(sx * 75, y - l.baseCentreY, z,
+						rear ? [1,0,0, 0,0,1, 0,-1,0] : [-1,0,0, 0,0,-1, 0,-1,0])});
+			}
 		}
 		// Four independent steel pairs provide a broad column mounting interface.
 		var footWidth = l.wall, footDepth = l.roof;

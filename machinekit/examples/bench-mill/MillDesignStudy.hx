@@ -92,10 +92,12 @@ class MillDesignStudy {
 			bounds.push({member:id,localBoundsMm:box});
 		} catch(e:Dynamic) {cache.close();throw e;}
 		cache.close();
-		// Section-only comparison: deck 200x40 and two 34x48 ribs. This is not assembled-machine stiffness.
-		var area=200*40+2*34*48, centroid=(200*40*20+2*34*48*(-24))/area;
-		var deckI=200*Math.pow(40,3)/12;
-		var ribbedI=deckI+200*40*Math.pow(20-centroid,2)+2*(34*Math.pow(48,3)/12+34*48*Math.pow(-24-centroid,2));
+		// Section-only comparison of the actual deck depth and two 34x48 ribs.
+		var xy:machinekit.milling.MillXYStageLayout=frame.xyAxis;
+		var depth=xy.tableDepth;
+		var area=depth*40+2*34*48, centroid=(depth*40*20+2*34*48*(-24))/area;
+		var deckI=depth*Math.pow(40,3)/12;
+		var ribbedI=deckI+depth*40*Math.pow(20-centroid,2)+2*(34*Math.pow(48,3)/12+34*48*Math.pow(-24-centroid,2));
 		var report={status:"concept review; manufacturing release blocked", units:"mm N kg",
 			assumptions:{cuttingForcePerWorldAxisN:500,payloadKg:20,payloadHeightAboveTableMm:50,accelerationEnvelopeMetresPerSecondSquared:1,guideStaticSafetyFactor:2,
 				beltCordRigidityPerWidthNPerMm:5000},
@@ -117,8 +119,8 @@ class MillDesignStudy {
 			tableSection:{bareDeckIyyMm4:deckI,ribbedIyyMm4:ribbedI,ratio:ribbedI/deckI,scope:"idealized unperforated section; no joint, guide or casting compliance"},
 			conceptStepParts:bounds,
 			stages:[
-				{step:1,status:"concept geometry",result:"250/150/250 travel retained; motor bays within base perimeter; service and enclosure envelope pending"},
-				{step:2,status:"concept geometry and motion checks",result:"Y direct front bay; X 1:1 HTD5M return into saddle; preload and belt life pending"},
+				{step:1,status:"concept geometry",result:"250/160/250 travel; motor bays within base perimeter; service and enclosure envelope pending"},
+				{step:2,status:"concept geometry and motion checks",result:"Y rear coaxial drive beneath column with 60 mm roof and removable end hatches; X 1:1 HTD5M return into saddle; preload and belt life pending"},
 				{step:3,status:"concept geometry",result:"four accessible foot pockets, bored steel seats and M16 foot envelopes; anchorage/load ratings pending"},
 				{step:4,status:"concept geometry and section comparison",result:"integral table ribs replace isolated risers; full stiffness qualification pending"},
 				{step:5,status:"supplier selection required",result:"BT30 is a candidate, not an installed spindle; current ER20 cartridge remains manual"},
@@ -129,7 +131,7 @@ class MillDesignStudy {
 			releaseBlockers:["verified ATC spindle/drawbar/actuator and motor drawings", "release force, stroke, air pressure, sensor and reaction-path data",
 				"complete fastener and insert anchorage design", "foot ratings, floor support and stability", "whole-machine stiffness, thermal and modal qualification",
 				"validated lubrication/coolant/guards and controls", "material, mould, cure and post-cast machining process qualification"]};
-		sys.io.File.saveContent(folder+"/interfaces.csv", "interface,pattern,status\nBK12 and BF12 pedestal bolts,2 x M5 x 55 per housing,nominal modeled\nX motor plate anchors,4 x M6 x 25,nominal modeled\nLeveling feet,M16 stem through 18 mm steel bore,concept geometry and supplier rating pending\nGuide and block screws,catalog pattern with accessible head seats,drilling and fasteners pending\nSpindle and actuator,selected supplier drawing required,unresolved\n");
+		sys.io.File.saveContent(folder+"/interfaces.csv", "interface,pattern,status\nBK12 and BF12 pedestal bolts,2 x M5 x 55 per housing,nominal modeled\nX motor plate anchors,4 x M6 x 25,nominal modeled\nY service hatches,4 x M4 x 10 per hatch into steel anchors,nominal modeled\nLeveling feet,M16 stem through 18 mm steel bore,concept geometry and supplier rating pending\nGuide and block screws,catalog pattern with accessible head seats,drilling and fasteners pending\nSpindle and actuator,selected supplier drawing required,unresolved\n");
 		sys.io.File.saveContent(folder+"/review.json",haxe.Json.stringify(report,null,"  "));
 		Sys.println("Mill concept design review: "+folder+"/review.json");
 	}

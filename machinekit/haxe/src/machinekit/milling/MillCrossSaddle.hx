@@ -7,7 +7,7 @@ import materia.assembly.AssemblyFrames as F;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
-/** Cross slide, bottom Z datum; through-Y tunnel clears the Y nut over its complete stroke. */
+/** Cross slide with a bottom Z datum and optional through-Y nut tunnel. */
 class MillCrossSaddle extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 
@@ -26,7 +26,7 @@ class MillCrossSaddle extends MachineComponent {
 	public function new(?values:ComponentValues) {
 		var v = P.resolve(parameters(), values);
 		if (v.number("bore") + 20 > v.number("height") || v.number("bore") >= v.number("width")) throw "Saddle tunnel leaves insufficient material";
-		super("MILL-CROSS-SADDLE", "Machined cross saddle with through nut tunnel", "cast iron", false, v);
+		super("MILL-CROSS-SADDLE", "Machined cross saddle", "cast iron", false, v);
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Face, Solids.axial(0, 0, v.number("height")));
 	}
@@ -37,7 +37,8 @@ class MillCrossSaddle extends MachineComponent {
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var w = parameterNumber("width"), d = parameterNumber("depth"), h = parameterNumber("height");
-		var tools = [Part.cylinderAlongY(parameterNumber("bore") / 2, -d / 2 - 1, d / 2 + 1, 0, h / 2)];
+		var tools:Array<Part> = [];
+		if (parameterNumber("bore") > 0) tools.push(Part.cylinderAlongY(parameterNumber("bore") / 2, -d / 2 - 1, d / 2 + 1, 0, h / 2));
 		for (x in [-35.0, 35.0]) for (z in [-20.0, 20.0]) tools.push(Part.cylinderAlongY(2.5, d / 2 - 16, d / 2 + 1, x, h / 2 + z));
 		if (values().boolean("motorPocket")) {
 			var bore = Part.cylinderSpan(33, -226, -64);
@@ -49,6 +50,7 @@ class MillCrossSaddle extends MachineComponent {
 				tools.push(PosedParts.moved(hole, F.fromRotationMatrix(0, y, z, [0,0,1, 1,0,0, 0,1,0]))); hole.close();
 			}
 		}
+		for (x in [-32.0, 32.0]) tools.push(Part.cylinderAlongY(2.5, -d / 2 - 1, -d / 2 + 16, x, 12));
 		return Solids.cut(Part.box(w, d, h), tools);
 	}
 }

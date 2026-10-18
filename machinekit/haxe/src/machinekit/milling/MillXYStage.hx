@@ -24,8 +24,8 @@ class MillXYStage extends AxisBuilder {
 		if (layout == null) throw "XY stage needs a layout";
 		this.layout = layout;
 		var l = layout, f = l.frame;
-		var y = orient(0, f.yRailStart, l.yScrewZ, [0, 0, 1], [0, 1, 0]);
-		drive("Y", y, l.yScrew, l.yFixedY - f.yRailStart, l.yFloatingY - f.yRailStart, 100, l.yScrewZ - f.railPlane, null);
+		var y = orient(0, l.yScrewStart, l.yScrewZ, [0, 0, 1], [0, -1, 0]);
+		drive("Y", y, l.yScrew, l.yScrewStart - l.yFixedY, l.yScrewStart - l.yFloatingY, 100, 40, null);
 		var yp:Array<AssemblyFrame> = [];
 		for (side in [-1, 1]) {
 			var rail = orient(side * f.yRailSpacing / 2, f.yRailStart, f.railPlane + l.block.spec.railHeight, [0, 0, 1], [0, 1, 0]);
@@ -46,10 +46,13 @@ class MillXYStage extends AxisBuilder {
 			yp[0],
 			{x: 0, y: -1, z: 0},
 			yp.slice(1), l.yOvertravel);
-		saddle = new MillCrossSaddle();
+		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 0));
 		attach("saddle", saddle, F.translation(0, l.centreY, l.saddleBottom), "blockY0");
 		for (i in 1...4) attach('blockY$i', l.block, yp[i], "saddle");
-		movingNut("Y", y, l.centreY + l.saddleDepth / 2 - f.yRailStart, "saddle", false);
+		var yFace = l.centreY - l.saddleDepth / 2;
+		attach("nutBracketY", new MillYNutBridge(new ComponentValues().setNumber("rise", l.saddleBottom - l.yScrewZ)),
+			F.compose(y, F.translation(0, 0, l.yScrewStart - yFace)), "saddle");
+		attach("nutY", l.nut, F.compose(y, F.translation(0, 0, l.yScrewStart - yFace - l.nut.bodyLength - l.nut.flangeThickness)), "nutBracketY");
 		var x = orient(l.xScrewStart, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]);
 		foldedXDrive(x);
 		var xp:Array<AssemblyFrame> = [];
@@ -82,12 +85,12 @@ class MillXYStage extends AxisBuilder {
 			xp[0],
 			{x: -1, y: 0, z: 0},
 			xp.slice(1), l.xOvertravel);
-		table = new MillCrossTable();
+		table = new MillCrossTable(l.tableDepth);
 		attach("table", table, F.translation(0, l.centreY, l.tableBottom), "blockX0");
 		for (i in 1...4) attach('blockX$i', l.block, xp[i], "table");
 		movingNut("X", x, -l.xScrewStart, "table", true);
 		for (a in ["X", "Y"]) {
-			var id = a.toLowerCase(), along = a == "X" ? [1.0, 0.0, 0.0] : [0.0, 1.0, 0.0];
+			var id = a.toLowerCase(), along = a == "X" ? [1.0, 0.0, 0.0] : [0.0, -1.0, 0.0];
 			addTransmission('$id-lead', id, 'screw$a-turn', Transmission.LeadScrew('screw$a', 'nut$a'), screwSense(id, along));
 			supportScrew('$id-lead', l.fixed.support, l.floating.support);
 		}
@@ -99,9 +102,14 @@ class MillXYStage extends AxisBuilder {
 		}
 		for (side in [-1, 1]) for (height in [10, 70]) attach('motorPlateBoltX$side$height', SocketHeadCapScrew.metric("M6", 25),
 			orient(-207, l.centreY + side * 32, l.saddleBottom + height, [0,0,1], [-1,0,0]), "motorMountX");
-		attach("motorCoverY", new MillMotorCover(), F.translation(0, f.yRailStart - 60, f.baseHeight), "motorMountY");
+		attach("motorCoverY", new MillDriveHatch(new ComponentValues().setNumber("lowerZ", l.yHatchLowerZ).setNumber("upperZ", l.yHatchUpperZ)), F.translation(0, f.rear + 2, 0), "fixedPedestalY");
+		for (side in [-1, 1]) for (row in [{name:"Lower",z:l.yHatchLowerZ},{name:"Upper",z:l.yHatchUpperZ}]) attach('rearCoverBoltY$side${row.name}' , SocketHeadCapScrew.metric("M4", 10),
+			orient(side * 75, f.rear + 4, row.z, [0,0,1], [0,1,0]), "motorCoverY");
 		attach("motorCoverX", new MillMotorCover(new ComponentValues().setNumber("width", 84).setNumber("depth", 38).setNumber("height", 142)),
 			F.fromRotationMatrix(-226, l.centreY, l.saddleBottom, [0,1,0, -1,0,0, 0,0,1]), "motorMountX");
+		attach("frontCoverY", new MillDriveHatch(new ComponentValues().setNumber("lowerZ", l.yHatchLowerZ).setNumber("upperZ", l.yHatchUpperZ)), F.fromRotationMatrix(0, f.front - 2, 0, [-1,0,0, 0,-1,0, 0,0,1]), "floatingPedestalY");
+		for (side in [-1, 1]) for (row in [{name:"Lower",z:l.yHatchLowerZ},{name:"Upper",z:l.yHatchUpperZ}]) attach('frontCoverBoltY$side${row.name}' , SocketHeadCapScrew.metric("M4", 10),
+			orient(side * 75, f.front - 4, row.z, [0,0,1], [0,-1,0]), "frontCoverY");
 		exposeConnector("mount", "fixedPedestalY", "mount");
 		exposeConnector("table", "table", "top");
 	}
@@ -118,17 +126,17 @@ class MillXYStage extends AxisBuilder {
 		}
 		attach("motorMountX", new MillBeltMotorPlate(), F.fromRotationMatrix(-201, l.centreY, l.saddleBottom,
 			[0,-1,0, 1,0,0, 0,0,1]), "saddle");
-		var motor = orient(-195, l.centreY, l.yScrewZ, [0,0,1], [-1,0,0]);
+		var motor = orient(-195, l.centreY, l.xMotorZ, [0,0,1], [-1,0,0]);
 		attach("motorX", l.motor, motor, "motorMountX");
 		hang("screwX", l.xScrew, shaft, "fixedBearingX");
 		addMateOnAxis("screwX-turn", "continuous", "fixedBearingX", "to-screwX", "screwX", "attach-screwX", {x:1,y:0,z:0});
 		var screwPulley = new TimingPulley(HTD5M, 20, 12, 15), motorPulley = new TimingPulley(HTD5M, 20, 14, 15);
 		attach("screwPulleyX", screwPulley, orient(-225, l.centreY, l.xScrewZ, [0,0,1], [1,0,0]), "screwX");
-		hang("motorPulleyX", motorPulley, orient(-225, l.centreY, l.yScrewZ, [0,0,1], [1,0,0]), "motorX");
+		hang("motorPulleyX", motorPulley, orient(-225, l.centreY, l.xMotorZ, [0,0,1], [1,0,0]), "motorX");
 		addMateOnAxis("motorX-turn", "continuous", "motorX", "to-motorPulleyX", "motorPulleyX", "attach-motorPulleyX", {x:-1,y:0,z:0});
 		attach("motorShaftX", l.motor.shaft(), motor, "motorPulleyX");
-		var belt = TimingBelt.twoPulley(HTD5M, 20, 20, l.xScrewZ-l.yScrewZ, 15, 5000);
-		attach("beltX", belt, F.fromRotationMatrix(-225, l.centreY, l.yScrewZ, [0,0,1, 0,-1,0, 1,0,0]), "saddle");
+		var belt = TimingBelt.twoPulley(HTD5M, 20, 20, l.xScrewZ-l.xMotorZ, 15, 5000);
+		attach("beltX", belt, F.fromRotationMatrix(-225, l.centreY, l.xMotorZ, [0,0,1, 0,-1,0, 1,0,0]), "saddle");
 		addBeltPath({belt:"beltX", wraps:[{instanceId:"motorPulleyX", connectorName:"front"}, {instanceId:"screwPulleyX", connectorName:"front"}]});
 		addTransmission("x-return-belt", "screwX-turn", "motorX-turn", Transmission.BeltReduction("beltX", "screwPulleyX", "motorPulleyX"), Same);
 	}

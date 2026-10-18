@@ -1,7 +1,7 @@
 # Bench mill and mineral-cast machine design
 
 The working legacy `BenchMill` has 250 mm X, 150 mm Y and 250 mm Z travel.
-`MillFramePreview` develops a separate mechanical concept with the same travel.
+`MillFramePreview` develops a separate mechanical concept with 250 mm X, 160 mm Y and 250 mm Z travel.
 Its output is a design study, not a machine released for manufacture.
 
 ## Current geometry
@@ -10,8 +10,8 @@ Its output is a design study, not a machine released for manufacture.
 size the axis assemblies. Castings and separately itemized steel interfaces use
 shared `MineralFoundation` recipes; other machine families keep their own layouts.
 
-The reference base is 520 × 909 × 220 mm. A 140 mm front extension contains the Y
-motor bay. The column is 320 × 260 × 728 mm. Guide/bearing inserts stand 4 mm proud
+The reference base is 520 × 909 × 220 mm. The Y motor sits in a rear service bay beneath the column, with a continuous
+60 mm casting roof and side supports. The column is 320 × 260 × 728 mm. Guide/bearing inserts stand 4 mm proud
 of the casting, with 16 mm embedded thickness. Core openings, walls, dimensions
 and materials remain design assumptions requiring process and structural review.
 
@@ -21,13 +21,25 @@ foot stations sit beneath a full-height bridge; underside cores start behind it.
 Foot supplier ratings, lateral restraint, anchoring, floor suitability and insert
 anchorage are unresolved. The shown pads/nuts are geometric concepts.
 
-Y guides carry a 450 × 174 × 80 mm saddle. Its central through-tunnel clears the
-Y nut. X guides, spaced 124 mm apart, carry a 400 × 200 × 40 mm T-slot table with
+Y guides carry a 450 × 174 × 80 mm saddle. A gusseted steel bridge connects the lowered Y nut to its front face.
+X guides, spaced 124 mm apart, carry a 400 × 210 × 40 mm T-slot table with
 48 mm integral longitudinal ribs. These replace four isolated spacers and keep
 the central drive corridor open. Table top remains 448 mm above the casting bottom.
 The spindle datum and column/guide length retain the earlier 58 mm stack increase.
 
-The Y motor drives its screw directly, inside a removable front hood. X uses a
+The Y screw and motor share a 124 mm shaft height above the casting bottom.
+The motor drives rearward through a coaxial coupling, with its body beneath the
+column. Removable front and rear hatches use dedicated steel anchors and M4 screws.
+The rear hatch admits axial motor removal; allow at least 163 mm behind the base
+for the modeled extraction, plus cable and tool access. The saddle bridge runs in
+an open central base channel above a continuous sole.
+
+Y travel increases from 150 to 160 mm without changing spindle reach or base
+footprint. The table retains 25 mm tool-edge margin and clears the lower Z guides
+by 3 mm at the rear stop. The 2 mm geometric overtravel allowance is not a verified
+stopping distance. More travel requires revisiting the throat or lower Z guides.
+
+X uses a
 1:1 return drive: two 20-tooth HTD5M pulleys, 80 mm centers and a 15 mm wide belt.
 Its motor sits in a saddle pocket below the X screw. A recessed motor plate and
 removable end hood keep the drive inside the base width without widening the
@@ -130,9 +142,11 @@ connected solids, physical support contacts, foot openings, casting/steel
 partitioning, drive containment and negative collision controls.
 
 `MillXYStageIntegrity` checks continuous X sweeps against the actual saddle/drive,
-then Cartesian-product X/Y envelopes against the fixed Y drive and frame. The
+then Cartesian-product X/Y envelopes against the fixed Y drive, frame and Z
+assembly. It also checks stationary Y hardware inside the casting and continuous
+rearward motor withdrawal after removing the rear hatch and its screws. The
 ribbed table sweep preserves the central corridor; the saddle sweep fills its
-moving motor pocket conservatively while retaining the through-Y shaft tunnel.
+moving motor pocket conservatively.
 The return-drive fit inside the saddle is also checked with actual CAD.
 `MillZAxisIntegrity` checks continuous moving structural envelopes against the
 frame and stationary Z hardware. These are nominal-stroke structural checks,
