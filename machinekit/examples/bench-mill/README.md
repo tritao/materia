@@ -92,6 +92,51 @@ The [Tormach BT30 upgrade procedure](https://knowledgebase.tormach.com/1100m/bt3
 is a reference for treating spindle/drawbar hardware as a matched installation;
 its part numbers and air settings are not specifications for our candidate.
 
+## Next spindle package: architecture and supplier comparison
+
+Develop the cartridge, drawbar, release mechanism, motor mount and belt drive as
+one spindle-head package. Retain the current preview until a package has real
+mounting datums; the blue 120 × 200 mm volume remains a project allocation.
+The working target for comparison is a compact BT30 package around 2.2 kW and
+6000–8000 rpm, subject to the requested spindle speed/power choice.
+
+The preferred motor position is behind the spindle, toward the carriage, on a
+plate carried by both rear head webs and its mounting structure. A rear-corner
+position is the fallback when the actuator or column prevents a centerline fit.
+Check actual motor body, flange, connectors, cylinder fittings and maintenance
+space before deciding the offset. The present narrow collar bridge is not the
+mount for the future larger motor. Provide positive belt adjustment, a locking
+arrangement, accessible mounting bolts and a removable belt guard. Check belt
+radial loads against both spindle and motor limits.
+
+Use a spring-clamped drawbar with the selected BT30 gripper and pull stud; the
+release actuator acts through the supplier-approved reaction structure. Model
+clamped, released and rotating-clearance positions, including tool ejection and
+actuator retraction. Verify minimum inlet pressure, force versus stroke, return
+behavior, and independent clamp/release feedback. A nominal cylinder bore or
+catalog clamping force alone is not a release-system specification.
+
+| Reference | Published information | Remaining selection issue |
+| --- | --- | --- |
+| [DAIYA BT30SP](https://daiya.co.jp/en/product/spindle/atc/) | 90 mm D1, 8000 rpm, 1200 N clamping and 2000 N unclamping | Controlled drawing, actuator stroke/interface, mass and bearing limits; different performance from PMK |
+| [PMK 100MCB30SSS](https://pmkindia.com/datasheets/spindles_belt-driven-spindles-for-machining-center.pdf) | 100 mm housing, 12000 rpm, family clamping force 2800 N | Unclamping force/stroke and matched actuator still unknown |
+| [Automation Technology complete kit](https://www.automationtechnologiesinc.com/download/17588/) | 90 mm BT30 cartridge, 6000 rpm, 2.2 kW motor; drawing labels motor L=380 mm and includes release-cylinder/frame drawings | Bulky reference; current motor and blue allocation cannot represent this kit; confirm actuator force at operating pressure and ambiguous drawing units |
+| [Tormach 770MX release assembly](https://knowledgebase.tormach.com/770mx/bt30-power-drawbar-cylinder-770mx) | Two-stack double-acting 100 mm bore cylinder, 25 mm stroke, dedicated plate and standoffs | Reference for matched architecture; not interchangeable release hardware for another spindle |
+
+The complete kit drawings demonstrate why the current 1.1 kW motor envelope and
+120 × 200 mm reservation cannot simply be reused as verified BT30 geometry.
+The [Tormach head parts](https://knowledgebase.tormach.com/770mx/spindle-head-770mx)
+also distinguish the motor base/pivot plate, spindle assembly and power drawbar.
+
+Implement a dedicated spindle-package assembly with explicit gauge-line,
+cartridge-seat, pulley, motor-mount and release-reaction datums. Keep the legacy
+ER20 machine independent. Replace the preview's legacy spindle-payload extraction
+when the new package is selected, rather than accumulating special-case offsets.
+Validate full XYZ motion, release motion, belt adjustment and removal envelopes,
+then rerun guide loads using the new masses. Automatic tool exchange additionally
+requires a magazine/rack, tool forks, exchange poses and control sequencing;
+powered drawbar release alone is not a complete tool changer.
+
 ## Services and controls to implement
 
 Keep lubrication and wiring accessible behind removable covers. Provide a fixed
