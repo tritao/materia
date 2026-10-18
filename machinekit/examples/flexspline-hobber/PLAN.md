@@ -1793,3 +1793,41 @@ batch after saving that case. Do not start a second batch beside the live one.
   `build/flexspline-hb4-refined/`. Acceptance remains open pending its successful
   convergence, grading result and zero exit status. HB11 continues on its frozen
   binaries/providers. Metrology smoke regression: **11 assertions passed**.
+
+### HB11 mandrel case reviewed with face ends (2026-10-18 evening)
+
+- The complete 92,151-window mandrel lead/end cut has finished. The promoted
+  report is reconstructed exactly from hash-verified original fine profile and
+  new physical lead/end data: original profile traces and interior pitch, runout
+  and thickness arrays are unchanged, and every replaced lead value/trace matches
+  the supplement. Both physical **Z=0/8 mm** planes are measured. The narrow lead
+  report intentionally omits profile evaluation; the promoted report retains the
+  original complete profile and has no coverage warnings.
+- The individual mandrel case fits all nine extrapolated class-6 limits under the
+  accepted fine study settings. Overall extrapolated grade is **4**, driven by
+  **Fp=9.124673 µm** and **Fr=8.493766 µm**. Other parameters are grade 1:
+  **fp=0.141554 µm**, **Falpha=0.256213 µm**, **ffalpha=0.005970 µm**,
+  **fHalpha=0.262226 µm**, **Fbeta=0.478125 µm**, **ffbeta=0.487574 µm**,
+  **fHbeta=0.022124 µm**. Module 0.3 remains outside the standard's scope;
+  `isoClass=null` is preserved, and this is not ISO certification.
+- Source-signature review uses baseline-subtracted traces. The runout's once-per-
+  revolution amplitude is **3.999311 µm**, matching the **Assumed 4 µm** eccentricity
+  input within **0.018%**. That harmonic explains **99.999990%** of its variance,
+  with **0.000890 µm** residual RMS. Both cumulative-pitch flank traces are likewise
+  dominated by one revolution (amplitudes **4.256791/4.256844 µm**). Diagnostic
+  signature thresholds were stated as 1% amplitude agreement and 99.9% explained
+  variance; these are not additional physical error-budget allocations.
+- The eccentricity-only mean thickness shift is **0.0000908 µm** and its varying
+  once-per-revolution amplitude is **2.848736 µm**. This does not close combined
+  tooth-thickness acceptance or replace the separate radial-force/wall-deflection
+  split and assumed support-stiffness sensitivity.
+- Settings retained: **0.000025 mm sweep**, **0.0000015625 mm path**, original
+  profile at **8 threads**, lead/end supplement at **4 threads**, 404 computed
+  lead circles. Completion is supported by the full physical measurement and
+  successful completion log. The adopted process's OS exit code is unavailable
+  following launcher replacement; it is recorded as null, not fabricated as zero.
+- Read-only audit took **0.4 seconds**, with no recut. Detailed values, harmonic
+  fits, coverage checks and hashes: `build/flexspline-reference-budget-parallel/`
+  `mandrel-case-review.json` and `.md`. **Individual mandrel review is complete**;
+  combined budget/signature superposition, other source cases, HB4 fine reference
+  acceptance and HB12 remain open. No running cut or frozen provider was changed.
