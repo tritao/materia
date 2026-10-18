@@ -18,6 +18,8 @@ class MachineKitComponents {
 		machinekit.assembly.AssemblyComponents.register(registry);
 		machinekit.control.ControlComponents.register(registry);
 		registry.register(machinekit.structural.RectTubeMember.recipeType());
+		registry.register(machinekit.structural.MineralCasting.recipeType());
+		registry.register(machinekit.structural.CastInsert.recipeType());
 		return registry;
 	}
 

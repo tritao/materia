@@ -51,6 +51,7 @@ class MachineComponent {
 	public var bom(get, never):BomItem;
 	public final description:String;
 	var cachedBom:Null<BomItem>;
+	final recipeInputs:Null<ComponentValues>;
 	static var nextInstanceId = 0;
 
 	/** Tells this component from every other, including ones built from the same recipe. */
@@ -67,7 +68,8 @@ class MachineComponent {
 	final bridgeList:Array<PortBridge> = [];
 	final conversionList:Array<PortBridge> = [];
 
-	function new(designation:String, description:String, ?material:String, codeOnly:Bool = false) {
+	function new(designation:String, description:String, ?material:String, codeOnly:Bool = false, ?recipeValues:ComponentValues) {
+		recipeInputs = recipeValues == null ? null : recipeValues.copy();
 		instanceId = nextInstanceId++;
 		if (designation == null || designation.length == 0) throw "Machine component needs a designation";
 		this.designation = designation;
@@ -189,8 +191,30 @@ class MachineComponent {
 
 	function get_type():Null<ComponentType> return componentType();
 
-	public function values():ComponentValues
-		throw 'Component "$designation" has no recipe values';
+	/** Snapshot of constructor inputs, with the current physical material. Existing components
+	 * may continue to compute their own values by overriding this method.
+	 */
+	public function values():ComponentValues {
+		if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
+		var result = new ComponentValues(), recipe = componentType();
+		for (name in recipeInputs.names()) if (name != "material") result.set(name, recipeInputs.get(name));
+		if (recipe == null || recipe.materialEditable) result.setToken("material", materialSpec());
+		return result;
+	}
+
+	/** Typed access to stored recipe inputs; geometry remains the component's responsibility. */
+	public function parameterNumber(name:String):Float {
+		if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
+		return recipeInputs.number(name);
+	}
+	public function parameterToken(name:String):String {
+		if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
+		return recipeInputs.token(name);
+	}
+	public function parameterCount(name:String):Int {
+		if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
+		return recipeInputs.integer(name);
+	}
 
 	public function connectors():Array<Connector>
 		return connectorList.copy();

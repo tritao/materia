@@ -277,7 +277,7 @@ function main():Void { BenchMillChecks.run(); EnclosedMillChecks.run(); }
 class EnclosedMillChecks {
 	public static function run():Void {
 		var cell = new EnclosedBenchMill(), state = cell.state();
-		var deck = BenchMillChecks.posed(cell, state, "standDeck");
+		var deck = BenchMillChecks.posed(cell, state, "stand/cap");
 		var tray = BenchMillChecks.posed(cell, state, "chipTray");
 		var db = deck.shape.bounds(), tb = tray.shape.bounds();
 		if (Math.abs(db.get_min().get_x() - tb.get_min().get_x()) > 1e-5 ||
@@ -287,17 +287,26 @@ class EnclosedMillChecks {
 			Math.abs(db.get_max().get_z() - tb.get_min().get_z()) > 1e-5)
 			throw "Stand deck must support the complete chip tray at its underside";
 		deck.close(); tray.close();
-		for (id in cell.standIds) if (StringTools.startsWith(id, "standLeg")) {
-			var leg = BenchMillChecks.posed(cell, state, id), bounds = leg.shape.bounds();
-			if (Math.abs(bounds.get_min().get_z()) > 1e-5 ||
-				Math.abs(bounds.get_max().get_z() - (cell.standHeight - 8)) > 1e-5)
-				throw "Stand legs must reach from the floor to the deck";
-			var expected = (80 * 80 - 72 * 72) * (cell.standHeight - 8);
-			if (Math.abs(leg.volume() - expected) > 0.01)
-				throw "Stand leg mass must come from hollow structural stock";
-			leg.close();
+		var casting = BenchMillChecks.posed(cell, state, "stand/casting"), cb = casting.shape.bounds();
+		if (Math.abs(cb.get_min().get_z() - 35) > 1e-5 ||
+			Math.abs(cb.get_max().get_z() - (cell.standHeight - 20)) > 1e-5)
+			throw "Mineral casting must bridge the recessed feet and steel cap";
+		// A hollow service core must remain; a solid block would give a misleading mass.
+		var fullVolume = (db.get_max().get_x() - db.get_min().get_x()) *
+			(db.get_max().get_y() - db.get_min().get_y()) * (cell.standHeight - 43);
+		if (casting.volume() >= fullVolume * 0.8 || casting.volume() <= 0)
+			throw "Mineral pedestal must retain its service cavity";
+		casting.close();
+		if (cell.standIds.length != 9) throw "Pedestal needs casting, cap, two seats, access panel and four feet";
+		for (id in ["standSeatLeft", "standSeatRight"]) {
+			var seat = BenchMillChecks.posed(cell, state, id);
+			var chipTray = BenchMillChecks.posed(cell, state, "chipTray");
+			var overlap = seat.intersect(chipTray);
+			if (overlap.volume() > 1e-5) throw "Steel mill seats must clear the chip tray";
+			if (Math.abs(seat.shape.bounds().get_max().get_z() - cell.floorOffset) > 1e-5)
+				throw "Mill seats must preserve the established bed height";
+			overlap.close(); chipTray.close(); seat.close();
 		}
-		if (cell.standIds.length != 15) throw "Stand needs a deck, four legs, eight rails and two rear braces";
 		// The X guide preserves the leaf's Y interval, so this separating plane
 		// proves panel clearance for the entire continuous stroke.
 		var guide = [for (joint in state.definition.joints) if (joint.id == "door") joint][0];

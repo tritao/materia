@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-casting-tests"
+  },
+  "entry": "CastingTests",
+  "sourceRoots": [
+    "src",
+    "../src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

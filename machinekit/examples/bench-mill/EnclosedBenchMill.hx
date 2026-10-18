@@ -12,9 +12,8 @@ import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
-import machinekit.structural.RectTube;
-import machinekit.structural.ProfileMember;
-import cadkit.modeling.Vector;
+import machinekit.milling.MillPedestal;
+import machinekit.milling.MillSupportTray;
 
 typedef MillBounds = {var low:Array<Float>; var high:Array<Float>;}
 
@@ -67,38 +66,40 @@ class EnclosedBenchMill extends MachineAssembly {
 		panel("chipTray", width, depth, trayThickness, centreX, centreY, standHeight);
 		include("mill", mill, AssemblyFrames.translation(0, 0, floorOffset));
 		exposePort("mains", "mill/powerSupply", "mains");
-		addMemberConnector("chipTray", "millSeat", AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("chipTray")),
+		// Mineral-cast shell carries a steel cap; small feet are recessed under its corners.
+		var deckThickness = 8.0, footHeight = 35.0;
+		var pedestalHeight = standHeight - deckThickness - footHeight;
+		var pedestal = new MillPedestal(width, depth, pedestalHeight);
+		include("stand", pedestal,
+			AssemblyFrames.translation(centreX, centreY, footHeight));
+		poses.set("stand/casting", AssemblyFrames.translation(centreX, centreY, footHeight));
+		poses.set("stand/cap", AssemblyFrames.translation(centreX, centreY, standHeight - 20));
+		addMemberConnector("chipTray", "castingSeat", AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("chipTray")),
+			AssemblyFrames.compose(poses.get("stand/casting"), pedestal.body.connector("mount").frame)));
+		addMate("stand-on-tray", "fixed", "chipTray", "castingSeat", "stand/casting", "mount");
+		standIds.push("stand/cap");
+		standIds.push("stand/casting");
+		addMemberConnector("stand/cap", "millSeat", AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("stand/cap")),
 			AssemblyFrames.translation(0, 0, floorOffset)));
 		addMemberConnector("mill/base", "standSeat", AssemblyFrames.identity());
-		addMate("mill-on-stand", "fixed", "chipTray", "millSeat", "mill/base", "standSeat");
-		// Support the entire enclosure footprint with hollow steel stock and a full deck.
-		var deckThickness = 8.0, legSize = 80.0, railSize = 60.0;
-		var deckBottom = standHeight - deckThickness;
-		panel("standDeck", width, depth, deckThickness, centreX, centreY, deckBottom, false);
-		standIds.push("standDeck");
-		var x0 = left + legSize / 2, x1 = right - legSize / 2;
-		var y0 = front + legSize / 2, y1 = back - legSize / 2;
-		for (xi in 0...2) for (yi in 0...2) {
-			var x = xi == 0 ? x0 : x1, y = yi == 0 ? y0 : y1;
-			standMember('standLeg$xi$yi', new RectTube(legSize, legSize, 4),
-				new Vector(x, y, 0), new Vector(x, y, deckBottom));
+		addMate("mill-on-stand", "fixed", "stand/cap", "millSeat", "mill/base", "standSeat");
+		// Steel strips pass through sealed tray slots and bear on the bed's 25 mm side rims.
+		for (side in [-1, 1]) {
+			var id = side < 0 ? "standSeatLeft" : "standSeatRight";
+			fixed(id, new MillPanel(25, 550, trayThickness),
+				AssemblyFrames.translation(side * 247.5, 0, standHeight), "stand/cap");
+			standIds.push(id);
 		}
-		for (level in 0...2) {
-			var z = level == 0 ? 180.0 : deckBottom - railSize / 2;
-			for (side in 0...2) {
-				var x = side == 0 ? x0 : x1, y = side == 0 ? y0 : y1;
-				standMember('standRailX$level$side', new RectTube(railSize, railSize, 3),
-					new Vector(x0 + legSize / 2, y, z), new Vector(x1 - legSize / 2, y, z));
-				standMember('standRailY$level$side', new RectTube(railSize, railSize, 3),
-					new Vector(x, y0 + legSize / 2, z), new Vector(x, y1 - legSize / 2, z));
-			}
-		}
-		// Rear diagonals resist racking while leaving the front clear for access.
-		for (side in 0...2) {
-			var startX = side == 0 ? x0 : x1, endX = side == 0 ? x1 : x0;
-			var braceY = y1 + (side == 0 ? -21 : 21);
-			standMember('standBrace$side', new RectTube(40, 40, 3),
-				new Vector(startX, braceY, 220), new Vector(endX, braceY, deckBottom - railSize));
+
+		fixed("standServicePanel", new MillPanel(400, 4, 420, "painted steel"),
+			AssemblyFrames.translation(centreX, front - 2, footHeight + 130), "stand/casting");
+		standIds.push("standServicePanel");
+		for (xi in [-1, 1]) for (yi in [-1, 1]) {
+			var id = 'standFoot${xi + 1}${yi + 1}';
+			fixed(id, new MillPanel(100, 100, footHeight),
+				AssemblyFrames.translation(centreX + xi * (width / 2 - 100),
+					centreY + yi * (depth / 2 - 100), 0), "stand/casting");
+			standIds.push(id);
 		}
 		panel("enclosureLeft", panelThickness, depth, top - bottom, left - panelThickness / 2, centreY, bottom);
 		panel("enclosureRight", panelThickness, depth, top - bottom, right + panelThickness / 2, centreY, bottom);
@@ -229,19 +230,11 @@ class EnclosedBenchMill extends MachineAssembly {
 	}
 
 	function panel(id:String, w:Float, d:Float, h:Float, x:Float, y:Float, z:Float, enclosure:Bool = true):Void {
-		var pose = AssemblyFrames.translation(x, y, z), part = new MillPanel(w, d, h);
+		var pose = AssemblyFrames.translation(x, y, z), part:MachineComponent = id == "chipTray" ? new MillSupportTray(new machinekit.component.ComponentValues().setNumber("width", w)
+			.setNumber("depth", d).setNumber("height", h).setNumber("millX", -x).setNumber("millY", -y)) : new MillPanel(w, d, h);
 		if (id == "chipTray") { addComponent(id, part, pose); poses.set(id, pose); }
 		else fixed(id, part, pose, "chipTray");
 		if (enclosure) panelIds.push(id);
-	}
-	function standMember(id:String, profile:RectTube, start:Vector, end:Vector):Void {
-		var delta = end.subtract(start), length = delta.length(), axis = delta.normalized();
-		var reference = Math.abs(axis.z) < 0.9 ? Vector.Z() : Vector.Y();
-		var x = reference.cross(axis).normalized(), y = axis.cross(x);
-		var pose = AssemblyFrames.fromRotationMatrix(start.x, start.y, start.z,
-			[x.x, y.x, axis.x, x.y, y.y, axis.y, x.z, y.z, axis.z]);
-		fixed(id, new ProfileMember(profile, length), pose, "chipTray");
-		standIds.push(id);
 	}
 	function doorPanel(id:String, w:Float, d:Float, h:Float, x:Float, y:Float, z:Float, material:String = "steel"):Void {
 		fixed(id, new MillPanel(w, d, h, material), AssemblyFrames.translation(x, y, z), "doorSlider");

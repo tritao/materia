@@ -14,6 +14,32 @@ import machinekit.transmission.TimingBeltProfile;
 
 /** Shared parameter constructors and parsed enum inputs for component recipes. */
 class ComponentRecipeSupport {
+	/** Resolve direct-constructor inputs using the same schema as recipe creation.
+	 * Material is an optional reserved override for constructors; ComponentType already declares it.
+	 */
+	public static function resolve(parameters:Array<ComponentParameter>, ?overrides:ComponentValues,
+			allowMaterial:Bool = true):ComponentValues {
+		var result = new ComponentValues(), names:Map<String, Bool> = [];
+		for (parameter in parameters) {
+			if (names.exists(parameter.name)) throw 'Duplicate component input "${parameter.name}"';
+			names.set(parameter.name, true);
+			var value = overrides == null ? null : overrides.get(parameter.name);
+			if (value == null) value = parameter.defaultValue;
+			parameter.validate(value); result.set(parameter.name, value);
+		}
+		if (overrides != null) for (name in overrides.names()) if (!names.exists(name)) {
+			if (name != "material" || !allowMaterial) throw 'Unknown component input "$name"';
+			var spec = overrides.token(name);
+			materia.project.MaterialLibrary.fromSpec(spec);
+			result.setToken(name, spec);
+		}
+		return result;
+	}
+
+	/** A quantity whose engineering unit travels with its recipe schema. */
+	public static function quantity(name:String, value:Float, unit:String, minimum:Null<Float> = 0):ComponentParameter
+		return new ComponentParameter(name, Scalar, Number(value), unit, minimum);
+
 	public static function threadParameters():Array<ComponentParameter> return [
 		choice("family", ["MetricTrapezoidal", "Acme", "Ball"], "MetricTrapezoidal"),
 		length("screwDiameter", 8), length("pitch", 2), count("starts", 1),

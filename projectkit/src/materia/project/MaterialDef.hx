@@ -21,6 +21,12 @@ package materia.project;
 @:wire typedef MaterialPhysical = {
   @:id(1) var density:Float;
   @:id(2) var spec:String;
+  /** Optional bulk inputs; no automatic structural/thermal simulation is implied. */
+  @:id(3) @:optional var youngsModulusPa:Null<Float>;
+  @:id(4) @:optional var dampingLossFactor:Null<Float>;
+  @:id(5) @:optional var thermalExpansionPerK:Null<Float>;
+  @:id(6) @:optional var thermalConductivityWPerMK:Null<Float>;
+  @:id(7) @:optional var propertiesAssumed:Null<Bool>;
 }
 
 /** Strengths and elastic modulus in MPa. Optional for nonstructural materials. */

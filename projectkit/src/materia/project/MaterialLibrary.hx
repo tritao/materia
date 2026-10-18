@@ -33,12 +33,25 @@ class MaterialLibrary {
     material("polycarbonate", "Polycarbonate", [0.58, 0.74, 0.79], 0.0, 0.2, 1200, "polycarbonate"),
     material("polyurethane", "Polyurethane", [0.26, 0.34, 0.37], 0.0, 0.65, 1200, "polyurethane PU"),
     material("plywood-birch", "Birch plywood", [0.70, 0.55, 0.34], 0.0, 0.72, 680, "birch plywood"),
+    mineralCast(),
     material("cast-iron", "Cast iron", [0.35, 0.37, 0.39], 0.60, 0.55, 7200, "cast iron"),
     material("bronze", "Bronze", [0.55, 0.38, 0.20], 0.70, 0.38, 8800, "bronze"),
     material("brass", "Brass", [0.69, 0.55, 0.29], 0.75, 0.34, 8500, "brass"),
     material("spring-steel", "Spring steel", [0.56, 0.58, 0.60], 0.75, 0.38, 7850, "spring steel"),
     sheetSteel(), sheetAluminium()
   ];
+
+  /** Assumed epoxy-granite bulk inputs, for checks that explicitly consume them.
+      eta=0.02 uses an assumed cast-iron reference eta=0.0025 (8x); not a modal result. */
+  static function mineralCast():MaterialDef {
+    var result=material("mineral-cast","Mineral cast",[0.16,0.17,0.18],0.0,0.95,2400,"mineral cast");
+    result.physical.youngsModulusPa=35e9;
+    result.physical.dampingLossFactor=0.02;
+    result.physical.thermalExpansionPerK=14e-6;
+    result.physical.thermalConductivityWPerMK=2;
+    result.physical.propertiesAssumed=true;
+    return result;
+  }
 
   /** Plan material A. Mechanical values and development defaults are assumed, not lot certificates. */
   static function sheetSteel():MaterialDef {

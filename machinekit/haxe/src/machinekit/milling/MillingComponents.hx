@@ -6,6 +6,7 @@ import machinekit.component.ComponentRegistry;
 class MillingComponents {
 	public static function register(registry:ComponentRegistry):Void {
 		registry.register(MillPanel.recipeType());
+		registry.register(MillSupportTray.recipeType());
 		registry.register(MillCasting.recipeType());
 		registry.register(SpindleCartridge.recipeType());
 		registry.register(SpindleCartridge.Er20Holder.recipeType());

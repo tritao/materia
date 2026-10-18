@@ -5,6 +5,47 @@ MachineKit is a Haxe-only layer of machine components above CadKit. A
 BOM line. `addTo(model, id)` registers an instance and its connectors on a
 CadKit `AssemblyModel`, so components mate through the existing assembly API.
 
+Recipe-backed components can pass resolved `ComponentValues` as the fifth
+`MachineComponent` constructor argument. `ComponentRecipeSupport.resolve(schema, overrides)`
+validates direct construction using the same resolver as `ComponentType.create`.
+The base class owns a snapshot, exposes typed `parameterNumber`, `parameterToken`
+and `parameterCount` accessors, and returns a fresh `values()` snapshot with the
+current editable material. Existing components can continue to override `values()`.
+This support imposes no geometry, connector layout, accuracy or rating assumptions.
+
+Mineral-cast foundations use shared components in `machinekit.structural`:
+
+- `MineralCasting`: a recipe-backed body with corner chamfers and named box voids.
+- `CastingFeatures`: typed core/recess layouts, including a regular cross-ribbed grid.
+- `CastInsert`: a steel insert envelope with a finished mounting plane and position tolerance.
+- `MineralFoundation`: separately itemised casting and steel, subtracting each insert's
+  recess from the casting so their masses do not overlap.
+- `FoundationIntegrity`: insert position/normal checks and checks that precision
+  mounts land on steel. These do not certify structural or casting-process adequacy.
+
+The mill pedestal and hobber bed/column supply machine-specific layouts to these
+shared components. All void dimensions and frames are persisted in recipe values;
+a saved assembly rebuilds with the standard component registry. Casting purchasing
+mass comes from actual CAD volume and the common `mineral-cast` material. Its
+2400 kg/m³ density and bulk elastic, thermal and damping inputs are explicitly assumed.
+
+The foundation layouts, steel-insert separation and bulk inputs were selectively
+ported from `flexspline-hobber` commit `f59fcf695` (building on `13358ee07`), without
+pulling in the gear library or `PrecisionPart`. When integrating that branch,
+use the structural casting/insert/foundation classes and retain only the hobber's
+layout adapters. Register shared structural recipes once; the old hobbing casting
+recipe ids are not aliases. Other recipe-backed hobbing parts can move their input
+storage to `MachineComponent`, resolution/quantity helpers to `ComponentRecipeSupport`,
+and geometry and engineering metadata to their own helpers or optional facets.
+
+Run the foundation, serialization and new component geometry checks with:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/tests/casting/haxeon.json
+```
+
+Append `-- --recipes` to also run the existing contract suite across all registered recipes.
+
 Fluid components expose typed `CylinderSpec`, `ValveSpec` and `PressureSource`
 capabilities. `addCylinder` binds a part to its existing prismatic guide; each
 rebuild resolves pressure from service connections, geometry from the parts and

@@ -69,19 +69,8 @@ class ComponentType {
 
 	public function defaults():ComponentValues return resolve(null);
 
-	public function resolve(?overrides:ComponentValues):ComponentValues {
-		var result = new ComponentValues();
-		if (overrides != null)
-			for (name in overrides.names())
-				if (parameter(name) == null) throw 'Unknown input "$name" for component type "$id"';
-		for (input in inputs) {
-			var value = overrides == null ? null : overrides.get(input.name);
-			if (value == null) value = input.defaultValue;
-			input.validate(value);
-			result.set(input.name, value);
-		}
-		return result;
-	}
+	public function resolve(?overrides:ComponentValues):ComponentValues
+		return ComponentRecipeSupport.resolve(inputs, overrides, false);
 
 	public function attachFamily(family:ComponentFamily):Void {
 		if (family.recipe != this || manufacturingFamily != null) throw "Recipe already belongs to a manufacturing family";
@@ -156,11 +145,6 @@ class ComponentType {
 	public function partNumber(component:MachineComponent):String
 		return keepDesignation && (component.materialSpec() == defaultMaterial || materialInDesignation)
 			? component.designation : key(valuesOf(component));
-
-	function parameter(name:String):Null<ComponentParameter> {
-		for (input in inputs) if (input.name == name) return input;
-		return null;
-	}
 
 	static function seenIndex(inputs:Array<ComponentParameter>, name:String):Int {
 		for (i in 0...inputs.length) if (inputs[i].name == name) return i;
