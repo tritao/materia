@@ -107,6 +107,12 @@ class CastingTests {
 		}
 		var material = MaterialLibrary.require("mineral-cast").physical;
 		check(material.propertiesAssumed == true && material.youngsModulusPa == 35e9, "bulk properties retain assumed provenance");
+		var bored = new CastInsert(new ComponentValues().setNumber("width", 40).setNumber("depth", 40).setNumber("height", 20).setNumber("boreDiameter", 18));
+		var boredShape = bored.geometry();
+		check(boredShape.valid() && boredShape.solidCount() == 1, "bored foot seat remains one solid");
+		near(boredShape.volume(), 40*40*20-Math.PI*9*9*20, 1e-6, "foot bore removes steel volume");
+		boredShape.close();
+		rejects(() -> new CastInsert(new ComponentValues().setNumber("boreDiameter", 40)), "reject insert bore consuming seat");
 		Sys.println('CastingTests: $assertions assertions passed');
 		if (Sys.args().indexOf("--recipes") >= 0) {
 			RecipeContractTests.run();
