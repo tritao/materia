@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "model": "fairino5_v6",
+  "sourceStep": "cad/fairino-v6-step/FRCobots-V6.0 STEP Models/FR5-V6.0 Model.STEP",
+  "sourceStepSha256": "d7a7e07f50a221dfba9ca807bc2a4241518fdfe162233b7c0d404341e78687be",
+  "method": "Native OCCT STEP import, exact cylindrical surfaces and rendered supplier triangles; no generated connector geometry",
+  "solidIndex": 36,
+  "solidCount": 37,
+  "terminalFaces": 566,
+  "indexBasis": "Zero-based CadKit/OCCT imported solid and face order for this file hash",
+  "connectors": [
+    {
+      "id": "rs485",
+      "contactCount": 5,
+      "cylindricalContactFaces": [
+        77,
+        78,
+        79,
+        80,
+        81,
+        111,
+        112,
+        113,
+        114,
+        115
+      ],
+      "pattern": "four outer contacts plus one centre",
+      "outwardAxisStep": [
+        0,
+        -1,
+        0
+      ],
+      "contactWallMidpointStepMm": [
+        -820,
+        17,
+        182
+      ],
+      "insertFaceIndex": 117,
+      "insertFaceCentreStepMm": [
+        -820.0000282763382,
+        12.000001592040576,
+        182.00002427210282
+      ]
+    },
+    {
+      "id": "io",
+      "contactCount": 8,
+      "cylindricalContactFaces": [
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110
+      ],
+      "pattern": "seven outer contacts plus one centre",
+      "outwardAxisStep": [
+        -1,
+        0,
+        0
+      ],
+      "contactWallMidpointStepMm": [
+        -854,
+        50,
+        182
+      ],
+      "insertFaceIndex": 116,
+      "insertFaceCentreStepMm": [
+        -858.0000282763378,
+        50.00000159203991,
+        182.00002426698867
+      ]
+    }
+  ],
+  "interpretation": "Contact counts correspond to manufacturer end-plate pinout. The two connector faces are on perpendicular sides of the same terminal housing.",
+  "limitations": [
+    "Contact wall midpoints are not insert faces or cable mating planes.",
+    "Nominal STEP-to-ROS mapping uses housing axis and rear shoulder; front flange differs by 1 mm and ROS socket caps are simplified.",
+    "Key clocking, electrical contact numbering in CAD and cable seating depth remain unqualified."
+  ],
+  "ur5e": {
+    "stepAvailable": false,
+    "availableGeometry": "Pinned official ROS visual/collision meshes only",
+    "reason": "Official UR STEP download required login; no STEP was obtained in the prepared sources."
+  }
+}

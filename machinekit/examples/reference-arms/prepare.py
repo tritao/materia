@@ -24,22 +24,9 @@ SOURCES = json.loads((ROOT / "sources.json").read_text())
 
 def wire_manifest(value):
     """Generate haxeon's typed JSON representation from the consumer's @:wire schema."""
-    schemas = {}
-    for path in (ROOT / "ReferenceRobot.hx", ROOT.parents[2] / "projectkit/src/materia/assembly/AssemblyRecord.hx"):
-        for name, body in re.findall(r"@:wire typedef (\w+) = \{(.*?)\n\}", path.read_text(), re.S):
-            schemas[name] = re.findall(r"@:id\((\d+)\)\s+(@:optional\s+)?var (\w+):([^;]+);", body)
-    def convert(item, kind):
-        if item is None:
-            return None
-        if kind.startswith("Null<"):
-            return convert(item, kind[5:-1])
-        if kind.startswith("Array<"):
-            return [convert(v, kind[6:-1]) for v in item]
-        if kind not in schemas:
-            return item
-        return [[f"{index}:{name}", convert(item[name], field_type)]
-                for index, optional, name, field_type in schemas[kind] if not optional or name in item]
-    return {"version": 1, "value": convert(value, "ReferenceManifest")}
+    from reference_wire import encode
+    return encode(value, "ReferenceManifest", [ROOT / "ReferenceRobot.hx",
+                  ROOT.parents[2] / "projectkit/src/materia/assembly/AssemblyRecord.hx"])
 
 
 def digest(path):
@@ -386,6 +373,8 @@ def compile_model(family, model):
         result["flangeOffset"] = frame(transform)
         result["tipStatus"] = interface["basis"] + " " + interface["meshDiscrepancy"]
         result["interfaceReview"] = interface
+    from wrist_interfaces import prepare_catalog
+    result["wristInterfaceCatalogSha256"] = prepare_catalog(ROOT)
     temporary = destination / "manifest.json.partial"
     temporary.write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
     temporary.replace(destination / "manifest.json")

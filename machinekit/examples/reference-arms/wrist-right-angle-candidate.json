@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "id": "rockwell-889d-e5ac-right-angle",
+  "manufacturer": "Rockwell Automation / Allen-Bradley",
+  "partNumber": "889D-E5AC-1",
+  "sourceFamilyModel": "889D-E5AC-2",
+  "sourcePage": "https://www.rockwellautomation.com/en-us/products/details.889D-E5AC-1.html",
+  "files": [
+    {
+      "path": "cad/right-angle-candidate/889D-E5AC-2.stp",
+      "url": "https://configurator.rockwellautomation.com/api/Doc/889D-E5AC-2.zip",
+      "sha256": "30ab9dd25f3605885a66fd69ff466d67a67fce81725dd07c7e1832100ef08ea1",
+      "archiveSha256": "7563f99f3636a3b8d72817cc21cf0088f0c0e2446cf72472dce7fa14947fe121",
+      "archiveMember": "889D-E5AC-2.stp"
+    },
+    {
+      "path": "cad/right-angle-candidate/889D-E5AC-2.pdf",
+      "url": "https://configurator.rockwellautomation.com/api/Doc/889D-E5AC-2.pdf",
+      "sha256": "02836d0ad76ef8a41a0f1dee2e034296643617f00e8fe25552d34a42e8fde2e0"
+    }
+  ],
+  "preferredForLayout": true,
+  "connectorExitDeg": 90,
+  "cableDiameterMm": 6.1,
+  "minBendRadiusMm": 61.0,
+  "manufacturerCableBendRule": "10 x diameter",
+  "nativeBodyAxialMaxXMm": 31.75,
+  "nativeCableAxis": [
+    25.4,
+    0,
+    0
+  ],
+  "nativeCableDirection": [
+    0,
+    1,
+    0
+  ],
+  "nativeStubStartYMm": 25.146,
+  "nativeStubEndYMm": 30.226,
+  "normalization": "Rotate source about Y by -90 degrees: study coordinates = (-sourceZ, sourceY, sourceX), millimetres. Source X=0 leading face is an assumed reference, not a qualified seating datum.",
+  "externalBodyStartZMm": 16.002,
+  "preferredClockDeg": 180,
+  "preferredExit": "wrist -Z, back along the robot arm",
+  "studyAxialOffsetsMm": [
+    -8,
+    0,
+    8
+  ],
+  "studyClockAnglesDeg": [
+    0,
+    90,
+    180,
+    270
+  ],
+  "limitations": [
+    "Supplier product page for 889D-E5AC-1 links family CAD/drawing named 889D-E5AC-2; connector family geometry is used, not a claim that the model represents 1 metre of cable.",
+    "Supplier long cable, label sleeve and stripped wire ends are cropped away at native Y=30.226 mm; complete connector and 5.08 mm original cable stub are retained. No flexible cable route is modeled.",
+    "Preferred clock follows the wrist reference; actual socket coding/sex, key clocking and seating remain unqualified.",
+    "Published PVC cable is unshielded; twisted-pair impedance, shielding requirements and robot torsion suitability remain unresolved.",
+    "Right-angle geometry is preferred for the layout; no purchase or electrical installation qualification is implied.",
+    "Eight-pin I/O socket remains unused in this RS485 layout. Any future cable on it should also use an independently qualified right-angle plug."
+  ],
+  "staticSeparationBoundThresholdMm": 5.0,
+  "matingZoneEvaluated": false
+}

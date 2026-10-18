@@ -373,3 +373,270 @@ The [original-arm follow-up](../zeroerr-arm/ORIGINAL-REFINEMENT.md) adds
 `--refine-routes`, explicit entry waypoints, paired outfeed IK branch checks,
 configuration-load refresh and a source-bound supplier review. Baseline reports
 are preserved; the four recovered vise transfers use additional planning work.
+
+## Manufacturer wrist electrical interfaces
+
+`wrist-interfaces.json` records source-backed pinouts separately from the custom
+cobot's provisional 5 A collar-mounted service module. `ReferenceRobot.wristInterfaces`
+loads the hash-pinned catalog with the imported UR5e/FR5 model. No hardware revision
+or current-rating edition is silently selected. Vendor mesh geometry is preserved.
+
+```sh
+# Attach the catalog to already-prepared UR5e/FR5 manifests; no mesh/FK changes.
+python3 machinekit/examples/reference-arms/wrist_interfaces.py
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.wrist-interfaces.json
+```
+
+Normal `prepare.py` also prepares/stamps this catalog. The wrist checks have a
+separate build directory and export review scenes and structured interface
+sidecars under `build/wrist-interface-review/`. Normal reference exports also write
+`<model>.wrist-interfaces.json`. Source pinout image URLs and SHA-256 values are
+stored per connector; the normalized catalog and typed artifact are hashed.
+
+| Profile | Physical connections | Electrical scope |
+| --- | --- | --- |
+| UR5e legacy | One M8 male, 8 contacts | 0/12/24 V, digital I/O, analog/RS485 multiplexing |
+| UR5e revised | One M8 female, 8 contacts; different pin numbering | Same service categories, explicit revised pinout |
+| FAIRINO FR5 manual end plate | M12 female 8-contact I/O plus a separate 5-contact RS485 connector | 24 V; one shared 1.5 A tool-board budget, no independently qualified transient overload |
+
+UR's [connector change notice and developer specifications](https://www.universal-robots.com/it/developer/hardware-and-motion/electrical-interfaces-tool-connector/)
+identify the first female UR5e serial as `20245501103`. Serial selection uses strings,
+not a 32-bit integer. The [published female pinout](https://a.storyblok.com/f/169662/758x337/3548b38c03/female-tool-out-orig.png)
+and [male pinout](https://a.storyblok.com/f/169662/679x337/557f9befc3/male-tool-out-new.png)
+are distinct: for example RS485+ is pin 2 on the female and pin 1 on the male.
+Adapter-cable numbering must follow its own documented mating interface.
+
+**UR source conflict is retained:** the captured developer table lists UR5e
+1 A single-pin / 1.5 A dual-pin typical current; the linked [SW5.25 UR5e manual](https://www.universal-robots.com/manuals/EN/PDF/SW5_25/user-manual-UR5e-PDF_online/710-965-00_UR5e_User_Manual_en_Global.pdf)
+section 8.7.6 lists 0.6 A for both. Both state 2 A peak, maximum 1 second, maximum
+10% duty and the typical-current limit on the 10-second average. They are separate
+rating-evidence options, not inferred hardware revisions. The serial connector
+cutover does not resolve the current-table conflict. Confirm the applicable limits
+for a purchased robot before treating either option as hardware-qualified.
+
+FAIRINO's [manual end-plate diagram](https://manual.fairino.support/latest/_images/0413.png)
+shows AI0/AO0/DI0/DI1/power/DO0/DO1/GND on the 8-contact connector, and
+485-A/485-B/power/unused/GND on the separate 5-contact connector. The 1.5 A tool
+supply comes from the [FR5 product specification](https://www.fairino.us/collaborative-robot/fairino/fr5),
+not the controller's separate power-supply table. The 5-contact connector's thread,
+coding and sex are deliberately unqualified; the schematic alone does not establish
+them. A/B naming is not silently equated with UR's +/- convention.
+
+`ReferenceWristInterfaces.checkUse` requires a selected rating edition, power and
+signal connector, supply mode and load envelope. It checks continuous/shared and
+transient current, peak duration/duty, window-average consistency, stated capacitive
+limit, RS485/analog exclusivity and digital outputs consumed by dual-pin power.
+The 2.4 A simultaneous peak of two PGC-140-50s fails every recorded wrist power option.
+This is a documented-interface compatibility check, not a hardware driver or wiring
+commissioning test.
+
+**Spatial qualification remains open.** Neither the pinout drawings nor the imported
+visual descriptions establish a verified installed socket mating position/key
+clocking for these hardware revisions. `matingFrame`, `parentLink` and
+`placementSource` remain null; `requireMatingFrame` refuses to invent a connector
+frame. No generic socket is added to or substituted into the manufacturer meshes.
+These references cannot yet certify mating-cable access, bend clearance or wrist
+motion around those sockets. Obtain/reconcile revision-matched CAD or drawings
+before qualifying those positions.
+
+### Connector geometry confirmed in FR5 STEP
+
+A subsequent direct STEP inspection confirms that both connector patterns are
+already part of the terminal wrist geometry: five contacts on one side and eight
+on a perpendicular side. They are embedded in terminal solid 36 of the 37-solid
+pinned FR5 V6.0 file, rather than separate connector components. Exact cylindrical
+contact faces and source-file provenance are recorded in `wrist-geometry-findings.json`.
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.wrist-geometry.json
+```
+
+The inspection exports `build/wrist-geometry-inspection/fr5-terminal-wrist.step`
+and `.mtrg`, the full supplier scene, raw mesh streams and cylindrical-face records.
+This confirms the geometry exists. Registering its source STEP coordinates to the
+imported ROS link and assigning electrical pin numbers, key clocking and a cable
+mating plane remain distinct checks. No UR STEP is present in the prepared assets.
+
+The FR5 port records now include typed `WristGeometryBinding` observations. These
+identify STEP solid 36, insert faces 117 (five contacts) and 116 (eight contacts),
+contact cylinder face indices, source SHA256 and parent URDF SHA256. Preparation
+checks both source files; loading checks the parent URDF and catalog hash.
+
+The insert face centres map nominally into `wrist3_link` at (0, -38, 80) mm
+and (-38, 0, 80) mm. Convert STEP mm to metres, then translate by
+(0.820, -0.050, -0.102) m, with no rotation. Housing axis and rear shoulder
+support this nominal mapping; the ROS mesh has simplified socket caps and a
+flange face 1 mm short of the STEP. This is not a full surface registration.
+Observation frame Z points outward and Y follows wrist +Z; this does not identify
+the mechanical key. `requireObservedGeometry` exposes the evidence separately
+from `requireMatingFrame`, which still rejects automatic cable attachment.
+Cable seating depth, connector key clocking and CAD contact-to-pin numbering
+remain unqualified. Earlier cylinder-wall midpoints in the findings file are
+now explicitly named as such, rather than being described as contact planes.
+
+Cable qualification follow-up (2026-10-18): the DH EN.2403 catalogue, PDF page 70,
+explicitly lists robot-cable option **14 = FAIRINO** for PGC-140-50. It is an
+ordering selector, not a complete cable part number or dimensioned plug. The
+manufacturer setup guide describes an 8-to-5-pin adapter for the AG series:
+https://www.fairino.mx/en/cobots-knowledge-base/setting-up-a-dh-robotics-ag-gripper
+The documented PGC option is saved as typed `WristCableEvidence` in the FR5
+profile; unknown seating/key/cable dimensions stay null. No generic M12 plug
+has been substituted. `cableGeometryGaps` reports missing evidence and
+`requireCableGeometry` rejects placement until those items and a qualified
+socket mating frame are present. This geometry gate does not replace electrical
+load, pin-mapping or actual CAD clearance validation.
+
+Run the independent supplier-face audit with:
+```
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.wrist-cable.json
+```
+It imports the hash-pinned STEP through native OCCT, rechecks solid/face inventory
+and insert locations, and compares each insert area with a radius-4 mm disc minus
+the measured contact holes. Both face boundaries are circular (two outer arcs),
+with no key notch represented on the insert face. The evidence is written to
+`build/wrist-cable-qualification/report.json`. This establishes a limit of the CAD,
+not the absence of a key on the real connector. No plug, routed cable, or clearance
+pass is emitted without the missing supplier geometry. The exact supplier data
+needed to finish is listed in `fairino-cable-request.txt`; nothing has been sent.
+
+A two-gripper harness also needs a power decision: our conservative 1.2 A peak
+per PGC totals 2.4 A against the documented shared 1.5 A FR5 wrist limit. Even
+the EN.2403 catalogue's 1.0 A peak per PGC would total 2.0 A. A passive splitter
+cannot support those simultaneous peaks from that supply. Either qualify
+nonoverlapping operation, including the other gripper's load, or use a designed
+external supply arrangement that does not backfeed the robot tool power.
+
+Commercial plug layout candidate
+
+`wrist-plug-candidate.json` records Binder **77 3429 0000 20005-0500**, a
+five-contact M12x1 A-coded straight male cordset, as a layout candidate.
+`prepare_wrist_plug.py` downloads and hash-checks the actual supplier STEP and
+PDF into ignored `build/cad/binder-m12-candidate/`. These assets are not bundled
+for redistribution. The original supplier geometry is retained, including its
+4.3 mm family-model cable stub; the selected cordset's published diameter is
+5.2 mm, with minimum fixed/moving bend radii of 26/52 mm. The candidate is also
+available as typed cable evidence alongside the DH catalogue option.
+
+```
+python3 machinekit/examples/reference-arms/prepare_wrist_plug.py
+python3 machinekit/examples/reference-arms/wrist_interfaces.py
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.wrist-plug.json
+python3 machinekit/examples/reference-arms/render_wrist_plug.py
+```
+
+The candidate entry exports the isolated plug, three wrist/plug `.mtrg` scenes,
+a combined nominal STEP, exact supplier surface observations, and
+`build/wrist-plug-candidate/layout-report.json`. Plug source Z=0 is its leading
+CAD face, not a verified seating datum. The study offsets -8/0/+8 mm relative to
+the observed FR5 insert are explicit sensitivity assumptions. Clock zero follows
+the existing wrist reference; 0/90/180/270-degree orientations are tested in the
+moving mesh screen without claiming the real key permits any of them.
+
+Exact static CAD checks compare the external body (source Z >= 15.8 mm) against
+all 37 source robot solids at the original STEP assembly pose. The excluded
+mating/coupling region cannot be judged for fit from our simplified socket CAD;
+its whole-plug overlap is recorded separately. Moving checks use actual imported
+ROS visual triangles over all prepared FK probes. Surface distance is not a
+signed penetration/containment test or a swept-path certificate. No grippers,
+custom adapter, hub or flexible cable are included in this candidate study.
+
+This unshielded PVC cordset is a geometric candidate, not a selected RS485 robot
+harness: twisted-pair impedance, shielding needs, torsion, OEM coding/sex, key
+clocking, seating, fixed lead and physical continuity remain unresolved. Its
+4 A connector contact rating does not increase the robot's 1.5 A supply. The
+shielded right-angle Binder 77 3527 0000 50705-0500 is a future geometry comparison;
+its public product page supplied a drawing but no direct STEP asset, and no
+geometry has been substituted for it.
+
+Recorded candidate result: the three static CAD cases have minimum external-body
+clearances of 6.502 / 14.109 / 21.997 mm at assumed offsets -8 / 0 / +8 mm.
+There is no external-body solid overlap in that static source pose. Whole-plug
+mating-region overlap at -8 mm is separately reported and cannot qualify seating.
+
+The moving screen contains 468 cases (39 source FK probes x 3 assumed depths x
+4 clockings), with 7,956 visual-mesh pair queries. Probe 12 reports forearm
+surface intersection at nominal/+8 mm placement; the -8 mm placement has only
+about 1.45 mm surface separation in that pose. These are sensitivity results,
+not a certified operating range. `review_wrist_plug.py` independently verifies a
+strict triangle crossing between the actual plug body (excluding the short
+supplier cable stub) and the source forearm visual mesh at nominal offset/clock.
+Its segment/triangle routine checks analytic hit/miss examples, and source mesh
+hashes and probe coordinates are checked before use.
+
+```
+python3 machinekit/examples/reference-arms/review_wrist_plug.py
+```
+
+This writes `independent-mesh-review.json` and `folded-pose-interference.png` next
+to the native report. `fr5-plug-candidate.png` shows the nominal candidate with
+the actual supplier terminal wrist. The straight plug remains a comparison
+candidate; these results do not support selecting it for the complete motion.
+
+Preferred wrist layout: right-angle connectors
+
+The current FR5 `layoutSelection` prefers the right-angle five-pin wrist lead,
+with study clock 180 degrees directing its cable toward wrist -Z / back along the arm.
+The eight-pin I/O socket remains unused; a future I/O lead should follow the
+same right-angle design preference after separate fit qualification. Selection
+is typed design metadata, not an assertion that socket key clocking is known.
+
+`wrist-right-angle-candidate.json` pins the manufacturer drawing and STEP supplied
+by the Rockwell product page for **889D-E5AC-1**. The linked file is the shared
+**889D-E5AC-2 / 889D-E5AC-*** connector-family model; cable length is not being
+inferred from this layout model. Its body projects 31.75 mm along the mating axis.
+The published 6.1 mm cable and 10-diameter bend rule imply a 61 mm minimum radius,
+but shielding, twisted-pair impedance and robot torsion suitability remain open.
+The published unshielded PVC cordset is a geometric comparison reference.
+
+```
+python3 machinekit/examples/reference-arms/prepare_wrist_plug.py
+python3 machinekit/examples/reference-arms/wrist_interfaces.py
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.wrist-right-angle.json
+python3 machinekit/examples/reference-arms/render_wrist_plug.py --right-angle
+```
+
+Supplier source geometry is retained unchanged in the ignored CAD directory.
+The derived connector clips off the illustrated long cable, label and wire ends
+at native Y=30.226 mm, preserving the whole connector and 5.08 mm original cable
+stub. Native OCCT verifies the derived part remains one valid solid. A -90-degree
+rotation about source Y maps native X into the study's outward Z and native Y
+into the cable-exit Y. With the existing wrist observation frame, study Y then
+points toward the tool flange before clocking. The selected 180-degree clock
+reverses the exit toward the arm. This reference alignment does not establish the
+mechanical key or physical seating datum.
+
+The shared `WristPlugCandidate` study supports a configurable identifier, axial
+cutoff, preferred clock, and depth/clock sensitivity cases. Right-angle outputs
+are isolated in `build/wrist-right-angle-candidate/`; the straight comparison and
+its known folded-pose interference remain available in their original directory.
+The right-angle study rechecks all 37 static STEP solids and the same 39 source
+FK probes. Static pairs whose bounding boxes prove at least 5 mm separation
+record that conservative lower bound; closer pairs use exact BRep distance and,
+where needed, solid intersection. Each pair identifies its distance method.
+The unqualified mating zone is left unevaluated. No new flexible cable route,
+grippers or hub are included.
+
+The exterior clipping box follows the imported connector bounds, preserving the
+sideways elbow and strain relief. A source-vertex containment guard checks that
+the axial exclusion has not silently shortened the candidate. It can be run
+without the full pose study:
+```
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.wrist-right-angle.json -- --exterior-check-only
+```
+The resulting `exterior-envelope-check.json` records the retained extents.
+
+Recorded right-angle result: the preferred study clock is **180 degrees**, exiting
+back along the arm. At the assumed nominal axial placement, all 39 source FK
+samples have positive external-geometry surface separation, minimum **4.062 mm**
+to the forearm at probe 12. The initial clock-zero/tool-facing exit still crosses
+the forearm in that pose. Clock choice therefore matters even with an elbow.
+The +8 mm seating sensitivity case remains near contact at the preferred clock;
+actual seating must be established before treating this as a fitted connector.
+Static supplier-solid separation lower bounds at -8/0/+8 mm are approximately
+6.002/14.002/22.002 mm. These are conservative bounds, not exact gap measurements.
+
+`review_wrist_plug.py --right-angle` reviews the limiting nominal-placement pose
+using the same imported supplier and ROS triangles, checks source mesh hashes,
+and runs an independent strict triangle-crossing screen. No crossing is found
+there; this is not a closed-volume containment or full-motion certification.
+`limiting-nominal-pose.png` and `fr5-right-angle-candidate.png` show the result.

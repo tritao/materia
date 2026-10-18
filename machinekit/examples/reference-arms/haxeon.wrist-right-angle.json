@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-reference-arms"
+  },
+  "entry": "WristRightAngleCandidate",
+  "sourceRoots": [
+    ".",
+    "build/assets"
+  ],
+  "dependencies": {
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadbridge": {
+      "path": "../../../robotkit/cadbridge"
+    },
+    "motionkit-robot": {
+      "path": "../../../motionkit/robot"
+    },
+    "collisionkit-native": {
+      "path": "../../../collisionkit/native"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/wrist-cable-run"
+}

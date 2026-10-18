@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "id": "binder-7734290000200050500",
+  "manufacturer": "Binder",
+  "partNumber": "77 3429 0000 20005-0500",
+  "sourcePage": "https://www.binder-connector.com/en/products/automation-technology/m12-a/77-3429-0000-20005-0500-m12-a-male-cable-connector-contacts-5-unshielded-moulded-on-cable-ip68-ul-pvc-grey-5-x-034-mm2-5-m",
+  "files": [
+    {
+      "path": "cad/binder-m12-candidate/binder-7734290000200050500.step",
+      "url": "https://www.binder-connector.com/en/products/cad-77-3429-0000-20005-0500-m12-a-male-cable-connector-contacts-5-unshielded-moulded-on-cable-ip68-ul-pvc-grey-5-x-034-mm2-5-m.stp?tx_avbinderproduct_products%5BcadUid%5D=34544&cHash=ed284799408e7bb48237b67ef35240e7",
+      "sha256": "a732683ed40958c19c86017b76da9bcf731ece1b4655a8ea8e82e2a6e9f377c1"
+    },
+    {
+      "path": "cad/binder-m12-candidate/binder-7734290000200050500.pdf",
+      "url": "https://www.binder-connector.com/en/products/datasheet-77-3429-0000-20005-0500-m12-a-male-cable-connector-contacts-5-unshielded-moulded-on-cable-ip68-ul-pvc-grey-5-x-034-mm2-5-m.pdf",
+      "sha256": "da06085fc7256294ad2fcdf992187448b114c32f7ba866054054e24ae9979e50"
+    }
+  ],
+  "thread": "M12x1",
+  "coding": "A",
+  "sex": "male",
+  "contactCount": 5,
+  "cableDiameterMm": 5.2,
+  "minStaticBendRadiusMm": 26.0,
+  "minMovingBendRadiusMm": 52.0,
+  "sourceBodyEndZMm": 48.4,
+  "sourceStubEndZMm": 52.7,
+  "sourceStubDiameterMm": 4.3,
+  "externalBodyStartZMm": 15.8,
+  "studyAxialOffsetsMm": [
+    -8,
+    0,
+    8
+  ],
+  "studyClockAnglesDeg": [
+    0,
+    90,
+    180,
+    270
+  ],
+  "qualification": "Commercial layout candidate; not confirmed compatible with FAIRINO socket",
+  "limitations": [
+    "Supplier STEP is a family model (77_3429_0000_X0005_999_02.stp), with a 4.3 mm stub while the selected cable datasheet specifies 5.2 mm; original CAD is preserved.",
+    "Source Z=0 is the leading CAD face, not a qualified mating datum. Axial offsets are sensitivity cases relative to the observed robot insert face.",
+    "Study clock 0 follows the wrist reference, not the mechanical connector key.",
+    "This PVC cable is unshielded; RS485 twisted-pair/impedance and robot torsion suitability have not been established.",
+    "Only external body beyond source Z=15.8 mm is eligible for clearance classification; the unqualified mating zone is reported separately.",
+    "Nominal STEP-to-ROS registration and representative mesh poses do not certify flexible cable motion or a tending cycle.",
+    "Conductor colours come from the Binder plug-side drawing and functions from the FAIRINO diagram. This proposed mapping requires physical continuity verification and is not the generic sensor power colour convention."
+  ],
+  "conductorByPin": [
+    {
+      "pin": 1,
+      "colour": "brown",
+      "fairinoFunction": "RS485-A"
+    },
+    {
+      "pin": 2,
+      "colour": "white",
+      "fairinoFunction": "RS485-B"
+    },
+    {
+      "pin": 3,
+      "colour": "blue",
+      "fairinoFunction": "POWER +24V"
+    },
+    {
+      "pin": 4,
+      "colour": "black",
+      "fairinoFunction": "UNASSIGNED"
+    },
+    {
+      "pin": 5,
+      "colour": "grey",
+      "fairinoFunction": "GND"
+    }
+  ]
+}

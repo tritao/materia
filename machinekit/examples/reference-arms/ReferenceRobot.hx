@@ -69,6 +69,7 @@ import materia.project.SceneArtifact.SceneArtifactPart;
   @:id(11) var probes:Array<ReferenceProbe>;
   @:id(12) @:optional var flangeOffset:AssemblyFrame;
   @:id(13) @:optional var sourceWarnings:Array<String>;
+  @:id(14) @:optional var wristInterfaceCatalogSha256:String;
 }
 
 /** Official URDF compiled to the same scene/assembly path as authored CAD robots.
@@ -79,6 +80,7 @@ class ReferenceRobot {
   public final scene:SceneArtifactData;
   public final directory:String;
   public final tipOccurrence:String;
+  public final wristInterfaces:Array<ReferenceWristInterfaces.WristProfile>;
   final linkAnchors:Map<String,{id:String,offset:AssemblyFrame}> = [];
 
   function anchorOf(id:String):{id:String,offset:AssemblyFrame} {
@@ -114,6 +116,8 @@ class ReferenceRobot {
     if (manifest.schema != 1 || manifest.metresPerUnit != 1 ||
         digest(sys.io.File.getBytes(directory + "/robot.urdf")) != manifest.urdfSha256)
       throw "Changed or unsupported reference description";
+    wristInterfaces=manifest.wristInterfaceCatalogSha256==null ? [] :
+      ReferenceWristInterfaces.load(directory,manifest.wristInterfaceCatalogSha256,manifest.id);
     var definition:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: manifest.id, lengthUnit: "m", definitions: [], occurrences: [], joints: []};
     var visible = [for (link in manifest.links) if (link.visuals.length>0) link];
@@ -191,6 +195,8 @@ class ReferenceRobot {
     AssemblyDefinitionCodec.validate(definition);
     scene = {lengthUnit: "m", metresPerUnit: 1, parts: parts, assemblyDefinition: definition,
       recipeDiagnostics: [manifest.tipStatus, "Collision geometry uses enclosing convex hulls of source collision meshes; dynamics not qualified."]};
+    scene.recipeDiagnostics.push(wristInterfaces.length==0 ? "Electrical wrist interface not prepared/qualified for this source model." :
+      "Source-backed wrist interface profiles available: "+[for(p in wristInterfaces) p.id].join(", ")+". Select hardware revision and rating edition explicitly; socket mating poses remain unqualified.");
     if (manifest.sourceWarnings != null) for (warning in manifest.sourceWarnings) scene.recipeDiagnostics.push(warning);
   }
 }

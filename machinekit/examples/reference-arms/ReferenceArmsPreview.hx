@@ -29,6 +29,9 @@ class ReferenceArmsPreview {
     for (id in models) {
       check(~/^[a-zA-Z0-9_]+$/.match(id),"Invalid model ID");
       var source = new ReferenceRobot(ROOT + id);
+      sys.io.File.saveContent(ROOT+id+"/"+id+".wrist-interfaces.json",haxe.Json.stringify({
+        model:id,catalogSha256:source.manifest.wristInterfaceCatalogSha256,profiles:source.wristInterfaces,
+        selection:"No hardware revision or power-rating edition automatically selected"},null,"  "));
       // Exercise the exact saved format consumed by the application.
       var bytes = SceneArtifact.encode(source.scene);
       sys.io.File.saveBytes(ROOT+id+"/"+id+".scene",bytes);

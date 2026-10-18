@@ -1,0 +1,37 @@
+Supplier information needed: FAIRINO FR5 V6 + two DH PGC-140-50 grippers
+
+Reference wrist CAD:
+FR5-V6.0 Model.STEP
+SHA256 d7a7e07f50a221dfba9ca807bc2a4241518fdfe162233b7c0d404341e78687be
+5-contact RS485 socket: terminal solid 36; observed insert face 117.
+Observed nominal ROS wrist3_link insert centre: (0, -38, 80) mm.
+This is an observed insert face, not a verified mating/seating datum.
+
+Please provide:
+1. Exact delivered wrist receptacle and mating cable/plug manufacturer and part
+   numbers, hardware applicability, thread, coding and contact sex.
+2. Dimensioned drawing or STEP for the mated plug, body, locknut and strain relief;
+   identify the seating datum relative to the robot socket insert/housing.
+3. Mechanical key orientation relative to the wrist flange/robot link frame;
+   allowable elbow orientations if a right-angle or adjustable plug is available.
+4. Cable outer diameter, minimum static/dynamic bend radii, fixed/straight lead
+   requirements, torsion limits and intended moving-service rating.
+5. Complete order code and wiring drawing for DH PGC-140-50 robot-cable option
+   14 (FAIRINO), including both connector face views and contact-to-contact map.
+6. Appropriate dual-gripper splitter/distribution wiring with distinct Modbus
+   addresses and the applicable RS485 termination arrangement.
+7. Confirm the shared FR5 tool supply rating and both PGC current envelopes.
+   Our model conservatively budgets 1.2 A peak per gripper (2.4 A together);
+   DH EN.2403 lists 1.0 A per PGC (2.0 A together), also over a shared 1.5 A.
+   If external 24 V is required, provide the wiring/isolation arrangement that
+   prevents backfeeding the robot tool supply, plus cable/conductor ratings.
+
+Until these data are available, cable mating/route/clearance remain unqualified.
+This request is saved locally; it has not been sent to a supplier.
+
+Layout preference update: use right-angle wrist plugs, with the five-pin lead
+exiting back along the arm (study clock 180 degrees). Current dimensional comparison uses the public
+Rockwell 889D-E5AC-* family CAD/drawing (product reference 889D-E5AC-1, supplied
+model 889D-E5AC-2). This unshielded PVC cordset is a geometry reference, not a
+qualified RS485/torsion cable selection. Confirm a compatible shielded moving
+cable/plug, socket key clocking, seating datum and allowable elbow orientations.

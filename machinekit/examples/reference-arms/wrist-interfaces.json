@@ -1,0 +1,584 @@
+{
+  "schema": 1,
+  "captured": "2026-10-18",
+  "profiles": [
+    {
+      "id": "ur5e-m8-male",
+      "modelId": "ur5e",
+      "manufacturer": "Universal Robots",
+      "hardwareRevision": "Legacy M8 male",
+      "applicability": "UR5e before first female serial 20245501103; UR change notice says transition September 2024. Mesh revision does not identify a physical robot serial.",
+      "voltageModes": [
+        0,
+        12,
+        24
+      ],
+      "ports": [
+        {
+          "id": "tool",
+          "thread": "M8",
+          "sex": "male",
+          "contactCount": 8,
+          "coding": null,
+          "pins": [
+            {
+              "number": 1,
+              "functions": [
+                "AI2",
+                "RS485+"
+              ]
+            },
+            {
+              "number": 2,
+              "functions": [
+                "AI3",
+                "RS485-"
+              ]
+            },
+            {
+              "number": 3,
+              "functions": [
+                "TI1"
+              ]
+            },
+            {
+              "number": 4,
+              "functions": [
+                "TI0"
+              ]
+            },
+            {
+              "number": 5,
+              "functions": [
+                "POWER"
+              ]
+            },
+            {
+              "number": 6,
+              "functions": [
+                "TO1",
+                "GND_EXTRA"
+              ]
+            },
+            {
+              "number": 7,
+              "functions": [
+                "TO0",
+                "PWR_EXTRA"
+              ]
+            },
+            {
+              "number": 8,
+              "functions": [
+                "GND"
+              ]
+            }
+          ],
+          "sharedPowerGroup": "tool-board",
+          "geometryStatus": "source-mesh-placement-unqualified",
+          "matingFrame": null,
+          "pinoutSource": "https://a.storyblok.com/f/169662/679x337/557f9befc3/male-tool-out-new.png",
+          "pinoutSourceSha256": "033fa20d2b0afe44e4dd67bf9b24500976f4611acea4a5164102e691a225facc",
+          "parentLink": null,
+          "placementSource": null,
+          "observedGeometry": null
+        }
+      ],
+      "ratings": [
+        {
+          "id": "ur-developer-table-captured-2026-10-18",
+          "singlePinContinuousA": 1,
+          "dualPinContinuousA": 1.5,
+          "peakA": 2,
+          "peakDurationS": 1,
+          "peakDutyFraction": 0.1,
+          "averageWindowS": 10,
+          "maxCapacitanceUf": 8000,
+          "source": "https://www.universal-robots.com/it/developer/hardware-and-motion/electrical-interfaces-tool-connector/",
+          "applicability": "UR5e developer table: 1 A single pin / 1.5 A dual pin. Conflicts with SW5.25 manual; confirm applicability to hardware."
+        },
+        {
+          "id": "ur5e-sw5.25-manual",
+          "singlePinContinuousA": 0.6,
+          "dualPinContinuousA": 0.6,
+          "peakA": 2,
+          "peakDurationS": 1,
+          "peakDutyFraction": 0.1,
+          "averageWindowS": 10,
+          "maxCapacitanceUf": 8000,
+          "source": "https://www.universal-robots.com/manuals/EN/PDF/SW5_25/user-manual-UR5e-PDF_online/710-965-00_UR5e_User_Manual_en_Global.pdf",
+          "applicability": "UR5e SW5.25 manual section 8.7.6: 600 mA typical in both modes; 2 A conditional peak. Conservative relative to conflicting developer table; not proof of serial-specific rating."
+        }
+      ],
+      "limitations": [
+        "No automatically selected current-rating edition: manufacturer publications disagree.",
+        "RS485 uses the same two pins as analog inputs AI2/AI3.",
+        "Dual-pin power consumes TO0 and TO1.",
+        "Pin numbers refer to the published connector face view; do not mirror by cable colour.",
+        "Exact installed socket position, key clocking and mating-cable envelope are not qualified in the pinned visual mesh.",
+        "No Modbus device configuration, tool driver or external 5 A supply is implied."
+      ],
+      "cables": [],
+      "layoutSelection": null
+    },
+    {
+      "id": "ur5e-m8-female",
+      "modelId": "ur5e",
+      "manufacturer": "Universal Robots",
+      "hardwareRevision": "Revised M8 female",
+      "applicability": "UR5e first female serial 20245501103 and subsequent serials; verify against robot label and any adapter cable. Source mesh is not silently relabelled as the revised cap.",
+      "voltageModes": [
+        0,
+        12,
+        24
+      ],
+      "ports": [
+        {
+          "id": "tool",
+          "thread": "M8",
+          "sex": "female",
+          "contactCount": 8,
+          "coding": null,
+          "pins": [
+            {
+              "number": 1,
+              "functions": [
+                "AI3",
+                "RS485-"
+              ]
+            },
+            {
+              "number": 2,
+              "functions": [
+                "AI2",
+                "RS485+"
+              ]
+            },
+            {
+              "number": 3,
+              "functions": [
+                "TO0",
+                "PWR_EXTRA"
+              ]
+            },
+            {
+              "number": 4,
+              "functions": [
+                "TO1",
+                "GND_EXTRA"
+              ]
+            },
+            {
+              "number": 5,
+              "functions": [
+                "POWER"
+              ]
+            },
+            {
+              "number": 6,
+              "functions": [
+                "TI0"
+              ]
+            },
+            {
+              "number": 7,
+              "functions": [
+                "TI1"
+              ]
+            },
+            {
+              "number": 8,
+              "functions": [
+                "GND"
+              ]
+            }
+          ],
+          "sharedPowerGroup": "tool-board",
+          "geometryStatus": "source-mesh-placement-unqualified",
+          "matingFrame": null,
+          "pinoutSource": "https://a.storyblok.com/f/169662/758x337/3548b38c03/female-tool-out-orig.png",
+          "pinoutSourceSha256": "83cccb10aa0f961c8e042ceabb6ee52ca9c04c94fe99e0db4c440f695d8a6185",
+          "parentLink": null,
+          "placementSource": null,
+          "observedGeometry": null
+        }
+      ],
+      "ratings": [
+        {
+          "id": "ur-developer-table-captured-2026-10-18",
+          "singlePinContinuousA": 1,
+          "dualPinContinuousA": 1.5,
+          "peakA": 2,
+          "peakDurationS": 1,
+          "peakDutyFraction": 0.1,
+          "averageWindowS": 10,
+          "maxCapacitanceUf": 8000,
+          "source": "https://www.universal-robots.com/it/developer/hardware-and-motion/electrical-interfaces-tool-connector/",
+          "applicability": "UR5e developer table: 1 A single pin / 1.5 A dual pin. Conflicts with SW5.25 manual; confirm applicability to hardware."
+        },
+        {
+          "id": "ur5e-sw5.25-manual",
+          "singlePinContinuousA": 0.6,
+          "dualPinContinuousA": 0.6,
+          "peakA": 2,
+          "peakDurationS": 1,
+          "peakDutyFraction": 0.1,
+          "averageWindowS": 10,
+          "maxCapacitanceUf": 8000,
+          "source": "https://www.universal-robots.com/manuals/EN/PDF/SW5_25/user-manual-UR5e-PDF_online/710-965-00_UR5e_User_Manual_en_Global.pdf",
+          "applicability": "UR5e SW5.25 manual section 8.7.6: 600 mA typical in both modes; 2 A conditional peak. Conservative relative to conflicting developer table; not proof of serial-specific rating."
+        }
+      ],
+      "limitations": [
+        "No automatically selected current-rating edition: manufacturer publications disagree.",
+        "RS485 uses the same two pins as analog inputs AI2/AI3.",
+        "Dual-pin power consumes TO0 and TO1.",
+        "Pin numbers refer to the published connector face view; do not mirror by cable colour.",
+        "Exact installed socket position, key clocking and mating-cable envelope are not qualified in the pinned visual mesh.",
+        "No Modbus device configuration, tool driver or external 5 A supply is implied."
+      ],
+      "cables": [],
+      "layoutSelection": null
+    },
+    {
+      "id": "fairino-fr5-endplate-manual4",
+      "modelId": "fairino5_v6",
+      "manufacturer": "FAIRINO",
+      "hardwareRevision": "FR5 end-plate electrical layout documented in manual 4.0.0",
+      "applicability": "Reference FR5 V6 source CAD/URDF; serial-specific end-board revision remains to be checked. Five-contact communication connector pinout is documented; thread/coding/sex are not inferred from the schematic.",
+      "voltageModes": [
+        24
+      ],
+      "ports": [
+        {
+          "id": "io",
+          "thread": "M12",
+          "sex": "female",
+          "contactCount": 8,
+          "coding": null,
+          "pins": [
+            {
+              "number": 1,
+              "functions": [
+                "AI0"
+              ]
+            },
+            {
+              "number": 2,
+              "functions": [
+                "AO0"
+              ]
+            },
+            {
+              "number": 3,
+              "functions": [
+                "DI0"
+              ]
+            },
+            {
+              "number": 4,
+              "functions": [
+                "DI1"
+              ]
+            },
+            {
+              "number": 5,
+              "functions": [
+                "POWER"
+              ]
+            },
+            {
+              "number": 6,
+              "functions": [
+                "DO0"
+              ]
+            },
+            {
+              "number": 7,
+              "functions": [
+                "DO1"
+              ]
+            },
+            {
+              "number": 8,
+              "functions": [
+                "GND"
+              ]
+            }
+          ],
+          "sharedPowerGroup": "tool-board",
+          "geometryStatus": "source-step-insert-observed; nominal-ros-registration; cable-mating-unqualified",
+          "matingFrame": null,
+          "pinoutSource": "https://manual.fairino.support/latest/_images/0413.png",
+          "pinoutSourceSha256": "cb9b8c878476a7be08121a6127e5a959213983605a883e55b747f7f02dfad804",
+          "parentLink": "wrist3_link",
+          "placementSource": "wrist-geometry-findings.json: source-hash-bound insert face, nominal ROS registration",
+          "observedGeometry": {
+            "sourceStep": "cad/fairino-v6-step/FRCobots-V6.0 STEP Models/FR5-V6.0 Model.STEP",
+            "sourceStepSha256": "d7a7e07f50a221dfba9ca807bc2a4241518fdfe162233b7c0d404341e78687be",
+            "solidIndex": 36,
+            "insertFaceIndex": 116,
+            "contactFaces": [
+              82,
+              83,
+              84,
+              85,
+              86,
+              87,
+              88,
+              89,
+              103,
+              104,
+              105,
+              106,
+              107,
+              108,
+              109,
+              110
+            ],
+            "stepMetresPerUnit": 0.001,
+            "insertFrameStepMm": {
+              "x": -858.0000282763378,
+              "y": 50.00000159203991,
+              "z": 182.00002426698867,
+              "qx": 0.5,
+              "qy": -0.5,
+              "qz": -0.5,
+              "qw": 0.5
+            },
+            "stepMetresToParent": {
+              "x": 0.82,
+              "y": -0.05,
+              "z": -0.102,
+              "qx": 0,
+              "qy": 0,
+              "qz": 0,
+              "qw": 1
+            },
+            "observedFrame": {
+              "x": -0.03800002827633786,
+              "y": 1.5920399096258642e-09,
+              "z": 0.0800000242669887,
+              "qx": 0.5,
+              "qy": -0.5,
+              "qz": -0.5,
+              "qw": 0.5
+            },
+            "parentLink": "wrist3_link",
+            "parentUrdfSha256": "bf875243b954bba414a6fba876272e78deee8defbfa0cfc26b82f6d586bacb9e",
+            "registrationStatus": "nominal-landmark-mapping; not full-surface registration",
+            "clockReference": "Frame Y follows wrist +Z; frame Z is outward. This is not connector-key clocking.",
+            "limitations": [
+              "Contact wall midpoints are not insert faces or cable mating planes.",
+              "Nominal STEP-to-ROS mapping uses housing axis and rear shoulder; front flange differs by 1 mm and ROS socket caps are simplified.",
+              "Key clocking, electrical contact numbering in CAD and cable seating depth remain unqualified."
+            ]
+          }
+        },
+        {
+          "id": "rs485",
+          "thread": "unqualified",
+          "sex": "unqualified",
+          "contactCount": 5,
+          "coding": null,
+          "pins": [
+            {
+              "number": 1,
+              "functions": [
+                "RS485-A"
+              ]
+            },
+            {
+              "number": 2,
+              "functions": [
+                "RS485-B"
+              ]
+            },
+            {
+              "number": 3,
+              "functions": [
+                "POWER"
+              ]
+            },
+            {
+              "number": 4,
+              "functions": [
+                "UNASSIGNED"
+              ]
+            },
+            {
+              "number": 5,
+              "functions": [
+                "GND"
+              ]
+            }
+          ],
+          "sharedPowerGroup": "tool-board",
+          "geometryStatus": "source-step-insert-observed; nominal-ros-registration; cable-mating-unqualified",
+          "matingFrame": null,
+          "pinoutSource": "https://manual.fairino.support/latest/_images/0413.png",
+          "pinoutSourceSha256": "cb9b8c878476a7be08121a6127e5a959213983605a883e55b747f7f02dfad804",
+          "parentLink": "wrist3_link",
+          "placementSource": "wrist-geometry-findings.json: source-hash-bound insert face, nominal ROS registration",
+          "observedGeometry": {
+            "sourceStep": "cad/fairino-v6-step/FRCobots-V6.0 STEP Models/FR5-V6.0 Model.STEP",
+            "sourceStepSha256": "d7a7e07f50a221dfba9ca807bc2a4241518fdfe162233b7c0d404341e78687be",
+            "solidIndex": 36,
+            "insertFaceIndex": 117,
+            "contactFaces": [
+              77,
+              78,
+              79,
+              80,
+              81,
+              111,
+              112,
+              113,
+              114,
+              115
+            ],
+            "stepMetresPerUnit": 0.001,
+            "insertFrameStepMm": {
+              "x": -820.0000282763382,
+              "y": 12.000001592040576,
+              "z": 182.00002427210282,
+              "qx": 0.7071067811865476,
+              "qy": 0,
+              "qz": 0,
+              "qw": 0.7071067811865476
+            },
+            "stepMetresToParent": {
+              "x": 0.82,
+              "y": -0.05,
+              "z": -0.102,
+              "qx": 0,
+              "qy": 0,
+              "qz": 0,
+              "qw": 1
+            },
+            "observedFrame": {
+              "x": -2.827633827084952e-08,
+              "y": -0.03799999840795942,
+              "z": 0.08000002427210283,
+              "qx": 0.7071067811865476,
+              "qy": 0,
+              "qz": 0,
+              "qw": 0.7071067811865476
+            },
+            "parentLink": "wrist3_link",
+            "parentUrdfSha256": "bf875243b954bba414a6fba876272e78deee8defbfa0cfc26b82f6d586bacb9e",
+            "registrationStatus": "nominal-landmark-mapping; not full-surface registration",
+            "clockReference": "Frame Y follows wrist +Z; frame Z is outward. This is not connector-key clocking.",
+            "limitations": [
+              "Contact wall midpoints are not insert faces or cable mating planes.",
+              "Nominal STEP-to-ROS mapping uses housing axis and rear shoulder; front flange differs by 1 mm and ROS socket caps are simplified.",
+              "Key clocking, electrical contact numbering in CAD and cable seating depth remain unqualified."
+            ]
+          }
+        }
+      ],
+      "ratings": [
+        {
+          "id": "fairino-fr5-tool-24v-1.5a",
+          "singlePinContinuousA": 1.5,
+          "dualPinContinuousA": null,
+          "peakA": null,
+          "peakDurationS": null,
+          "peakDutyFraction": null,
+          "averageWindowS": null,
+          "maxCapacitanceUf": null,
+          "source": "https://www.fairino.us/collaborative-robot/fairino/fr5",
+          "applicability": "FR5 product tool-I/O rating. Treat as one shared end-board limit, never 1.5 A independently per connector. No separately qualified transient rating."
+        }
+      ],
+      "limitations": [
+        "I/O connector and five-contact RS485 connector are separate physical connections.",
+        "Do not infer RS485-A/B polarity equivalence to another manufacturer naming convention.",
+        "No hot-plugging; follow end-board manual.",
+        "Five-contact communication connector thread, coding, sex and installed geometry are not yet qualified.",
+        "Tool current rating is shared across power outputs; no independent second 1.5 A supply is assumed.",
+        "Pinout diagram does not establish exact positions or key orientation in the pinned V6 visual mesh.",
+        "Both physical connector patterns confirmed in pinned FR5 V6 STEP terminal solid 36; see wrist-geometry-findings.json. Nominal STEP-to-ROS mapping is recorded; cable mating/key frames remain unqualified."
+      ],
+      "cables": [
+        {
+          "id": "dh-fairino-robot-cable-14",
+          "manufacturer": "DH-Robotics",
+          "selector": "14 = FAIRINO (Robot Cable ordering option)",
+          "selectorKind": "catalogue selection code; not a complete orderable cable SKU",
+          "portId": "rs485",
+          "source": "https://en.dh-robotics.com/wp-content/uploads/2023/05/Servo-Electric-Gripper-Catalog_DH-Robotics_EN.2403.pdf # PDF page 70, PGC-140-50 selection method",
+          "exactPartNumber": null,
+          "drawingSource": null,
+          "geometrySha256": null,
+          "seatingOffsetMm": null,
+          "keyClockingRad": null,
+          "cableDiameterMm": null,
+          "minBendRadiusMm": null,
+          "fixedLeadMm": null,
+          "limitations": [
+            "PGC-140-50 catalogue page 70 explicitly lists FAIRINO robot-cable option 14; it does not supply the adapter mating dimensions or qualify our dual-gripper assembly.",
+            "FAIRINO setup guide describes an 8-to-5-pin adapter for DH AG grippers; verify PGC cable ordering and delivered pin mapping separately.",
+            "A passive splitter does not increase the shared 1.5 A wrist supply. Simultaneous 1.2 A PGC peaks total 2.4 A and exceed it.",
+            "DH gripper-tail R50 mm guidance must not be reused as an undocumented robot adapter cable rating."
+          ]
+        },
+        {
+          "id": "binder-7734290000200050500",
+          "manufacturer": "Binder",
+          "selector": "77 3429 0000 20005-0500",
+          "selectorKind": "commercial layout candidate; not selected for installation",
+          "portId": "rs485",
+          "source": "https://www.binder-connector.com/en/products/automation-technology/m12-a/77-3429-0000-20005-0500-m12-a-male-cable-connector-contacts-5-unshielded-moulded-on-cable-ip68-ul-pvc-grey-5-x-034-mm2-5-m",
+          "exactPartNumber": "77 3429 0000 20005-0500",
+          "drawingSource": "https://www.binder-connector.com/en/products/datasheet-77-3429-0000-20005-0500-m12-a-male-cable-connector-contacts-5-unshielded-moulded-on-cable-ip68-ul-pvc-grey-5-x-034-mm2-5-m.pdf",
+          "geometrySha256": "a732683ed40958c19c86017b76da9bcf731ece1b4655a8ea8e82e2a6e9f377c1",
+          "seatingOffsetMm": null,
+          "keyClockingRad": null,
+          "cableDiameterMm": 5.2,
+          "minBendRadiusMm": 52.0,
+          "fixedLeadMm": null,
+          "limitations": [
+            "Supplier STEP is a family model (77_3429_0000_X0005_999_02.stp), with a 4.3 mm stub while the selected cable datasheet specifies 5.2 mm; original CAD is preserved.",
+            "Source Z=0 is the leading CAD face, not a qualified mating datum. Axial offsets are sensitivity cases relative to the observed robot insert face.",
+            "Study clock 0 follows the wrist reference, not the mechanical connector key.",
+            "This PVC cable is unshielded; RS485 twisted-pair/impedance and robot torsion suitability have not been established.",
+            "Only external body beyond source Z=15.8 mm is eligible for clearance classification; the unqualified mating zone is reported separately.",
+            "Nominal STEP-to-ROS registration and representative mesh poses do not certify flexible cable motion or a tending cycle."
+          ]
+        },
+        {
+          "id": "rockwell-889d-e5ac-right-angle",
+          "manufacturer": "Rockwell Automation / Allen-Bradley",
+          "selector": "889D-E5AC-1",
+          "selectorKind": "preferred right-angle layout candidate; installation unqualified",
+          "portId": "rs485",
+          "source": "https://www.rockwellautomation.com/en-us/products/details.889D-E5AC-1.html",
+          "exactPartNumber": "889D-E5AC-1",
+          "drawingSource": "https://configurator.rockwellautomation.com/api/Doc/889D-E5AC-2.pdf",
+          "geometrySha256": "30ab9dd25f3605885a66fd69ff466d67a67fce81725dd07c7e1832100ef08ea1",
+          "seatingOffsetMm": null,
+          "keyClockingRad": null,
+          "cableDiameterMm": 6.1,
+          "minBendRadiusMm": 61.0,
+          "fixedLeadMm": null,
+          "limitations": [
+            "Supplier product page for 889D-E5AC-1 links family CAD/drawing named 889D-E5AC-2; connector family geometry is used, not a claim that the model represents 1 metre of cable.",
+            "Supplier long cable, label sleeve and stripped wire ends are cropped away at native Y=30.226 mm; complete connector and 5.08 mm original cable stub are retained. No flexible cable route is modeled.",
+            "Preferred clock follows the wrist reference; actual socket coding/sex, key clocking and seating remain unqualified.",
+            "Published PVC cable is unshielded; twisted-pair impedance, shielding requirements and robot torsion suitability remain unresolved.",
+            "Right-angle geometry is preferred for the layout; no purchase or electrical installation qualification is implied.",
+            "Eight-pin I/O socket remains unused in this RS485 layout. Any future cable on it should also use an independently qualified right-angle plug."
+          ]
+        }
+      ],
+      "layoutSelection": {
+        "cableId": "rockwell-889d-e5ac-right-angle",
+        "connectorExitDeg": 90,
+        "preferredStudyClockDeg": 180,
+        "status": "preferred layout; mating and installation unqualified",
+        "source": "wrist-right-angle-candidate.json"
+      }
+    }
+  ]
+}
