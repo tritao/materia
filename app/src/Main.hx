@@ -620,6 +620,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final missionPanel = new app.editor.MissionPanel();
   public var missionController(default, null):MissionController;
   final cncPanel = new app.editor.CncPanel();
+  final machineControlPanel = new app.editor.MachineControlPanel();
   static inline var MAX_LOG_LINES:Int = 1000;
   final logLines:Array<String>;
   // The console view edits nothing: it is a read-only text area over this document, so its text is
@@ -1741,6 +1742,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // Recognize legacy saved layouts; this panel is removed before the UI builds.
     result.register(new DockPanelDescriptor("viewport", "Viewport", false, true, IconName.Grid));
     result.register(new DockPanelDescriptor("perspective", "3D", false, true, IconName.Cube));
+    result.register(new DockPanelDescriptor("machine-control", "Machine", true, true, IconName.Sliders));
     result.register(new DockPanelDescriptor("inspector", "Inspector", false, true, IconName.Sliders));
     result.register(new DockPanelDescriptor("sensors", "Sensors", false, true, IconName.Radar));
     result.register(new DockPanelDescriptor("console", "Console", true, true, IconName.Terminal));
@@ -1763,6 +1765,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         function() return perspectiveRevisionKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible +
           ":viewportPresentation=" + (perspectiveViewport == null ? "" : perspectiveViewport.presentationKey()) +
           ":collisions=" + collisionsVisible + "/" + collisionNearMillimetres),
+      new DockPanelContent("machine-control", function(_) return machineControlPanel.build(this)),
       new DockPanelContent("inspector", function(_) return inspectorPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
           ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() +
@@ -2214,6 +2217,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if(ownership!=null){simulation.setBackend(ownership.backend());simulation.setTimestep(ownership.timestep());}
       log("Document configuration replaced");
       sceneGeneration = session.generation;
+      if (MachineControlModel.axes(session).length > 0) {
+        if (!workspace.isOpen("machine-control")) workspace.open("machine-control", "inspector");
+        workspace.activate("machine-control");
+      }
       treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
       treeModel.setFilter(hierarchySearch);
       if (perspectiveViewport != null) perspectiveViewport.dispose();

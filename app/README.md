@@ -66,6 +66,23 @@ Occlusion affects indirect light on opaque geometry, preserves transparent
 backgrounds, and ignores blended/masked surfaces as occluders. It uses visible
 depth, so hidden surfaces and subpixel recesses cannot contribute.
 
+## Machine travel controls
+
+Opening an assembly with movable joints opens the **Machine** tab beside Inspector.
+Use a bounded axis slider or enter a position and press **Set** or Enter. **Min**
+and **Max** move to the authored travel stops; **Initial** restores that joint's
+initial coordinate. Distances display in millimetres and angles in degrees,
+independently of the assembly's source units. Unbounded rotary joints use numeric
+entry. Edits update the complete assembly and support Undo/Redo.
+
+Coupled screw/pulley joints and closure-dependent joints follow their driving axes.
+Manual editing is disabled while simulation or a script owns the machine. These
+are design-position controls, not live machine commands or a collision interlock.
+
+```sh
+./haxeon/scripts/haxeon run --project=app/tests/haxeon.machine-control.json
+```
+
 ## Mission monitor
 
 In Simulate, projects with an authored mission open the Mission sidebar tab. It shows

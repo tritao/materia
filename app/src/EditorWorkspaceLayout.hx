@@ -18,7 +18,7 @@ class EditorWorkspaceLayout {
   public static function defaultLayout():DockNode {
     var upper = DockNode.Split(DockSplitAxis.Horizontal, 0.725,
       DockNode.Panel("perspective"),
-      DockNode.Panel("inspector"));
+      DockNode.Tabs(["inspector", "machine-control"], "inspector"));
     var main = DockNode.Split(DockSplitAxis.Vertical, 0.76, upper,
       DockNode.Tabs(["console", "telemetry"], "console"));
     return DockNode.Split(DockSplitAxis.Horizontal, 0.20,
@@ -31,7 +31,7 @@ class EditorWorkspaceLayout {
       DockNode.Panel("perspective"),
       DockNode.Tabs(["console", "telemetry"], "console"));
     return DockNode.Split(DockSplitAxis.Horizontal, 0.74, main,
-      DockNode.Tabs(hasMission ? ["mission", "sensors", "cnc", "inspector", "hierarchy"] :
-        ["sensors", "cnc", "inspector", "hierarchy"], hasMission ? "mission" : "sensors"));
+      DockNode.Tabs(hasMission ? ["mission", "sensors", "cnc", "machine-control", "inspector", "hierarchy"] :
+        ["sensors", "cnc", "machine-control", "inspector", "hierarchy"], hasMission ? "mission" : "sensors"));
   }
 }

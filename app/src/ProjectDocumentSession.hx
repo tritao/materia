@@ -787,6 +787,8 @@ class ProjectDocumentSession {
       function() applyAssemblyStateRecord(before)));
   }
 
+  public function assemblyJointIsDependent(jointId:String):Bool return assemblyDependentJoints.exists(jointId);
+
   /** Metres in one unit of the project's assembly. */
   public function assemblyUnitMetres():Float return assemblyMetresPerUnit;
 
