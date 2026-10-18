@@ -48,6 +48,23 @@ class FlexsplineHobberBudget {
       supportStiffnessNPerMm:support.stiffness,scope:"complete HB8 feed stroke; fixed baseline HB10 load history; simulated HB7 servo, assumed plant; m0.3 ISO extrapolation only"};
     sys.io.File.saveContent(output+"/settings.json",haxe.Json.stringify(metadata));
     Sys.println("REFERENCE_BUDGET_SETTINGS "+haxe.Json.stringify(metadata));Sys.stdout().flush();
+    if(mode=="lead-ends"){
+      // Only the two radius samples needed by lead/pitch metrology. Complete
+      // stroke and source physics remain unchanged; profile is intentionally absent.
+      var blank=RingStock.fromGearBlank(s,wall.wall,radialStep,axialStep);
+      var cross=InspectionRingStock.create(blank.grid,inspection);
+      if(cross==null){blank.dispose();throw "exact reference lead sampling unavailable";}
+      var leadGrid=cross.stocks[1].grid;cross.dispose();blank.dispose();
+      var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
+      var endJob=new HobbingErrorJob(s,machine.hob.design,motion.axesAt,passes,sources,wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,knots,threads,false,true,leadGrid);
+      var base=endJob.run([]);sys.io.File.saveContent(output+"/face-end-baseline.json",haxe.Json.stringify(measurement(base)));
+      var combined=endJob.run([for(source in sources)source.id]);sys.io.File.saveContent(output+"/face-end-combined.json",haxe.Json.stringify(measurement(combined)));
+      for(m in [base,combined])if(m.warnings.indexOf("Face endpoints not sampled; end excess material unchecked")>=0)throw "face-end coverage was not measured";
+      var leadKeys=["Fbeta","ffbeta","fHbeta"],failed=[for(key in leadKeys)if(combined.value(key)>Iso1328.tolerance(s,key,6))key];
+      sys.io.File.saveContent(output+"/face-end-result.json",haxe.Json.stringify({baseline:measurement(base),combined:measurement(combined),failedClass6LeadParameters:failed,
+        threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,endpointZMm:[0.0,s.faceWidth],scope:"complete HB8 stroke; lead-only baseline and combined physical inspections with exact face-end samples; profile budget and per-source end superposition are separate"}));
+      Sys.println("FACE_END_ACCEPTANCE "+haxe.Json.stringify({failedClass6LeadParameters:failed,baselineFbetaUm:base.value("Fbeta"),combinedFbetaUm:combined.value("Fbeta"),scope:"lead-only physical face-end coverage; no profile regrading"}));return;
+    }
     if(mode=="engaged"||mode=="engaged-cross"){
       // Common pre-cut stock for a performance/equality fixture. This is NOT
       // a substitute for the complete HB8 history or a metrology acceptance.
@@ -103,7 +120,7 @@ class FlexsplineHobberBudget {
     }
     var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
     var useCross=Sys.getEnv("HOBBER_BUDGET_DENSE")!="1";
-    var job=new HobbingErrorJob(s,machine.hob.design,motion.axesAt,passes,sources,wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,knots,threads,useCross);
+    var job=new HobbingErrorJob(s,machine.hob.design,motion.axesAt,passes,sources,wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,knots,threads,useCross,true);
     function runCut(ids:Array<String>):GearMeasurement {
       var label=ids.length==0?"baseline":ids.length==1?ids[0]:"combined",measured=job.run(ids);
       sys.io.File.saveContent(output+"/"+label+".json",haxe.Json.stringify(measurement(measured)));

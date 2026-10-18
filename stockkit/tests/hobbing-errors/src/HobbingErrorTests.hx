@@ -72,7 +72,44 @@ class HobbingErrorTests {
     }
     Sys.println('Inspection cross parity: $checks assertions passed');
   }
+  static function faceEnds():Void {
+    var spec=new GearSpec(1,20,2,20*Math.PI/180),hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),1,32,4);
+    var motion=new IdealHobbingJob(spec,hob,3000,1.1,0,1),cfg=new GearInspection(spec,spec.pitchRadius());
+    var reports:Array<GearMeasurement> = [],legacy:Array<GearMeasurement> = [];
+    for(excess in [false,true]){
+      var interior=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2);
+      var covered=new FaceEndpointStock(interior,[interior],interior.grid,spec.faceWidth);
+      for(part in covered.stocks)part.setThreads(4);
+      var positions=covered.axialPositions();check(positions[0]==0&&positions[positions.length-1]==2,"face endpoints are exact measured planes");
+      var sweep=new HobbingSweep(hob,-6,6,0.000025),passes=motion.schedule(interior.grid);
+      function endMotion(t:Float):HobbingAxes {var a=motion.axesAt(t);return new HobbingAxes(a.x+0.02,a.y,a.z,a.a,a.b,a.c,a.offset);}
+      try{for(pass in passes){
+        if(excess){sweep.cutPassMany(covered.stocks.slice(0,covered.stocks.length-1),motion.axesAt,pass,0.000025/16);
+          sweep.cutPass(covered.stocks[covered.stocks.length-1],endMotion,pass,0.000025/16);}
+        else sweep.cutPassMany(covered.stocks,motion.axesAt,pass,0.000025/16);
+      }
+      legacy.push(GearMeasurement.fromRings(interior,spec,cfg));
+      var report=GearMeasurement.fromRings(covered,spec,cfg);reports.push(report);
+      check(report.warnings.indexOf("Face endpoints not sampled; end excess material unchecked")<0,"real endpoint cuts resolve face coverage warning");
+      }catch(e:Dynamic){sweep.dispose();for(part in covered.stocks)part.dispose();throw e;}
+      sweep.dispose();for(part in covered.stocks)part.dispose();
+    }
+    Sys.println('FACE_END_FIXTURE '+haxe.Json.stringify({baselineFbeta:reports[0].value("Fbeta"),excessFbeta:reports[1].value("Fbeta"),baselineForm:reports[0].value("ffbeta"),excessForm:reports[1].value("ffbeta")}));Sys.stdout().flush();
+    check(reports[1].value("Fbeta")>reports[0].value("Fbeta")+0.25*20*Math.sin(spec.pressureAngle),"physical 20 um radial recession at one end exposes excess material in lead inspection");
+    near(legacy[1].value("Fbeta"),legacy[0].value("Fbeta"),1e-12,"interior-only inspection misses the injected end-only excess");
+    check(legacy[0].warnings.indexOf("Face endpoints not sampled; end excess material unchecked")>=0,"legacy inset inspection retains its coverage warning");
+    near(reports[1].value("Fp"),reports[0].value("Fp"),1e-12,"face-end excess leaves interior pitch measurement unchanged");
+    near(reports[1].value("Falpha"),reports[0].value("Falpha"),1e-12,"face-end excess leaves interior profile measurement unchanged");
+    var blank=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2),passes=motion.schedule(blank.grid);
+    var cross=InspectionRingStock.create(blank.grid,cfg);if(cross==null)throw "exact radial strip for focused end check";
+    var leadGrid=cross.stocks[1].grid;cross.dispose();blank.dispose();
+    var focused=new HobbingErrorJob(spec,hob,motion.axesAt,passes,[],0.6,0.1,0.2,-6,6,0.000025,cfg,null,4,false,true,leadGrid).run([]);
+    for(key in ["fp","Fp","Fr","Fbeta","ffbeta","fHbeta"])near(focused.value(key),reports[0].value(key),1e-12,'focused lead/end domain preserves $key');
+    check(focused.warnings.indexOf("Face endpoints not sampled; end excess material unchecked")<0,"focused domain has actual face-end coverage");
+    Sys.println('Face-end inspection: $checks assertions passed; baseline Fbeta=${reports[0].value("Fbeta")} um; end-excess Fbeta=${reports[1].value("Fbeta")} um');
+  }
   public static function main():Void {
+    if(Sys.args().indexOf("face-ends")>=0){faceEnds();return;}
     if(Sys.args().indexOf("cross-parity")>=0){crossParity();return;}
     if(Sys.args().indexOf("knot-parity")>=0){knotParity();return;}
     if(Sys.args().indexOf("physical-fine")>=0){physical(0.000025,8);return;}

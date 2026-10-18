@@ -1547,3 +1547,35 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   successful/failed process exits, class-limit failure, superposition failure and
   qualified numerical success. The watcher is active; no completed reference
   inspection was available when it was installed, so actual acceptance is pending.
+
+### HB11 true face-end coverage
+
+- The running batch's cell centres stop 0.02 mm inside each face. Its warning is
+  valid: unseen end excess cannot be inferred from those circles. Existing HB11
+  artifacts and the running HB4 job remain unchanged.
+- `FaceEndpointStock` adds independent physical rake samples exactly at Z=0 and
+  Z=faceWidth, retaining every interior sample. Bounds are sampling domains only,
+  not added workpiece volume. `HobbingErrorJob` has explicit endpoint sampling and
+  an optional inspection domain inside the physical blank. Future reference
+  baseline/source/combined runs enable the endpoints, so lead filtering includes
+  actual end material rather than extending an unseen tooth surface.
+- A separate `check-reference-budget.sh lead-ends` run is active in
+  `build/flexspline-face-end-check/`. It repeats only the baseline and combined
+  lead inspection over the complete HB8 stroke: **404 circles**, 8 threads,
+  **0.000025 mm sweep / 0.0000015625 mm path tolerance**. It retains the original
+  two measurement-radius samples and all 200 interior axial positions, plus both
+  exact face ends. No full profile study or per-source batch is repeated.
+- The supplement intentionally has no profile coverage. It grades Fbeta, ffbeta
+  and fHbeta with actual ends, while fp/Fp/Fr must match the corresponding main
+  inspection exactly before its result is accepted as compatible. The review
+  watcher includes the separate artifacts and keeps numerical acceptance pending
+  while required coverage is missing. Original source warnings remain visible;
+  per-source trace-superposition at the newly sampled ends is not recomputed by
+  this two-case supplement. New full endpoint-enabled batches include that check.
+- Physical regression (m1/z20/face2, diagnostic stock spacing) offsets the cutter
+  radially by 20 um only at one end. Interior-only lead inspection misses that
+  defect; direct end sampling detects increased filtered lead error, while
+  interior pitch/profile remain identical. A narrow lead/end domain also matches
+  the corresponding full-domain measurements exactly: **16 assertions pass**.
+  **26 existing inspection-parity, 24 error-model and 264 machine assertions**
+  also pass. These small fixtures do not claim reference or ISO acceptance.

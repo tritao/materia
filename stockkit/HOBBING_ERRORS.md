@@ -265,3 +265,25 @@ also retains every inspected endpoint/provenance value exactly. At 8 threads and
 optimizations; the native clipper alone takes 22.61 s with whole-stock hash parity.
 These timings do not establish the remaining full-study duration. Reproduce with
 `check-reference-budget.sh engaged-cross` in a separate evidence directory.
+
+### Measured face endpoints
+
+`HobbingErrorJob(..., faceEndpoints=true)` wraps the sampled stock with
+`FaceEndpointStock`, which adds native rake samples at exactly Z=0 and Z=faceWidth.
+Interior cell centres are preserved. This gives `GearMeasurement` real endpoint
+boundaries for lead filtering and excess-material assessment; the existing
+missing-end warning remains correct for unaugmented grids. The additional thin
+native grids represent sample planes, not physical volume or extra blank stock.
+
+An optional `stockGrid` inside the physical blank supports a focused lead-only
+check. The hobber runner's `lead-ends` mode uses the original two radius samples,
+all 200 interior axial samples and both endpoints (404 circles), with the original
+full-stroke gash schedule and fine tolerances. Profile coverage is deliberately
+absent in that supplement. Baseline and combined lead are checked; original
+per-source end interactions are not reconstructed. The original batch is retained.
+Future full reference runs include endpoints in every source inspection.
+
+The review watcher can take `--face-end-directory` and requires matching interior
+fp/Fp/Fr before using the supplement. Missing endpoint evidence remains pending;
+failed lead grades or incompatible interiors cannot close the coverage check.
+Already measured full-face inspections do not depend on a stale supplement.
