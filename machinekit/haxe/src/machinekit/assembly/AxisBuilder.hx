@@ -170,9 +170,10 @@ class AxisBuilder extends MachineAssembly {
 	 * coordinate zero. The axis's overtravel is the room its block has left on the rail at either end
 	 * of travel, where the rail's end stops are. Additional block poses let a
 	 * rigid multi-block carriage use the most restrictive block at either end.
+	 * An optional overtravelLimit further restricts reserve for bearings or other hardware.
 	 */
 	public function slide(spec:AxisSpec, parent:String, id:String, component:MachineComponent, pose:AssemblyFrame,
-			axis:{x:Float, y:Float, z:Float}, ?additionalBlockPoses:Array<AssemblyFrame>):Void {
+			axis:{x:Float, y:Float, z:Float}, ?additionalBlockPoses:Array<AssemblyFrame>, ?overtravelLimit:Float):Void {
 		var rail = [for (entry in components()) if (entry.id == parent) entry.component][0];
 		if (!Std.isOfType(rail, LinearRail)) throw 'Axis ${spec.id} must slide on a rail';
 		var guide:LinearRail = cast rail;
@@ -191,6 +192,10 @@ class AxisBuilder extends MachineAssembly {
 			room = Math.min(room, Math.min(Math.min(low, high) - reach, guide.length - reach - Math.max(low, high)));
 		}
 		if (room < 0) throw 'Axis ${spec.id} runs its block off its rail by ${Dimension.format(-room)} mm';
+		if (overtravelLimit != null) {
+			if (!Math.isFinite(overtravelLimit) || overtravelLimit < 0) throw "Axis overtravel limit must be finite and nonnegative";
+			room = Math.min(room, overtravelLimit);
+		}
 		overtravel.set(spec.id, room);
 		var length = Math.sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
 		if (!(length > 0)) throw 'Axis ${spec.id} needs a direction';

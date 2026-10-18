@@ -84,5 +84,18 @@ class AxisBuilderChecks {
 		pair.slide({id: "x", lower: 0.0, upper: 100.0, initial: 0.0}, "rail", "first", LinearRailBlock.metric("MGN12C"),
 			AxisBuilder.orient(60, 0, 0, up, along), {x: 1.0, y: 0.0, z: 0.0}, [AxisBuilder.orient(150, 0, 0, up, along)]);
 		check(Math.abs(pair.axisOvertravel("x") - 22.65) < 1e-9, "the block nearest the far stop limits the complete carriage to 22.65 mm reserve");
+		var capped = new AxisBuilder();
+		capped.place("rail", LinearRail.metric("MGN12C", 300), AxisBuilder.orient(0, 0, 0, up, along));
+		for (limit in [-1.0, Math.NaN, Math.POSITIVE_INFINITY]) {
+			var badLimit = false;
+			try capped.slide({id: "bad-limit", lower: 0, upper: 100, initial: 0}, "rail", "bad", LinearRailBlock.metric("MGN12C"),
+				AxisBuilder.orient(60, 0, 0, up, along), {x: 1.0, y: 0.0, z: 0.0}, null, limit) catch (_:Dynamic) badLimit = true;
+			check(badLimit && capped.components().length == 1, "invalid hardware reserve rejected before mutation");
+		}
+		capped.slide({id: "x", lower: 0, upper: 100, initial: 0}, "rail", "block", LinearRailBlock.metric("MGN12C"),
+			AxisBuilder.orient(60, 0, 0, up, along), {x: 1.0, y: 0.0, z: 0.0}, null, 0.5);
+		check(Math.abs(capped.axisOvertravel("x") - 0.5) < 1e-9, "hardware can constrain rail reserve");
+		var cappedModel = new AssemblyModel("mm"); capped.addTo(cappedModel, "");
+		check(cappedModel.definition("capped").joints[0].limits.overtravel == 0.5, "hardware reserve reaches joint limits");
 	}
 }
