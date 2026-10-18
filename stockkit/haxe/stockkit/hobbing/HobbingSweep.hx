@@ -14,10 +14,11 @@ class HobbingSweep {
   final owner:Ownedsk_rake_tool_handle;
   final probes:Array<Point3>;
   var disposed=false;
+  final batchDomains:Bool;
   public function new(hob:HobDesign,firstTooth:Int,lastTooth:Int,tolerance:Float=0.00005,?warp:Point3->Point3) {
     if(firstTooth>lastTooth||lastTooth-firstTooth>256||!Math.isFinite(tolerance)||tolerance<=0)
       throw "invalid hob sweep extent/tolerance";
-    this.hob=hob;this.tolerance=tolerance;
+    this.hob=hob;this.tolerance=tolerance;batchDomains=Sys.getEnv("STOCKKIT_RAKE_BATCH_DOMAINS")=="1";
     var vertices:Array<Float> =[],regions:Array<sk_rake_region> =[];
     var xmin=0.0,xmax=0.0,ymin=0.0,ymax=0.0,zmin=0.0,zmax=0.0;
     for(gash in 0...hob.gashes)for(tooth in firstTooth...lastTooth+1) {
@@ -116,7 +117,10 @@ class HobbingSweep {
     if(disposed||stocks.length==0)throw "invalid multi-stock rake sweep";
     if(!Math.isFinite(pathTolerance)||pathTolerance<=0||!Math.isFinite(maxTimeStep)||maxTimeStep<=0)throw "invalid sweep path sampling";
     var poses=sample(axesAt,pass.start,pass.end,pass.center,pathTolerance,maxTimeStep,motionKnots);
-    for(stock in stocks)check(StockKitNative.sk_ring_stock_sweep_rake(stock.borrowForSweep(),owner.borrow(),pass.gash,pass.pass,poses),"rake sweep");
+    if(batchDomains){var i=0;
+      while(i+1<stocks.length){check(StockKitNative.sk_ring_stock_sweep_rake_pair(stocks[i].borrowForSweep(),stocks[i+1].borrowForSweep(),owner.borrow(),pass.gash,pass.pass,poses),"paired rake sweep");i+=2;}
+      if(i<stocks.length)check(StockKitNative.sk_ring_stock_sweep_rake(stocks[i].borrowForSweep(),owner.borrow(),pass.gash,pass.pass,poses),"rake sweep");
+    }else for(stock in stocks)check(StockKitNative.sk_ring_stock_sweep_rake(stock.borrowForSweep(),owner.borrow(),pass.gash,pass.pass,poses),"rake sweep");
     return poses.length;
   }
   function sample(at:Float->HobbingAxes,start:Float,end:Float,center:Float,tol:Float,maxStep:Float,knots:Null<Array<Float>>):Array<sk_rake_pose> {

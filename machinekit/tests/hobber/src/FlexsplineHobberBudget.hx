@@ -51,6 +51,50 @@ class FlexsplineHobberBudget {
       supportStiffnessNPerMm:support.stiffness,scope:"complete HB8 feed stroke; fixed baseline HB10 load history; simulated HB7 servo, assumed plant; m0.3 ISO extrapolation only"};
     sys.io.File.saveContent(output+"/"+(mode=="all"?"settings":mode+"-settings")+".json",haxe.Json.stringify(metadata));
     Sys.println("REFERENCE_BUDGET_SETTINGS "+haxe.Json.stringify(metadata));Sys.stdout().flush();
+    if(mode=="geometry-speed"){
+      var reference=InspectionRingStock.create(new RingGrid(s.rootRadius()-wall.wall,s.tipRadius(),0,s.faceWidth,radialStep,axialStep),inspection);
+      var candidate=InspectionRingStock.create(new RingGrid(s.rootRadius()-wall.wall,s.tipRadius(),0,s.faceWidth,radialStep,axialStep),inspection);
+      if(reference==null||candidate==null)throw "reference inspection domains unavailable";
+      var a=new FaceEndpointStock(reference,reference.stocks,reference.grid,s.faceWidth),b=new FaceEndpointStock(candidate,candidate.stocks,candidate.grid,s.faceWidth);
+      for(part in a.stocks.concat(b.stocks))part.setThreads(threads);
+      var previous=Sys.getEnv("STOCKKIT_RAKE_BATCH_DOMAINS");
+      Sys.putEnv("STOCKKIT_RAKE_BATCH_DOMAINS","1");
+      var span=Std.int(Math.ceil(machine.hob.n("height")/(2*machine.hob.design.axialPitch)))+2;
+      var seed=new HobbingSweep(machine.hob.design,-span,span,0.002),first=30000,count=100,started=Sys.time();
+      for(pass in passes.slice(first-2400,first))seed.cutPassMany(a.stocks,motion.axesAt,pass,0.002/16);seed.dispose();
+      for(i in 0...a.stocks.length){var saved=a.stocks[i].snapshot();b.stocks[i].restore(saved);saved.dispose();}
+      Sys.println("GEOMETRY_SEED_SECONDS "+(Sys.time()-started));Sys.stdout().flush();
+      Sys.putEnv("STOCKKIT_RAKE_BATCH_DOMAINS","0");
+      var baselineSweep=new HobbingSweep(machine.hob.design,-span,span,tolerance);
+      Sys.putEnv("STOCKKIT_RAKE_BATCH_DOMAINS","1");var candidateSweep=new HobbingSweep(machine.hob.design,-span,span,tolerance);
+      Sys.putEnv("STOCKKIT_RAKE_BATCH_DOMAINS",previous==null?"":previous);
+      var sorted:Array<Float> = [],i=0,j=0;
+      while(i<sync.length||j<force.length){var t=j>=force.length||(i<sync.length&&sync[i][0]<force[j][0])?sync[i++][0]:force[j++][0];
+        if(sorted.length==0||t>sorted[sorted.length-1])sorted.push(t);}
+      var baselineSeconds=0.0,candidateSeconds=0.0,baselinePoses=0,candidatePoses=0,index=0;
+      for(pass in passes.slice(first,first+count)){
+        var lo=0,hi=sorted.length;while(lo<hi){var mid=(lo+hi)>>1;if(sorted[mid]<=pass.start)lo=mid+1;else hi=mid;}
+        var local:Array<Float> = [];while(lo<sorted.length&&sorted[lo]<pass.end)local.push(sorted[lo++]);
+        function baseline():Void {var begin=Sys.time();baselinePoses+=baselineSweep.cutPassMany(a.stocks,motion.axesAt,pass,tolerance/16,0.001,local);baselineSeconds+=Sys.time()-begin;}
+        function trial():Void {var begin=Sys.time();candidatePoses+=candidateSweep.cutPassMany(b.stocks,motion.axesAt,pass,tolerance/16,0.001,local);candidateSeconds+=Sys.time()-begin;}
+        if(index++%2==0){baseline();trial();}else{trial();baseline();}
+      }
+      var exact=true,maxArc=0.0;
+      for(i in 0...a.stocks.length){var left=a.stocks[i],right=b.stocks[i],difference=left.compareStock(right);
+        for(z in 0...left.grid.axialCount)for(r in 0...left.grid.radialCount){var k=z*left.grid.radialCount+r;
+          maxArc=Math.max(maxArc,(difference.leftover[k]+difference.gouge[k])*left.grid.radius(r));
+          var aa=left.circle(r,z),bb=right.circle(r,z);if(aa.length!=bb.length){exact=false;continue;}
+          for(k in 0...aa.length)if(aa[k].lo!=bb[k].lo||aa[k].hi!=bb[k].hi||aa[k].loGash!=bb[k].loGash||aa[k].hiGash!=bb[k].hiGash||aa[k].loPass!=bb[k].loPass||aa[k].hiPass!=bb[k].hiPass)exact=false;}}
+      reference.assertOverlap();candidate.assertOverlap();
+      if(!exact||maxArc!=0)throw "shared geometry changes sampled stock/provenance";
+      var report={mode:mode,firstWindow:first,windows:count,threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,
+        radialStepMm:radialStep,axialStepMm:axialStep,faceEndpoints:true,baselineSeconds:baselineSeconds,candidateSeconds:candidateSeconds,
+        speedup:baselineSeconds/candidateSeconds,baselinePoses:baselinePoses,candidatePoses:candidatePoses,exactEndpointsAndProvenance:exact,
+        maxArcDifferenceMm:maxArc,
+        scope:"paired interleaved engaged reference-geometry fixture with common coarse-precut seed; all inspected domains and physical ends; not full-stroke acceptance"};
+      sys.io.File.saveContent(output+"/"+mode+".json",haxe.Json.stringify(report));Sys.println("GEOMETRY_SPEED "+haxe.Json.stringify(report));
+      baselineSweep.dispose();candidateSweep.dispose();for(part in a.stocks.concat(b.stocks))part.dispose();return;
+    }
     if(mode=="lead-ends"||StringTools.startsWith(mode,"lead-")){
       // Only the two radius samples needed by lead/pitch metrology. Complete
       // stroke and source physics remain unchanged; profile is intentionally absent.

@@ -103,6 +103,37 @@ void thread_identical(unsigned threads) {
     sk_rake_tool_destroy(t);sk_ring_stock_destroy(one);sk_ring_stock_destroy(many);
 }
 
+void paired_domains() {
+    auto t=tool({0.3,-4,0,1.2,-4,0,1.2,4,0,0.3,4,0});
+    for(unsigned fixture=0;fixture<3;++fixture){
+        sk_ring_grid ga{sizeof(sk_ring_grid),32,fixture==0?2u:1u,1,3,fixture==0?-0.1:-1.25,fixture==0?0.1:-0.75};
+        sk_ring_grid gb{sizeof(sk_ring_grid),fixture==2?8u:4u,fixture==0?8u:1u,fixture==2?0.2:1.2,fixture==2?4.0:2.2,fixture==0?-2.0:0.75,fixture==0?2.0:1.25};
+        sk_ring_stock_handle a{},b{},oa{},ob{};
+        check(sk_ring_stock_create(&ga,&a)==0&&sk_ring_stock_create(&gb,&b)==0&&sk_ring_stock_create(&ga,&oa)==0&&sk_ring_stock_create(&gb,&ob)==0,"paired independent domains");
+        check(sk_ring_stock_set_threads(a,fixture%2?1:4)==0&&sk_ring_stock_set_threads(b,8)==0&&sk_ring_stock_set_threads(oa,1)==0&&sk_ring_stock_set_threads(ob,4)==0,"paired varied thread counts");
+        for(unsigned pass=0;pass<3;++pass){
+            std::vector<sk_rake_pose> poses;
+            for(unsigned k=0;k<17;++k){auto p=pose(-1.5+3.0*k/16);double angle=.2*pass+.3*k/16;
+                p.rotation[0]=p.rotation[4]=std::cos(angle);p.rotation[1]=-std::sin(angle);p.rotation[3]=std::sin(angle);poses.push_back(p);}
+            check(sk_ring_stock_sweep_rake(oa,t,pass%2,pass,poses.data(),poses.size())==0&&sk_ring_stock_sweep_rake(ob,t,pass%2,pass,poses.data(),poses.size())==0,"independent sweep oracle");
+            check(sk_ring_stock_sweep_rake_pair(a,b,t,pass%2,pass,poses.data(),poses.size())==0,"paired sweep");
+            check(sk_ring_stock_sweep_rake_pair(a,a,t,0,pass,poses.data(),poses.size())==SK_ERROR_INVALID_ARGUMENT,"duplicate paired domain rejected");
+            check(sk_ring_stock_sweep_rake_pair(a,{},t,0,pass,poses.data(),poses.size())==SK_ERROR_INVALID_HANDLE,"invalid second domain rejected before mutation");
+            auto bad=poses;bad[1].rotation[0]=2;
+            check(sk_ring_stock_sweep_rake_pair(a,b,t,0,pass,bad.data(),bad.size())==SK_ERROR_INVALID_ARGUMENT,"invalid paired pose rejected before mutation");
+            for(unsigned domain=0;domain<2;++domain){auto g=domain?gb:ga;auto actual=domain?b:a,oracle=domain?ob:oa;
+                for(unsigned z=0;z<g.axial_count;++z)for(unsigned r=0;r<g.radial_count;++r){auto x=read(actual,r,z),y=read(oracle,r,z);
+                    check(x.size()==y.size(),"paired topology identical");
+                    for(size_t k=0;k<x.size();++k){
+                        check(std::memcmp(&x[k].lo,&y[k].lo,sizeof(double))==0&&std::memcmp(&x[k].hi,&y[k].hi,sizeof(double))==0,"paired endpoints bit identical");
+                        check(x[k].lo_gash==y[k].lo_gash&&x[k].hi_gash==y[k].hi_gash&&x[k].lo_pass==y[k].lo_pass&&x[k].hi_pass==y[k].hi_pass,"paired provenance identical");}}
+            }
+        }
+        sk_ring_stock_destroy(a);sk_ring_stock_destroy(b);sk_ring_stock_destroy(oa);sk_ring_stock_destroy(ob);
+    }
+    sk_rake_tool_destroy(t);
 }
-int main() {try{analytic();concave();rotational_convergence();thread_identical(4);thread_identical(8);}catch(const std::exception&e){std::printf("FAIL after %d checks: %s\n",checks,e.what());return 1;}
+
+}
+int main() {try{analytic();concave();rotational_convergence();thread_identical(4);thread_identical(8);paired_domains();}catch(const std::exception&e){std::printf("FAIL after %d checks: %s\n",checks,e.what());return 1;}
 std::printf("Rake sweep: %d checks passed\n",checks);return 0;}

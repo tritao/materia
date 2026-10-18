@@ -933,3 +933,28 @@ SK_API sk_result SK_CALL sk_ring_stock_sweep_rake(sk_ring_stock_handle stock,sk_
         sweep_rake(*s,*t,gash,pass,poses,pose_count);return SK_OK;
     });
 }
+
+SK_API sk_result SK_CALL sk_ring_stock_sweep_rake_pair(sk_ring_stock_handle stock,sk_ring_stock_handle second,sk_rake_tool_handle tool,
+    uint32_t gash,uint32_t pass,const sk_rake_pose *poses,uint32_t pose_count) {
+    return guarded([&]() -> sk_result {
+        auto *s=ring_stocks().get(stock.id);auto *other=ring_stocks().get(second.id);auto *t=rake_tools().get(tool.id);
+        if(!s||!other||!t)return SK_ERROR_INVALID_HANDLE;
+        if(s==other)return SK_ERROR_INVALID_ARGUMENT;
+        if(gash>=t->gashes.size()||pass>=SK_SOURCE_NONE||!poses||pose_count<2)return SK_ERROR_INVALID_ARGUMENT;
+        for(uint32_t k=0;k<pose_count;++k) {
+            const auto &p=poses[k];if(p.struct_size!=sizeof(p)||!finite(p.rotation,9)||!finite(p.translation,3))return SK_ERROR_INVALID_ARGUMENT;
+            for(int a=0;a<3;++a)for(int b=0;b<3;++b) {
+                double dot=0;for(int c=0;c<3;++c)dot+=p.rotation[3*a+c]*p.rotation[3*b+c];
+                if(std::abs(dot-(a==b?1.0:0.0))>1e-9)return SK_ERROR_INVALID_ARGUMENT;
+            }
+            double det=p.rotation[0]*(p.rotation[4]*p.rotation[8]-p.rotation[5]*p.rotation[7])
+                -p.rotation[1]*(p.rotation[3]*p.rotation[8]-p.rotation[5]*p.rotation[6])
+                +p.rotation[2]*(p.rotation[3]*p.rotation[7]-p.rotation[4]*p.rotation[6]);
+            if(det<0)return SK_ERROR_INVALID_ARGUMENT;
+        }
+        auto before_first=s->layers,before_second=other->layers;
+        try{sweep_rake_pair(*s,*other,*t,gash,pass,poses,pose_count);}
+        catch(...){s->layers=std::move(before_first);other->layers=std::move(before_second);throw;}
+        return SK_OK;
+    });
+}

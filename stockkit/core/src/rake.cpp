@@ -198,4 +198,94 @@ void sweep_rake(RingStock &stock,const RakeTool &tool,uint32_t gash,uint32_t pas
     }
     stock.cut(cuts.data(),uint32_t(cuts.size()));
 }
+// Share transforms and prism bounds, preserving the single-domain clipping
+// arithmetic and deterministic interval union separately for each domain.
+void sweep_rake_pair(RingStock &left,RingStock &right,const RakeTool &tool,uint32_t gash,uint32_t pass,
+    const sk_rake_pose *poses,uint32_t pose_count) {
+    const auto &mesh=tool.gashes[gash];RingStock *stocks[]={&left,&right};
+    if(pose_count<2)return;
+    // A worker owns a contiguous range of pose segments, including all transforms,
+    // culling and circle intersections. No interval or floating reduction is shared.
+    // Every resulting arc is sorted by the existing union below, so chunk order
+    // cannot change endpoints or gash/pass provenance.
+    const unsigned jobs=std::min<unsigned>(left.pool.size(),pose_count-1);
+    struct CutArc { size_t bin; Arc arc; };
+    std::array<std::vector<std::vector<CutArc>>,2> results;for(auto &domain:results)domain.resize(jobs);
+    left.pool.run(jobs,[&](unsigned job) {
+    const uint32_t first=1+uint64_t(pose_count-1)*job/jobs;
+    const uint32_t last=1+uint64_t(pose_count-1)*(job+1)/jobs;
+    std::vector<P2> intersections,polygon;intersections.reserve(24);polygon.reserve(48);
+    std::vector<CircleEdge> edges;edges.reserve(24);
+    std::vector<Arc> spans,next;spans.reserve(24);next.reserve(24);
+    std::vector<RakePoint> previous,current(mesh.vertices.size());
+    for(size_t k=0;k<mesh.vertices.size();++k)current[k]=transform(mesh.vertices[k],poses[first-1]);
+    for(uint32_t pose=first;pose<last;++pose) {
+        previous.swap(current);current.resize(mesh.vertices.size());
+        for(size_t k=0;k<mesh.vertices.size();++k)current[k]=transform(mesh.vertices[k],poses[pose]);
+        double allMinZ=std::numeric_limits<double>::infinity(),allMaxZ=-allMinZ;
+        for(size_t k=0;k<current.size();++k) {allMinZ=std::min({allMinZ,previous[k][2],current[k][2]});allMaxZ=std::max({allMaxZ,previous[k][2],current[k][2]});}
+        if((allMinZ>left.grid.z_max||allMaxZ<left.grid.z_min)&&(allMinZ>right.grid.z_max||allMaxZ<right.grid.z_min))continue;
+        for(auto tri:mesh.triangles) {
+            std::array<RakePoint,6> p{previous[tri[0]],previous[tri[1]],previous[tri[2]],current[tri[0]],current[tri[1]],current[tri[2]]};
+            auto planeNormal=cross3(minus(p[1],p[0]),minus(p[2],p[0]));
+            double thickness=0;
+            for(size_t k=3;k<6;++k) {auto d=minus(p[k],p[0]);thickness=std::max(thickness,std::abs(d[0]*planeNormal[0]+d[1]*planeNormal[1]+d[2]*planeNormal[2]));}
+            if(thickness==0)continue; // a stationary or in-plane moving face sweeps no volume
+            double minz=p[0][2],maxz=minz,minx=p[0][0],maxx=minx,miny=p[0][1],maxy=miny;
+            for(auto v:p){minz=std::min(minz,v[2]);maxz=std::max(maxz,v[2]);minx=std::min(minx,v[0]);maxx=std::max(maxx,v[0]);miny=std::min(miny,v[1]);maxy=std::max(maxy,v[1]);}
+            for(unsigned domain=0;domain<2;++domain){
+            const auto &g=stocks[domain]->grid;auto &result=results[domain][job];
+            const double dr=(g.radius_max-g.radius_min)/g.radial_count,dz=(g.z_max-g.z_min)/g.axial_count;
+            if(minx>g.radius_max||maxx<-g.radius_max||miny>g.radius_max||maxy<-g.radius_max||minz>g.z_max||maxz<g.z_min)continue;
+            double closeX=std::clamp(0.0,minx,maxx),closeY=std::clamp(0.0,miny,maxy);
+            double farX=std::max(std::abs(minx),std::abs(maxx)),farY=std::max(std::abs(miny),std::abs(maxy));
+            if(std::hypot(closeX,closeY)>g.radius_max||std::hypot(farX,farY)<g.radius_min)continue;
+            int first=int(std::clamp(std::ceil((minz-g.z_min)/dz-0.5),0.0,double(g.axial_count))),last=int(std::clamp(std::floor((maxz-g.z_min)/dz-0.5),-1.0,double(g.axial_count)-1));
+            for(int z=first;z<=last;++z) {
+                double height=g.z_min+(z+0.5)*dz;intersections.clear();
+                for(size_t a=0;a<6;++a) {
+                    if(p[a][2]==height)intersections.push_back({p[a][0],p[a][1]});
+                    for(size_t b=a+1;b<6;++b)if((p[a][2]<height&&p[b][2]>height)||(p[b][2]<height&&p[a][2]>height)) {
+                        double t=(height-p[a][2])/(p[b][2]-p[a][2]);
+                        intersections.push_back({p[a][0]+t*(p[b][0]-p[a][0]),p[a][1]+t*(p[b][1]-p[a][1])});
+                    }
+                }
+                hull(intersections,polygon);if(polygon.size()<3)continue;
+                double rmax=0,rmin=std::numeric_limits<double>::infinity();bool contains=true;
+                for(size_t k=0;k<polygon.size();++k) {
+                    P2 a=polygon[k],b=polygon[(k+1)%polygon.size()];rmax=std::max(rmax,std::hypot(a.x,a.y));
+                    double dx=b.x-a.x,dy=b.y-a.y,t=std::clamp(-(a.x*dx+a.y*dy)/(dx*dx+dy*dy),0.0,1.0);
+                    rmin=std::min(rmin,std::hypot(a.x+t*dx,a.y+t*dy));if(cross(a,b,{0,0})<0)contains=false;
+                }
+                if(contains)rmin=0;
+                int r0=int(std::clamp(std::ceil((rmin-g.radius_min)/dr-0.5),0.0,double(g.radial_count))),r1=int(std::clamp(std::floor((rmax-g.radius_min)/dr-0.5),-1.0,double(g.radial_count)-1));
+                if(r0>r1)continue;
+                circle_edges(polygon,edges);
+                for(int r=r0;r<=r1;++r) {
+                    circle_inside(edges,g.radius_min+(r+0.5)*dr,spans,next);
+                    for(auto arc:spans)result.push_back({size_t(z)*g.radial_count+r,arc});
+                }
+            }
+            }
+        }
+    }
+    });
+    for(unsigned domain=0;domain<2;++domain){
+    auto &stock=*stocks[domain];const auto &g=stock.grid;
+    std::vector<std::vector<Arc>> removed(size_t(g.radial_count)*g.axial_count);
+    for(auto &result:results[domain]) {
+        for(const auto &cut:result)removed[cut.bin].push_back(cut.arc);
+        std::vector<CutArc>().swap(result);
+    }
+    std::vector<sk_ring_cut> cuts;
+    for(uint32_t z=0;z<g.axial_count;++z)for(uint32_t r=0;r<g.radial_count;++r) {
+        auto &arcs=removed[size_t(z)*g.radial_count+r];if(arcs.empty())continue;
+        std::sort(arcs.begin(),arcs.end());double lo=arcs[0].first,hi=arcs[0].second;
+        auto emit=[&](){cuts.push_back({sizeof(sk_ring_cut),r,z,1,lo,hi-lo,gash,pass});};
+        for(size_t k=1;k<arcs.size();++k)if(arcs[k].first<=hi+32*std::numeric_limits<double>::epsilon()*std::max(1.0,std::abs(hi)))hi=std::max(hi,arcs[k].second);else {emit();lo=arcs[k].first;hi=arcs[k].second;}
+        emit();
+    }
+    stock.cut(cuts.data(),uint32_t(cuts.size()));
+    }
+}
 }

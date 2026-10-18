@@ -10,6 +10,13 @@ evidence=${HOBBER_BUDGET_EVIDENCE:-"$default_evidence"}
 force=${HOBBER_FORCE_EVIDENCE:-"$root/build/flexspline-reference-force-fast"}
 default_stock="$evidence/native"
 [[ "$mode" != parallel ]] || default_stock="$root/build/flexspline-clipping-speed-v2/native"
+if [[ "$mode" == parallel && -f "$evidence/native-upgrade-validation.json" ]]; then
+  default_stock=$(python3 - "$evidence/native-upgrade-validation.json" <<'PYNATIVE'
+import json, sys
+print(json.load(open(sys.argv[1]))['newNativeDirectory'])
+PYNATIVE
+  )
+fi
 stock=${HOBBER_STOCK_NATIVE:-"$default_stock"}
 cache=${HOBBER_NATIVE_CACHE:-"$root/../machine-tending/app/build/host/native"}
 mkdir -p "$evidence"

@@ -2,7 +2,8 @@
 """Restartable, bounded parallel fine cuts. Never alters legacy evidence.
 
 Prepare a frozen main.hl, inputs.json and settings.json in the output directory.
-All jobs retain the accepted grid/sweep/path settings; only thread count changes.
+Grid/sweep/path settings remain pinned. Native/bytecode upgrades require
+hash-bound exact-parity and paired speed evidence.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -128,6 +129,8 @@ def main():
     parser.add_argument('--legacy-directory', required=True, type=Path)
     parser.add_argument('--face-directory', required=True, type=Path)
     parser.add_argument('--native', required=True, type=Path)
+    parser.add_argument('--upgrade-validation', type=Path, help='exact parity and paired speed evidence for a native-library upgrade')
+    parser.add_argument('--adopt-running', type=Path, help='existing native cuts to let finish under their original library')
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--threads', type=int, default=4)
     parser.add_argument('--legacy-pid', type=int, help='stop this old all-case process only AFTER table-radial.json is complete')
@@ -140,8 +143,8 @@ def main():
     lock = (directory / 'parallel.lock').open('w')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     available = int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemAvailable:'))) * 1024
-    if available < args.workers * 900 * 1024**2 + 3 * 1024**3:
-        raise RuntimeError('insufficient available memory for workers plus 3 GiB headroom')
+    if available < 3 * 1024**3:
+        raise RuntimeError('insufficient available memory for 3 GiB headroom')
     settings = load(directory / 'settings.json')
     if settings is None:
         raise ValueError('prepare settings.json first')
@@ -152,24 +155,50 @@ def main():
     for key in ['moduleMm', 'teeth', 'faceWidthMm', 'sweepToleranceMm', 'pathToleranceMm', 'radialStepMm', 'axialStepMm', 'windows', 'sourceIds']:
         if settings[key] != old_settings[key]:
             raise ValueError(f'legacy settings differ: {key}')
-    if digest(args.native / 'libstockkit_core.so') not in (legacy / 'provenance.txt').read_text():
+    proof_path = args.upgrade_validation or directory / 'native-upgrade-validation.json'
+    proof = load(proof_path)
+    native_hash = digest(args.native / 'libstockkit_core.so')
+    binary = Path(proof['newBinaryPath']).resolve() if proof else directory / 'main.hl'
+    if proof is not None:
+        if (proof.get('method') != 'paired streaming domains' or proof.get('newBinarySha256') != digest(binary)
+                or proof.get('oldBinarySha256') != digest(directory / 'main.hl')
+                or proof.get('newNativeSha256') != native_hash or proof.get('passed') is not True
+                or proof.get('referenceStockHashIdentical') is not True
+                or proof.get('pairedExactEndpointsAndProvenance') is not True
+                or proof.get('nativeTestsPassed') is not True or proof.get('speedup', 0) < 1.1):
+            raise ValueError('native upgrade lacks exact parity and paired speed validation')
+    worker_memory = 900 * 1024**2
+    legacy_native = proof['oldNativeSha256'] if proof else native_hash
+    if legacy_native not in (legacy / 'provenance.txt').read_text():
         raise ValueError('legacy native implementation differs')
     if digest(directory / 'inputs.json') != digest(legacy / 'inputs.json'):
         raise ValueError('legacy inputs differ')
     if settings['threads'] != args.threads or settings.get('workers') != args.workers:
         raise ValueError('execution worker/thread settings differ from saved settings')
-    fingerprint = dict(binary=digest(directory / 'main.hl'), inputs=digest(directory / 'inputs.json'),
+    fingerprint = dict(binary=digest(binary), inputs=digest(directory / 'inputs.json'),
                        native=digest(args.native / 'libstockkit_core.so'), threads=args.threads,
                        settings=settings, schema=1)
+    if proof:
+        fingerprint.update(sharedGeometry=True, batchDomains=True, upgradeValidationSha256=digest(proof_path))
+    adoption_path = args.adopt_running or directory / 'adopt-running.json'
+    adopted = load(adoption_path) or {}
+    for mode, row in adopted.items():
+        if row.get('nativeSha256') not in [native_hash, legacy_native]:
+            raise ValueError(f'{mode}: unknown native library in adoption manifest')
     existing = load(directory / 'execution.json')
     if existing is not None and existing != fingerprint:
-        raise ValueError('frozen inputs/binary/settings changed; use a separate evidence directory')
+        before = {k: v for k, v in existing.items() if k not in ['native', 'binary', 'sharedGeometry', 'batchDomains', 'upgradeValidationSha256']}
+        after = {k: v for k, v in fingerprint.items() if k not in ['native', 'binary', 'sharedGeometry', 'batchDomains', 'upgradeValidationSha256']}
+        if not proof or before != after or existing['native'] != proof['oldNativeSha256'] or existing['binary'] != proof['oldBinarySha256']:
+            raise ValueError('frozen inputs/binary/settings changed; use a separate evidence directory')
+        save(directory / ('execution-before-' + existing['native'][:12] + '.json'), existing)
     save(directory / 'execution.json', fingerprint)
     (directory / 'all-exit-status.txt').unlink(missing_ok=True)
     ids = settings['sourceIds']
     env = os.environ.copy()
     env['HOBBER_BUDGET_THREADS'] = str(args.threads)
     env.pop('HOBBER_BUDGET_LEGACY_ENDS', None)
+    env['STOCKKIT_RAKE_BATCH_DOMAINS'] = '1' if proof else '0'
     env['LD_LIBRARY_PATH'] = ':'.join(map(str, [args.native.resolve(), root / '../machine-tending/app/build/host/native/cadkit',
         Path('/home/joao/dev/materia-cache/occt-f1dc4efb-release/lib'), root / 'haxeon/.tools/hashlink', root / 'haxeon/out']))
 
@@ -185,19 +214,56 @@ def main():
     signal.signal(signal.SIGINT, stop_children)
 
     def cut(mode):
+        if mode in adopted:
+            row = adopted[mode]
+            pid = int(row['pid'])
+            print(f'ADOPTING {mode} pid={pid}', flush=True)
+            while not stopping.is_set():
+                try:
+                    command = Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')
+                except FileNotFoundError:
+                    break
+                if len(command) < 2 or not any(path in command for path in [str(directory / 'main.hl').encode(),str(binary).encode()]) or mode.encode() != command[-2]:
+                    break  # Exited/reaped, or PID reused: never signal it.
+                time.sleep(5)
+            if stopping.is_set():
+                raise RuntimeError('scheduler stopped; adopted native cut left running')
+            validate(load(directory / f'{mode}.json'), not mode.startswith('lead-'))
+            results = [json.loads(line.split(' ', 1)[1]) for line in (directory / f'{mode}.log').read_text().splitlines()
+                       if line.startswith('HOBBING_ERROR_RESULT ')]
+            if not results:
+                raise RuntimeError(f'{mode}: adopted process has no completed-cut log')
+            prior = load(directory / f'{mode}-execution.json') or {}
+            save(directory / f'{mode}-execution.json', dict(prior, exitCode=prior.get('exitCode'), completedCut=True, adopted=True,
+                 wallSeconds=results[-1]['wallSeconds'], threads=results[-1]['threads'], nativeSha256=row['nativeSha256'],
+                 sharedGeometry=row.get('sharedGeometry', False), acceptanceBasis='complete physical measurement and successful cut log; old launcher replaced, OS exit status unavailable'))
+            print(f'ADOPTED_COMPLETED {mode}', flush=True)
+            return
         started = time.monotonic()
         with (directory / f'{mode}.log').open('w') as log:
-            child = subprocess.Popen([str(root / 'haxeon/.tools/hashlink/hl'), str(directory / 'main.hl'),
-                'reference-budget', str(directory / 'inputs.json'), str(directory), mode], cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT)
-            with child_lock:
-                children.add(child)
-                if stopping.is_set():
-                    child.terminate()
+            while True:
+                with child_lock:
+                    if stopping.is_set():
+                        raise RuntimeError('scheduler stopped')
+                    available = int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemAvailable:'))) * 1024
+                    pending = 0
+                    for running in children:
+                        try:
+                            rss = int(Path(f'/proc/{running.pid}/statm').read_text().split()[1]) * os.sysconf('SC_PAGE_SIZE')
+                        except FileNotFoundError:
+                            rss = 0
+                        pending += max(0, worker_memory - rss)
+                    if available >= pending + worker_memory + 3 * 1024**3:
+                        child = subprocess.Popen([str(root / 'haxeon/.tools/hashlink/hl'), str(binary),
+                            'reference-budget', str(directory / 'inputs.json'), str(directory), mode], cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT)
+                        children.add(child)
+                        break
+                stopping.wait(5)
             returncode = child.wait()
             with child_lock:
                 children.remove(child)
         save(directory / f'{mode}-execution.json', dict(exitCode=returncode, wallSeconds=time.monotonic()-started,
-                                                       threads=args.threads, executionFingerprint=digest(directory / 'execution.json')))
+                                                       threads=args.threads, nativeSha256=native_hash, sharedGeometry=bool(proof), executionFingerprint=digest(directory / 'execution.json')))
         if returncode:
             raise RuntimeError(f'{mode} exited {returncode}; see its log')
 
@@ -232,8 +298,9 @@ def main():
                 # Verify identity before signalling; PID reuse must not kill unrelated work.
                 try:
                     command = Path(f'/proc/{args.legacy_pid}/cmdline').read_bytes().split(b'\0')
-                    if str(legacy / 'main.hl').encode() in command and command[-2] == b'all':
+                    if len(command) >= 2 and str(legacy / 'main.hl').encode() in command and command[-2] == b'all':
                         os.kill(args.legacy_pid, signal.SIGTERM)
+                        save(legacy / 'replacement.json', dict(status='deliberately stopped after table-radial', pid=args.legacy_pid, replacement=str(directory)))
                 except (ProcessLookupError, FileNotFoundError):
                     pass
             if label == 'baseline':
@@ -281,7 +348,8 @@ def main():
         raise
     result['scope'] = settings['scope']
     result['execution'] = dict(workers=args.workers, threadsPerCut=args.threads, faceEndpoints=True,
-                               settingsUnchanged=True, provenance='execution.json and per-case execution/settings files')
+                               settingsUnchanged=True, sharedGeometryForNewCuts=bool(proof),
+                               provenance='execution.json and per-case execution/settings files; adopted cuts retain their original native hash')
     save(directory / 'result.json', result)
     (directory / 'all-exit-status.txt').write_text('0\n')
     print('ALL_COMPLETED', flush=True)

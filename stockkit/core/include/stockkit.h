@@ -587,6 +587,12 @@ SK_API void SK_CALL sk_rake_tool_destroy(sk_rake_tool_handle tool);
 SK_API sk_result SK_CALL sk_ring_stock_sweep_rake(sk_ring_stock_handle stock, sk_rake_tool_handle tool,
     uint32_t gash, uint32_t pass, const sk_rake_pose *poses SK_IN_ARRAY(pose_count), uint32_t pose_count);
 
+/* The same physical sweep on two distinct domains, sharing geometry processing.
+ * All arguments are validated before mutation; failure restores both domains. */
+SK_API sk_result SK_CALL sk_ring_stock_sweep_rake_pair(sk_ring_stock_handle first, sk_ring_stock_handle second,
+    sk_rake_tool_handle tool, uint32_t gash, uint32_t pass,
+    const sk_rake_pose *poses SK_IN_ARRAY(pose_count), uint32_t pose_count);
+
 #ifdef __cplusplus
 }
 #endif

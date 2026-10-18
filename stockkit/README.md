@@ -89,6 +89,16 @@ class. Nonlinear motion must be resolved by the caller's time knots and sampling
 A failed job restores the incoming stock; each native pass is atomic. `cutPass` exposes one
 sampling resolution for studies. Gash/pass endpoint provenance is preserved.
 
+`HobbingSweep.cutPassMany` can share native geometry processing between pairs of
+independent inspection domains. Set `STOCKKIT_RAKE_BATCH_DOMAINS=1` before creating
+the sweep to opt in. It uses `sk_ring_stock_sweep_rake_pair`; an odd final domain
+uses the ordinary sweep. Both domains keep independent circle intersections,
+interval unions and provenance. Invalid arguments leave both stocks unchanged,
+and an exception during application restores both domains. Transforms and prism
+bounds are streamed once per pair, with no geometry cache across passes. Sweep
+sampling, tolerances and thread counts remain explicit. The ordinary single-stock
+force path is unchanged.
+
 Focused checks live in `tests/hobbing/haxeon.json` and also run as a main StockKit test group.
 They cover generating facets and their inverse-square gash-count trend, multiple starts, pitch
 thickness, axial-feed marks, controller interpolation and rollback. Their acceptance runs use

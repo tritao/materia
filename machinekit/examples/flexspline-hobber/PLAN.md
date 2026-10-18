@@ -1651,3 +1651,59 @@ python3 machinekit/examples/flexspline-hobber/review-reference-budget.py \
 While the old table case is still running, set `HOBBER_BUDGET_LEGACY_PID` to its
 verified PID when starting the scheduler so it can stop the superseded serial
 batch after saving that case. Do not start a second batch beside the live one.
+
+### HB11 native paired-domain speedup (2026-10-18)
+
+- A 30 s live profile puts **90–93% of sampled CPU time in native rake workers**.
+  The focused change shares transforms, triangle thickness and prism bounds
+  between two stock domains inside one native call. Each domain retains its own
+  clipping, interval union and provenance. `sk_ring_stock_sweep_rake_pair` validates
+  both domains first and restores both on application exceptions. The existing
+  single-domain API and force path are unchanged; the C ABI addition is additive.
+- `HobbingSweep.cutPassMany` opts in with `STOCKKIT_RAKE_BATCH_DOMAINS=1`, captured
+  when the sweep is created. It pairs domains and sweeps any odd final domain
+  normally. Geometry is streamed, not retained across passes. Whole-sweep cache
+  prototypes were rejected: a large engaged case exceeded their memory limits
+  and fallback overhead made them slower. No acceptance cut used those caches.
+- Paired, interleaved benchmark at windows **30,000–30,099**: **70.9068 s ->
+  54.6342 s**, **1.29785x** speedup (about **23% less cut time**). Both paths use
+  exactly **110,383 poses**, and every inspected endpoint/provenance value matches;
+  the maximum symmetric-difference arc length is zero, including physical ends.
+  Both begin from the same 2,400-window coarse-precut seed. This fixture tests
+  geometry and throughput, not full-stroke grading or total batch runtime.
+- All accepted numerical settings remain unchanged: **4 threads per new cut,
+  0.0015/0.04 mm grid, 0.000025 mm sweep, 0.0000015625 mm path tolerance**, and the
+  complete HB8 schedule and force/sync histories. No coarser grid or inactive-knot
+  pruning has been adopted. A separate reference compatibility fixture retains
+  the previous stock/provenance hash exactly. All **three native suites** pass;
+  new pair tests cover different grids, 1/4/8 configured thread counts, invalid
+  second handles, duplicate domains and invalid poses. The binding audit passes
+  Linux, Windows and both macOS architectures.
+- Evidence: `build/flexspline-shared-sweep/validation.json`,
+  `paired-streaming/geometry-speed.json`, `pair-compatibility/engaged.json` and
+  `engaged-profile.txt`. A hash-bound proof selects the new native library and
+  frozen `main-batched.hl` for future cases. The original executable, native
+  library and execution fingerprint remain archived. The benchmark's compiled
+  Haxe source is retained alongside its binary; later cleanup only removes
+  unused experimental benchmark branches from repository source.
+- The old Python launcher alone was replaced. Its three active native cuts
+  (**combined, table-axial, lead-mandrel**) retain their PIDs, original executable,
+  native library and progress; the new launcher adopts their completed artifacts.
+  The original table-radial case still finishes before the serial runner stops.
+  HB4 and the face-end supplement continue unchanged. Adopted cuts retain their
+  original library hash; where the replaced launcher cannot report an OS exit
+  status, the record explicitly says so and requires the completed physical
+  measurement and successful cut log.
+- One additional **encoder-eccentricity** full source cut starts immediately with
+  paired domains, in a separate **1,500 MiB / no-swap** scope. Its result is reused
+  by the four-slot budget scheduler rather than cut again. This is an additional
+  bounded full-source validation while existing cuts finish, not a fifth permanent
+  worker. Each fresh worker launch reserves estimated memory, including workers
+  still allocating, while leaving **3 GiB available headroom**. Existing adopted
+  allocations are not counted twice.
+- The fast scheduler regression uses synthetic saved results and a real short
+  child process: completed cases survive a native/bytecode upgrade, an active
+  child is adopted without restarting it, old execution provenance is archived,
+  restarts reuse saved cases, and a slower candidate is rejected without changing
+  completed acceptance status. Full-reference and HB11/HB12 acceptance remain
+  pending; the short benchmark does not establish an hours-scale full-batch ETA.
