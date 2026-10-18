@@ -7,7 +7,7 @@ enum ThreadHand {
 	@:id(2) LeftHand;
 }
 
-/** Nominal thread profile; ball races have no cosmetic flank profile. */
+/** Nominal thread profile; ball races use rounded cosmetic grooves. */
 @:wire
 enum ThreadProfile {
 	@:id(1) Metric;

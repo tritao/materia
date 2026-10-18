@@ -3,6 +3,7 @@ package machinekit.motion;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentRecipeSupport;
+import cadkit.threads.ThreadedFace.ThreadStart;
 
 /** Generic SFU1605 screw. Race root and efficiency are assumed reference values.
  * The shaft, support critical speed and transmission use the same screw model as sliding screws.
@@ -38,10 +39,17 @@ class BallScrew extends LeadScrew {
 	}
 
 	override public function geometry(detail:machinekit.component.ComponentDetail = Preview):cadkit.modeling.Part {
-		return machinekit.component.Solids.union([
+		var shaft = machinekit.component.Solids.union([
 			machinekit.component.Solids.named(cadkit.modeling.Part.cylinderSpan(JOURNAL_DIAMETER / 2, 0, INPUT_JOURNAL_LENGTH), "input-journal"),
 			machinekit.component.Solids.named(cadkit.modeling.Part.cylinderSpan(thread.screwDiameter / 2, INPUT_JOURNAL_LENGTH, totalLength - JOURNAL_LENGTH), "race"),
 			machinekit.component.Solids.named(cadkit.modeling.Part.cylinderSpan(JOURNAL_DIAMETER / 2, totalLength - JOURNAL_LENGTH, totalLength), "output-journal")]);
+		if (detail == Envelope) return shaft;
+		try {
+			var result = new cadkit.modeling.Part(cadkit.threads.Threads.attach(
+			    shaft.shape, "race:cyl.side", thread.threadSpec(), AxisMinimum));
+			shaft.close();
+			return result;
+		} catch (error:Dynamic) { shaft.close(); throw error; }
 	}
 
 	public static function sfu1605(length:Float):BallScrew return new BallScrew(length);

@@ -16,7 +16,6 @@ import nativekit.scene.NodeId;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import materia.project.ThreadSpecData;
-import materia.project.ThreadSpecData.ThreadProfile;
 
 private typedef ThreadTextures = {var color:Texture; var normal:Texture; var colorImage:SceneImage; var normalImage:SceneImage; var references:Int;}
 private typedef ThreadNode = {var node:NodeId; var geometry:Geometry; var material:Material; var textureKey:String;}
@@ -60,7 +59,6 @@ class CosmeticThreadPresentation {
       var nodes:Array<ThreadNode> = [];
       try {
         for (thread in cad.threads) {
-          if (thread.source.spec.profile == Ball) continue;
           var data = CosmeticThreadMesh.build(cad, thread);
           if (data.triangleCount() == 0) continue;
           var key = '${thread.source.spec.profile}|${thread.source.spec.majorDiameter}|${thread.source.spec.pitch}|${thread.source.spec.starts}';

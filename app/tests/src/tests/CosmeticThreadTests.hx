@@ -116,6 +116,53 @@ class CosmeticThreadTests {
     check(!sameBytes(CosmeticThreadTexture.pixels(new ThreadSpec("TR6x1", 6, 1, 1, RightHand, false, null, Trapezoidal).data(), true), normal), "trapezoidal flanks differ from metric flanks");
   }
 
+  static function ballRace():Void {
+    for (length in [105.0,237.0,600.0]) {
+      var screw = new machinekit.motion.BallScrew(length);
+      var part = screw.geometry(), envelope = screw.geometry(Envelope);
+      near(part.volume(), envelope.volume(), "cosmetic ball race preserves CAD volume");
+      check(Threads.ofShape(envelope.shape).length == 0, "collision envelope has no cosmetic thread");
+      envelope.close();
+      var threads = Threads.ofShape(part.shape);
+      check(threads.length == 1 && threads[0].attribute.faceName == "race:cyl.side", "only central race is threaded");
+      near(threads[0].frame.origin.z, 50, "race starts after input journal");
+      near(threads[0].length, length - 75, "race ends before output journal");
+      check(threads[0].attribute.spec.profile == Ball && !threads[0].attribute.spec.internal, "external rounded ball profile");
+      near(threads[0].attribute.spec.pitch, 5, "ball race pitch");
+      check(threads[0].attribute.spec.hand == RightHand, "ball race hand");
+      var cad:CadGeometryData = cast CadSceneGeometry.fromMesh(part.shape.tessellate(), part.shape);
+      var overlay = CosmeticThreadMesh.build(cad, cad.threads[0]);
+      check(overlay.triangleCount() > 0, "ball race overlay exists");
+      var positions = stream(overlay, 1).bytes;
+      for (index in 0...overlay.vertexCount()) {
+        var z = positions.getFloat(index * 12 + 8);
+        check(z >= 0.05 - 1e-7 && z <= (length - 25) / 1000 + 1e-7, "overlay excludes both journals");
+      }
+      part.close();
+      var exported = machinekit.assembly.AssemblyPreview.part("screw", "Ball screw", screw.geometry(), screw.materialId);
+      var saved = materia.project.SceneArtifact.decode(materia.project.SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:[exported]}));
+      var savedThreads = saved.parts[0].threads;
+      if (savedThreads == null) throw "Missing saved ball race";
+      check(savedThreads.length == 1 && savedThreads[0].spec.profile == Ball, "ball profile survives artifact round trip");
+      var generated:Map<String,GeometryData> = []; generated.set("ball-race",cad);
+      var scene = new EditorScene([{id:"ball",label:"Ball screw",type:"cad-preview",x:0.0,y:0.0,z:0.0,
+        width:0.016,height:0.016,depth:length/1000,collisionEnabled:false,dynamicBody:false,mass:1.0,
+        red:0.7,green:0.7,blue:0.7,visible:true,meshSnapshot:"ball-race"}],null,null,generated);
+      try {
+        scene.configureRenderView(new SceneView(),Transform.identity());
+        check(scene.presentation.threads.nodesFor("ball").length == 1, "ball race creates runtime visual child");
+      } catch (error:Dynamic) { scene.dispose(); throw error; }
+      scene.dispose();
+    }
+    var spec = new ThreadSpec("BALL16x5",16,5,1,RightHand,false,null,Ball).data();
+    var normal = CosmeticThreadTexture.pixels(spec,true);
+    check(!sameBytes(normal,CosmeticThreadTexture.pixels(new ThreadSpec("M16x5",16,5).data(),true)), "rounded groove differs from metric flanks");
+    for (pixel in 0...Std.int(normal.length/4)) {
+      var offset = pixel*4, x = normal.get(offset)/127.5-1, y = normal.get(offset+1)/127.5-1, z = normal.get(offset+2)/127.5-1;
+      check(Math.abs(x*x+y*y+z*z-1)<0.02,"ball race mip normals normalized");
+    }
+  }
+
   static function presentation():Void {
     var geometry = cylinder(20);
     var generated:Map<String, GeometryData> = []; generated.set("thread-mesh", geometry);
@@ -164,7 +211,7 @@ class CosmeticThreadTests {
   }
 
   public static function main():Int {
-    mesh(); texture(); presentation();
+    mesh(); texture(); presentation(); ballRace();
     trace('CosmeticThreadTests passed ($checks checks)');
     return 0;
   }

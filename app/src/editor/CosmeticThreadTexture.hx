@@ -11,7 +11,6 @@ class CosmeticThreadTexture {
   public static inline var MIPS:Int = 8;
 
   public static function image(spec:ThreadSpecData, normal:Bool):ImageData {
-    if (spec.profile == Ball) throw "Ball races have no cosmetic flank profile";
     var bytes = pixels(spec, normal);
     return new ImageData(SIZE, SIZE).setMipCount(MIPS).setPixels(bytes);
   }
@@ -29,6 +28,15 @@ class CosmeticThreadTexture {
       // A flat crest and root avoid infinitely sharp texture cusps.
       var height = Math.max(0, Math.min(1, (distance - 0.12) / 0.28));
       var slope = distance > 0.12 && distance < 0.4 ? (phase < 0.5 ? -flank : flank) : 0.0;
+      if (spec.profile == Ball) {
+        // Smooth rounded raceway with a flat land. Cosmetic only: this is not
+        // a supplier-qualified ball-contact section or a CAD displacement.
+        var width = 0.36;
+        var t = Math.min(1, distance / width);
+        height = 0.5 - 0.5 * Math.cos(Math.PI * t);
+        slope = distance < width ? (phase < 0.5 ? -1 : 1)
+          * 0.2 * Math.PI / (2 * width) * Math.sin(Math.PI * t) : 0;
+      }
       var offset = (y * SIZE + x) * 4;
       if (normal) {
         var nx = -slope * helix, ny = slope, nz = 1.0;
