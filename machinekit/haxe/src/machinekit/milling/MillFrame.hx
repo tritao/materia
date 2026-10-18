@@ -17,11 +17,14 @@ class MillFrame extends MachineAssembly {
 	public final layout:MillFrameLayout;
 	public final base:MineralFoundation;
 	public final column:MineralFoundation;
+	public final zAxis:Null<MillZAxisLayout>;
 
-	public function new(layout:MillFrameLayout) {
+	public function new(layout:MillFrameLayout, ?zAxis:MillZAxisLayout) {
 		super();
 		if (layout == null) throw "Mill frame needs a layout";
 		this.layout = layout;
+		if (zAxis != null && zAxis.frame != layout) throw "Frame and Z datums must share one layout";
+		this.zAxis = zAxis;
 		var l = layout, baseVoids:Array<CastingBox> = [], baseInserts:Array<CastInsertPlacement> = [];
 		var beamOuter = (l.yRailSpacing + l.seatWidth) / 2;
 		var outerWidth = l.baseWidth / 2 - l.wall - beamOuter;
@@ -57,12 +60,24 @@ class MillFrame extends MachineAssembly {
 		include("base", base, F.translation(0, l.baseCentreY, 0));
 
 		var columnVoids:Array<CastingBox> = [], columnInserts:Array<CastInsertPlacement> = [];
+		var frontWeb = zAxis == null ? l.roof : Math.max(l.roof, zAxis.channelBack + l.wall - (l.columnCentreY - l.columnDepth / 2));
+		if (zAxis != null) {
+			var channelFront = l.columnCentreY - l.columnDepth / 2 - 1;
+			columnVoids.push(CastingFeatures.box("z-drive-channel", zAxis.channelWidth, zAxis.channelBack - channelFront,
+				l.columnHeight + 2, 0, (channelFront + zAxis.channelBack) / 2 - l.columnCentreY, -1));
+			for (side in [-1, 1]) for (end in ["Lower", "Upper"]) {
+				var start = end == "Lower" ? 0.0 : l.zRailStart + l.zRailLength;
+				columnInserts.push(insert('drive$end${side < 0 ? "Left" : "Right"}', l.seatWidth, 20, l.insertThickness,
+					"Z bearing mount anchor", F.fromRotationMatrix(side * l.zRailSpacing / 2,
+						-l.columnDepth / 2 + l.insertThickness - l.seatRise, start + 10, [1,0,0, 0,0,-1, 0,1,0])));
+			}
+		}
 		var chamberHeight = (l.columnHeight - 2 * l.roof - l.wall) / 2;
 		// Rear-open chambers leave a thick front web, side walls, sole, top and
 		// cross rib. This avoids prescribing inaccessible sealed internal cores.
 		for (row in 0...2) columnVoids.push(CastingFeatures.box('rear-chamber-$row',
-			l.columnWidth - 2 * l.wall, l.columnDepth - l.roof + 1, chamberHeight,
-			0, (l.roof + 1) / 2, l.roof + row * (chamberHeight + l.wall)));
+			l.columnWidth - 2 * l.wall, l.columnDepth - frontWeb + 1, chamberHeight,
+			0, (frontWeb + 1) / 2, l.roof + row * (chamberHeight + l.wall)));
 		for (side in [-1, 1]) columnInserts.push(insert(side < 0 ? "railZLeft" : "railZRight",
 			l.seatWidth, l.zRailLength, l.insertThickness, "Z guide seat",
 			F.fromRotationMatrix(side * l.zRailSpacing / 2, -l.columnDepth / 2 + l.insertThickness - l.seatRise,

@@ -8,6 +8,10 @@ class MillingComponents {
 		registry.register(MillPanel.recipeType());
 		registry.register(MillSupportTray.recipeType());
 		registry.register(MillCasting.recipeType());
+		registry.register(MillZCarriage.recipeType());
+		registry.register(MillZHead.recipeType());
+		registry.register(MillZBearingPlate.recipeType());
+		registry.register(MillZMotorStand.recipeType());
 		registry.register(SpindleCartridge.recipeType());
 		registry.register(SpindleCartridge.Er20Holder.recipeType());
 		registry.register(SpindleMotor.recipeType());

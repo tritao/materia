@@ -17,7 +17,7 @@ class MillFrameChecks {
 		check(rejected, label);
 	}
 	public static function main():Void {
-		var reference = new BenchMill(false, false), layout = MillFramePreview.layout(reference), frame = new MillFrame(layout);
+		var reference = new BenchMill(false, false), layout = MillFramePreview.layout(reference), frame = new MillFrame(layout, MillFramePreview.zLayout(reference, layout));
 		frame.validate();
 		var poses = frame.solvedPoses();
 		for (foundation in [frame.base, frame.column]) {
@@ -65,12 +65,12 @@ class MillFrameChecks {
 		var studyPoses:Map<String, AssemblyFrame> = study.solvedPoses();
 		var referencePoses:Map<String, AssemblyFrame> = reference.solvedPoses();
 		check(study.components().filter(m -> m.id == "reference/base" || m.id == "reference/column").length == 0, "old structural bodies omitted");
-		for (id in ["railYLeft", "railZLeft", "saddle", "table", "head", "tool", "screwX", "screwY", "screwZ"]) {
+		for (id in ["railYLeft", "saddle", "table", "screwX", "screwY"]) {
 			var expected:AssemblyFrame = referencePoses.get(id);
 			var actual:AssemblyFrame = studyPoses.get('reference/$id');
 			check(actual != null, 'reference part $id included');
-			near(actual.x - expected.x, id == "screwZ" ? MillFramePreview.zDriveOffset(reference, frame) : 0,
-				"reference X or explicit Z drive clearance shift"); near(actual.y, expected.y, "reference Y retained");
+			near(actual.x - expected.x, 0,
+				"reference X retained"); near(actual.y, expected.y, "reference Y retained");
 			near(actual.z - expected.z, layout.railPlane - reference.base.height, "common datum shift");
 		}
 		var interfaces:MillFrameInterfaces = {yRailSpacing: layout.yRailSpacing, yRailStart: layout.yRailStart,

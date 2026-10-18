@@ -4,33 +4,52 @@ The working `BenchMill` has 250 mm X, 150 mm Y and 250 mm Z travel.
 `EnclosedBenchMill` adds its stand, tray, guarding and tending interfaces.
 `MillBasePreview` isolates that existing stand; it is not the machine frame.
 
-## New structural concept
+## Structural frame and mechanical Z axis
 
-`MillFramePreview` derives the guide datums from the real `BenchMill` assembly
-and builds a separate `machinekit.milling.MillFrame`. The existing machine and
-its motion/controller model remain available unchanged.
+`MillFramePreview` derives the working envelope from `BenchMill` and builds
+`machinekit.milling.MillFrame`. The legacy machine keeps its independent,
+working motion/controller model while the new frame develops separately.
 
-The mill-specific layout uses two shared `MineralFoundation` assemblies:
+The mill-specific frame uses shared `MineralFoundation` assemblies:
 
-- A lower casting with full-height longitudinal beams under the Y seats, a
-  transverse rib, six underside-open pockets and a solid rear column support.
-- A separate column casting with two rear-open chambers, a thick front web and
-  a cross rib.
-- Separate steel Y/Z guide inserts, four pairs of column mounting pads, and
-  four underside foot interfaces. Each insert has a matching casting recess.
+- A lower casting with full-height Y rail beams, a transverse rib, six
+  underside-open pockets, a solid rear column support and steel mounting seats.
+- A separate column with two rear-open chambers, a central front-open screw
+  channel, a thick web behind that channel, and steel rail/bearing-mount seats.
+- Four pairs of steel column mounting pads and four underside foot interfaces.
+  Every insert has a matching casting recess, avoiding double-counted mass.
 
-`MillFrameLayout` takes typed guide interfaces and structural options. It owns
-mill layout constraints; shared casting, insert, mass and persistence code stays
-in `machinekit.structural`. A future lathe bed should supply its own layout on
-that same structural layer, rather than add machine-type switches here.
+`MillFrameLayout` owns the mill layout. `MillZAxisLayout` sizes the central-drive
+Z interfaces from the guide, nut, bearing and motor envelopes. The Z rail span
+is now 180 mm, compared with the old machine's 110 mm. Its 250 mm stroke and
+spindle/work datums are retained; the carriage and spindle head are redesigned.
 
-The initial concept uses a 520 mm wide, 220 mm high base and a 320 × 260 mm
-column cross-section. Base depth follows the Y guides and column support,
-not the enclosure footprint. Steel seats finish 4 mm above/in front of their
-castings, with 16 mm embedded thickness. These are concept dimensions; they
-are not validated process minima or calculated stiffness requirements.
+`MillZAxis` is a mechanical assembly with a real `z` prismatic joint and a coupled
+rotating screw. It includes:
 
-Generate the inspection artifacts from the repository root:
+- Two rails and four carriage blocks, with a broad steel carriage plate.
+- A central ball nut on a gusseted shelf behind the carriage, inside the casting
+  channel, with 3 mm nominal clearance to the channel sides and back.
+- A ribbed fabricated steel spindle head projecting from the carriage.
+- Upper fixed and lower floating bearing units on machined steel crossplates.
+- A stationary motor on an open U stand, a coupling, shaft, and spring-applied
+  shaft-brake hardware. The stand and bearing plates connect to steel anchors
+  in the column; their contact interfaces are checked in CAD.
+
+The new carriage, head, bearing plates and motor stand have registered component
+recipes. The Z assembly rebuilds with the standard registry, including its
+kinematic joints and lead-screw relation. Shared casting/insert code stays in
+`machinekit.structural`; future lathe layouts belong in a separate machine package.
+
+The base is initially 520 mm wide and 220 mm high, with depth determined by the
+Y guides and rear column support. The column cross-section is 320 × 260 mm.
+Steel seats finish 4 mm above/in front of their castings, with 16 mm embedded
+thickness. These and the fabricated-part thicknesses are design assumptions,
+not calculated stiffness requirements or validated casting-process minima.
+
+## Inspect and check
+
+From the repository root:
 
 ```sh
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.frame.json
@@ -39,35 +58,52 @@ Generate the inspection artifacts from the repository root:
 
 Outputs in `build/`:
 
-- `mill-frame.mtrg`: the castings and steel interfaces alone.
-- `mill-frame-concept.mtrg`: frame plus reference rails, carriages, table, head,
-  spindle, screws, support units and motors in their original initial arrangement.
-- `mill-frame-concept.json`: travel, principal dimensions, casting masses and
-  remaining design work.
+- `mill-frame.mtrg`: castings and steel interfaces alone.
+- `mill-z-axis.mtrg`: frame with the actual mechanical Z assembly.
+- `mill-frame-concept.mtrg`: that same structure plus frozen X/Y reference
+  hardware and the existing spindle drive attached to the moving Z head.
+- `mill-frame-concept.json`: travel, dimensions, casting masses, clearance-audit
+  status and remaining design work.
 
-The reference parts are a **static arrangement study**, not an operable machine.
-The guides and moving bodies share a single vertical datum shift; their internal
-axis geometry is not resized. The Z screw, support units and motor move sideways
-by an additional explicit offset so the nut clears the wider column; the offset
-is derived from the actual nut flange diameter and recorded in the report. The old structural bodies, electrical equipment and structure-specific
-mounting brackets are omitted. Screw/motor support adapters, their steel insert
-patterns and fasteners still need design, including the longer Z nut-to-head
-adapter required by that sideways offset.
-Do not infer full-travel clearance or load capacity from the initial picture.
-
-Run focused checks:
+The full preview uses `zAxis/z` for the new joint. The spindle, tool and spindle
+motor supports follow it; the Z motor stays stationary. X and Y remain frozen
+reference arrangements, with their new mounting adapters still to be designed.
+The spindle motor shelf/riser come from the existing machine, and their contacts
+with the new head and motor are checked. The old Z head, rails, side screw and
+mounts are omitted. Preview generation runs the Z structural clearance audit and
+refuses output if it fails. This is not a powered CNC/controller integration.
 
 ```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.z-axis-tests.json
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.frame-tests.json
 ./haxeon/scripts/haxeon run --project=machinekit/tests/casting/haxeon.json
 ```
 
-Checks cover connected CAD solids, non-overlapping steel/casting volumes,
-solved guide planes and column-pad contact, assembly recipe roundtrips, reference
-part datums and rejected layouts. They do not replace a full-travel collision
-sweep, static/modal analysis, or mold/process design.
+`MillZAxisIntegrity` checks conservative CAD swept envelopes over the complete
+nominal Z stroke against both castings, every insert, the rails, bearing mounts,
+bearings and stationary motor/stand. The envelope decomposition includes the
+carriage plate, nut shelf/gussets, nut, head and all four blocks. The head envelope
+comes from its actual CAD bounds. This continuous check is separate from the
+51-position joint-motion test. A negative control confirms a column without the
+channel produces real swept-volume collisions.
 
-Next: resolve drive supports and fasteners, audit the full motion envelope,
-compare column alternatives, then design chip drainage, lifting points, molds
-and the separate enclosure. Material properties remain the shared assumed
-mineral-cast values; this study does not claim the reference images' UHPC grade.
+Checks also cover connected solids, physical support contact without overlap,
+steel/casting partitioning, guide planes and column-pad contact, recipe roundtrips,
+coupled screw rotation, and spindle-payload motion after integration.
+
+## Remaining design work
+
+X/Y supports and carriage attachments still need mechanical design. Nominal
+bracket holes are modeled, but vendor-specific mounting patterns, tapped insert
+holes, installed fasteners, weld details and insert anchorage remain unfinished.
+The generic motor does not supply a verified bolt pattern; the stand's explicit
+40 mm square pitch is an assumed interface. The modeled brake is not yet bound
+to electrical control or simulation interlocks.
+
+The structural Z clearance audit does not qualify cutting-load capacity, bracket
+or weld stiffness, whole-machine XYZ clearance, tool/work contact, or overrun
+beyond nominal joint limits. Those checks, material qualification and static/modal
+analysis precede manufacture. Chip drainage, lubrication access, guards, lifting,
+molds and the separate enclosure follow the mechanical layout. Mineral-cast
+properties remain the shared assumptions; this study does not claim the pictured
+reference machine's UHPC grade.

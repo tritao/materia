@@ -27,7 +27,10 @@ The mill pedestal, mill structural frame and hobber bed/column supply machine-sp
 layouts to these shared components. `machinekit.milling.MillFrame` uses a typed
 `MillFrameLayout` to build a ribbed base and separate column with steel mounting
 interfaces. See [the bench-mill frame study](examples/bench-mill/README.md) for
-its static full-machine preview, checks and remaining design work.
+its mechanical Z assembly, full-machine preview, checks and remaining design work.
+`MillZAxis` supplies the real carriage/head motion, central screw, supported motor
+and bearing mounts; `MillZAxisIntegrity` audits continuous structural swept volumes.
+The full concept still uses frozen X/Y reference hardware.
 All void dimensions and frames are persisted in recipe values;
 a saved assembly rebuilds with the standard component registry. Casting purchasing
 mass comes from actual CAD volume and the common `mineral-cast` material. Its
