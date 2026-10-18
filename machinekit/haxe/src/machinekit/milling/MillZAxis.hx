@@ -28,6 +28,7 @@ class MillZAxis extends AxisBuilder {
 		place("fixedMount", upper, F.translation(0, f.columnFront - l.mountThickness / 2, l.upperBottom));
 		var lower = new MillZBearingPlate(new ComponentValues().setNumber("width", width)
 			.setNumber("height", l.lowerHeight).setNumber("thickness", l.mountThickness)
+			.setNumber("crossShaftZ", l.crossDriveZ == null ? 0 : l.crossDriveZ - f.railPlane)
 			.setNumber("bearingZ", l.lowerHeight / 2).setNumber("anchorZ", 10).setNumber("anchorSpacing", f.zRailSpacing));
 		attach("floatingMount", lower, F.translation(0, f.columnFront - l.mountThickness / 2, f.railPlane), "fixedMount");
 		attach("fixedBearing", l.fixed, down(0, l.screwY, l.fixedZ), "fixedMount");

@@ -109,7 +109,7 @@ class MillXYStageIntegrity {
 			moving.close();
 		}
 		// Remove the rear hatch and its screws before extracting the motor along +Y.
-		var withdrawal = l.frame.rear - l.yMotorFace + l.motor.rating.shaftLength + l.clearance;
+		var withdrawal = l.yServiceRear - l.yMotorFace + l.motor.rating.shaftLength + l.clearance;
 		var extraction = [Part.cylinderAlongY(l.motor.rating.bodyDiameter / 2, l.yMotorFace,
 			l.yMotorFace + l.motor.rating.bodyLength + withdrawal, 0, l.yScrewZ),
 			Part.cylinderAlongY(l.motor.rating.shaftDiameter / 2, l.yMotorFace - l.motor.rating.shaftLength,
@@ -163,7 +163,7 @@ class MillXYStageIntegrity {
 	static function expectedHatchThread(bolt:String, insert:String):Bool {
 		for (end in ["Front", "Rear"]) for (side in [-1, 1]) for (name in ["Lower", "Upper"]) {
 			var prefix = end == "Front" ? "frontCoverBoltY" : "rearCoverBoltY";
-			if (bolt == '$prefix$side$name' && insert == 'base/hatch$end${side < 0 ? "Left" : "Right"}${name}') return true;
+			if (bolt == '$prefix$side$name' && insert == '${end == "Rear" ? "column" : "base"}/hatch$end${side < 0 ? "Left" : "Right"}${name}') return true;
 		}
 		return false;
 	}

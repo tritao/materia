@@ -52,6 +52,16 @@ class MillZAxisChecks {
 			var shape = member.component.geometry();
 			check(shape.valid() && shape.solidCount() == 1, 'valid connected ${member.id}'); shape.close();
 		}
+		var crossShaft = Part.cylinderAlongY(8, f.columnFront-30, l.screwY+40, 0, f.railPlane+l.block.spec.blockHeight);
+		for (id in ["floatingMount","floatingBearing","screw"]) {
+			var local=axis.component(id).geometry(), fixed=PosedParts.moved(local,pose(poses,id)); local.close();
+			noOverlap(crossShaft,fixed,"raised Y shaft clears lower Z hardware: "+id); fixed.close();
+		}
+		var unbored=new MillZBearingPlate(axis.component("floatingMount").values().setNumber("crossShaftZ",0)).geometry();
+		var blockedCrossing=PosedParts.moved(unbored,pose(poses,"floatingMount")); unbored.close();
+		var interference=crossShaft.intersect(blockedCrossing);
+		check(interference.volume()>1,"cross-axis negative control detects missing support-plate bore");
+		interference.close(); blockedCrossing.close(); crossShaft.close();
 		var registry = MachineKitComponents.standard();
 		var restored:MachineAssembly = MachineAssembly.decode(axis.encode(), registry);
 		restored.validate();

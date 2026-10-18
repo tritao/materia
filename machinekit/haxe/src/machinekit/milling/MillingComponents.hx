@@ -10,6 +10,7 @@ class MillingComponents {
 		registry.register(MillMotorCover.recipeType());
 		registry.register(MillDriveHatch.recipeType());
 		registry.register(MillYNutBridge.recipeType());
+		registry.register(MillYNutMount.recipeType());
 		registry.register(MillBeltMotorPlate.recipeType());
 		registry.register(MillSupportTray.recipeType());
 		registry.register(MillCasting.recipeType());

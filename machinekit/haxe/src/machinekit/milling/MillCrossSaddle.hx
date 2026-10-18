@@ -15,7 +15,7 @@ class MillCrossSaddle extends MachineComponent {
 		P.length("width", 450),
 		P.length("depth", 174),
 		P.length("height", 80),
-		P.length("bore", 54), P.flag("motorPocket", true), P.flag("sidePockets", false)
+		P.length("bore", 54), P.length("boreZ", 40), P.flag("motorPocket", true), P.flag("sidePockets", false)
 	];
 
 	public static function recipeType():ComponentType {
@@ -40,7 +40,7 @@ class MillCrossSaddle extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var w = parameterNumber("width"), d = parameterNumber("depth"), h = parameterNumber("height");
 		var tools:Array<Part> = [];
-		if (parameterNumber("bore") > 0) tools.push(Part.cylinderAlongY(parameterNumber("bore") / 2, -d / 2 - 1, d / 2 + 1, 0, h / 2));
+		if (parameterNumber("bore") > 0) tools.push(Part.cylinderAlongY(parameterNumber("bore") / 2, -d / 2 - 1, d / 2 + 1, 0, parameterNumber("boreZ")));
 		for (x in [-35.0, 35.0]) for (z in [-20.0, 20.0]) tools.push(Part.cylinderAlongY(2.5, d / 2 - 16, d / 2 + 1, x, h / 2 + z));
 		if (values().boolean("motorPocket")) {
 			var bore = Part.cylinderSpan(33, -226, -64);

@@ -40,7 +40,6 @@ class MillFrame extends MachineAssembly {
 		// transverse rib. The rear column support stays solid through the base.
 		for (i in 0...channels.length) for (row in 0...2) {
 			var channel = channels[i];
-			if (xyAxis != null && i == 0) continue; // The lowered drive needs a continuous central sole.
 			baseVoids.push(CastingFeatures.box('underside-$i-$row', channel.width, pocketLength,
 				l.baseHeight - l.roof + 1, channel.x,
 				pocketFront + pocketLength / 2 + row * (pocketLength + l.wall) - l.baseCentreY, -1));
@@ -55,29 +54,15 @@ class MillFrame extends MachineAssembly {
 				l.insertThickness, "Y drive bearing seat", F.translation(0, y - l.baseCentreY, xyAxis.yMountPlane - l.insertThickness)));
 		}
 		if (xyAxis != null) {
-			var a = xyAxis, floor = a.yMountPlane;
-			// Open-top moving bridge channel; it ends before the column support.
-			var channelEnd = l.columnFront - l.wall;
-			baseVoids.push(CastingFeatures.box("y-bridge-channel", a.yChannelWidth, channelEnd - l.yRailStart,
-				l.baseHeight - floor + 1, 0, (channelEnd + l.yRailStart) / 2 - l.baseCentreY, floor));
-			// A small shaft passage beneath the intact front cross-web joins the two bays.
+			var a = xyAxis;
 			var bayFront = a.yFixedY - a.fixed.length / 2 - a.clearance;
-			baseVoids.push(CastingFeatures.box("y-shaft-tunnel", 24, bayFront - channelEnd + 2, 24,
-				0, (bayFront + channelEnd) / 2 - l.baseCentreY, a.yScrewZ - 12));
-			baseVoids.push(CastingFeatures.box("rear-y-drive-bay", a.yBayWidth, l.rear + 1 - bayFront, a.yBayTop - floor,
-				0, (bayFront + l.rear + 1) / 2 - l.baseCentreY, floor));
-			var frontBayEnd = a.yFloatingY + a.floating.length / 2 + a.clearance;
-			baseVoids.push(CastingFeatures.box("front-y-bearing-bay", 106, frontBayEnd - l.front + 1, a.yBayTop - floor,
-				0, (frontBayEnd + l.front - 1) / 2 - l.baseCentreY, floor));
-			for (end in ["Front", "Rear"]) for (sx in [-1, 1]) for (z in [a.yHatchLowerZ, a.yHatchUpperZ]) {
-				var rear = end == "Rear", y = rear ? l.rear - 8 : l.front + 8;
-				baseInserts.push({id: 'hatch$end${sx < 0 ? "Left" : "Right"}${z == a.yHatchLowerZ ? "Lower" : "Upper"}',
-					part: new CastInsert(new ComponentValues().setNumber("width", 20).setNumber("depth", 20)
-						.setNumber("height", 10).setNumber("boreDiameter", 3.3).setToken("role", "service hatch anchor")),
-					pose: F.fromRotationMatrix(sx * 75, y - l.baseCentreY, z,
-						rear ? [1,0,0, 0,0,1, 0,-1,0] : [-1,0,0, 0,0,-1, 0,-1,0])});
-			}
+			// Only shallow bearing/motor-foot recesses remain in the base.
+			baseVoids.push(CastingFeatures.box("rear-y-drive-seat", a.yBayWidth, a.yServiceRear + 1 - bayFront,
+				l.baseHeight + 1 - a.yMountPlane, 0, (bayFront+a.yServiceRear+1)/2-l.baseCentreY, a.yMountPlane));
+			baseVoids.push(CastingFeatures.box("front-y-bearing-seat", 106, a.floating.length+2*a.clearance,
+				l.baseHeight + 1 - a.yMountPlane, 0, a.yFloatingY-l.baseCentreY, a.yMountPlane));
 		}
+
 		// Four independent steel pairs provide a broad column mounting interface.
 		var footWidth = l.wall, footDepth = l.roof;
 		for (sx in [-1, 1]) for (sy in [-1, 1]) {
@@ -117,12 +102,26 @@ class MillFrame extends MachineAssembly {
 						-l.columnDepth / 2 + l.insertThickness - l.seatRise, start + 10, [1,0,0, 0,0,-1, 0,1,0])));
 			}
 		}
+		if (xyAxis != null) {
+			var a = xyAxis, bayFront = a.yFixedY-a.fixed.length/2-a.clearance;
+			columnVoids.push(CastingFeatures.box("rear-y-motor-bay", a.yBayWidth, a.yServiceRear+1-bayFront,
+				a.yBayTop-l.railPlane+1, 0, (bayFront+a.yServiceRear+1)/2-l.columnCentreY, -1));
+			for (sx in [-1,1]) for (z in [a.yHatchLowerZ,a.yHatchUpperZ]) columnInserts.push({
+				id:'hatchRear${sx < 0 ? "Left" : "Right"}${z == a.yHatchLowerZ ? "Lower" : "Upper"}',
+				part:new CastInsert(new ComponentValues().setNumber("width",20).setNumber("depth",20).setNumber("height",10)
+					.setNumber("boreDiameter",3.3).setToken("role","rear motor hatch anchor")),
+				pose:F.fromRotationMatrix(sx*75,a.yServiceRear-8-l.columnCentreY,z-l.railPlane,[1,0,0, 0,0,1, 0,-1,0])});
+		}
 		var chamberHeight = (l.columnHeight - 2 * l.roof - l.wall) / 2;
 		// Rear-open chambers leave a thick front web, side walls, sole, top and
 		// cross rib. This avoids prescribing inaccessible sealed internal cores.
-		for (row in 0...2) columnVoids.push(CastingFeatures.box('rear-chamber-$row',
-			l.columnWidth - 2 * l.wall, l.columnDepth - frontWeb + 1, chamberHeight,
-			0, (frontWeb + 1) / 2, l.roof + row * (chamberHeight + l.wall)));
+		for (row in 0...2) {
+			var start = l.roof + row*(chamberHeight+l.wall), top = start+chamberHeight;
+			if (row == 0 && xyAxis != null) start = Math.max(start,xyAxis.yBayTop-l.railPlane+l.roof);
+			columnVoids.push(CastingFeatures.box('rear-chamber-$row',l.columnWidth-2*l.wall,l.columnDepth-frontWeb+1,
+				top-start,0,(frontWeb+1)/2,start));
+		}
+
 		for (side in [-1, 1]) columnInserts.push(insert(side < 0 ? "railZLeft" : "railZRight",
 			l.seatWidth, l.zRailLength, l.insertThickness, "Z guide seat",
 			F.fromRotationMatrix(side * l.zRailSpacing / 2, -l.columnDepth / 2 + l.insertThickness - l.seatRise,

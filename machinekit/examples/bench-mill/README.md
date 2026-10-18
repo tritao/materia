@@ -21,23 +21,31 @@ foot stations sit beneath a full-height bridge; underside cores start behind it.
 Foot supplier ratings, lateral restraint, anchoring, floor suitability and insert
 anchorage are unresolved. The shown pads/nuts are geometric concepts.
 
-Y guides carry a 450 × 200 × 80 mm saddle. A gusseted steel bridge connects the lowered Y nut to its front face.
+Y guides carry a 450 × 200 × 80 mm saddle. A compact steel plate fixes the Y nut directly to its front face; the nut and
+lubrication fitting enter a 58 mm underside tunnel.
 X guides, spaced 160 mm apart, carry a 400 × 210 × 40 mm T-slot table with
 48 mm integral longitudinal ribs. These replace four isolated spacers and keep
 the central drive corridor open. Table top remains 448 mm above the casting bottom.
 The spindle datum and column/guide length retain the earlier 58 mm stack increase; the taller Z block footprint adds another 40 mm
 to the column and Z guides.
 
-The Y screw and motor share a 124 mm shaft height above the casting bottom.
-The motor drives rearward through a coaxial coupling, with its body beneath the
-column. Removable front and rear hatches use dedicated steel anchors and M4 screws.
-The rear hatch admits axial motor removal; allow at least 163 mm behind the base
-for the modeled extraction, plus cable and tool access. The saddle bridge runs in
-an open central base channel above a continuous sole.
+The Y screw and motor share a 252 mm shaft height, at the saddle underside and
+between the guides. The motor remains coaxial, in a recess through the lower
+column. Its fixed bearing sits behind the Z screw. Z's lower bearing and guide
+starts are raised 100 mm, with a 24 mm crossing-shaft bore in the lower Z support
+plate. Z stroke, spindle position and table height remain unchanged.
+
+The rear hatch mounts to steel anchors in the column. Allow 163 mm behind the
+column rear face for modeled motor extraction (123 mm beyond the base), plus
+cable/tool access. The front bearing is accessible from above. The former deep
+base channel and tall nut bridge are removed; only 8 mm deep seat recesses
+remain. Central underside casting cores are restored. The lower column retains
+side supports and a 60 mm casting roof above the motor bay. Sealing, cover edges,
+mounting fasteners and structural qualification remain unfinished.
 
 Y travel increases from 150 to 160 mm without changing spindle reach or base
-footprint. The table retains 25 mm tool-edge margin and clears the lower Z guides
-by 3 mm at the rear stop. The 2 mm geometric overtravel allowance is not a verified
+footprint. The table retains 25 mm tool-edge margin and clears the column-side envelope
+by at least 3 mm at the rear stop. The 2 mm geometric overtravel allowance is not a verified
 stopping distance. More travel requires revisiting the throat or lower Z guides.
 
 X uses a
@@ -263,7 +271,7 @@ Z uses 141.4 mm block-center spacing, a taller carriage and a 190 mm deep rear
 head flange around its 130 mm spindle collar. Upper/lower triangular webs brace
 that root. The column and Z guides grow 40 mm to preserve the 250 mm Z stroke
 and guide end margins. X/Y strokes remain 250/160 mm; table height, spindle
-position, base footprint and the rear direct Y drive remain unchanged.
+position, base footprint and the rear direct Y drive remain unchanged. Its shaft is now at the saddle underside.
 
 All eight XY blocks and all four Z blocks must physically contact their carrying
 structures. Continuous CAD sweeps include the larger root, saddle and table ribs.

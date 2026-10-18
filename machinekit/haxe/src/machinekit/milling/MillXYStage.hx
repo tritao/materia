@@ -46,11 +46,11 @@ class MillXYStage extends AxisBuilder {
 			yp[0],
 			{x: 0, y: -1, z: 0},
 			yp.slice(1), l.yOvertravel);
-		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 0).setNumber("depth", l.saddleDepth).setBoolean("sidePockets", true));
+		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 58).setNumber("boreZ", 0).setNumber("depth", l.saddleDepth).setBoolean("sidePockets", true));
 		attach("saddle", saddle, F.translation(0, l.centreY, l.saddleBottom), "blockY0");
 		for (i in 1...4) attach('blockY$i', l.block, yp[i], "saddle");
 		var yFace = l.centreY - l.saddleDepth / 2;
-		attach("nutBracketY", new MillYNutBridge(new ComponentValues().setNumber("rise", l.saddleBottom - l.yScrewZ)),
+		attach("nutBracketY", new MillYNutMount(),
 			F.compose(y, F.translation(0, 0, l.yScrewStart - yFace)), "saddle");
 		attach("nutY", l.nut, F.compose(y, F.translation(0, 0, l.yScrewStart - yFace - l.nut.bodyLength - l.nut.flangeThickness)), "nutBracketY");
 		var x = orient(l.xScrewStart, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]);
@@ -102,14 +102,11 @@ class MillXYStage extends AxisBuilder {
 		}
 		for (side in [-1, 1]) for (height in [10, 70]) attach('motorPlateBoltX$side$height', SocketHeadCapScrew.metric("M6", 25),
 			orient(-207, l.centreY + side * 32, l.saddleBottom + height, [0,0,1], [-1,0,0]), "motorMountX");
-		attach("motorCoverY", new MillDriveHatch(new ComponentValues().setNumber("lowerZ", l.yHatchLowerZ).setNumber("upperZ", l.yHatchUpperZ)), F.translation(0, f.rear + 2, 0), "fixedPedestalY");
+		attach("motorCoverY", new MillDriveHatch(new ComponentValues().setNumber("lowerZ", l.yHatchLowerZ).setNumber("upperZ", l.yHatchUpperZ)), F.translation(0, l.yServiceRear + 2, 0), "fixedPedestalY");
 		for (side in [-1, 1]) for (row in [{name:"Lower",z:l.yHatchLowerZ},{name:"Upper",z:l.yHatchUpperZ}]) attach('rearCoverBoltY$side${row.name}' , SocketHeadCapScrew.metric("M4", 10),
-			orient(side * 75, f.rear + 4, row.z, [0,0,1], [0,1,0]), "motorCoverY");
+			orient(side * 75, l.yServiceRear + 4, row.z, [0,0,1], [0,1,0]), "motorCoverY");
 		attach("motorCoverX", new MillMotorCover(new ComponentValues().setNumber("width", 84).setNumber("depth", 38).setNumber("height", 142)),
 			F.fromRotationMatrix(-226, l.centreY, l.saddleBottom, [0,1,0, -1,0,0, 0,0,1]), "motorMountX");
-		attach("frontCoverY", new MillDriveHatch(new ComponentValues().setNumber("lowerZ", l.yHatchLowerZ).setNumber("upperZ", l.yHatchUpperZ)), F.fromRotationMatrix(0, f.front - 2, 0, [-1,0,0, 0,-1,0, 0,0,1]), "floatingPedestalY");
-		for (side in [-1, 1]) for (row in [{name:"Lower",z:l.yHatchLowerZ},{name:"Upper",z:l.yHatchUpperZ}]) attach('frontCoverBoltY$side${row.name}' , SocketHeadCapScrew.metric("M4", 10),
-			orient(side * 75, f.front - 4, row.z, [0,0,1], [0,-1,0]), "frontCoverY");
 		exposeConnector("mount", "fixedPedestalY", "mount");
 		exposeConnector("table", "table", "top");
 	}

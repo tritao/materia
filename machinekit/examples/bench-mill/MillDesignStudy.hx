@@ -127,7 +127,7 @@ class MillDesignStudy {
 			conceptStepParts:bounds,
 			stages:[
 				{step:1,status:"concept geometry",result:"250/160/250 travel; motor bays within base perimeter; service and enclosure envelope pending"},
-				{step:2,status:"concept geometry and motion checks",result:"Y rear coaxial drive beneath column with 60 mm roof and removable end hatches; X 1:1 HTD5M return into saddle; preload and belt life pending"},
+				{step:2,status:"concept geometry and motion checks",result:"Raised Y screw/direct saddle nut mount; rear coaxial motor in lower-column bay and bored Z support plate; X 1:1 HTD5M return into saddle; preload and belt life pending"},
 				{step:3,status:"concept geometry",result:"four accessible foot pockets, bored steel seats and M16 foot envelopes; anchorage/load ratings pending"},
 				{step:4,status:"concept geometry and section comparison",result:"integral table ribs replace isolated risers; full stiffness qualification pending"},
 				{step:5,status:"supplier selection required",result:"BT30 is a candidate, not an installed spindle; current ER20 cartridge remains manual"},
@@ -138,7 +138,7 @@ class MillDesignStudy {
 			releaseBlockers:["verified ATC spindle/drawbar/actuator and motor drawings", "release force, stroke, air pressure, sensor and reaction-path data",
 				"complete fastener and insert anchorage design", "foot ratings, floor support and stability", "whole-machine stiffness, thermal and modal qualification",
 				"validated lubrication/coolant/guards and controls", "material, mould, cure and post-cast machining process qualification"]};
-		sys.io.File.saveContent(folder+"/interfaces.csv", "interface,pattern,status\nBK12 and BF12 pedestal bolts,2 x M5 x 55 per housing,nominal modeled\nX motor plate anchors,4 x M6 x 25,nominal modeled\nY service hatches,4 x M4 x 10 per hatch into steel anchors,nominal modeled\nZ head flange,4 x M6 x 16 with counterbores and blind carriage taps,nominal modeled\nLeveling feet,M16 stem through 18 mm steel bore,concept geometry and supplier rating pending\nGuide and block screws,catalog pattern with accessible head seats,drilling and fasteners pending\nSpindle and actuator,selected supplier drawing required,unresolved\n");
+		sys.io.File.saveContent(folder+"/interfaces.csv", "interface,pattern,status\nBK12 and BF12 pedestal bolts,2 x M5 x 55 per housing,nominal modeled\nX motor plate anchors,4 x M6 x 25,nominal modeled\nY rear service hatch,4 x M4 x 10 into column steel anchors,nominal modeled\nZ head flange,4 x M6 x 16 with counterbores and blind carriage taps,nominal modeled\nLeveling feet,M16 stem through 18 mm steel bore,concept geometry and supplier rating pending\nGuide and block screws,catalog pattern with accessible head seats,drilling and fasteners pending\nSpindle and actuator,selected supplier drawing required,unresolved\n");
 		sys.io.File.saveContent(folder+"/review.json",haxe.Json.stringify(report,null,"  "));
 		Sys.println("Mill concept design review: "+folder+"/review.json");
 	}

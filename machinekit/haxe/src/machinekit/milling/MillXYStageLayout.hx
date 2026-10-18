@@ -38,6 +38,7 @@ class MillXYStageLayout {
 	public final xMotorZ:Float;
 	public final yScrewStart:Float;
 	public final yMotorFace:Float;
+	public final yServiceRear:Float;
 	public final yMountPlane:Float;
 	public final yBayTop:Float;
 	public final yHatchLowerZ:Float;
@@ -69,14 +70,15 @@ class MillXYStageLayout {
 		xRailPlane = saddleBottom + SADDLE_HEIGHT;
 		tableBottom = xRailPlane + block.spec.blockHeight + RISER_HEIGHT;
 		tableTop = tableBottom + TABLE_HEIGHT;
-		// Keep the complete motor/cage below the column sole with a full roof above it.
-		yBayTop = frame.baseHeight - frame.roof;
-		yScrewZ = yBayTop - 33 - clearance;
+		// Put the screw at the saddle underside, between the guides.
+		yScrewZ = saddleBottom;
 		yMountPlane = yScrewZ - 40;
-		yHatchLowerZ = yMountPlane - 10; yHatchUpperZ = yBayTop + 10;
+		yBayTop = yScrewZ + 33 + clearance;
+		yHatchLowerZ = frame.railPlane + 10; yHatchUpperZ = yBayTop + 10;
 		xMotorZ = saddleBottom + SADDLE_HEIGHT / 2;
 		xScrewZ = xRailPlane + 40;
-		yMotorFace = frame.columnFront + 90;
+		yServiceRear = frame.columnCentreY + frame.columnDepth / 2;
+		yMotorFace = yServiceRear - motor.rating.bodyLength - clearance;
 		yScrewStart = yMotorFace - motor.rating.shaftLength;
 		yFixedY = yScrewStart - BallScrew.INPUT_JOURNAL_LENGTH + fixed.length / 2;
 		yFloatingY = frame.yRailStart + BallScrew.JOURNAL_LENGTH / 2;
@@ -98,7 +100,7 @@ class MillXYStageLayout {
 			-xHalfTravel - nut.bodyLength - nut.flangeThickness - (xFixedX + fixed.length / 2) - clearance
 		);
 		if (frame.baseWidth / 2 < 245 + clearance || yMountPlane < frame.insertThickness + frame.wall ||
-			yMotorFace + motor.rating.bodyLength + clearance > frame.rear || yBayWidth / 2 + frame.wall > frame.columnWidth / 2 - 1.5 * frame.wall)
+			yMotorFace + motor.rating.bodyLength + clearance > yServiceRear || yBayWidth / 2 + frame.wall > frame.columnWidth / 2 - 1.5 * frame.wall)
 			throw "Rear Y drive bay leaves insufficient column support, floor or service space";
 		if (xOvertravel <= 0 || yOvertravel <= 0 ||
 			frame.yRailSpacing / 2 - frame.seatWidth / 2 < yChannelWidth / 2 + clearance ||

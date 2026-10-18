@@ -34,6 +34,7 @@ class MillZAxisLayout {
 	public final upperBottom:Float;
 	public final upperHeight:Float;
 	public final lowerHeight:Float;
+	public final crossDriveZ:Null<Float>;
 	public final motorFace:Float;
 	public final motorStandBottom:Float;
 	public final motorStandHeight:Float;
@@ -48,10 +49,11 @@ class MillZAxisLayout {
 	public final profile:String;
 
 	public function new(frame:MillFrameLayout, headBottom:Float, headHeight:Float, spindleY:Float,
-		lower:Float = -250, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null) {
+		lower:Float = -250, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null, crossDriveZ:Null<Float> = null) {
 		if (frame == null) throw "Z axis needs frame datums";
 		for (v in [headBottom, headHeight, spindleY, lower]) if (!Math.isFinite(v)) throw "Z datums must be finite";
 		if (headHeight <= 0 || lower >= 0) throw "Z needs positive head height and negative lower stop";
+		this.crossDriveZ = crossDriveZ;
 		this.frame = frame; this.headBottom = headBottom; this.headHeight = headHeight;
 		this.spindleY = spindleY; this.lower = lower; this.profile = profile;
 		if (guideBlock != null && guideBlock.spec.designation != profile)
@@ -76,6 +78,8 @@ class MillZAxisLayout {
 		upperHeight = 2 * (fixedZ - upperBottom);
 		screwTop = fixedZ + BallScrew.INPUT_JOURNAL_LENGTH - fixed.length / 2;
 		screw = new BallScrew(screwTop - floatingZ + BallScrew.JOURNAL_LENGTH / 2);
+		if (crossDriveZ != null && (!Math.isFinite(crossDriveZ) || floatingZ-BallScrew.JOURNAL_LENGTH/2 <= crossDriveZ+12+clearance))
+			throw "Z screw end enters the crossing Y shaft clearance";
 		brake = new ShaftBrakePart(motor.rating.shaftDiameter, "shell");
 		var couplingLength = 2 * (motor.rating.shaftLength - motorPlateThickness - brake.depth - 1);
 		coupling = new ShaftCoupling(motor.rating.shaftDiameter, BallScrew.JOURNAL_DIAMETER, null, couplingLength);
