@@ -70,7 +70,7 @@ confirmation.
 | X moving mass | 81.71 kg | 127.98 kg |
 | Z moving mass | 106.79 kg | 41.10 kg |
 | Y moving mass | 18.01 kg | 14.03 kg |
-| Machine mass | 351.61 kg | 1044.85 kg |
+| Machine mass | 351.61 kg | 1125.56 kg |
 | Bed footprint (radial × tangential) | 650 × 750 mm | 930 × 800 mm |
 | Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1510 × 800 mm |
 | X continuous thrust margin, same assumed demand basis | 911.15 N | 888.01 N |
@@ -149,9 +149,9 @@ thermal behaviour and detailed manufacturing release remain open plan items.
 
 ## Heavy plinth acceptance (HB-D11)
 
-The casting is 754.87 kg; the base assembly is 778.51 kg and the complete machine
-is 1044.85 kg. The casting-to-moving-mass ratios are 5.90:1 (X), 53.81:1 (Y)
-and 18.37:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
+The casting is 835.58 kg; the base assembly is 859.22 kg and the complete machine
+is 1125.56 kg. The casting-to-moving-mass ratios are 6.53:1 (X), 59.56:1 (Y)
+and 20.33:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
 from 37.28 to 31.75 kg; its insert-equipped assembly falls from 55.50 to 49.97 kg.
 X moves 127.98 kg including the complete column/head. The three support points
 span 690 mm radially and 660 mm across the front. Positive reactions are checked
@@ -176,8 +176,8 @@ lowering the plate 20 mm and sliding it out sideways; supports are never removed
 under machine weight. Floor clearance, support centres and the 1000 mm tooth-band
 height are unchanged. Nominal foot/stem envelope height is now 232 mm.
 
-Maximum static reaction is 4.45 kN across 21 X positions; mean roof bearing stress
-is about 0.393 MPa assuming full plate contact outside the stem passage. Full-area
+Maximum static reaction is 5.08 kN across 21 X positions; mean roof bearing stress
+is about 0.449 MPa assuming full plate contact outside the stem passage. Full-area
 contact needs a replicated/bedded roof bearing face, using a removable released
 master; no machining of the mineral casting is specified. Bedding, roof bending,
 creep, thread strength, lateral restraint, floor compliance and dynamic tipping
@@ -387,3 +387,33 @@ each), so slow physics does not stretch a display-only transfer. Pause freezes
 that time. Explicit deterministic steps advance handling by the fixed timestep.
 Cutting and head withdrawal retain the physical clock and 4 kHz controller;
 illustrative transfers remain excluded from the measured machining cycle.
+
+
+## Central X-drive casting load path
+
+The former lightening cores left the central X-drive insert unsupported: the
+entire required 50 mm backing slab (1,437,500 mm³) was void. Contact between the
+steel frame and its insert did not prove that the insert itself had casting
+support. The existing rail checks missed this separate mount.
+
+The corrected channel has a 60 mm cast floor/cap, 300 mm wide, at casting
+Z=660..720 mm. The insert recess leaves 50 mm of continuous casting immediately
+below its full footprint. Two 35 mm longitudinal webs at transverse Y=±112.5 mm
+carry the floor down to the sole. Two 30 mm transverse ribs at work X=202.5 and
+450 mm connect the drive structure into both existing rail beams. These supports
+run from the table-side structure to the rear wall; hollow bays remain between
+webs. The motor body is flange-mounted, so its overhang behind the flange is
+intentional; its flange/frame now has a continuous casting load path.
+
+The updated casting is 835.58 kg, within the assumed 600–900 kg range; the whole
+machine is 1125.56 kg. X's casting-to-moving-mass ratio is 6.53. Local drive-floor
+bending, screw thrust, motor torque and structural/modal adequacy still need FEA.
+The simplified global beam bound remains 0.00247 µm over X travel and does not
+qualify this local load path.
+
+See the dimensioned transverse [section below the motor](DRIVE_SUPPORT_SECTION.svg),
+the [flange section](DRIVE_SUPPORT_FLANGE.svg), the [previous section](DRIVE_SUPPORT_BEFORE.svg),
+and [exact-volume evidence](DRIVE_SUPPORT_REPORT.json). Normal assembly checks now
+verify both the backing slab and supporting ribs. Collision boxes are compacted
+by exact repartition, preserving every cavity and the CAD volume; no geometry or
+metrology tolerance is relaxed.

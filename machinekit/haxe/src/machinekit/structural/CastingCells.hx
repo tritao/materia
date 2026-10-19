@@ -49,10 +49,47 @@ class CastingCells {
     }
     return boxes;
   }
+  /** Repartition on exact existing planes to remove avoidable collision-box fragmentation.
+      Bounded grid work; no rounding, filled cavities or omitted material. */
+  public static function compact(input:Array<Array<Float>>):Array<Array<Float>> {
+    if(input.length<100)return [for(b in input)b.copy()];
+    var planes:Array<Array<Float>> =[[],[],[]];
+    for(b in input)for(axis in 0...3)for(v in [b[axis],b[axis+3]])if(planes[axis].indexOf(v)<0)planes[axis].push(v);
+    for(p in planes)p.sort((a,b)->a<b?-1:a>b?1:0);
+    var dims=[for(p in planes)p.length-1],nx=dims[0],ny=dims[1],nz=dims[2],total=nx*ny*nz;
+    if(total<=0||total>200000)return [for(b in input)b.copy()];
+    var occupied=[for(i in 0...total)false];
+    for(b in input){var lo=[for(a in 0...3)planes[a].indexOf(b[a])],hi=[for(a in 0...3)planes[a].indexOf(b[a+3])];
+      for(z in lo[2]...hi[2])for(y in lo[1]...hi[1])for(x in lo[0]...hi[0])occupied[(z*ny+y)*nx+x]=true;
+    }
+    var best=[for(b in input)b.copy()];
+    for(order in [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]]){
+      var remaining=occupied.copy(),boxes:Array<Array<Float>> = [];
+      for(z0 in 0...nz)for(y0 in 0...ny)for(x0 in 0...nx){
+        if(!remaining[(z0*ny+y0)*nx+x0])continue;
+        var lo=[x0,y0,z0],hi=[x0+1,y0+1,z0+1];
+        for(axis in order)while(hi[axis]<dims[axis]){
+          var faceLo=lo.copy(),faceHi=hi.copy();faceLo[axis]=hi[axis];faceHi[axis]++;
+          var full=true;
+          for(z in faceLo[2]...faceHi[2])for(y in faceLo[1]...faceHi[1])for(x in faceLo[0]...faceHi[0])if(!remaining[(z*ny+y)*nx+x])full=false;
+          if(!full)break;hi[axis]++;
+        }
+        for(z in lo[2]...hi[2])for(y in lo[1]...hi[1])for(x in lo[0]...hi[0])remaining[(z*ny+y)*nx+x]=false;
+        boxes.push([planes[0][lo[0]],planes[1][lo[1]],planes[2][lo[2]],planes[0][hi[0]],planes[1][hi[1]],planes[2][hi[2]]]);
+      }
+      boxes=coalesce(boxes);if(boxes.length<best.length)best=boxes;
+    }
+    if(Math.abs(volume(best)-volume(input))>Math.max(1e-6,volume(input)*1e-10))throw "Casting cell compaction changed volume";
+    return best;
+  }
   /** Reserve full-height backing beneath precision seats, instead of cutting a core through it. */
   public static function outsideColumns(cores:Array<CastingBox>,footprints:Array<Array<Float>>):Array<CastingBox> {
+    return outsideBoxes(cores,[for(foot in footprints)[foot[0],foot[1],-1e9,foot[2],foot[3],1e9]]);
+  }
+  /** Retain bounded webs and diaphragms without filling unrelated lightening bays. */
+  public static function outsideBoxes(cores:Array<CastingBox>,supports:Array<Array<Float>>):Array<CastingBox> {
     var result:Array<CastingBox> = [];
-    for(core in cores){var cells=[bounds(core)];for(foot in footprints)cells=remove(cells,[foot[0],foot[1],-1e9,foot[2],foot[3],1e9]);
+    for(core in cores){var cells=[bounds(core)];for(support in supports)cells=remove(cells,support);
       for(i in 0...cells.length){var b=cells[i];result.push(CastingFeatures.box(core.id+"-backing-"+i,b[3]-b[0],b[4]-b[1],b[5]-b[2],(b[0]+b[3])/2,(b[1]+b[4])/2,b[2]));}
     }
     return result;

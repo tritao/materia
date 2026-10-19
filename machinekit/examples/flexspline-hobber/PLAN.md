@@ -167,7 +167,7 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
   ≥ 5:1 (5–10:1 design aim, assumed), with machine mass around 1–1.5 t.
 - Use one monolithic, ribbed, partly hollow mineral-cast plinth, starting around
   1100 × 800 × 650 mm and 600–900 kg. The sized front-loading design is
-  930 × 800 × 800 mm, casting 754.87 kg; retain ≥5:1 X mass ratio after shortening.
+  930 × 800 × 800 mm, casting 835.58 kg; retain ≥5:1 X mass ratio after shortening.
   Derive rail/screw/base length from travel, blocks, end margins, overtravel and
   the fixed motor envelope. Put the heavy solid section at the bottom,
   pockets/ribs higher. Size it using the working height and stiffness estimate;
@@ -618,7 +618,7 @@ r 30 mm. HB7 and HB11 must show this.
   from a smaller hob OD. Each must be checked against HB11's error budget; none is
   assumed to preserve accuracy for free.
 
-- Casting process model and structural/modal analysis (external FEA), first targets: base/column deflection over X travel and modes versus ≈ 50 Hz spindle / 600 Hz gash excitations.
+- Casting process model and structural/modal analysis (external FEA), first targets: base/column deflection over X travel, local X-drive floor/web stiffness under screw thrust and motor torque, and modes versus ≈ 50 Hz spindle / 600 Hz gash excitations.
 - Double-circular-arc and S-tooth flexsplines; crowning and longitudinal modification.
 - Thermal growth (spindle and table heat, bed); hob wear and shift strategy.
 - G-code: a Fanuc-style EGB dialect in CncKit (writer and reader).
@@ -2649,3 +2649,32 @@ with the stem withdrawn before the plate is lowered and extracted sideways.
 The regenerated saved scene passes complete load/cut/unload playback, inspection
 and reset (982 windows, 6.49625 s machining, zero fixture-envelope contacts),
 and is open in Materia. Earlier frozen HB11 binaries were left untouched.
+
+### X-drive casting support correction (2026-10-19)
+
+A casting review found that general lightening cores removed all 50 mm backing
+under the central X-drive insert (1,437,500 mm³ missing), while the previous
+load-path checks only covered steel-frame contact and rail backing. Added a
+60 mm-thick, 300 mm-wide channel floor/cap, twin 35 mm longitudinal webs and
+30 mm cross-ribs at both screw-bearing stations, joining the existing rail beams.
+Hollow bays remain; the drive insert now has complete 50 mm casting backing.
+The normal assembly suite checks this backing and the webs/cross-ribs directly.
+
+Casting mass becomes 835.58 kg, machine 1125.56 kg, X mass ratio 6.53; maximum
+static foot reaction is 5.08 kN. Work height and axis positions are unchanged.
+Foot access/removal checks still pass. Exact changed-casting clearance audit:
+85 poses, 2635 candidate pairs, zero unexpected intersections. Local X-drive
+floor/web stiffness under screw thrust and motor torque remains a Phase D FEA
+check, alongside the existing global bed/column and modal checks.
+
+Exact collision-cell repartition reduces the bed from 185 to 170 boxes and the
+installed machine to 761 shapes (runtime capacity 768). Box volume matches CAD;
+none fills a casting void. Tolerances, physical geometry and cutting settings
+are unchanged. See DRIVE_SUPPORT_REPORT.json and the before/after section SVGs.
+
+The foot bosses are 190 mm wide, meeting the webs and outer walls directly and
+leaving 25 mm beside access openings. Final validation: 968 assembly checks,
+102 foot access/roof/removal checks, and unchanged bought/built interface parity
+(126 checks). Complete saved-scene playback passes: 982 windows, 6.49625 s
+machining, zero fixture-envelope contacts, inspection/reset passed. The final
+scene is open in Materia; frozen HB11/HB4 work was left untouched.

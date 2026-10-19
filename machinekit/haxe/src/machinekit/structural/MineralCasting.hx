@@ -40,7 +40,7 @@ class MineralCasting extends MachineComponent {
 		voids = cuts;
     var orthogonal=true;for(cut in cuts)if(!CastingCells.orthogonal(cut))orthogonal=false;
     if(orthogonal&&v.number("cornerChamfer")==0&&v.number("footWidth")==0)
-      addFacet(CollisionHullFacet.fromBoxes(CastingCells.material(v.number("width"),v.number("depth"),v.number("height"),cuts)));
+      addFacet(CollisionHullFacet.fromBoxes(CastingCells.compact(CastingCells.material(v.number("width"),v.number("depth"),v.number("height"),cuts))));
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Mount, Solids.axial(0, 0, parameterNumber("height")));
 	}

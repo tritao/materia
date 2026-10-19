@@ -1,29 +1,13 @@
 {
   "assertions": 102,
-  "basis": "Static gravity reaction at 21 X positions; nominal full plate contact assumed. Bearing stress is a preliminary average, not a roof bending, creep, fatigue, thread or dynamic stability qualification.",
-  "footCount": 3,
-  "meanRoofBearingStressMPa": 0.39310358610965856,
-  "plateMm": [
-    110,
-    110,
-    15
-  ],
-  "pocketFloorMm": 40,
-  "pocketRoofMm": 160,
-  "replacement": "Unload and lift base before withdrawing foot stem, lowering plate and extracting through side opening; never remove a loaded support.",
-  "roofThicknessMm": 70,
-  "seconds": 4.821036100387573,
-  "stemClearanceMm": 28,
-  "thread": "M24x3 nominal, semantic threads",
-  "worstFootReactionN": 4448.360180416897,
   "base": {
-    "baseCastingKg": 754.8716039999994,
-    "baseAssemblyKg": 778.5147619813539,
-    "machineKg": 1044.8481210735054,
+    "baseCastingKg": 835.5798839999995,
+    "baseAssemblyKg": 859.2230419813541,
+    "machineKg": 1125.556401073507,
     "baseToMovingMassRatio": {
-      "X": 5.898287474724477,
-      "Y": 53.80827447137733,
-      "Z": 18.368236211559598
+      "X": 6.528912119376705,
+      "Y": 59.56127042372314,
+      "Z": 20.33210495879187
     },
     "column": {
       "afterAssemblyKg": 49.96585,
@@ -48,7 +32,7 @@
       "radialSpacingMm": 690,
       "removableSeat": true,
       "vibrationMounts": false,
-      "worstReactionN": 4448.360180416897
+      "worstReactionN": 5078.423992883235
     },
     "table": {
       "basis": "per-field catalog/measured/assumed data; face/flange/centering provisional; bearing construction not claimed",
@@ -440,9 +424,9 @@
             0.004458849778258266
           ],
           "footReactionN": [
-            2986.466366283542,
-            2966.243309566879,
-            4293.75015067507
+            3067.1733870813814,
+            3046.950330364717,
+            4923.813963141408
           ]
         },
         {
@@ -457,9 +441,9 @@
             0.004404186960450699
           ],
           "footReactionN": [
-            2982.6011155399965,
-            2962.378058823334,
-            4301.48065216216
+            3063.308136337835,
+            3043.0850796211716,
+            4931.5444646285005
           ]
         },
         {
@@ -474,9 +458,9 @@
             0.004344054488312958
           ],
           "footReactionN": [
-            2978.7358647964497,
-            2958.512808079787,
-            4309.211153649254
+            3059.4428855942897,
+            3039.219828877626,
+            4939.274966115591
           ]
         },
         {
@@ -491,9 +475,9 @@
             0.0042785518602035735
           ],
           "footReactionN": [
-            2974.8706140529043,
-            2954.647557336241,
-            4316.941655136346
+            3055.577634850743,
+            3035.3545781340786,
+            4947.005467602684
           ]
         },
         {
@@ -508,9 +492,9 @@
             0.004207787345016051
           ],
           "footReactionN": [
-            2971.0053633093594,
-            2950.782306592697,
-            4324.672156623435
+            3051.7123841071984,
+            3031.489327390535,
+            4954.735969089773
           ]
         },
         {
@@ -525,9 +509,9 @@
             0.004131877982178847
           ],
           "footReactionN": [
-            2967.1401511856384,
-            2946.9170172293257,
-            4332.402658110527
+            3047.847171983478,
+            3027.6240380271634,
+            4962.466470576866
           ]
         },
         {
@@ -542,9 +526,9 @@
             0.0040509495816553965
           ],
           "footReactionN": [
-            2963.274868184568,
-            2943.051798743303,
-            4340.13315959762
+            3043.9818889824073,
+            3023.7588195411413,
+            4970.196972063958
           ]
         },
         {
@@ -559,9 +543,9 @@
             0.003965136723944086
           ],
           "footReactionN": [
-            2959.409611777552,
-            2939.186553663228,
-            4347.863661084711
+            3040.116632575391,
+            3019.8935744610667,
+            4977.927473551049
           ]
         },
         {
@@ -576,9 +560,9 @@
             0.0038745827600782804
           ],
           "footReactionN": [
-            2955.544386633724,
-            2935.3212773199666,
-            4355.5941625718
+            3036.251407431563,
+            3016.0282981178057,
+            4985.657975038139
           ]
         },
         {
@@ -593,9 +577,9 @@
             0.003779439811626294
           ],
           "footReactionN": [
-            2951.679171647918,
-            2931.4559908186784,
-            4363.324664058893
+            3032.3861924457574,
+            3012.163011616518,
+            4993.388476525232
           ]
         },
         {
@@ -610,9 +594,9 @@
             0.0036798687706914154
           ],
           "footReactionN": [
-            2947.8139373404024,
-            2927.5907236391035,
-            4371.055165545986
+            3028.5209581382414,
+            3008.297744436942,
+            5001.118978012323
           ]
         },
         {
@@ -627,9 +611,9 @@
             0.003576039299911884
           ],
           "footReactionN": [
-            2943.9486701608275,
-            2923.725489331588,
-            4378.785667033075
+            3024.6556909586675,
+            3004.432510129426,
+            5008.849479499413
           ]
         },
         {
@@ -644,9 +628,9 @@
             0.003468129832460927
           ],
           "footReactionN": [
-            2940.083383659541,
-            2919.860274345784,
-            4386.516168520166
+            3020.790404457381,
+            3000.5672951436222,
+            5016.579980986504
           ]
         },
         {
@@ -661,9 +645,9 @@
             0.0033563275720467052
           ],
           "footReactionN": [
-            2936.218107316279,
-            2915.9950492019534,
-            4394.246670007258
+            3016.9251281141183,
+            2996.702069999792,
+            5024.3104824735965
           ]
         },
         {
@@ -678,9 +662,9 @@
             0.0032408284929123644
           ],
           "footReactionN": [
-            2932.352862236202,
-            2912.1297927949386,
-            4401.97717149435
+            3013.0598830340414,
+            2992.8368135927767,
+            5032.040983960689
           ]
         },
         {
@@ -695,9 +679,9 @@
             0.003121837339836011
           ],
           "footReactionN": [
-            2928.487643750182,
-            2908.264509793869,
-            4409.707672981441
+            3009.194664548021,
+            2988.9715305917075,
+            5039.771485447778
           ]
         },
         {
@@ -712,9 +696,9 @@
             0.0029995676281307183
           ],
           "footReactionN": [
-            2924.62242526416,
-            2904.399226792799,
-            4417.438174468531
+            3005.3294460619995,
+            2985.1062475906374,
+            5047.50198693487
           ]
         },
         {
@@ -729,9 +713,9 @@
             0.002874241643644498
           ],
           "footReactionN": [
-            2920.757180184086,
-            2900.533970385784,
-            4425.168675955622
+            3001.4642009819254,
+            2981.2409911836235,
+            5055.232488421959
           ]
         },
         {
@@ -746,9 +730,9 @@
             0.002746090442760376
           ],
           "footReactionN": [
-            2916.8919038408226,
-            2896.6687452419537,
-            4432.899177442714
+            2997.5989246386625,
+            2977.3757660397923,
+            5062.962989909052
           ]
         },
         {
@@ -763,9 +747,9 @@
             0.002615353852396299
           ],
           "footReactionN": [
-            2913.0266173395353,
-            2892.803530256149,
-            4440.629678929808
+            2993.733638137374,
+            2973.510551053987,
+            5070.693491396147
           ]
         },
         {
@@ -780,9 +764,9 @@
             0.002482280470005188
           ],
           "footReactionN": [
-            2909.161350159961,
-            2888.9382959486334,
-            4448.360180416897
+            2989.8683709578,
+            2969.6453167464715,
+            5078.423992883235
           ]
         }
       ],
@@ -790,6 +774,22 @@
       "youngsNPerMm2": 35000
     }
   },
-  "geometrySource": "machinekit.structural.CastingFootPocket / LevelingSeat / LevelingFoot",
-  "millReference": "machinekit.milling.MillFrame foot-access and foot-stem casting cores; mill retains its own cast-in seats."
+  "basis": "Static gravity reaction at 21 X positions; nominal full plate contact assumed. Bearing stress is a preliminary average, not a roof bending, creep, fatigue, thread or dynamic stability qualification.",
+  "footCount": 3,
+  "meanRoofBearingStressMPa": 0.4487826080667404,
+  "plateMm": [
+    110,
+    110,
+    15
+  ],
+  "pocketFloorMm": 40,
+  "pocketRoofMm": 160,
+  "replacement": "Unload and lift base before withdrawing foot stem, lowering plate and extracting through side opening; never remove a loaded support.",
+  "roofThicknessMm": 70,
+  "seconds": 5.948015928268433,
+  "stemClearanceMm": 28,
+  "thread": "M24x3 nominal, semantic threads",
+  "worstFootReactionN": 5078.423992883235,
+  "geometrySource": "CastingFootPocket / LevelingSeat / LevelingFoot; final X-drive support and 190 mm foot bosses included",
+  "millReference": "machinekit.milling.MillFrame access-pocket/stem-passage pattern; mill retains its own cast-in seats."
 }

@@ -214,3 +214,7 @@ The seat is 18 mm in work Z (floor655); face floor865, work band floor1000.
 The default supplier candidate and source are documented in MACHINE_DESIGN.md;
 vendor names are absent from code identifiers. No supplier bearing construction
 or mounted accuracy is implied by the envelope.
+
+The central X-drive insert has 50 mm full-footprint casting backing, carried by
+a 60 mm channel floor/cap, twin 35 mm longitudinal webs and transverse ribs
+linking both guide beams. See DRIVE_SUPPORT_REPORT.json and its section SVGs.

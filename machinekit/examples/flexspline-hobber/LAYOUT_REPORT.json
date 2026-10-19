@@ -16,11 +16,11 @@
   },
   "after": {
     "collisionShapes": {
-      "authoredPlusDefaultTotal": 731,
+      "authoredPlusDefaultTotal": 761,
       "parts": [
         {
           "part": "bed/casting",
-          "hulls": 140
+          "hulls": 170
         },
         {
           "part": "bed/tablePlate",
@@ -508,7 +508,7 @@
       "Y": 14.028913051310433,
       "Z": 41.09657537640654
     },
-    "machineMassKg": 1044.8481210735054,
+    "machineMassKg": 1125.556401073507,
     "members": 108
   },
   "open": [
@@ -580,13 +580,13 @@
     "basis": "Assumed design; thread helices, fits, bearing preload, contact grinding and strength qualification remain open"
   },
   "baseAcceptance": {
-    "baseCastingKg": 754.8716039999994,
-    "baseAssemblyKg": 778.5147619813539,
-    "machineKg": 1044.8481210735054,
+    "baseCastingKg": 835.5798839999995,
+    "baseAssemblyKg": 859.2230419813541,
+    "machineKg": 1125.556401073507,
     "baseToMovingMassRatio": {
-      "X": 5.898287474724477,
-      "Y": 53.80827447137733,
-      "Z": 18.368236211559598
+      "X": 6.528912119376705,
+      "Y": 59.56127042372314,
+      "Z": 20.33210495879187
     },
     "column": {
       "afterAssemblyKg": 49.96585,
@@ -611,7 +611,7 @@
       "radialSpacingMm": 690,
       "removableSeat": true,
       "vibrationMounts": false,
-      "worstReactionN": 4448.360180416897
+      "worstReactionN": 5078.423992883235
     },
     "table": {
       "basis": "per-field catalog/measured/assumed data; face/flange/centering provisional; bearing construction not claimed",
@@ -1003,9 +1003,9 @@
             0.004458849778258266
           ],
           "footReactionN": [
-            2986.466366283542,
-            2966.243309566879,
-            4293.75015067507
+            3067.1733870813814,
+            3046.950330364717,
+            4923.813963141408
           ]
         },
         {
@@ -1020,9 +1020,9 @@
             0.004404186960450699
           ],
           "footReactionN": [
-            2982.6011155399965,
-            2962.378058823334,
-            4301.48065216216
+            3063.308136337835,
+            3043.0850796211716,
+            4931.5444646285005
           ]
         },
         {
@@ -1037,9 +1037,9 @@
             0.004344054488312958
           ],
           "footReactionN": [
-            2978.7358647964497,
-            2958.512808079787,
-            4309.211153649254
+            3059.4428855942897,
+            3039.219828877626,
+            4939.274966115591
           ]
         },
         {
@@ -1054,9 +1054,9 @@
             0.0042785518602035735
           ],
           "footReactionN": [
-            2974.8706140529043,
-            2954.647557336241,
-            4316.941655136346
+            3055.577634850743,
+            3035.3545781340786,
+            4947.005467602684
           ]
         },
         {
@@ -1071,9 +1071,9 @@
             0.004207787345016051
           ],
           "footReactionN": [
-            2971.0053633093594,
-            2950.782306592697,
-            4324.672156623435
+            3051.7123841071984,
+            3031.489327390535,
+            4954.735969089773
           ]
         },
         {
@@ -1088,9 +1088,9 @@
             0.004131877982178847
           ],
           "footReactionN": [
-            2967.1401511856384,
-            2946.9170172293257,
-            4332.402658110527
+            3047.847171983478,
+            3027.6240380271634,
+            4962.466470576866
           ]
         },
         {
@@ -1105,9 +1105,9 @@
             0.0040509495816553965
           ],
           "footReactionN": [
-            2963.274868184568,
-            2943.051798743303,
-            4340.13315959762
+            3043.9818889824073,
+            3023.7588195411413,
+            4970.196972063958
           ]
         },
         {
@@ -1122,9 +1122,9 @@
             0.003965136723944086
           ],
           "footReactionN": [
-            2959.409611777552,
-            2939.186553663228,
-            4347.863661084711
+            3040.116632575391,
+            3019.8935744610667,
+            4977.927473551049
           ]
         },
         {
@@ -1139,9 +1139,9 @@
             0.0038745827600782804
           ],
           "footReactionN": [
-            2955.544386633724,
-            2935.3212773199666,
-            4355.5941625718
+            3036.251407431563,
+            3016.0282981178057,
+            4985.657975038139
           ]
         },
         {
@@ -1156,9 +1156,9 @@
             0.003779439811626294
           ],
           "footReactionN": [
-            2951.679171647918,
-            2931.4559908186784,
-            4363.324664058893
+            3032.3861924457574,
+            3012.163011616518,
+            4993.388476525232
           ]
         },
         {
@@ -1173,9 +1173,9 @@
             0.0036798687706914154
           ],
           "footReactionN": [
-            2947.8139373404024,
-            2927.5907236391035,
-            4371.055165545986
+            3028.5209581382414,
+            3008.297744436942,
+            5001.118978012323
           ]
         },
         {
@@ -1190,9 +1190,9 @@
             0.003576039299911884
           ],
           "footReactionN": [
-            2943.9486701608275,
-            2923.725489331588,
-            4378.785667033075
+            3024.6556909586675,
+            3004.432510129426,
+            5008.849479499413
           ]
         },
         {
@@ -1207,9 +1207,9 @@
             0.003468129832460927
           ],
           "footReactionN": [
-            2940.083383659541,
-            2919.860274345784,
-            4386.516168520166
+            3020.790404457381,
+            3000.5672951436222,
+            5016.579980986504
           ]
         },
         {
@@ -1224,9 +1224,9 @@
             0.0033563275720467052
           ],
           "footReactionN": [
-            2936.218107316279,
-            2915.9950492019534,
-            4394.246670007258
+            3016.9251281141183,
+            2996.702069999792,
+            5024.3104824735965
           ]
         },
         {
@@ -1241,9 +1241,9 @@
             0.0032408284929123644
           ],
           "footReactionN": [
-            2932.352862236202,
-            2912.1297927949386,
-            4401.97717149435
+            3013.0598830340414,
+            2992.8368135927767,
+            5032.040983960689
           ]
         },
         {
@@ -1258,9 +1258,9 @@
             0.003121837339836011
           ],
           "footReactionN": [
-            2928.487643750182,
-            2908.264509793869,
-            4409.707672981441
+            3009.194664548021,
+            2988.9715305917075,
+            5039.771485447778
           ]
         },
         {
@@ -1275,9 +1275,9 @@
             0.0029995676281307183
           ],
           "footReactionN": [
-            2924.62242526416,
-            2904.399226792799,
-            4417.438174468531
+            3005.3294460619995,
+            2985.1062475906374,
+            5047.50198693487
           ]
         },
         {
@@ -1292,9 +1292,9 @@
             0.002874241643644498
           ],
           "footReactionN": [
-            2920.757180184086,
-            2900.533970385784,
-            4425.168675955622
+            3001.4642009819254,
+            2981.2409911836235,
+            5055.232488421959
           ]
         },
         {
@@ -1309,9 +1309,9 @@
             0.002746090442760376
           ],
           "footReactionN": [
-            2916.8919038408226,
-            2896.6687452419537,
-            4432.899177442714
+            2997.5989246386625,
+            2977.3757660397923,
+            5062.962989909052
           ]
         },
         {
@@ -1326,9 +1326,9 @@
             0.002615353852396299
           ],
           "footReactionN": [
-            2913.0266173395353,
-            2892.803530256149,
-            4440.629678929808
+            2993.733638137374,
+            2973.510551053987,
+            5070.693491396147
           ]
         },
         {
@@ -1343,9 +1343,9 @@
             0.002482280470005188
           ],
           "footReactionN": [
-            2909.161350159961,
-            2888.9382959486334,
-            4448.360180416897
+            2989.8683709578,
+            2969.6453167464715,
+            5078.423992883235
           ]
         }
       ],
@@ -1584,7 +1584,7 @@
     }
   },
   "validation": {
-    "mechanicalAssertions": 961,
+    "mechanicalAssertions": 968,
     "boughtTableAssertions": 126,
     "sizeRangeAssertions": 1318,
     "cupLoadingPathAssertions": 6666,
@@ -1658,6 +1658,25 @@
       "fixtureEnvelopeContacts": 0,
       "inspectionAndReset": "passed",
       "scope": "Coarse demonstration, not ISO grading"
+    },
+    "driveSupportReport": "DRIVE_SUPPORT_REPORT.json",
+    "driveSupportClearanceGrid": {
+      "reference": true,
+      "scope": "changed bed casting against every other part at the full travel grid; unchanged pairs retain prior audit evidence",
+      "completed": 85,
+      "members": 108,
+      "checked": 2635,
+      "thresholdMm3": 0.001,
+      "unexpected": 0,
+      "seconds": 7.327264070510864
+    },
+    "driveSupportAssertions": 10210,
+    "driveSupportAppPlayback": {
+      "cutWindows": 982,
+      "machiningSeconds": 6.496250000003627,
+      "fixtureEnvelopeContacts": 0,
+      "inspectionAndReset": "passed",
+      "scope": "Coarse demonstration, not ISO grading"
     }
   },
   "previousRevisionProvenance": {
@@ -1719,7 +1738,7 @@
       "machinekit/haxe/src/machinekit/component/MachineKitComponents.hx": "6c6950e089b617475f9d78c067f5a173e4a4e510f91cbd9aabbb9e3dcdfcf91d",
       "machinekit/haxe/src/machinekit/hobbing/ExpandingMandrel.hx": "ffdfc50f183eaf2c07106b867c98c29a37bf89e25ef05ab0c4c71ad75f01aec9",
       "machinekit/haxe/src/machinekit/hobbing/FlexsplineCupBlank.hx": "a73acc3962d71d5ceff7fc342bd4a8c921726ce711e13e53ea5f3dd2b295db5f",
-      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "ca0424b6cdbcda17d952b5ebcbe0bd11a73526ba802f4220c8d7f7fc5114b21e",
+      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "1b1ac1672a6b1a1c019929cdb8a8d36b60e024f0556510d63666c77c04e12b1a",
       "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "b4e8fbf026a11f87c228fcb77acf601cbe4172d6e85f91b9098ff07a27712203",
       "machinekit/haxe/src/machinekit/hobbing/HobberXLayout.hx": "76c7553f9cbc7bd2de4603371bc68208075e67ded383a534076127332957ce0c",
       "machinekit/haxe/src/machinekit/hobbing/HobbingComponents.hx": "0c31815eb5d7cea1532a7af4eb2825bddddbc36d09576c90a5a557ed082a8812",
@@ -1732,12 +1751,12 @@
       "machinekit/haxe/src/machinekit/motion/PurchasedRotaryPart.hx": "c6ed48ed15df7841609a4ddda5c2268e5ffafa783ce76460584fe999dfb1c09c",
       "machinekit/haxe/src/machinekit/motion/PurchasedRotaryTable.hx": "5c65e0ba2ec6c50d5df190023d1dd8b37236c7658d18afce7f2c9b52a9564dbd",
       "machinekit/haxe/src/machinekit/motion/RotaryAxisSpec.hx": "3a2a0e92aae2f3ba07c524b867240ad4308dc48e351ab316cf0bdc9ade64c0f6",
-      "machinekit/haxe/src/machinekit/structural/CastingCells.hx": "feb336c079b123df7467523fccf5797b0f46ef8189aceb4f9b197d053cf20293",
+      "machinekit/haxe/src/machinekit/structural/CastingCells.hx": "b68983fa9d62f6d7d3a6fef78ac2a1893dc80aafe35dae12d15a0ba3cee210ed",
       "machinekit/haxe/src/machinekit/structural/LevelingFoot.hx": "36578ac1e24e617487a62e6171c4112bf39375efac0a0f698d936372385935a3",
-      "machinekit/haxe/src/machinekit/structural/MineralCasting.hx": "0bb3c449f5495ec43201dc85cfcd35d523d046c20e7153ad1cd48b4652fda092",
+      "machinekit/haxe/src/machinekit/structural/MineralCasting.hx": "7138391b28ad14298881196fb437b2dcd380cdec6b74b75bfa60907d9539c5b3",
       "machinekit/tests/hobber/src/FlexsplineHobberBudget.hx": "d4e5ac6f79878c64cfa7ea5ab829b451e094c5a9fb1c3102ddda8ef8bb456397",
-      "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "58eb0966aa63158debe82407fb7ce168ffe27733de2d02e3f6e1f37032ff09e5",
-      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "1d582bfa52255975e77b6b4c3ba7d3eb0021dd52d665d9b9ae44fac9a929b59e",
+      "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "f3f5ea94f5007ac45cfcb91069acd544681a5f2c0aff630b33c58a4693817f1a",
+      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "26f1e543a9ced8f0505ee919f8cfc9020a0da61c13cd4b3a64250f3370389b20",
       "machinekit/tests/hobber/src/HobberGERangeChecks.hx": "b4fc587212d9ac63c2a712b5c45db9301209eb3ae744c6f1be2512b3dec82ce5",
       "machinekit/tests/hobber/src/HobberInterferenceChecks.hx": "689f157daadb3a2e4b2e186541ee650e2da2721a1b6cb19c1524343d751b7b6a",
       "machinekit/tests/hobber/src/HobberLoadingChecks.hx": "7a71d9e46e368722d0b10bf695c4a46f352fc672761e156cd2414df6f18871f7",
@@ -1751,9 +1770,10 @@
       "stockkit/haxe/stockkit/hobbing/HobbingErrorSource.hx": "78ea849d3c33abe69e00da7917238f6a16cc71bc4fdd1025b88235311aaa630b",
       "stockkit/haxe/stockkit/hobbing/HobbingMotion.hx": "4910056ed94ec924b5916a74c01935e4430b94474bc8de6dbb2dfdb2d8ddafbc",
       "stockkit/haxe/stockkit/hobbing/HobbingPoseOffset.hx": "b0f24540cfb7e35f1d191b2eb65d0bcea53512d1c623b05409ed37436397dd96",
-      "machinekit/haxe/src/machinekit/structural/CastingFootPocket.hx": "fdd4784a9ed952840741ee9ce5734a2b57a9a69a775a9353d669456ddd544cdb",
+      "machinekit/haxe/src/machinekit/structural/CastingFootPocket.hx": "35eb048fe6bc66fb383df2f037f3ae7d404335c28c85c4ef6ad7c78b7e49dd35",
       "machinekit/haxe/src/machinekit/structural/LevelingSeat.hx": "ebadd947b5603270e9234cb393d6d22b9729bfd5ef5ee1ab5b2f7a9bbeb376df",
-      "machinekit/tests/hobber/src/HobberFootChecks.hx": "6a0e417dd4ddb4fba85d5f099cf72efb9d77b916a838eeeb554023ebb475ce17"
+      "machinekit/tests/hobber/src/HobberFootChecks.hx": "6a0e417dd4ddb4fba85d5f099cf72efb9d77b916a838eeeb554023ebb475ce17",
+      "machinekit/tests/hobber/src/HobberDriveSupportChecks.hx": "ffbc86b6bccecccb69cb82f6771fb9daf49a047cdff013c9ed7c2fd7e1a1fd57"
     }
   },
   "previousPlinthValidation": {

@@ -17,13 +17,14 @@ class CastingFootPocket {
       CastingFeatures.box(id+"-plate-register",PLATE_WIDTH+1,PLATE_WIDTH+1,PLATE_THICKNESS,x,y,ROOF-PLATE_THICKNESS),
       CastingFeatures.box(id+"-stem",STEM_CLEARANCE,STEM_CLEARANCE,SUPPORT_TOP+2,x,y,-1)];
   }
-  /** Preserve a local support boss below general lightening cores; pockets are cut later. */
+  /** A 190 mm boss leaves 25 mm walls beside the 140 mm access opening and
+   * joins adjacent support webs and outer walls. Pockets are cut afterwards. */
   public static function reserve(cells:Array<CastingBox>,x:Float,y:Float):Array<CastingBox> {
     var out:Array<CastingBox> =[];
     for(c in cells){
       if(!CastingCells.orthogonal(c))throw "Foot support reservation requires orthogonal cores";
       var boxes=CastingCells.remove([CastingCells.bounds(c)],
-        [x-90,y-90,0,x+90,y+90,SUPPORT_TOP]);
+        [x-95,y-95,0,x+95,y+95,SUPPORT_TOP]);
       for(i in 0...boxes.length){var b=boxes[i];out.push(CastingFeatures.box(c.id+"-foot-"+i,b[3]-b[0],b[4]-b[1],b[5]-b[2],(b[0]+b[3])/2,(b[1]+b[4])/2,b[2]));}
     }
     return out;

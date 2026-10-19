@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1050" viewBox="0 0 1000 1050"><rect width="1000" height="1050" fill="white"/><g font-family="sans-serif" fill="#222"><text x="50" y="35" font-size="21">Bed transverse section: work X = 545 mm</text><text x="50" y="62" font-size="15">Dark: actual casting material. White: cavities. Dimensions in mm.</text>
+<rect x="430" y="880" width="140" height="40" fill="#515862"/>
+<rect x="100" y="120" width="25" height="800" fill="#515862"/>
+<rect x="225" y="120" width="110" height="800" fill="#515862"/>
+<rect x="410" y="690" width="20" height="230" fill="#515862"/>
+<rect x="570" y="690" width="20" height="230" fill="#515862"/>
+<rect x="430" y="690" width="14.5" height="85" fill="#515862"/>
+<rect x="555.5" y="690" width="14.5" height="85" fill="#515862"/>
+<rect x="444.5" y="690" width="111" height="70" fill="#515862"/>
+<rect x="335" y="120" width="110" height="25" fill="#515862"/>
+<rect x="555" y="120" width="110" height="25" fill="#515862"/>
+<rect x="665" y="120" width="110" height="800" fill="#515862"/>
+<rect x="875" y="120" width="25" height="800" fill="#515862"/>
+<rect x="775" y="835" width="100" height="85" fill="#515862"/>
+<rect x="775" y="120" width="100" height="25" fill="#515862"/>
+<rect x="590" y="835" width="75" height="85" fill="#515862"/>
+<rect x="335" y="835" width="75" height="85" fill="#515862"/>
+<rect x="125" y="835" width="100" height="85" fill="#515862"/>
+<rect x="125" y="120" width="100" height="25" fill="#515862"/>
+<path d="M 80 920 H 920" stroke="#aab1ba" stroke-dasharray="3 5"/><text x="20" y="925" font-size="14">0</text>
+<path d="M 80 835 H 920" stroke="#aab1ba" stroke-dasharray="3 5"/><text x="20" y="840" font-size="14">85</text>
+<path d="M 80 260 H 920" stroke="#aab1ba" stroke-dasharray="3 5"/><text x="20" y="265" font-size="14">660</text>
+<path d="M 80 210 H 920" stroke="#aab1ba" stroke-dasharray="3 5"/><text x="20" y="215" font-size="14">710</text>
+<path d="M 80 200 H 920" stroke="#aab1ba" stroke-dasharray="3 5"/><text x="20" y="205" font-size="14">720</text>
+<path d="M 80 120 H 920" stroke="#aab1ba" stroke-dasharray="3 5"/><text x="20" y="125" font-size="14">800</text>
+<text x="50" y="970" font-size="16">Z measured from casting bottom; transverse Y spans -400 to +400.</text><text x="50" y="998" font-size="15">Nominal geometry only; structural/modal stiffness remains unqualified.</text></g></svg>

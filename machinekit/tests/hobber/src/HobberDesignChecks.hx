@@ -75,6 +75,14 @@ class HobberDesignChecks {
       for(foundation in foundations){
         var localPoses=foundation.solvedPoses(),body=cache.posed(foundation.body,localPoses.get("casting"));
         try {
+          if(foundation.kind=="bed"){
+            var drive=foundation.insertLocations().filter(p->p.id=="driveSeat")[0];
+            var raw=cadkit.modeling.Part.box(drive.part.parameterNumber("width"),drive.part.parameterNumber("depth"),50);
+            var slab=PosedParts.moved(raw,F.compose(drive.pose,F.translation(0,0,-50)));raw.close();
+            var missing=slab.subtract(body),volume=missing.volume();missing.close();slab.close();
+            count++;if(volume>0.001)throw 'X drive insert lacks 50 mm full-footprint casting backing: $volume mm3';
+            for(probe in HobberDriveSupportChecks.ribProbes(body)){count++;if(probe.missingMm3>0.001)throw 'Missing casting load path ${probe.label}: ${probe.missingMm3} mm3';}
+          }
           for(row in foundation.insertLocations())if(row.id=="railLeft"||row.id=="railRight"){
             var backing=foundation.kind=="bed"?row.pose.z:10.0;
             var raw=cadkit.modeling.Part.box(row.part.parameterNumber("width"),row.part.parameterNumber("depth"),backing);

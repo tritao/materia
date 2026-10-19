@@ -38,6 +38,15 @@ class FoundationLayout {
     }
     return result;
   }
+  /** Central drive channel: cap on twin webs, cross-ribbed into both rail beams.
+      Coordinates are casting-local bounds; the channel/insert recesses are cut afterwards. */
+  public static function driveSupports():Array<Array<Float>> {
+    var l=HobberXLayout.front(),start=140-l.bedCentre,end=l.bedRear-l.bedCentre;
+    var supports=[[start,-150.0,660.0,end,150.0,720.0]];
+    for(side in [-1,1])supports.push([start,side*112.5-17.5,0.0,end,side*112.5+17.5,720.0]);
+    for(station in [l.floatingCentre,l.screwStart])supports.push([station-l.bedCentre-15,-275.0,0.0,station-l.bedCentre+15,275.0,720.0]);
+    return supports;
+  }
   /** Three support centres in casting-local coordinates, kept fixed through X travel. */
   public static function feet():Array<{x:Float,y:Float}> return [for(i in 0...3)
     {x:(i<2?-1:1)*(HobberXLayout.front().bedLength/2-120),y:i==0?-330.0:i==1?330.0:0.0}];
@@ -53,6 +62,7 @@ class FoundationLayout {
       if(kind=="bed"){
         var centre=HobberXLayout.front().bedCentre;
         cores=machinekit.structural.CastingCells.outsideColumns(bedCores(cores),[[-140.0-centre,-140,140-centre,140]]);
+        cores=machinekit.structural.CastingCells.outsideBoxes(cores,driveSupports());
         for(p in feet())cores=machinekit.structural.CastingFootPocket.reserve(cores,p.x,p.y);
         var feet=feet();for(i in 0...feet.length){var p=feet[i];
           var edge=i<2?(p.y<0?-401.0:401.0):d[0]/2+1;
