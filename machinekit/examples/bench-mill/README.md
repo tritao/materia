@@ -314,6 +314,23 @@ checked against the saddle and installed X motor. The 508 mm Y rails end in expl
 front-face reliefs in the lower Z bearing plate, retaining the plate's rear
 section and anchor stations.
 
+The Y nut now seats on a registered steel adapter backed by an integral saddle
+boss and four diagonal webs joining the central spine to the guide-pad webs,
+bottom chord and top deck. The front face and screw centerline stay unchanged.
+A shallow rear locating lip registers the nut flange without changing its axial seat.
+Four recessed M6 × 25 bolts secure the adapter; two integral locating pilots use
+one round and one relieved seat. Six rear-entry M5 × 16 screws attach the nut
+flange to blind adapter taps. Assemble these screws with the nut/adapter off the
+saddle, before installing the ballscrew assembly; in-place nut extraction is not
+claimed. These interfaces follow the existing generic SFU1605 study dimensions,
+not a verified supplier drawing.
+
+A dedicated Ø10 mm grease-access passage reaches the existing radial fitting.
+The Ø8 mm coupler envelope is checked with X parked at +125 mm and Y centered,
+clearing the saddle and X guides/blocks. The guide-block access pockets stay
+open. This is a geometry and assembly-access revision; FEM and a quantified
+stiffness comparison are deferred.
+
 The upper Z motor stand has a broad bolted foot, open cheeks, motor register,
 mounting bolts and removable front coupling guard. The motor can lift away
 without removing the fixed bearing. Register/pattern dimensions remain

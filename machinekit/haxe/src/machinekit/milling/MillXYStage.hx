@@ -46,7 +46,7 @@ class MillXYStage extends AxisBuilder {
 			yp[0],
 			{x: 0, y: -1, z: 0},
 			yp.slice(1), l.yOvertravel);
-		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 58).setNumber("boreZ", 0).setNumber("depth", l.saddleDepth).setBoolean("ribbed", true).setBoolean("blockAccess",true).setNumber("guideSpacing",f.yRailSpacing).setNumber("blockSpan",l.yBlockSpan).setNumber("blockHolePitchB",l.block.spec.blockHolePitchB).setNumber("blockHolePitchC",l.block.spec.blockHolePitchC));
+		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 58).setNumber("boreZ", 0).setNumber("depth", l.saddleDepth).setBoolean("ribbed", true).setBoolean("blockAccess",true).setBoolean("nutBoss",true).setNumber("guideSpacing",f.yRailSpacing).setNumber("blockSpan",l.yBlockSpan).setNumber("blockHolePitchB",l.block.spec.blockHolePitchB).setNumber("blockHolePitchC",l.block.spec.blockHolePitchC));
 		attach("saddle", saddle, F.translation(0, l.centreY, l.saddleBottom), "blockY0");
 		for (i in 1...4) attach('blockY$i', l.block, yp[i], "saddle");
 		for (i in 0...4) for (hole in 1...5) {
@@ -54,8 +54,13 @@ class MillXYStage extends AxisBuilder {
 			attach('blockYBolt$i-$hole',SocketHeadCapScrew.metric("M4",MillCrossSaddle.BLOCK_SCREW_LENGTH),F.translation(p.x,p.y,l.saddleBottom+MillCrossSaddle.BLOCK_SEAT),"saddle");
 		}
 		var yFace = l.centreY - l.saddleDepth / 2;
-		attach("nutBracketY", new MillYNutMount(),
-			F.compose(y, F.translation(0, 0, l.yScrewStart - yFace)), "saddle");
+		var nutMountPose=F.compose(y,F.translation(0,0,l.yScrewStart-yFace));
+		attach("nutBracketY",new MillYNutMount(new ComponentValues().setBoolean("reinforced",true)),nutMountPose,"saddle");
+		for(p in MillYNutMount.anchors()) attach('nutBracketYBolt${p.x}-${p.y}',SocketHeadCapScrew.metric("M6",MillYNutMount.ANCHOR_LENGTH),
+			F.compose(nutMountPose,F.translation(p.x,p.y,MillYNutMount.ANCHOR_SEAT)),"nutBracketY");
+		var nutBolt=0;
+		for(p in l.nut.boltPattern()) attach('nutYBolt${nutBolt++}',SocketHeadCapScrew.metric(l.nut.mountScrew,MillYNutMount.FLANGE_BOLT_LENGTH),
+			F.compose(nutMountPose,F.fromRotationMatrix(p.x,p.y,-l.nut.flangeThickness,[1,0,0,0,-1,0,0,0,-1])),"nutBracketY");
 		attach("nutY", l.nut, F.compose(y, F.translation(0, 0, l.yScrewStart - yFace - l.nut.bodyLength - l.nut.flangeThickness)), "nutBracketY");
 		var x = orient(l.xScrewStart, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]);
 		foldedXDrive(x);

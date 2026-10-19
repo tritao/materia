@@ -18,7 +18,7 @@ class MillCrossSaddle extends MachineComponent {
 		P.length("width", 450),
 		P.length("depth", 174),
 		P.length("height", 80),
-		P.flag("ribbed", false), P.flag("blockAccess",false), P.length("guideSpacing",220), P.length("blockSpan",50.7), P.length("blockHolePitchB",26),P.length("blockHolePitchC",26),
+		P.flag("ribbed", false), P.flag("blockAccess",false), P.flag("nutBoss",false), P.length("guideSpacing",220), P.length("blockSpan",50.7), P.length("blockHolePitchB",26),P.length("blockHolePitchC",26),
 		P.length("bore", 54), P.length("boreZ", 40), P.flag("motorPocket", true), P.flag("sidePockets", false)
 	];
 
@@ -39,6 +39,9 @@ class MillCrossSaddle extends MachineComponent {
 			v.number("blockSpan")+v.number("blockHolePitchB")/2+10>=v.number("depth")/2 ||
 			v.number("guideSpacing")/2-(v.number("blockHolePitchC")+20)/2-12<=45))
 			throw "Block access pockets need ribbed guide pads, end clearance and retained central webs";
+		if(v.boolean("nutBoss") && (!v.boolean("ribbed") || !v.boolean("blockAccess") || v.number("height")<72 ||
+			v.number("boreZ")!=0 || v.number("guideSpacing")/2-(v.number("blockHolePitchC")+20)/2<MillYNutMount.BOSS_WIDTH/2+12))
+			throw "Nut boss needs the underside screw datum and separated guide service webs";
 		super("MILL-CROSS-SADDLE", "Machined cross saddle", "cast iron", false, v);
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Face, Solids.axial(0, 0, v.number("height")));
@@ -99,8 +102,29 @@ class MillCrossSaddle extends MachineComponent {
 				if (!values().boolean("blockAccess")) tools.push(Part.cylinderSpan(5,12,h+1,x,y));
 			}
 		}
-		var raw=Solids.cut(Part.box(w,d,h),tools);
-		if (!values().boolean("blockAccess")) return raw;
+		var body=Part.box(w,d,h);
+		if (values().boolean("nutBoss")) {
+			var pieces=[body,Part.box(MillYNutMount.BOSS_WIDTH,MillYNutMount.BOSS_DEPTH,h)
+				.translated(new Vector(0,-d/2+MillYNutMount.BOSS_DEPTH/2,0))];
+			for(sx in [-1,1]) for(sy in [-1,1]) pieces.push(Part.prism([
+				new Vector(sx*46,sy*d/2),new Vector(sx*58,sy*d/2),
+				new Vector(sx*(guide-(parameterNumber("blockHolePitchC")+20)/2),sy*40),
+				new Vector(sx*(guide-(parameterNumber("blockHolePitchC")+20)/2-12),sy*40)],BLOCK_SEAT,h-14));
+			// Add the load-transfer ribs after lightening cuts, then retain all interfaces.
+			var relieved=Solids.cut(body,tools); pieces[0]=relieved;
+			body=Solids.union(pieces); tools=[];
+			tools.push(Part.cylinderAlongY(parameterNumber("bore")/2,-d/2-1,d/2+1,0,parameterNumber("boreZ")));
+			for(p in MillYNutMount.anchors()) tools.push(Part.cylinderAlongY(2.5,-d/2-1,-d/2+22,p.x,p.y));
+			for(p in MillYNutMount.pilots()) {
+				if(p.x<0) tools.push(Part.cylinderAlongY(3.05,-d/2-1,-d/2+10,p.x,p.y));
+				else tools.push(Solids.union([Part.cylinderAlongY(3.05,-d/2-1,-d/2+10,p.x-0.2,p.y),
+					Part.cylinderAlongY(3.05,-d/2-1,-d/2+10,p.x+0.2,p.y),
+					Part.box(0.4,11,6.1).translated(new Vector(p.x,-d/2+4.5,p.y-3.05))]));
+			}
+			tools.push(Part.cylinderSpan(5,24,h+1,0,-d/2+5));
+		}
+		var raw=Solids.cut(body,tools);
+		if (!values().boolean("blockAccess") && !values().boolean("nutBoss")) return raw;
 		try { var result=raw.refined(); raw.close(); return result; } catch(e:Dynamic) { raw.close(); throw e; }
 	}
 	/** Rounded XZ profile extruded from the side face to the inner bolt row. */

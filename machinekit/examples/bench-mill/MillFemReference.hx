@@ -1,4 +1,5 @@
 import cadkit.modeling.AssemblyState;
+import cadkit.modeling.AssemblyModel;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.PosedParts;
 import machinekit.milling.MillFrame;
@@ -16,9 +17,14 @@ class MillFemReference {
 		var members=assembly.components();
 		members.sort((a,b)->Reflect.compare(a.id,b.id));
 		var records:Array<Dynamic> = [];
+		// Physical preview records must build without importing the optional FEM exporter.
+		var model=new AssemblyModel("mm"); assembly.addTo(model,"");
+		var definition=model.definition("mill-physical-reference");
 		PosedParts.scope(cache->{
 			for (pose in poses) {
-				var state=MillFemExport.state(assembly,pose.x,pose.y,pose.z), parts:Array<Dynamic> = [];
+				var state=new AssemblyState(definition), parts:Array<Dynamic> = [];
+				state.setJoint("xyStage/x",pose.x); state.setJoint("xyStage/y",pose.y); state.setJoint("zAxis/z",pose.z);
+				state.forwardKinematics();
 				for (member in members) {
 					var world=state.worldPose(member.id), physical=member.component.massProperties(), c=physical.centreOfMass;
 					var shape=cache.posed(member.component,world);

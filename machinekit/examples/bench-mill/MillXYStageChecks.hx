@@ -110,6 +110,44 @@ class MillXYStageChecks {
 			near(bolt.z-MillCrossSaddle.BLOCK_SCREW_LENGTH,l.saddleBottom-4,"M4 screw engages 4 mm of block thread");
 		}
 		motorBody.close(); saddleBody.close(); rebuiltSaddle.close();
+		var adapter=cache.posed(axis.component("nutBracketY"),poses.get("nutBracketY"));
+		var rebuiltAdapter=cache.posed(restored.components().filter(m->m.id=="nutBracketY")[0].component,poses.get("nutBracketY"));
+		near(rebuiltAdapter.volume(),adapter.volume(),"registered adapter and pilots survive recipe rebuild"); rebuiltAdapter.close();
+		var nutBody=cache.posed(axis.component("nutY"),poses.get("nutY"));
+		var nutSaddle=cache.posed(axis.saddle,poses.get("saddle"));
+		var nutPose:AssemblyFrame=poses.get("nutY");
+		near(nutPose.x,0,"Y nut remains centered between guide rails");
+		near(nutPose.z,l.yScrewZ,"Y nut stays coaxial with the screw");
+		var mountPose:AssemblyFrame=poses.get("nutBracketY");
+		for(member in axis.components()) if(StringTools.startsWith(member.id,"nutBracketYBolt") || StringTools.startsWith(member.id,"nutYBolt")) {
+			var bolt=cache.posed(member.component,poses.get(member.id));
+			var parent=StringTools.startsWith(member.id,"nutYBolt")?nutBody:adapter;
+			near(bolt.distance(parent),0,"Y nut fastener has a physical bearing seat");
+			var common=bolt.intersect(parent); near(common.volume(),0,"Y nut fastener clears its clamped part"); common.close(); bolt.close();
+			check(!MillXYStageIntegrity.yFixed(member.id),"Y nut fasteners belong to moving saddle");
+			if(StringTools.startsWith(member.id,"nutYBolt")) {
+				var screw:machinekit.standard.SocketHeadCapScrew=cast member.component;
+				near(screw.length-l.nut.flangeThickness,6,"nut flange screw engages six millimetres of steel");
+				check(screw.length-l.nut.flangeThickness<MillYNutMount.NUT_THREAD_DEPTH,"nut screw cannot bottom in blind adapter tap");
+			}
+		}
+		for(p in MillYNutMount.anchors()) {
+			var tool=cadkit.modeling.Part.cylinderAlongY(3,mountPose.y-70,mountPose.y-9,p.x,l.saddleBottom+p.y);
+			for(body in [adapter,nutBody]) { var common=tool.intersect(body); near(common.volume(),0,"front key reaches recessed saddle bolt"); common.close(); }
+			tool.close();
+		}
+		var grease=F.compose(poses.get("nutY"),l.nut.connector("lubricator").frame);
+		var access=cadkit.modeling.Part.cylinderSpan(4,grease.z+3.1,l.xRailPlane+20,grease.x,grease.y);
+		for(body in [nutSaddle,adapter]) {
+			var greaseCommon=access.intersect(body); near(greaseCommon.volume(),0,"grease coupler reaches fitting through central passage and locating lip"); greaseCommon.close();
+		}
+		var serviceModel=new AssemblyModel("mm"); axis.addTo(serviceModel,"");
+		var serviceState=new AssemblyState(serviceModel.definition("nut-service")); serviceState.setJoint("x",l.xHalfTravel); serviceState.forwardKinematics();
+		for(id in ["railXFront","railXRear","blockX0","blockX1","blockX2","blockX3"]) {
+			var part=cache.posed(axis.component(id),serviceState.worldPose(id)), common=access.intersect(part);
+			near(common.volume(),0,"grease tool clears guides with X parked for service"); common.close(); part.close();
+		}
+		access.close(); adapter.close(); nutBody.close(); nutSaddle.close();
 		near(cache.overlap(axis.component("nutY"), poses.get("nutY"), axis.saddle, poses.get("saddle")), 0, "nut body and fitting clear underside saddle tunnel");
 		for (id in ["motorShaftX", "motorPulleyX", "screwPulleyX", "beltX", "motorMountX", "fixedBearingX"]) {
 			near(cache.overlap(axis.component(id), poses.get(id), axis.component("motorCoverX"), poses.get("motorCoverX")), 0, 'return hood clears $id');

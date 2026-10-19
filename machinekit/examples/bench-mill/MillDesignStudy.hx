@@ -82,7 +82,7 @@ class MillDesignStudy {
 	public static function write(assembly:MachineAssembly, frame:MillFrame, directory:String):Void {
 		var folder=directory+"/design-review";
 		if (!sys.FileSystem.exists(folder)) sys.FileSystem.createDirectory(folder);
-		var ids=["frame/base/casting","frame/column/casting","xyStage/saddle","xyStage/table","xyStage/motorMountX","zAxis/head","zAxis/carriage","spindle/spindle","spindle/motorCarrier","spindle/reactionFrame","spindle/cylinder","spindle/beltGuard"];
+		var ids=["frame/base/casting","frame/column/casting","xyStage/saddle","xyStage/nutBracketY","xyStage/table","xyStage/motorMountX","zAxis/head","zAxis/carriage","spindle/spindle","spindle/motorCarrier","spindle/reactionFrame","spindle/cylinder","spindle/beltGuard"];
 		var poses:Map<String,AssemblyFrame> = assembly.solvedPoses(), cache=new PosedParts();
 		var bounds:Array<Dynamic> = [];
 		try for (id in ids) {
@@ -130,7 +130,7 @@ class MillDesignStudy {
 			conceptStepParts:bounds,
 			stages:[
 				{step:1,status:"concept geometry",result:"250/160/250 travel; motor bays within base perimeter; service and enclosure envelope pending"},
-				{step:2,status:"concept geometry and motion checks",result:"Raised Y screw/direct saddle nut mount; rear coaxial motor in lower-column bay and bored Z support plate; X 1:1 HTD5M return into saddle; preload and belt life pending"},
+				{step:2,status:"concept geometry and motion checks",result:"Raised Y screw with registered nut adapter and ribbed saddle boss; rear coaxial motor in lower-column bay and bored Z support plate; X 1:1 HTD5M return into saddle; preload and belt life pending"},
 				{step:3,status:"concept geometry",result:"four accessible foot pockets, bored steel seats and M16 foot envelopes; anchorage/load ratings pending"},
 				{step:4,status:"concept geometry and section comparison",result:"ribbed four-pad saddle, raised guide beds and integral table ribs; full stiffness qualification pending"},
 				{step:5,status:"supplier selection required",result:"BT30 packaging study installed in concept; supplier-compatible spindle/release hardware selection pending"},
@@ -141,7 +141,7 @@ class MillDesignStudy {
 			releaseBlockers:["verified ATC spindle/drawbar/actuator and motor drawings", "release force, stroke, air pressure, sensor and reaction-path data",
 				"complete fastener and insert anchorage design", "foot ratings, floor support and stability", "whole-machine stiffness, thermal and modal qualification",
 				"validated lubrication/coolant/guards and controls", "material, mould, cure and post-cast machining process qualification"]};
-		sys.io.File.saveContent(folder+"/interfaces.csv", "interface,pattern,status\nBK12 and BF12 pedestal bolts,2 x M5 x 55 per housing,nominal modeled\nX motor plate anchors,4 x M6 x 25,nominal modeled\nY rear service hatch,4 x M4 x 10 into column steel anchors,nominal modeled\nZ head flange,4 x M6 x 16 with counterbores and blind carriage taps,nominal modeled\nLeveling feet,M16 stem through 18 mm steel bore,concept geometry and supplier rating pending\nY saddle blocks,16 x M4 x 16 with side-entry pockets,nominal modeled; other guide fasteners pending\nColumn clamps,4 x M12 x 35 into embedded steel pads,nominal modeled; anchorage/preload pending\nSpindle and actuator,nominal cartridge/reaction-frame/cylinder fasteners,concept only; selected supplier drawings required\n");
+		sys.io.File.saveContent(folder+"/interfaces.csv", "interface,pattern,status\nBK12 and BF12 pedestal bolts,2 x M5 x 55 per housing,nominal modeled\nX motor plate anchors,4 x M6 x 25,nominal modeled\nY rear service hatch,4 x M4 x 10 into column steel anchors,nominal modeled\nZ head flange,4 x M6 x 16 with counterbores and blind carriage taps,nominal modeled\nLeveling feet,M16 stem through 18 mm steel bore,concept geometry and supplier rating pending\nY saddle blocks,16 x M4 x 16 with side-entry pockets,nominal modeled; other guide fasteners pending\nY nut adapter,4 x M6 x 25 recessed anchors and 6 x M5 x 16 flange screws,study pattern; registered boss and service passage; supplier drawing pending\nColumn clamps,4 x M12 x 35 into embedded steel pads,nominal modeled; anchorage/preload pending\nSpindle and actuator,nominal cartridge/reaction-frame/cylinder fasteners,concept only; selected supplier drawings required\n");
 		sys.io.File.saveContent(folder+"/review.json",haxe.Json.stringify(report,null,"  "));
 		Sys.println("Mill concept design review: "+folder+"/review.json");
 	}
