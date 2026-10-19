@@ -23,7 +23,7 @@ class CrossedRollerBearing extends MachineComponent {
     return EngineeringMetadata.assumedCatalog("Crossed-roller precision bearing","CROSSED-ROLLER-80-120-16",parameters(),"machinekit/examples/flexspline-hobber/PLAN.md (assumed reference design)");
   public function new(?overrides:ComponentValues) {
     var v=P.resolve(parameters(),overrides);
-    super("CROSSED-ROLLER-80-120-16","Crossed-roller precision bearing (reference envelope)","bearing steel",false,v);
+    super("CROSSED-ROLLER-"+machinekit.component.Dimension.format(v.number("bore"))+"-"+machinekit.component.Dimension.format(v.number("outside"))+"-"+machinekit.component.Dimension.format(v.number("height")),"Crossed-roller precision bearing (reference envelope)","bearing steel",false,v);
     if(v.get("material")!=null)setMaterial(v.token("material"));
     ComponentEnvelopes.validateAnnular(v);
     addConnector("mount",Mount,Solids.axial(0,0,0));

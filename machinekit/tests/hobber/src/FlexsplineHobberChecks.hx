@@ -245,6 +245,7 @@ class FlexsplineHobberChecks {
     Sys.println('Reference load ratings: $assertions checks passed');
   }
   public static function main():Void {
+    if(Sys.args().length>1&&Sys.args()[0]=="layout-section"){FlexsplineHobberLayoutReport.writeSection(new FlexsplineHobber(),Sys.args()[1]);return;}
     if(Sys.args().length>0&&Sys.args()[0]=="ge-range"){HobberGERangeChecks.run();return;}
     if(Sys.args().length>1&&Sys.args()[0]=="scene-bounds"){Sys.println(haxe.Json.stringify(FlexsplineHobberLayoutReport.sceneBounds(Sys.args()[1])));return;}
     if(Sys.args().length>0&&Sys.args()[0]=="ge-frame"){HobberGEFrameChecks.run();return;}

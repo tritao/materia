@@ -39,8 +39,8 @@ class FoundationLayout {
         add("tablePlate","table seat",180,180,20,-250,0,110);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"preloaded column guide seat",width:50,depth:680,height:20,
           pose:F.fromRotationMatrix(110,side*165,200,[0.0,1,0,-1,0,0,0,0,1])});
-        out.push({id:"driveSeat",role:"X screw and scale seat",width:90,depth:680,height:20,pose:F.fromRotationMatrix(150,250,190,[0.0,1,0,-1,0,0,0,0,1])});
-        for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,0,side*310,180);
+        out.push({id:"driveSeat",role:"X screw and scale seat",width:90,depth:680,height:20,pose:F.fromRotationMatrix(150,310,190,[0.0,1,0,-1,0,0,0,0,1])});
+        for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,-400,side*310,180);
       }else{
         add("basePlate","column carriage sole",380,100,20,0,-40,-10);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"Z rail seat",width:35,depth:480,height:20,

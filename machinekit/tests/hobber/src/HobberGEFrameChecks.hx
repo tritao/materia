@@ -24,6 +24,7 @@ class HobberGEFrameChecks {
     }
     var grid=new RingGrid(machine.spec.rootRadius()+0.01,machine.spec.tipRadius()-0.01,3.9,4.1,0.08,0.1);
     var before=RingStock.annulus(grid),after=RingStock.annulus(grid),sweep=new HobbingSweep(machine.hob.design,-2,2,0.00002);
+    before.setThreads(1);after.setThreads(1);
     var fa=new HobbingForces(before,30,machine.spec.pressureAngle,1),fb=new HobbingForces(after,30,machine.spec.pressureAngle,1);
     var pass=new GashPass(0,0,0,0.00005,0.0001),maxPose=0.0,maxArc=0.0;
     try {
@@ -40,7 +41,7 @@ class HobberGEFrameChecks {
       if(removed==0||maxArc>1e-8)throw "GE reference chip fixture empty or changed";
       var forceDelta=Math.max(Math.abs(fa.maxTangential-fb.maxTangential),Math.abs(fa.maxRadial-fb.maxRadial));
       if(forceDelta>1e-6)throw "GE frame changes HB10 loads";
-      Sys.println("GE_FRAME_PASS "+haxe.Json.stringify({poseToleranceMmRad:1e-8,maxPoseDifference:maxPose,arcToleranceMm:1e-8,maxArcDifferenceMm:maxArc,forceToleranceN:1e-6,maxForceDifferenceN:forceDelta,cutCircles:removed,scope:"short reference-geometry cut using measured assembly transforms; no full-reference grade claim"}));
+      Sys.println("GE_FRAME_PASS "+haxe.Json.stringify({threads:1,sweepToleranceMm:0.00002,cutPassToleranceMm:0.000005,poseToleranceMmRad:1e-8,maxPoseDifference:maxPose,arcToleranceMm:1e-8,maxArcDifferenceMm:maxArc,forceToleranceN:1e-6,maxForceDifferenceN:forceDelta,cutCircles:removed,scope:"short reference-geometry cut using measured assembly transforms; no full-reference grade claim"}));
     }catch(error:Dynamic){fa.dispose();fb.dispose();sweep.dispose();before.dispose();after.dispose();throw error;}
     fa.dispose();fb.dispose();sweep.dispose();before.dispose();after.dispose();
   }

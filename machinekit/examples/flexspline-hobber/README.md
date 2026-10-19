@@ -11,3 +11,6 @@ Full reference metrology and error-budget cuts are separate, expensive checks.
 
 Open `inspection.scene.json` for the mechanical inspection view with the electrical
 rack hidden. Its drives and power wiring remain in the underlying assembly.
+
+The head has a front-mounted compact swivel and vertical twin-rail Y stage.
+[LAYOUT_SECTION.svg](LAYOUT_SECTION.svg) shows the dimensioned radial stack.

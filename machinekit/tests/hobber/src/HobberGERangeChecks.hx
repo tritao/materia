@@ -23,8 +23,12 @@ class HobberGERangeChecks {
           for(member in machine.components()){
             if(member.id=="mandrel"||member.id=="blank")continue; // Intended loading/locating interfaces.
             var b=cache.box(member.component,state.worldPose(member.id));
-            if(!(b.minX>=80||b.maxX<=-80||b.minY>=80||b.maxY<=-80||b.maxZ<=363))
-              throw 'part obstructs reserved top-loading cylinder: ${member.id}, OD=${2*spec.tipRadius()}';
+            if(!(b.minX>=80||b.maxX<=-80||b.minY>=80||b.maxY<=-80||b.maxZ<=363)){
+              var solid=cache.posed(member.component,state.worldPose(member.id));
+              var opening=cadkit.modeling.Part.cylinderSpan(80,363,1200),volume=PosedParts.sharedVolume(solid,opening);
+              solid.close();opening.close();if(volume>0.001)
+                throw 'part obstructs reserved top-loading cylinder: ${member.id}, OD=${2*spec.tipRadius()}';
+            }
             count++;
           }
         }

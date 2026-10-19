@@ -1,0 +1,193 @@
+{
+  "basis": "CAD volumes and declared material densities; assumed compact swivel ratings and structural adequacy, not measured machine accuracy",
+  "before": {
+    "guideToHobMm": {
+      "X": 346.99999999999994,
+      "Y": 136.9999999999999,
+      "Z": 325.0000000000001
+    },
+    "movingMassKg": {
+      "X": 81.70896226077305,
+      "Y": 18.00841694005188,
+      "Z": 106.78886171743362
+    },
+    "machineMassKg": 351.612221714231,
+    "members": 99
+  },
+  "after": {
+    "installedPoseEnvelopeMm": {
+      "radial": 1630,
+      "scope": "initial pose including separate electrical rack; CAD envelope bounds",
+      "tangential": 682.0000000000001
+    },
+    "headStackMm": {
+      "swivelBearingFrontFace": 114,
+      "swivelOutputFace": 100,
+      "verticalGuideSeparation": 120,
+      "yGuidePlane": 70,
+      "zGuidePlane": 161,
+      "zSaddleFront": 135
+    },
+    "drives": [
+      {
+        "thrustMarginN": 888.2832523661427,
+        "axis": "X",
+        "movingMassKg": 127.43349526771446,
+        "continuousThrustWith20PercentReserveN": 1152,
+        "designDemandN": 263.7167476338572,
+        "passed": true,
+        "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
+      },
+      {
+        "thrustMarginN": 911.9661993369266,
+        "axis": "Y",
+        "movingMassKg": 13.177041884720607,
+        "continuousThrustWith20PercentReserveN": 1152,
+        "designDemandN": 240.0338006630734,
+        "passed": true,
+        "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
+      },
+      {
+        "thrustMarginN": 1548.812718943668,
+        "axis": "Z",
+        "movingMassKg": 39.89533757877988,
+        "continuousThrustWith20PercentReserveN": 2159.9999999999995,
+        "designDemandN": 611.1872810563316,
+        "passed": true,
+        "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
+      }
+    ],
+    "bedFootprintRadialTangentialMm": [
+      1000,
+      650
+    ],
+    "guideToHobMm": {
+      "X": 121.00000000000006,
+      "Y": 70.00000000000006,
+      "Z": 161
+    },
+    "movingMassKg": {
+      "X": 127.43349526771446,
+      "Y": 13.177041884720607,
+      "Z": 39.89533757877988
+    },
+    "machineMassKg": 343.67417547447616,
+    "members": 96
+  },
+  "validation": {
+    "mechanicalAssertions": 775,
+    "partAssertions": 1000,
+    "partGeometryAssertions": 60,
+    "loadingChecks": 1532,
+    "loadingRange": "OD25/140 mm, face20 mm, X retract250 mm, reserved top cylinder radius80 mm",
+    "nominalInstallation": {
+      "assertions": 5888,
+      "configurations": [
+        {
+          "reference": false,
+          "poses": 243,
+          "toolSeatStartMm": 40,
+          "toolSeatEndMm": 80,
+          "boreMm": 16,
+          "nominalDiametralClearanceMm": 0,
+          "spindleHousingAxialGapMm": 39.99999999999994,
+          "outboardHousingAxialGapMm": 65.00000000000014,
+          "setupTiltRadians": -0.03390480050668439,
+          "tablePhaseRadians": 0.07853981633974483,
+          "rakePointsOnToothedRim": 2620,
+          "engagedBandMinZMm": 1.6825151152134694,
+          "engagedBandMaxZMm": 2.31748488478663,
+          "axialRetention": "OPEN: datum seating only; no physical stop, spacer or retainer modeled",
+          "manufacturingFits": "OPEN: no bore/shaft fit tolerances specified"
+        },
+        {
+          "reference": true,
+          "poses": 243,
+          "toolSeatStartMm": 40,
+          "toolSeatEndMm": 80,
+          "boreMm": 16,
+          "nominalDiametralClearanceMm": 0,
+          "spindleHousingAxialGapMm": 40.00000000000003,
+          "outboardHousingAxialGapMm": 65.00000000000009,
+          "setupTiltRadians": -0.00960014746211563,
+          "tablePhaseRadians": 0.015707963267949016,
+          "rakePointsOnToothedRim": 5824,
+          "engagedBandMinZMm": 3.9443607703492587,
+          "engagedBandMaxZMm": 4.055639229650623,
+          "axialRetention": "OPEN: datum seating only; no physical stop, spacer or retainer modeled",
+          "manufacturingFits": "OPEN: no bore/shaft fit tolerances specified"
+        }
+      ],
+      "scope": "nominal datums, coaxiality and toothed-rim reach; retention and manufacturing fits remain open"
+    },
+    "frameRegression": {
+      "threads": 1,
+      "sweepToleranceMm": 2e-05,
+      "cutPassToleranceMm": 5e-06,
+      "poseToleranceMmRad": 1e-08,
+      "maxPoseDifference": 1.7763568394002505e-13,
+      "arcToleranceMm": 1e-08,
+      "maxArcDifferenceMm": 1.8447441105548834e-13,
+      "forceToleranceN": 1e-06,
+      "maxForceDifferenceN": 1.8133050616597757e-10,
+      "cutCircles": 9,
+      "scope": "short reference-geometry cut using measured assembly transforms; no full-reference grade claim"
+    },
+    "clearanceAudits": [
+      {
+        "reference": false,
+        "completed": 85,
+        "checked": 18657,
+        "unexpected": 0,
+        "thresholdMm3": 0.001,
+        "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
+      },
+      {
+        "reference": true,
+        "completed": 85,
+        "checked": 18633,
+        "unexpected": 0,
+        "thresholdMm3": 0.001,
+        "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
+      }
+    ],
+    "appCoarseCut": {
+      "cycleSeconds": 6.0027500000015905,
+      "cuttingSeconds": 3.6009120961748557,
+      "syncArcsec": 0.003931747276662378,
+      "grade": null,
+      "isoClass": null,
+      "collisions": 0,
+      "stockBytes": 969168,
+      "bufferedSamples": 619,
+      "gashWindows": 982
+    }
+  },
+  "provenance": {
+    "baseCommit": "f1f9935c7741ae0ab5c4553845d7cfc0fa6f4a28",
+    "geometryAndChecksSourceSha256": {
+      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "d1642cf6d26a6aed2fc1a3214877c408425fad4e9f1f52f74f1edff73d7bc6e0",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberLayoutReport.hx": "6db47141cb898bba755073c037fcded6478e24379f515efa80a8d52e99a0a44a",
+      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "591d338556cf600563e6d2329ba1aca476a95a102142a46b7ab3f3b76a9a567d",
+      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "cdf49e12cc2f99fa1f4f0a5c672b022ba5e6afe866fe0ecd673eb95a0b4d1735",
+      "machinekit/haxe/src/machinekit/hobbing/SwivelHead.hx": "a40f69c47bdc11f07b53ac6a22680e83bc06c5d507289d7522ce7c419634e4b7",
+      "machinekit/haxe/src/machinekit/hobbing/SwivelHousing.hx": "f8d5f214aaa9bff19158018b4ef93b790165c8cfc8d9ee473005f8d8a56e0b71",
+      "machinekit/haxe/src/machinekit/motion/CrossedRollerBearing.hx": "2cd6f3e7817ff3b046097ec543849296539ea34bc779de417f31969c22af4a46",
+      "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "444a04b6262d529534e47d556c03d2e681d69de88c9f996ed74d3f1bcc1ed08a",
+      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "4d2d569116f4c92fe4e7c3868d1d81a791915b381a4faa695fb62ec68e78a7df",
+      "machinekit/tests/hobber/src/HobberGEFrameChecks.hx": "235210d127330f61e6fdd6c70b199c4fb219c5e44100250bc2737a7ec958218b",
+      "machinekit/tests/hobber/src/HobberGERangeChecks.hx": "20bd7b6df87cf7f7147c7e89684cebcf4b21a8b2b50c95724111ee92ca2030d6",
+      "machinekit/tests/hobbing/src/HobberPartTests.hx": "b60769546559cdfdbefb56ea53cf3a0a135bb9db2e96f46ee73fd5aeb956e54e"
+    },
+    "nativeProviders": "Existing providers reused read-only; frozen HB4/HB11 workers not rebuilt or signalled."
+  },
+  "open": [
+    "Z guide offset 161 mm is 11 mm beyond the approximate 150 mm target; needed for the front-mounted stack.",
+    "Compact concentric swivel motor/bearing/clamp dimensions, ratings and manufacturing fits need supplier confirmation.",
+    "No structural/modal qualification or class-6 claim from this layout audit.",
+    "Sampled grid is not a continuous swept-volume proof.",
+    "Hob axial retention hardware and manufacturing fits remain open as recorded by installation checks.",
+    "Moving bellows and complete enclosure/coolant containment remain provisions.",
+    "Full-reference HB12 cycle and grade are not established by the coarse app cut."
+  ]
+}

@@ -12,6 +12,17 @@ class HobberDesignChecks {
       var seat=F.compose(poses.get("spindle/arbor"),machine.spindle.arbor.connector("hobCentre").frame);
       var cutter=F.compose(poses.get("hob"),machine.hob.connector("centre").frame);
       count++;if(Math.abs(seat.x-cutter.x)+Math.abs(seat.y-cutter.y)+Math.abs(seat.z-cutter.z)>1e-7)throw "arbor hob seat differs from actual cutter datum";
+      var canonical=F.inverse(FlexsplineHobber.MACHINE_FROM_WORK),centre=F.compose(canonical,cutter);
+      for(id in ["railYLeft","railYRight"]){
+        var frame=F.compose(canonical,poses.get(id)),normal=F.transformVector(frame,0,1,0),axis=F.transformVector(frame,0,0,1);
+        count++;if(Math.abs(frame.x-centre.x-70)>1e-8||Math.abs(normal.x+1)+Math.abs(normal.y)+Math.abs(normal.z)>1e-8||Math.abs(axis.y+1)+Math.abs(axis.x)+Math.abs(axis.z)>1e-8)throw "Y guides must lie on the radial vertical face, 70 mm behind hob";
+      }
+      var face=F.compose(canonical,F.compose(poses.get("swivel/bearing"),F.translation(0,0,machine.swivel.bearing.parameterNumber("height"))));
+      var mount=F.compose(canonical,poses.get("swivel/housing"));
+      count++;if(Math.abs(face.x-centre.x-114)>1e-8||Math.abs(mount.x-centre.x-135)>1e-8||face.x>=mount.x)throw "swivel bearing must be in front of the Z saddle";
+      for(m in members)if(Std.isOfType(m.component,HobberSaddle)){
+        count++;if(["A-yoke","Y-saddle","X-bridge","Z-saddle"].indexOf(m.component.values().token("design"))>=0)throw "retired overhead saddle installed";
+      }
       for(mount in machine.mountContacts){
         var first=members.filter(m->m.id==mount.parent)[0],second=members.filter(m->m.id==mount.child)[0];
         var a=cache.posed(first.component,poses.get(first.id)),b=cache.posed(second.component,poses.get(second.id));

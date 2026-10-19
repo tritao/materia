@@ -122,7 +122,10 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
   a 16×5 ground ball screw (C5 procurement target, assumed), preloaded nut and
   linear scale provide radial infeed. X retracts to 250 mm for top loading.
 - Z is on the recessed column face, with 200 mm travel. A is bolted directly to
-  the Z saddle, radial pivot through the hob-centre line. Y uses twin rails.
+  the front of the vertical Z saddle, radial pivot through the hob-centre line.
+  Its compact concentric bearing/motor/clamp drives a vertical swivel plate;
+  Y uses twin rails on that plate’s front face, with a vertical spindle saddle.
+  No overhead A-yoke roof or underhung horizontal Y plate remains.
   Target range: flexspline OD 25–140 mm, faces up to 20 mm.
 - Target hob-centre distance from the nearest X and Z guide planes ≤ about
   150 mm. Report actual guide-plane offsets and moving masses, not an inferred
@@ -2049,3 +2052,55 @@ omission removes its checks) and the short assembled/analytic frame regression:
 max pose delta 1.85e-13 mm/rad, boundary delta 3.17e-13 mm and load delta
 1.82e-10 N, against unchanged 1e-8, 1e-8 mm and 1e-6 N criteria respectively.
 Full travel-grid acceptance and the remaining layout gates above stay open.
+
+### GE moving-column layout accepted as a CAD/app layout (2026-10-19)
+
+- Replaced the remaining overhead head with a vertical stack: Z saddle front,
+  compact concentric crossed-roller/motor/clamp cartridge, vertical swivel plate,
+  twin front-face Y rails and a vertical spindle saddle with an open rear C bracket.
+  The outboard bearing remains axially floating on the same Y saddle. Retired the
+  old `A-yoke`, `Y-saddle`, `X-bridge` and `Z-saddle` designs without legacy aliases.
+- Achieved guide-plane offsets X/Y/Z = **121/70/161 mm**, versus the old
+  **347/137/325 mm**. The A bearing front face is **114 mm** behind the hob;
+  the Z saddle mounting face is 135 mm. The initial moving-column Z offset was
+  125 mm; moving its rail plane rearward by 36 mm permits the actual front-mounted
+  bearing/plate/rail stack. Its 161 mm result is explicitly 11 mm beyond the
+  approximate 150 mm target. The fixture shoulder stays at Z=363 mm; its integral
+  base is not raised to conceal head clashes.
+- Moved the X drive outside the tilted spindle envelope and repositioned lifting
+  inserts. The first X block is at station 102 mm, giving 24.5 mm of carriage plate
+  ahead of its front mounting bolt and full support under its nominal block foot.
+  Used insert-only precision mounts, rail margins and declared overtravel remain
+  checked. The stationary end shields fit below the head; moving bellows remain
+  a reserved provision. Enclosure panels stay omitted and the electrical rack
+  stays hidden in the inspection view, with its wiring retained.
+- Native-volume masses: X **127.43 kg**, Y **13.18 kg**, Z **39.90 kg**, machine
+  **343.67 kg** including the rack and excluding enclosure panels. Continuous
+  thrust margins are X/Y/Z **888.28/911.97/1548.81 N** under the stated assumed
+  0.5 m/s², 100 N process plus 100 N friction demand, Z gravity and Y gravity
+  at ±15° tilt, after 20%
+  continuous-thrust reserve. These are drive-sizing checks, not stiffness results.
+- Validation: **775** mechanical/persistence assertions; **1000** parts assertions;
+  **60** part-geometry assertions; **1532** loading/range checks at OD25/140 mm,
+  face20 mm and ±15° A. Installation checks pass **5888** assertions over 243 poses
+  per configuration. Exact-solid audits pass **85 poses per configuration**,
+  **37,290** candidate pair checks in total, with zero unintended intersections
+  above 0.001 mm³; only intentional hob/blank engagement is permitted. This is
+  a sampled grid, not continuous swept-volume certification.
+- Work-frame regression: max pose difference **1.78e-13 mm/rad**, cut boundary
+  difference **1.85e-13 mm** and force difference **1.82e-10 N**, within unchanged
+  1e-8 mm/rad, 1e-8 mm and 1e-6 N criteria. The nine-circle reference-geometry
+  test uses one thread and recorded sweep/cut-pass tolerances of 0.00002/0.000005 mm.
+  No full reference metrology or force cut is rerun for this rigid-frame check.
+- HB6/HB9 acceptance now uses this front-mounted head. The coarse physical app cut
+  completes in **6.00275 simulated seconds**, with 3.600912 seconds programmed
+  cutting feed, **982** gash windows, zero cutter/fixture envelope collisions and
+  **0.00393175 arcsec** sync error. The remaining 2.401838 seconds include ramps
+  and positioning. This ungraded smoke cut does not establish HB12's full-reference
+  ≤3 min cycle or class-6 acceptance. The earlier overhead app smoke was 5.55875 s;
+  accepted axis acceleration/moving-load timing now differs.
+- `MACHINE_DESIGN.md`, `LAYOUT_REPORT.json` and the dimensioned `LAYOUT_SECTION.svg`
+  carry the comparison and evidence. The section is schematic and labels projected
+  Y-offset parts; it is not a manufacturing drawing. Compact swivel procurement,
+  manufactured fits/retention, modal stiffness and physical accuracy remain open.
+  Frozen HB11/HB4 cuts/providers were left untouched.

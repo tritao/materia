@@ -7,9 +7,9 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Swivel-head housing. Reference row is Assumed; dimensions are simplified envelopes. */
 class SwivelHousing extends MachineComponent {
   public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
-    P.quantity("outside",180,"mm"),
+    P.quantity("outside",220,"mm"),
     P.quantity("bore",100,"mm"),
-    P.quantity("height",80,"mm")]);
+    P.quantity("height",25,"mm")]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
     if(recipe==null)recipe=new ComponentType("machinekit.hobbing.swivel-housing",parameters(),v -> new SwivelHousing(v));
@@ -32,8 +32,8 @@ class SwivelHousing extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
     return Solids.cut(ComponentEnvelopes.annular(values()),[
-      cadkit.modeling.Part.cylinderSpan(60,-0.1,16),
-      cadkit.modeling.Part.cylinderSpan(75,16,61)]);
+      cadkit.modeling.Part.cylinderSpan(90,5,15),
+      cadkit.modeling.Part.cylinderSpan(100,15,25.1)]);
   override public function componentType():Null<ComponentType>return recipeType();
 
 

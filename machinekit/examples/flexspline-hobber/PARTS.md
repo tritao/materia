@@ -64,10 +64,10 @@ and empty verified-field lists.
 - `SwivelHead extends MachineAssembly`: direct servo, crossed-roller support, housing,
   moving head and clamp. A is ±45°, with 15°/s rated and 30°/s maximum speed.
   The static 100 N m clamp rating remains separate from the drive's joint effort.
-- `MineralCastBed`: 650 × 750 × 120 mm ribbed casting, with steel rail seats,
-  table/column plates, threaded bushes and lifting points as child parts.
-- `MineralCastColumn`: 200 × 180 × 850 mm ribbed casting and separate steel base,
-  rail seats, a side Z-drive seat, bushes and lifting inserts, 110 mm rail spacing. All precision mounts
+- `MineralCastBed`: 1000 × 650 × 210 mm ribbed casting, with steel rail seats,
+  a table plate, used drive seat and lifting points as child parts.
+- `MineralCastColumn`: 400 × 200 × 500 mm ribbed casting and separate steel base,
+  rail seats, a side Z-drive seat, lifting inserts, 290 mm Z rail spacing. All precision mounts
   are insert faces, with 0.01 mm assumed position tolerance and ground-after-casting
   finish. Casting BOM rows show native-computed kg; inserts are separate items.
   Optional assumed bulk inputs are 35 GPa Young modulus, loss factor 0.02 (8x an
@@ -120,20 +120,20 @@ B has process-velocity ownership, C has a position servo, and A has a spring-app
 100 N m static clamp with release/feedback channels. Electronic gearing and the
 program that releases/reapplies A remain HB7 work; there is no B/C mechanical coupling.
 
-Three SFU1605 ball-screw/nut drives carry 400 W servos, fixed/floating supports,
+Three ground SFU1605 ball-screw/nut drives carry 400 W X/Y and 750 W Z servos, fixed/floating supports,
 couplings and separate rotating shafts. The lead and support critical speed enter
 the existing transmission resolver. Linear scales provide 10,000 counts/mm
 (0.1 micrometre resolution). Six 20 A phase-RMS drives share an assumed 400 V
 three-phase rectifier/bus; explicit winding ratings are checked by the existing
 motor/driver power model. Ratings, fixtures and travel are design assumptions.
 
-The reference's work shoulder is 75 mm above the table platen, allowing end feed
+The reference's work shoulder is 115 mm above the table platen (including an integral 40 mm base), allowing end feed
 and tilted-tool clearance. Its mandrel is sized from the cup's inner root/wall
 geometry; other reference parts rebuild the fixture to match. X's lower soft bound
-also accounts for that fixture radius. X ends at 100 mm, Y is ±10 mm, Z is
-−10..60 mm relative to the work shoulder. A's installed range is ±15°; the generic
-swivel package still supports its original ±45° envelope. The table mounting insert
-is forward at Y=−160 mm so the horizontal spindle clears the column.
+also accounts for that fixture radius. X retracts to 250 mm, Y is ±10 mm, Z is
+−10..190 mm relative to the work shoulder. A's installed range is ±15°; the generic
+swivel package still supports its original ±45° envelope. The work table remains fixed; the column moves on bed rails. An explicit +90°
+rotation maps work-frame radial X to global Y and the hob axis to global X.
 
 `hobToWork(state)` exports the actual solved mechanical frame in the hob designer's
 CAD axes and the workpiece's cylindrical axes. It strips the connector convention
@@ -149,12 +149,13 @@ Open `materia.project.json` in this directory, or the **Gear cutting** Start-pag
 card. It currently opens the mechanical twin; the cutting program is HB8 work.
 `machinekit/tests/hobber/haxeon.json` runs the mechanical checks; `scene` also exports
 and decodes the scene artifact. The registered app `flexspline-hobber` project-source
-case checks project loading, source-derived axis limits and a short MuJoCo pose hold.
+case checks project loading, source-derived axis limits and a coarse physical MuJoCo cutting cycle.
 
 ## Redesigned machine structure
 
-The example now uses registered `HobberSaddle` recipes for the Z saddle, closed-box
-X bridge, A yoke, Y spindle saddle, three drive support frames and electrical rack.
+The example uses registered `HobberSaddle` recipes for the X carriage, vertical
+Z saddle, vertical swivel and Y plates, three drive support frames and electrical rack.
+The old overhead A-yoke, Y-saddle, X-bridge and Z-saddle recipes are retired.
 These extend `MachineComponent` directly. Designed steel weldments remain assumed;
 physical contacts, connected solids and recipe/pose round trips are checked.
 See [MACHINE_DESIGN.md](MACHINE_DESIGN.md) for datums, load paths and qualification scope.
