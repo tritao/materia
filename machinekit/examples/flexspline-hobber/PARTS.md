@@ -64,7 +64,7 @@ and empty verified-field lists.
 - `SwivelHead extends MachineAssembly`: direct servo, crossed-roller support, housing,
   moving head and clamp. A is ±45°, with 15°/s rated and 30°/s maximum speed.
   The static 100 N m clamp rating remains separate from the drive's joint effort.
-- `MineralCastBed`: 1100 × 800 × 800 mm monolithic ribbed casting, with steel rail seats,
+- `MineralCastBed`: 930 × 800 × 800 mm monolithic ribbed casting, with steel rail seats,
   a table plate, used drive seat and three levelling-foot anchors as child parts; lifting hardware is deferred.
 - `MineralCastColumn`: 400 × 200 × 500 mm ribbed casting and separate steel base,
   rail seats, a side Z-drive seat, lifting inserts, 290 mm Z rail spacing. All precision mounts
@@ -132,7 +132,7 @@ motor/driver power model. Ratings, fixtures and travel are design assumptions.
 The reference's work shoulder is 115 mm above the table platen (including an integral 40 mm base), allowing end feed
 and tilted-tool clearance. Its mandrel is sized from the cup's inner root/wall
 geometry; other reference parts rebuild the fixture to match. X's lower soft bound
-also accounts for that fixture radius. X retracts to 250 mm, Y is ±10 mm, Z is
+also accounts for that fixture radius. X retracts to 110 mm for front loading, Y is ±10 mm, Z is
 −10..190 mm relative to the work shoulder. A's installed range is ±15°; the generic
 swivel package still supports its original ±45° envelope. The work table remains fixed; the column moves on bed rails. An explicit +90°
 rotation maps work-frame radial X to global Y and the hob axis to global X.
@@ -166,7 +166,9 @@ longer used to assemble the machine.
 
 ### Centred X transmission and supplier guide exteriors
 
-X uses a central recessed screw deck and nut carrier, rear motor/fixed bearing,
+X uses 420 mm HGR25 guides and a 260 mm SFU1605 screw, sized for X25..110
+plus 5 mm overtravel, block/nut lengths and end margins. It has a central
+recessed screw deck and nut carrier, rear motor/fixed bearing,
 and a separate cast-in channel-floor insert. The bed channel is a shared casting
 void, not a machined mineral-cast surface. All twelve carriage blocks select pinned
 HGH25CA (X) / HGH15CA (Y/Z) supplier exteriors. X rails use the matching HGR25R

@@ -15,7 +15,7 @@ synchronisation and force calculations retain their work-frame conventions.
 The frame regression compares actual assembled poses, cut boundaries and loads
 with the analytic reference chain, rather than changing the cutting definition.
 
-The base is one 1100 × 800 × 800 mm monolithic mineral casting, supported on
+The base is one 930 × 800 × 800 mm monolithic mineral casting, supported on
 three 47 mm rigid levelling feet. Its top is 847 mm above the floor and the tooth
 band is at 1000 mm. The initial 650 mm plinth height would leave the band at
 850 mm with this low fixture; the taller casting raises the work without adding
@@ -55,7 +55,7 @@ recessed casting channel. Its nut carrier drops from the carriage into the chann
 a steel deck mounts to a separate ground-after-casting steel insert. The fixed
 support and motor sit at the rear; the screw axis points towards the table.
 The screw transmission sign follows that reversed axis. The insert starts beyond
-the chip guard, with 5.5 mm nominal radial clearance. A channel cover/bellows remains
+the chip guard, with 45.5 mm nominal radial clearance. A channel cover/bellows remains
 a design provision; the exposed mechanism is an inspection model.
 
 Ground screws and linear scales serve
@@ -70,9 +70,9 @@ confirmation.
 | X moving mass | 81.71 kg | 127.98 kg |
 | Z moving mass | 106.79 kg | 41.10 kg |
 | Y moving mass | 18.01 kg | 14.03 kg |
-| Machine mass | 351.61 kg | 1161.27 kg |
-| Bed footprint (radial × tangential) | 650 × 750 mm | 1100 × 800 mm |
-| Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1680 × 800 mm |
+| Machine mass | 351.61 kg | 1038.15 kg |
+| Bed footprint (radial × tangential) | 650 × 750 mm | 930 × 800 mm |
+| Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1510 × 800 mm |
 | X continuous thrust margin, same assumed demand basis | 911.15 N | 888.01 N |
 | Y continuous thrust margin, same assumed demand basis | 897.29 N | 909.38 N |
 | Z continuous thrust margin, same assumed demand basis | 859.36 N | 1536.43 N |
@@ -101,7 +101,8 @@ replace the HB10 measured-load report or modal analysis.
 ## Travel, fixture and support
 
 The target envelope is flexspline outside diameter 25–140 mm, face width up to
-20 mm. X retracts to 250 mm for top loading; Z spans -10..190 mm, Y ±10 mm,
+20 mm. The X mechanism spans 25..110 mm with fixture-dependent cutting soft limits;
+front loading retracts to 110 mm. Z spans -10..190 mm, Y ±10 mm,
 and A ±15°. Guide checks include block length, end margins and overtravel.
 An integral 40 mm flange and mandrel base replaces the stacked riser assembly;
 it preserves the work-frame tooth-band datum (Z=363 mm), now 1000 mm above the floor, and tilt clearance. The mandrel sleeve continues
@@ -121,7 +122,7 @@ shields have been removed at the user’s request. Rails, blocks and the central
 screw remain exposed; bellows with suitable chip protection and attached end
 frames are an open design item, including compressed-length checks at both
 travel limits. The enclosure recipe reserves
-the machine envelope and top loading opening; its panels are currently omitted
+the machine envelope, front loading access and optional top opening; its panels are currently omitted
 from the assembly at the user’s request for unobstructed inspection. Door interlocks,
 fluid containment and a complete conveyor are not implemented.
 
@@ -142,12 +143,12 @@ thermal behaviour and detailed manufacturing release remain open plan items.
 
 ## Heavy plinth acceptance (HB-D11)
 
-The casting is 884.62 kg; the base assembly is 921.81 kg and the complete machine
-is 1161.27 kg. The casting-to-moving-mass ratios are 6.91:1 (X), 63.06:1 (Y)
-and 21.53:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
+The casting is 774.49 kg; the base assembly is 802.86 kg and the complete machine
+is 1038.15 kg. The casting-to-moving-mass ratios are 6.05:1 (X), 55.21:1 (Y)
+and 18.85:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
 from 37.28 to 31.75 kg; its insert-equipped assembly falls from 55.50 to 49.97 kg.
 X moves 127.98 kg including the complete column/head. The three support points
-span 860 mm radially and 660 mm across the front. Positive reactions are checked
+span 690 mm radially and 660 mm across the front. Positive reactions are checked
 through X travel against an assumed 15 kN target per foot; no vibration pads
 are fitted. Floor, pad and screw compliance remain unqualified.
 
@@ -164,12 +165,14 @@ assumed stiffness. The variation across the 8 mm face is about 0.025 µm.
 These are load-model bounds, not measured table performance.
 
 [BASELINE_FOUNDATIONS.json](BASELINE_FOUNDATIONS.json) preserves the previous
-210 mm bed's CAD geometry/masses. `base-report` compares that bed and this
-plinth using a simply supported beam over the same 860 mm span, the minimum
-net section and E=35 GPa (assumed). It samples the actual moving CAD mass centre
-across X travel and combines relative vertical displacement and Abbe rotation.
-The estimated change falls from 0.399 µm to about 0.0063 µm, or 0.0126 µm at
-half the assumed modulus, below the explicitly allocated 1.9 µm profile share.
+210 mm bed's CAD geometry/masses and the preceding full-stroke heavy plinth.
+`base-report` uses a simply supported beam, minimum net section and E=35 GPa
+(assumed). Across the new full mechanism X25..110 range, the old bed retains
+its original 860 mm support span and changes by 0.132 µm; the shortened plinth
+uses its 690 mm span and changes by 0.00196 µm (0.00392 µm at half modulus).
+The previous 1100 mm plinth changed by 0.00628 µm across X45.2..250; that
+historical result is retained separately, not compared as equal travel.
+The new bound is below the explicitly allocated 1.9 µm profile share.
 Both beds pass this simplified allocation: this calculation alone does not
 prove the old bed unacceptable. The old mass ratio and work height motivate
 the redesign. Local insert/contact flexibility, joints, torsion, foot/floor
@@ -240,7 +243,7 @@ demand are X 885.968 N, Y 907.722 N, Z 1531.207 N. Guide-to-hob offsets and bed
 footprint were unchanged by that cartridge change; current masses are in the HB-D11 table above.
 
 
-### Cup and top loading
+### Cup and front loading
 
 The workpiece is now a one-piece cup blank rather than an annular band: the
 open/toothed end is the unchanged Z=0 work datum, the closed end is Z=40 mm,
@@ -254,8 +257,36 @@ with a 0.3 mm radial rim-support land. The sleeve is a separate child part;
 the body is recessed for it and its assumed 0.5 mm oil cavity. Sleeve start is
 now the work seat, so the stop is below the active sleeve and the complete
 4/8 mm tooth band remains supported. Collapsed radial bore clearance is 0.025 mm.
-The head retracts to X=250 mm for the 120 mm top-loading path. Loading-path
-sampling and cutting grids cover coarse and reference models; see LAYOUT_REPORT.json.
+The head retracts to X=110 mm, parks Y=Z=0 and stops B. The robot approaches
+from work −X (global −Y, away from the column), transfers 250 mm horizontally
+with the cup 35 mm above its seat, then lowers it over the collapsed sleeve.
+This clears the maximum 30 mm mandrel protrusion by 5 mm. Unloading reverses
+that path after cutting and measured X/Y/Z withdrawal. The transfer distance
+belongs to the robot, not the X screw.
+
+[LOADING_CLEARANCE.json](LOADING_CLEARANCE.json) records the exact-solid sizing.
+For cup outside radius R, the assumed front palm occupies x=[−R−80,−R−25],
+y=±(R+25), z=40..80 mm above the cup base. Two side fingers occupy
+x=[−R−30,15], y=[R−3,R+25] and its opposite, z=30..55 mm. These are assumed
+occupied envelopes, including finger engagement; robot reach/wrist design remains
+open. The front transfer sweeps them through 250 mm and then 35 mm down.
+The head corridor adds 10 mm clearance and encloses all A ±15° using 1°
+samples padded by Rmax·0.5°=2.735 mm. B is stopped; Y=Z=0.
+
+| Cup OD, face 20 mm | Front required / rounded | Top required / rounded |
+|---|---:|---:|
+| 25 mm | 61.37 / 65 mm | 57.66 / 60 mm |
+| 140 mm | 108.54 / 110 mm | 142.33 / 145 mm |
+
+Front loading is selected. Top loading remains an evaluated alternative with
+R+25 mm gripper reach and 120 mm vertical lift; it needs longer mechanics.
+The chosen HGR25 rails are 420 mm, including 84 mm blocks, 20 mm rail end
+margins and 5 mm overtravel. The X screw is 260 mm, including journal lengths,
+nut/flange length, support/carrier clearance and 10 mm end allowance. Its fixed
+motor ends 610 mm behind the work datum; 20 mm rear clearance sets the base
+rear at 630 mm (front −300 mm), hence 930 mm base length. The top alternative
+would need 460 mm rails, 290 mm screw and 960 mm base. See LAYOUT_REPORT.json
+for the exact loading and cutting audits.
 
 The app handling timeline is explicitly presentational: no gripper, pressure
 solver or loose-body collision integration. The cup is held in the fixture's

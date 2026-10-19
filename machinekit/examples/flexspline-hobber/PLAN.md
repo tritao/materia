@@ -120,7 +120,15 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
   ring encoder/full closed loop and the specified non-contact seal arrangement.
 - X moves the complete column on preloaded HGR25 bed guides toward the table;
   a 16×5 ground ball screw (C5 procurement target, assumed), preloaded nut and
-  linear scale provide radial infeed. X retracts to 250 mm for top loading.
+  linear scale provide radial infeed. Size X from cutting centre distance plus
+  loading clearance: mechanism X=25..110 mm, with fixture-dependent cutting
+  soft limits. Front loading is the default: robot on work −X (global −Y),
+  250 mm horizontal transfer, then 35 mm final vertical seating. The assumed
+  side-jaw gripper and actual head solids give 108.54 mm required retract,
+  rounded to 110 mm; top loading requires 142.33 mm, rounded to 145 mm.
+  Validate both OD25/140, face20 and the complete A ±15° interval; park Y=Z=0
+  and stop B before transfer. See LOADING_CLEARANCE.json for the stated gripper
+  envelope and angular enclosure. No fixed 250 mm column stroke is retained.
 - Z is on the recessed column face, with 200 mm travel. A is bolted directly to
   the front of the vertical Z saddle, radial pivot through the hob-centre line.
   Its compact concentric bearing/motor/clamp drives a vertical swivel plate;
@@ -156,7 +164,10 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
   and puts the tooth band at knee height. Target base-to-X-moving-mass ratio
   ≥ 5:1 (5–10:1 design aim, assumed), with machine mass around 1–1.5 t.
 - Use one monolithic, ribbed, partly hollow mineral-cast plinth, starting around
-  1100 × 800 × 650 mm and 600–900 kg. Put the heavy solid section at the bottom,
+  1100 × 800 × 650 mm and 600–900 kg. The sized front-loading design is
+  930 × 800 × 800 mm, casting 774.49 kg; retain ≥5:1 X mass ratio after shortening.
+  Derive rail/screw/base length from travel, blocks, end margins, overtravel and
+  the fixed motor envelope. Put the heavy solid section at the bottom,
   pockets/ribs higher. Size it using the working height and stiffness estimate;
   record any departure from that starting size. No welded stand or legs.
 - Put the tooth band around 1000 mm above the floor (950–1100 mm target), for
@@ -417,6 +428,24 @@ r 30 mm. HB7 and HB11 must show this.
   - `RotaryEncoderRing`: counts, accuracy, eccentricity, as error-source fields.
 - `machinekit.hobbing`:
   - `RotaryTable`: torque motor, crossed roller, ring encoder, clamp.
+  - Add a bought-table form alongside the built-up `RotaryTable`, selectable by
+    the machine through the same table interfaces. One catalogue component carries
+    radial/axial runout (total and non-repeatable), absolute accuracy and encoder
+    interpolation error, cogging and speed ripple at 10–20 rpm, seal drag,
+    tilt/axial/radial stiffness, inertia, torque constants, bore, clamp and thermal
+    data. Every value carries `ValueBasis` (`Catalog` / `Measured` / `Assumed`).
+    Seed one generic-id instance from the Demat RTV210-050 public data: Ø200 mm
+    table, Ø40 mm bore, 54.9/223 Nm continuous/peak, 200/234 rpm rated/max,
+    ±5″ positioning / ±2″ repeatability, IP67 and 6 bar air clamp. Keep positioning
+    accuracy distinct from repeatability, runout and interpolation error. Unpublished
+    runout/NRRO, interpolation, low-speed ripple/cogging, drag, stiffness, inertia,
+    torque constants, clamp holding torque and thermal values must be explicitly
+    `Assumed` and listed, never inferred from those two positioning figures.
+    Reference [STRAIN_WAVE_RESEARCH.md — Suppliers and prices](../../STRAIN_WAVE_RESEARCH.md#suppliers-and-prices-collected-2026-10-19)
+    for the purchase specification, candidates and prices. Follow HB-D10: no vendor
+    names in code identifiers; use a generic seed id plus that document reference.
+    Vendor/model strings may appear only in recipe data/descriptions if permitted
+    by repository convention. This bought-form extension remains planned work.
   - `HobSpindle`: motorised direct drive, angular-contact pair, HSK-E interface.
   - `HobArbor` + `OutboardSupport`.
   - `Hob`: the part from a `gearkit.HobDesign`.
@@ -448,6 +477,10 @@ r 30 mm. HB7 and HB11 must show this.
 - HB-D11 acceptance: working height, three-foot support/spacing, base-to-moving
   mass ratios (X ≥ 5:1), and old/new assumed-stiffness displacement change over
   X travel, alongside the ordinary layout checks.
+- Loading acceptance: derive front/top retracts from actual head geometry,
+  assumed gripper envelope and largest/smallest parts, enclosing all A angles;
+  check the selected front corridor, final vertical seating and mandrel support.
+  Rails, screw and base include block/nut lengths, end margins and 5 mm overtravel.
 - `FlexsplineHobber extends MachineAssembly`:
   - joints C (revolute, direct drive), B (continuous, process velocity), X, Y, Z (prismatic, ball
     screws, linear scales), A (revolute, clamped);
@@ -507,6 +540,11 @@ r 30 mm. HB7 and HB11 must show this.
   - spindle power is below its rating with the margin stated.
 
 **HB11. Error sources and budget (HB-D7).**
+- Support both built-up and bought C-table forms as the source of table errors,
+  retaining each value's provenance. Compare candidate predicted grades before
+  purchase using stated catalogue/assumed inputs, then rerun with bench-measured
+  values. Predictions using unpublished assumptions are conditional, not supplier
+  qualification. Use the HB5 specification and supplier research reference above.
 - Turn on each source from its part:
   - encoder eccentricity and graduation error;
   - table radial and axial runout; radial-load-induced tilt from the stated bearing moment stiffness (separate from axial TIR);
@@ -543,6 +581,13 @@ r 30 mm. HB7 and HB11 must show this.
 - A short report of the numbers in this plan, with every assumed value listed.
 
 ### Phase D: later
+
+- Buy two candidate C tables (e.g. Demat RTV210-050 + ZRT budget unit) and
+  measure runout, accuracy and speed ripple at 15 rpm on a small bench (first
+  piece of the end-of-line bench); enter `Measured` values into the bought form.
+  HIWIN remains the reference candidate. See
+  [STRAIN_WAVE_RESEARCH.md](../../STRAIN_WAVE_RESEARCH.md#suppliers-and-prices-collected-2026-10-19)
+  for the purchase specification, suppliers and price assumptions.
 
 - [ ] Deferred lifting design: replace the current lifting insert blocks with recessed,
   cast-in steel threaded sockets in reinforced casting bosses, flush with the surface
@@ -2400,3 +2445,63 @@ close that acceptance. Do not relax the tolerance or claim reference grading
 from the coarse app demo. HB12 remains pending the completed current HB11 budget,
 HB4 convergence and the measured reference-cycle breakdown (prototype target
 ≤3 min). No native providers or older running cuts were rebuilt or stopped.
+
+
+### X travel sized from loading geometry (2026-10-19)
+
+The GE moving-column/head and heavy monolithic base are retained. The X mechanism
+is now **25..110 mm**, with a fixture-dependent lower cutting soft stop. Front
+loading is the default: a front-side robot transfers the cup 250 mm along work
+−X/global −Y at 35 mm lift, then makes the short vertical seating move. B is
+stopped and Y/Z park at zero. This is an assumed gripper envelope and a display
+handling sequence; it does not model a robot or hydraulic/contact dynamics.
+
+`loading-sizing` checks actual head solids against the documented cup/gripper
+corridors, at A −15..+15° in 1° steps with a conservative 2.735 mm angular
+motion enclosure and 10 mm additional clearance. At OD25/140, face20, front
+retracts round to **65/110 mm**; top-loading alternatives round to **60/145 mm**.
+The largest front requirement is 108.54 mm; top is 142.33 mm. The complete
+assumed envelope and both alternatives are in `LOADING_CLEARANCE.json`.
+
+The chosen mechanics have **420 mm HGR25 rails**, a **260 mm X screw** and a
+**930 × 800 × 800 mm** base. Dimensions include block/nut lengths, end margins,
+5 mm overtravel and support/carrier clearance. The fixed rear motor reaches
+610 mm, so its 20 mm rear clearance governs the shortened base. Top loading
+would need 460 mm rails, a 290 mm screw and a 960 mm base. No 250 mm column
+retract remains; 250 mm is only the robot's illustrative transfer distance.
+
+The casting is **774.49 kg**, base assembly **802.86 kg**, machine **1038.15 kg**;
+X/Y/Z moving masses remain **127.98/14.03/41.10 kg**. Casting-to-moving ratios
+are **6.05/55.21/18.85**, meeting the X ≥5 target. Work height remains 1000 mm;
+feet span 690 mm radially and 660 mm across the front. The assumed beam bound
+over full X25..110 travel is **0.00196 µm**, **0.00392 µm** at half modulus;
+the preceding 1100 mm plinth/full-stroke result is archived separately. This
+remains preliminary stiffness evidence, with joints/floor/torsion/modes open.
+
+Validation: 989 mechanical/persistence assertions, 1044 component assertions,
+127 geometry assertions and 1398 size-range checks pass. An additional 6930
+cup/gripper/neighbour checks cover OD25/140 and seating, with the complete swept
+gripper boxes checked rather than only discrete path points. Both coarse and
+reference 85-pose exact-solid grids pass: 21,991/21,976 evaluated pairs, zero
+unintended overlaps above 0.001 mm³. Frame/cut/load regression retains
+1e−8 mm/rad pose, 1e−8 mm cut-boundary and 1e−6 N load limits; observed maxima
+are 1.78e−13, 1.32e−13 and 1.41e−10 respectively. Fine HB4/HB11 binaries and
+running jobs are untouched; their open metrology/combined-budget gates remain.
+
+The saved front-loading app scene also passes its full background playback:
+982 gash windows, 6.496250 s machining (excluding illustrative handling), zero
+fixture-envelope contacts; head X/Y/Z park before release, fixed front direction
+in live and paused views, complete-cup inspection, stock preservation and reset
+all pass. This coarse cut is explicitly ungraded. The app now distinguishes the
+live C frame from the authored paused frame when displaying the cup transfer.
+
+Plan-only follow-up added from the supplier research in b5244792e: HB5's selectable
+bought C-table form with per-value provenance, HB11 candidate comparisons before/
+after measurements, and Phase D's two-candidate 15 rpm bench. No supplier-specific
+component or new purchase is implemented by this layout revision.
+
+HB6/HB9's ordinary app acceptance also passes with the shorter mechanics:
+982 windows, **6.002750 s** total coarse cycle, **3.600912 s** programmed feed,
+**0.002800 arcsec** maximum sync error, zero fixture-envelope contacts and no
+inspection exception. Stock retains 969,168 bytes and 619 buffered samples.
+Neither coarse app result claims an ISO grade or closes full-reference HB12.

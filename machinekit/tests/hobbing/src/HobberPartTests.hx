@@ -42,7 +42,7 @@ class HobberPartTests {
     near(oldCasting.massProperties().mass,49.992,1e-8,"legacy HB5 bed keeps its original recessed casting mass");
     near(oldCasting.parameterNumber("depth"),550,0,"legacy bed retains original footprint");
     near(new MineralCastBed().body.parameterNumber("depth"),800,0,"current bed uses moving-column footprint");
-    near(new MineralCastBed().body.parameterNumber("width"),1100,0,"bed radial length covers loading retract");
+    near(new MineralCastBed().body.parameterNumber("width"),machinekit.hobbing.HobberXLayout.front().bedLength,0,"bed radial length covers loading retract");
     near(new MineralCastColumn().body.parameterNumber("height"),500,0,"moving column height");
     var largeBearing=new CrossedRollerBearing(new ComponentValues().setNumber("outside",180).setNumber("bore",150));
     check(largeBearing.bom.partNumber!=new CrossedRollerBearing().bom.partNumber,"compact swivel bearing has a distinct BOM size");

@@ -20,6 +20,20 @@ class HobbingHandlingTests {
     h.inspect("blank");if(h.displayedLift()!=120||h.displayedClamp()!=0)throw "blank inspection";
     h.inspect("finished");if(h.displayedLift()!=120||h.displayedClamp()!=0)throw "finished inspection";
     h.inspect("sequence");if(h.liftMm!=120||h.clamp!=0)throw "inspection mutated handling timeline";
+    var front=new HobbingHandling(250,35);
+    for(i in 0...161){front.load(i*0.025);
+      if(front.frontMm>0&&(front.liftMm!=35||front.clamp!=0))throw "front transfer must clear mandrel before moving horizontally";
+      if(front.clamp>0&&(front.frontMm!=0||front.liftMm!=0))throw "front clamp requires seating";
+    }
+    if(front.frontMm!=0||front.liftMm!=0||front.clamp!=1)throw "front loading incomplete";
+    front.cutting();front.retracting();
+    for(i in 0...161){front.unload(i*0.025);
+      if(front.frontMm>0&&(front.liftMm!=35||front.clamp!=0))throw "front unload must release and lift before transferring";
+    }
+    if(front.frontMm!=250||front.liftMm!=35||front.clamp!=0)throw "front unloading incomplete";
+    front.inspect("clamped");if(front.displayedFront()!=0||front.displayedLift()!=0)throw "front clamped inspection";
+    front.inspect("finished");if(front.displayedFront()!=250||front.displayedLift()!=35)throw "front finished inspection";
+    front.inspect("sequence");front.load(0);if(front.frontMm!=250||front.liftMm!=35||front.clamp!=0)throw "front reset";
     Sys.println("Hobbing handling timeline and inspection checks passed");
   }
 }

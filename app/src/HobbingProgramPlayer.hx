@@ -35,6 +35,8 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   final session:SimSession;
   final project:ProjectDocumentSession;
   final centerMetres:Array<Float>;
+  final frontDirection:Array<Float>;
+  var physicalPresentation=false;
   final indices:Array<Int>;
   final offsets:Array<Float>;
   final observerId:Int;
@@ -47,12 +49,15 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   final trace:Bool=Sys.getEnv("HOBBER_TRACE")=="1";
   var traceTime=-1.0;
   public function new(config:SceneArtifactHobbing,robot:AssemblyRobot,simulation:Simulation,session:SimSession,project:ProjectDocumentSession) {
-    handling=config.handling==null?null:new HobbingHandling();
+    var configHandling=config.handling;
+    handling=configHandling==null?null:new HobbingHandling(configHandling.frontApproachMm==null?0:cast configHandling.frontApproachMm,configHandling.liftMm==null?120:cast configHandling.liftMm);
     this.config=config;this.robot=robot;this.simulation=simulation;this.session=session;this.project=project;
     indices=[for(id in config.axes)[for(j in 0...robot.model.joints.length)if(robot.model.joints[j].id==id)j][0]];
     var definition=project.projectAssemblyDefinition;if(definition==null)throw "Hobbing needs assembly placement";
     var placement=new cadkit.modeling.AssemblyState(definition,project.projectAssemblyState);
     offsets=[for(i in 0...6)placement.joint(config.axes[i])*(i<3?project.assemblyUnitMetres():1.0)];
+    var frame=placement.worldPose(config.stock);
+    frontDirection=AssemblyRobot.rotate([frame.qx,frame.qy,frame.qz,frame.qw],[-Math.cos(offsets[5]),Math.sin(offsets[5]),0]);
     var component=definition.occurrences.filter(o->o.id==config.stock)[0].definition;
     var c=project.assemblyPreviewCenter(component);centerMetres=c==null?[0.0,0,0]:[for(value in c)value*project.assemblyUnitMetres()];
     var spec=new GearSpec(config.module,config.teeth,config.width,config.pressureAngle);
@@ -78,6 +83,8 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     withdrawal=hc==null?null:new ToolpathLowering(binding).lower([
       toolpathkit.path.ToolpathOp.SetSetup("hobber-axes",handlingSpan),
       toolpathkit.path.ToolpathOp.PositionJoint(config.axes[0],hc.retractX/1000-offsets[0],handlingSpan),
+      toolpathkit.path.ToolpathOp.PositionJoint(config.axes[2],-offsets[2],handlingSpan),
+      toolpathkit.path.ToolpathOp.PositionJoint(config.axes[1],-offsets[1],handlingSpan),
       toolpathkit.path.ToolpathOp.End(handlingSpan)]).program;
     if(hc!=null){
       var sleeveId=hc.sleeve;
@@ -119,7 +126,8 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
         if(motion.completed){
           var x=(robot.robot.snapshot().positions.get(indices[0])+offsets[0])*1000;
           var hc=config.handling;if(hc==null)throw "Handling configuration absent";
-          if(Math.abs(x-hc.retractX)>0.01)throw "Head has not reached loading clearance";
+          var q=robot.robot.snapshot().positions;
+          if(Math.abs(x-hc.retractX)>0.01||Math.abs((q.get(indices[2])+offsets[2])*1000)>0.01||Math.abs((q.get(indices[1])+offsets[1])*1000)>0.01)throw "Head has not reached loading park X/Y/Z";
           headRetracted=true;unloadStart=now;
         }
       }else if(handling!=null)completed=handling.unload(now-unloadStart);
@@ -154,10 +162,20 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     if(mode=="finished"&&!cutCompleted)throw "No finished cut is available";
     handling.inspect(mode);present();
   }
+  /** Use the same authored/live frame selection as the viewport. */
+  public function presentStockFrame(physical:Bool):Void {physicalPresentation=physical;present();}
   public function present():Void {
     if(disposed)return;
     var lift=handling==null?0:handling.displayedLift(),blank=handling!=null&&(handling.inspection=="blank"||handling.inspection=="clamped");
-    var geometry=stock.geometry(lift,blank);if(geometry!=null)project.scene.setRuntimeGeometry("project:"+config.stock,geometry);
+    var front=handling==null?0:handling.displayedFront();
+    var object=project.scene.object("project:"+config.stock);
+    if(object==null||object.rotation==null)throw "Cup presentation frame is absent";
+    var q=object.rotation,c=robot.robot.snapshot().positions.get(indices[5])+offsets[5];
+    // Sensors are safe to read on the UI owner while physics runs in the background.
+    // The cup rotates only about C; paused inspection uses the authored scene frame.
+    var local=physicalPresentation?[-front*Math.cos(c),front*Math.sin(c),0.0]:
+      AssemblyRobot.rotate([-q[0],-q[1],-q[2],q[3]],[for(v in frontDirection)v*front]);
+    var geometry=stock.geometry(lift,blank,local[0],local[1]);if(geometry!=null)project.scene.setRuntimeGeometry("project:"+config.stock,geometry);
     if(handling!=null){
       var clamp=handling.displayedClamp();
       if(clamp!=sleeveDisplay){

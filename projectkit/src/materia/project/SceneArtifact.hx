@@ -176,6 +176,8 @@ typedef SceneArtifactProjectMotion = {
   @:id(4) var length:Float;
   @:id(5) var radialTravel:Float;
   @:id(6) var retractX:Float;
+  @:id(7) @:optional var frontApproachMm:Float;
+  @:id(8) @:optional var liftMm:Float;
 }
 
 /** Press travel and gauge setup use millimetres; axis planning converts to SI once. */

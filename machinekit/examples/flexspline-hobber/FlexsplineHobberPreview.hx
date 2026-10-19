@@ -28,9 +28,9 @@ class FlexsplineHobberPreview {
     var motion=data.machineMotion;if(motion==null)throw "Missing machine motion";
     var config=motion.hobbing;if(config==null)throw "Missing hobbing job";
     config.handling={sleeve:"mandrelSleeve",outside:machine.mandrel.parameterNumber("outside"),wall:machine.mandrel.parameterNumber("sleeveWall"),
-      length:machine.mandrel.parameterNumber("sleeveLength"),radialTravel:machine.mandrel.parameterNumber("radialFitGap"),retractX:250};
+      length:machine.mandrel.parameterNumber("sleeveLength"),radialTravel:machine.mandrel.parameterNumber("radialFitGap"),retractX:machinekit.hobbing.HobberXLayout.RETRACT,frontApproachMm:machinekit.hobbing.HobberXLayout.FRONT_APPROACH,liftMm:machinekit.hobbing.HobberXLayout.FRONT_LIFT};
     var definition=data.assemblyDefinition;if(definition==null)throw "Missing assembly definition";
-    var state=new cadkit.modeling.AssemblyState(definition);state.setJoint("X",250);data.assemblyState=state.record();
+    var state=new cadkit.modeling.AssemblyState(definition);state.setJoint("X",machinekit.hobbing.HobberXLayout.RETRACT);data.assemblyState=state.record();
     return SceneArtifact.encode(data);
   }
   /** Full reference tool, isolated for close inspection; physical properties use the blank envelope. */

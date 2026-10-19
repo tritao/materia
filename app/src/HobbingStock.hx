@@ -99,14 +99,15 @@ class HobbingStock {
     var i=0;while(i<trace.filtered.length){values.push(Std.string(Math.round(trace.filtered[i]*1000)/1000));i+=stride;}
     return values.join(" ");
   }
-  public function geometry(liftMm:Float=0,blank:Bool=false):Null<GeometryData> {
+  var lastDx=0.0;var lastDy=0.0;
+  public function geometry(liftMm:Float=0,blank:Bool=false,dxMm:Float=0,dyMm:Float=0):Null<GeometryData> {
     if(stream.passes!=previewPasses&&(finalPreview||stream.lastTime-lastPreviewTime>=0.1)&&preview.refresh()){previewPasses=stream.passes;lastPreviewTime=stream.lastTime;finalPreview=false;}
     var mesh=preview.take();
-    if(mesh==null&&lastLift==liftMm&&lastBlank==blank)return null;
+    if(mesh==null&&lastLift==liftMm&&lastBlank==blank&&lastDx==dxMm&&lastDy==dyMm)return null;
     if(mesh!=null)displayedBand=ringGeometry(mesh);
-    lastLift=liftMm;lastBlank=blank;
+    lastLift=liftMm;lastBlank=blank;lastDx=dxMm;lastDy=dyMm;
     var band=blank?initialBand:displayedBand;
-    return cupBody==null?HobbingCupDisplay.shifted(band,liftMm/1000):HobbingCupDisplay.combine(band,cupBody,centerMetres,spec.rootRadius(),config.width,liftMm);
+    return cupBody==null?HobbingCupDisplay.shifted(band,liftMm/1000,dxMm/1000,dyMm/1000):HobbingCupDisplay.combine(band,cupBody,centerMetres,spec.rootRadius(),config.width,liftMm,dxMm,dyMm);
   }
   function ringGeometry(mesh:stockkit.StockMesh):GeometryData {
     var positions=Bytes.alloc(mesh.vertexCount*12);

@@ -48,6 +48,28 @@ class HobberDesignChecks {
         var hi=rail.length-(relative.z+travel.upper-travel.initial+block.spec.blockLength/2)-rail.spec.railEndMargin;
         count++;if(lo<5||hi<5)throw 'guide lacks declared 5 mm overtravel ${m.id}: $lo/$hi';
       }
+      // Verify physical nut/carrier travel, including reserve beyond both soft stops.
+      // Use the full mechanism lower bound even when this fixture imposes a higher cutting stop.
+      var xTravel=machine.travel.filter(t->t.id=="X")[0];
+      var screwPart:machinekit.motion.BallScrew=cast members.filter(m->m.id=="Xscrew")[0].component;
+      var nutPart:machinekit.motion.BallNut=cast members.filter(m->m.id=="Xnut")[0].component;
+      for(x in [machinekit.hobbing.HobberXLayout.MIN-5,xTravel.upper+5]){
+        // Translation vector only; keep the mounted part's existing orientation.
+        var delta=F.transformVector(FlexsplineHobber.MACHINE_FROM_WORK,x-xTravel.initial,0,0);
+        var nutPose=F.compose(F.translation(delta.x,delta.y,delta.z),poses.get("Xnut"));
+        var relative=F.compose(F.inverse(poses.get("Xscrew")),nutPose);
+        var n0=F.compose(relative,F.translation(0,0,0)),n1=F.compose(relative,F.translation(0,0,nutPart.bodyLength+nutPart.flangeThickness));
+        count++;if(Math.min(n0.z,n1.z)<screwPart.inputJournalLength+10-1e-7||Math.max(n0.z,n1.z)>screwPart.totalLength-machinekit.motion.BallScrew.JOURNAL_LENGTH-10+1e-7)
+          throw 'X nut lacks 10 mm race allowance at reserve travel $x';
+        for(id in ["Xnut","Xbridge"]){
+          var moving=members.filter(m->m.id==id)[0],pose=F.compose(F.translation(delta.x,delta.y,delta.z),poses.get(id));
+          for(supportId in ["Xfixed","Xfloating"]){var fixed=members.filter(m->m.id==supportId)[0];
+            var a=cache.posed(moving.component,pose),b=cache.posed(fixed.component,poses.get(supportId));
+            var gap=a.distance(b);a.close();b.close();count++;
+            if(gap<10-1e-7)throw 'X carrier/support clearance below 10 mm at reserve travel $x: $id/$supportId $gap';
+          }
+        }
+      }
       // A point contact can pass while a rail seat overhangs a well. Check its full backing volume.
       var foundations:Array<machinekit.hobbing.MineralFoundation> = [machine.bed,machine.column];
       for(foundation in foundations){

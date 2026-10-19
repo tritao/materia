@@ -13,7 +13,7 @@ class HobbingCupDisplay {
     var colors=geometry.stream(6);if(colors!=null)for(i in 0...colors.bytes.length)colors.bytes.set(i,255);
     return geometry;
   }
-  public static function combine(band:GeometryData,body:GeometryData,center:Array<Float>,root:Float,bandTop:Float,liftMm:Float):GeometryData {
+  public static function combine(band:GeometryData,body:GeometryData,center:Array<Float>,root:Float,bandTop:Float,liftMm:Float,dxMm:Float=0,dyMm:Float=0):GeometryData {
     var a=band.vertexCount(),b=body.vertexCount(),positions=Bytes.alloc((a+b)*12),normals=Bytes.alloc((a+b)*12),colors=Bytes.alloc((a+b)*4);
     var lo=[1e30,1e30,1e30],hi=[-1e30,-1e30,-1e30],at=0;
     for(source in [band,body]) {
@@ -26,7 +26,7 @@ class HobbingCupDisplay {
           var rx=(x+center[0])*1000,ry=(y+center[1])*1000,r=Math.sqrt(rx*rx+ry*ry);
           if(r<root){x=rx*root/r/1000-center[0];y=ry*root/r/1000-center[1];}
         }
-        var point=[x,y,z+liftMm/1000];
+        var point=[x+dxMm/1000,y+dyMm/1000,z+liftMm/1000];
         for(axis in 0...3){positions.setFloat(at*12+axis*4,point[axis]);normals.setFloat(at*12+axis*4,n.bytes.getFloat(i*12+axis*4));lo[axis]=Math.min(lo[axis],point[axis]);hi[axis]=Math.max(hi[axis],point[axis]);}
         for(channel in 0...4)colors.set(at*4+channel,c==null?(channel==3?255:200):c.bytes.get(i*4+channel));
         at++;
@@ -50,9 +50,9 @@ class HobbingCupDisplay {
     return new GeometryData().addStream(1,2,positions,a+b,12).addStream(2,2,normals,a+b,12).addStream(6,4,colors,a+b,4)
       .setIndexBuffer(indices,corners.length).setBounds(lo[0],lo[1],lo[2],hi[0],hi[1],hi[2]);
   }
-  public static function shifted(source:GeometryData,dz:Float):GeometryData {
+  public static function shifted(source:GeometryData,dz:Float,dx:Float=0,dy:Float=0):GeometryData {
     var result=new GeometryData(),p=source.stream(1);if(p==null)throw "Cup mesh positions absent";var positions=Bytes.alloc(p.count*12),lo=[1e30,1e30,1e30],hi=[-1e30,-1e30,-1e30];
-    for(i in 0...p.count)for(axis in 0...3){var v=p.bytes.getFloat(i*12+axis*4)+(axis==2?dz:0);positions.setFloat(i*12+axis*4,v);lo[axis]=Math.min(lo[axis],v);hi[axis]=Math.max(hi[axis],v);}
+    for(i in 0...p.count)for(axis in 0...3){var v=p.bytes.getFloat(i*12+axis*4)+(axis==2?dz:axis==0?dx:dy);positions.setFloat(i*12+axis*4,v);lo[axis]=Math.min(lo[axis],v);hi[axis]=Math.max(hi[axis],v);}
     result.addStream(1,2,positions,p.count,12);
     for(semantic in [2,6]){var s=source.stream(semantic);if(s!=null)result.addStream(semantic,s.format,s.bytes,s.count,s.stride);}
     var indices=Bytes.alloc(source.triangleCount()*12);for(i in 0...source.triangleCount()*3)indices.setInt32(i*4,source.indexAt(i));

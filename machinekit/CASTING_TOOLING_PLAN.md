@@ -132,7 +132,7 @@ Surveyed 2026-10-17 on branch `flexspline-hobber` (a71f86f61) and local main 73b
 - A cavity region no rule can assign is a diagnostic naming the region. The generator never
   silently fills it.
 - **Rejected:** one monolithic printed or milled mould. It is slow and costly at bed size
-  (1100 × 800 × 800 mm for the HB-D11 hobber plinth), and panels are faster and reusable as templates.
+  (930 × 800 × 800 mm for the HB-D11 hobber plinth), and panels are faster and reusable as templates.
 
 **CT-D5. The mould is an assembly, so existing checks apply.**
 - `MouldAssembly` (a MachineAssembly) holds panels, cores, printed pieces, fixtures, fasteners,
@@ -230,7 +230,7 @@ Surveyed 2026-10-17 on branch `flexspline-hobber` (a71f86f61) and local main 73b
 | Mould panel tolerance | ±0.5 mm | assumed, router-cut panel class |
 | Panel stock | 18 mm coated MDF or birch plywood | assumed |
 | Replication layer | 0.5–2 mm | assumed, check with the replication resin datasheet |
-| Hobber base envelope | 1100 × 800 × 800 mm monolithic plinth (HB-D11) | HB5 `FoundationLayout` |
+| Hobber base envelope | 930 × 800 × 800 mm monolithic plinth (HB-D11) | HB5 `FoundationLayout` |
 
 ## Test castings
 

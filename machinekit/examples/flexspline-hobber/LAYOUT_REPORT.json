@@ -16,11 +16,11 @@
   },
   "after": {
     "collisionShapes": {
-      "authoredPlusDefaultTotal": 664,
+      "authoredPlusDefaultTotal": 660,
       "parts": [
         {
           "part": "bed/casting",
-          "hulls": 81
+          "hulls": 77
         },
         {
           "part": "bed/tablePlate",
@@ -445,7 +445,7 @@
       ]
     },
     "installedPoseEnvelopeMm": {
-      "radial": 1680,
+      "radial": 1510,
       "scope": "initial pose including separate electrical rack; CAD envelope bounds",
       "tangential": 800
     },
@@ -487,7 +487,7 @@
       }
     ],
     "bedFootprintRadialTangentialMm": [
-      1100,
+      930,
       800
     ],
     "guideToHobMm": {
@@ -500,7 +500,7 @@
       "Y": 14.028913051310433,
       "Z": 41.09657537640654
     },
-    "machineMassKg": 1161.2688626961556,
+    "machineMassKg": 1038.1468592989736,
     "members": 106
   },
   "open": [
@@ -522,22 +522,23 @@
     ],
     "motor": "rear; screw axis points towards table",
     "support": "steel deck on separate cast-in steel channel-floor insert, ground after casting",
-    "chipGuardToInsertClearanceMm": 2.5,
+    "chipGuardToInsertClearanceMm": 45.5,
     "cover": "open design provision"
   },
   "railSeatDesign": {
-    "bedGuideSpacingMm": 370,
+    "bedGuideSpacingMm": 440,
     "steelInsertWidthMm": 50,
     "beamCoreExclusionWidthMm": 110,
-    "beamMinimumWidthAtWellMm": 90,
-    "wellOpeningWidthMm": 300,
+    "beamMinimumWidthAtWellMm": 50,
+    "wellOpeningWidthMm": 350,
     "castTopZmm": 210,
     "steelMountingFaceZmm": 220,
     "assembly": "tray and guides before moving column/head; steel seats ground after casting",
     "massChangeKg": {
       "fixedCasting": 79.5096,
       "Xcarriage": 1.4287,
-      "total": 80.9383
+      "total": 80.9383,
+      "scope": "historical rail-seat redesign before heavy-plinth/front-loading changes; current mass in after/baseAcceptance"
     }
   },
   "spindleCartridge": {
@@ -571,13 +572,13 @@
     "basis": "Assumed design; thread helices, fits, bearing preload, contact grinding and strength qualification remain open"
   },
   "baseAcceptance": {
-    "baseCastingKg": 884.6184,
-    "baseAssemblyKg": 921.8117,
-    "machineKg": 1161.2688626961556,
+    "baseCastingKg": 774.4944000000003,
+    "baseAssemblyKg": 802.8564500000003,
+    "machineKg": 1038.1468592989736,
     "baseToMovingMassRatio": {
-      "X": 6.912080943278947,
-      "Y": 63.056802530925104,
-      "Z": 21.525355626295255
+      "X": 6.05161274388625,
+      "Y": 55.20701405499517,
+      "Z": 18.845716289163978
     },
     "column": {
       "afterAssemblyKg": 49.96585,
@@ -586,7 +587,7 @@
       "beforeCastingKg": 37.27980000000002
     },
     "dimensionsMm": [
-      1100,
+      930,
       800,
       800
     ],
@@ -596,9 +597,9 @@
       "count": 3,
       "frontTangentialSpacingMm": 660,
       "heightMm": 47,
-      "radialSpacingMm": 860,
+      "radialSpacingMm": 690,
       "vibrationMounts": false,
-      "worstReactionN": 5046.786259260345
+      "worstReactionN": 4406.282366897753
     },
     "table": {
       "axialRunoutMm": 0.002,
@@ -611,375 +612,376 @@
     "coolantReservedLitres": 7.92,
     "beam": {
       "assumedProfileAllocationUm": 1.9000000000000001,
-      "atHalfModulusChangeBoundUm": 0.01255430153706397,
-      "basis": "Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; old same support span to isolate casting change; 121/233 mm guide/table Abbe heights; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open.",
-      "newChangeBoundUm": 0.006277150768531985,
+      "atHalfModulusChangeBoundUm": 0.003918328546361262,
+      "basis": "Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; full mechanism X25..retract evaluated by exact prismatic COM translation, reference moving mass; old 210 mm bed uses its original 860 mm support span over the new X range; previous heavy-plinth/full-stroke result is retained separately; 121/233 mm guide/table Abbe heights; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open.",
+      "newChangeBoundUm": 0.001959164273180631,
       "newMinimumIyMm4": 16179886126.207409,
-      "oldChangeBoundUm": 0.39887608079244286,
+      "oldChangeBoundUm": 0.13166196957844534,
       "oldMinimumIyMm4": 262747548.55643028,
       "passed": true,
       "samples": [
         {
-          "xMm": 45.2,
-          "movingLoadWorkXMm": 249.53962151579572,
+          "xMm": 25,
+          "movingLoadWorkXMm": 229.33962151579559,
           "oldRelativeRadialVerticalUm": [
-            -1.250154231490643,
-            0.7624893626058796
+            -1.208642160363676,
+            0.7415006955022614
           ],
           "newRelativeRadialVerticalUm": [
-            -0.019673795880150648,
-            0.011999367520283851
+            -0.012421984017220966,
+            0.004262041722033476
           ],
           "footReactionN": [
-            3330.0733019956497,
-            3310.1794345625835,
-            4747.90455580102
+            2974.6468086525074,
+            2954.423751935844,
+            4251.672337155927
           ]
         },
         {
-          "xMm": 55.440000000000005,
-          "movingLoadWorkXMm": 259.77962151579555,
+          "xMm": 29.25,
+          "movingLoadWorkXMm": 233.58962151579559,
           "oldRelativeRadialVerticalUm": [
-            -1.2686651354218037,
-            0.7688354372104214
+            -1.2179147973013873,
+            0.7468389852601912
           ],
           "newRelativeRadialVerticalUm": [
-            -0.019965103733474075,
-            0.012099236299083332
+            -0.012460977566144319,
+            0.004209791652682459
           ],
           "footReactionN": [
-            3322.6012640977215,
-            3302.7073872875476,
-            4762.848640973985
+            2970.7815579089615,
+            2950.5585011922985,
+            4259.402838643017
           ]
         },
         {
-          "xMm": 65.68,
-          "movingLoadWorkXMm": 270.0196215157956,
+          "xMm": 33.5,
+          "movingLoadWorkXMm": 237.8396215157957,
           "oldRelativeRadialVerticalUm": [
-            -1.2854135046121586,
-            0.772254828085745
+            -1.226903268670192,
+            0.751688959510412
           ],
           "newRelativeRadialVerticalUm": [
-            -0.02022867441017654,
-            0.012153047578060764
+            -0.012494308626500597,
+            0.004152313352707038
           ],
           "footReactionN": [
-            3315.1292292627977,
-            3295.235336949503,
-            4777.792726146952
+            2966.916307165415,
+            2946.6932504487518,
+            4267.133340130112
           ]
         },
         {
-          "xMm": 75.92000000000002,
-          "movingLoadWorkXMm": 280.2596215157957,
+          "xMm": 37.75,
+          "movingLoadWorkXMm": 242.08962151579576,
           "oldRelativeRadialVerticalUm": [
-            -1.3003552048983822,
-            0.7727368440335898
+            -1.2356044191616562,
+            0.7560469188357142
           ],
           "newRelativeRadialVerticalUm": [
-            -0.02046381336673796,
-            0.012160633108813702
+            -0.012521915308965015,
+            0.00408970192873256
           ],
           "footReactionN": [
-            3307.657196791141,
-            3287.763284248193,
-            4792.73681131992
+            2963.05105642187,
+            2942.8279997052064,
+            4274.8638416172025
           ]
         },
         {
-          "xMm": 86.16,
-          "movingLoadWorkXMm": 290.4996215157956,
+          "xMm": 42,
+          "movingLoadWorkXMm": 246.33962151579576,
           "oldRelativeRadialVerticalUm": [
-            -1.3134461021171497,
-            0.7702851981212749
+            -1.244015093467349,
+            0.7599095912311873
           ],
           "newRelativeRadialVerticalUm": [
-            -0.020669826059638234,
-            0.012122051324235182
+            -0.012543735724212782,
+            0.00402206087079889
           ],
           "footReactionN": [
-            3300.1851657696766,
-            3280.2912300966914,
-            4807.680896492885
+            2959.185805678326,
+            2938.962748961662,
+            4282.5943431042915
           ]
         },
         {
-          "xMm": 96.4,
-          "movingLoadWorkXMm": 300.73962151579576,
+          "xMm": 46.25,
+          "movingLoadWorkXMm": 250.58962151579564,
           "oldRelativeRadialVerticalUm": [
-            -1.3246420621051371,
-            0.7649180076816942
+            -1.252132136278837,
+            0.7632741321042184
           ],
           "newRelativeRadialVerticalUm": [
-            -0.0208460179453573,
-            0.012037587338513756
+            -0.012559707982919116,
+            0.003949502052360401
           ],
           "footReactionN": [
-            3292.713135154419,
-            3272.819175538982,
-            4822.624981665852
+            2955.320593554604,
+            2935.0974595982902,
+            4290.324844591384
           ]
         },
         {
-          "xMm": 106.64000000000001,
-          "movingLoadWorkXMm": 310.9796215157957,
+          "xMm": 50.5,
+          "movingLoadWorkXMm": 254.83962151579559,
           "oldRelativeRadialVerticalUm": [
-            -1.3338989506990198,
-            0.7566677943133158
+            -1.2599523922876879,
+            0.7661381242744907
           ],
           "newRelativeRadialVerticalUm": [
-            -0.02099169448037505,
-            0.011907752947133397
+            -0.012569770195759236,
+            0.0038721457302859875
           ],
           "footReactionN": [
-            3285.241103864715,
-            3265.3471216557205,
-            4837.569066838818
+            2951.455310553534,
+            2931.232241112269,
+            4298.055346078475
           ]
         },
         {
-          "xMm": 116.88000000000001,
-          "movingLoadWorkXMm": 321.21962151579606,
+          "xMm": 54.75,
+          "movingLoadWorkXMm": 259.0896215157957,
           "oldRelativeRadialVerticalUm": [
-            -1.3411726337354728,
-            0.7455814838801861
+            -1.2674727061854705,
+            0.7684995779739876
           ],
           "newRelativeRadialVerticalUm": [
-            -0.02110616112117142,
-            0.011733286626873608
+            -0.012573860473408353,
+            0.0037901205448590417
           ],
           "footReactionN": [
-            3277.769070880793,
-            3257.875069466675,
-            4852.513152011785
+            2947.5900541465185,
+            2927.3669960321936,
+            4305.785847565568
           ]
         },
         {
-          "xMm": 127.12,
-          "movingLoadWorkXMm": 331.4596215157956,
+          "xMm": 59,
+          "movingLoadWorkXMm": 263.3396215157957,
           "oldRelativeRadialVerticalUm": [
-            -1.3464189770511716,
-            0.7317204065119269
+            -1.2746899226637511,
+            0.7703569308469874
           ],
           "newRelativeRadialVerticalUm": [
-            -0.021188723324226295,
-            0.011515153535809355
+            -0.012571916926541684,
+            0.003703563519777489
           ],
           "footReactionN": [
-            3270.297035335823,
-            3250.4030198386786,
-            4867.457237184751
+            2943.72482900269,
+            2923.501719688933,
+            4313.516349052657
           ]
         },
         {
-          "xMm": 137.36,
-          "movingLoadWorkXMm": 341.69962151579557,
+          "xMm": 63.25,
+          "movingLoadWorkXMm": 267.5896215157957,
           "oldRelativeRadialVerticalUm": [
-            -1.3495938464827917,
-            0.7151602966037343
+            -1.2816008864140975,
+            0.7717090479500673
           ],
           "newRelativeRadialVerticalUm": [
-            -0.021238686546019618,
-            0.011254545513311065
+            -0.012563877665834444,
+            0.003612620062153751
           ],
           "footReactionN": [
-            3262.8249965941604,
-            3242.930973407376,
-            4882.401322357718
+            2939.859614016885,
+            2919.636433187645,
+            4321.246850539749
           ]
         },
         {
-          "xMm": 147.60000000000002,
-          "movingLoadWorkXMm": 351.9396215157957,
+          "xMm": 67.5,
+          "movingLoadWorkXMm": 271.8396215157956,
           "oldRelativeRadialVerticalUm": [
-            -1.3506531078670088,
-            0.6959912928163815
+            -1.2882024421280773,
+            0.7725552217521022
           ],
           "newRelativeRadialVerticalUm": [
-            -0.02125535624303129,
-            0.01095288108004467
+            -0.012549680801961843,
+            0.0035174439625147687
           ],
           "footReactionN": [
-            3255.3529543087284,
-            3235.4589305198406,
-            4897.3454075306845
+            2935.994379709368,
+            2915.77116600807,
+            4328.977352026841
           ]
         },
         {
-          "xMm": 157.84000000000003,
-          "movingLoadWorkXMm": 362.17962151579553,
+          "xMm": 71.75,
+          "movingLoadWorkXMm": 276.0896215157956,
           "oldRelativeRadialVerticalUm": [
-            -1.3495526270404978,
-            0.6743179380762182
+            -1.2944914344972591,
+            0.7728951721342643
           ],
           "newRelativeRadialVerticalUm": [
-            -0.02123803787174123,
-            0.010611805437971578
+            -0.012529264445599101,
+            0.0034181973948019914
           ],
           "footReactionN": [
-            3247.880908452354,
-            3227.9868912032507,
-            4912.289492703648
+            2932.129112529794,
+            2911.905931700554,
+            4336.707853513931
           ]
         },
         {
-          "xMm": 168.08000000000004,
-          "movingLoadWorkXMm": 372.4196215157955,
+          "xMm": 76,
+          "movingLoadWorkXMm": 280.33962151579544,
           "oldRelativeRadialVerticalUm": [
-            -1.3462482698399347,
-            0.6502591795751691
+            -1.3004647082132095,
+            0.7727290463900236
           ],
           "newRelativeRadialVerticalUm": [
-            -0.02118603688862936,
-            0.010233190470348657
+            -0.012502566707421432,
+            0.0033150509163713928
           ],
           "footReactionN": [
-            3240.408859320209,
-            3220.5148551624275,
-            4927.233577876617
+            2928.2638260285075,
+            2908.040716714749,
+            4344.4383550010225
           ]
         },
         {
-          "xMm": 178.32,
-          "movingLoadWorkXMm": 382.6596215157957,
+          "xMm": 80.25,
+          "movingLoadWorkXMm": 284.5896215157955,
           "oldRelativeRadialVerticalUm": [
-            -1.340695902101994,
-            0.6239483687707337
+            -1.3061191079674963,
+            0.7720574192251484
           ],
           "newRelativeRadialVerticalUm": [
-            -0.021098658750175574,
-            0.009819134741728262
+            -0.012469525698104052,
+            0.0032081834679934394
           ],
           "footReactionN": [
-            3232.93680750318,
-            3213.0428218064912,
-            4942.177663049582
+            2924.3985496852442,
+            2904.1754915709193,
+            4352.168856488115
           ]
         },
         {
-          "xMm": 188.56,
-          "movingLoadWorkXMm": 392.8996215157955,
+          "xMm": 84.5,
+          "movingLoadWorkXMm": 288.83962151579556,
           "oldRelativeRadialVerticalUm": [
-            -1.3328513896633527,
-            0.5955332613859907
+            -1.311451478451688,
+            0.7708812927577021
           ],
           "newRelativeRadialVerticalUm": [
-            -0.0209752089128598,
-            0.009371963497958272
+            -0.01243007952832217,
+            0.0030977823738531263
           ],
           "footReactionN": [
-            3225.4647538345152,
-            3205.5707903021903,
-            4957.121748222548
+            2920.5333046051683,
+            2900.310235163904,
+            4359.899357975207
           ]
         },
         {
-          "xMm": 198.8,
-          "movingLoadWorkXMm": 403.13962151579557,
+          "xMm": 88.75,
+          "movingLoadWorkXMm": 293.0896215157956,
           "oldRelativeRadialVerticalUm": [
-            -1.3226705983606846,
-            0.5651760174095906
+            -1.3164586643573508,
+            0.769202096518049
           ],
           "newRelativeRadialVerticalUm": [
-            -0.020814992833161954,
-            0.008894228666181966
+            -0.012384166308751006,
+            0.0029840433415499576
           ],
           "footReactionN": [
-            3217.992699314612,
-            3198.0987596491254,
-            4972.065833395515
+            2916.6680861191476,
+            2896.444952162834,
+            4367.629859462298
           ]
         },
         {
-          "xMm": 209.04000000000002,
-          "movingLoadWorkXMm": 413.37962151579524,
+          "xMm": 93,
+          "movingLoadWorkXMm": 297.33962151579556,
           "oldRelativeRadialVerticalUm": [
-            -1.3101093940306665,
-            0.5330532010957652
+            -1.3211375103760532,
+            0.7670216874488495
           ],
           "newRelativeRadialVerticalUm": [
-            -0.020617315967561962,
-            0.008388708854838183
+            -0.012331724150065781,
+            0.002867170462097955
           ],
           "footReactionN": [
-            3210.520645020714,
-            3190.626728770059,
-            4987.00991856848
+            2912.802867633126,
+            2892.5796691617647,
+            4375.360360949388
           ]
         },
         {
-          "xMm": 219.28000000000003,
-          "movingLoadWorkXMm": 423.61962151579564,
+          "xMm": 97.25,
+          "movingLoadWorkXMm": 301.5896215157958,
           "oldRelativeRadialVerticalUm": [
-            -1.2951236425099715,
-            0.499355780964313
+            -1.325484861199363,
+            0.7643423499050608
           ],
           "newRelativeRadialVerticalUm": [
-            -0.0203814837725397,
-            0.007858409353661134
+            -0.01227269116294169,
+            0.0027473762099256313
           ],
           "footReactionN": [
-            3203.0485920096585,
-            3183.1546966081496,
-            5001.954003741445
+            2908.937622553051,
+            2888.71441275475,
+            4383.090862436478
           ]
         },
         {
-          "xMm": 229.51999999999998,
-          "movingLoadWorkXMm": 433.85962151579577,
+          "xMm": 101.5,
+          "movingLoadWorkXMm": 305.8396215157957,
           "oldRelativeRadialVerticalUm": [
-            -1.2776692096352773,
-            0.46428912980061915
+            -1.3294975615188471,
+            0.7611667956539379
           ],
           "newRelativeRadialVerticalUm": [
-            -0.020106801704575114,
-            0.007306562133680632
+            -0.012207005458053975,
+            0.002624881442876049
           ],
           "footReactionN": [
-            3195.5765412224805,
-            3175.6826622223593,
-            5016.898088914414
+            2905.072346209789,
+            2884.8491876109197,
+            4390.821363923571
           ]
         },
         {
-          "xMm": 239.76,
-          "movingLoadWorkXMm": 444.0996215157956,
+          "xMm": 105.75,
+          "movingLoadWorkXMm": 310.0896215157955,
           "oldRelativeRadialVerticalUm": [
-            -1.2577019612432592,
-            0.428073024655639
+            -1.3331724560260734,
+            0.7574981638750359
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01979257522014813,
-            0.00673662584722194
+            -0.012134605146077832,
+            0.002499915402206755
           ],
           "footReactionN": [
-            3188.104493399465,
-            3168.210624872409,
-            5031.842174087379
+            2901.2070597085008,
+            2880.9839726251143,
+            4398.551865410664
           ]
         },
         {
-          "xMm": 250,
-          "movingLoadWorkXMm": 454.33962151579544,
+          "xMm": 110,
+          "movingLoadWorkXMm": 314.33962151579544,
           "oldRelativeRadialVerticalUm": [
-            -1.235177763170592,
-            0.390941646845905
+            -1.3365063894126095,
+            0.7533400211602046
           ],
           "newRelativeRadialVerticalUm": [
-            -0.019438109775738635,
-            0.0061522858279057435
+            -0.012055428337688483,
+            0.0023727157125898106
           ],
           "footReactionN": [
-            3180.632449013319,
-            3160.7385840855895,
-            5046.786259260345
+            2897.3417925289273,
+            2877.1187383175993,
+            4406.282366897753
           ]
         }
       ],
-      "spanMm": 860,
+      "spanMm": 690,
       "youngsNPerMm2": 35000
-    }
+    },
+    "previousFullStrokePlinth": "BASELINE_FOUNDATIONS.json:beforeLoadingRevision"
   },
   "previousRevisionValidation": {
     "mechanicalAssertions": 930,
@@ -1212,6 +1214,287 @@
     }
   },
   "validation": {
+    "mechanicalAssertions": 989,
+    "partAssertions": 1044,
+    "partGeometryAssertions": 127,
+    "sizeRangeAssertions": 1398,
+    "cupLoadingPathAssertions": 6930,
+    "tableTiltAssertions": 87,
+    "referenceFrame": {
+      "threads": 1,
+      "sweepToleranceMm": 2e-05,
+      "cutPassToleranceMm": 5e-06,
+      "poseToleranceMmRad": 1e-08,
+      "maxPoseDifference": 1.7763568394002505e-13,
+      "arcToleranceMm": 1e-08,
+      "maxArcDifferenceMm": 1.3176743646820595e-13,
+      "forceToleranceN": 1e-06,
+      "maxForceDifferenceN": 1.4074430509936064e-10,
+      "cutCircles": 9,
+      "scope": "short reference-geometry cut using measured assembly transforms; no full-reference grade claim"
+    },
+    "clearanceGrids": {
+      "coarse": {
+        "completed": 85,
+        "checked": 21991,
+        "unexpected": 0,
+        "thresholdMm3": 0.001,
+        "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
+      },
+      "reference": {
+        "completed": 85,
+        "checked": 21976,
+        "unexpected": 0,
+        "thresholdMm3": 0.001,
+        "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
+      }
+    },
+    "installedMandrelSensitivity": {
+      "basis": "Assumed: sleeve span [115,131] mm; toothed rim [115,123] mm, radial gap=0.02499999999999858 mm, rim supported=true; sleeve t=1.5 mm, end span L=16 mm, band=8 mm, mid-radius R=28.25 mm; E=210000 N/mm\u00b2, nu=0.3; D=E*t^3/[12(1-nu\u00b2)]; k_s=D*pi*R*[pi^4/(2L^3)+9L/(2R^4)+(4-nu)*pi\u00b2/(R\u00b2L)]; conforming steel harmonic half-space contact c=E*q/[4(1-nu\u00b2)]*factor, q=sqrt(4/R\u00b2+pi\u00b2/L\u00b2), factor=1, c=12041.710189094985 N/mm\u00b3; k_c=c*pi*R*integral_band cos\u00b2(pi*z/L) dz; 1/k=1/k_s+1/k_c; oil K=1500 N/mm\u00b2, cavity=0.5 mm: n=2 volume change and oil stiffness zero at first order; uniform oil k=8519999.276535518 N/mm only; radial fit gap=0.02499999999999858 mm, hoop seating pressure=9.867648210509268 MPa, remaining pressure=0.13235178949073223 MPa (end restraint omitted from seating check); full seated contact required; modal estimate, not measured stiffness or FEA; expansion sleeve/cavity are assumed design dimensions, envelope CAD does not resolve them",
+      "forceBasis": "radial time mean over material-engaged windows; full-stroke mean including air retained separately",
+      "forceSettings": {
+        "acceptanceBasis": "completed full stroke; <1% short reference-geometry fixture convergence; no fine full-stroke comparison",
+        "fineFullStrokeValidated": false,
+        "forceStudyValidated": true,
+        "historyCsv": "/home/joao/dev/materia-worktrees/flexspline-hobber/build/flexspline-reference-force-fast/passes.csv",
+        "pathToleranceMm": 0.000125,
+        "sweepToleranceMm": 0.002,
+        "threads": 4
+      },
+      "meanRadialForceN": 4.956327956639297,
+      "meanRadialForceUpperBoundN": 4.956327956639297,
+      "varyingRadialRangeBoundN": 16.989670571379065,
+      "peakRadialN": 16.989670571379055,
+      "radialStatistics": {
+        "radialMeanN": 3.0357105623817056,
+        "radialMinN": 0,
+        "radialPeakN": 16.989670571379065,
+        "radialRangeN": 16.989670571379065,
+        "radialStdDevN": 3.282393873176609,
+        "radialPeakDeviationFromMeanN": 13.95396000899736,
+        "activeSeconds": 94.56775563452715,
+        "activeMeanRadialN": 4.956327956639297,
+        "perPassRadialMinN": 0,
+        "perPassRadialMaxN": 9.442332958899588,
+        "perPassRadialMaxStepN": 5.80122657306748,
+        "perPassRadialRmsStepN": 0.7285037351697009,
+        "windows": 92151,
+        "startSeconds": 0,
+        "endSeconds": 154.3983859516267,
+        "basis": "radial force; time statistics of overlapping rectangular gash-window means, including air; per-pass steps use successive individual gash means; no instantaneous tooth peaks"
+      },
+      "forceValidated": true,
+      "forceComponents": "all displacement/stiffness inputs are radial N; tangential Fc is used only for cutting load/power checks",
+      "supportsToothedRim": true,
+      "bandStartMm": 115,
+      "bandEndMm": 123,
+      "sleeveStartMm": 115,
+      "sleeveEndMm": 131,
+      "actualRadialFitGapMm": 0.02499999999999858,
+      "supportApplied": true,
+      "seatingScreen": true,
+      "unsupportedRingNPerMm": 33.90471566452706,
+      "estimatedNPerMm": 83936.78528166225,
+      "profileAllocationUm": 1.9000000000000001,
+      "pitchAllocationUm": 1.5,
+      "toothThicknessTolerancePlusMinusUm": 5,
+      "thicknessBasis": "Assumed physical flexspline tolerance +/-5 um; mean compensable by X infeed; no ISO thickness class",
+      "varyingBasis": "geometry bounds on the load range about its time mean, in the 20 percent wall share of HB11 class-6 profile and single-pitch limits",
+      "outsideIsoScope": [
+        "module outside 0.5..70 mm"
+      ],
+      "rows": [
+        {
+          "factor": 0.3,
+          "meanDeflectionUm": 0.19656314461340277,
+          "meanThicknessErrorBoundUm": 0.14308626758608323,
+          "passes": true,
+          "peakRadialDeflectionUm": 0.6737938051461138,
+          "perPassMaxStepDeflectionUm": 0.23007100171599187,
+          "perPassRmsStepDeflectionUm": 0.028891749355638402,
+          "radialStdDevDeflectionUm": 0.13017654747948634,
+          "supportNPerMm": 25181.035584498673,
+          "varyingDeflectionRangeBoundUm": 0.6737938051461142,
+          "varyingPitchBoundUm": 0.49048177821229416,
+          "varyingProfileBoundUm": 1.3475876102922284,
+          "xCompensationMagnitudeUm": 0.19656314461340277
+        },
+        {
+          "factor": 1,
+          "meanDeflectionUm": 0.05902449958190272,
+          "meanThicknessErrorBoundUm": 0.04296632188054099,
+          "passes": true,
+          "peakRadialDeflectionUm": 0.20232858122185166,
+          "perPassMaxStepDeflectionUm": 0.0690863273036361,
+          "perPassRmsStepDeflectionUm": 0.008675690710566902,
+          "radialStdDevDeflectionUm": 0.039089757072153446,
+          "supportNPerMm": 83936.78528166225,
+          "varyingDeflectionRangeBoundUm": 0.20232858122185177,
+          "varyingPitchBoundUm": 0.14728316221213147,
+          "varyingProfileBoundUm": 0.40465716244370353,
+          "xCompensationMagnitudeUm": 0.05902449958190272
+        },
+        {
+          "factor": 3,
+          "meanDeflectionUm": 0.019680130671255347,
+          "meanThicknessErrorBoundUm": 0.014325963541612564,
+          "passes": true,
+          "peakRadialDeflectionUm": 0.0674610194949726,
+          "perPassMaxStepDeflectionUm": 0.02303497629905439,
+          "perPassRmsStepDeflectionUm": 0.002892675550945329,
+          "radialStdDevDeflectionUm": 0.013033427348589964,
+          "supportNPerMm": 251810.35584498674,
+          "varyingDeflectionRangeBoundUm": 0.06746101949497263,
+          "varyingPitchBoundUm": 0.04910760613884406,
+          "varyingProfileBoundUm": 0.13492203898994526,
+          "xCompensationMagnitudeUm": 0.019680130671255347
+        }
+      ],
+      "sufficientEffectiveSupportNPerMm": 17849.959043681854,
+      "sufficientNominalFor03RangeNPerMm": 59499.863478939515,
+      "acceptance": "wall allocation passed, dependent on assumed support/contact and force bounds",
+      "scope": "wall-only quasistatic mean/variation bounds; full HB11 combined-source budget and physical reference inspection remain open"
+    },
+    "tableTilt": {
+      "basis": "Assumed moment stiffness 1 MN m/rad; measured HB10 radial gash-window statistics, not instantaneous peaks; separate from axial TIR",
+      "radialPeakN": 16.989670571379065,
+      "activeMeanRadialN": 4.956327956639297,
+      "pivotDepthMm": 178,
+      "forceHeightMm": 182,
+      "peakTiltRad": 3.09212004399099e-06,
+      "peakWorkDatumRadialUm": 0.5503973678303963,
+      "across8mmBandUm": 0.02473696035192792,
+      "fullSourceAndCombinedBudget": "open; frozen HB11 runs exclude the added source"
+    },
+    "appCoarseCut": {
+      "cycleSeconds": 6.0027500000015905,
+      "cuttingSeconds": 3.6009120961748557,
+      "syncArcsec": 0.0027997152165717,
+      "grade": null,
+      "isoClass": null,
+      "collisions": 0,
+      "stockBytes": 969168,
+      "bufferedSamples": 619,
+      "gashWindows": 982,
+      "completed": true,
+      "inspectionFailure": null,
+      "scope": "full coarse module-1/40-tooth app cut on shorter-travel machine; no reference grade claim"
+    },
+    "cupHandling": {
+      "completed": true,
+      "windows": 982,
+      "machiningSeconds": 6.496249999999069,
+      "headRetracted": true,
+      "parkMm": {
+        "X": 110,
+        "Y": 0,
+        "Z": 0
+      },
+      "releasedAndLiftedMm": 35,
+      "frontTransferMm": 250,
+      "liveAndPausedFrontDirectionChecked": true,
+      "stockPreservedAcrossInspectionViews": true,
+      "resetPassed": true,
+      "fixtureContacts": 0,
+      "illustrativeHandlingExcludedFromMachiningTime": true,
+      "fullHydraulicOrLooseBodySimulation": false,
+      "controllerHz": 4000,
+      "scope": "saved front-loading scene; asynchronous preparation; background playback; coarse ungraded cut; live viewport and paused/authored transform checks"
+    },
+    "collisionGeometry": {
+      "authoredPlusDefaultShapes": 660,
+      "runtimeCap": 768,
+      "castingCells": "exact orthogonal material union; adjacent cells coalesced without filling voids",
+      "saddleExtrusions": {
+        "linearDeflectionMm": 0.05,
+        "angularDeflectionRad": 0.5,
+        "holesRetained": true
+      },
+      "mandrel": "separate axial external sections; internal bores/oil cavities conservatively filled in collision only",
+      "cuttingAndMetrologySettingsChanged": false,
+      "additionalContactExclusions": false
+    },
+    "loadingScope": "Front approach on work -X/global -Y, X110, Y=Z=0, OD25/140 face20; complete swept jaw boxes against every neighbour at A -15/0/+15; hollow cup sampled along transfer/seating; head corridor all-A angular enclosure in LOADING_CLEARANCE.json",
+    "unchangedTableEvidence": "Table tilt and mandrel source checks reused from preceding plinth revision; cutting geometry and installed C/fixture/head datums unchanged. Current work-frame/load regression passed."
+  },
+  "previousRevisionProvenance": {
+    "baseCommit": "483c8052c84030c566acb20759ebedfdbdfbd999",
+    "geometryAndChecksSourceSha256": {
+      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "4f17392eb8d0e321c754fdf3afddf2c29b3ef8ae870ecd9fba416ec74e17c468",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberLayoutReport.hx": "6db47141cb898bba755073c037fcded6478e24379f515efa80a8d52e99a0a44a",
+      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "399cf101a31945d2b7959c35fd67f5ee577cba595fedb2f86a53f8429e9e5b5f",
+      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "2a9e7dedd684fc1bbfe2784e04fba64b61a623bd017c558fb565f89725b26356",
+      "machinekit/haxe/src/machinekit/hobbing/SwivelHead.hx": "a40f69c47bdc11f07b53ac6a22680e83bc06c5d507289d7522ce7c419634e4b7",
+      "machinekit/haxe/src/machinekit/hobbing/SwivelHousing.hx": "f8d5f214aaa9bff19158018b4ef93b790165c8cfc8d9ee473005f8d8a56e0b71",
+      "machinekit/haxe/src/machinekit/motion/CrossedRollerBearing.hx": "2cd6f3e7817ff3b046097ec543849296539ea34bc779de417f31969c22af4a46",
+      "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "444a04b6262d529534e47d556c03d2e681d69de88c9f996ed74d3f1bcc1ed08a",
+      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "4044979adeba43be4a6373a895e9d857f311d3bd921cf0875429b1f80c362461",
+      "machinekit/tests/hobber/src/HobberGEFrameChecks.hx": "235210d127330f61e6fdd6c70b199c4fb219c5e44100250bc2737a7ec958218b",
+      "machinekit/tests/hobber/src/HobberGERangeChecks.hx": "20bd7b6df87cf7f7147c7e89684cebcf4b21a8b2b50c95724111ee92ca2030d6",
+      "machinekit/tests/hobbing/src/HobberPartTests.hx": "b60769546559cdfdbefb56ea53cf3a0a135bb9db2e96f46ee73fd5aeb956e54e",
+      "machinekit/haxe/src/machinekit/motion/SupplierRailAssets.hx": "9592728d2f99dec5f54173fff6105467b4f1e2400523756abfe3d5df0f72d822",
+      "machinekit/haxe/src/machinekit/motion/SupplierRailBlock.hx": "fb66ad37ad065078be392d1ce31b6a32d6050ca884d1eb689dd7c5a102a0ee90",
+      "machinekit/haxe/src/machinekit/motion/HiwinHgr25Rail.hx": "b1a5b3fb8806995ef975084d9f1500da2400fca072229ec98424d034dd73f1c1",
+      "machinekit/haxe/src/machinekit/motion/HiwinHgh15ca.hx": "dd0254518e2452a631b88d1ca996a7a030b38f19590a6534a67f35c305499c7a",
+      "machinekit/haxe/src/machinekit/motion/LinearRail.hx": "48cc1358bba6d78eabc5ac9a93e422ee5cd362222eac59e2f8153973d4de34df",
+      "machinekit/haxe/src/machinekit/motion/LinearRailBlock.hx": "47c3fea6d7a8372b88bd7cd29f49cfd57814fa5254a283a91ef2ffd0fe203319",
+      "machinekit/haxe/src/machinekit/motion/MotionComponents.hx": "dc068a7de9fc7d95ce7d9bdf3df3c9d31e52b2df57c1052cc58cee6cc8611c19",
+      "machinekit/examples/linear-rail-reference/RailReferenceChecks.hx": "9cfea4c0d0a76d17a4580fb514d6455d31ebf1b418ef89cb65e76d0ceb829dd5",
+      "machinekit/examples/linear-rail-reference/prepare.py": "c10dd9d59feb2c8e4871dce5070e88d84e2505fd02a1314e4200ff4637ead7e3",
+      "machinekit/tests/hobber/src/HobberInterferenceChecks.hx": "94149d27c14eca61576643dc425b877b2a2d0a785b2d12db656e4448d6d7c177"
+    },
+    "nativeProviders": "Existing providers reused read-only; frozen HB4/HB11 workers not rebuilt or signalled."
+  },
+  "provenance": {
+    "baseCommit": "b5244792e062b3e7d788ec186429134524e448cf",
+    "geometryAndChecksSourceSha256": {
+      "app/src/ApplicationSimulation.hx": "9806233a01be9ea535155d4ff6d867984137d92b6fd7a048d5df792cbdfba9de",
+      "app/src/CutterGeometry.hx": "51e730c0f3d5f3660b60b9a1c935d40e2376cc05303392e471d099b396ad4455",
+      "app/src/HobbingCupDisplay.hx": "622a96f6ee8f54bb2657997ceb6a8729c142c6f5d87f7600d8b70a7d3f4567ab",
+      "app/src/HobbingHandling.hx": "0b396620c834c4953358082ff66902ec1cd29aef7beac7ca72c55fda917f3c0e",
+      "app/src/HobbingProgramPlayer.hx": "a8e08e0f65aabba4579282e08d0bf6c95e9671abbeff2a7b883b2dea7e43aa1c",
+      "app/src/HobbingStock.hx": "fb03b49244cfe6b9bf12b9e0eb24950a76cd1363477814d3f2682f801fe7b2f1",
+      "app/src/editor/CncPanel.hx": "f8a5138450360c748fa8a7d3981f08a9523f2b4d7f3c0825bbd16073d4c7ed5f",
+      "app/src/editor/MachineControlPanel.hx": "576a025d663720db6396726647ed6d9f214aeec4d847ebf6ad0c1f73931e3d37",
+      "app/tests/src/app/ProjectSourceTests.hx": "e90cfdf3f626293e14df976892d3b4fe59506506365177c6dee363adfb1f799b",
+      "app/tests/src/tests/AppTests.hx": "af6c1674ed70f65eaf529677f58c97f1fff9946a8724e5d5d8ec9e0062f4b212",
+      "app/tests/src/tests/HobbingHandlingTests.hx": "03abc85824faf2cc81d11ccab263bdd53d2af9b790616ffa9a4c23d29f78da07",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "1db94b96dd3216fc586148a27eb05adafc2363003813c10fa6b4196c60b6ee9e",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberBaseReport.hx": "bae86798e500175efa1fdc0fae7f0bf7797d07df56426e112f13f16cf1e03be7",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberErrors.hx": "71033e681ad34fa9a4573716be0712bf6fc2b51a6800d196137628ed2d7d6d1c",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberLayoutReport.hx": "364e29ac6292068ecab01cde5ef83200a2d95eb4627e5f0e99e13916b1d7e963",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberPreview.hx": "67d5c9acc595719541f4b1a067fd11a5e91a70629ca3145436464792620bbb09",
+      "machinekit/haxe/src/machinekit/component/ExtrusionCollision.hx": "71ca3dd52cbe7bd52ed73c41f1a9df88693e6f35dcd33a7e9c595bd781e942a7",
+      "machinekit/haxe/src/machinekit/component/MachineKitComponents.hx": "258abc8b5fcf77bd255ae08f898b0f983f0a9ed5f4a5dfc8f8918f0ff84f2025",
+      "machinekit/haxe/src/machinekit/hobbing/ExpandingMandrel.hx": "faffbb28e9546b5cc6e8ce9a181eaa7b8de932cc0bb6ba1ba3f8bea7ad18304b",
+      "machinekit/haxe/src/machinekit/hobbing/FlexsplineCupBlank.hx": "a73acc3962d71d5ceff7fc342bd4a8c921726ce711e13e53ea5f3dd2b295db5f",
+      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "318e535c877ccf9fb2f8475ab0da02a07ea54f701d6a740235a8ac9d31d4ca74",
+      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "81d909f7f92369917683f3da4c0f5f66735e405014c9f82342f174045a665b68",
+      "machinekit/haxe/src/machinekit/hobbing/HobberXLayout.hx": "76c7553f9cbc7bd2de4603371bc68208075e67ded383a534076127332957ce0c",
+      "machinekit/haxe/src/machinekit/hobbing/HobbingComponents.hx": "0c31815eb5d7cea1532a7af4eb2825bddddbc36d09576c90a5a557ed082a8812",
+      "machinekit/haxe/src/machinekit/hobbing/MandrelSleeve.hx": "65c2a3ebb037cae0d21e09b53e423045239225c0412377edfc715d669b0b7b2f",
+      "machinekit/haxe/src/machinekit/hobbing/RotaryTable.hx": "15f07b7b92bb674b12c0a1d3f28bfe2d44cb7cb0d7806feede099a60403f41e2",
+      "machinekit/haxe/src/machinekit/hobbing/TableHousing.hx": "c60b024cd0d03439ad204be01312d5baef3c3814898c1b04d94b5e2861ac5918",
+      "machinekit/haxe/src/machinekit/hobbing/TablePlaten.hx": "4d4e269f1a535d19438fba753245341c6650973b3d626bc7d255bfc9c2bb3572",
+      "machinekit/haxe/src/machinekit/structural/CastingCells.hx": "feb336c079b123df7467523fccf5797b0f46ef8189aceb4f9b197d053cf20293",
+      "machinekit/haxe/src/machinekit/structural/LevelingFoot.hx": "4ffc6b7967929f09a1f8d431f5225b1a10828ad5dc9a41f88c69c2221cc6b8ce",
+      "machinekit/haxe/src/machinekit/structural/MineralCasting.hx": "0bb3c449f5495ec43201dc85cfcd35d523d046c20e7153ad1cd48b4652fda092",
+      "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "144c743c468b8cbbbc40da409ddca7929e8f637f6f850e5dcec383e9478c1478",
+      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "1d582bfa52255975e77b6b4c3ba7d3eb0021dd52d665d9b9ae44fac9a929b59e",
+      "machinekit/tests/hobber/src/HobberGERangeChecks.hx": "b4fc587212d9ac63c2a712b5c45db9301209eb3ae744c6f1be2512b3dec82ce5",
+      "machinekit/tests/hobber/src/HobberInterferenceChecks.hx": "a18addd8d569ba3b602f2fe29ccdb85a4920f1a50b48d1e3b713cfb2c0caff27",
+      "machinekit/tests/hobber/src/HobberLoadingChecks.hx": "7a71d9e46e368722d0b10bf695c4a46f352fc672761e156cd2414df6f18871f7",
+      "machinekit/tests/hobber/src/HobberLoadingSizing.hx": "061d9f67f2008dfc1f69c0d347a4449edcdc0e63022a221353d1d2aa7c11ab1c",
+      "machinekit/tests/hobber/src/HobberTableTiltChecks.hx": "fd4d58f55145f43f1bcc4e12f2ee62aa2941846735c0b5e01bd09f1fb7d64355",
+      "machinekit/tests/hobbing/src/HobberPartTests.hx": "cd1a6b59ea47fc7153ee715e89f8bd9269cdfdd7d7e499317139535532fab700",
+      "projectkit/src/materia/project/SceneArtifact.hx": "1217be1239c42fc5a74a0fe5ac7df908878ec9cad7e41bc0b92817466615d7ef",
+      "stockkit/haxe/stockkit/hobbing/HobbingAxes.hx": "25db0683a4929f286b725ef0c95d4435dcb903bcb7a5879283e2ee1c3162348d",
+      "stockkit/haxe/stockkit/hobbing/HobbingErrorSource.hx": "78ea849d3c33abe69e00da7917238f6a16cc71bc4fdd1025b88235311aaa630b",
+      "stockkit/haxe/stockkit/hobbing/HobbingMotion.hx": "4910056ed94ec924b5916a74c01935e4430b94474bc8de6dbb2dfdb2d8ddafbc",
+      "stockkit/haxe/stockkit/hobbing/HobbingPoseOffset.hx": "b0f24540cfb7e35f1d191b2eb65d0bcea53512d1c623b05409ed37436397dd96"
+    }
+  },
+  "previousPlinthValidation": {
     "mechanicalAssertions": 979,
     "partAssertions": 1044,
     "partGeometryAssertions": 127,
@@ -1230,14 +1513,14 @@
     "clearanceGrids": {
       "coarse": {
         "completed": 85,
-        "checked": 21696,
+        "checked": 21991,
         "unexpected": 0,
         "thresholdMm3": 0.001,
         "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
       },
       "reference": {
         "completed": 85,
-        "checked": 21677,
+        "checked": 21976,
         "unexpected": 0,
         "thresholdMm3": 0.001,
         "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
@@ -1396,35 +1679,7 @@
       "additionalContactExclusions": false
     }
   },
-  "previousRevisionProvenance": {
-    "baseCommit": "483c8052c84030c566acb20759ebedfdbdfbd999",
-    "geometryAndChecksSourceSha256": {
-      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "4f17392eb8d0e321c754fdf3afddf2c29b3ef8ae870ecd9fba416ec74e17c468",
-      "machinekit/examples/flexspline-hobber/FlexsplineHobberLayoutReport.hx": "6db47141cb898bba755073c037fcded6478e24379f515efa80a8d52e99a0a44a",
-      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "399cf101a31945d2b7959c35fd67f5ee577cba595fedb2f86a53f8429e9e5b5f",
-      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "2a9e7dedd684fc1bbfe2784e04fba64b61a623bd017c558fb565f89725b26356",
-      "machinekit/haxe/src/machinekit/hobbing/SwivelHead.hx": "a40f69c47bdc11f07b53ac6a22680e83bc06c5d507289d7522ce7c419634e4b7",
-      "machinekit/haxe/src/machinekit/hobbing/SwivelHousing.hx": "f8d5f214aaa9bff19158018b4ef93b790165c8cfc8d9ee473005f8d8a56e0b71",
-      "machinekit/haxe/src/machinekit/motion/CrossedRollerBearing.hx": "2cd6f3e7817ff3b046097ec543849296539ea34bc779de417f31969c22af4a46",
-      "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "444a04b6262d529534e47d556c03d2e681d69de88c9f996ed74d3f1bcc1ed08a",
-      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "4044979adeba43be4a6373a895e9d857f311d3bd921cf0875429b1f80c362461",
-      "machinekit/tests/hobber/src/HobberGEFrameChecks.hx": "235210d127330f61e6fdd6c70b199c4fb219c5e44100250bc2737a7ec958218b",
-      "machinekit/tests/hobber/src/HobberGERangeChecks.hx": "20bd7b6df87cf7f7147c7e89684cebcf4b21a8b2b50c95724111ee92ca2030d6",
-      "machinekit/tests/hobbing/src/HobberPartTests.hx": "b60769546559cdfdbefb56ea53cf3a0a135bb9db2e96f46ee73fd5aeb956e54e",
-      "machinekit/haxe/src/machinekit/motion/SupplierRailAssets.hx": "9592728d2f99dec5f54173fff6105467b4f1e2400523756abfe3d5df0f72d822",
-      "machinekit/haxe/src/machinekit/motion/SupplierRailBlock.hx": "fb66ad37ad065078be392d1ce31b6a32d6050ca884d1eb689dd7c5a102a0ee90",
-      "machinekit/haxe/src/machinekit/motion/HiwinHgr25Rail.hx": "b1a5b3fb8806995ef975084d9f1500da2400fca072229ec98424d034dd73f1c1",
-      "machinekit/haxe/src/machinekit/motion/HiwinHgh15ca.hx": "dd0254518e2452a631b88d1ca996a7a030b38f19590a6534a67f35c305499c7a",
-      "machinekit/haxe/src/machinekit/motion/LinearRail.hx": "48cc1358bba6d78eabc5ac9a93e422ee5cd362222eac59e2f8153973d4de34df",
-      "machinekit/haxe/src/machinekit/motion/LinearRailBlock.hx": "47c3fea6d7a8372b88bd7cd29f49cfd57814fa5254a283a91ef2ffd0fe203319",
-      "machinekit/haxe/src/machinekit/motion/MotionComponents.hx": "dc068a7de9fc7d95ce7d9bdf3df3c9d31e52b2df57c1052cc58cee6cc8611c19",
-      "machinekit/examples/linear-rail-reference/RailReferenceChecks.hx": "9cfea4c0d0a76d17a4580fb514d6455d31ebf1b418ef89cb65e76d0ceb829dd5",
-      "machinekit/examples/linear-rail-reference/prepare.py": "c10dd9d59feb2c8e4871dce5070e88d84e2505fd02a1314e4200ff4637ead7e3",
-      "machinekit/tests/hobber/src/HobberInterferenceChecks.hx": "94149d27c14eca61576643dc425b877b2a2d0a785b2d12db656e4448d6d7c177"
-    },
-    "nativeProviders": "Existing providers reused read-only; frozen HB4/HB11 workers not rebuilt or signalled."
-  },
-  "provenance": {
+  "previousPlinthProvenance": {
     "baseCommit": "3ac30c2fbbc0ddb6233bb5c02ad5531626a09ee7",
     "geometryAndChecksSourceSha256": {
       "app/src/CutterGeometry.hx": "51e730c0f3d5f3660b60b9a1c935d40e2376cc05303392e471d099b396ad4455",
@@ -1470,5 +1725,152 @@
     },
     "baselineFoundationsSha256": "cfd61d974404f1f2b25446a5d2bd95fdacce26663ebf8d10af9ac2263514b77b",
     "frozenHB4HB11BinariesAndNativeProviders": "untouched"
+  },
+  "loadingClearance": "LOADING_CLEARANCE.json",
+  "XTravelSizing": {
+    "mechanicalFront": {
+      "bedCentre": 165,
+      "bedLength": 930,
+      "bedRear": 630,
+      "deckStart": 192.5,
+      "floatingCentre": 202.5,
+      "footRear": 510,
+      "footSpan": 690,
+      "motorFace": 480,
+      "motorRear": 610,
+      "nutStation": 200,
+      "railLength": 420,
+      "railStart": 60,
+      "screwLength": 260,
+      "screwStart": 450
+    },
+    "mechanicalTopAlternative": {
+      "bedCentre": 180,
+      "bedLength": 960,
+      "bedRear": 660,
+      "deckStart": 192.5,
+      "floatingCentre": 202.5,
+      "footRear": 540,
+      "footSpan": 720,
+      "motorFace": 510,
+      "motorRear": 640,
+      "nutStation": 230,
+      "railLength": 460,
+      "railStart": 60,
+      "screwLength": 290,
+      "screwStart": 480
+    },
+    "basis": "Assumed side-jaw gripper and front wrist; actual head solids; all A enclosed by 1-degree samples plus R*half-angle displacement padding; B stopped, Y=Z=0; exact hollow-cup and unpadded jaw/fixture paths checked separately",
+    "configurations": [
+      {
+        "outsideMm": 25,
+        "faceMm": 20,
+        "headZMm": 0,
+        "hobShiftMm": 0,
+        "aDegrees": [
+          -15,
+          15
+        ],
+        "aSampleStepDegrees": 1,
+        "angularRadiusBoundMm": 313.40867888429636,
+        "angularPaddingMm": 2.7350066754283,
+        "headClearanceMm": 10,
+        "frontLiftMm": 35,
+        "frontApproachMm": 250,
+        "results": [
+          {
+            "direction": "front",
+            "minimumClearRetractMm": 61.36591796875,
+            "roundedRetractMm": 65,
+            "limitingPart": "spindle/housing",
+            "exactCommonChecks": 487
+          },
+          {
+            "direction": "top",
+            "minimumClearRetractMm": 57.662939453125006,
+            "roundedRetractMm": 60,
+            "limitingPart": "hob",
+            "exactCommonChecks": 789
+          }
+        ]
+      },
+      {
+        "outsideMm": 140,
+        "faceMm": 20,
+        "headZMm": 0,
+        "hobShiftMm": 0,
+        "aDegrees": [
+          -15,
+          15
+        ],
+        "aSampleStepDegrees": 1,
+        "angularRadiusBoundMm": 313.40867888429636,
+        "angularPaddingMm": 2.7350066754283,
+        "headClearanceMm": 10,
+        "frontLiftMm": 35,
+        "frontApproachMm": 250,
+        "results": [
+          {
+            "direction": "front",
+            "minimumClearRetractMm": 108.53881835937501,
+            "roundedRetractMm": 110,
+            "limitingPart": "Yplate",
+            "exactCommonChecks": 867
+          },
+          {
+            "direction": "top",
+            "minimumClearRetractMm": 142.32783203124998,
+            "roundedRetractMm": 145,
+            "limitingPart": "Yplate",
+            "exactCommonChecks": 317
+          }
+        ]
+      }
+    ],
+    "selectedDirection": "front",
+    "selectedMechanismRangeMm": [
+      25,
+      110
+    ],
+    "gripperEnvelope": {
+      "basis": "Assumed occupied envelope, work frame mm relative to cup base; fingers include engagement. Robot not modeled.",
+      "radius": "R = part outside radius",
+      "palm": {
+        "x": [
+          "-R-80",
+          "-R-25"
+        ],
+        "y": [
+          "-R-25",
+          "R+25"
+        ],
+        "z": [
+          40,
+          80
+        ]
+      },
+      "fingers": {
+        "x": [
+          "-R-30",
+          15
+        ],
+        "y": [
+          "R-3..R+25",
+          "-R-25..-R+3"
+        ],
+        "z": [
+          30,
+          55
+        ]
+      },
+      "topAlternative": "cylindrical overhead reach R+25 mm; 120 mm lift"
+    },
+    "mountAndTravelAllowancesMm": {
+      "overtravelEachEnd": 5,
+      "railEndMargin": 20,
+      "blockLength": 84,
+      "screwEndAllowance": 10,
+      "rearMotorToBedEdge": 20
+    }
   }
 }

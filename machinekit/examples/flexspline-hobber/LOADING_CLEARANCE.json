@@ -1,0 +1,146 @@
+{
+  "mechanicalFront": {
+    "bedCentre": 165,
+    "bedLength": 930,
+    "bedRear": 630,
+    "deckStart": 192.5,
+    "floatingCentre": 202.5,
+    "footRear": 510,
+    "footSpan": 690,
+    "motorFace": 480,
+    "motorRear": 610,
+    "nutStation": 200,
+    "railLength": 420,
+    "railStart": 60,
+    "screwLength": 260,
+    "screwStart": 450
+  },
+  "mechanicalTopAlternative": {
+    "bedCentre": 180,
+    "bedLength": 960,
+    "bedRear": 660,
+    "deckStart": 192.5,
+    "floatingCentre": 202.5,
+    "footRear": 540,
+    "footSpan": 720,
+    "motorFace": 510,
+    "motorRear": 640,
+    "nutStation": 230,
+    "railLength": 460,
+    "railStart": 60,
+    "screwLength": 290,
+    "screwStart": 480
+  },
+  "basis": "Assumed side-jaw gripper and front wrist; actual head solids; all A enclosed by 1-degree samples plus R*half-angle displacement padding; B stopped, Y=Z=0; exact hollow-cup and unpadded jaw/fixture paths checked separately",
+  "configurations": [
+    {
+      "outsideMm": 25,
+      "faceMm": 20,
+      "headZMm": 0,
+      "hobShiftMm": 0,
+      "aDegrees": [
+        -15,
+        15
+      ],
+      "aSampleStepDegrees": 1,
+      "angularRadiusBoundMm": 313.40867888429636,
+      "angularPaddingMm": 2.7350066754283,
+      "headClearanceMm": 10,
+      "frontLiftMm": 35,
+      "frontApproachMm": 250,
+      "results": [
+        {
+          "direction": "front",
+          "minimumClearRetractMm": 61.36591796875,
+          "roundedRetractMm": 65,
+          "limitingPart": "spindle/housing",
+          "exactCommonChecks": 487
+        },
+        {
+          "direction": "top",
+          "minimumClearRetractMm": 57.662939453125006,
+          "roundedRetractMm": 60,
+          "limitingPart": "hob",
+          "exactCommonChecks": 789
+        }
+      ]
+    },
+    {
+      "outsideMm": 140,
+      "faceMm": 20,
+      "headZMm": 0,
+      "hobShiftMm": 0,
+      "aDegrees": [
+        -15,
+        15
+      ],
+      "aSampleStepDegrees": 1,
+      "angularRadiusBoundMm": 313.40867888429636,
+      "angularPaddingMm": 2.7350066754283,
+      "headClearanceMm": 10,
+      "frontLiftMm": 35,
+      "frontApproachMm": 250,
+      "results": [
+        {
+          "direction": "front",
+          "minimumClearRetractMm": 108.53881835937501,
+          "roundedRetractMm": 110,
+          "limitingPart": "Yplate",
+          "exactCommonChecks": 867
+        },
+        {
+          "direction": "top",
+          "minimumClearRetractMm": 142.32783203124998,
+          "roundedRetractMm": 145,
+          "limitingPart": "Yplate",
+          "exactCommonChecks": 317
+        }
+      ]
+    }
+  ],
+  "selectedDirection": "front",
+  "selectedMechanismRangeMm": [
+    25,
+    110
+  ],
+  "gripperEnvelope": {
+    "basis": "Assumed occupied envelope, work frame mm relative to cup base; fingers include engagement. Robot not modeled.",
+    "radius": "R = part outside radius",
+    "palm": {
+      "x": [
+        "-R-80",
+        "-R-25"
+      ],
+      "y": [
+        "-R-25",
+        "R+25"
+      ],
+      "z": [
+        40,
+        80
+      ]
+    },
+    "fingers": {
+      "x": [
+        "-R-30",
+        15
+      ],
+      "y": [
+        "R-3..R+25",
+        "-R-25..-R+3"
+      ],
+      "z": [
+        30,
+        55
+      ]
+    },
+    "topAlternative": "cylindrical overhead reach R+25 mm; 120 mm lift"
+  },
+  "mountAndTravelAllowancesMm": {
+    "overtravelEachEnd": 5,
+    "railEndMargin": 20,
+    "blockLength": 84,
+    "screwEndAllowance": 10,
+    "rearMotorToBedEdge": 20
+  }
+}

@@ -4251,13 +4251,12 @@ class ProjectSourceTests {
       if(player==null)throw "Saved cutting scene did not install hobbing player: "+editor.simulation.error+"; "+editor.logLines.join(" | ");
       deadline=Sys.time()+(loading?180:120);
       while(!player.completed&&player.failure==null&&Sys.time()<deadline){editor.tick();Sys.sleep(0.005);}
-      editor.simulation.stop();editor.tick();
       player.stock.preview.wait();player.present();
       var visible=editor.scene.info("project:blank").bounds();
       Sys.println("HOBBER_PLAYBACK_STATE "+haxe.Json.stringify({completed:player.completed,failure:player.failure,phase:player.handling==null?"cut-only":player.handling.phase,elapsed:player.elapsed,windows:player.stock.stream.passes}));
       check(player.failure==null,"Desktop hobbing failure: "+player.failure);
       check(original.valid&&visible.valid,"Stock display has valid bounds");
-      var lift=loading?0.120:0;
+      var lift=loading?0.035:0;
       check(Math.abs(original.minZ+lift-visible.minZ)<1e-5&&Math.abs(original.maxZ+lift-visible.maxZ)<1e-5,
         'Runtime stock stays at fixture height: original ${original.minZ}..${original.maxZ}, visible ${visible.minZ}..${visible.maxZ}');
       check(editor.simulation.timestep==1.0/4000,"Prepared playback retains the hobbing controller timestep");
@@ -4269,15 +4268,28 @@ class ProjectSourceTests {
       if(loading){
         var handling=player.handling;if(handling==null)throw "Handling timeline missing";
         check(player.cutCompleted&&player.headRetracted,"Cut finishes and head retracts before unload");
-        check(handling.clamp==0&&handling.liftMm==120,"Finished cup lifted after release");
+        // Scene bounds use the authored CAD transform; viewport applies the live snapshot separately.
+        var item=editor.scene.object("project:blank");
+        if(item==null||item.rotation==null)throw "Cup display frame absent";
+        var q=item.rotation;
+        var local=app.AssemblyRobot.rotate([-q[0],-q[1],-q[2],q[3]],[(visible.minX+visible.maxX)/2-item.x,(visible.minY+visible.maxY)/2-item.y,(visible.minZ+visible.maxZ)/2-item.z]);
+        var live=[for(p in editor.simulation.capturePresentationSnapshot().environment)if(p.id=="project:blank")p][0];
+        check(live!=null,"Live cup presentation exists");
+        var displacement=app.AssemblyRobot.rotate(live.rotation,local);
+        check(Math.abs(live.position[0]+displacement[0])<0.0001&&Math.abs(live.position[1]+displacement[1]+0.250)<0.0001,"Front transfer stays on machine -Y after C rotates");
+        editor.simulation.stop();editor.tick();player.present();
+        var paused=editor.scene.info("project:blank").bounds();
+        check(Math.abs((paused.minY+paused.maxY-original.minY-original.maxY)/2+0.250)<0.0001,"Paused cup retains the fixed front approach");
+        check(handling.clamp==0&&handling.liftMm==35&&handling.frontMm==250,"Finished cup lifted after release");
         var intervals=player.stock.stock.intervalCount();
         player.inspectCup("clamped");var clamped=editor.scene.info("project:blank").bounds();
         check(Math.abs(clamped.minZ-original.minZ)<1e-5&&Math.abs(clamped.maxZ-original.maxZ)<1e-5,"Clamped inspection shows complete cup at fixture");
         player.inspectCup("blank");player.inspectCup("finished");
         check(player.stock.stock.intervalCount()==intervals,"Inspection preserves actual cut stock");
         check(editor.simulation.reset(),"Loading demo resets");
-        check(!player.completed&&!player.cutStarted&&handling.clamp==0&&handling.liftMm==120,"Reset restores handling timeline");
+        check(!player.completed&&!player.cutStarted&&handling.clamp==0&&handling.liftMm==35&&handling.frontMm==250,"Reset restores handling timeline");
       }
+      editor.simulation.stop();
     }catch(e:Dynamic){editor.dispose();fonts.dispose();throw e;}
     editor.dispose();fonts.dispose();
   }

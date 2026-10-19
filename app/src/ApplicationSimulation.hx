@@ -865,7 +865,8 @@ class ApplicationSimulation {
   public function stop():Void { stopPlayback(); var active = space; if (active != null) active.session.stop(); running = false; pumpStamp = -1.0;
     if (tools != null) {tools.safeWelders(); tools.safeFeeders();}
     if (presentAssemblyPhysics) presentationEpoch++;
-    presentAssemblyPhysics = false; }
+    presentAssemblyPhysics = false;
+    if(hobbing!=null)hobbing.presentStockFrame(false); }
   public function reset():Bool {
     var active = space;
     if (active == null) return false;
@@ -1119,7 +1120,7 @@ class ApplicationSimulation {
 
   /** Publishes every member's current state to the scene, once per presented frame. */
   function presentMembers():Void {
-    for (member in members) member.present();
+    for (member in members) if(member==hobbing)hobbing.presentStockFrame(presentAssemblyPhysics);else member.present();
   }
 
   /** True in both running and paused simulation modes. */

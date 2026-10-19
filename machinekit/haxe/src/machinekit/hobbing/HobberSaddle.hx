@@ -60,8 +60,8 @@ class HobberSaddle extends MachineComponent {
         box(35,45,-160,130,115,190),box(35,100,-115,-95,95,115),
         box(35,115,100,130,185,190),
         Solids.cut(box(35,115,125,130,110,190),[boreY(7.1,124.9,130.1,70,145)])];
-      case "GE-X-drive": [box(160,630,-45,45,140,155),box(160,620,40,45,155,190),
-        Solids.cut(box(625,630,-45,45,150,220),[boreX(7.1,624.9,630.1,0,180)])];
+      case "GE-X-drive": [box(HobberXLayout.front().deckStart,HobberXLayout.front().motorFace,-45,45,140,155),box(HobberXLayout.front().deckStart,HobberXLayout.front().motorFace-10,40,45,155,190),
+        Solids.cut(box(HobberXLayout.front().motorFace-5,HobberXLayout.front().motorFace,-45,45,150,220),[boreX(7.1,HobberXLayout.front().motorFace-5.1,HobberXLayout.front().motorFace+0.1,0,180)])];
       case "GE-Z-drive": [box(165,255,-230,-210,295,887),box(55,145,-280,-275,445,887),
         Solids.cut(box(55,220,-295,-210,440,445),[Part.cylinderSpan(9.6,439.9,445.1,100,-250)]),
         box(55,220,-275,-210,882,887),box(35,95,-300,-290,445,887)];

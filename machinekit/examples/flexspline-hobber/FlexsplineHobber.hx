@@ -39,9 +39,9 @@ class FlexsplineHobber extends MachineAssembly {
     if(this.spec.internal)throw "external hobbing machine requires external gear";
     var profile=new ToothProfile(this.spec);hob=Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),1,32,gashes),this.spec,40,16,false,detailedHob);
     bed=new MineralCastBed();column=new MineralCastColumn();
-    includeAt("bed",bed,F.translation(250,0,-590));
-    for(i in 0...3)fixAt("foot"+i,new machinekit.structural.LevelingFoot(),F.translation(i<2?-180:680,i==0?-330:i==1?330:0,-637),"bed/foot"+i,
-      F.alongY(i<2?-180:680,i==0?-330:i==1?330:0,-590,0,0,1));
+    includeAt("bed",bed,F.translation(HobberXLayout.front().bedCentre,0,-590));
+    for(i in 0...3)fixAt("foot"+i,new machinekit.structural.LevelingFoot(),F.translation(i<2?HobberXLayout.FOOT_FRONT:HobberXLayout.front().footRear,i==0?-330:i==1?330:0,-637),"bed/foot"+i,
+      F.alongY(i<2?HobberXLayout.FOOT_FRONT:HobberXLayout.front().footRear,i==0?-330:i==1?330:0,-590,0,0,1));
     var tableMotor=new TorqueMotor(new ComponentValues().setNumber("torqueConstant",2).setNumber("backEmfConstant",2/Math.sqrt(3)));
     table=new RotaryTable(tableMotor,new CrossedRollerBearing(new ComponentValues().setNumber("outside",220).setNumber("bore",180).setNumber("height",20)));includeAt("table",table,F.translation(0,0,130));
     fixed("table-mount","bed/tablePlate","top","table/housing","mount");precisionMounts.push({name:"table-mount",parent:"bed/tablePlate"});
@@ -59,15 +59,15 @@ class FlexsplineHobber extends MachineAssembly {
     // Construction frames are at X=0; the joint coordinate supplies radial infeed once.
     var centre=0.0;
     if(cutDistance<minX||cutDistance>100||this.spec.faceWidth>20)throw "gear/fixture exceeds hobber capacity";
-    travel=[{id:"X",lower:minX,upper:250,initial:cutDistance},{id:"Y",lower:-10,upper:10,initial:0},{id:"Z",lower:-10,upper:190,initial:0}];
+    travel=[{id:"X",lower:minX,upper:HobberXLayout.RETRACT,initial:cutDistance},{id:"Y",lower:-10,upper:10,initial:0},{id:"Z",lower:-10,upper:190,initial:0}];
     for(side in [-1,1]){
       var name=side<0?"Left":"Right",insert=side<0?"bed/railLeft":"bed/railRight";
-      fixAt("railX"+name,new HiwinHgr25Rail(680),AxisBuilder.orient(20,side*FoundationLayout.BED_RAIL_CENTRE,242,[0.0,0,1],[1.0,0,0]),insert,F.alongY(20,side*FoundationLayout.BED_RAIL_CENTRE,220,0,0,1));
+      fixAt("railX"+name,new HiwinHgr25Rail(HobberXLayout.front().railLength),AxisBuilder.orient(HobberXLayout.front().railStart,side*FoundationLayout.BED_RAIL_CENTRE,242,[0.0,0,1],[1.0,0,0]),insert,F.alongY(HobberXLayout.front().railStart,side*FoundationLayout.BED_RAIL_CENTRE,220,0,0,1));
       precisionMounts.push({name:"railX"+name+"-mount",parent:insert});
     }
     addComponent("Xbridge",new HobberSaddle("GE-X-carriage"));zero.set("Xbridge",F.translation(centre,0,0));
-    moving("X",Prismatic,"railXLeft","Xbridge",F.translation(0,0,242),[1.0,0,0],cutDistance,minX,250);
-    for(side in [-1,1])for(row in [102,300])fixAt("blockX"+(side<0?"Left":"Right")+(row==102?"":"Front"),new SupplierRailBlock("HGR25"),
+    moving("X",Prismatic,"railXLeft","Xbridge",F.translation(0,0,242),[1.0,0,0],cutDistance,minX,HobberXLayout.RETRACT);
+    for(side in [-1,1])for(row in [HobberXLayout.BLOCK_FRONT,HobberXLayout.BLOCK_REAR])fixAt("blockX"+(side<0?"Left":"Right")+(row==HobberXLayout.BLOCK_FRONT?"":"Front"),new SupplierRailBlock("HGR25"),
       AxisBuilder.orient(centre+row,side*FoundationLayout.BED_RAIL_CENTRE,242,[0.0,0,1],[1.0,0,0]),"Xbridge",F.alongY(centre+row,side*FoundationLayout.BED_RAIL_CENTRE,260,0,0,1));
     includeAt("column",column,F.fromRotationMatrix(centre+286,0,290,[0.0,-1,0,1,0,0,0,0,1]));
     fixExisting("column-mount","Xbridge","column/basePlate",F.alongY(centre+326,0,280,0,0,1));
@@ -107,12 +107,12 @@ class FlexsplineHobber extends MachineAssembly {
     var supply=new ThreePhaseRectifier(new AcMains(ThreePhase,new AcRmsVoltage(400),50),new DcCurrent(40),6,240,120,100,10000);
     fixAt("electricalPanel",new HobberSaddle("electrical-panel"),F.translation(-650,100,0),"bed/liftLeft");
     fixAt("powerSupply",supply,F.translation(-650,30,20),"electricalPanel");exposePort("mains","powerSupply","mains");
-    fixAt("XdriveFrame",new HobberSaddle("GE-X-drive"),F.translation(centre,0,0),"bed/driveSeat",F.alongY(centre+400,0,140,0,0,1));
+    fixAt("XdriveFrame",new HobberSaddle("GE-X-drive"),F.translation(centre,0,0),"bed/driveSeat",F.alongY((HobberXLayout.front().motorFace+HobberXLayout.front().deckStart)/2,0,140,0,0,1));
     precisionMounts.push({name:"XdriveFrame-mount",parent:"bed/driveSeat"});
     fixAt("ZdriveFrame",new HobberSaddle("GE-Z-drive"),F.translation(centre+36,0,0),"column/driveSeat",F.alongY(centre+246,-210,535,0,-1,0));
     precisionMounts.push({name:"ZdriveFrame-mount",parent:"column/driveSeat"});
     fixAt("YdriveFrame",new HobberSaddle("GE-Y-drive"),F.translation(centre,0,363),"swivelPlate",F.alongY(centre+85,-105,458,-1,0,0));
-    drive("X","XdriveFrame","Xbridge",[-1.0,0,0],F.translation(centre+250,0,180),430,350);
+    drive("X","XdriveFrame","Xbridge",[-1.0,0,0],F.translation(centre+HobberXLayout.NUT_DATUM,0,180),HobberXLayout.front().screwLength,HobberXLayout.front().nutStation);
     drive("Z","ZdriveFrame","Zplate",[0.0,0,1],F.translation(centre+136,-250,575),400);
     drive("Y","YdriveFrame","Yplate",[0.0,-1,0],F.translation(centre+70,0,508),250);
     fixAt("chipTray",new HobberSaddle("GE-chip-tray"),F.identity(),"bed/tablePlate");

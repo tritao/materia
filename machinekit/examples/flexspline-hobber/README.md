@@ -46,8 +46,9 @@ pins. It is an assumed custom interface, not a qualified HSK interface; see
 ### Cup loading demonstration
 
 Open [loading.scene.json](loading.scene.json) and press **Play**. The head starts
-at X=250 mm. A one-piece cup (open end/toothed rim down, closed end up) lowers
-120 mm over the collapsed sleeve onto the axial stop, clamps, runs the actual
+at X=110 mm, with Y=Z=0. A one-piece cup (open end/toothed rim down,
+closed end up) approaches from the front, transfers 250 mm with 35 mm clearance,
+then lowers over the collapsed sleeve onto the axial stop, clamps, runs the actual
 coarse tooth-band cut, retracts the head, releases and lifts out. **Reset → Play**
 replays it. The original quick [cutting.scene.json](cutting.scene.json) remains
 available without the handling sequence.
@@ -68,9 +69,9 @@ Loading is a guided kinematic illustration, without a robot or loose-body
 contact dynamics. The separate sleeve closes the nominal 25 µm radial fit gap
 at true display scale; its expansion is explicitly illustrative, not a solved
 hydraulic strain or pressure prediction. Cutting starts after seating/clamping;
-unloading starts only after the spindle stops and X returns to loading clearance.
+unloading starts only after the spindle stops and X/Y/Z return to the loading pose.
 
-The HB-D11 foundation is a 1100 × 800 × 800 mm monolithic plinth on three rigid
+The HB-D11 foundation is a 930 × 800 × 800 mm monolithic plinth on three rigid
 levelling feet, with the tooth band 1000 mm above the floor. The Ø220 mm table
 bearing and lighter column retain explicitly assumed engineering ratings.
 See [MACHINE_DESIGN.md](MACHINE_DESIGN.md#heavy-plinth-acceptance-hb-d11) for mass,

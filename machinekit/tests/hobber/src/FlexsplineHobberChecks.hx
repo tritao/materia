@@ -245,6 +245,7 @@ class FlexsplineHobberChecks {
     Sys.println('Reference load ratings: $assertions checks passed');
   }
   public static function main():Void {
+    if(Sys.args().indexOf("loading-sizing")>=0){HobberLoadingSizing.run();return;}
     if(Sys.args().indexOf("table-tilt-checks")>=0){HobberTableTiltChecks.run();return;}
     if(Sys.args().indexOf("base-report")>=0){Sys.println(haxe.Json.stringify(FlexsplineHobberBaseReport.measure(new FlexsplineHobber())));return;}
     if(Sys.args().indexOf("loading-checks")>=0){HobberLoadingChecks.run();return;}

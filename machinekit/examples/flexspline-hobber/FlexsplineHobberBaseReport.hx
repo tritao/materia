@@ -1,11 +1,12 @@
 import materia.assembly.AssemblyFrames as F;
 import machinekit.structural.CastingCells;
 import machinekit.structural.CastingFeatures;
+import machinekit.hobbing.HobberXLayout;
 
 /** Preliminary assumed-stiffness evidence, not FEA or a structural certification. */
 class FlexsplineHobberBaseReport {
-  static function beam(x:Float,a:Float,force:Float,ei:Float):Array<Float> {
-    var l=860.0,b=l-a;
+  static function beam(x:Float,a:Float,force:Float,ei:Float,l:Float=860):Array<Float> {
+    var b=l-a;
     return x<=a?[force*b*x*(l*l-b*b-x*x)/(6*l*ei),force*b*(l*l-b*b-3*x*x)/(6*l*ei)]:
       [force*a*(l-x)*(l*l-a*a-(l-x)*(l-x))/(6*l*ei),-force*a*(l*l-a*a-3*(l-x)*(l-x))/(6*l*ei)];
   }
@@ -19,7 +20,8 @@ class FlexsplineHobberBaseReport {
     var oldCells=CastingCells.material(old.width,old.depth,old.height,CastingFeatures.decode(old.voids));
     var nativeBody=body.geometry();var nativeVolume=nativeBody.volume();nativeBody.close();
     if(Math.abs(CastingCells.volume(cells)-nativeVolume)>nativeVolume*1e-9)throw "Casting collision/beam cells disagree with exact CAD volume";
-    var oldI=CastingCells.minimumIy(oldCells,-430,430),newI=CastingCells.minimumIy(cells,-430,430),e=35000.0;
+    var span=HobberXLayout.front().footSpan,half=span/2;
+    var oldI=CastingCells.minimumIy(oldCells,-430,430),newI=CastingCells.minimumIy(cells,-half,half),e=35000.0;
     var baseKg=0.0,columnKg=0.0,total=0.0;for(m in machine.components()){var mass=m.component.massProperties().mass;total+=mass;
       if(StringTools.startsWith(m.id,"bed/"))baseKg+=mass;if(StringTools.startsWith(m.id,"column/"))columnKg+=mass;}
     var def=machine.definition();
@@ -33,19 +35,19 @@ class FlexsplineHobberBaseReport {
     var model=new cadkit.modeling.AssemblyModel("mm");machine.addTo(model,"");var state=model.initialState(),canonical=F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
     var samples:Array<Dynamic> = [],oldLo=[1e30,1e30],oldHi=[-1e30,-1e30],newLo=[1e30,1e30],newHi=[-1e30,-1e30],worstFoot=0.0;
     for(i in 0...21){
-      var x=machine.travel[0].lower+(machine.travel[0].upper-machine.travel[0].lower)*i/20;
-      state.setJoint("X",x);state.forwardKinematics();var loadX=0.0,allX=0.0,allY=0.0;
+      var x=HobberXLayout.MIN+(HobberXLayout.RETRACT-HobberXLayout.MIN)*i/20,legalX=Math.max(machine.travel[0].lower,x);
+      state.setJoint("X",legalX);state.forwardKinematics();var loadX=0.0,allX=0.0,allY=0.0;
       for(m in machine.components()){var mass=m.component.massProperties(),p=F.compose(canonical,state.worldPose(m.id));
         var c=F.transformPoint(p,mass.centreOfMass.x,mass.centreOfMass.y,mass.centreOfMass.z);
-        if(ids.exists(m.id))loadX+=mass.mass*c.x;allX+=mass.mass*c.x;allY+=mass.mass*c.y;}
+        if(ids.exists(m.id)){c.x+=x-legalX;loadX+=mass.mass*c.x;}allX+=mass.mass*c.x;allY+=mass.mass*c.y;}
       loadX/=moving;var a=loadX+180;
-      if(a<=0||a>=860)throw "Moving weight lies outside beam support span";
+      if(a<=0||a>=span)throw "Moving weight lies outside beam support span";
       var ov=beam(a,a,oldMoving*9.80665,e*oldI),ot=beam(180,a,oldMoving*9.80665,e*oldI),
-        nv=beam(a,a,moving*9.80665,e*newI),nt=beam(180,a,moving*9.80665,e*newI);
+        nv=beam(a,a,moving*9.80665,e*newI,span),nt=beam(180,a,moving*9.80665,e*newI,span);
       // 121 mm hob above X guide plane; 233 mm work above table mount.
       var oldError=[(121*ov[1]-233*ot[1])*1000,(ov[0]-ot[0])*1000],newError=[(121*nv[1]-233*nt[1])*1000,(nv[0]-nt[0])*1000];
       for(k in 0...2){oldLo[k]=Math.min(oldLo[k],oldError[k]);oldHi[k]=Math.max(oldHi[k],oldError[k]);newLo[k]=Math.min(newLo[k],newError[k]);newHi[k]=Math.max(newHi[k],newError[k]);}
-      var rear=(allX/total+180)/860,front=1-rear,skew=(allY/total)/330;
+      var rear=(allX/total+180)/span,front=1-rear,skew=(allY/total)/330;
       var reactions=[(front-skew)/2,(front+skew)/2,rear];
       for(r in reactions){if(r<=0)throw "Machine centre of mass leaves three-foot support triangle";worstFoot=Math.max(worstFoot,r*total*9.80665);}
       samples.push({xMm:x,movingLoadWorkXMm:loadX,oldRelativeRadialVerticalUm:oldError,newRelativeRadialVerticalUm:newError,footReactionN:[for(r in reactions)r*total*9.80665]});
@@ -59,10 +61,10 @@ class FlexsplineHobberBaseReport {
     return {baseCastingKg:body.massProperties().mass,baseAssemblyKg:baseKg,machineKg:total,
       baseToMovingMassRatio:{X:body.massProperties().mass/moving,Y:body.massProperties().mass/movingY,Z:body.massProperties().mass/movingZ},
       column:{beforeCastingKg:oldColumn,afterCastingKg:machine.column.body.massProperties().mass,beforeAssemblyKg:oldColumn+oldInserts,afterAssemblyKg:columnKg},
-      dimensionsMm:[1100,800,800],workingHeightMm:work,feet:{count:3,radialSpacingMm:860,frontTangentialSpacingMm:660,heightMm:47,worstReactionN:worstFoot,assumedTargetPerFootN:15000,vibrationMounts:false},
+      beforeLoadingRevision:Reflect.field(raw,"beforeLoadingRevision"),dimensionsMm:[body.parameterNumber("width"),body.parameterNumber("depth"),body.parameterNumber("height")],workingHeightMm:work,feet:{count:3,radialSpacingMm:span,frontTangentialSpacingMm:660,heightMm:47,worstReactionN:worstFoot,assumedTargetPerFootN:15000,vibrationMounts:false},
       table:{bearingOutsideMm:machine.table.bearing.parameterNumber("outside"),bearingBoreMm:machine.table.bearing.parameterNumber("bore"),housingOutsideMm:270,axialRunoutMm:machine.table.bearing.axialRunout,momentStiffnessNmPerRad:machine.table.bearing.momentStiffness,basis:"larger geometry, existing error/stiffness bounds retained Assumed; no catalogue qualification or automatic accuracy gain"},
-      coolantReservedLitres:7.92,beam:{youngsNPerMm2:e,spanMm:860,oldMinimumIyMm4:oldI,newMinimumIyMm4:newI,
+      coolantReservedLitres:7.92,beam:{youngsNPerMm2:e,spanMm:span,oldMinimumIyMm4:oldI,newMinimumIyMm4:newI,
         oldChangeBoundUm:oldRange,newChangeBoundUm:newRange,atHalfModulusChangeBoundUm:2*newRange,assumedProfileAllocationUm:allocation,passed:true,samples:samples,
-        basis:"Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; old same support span to isolate casting change; 121/233 mm guide/table Abbe heights; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open."}};
+        basis:"Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; full mechanism X25..retract evaluated by exact prismatic COM translation, reference moving mass; old 210 mm bed uses its original 860 mm support span over the new X range; previous heavy-plinth/full-stroke result is retained separately; 121/233 mm guide/table Abbe heights; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open."}};
   }
 }
