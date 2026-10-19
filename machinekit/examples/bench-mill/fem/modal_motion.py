@@ -11,6 +11,8 @@ import math
 from pathlib import Path
 import re
 from packet import digest,finite
+from frame_solver import cross
+from modal_study import vectors as dat_vectors
 
 
 def stream_digest(path):
@@ -44,9 +46,26 @@ def frd_displacements(path,wanted):
     return result
 
 
+def relative_motion(model,u,point):
+    result=[0.0]*3
+    for name,sign in (('head',1),('table',-1)):
+        ref=model['references'][name]
+        spin=cross(u[ref['rotation']],[point[i]-ref['pointMm'][i] for i in range(3)])
+        for i in range(3):result[i]+=sign*(u[ref['translation']][i]+spin[i])
+    return result
+
+
 def analyze(report_path):
     report=json.loads(report_path.read_text());finite(report)
     if not report['converged']:raise ValueError('Converged modal report required')
+    packet_path=Path(report['frozenManifestPath'])
+    if digest(packet_path)!=report['manifestSha256']:raise ValueError('Modal packet differs from report')
+    packet=json.loads(packet_path.read_text())
+    gauge=next(p['poseMm'] for p in packet['parts'] if p['id']=='spindle/holder')
+    qx,qy,qz,qw=(gauge[k] for k in ('qx','qy','qz','qw'))
+    axial=[2*(qx*qz+qw*qy),2*(qy*qz-qw*qx),1-2*(qx*qx+qy*qy)]
+    nose=[gauge[k] for k in ('x','y','z')]
+    references={'spindle-nose':nose,'test-bar-20':[nose[i]-40*axial[i] for i in range(3)]}
     mesh=report['meshes'][-1];results={};sources={}
     for name,support in mesh['supports'].items():
         directory=report_path.parent/f'mesh-{mesh["sizeMm"]:g}'/name
@@ -54,6 +73,7 @@ def analyze(report_path):
         if digest(deck)!=support['model']['inputSha256'] or digest(directory/'frame.dat')!=support['resultSha256']:
             raise ValueError('Modal result/deck differs from report')
         ids=mass_nodes(deck);model=support['model'];attachments=model['massAttachments'];rows=[]
+        observations=dat_vectors((directory/'frame.dat').read_text())
         # Use a real casting node to cross-check FRD scaling against .dat output.
         check_nodes=[int(max(m['sensorDisplacements'],key=lambda n:sum(v*v for v in m['sensorDisplacements'][n]))) for m in support['modes']]
         fields=frd_displacements(frd,set(ids.values())|set(check_nodes))
@@ -78,25 +98,30 @@ def analyze(report_path):
                     'rmsMotionOverMaxCastingMotion':math.sqrt(motion/mass)/peak})
             lumped=sum(g['kineticFraction'] for g in groups)
             if lumped>1.0001:raise ValueError(f'Lumped kinetic energy exceeds generalized modal energy: {lumped}')
-            rows.append({'mode':mode['mode'],'frequencyHz':mode['frequencyHz'],'generalizedMass':normalization,
+            reference_motion={}
+            for label,point in references.items():
+                vector=relative_motion(model,observations[mode['mode']],point)
+                reference_motion[label]={'relativeVector':vector,'normOverMaxCastingMotion':math.sqrt(sum(v*v for v in vector))/peak}
+            rows.append({'machineReferenceMotion':reference_motion,'mode':mode['mode'],'frequencyHz':mode['frequencyHz'],'generalizedMass':normalization,
                 'solidKineticFraction':max(0,1-lumped),'lumpedKineticFraction':lumped,
                 'massGroups':sorted(groups,key=lambda g:g['kineticFraction'],reverse=True)})
         results[name]=rows;sources[name]={'inputSha256':digest(deck),'frdSha256':stream_digest(frd)}
     return {'status':'Mass-motion diagnostic; no automatic physical mode classification',
         'sourceReportSha256':digest(report_path),'postprocessorSha256':digest(Path(__file__)),
+        'referencePointsMm':references,'referencePointSource':'Spindle/holder CAD gauge frame, and 40 mm along its negative local Z; rigid reference motion only, no tool or holder bending',
         'normalization':'CCX FRD generalized mass; point masses converted kg to tonne; FRD displacements cross-checked against .dat',
         'supports':results,'sources':sources}
 
 
 def markdown(report):
     lines=['# Modal mass motion','',report['status'],'',report['normalization'],'',
-        '| Support | Mode | Hz | Largest lumped target | Its kinetic fraction | Its RMS / casting peak | Solid kinetic fraction |',
-        '| --- | --- | --- | --- | --- | --- | --- |']
+        '| Support | Mode | Hz | Largest lumped target | Its kinetic fraction | Its RMS / casting peak | Meshed-solid kinetic fraction | Nose gap / casting peak | Test-bar gap / casting peak |',
+        '| --- | --- | --- | --- | --- | --- | --- | --- | --- |']
     for name,modes in report['supports'].items():
         for mode in modes:
             group=mode['massGroups'][0]
-            lines.append(f'| {name} | {mode["mode"]} | {mode["frequencyHz"]:.3f} | {group["target"]} | {100*group["kineticFraction"]:.2f}% | {group["rmsMotionOverMaxCastingMotion"]:.3f} | {100*mode["solidKineticFraction"]:.2f}% |')
-    lines+=['','Kinetic localization helps interpret the casting-only shape proxy; it does not locate strain energy. Attachment assumptions and all group fractions remain visible in mass-motion.json.']
+            lines.append(f'| {name} | {mode["mode"]} | {mode["frequencyHz"]:.3f} | {group["target"]} | {100*group["kineticFraction"]:.2f}% | {group["rmsMotionOverMaxCastingMotion"]:.3f} | {100*mode["solidKineticFraction"]:.2f}% | {mode["machineReferenceMotion"]["spindle-nose"]["normOverMaxCastingMotion"]:.3f} | {mode["machineReferenceMotion"]["test-bar-20"]["normOverMaxCastingMotion"]:.3f} |')
+    lines+=['',report['referencePointSource'],'','Kinetic localization helps interpret the casting-only shape proxy; it does not locate strain energy. Attachment assumptions and all group fractions remain visible in mass-motion.json.']
     return '\n'.join(lines)+'\n'
 
 if __name__=='__main__':

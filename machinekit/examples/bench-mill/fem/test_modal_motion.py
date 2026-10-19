@@ -2,9 +2,17 @@ import math
 from pathlib import Path
 import tempfile
 import unittest
-from modal_motion import frd_displacements
+from modal_motion import frd_displacements,relative_motion
 
 class ModalMotionChecks(unittest.TestCase):
+    def test_rigid_reference_observation_and_common_motion_cancellation(self):
+        model={'references':{'head':{'translation':1,'rotation':2,'pointMm':[0,0,0]},
+            'table':{'translation':3,'rotation':4,'pointMm':[10,0,0]}}}
+        u={1:[1,2,3],2:[0,0,.1],3:[0,0,0],4:[0,0,0]}
+        self.assertEqual(relative_motion(model,u,[10,20,30]),[-1,3,3])
+        u[3]=[1,3,3];u[4]=[0,0,.1]
+        self.assertEqual(relative_motion(model,u,[10,20,30]),[0,0,0])
+
     def test_native_fixed_width_negative_components(self):
         # Literal CCX 2.21 field layout: adjacent negative numbers have no spaces.
         text='''    1PSTEP                         1           1           1

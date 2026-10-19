@@ -406,8 +406,9 @@ Later work includes the distributing-coupling assembly model, all nine poses,
 uncertainty/contact checks and modal inertia tensors. Geometry candidates stay
 deferred until the compliance budget justifies them.
 
-The current nine-pose run has completed center, `xminus_yminus_zlower` and
-`xminus_yminus_zupper` on both meshes and supports. Host earlyoom terminated a fine-mesh solve at
+The current nine-pose run has qualified eight poses on both supports and
+resolved mesh levels. `xminus_yplus_zupper` required a 27 mm third level:
+40→30 mm changed one higher frequency by 6.42%; 30→27 mm changes at most 1.14%. Host earlyoom terminated a fine-mesh solve at
 `xminus_yminus_zupper`; it is not a numerical failure or a counted result.
 The runner requires 10 GiB available at startup (4 GiB need plus 6 GiB reserve).
 `resource_guard.py` additionally monitors host pressure during the full run:
@@ -416,14 +417,14 @@ these output directories and `heavy-mill-*` scopes. It retries those pressure
 interruptions with exact-deck resume; numerical errors are not retried. Shared
 cgroup memory/no-swap limits and host earlyoom remain enabled. Active work
 and logs are under `build/fem/nine-pose-upper-bound` and
-`build/fem/follow-up-resume.log`. No interrupted solve qualifies as evidence.
+`build/fem/follow-up-final.log`. No interrupted solve qualifies as evidence.
 
 Modal mass-motion post-processing now reads the native FRD generalized mass,
 checks mode/frequency and displacement normalization against the immutable
 solver report, and decomposes the exact lumped mass/inertia kinetic energy.
 The known six-mode platform reproduces its analytical kinetic fractions;
 fixed-width negative FRD fields and process ownership/retry controls are tested.
-All **31 Python tests** pass.
+All **32 Python tests** pass. Rigid reference-motion checks also verify spindle-nose/test-bar points and cancellation of a common rigid motion.
 
 At center, the ~78 Hz mode carries **65% (three-point) / 80% (four-spring)** of
 its kinetic energy in the 14.442 kg Z-drive mass group attached to
