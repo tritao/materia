@@ -62,18 +62,19 @@ class CadPreviewGeometry {
     if (edgeIds != null && edgeIds.length != 0 &&
         (edges == null || edgeIds.length != Std.int(edges.length / 48) * 4))
       throw "CAD mesh has invalid edge IDs";
+    var featureEdges=CadFeatureEdges.classify(part);
     if (edges != null) for (index in 0...Std.int(edges.length / 48)) {
       var offset = index * 48;
       for (axis in 0...6) if (!finite(edges.getDouble(offset + axis * 8)))
         throw "CAD mesh has a non-finite edge endpoint";
-      geometry.addStrokeSegment(
+      geometry.addCadStroke([
         (edges.getDouble(offset) - centerX) * scale,
         (edges.getDouble(offset + 8) - centerY) * scale,
         (edges.getDouble(offset + 16) - centerZ) * scale,
         (edges.getDouble(offset + 24) - centerX) * scale,
         (edges.getDouble(offset + 32) - centerY) * scale,
-        (edges.getDouble(offset + 40) - centerZ) * scale,
-        edgeIds == null || edgeIds.length == 0 ? -1 : edgeIds.getInt32(index * 4));
+        (edges.getDouble(offset + 40) - centerZ) * scale],
+        edgeIds == null || edgeIds.length == 0 ? -1 : edgeIds.getInt32(index * 4),featureEdges[index]);
     }
     geometry.setBounds((minimum[0] - centerX) * scale,
       (minimum[1] - centerY) * scale, (minimum[2] - centerZ) * scale,

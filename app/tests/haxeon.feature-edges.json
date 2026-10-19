@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "package": {
+    "name": "feature-edge-tests"
+  },
+  "entry": "tests.CadFeatureEdgeTests",
+  "sourceRoots": [
+    "src",
+    "../../processkit/tests/moonraker"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    },
+    "processkit": {
+      "path": "../../processkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "../build/feature-edge-tests"
+}

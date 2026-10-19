@@ -158,6 +158,31 @@ class EditorScene {
   /** Child nodes showing parts of objects' runtime geometry, by object then part. */
   final runtimeParts:Map<String, RuntimeGeometryParts> = new Map();
   final generatedGeometry:Map<String, GeometryData>;
+  public var cadEdgeMode(default,null):CadEdgeMode=Feature;
+  final cadDisplayGeometry:Map<String,{geometry:Geometry,data:CadGeometryData}> = [];
+
+  function setGeometryData(geometry:Geometry,data:GeometryData):Void {
+    var cad:Null<CadGeometryData> = Std.isOfType(data,CadGeometryData) ? cast data : null;
+    if(cad!=null)cad.setEdgeMode(cadEdgeMode);
+    scene.setGeometryData(geometry,data);
+    // Generation-bearing resource IDs distinguish disposed handles and shared CAD geometry.
+    var key=haxe.Int64.toStr(geometry.id().get_value());
+    if(cad!=null)cadDisplayGeometry.set(key,{geometry:geometry,data:cad});
+    else cadDisplayGeometry.remove(key);
+  }
+
+  public function setCadEdgeMode(mode:CadEdgeMode):Void {
+    if(cadEdgeMode==mode)return;
+    cadEdgeMode=mode;
+    var disposedKeys:Array<String> = [];
+    for(key=>entry in cadDisplayGeometry) {
+      if(entry.geometry.isDisposed()){disposedKeys.push(key);continue;}
+      entry.data.setEdgeMode(mode);scene.setGeometryData(entry.geometry,entry.data);
+    }
+    for(key in disposedKeys)cadDisplayGeometry.remove(key);
+    requireRenderRefresh();markVisualChanged();rebuildPresentation();
+  }
+
   final kinematicOccurrences:Map<String, Bool> = new Map();
   final componentFinishes:Map<String, SceneObjectData> = new Map();
   var assemblyPropertyProvider:Null<String->Array<PropertyDescriptor>> = null;
@@ -375,7 +400,7 @@ class EditorScene {
     profileLoadEnd("geometryData", phaseStarted);
     try {
       phaseStarted = profileLoadStart();
-      scene.setGeometryData(geometry, geometryData);
+      setGeometryData(geometry, geometryData);
       profileLoadEnd("geometryPublication", phaseStarted);
       phaseStarted = profileLoadStart();
       var material = scene.createMaterial();
@@ -1492,7 +1517,7 @@ class EditorScene {
     var item = requiredObject(id);
     var session = requireCadSession(id);
     faceHoverIndexes.remove(id);
-    scene.setGeometryData(runtimeFor(id).geometry, session.geometry());
+    setGeometryData(runtimeFor(id).geometry, session.geometry());
     var values = session.model.sceneDimensions();
     // Scene persistence requires strictly positive authored dimensions, while a
     // valid CAD result can be planar or have kernel-scale numerical thickness.
@@ -2174,7 +2199,7 @@ class EditorScene {
       var changes:Null<ChangeSet> = null;
       try {
         geometry = scene.createGeometry();
-        scene.setGeometryData(geometry, boxGeometry(width, height, chosenDepth));
+        setGeometryData(geometry, boxGeometry(width, height, chosenDepth));
         transaction.setGeometry(runtime.node, geometry);
         failIfInjected("prepare.existing-geometry");
         failIfInjected("prepare.existing-object");
@@ -2721,7 +2746,7 @@ class EditorScene {
 
   function refreshStockSimulation(id:String, session:StockSimulationSession):Void {
     var runtime = runtimeFor(id);
-    scene.setGeometryData(runtime.geometry, session.geometry());
+    setGeometryData(runtime.geometry, session.geometry());
     publish([runtime.node], false);
   }
 
@@ -2751,7 +2776,7 @@ class EditorScene {
     var runtime = runtimeFor(id);
     var owned = ownedRuntimeGeometry.get(id);
     if (owned != null && owned == runtime.geometry) {
-      scene.setGeometryData(owned, data);
+      setGeometryData(owned, data);
       if (updated == null) publishRuntimeNodes([runtime.node]); else updated.push(runtime.node);
       return;
     }
@@ -2760,7 +2785,7 @@ class EditorScene {
     var changes:Null<ChangeSet> = null;
     try {
       geometry = scene.createGeometry();
-      scene.setGeometryData(geometry, data);
+      setGeometryData(geometry, data);
       transaction.setGeometry(runtime.node, geometry);
       changes = transaction.commitWithChanges();
     } catch (error:Dynamic) {
@@ -2879,7 +2904,7 @@ class EditorScene {
         if (index < 0 || index >= count) throw 'Runtime geometry part $index of $count';
         var data = changed.get(index);
         if (parts.nodes.exists(index)) {
-          scene.setGeometryData(parts.geometries.get(index), data);
+          setGeometryData(parts.geometries.get(index), data);
           updated.push(parts.nodes.get(index));
           continue;
         }
@@ -2887,7 +2912,7 @@ class EditorScene {
         transaction = open;
         var geometry = scene.createGeometry();
         created.push({index: index, node: open.createNode(), geometry: geometry});
-        scene.setGeometryData(geometry, data);
+        setGeometryData(geometry, data);
         var node = created[created.length - 1].node;
         open.setName(node, '$id part $index');
         open.setParent(node, runtime.node);
@@ -3030,6 +3055,7 @@ class EditorScene {
   public function dispose():Void {
     if (disposed) return;
     disposed = true;
+    cadDisplayGeometry.clear();
     presentation.threads.dispose(this);
     for (visual in workerVisuals) visual.dispose(scene, false);
     workerVisuals.clear();

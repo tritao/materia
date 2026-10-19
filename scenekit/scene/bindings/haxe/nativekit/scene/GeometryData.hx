@@ -136,6 +136,9 @@ class GeometryData {
 		return this;
 	}
 
+	/** Replace display strokes without changing triangle topology or face IDs. */
+	public function clearStrokeSegments():Void strokeSegments.resize(0);
+
 	public function vertexCount():Int {
 		if (vertices.length != 0)
 			return vertices.length;

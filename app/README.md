@@ -66,6 +66,21 @@ Occlusion affects indirect light on opaque geometry, preserves transparent
 backgrounds, and ignores blended/masked surfaces as occluders. It uses visible
 depth, so hidden surfaces and subpixel recesses cannot contribute.
 
+CAD display defaults to **Feature edges**. The viewport's edge-display button cycles
+through **All edges**, **Shaded**, and **Feature edges**. Feature display suppresses
+an edge only when both sides of its tessellated boundary have matching surface
+normals (within one degree); uncertain, open, sharp and non-manifold boundaries
+stay visible. All edges restores every original edge ID for inspection. The
+setting changes the display only, including newly published CAD geometry, and
+does not edit the document, CAD shape or simulation geometry.
+
+The focused regression covers smooth splits, sharp/open boundaries, a cylinder's
+periodic seam and end rims, restored selection IDs and scene revision isolation:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/tests/haxeon.feature-edges.json
+```
+
 ## Machine travel controls
 
 Opening an assembly with movable joints opens the **Machine** tab beside Inspector.

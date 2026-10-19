@@ -1971,6 +1971,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     controls.push(new KeyedView("snap", viewportToolbarAction("viewport-snap",
       "scene.toggle-grid-snap", "Snap", IconName.Magnet, compact)));
     controls.push(new KeyedView("options", options));
+    var edgeMode=new Button(compact ? "" : app.CadEdgeModes.label(scene.cadEdgeMode),null,()->{
+      scene.setCadEdgeMode(app.CadEdgeModes.next(scene.cadEdgeMode));invalidateView();
+    },"viewport-cad-edge-mode");
+    edgeMode.leadingIcon=IconName.Cube;
+    edgeMode.variant=ButtonVariant.Navigation;
+    edgeMode.classes=["viewport-tool"];edgeMode.iconSize=12.0;
+    edgeMode.accessibilityLabel="CAD display: "+app.CadEdgeModes.label(scene.cadEdgeMode)+". Cycle Feature edges, All edges, Shaded.";
+    controls.push(new KeyedView("cad-edge-mode",edgeMode));
     // While a jointed part is dragged, say whether it follows the cursor and why not.
     var dragMessage = perspectiveViewport == null ? null : perspectiveViewport.assemblyDragMessage();
     var mateMessage = perspectiveViewport == null ? null : perspectiveViewport.matePickMessage();

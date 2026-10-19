@@ -1,0 +1,55 @@
+package tests;
+
+import app.CadFeatureEdges;
+import app.CadGeometryData;
+import app.CadSceneGeometry;
+import app.CadEdgeMode;
+import app.EditorScene;
+import cadkit.modeling.Part;
+import haxe.io.Bytes;
+import materia.project.SceneArtifact.SceneArtifactPart;
+
+@:access(nativekit.scene.GeometryData)
+@:access(app.EditorScene)
+class CadFeatureEdgeTests {
+  static var checks=0;
+  static function check(ok:Bool,message:String):Void {checks++;if(!ok)throw message;}
+  static function sample(crease:Bool=false,open:Bool=false):SceneArtifactPart {
+    var vertices=Bytes.alloc(6*24),normals=Bytes.alloc(6*24),indices=Bytes.alloc((open ? 3 : 6)*4);
+    var points=[[0.0,0,0],[1.0,0,0],[0.0,1,0],[1.0,0,0],[0.0,0,0],[1.0,-1,0]];
+    for(i in 0...6) {
+      for(axis in 0...3) {vertices.setDouble(i*24+axis*8,points[i][axis]);normals.setDouble(i*24+axis*8,axis==(crease && i>=3 ? 1 : 2) ? 1 : 0);}
+      if(i<(open ? 3 : 6))indices.setInt32(i*4,i);
+    }
+    var edges=Bytes.alloc(48);edges.setDouble(24,1);
+    var ids=Bytes.alloc(4);ids.setInt32(0,17);
+    return {id:"sample",name:"sample",red:1,green:1,blue:1,vertexCount:6,indexCount:open ? 3 : 6,
+      vertices:vertices,normals:normals,indices:indices,edgeSegments:edges,edgeIds:ids,faceRanges:[]};
+  }
+  public static function main():Void {
+    check(!CadFeatureEdges.classify(sample())[0],"Coplanar face split is hidden");
+    check(CadFeatureEdges.classify(sample(true))[0],"Sharp crease stays visible");
+    check(CadFeatureEdges.classify(sample(false,true))[0],"Open boundary stays visible");
+    var cylinder=Part.cylinder(10,30);
+    var mesh=cylinder.shape.tessellate();
+    var data:CadGeometryData=cast CadSceneGeometry.fromMesh(mesh,cylinder.shape);
+    var features=data.strokeSegments.length;
+    check(features>0,"Cylinder keeps real end rims");
+    var featureIds=[for(stroke in data.strokeSegments)stroke.get_subelement()];
+    var streams=data.vertexCount();
+    data.setEdgeMode(All);var all=data.strokeSegments.length;
+    check(all>features,"Cylinder periodic seam is hidden only in Feature mode");
+    data.setEdgeMode(Shaded);check(data.strokeSegments.length==0,"Shaded omits CAD edge overlay");
+    data.setEdgeMode(Feature);check(data.strokeSegments.length==features,"Feature mode restores exact stroke count");
+    for(i in 0...features)check(data.strokeSegments[i].get_subelement()==featureIds[i],"Edge selection identity survives display changes");
+    check(data.vertexCount()==streams,"Display modes do not alter surface geometry");
+    var scene=new EditorScene([]);scene.createRectangle();
+    var revision=scene.revision,environment=scene.environmentRevision;
+    scene.setRuntimeGeometry(scene.selectedId,data);scene.setCadEdgeMode(All);
+    check(data.strokeSegments.length==all,"Scene publishes All mode to live CAD geometry");
+    scene.setCadEdgeMode(Shaded);check(data.strokeSegments.length==0,"Scene publishes Shaded mode");
+    check(scene.revision==revision && scene.environmentRevision==environment,"Display changes leave document and physics revisions unchanged");
+    scene.dispose();cylinder.close();
+    Sys.println('CAD feature edge checks passed: $checks');
+  }
+}
