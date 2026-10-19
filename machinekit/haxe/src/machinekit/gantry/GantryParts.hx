@@ -37,10 +37,10 @@ class GantryPlate extends MachineComponent {
 	public final width:Float;
 	public final depth:Float;
 	public final height:Float;
-	public final motor:Null<NemaStepper>;
+	public final motor:Null<MachineComponent>;
 	public final motorFace:Null<AssemblyFrame>;
 	public function new(name:String, width:Float, depth:Float, height:Float,
-			?motor:NemaStepper, ?motorFace:AssemblyFrame) {
+			?motor:MachineComponent, ?motorFace:AssemblyFrame) {
 		for (value in [width, depth, height])
 			if (!Math.isFinite(value) || value <= 0) throw "Gantry plate dimensions must be positive";
 		if ((motor == null) != (motorFace == null)) throw "A motor mounting plate needs its motor face";
@@ -58,7 +58,7 @@ class GantryPlate extends MachineComponent {
 		return Solids.building([], owned -> {
 			var block = Part.box(width, depth, height);
 			owned.push(block);
-			var cutout = mounted.mountingCutout(width + depth + height);
+			var cutout = machinekit.motion.AxisMotor.of(mounted).mountingCutout(width + depth + height);
 			owned.push(cutout);
 			var x = AssemblyFrames.transformVector(face, 1, 0, 0), z = AssemblyFrames.transformVector(face, 0, 0, 1);
 			var tool = cutout.placed(new Location(new Plane(new Vector(face.x, face.y, face.z),
@@ -183,12 +183,12 @@ class GantryBoredBracket extends GantryPlate {
 
 /** Frame/carriage bridge with clearance for the actual motor shaft or pinion. */
 class GantryMotorSupport extends GantryBoredBracket {
-	public final mountedMotor:NemaStepper;
+	public final mountedMotor:MachineComponent;
 	public final shaftFace:AssemblyFrame;
-	public function new(name:String, width:Float, depth:Float, height:Float, motor:NemaStepper,
+	public function new(name:String, width:Float, depth:Float, height:Float, motor:MachineComponent,
 			shaftFace:AssemblyFrame, ?sections:Array<Array<Float>>, ?clearanceDiameter:Float) {
-		var bore = clearanceDiameter == null ? motor.variant.shaftDiameter + 0.5 : clearanceDiameter;
-		if (!Math.isFinite(bore) || bore < motor.variant.shaftDiameter + 0.5)
+		var bore = clearanceDiameter == null ? machinekit.motion.AxisMotor.of(motor).shaftDiameter + 0.5 : clearanceDiameter;
+		if (!Math.isFinite(bore) || bore < machinekit.motion.AxisMotor.of(motor).shaftDiameter + 0.5)
 			throw "Motor support clearance must cover its shaft";
 		super(name, width, depth, height, shaftFace, bore, sections);
 		mountedMotor = motor; this.shaftFace = shaftFace;

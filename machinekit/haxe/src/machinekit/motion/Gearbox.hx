@@ -55,6 +55,8 @@ class Gearbox extends MachineComponent {
 		addConnector("output", Mount, Solids.axial(0, 0, length));
 	}
 
+    override public function reducerSpec():Null<ReducerSpec> return {ratio:ratio,efficiency:efficiency,inputInertia:inputInertia,
+        inertiaAssumed:inertiaAssumed,assumed:assumed,diameter:diameter,length:length,bore:bore};
 	public function jointTorque(motorTorque:Float):Float return motorTorque * ratio * efficiency;
 	public function jointSpeed(motorSpeed:Float):Float return motorSpeed / ratio;
 	public static function recipeType():ComponentType {

@@ -153,6 +153,7 @@ class GantryChecks {
 			case Screw(thread): 2 * Math.PI / thread.lead;
 			case Belt(profile, teeth, _): 2 * Math.PI / (TimingPulley.profileDimensions(profile).pitch * teeth);
 			case Rack(moduleSize, teeth, _): 2 / (moduleSize * teeth);
+            case HelicalRack(moduleSize,teeth,_,helix):2*Math.cos(helix)/(moduleSize*teeth);
 		};
 		for (coupling in couplings) near(Math.abs(coupling.ratio), expectedMagnitude, "part-derived transmission ratio");
 		var actuators = definition.actuators;

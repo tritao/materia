@@ -409,8 +409,8 @@ class DriveSystem {
 		var gearbox = record.gearbox;
 		if (gearbox != null) {
 			var part = flat.member(gearbox);
-			if (!Std.isOfType(part, machinekit.motion.Gearbox)) throw 'Motor "${record.actuator}": "$gearbox" is not a gearbox part';
-			var gear:machinekit.motion.Gearbox = cast part;
+			if (part.reducerSpec()==null) throw 'Motor "${record.actuator}": "$gearbox" is not a gearbox part';
+			var gear:machinekit.motion.ReducerSpec=cast part.reducerSpec();
 			var housing = flat.member(record.motor);
 			if (Std.isOfType(housing, machinekit.robotics.GearedArmJoint)) {
 				var pocket:machinekit.robotics.GearedArmJoint = cast housing;

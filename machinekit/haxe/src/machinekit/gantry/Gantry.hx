@@ -17,6 +17,9 @@ import machinekit.component.MachineComponent;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.AxisMotor;
+import machinekit.transmission.RackGeometry;
+import machinekit.component.ComponentValues;
 import machinekit.motion.MotorDriver;
 import machinekit.motion.PowerSupply;
 import machinekit.motion.LeadScrew;
@@ -55,16 +58,16 @@ class Gantry extends AxisBuilder {
 		axes = [{id: "x", lower: 0.0, upper: spec.travelX, initial: 0.0},
 			{id: "y", lower: 0.0, upper: spec.travelY, initial: 0.0, rackingTolerance: spec.dualY ? spec.racking : null},
 			{id: "z", lower: 0.0, upper: spec.travelZ, initial: 0.0}];
-		var frame = TSlotExtrusion.forProfile(spec.frameProfile);
-		var beam = TSlotExtrusion.forProfile(spec.beamProfile);
+		var frame = spec.frameSection();
+		var beam = spec.frameSection(true);
 		var guide = LinearRailBlock.metric(spec.railProfile).spec;
 		var flange = new RobotFlange(50);
 		// The flange's rear rim must clear the column's projecting rail by 3 mm.
 		var toolReach = Math.max(spec.toolReach, Math.max(flange.flangeDiameter / 2, headRadius) + 3 - (guide.blockHeight - guide.railHeight + 4));
 		railMargin = Math.max(Math.max(80, Math.max(frame.size / 2 + 66, 89)), guide.railEndMargin + guide.blockLength / 2 + 20);
 		var guideOvertravel = railMargin - guide.railEndMargin - guide.blockLength / 2;
-		var zDriveX = 40 + Math.max((NemaStepper.frame(spec.motorFrame).spec.face + 12) / 2, 30) + 12 + 3;
-		var sideRoom = Math.max(Math.max(railMargin, headRadius + frame.size / 2 + 3), zDriveX + Math.max((NemaStepper.frame(spec.motorFrame).spec.face + 12) / 2, 30) + frame.size / 2 + 3);
+		var zDriveX = 40 + Math.max((AxisMotor.of(spec.motorPart("z")).face + 12) / 2, 30) + 12 + 3;
+		var sideRoom = Math.max(Math.max(railMargin, headRadius + frame.size / 2 + 3), zDriveX + Math.max((AxisMotor.of(spec.motorPart("z")).face + 12) / 2, 30) + frame.size / 2 + 3);
 		var left = -sideRoom - spec.sideExtension - guideOvertravel;
 		var right = spec.travelX + sideRoom + spec.sideExtension + guideOvertravel;
 		// Keep the front crossmember ahead of the full vertical carriage sweep.
@@ -76,19 +79,19 @@ class Gantry extends AxisBuilder {
 		var front = Math.min(-railMargin, Math.min(flangeFront, Math.min(carriageFront, sensorFront)) - frame.size / 2 - 3 - guideOvertravel) - spec.frontExtension;
 		var back = spec.travelY + railMargin;
 		var frameZ = spec.travelZ + 350 + spec.frameLift + headDepth;
-		var endAllowance = Math.max(frame.size / 2, NemaStepper.frame(spec.motorFrame).variant.shaftLength + 6);
+		var endAllowance = Math.max(frame.size / 2, AxisMotor.of(spec.motorPart("y")).shaftLength + 6);
 		var up = [0.0, 0, 1], alongX = [1.0, 0, 0], alongY = [0.0, 1, 0];
-		place("frameFront", new GantryExtrusion(frame, right - left - frame.size),
+		place("frameFront", frame.member(right - left - frame.size),
 			AxisBuilder.orient(left + frame.size / 2, front, frameZ, up, alongX));
-		attach("frameBack", new GantryExtrusion(frame, right - left - frame.size),
+		attach("frameBack", frame.member(right - left - frame.size),
 			AxisBuilder.orient(left + frame.size / 2, back, frameZ, up, alongX), "frameFront");
 		for (side in [-1, 1]) {
 			var name = side < 0 ? "Left" : "Right", x = side < 0 ? left : right;
-			attach('frame$name', new GantryExtrusion(frame, back - front + 2 * endAllowance),
+			attach('frame$name', frame.member(back - front + 2 * endAllowance),
 				AxisBuilder.orient(x, front - endAllowance, frameZ, up, alongY), "frameFront");
 			if (!spec.tableMounted) for (end in [0, 1]) {
 				var id = 'post$name${end == 0 ? "Front" : "Back"}';
-				attach(id, new GantryExtrusion(frame, frameZ - frame.height / 2),
+				attach(id, frame.member(frameZ - frame.height / 2),
 					AxisBuilder.orient(x, end == 0 ? front : back, 0, [0.0, 1, 0], up), "frameFront");
 			}
 		}
@@ -102,12 +105,12 @@ class Gantry extends AxisBuilder {
 		slide(axes[1], "railYLeft", "blockYLeft", LinearRailBlock.metric(spec.railProfile),
 			AxisBuilder.orient(left, 0, railYTop, up, alongY), {x: 0.0, y: 1.0, z: 0.0});
 		var feetZ = railYTop + guide.blockHeight - guide.railHeight;
-		attach("beamFootLeft", new GantryPlate("beam foot", 60, 60, 12),
+		attach("beamFootLeft", new GantryPlate("beam foot", spec.driveFootprint("y",60), spec.driveFootprint("y",60), 12),
 			AssemblyFrames.translation(left, 0, feetZ), "blockYLeft");
 		var beamZ = feetZ + 12 + beam.height / 2;
-		attach("beam", new GantryExtrusion(beam, right - left + 2 * endAllowance),
+		attach("beam", beam.member(right - left + 2 * endAllowance),
 			AxisBuilder.orient(left - endAllowance, 0, beamZ, up, alongX), "beamFootLeft");
-		attach("beamFootRight", new GantryPlate("beam foot", 60, 60, 12),
+		attach("beamFootRight", new GantryPlate("beam foot", spec.driveFootprint("y",60), spec.driveFootprint("y",60), 12),
 			AssemblyFrames.translation(right, 0, feetZ), "beam");
 		attach("blockYRight", LinearRailBlock.metric(spec.railProfile),
 			AxisBuilder.orient(right, 0, railYTop, up, alongY), "beamFootRight");
@@ -118,10 +121,10 @@ class Gantry extends AxisBuilder {
 			AxisBuilder.orient(0, 0, railXTop, up, alongX), {x: 1.0, y: 0.0, z: 0.0});
 		var xPlateZ = railXTop + guide.blockHeight - guide.railHeight;
 		// The Z column is in front of the beam, joined by the carriage's top plate.
-		attach("xCarriage", new GantryPlate("X carriage", 80, -columnY + 80, 12),
+		attach("xCarriage", new GantryPlate("X carriage", spec.driveFootprint("x",80), -columnY + 80, 12),
 			AssemblyFrames.translation(0, columnY / 2, xPlateZ), "blockX");
 		var columnLength = spec.travelZ + 2 * railMargin;
-		attach("zColumn", new GantryExtrusion(frame, columnLength),
+		attach("zColumn", frame.member(columnLength),
 			AxisBuilder.orient(0, columnY, xPlateZ - columnLength, [0.0, 1, 0], up), "xCarriage");
 		var railZFace = columnY - frame.height / 2 - guide.railHeight;
 		attach("railZ", LinearRail.metric(spec.railProfile, columnLength),
@@ -133,7 +136,7 @@ class Gantry extends AxisBuilder {
 		var carriageHeight = 100.0;
 		// Retain 3 mm of plate above the upper guide-block mounting row.
 		var carriageDrop = carriageHeight - guide.blockHolePitchC / 2 - 3;
-		attach("zCarriage", new GantryPlate("Z carriage", 80, 8 + toolReach, carriageHeight),
+		attach("zCarriage", new GantryPlate("Z carriage", spec.driveFootprint("z",80), 8 + toolReach, carriageHeight),
 			AssemblyFrames.translation(0, zPlateY - toolReach / 2, xPlateZ - railMargin - carriageDrop), "blockZ");
 		var mountZero = AxisBuilder.orient(0, zPlateY - toolReach, xPlateZ - railMargin - carriageDrop - flange.thickness,
 			[0.0, 1, 0], [0.0, 0, -1]);
@@ -149,9 +152,14 @@ class Gantry extends AxisBuilder {
 			headMountZero = state.worldPose("head/mount");
 			flangeZero = state.worldPose("head/outputFlange");
 		}
-		attach("powerSupply", new PowerSupply(spec.supplyVoltage, new machinekit.power.DcCurrent(20),
+        var power=axisPower(),headRegen=head==null?0.0:head.regenerativePower;
+        var sourceAmps=new machinekit.power.DcCurrent(Math.max(20,1.1*(power.peak+2*headRegen)/spec.supplyVoltage.volts()));
+        var requestedCurrent=spec.supplyCurrent;
+        if(requestedCurrent!=null)sourceAmps=requestedCurrent;
+        if(!Math.isFinite(sourceAmps.amps())||sourceAmps.amps()<=0)throw 'Invalid gantry source current ${sourceAmps.amps()}, request ${requestedCurrent}, peak ${power.peak}';
+		attach("powerSupply", new PowerSupply(spec.supplyVoltage, sourceAmps,
 			(spec.dualY ? 4 : 3) + (head == null ? 0 : head.rotaryJoints.length), 120, 60, 30,
-			head == null ? 0 : head.regenerativePower),
+			headRegen+power.regeneration),
 			AssemblyFrames.translation(left - 180, front, 30), "frameFront");
 		buildDrive(axes[1], spec.driveY, "YLeft", "frameLeft", "beamFootLeft",
 			[left - 70, 0.0, feetZ + 6], alongY);
@@ -182,7 +190,33 @@ class Gantry extends AxisBuilder {
 		buildSwitches(axes[2], "Z", "zColumn", "zCarriage", 0, -1, [0.0, 0, -1]);
 		homeAfter("x", ["z"]);
 		homeAfter("y", ["z"]);
+        if(spec.cableChain!=null)buildCableChains();
 	}
+
+    public final cableChainBindings:Array<{axis:String,member:String,carrier:String,pose:AssemblyFrame,chain:machinekit.motion.CableChain}> = [];
+    function buildCableChains():Void {
+        for(axis in ["y","x"]) {
+            var travel=axis=="y"?spec.travelY:spec.travelX,carrier=axis=="y"?"beam":"xCarriage",fixed=axis=="y"?"frameLeft":"beam";
+            var start=zeroPose(carrier),r=spec.cableChain.n("bendRadius"),direction=axisDirection(axis);
+            var origin=[start.x+direction[0]*travel/2,start.y+direction[1]*travel/2,start.z-2*r];
+            var pose=AxisBuilder.orient(origin[0],origin[1],origin[2],direction,[0.0,0,1]);
+            var member="cableChain"+axis.toUpperCase(),values=spec.cableChain.values().setNumber("travel",travel);
+            var chain=new machinekit.motion.CableChain(values);
+            attach(member,new GantryCableChain(chain),pose,fixed);
+            cableChainBindings.push({axis:axis,member:member,carrier:carrier,pose:pose,chain:chain});
+        }
+    }
+    public function cableChainEnd(axis:String,position:Float):AssemblyFrame {
+        for(binding in cableChainBindings)if(binding.axis==axis) {
+            var chain=binding.chain;
+            return AssemblyFrames.compose(binding.pose,chain.movingFrame(position));
+        }
+        throw "No cable chain for axis "+axis;
+    }
+    public function cableChainGeometry(axis:String,position:Float):cadkit.modeling.Part {
+        for(binding in cableChainBindings)if(binding.axis==axis)return binding.chain.geometryAt(position);
+        throw "No cable chain for axis "+axis;
+    }
 
 	/** Side-mounted steel trigger and switches carried by the actual guide's fixed structure. */
 	function buildSwitches(axis:AxisSpec, suffix:String, fixed:String, moving:String,
@@ -191,7 +225,7 @@ class Gantry extends AxisBuilder {
 		var driveJoint = switch drive {
 			case Screw(_): "screw" + suffix + "-turn";
 			case Belt(_, _, _): "pulley" + suffix + "-turn";
-			case Rack(_, _, _): "pinion" + suffix + "-turn";
+			case Rack(_, _, _) | HelicalRack(_,_,_,_): "pinion" + suffix + "-turn";
 		};
 		var bounds = mountBounds(component(moving), zeroPose(moving));
 		var point = [for (i in 0...3) (bounds.min[i] + bounds.max[i]) / 2];
@@ -332,24 +366,44 @@ class Gantry extends AxisBuilder {
 		return {min: lo, max: hi};
 	}
 
-	function addDriver(motorId:String):String {
-		var motor:NemaStepper = cast component(motorId);
-		var rating = motor.rating();
-		if (rating == null) throw "Gantry motor needs rated drive data";
-		var family = rating.ratedCurrent <= 2 && spec.supplyVoltage.volts() <= 29 ? "GENERIC-TMC2209" : "GENERIC-DM542";
-		var id = motorId + "Driver";
-		attach(id, new MotorDriver(family,
-			new machinekit.power.PhaseRmsCurrent(Math.min(rating.ratedCurrent, family == "GENERIC-TMC2209" ? 2.0 : 3.0)),
-			spec.microsteps),
-			AssemblyFrames.translation(-railMargin - 180, -railMargin - 130 - 125 * driverIndex, 30), "frameFront");
-		driverIndex++;
-		connectPorts(id + "-power", "powerSupply", 'power$driverIndex', id, "power");
-		return id;
-	}
+    /** The shared bus is explicit; winding and peak torque determine phase current. */
+    function driverPart(part:MachineComponent):MotorDriver {
+        if(Std.isOfType(part,NemaStepper)) {
+            var motor:NemaStepper=cast part, rating=motor.rating();
+            if(rating==null)throw "Gantry stepper needs rated drive data";
+            var family=rating.ratedCurrent<=2 && spec.supplyVoltage.volts()<=29?"GENERIC-TMC2209":"GENERIC-DM542";
+            return new MotorDriver(family,new machinekit.power.PhaseRmsCurrent(Math.min(rating.ratedCurrent,family=="GENERIC-TMC2209"?2.0:3.0)),spec.microsteps);
+        }
+        var drive=part.motorDrive();
+        if(drive==null)throw "Gantry motor has no drive ratings";
+        var winding=drive.electricalRating();
+        if(winding==null)throw "Servo needs a winding rating";
+        var actuator=drive.actuator("sizing","joint",spec.supplyVoltage.volts(),0.5),peak=actuator.peakTorque;
+        if(peak==null)throw "Servo needs peak torque";
+        var family=spec.supplyVoltage.volts()>=450?"GENERIC-400V-SERVO-AMP":spec.supplyVoltage.volts()>=200?"GENERIC-AC-SERVO-AMP":"GENERIC-LV-SERVO-AMP";
+        return new MotorDriver(family,new machinekit.power.PhaseRmsCurrent(peak/winding.torqueConstant));
+    }
+    function axisPower():{peak:Float,regeneration:Float} {
+        var peak=0.0,regeneration=0.0;
+        for(axis in ["x","y","z"]) {
+            if(GantrySpec.isStepper(spec.motorFor(axis)))continue;
+            var part=spec.motorPart(axis),drive=part.motorDrive(),winding=drive.electricalRating();
+            if(winding==null)continue;
+            var driver=driverPart(part),load=new machinekit.motion.ServoElectricalLoad(drive.actuator("sizing","joint",spec.supplyVoltage.volts(),0.5),winding,driver);
+            var count=axis=="y"&&spec.dualY?2:1;peak+=count*load.peakPower;regeneration+=count*load.regenerativePower;
+        }
+        return {peak:peak,regeneration:regeneration};
+    }
+    function addDriver(motorId:String):String {
+        var id=motorId+"Driver";
+        attach(id,driverPart(component(motorId)),AssemblyFrames.translation(-railMargin-180,-railMargin-130-125*driverIndex,30),"frameFront");
+        driverIndex++;connectPorts(id+"-power","powerSupply",'power$driverIndex',id,"power");return id;
+    }
 
-	function mountMotor(id:String, parent:String, face:AssemblyFrame, ?clearanceDiameter:Float):NemaStepper {
-		var motor = NemaStepper.frame(spec.motorFrame);
-		var plate = new GantryPlate("motor mount", motor.spec.face + 12, motor.spec.face + 12, MOTOR_PLATE_THICKNESS, motor, AssemblyFrames.identity());
+	function mountMotor(id:String, parent:String, face:AssemblyFrame, ?clearanceDiameter:Float):MachineComponent {
+        var motor=spec.motorPart(StringTools.endsWith(id,"Z")?"z":StringTools.startsWith(id,"motorY")?"y":"x"), mount=AxisMotor.of(motor);
+		var plateSize = Math.max(mount.face + 12, clearanceDiameter == null ? 0 : clearanceDiameter + 10);
+		var plate = new GantryPlate("motor mount", plateSize, plateSize, MOTOR_PLATE_THICKNESS, motor, AssemblyFrames.identity());
 		var support = supportMotor(id + "Support", parent, plate, face, motor, clearanceDiameter);
 		attach(id + "Plate", plate, face, support);
 		attach(id, motor, face, id + "Plate");
@@ -387,7 +441,7 @@ class Gantry extends AxisBuilder {
 		return {min: lo, max: hi};
 	}
 
-	function supportMotor(id:String, parent:String, plate:GantryPlate, face:AssemblyFrame, motor:NemaStepper, ?clearanceDiameter:Float):String {
+	function supportMotor(id:String, parent:String, plate:GantryPlate, face:AssemblyFrame, motor:MachineComponent, ?clearanceDiameter:Float):String {
 		var host = mountBounds(component(parent), zeroPose(parent)), target = mountBounds(plate, face);
 		var gaps:Array<Int> = [];
 		for (axis in 0...3) if (target.min[axis] > host.max[axis] + 1e-7 || host.min[axis] > target.max[axis] + 1e-7) gaps.push(axis);
@@ -412,7 +466,7 @@ class Gantry extends AxisBuilder {
 
 	/** Two intersecting arms support a motor beside a frame corner without passing through its body. */
 	function supportMotorCorner(id:String, parent:String, host:GantryBox, target:GantryBox,
-			face:AssemblyFrame, motor:NemaStepper, gaps:Array<Int>, ?clearanceDiameter:Float):String {
+			face:AssemblyFrame, motor:MachineComponent, gaps:Array<Int>, ?clearanceDiameter:Float):String {
 		var a = gaps[0], b = gaps[1], c = 3 - a - b;
 		var signA = target.min[a] > host.max[a] ? 1.0 : -1.0;
 		var signB = target.min[b] > host.max[b] ? 1.0 : -1.0;
@@ -481,25 +535,25 @@ class Gantry extends AxisBuilder {
 			origin:Array<Float>, direction:Array<Float>):Void {
 		var transverse:Array<Float> = direction[2] == 0 ? [0.0, 0, 1] : [1.0, 0, 0];
 		// Mirror right-side transverse drives to keep the motor body outboard.
-		var mirroredDrive = suffix == "YRight" && (switch drive { case Rack(_, _, _) | Belt(_, _, _): true; case _: false; });
+		var mirroredDrive = suffix == "YRight" && (switch drive { case Rack(_, _, _) | HelicalRack(_,_,_,_) | Belt(_, _, _): true; case _: false; });
 		if (mirroredDrive) transverse = [for (value in transverse) -value];
 		var normal = [direction[1] * transverse[2] - direction[2] * transverse[1],
 			direction[2] * transverse[0] - direction[0] * transverse[2],
 			direction[0] * transverse[1] - direction[1] * transverse[0]];
 		var motorId = "motor" + suffix;
-		var selectedMotor = NemaStepper.frame(spec.motorFrame);
-		var shaft = selectedMotor.variant.shaftLength;
+		var selectedMotor=AxisMotor.of(spec.motorPart(axis.id)),reducer=spec.reducerFor(axis.id);
+        var shaft=selectedMotor.shaftLength+(reducer==null?0:reducer.n("length")+MOTOR_PLATE_THICKNESS);
 		function point(distance:Float):Array<Float> return [origin[0] + direction[0] * distance,
 			origin[1] + direction[1] * distance, origin[2] + direction[2] * distance];
 		switch drive {
 			case Screw(thread):
 				var ball = thread.family == machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball;
 				var unit = ball ? new ScrewSupportUnit(true, thread.screwDiameter) : null;
-				var coupling = new ShaftCoupling(selectedMotor.variant.shaftDiameter, thread.screwDiameter);
+				var coupling = new ShaftCoupling(selectedMotor.shaftDiameter, thread.screwDiameter);
 				// Short-shaft motors cannot bury a long sleeve inside their pilot or mounting plate.
 				if (ball) {
 					var engagement = Math.min(coupling.length / 2, shaft - MOTOR_PLATE_THICKNESS - DRIVE_CLEARANCE);
-					coupling = new ShaftCoupling(selectedMotor.variant.shaftDiameter, thread.screwDiameter, null, 2 * engagement);
+					coupling = new ShaftCoupling(selectedMotor.shaftDiameter, thread.screwDiameter, null, 2 * engagement);
 				}
 				var grip = coupling.length / 2;
 				// The bearing follows the coupling's screw-side grip. Keep its far face clear of the
@@ -516,10 +570,10 @@ class Gantry extends AxisBuilder {
 					endRoom = Math.max(0, grip + unit.length + DRIVE_CLEARANCE - railMargin - leading);
 				}
 				var start = point(-railMargin - endRoom), face = point(-railMargin - endRoom - shaft);
-				mountMotor(motorId, fixed, AxisBuilder.orient(face[0], face[1], face[2], transverse, direction));
+				mountMotor(motorId, fixed, AxisBuilder.orient(face[0], face[1], face[2], transverse, direction), reducer == null ? null : reducer.n("diameter") + 2);
 				var screwId = "screw" + suffix;
 				driveScrew(axis, screwId, motorId, new LeadScrew(thread, axis.upper + 2 * railMargin + endRoom),
-					AxisBuilder.orient(start[0], start[1], start[2], transverse, direction), direction, true, addDriver, coupling);
+					AxisBuilder.orient(start[0], start[1], start[2], transverse, direction), direction, true, addDriver, coupling,reducer);
 				if (unit != null) {
 					// Generic screws retain their nominal cylindrical end, unlike the SFU1605's 12 mm journal.
 					// A fixed bearing fits that actual shaft; its foot is carried back to the motor mounting plate.
@@ -530,12 +584,19 @@ class Gantry extends AxisBuilder {
 					var thickness = motorPlate.height;
 					var begin = point(-railMargin - endRoom - shaft + thickness);
 					var bracketLength = shaft - thickness + grip + unit.length;
-					var bracketPose = AxisBuilder.orient(begin[0] + transverse[0] * (foot - thickness / 2),
-						begin[1] + transverse[1] * (foot - thickness / 2),
-						begin[2] + transverse[2] * (foot - thickness / 2), transverse, direction);
+					var drop = reducer == null ? 0 : Math.max(0, reducer.n("diameter") / 2 + DRIVE_CLEARANCE + foot);
+					var bracketPose = AxisBuilder.orient(begin[0] + transverse[0] * (foot - thickness / 2 - drop),
+						begin[1] + transverse[1] * (foot - thickness / 2 - drop),
+						begin[2] + transverse[2] * (foot - thickness / 2 - drop), transverse, direction);
 					var bracketId = screwId + "FixedBracket";
 					attach(bracketId, new GantryPlate("fixed bearing bracket", unit.width, thickness, bracketLength),
 						bracketPose, motorId + "Plate");
+					if (drop > 0) {
+						var riser = AxisBuilder.orient(bearing[0] + transverse[0] * (foot - drop / 2) - direction[0] * unit.length / 2,
+							bearing[1] + transverse[1] * (foot - drop / 2) - direction[1] * unit.length / 2,
+							bearing[2] + transverse[2] * (foot - drop / 2) - direction[2] * unit.length / 2, transverse, direction);
+						attach(bracketId + "Riser", new GantryPlate("fixed bearing riser", unit.width, drop, unit.length), riser, bracketId);
+					}
 					attach(screwId + "Fixed", unit, bearingPose, bracketId);
 				}
 				var nut:LeadScrewNut = cast component(screwId + "Nut");
@@ -567,8 +628,8 @@ class Gantry extends AxisBuilder {
 				var plane = AxisBuilder.orient(start[0], start[1], start[2], transverse, normal);
 				var pulleyId = "pulley" + suffix, idlerId = "idler" + suffix;
 				twoPulleyAxis({axis: axis, beltId: beltId, belt: belt, beltPose: plane, beltParent: fixed,
-					motorId: motorId, pulleyId: pulleyId, pulley: new TimingPulley(profile, teeth, motor.variant.shaftDiameter, width),
-					idlerId: idlerId, idler: new TimingPulley(profile, teeth, motor.variant.shaftDiameter, width),
+					motorId: motorId, pulleyId: pulleyId, pulley: new TimingPulley(profile, teeth, AxisMotor.of(motor).shaftDiameter, width),
+					idlerId: idlerId, idler: new TimingPulley(profile, teeth, AxisMotor.of(motor).shaftDiameter, width),
 					idlerPose: AxisBuilder.orient(end[0], end[1], end[2], transverse, normal), about: normal,
 					strand: 0, travelX: 1.0, travelY: 0.0, driverForMotor: addDriver,
 					mountIdler: () -> {
@@ -577,7 +638,7 @@ class Gantry extends AxisBuilder {
 						var plate = new GantryPlate("idler mount", 60, 60, 6);
 						var support = supportMotor(idlerId + "Support", fixed, plate, mount, motor);
 						attach(idlerId + "Plate", plate, mount, support);
-						attach(idlerId + "Pin", new GantryIdlerPin(motor.variant.shaftDiameter, width),
+						attach(idlerId + "Pin", new GantryIdlerPin(AxisMotor.of(motor).shaftDiameter, width),
 							AxisBuilder.orient(end[0], end[1], end[2], transverse, normal), idlerId + "Plate");
 						return idlerId + "Pin";
 					}});
@@ -591,17 +652,22 @@ class Gantry extends AxisBuilder {
 				addBeltPath({belt: beltId, clamp: {instanceId: clampId, connectorName: "belt"},
 					wraps: [{instanceId: pulleyId, connectorName: "attach-" + pulleyId},
 						{instanceId: idlerId, connectorName: "attach-" + idlerId}]});
-			case Rack(moduleSize, teeth, width):
+			case Rack(moduleSize, teeth, width) | HelicalRack(moduleSize,teeth,width,_):
 				var face = [origin[0] - normal[0] * (shaft - width), origin[1] - normal[1] * (shaft - width), origin[2] - normal[2] * (shaft - width)];
-				var pinion = new SpurGear(moduleSize, teeth, width, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0, selectedMotor.variant.shaftDiameter);
-				mountMotor(motorId, moving, AxisBuilder.orient(face[0], face[1], face[2], transverse, normal), pinion.outsideDiameter + 2);
+				var helix:Null<Float> = switch drive {case HelicalRack(_,_,_,angle):angle;case _:null;};
+                var pinion:MachineComponent=helix==null?new SpurGear(moduleSize,teeth,width,SpurGear.STANDARD_PRESSURE_ANGLE,0,0,selectedMotor.shaftDiameter):
+                    new machinekit.transmission.HelicalPinion(new ComponentValues().setNumber("normalModule",moduleSize).setInteger("teeth",teeth).setNumber("faceWidth",width).setNumber("helixAngle",helix).setNumber("bore",selectedMotor.shaftDiameter));
+                var wheel=RackGeometry.pinion(pinion);
+				mountMotor(motorId, moving, AxisBuilder.orient(face[0], face[1], face[2], transverse, normal), Math.max(wheel.diameter+2*moduleSize,reducer==null?0:reducer.n("diameter")) + 2);
 				// driveRack places the rack under the pinion, phases a gap to the pinion's tooth and derives the sense.
-				var rackPitch = Math.PI * moduleSize;
+				var rackPitch = Math.PI * wheel.moduleSize;
 				var rackMargin = Math.ceil(railMargin / rackPitch) * rackPitch;
 				var rackTeeth = Std.int(Math.ceil((axis.upper + 2 * rackMargin) / rackPitch));
 				var pinionPose = AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal);
 				driveRack(axis, "pinion" + suffix, motorId, pinion, pinionPose, [-transverse[0], -transverse[1], -transverse[2]],
-					"rack" + suffix, new Rack(moduleSize, rackTeeth, width), fixed, addDriver);
+					"rack" + suffix, helix==null?new Rack(moduleSize,rackTeeth,width):
+                        new machinekit.transmission.HelicalRack(new ComponentValues().setNumber("normalModule",moduleSize).setInteger("teeth",rackTeeth).setNumber("faceWidth",width).setNumber("helixAngle",helix)),
+                    fixed,addDriver,reducer,spec.preload);
 		}
 	}
 }

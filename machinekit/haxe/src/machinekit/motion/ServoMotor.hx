@@ -181,6 +181,35 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 	/** Supplier or explicitly assumed mounting dimensions; never infer them from body size. */
 	public function mounting():Null<ServoMounting> return null;
 
+    override public function axisMotor():Null<AxisMotor> {
+        var face=mounting();
+        if(face==null)return null;
+        return new AxisMotor(this,face.face,rating.shaftDiameter,rating.shaftLength,depth->mountingCutout(depth));
+    }
+
+    /** Pilot and fastener clearances from the declared interface, in the mounting face. */
+    public function mountingCutout(depth:Float):Part {
+        var face=mounting();
+        if(face==null || !Math.isFinite(depth)||depth<=0)throw "Servo needs declared mounting data and positive cutout depth";
+        var tools=[Solids.named(Part.cylinderSpan((face.pilotDiameter+0.2)/2,0,depth),"pilot")];
+        return Solids.building(tools,parts->{
+            var i=0;
+            for(hole in face.holes)parts.push(Solids.named(Part.cylinderSpan(face.holeDiameter/2,0,depth,hole.x,hole.y),"bolt"+(++i)));
+            return Solids.union(parts);
+        });
+    }
+
+    /** Explicit, unverified flange rows for the generic motor families. */
+    public static function assumedMounting(designation:String):ServoMounting {
+        var face=0.0,pilot=0.0,pitch=0.0,hole=0.0;
+        if(StringTools.endsWith(designation,"50W")&&!StringTools.endsWith(designation,"750W") || StringTools.endsWith(designation,"100W")) {face=40;pilot=30;pitch=31;hole=3.5;}
+        else if(StringTools.endsWith(designation,"200W")||StringTools.endsWith(designation,"400W")) {face=60;pilot=50;pitch=50;hole=5.5;}
+        else if(StringTools.endsWith(designation,"750W")) {face=80;pilot=70;pitch=70;hole=6.6;}
+        else throw "No assumed flange row for "+designation;
+        return {face:face,flangeThickness:6,pilotDiameter:pilot,pilotHeight:2,holeDiameter:hole,
+            holes:[for(x in [-1,1])for(y in [-1,1]){x:x*pitch/2,y:y*pitch/2}]};
+    }
+
 	/** Continuous local-Z clearance sweep. The default bounds the actual envelope;
 	 * families may override this with a tighter union of swept features.
 	 */
@@ -210,6 +239,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
  */
 private class CatalogServoMotor extends ServoMotor {
 	public function new(rating:ServoRating) super(rating, Assumed);
+    override public function mounting():Null<ServoMounting> return ServoMotor.assumedMounting(rating.designation);
 	override public function componentType():Null<machinekit.component.ComponentType> return ServoMotor.namedRecipeType();
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues()
 		.setToken("designation", rating.designation).setToken("material", materialSpec());

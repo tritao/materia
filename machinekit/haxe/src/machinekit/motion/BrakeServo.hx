@@ -20,7 +20,7 @@ class BrakeServo extends AssumedCatalogComponent {
   public function new(?v:ComponentValues) {
     super("brake-servo", "AC servo with spring-applied holding brake", "aluminium 6061", inputs(), v);
     positive(["brakeTorque", "brakeLength", "releaseDelay", "applicationDelay"]);
-    motor = ServoMotor.model("GENERIC-HV-SERVO-" + parameterToken("power") + "W");
+    motor = new AxisServoMotor("GENERIC-HV-SERVO-" + parameterToken("power") + "W");
     require(n("brakeTorque") >= motor.rating.ratedTorque, "holding brake below motor rated torque");
     addConnector("mountFace", Mount, Solids.axial(0, 0, 0));
     addConnector("shaftAxis", Axis, Solids.axial(0, 0, 0));
@@ -45,6 +45,10 @@ class BrakeServo extends AssumedCatalogComponent {
     ]);
   }
   public final motor:ServoMotor;
+  override public function axisMotor():Null<AxisMotor> {
+    var face=AxisMotor.of(motor);
+    return new AxisMotor(this,face.face,face.shaftDiameter,face.shaftLength,depth->face.mountingCutout(depth));
+  }
   override public function motorDrive():Null<MotorDrive> return motor;
   override public function motorBrakeSpec():Null<MotorBrakeSpec> return new BrakeServoSpec(this);
 }

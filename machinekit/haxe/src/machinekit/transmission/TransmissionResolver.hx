@@ -33,8 +33,7 @@ class TransmissionResolver {
 				result;
 			case GearMesh(driver, driven): GearPair.relation(gear(driver), gear(driven), alignment);
 			case RackAndPinion(pinion, rack):
-				if (rack != null && !Std.isOfType(member(rack), Rack)) throw new TransmissionDesignError("Transmission needs a rack");
-				Rack.relation(gear(pinion), rack == null ? null : cast member(rack), alignment);
+				RackGeometry.relation(member(pinion), rack == null ? null : member(rack), alignment);
 			case TimingBelt(beltId, pulleyId) | BeltIdler(beltId, pulleyId):
 				var belt = member(beltId), pulley = member(pulleyId);
 				if (!Std.isOfType(belt, TimingBelt)) throw new TransmissionDesignError("Transmission needs a timing belt");

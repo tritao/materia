@@ -7,6 +7,9 @@ import machinekit.motion.LinearRailBlock;
 import machinekit.motion.LeadScrew;
 import machinekit.motion.LeadScrewNut;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.AxisMotor;
+import machinekit.transmission.RackGeometry;
+import machinekit.transmission.PreloadedPinionMount;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.ScrewSupport;
 import machinekit.transmission.TimingBelt;
@@ -234,8 +237,11 @@ class AxisBuilder extends MachineAssembly {
 	 * The coupling is centred on the shaft tip and turns inside the mount's pilot bore.
 	 */
 	public function driveScrew(axis:AxisSpec, id:String, motor:String, screw:LeadScrew, pose:AssemblyFrame,
-			along:Array<Float>, flangedNut:Bool, driverForMotor:String->String, ?coupling:ShaftCoupling):Void {
-		var shaft = cast(component(motor), NemaStepper).variant.shaftDiameter;
+			along:Array<Float>, flangedNut:Bool, driverForMotor:String->String, ?coupling:ShaftCoupling, ?reducer:MachineComponent):Void {
+        var mount=AxisMotor.of(component(motor));
+        var stage=mountReducer(id,motor,pose,reducer);
+        var gearing=reducer==null?null:reducer.reducerSpec();
+        var shaft = gearing==null?mount.shaftDiameter:gearing.bore;
 		if (coupling == null) coupling = new ShaftCoupling(shaft, screw.thread.screwDiameter);
 		if (coupling.boreA != shaft || coupling.boreB != screw.thread.screwDiameter)
 			throw "Screw coupling bores must fit the motor and screw shaft";
@@ -244,7 +250,7 @@ class AxisBuilder extends MachineAssembly {
 		addComponent(couplingId, coupling);
 		zeroPoses.set(couplingId, {x: pose.x - along[0] * grip, y: pose.y - along[1] * grip, z: pose.z - along[2] * grip,
 			qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw});
-		connect(motor, couplingId);
+		connect(stage.parent, couplingId);
 		attach(id, screw, pose, couplingId);
 		// The screw's thread sets the ratio; the joint starts where the axis puts it.
 		var nut = new LeadScrewNut(screw.thread, 4, flangedNut,
@@ -254,14 +260,29 @@ class AxisBuilder extends MachineAssembly {
 		addComponent(id + "Nut", nut);
 		var ratio = addTransmission('$id-lead', axis.id, '$id-turn', Transmission.LeadScrew(id, id + "Nut"),
 			screwSense(axis.id, along));
-		addMateOnAxis('$id-turn', "continuous", motor, 'to-$couplingId', couplingId, 'attach-$couplingId',
+		addMateOnAxis('$id-turn', "continuous", stage.parent, 'to-$couplingId', couplingId, 'attach-$couplingId',
 			{x: along[0], y: along[1], z: along[2]}, ratio * axis.initial);
 		// The input is fixed and the far end free; the moving nut is no bending support. Use the whole
 		// shaft as a conservative unsupported length. Ball-screw layouts must also place the physical
 		// fixed bearing whose axial load path is resolved by ScrewStretch.
 		supportScrew('$id-lead', Fixed, Free);
-		addMotor(motor, '$id-turn', motor, driverForMotor(motor));
+		addMotor(motor, '$id-turn', motor, driverForMotor(motor),0.5,stage.id);
+        mountOutputShaft(id, couplingId,pose,stage.id,mount);
 	}
+
+    function mountReducer(id:String,motor:String,tip:AssemblyFrame,reducer:Null<MachineComponent>):{id:Null<String>,parent:String} {
+        if(reducer==null)return {id:null,parent:motor};
+        var shaft=AxisMotor.of(component(motor)),spec=reducer.reducerSpec();
+        if(spec==null || Math.abs(spec.bore-shaft.shaftDiameter)>1e-9)throw "Reducer input bore does not match axis motor shaft";
+        var stageId=id+"Reducer";
+        attach(stageId,reducer,AssemblyFrames.compose(tip,AssemblyFrames.translation(0,0,-shaft.shaftLength-spec.length)),motor);
+        return {id:stageId,parent:stageId};
+    }
+    function mountOutputShaft(id:String,parent:String,tip:AssemblyFrame,stage:Null<String>,motor:AxisMotor):Void {
+        if(stage==null && motor.part.motorDrive().electricalRating()==null)return;
+        attach(id+"OutputShaft",new machinekit.motion.SteppedShaft([{diameter:motor.shaftDiameter,length:motor.shaftLength}]),
+            AssemblyFrames.compose(tip,AssemblyFrames.translation(0,0,-motor.shaftLength)),parent);
+    }
 
 	/** Attach the source nut to its carriage once the bracket exists. */
 	public function mountNut(screw:String, parent:String, face:AssemblyFrame):Void {
@@ -333,16 +354,28 @@ class AxisBuilder extends MachineAssembly {
 	 * `rackSide` of it. The rack's pose comes from `rackPlacement`, and the coupling's sense from the pinion rolling
 	 * on it as the axis slides (`slide` comes first).
 	 */
-	public function driveRack(axis:AxisSpec, id:String, motor:String, pinion:SpurGear, pose:AssemblyFrame, rackSide:Array<Float>,
-			rackId:String, rack:Rack, rackParent:Null<String>, driverForMotor:String->String):Void {
-		var placement = rackPlacement(axis, pinion, pose, rackSide, rack);
+	public function driveRack(axis:AxisSpec, id:String, motor:String, pinion:MachineComponent, pose:AssemblyFrame, rackSide:Array<Float>,
+            rackId:String, rack:MachineComponent, rackParent:Null<String>, driverForMotor:String->String,
+            ?reducer:MachineComponent, ?preload:PreloadedPinionMount):Void {
+        var mount=AxisMotor.of(component(motor)), wheel=RackGeometry.pinion(pinion);
+        RackGeometry.relation(pinion,rack,1);
+        var tip=AssemblyFrames.compose(pose,AssemblyFrames.translation(0,0,wheel.width));
+        var stage=mountReducer(id,motor,tip,reducer);
+        var placement = rackPlacement(axis, pinion, pose, rackSide, rack);
 		if (rackParent == null) place(rackId, rack, placement.pose);
 		else attach(rackId, rack, placement.pose, rackParent);
-		hang(id, pinion, pose, motor);
+		hang(id, pinion, pose, stage.parent);
 		var ratio = addTransmission('$id-rack', axis.id, '$id-turn', Transmission.RackAndPinion(id, rackId), placement.sense);
 		var about = AssemblyFrames.transformVector(pose, 0, 0, 1);
-		addMateOnAxis('$id-turn', "continuous", motor, 'to-$id', id, 'attach-$id', about, ratio * axis.initial);
-		addMotor(motor, '$id-turn', motor, driverForMotor(motor));
+		addMateOnAxis('$id-turn', "continuous", stage.parent, 'to-$id', id, 'attach-$id', about, ratio * axis.initial);
+		addMotor(motor, '$id-turn', motor, driverForMotor(motor),0.5,stage.id);
+        mountOutputShaft(id,id,tip,stage.id,mount);
+        if(preload!=null) {
+            if(preload.n("shaftClearance")<mount.shaftDiameter+0.5)throw "Preloaded mount does not clear pinion shaft";
+            var target=AssemblyFrames.compose(pose,machinekit.component.Solids.axial(0,0,0));
+            var location=AssemblyFrames.compose(target,AssemblyFrames.inverse(preload.connector("pinion").frame));
+            attach(id+"Preload",preload,location,motor);
+        }
 	}
 
 	/**
@@ -353,8 +386,9 @@ class AxisBuilder extends MachineAssembly {
 	 * this throws). `sense` is the coupling sense that makes the pinion roll on it. Machines size the rack's support from
 	 * the pose before calling `driveRack`.
 	 */
-	public function rackPlacement(axis:AxisSpec, pinion:SpurGear, pose:AssemblyFrame, rackSide:Array<Float>, rack:Rack)
+	public function rackPlacement(axis:AxisSpec, pinion:MachineComponent, pose:AssemblyFrame, rackSide:Array<Float>, rack:MachineComponent)
 			:{pose:AssemblyFrame, sense:Sense} {
+        var wheel=RackGeometry.pinion(pinion), bar=RackGeometry.rack(rack);
 		var a = AssemblyFrames.transformVector(pose, 0, 0, 1);
 		var t = axisDirection(axis.id);
 		var length = Math.sqrt(rackSide[0] * rackSide[0] + rackSide[1] * rackSide[1] + rackSide[2] * rackSide[2]);
@@ -365,25 +399,26 @@ class AxisBuilder extends MachineAssembly {
 		// Rack frame: face along +X (the pinion's axis), teeth along +Y (towards the pinion), length along +Z = X x Y.
 		var x = [a.x, a.y, a.z], y = [-n[0], -n[1], -n[2]];
 		var z = cross(x, y);
-		var radius = pinion.pitchDiameter / 2, pitch = Math.PI * pinion.moduleSize;
+		var radius = wheel.diameter / 2, pitch = Math.PI * wheel.moduleSize;
 		// Pitch point at coordinate zero, on the pinion's face start; the face of the rack centred on the pinion's.
-		var faceShift = (pinion.faceWidth - rack.faceWidth) / 2;
+		var faceShift = (wheel.width - bar.width) / 2;
 		var contact = [pose.x + radius * n[0] + faceShift * x[0], pose.y + radius * n[1] + faceShift * x[1], pose.z + radius * n[2] + faceShift * x[2]];
 		// The pinion's tooth nearest the pitch point: teeth are centred on multiples of 2 pi / teeth from its local +X.
 		var local = AssemblyFrames.transformVector(AssemblyFrames.inverse(pose), n[0], n[1], n[2]);
-		var angle = Math.atan2(local.y, local.x), step = 2 * Math.PI / pinion.teeth;
-		var offset = radius * (angle - Math.round(angle / step) * step);
+		var angle = Math.atan2(local.y, local.x), step = 2 * Math.PI / wheel.teeth;
+		var phase=wheel.hand*wheel.width*Math.tan(wheel.helix)/wheel.diameter;
+        var offset = radius * (angle-phase - Math.round((angle-phase) / step) * step);
 		// That tooth's centre lies `offset` behind the pitch point along the direction the pitch circle turns (a x n).
 		var tangent = cross(x, n);
-		var tooth = -offset * dot(tangent, z);
+		var tooth = -offset * dot(tangent, z)-bar.hand*bar.width/2*Math.tan(bar.helix);
 		// Rack gaps are centred on multiples of the pitch from its start: start the rack a whole number of pitches before
 		// the tooth, as near as that comes to centring the rack on the pitch point's travel.
 		var travel = dot(t, z);
 		var low = Math.min(axis.lower * travel, axis.upper * travel), high = Math.max(axis.lower * travel, axis.upper * travel);
-		var centred = (low + high) / 2 - rack.length / 2;
+		var centred = (low + high) / 2 - bar.length / 2;
 		var start = tooth - Math.round((tooth - centred) / pitch) * pitch;
-		if (start > low - 2 * pitch || start + rack.length < high + 2 * pitch)
-			throw 'Rack of axis ${axis.id} is too short: it needs ${Math.ceil((high - low) / pitch) + 5} teeth, has ${rack.teethCount}';
+		if (start > low - 2 * pitch || start + bar.length < high + 2 * pitch)
+			throw 'Rack of axis ${axis.id} is too short: it needs ${Math.ceil((high - low) / pitch) + 5} teeth, has ${bar.teeth}';
 		var origin = [contact[0] + start * z[0], contact[1] + start * z[1], contact[2] + start * z[2]];
 		// Rolling: the pinion's centre moves along a x n per unit turn of radius; it turns by (t . z) / radius per unit
 		// travel, and Rack.relation gives alignment * 2 / pitch diameter.

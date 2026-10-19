@@ -18,12 +18,14 @@ class PreloadedPinionMount extends AssumedCatalogComponent {
     P.length("springArm", 70),
     P.quantity("springForce", 700, "N"),
     P.quantity("springRate", 40, "N/mm"),
-    P.length("stroke", 4)
+    P.length("stroke", 4),
+    P.length("shaftClearance",20),P.length("hingeBore",10)
   ];
   public function new(?v:ComponentValues) {
     super("preloaded-pinion-mount", "hinged spring-preloaded pinion mount", "steel", inputs(), v);
-    positive(["width", "length", "thickness", "leverArm", "springArm", "springForce", "springRate", "stroke"]);
+    positive(["width", "length", "thickness", "leverArm", "springArm", "springForce", "springRate", "stroke", "shaftClearance", "hingeBore"]);
     require(n("leverArm") < n("length") && n("springArm") < n("length"), "lever arms must lie within plate");
+    require(n("shaftClearance")<n("width") && n("hingeBore")<n("width"),"mount holes consume plate");
     addConnector("hinge", Axis, Solids.axial(0, 0, 0));
     addConnector("pinion", Axis, Solids.axial(0, n("leverArm"), n("thickness")));
     addConnector("spring", Mount, Solids.axial(0, n("springArm"), n("thickness")));
@@ -38,7 +40,9 @@ class PreloadedPinionMount extends AssumedCatalogComponent {
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    return Solids.named(Part.box(n("width"), n("length"), n("thickness"), Center, Min), "hinged-plate");
+    return Solids.cut(Solids.named(Part.box(n("width"), n("length"), n("thickness"), Center, Min), "hinged-plate"),[
+      Solids.named(Part.cylinderSpan(n("shaftClearance")/2,-1,n("thickness")+1,0,n("leverArm")),"pinion-shaft-clearance"),
+      Solids.named(Part.cylinderSpan(n("hingeBore")/2,-1,n("thickness")+1),"hinge-bore")]);
   }
   /** N at the pinion for spring extension measured in mm. */
   public function preload(extension:Float = 0):Float {

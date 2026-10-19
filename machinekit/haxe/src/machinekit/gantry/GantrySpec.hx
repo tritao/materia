@@ -10,6 +10,32 @@ enum GantryDrive {
 	Screw(thread:LeadScrewThread);
 	Belt(profile:TimingBeltProfile, teeth:Int, width:Float);
 	Rack(moduleSize:Float, pinionTeeth:Int, width:Float);
+	HelicalRack(normalModule:Float,pinionTeeth:Int,width:Float,helixAngle:Float);
+}
+
+/** Motor selection is explicit; a braked motor exposes its physical brake for commissioning. */
+enum GantryMotor {
+    Stepper(frame:Int);
+    Servo(designation:String);
+    BrakedServo(power:String);
+}
+enum GantryStructure {
+    Aluminium;
+    Steel(frame:machinekit.structural.RectTube,beam:machinekit.structural.RectTube);
+}
+typedef GantryOptions = {
+    @:optional var motor:GantryMotor;
+    @:optional var motorX:GantryMotor;
+    @:optional var motorY:GantryMotor;
+    @:optional var motorZ:GantryMotor;
+    @:optional var reducer:machinekit.motion.PlanetaryReducer;
+    @:optional var reducerX:machinekit.motion.PlanetaryReducer;
+    @:optional var reducerY:machinekit.motion.PlanetaryReducer;
+    @:optional var reducerZ:machinekit.motion.PlanetaryReducer;
+    @:optional var preload:machinekit.transmission.PreloadedPinionMount;
+    @:optional var structure:GantryStructure;
+    @:optional var cableChain:machinekit.motion.CableChain;
+    @:optional var supplyCurrent:Null<machinekit.power.DcCurrent>;
 }
 
 /** Optional rotary head; the translational assembly exposes the flange without one. */
@@ -30,6 +56,18 @@ class GantrySpec {
 	public final dualY:Bool;
 	public final railProfile:String;
 	public final motorFrame:Int;
+    public final motor:GantryMotor;
+    public final motorX:GantryMotor;
+    public final motorY:GantryMotor;
+    public final motorZ:GantryMotor;
+    public final reducer:Null<machinekit.motion.PlanetaryReducer>;
+    public final reducerX:Null<machinekit.motion.PlanetaryReducer>;
+    public final reducerY:Null<machinekit.motion.PlanetaryReducer>;
+    public final reducerZ:Null<machinekit.motion.PlanetaryReducer>;
+    public final preload:Null<machinekit.transmission.PreloadedPinionMount>;
+    public final structure:GantryStructure;
+    public final cableChain:Null<machinekit.motion.CableChain>;
+    public final supplyCurrent:Null<machinekit.power.DcCurrent>;
 	public final frameProfile:String;
 	public final beamProfile:String;
 	public final tableMounted:Bool;
@@ -55,13 +93,23 @@ class GantrySpec {
 			railProfile:String = "MGN12C", motorFrame:Int = 23,
 			frameProfile:String = "HFS5-4040", beamProfile:String = "HFS5-4040",
 			tableMounted:Bool = false, head:GantryHead = None, racking:Float = 0.5,
-			?supplyVoltage:machinekit.power.DcVoltage, microsteps:Int = 16, frontExtension:Float = 0, sideExtension:Float = 0, frameLift:Float = 0, toolReach:Float = 0) {
+			?supplyVoltage:machinekit.power.DcVoltage, microsteps:Int = 16, frontExtension:Float = 0, sideExtension:Float = 0, frameLift:Float = 0, toolReach:Float = 0, ?options:GantryOptions) {
 		for (value in [travelX, travelY, travelZ, racking])
 			if (!Math.isFinite(value) || value <= 0) throw "Gantry dimensions and electrical limits must be finite and positive";
 		if (microsteps <= 0) throw "Gantry microsteps must be positive";
 		if (!Math.isFinite(frontExtension) || frontExtension < 0) throw "Gantry front extension must be finite and non-negative";
 		if (!Math.isFinite(sideExtension) || sideExtension < 0) throw "Gantry side extension must be finite and non-negative";
 		if (!Math.isFinite(frameLift) || frameLift < 0) throw "Gantry frame lift must be finite and non-negative";
+        var selected:GantryOptions=options==null?{motor:null}:options;
+        motor=selected.motor==null?Stepper(motorFrame):selected.motor;
+        motorX=selected.motorX==null?motor:selected.motorX;
+        motorY=selected.motorY==null?motor:selected.motorY;
+        motorZ=selected.motorZ==null?motor:selected.motorZ;
+        reducer=selected.reducer;reducerX=selected.reducerX==null?reducer:selected.reducerX;
+        reducerY=selected.reducerY==null?reducer:selected.reducerY;reducerZ=selected.reducerZ;preload=selected.preload;
+        structure=selected.structure==null?Aluminium:selected.structure;
+        cableChain=selected.cableChain;supplyCurrent=selected.supplyCurrent;
+        if(supplyVoltage==null && (!isStepper(motorX)||!isStepper(motorY)||!isStepper(motorZ)))throw "Servo gantries need an explicit DC bus voltage";
 		this.travelX = travelX; this.travelY = travelY; this.travelZ = travelZ;
 		this.driveX = driveX == null ? Belt(TimingBeltProfile.GT2, 20, 9) : driveX;
 		this.driveY = driveY == null ? Belt(TimingBeltProfile.GT2, 20, 9) : driveY;
@@ -78,8 +126,40 @@ class GantrySpec {
 		this.racking = racking; rackingBasis = ValueBasis.Assumed;
 		this.supplyVoltage = supplyVoltage == null ? new machinekit.power.DcVoltage(24) : supplyVoltage;
 		this.microsteps = microsteps;
+        for(axis in ["x","y","z"])validateReduction(axis);
 		assumedFields = ["travelX", "travelY", "travelZ", "driveX", "driveY", "driveZ", "dualY",
 			"railProfile", "motorFrame", "frameProfile", "beamProfile", "tableMounted", "head",
-			"racking", "supplyVoltage", "microsteps", "frontExtension", "sideExtension", "frameLift", "toolReach"];
+			"racking", "supplyVoltage", "microsteps", "frontExtension", "sideExtension", "frameLift", "toolReach", "motor", "motorX", "motorY", "motorZ", "reducer", "reducerX", "reducerY", "reducerZ", "preload", "structure", "cableChain", "supplyCurrent"];
 	}
+    function validateReduction(axis:String):Void {
+        if(reducerFor(axis)==null)return;
+        var drive=axis=="x"?driveX:axis=="y"?driveY:driveZ;
+        switch drive {
+            case Belt(_,_,_):throw "Reducer stage requires a screw or rack drive";
+            case _:
+        }
+        var choice=motorFor(axis);
+        switch choice {
+            case BrakedServo(_):throw "A braked servo requires a direct shaft joint";
+            case _:
+        }
+    }
+    public static function isStepper(choice:GantryMotor):Bool return switch choice {case Stepper(_):true;case _:false;};
+    public function motorFor(axis:String):GantryMotor return axis=="z"?motorZ:axis=="y"?motorY:motorX;
+    public function motorPart(axis:String):machinekit.component.MachineComponent return switch motorFor(axis) {
+        case Stepper(frame):machinekit.motion.NemaStepper.frame(frame);
+        case Servo(name):new machinekit.motion.AxisServoMotor(name);
+        case BrakedServo(power):new machinekit.motion.BrakeServo(new machinekit.component.ComponentValues().setToken("power",power));
+    };
+    public function reducerFor(axis:String):Null<machinekit.motion.PlanetaryReducer> return axis=="z"?reducerZ:axis=="y"?reducerY:reducerX;
+    public function frameSection(beam:Bool=false):GantrySection return switch structure {
+        case Aluminium:new GantrySection(machinekit.structural.TSlotExtrusion.forProfile(beam?beamProfile:frameProfile));
+        case Steel(frame,member):new GantrySection(null,beam?member:frame);
+    };
+    public function driveFootprint(axis:String,baseline:Float):Float {
+        var stage=reducerFor(axis);
+        if(isStepper(motorFor(axis))&&stage==null)return baseline;
+        return Math.max(baseline,Math.max(machinekit.motion.AxisMotor.of(motorPart(axis)).face+12,stage==null?0:stage.n("diameter")+12));
+    }
+
 }

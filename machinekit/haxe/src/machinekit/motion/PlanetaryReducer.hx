@@ -65,6 +65,10 @@ class PlanetaryReducer extends AssumedCatalogComponent {
       )]
     );
   }
+  override public function reducerSpec():Null<ReducerSpec> return {
+    ratio:n("ratio"),efficiency:n("efficiency"),inputInertia:n("inputInertia"),inertiaAssumed:true,assumed:true,
+    diameter:n("diameter"),length:n("length"),bore:n("bore")
+  };
   public function jointTorque(motorTorque:Float):Float return motorTorque * n("ratio") * n("efficiency");
   public function jointSpeed(motorSpeed:Float):Float return motorSpeed / n("ratio");
   public function backlashRadians():Float return n("backlash") * Math.PI /(180 * 60);

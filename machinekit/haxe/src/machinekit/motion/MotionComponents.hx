@@ -23,6 +23,7 @@ class MotionComponents {
 		registry.register(NemaStepper.namedRecipeType());
 		registry.register(NemaStepper.genericRecipeType());
 		registry.register(ServoMotor.namedRecipeType());
+		registry.register(AxisServoMotor.recipeType());
 		registry.register(LeadshineServo.recipeType());
 		registry.register(ShaftBrakePart.recipeType());
 		registry.register(MotorDriver.recipeType());

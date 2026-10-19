@@ -913,7 +913,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 |---|---|---|
 | SR0 | started: reference survey recorded; gate blocked by disk headroom and toolchain setup; workshop facts pending | see SR0 notes |
 | SR1 | done: 25 assumed part recipes, HGR20/25 rows; focused gate 292 assertions | this commit |
-| SR2 | planned | |
+| SR2 | done: shared servo/reducer/steel builders; 59 focused assertions, existing gantry/router checks, 292 catalogue assertions | this commit |
 | SR3 | planned | |
 | SR4 | planned | |
 | SR5 | planned | |
@@ -1080,3 +1080,56 @@ MachineKit/application baseline, SR2 servo-axis integration, safety architecture
 validation or hardware acceptance is claimed by this focused result. No native
 library was rebuilt. Root free space was 3.5 GiB at closing; future builds must
 recheck headroom.
+
+## SR2 — shared servo and steel axis builders
+
+`AxisMotor` now declares the flange cutout and shaft dimensions used by the axis
+builders. NEMA, catalogue servo and braked-servo selections supply that interface;
+`AxisServoMotor` adds a declared flange/pilot while preserving the existing generic
+servo envelopes. The catalogue servo mounting dimensions remain assumed. Rotating
+servo/output shafts are separate physical members on the driven joint.
+
+Screw and rack drives accept an optional reducer capability. Its ratio, efficiency
+and input inertia enter drive compilation and motor-derived limits. Helical rack
+pairs use the existing rack transmission record with matched normal/transverse
+pitch and hand validation. Optional preload hardware clears the pinion shaft.
+Reducer support plates clear the housing; reduced ball screws carry their fixed
+bearing on a lowered bracket and riser.
+
+`GantryOptions` selects per-axis motors and reducers, steel rectangular-tube frame
+and beam sections, and X/Y cable chains. Existing constructor defaults retain the
+old stepper/aluminium geometry. The source current and regeneration capacity are
+derived from the selected electrical motor curves; an explicit undersized supply
+is rejected. A braked Z servo retains its typed brake capability. Reducers on belt
+drives and braked servos are explicitly rejected by this implementation.
+
+Cable chains are assembled at coordinate zero and expose moving-end frames and
+posed geometry over travel. Dynamic preview consumption belongs to the SR3 machine
+integration; this step does not add an application animation controller.
+
+Validation uses the existing native libraries, with no native rebuild:
+
+```sh
+/home/joao/dev/materia-cache/tools/heavy-run --mem 10G --need 2G --label sr2-axes -- \
+  machinekit/scripts/test-sheet-router-axes
+/home/joao/dev/materia-cache/tools/heavy-run --mem 10G --need 2G --label sr2-legacy -- \
+  machinekit/scripts/test-sheet-router-axes --legacy
+```
+
+The focused gate passed **59 assertions** (54 servo/steel checks plus five baseline
+signatures). Before/after assembly definitions and preview geometry keys match
+exactly for cnc-router, gantry-picker, gantry-welder, overhead-arm and CoreXY. The
+mixed 400 W X / dual 750 W Y / braked 400 W Z fixture validates as an assembly and
+robot model; its Y speed is derived as 5/3 m/s through a 5:1 reducer. Both Y motors
+remain coupled to the same leader with the 0.5 mm skew bound. Checks also cover FK,
+new hardware solids, reducer inertia/efficiency, cable endpoints, reduced metric
+and ball screws, and invalid bore, supply and belt/reducer combinations. Logs:
+`build/sheet-router-sr0/sr2-gate.log`, `sr2-legacy.log`, `sr2-parts.log`.
+
+The full SR0 application baseline and workshop acceptance remain open. This step
+adds shared builder capabilities; the full `SheetRouter` assembly is SR3.
+
+SR2 closing evidence: existing `GantryChecks` and `CncRouterChecks` passed (exit 0),
+and the SR1 catalogue gate passed all **292 assertions** again (exit 0). Both ran
+through heavy-run against the final SR2 sources and existing native libraries.
+Root free space at closing was 3.6 GiB.
