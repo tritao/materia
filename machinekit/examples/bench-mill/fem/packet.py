@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from provenance import validate as validate_provenance
 
 CAD_UNITS = {"length": "mm", "force": "N", "mass": "kg", "time": "s",
              "modulus": "Pa", "density": "kg/m3"}
@@ -38,6 +39,38 @@ def finite(value):
             finite(child)
 
 
+def compare_concept(packet, directory):
+    reference = packet["conceptReference"]
+    path = directory/reference["file"]
+    if path.name != "mill-frame-concept.json" or digest(path)!=reference["sha256"]:
+        raise ValueError("Concept physical reference digest mismatch")
+    concept = json.loads(path.read_text())
+    if "analysisReference" not in concept:
+        raise ValueError("Regenerate mill-frame-concept.json with per-part analysisReference records")
+    poses = concept["analysisReference"]["poses"]
+    matching = [p for p in poses if all(abs(p["jointsMm"][a]-packet["jointsMm"][a])<1e-6 for a in "xyz")]
+    if len(matching)!=1:
+        raise ValueError("No unique concept reference for the exported XYZ pose")
+    expected = {p["id"]:p for p in matching[0]["parts"]}
+    if set(expected)!={p["id"] for p in packet["parts"]}:
+        raise ValueError("Concept/export component lists differ")
+    for part in packet["parts"]:
+        other = expected[part["id"]]
+        for key,absolute in (("massKg",1e-9),("volumeMm3",1e-5)):
+            if not math.isclose(part[key],other[key],rel_tol=1e-9,abs_tol=absolute):
+                raise ValueError(f"Concept mismatch: {part['id']} / {key}")
+        for key,absolute in (("centreOfMassMm",1e-6),("boundsMm",1e-5)):
+            if set(part[key])!=set(other[key]) or any(abs(part[key][a]-other[key][a])>absolute for a in other[key]):
+                raise ValueError(f"Concept mismatch: {part['id']} / {key}")
+    for name,expected_datum in matching[0]["keyDatums"].items():
+        actual = packet["datums"][name]
+        if any(abs(actual[a]-expected_datum[a])>1e-6 for a in "xyz"):
+            raise ValueError(f"Concept datum mismatch: {name}")
+        if min(max(abs(actual[a]-s*expected_datum[a]) for a in ("qx","qy","qz","qw")) for s in (1,-1))>1e-6:
+            raise ValueError(f"Concept datum rotation mismatch: {name}")
+    return {"partsCompared":len(expected),"datumsCompared":len(matching[0]["keyDatums"]),
+            "jointsMm":packet["jointsMm"],"massRelativeTolerance":1e-9,"volumeRelativeTolerance":1e-9,
+            "centreAbsoluteToleranceMm":1e-6,"boundsAbsoluteToleranceMm":1e-5}
 def validate(manifest_path):
     manifest_path = Path(manifest_path).resolve()
     packet = json.loads(manifest_path.read_text())
@@ -106,10 +139,14 @@ def validate(manifest_path):
         raise ValueError("Payload reference must be 50 mm above the table in world Z")
     if any(s["member"] not in by_id for s in packet["supports"]):
         raise ValueError("Unknown support component")
+    comparison=compare_concept(packet,manifest_path.parent)
+    validate_provenance(packet["provenance"]["sourceBuild"],manifest_path.parent)
     return {"status": "CAD packet validated; structural inputs remain unassigned",
             "components": len(parts), "solids": len(solids), "massOnly": len(parts) - len(solids),
             "totalComponentMassKg": packet["totalComponentMassKg"],
-            "manifestSha256": digest(manifest_path), "pending": packet["pending"]}
+            "manifestSha256": digest(manifest_path), "conceptComparison":comparison,
+            "sourceBuildProvenance":"root/submodule diffs captured; loaded binaries identified",
+            "pending": packet["pending"]}
 
 
 def main():

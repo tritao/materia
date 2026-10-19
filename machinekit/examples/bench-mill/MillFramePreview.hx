@@ -122,6 +122,7 @@ class MillFramePreview {
 		}
 		writeServiceStudy(concept(reference, frame), z, directory);
 		var report = {status: "mechanical XYZ concept; not qualified for manufacture", units: "mm",
+			analysisReference:MillFemReference.capture(concept(reference,frame),frame),
 			travel: [{axis:"x",travel:2*xy.xHalfTravel},{axis:"y",travel:2*xy.yHalfTravel},{axis:"z",travel:-z.lower}],
 			base: {width: l.baseWidth, depth: l.baseDepth, height: l.baseHeight, railPlane: l.railPlane},
 			column: {width: l.columnWidth, depth: l.columnDepth, height: l.columnHeight, railFaceY: l.columnFront,
@@ -135,6 +136,6 @@ class MillFramePreview {
 				"electrical brake and motor controls", "chip drainage and enclosure", "lifting and mold design", "material qualification and static/modal analysis"]};
 		MillDesignStudy.write(concept(reference, frame), frame, directory);
 		sys.io.File.saveContent(directory + "/mill-frame-concept.json", haxe.Json.stringify(report, null, "  "));
-		Sys.println(haxe.Json.stringify(report));
+		Sys.println('Mill frame concept report: $directory/mill-frame-concept.json');
 	}
 }

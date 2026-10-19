@@ -96,6 +96,26 @@ class MillFemExport {
 		FileSystem.createDirectory(path);
 	}
 
+	static function sourceBuildProvenance(repository:String,folder:String):Dynamic {
+		ensure(folder+"/provenance");
+		var paths=[FileSystem.fullPath(Sys.programPath()),FileSystem.fullPath(Sys.executablePath())];
+		var reader=sys.io.Process.run("cat",[FileSystem.fullPath("/proc/self/maps")]);
+		var mappings=reader.readStdout(),status=reader.exitCode();reader.close();
+		if(status!=0)throw "Cannot read loaded geometry-generation build identities";
+		for(line in mappings.split("\n")) {
+			var start=line.indexOf("/");
+			if(start<0)continue;
+			var path=line.substr(start);
+			if((path.indexOf(".so")>=0 || path.indexOf(".hdll")>=0) && paths.indexOf(path)<0)paths.push(path);
+		}
+		var runtime=folder+"/provenance/runtime.json",file=folder+"/provenance/source-build.json";
+		File.saveContent(runtime,haxe.Json.stringify(paths));
+		var process=sys.io.Process.run("python3",[repository+"/"+DIRECTORY+"/fem/provenance.py",repository,runtime,file]);
+		var output=process.readStdout(),code=process.exitCode();process.close();
+		if(code!=0)throw 'Cannot capture source/build provenance: $output';
+		return haxe.Json.parse(File.getContent(file));
+	}
+
 	/** Preserve STEP geometry but fix the writer's volatile header timestamp. */
 	static function stepText(text:String):String {
 		var end = text.indexOf("DATA;");
@@ -113,6 +133,7 @@ class MillFemExport {
 		var poses = assembly.solvedPoses(state), parts:Array<Dynamic> = [], interfaces:Array<Dynamic> = [];
 		var supports:Array<Dynamic> = [], materials:Array<Dynamic> = [], materialIds:Array<String> = [];
 		var members = assembly.components();
+		var parents = assembly.mateParents();
 		members.sort((a,b) -> Reflect.compare(a.id,b.id));
 		var totalMass = 0.0, solidMass = 0.0;
 		PosedParts.scope(cache -> {
@@ -133,24 +154,26 @@ class MillFemExport {
 				var centre = F.transformPoint(pose,c.x,c.y,c.z);
 				var solid = exportSolid(id), file:Null<String> = null, digest:Null<String> = null;
 				var volume:Null<Float> = null, bounds:Dynamic = null;
-				if (solid) {
+				{
 					var part = cache.posed(component,pose);
 					try {
 						volume = part.volume();
-						if (!part.valid() || part.solidCount() != 1 || !Math.isFinite(volume) || volume <= 0)
+						if (!part.valid() || (solid && part.solidCount() != 1) || !Math.isFinite(volume) || volume <= 0)
 							throw 'FEM solid must be valid, connected and positive-volume: $id';
 						bounds = PosedParts.boxOf(part);
+						if(solid) {
 						file = StringTools.replace(id,"/","__") + ".step";
 						part.shape.exportStep(folder + "/" + file);
 						var text = stepText(File.getContent(folder + "/" + file));
 						File.saveContent(folder + "/" + file,text);
 						digest = Sha256.encode(text);
+						}
 					} catch (error:Dynamic) {part.close(); throw error;}
 					part.close();
-					solidMass += mass.mass;
+					if(solid)solidMass += mass.mass;
 				}
 				totalMass += mass.mass;
-				parts.push({id:id, materialId:material.id, representation:solid?"solid":"mass-only",
+				parts.push({id:id, parentId:parents.get(id), materialId:material.id, representation:solid?"solid":"mass-only",
 					poseMm:pose, massKg:mass.mass, centreOfMassMm:centre, volumeMm3:volume,
 					boundsMm:bounds, stepFile:file, stepSha256:digest});
 			}
@@ -176,22 +199,29 @@ class MillFemExport {
 		for (group in [{axis:"x",ids:["xyStage/blockX0","xyStage/blockX1","xyStage/blockX2","xyStage/blockX3"]},
 			{axis:"y",ids:["xyStage/blockY0","xyStage/blockY1","xyStage/blockY2","xyStage/blockY3"]},
 			{axis:"z",ids:["zAxis/blockLeftLower","zAxis/blockLeftUpper","zAxis/blockRightLower","zAxis/blockRightUpper"]}])
-			for (id in group.ids) guides.push({axis:group.axis,member:id,topMm:state.worldConnector(id,"top"),stiffness:"unassigned"});
+			for (id in group.ids) {
+				var block:machinekit.motion.LinearRailBlock = cast members.filter(m -> m.id == id)[0].component;
+				guides.push({axis:group.axis,member:id,topMm:state.worldConnector(id,"top"),stiffness:"unassigned",
+					railWidthMm:block.spec.railWidth,blockLengthMm:block.spec.blockLength});
+			}
 		materials.sort((a,b) -> Reflect.compare(a.id,b.id));
 		var result = {schemaVersion:1, status:"geometry packet; not solver-ready", geometryFrame:"world", poseApplication:"already-applied",
 			units:{length:"mm",force:"N",mass:"kg",time:"s",modulus:"Pa",density:"kg/m3"},
 			provenance:{revision:StringTools.trim(command(repository,["rev-parse","HEAD"])),
 				trackedDiffSha256:Sha256.encode(command(repository,["diff","--binary","HEAD","--","machinekit","cadkit","projectkit","haxeon"])),
-				exporterSha256:Sha256.encode(File.getContent(repository+"/"+DIRECTORY+"/MillFemExport.hx"))},
+				exporterSha256:Sha256.encode(File.getContent(repository+"/"+DIRECTORY+"/MillFemExport.hx")),
+				sourceBuild:sourceBuildProvenance(repository,folder)},
 			jointsMm:{x:state.joint("xyStage/x"),y:state.joint("xyStage/y"),z:state.joint("zAxis/z")},
 			jointDirections:jointDirections(state),
 			parts:parts, materials:materials, interfaces:interfaces, supports:supports, guides:guides,
+			conceptReference:{file:"mill-frame-concept.json",sha256:Sha256.encode(File.getContent(repository+"/"+DIRECTORY+"/build/mill-frame-concept.json"))},
 			datums:datums(state), totalComponentMassKg:totalMass, solidMassKg:solidMass,
 			castingMassKg:{base:frame.base.castingByWeight().kg,column:frame.column.castingByWeight().kg},
 			studyEnvelope:{cuttingForcePerAxisN:500,payloadKg:20,payloadHeightMm:50,accelerationMPerS2:1,
 				gravityMPerS2:9.80665,cuttingContactAssigned:false},
 			pending:["mesh and elastic material inputs including Poisson ratio", "guide and drive load-path stiffness", "insert bonds and column clamp contact/preload", "foot/floor restraints", "cutting contact and workpiece attachment", "mass-only component attachment and inertia for modal study"]};
 		File.saveContent(manifestPath,haxe.Json.stringify(result,null,"  ")+"\n");
+		File.saveContent(folder+"/mill-frame-concept.json",File.getContent(repository+"/"+DIRECTORY+"/build/mill-frame-concept.json"));
 		return result;
 	}
 

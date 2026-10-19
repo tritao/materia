@@ -9,8 +9,8 @@ The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN
 
 - Solver-fixture gate: passed, including the common Gmsh-to-C3D10 deck path,
   known prescribed translation/rotation, and reference-node reaction correction.
-  The provenance upgrade required by step 1 is still being implemented.
-- Export comparison and build/submodule provenance: in progress.
+  Root/submodule patch snapshots and loaded build identities are now captured.
+- Export comparison: 214 parts and three datums pass at the center pose; repeat geometry hashes pass. The corner pose also passes. Full manifest identity across a stable source/build state remains to be recorded; concurrent source changes correctly alter provenance.
 - The bonded-frame upper-bound static model, bracketed supports, energy
   decomposition and compliance budget are WIP; no stiffness result is qualified yet.
 
@@ -46,9 +46,10 @@ The version-1 `manifest.json` contains:
 - Stable component IDs, material IDs, posed bounds, volumes, masses, centres of
   mass, and hashes of each STEP file. Writer timestamps in STEP headers are
   fixed to the Unix epoch for repeatable file hashing; geometry is preserved.
-- Source revision, tracked working-tree diff hash, and exporter source hash.
-  Untracked files outside the exporter are not covered by the diff hash; retain
-  the packet's exact geometry hashes when using it as analysis input.
+- Source revision, root and initialized submodule revisions, their actual tracked
+  patches and hashes, and snapshots of untracked source files. Loaded haxeon,
+  CadKit and OCCT binaries are hashed, with CadKit CMake/OCCT version identities.
+  Dirty-tree runs retain these snapshots under the packet provenance directory.
 - Separate cast-in interface pairs and four column clamp pad pairs. Their
   `connection` is deliberately `unassigned`: CAD mates do not set bond/preload.
 - Four support stations with floor and seat datums, twelve guide block datums,
@@ -61,6 +62,11 @@ The version-1 `manifest.json` contains:
 - Material-library density and optional modulus snapshots. Mineral-cast density
   2400 kg/m³ and modulus 35 GPa remain assumptions. Poisson ratio, joint data,
   and some metal moduli remain unassigned.
+
+`MillFramePreview` records independent per-part physical reference data at the
+center, zero and eight corner poses in `mill-frame-concept.json`. The export
+copies that reference and checks all 214 volumes, masses, centres and bounds,
+plus tool/table/payload datums. Tolerances are recorded in the validation output.
 
 `packet.py` checks hashes, units, representations, material references, positive
 masses, normalized poses, casting volume/density consistency, total mass sums,
@@ -148,6 +154,6 @@ Add named interface face regions and pilot the casting/steel mesh partition.
 Then configure explicit elastic inputs, support constraints, guide/drive load
 paths and column-clamp behavior for the first upper-bound static model. Assign
 a physically consistent tool/workpiece load pair and distribute its loads to
-the interfaces. Report displacement relative to the same pose's gravity-only
-state. Mesh the full load path and pass equilibrium/convergence checks before
+the interfaces. Use independent XYZ unit pairs to form the compliance matrix; gravity supplies
+reactions independently and is not subtracted in the linear model. Mesh the full load path and pass equilibrium/convergence checks before
 using any result to change the casting geometry.

@@ -86,6 +86,20 @@ class FemChecks(unittest.TestCase):
             with self.subTest(text=invalid), self.assertRaises(ValueError):
                 read_table(invalid, "U")
 
+    def test_concept_part_comparison(self):
+        def change(packet, _):
+            part = next(p for p in packet["parts"] if p["representation"] == "mass-only")
+            part["boundsMm"]["maxX"] += 1
+        with self.assertRaisesRegex(ValueError, "comparison|bounds"):
+            self.mutated(change)
+
+    def test_submodule_diff_snapshot(self):
+        def change(packet, folder):
+            entry = next(p for p in packet["provenance"]["sourceBuild"]["submodules"] if p["path"] == "haxeon")
+            (folder / "provenance" / entry["diffFile"]).write_text("changed submodule diff")
+        with self.assertRaisesRegex(ValueError, "diff snapshot"):
+            self.mutated(change)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
