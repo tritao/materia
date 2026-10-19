@@ -812,6 +812,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
         hostContext);
       perspectiveViewport.setSampleCount(antialiasing);
       perspectiveViewport.setLightingPreset(lightingPreset);
+      var preferredView = session.initialView;
+      if (preferredView != null) {
+        perspectiveViewport.setViewAngle(preferredView.yaw, preferredView.pitch);
+        perspectiveViewport.fitAll();
+      }
     }
     telemetry = new TelemetryPanel(demo);
     logLines = [];
@@ -2236,6 +2241,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (perspectiveViewport != null) {
         perspectiveViewport.setSampleCount(antialiasing);
         perspectiveViewport.setLightingPreset(lightingPreset);
+        var preferredView = session.initialView;
+        if (preferredView != null) {
+          perspectiveViewport.setViewAngle(preferredView.yaw, preferredView.pitch);
+          perspectiveViewport.fitAll();
+        }
       }
       sceneInspector = null;
     }

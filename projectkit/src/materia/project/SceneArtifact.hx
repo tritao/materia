@@ -110,7 +110,14 @@ typedef SceneArtifactCellSignal = {
 	var to:SceneArtifactSignalPort;
 }
 
+typedef SceneArtifactView = {
+  var yaw:Float;
+  var pitch:Float;
+}
+
 typedef SceneArtifactProject = {
+  /** Preferred orbit angle when opening the generated assembly; radians, Z up. */
+  @:optional var initialView:SceneArtifactView;
   @:optional var job:String;
   var dynamicParts:Array<String>;
   var motions:Array<SceneArtifactProjectMotion>;
@@ -1018,7 +1025,17 @@ class SceneArtifact {
       }
       tracks.push({joint: joint, loop: loop, keys: keys});
     }
-    return {job: job, dynamicParts: dynamicParts, motions: tracks};
+    var view:Null<SceneArtifactView> = null;
+    var rawView:Dynamic = Reflect.field(raw, "initialView");
+    if (rawView != null) {
+      var yaw:Dynamic = Reflect.field(rawView, "yaw"), pitch:Dynamic = Reflect.field(rawView, "pitch");
+      for (value in [yaw, pitch])
+        if ((!Std.isOfType(value, Int) && !Std.isOfType(value, Float)) || !Math.isFinite(value))
+          throw "Invalid project initial view";
+      if (Math.abs(pitch) > 1.48) throw "Invalid project initial view pitch";
+      view = {yaw: yaw, pitch: pitch};
+    }
+    return {job: job, dynamicParts: dynamicParts, motions: tracks, initialView: view};
   }
 
   static function validateProject(project:SceneArtifactProject, data:SceneArtifactData):Void {

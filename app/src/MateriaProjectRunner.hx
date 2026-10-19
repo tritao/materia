@@ -526,7 +526,7 @@ class MateriaProjectRunner {
       item.z = worldCenter.z * generated.metresPerUnit;
       item.rotation = [pose.qx, pose.qy, pose.qz, pose.qw];
     }
-    return {objects: objects, projectJob: generated.projectJob,
+    return {objects: objects, initialView: generated.initialView, projectJob: generated.projectJob,
       geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: state.definition,
       assemblyState: state.record(), assemblyModel: state.model, localCentersByDefinition: generated.localCentersByDefinition,
       faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition, metresPerUnit: generated.metresPerUnit, physical: generated.physical,

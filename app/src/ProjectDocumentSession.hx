@@ -74,6 +74,7 @@ class ProjectDocumentSession {
   public var projectReference(default,null):Null<String> = null;
   /** Selected entrypoint in the source project's job list, when it defines one. */
   public var projectJob(default,null):Null<String> = null;
+  public var initialView(default,null):Null<materia.project.SceneArtifact.SceneArtifactView> = null;
   public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
   public var projectPhysical(default,null):Null<AssemblyPhysicalData> = null;
@@ -272,6 +273,7 @@ class ProjectDocumentSession {
       generated.robotSensors, generated.machineMotion, generated.assemblyModel, generated.controllers, generated.signals,
       generated.printJob);
     projectJob = generated.projectJob;
+    initialView = generated.initialView;
   }
 
   /** Open generated geometry while retaining its source manifest. */
@@ -406,6 +408,7 @@ class ProjectDocumentSession {
     projectReference = reference;
     projectBaseline = baseline;
     projectJob = generated.projectJob;
+    initialView = generated.initialView;
     staleProjectEdits = diagnostics;
     staleProjectRecord = diagnostics.length == 0 ? null : project;
     installAssemblyRuntime(generated.assemblyDefinition, runtime,
@@ -1053,6 +1056,7 @@ class ProjectDocumentSession {
     scriptOwnership=nextOwnership;
     projectReference = null;
     projectJob = null;
+    initialView = null;
     recipeDocument = null;
     projectBaseline = null;
     staleProjectEdits = [];
