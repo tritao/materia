@@ -68,11 +68,59 @@ and the test listing are identified separately.
 `fasteners.json` joins the Vallder A2-70 and class 8.8 socket-head screw families' exact SKUs,
 dimensional row and variation option into MachineKit recipe inputs. Changes
 to the expected table layout or inconsistent identities stop the mapping.
-`recipes.json` binds these SKUs and HGR15 rail to existing MachineKit recipes.
+`recipes.json` binds these SKUs, HGR15 rail and seven 30/40-series slide-in nuts
+to MachineKit recipes.
 `SupplierRecipeLibrary.create("vallder", sku, requestedInputs)` instantiates
 them through a supplied `ComponentRegistry`; it contains no geometry code.
 Only explicit required inputs can be supplied by the caller; supplier-bound
 size and property class cannot be overridden. The rail requires a cut length.
+
+### Slot hardware evidence and fit checks
+
+`coverage.py` also writes `hardware.json`. Slide-in nut variants join exact
+option identities to the dimension table and drawing at
+[Vallder's T-slot nut page](https://vallder.com/product/t-slot-nut/).
+`machinekit.structural.slide-in-slot-nut` is a supplier-independent, saveable
+recipe: width, length, total height, ridge width/height and metric thread.
+The model retains sharp corners where chamfers are unspecified and attaches
+semantic threads. Its local ridge top is Z=0, shoulders are Z=-ridgeHeight,
+and X runs across the slot. No STEP download is required.
+
+Run the focused native check after generating coverage:
+
+```sh
+MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run --project machinekit/examples/supplier-fasteners/haxeon.slot-hardware.json
+```
+
+It validates all seven threaded models and recipe/BOM identities, then checks
+the unperforated nut envelope against every slot in the four exact drawing
+sections. `hardware-fit.json` records the section hash, face, slot offset,
+ridge-top depth and intersection volume. It searches depths 0–5 mm in 0.25 mm
+increments. `static_clearance_candidate` means only that this envelope has a
+clear static position. `envelope_interference` can require omitted chamfers or
+indicate a mismatch; it does not by itself prove the real nut incompatible.
+Neither result establishes seated bearing contact, insertion motion, dimensional
+tolerances, thread engagement, tightening torque or joint strength. All offers
+remain unverified, with optional sourcing separate from engineering BOMs.
+`slot-nuts.assembly.json` saves the seven engineering definitions without supplier
+metadata. `slot-nuts.bom.json` lists their optional Vallder offers, all unselected.
+Add `-- --recipes-only` to validate models, assembly persistence and sourcing
+without repeating the fit sweep. Regenerate the fit report after changing nut
+dimensions or source sections.
+
+The initial sweep found envelope interference in all 22 slots. Best sampled
+ridge-top depths were 0.5 mm for the 30-series nut and 1.5 mm for the 40-series
+nut. The supplier illustration shows corner relief without dimensions, which
+the conservative generator does not remove. Obtain those relief dimensions
+and tolerances before approving a supplier fit; these sampled depths are not
+qualified mounting positions.
+
+The same report preserves evidence gaps for 20/45-series slide-in nuts, hammer
+nuts, spring nuts and brackets. The bracket interface records retain known slot
+width/travel and the 8080 bracket's 40 mm hole pitch. Matching that pitch is only
+a candidate for the shared 40 mm grid. Missing dimensions prevent full bracket
+models and screw/tool-access qualification; existing table hardware assumptions
+are not substituted for those supplier parts.
 The example creates two assembly occurrences of each screw configuration,
 exercises the rail at 300 mm and writes:
 
@@ -94,9 +142,11 @@ XY offsets, elevation and any section rotation are recorded. The example checks
 solid validity, section area, external dimensions and volume scaling at 100
 and 250 mm, then writes `profile-validation.json`. Cut length is a runtime
 parameter. Profile material/alloy, mounting compatibility and per-metre sourcing
-remain unqualified. Drawing-derived ProfileMember instances are code-only;
-retain the section data and length to reconstruct them rather than using the
-assembly recipe codec.
+remain unqualified. Shared T-slot and drawing-derived `ProfileMember` instances
+are registered recipes and can be saved through the assembly or document codec.
+`profiles.assembly.json` is a complete local reconstruction example: measured
+sections are embedded as geometry data and require no supplier downloads when
+reopened.
 
 The 30×30, 40×40, 40×80 and 80×80 sections now belong to shared dimensional
 families: `TSLOT-30-SLOT8` and `TSLOT-40-SLOT8`. These are slot-8 candidates,
@@ -120,6 +170,26 @@ thicknesses. Variant bounds must agree with the family. Hardware depth cannot be
 inferred from a drawing variant's nominal family dimensions. Geometry/BOM
 identity includes the actual section variant but excludes supplier names, SKUs,
 prices and source URLs. Different wall/cavity variants remain distinct parts.
+
+The built-in registry includes `machinekit.structural.tslot-member` (system,
+width, height, length, optional embedded section and material) and
+`machinekit.structural.drawing-profile-member` (section, length and material).
+Both use the normal assembly/document save and reload paths. Section payloads
+contain only validated dimensions, loops, circles and area; supplier metadata
+and cache paths are omitted. Geometry/BOM keys use a compact section digest
+rather than the full JSON payload. Non-default materials get distinct BOM
+part numbers. Invalid payloads or section/family dimension mismatches are
+rejected. Legacy/custom profiles outside these supported recipes retain their
+previous code-only behavior.
+
+Run the portable-profile checks without a supplier cache:
+
+```sh
+./haxeon/scripts/haxeon run --project machinekit/examples/supplier-fasteners/haxeon.profile-recipes.json
+```
+
+They cover assembly and document reload, editable cut length, material and section
+identity, compact BOM keys and rejection of invalid or unsupported configurations.
 
 `profile-families.json` separates supplier-neutral family definitions from
 Vallder offers targeting specific measured section variants. The example writes

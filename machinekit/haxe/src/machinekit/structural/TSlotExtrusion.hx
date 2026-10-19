@@ -141,6 +141,9 @@ class TSlotExtrusion implements StructuralProfile {
 		return faceSlots[face].copy();
 	}
 	public function boreCentres():Array<{x:Float,y:Float}> return [for(p in borePositions) {x:p.x,y:p.y}];
+	/** Portable detailed sections use a self-contained geometry recipe, never a local supplier path. */
+	public function drawingSection():Null<DrawingExtrusionProfile>
+		return Std.isOfType(sectionVariant,DrawingExtrusionProfile) ? cast sectionVariant : null;
 
 	static function rows():Array<TSlotProfileSpec>
 		return [

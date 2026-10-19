@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from vallder import DEFAULT_OUTPUT, now, write_json
+from hardware import build as hardware_review
 
 
 def build(output):
@@ -34,6 +35,9 @@ def build(output):
         "limits": ["Default first hole is 20 mm from the end; custom/symmetrical cutting is not represented",
                    "Cut length and cutting charges require a quote; per-metre price is not a per-piece price",
                    "Generic running section is not a manufacturer-matched raceway"]})
+    hardware = hardware_review(catalog)
+    recipes.extend(hardware["recipes"])
+    write_json(output / "hardware.json", hardware)
     write_json(output / "recipes.json", {"schema_version": 1, "recipes": recipes})
     by_parent = {}
     for recipe in recipes:

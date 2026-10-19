@@ -22,6 +22,7 @@ class SupplierFasteners {
     static function main() {
         SourcingChecks.run();
         TSlotFamilyChecks.run();
+        ProfileRecipeChecks.run();
         var root = Sys.getEnv("MATERIA_ROOT");
         if (root == null) root = Sys.getCwd();
         var output = root + "/build/suppliers/vallder";
@@ -30,6 +31,7 @@ class SupplierFasteners {
         var registry = new ComponentRegistry();
         registry.register(SocketHeadCapScrew.recipeType());
         registry.register(LinearRail.recipeType());
+        registry.register(machinekit.structural.SlideInSlotNut.recipeType());
         var library = new SupplierRecipeLibrary(sys.io.File.getContent(output + "/recipes.json"),registry);
         var assembly = new MachineAssembly(), plan = new SourcingPlan();
         var geometry:Array<Dynamic> = [];
@@ -150,6 +152,18 @@ class SupplierFasteners {
                 testedLengthsMm:[100,250],areaMm2:volume/100,compatibilityVerified:false});
         }
         save(output + "/profile-validation.json",profileResults);
+        var savedProfiles=profileAssembly.encode(),reloadedProfiles=MachineAssembly.decode(savedProfiles);
+        if(haxe.Json.stringify(profileAssembly.billOfMaterials().lines())!=haxe.Json.stringify(reloadedProfiles.billOfMaterials().lines()))
+            throw "Measured profile BOM changed on reload";
+        var originalProfiles=profileAssembly.components(),restoredProfiles=reloadedProfiles.components();
+        for(i in 0...originalProfiles.length) {
+            var original=originalProfiles[i].component,restored=restoredProfiles[i].component;
+            if(original.geometryKey()!=restored.geometryKey()) throw "Measured section geometry identity changed on reload";
+            var a=original.geometry(),b=restored.geometry();
+            if(!b.valid() || Math.abs(a.volume()-b.volume())>0.001) throw "Measured section geometry changed on reload";
+            a.close();b.close();
+        }
+        sys.io.File.saveContent(output + "/profiles.assembly.json",savedProfiles);
         var profileLines=profilePlan.lines(profileAssembly.billOfMaterials());
         for(line in profileLines) if(line.selected!=null || line.offers.length!=1 || line.estimatedLinePriceMinor!=null)
             throw "Profile sourcing must remain optional and require a cut-length quote";

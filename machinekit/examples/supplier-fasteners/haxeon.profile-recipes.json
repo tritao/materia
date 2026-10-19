@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-profile-recipe-checks"},
+  "entry": "ProfileRecipeChecks",
+  "sourceRoots": ["."],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "../../../build/suppliers/profile-recipe-checks"
+}

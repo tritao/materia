@@ -18,6 +18,9 @@ class MachineKitComponents {
 		machinekit.assembly.AssemblyComponents.register(registry);
 		machinekit.control.ControlComponents.register(registry);
 		registry.register(machinekit.structural.RectTubeMember.recipeType());
+		registry.register(machinekit.structural.ProfileMember.tslotRecipeType());
+		registry.register(machinekit.structural.ProfileMember.drawingRecipeType());
+		registry.register(machinekit.structural.SlideInSlotNut.recipeType());
 		registry.register(machinekit.structural.MineralCasting.recipeType());
 		registry.register(machinekit.structural.CastInsert.recipeType());
 		registry.register(machinekit.tooling.ToolingPanel.recipeType());
