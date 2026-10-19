@@ -2,7 +2,7 @@
 """Fast launcher regression: fake libraries/results, no physical cuts or native builds.
 Run from the repository root; the scheduler retains its normal memory guard.
 """
-import tempfile,json,hashlib,subprocess
+import tempfile,json,hashlib,subprocess,shutil
 from pathlib import Path
 script=Path('machinekit/examples/flexspline-hobber/run-reference-budget.py').resolve()
 settings=dict(moduleMm=.3,teeth=200,faceWidthMm=8,threads=4,workers=4,
@@ -36,7 +36,30 @@ with tempfile.TemporaryDirectory(prefix='hb11-upgrade-') as temp:
  assert json.loads((out/'execution.json').read_text())['sharedGeometry']
  assert list(out.glob('execution-before-*.json'))[0].read_bytes()==old_execution
  r=subprocess.run(base+['--native',str(new)],capture_output=True,text=True);assert r.returncode==0,r.stderr
+ # A dead adoption with only a partial log must retry, preserving the original
+ # evidence. Use a synthetic launcher root so no real HashLink/native cut can run.
+ synthetic=p/'synthetic';copied=synthetic/'machinekit/examples/flexspline-hobber/run-reference-budget.py'
+ copied.parent.mkdir(parents=True);shutil.copyfile(script,copied)
+ fake=synthetic/'haxeon/.tools/hashlink/hl';fake.parent.mkdir(parents=True)
+ fake.write_text("#!/usr/bin/env python3\nimport sys,json\nfrom pathlib import Path\np=Path(sys.argv[4]);mode=sys.argv[5]\n(p/(mode+'.json')).write_text("+repr(json.dumps(raw))+ ")\nprint('HOBBING_ERROR_RESULT '+json.dumps(dict(wallSeconds=.01,threads=4)))\n")
+ fake.chmod(0o755)
+ (out/'combined.json').unlink();partial='HOBBING_ERROR_PROGRESS {"windows":64900,"total":92151}\n'
+ (out/'combined.log').write_text(partial)
+ # The completed child is gone; its stale adoption remains deliberately.
+ preserved=(out/'mandrel.json').read_bytes()
+ r=subprocess.run(['python3',str(copied),*base[2:],'--native',str(new)],capture_output=True,text=True)
+ assert r.returncode==0,r.stderr
+ assert 'RETRY_INTERRUPTED_ADOPTION combined' in r.stdout
+ archives=list(out.glob('combined-interrupted-*.log'));assert len(archives)==1 and archives[0].read_text()==partial
+ assert (out/'mandrel.json').read_bytes()==preserved
+ assert json.loads((out/'combined-resume.json').read_text())['originalAdoption']['pid']==child.pid
+ # A completed but invalid inspection must not be retried or overwritten.
+ (out/'combined.json').write_text(json.dumps({'values':{}}));(out/'combined.log').write_text('HOBBING_ERROR_RESULT {}\n')
+ r=subprocess.run(['python3',str(copied),*base[2:],'--native',str(new)],capture_output=True,text=True)
+ assert r.returncode!=0 and len(list(out.glob('combined-interrupted-*.log')))==1
+ (out/'combined.json').write_text(json.dumps(raw))
+ (out/'all-exit-status.txt').write_text('0\n')
  proof['speedup']=.9;(out/'native-upgrade-validation.json').write_text(json.dumps(proof))
  r=subprocess.run(base+['--native',str(new)],capture_output=True,text=True);assert r.returncode!=0 and 'lacks exact parity' in r.stderr
  assert (out/'all-exit-status.txt').read_text()=='0\n'
- print('Upgrade scheduler: exact-proof gate, completed-case preservation, running-child adoption, old execution archive and restart passed; slow candidate rejected')
+ print('Upgrade scheduler: exact-proof gate, completed-case preservation, running-child adoption, old execution archive, interrupted-adoption retry and restart passed; invalid completed inspection and slow candidate rejected')

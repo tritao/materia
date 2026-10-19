@@ -228,17 +228,38 @@ def main():
                 time.sleep(5)
             if stopping.is_set():
                 raise RuntimeError('scheduler stopped; adopted native cut left running')
-            validate(load(directory / f'{mode}.json'), not mode.startswith('lead-'))
-            results = [json.loads(line.split(' ', 1)[1]) for line in (directory / f'{mode}.log').read_text().splitlines()
-                       if line.startswith('HOBBING_ERROR_RESULT ')]
-            if not results:
-                raise RuntimeError(f'{mode}: adopted process has no completed-cut log')
-            prior = load(directory / f'{mode}-execution.json') or {}
-            save(directory / f'{mode}-execution.json', dict(prior, exitCode=prior.get('exitCode'), completedCut=True, adopted=True,
-                 wallSeconds=results[-1]['wallSeconds'], threads=results[-1]['threads'], nativeSha256=row['nativeSha256'],
-                 sharedGeometry=row.get('sharedGeometry', False), acceptanceBasis='complete physical measurement and successful cut log; old launcher replaced, OS exit status unavailable'))
-            print(f'ADOPTED_COMPLETED {mode}', flush=True)
-            return
+            path = directory / f'{mode}.log'
+            results = [json.loads(line.split(' ', 1)[1]) for line in path.read_text().splitlines()
+                       if line.startswith('HOBBING_ERROR_RESULT ')] if path.exists() else []
+            measured = load(directory / f'{mode}.json')
+            if measured is not None or results:
+                # A finished but invalid measurement must remain a failure, rather
+                # than being silently replaced by a new physical cut.
+                try:
+                    validate(measured, not mode.startswith('lead-'))
+                except ValueError as error:
+                    raise ValueError(f'{mode}: invalid adopted inspection: {error}') from error
+                if not results:
+                    raise RuntimeError(f'{mode}: adopted process has no completed-cut log')
+                prior = load(directory / f'{mode}-execution.json') or {}
+                save(directory / f'{mode}-execution.json', dict(prior, exitCode=prior.get('exitCode'), completedCut=True, adopted=True,
+                     wallSeconds=results[-1]['wallSeconds'], threads=results[-1]['threads'], nativeSha256=row['nativeSha256'],
+                     sharedGeometry=row.get('sharedGeometry', False), acceptanceBasis='complete physical measurement and successful cut log; old launcher replaced, OS exit status unavailable'))
+                print(f'ADOPTED_COMPLETED {mode}', flush=True)
+                return
+            # The original process has gone and never completed an inspection.
+            # Preserve its partial evidence before falling through to a fresh cut.
+            stamp = time.time_ns()
+            archived = []
+            for suffix in ['.log', '.json', '-execution.json']:
+                source = directory / f'{mode}{suffix}'
+                if source.exists():
+                    target = directory / f'{mode}-interrupted-{stamp}{suffix}'
+                    source.rename(target)
+                    archived.append(str(target))
+            save(directory / f'{mode}-resume.json', dict(reason='adopted process exited without a completed inspection',
+                 originalAdoption=row, archived=archived, retryNativeSha256=native_hash))
+            print(f'RETRY_INTERRUPTED_ADOPTION {mode}', flush=True)
         started = time.monotonic()
         with (directory / f'{mode}.log').open('w') as log:
             while True:

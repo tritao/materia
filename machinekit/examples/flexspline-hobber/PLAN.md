@@ -1968,3 +1968,30 @@ batch after saving that case. Do not start a second batch beside the live one.
   axial retention. Stops/spacers/retainer hardware, retention capacity and bore/shaft
   manufacturing-fit tolerances remain unspecified. No full cut or metrology/error
   qualification was rerun or claimed for this scene inspection.
+
+### Layout hold and HB4/HB11 follow-up (2026-10-19)
+
+- The horizontal-layout proposal is **on hold** at the user's request. No layout
+  direction is confirmed; the current scene/layout remains unchanged. Turning is
+  being considered under a separate lathe plan. Do not apply the proposed HB-D1
+  replacement, foundation/axis redesign or turning-spindle requirements until
+  the user confirms a direction.
+- HB11 remains on its frozen workers/providers. Current completed cases are
+  baseline, mandrel, encoder eccentricity and table radial (4/15); four further
+  source cuts are active. The saved review has been refreshed from completed
+  artifacts. Combined and table-axial adopted cuts previously stopped at
+  64,900/92,151 and 68,700/92,151 windows without producing inspections. They
+  are missing evidence, not measured class-6 failures.
+- A future launcher resume now detects stale interrupted adoptions, archives their
+  partial logs/execution evidence and retries them using the validated frozen
+  binary/provider and unchanged settings. Finished but invalid measurements still
+  fail; they are not silently replaced. The active launcher is not restarted and
+  its workers are not signalled. Synthetic launcher regressions pass, including
+  partial-log preservation, retry, reuse of completed cases and rejection of an
+  invalid completed result. No new full physical cut was started for this fix.
+- HB4's refined full-face run exited 1 after level 5: total-circle arc change
+  **0.0617216 µm** exceeds the unchanged **0.05 µm** criterion. The worst circle
+  is lead domain 1, radial index 1, axial index 93 (Z≈3.72 mm). HB4 remains open;
+  the earlier local-boundary diagnostic does not establish full-circle acceptance.
+  `build/flexspline-hb4-refined/postrun-review.json` records this result. Inspect
+  these final worst circles before committing to another expensive full rerun.
