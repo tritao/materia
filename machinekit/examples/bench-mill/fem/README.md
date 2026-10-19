@@ -23,8 +23,39 @@ The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN
   support bounds, all 15 thickness probes on two counted meshes, the full
   compliance matrix/load-box reduction, equilibrium, reciprocity, scaling/sign
   checks and a base-casting energy-sensitivity cross-check.
-- Geometry screening: deferred by the provisional 30% casting-share target.
+- Geometry screening: the old cutter-dominated budget is superseded as a decision basis.
+  The 30% target is judged on the machine loop excluding the job-dependent tool,
+  at spindle nose and a 20 mm steel / 40 mm gauge test bar.
+  New reference-point solves, modal and travel screening are pending.
   Assembly joints, the nine-pose sweep, contact/uncertainty and modal work remain open.
+
+## Tool-reference and modal follow-up
+
+The machine-loop decision excludes the job-dependent tool. The revised budget
+uses `spindle-nose` (no holder stick-out) and `test-bar-20` (solid steel,
+20 mm diameter, 40 mm gauge). Context cases use 6/10/16 mm cutters at assumed
+20/30/45 mm stick-outs, in steel and explicitly assumed 600 GPa carbide.
+`static_study.py --tool-case NAME` moves the FE load and rigid-workpiece
+reference, and all lumped-network lever arms, to the selected contact.
+`tool_cases.py build/fem/tool-cases` combines converged studies; material-only
+changes reuse the identical FE contact solution. It reports total and
+machine-loop-without-tool budgets separately and judges casting share on the
+latter for the two decision cases only. Numerical tool-case studies are pending.
+
+The modal mass/coupling analytical gate passes: six modes of a spring-supported
+platform with a full mass/inertia attachment match analytical frequencies to
+2.41e-7 relative error. Three Python checks verify complete inertia (including
+products), physical triangle inequalities, and recovery of a known rigid motion
+by the distributing coupling. Six symmetric point masses reproduce each
+centroidal inertia; they add no stiffness. A zero-stiffness `SPRINGA` graph
+supplies the off-diagonal mass sparsity missing for MPC-coupled `MASS` elements
+in CalculiX 2.21; omitting it fails this fixture. The platform has explicit
+0.1 kg per support node as well as the 12 kg inertia attachment.
+
+Modal export, frame modes and the nine-pose sweep are not yet qualified.
+Frequency stability is a numerical gate; acceptance against spindle/tooth-pass,
+motor and axis excitation requires declared operating bands. No lightening
+candidate is selected and no `MillFrameLayout` geometry has been edited.
 
 ## Recorded center baseline
 
@@ -51,9 +82,13 @@ reduces X compliance by 0.3460%, versus 0.3491% predicted from its strain energy
 | Soft three-point | 0.88% | 0.61% | 12.31% |
 | Stiff four-spring | 0.81% | 0.61% | 12.31% |
 
-These conditional shares fall below the 30% target in every world direction
-under both supports. For this pose and the current 6 mm steel tool, prioritize
-better tool, spindle, drive and joint inputs before casting geometry changes.
+These historical shares include the job-dependent 6 mm steel tool and must
+not decide casting geometry. The revised decision uses spindle-nose and short
+stiff test-bar cases, with the FE contact and all lever arms moved explicitly.
+Cutter cases (6/10/16 mm, assumed stick-outs 20/30/45 mm) are contextual; steel
+and an explicitly assumed 600 GPa carbide option are separate inputs.
+Lightening parameters will be proposed only after modal and travel screening;
+no MillFrameLayout geometry has been changed.
 The full matrices, principal directions, eight load-box corners, gravity
 reactions, element-group energy shares and source/preload assumptions are in
 `build/fem/partitioned-baseline/report.md` and `report.json`.
