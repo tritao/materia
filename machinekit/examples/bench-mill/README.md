@@ -4,13 +4,35 @@ Use **`materia.project.json`** as the main project. Its `small` entrypoint is th
 Small configuration with the selected Y drive; `compact-vmc` is the Compact VMC
 layout with the same complete Z and spindle assemblies, including drawbar and
 pneumatic release. `spindle-drive` is the editable motor study. `legacy-machining`
-and `enclosed` retain the older machining demos. Older project files remain
+and `enclosed` entrypoints retain the older machining demos. Older project files remain
 compatibility shortcuts to this shared build, rather than independent designs.
 Run `haxeon.json` to check and generate `build/mill/small.mtrg` and `large.mtrg`.
 
 Open the source project and use the **Configuration** selector to choose **Small**
 or **Compact VMC**. Stop simulation before switching. Opening a generated `.mtrg`
 file gives a single scene and does not expose the project selector.
+
+Both configurations include **Machine bearing block**, a named CNC mission. Play
+runs the shared bearing-block program once; the Mission panel follows its actual
+CNC execution state and the CNC panel provides feed hold, resume and program
+inspection. Stock, toe clamps, work offset and effective tool length are derived
+from each configuration's table and BT30 spindle. The Compact VMC setup adds a
+riser where needed to reach the blank. The old `legacy-machining` entrypoint is
+retained for compatibility, but its duplicate demo is removed from the chooser.
+The enclosed cell remains a separate demo; its loader and pneumatic vise are not
+part of this shared standalone setup.
+
+These are **kinematic machining previews**: axis commands use explicit 20 mm/s
+velocity and 100 mm/s² acceleration assumptions. They do not qualify motor sizing,
+cutting forces, structural performance or production capacity. The capacity-only
+preview keeps its fixture envelope and contains no cutting mission.
+
+Run `haxeon.machining.json` for G-code, datum and travel checks on both setups;
+`app/tests/mill-missions/haxeon.json` exercises the actual CNC mission executor.
+Its default backend is deterministic; set `MILL_MISSION_BACKEND=mujoco` to check
+the desktop backend. The execution tests retain the real machine geometry and
+joints while disabling general physical contacts; cutter/holder/stock interaction
+is checked by the CNC kernel. These tests do not qualify machine contact dynamics.
 
 The working legacy `BenchMill` has 250 mm X, 150 mm Y and 250 mm Z travel.
 `MillFramePreview` develops a separate mechanical concept with 250 mm X, 160 mm Y and 250 mm Z travel.

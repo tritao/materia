@@ -6,6 +6,10 @@ import materia.project.SceneArtifact.SceneArtifactMission;
 typedef MissionViewState = {
   var generation:Int;
   var mission:Null<SceneArtifactMission>;
+  var machining:Null<materia.project.SceneArtifact.SceneArtifactMachiningMission>;
+  var machiningStatus:String;
+  var machiningPreview:Bool;
+  var hasWork:Bool;
   /** Every program's robot controller, in authored order; empty for the one implicit controller. */
   var programs:Array<String>;
   var selectedProgram:String;
@@ -40,8 +44,17 @@ class MissionController {
     if (mission == null && session.missions != null)
       for (work in session.missions) if (mission == null && (work.controllerId == null ? "" : work.controllerId) == chosen) mission = work;
     if (mission != null && mission.loop == true) status += " · Loop " + (progress == null ? 1 : progress.loop);
-    if(mission==null)status="No mission";
-    return {generation:session.generation,mission:mission,programs:programs,selectedProgram:chosen,
+    var cncJob=session.cncJob;
+    var machining=cncJob==null?null:cncJob.mission;
+    var machiningStatus="";
+    if(machining!=null) {
+      var cnc=simulation.cncPlayer();
+      machiningStatus=cnc==null?"Ready · Play to start":cnc.failure!=null?"Failed · "+cnc.failure:
+        cnc.finished()?"Completed":!cnc.hasStarted()?"Ready · Play to start":!simulation.isRunning()?"Paused":cnc.held()?"Held":
+        "Running"+(cnc.currentLine>0?" · line "+cnc.currentLine:"")+cnc.statusDetail();
+    }
+    if(mission==null)status=machining==null?"No mission":machining.label+" · "+machiningStatus;
+    return {generation:session.generation,mission:mission,machining:machining,machiningStatus:machiningStatus,machiningPreview:cncJob!=null&&cncJob.kinematicPreview==true,hasWork:mission!=null||machining!=null,programs:programs,selectedProgram:chosen,
       progress:progress,status:status};
   }
 

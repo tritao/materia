@@ -70,6 +70,8 @@ typedef CncJobStock = {
 }
 
 typedef CncJob = {
+	@:optional var kinematicPreview:Bool;
+	@:optional var mission:materia.project.SceneArtifact.SceneArtifactMachiningMission;
 	@:optional var powerUpSideOffsets:Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>;
 	@:optional var powerUpOffsets:Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>;
 	var source:String;
@@ -259,7 +261,7 @@ class CncProgramPlayer extends ToolpathPlayer {
 		recipe = new MachiningRecipe(0.01, 0.0, top * metresPerUnit - 0.001);
 		var planning = planningModel(machineModel, job.axes, steady);
 		var machine = new MachineBinding("machine", job.axes[0], job.axes[1], job.axes[2], rapid, channels);
-		rapidDisplacement = interfaceManaged ? [0.0, 0.0, 0.0] : robotkit.model.DriveLoads.rapidDisplacement(machineModel, job.axes, steady);
+		rapidDisplacement = interfaceManaged || job.kinematicPreview == true ? [0.0, 0.0, 0.0] : robotkit.model.DriveLoads.rapidDisplacement(machineModel, job.axes, steady);
 		var clearanceStocks:Array<toolpathkit.motion.RapidClearance.ClearanceStock> = [];
 		// Fixed stock has a known machine frame at compile time. Robot-tended blanks move before their CNC cycle;
 		// those retain their existing cell planning until its active-stock pose is available to the compiler.
@@ -277,9 +279,9 @@ class CncProgramPlayer extends ToolpathPlayer {
 		}
 		var binding = new ToolpathMotionBinding(machine,
 			new MotionSystemBlueprint(planning.model, robot.blueprint, axes, session.fixedTimestep()));
-		// Every plan the compiler makes is checked against the motors' drives: torque along the plan and
-		// the drives' stretch. The findings are on the plan, and summed in `planChecks()`.
-		binding.compiler.planCheck = new PlanCheck(machineModel, job.axes, checkOptions);
+		// Drive-qualified jobs check torque and drive stretch on every plan. Explicit kinematic
+		// previews retain commanded travel/rate limits without claiming motor-load qualification.
+		binding.compiler.planCheck = job.kinematicPreview == true ? null : new PlanCheck(machineModel, job.axes, checkOptions);
 		var controller = new CncController();
 		for (tool in job.tools) {
 			controller.toolLibrary.set(tool);

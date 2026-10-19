@@ -15,10 +15,18 @@ class MillProject {
   var z=MillFramePreview.zLayout(reference,f,guide),xy=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,true);
   return MillFramePreview.concept(reference,new MillFrame(f,z,xy));
  }
- public static function small():Bytes return scene(smallAssembly(),"mill-small",[
-  "250 x 160 x 250 mm mechanical mill, selected Leadshine/HZMotion Y drive and complete shared Z/spindle assemblies.",
-  "Spindle release is an inspection mechanism; supplier force, preload, drive capacity and control remain unqualified."]);
- public static function large():Bytes return MillCapacityStudy.preview();
+ public static function small():Bytes {
+  var reference=new BenchMill(false,false),frame=MillFramePreview.layout(reference);
+  var z=MillFramePreview.zLayout(reference,frame,new HiwinHgh15ca());
+  var xy=new MillXYStageLayout(frame,z.spindleY,BenchMill.RAIL,new HiwinHgh15ca(),true);
+  return new MillMachiningSetup(smallAssembly(),["xyStage/x","xyStage/y","zAxis/z"],"xyStage/table",xy.tableTop)
+   .scene("mill-small",["250 x 160 x 250 mm mechanical mill with shared bearing-block mission."]);
+ }
+ public static function large():Bytes {
+  var layout=new MillCapacityLayout();
+  return new MillMachiningSetup(MillCapacityStudy.build(layout,false),["x","y","zAxis/z"],"table",layout.tableTop)
+   .scene("mill-large",["400 x 300 x 380 mm packaging study; XY drives are not fitted. Shared bearing-block mission uses kinematic preview bounds."]);
+ }
 
  /** Shared writer retains each occurrence's hierarchy and cosmetic-thread data.
   * Imported bearing/carriage mass substitutes are for display only, not sizing.
@@ -46,7 +54,7 @@ class MillProject {
   var z=MillFramePreview.zLayout(reference,f,new HiwinHgh15ca());
   MillSpindleIntegrity.checkPayload(assembly,z).throwIfErrors();
   MillSpindleIntegrity.checkMotorRemoval(assembly).throwIfErrors();
-  var bytes=scene(assembly,"mill-small",["Complete small mechanical mill with selected Y drive."]);
+  var bytes=small();
   var decoded=SceneArtifact.decode(bytes);
   for(id in ["xyStage/screwX","xyStage/screwY","zAxis/screw","spindle/drawbar","spindle/cylinder","spindle/motor","spindle/belt"])
    if(decoded.parts.filter(p -> p.id==id).length!=1)throw "Unified small scene is missing "+id;
@@ -54,7 +62,7 @@ class MillProject {
   sys.io.File.saveContent(dir+"/small.assembly.json",assembly.encode());
   Sys.println("Unified small mill payload, motor removal and scene completeness passed");
   MillCapacityStudy.main();
-  sys.io.File.saveBytes(dir+"/large.mtrg",sys.io.File.getBytes(root+"/machinekit/examples/bench-mill/build/capacity/mill-capacity.mtrg"));
+  sys.io.File.saveBytes(dir+"/large.mtrg",large());
   Sys.println("Unified mill project: small and large scenes generated");
  }
 }

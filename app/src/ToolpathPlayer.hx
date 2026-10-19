@@ -256,6 +256,12 @@ class ToolpathPlayer implements SessionMember {
 	/** The job can be restarted from a line the operator picks. */
 	public function canRestart():Bool return false;
 
+	/** Whether homing or program execution has begun since reset. */
+	public function hasStarted():Bool return started || homingStarted;
+
+	/** A finite program completed successfully; restarting clears the underlying motion state. */
+	public function finished():Bool return !loop && started && motion.completed && !motion.running && failure == null;
+
 	/** The program's G-code, one entry per line. */
 	public function sourceLines():Array<String> return source.split("\n");
 

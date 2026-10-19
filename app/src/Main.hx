@@ -1791,7 +1791,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, appearance.theme.tokens.surface,
         appearance.theme.tokens.textSecondary, simulation)),
       new DockPanelContent("project", function(_) return app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"project-panel")),
-      new DockPanelContent("mission", function(_) return missionPanel.build(missionController, appearance.theme.tokens)),
+      new DockPanelContent("mission", function(_) return missionPanel.build(missionController, appearance.theme.tokens, function() {
+        workspace.open("cnc", "inspector");workspace.activate("cnc");invalidateView();
+      })),
       new DockPanelContent("cnc", function(_) return cncPanel.build(simulation, appearance.theme.tokens,
         printerLink.connected() || printerLink.error != null ? printerLink.summary() : null))
     ];
@@ -2039,7 +2041,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var sceneControls:Array<KeyedView> = [];
     if(variantState.variants.length>0||variantState.error!=null)
       sceneControls.push(new KeyedView("project",app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"viewport-project")));
-    if(missionState.mission!=null)
+    if(missionState.hasWork)
       sceneControls.push(new KeyedView("mission",app.editor.MissionStatusView.build(missionController,appearance.theme.tokens,"viewport-mission",function() {
         workspace.open("mission",workspace.isOpen("sensors")?"sensors":"inspector");
         workspace.activate("mission");invalidateView();

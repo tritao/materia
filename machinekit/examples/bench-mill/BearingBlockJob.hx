@@ -9,12 +9,16 @@ import toolpathkit.path.Point3;
 import toolpathkit.setup.Setup;
 import toolpathkit.setup.SetupStock;
 
+typedef BearingBlockSetup = {
+ var tools:Array<toolpathkit.tool.Tool>;
+ var fixtures:Array<toolpathkit.setup.Fixture>;
+ /** Machine coordinates in millimetres; work origin is the blank's front-left top corner. */
+ var workOffset:Array<Float>;
+ var start:Array<Float>;
+}
+
 /** The single-tool bearing-block program reads pocket outlines and floors from its solid. */
 class BearingBlockJob {
-	/** The stock block, as the mill clamps it, in millimetres. */
-	static final WIDTH = BenchMill.STOCK_WIDTH;
-	static final DEPTH = BenchMill.STOCK_DEPTH;
-	static final HEIGHT = BenchMill.STOCK_HEIGHT;
 	/**
 	 * How closely the part's round edges are followed, in metres: CAM samples them within this, and fits
 	 * its cutting lines back into arcs within it, so circles are cut as G2/G3.
@@ -28,21 +32,27 @@ class BearingBlockJob {
 
 	/** The G-code that makes the plate's features on `mill`, read from its faces. */
 	public static function program(router:BenchMill, plate:BearingBlock, part:Part, ?loadPosition:Array<Float>):String {
+    return generate({tools:router.tools(),fixtures:router.fixtures(),workOffset:router.workOffset(),
+      start:[for(spec in router.specs)spec.initial]},plate,part,loadPosition);
+  }
+
+  public static function generate(binding: BearingBlockSetup, plate:BearingBlock, part:Part, ?loadPosition:Array<Float>):String {
+    var width=plate.width,depth=plate.depth,height=plate.height;
 		var faces = part.shape.faces().all();
 		// Work coordinates put the stock's front-left top corner at zero.
-		var shiftX = WIDTH / 2, shiftY = DEPTH / 2, top = HEIGHT;
+		var shiftX = width / 2, shiftY = depth / 2, top = height;
 		var upward = [for (face in faces) if (face.surfaceKind() == CadKit.SurfaceKind.Plane &&
 			face.normal().get_z() > 1 - 1e-9) face];
 		var topFace = [for (face in upward) if (Math.abs(face.center().get_z() - top) < 1e-6) face];
 		if (topFace.length != 1) throw "The bearing block should have one top face";
 		var outlines = CamContour.fromFaceBoundaries(topFace[0], "mm", CHORD).slice(1);
 		if (outlines.length == 0) throw "The bearing block's top face has no recesses";
-		var tools = router.tools(), mill = tools[0];
+		var tools = binding.tools, mill = tools[0];
 		var setup = new Setup("1", new Point3(0, 0, 0),
-			new SetupStock(0.0, WIDTH / 1000, 0.0, DEPTH / 1000, 0.0, -HEIGHT / 1000, 0.02, router.fixtures()));
+			new SetupStock(0.0, width / 1000, 0.0, depth / 1000, 0.0, -height / 1000, 0.02, binding.fixtures));
 		// The machine starts at its initial pose, which in work coordinates is above the stock's middle.
-		var offset = router.workOffset();
-		var start = [for (spec in router.specs) spec.initial];
+		var offset = binding.workOffset;
+		var start = binding.start;
 		var job = new CamJob(0.02, 8000,
 			new Point3((start[0] - offset[0]) / 1000, (start[1] - offset[1]) / 1000, (start[2] - offset[2]) / 1000),
 			BLEND, CHORD);

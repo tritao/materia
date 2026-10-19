@@ -56,7 +56,7 @@ class CncPanel {
     }
     var held = player.held(), failure = player.failure;
     var status = failure != null ? 'Stopped: $failure' :
-      (held ? "Held" : "Running") + (player.currentLine > 0 ? ' · line ${player.currentLine}' : "") +
+      (player.finished() ? "Completed" : held ? "Held" : "Running") + (player.currentLine > 0 ? ' · line ${player.currentLine}' : "") +
       player.statusDetail() + ' · speed ${Math.round(player.speedOverride * 100)}%';
     var hold = new Button("Hold", null, () -> simulation.control(() -> player.hold()), "cnc-hold");
     hold.enabled = !held && failure == null;

@@ -20,7 +20,10 @@
           "../../haxe/src/machinekit/milling/MillXYStage.hx",
           "../../haxe/src/machinekit/milling/MillZAxis.hx",
           "../../haxe/src/machinekit/milling/MillZAxisLayout.hx",
-          "../../haxe/src/machinekit/milling/MillSpindleHead.hx"
+          "../../haxe/src/machinekit/milling/MillSpindleHead.hx",
+          "MillMachiningSetup.hx",
+          "BearingBlockJob.hx",
+          "BearingBlock.hx"
         ]
       }
     },
@@ -54,7 +57,10 @@
           "../../haxe/src/machinekit/milling/MillZAxisLayout.hx",
           "../../haxe/src/machinekit/milling/MillSpindleHead.hx",
           "MillCapacityStudy.hx",
-          "../../haxe/src/machinekit/milling/MillCapacityLayout.hx"
+          "../../haxe/src/machinekit/milling/MillCapacityLayout.hx",
+          "MillMachiningSetup.hx",
+          "BearingBlockJob.hx",
+          "BearingBlock.hx"
         ]
       }
     },
@@ -78,14 +84,14 @@
       "id": "small",
       "label": "Small",
       "entrypoint": "small",
-      "summary": "250 × 160 × 250 mm. Complete mechanical mill with selected Y drive and shared spindle.",
+      "summary": "250 × 160 × 250 mm. Complete mechanical mill with selected Y drive and shared spindle. Includes the shared bearing-block machining mission (kinematic preview).",
       "kind": "configuration"
     },
     {
       "id": "compact-vmc",
       "label": "Compact VMC",
       "entrypoint": "compact-vmc",
-      "summary": "400 × 300 × 380 mm. Complete Z and spindle; X/Y drive integration and sizing remain pending.",
+      "summary": "400 × 300 × 380 mm. Complete Z and spindle; X/Y drive integration and sizing remain pending. Includes the shared bearing-block machining mission (kinematic preview).",
       "kind": "configuration"
     },
     {
@@ -94,13 +100,6 @@
       "entrypoint": "spindle-drive",
       "summary": "Editable Leadshine spindle-drive study on the reference mill.",
       "kind": "study"
-    },
-    {
-      "id": "legacy-machining",
-      "label": "Legacy machining demo",
-      "entrypoint": "legacy-machining",
-      "summary": "Original bearing-block machining demo.",
-      "kind": "demo"
     },
     {
       "id": "enclosed",

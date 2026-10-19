@@ -16,7 +16,7 @@ class MillCapacityStudy {
  static function check(ok:Bool,label:String):Void { assertions++;if(!ok)throw label; }
  static function near(a:Float,b:Float,label:String):Void check(Math.abs(a-b)<1e-5,label+": "+a+" vs "+b);
 
- public static function build(l:MillCapacityLayout):MachineAssembly {
+ public static function build(l:MillCapacityLayout,fixtureEnvelope:Bool=true):MachineAssembly {
   var z=l.zLayout(),frame=new MillFrame(l.frame,z),axis=new MillZAxis(z),a=MillFramePreview.structure(frame);
   var poses:Map<String,AssemblyFrame> = frame.solvedPoses(),zero:Map<String,AssemblyFrame> = [];
   for(row in frame.components())zero.set("frame/"+row.id,poses.get(row.id));
@@ -39,7 +39,7 @@ class MillCapacityStudy {
    F.fromRotationMatrix(x,y,z,[0,0,1, 1,0,0, 0,1,0]):F.fromRotationMatrix(x,y,z,[-1,0,0, 0,0,1, 0,1,0]);
   add("saddle",new MillPanel(l.saddleWidth,l.saddleDepth,l.saddleHeight,"cast iron"),F.translation(0,l.spindleY,l.saddleBottom),"frame/base/casting","y");
   add("table",new MillPanel(l.tableWidth,l.tableDepth,l.tableThickness,"cast iron"),F.translation(0,l.spindleY,l.tableBottom),"saddle","x");
-  add("fixture-envelope",new MillPanel(200,150,l.fixtureHeight),F.translation(0,l.spindleY,l.tableTop),"table");
+  if(fixtureEnvelope)add("fixture-envelope",new MillPanel(200,150,l.fixtureHeight),F.translation(0,l.spindleY,l.tableTop),"table");
   for(side in [-1,1]) {
    add('railY$side',new HgRail("HGR25R",l.frame.yRailLength),horizontal(side*l.frame.yRailSpacing/2,l.frame.yRailStart,l.frame.railPlane+g.railHeight,false),"frame/base/casting");
    add('railX$side',new HgRail("HGR25R",l.xRailLength),horizontal(-l.xRailLength/2,l.spindleY+side*l.xRailSpacing/2,l.xRailPlane+g.railHeight,true),"saddle");

@@ -192,7 +192,7 @@ class ProjectArtifactLoader {
     for (stock in machining.stocks) entered.push(stock);
     for (id in entered) for (record in records) if (record.id == "project:" + id) record.collisionEnabled = false;
     var target = machining.target;
-    return {source: machining.program, axes: machining.axes, spindle: machining.spindle,
+    return {kinematicPreview:machining.kinematicPreview,mission:machining.mission, source: machining.program, axes: machining.axes, spindle: machining.spindle,
       channelScope: machining.channelScope, workOffset: machining.workOffset, loop: machining.loop == true,
       tools: [for (tool in machining.tools) Tool.shaped(tool.number, tool.length, CutterProfile.decode(tool.profile))],
       stocks: machining.stocks.copy(), stockSources: stockSources, target: target == null ? null : partMesh(target),

@@ -31,7 +31,7 @@ class MissionPanel {
 
   public function new() {}
 
-  public function build(controller:MissionController, tokens:ThemeTokens):View {
+  public function build(controller:MissionController, tokens:ThemeTokens, ?showProgram:Void->Void):View {
     var state = controller.snapshot();
     var mission = state.mission;
     var style = fill();
@@ -44,8 +44,14 @@ class MissionPanel {
     if (state.programs.length > 1) for (id in state.programs)
       items.push(new KeyedView("program-" + id, new Button((id == state.selectedProgram ? "● " : "○ ") + id, null,
         function() controller.selectProgram(id), "mission-program-" + id)));
+    if(state.machining!=null) {
+      items.push(new KeyedView("machining-label",new Text(state.machining.label)));
+      items.push(new KeyedView("machining-status",new Text(state.machiningStatus)));
+      if(showProgram!=null)items.push(new KeyedView("program",new Button("Open CNC program",null,showProgram,"mission-cnc-program")));
+      items.push(new KeyedView("machining-task",new Text("Run the CNC program to completion. Use the CNC panel for feed hold, resume and program details.")));
+    }
     if (mission == null || mission.steps.length == 0) {
-      items.push(new KeyedView("empty", new Text("This project has no mission.")));
+      if(!state.hasWork)items.push(new KeyedView("empty", new Text("This project has no mission.")));
       return new Column("mission-panel", items, style);
     }
     if (mission != source || generation != state.generation) {

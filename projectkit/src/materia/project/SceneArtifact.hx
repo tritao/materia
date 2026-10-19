@@ -685,6 +685,12 @@ typedef SceneArtifactFloorPose = {
 	var yaw:Float;
 }
 
+/** A named, single-program machining mission, executed by the CNC player. */
+typedef SceneArtifactMachiningMission = {
+  var id:String;
+  var label:String;
+}
+
 /**
  * A machining job the generator made for its own machine, with everything needed to run it (since
  * version 20). Lengths are metres, whatever the scene's unit.
@@ -703,6 +709,9 @@ typedef SceneArtifactFloorPose = {
  * limits are the motors' and drives', and the controller's step rate caps them further.
  */
 typedef SceneArtifactMachining = {
+	/** Explicit ideal-motion preview: travel checks apply, motor-load qualification does not. */
+	@:optional var kinematicPreview:Bool;
+	@:optional var mission:SceneArtifactMachiningMission;
 	@:optional var powerUpOffsets:Array<SceneArtifactPowerUpOffset>;
 	@:optional var powerUpSideOffsets:Array<SceneArtifactPowerUpSideOffset>;
 	var program:String;
@@ -2914,6 +2923,14 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 	static function validateMachining(machining:SceneArtifactMachining, parts:Map<String, Bool>,
 			definition:Null<AssemblyDefinition>):Void {
 		function fail(detail:String):Void throw 'Scene artifact machining job $detail';
+		if (machining.mission != null) {
+      for (text in [machining.mission.id, machining.mission.label]) {
+        if (text == null || StringTools.trim(text).length == 0 || text.length > 500)
+          fail("has an invalid mission identity");
+        for (i in 0...text.length) if (text.charCodeAt(i) == 0) fail("has an invalid mission identity");
+      }
+      if (machining.loop == true) fail("mission must finish rather than loop automatically");
+    }
 		validatePowerUpOffsets(machining.powerUpOffsets, definition);
 		validatePowerUpSideOffsets(machining.powerUpSideOffsets, definition);
 		if (machining.program == null) fail("has no program");
@@ -2930,6 +2947,11 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 			var axis = machining.axes[index];
 			if (!joints.exists(axis) || machining.axes.indexOf(axis) != index) fail('axis "$axis" is not a distinct joint');
 		}
+    if(machining.kinematicPreview==true)for(axis in machining.axes) {
+      var limit:materia.assembly.AssemblyDefinition.AssemblyJointLimits=[for(j in definition.joints)if(j.id==axis)j.limits][0];
+      if(limit.velocity==null||limit.acceleration==null||!finite(limit.velocity)||!finite(limit.acceleration)||limit.velocity<=0||limit.acceleration<=0)
+        fail("kinematic preview requires explicit positive velocity and acceleration bounds");
+    }
 		if (!occurrences.exists(machining.spindle)) fail('spindle "${machining.spindle}" is not an occurrence');
 		if (machining.stocks == null) fail("needs a stock occurrence list");
 		var stockIds = new Map<String, Bool>();
@@ -2986,6 +3008,10 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 			workOffset: [for (value in list(Reflect.field(decoded, "workOffset"))) number(value)],
 			tools: tools,
 			stocks: [for (stock in list(Reflect.field(decoded, "stocks"))) text(stock)]};
+    var kinematicPreview:Dynamic=Reflect.field(decoded,"kinematicPreview");
+    if(kinematicPreview!=null)machining.kinematicPreview=Std.isOfType(kinematicPreview,Bool)?(kinematicPreview:Bool):fail();
+    var mission:Dynamic=Reflect.field(decoded,"mission");
+    if(mission!=null)machining.mission={id:text(Reflect.field(mission,"id")),label:text(Reflect.field(mission,"label"))};
 		var sacrificial:Dynamic = Reflect.field(decoded, "sacrificial");
 		if (sacrificial != null) machining.sacrificial = [for (id in list(sacrificial)) text(id)];
 		var toolPart:Dynamic = Reflect.field(decoded, "toolPart");

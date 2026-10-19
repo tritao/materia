@@ -746,3 +746,14 @@ scene files and required animation assets. Downloads support cancellation and re
 and OPFS retains both source artifacts and prepared scenes for later opens. The
 native build publishes the downloadable files; see [browser examples](web/README.md#examples-and-local-storage)
 for hosting, bundle reuse and checks.
+
+A CNC job may carry `machining.mission: {id, label}`. This names a finite,
+single-program machining task executed by the existing CNC player. Its Mission
+view follows the player's real state, including feed hold, failure and completion;
+it does not create robot steps or a second executor. Named machining missions
+require `loop: false` (or omitted). Existing unlabelled CNC demos remain compatible.
+`machining.kinematicPreview: true` explicitly opts a packaging model into ideal
+motion with authored positive axis velocity and acceleration limits. Travel and
+stock/tool geometry checks still apply; motor-load plan checks and drive-error
+allowances do not. The Mission view displays this mode. Omitting the flag retains
+the existing drive-qualified CNC behavior.

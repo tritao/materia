@@ -14,7 +14,9 @@
     "MillProject.hx",
     "MillFramePreview.hx",
     "MillCapacityStudy.hx",
-    "MillMotorStudy.hx"
+    "MillMotorStudy.hx",
+    "MillMachiningSetup.hx",
+    "BearingBlockJob.hx"
   ],
   "sourceRoots": [
     ".",
