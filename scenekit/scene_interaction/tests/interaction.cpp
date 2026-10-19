@@ -143,9 +143,9 @@ void selection_presentation_50k() {
     const auto base_material = scene->reserve_material_id();
     scene->material_store().create(base_material);
     const auto highlight_material = scene->reserve_material_id();
-    scene->material_store().create(highlight_material);
+    scene->material_store().create(highlight_material).edit_state().base_color = {1, 1, 0, 1};
     const auto hover_material = scene->reserve_material_id();
-    scene->material_store().create(hover_material);
+    scene->material_store().create(hover_material).edit_state().base_color = {0, 0, 1, 1};
 
     std::vector<nkscene::NodeId> nodes;
     nodes.reserve(count);
@@ -186,17 +186,18 @@ void selection_presentation_50k() {
     assert(plan.compile_count() == compile_count);
     assert(update.patched_instances == 0);
     assert(update.patched_visibility == 0);
-    assert(update.patched_materials == 1);
+    assert(update.patched_materials == 0);
     assert(update.updated_geometry_resources == 0);
     assert(update.updated_material_resources == 0);
-    assert(update.rebuilt_batches != 0);
+    assert(update.rebuilt_batches == 0);
 
     const auto selected_item = std::find_if(
         plan.items().begin(), plan.items().end(), [&](const auto &item) {
             return item.node == nodes[12345];
         });
     assert(selected_item != plan.items().end());
-    assert(selected_item->material == highlight_material);
+    assert(selected_item->material == base_material);
+    assert((selected_item->highlight_tint == std::array<float, 4>{1, 1, 0, 1}));
 
     auto hovered_view = selected_view;
     hovered_view.set_hover_material_override(nodes[12345], hover_material);
@@ -206,15 +207,17 @@ void selection_presentation_50k() {
     assert(!hover_update.plan_rebuilt);
     assert(hover_update.patched_instances == 0);
     assert(hover_update.patched_visibility == 0);
-    assert(hover_update.patched_materials == 1);
-    assert(selected_item->material == hover_material);
+    assert(hover_update.patched_materials == 0);
+    assert(selected_item->material == base_material);
+    assert((selected_item->highlight_tint == std::array<float, 4>{0, 0, 1, 1}));
 
     const auto selection_update = nkscene::update(plan, snapshot, changes, selected_view);
     assert(!selection_update.plan_rebuilt);
     assert(selection_update.patched_instances == 0);
     assert(selection_update.patched_visibility == 0);
-    assert(selection_update.patched_materials == 1);
-    assert(selected_item->material == highlight_material);
+    assert(selection_update.patched_materials == 0);
+    assert(selected_item->material == base_material);
+    assert((selected_item->highlight_tint == std::array<float, 4>{1, 1, 0, 1}));
 }
 
 } // namespace

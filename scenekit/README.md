@@ -61,6 +61,17 @@ The Haxeon end-to-end smoke test uses the SceneKit build directory:
 NATIVEKIT_BUILD="$PWD/build" scene_render/tools/test-haxeon.sh
 ```
 
+## Interaction appearance
+
+Selection and hover use the highlight material's RGB as a display tint. They
+retain each primitive's source material, including opacity, base alpha, alpha
+mode/cutoff, textures, roughness, and sidedness. Highlight alpha is ignored.
+Tints inherit through subtrees; the nearest override wins within a layer, and
+hover takes precedence over selection. Base node/source material overrides still
+replace materials before tinting. Face-hover overlays must use the source
+surface material and enter the hover layer rather than the base material layer.
+Tint-only updates change instance data without rebuilding material batches.
+
 ## Reusable translation gizmos
 
 `scene_interaction/haxe` is a pure Haxe package (`scenekit-gizmo`, namespace

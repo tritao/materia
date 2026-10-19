@@ -76,9 +76,9 @@ int main() {
         const auto material = scene->reserve_material_id();
         scene->material_store().create(material);
         const auto selection_material = scene->reserve_material_id();
-        scene->material_store().create(selection_material);
+        scene->material_store().create(selection_material).edit_state().base_color = {1, 1, 0, 1};
         const auto hover_material = scene->reserve_material_id();
-        scene->material_store().create(hover_material);
+        scene->material_store().create(hover_material).edit_state().base_color = {0, 0, 1, 1};
         const auto node = scene->reserve_node_id();
         nkscene::Transaction create(scene);
         create.add_create(node);
@@ -129,8 +129,9 @@ int main() {
         assert(!hover_update.plan_rebuilt);
         assert(hover_update.patched_instances == 0);
         assert(hover_update.patched_visibility == 0);
-        assert(hover_update.patched_materials == 1);
-        assert(plan.items().front().material == hover_material);
+        assert(hover_update.patched_materials == 0);
+        assert(plan.items().front().material == material);
+        assert((plan.items().front().highlight_tint == std::array<float, 4>{0, 0, 1, 1}));
         assert(executor.execute(plan, snapshot).result == NKGPU_OK);
 
         presentation_view.clear_hover_material_overrides();
@@ -139,8 +140,9 @@ int main() {
         assert(!selection_update.plan_rebuilt);
         assert(selection_update.patched_instances == 0);
         assert(selection_update.patched_visibility == 0);
-        assert(selection_update.patched_materials == 1);
-        assert(plan.items().front().material == selection_material);
+        assert(selection_update.patched_materials == 0);
+        assert(plan.items().front().material == material);
+        assert((plan.items().front().highlight_tint == std::array<float, 4>{1, 1, 0, 1}));
 
         nkscene::SceneView changed_view;
         changed_view.include_invisible = true;

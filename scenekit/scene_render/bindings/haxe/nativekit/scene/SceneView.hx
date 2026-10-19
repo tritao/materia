@@ -374,13 +374,14 @@ class SceneView {
 	public function applyPolicy(policy:SceneViewPolicy):SceneView
 		return policy.apply(this);
 
+	/** Tints selected subtrees with highlight RGB while retaining each surface material. */
 	public function applySelection(selection:SelectionSet, highlight:Material):SceneView {
 		clearSelectionOverrides();
 		selection.apply(this, highlight);
 		return this;
 	}
 
-	/** Replaces the hover layer; hover takes precedence over selection. */
+	/** Tints a hovered subtree; preserves source alpha and takes precedence over selection. */
 	public function applyHover(node:Null<NodeId>, highlight:Material):SceneView {
 		clearHoverOverrides();
 		if (node != null)

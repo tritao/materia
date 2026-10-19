@@ -218,6 +218,34 @@ void append_culling_planes(const SceneView &view, std::vector<std::array<float, 
     }
 }
 
+HighlightTints::HighlightTints(const SceneSnapshot &snapshot, const SceneView &view)
+    : snapshot_(snapshot) {
+    const auto load = [&](Colors &colors, const auto &overrides) {
+        for (const auto &value : overrides)
+            if (const auto *material = snapshot.find_material(value.material)) {
+                const auto &color = material->state->base_color;
+                colors[value.node] = {color[0], color[1], color[2], 1.0f};
+            }
+    };
+    load(selection_, view.selection_material_overrides);
+    load(hover_, view.hover_material_overrides);
+}
+
+std::array<float, 4> HighlightTints::resolve(Colors &colors, NodeId node) {
+    if (colors.empty() || !node.valid()) return {};
+    if (const auto found = colors.find(node); found != colors.end()) return found->second;
+    const auto *value = snapshot_.find(node);
+    const auto color = value ? resolve(colors, value->parent) : std::array<float, 4>{};
+    colors.emplace(node, color);
+    return color;
+}
+
+std::array<float, 4> HighlightTints::tint(NodeId node) {
+    // Hover wins over selection; each layer inherits the nearest ancestor's tint.
+    const auto hovered = resolve(hover_, node);
+    return hovered[3] != 0 ? hovered : resolve(selection_, node);
+}
+
 EffectiveState effective_state(const SceneSnapshot &snapshot, const SceneView &view) {
     EffectiveState result;
     const auto nodes = snapshot.nodes();
@@ -292,8 +320,7 @@ EffectiveState effective_state(const SceneSnapshot &snapshot, const SceneView &v
             material_overrides[override.node] = override.material;
     };
     apply_material_layer(view.material_overrides);
-    apply_material_layer(view.selection_material_overrides);
-    apply_material_layer(view.hover_material_overrides);
+    // Interaction layers tint surfaces; they never replace their authored materials.
     for (const auto &[node, material] : material_overrides)
         if (result.material.contains(node))
             result.material[node] = material;
@@ -471,6 +498,7 @@ std::uint64_t culling_signature(const SceneView &view) noexcept {
 
 void build_items(RenderPlan &plan, const SceneSnapshot &snapshot, const SceneView &view) {
     const auto state = effective_state(snapshot, view);
+    HighlightTints highlights(snapshot, view);
     const auto camera = camera_for_snapshot(snapshot, view);
     plan.items_.clear();
     plan.transforms_.clear();
@@ -510,6 +538,7 @@ void build_items(RenderPlan &plan, const SceneSnapshot &snapshot, const SceneVie
         item.node = node.node;
         item.geometry = node.geometry;
         item.material = state.material.at(node.node);
+        item.highlight_tint = highlights.tint(node.node);
         item.pickId = static_cast<std::uint32_t>(plan.items_.size() + 1);
         item.transformIndex = transform_index;
         item.flags = RenderFlags::Opaque;

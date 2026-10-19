@@ -1204,7 +1204,86 @@ void render_snapshots_are_concurrent_reader_safe() {
 
 } // namespace
 
+// Interaction tints must not depend on a material catalogue or replace surface resources.
+void highlights_preserve_authored_materials() {
+    auto scene = std::make_shared<Scene>();
+    const auto geometry = scene->reserve_geometry_id();
+    scene->geometry_store().create(geometry);
+    const auto glass = scene->reserve_material_id();
+    auto &surface = scene->material_store().create(glass);
+    surface.edit_state().opacity = 0.27f;
+    surface.edit_state().base_color[3] = 0.8f;
+    surface.edit_state().alpha_mode = nkscene::AlphaMode::Blend;
+    surface.edit_state().flags = 0;
+    const auto solid = scene->reserve_material_id();
+    scene->material_store().create(solid);
+    const auto yellow = scene->reserve_material_id();
+    scene->material_store().create(yellow).edit_state().base_color = {1, 1, 0, 1};
+    const auto blue = scene->reserve_material_id();
+    scene->material_store().create(blue).edit_state().base_color = {0, 0, 1, 1};
+    const auto group = scene->reserve_node_id();
+    const auto window = scene->reserve_node_id();
+    const auto panel = scene->reserve_node_id();
+    const auto face = scene->reserve_node_id();
+    Transaction create(scene);
+    for (const auto node : {group, window, panel, face}) create.add_create(node);
+    ChangeSet changes;
+    assert(scene->commit(create, changes) == NKS_OK);
+    create.close();
+    Transaction configure(scene);
+    for (const auto node : {window, panel, face}) {
+        configure.add_geometry(node, geometry);
+        configure.add_parent(node, node == face ? window : group);
+        configure.add_material(node, node == panel ? solid : glass);
+    }
+    configure.add_visibility(face, false);
+    assert(scene->commit(configure, changes) == NKS_OK);
+    configure.close();
+    nkscene::SceneView view;
+    view.set_selection_material_override(group, yellow);
+    auto plan = nkscene::compile(scene->snapshot(), view);
+    const std::array<float, 4> selected{1, 1, 0, 1}, hovered{0, 0, 1, 1}, none{};
+    auto item = [&](nkscene::NodeId node) -> const nkscene::RenderItem & {
+        return plan.items()[plan.item_index(node)];
+    };
+    assert(item(window).material == glass && item(panel).material == solid);
+    assert(item(window).highlight_tint == selected && item(panel).highlight_tint == selected);
+    view.set_hover_material_override(window, blue);
+    auto update = nkscene::refresh(plan, scene->snapshot(), view);
+    assert(!update.plan_rebuilt && update.rebuilt_batches == 0);
+    assert(item(window).highlight_tint == hovered && item(panel).highlight_tint == selected);
+    // A face overlay uses its source surface and the same tint semantics.
+    view.clear_hover_material_overrides();
+    view.set_visibility_override(face, true);
+    view.set_hover_material_override(face, blue);
+    nkscene::refresh(plan, scene->snapshot(), view);
+    assert(item(face).material == glass && item(face).highlight_tint == hovered);
+    assert(item(window).highlight_tint == selected);
+    // Editing custom opacity while highlighted keeps the authored material live.
+    surface.edit_state().opacity = 0.63f;
+    scene->publish();
+    nkscene::refresh(plan, scene->snapshot(), view);
+    assert(item(window).material == glass);
+    assert(scene->snapshot().find_material(glass)->state->opacity == 0.63f);
+    scene->material_store().find(blue)->edit_state().base_color = {1, 0, 1, 1};
+    scene->publish();
+    nkscene::refresh(plan, scene->snapshot(), view);
+    assert((item(face).highlight_tint == std::array<float, 4>{1, 0, 1, 1}));
+    view.clear_hover_material_overrides();
+    view.clear_selection_material_overrides();
+    nkscene::refresh(plan, scene->snapshot(), view);
+    assert(item(window).highlight_tint == none && item(face).highlight_tint == none);
+    assert(item(window).material == glass && item(panel).material == solid);
+    // Base presentation overrides remain replacements underneath interaction tints.
+    view.set_material_override(window, solid);
+    view.set_selection_material_override(group, yellow);
+    nkscene::refresh(plan, scene->snapshot(), view);
+    assert(item(window).material == solid && item(window).highlight_tint == selected);
+    assert(scene->snapshot().find(window)->material == glass);
+}
+
 int main() {
+    highlights_preserve_authored_materials();
     shader_sources_cover_backend_matrix();
     geometry_payload_contract_is_validated();
     resource_lifecycle_is_cache_safe();

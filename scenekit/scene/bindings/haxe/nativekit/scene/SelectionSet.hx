@@ -1,6 +1,6 @@
 package nativekit.scene;
 
-/** Reusable set of nodes to highlight through a view material override. */
+/** Reusable set of subtrees to tint without replacing their surface materials. */
 class SelectionSet {
 	var entries:Array<{node:NodeId, material:Null<Material>}> = [];
 
