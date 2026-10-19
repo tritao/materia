@@ -152,3 +152,20 @@ masking and control frames belong to NativeKit. The old wire helpers exist only 
 The Moonraker test's native provider builds NativeKit with HTTP enabled, without the robotd aggregate. Linux builds require
 libcurl development files. Run the loopback suite with `haxeon build --project processkit/tests/moonraker/haxeon.json` and
 its generated binary. `bash processkit/tests/moonraker/web/check-compile.sh` checks the production client against ABI32.
+
+## Enclosure guard interface
+
+`processkit.guard.EnclosureGuard` consumes door requests, separate closed/open and
+lock feedback, spindle/axis standstill, the E-stop chain, boundary status, and
+setup/hold-to-run inputs. Its outputs are door direction, lock command, cutting
+permission, reduced-speed setup permission, and a stop request for hazardous
+spindle/process-axis motion. The host must apply those permissions to its drive
+controls. Setup speed and feedback timeout are required explicit policy inputs.
+
+The interface is a simulation/control contract. Physical actuator sizing,
+stop-distance validation and safety qualification belong to each machine.
+Run its focused interlock regression with:
+
+```sh
+./haxeon/scripts/haxeon run --jobs=1 --project=processkit/tests/guard/haxeon.json
+```
