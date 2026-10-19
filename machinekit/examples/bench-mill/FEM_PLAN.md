@@ -37,6 +37,14 @@ from this mechanical concept.
 
 ## Implementation sequence
 
+Implementation started with `MillFemExport`, `MillFemChecks`, and the tools in
+`fem/`. The initial export includes posed castings/steel interfaces and complete
+component mass accounting. CalculiX 2.21 analytical fixtures and Gmsh 4.12.2
+independent casting mesh checks are implemented. See `fem/README.md` for commands.
+Named contact face regions, assembled load paths, explicit joint/support inputs,
+and the first static mill solve remain the next work. The first complete
+milestone below is not yet achieved.
+
 ### 1. Fix the analysis contract and solver workflow
 
 Create `machinekit/examples/bench-mill/fem/` for source-controlled scripts,
@@ -143,8 +151,7 @@ the stated force, and contributions from base/column bending, head/table
 flexure, guides, column joint, and supports where the model permits
 decomposition. Also report support reactions, pad/interface tractions, and
 stresses at mesh-converged locations. Flag contact-edge and constraint
-singularities instead of using
-their peak stress as a design limit.
+singularities instead of using their peak stress as a design limit.
 
 **Gate:** linear scaling check at half and full force, force/moment balance,
 expected sign symmetry for the linear model, and mesh refinement until the

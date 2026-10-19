@@ -158,6 +158,12 @@ the new mechanical assembly has no commissioned controller/interlock integration
 
 ## Inspect and check
 
+The FEM implementation has started with a posed geometry packet, datum checks,
+analytical solver fixtures and a casting meshing pilot. See
+[fem/README.md](fem/README.md) for commands and the current analysis boundary,
+and [FEM_PLAN.md](FEM_PLAN.md) for the remaining implementation gates.
+There is no assembled-machine FEM stiffness result yet.
+
 Run these commands sequentially: the example configurations share one output directory.
 
 ```sh
@@ -225,8 +231,9 @@ accuracy or the actual controller's acceleration limits.
 The table comparison evaluates an unperforated deck and rib section. Its second
 moment of area improvement is not an assembled-machine stiffness multiplier.
 Guide/joint compliance, pockets, insert anchorage, preload, thermal effects and
-casting flexibility require separate analysis. No FEA/modal solver or physical
-material/deflection test is configured for this study.
+casting flexibility require separate analysis. The FEM tools currently cover
+geometry export, solver fixtures and casting meshing; assembled static/modal
+analysis and physical material/deflection measurements remain pending.
 
 Manufacturing release remains blocked until those gates have evidence. Preserve
 material-property provenance, finish-machine the precision interfaces after
