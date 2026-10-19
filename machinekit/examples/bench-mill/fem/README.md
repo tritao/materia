@@ -78,6 +78,28 @@ Thirteen of eighteen travel/reference static studies currently pass. Contextual 
 three center contact solutions for steel/carbide variants after the travel sweep.
 
 
+## Conditional lightening parameter proposal
+
+[lightening-candidates.json](lightening-candidates.json) records proposed
+parameters only; none is evaluated or selected and CAD geometry is unchanged.
+The full static-share gate and modal operating-band review remain prerequisites.
+
+| Parameter family | Baseline | Proposed levels | Constraint |
+| --- | --- | --- | --- |
+| Existing `roof` | 60 mm | 55, 50 mm | Relieved base roof becomes 35, 30 mm; column clamp-pad depth/position also change |
+| New `baseRibThickness` | 40 mm | 36, 32 mm | Keep full rail-insert caps, foot regions and insert bosses |
+| New `columnCrossRibThickness` | 40 mm | 36, 32 mm | Keep front drive web, sole and clamp stations |
+| New `columnWallThickness` | 40 mm | 36 mm, later | Keep base and local supports at 40 mm; shared `wall<40` fails foot-pocket guard |
+
+Screen each family separately using actual CAD mass, both supports, resolved
+new minimum sections, nose/bar machine-loop share and mode shapes. A proposed
+comparative screen is casting share <30% and relevant frequencies >=95% of
+baseline; this is not a physical acceptance criterion. Tighten finalist mesh
+convergence to 1% or better and assess excitation clearance with numerical and
+material/joint uncertainty. The current 0.437% frequency separation cannot be
+resolved by a 1% mesh gate. Full nine-pose checks precede combining families.
+No mass savings are asserted before rebuilding the candidate CAD.
+
 ## Tool cases and model contract
 
 The casting decision uses the machine loop **excluding job-dependent tool
@@ -401,4 +423,3 @@ Later work includes the distributing-coupling assembly model and uncertainty/con
 checks. The modal inertia/export and nine-pose numerical gates now pass;
 the revised static travel budget is running. Geometry candidates stay deferred
 until that budget and modal review justify them.
-

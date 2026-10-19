@@ -1,0 +1,126 @@
+{
+  "status": "Conditional parameter proposal; not evaluated or selected; geometry unchanged",
+  "prerequisites": [
+    "Spindle-nose and short-test-bar machine-loop casting shares below 30% at center and all eight travel corners, both supports",
+    "Converged upper-bound modes; low column modes and pose-dependent crossings reviewed",
+    "Operating excitation bands declared before any claim of modal acceptance",
+    "Review sensitivity to assumed casting modulus and catalogue/joint proxies before selecting a physical design; nominal shares alone are not robust release evidence"
+  ],
+  "proposedScreens": {
+    "maximumCastingMachineLoopShare": 0.3,
+    "minimumRelevantFrequencyRatioToBaseline": 0.95,
+    "frequencyRatioStatus": "Proposed comparative screen only, not an accepted release limit or an excitation exclusion band",
+    "finalistFrequencyMeshTolerance": 0.01,
+    "rationale": "A 5% comparative modal budget needs a tighter finalist mesh check than the initial 5% convergence gate; all absolute excitation-band checks remain necessary. Rank mass saved against machine-loop compliance and modal penalties.",
+    "excitationClearance": "Use numerical and material/joint uncertainty margins appropriate to declared operating bands; 1% mesh convergence alone cannot resolve the present 0.437% separation."
+  },
+  "candidates": [
+    {
+      "id": "roof-55",
+      "parametersMm": {
+        "roof": 55,
+        "wall": 40
+      },
+      "baselineMm": {
+        "roof": 60,
+        "wall": 40
+      },
+      "requiresNewLayoutParameters": false,
+      "notes": "Existing option; check all coupled sole/top/foot-depth changes and retained material below recessed seats. Not a uniform 5 mm reduction in every relieved section.",
+      "geometryEffects": {
+        "relievedBaseRoofThicknessMm": 35,
+        "columnPadDepthMm": 55,
+        "columnPadOffsetFromColumnCentreMm": 75,
+        "columnPadOffsetBaselineMm": 70
+      }
+    },
+    {
+      "id": "roof-50",
+      "parametersMm": {
+        "roof": 50,
+        "wall": 40
+      },
+      "baselineMm": {
+        "roof": 60,
+        "wall": 40
+      },
+      "requiresNewLayoutParameters": false,
+      "notes": "Second roof-only level; dependent clamp station geometry must be rebuilt and checked, not frozen as a stale STEP interface.",
+      "geometryEffects": {
+        "relievedBaseRoofThicknessMm": 30,
+        "columnPadDepthMm": 50,
+        "columnPadOffsetFromColumnCentreMm": 80,
+        "columnPadOffsetBaselineMm": 70
+      }
+    },
+    {
+      "id": "base-rib-36-then-32",
+      "proposedNewParameter": "baseRibThickness",
+      "levelsMm": [
+        36,
+        32
+      ],
+      "baselineMm": 40,
+      "requiresNewLayoutParameters": true,
+      "notes": "Separate interior longitudinal/transverse ribs from outer walls and foot-pocket guards. Preserve exterior envelope, rail datums and local foot/insert bosses; measure energy by rib family before choosing reductions. Longitudinal ribs currently follow seatWidth, not wall; retain the full 40 mm casting cap beneath each steel rail insert while changing the web below it."
+    },
+    {
+      "id": "column-rib-36-then-32",
+      "proposedNewParameter": "columnCrossRibThickness",
+      "levelsMm": [
+        36,
+        32
+      ],
+      "baselineMm": 40,
+      "requiresNewLayoutParameters": true,
+      "notes": "Reduce the rear-chamber cross rib independently; retain front drive web, clamp stations, sole and insert support. Check column mode shapes before combining with roof changes."
+    },
+    {
+      "id": "column-wall-36",
+      "proposedNewParameter": "columnWallThickness",
+      "levelsMm": [
+        36
+      ],
+      "baselineMm": 40,
+      "requiresNewLayoutParameters": true,
+      "notes": "Later-stage option only. The existing shared wall also changes base envelope and violates foot-pocket wall<40 guards. Keep local clamp/foot regions at their qualified geometry and introduce a separate column-side-wall option rather than relaxing that guard globally."
+    }
+  ],
+  "requiredChecks": [
+    "No MillFrameLayout changes until proposal is reviewed",
+    "Rebuild through CAD recipes, native solid validity and per-part packet comparison",
+    "MillFrameChecks, XY/Z/spindle integrity, clearance and service access",
+    "At least two quadratic normal layers in every new minimum section",
+    "Both supports and nine poses; modal tracking plus nose/test-bar machine-loop budgets",
+    "Rank actual casting mass savings, compliance and modal frequency; no fabricated mass estimates",
+    "Do not combine parameter families before their separate screens pass",
+    "Export each independent thickness and update section probes/partition planes; do not certify a 32 mm web using the old shared wall=40 metadata",
+    "Review full mass motion and phase for mode families; shared casting-only MAC matches do not establish unique mode identity"
+  ],
+  "screenSequence": [
+    "Rebuild each parameter family independently and measure actual CAD mass; reject invalid geometry before FEM",
+    "Screen both supports at center and the baseline critical static/modal poses, with resolved minimum sections and tracked modes",
+    "Run the full nine-pose nose/test-bar and modal matrix for surviving candidates; tighten finalist mesh checks before comparing a 5% frequency budget",
+    "Combine parameter families only after their separate screens pass; rank mass saved against compliance and modal penalties"
+  ],
+  "baselineModalConcern": {
+    "status": "Operating-band clearance unresolved; no lightening candidate selected",
+    "referenceRpm": 8000.0,
+    "modalAggregateSha256": "e860a8a455a503f7c18bd2694abcfe07872815594ce4ac76293d3a81c7253b5b",
+    "pose": "xplus_yminus_zupper",
+    "support": "stiff-four-springs",
+    "mode": 7,
+    "targetHz": 133.33333333333334,
+    "frequencyHz": 132.7509,
+    "relativeFrequencyDistance": 0.00436825000000006,
+    "lastRefinementRelativeChange": 0.01884615612028906
+  },
+  "proposalSource": {
+    "revision": "6559e2f444d8849655876fa0c74b32cd1c6b167b",
+    "files": {
+      "machinekit/haxe/src/machinekit/milling/MillFrameLayout.hx": "836007b7f1268bb36ca94d78364e59133b029722e360882a523d5b3001958b5d",
+      "machinekit/haxe/src/machinekit/milling/MillFrame.hx": "ea18bd2babfd919f44eb267d57193e78ab998b731a6a01581f323845b6df46a2"
+    },
+    "status": "Source inspection only; no candidate geometry generated"
+  }
+}
