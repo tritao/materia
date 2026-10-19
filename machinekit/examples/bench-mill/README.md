@@ -14,6 +14,50 @@ The reference base is 520 × 909 × 220 mm. The Y motor sits in a rear service b
 60 mm casting roof and side supports. The column is 320 × 260 × 833 mm. Guide/bearing inserts stand 4 mm proud
 of the casting, with 16 mm embedded thickness. Core openings, walls, dimensions
 and materials remain design assumptions requiring process and structural review.
+That geometry assumes the seats are machined after casting. The chosen
+process now uses replication instead; see below. The geometry has not been
+updated yet.
+
+### Precision interfaces: DIY replication route (decided 2026-10-19)
+
+The first machine is built without access to a mill large enough to finish the
+909 mm base, so precision surfaces are **replicated, not machined**:
+
+- **Steel stays at every bolted or load-bearing interface.** That covers rail
+  and screw-bearing seats, nut/motor mounts, column clamp stations and foot
+  seats. Epoxy granite cannot hold rail-bolt threads, and its resin binder
+  creeps under steady bolt preload. These inserts carry threads and bearing
+  area. They need only coarse placement from the mold fixture, not precision
+  faces.
+- **Rail and screw-bearing seats are replicated.** Each steel seat stops below
+  its final mounting plane by a replication allowance. A thin layer of
+  slideway replication compound is then cast against a precision master
+  (surface plate, ground straightedge or ground bar) with release agent, and
+  the rails bolt onto that layer. Rail holes are protected with release-coated
+  plugs during replication, or drilled through the layer afterwards. Both
+  rails of one axis are replicated in a single pour against one master, so
+  they share one plane. The same pour can form a rail reference shoulder
+  against a straightedge.
+- **The allowance is set by error, not by habit.** It is the compound's
+  minimum supported layer thickness, plus the expected insert height error
+  from the mold fixture, plus the casting's cure distortion over the seat
+  length. Until those are measured on a coupon, the layer thickness stays a
+  declared assumption.
+- **The column joint is grouted, not pad-matched.** The column stands on jack
+  screws and is squared to the replicated Y plane by indicator. The gap at the
+  four clamp stations is then filled with epoxy chocking compound, with the
+  clamp bolts sleeved. Bolts are torqued only after cure. This sets Y–Z
+  squareness without machining, and gives full bearing area instead of four
+  pads touching at their high points.
+- **Foot seats and other mounts are used as cast.** They keep their steel
+  inserts. Slots and shims take up position error.
+
+Pending, before geometry changes: choose the replication and chocking
+compounds (layer limits, modulus, cure shrinkage, creep data), define the
+masters and their flatness, add a replication allowance and grout gap to
+`MillFrameLayout`, and run a coupon trial on a scrap casting. The geometry
+change also updates `MillFrame`'s seat inserts and adds replication layer and
+grout solids for the FEM packet.
 
 Four side-open foot pockets expose adjustment nuts. M16 foot envelopes pass
 through 18 mm steel seat bores and separate stem openings in the casting. Front
@@ -236,8 +280,8 @@ geometry export, solver fixtures and casting meshing; assembled static/modal
 analysis and physical material/deflection measurements remain pending.
 
 Manufacturing release remains blocked until those gates have evidence. Preserve
-material-property provenance, finish-machine the precision interfaces after
-casting as specified by the chosen process, and develop moulds, curing, lifting,
+material-property provenance, replicate the precision interfaces and grout the
+column joint as described under "Precision interfaces", and develop moulds, curing, lifting,
 inspection and assembly instructions from the final geometry.
 
 ## Separate column joint and structural access

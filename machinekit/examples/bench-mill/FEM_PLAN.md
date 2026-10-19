@@ -150,8 +150,13 @@ Build two clearly labeled interface models:
    patches is acceptable here only because the model is labelled an upper
    bound. It stiffens the coupled rail/seat region.
 2. **Assembly model:** casting-to-insert connection according to the selected
-   process assumption; four discrete column clamp stations with linearized
-   equivalent stiffness derived from justified preload; guide/block stiffness
+   process assumption. The chosen DIY process (bench-mill `README.md`,
+   "Precision interfaces") puts a thin replicated epoxy layer between each
+   steel seat and its rail or bearing. Model it as a separate thin solid or
+   equivalent layer stiffness, using the compound's modulus with its source.
+   The column joint is a grouted chock layer at the four clamp stations, in
+   compression under bolt preload, with linearized equivalent stiffness
+   derived from preload and grout properties; guide/block stiffness
    in the relevant directions from catalogue data; screw/nut/bearing axial
    stiffness for the drives; and realistic foot support. Connect each spring to
    its frame patch with a distributing (RBE3-type) coupling, not a rigid one.

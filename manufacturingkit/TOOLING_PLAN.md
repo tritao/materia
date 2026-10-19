@@ -337,6 +337,27 @@ closed by the insert's mounting face: record them as insert-sealed penetrations
 with the sealing face, seal material and the thread protection that keeps resin
 out. Plug any threaded hole not used for fixing.
 
+**Finishing route.** Each precision interface declares how it reaches its final
+plane: `machined` (proud finishing stock, as before), `replicated`, or
+`as-cast`. The bench mill's first build uses `replicated` for rail and
+screw-bearing seats, and grouts the column joint (see
+`machinekit/examples/bench-mill/README.md`, "Precision interfaces"). For
+replicated seats, the insert fixture only needs to place the insert within
+the replication allowance. The plan must not credit it with final alignment.
+Record per seat:
+
+- the allowance below the final plane, and how it was derived (compound
+  minimum layer + fixture height error + cure distortion);
+- the master (part, flatness evidence) and the release agent;
+- the dam geometry that contains the compound;
+- plugs or the drill-after rule for threaded holes through the layer;
+- which seats share one pour.
+
+Grouted joints record the gap, jacking/squaring method, bolt sleeves and cure
+before torque. Replication masters, dams and plugs are tooling items in the
+fabrication package. Phase 7 coupons cover replication thickness, flatness
+transfer and bond to the steel seat.
+
 ## Validation and readiness
 
 Run pure record checks before CAD. Then check the following against the resolved
