@@ -180,6 +180,51 @@ private class ReachPlannerStates implements motionkit.planner.PlannerSpace {
  * MotionKit certifies the actual timed joint paths when it admits the generated moveVia plans.
  */
 class TendingReach {
+	/** Opt-in diagnostics: distinguish cumulative VM allocations, retained heap and OS RSS. */
+	static function memory(stage:String):Void {
+		if (Sys.args().indexOf("--profile-memory") < 0) return;
+		#if (haxeon || hl)
+		Sys.println("Reach memory " + haxe.Json.stringify({stage:stage,time:Sys.time(),
+			heapBytes:hl.Gc.heapBytes(),allocatedBytes:hl.Gc.totalAllocated(),collections:hl.Gc.collections(),
+			sinceCollection:hl.Gc.allocatedSinceCollection(),triggerBytes:hl.Gc.triggerBytes()}));
+		for (arg in Sys.args()) if (StringTools.startsWith(arg,"--profile-census=")) {
+			var path=arg.substr("--profile-census=".length);
+			var bytes=haxe.io.Bytes.ofString(path), terminated=haxe.io.Bytes.alloc(bytes.length+1);
+			terminated.blit(0,bytes,0,bytes.length);
+			hl.Gc.censusDump(terminated.getData());
+		}
+		#end
+		Sys.stdout().flush();
+	}
+
+	/** Bounded setup/fallback probe; deliberately rejects a proposal without starting IK or
+	 * changing any physical input. Never writes the stored certificate. */
+	public static function profileSetup():Void {
+		memory("process start");
+		var inputs=new TendingReachInputs(null,true);
+		memory("reference inputs ready");
+		var previous=TendingReachLayout.decode(TendingReachCertificate.JSON).result;
+		previous.trays[0].width += 1;
+		try study(inputs.cell,TendingCyclePlan.bearingBlocks(),previous.armPlacement,previous,inputs,true)
+		catch (error:Dynamic) {
+			if (!Std.isOfType(error,ReachProfileComplete)) throw error;
+			memory("setup probe complete");
+			return;
+		}
+		throw "Setup probe did not stop before search";
+	}
+
+	/** Same reuse/fallback path as store(), but profiling must never publish a certificate. */
+	public static function profileSearch():Void {
+		memory("process start");
+		var inputs=new TendingReachInputs(null,true);
+		memory("reference inputs ready");
+		var production=TendingCyclePlan.bearingBlocks();
+		var previous=TendingReachLayout.decode(TendingReachCertificate.JSON).result;
+		study(inputs.cell,production,previous.armPlacement,previous,inputs,true);
+		memory("search complete");
+	}
+
 	static inline var SEATED_STOCK:String = "machine:mill/seated-stock";
 	static inline var MIN_JOINT_MARGIN:Float = 0.1;
 	/** Base stand-off behind the door opening certified by MT12, in millimetres; a drift is a layout change. */
@@ -291,14 +336,8 @@ class TendingReach {
 			previous = TendingReachLayout.decode(TendingReachCertificate.JSON).result;
 			if (previous.cls == Reach1300 && previous.riser == 550) preferred = previous.armPlacement;
 		}
-		var result:Null<TendingReachResult> = null;
-		if (previous != null && !search) {
-			try result = revalidate(inputs.cell, production, previous, inputs) catch (error:Dynamic) {
-				if (!Std.isOfType(error, ReachReuseFailure)) throw error;
-				Sys.println(Std.string(error) + "; searching again");
-			}
-		}
-		if (result == null) result = study(inputs.cell, production, preferred, null, inputs);
+		// A rejected proposal falls back inside the prepared study, not through a second setup pass.
+		var result = study(inputs.cell,production,preferred,search ? null : previous,inputs,true);
 		var source = TendingReachLayout.certificateSource(result, fingerprint);
 		var path = certificatePath();
 		sys.io.File.saveContent(path, source);
@@ -430,7 +469,10 @@ class TendingReach {
 			var contacts = scene.contacts(members);
 			scene.payload(payload.body.id, contacts, CollisionPairRule.Touch, CollisionPairStatus.Checked, 0.0);
 		}
+		memory("before collision build: objects=" + scene.description.objects.length +
+			" bodyRules=" + scene.description.bodyRules.length + " objectRules=" + scene.description.objectRules.length);
 		var build = scene.build(new NativeCollisionWorld());
+		memory("after collision build");
 		var space = new ManipulatorPlannerSpace(new CollisionPlannerSpace(description, build, bodies, scene.margins()), arm, reference, scene.bodies.reference.q);
 		return [{space: space, description: description, build: build}];
 	}
@@ -478,16 +520,17 @@ class TendingReach {
 		return study(cell, production, previous.armPlacement, previous, inputs);
 
 	public static function study(cell:EnclosedBenchMill, production:TendingCyclePlan, ?preferredPlacement:AssemblyFrame,
-		?reuse:TendingReachResult, ?inputs:TendingReachInputs):TendingReachResult {
+		?reuse:TendingReachResult, ?inputs:TendingReachInputs, fallback:Bool = false):TendingReachResult {
 		var searchStarted = Sys.time();
 		function progress(message:String):Void {
 			Sys.println('Reach search (${Math.round(Sys.time() - searchStarted)} s): $message');
 			Sys.stdout().flush();
 		}
 		progress("building geometry and collision states");
+		memory("study entry");
 		// Reach uses the same physical blank hull as machining, but the tending cell starts with an
 		// empty vise. Study a loaded reference machine so the stock remains geometry input only.
-		if (!cell.includesWorkpiece) return study(new EnclosedBenchMill(), production, preferredPlacement, reuse);
+		if (!cell.includesWorkpiece) return study(new EnclosedBenchMill(), production, preferredPlacement, reuse, null, fallback);
 		if (inputs == null) inputs = new TendingReachInputs(cell);
 		if (inputs.cell != cell) throw "Reach inputs belong to another cell";
 		var transferRequests = production.transferRequests();
@@ -502,6 +545,7 @@ class TendingReach {
 		var gripper = armTool.spec;
 		var millScene = inputs.millScene;
 		var millPhysical = AssemblyPhysicalPartView.fromSceneArtifact(millScene);
+		memory("mill physical hulls");
 		var flat = AssemblyDefinitionFlattener.flatten(millScene.assemblyDefinition);
 		var toolWidth = armTool.envelopeWidthMm;
 		var toolDepth = armTool.envelopeDepthMm;
@@ -616,9 +660,11 @@ class TendingReach {
 		var reachAssembly = inputs.assembly;
 		var armScene = inputs.armScene;
 		var armPhysical = AssemblyPhysicalPartView.fromSceneArtifact(armScene);
+		memory("arm physical hulls");
 		var tools = machinekit.robot.RobotScene.robotTools(source.tool, "arm/tool");
 		var toolMembers = tools[0].members;
 		var spacing = traySpacing(armScene, armPhysical, gripper, graspLocal, tools);
+		memory("tray spacing");
 		var trayAssembly = new PartTray(production.rows, production.columns, BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,
 			spacing.x, spacing.y);
 		// The two tray banks are fixed to the tending cell, independent of tool or
@@ -708,6 +754,7 @@ class TendingReach {
 		}
 		tableFrame.y = trayY;
 		checkFixtureDoorSweep(doorSweeps, environment.slice(fixtureStart));
+		memory("fixture hulls and door sweep");
 	// The collision-screened design is the 1.3 m cobot on the cell's 550 mm riser.
 	// `study` certifies its actual gripper and every assembled cell pose; the design
 	// search is not repeated during each project load.
@@ -725,6 +772,7 @@ class TendingReach {
 				throw "Reference gripper does not fit the actual doorway";
 			var scene = armScene;
 			var converted = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, armPhysical);
+			memory("robot conversion");
 			var toolOccurrence = "arm/" + DualArmGripperTool.GRIPPER_A_BODY;
 			var baseCarrier = converted.partLinks.get("arm/baseFlange");
 			var carrier = converted.partLinks.get(toolOccurrence);
@@ -770,6 +818,7 @@ class TendingReach {
 				policy.rates(arm.robot.joints[motionJoints[index]].type, arm.group.limitsOf(index))]);
 			var clearance = reachClearances(arm, mechanismObservations(converted, toolMembers),
 				source.ready(), [], false, converted.jointInterfaces)[0];
+			memory("self collision world");
 			var toolStandOff = toolLength + source.baseFlange.flangeDiameter + toolDepth + 20;
 			// The static tool envelope includes its assumed hose clearance. Keep the
 			// runtime's full obstacle margin beyond that envelope at the door plane.
@@ -878,7 +927,9 @@ class TendingReach {
 			if (prioritizePlacement(candidates, preferredPlacement, source.reference.d[3], classBaseY))
 				progress("trying the previous placement first; all poses and paths will be recertified");
 
-			for (candidate in candidates) {
+			var candidateIndex = 0;
+			while (candidateIndex < candidates.length) {
+				var candidate = candidates[candidateIndex++];
 				progress('placement ${candidates.indexOf(candidate) + 1}/${candidates.length}: ' +
 					'X ${candidate.baseXOffset}, Y ${candidate.baseYOffset}, riser ${candidate.height} mm');
 				var height = candidate.height, baseXOffset = candidate.baseXOffset, baseYOffset = candidate.baseYOffset;
@@ -886,16 +937,25 @@ class TendingReach {
 					classBaseY + baseYOffset, height),
 					AssemblyFrames.fromRotationMatrix(0, 0, 0, [0.0, 1, 0, -1, 0, 0, 0, 0, 1]));
 				var baseFlange = mountedBaseFlange(source, armPlacement);
+				memory("candidate ready");
 				if (reuse != null) {
 					var layout:TendingReachResult = {cls: cls, riser: height, armPlacement: armPlacement, armBaseFlange: baseFlange,
 						jointMargin: 0, wristSine: 0, parkPose: parkPose, trayClearanceMm: trayClearanceMm,
 						poses: [], transfers: [], trays: trayLayouts, handlingApproachMm: approach,
 						tableFrame: tableFrame, tableOffset: tableOffset, tableWidth: tableWidth, tableDepth: tableDepth, tableTop: tableTop};
 					if (TendingReachReuse.layoutKey(reuse) != TendingReachReuse.layoutKey(layout) || reuse.poses.length != requests.length) {
-						clearance.space.dispose();
-						throw new ReachReuseFailure("layout, fixtures or request coverage changed");
+						if (!fallback) {
+							clearance.space.dispose();
+							throw new ReachReuseFailure("layout, fixtures or request coverage changed");
+						}
+						progress("saved layout changed; searching with the prepared geometry and collision world");
+						reuse = null;
 					}
-					progress("revalidating saved poses and routes against current geometry");
+					if (reuse != null) progress("revalidating saved poses and routes against current geometry");
+				}
+				if (Sys.args().indexOf("--profile-setup") >= 0) {
+					clearance.space.dispose();
+					throw new ReachProfileComplete();
 				}
 				// AssemblySimulationBridge's root link is the arm assembly origin;
 				// the base-flange part is offset within it and is checked separately.
@@ -906,6 +966,7 @@ class TendingReach {
 				var poseResults:Array<TendingReachPose> = [];
 				for (pointIndex in 0...requests.length) {
 					var request = requests[pointIndex], point = request.point;
+					memory("IK " + pointIndex + ": " + request.name);
 					if (reuse != null) {
 						var found = TendingReachReuse.findPose(reuse, request.name, request.tool);
 						var saved:TendingReachPose = cast found;
@@ -937,6 +998,7 @@ class TendingReach {
 							new Quat(pose.qx, pose.qy, pose.qz, pose.qw));
 						var target = inverse.compose(desiredTool.compose(request.toolOffset.inverse()));
 						var solution = arm.solve(target, seed, options);
+						memory("IK solve result");
 						preferNearbyTurns(arm, solution.q, seed);
 						if (!solution.converged) { selectionFailure = 'IK residual ${solution.positionError}/${solution.orientationError}'; continue; }
 						if (!withinMargins(arm, solution.q)) {
@@ -944,6 +1006,7 @@ class TendingReach {
 							continue;
 						}
 						var selfHit = clearanceViolation(clearance, solution.q);
+						memory("IK self collision result");
 						if (selfHit != null) { selectionFailure = 'self ${selfHit.a}/${selfHit.b} ${selfHit.distance} < ${selfHit.required}'; continue; }
 						selected = solution.q; selectedTarget = pose; selectedYaw = yaw; break;
 					}
@@ -1588,6 +1651,14 @@ class TendingReach {
 							tableDepth: tableDepth, tableTop: tableTop};
 					}
 				}
+				if (!valid && reuse != null && fallback) {
+					// Candidate-specific spaces were disposed above; preserve the shared setup and
+					// retry this placement with fresh IK/path search. Public revalidate remains strict.
+					progress('saved candidate rejected at $failedAt; searching with the prepared scene');
+					reuse = null;
+					candidateIndex--;
+					continue;
+				}
 				if (!valid && failedAt != null) {
 					var failure = failedAt == "ready"
 						? '$height mm, base X ${baseXOffset} mm / Y ${baseYOffset} mm at ready pose: $failedReason'
@@ -1818,7 +1889,10 @@ class TendingReach {
 			var contacts = scene.contacts(payload.contacts);
 			scene.payload(payload.body.id, contacts, CollisionPairRule.Allow, CollisionPairStatus.DeclaredContact, 0.0);
 		}
+		memory("before collision build: objects=" + scene.description.objects.length +
+			" bodyRules=" + scene.description.bodyRules.length + " objectRules=" + scene.description.objectRules.length);
 		var build = scene.build(new NativeCollisionWorld());
+		memory("after collision build");
 		return new ReachCachedSpace(new ManipulatorPlannerSpace(new CollisionPlannerSpace(scene.description, build, scene.bodies,
 			scene.margins()), arm, reference, scene.bodies.reference.q));
 	}
@@ -1897,8 +1971,17 @@ class TendingReach {
 }
 
 /** Revalidate/repair by default. `--search` reruns optimization; `--fresh` also resets placement order. */
+private class ReachProfileComplete extends haxe.Exception {
+	public function new() super("Reach setup probe complete");
+}
+
 function main():Void {
 	var args = Sys.args();
+	#if (haxeon || hl)
+	for (arg in args) if (StringTools.startsWith(arg,"--profile-census=")) hl.Gc.censusStart(1048576);
+	#end
+	if (args.indexOf("--profile-search") >= 0) { TendingReach.profileSearch(); return; }
+	if (args.indexOf("--profile-setup") >= 0) { TendingReach.profileSetup(); return; }
 	if (args.indexOf("--setup-tests") >= 0) TendingReachSetupChecks.run();
 	else if (args.indexOf("--reuse-tests") >= 0) TendingReachReuseChecks.run();
 	else if (args.indexOf("--placement-tests") >= 0) TendingReachPlacementChecks.run();

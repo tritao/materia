@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-electric-runtime-checks"
+  },
+  "entry": "TendingElectricRuntimeChecksMain",
+  "sources": [
+    "TendingElectricRuntimeChecksMain.hx",
+    "TendingElectricRuntimeChecks.hx",
+    "TendingElectricEdgeExecutor.hx",
+    "TendingElectricRuntimeProfile.hx",
+    "TendingGuardedAction.hx",
+    "TendingContactSearchAction.hx",
+    "TendingSeatPolicy.hx",
+    "TendingStockDatum.hx"
+  ],
+  "sourceRoots": [
+    "."
+  ],
+  "target": "host",
+  "outputDir": "build/electric-runtime-checks-run"
+}

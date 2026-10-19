@@ -3,7 +3,8 @@ import machinekit.robotics.DualArmGripperTool;
 /** Production operations before CAD frames and certified paths are resolved. */
 /**
  * The robot never reports itself clear: the machine's robot zone measures it. The door is asked
- * to close as the arm starts to leave the vise, and moves once the zone reads clear.
+ * to close as the arm leaves in the legacy pneumatic sequence. The electric sequence returns
+ * to park, clamps with the door open, and waits for full door closure before moving again.
  */
 enum TendingOperation {
 	Collect(slot:Int, tool:String, fromTool:String, initial:Bool);
@@ -11,7 +12,8 @@ enum TendingOperation {
 	RequestDoorClose;
 	DoorClosed;
 	Unclamp;
-	/** Places a blank in the vise and clamps it. */
+	Clamp;
+	/** Places a blank; legacy mode also clamps here. Electric mode uses explicit Clamp after withdrawal. */
 	Load(tool:String, fromTool:Null<String>);
 	/** Leaves the vise after loading, through the loading route. */
 	LeaveVise(tool:String);
@@ -134,6 +136,7 @@ typedef TendingTransferRequest = {
 
 /** One production sequence owns both mission ordering and the paths it needs. */
 class TendingCyclePlan {
+	public final electricProcess:Bool;
 	public final rows:Int;
 	public final columns:Int;
 	public final firstSlot:Int;
@@ -142,9 +145,13 @@ class TendingCyclePlan {
 	public static function bearingBlocks():TendingCyclePlan
 		return new TendingCyclePlan(2, 3, [0, 1, 2, 3]);
 
-	public function new(rows:Int, columns:Int, slots:Array<Int>) {
+	public static function electricBearingBlocks():TendingCyclePlan
+		return new TendingCyclePlan(2, 3, [0, 1, 2, 3], true);
+
+	public function new(rows:Int, columns:Int, slots:Array<Int>, electricProcess:Bool=false) {
 		if (rows < 1 || columns < 1 || slots == null || slots.length == 0)
 			throw "Tending production needs a tray grid and at least one infeed slot";
+		this.electricProcess = electricProcess;
 		this.rows = rows;
 		this.columns = columns;
 		firstSlot = slots[0];
@@ -153,6 +160,22 @@ class TendingCyclePlan {
 			if (slot < 0 || slot >= rows * columns || seen.exists(slot))
 				throw 'Invalid or repeated tending slot $slot';
 			seen.set(slot, true);
+		}
+		if(electricProcess) {
+			sequence=[Collect(firstSlot,toolFor(0),toolFor(0),true),OpenDoor,Unclamp,Load(toolFor(0),null),
+				LeaveVise(toolFor(0)),Clamp,RequestDoorClose,DoorClosed,StartCycle];
+			for(cycle in 0...slots.length) {
+				var slot=slots[cycle],tool=toolFor(cycle),hasNext=cycle+1<slots.length;
+				var nextTool=hasNext ? toolFor(cycle+1) : tool;
+				if(hasNext)sequence.push(Collect(slots[cycle+1],nextTool,tool,false));
+				sequence.push(CycleReady);sequence.push(OpenDoor);sequence.push(Unload(slot,tool));
+				sequence.push(Retreat(tool)); // Return through the certified common park; no unverified exchange path.
+				if(hasNext){sequence.push(Load(nextTool,null));sequence.push(LeaveVise(nextTool));sequence.push(Clamp);}
+				sequence.push(RequestDoorClose);sequence.push(DoorClosed);
+				if(hasNext)sequence.push(StartCycle);
+				sequence.push(Deliver(slot,tool,nextTool,true));
+			}
+			return;
 		}
 		sequence = [Collect(firstSlot, toolFor(0), toolFor(0), true), OpenDoor,
 			Unclamp, Load(toolFor(0), null), RequestDoorClose, LeaveVise(toolFor(0)), DoorClosed, StartCycle];

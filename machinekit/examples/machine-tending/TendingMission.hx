@@ -45,11 +45,11 @@ class TendingMission {
 		}
 		function pick(occurrence:String, station:String, tool:String):Void result.push({kind: "pick",
 			at: {occurrence: occurrence, connector: "grasp"}, tool: tool,
-			timeoutSeconds: MOTION_TIMEOUT, approachDistance: cell.reach.handlingApproachMm / 1000,
+			timeoutSeconds: MOTION_TIMEOUT, approachDistance: cell.production.electricProcess ? 0 : cell.reach.handlingApproachMm / 1000,
 			toolYaw: TendingReach.toolYaw(cell.reach, station, tool)});
 		function place(target:materia.project.SceneArtifact.SceneArtifactPlace, station:String, tool:String):Void
 			result.push({kind: "place", at: target, tool: tool, timeoutSeconds: MOTION_TIMEOUT,
-				approachDistance: cell.reach.handlingApproachMm / 1000,
+				approachDistance: cell.production.electricProcess ? 0 : cell.reach.handlingApproachMm / 1000,
 				toolYaw: TendingReach.toolYaw(cell.reach, station, tool)});
 		function rowOf(slot:Int):Int return cell.production.rowOf(slot);
 		function columnOf(slot:Int):Int return cell.production.columnOf(slot);
@@ -96,7 +96,7 @@ class TendingMission {
 			}
 			else moveToVise(tool, "vise-load");
 			place(cell.viseLoadPlace(), "vise-load", tool);
-			clampPart();
+			if(!cell.production.electricProcess)clampPart();
 		}
 		var cycleRequest = -1, doorCloseRequest = -1;
 		for (operation in cell.production.operations()) switch operation {
@@ -111,6 +111,7 @@ class TendingMission {
 				signal(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, false);
 				doorCloseRequest = -1;
 			case Unclamp: unclampPart();
+			case Clamp: clampPart();
 			case Load(tool, fromTool): load(tool, fromTool);
 			case LeaveVise(tool): moveFromVise(tool, "vise-load");
 			case StartCycle: cycleRequest = startCycle();
@@ -120,8 +121,8 @@ class TendingMission {
 				wait(RobotInterfaceChannels.CNC_READY, true, CNC_SIGNAL_TIMEOUT);
 			case Unload(slot, tool):
 				moveToVise(tool);
-				unclampPart();
-				pick(blankOf(slot), "vise", tool);
+				if(cell.production.electricProcess){pick(blankOf(slot),"vise",tool);unclampPart();}
+				else {unclampPart();pick(blankOf(slot),"vise",tool);}
 			case Retreat(tool): moveFromVise(tool);
 			case Deliver(slot, tool, fromTool, returnToStage):
 				var station = 'outfeed-${rowOf(slot)}-${columnOf(slot)}';

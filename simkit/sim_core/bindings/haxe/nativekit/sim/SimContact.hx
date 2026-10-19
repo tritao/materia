@@ -7,5 +7,6 @@ typedef SimContact = {
   var distance:Float;
   var active:Bool;
   var wrenchValid:Bool;
+  /** World-axis contact force acting on bodyA; negate it for bodyB (newtons). */
   var force:Array<Float>;
 }

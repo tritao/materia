@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-electric-mass-properties-checks"
+  },
+  "entry": "TendingPhysicalMassChecks",
+  "sources": [
+    "TendingPhysicalMassChecks.hx"
+  ],
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "robotkit": {
+      "path": "../../../robotkit"
+    },
+    "cadbridge": {
+      "path": "../../../robotkit/cadbridge"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/electric-mass-properties-checks-run"
+}

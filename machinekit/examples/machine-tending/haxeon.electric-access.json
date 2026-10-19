@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-tending-electric-access"
+  },
+  "entry": "TendingElectricAccess",
+  "sources": [
+    "TendingReach.hx",
+    "TendingReachInputs.hx",
+    "TendingGeometryCache.hx",
+    "TendingReachSetupChecks.hx",
+    "TendingReachReuse.hx",
+    "TendingReachReuseChecks.hx",
+    "TendingReachPlacementChecks.hx",
+    "TendingReachLayout.hx",
+    "TendingReachCertificate.hx",
+    "TendingControllers.hx",
+    "TendingBlank.hx",
+    "TendingMission.hx",
+    "TendingCell.hx",
+    "PartTray.hx",
+    "TendingCellTable.hx",
+    "TendingCellRiser.hx",
+    "../bench-mill/EnclosedBenchMill.hx",
+    "../bench-mill/BenchMill.hx",
+    "../cnc-router/CncRouter.hx",
+    "TendingEndEffectorPreview.hx",
+    "TendingElectricAccess.hx",
+    "TendingElectricPlanner.hx",
+    "TendingElectricCollisionAudit.hx",
+    "TendingExactCad.hx",
+    "TendingElectricApproach.hx",
+    "TendingJawStrokeAudit.hx",
+    "TendingDoorSweepAudit.hx",
+    "TendingStockDatum.hx"
+  ],
+  "sourceRoots": [
+    ".",
+    "../bench-mill",
+    "../cnc-router"
+  ],
+  "dependencies": {
+    "processkit": {
+      "path": "../../../processkit"
+    },
+    "collisionkit-native": {
+      "path": "../../../collisionkit/native"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../"
+    },
+    "robotkit": {
+      "path": "../../../robotkit"
+    },
+    "motionkit-robot": {
+      "path": "../../../motionkit/robot"
+    },
+    "cadbridge": {
+      "path": "../../../robotkit/cadbridge"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    },
+    "machinekit-dh-gripper-example": {
+      "path": "../dh-gripper"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/electric-access-run"
+}

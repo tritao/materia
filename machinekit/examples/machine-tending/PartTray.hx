@@ -160,6 +160,14 @@ class PartTraySeatPad extends MachineComponent {
 		this.depth = depth;
 		this.height = height;
 		this.chamfer = chamfer;
+		// The loft is a convex eight-vertex solid. Preserve the exact seat datum
+		// rather than adding a mesh-hull offset at intended stock contact.
+		var vertices:Array<Float> = [];
+		for (z in [0.0, height]) for (x in [-1.0, 1.0]) for (y in [-1.0, 1.0]) {
+			vertices.push(x * (z == 0 ? width : width - 2 * chamfer) * 0.5);
+			vertices.push(y * depth * 0.5); vertices.push(z);
+		}
+		addFacet(new machinekit.component.CollisionHullFacet([vertices]));
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {

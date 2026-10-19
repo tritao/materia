@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-electric-gripper-physics"
+  },
+  "entry": "TendingElectricGripperPhysicsChecks",
+  "sources": [
+    "TendingElectricGripperPhysicsChecks.hx"
+  ],
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "robotkit": {
+      "path": "../../../robotkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/electric-gripper-physics-run"
+}
