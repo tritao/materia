@@ -14,6 +14,9 @@ import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 
 /** The editor's collision world over plain scene objects (COLLISION.md CL8a) and how it is shown (CL8b). */
+@:access(app.EditorScene)
+@:access(app.editor.ScenePresentation)
+@:access(nativekit.scene.MaterialData)
 @:access(app.Main.ReferenceEditorApp)
 @:access(app.EditorPerspectiveViewport)
 class SceneCollisionTests {
@@ -35,9 +38,23 @@ class SceneCollisionTests {
   }
 
   static function run():Void {
+    translucentDiagnostics();
     world();
     shown();
     editor();
+  }
+
+  static function translucentDiagnostics():Void {
+    var finish=materia.project.MaterialLibrary.appearance("polycarbonate");
+    for(colliding in [false,true]) {
+      var data=app.editor.ScenePresentation.diagnosticMaterialData(finish,"cad-preview",colliding);
+      check(Math.abs(data.value.get_opacity()-0.18)<1e-6,"Diagnostic colours preserve polycarbonate opacity");
+      check((data.value.get_flags() & NativeKitScene.NativeKitSceneConstants.NKS_MATERIAL_OPAQUE)==0,
+        "Diagnostic colours keep translucent surfaces in the blended pass");
+      check(Math.abs(data.value.get_roughness()-finish.roughness)<1e-6,"Diagnostic colours preserve surface finish");
+      var solid=app.editor.ScenePresentation.diagnosticMaterialData(materia.project.Appearance.Appearances.neutral(),"cad-preview",colliding);
+      check(solid.value.get_opacity()==1,"Opaque parts stay opaque under diagnostics");
+    }
   }
 
   static function world():Void {
@@ -92,6 +109,12 @@ class SceneCollisionTests {
       return scene.configureRenderView(new SceneView(), Transform.identity(), null, null, -1, with).materialOverrideValues().length;
     scene.select("scene");
     check(tinted(pairs) == 4, 'all four objects are tinted (${tinted(pairs)})');
+    scene.renderSnapshot();
+    check(!scene.presentation.presentationStale,"New diagnostic materials are published before rendering");
+    var materials=scene.presentation.diagnosticMaterials;
+    var cachedCount=[for(_ in materials) 1].length;
+    tinted(pairs);
+    check([for(_ in materials) 1].length==cachedCount,"Diagnostic materials are reused across frames");
     scene.select("a");
     check(tinted(pairs) == 3, "the selected object keeps its selection highlight");
     check(tinted() == 0, "without pairs nothing is tinted");

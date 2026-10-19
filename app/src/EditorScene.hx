@@ -354,10 +354,6 @@ class EditorScene {
       scene.setMaterialData(selectionMaterial, MaterialData.opaque(1.0, 0.88, 0.35).setRoughness(0.7));
       hoverMaterial = scene.createMaterial();
       scene.setMaterialData(hoverMaterial, MaterialData.opaque(0.45, 0.78, 1.0).setRoughness(0.55));
-      presentation.collidingMaterial = scene.createMaterial();
-      scene.setMaterialData(presentation.collidingMaterial, MaterialData.opaque(0.92, 0.22, 0.2).setRoughness(0.6));
-      presentation.nearMaterial = scene.createMaterial();
-      scene.setMaterialData(presentation.nearMaterial, MaterialData.opaque(1.0, 0.66, 0.18).setRoughness(0.6));
       profileLoadEnd("finalMaterial", phaseStarted);
       phaseStarted = profileLoadStart();
       snapshot = scene.snapshot();

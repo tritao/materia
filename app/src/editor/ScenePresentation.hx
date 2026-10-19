@@ -34,9 +34,8 @@ class ScenePresentation {
   public var renderNeedsRefresh:Bool = false;
   public var selectionMaterial:Material;
   public var hoverMaterial:Material;
-  /** Objects in collision, and objects nearer than the near distance (COLLISION.md CL8b). */
-  public var collidingMaterial:Material;
-  public var nearMaterial:Material;
+  /** Cached diagnostic colours with the source finish and alpha (COLLISION.md CL8b). */
+  final diagnosticMaterials:Map<String,Material> = [];
   public final faceHoverNodes:Map<String, NodeId> = new Map();
   public final faceHoverGeometries:Map<String, Geometry> = new Map();
   public final faceHoverIndexes:Map<String, Int> = new Map();
@@ -179,7 +178,7 @@ class ScenePresentation {
       for (id in colliding.keys()) if (id != owner.selectedId && id != hoveredId) {
         var runtime = bridge.runtime(id);
         if (runtime != null) {
-          var highlight = colliding.get(id) == true ? collidingMaterial : nearMaterial;
+          var highlight = diagnosticMaterial(owner, owner.object(id), colliding.get(id) == true);
           view.setMaterial(runtime.node, highlight); threadHighlights.set(id, highlight);
         }
       }
@@ -255,6 +254,27 @@ class ScenePresentation {
       view.replacePoses(poseNodes, poseTransforms);
     }
     return view;
+  }
+
+  /** Diagnostic colours retain the authored surface finish and transparency. */
+  function diagnosticMaterial(owner:EditorScene, item:EditorSceneObject, colliding:Bool):Material {
+    var finish = item.appearance == null ? Appearances.neutral() : item.appearance;
+    var key = haxeon.wire.JsonWire.encode([finish.finish, Std.string(finish.metallic),
+      Std.string(finish.roughness), item.kind, colliding ? "collision" : "near"]);
+    var cached = diagnosticMaterials.get(key);
+    if(cached!=null)return cached;
+    var material = owner.scene.createMaterial();
+    owner.scene.setMaterialData(material,diagnosticMaterialData(finish,item.kind,colliding));
+    diagnosticMaterials.set(key,material);
+    // The renderer must see newly allocated materials in its next snapshot.
+    presentationStale = true;
+    requireRenderRefresh();
+    return material;
+  }
+
+  static function diagnosticMaterialData(finish:Appearance, kind:String, colliding:Bool):MaterialData {
+    var color = colliding ? [0.92,0.22,0.2] : [1.0,0.66,0.18];
+    return materialFor(color[0],color[1],color[2],finish,kind);
   }
 
   public static function materialFor(red:Float, green:Float, blue:Float, appearance:Null<Appearance>,
