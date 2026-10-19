@@ -91,8 +91,17 @@ void main() {
         vec2 duv1 = dFdx(vertex_texcoord), duv2 = dFdy(vertex_texcoord);
         vec3 T = cross(dp2, N) * duv1.x + cross(N, dp1) * duv2.x;
         vec3 B = cross(dp2, N) * duv1.y + cross(N, dp1) * duv2.y;
-        float scale = inversesqrt(max(max(dot(T, T), dot(B, B)), 1.0e-8));
-        N = normalize(T * (mapped.x * scale) + B * (mapped.y * scale) + N * mapped.z);
+        // Derivatives depend on world units and pixel footprint. Rescale before
+        // squaring rather than clamping their length to a world-scale epsilon:
+        // that clamp makes normal-map strength vary with distance and zoom.
+        float frame_max = max(max(max(abs(T.x), abs(T.y)), abs(T.z)),
+                              max(max(abs(B.x), abs(B.y)), abs(B.z)));
+        if (frame_max > 0.0) {
+            T /= frame_max;
+            B /= frame_max;
+            float scale = inversesqrt(max(dot(T, T), dot(B, B)));
+            N = normalize(T * (mapped.x * scale) + B * (mapped.y * scale) + N * mapped.z);
+        }
     }
     vec4 metal_rough = texture(metallic_roughness_texture, vertex_texcoord);
     float hemisphere = 0.5 + 0.5 * dot(N, vec3(0.0, 0.0, 1.0));

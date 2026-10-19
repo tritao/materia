@@ -99,6 +99,13 @@ if(NK_BUILD_TESTS)
                 TIMEOUT 30
                 ENVIRONMENT "LIBGL_ALWAYS_SOFTWARE=1")
 
+            add_executable(nativekit_scene_render_normal_tests tests/normal_mapping.cpp)
+            target_compile_features(nativekit_scene_render_normal_tests PRIVATE cxx_std_20)
+            target_include_directories(nativekit_scene_render_normal_tests PRIVATE src "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src")
+            target_link_libraries(nativekit_scene_render_normal_tests PRIVATE NativeKit::scene_render NativeKit::scene NativeKit::gpu NativeKit::nativekit)
+            add_test(NAME scene_render_normal_mapping COMMAND ${NKSRENDER_XVFB_RUN} -a $<TARGET_FILE:nativekit_scene_render_normal_tests>)
+            set_tests_properties(scene_render_normal_mapping PROPERTIES LABELS "scene;render;graphics;gpu" TIMEOUT 30 ENVIRONMENT "LIBGL_ALWAYS_SOFTWARE=1")
+
             add_executable(nativekit_scene_render_ao_tests tests/ambient_occlusion.cpp)
             target_compile_features(nativekit_scene_render_ao_tests PRIVATE cxx_std_20)
             target_include_directories(nativekit_scene_render_ao_tests PRIVATE src "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src")
