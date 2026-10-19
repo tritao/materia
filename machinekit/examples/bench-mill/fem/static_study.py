@@ -20,6 +20,7 @@ from compliance_budget import budget, tool_case_packet
 from provenance import capture_sources
 from leveling import add_influence_steps, offsets_from_tables
 from leveling_fixture import verify as verify_leveling
+from independent_static import run_independent
 
 
 def validate_config(config):
@@ -135,7 +136,7 @@ def main():
         if args.tool_case:
             packet = tool_case_packet(packet,json.loads(args.budget.read_text()),args.tool_case)
         validate_config(config)
-        source_names=("static_study.py","leveling.py","leveling_fixture.py","mesh_cache.py","frame_mesh.py","frame_solver.py","packet.py","tet_fixture.py","spring_fixture.py","ccx_deck.py","mesh_resolution.py","compliance.py","compliance_budget.py","provenance.py","solver_fixtures.py")
+        source_names=("static_study.py","independent_static.py","leveling.py","leveling_fixture.py","mesh_cache.py","frame_mesh.py","frame_solver.py","packet.py","tet_fixture.py","spring_fixture.py","ccx_deck.py","mesh_resolution.py","compliance.py","compliance_budget.py","provenance.py","solver_fixtures.py")
         source_hashes={name:digest(Path(__file__).with_name(name)) for name in source_names}
         provenance_output=args.output.resolve()/"provenance"
         source_build=capture_sources(Path(__file__).resolve().parents[4],provenance_output)
@@ -160,13 +161,8 @@ def main():
         spring_fixture = verify_springs(ccx,args.output/"spring-verification")
         leveling_fixture = verify_leveling(ccx,args.output/"leveling-verification")
         def solve_case(output, write):
-            previous_input=digest(output/"frame.inp") if (output/"frame.inp").exists() else None
-            previous_result=(output/"frame.dat").exists() and (output/"solver.log").exists() and "Job finished" in (output/"solver.log").read_text() and "*ERROR" not in (output/"solver.log").read_text().upper() and re.search(rf"Using up to\s+{args.threads}\s+cpu",(output/"solver.log").read_text()) is not None
             model=write()
-            if not (args.resume and previous_result and previous_input==model["inputSha256"]):
-                run_solver(ccx,output,args.timeout,args.threads)
-            else:
-                print(f"Reusing identical completed deck: {output}",flush=True)
+            model["independentLoadCases"] = run_independent(ccx,output,args.timeout,args.threads,args.resume)
             return model
         results = []
         for size in args.sizes:

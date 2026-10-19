@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--ccx',required=True);parser.add_argument('--heavy-run',type=Path,default=Path('/home/joao/dev/materia-cache/tools/heavy-run'))
     parser.add_argument('--config',type=Path,default=Path(__file__).with_name('frame-study.json'))
     parser.add_argument('--sizes',nargs='+',type=float,default=[40,30]);parser.add_argument('--resume',action='store_true')
-    parser.add_argument('--threads',type=int,choices=[1,2,4],default=4)
+    parser.add_argument('--threads',type=int,choices=[1,2,4],default=1)
     parser.add_argument('--stage',choices=['all','modal','static'],default='all')
     args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
     entries=json.loads((args.packets/'poses.json').read_text())

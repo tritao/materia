@@ -26,8 +26,9 @@ The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN
 - Geometry screening: the old cutter-dominated budget is superseded as a decision basis.
   The 30% target is judged on the machine loop excluding the job-dependent tool,
   at spindle nose and a 20 mm steel / 40 mm gauge test bar.
-  New reference-point solves, modal and travel screening are pending.
-  Assembly joints, the nine-pose sweep, contact/uncertainty and modal work remain open.
+  Nine-pose upper-bound modal convergence passes; new reference-point statics
+  and their travel screening are running. Assembly joints, contact/uncertainty
+  and physical modal acceptance remain open.
 
 ## Tool-reference and modal follow-up
 
@@ -73,7 +74,7 @@ from one loaded build. All nine packets now pass the part/concept, mass/inertia 
 36 fixed-frame STEP hashes remain identical across the matrix. The pose index
 is `build/fem/modal-poses/poses.json`; center packet SHA256 is
 `c96473be097a62a1410c45fdb45b3498d3e4bc53db26ed06ae366c4a52b7381e`.
-The complete modal/static travel comparison remains pending.
+The modal travel comparison passes its numerical gate; the static comparison is running.
 
 The root filesystem filled during concurrent work. Generated FEM artifacts were
 moved intact to `/media/joao/DEV/materia-fem-runs/bench-mill-20261019`, with the
@@ -402,11 +403,12 @@ screening for this pose, tool and assumed hardware. This is a conditional budget
 selected supplier data and joint measurements remain open inputs.
 
 The first-milestone numerical and budget gates pass for the frozen center run.
-Later work includes the distributing-coupling assembly model, all nine poses,
-uncertainty/contact checks and modal inertia tensors. Geometry candidates stay
-deferred until the compliance budget justifies them.
+Later work includes the distributing-coupling assembly model and uncertainty/contact
+checks. The modal inertia/export and nine-pose numerical gates now pass;
+the revised static travel budget is running. Geometry candidates stay deferred
+until that budget and modal review justify them.
 
-The nine-pose **modal numerical gate passes** for all 12 modes, both supports,
+The nine-pose four-thread **modal numerical gate is provisional pending serial verification** for all 12 modes, both supports,
 positive Jacobians and resolved minimum sections on every counted level.
 Maximum last-refinement frequency change across poses is **3.59%** (limit 5%).
 Two upper corners needed 27 mm third levels: `xminus_yplus_zupper` resolves
@@ -473,3 +475,21 @@ results are superseded for gravity/leveling by this correction; their no-gravity
 linear unit-load matrices are retained as historical evidence only.
 The already completed modal decks have no gravity/precompression and are unaffected;
 the static helper change is recorded after their immutable source snapshots.
+
+
+### Serial solver qualification in progress
+
+A repeated center static check exposed nondeterministic four-thread results:
+the identical isolated Z deck failed equilibrium with four threads, while its
+one-thread result recovers the previously consistent response and closes
+reactions near round-off. Isolating load cases alone did not cure this.
+The earlier one/four-thread modal spot comparison is insufficient to qualify
+all studies. Four-thread numerical gates are therefore provisional; a full
+serial nine-pose modal matrix will precede the serial static sweep.
+Raw four-thread results remain under `build/fem/nine-pose-upper-bound` for audit;
+replacement runs are `build/fem/nine-pose-serial` and `tool-cases-serial`.
+No geometry decision uses the provisional results. `pose_sweep.py` now defaults
+to one thread. Static cases also run in fresh processes at solver time zero;
+raw case DAT/deck/log hashes are recorded, with case-time relabeling only in
+an explicitly derived concatenated DAT. The known coupled-seat solver fixture
+passes that path; all **34 Python tests** pass. No gate tolerance is relaxed.
