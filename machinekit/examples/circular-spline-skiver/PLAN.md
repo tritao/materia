@@ -122,6 +122,10 @@ hobber branch must land first (Working rules).
   spindle encoder for C.
 - Ring workholding: a diaphragm chuck or face clamp with a centring bore. Clamping distortion of
   the thin-ish ring is a named error source (three-lobe after unclamping).
+- Candidate bought spindle: Demat RTVS230H-030 (Ø280, 37/55 Nm, 1500/2000 rpm, ±10″/±6″,
+  water-cooled; ≈ US$5,000–12,000 estimated). Runout and sync data must be requested
+  (`machinekit/STRAIN_WAVE_RESEARCH.md`, Suppliers and prices). Model it with PS4's spindle
+  part's bought form, carrying datasheet or measured values.
 
 **PS-D6. Programs are multi-pass and geometry-derived.**
 - `SkivingJob(target, tool, machine, ring)`:

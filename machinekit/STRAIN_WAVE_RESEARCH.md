@@ -381,6 +381,189 @@ independently.
   (US 11,839,927 / 11,198,181), bulk-metallic-glass cast flexsplines
   (US 10,151,377, US 11,859,705), 3D-printed polymer.
 
+### Machine architectures (added 2026-10-19)
+
+- **EMAG Koepfer K 160 is a horizontal hobber**, listed under EMAG's horizontal
+  gear hobbing machines: module 0.3–2.5, workpiece Ø ≤ 100 mm, length ≤ 1000 mm.
+  The hobber plan's original HB-D1 wrongly called our vertical layout a K 160
+  match.
+  <https://www.emag.com/machines/gear-cutting-machines/gear-hobbing-machines/horizontal-gear-hobbing-machines/koepfer-k-160.html>
+- **Mitsubishi GE15A is a vertical hobber**, about 7 t (15,400 lb), radial travel
+  140 mm, axial 250 mm, table ≤ 300 rpm (dealer listing,
+  <https://tramar.machinehub.com/?p=6632>). It is the vertical,
+  moving-column-type reference our hobber follows (HB-D1 revised, 2026-10-19).
+- **Turn-and-hob in one machine exists** (DMG MORI hob option on NLX/ALX/CTX TC,
+  INDEX turn-mill gear cutting, EMAG VLC 250 WF / VSC 400 WF, Liebherr complete
+  machining, Felsomat FHC green turning + hobbing). It is mostly medium precision:
+  WTO's hobbing unit for turning centres quotes ISO 1328 **class 8**.
+  <https://www.wto-tools.com/Marketing/Newsletter/WTO/WTO_Abwaelzfraeseinheit/NEWSLETTER_07_2020_KV1_0_US.html>
+  Precision flexspline lines keep hard turning, honing and hobbing on separate
+  machines. Our split: the lathe plan (`examples/lathe/PLAN.md`) makes the
+  blanks; the hobber cuts the flexspline teeth; the skiver
+  (`examples/circular-spline-skiver/PLAN.md`) cuts the circular-spline teeth.
+- **Power skiving needs its own machine.** Both spindles are fast: about 1,500 rpm
+  table and 6,000 rpm tool on our reference ring, against 15 rpm hobbing. That
+  takes a cantilevered tool inside the ring, a crossed-axis angle of 15–30°, and a
+  much faster gearbox. At 1,500 rpm, 1 µs of sync jitter ≈ 33″ ≈ 4.9 µm at r 30 mm.
+  Dedicated makers: Liebherr, Präwema, DVS/Pittler, Mitsubishi, Gleason.
+
+### Double-flexspline reducer (Ling et al. 2023)
+
+Ling, Zhao, Xiao, Zhou, Ma, He, Liu, "A Novel Strain Wave Gear Reducer with
+Double Flexsplines", *Actuators* 12 (2023) 313, doi:10.3390/act12080313. CC BY.
+Authors are from AICI Technology, KUKA Robotics Guangdong and SIAT; the design is
+patented by the first author (US 11,614,153).
+
+- **Idea.** The circular spline is made slightly flexible, and an adjustable
+  **limit ring** with a tapered contact surface preloads it. Backlash is set at
+  assembly and can be re-tightened as teeth wear, so machining tolerances can be
+  looser.
+- **Measured.** Five size-14, ratio-80 units (rated 10 Nm, peak 61 Nm):
+  - K1/K2/K3 ≈ 2.56/2.51/2.63 Nm/arcmin;
+  - lost motion ≈ 11″, hysteresis ≈ 37″;
+  - transmission error < 20″, repeatability ±4.9″.
+  Without the ring: lost motion 44.8″ and hysteresis 87.9″. With it: 11.6″ and
+  32.8″.
+- **Bench.** Heidenhain encoders on input and output (±1–2″), HBM torque
+  sensors, Kollmorgen motors, Wittenstein load gearbox. A template for our
+  end-of-line test bench.
+- **Weaknesses.**
+  - No tolerance-relief study, no wear or life test, no efficiency or starting
+    torque reported.
+  - The preload raises stresses (flexspline 304 → 339 MPa, circular spline
+    153 → 218 MPa, contact +32 MPa).
+  - The comparison with Harmonic Drive catalogue values sets measured typical
+    values against guaranteed maxima.
+- **For us.** It adjusts backlash, not pitch accuracy, so accurate teeth are
+  still needed. A compliant-circular-spline-plus-preload-ring option belongs in
+  the tooth-design plan's later work. Check the patent before using the idea in a
+  product.
+
+## Suppliers and prices (collected 2026-10-19)
+
+From web listings and marketing pages, not experience with these companies. All
+specs are claims; request test certificates for the actual units.
+
+### What a hobbing C table must state (send with every request)
+
+| Item | Requirement |
+|---|---|
+| Use | Slow precision rotation under an electronic gearbox, ≤ 100–300 rpm |
+| Size | Bearing ≈ Ø200–250 mm class, parts up to Ø140 mm |
+| Runout | Radial and axial, total and non-repeatable, at the table face: ≤ 1–2 µm (class 5–6); ≤ 0.5 µm for class 3 |
+| Tilt stiffness | Stated, with the mandrel and part stack ≈ 100–150 mm above the face |
+| Encoder | Absolute, ≥ 2²³ counts; accuracy ±1–2″, two heads preferred; **interpolation error** stated; EnDat 2.2 or BiSS-C |
+| Smoothness | Cogging torque, and torque and speed ripple at 10–20 rpm |
+| Seal | Type and drag torque. Non-contact labyrinth preferred (contact-seal drag spoiled the GE15FRplus's rotation accuracy) |
+| Through-bore | Room for a rotary union to actuate the mandrel automatically |
+| Clamp | Holding torque |
+| Thermal | Cooling, and heat at duty |
+| Data | Inertia, torque constant, continuous and peak torque, mass, mounting pattern, test certificate for the unit |
+
+Positioning and repeatability figures alone do not qualify a hobbing table.
+
+### Complete direct-drive tables
+
+- **Foshan Demat (德玛特)**, <https://www.maxfara.cn>, info@maxfara.cn,
+  +86 18927758400, Foshan Nanhai. Machine-tool oriented; publishes spec tables
+  (as images on product pages).
+  - RTV vertical DD tables (air 6 bar clamp, IP67):
+
+    | Model | Table Ø | Bore | Cont./peak torque | Rated/max speed | Load | Positioning / repeat |
+    |---|---|---|---|---|---|---|
+    | RTV140-030 | 125 | 30 | 8.65 / 38 Nm | 200 / 300 rpm | 20 kg | ±5″ / ±2″ |
+    | **RTV210-050** | **200** | **40** | **54.9 / 223 Nm** | 200 / 234 | 50 kg | ±5″ / ±2″ |
+    | RTV210-070 | 160 | 40 | 65 / 309 | 200 / 234 | 50 kg | ±5″ / ±2″ |
+    | RTV230-070 | 320 | 30 | 65 / 309 | 120 / 150 (water, oil clamp) | 300 kg | ±5″ / ±2″ |
+    | RTV385-050 | 356 | 60 | 390 / 735 | 60 / 100 (water) | 400 kg | 10″ / 4″ |
+
+    **RTV210-050 is the first candidate for the hobber C table.** IP67 suggests
+    contact seals; ask about drag and a low-drag option. No runout,
+    interpolation-error or ripple data is published.
+  - RTVS high-speed vertical DD tables (water-cooled):
+    RTVS160-030 (Ø125, 19.1/38 Nm, 1000/2000 rpm, ±5″/±5″),
+    **RTVS230H-030** (Ø280, 37/55 Nm, 1500/2000 rpm, ±10″/±6″),
+    RTVS310-030 (Ø400, 133/286 Nm, 500/600 rpm, ±5″/±2″).
+    **RTVS230H-030 is the candidate skiving work spindle.**
+  - DDF water-cooled frameless DD motors, IP67: DDF145, DDF160, DDF195 and
+    DDF230, stack lengths 30–200; continuous 14–507 Nm, peak 22–934 Nm. Claimed
+    ±3″ positioning and ±1″ repeat in their system. For a built-up table or the
+    A swivel.
+  - airUPRT air-bearing rotary table: 70 nm axial and 100 nm radial runout, ±1″
+    repeat, zero-cogging DD motor. For class 3 or a gear-measuring station; load
+    and stiffness to confirm.
+  - Also linear motors and modules (for the wave-generator cam's non-round X),
+    robot-joint frameless motors, DD swivel heads and five-axis cradles.
+- **Shenzhen ZRT**: DD tables for CNC, ±15″ absolute / ±2″ repeat claimed,
+  ≈ US$1,700–4,300, MOQ 1. A budget probe unit.
+  <https://direct-drive-motor.en.made-in-china.com/>
+- **Jiangsu 3F (锋桦)**: DD motors Ø60–490 mm, 1–1200 N·m, ±10″ / ±0.5″
+  claimed. Fits the A swivel. <https://www.3fgearmotor.com/products/dd157.html>
+- **Qingdao Zhihe (智和)**: LDE outer-rotor DD motors, ±1.5″ repeat.
+  <https://zcoe-dd.com/>
+- **HIWIN (Taiwan)**: torque-motor rotary tables (water-cooled motor,
+  integrated precision bearing, absolute encoder, clamp). The regional
+  reference. <https://www.hiwin.com/torque-motors-rotary-tables.html>
+- TJR (Taiwan) DD tables; Nanjing Qitu (≈ US$4,000 listing); Zolix (lab stages,
+  not machine-tool loads).
+- Tianjin Betek, a Chinese gear-machine builder, uses a DD C table on its YK3132Z
+  six-axis hobber with NUM drives.
+  <https://www.num.com/references/tianjin-betek-machinery-manufacturing-co>
+
+### Components (built-up table)
+
+- **Bearings (YRT / crossed roller, P4/P2 claimed):** ZWZ (Wafangdian), Dalian
+  DYZV, and a Luoyang cluster (Hongyuan, Monton, LKP, Yufanda). One source cites
+  ≈ 1.5 µm rotation accuracy without test conditions. Installation (seat
+  accuracy, zero-clearance fits) matters as much as grade.
+- **Ring encoders:** Changchun Yuheng Optics (长春禹衡), <https://www.yu-heng.cn/>.
+  A broker report quotes the company claiming over 90 % of Heidenhain's
+  performance at 20–30 % lower price. No ±1″ absolute ring spec was found.
+- **Frameless torque motors:** Shenzhen Mosrac (强和, F/U series, custom),
+  <https://www.mosrac.cn/>; Kinco (步科, low-cogging claim); also Han's Motor,
+  Leadshine, Wolong (mostly for robot joints).
+
+### Price anchors and estimates
+
+- Found: ZRT US$1,700–4,300 (new); Nanjing Qitu ≈ US$4,000 (new); Nikken
+  DDRT-200X ≈ US$12,500 (**used**); HIWIN TMN71E ≈ US$1,300 (used, single
+  listing). Air-bearing stages (PI, Aerotech) are quote-only.
+- Our estimates (order of magnitude, not quotes):
+  - Demat RTV210-050 ≈ US$3,000–8,000;
+  - RTVS230H-030 ≈ US$5,000–12,000;
+  - DDF motor ≈ US$500–3,000 each;
+  - airUPRT ≈ US$10,000–30,000.
+
+  Western or Japanese equivalents are typically several times these. Budget
+  extra for drivers (≈ US$500–2,000 each, if not included), cables, rotary
+  union, shipping, duty and VAT, and test certificates.
+- **Prototype hobber bought hardware: ≈ US$25,000–65,000** (rough), before our
+  own machining, assembly and metrology:
+  - C table $3–8k;
+  - hob motor spindle $3–10k;
+  - A swivel $1–3k;
+  - three ball-screw axes with guides, scales and servos $5–15k;
+  - controller with electronic gearbox $3–15k;
+  - mineral-cast base $3–8k;
+  - mandrel and hob $2–6k.
+
+  The controller and spindle choices swing it most.
+
+### Approach
+
+1. Send one request for quotation with the specification table above to Demat
+   (RTV210-050, RTV210-070, RTVS230H-030, DDF195/DDF145, airUPRT), HIWIN
+   (reference) and ZRT (budget). Include the missing-data items: runout,
+   interpolation error, ripple at 10–20 rpm, seal drag, stiffness, thermal,
+   rotary union, test certificate.
+2. Price the built-up alternative: a ZWZ/DYZV or Luoyang P4/P2 bearing, a Yuheng
+   ring encoder, a Mosrac or Kinco frameless motor, and our own housing.
+3. Buy two candidates (Demat or HIWIN, plus ZRT as a budget probe). Measure them
+   on a small bench: encoders on both sides, a runout probe, speed ripple at
+   15 rpm. This is the first piece of the end-of-line bench.
+4. Enter the measured data into the hobber model's bought-table form and rerun
+   the HB11 table sources.
+
 ## Open questions
 
 - Get the Guida 2025 PDF and extract the model equations and parameters.
@@ -388,3 +571,4 @@ independently.
   parameters.
 - Collect catalogue stiffness, hysteresis and efficiency data for sizes 14–32
   as the default parameter table.
+- Quotes and test data for the C table candidates (Suppliers and prices).
