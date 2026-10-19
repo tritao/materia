@@ -61,6 +61,8 @@ class MachineControlPanel {
     var style = new LayoutStyle();style.width=LayoutAxis.grow();style.childGap=8;
     style.padding=new Insets(12,12,12,12);
     var rows:Array<KeyedView> = [new KeyedView("heading",app.sectionHeading("MACHINE CONTROL"))];
+    var guardPanel=EnclosureGuardPanel.build(app.simulation);
+    if(guardPanel!=null)rows.push(new KeyedView("enclosure-guard",guardPanel));
     var viewport=app.perspectiveViewport;
     var cup=app.simulation.hobbingPlayer();
     if(cup!=null&&cup.handling!=null){

@@ -28,8 +28,8 @@ Seals, the plinth transition, mounting/retention hardware, tray slope, coolant
 flow, extractor performance and impact/fire ratings remain unqualified. The
 layout report lists these rule violations; geometric clearance is not a claim
 of fluid containment or protective qualification. The shared EN5 guard controller and fitted-door kinematic adapter are implemented
-and exercised below. Hardware actuator/lock selection and live cutting-runtime
-binding remain separate work. The opening collision proxy is exact for a rectangular cutout;
+and exercised below. The enclosed desktop scene also binds the guard to the live
+MuJoCo cutting runtime. Hardware actuator/lock selection remains separate work. The opening collision proxy is exact for a rectangular cutout;
 a round port uses a circumscribed-square aperture proxy, while its CAD is round.
 
 Run the focused CAD acceptance from the worktree root:
@@ -45,7 +45,7 @@ Outputs under `build/enclosure/`: `hobber.mtrg`, `layout.json`, `checks.json`.
 Acceptance checks 48 machine/door positions, exact near-pair intersections,
 the loading reservation, removable service openings, the round port cut and
 mass, collision aperture proxy and assembly save/reopen. It is sampled clearance
-evidence; the scene does not run a production cycle.
+evidence; these checks do not qualify a production cycle.
 
 ## Electrical rack mounting
 
@@ -96,10 +96,38 @@ moving leaf against stationary enclosure parts at 21 positions across its stroke
 `build/enclosure/guard-checks.json` records the controller simulation results.
 Lock feedback and spindle/axis standstill are independent simulated inputs in
 these checks; commands and elapsed time never substitute for their confirmation.
-The desktop's manual joint slider is a geometry preview, and the separate cutting
-entrypoints are not yet bound to this controller. No hardware safety qualification
-is claimed by this simulation.
+The desktop's manual joint slider remains a geometry preview. In the enclosed
+scene, press Play and use the Machine panel's enclosure controls: Open door,
+Close door and Start cut. Cutting requires a fresh Start cut after closed/locked
+confirmation. Opening during a cut requests a controlled stop and waits for
+measured spindle and axis standstill before releasing the independent simulated
+lock. Door movement uses a process-owned joint, separate from cutting plans.
 
-Validation: 42 shared-controller assertions and 971 fitted-door assertions pass.
+The live model assumes a 200 mm/s door rate, 400 mm/s² acceleration, 50 ms lock
+actuation, and 250 ms of consecutive measured standstill. Thresholds are
+0.01 mm/s for linear axes and 0.0001 rad/s for rotary axes. These are simulation
+policy values. MuJoCo is required for the authored rotary brakes. Door-open setup
+jogging is not exposed by the live controls.
+
+After access interrupts a cut, use Reset simulation before starting again: this
+restores stock and requires another explicit start. Reset guard only clears a
+safe guard fault; it does not resume an interrupted cut. Native E-stop or boundary
+interruption removes cutting permission and latches the guard. No hardware safety
+qualification is claimed by this simulation.
+
+Run the native integration check (using this branch's native libraries):
+
+```sh
+/home/joao/dev/materia-cache/tools/heavy-run --mem 6G --need 5G --label enclosure-live -- env HAXEON_COMPILER_SERVER=0 ./haxeon/scripts/haxeon run --jobs=1 --project=app/tests/enclosure-guard/haxeon.json
+```
+
+Validation: 43 shared-controller assertions and 971 fitted-door assertions pass.
 The CAD acceptance passes 48 machine/door states, 624 exact near-pair checks,
 21 leaf-travel samples, loading/service clearances and assembly save/reopen.
+
+Live native acceptance passes 18,798 assertions using the fitted coarse hobber:
+artifact binding validation, native end switches and lock feedback, no automatic
+cut on Play, actual hob-spindle rotation, controlled stop before unlock, door
+reclosure, no access/reset restart, boundary interruption, native E-stop feedback
+and operator-panel actions. Contact collisions are disabled in this controller
+fixture; the separate CAD clearance checks remain the geometry evidence.

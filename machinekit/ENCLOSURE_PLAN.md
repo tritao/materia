@@ -284,9 +284,9 @@ EN0 ── EN1 ── EN2 ── EN3 ── EN4 ── EN5 ── EN6 ── EN7
 | EN2 | planned | |
 | EN3 | planned | |
 | EN4 | in progress: fitted front-loading generator and plinth/tray interface | |
-| EN5 | in progress: shared guard controller, end switches and fitted hobber kinematic adapter tested; live runtime/hardware binding remains | |
+| EN5 | in progress: shared guard controller, end switches, fitted adapter and live hobber runtime binding; hardware qualification remains | |
 | EN6 | planned | |
-| EN7 | in progress: current hobber geometry fitted; guard and qualification remain open | |
+| EN7 | in progress: current hobber geometry fitted; live guard integrated; containment and hardware qualification remain open | |
 | EN8 | planned | |
 | EN9 | planned | |
 | EN10 | planned | |
@@ -367,3 +367,20 @@ standstill feedback. Focused tests use the fitted 610 mm joint, sensor save/reop
 and simulated motion-permission consumption. These are simulation/control-contract
 tests; physical actuator/lock sizing, safety validation, the live cutting-runtime
 binding and the unchanged-timing bench-mill port remain follow-on work.
+
+### EN5 live enclosed-hobber runtime
+
+The enclosed artifact carries explicit door/sensor/hazardous-axis bindings and
+feedback policy. The app reads native joint switches and measured velocities,
+qualifies consecutive standstill samples, and runs the guard before the hobbing
+player on each tick. Cutting starts only on an explicit guarded request. Door
+access requests a controlled cutting stop; the independently simulated lock
+releases after confirmed standstill, then a process-owned actuator moves the
+leaf without changing cutting-axis plans or brake ownership. The Machine panel
+exposes door, cutting and reset actions with feedback and explanatory status.
+
+Interrupted cutting requires a full simulation reset (including stock) and a
+fresh start. Physical actuator/lock selection, safety qualification, bench-mill
+port and containment/fabrication requirements remain open. The live path does
+not expose door-open setup jogging. See the hobber ENCLOSURE.md for assumed
+rates, confirmation policy and the native integration check.

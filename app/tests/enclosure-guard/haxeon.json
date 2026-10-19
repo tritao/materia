@@ -1,0 +1,1 @@
+{"version":1,"entry":"tests.EnclosureRuntimeTests","sourceRoots":["../src","../../../machinekit/examples/flexspline-hobber"],"scopeSourceRoots":false,"dependencies":{"app":{"path":"../.."},"machinekit":{"path":"../../../machinekit"}},"target":"host","outputDir":"build"}

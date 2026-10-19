@@ -87,6 +87,7 @@ class ApplicationSimulation {
   var power:Null<SimulatedMobilePower> = null;
   var cnc:Null<CncProgramPlayer> = null;
   var hobbing:Null<HobbingProgramPlayer> = null;
+  var enclosureGuard:Null<EnclosureGuardPlayer> = null;
   /** Robot zone monitors own native collision worlds; they go with their simulation. */
   var zoneMonitors:Array<SimulatedRobotZoneAdapter> = [];
   var print:Null<PrintProgramPlayer> = null;
@@ -176,6 +177,7 @@ class ApplicationSimulation {
     if (tools != null) members.push(tools);
     if (power != null) members.push(power);
     if (cnc != null) members.push(cnc);
+    if (enclosureGuard != null) members.push(enclosureGuard);
     if (hobbing != null) members.push(hobbing);
     if (print != null) members.push(print);
     if (machineProgram != null) members.push(machineProgram);
@@ -205,6 +207,7 @@ class ApplicationSimulation {
     var candidateWarnings:Array<String> = [];
     var candidateCnc:Null<CncProgramPlayer> = null;
     var candidateHobbing:Null<HobbingProgramPlayer> = null;
+    var candidateGuard:Null<EnclosureGuardPlayer> = null;
     var candidatePrint:Null<PrintProgramPlayer> = null;
     var pendingCnc:Null<{job:CncJob, robot:AssemblyRobot,
       input:Null<String->Null<EventValue>>, interfaceManaged:Bool}> = null;
@@ -461,6 +464,12 @@ class ApplicationSimulation {
         if(candidateAssembly==null||session==null)throw "Hobbing needs its simulated assembly";
         candidateHobbing=new HobbingProgramPlayer(hobbingConfig,candidateAssembly,candidate,createdSpace.session,session);
       }
+      var guardConfig=session==null||session.machineMotion==null?null:session.machineMotion.enclosureGuard;
+      if(guardConfig!=null) {
+        if(candidateAssembly==null)throw "Enclosure guard needs one assembled machine runtime";
+        candidateGuard=new EnclosureGuardPlayer(guardConfig,candidateAssembly,createdSpace.session,session,candidate,candidateHobbing);
+      }
+
       var freeObjects = [for (entry in candidateObjects) entry.object];
       for (index in 0...candidateBlueprints.length) {
         var hasPresenceInput = false;
@@ -645,6 +654,7 @@ class ApplicationSimulation {
       power = candidatePower;
       workforce = candidateWorkforce;
       if (cnc != null) cnc.dispose();
+      if(enclosureGuard!=null){enclosureGuard.beforeReset();enclosureGuard=null;}
       if (hobbing != null) hobbing.dispose();
       if (print != null) print.dispose();
       for (visual in beltVisuals) visual.reset();
@@ -656,6 +666,7 @@ class ApplicationSimulation {
       if (pressBrake != null) pressBrake.beforeReset();
       pressBrake = candidatePress;
       cnc = candidateCnc;
+      enclosureGuard=candidateGuard;
       hobbing = candidateHobbing;
       var previousZones = zoneMonitors;
       zoneMonitors = candidateZones;
@@ -750,6 +761,7 @@ class ApplicationSimulation {
     power = prepared.power;
     cnc = prepared.cnc;
     hobbing = prepared.hobbing;
+    enclosureGuard = prepared.enclosureGuard;
     zoneMonitors = prepared.zoneMonitors;
     print = prepared.print;
     beltVisuals = prepared.beltVisuals;
@@ -942,6 +954,7 @@ class ApplicationSimulation {
 
   /** The project's CNC program player, or null when the project has no CNC job. */
   public function hobbingPlayer():Null<HobbingProgramPlayer> return hobbing;
+  public function enclosureController():Null<EnclosureGuardPlayer> return enclosureGuard;
   public function cncPlayer():Null<CncProgramPlayer> return cnc;
   /** The project's print job player, or null when the project has none. */
   public function printPlayer():Null<PrintProgramPlayer> return print;
@@ -1291,6 +1304,7 @@ class ApplicationSimulation {
     }
     workforce = null; motions = null; tools = null; power = null;
     if (cnc != null) cnc.dispose(releases);
+    if(enclosureGuard!=null){enclosureGuard.beforeReset();enclosureGuard=null;}
     if (hobbing != null) { var retiredHobbing=hobbing;release(()->retiredHobbing.dispose());hobbing=null; }
     if (print != null) print.dispose(releases);
     if (beads != null) beads.dispose();

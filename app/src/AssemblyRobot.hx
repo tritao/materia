@@ -537,6 +537,12 @@ class AssemblyRobot {
       blueprint.addChannel(robotkit.execution.GearEvents.declaration(index[0]));
       blueprint.ownerPeriodNs=haxe.Int64.ofInt(Std.int(Math.round(1e9/hobbing.controllerHz)));
     }
+    var guardPolicy=machine==null?null:machine.enclosureGuard;
+    if(guardPolicy!=null) {
+      var door=[for(i in 0...converted.model.joints.length)if(converted.model.joints[i].id==guardPolicy.doorJoint)i];
+      if(door.length!=1)throw "Enclosure door actuator joint is missing";
+      blueprint.processModelJoints.push(door[0]);
+    }
     // Each robot tool brings its own channels with the stop policy it needs (RobotKit's `ToolChannels`): a suction tool
     // keeps holding through a commanded stop, as when its base arrives somewhere carrying a part; a torch's arc and wire
     // go off on any stop. A declaration made above that disagrees with the tool is refused.

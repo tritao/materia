@@ -47,6 +47,23 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   final program:motionkit.program.MotionProgram;
   var motion:ManipulatorMotion;
   var started=false;
+  var guardPermission=true;
+  public var guardInterrupted(default,null)=false;
+  var guardStopRequested=false;
+  public function canStartGuardedCut():Bool return !started&&!completed&&failure==null&&!guardInterrupted;
+  public function guardMotionActive():Bool return motion.running;
+  public function setGuardPermission(allowed:Bool):Void {
+    guardPermission=allowed;
+    if(!allowed&&started&&motion.running&&!guardStopRequested) {
+      guardStopRequested=true;guardInterrupted=true;
+      try motion.stop() catch(error:Dynamic) {
+        failure="Guard stop: "+Std.string(error);
+        robot.robot.stop(robotkit.core.StopMode.Emergency);
+      }
+    }
+  }
+
+  final spindleAtSpeedChannel:String;
   var startTime=0.0;
   var disposed=false;
   final trace:Bool=Sys.getEnv("HOBBER_TRACE")=="1";
@@ -69,14 +86,24 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     if(config.tolerance>=0.001)settings.infeed=5; // coarse smoke: faster below-face air approach, mm/s
     settings.xAxis=config.axes[0];settings.yAxis=config.axes[1];settings.zAxis=config.axes[2];settings.tiltJoint=config.axes[3];settings.hobJoint=config.axes[4];settings.tableJoint=config.axes[5];
     job=new HobbingJob(spec,hob,config.length,settings);
-    var binding=new MachineBinding("hobber-axes",config.axes[0],config.axes[1],config.axes[2],0.02,new ToolpathChannels("","hob"));
+    var spindleDrives=[for(drive in robot.blueprint.velocityDrives)if(drive.joint==indices[4])drive];
+    if(spindleDrives.length!=1)throw "Hobbing needs one declared spindle velocity drive";
+    var spindleDrive=spindleDrives[0],speedSuffix=".speed";
+    if(!StringTools.endsWith(spindleDrive.speedChannel,speedSuffix))throw "Hobbing spindle needs named speed/direction channels";
+    var spindleName=spindleDrive.speedChannel.substr(0,spindleDrive.speedChannel.length-speedSuffix.length);
+    if(spindleDrive.directionChannel!=spindleName+".direction")throw "Hobbing spindle channels must share their declared name";
+    var binding=new MachineBinding("hobber-axes",config.axes[0],config.axes[1],config.axes[2],0.02,new ToolpathChannels("",spindleName));
+    spindleAtSpeedChannel=binding.channels.spindleAtSpeed;
     binding.spindleJointId=config.axes[4];binding.auxiliaryJoints=[config.axes[3],config.axes[5]];
     var delays:Map<String,Int> = [config.axes[4]=>0,config.axes[5]=>0]; // physics samples carry their real timestamp; no extra transport delay
     GearBinding.install(binding,robot.model,config.controllerHz,delays,[config.axes[5]]);
     var axes=[for(i in 0...3){var j=robot.model.joints[indices[i]],l=robot.model.coupledLimits(j.id,new robotkit.model.SteadyLoads());
       new motionkit.axis.MotionAxisBlueprint(config.axes[i],[j.id],j.limits.lower+offsets[i],j.limits.upper+offsets[i],l.requireVelocity(),l.requireAcceleration(),offsets[i],[1.0],[-offsets[i]]);}];
     var bp=new MotionSystemBlueprint(robot.model,robot.blueprint,axes,session.fixedTimestep());
-    var planning=new ToolpathMotionBinding(binding,bp,null,null,[config.axes[4]]);compiler=planning.compiler;
+    var held=[config.axes[4]];
+    var guardConfig=project.machineMotion==null?null:project.machineMotion.enclosureGuard;
+    if(guardConfig!=null)held.push(guardConfig.doorJoint);
+    var planning=new ToolpathMotionBinding(binding,bp,null,null,held);compiler=planning.compiler;
     var lowered=new ToolpathLowering(binding).lower([for(op in job.program.ops)switch op{
       case PositionJoint(id,position,span):var at=config.axes.indexOf(id);toolpathkit.path.ToolpathOp.PositionJoint(id,position-(at<0?0:offsets[at]),span);
       case _:op;
@@ -102,7 +129,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     var s=robot.robot.snapshot(),b=s.velocities.get(indices[4]);
     if(channel=="hob.job_ready")return Digital(Math.abs(s.positions.get(indices[4])+offsets[4])<1e-5&&Math.abs(b)<0.01);
     if(channel=="hob.stopped")return Digital(Math.abs(b)<0.01);
-    if(channel=="hob.at_speed")return Digital(Math.abs(b-job.rpm*2*Math.PI/60)<Math.max(0.01,job.rpm*2*Math.PI/60*0.001));
+    if(channel==spindleAtSpeedChannel)return Digital(Math.abs(b-job.rpm*2*Math.PI/60)<Math.max(0.01,job.rpm*2*Math.PI/60*0.001));
     return null;
   }
   /** Display-only transfer time; paused playback never advances it. */
@@ -110,7 +137,13 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     if(handling!=null&&!completed&&handling.inspection=="sequence"&&(!cutStarted||headRetracted))handlingClock+=seconds;
   }
   public function feed():Void {
-    if(completed||failure!=null||disposed)return;
+    if(disposed)return;
+    if(!guardPermission||guardInterrupted) {
+      if(guardStopRequested&&motion.running)motion.update(session.fixedTimestep());
+      if(motion.failure!=null)failure=motion.failure;
+      return;
+    }
+    if(completed||failure!=null)return;
     try{
       var now=session.simulationTime();
       if(handling!=null&&handling.inspection!="sequence")return;
@@ -141,7 +174,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     }catch(e:Dynamic){failure=Std.string(e);motion.abort();}
   }
   public function afterSimulationStep(timestamp:Int64):Void {
-    if(!started||cutCompleted||completed||failure!=null||disposed)return;
+    if(!started||cutCompleted||completed||failure!=null||disposed||guardInterrupted&&!motion.running)return;
     try{
       var q=robot.robot.snapshot().positions;
       var axes=new HobbingAxes((q.get(indices[0])+offsets[0])*1000,(q.get(indices[1])+offsets[1])*1000,(q.get(indices[2])+offsets[2])*1000,q.get(indices[3])+offsets[3],q.get(indices[4])+offsets[4],q.get(indices[5])+offsets[5]);
@@ -206,6 +239,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   }
   public function beforeReset():Void{if(motion.running)motion.abort();}
   public function reset():Void{stock.dispose();stock=new HobbingStock(config,centerMetres);motion=newMotion();started=false;cutStarted=false;cutCompleted=false;headRetracted=false;completed=false;failure=null;syncError=0;elapsed=0;
+    guardInterrupted=false;guardStopRequested=false;
     handlingStart=-1;handlingClock=0;unloadStart=-1;sleeveDisplay=-1;
     if(handling!=null){handling.inspect("sequence");handling.load(0);}}
   public function dispose():Void{if(disposed)return;beforeReset();disposed=true;simulation.removeStepObserver(observerId);stock.dispose();}

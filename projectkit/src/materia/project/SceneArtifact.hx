@@ -141,6 +141,26 @@ typedef SceneArtifactProjectMotion = {
   /** Feedback-driven press controller, independent of the robot mission. */
   @:id(6) @:optional var pressBrake:SceneArtifactPressBrake;
   @:id(7) @:optional var hobbing:SceneArtifactHobbing;
+  /** Feedback-driven access guard, executed before the machine program. */
+  @:id(8) @:optional var enclosureGuard:SceneArtifactEnclosureGuard;
+}
+
+/** Runtime guard policy; door travel and linear speeds are SI, angles radians. */
+@:wire typedef SceneArtifactEnclosureGuard = {
+  @:id(1) var doorJoint:String;
+  @:id(2) var closedSensor:String;
+  @:id(3) var openSensor:String;
+  @:id(4) var spindleJoints:Array<String>;
+  @:id(5) var axisJoints:Array<String>;
+  @:id(6) var stroke:Float;
+  @:id(7) var setupSpeedLimit:Float;
+  @:id(8) var timeoutSeconds:Float;
+  /** Delay of the independent simulated guard-lock actuator. */
+  @:id(9) var lockTravelSeconds:Float;
+  @:id(10) var linearStandstillTolerance:Float;
+  @:id(11) var rotaryStandstillTolerance:Float;
+  /** Consecutive below-threshold physics observations required to confirm standstill. */
+  @:id(12) var standstillConfirmationSeconds:Float;
 }
 
 /** Gear/hob lengths in mm, angles radians, process speed m/min. */
@@ -1111,6 +1131,27 @@ class SceneArtifact {
     var definition = AssemblyDefinitionFlattener.flattenView(source);
     var occurrences = [for (value in definition.occurrences) value.id];
     var joints = [for (value in definition.joints) value.id];
+    var guard=motion.enclosureGuard;
+    if(guard!=null) {
+      if(motion.program!=null||motion.digitalProgram!=null||motion.pressBrake!=null||motion.virtualDevice==true||data.machining!=null||data.printing!=null||data.missions!=null)
+        throw "Enclosure guard currently requires exclusive hobber/door execution ownership";
+      if(joints.indexOf(guard.doorJoint)<0||guard.spindleJoints==null||guard.axisJoints==null||guard.spindleJoints.length==0||guard.axisJoints.length==0)
+        throw "Enclosure guard needs a door, spindle and axis bindings";
+      for(v in [guard.stroke,guard.setupSpeedLimit,guard.timeoutSeconds,guard.lockTravelSeconds,guard.linearStandstillTolerance,guard.rotaryStandstillTolerance,guard.standstillConfirmationSeconds])
+        if(!Math.isFinite(v)||v<=0)throw "Enclosure guard policy must be finite and positive";
+      if(guard.standstillConfirmationSeconds>=guard.timeoutSeconds)throw "Standstill confirmation must fit inside the guard timeout";
+      var observed=[guard.doorJoint];
+      for(id in guard.spindleJoints.concat(guard.axisJoints)) {
+        if(joints.indexOf(id)<0||observed.indexOf(id)>=0)throw "Enclosure guard observations must name distinct existing joints";
+        observed.push(id);
+      }
+      if(motion.hobbing!=null)for(id in motion.hobbing.axes)
+        if(observed.indexOf(id)<0||id==guard.doorJoint)throw "Enclosure guard must observe every cutting axis";
+      if(guard.closedSensor==guard.openSensor)throw "Enclosure guard needs separate end switches";
+      for(id in [guard.closedSensor,guard.openSensor])
+        if(definition.sensors==null||[for(sensor in definition.sensors)if(sensor.id==id&&sensor.kind=="joint_switch"&&sensor.joint==guard.doorJoint)sensor].length!=1)
+          throw "Enclosure guard end switches must observe its actual door joint";
+    }
     var hobbing=motion.hobbing;
     if(hobbing!=null){
       if(motion.program!=null||motion.digitalProgram!=null||motion.pressBrake!=null||motion.virtualDevice==true||data.machining!=null||data.printing!=null||data.missions!=null)

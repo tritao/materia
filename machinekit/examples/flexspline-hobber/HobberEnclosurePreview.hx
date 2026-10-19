@@ -62,8 +62,8 @@ class HobberEnclosurePreview {
       cache.close();return result;
     }catch(error:Dynamic){cache.close();throw error;}
   }
-  public static function assembled():{assembly:MachineAssembly,shell:GeneratedEnclosure,report:Dynamic} {
-    var machine=new FlexsplineHobber(),fit=fitted(machine),shell=new GeneratedEnclosure(fit.layout),assembly=new MachineAssembly();
+  public static function assembled(?source:FlexsplineHobber):{assembly:MachineAssembly,shell:GeneratedEnclosure,machine:FlexsplineHobber,report:Dynamic} {
+    var machine=source==null?new FlexsplineHobber():source,fit=fitted(machine),shell=new GeneratedEnclosure(fit.layout),assembly=new MachineAssembly();
     assembly.include("machine",machine);assembly.include("enclosure",shell);
     for(name in machine.portNames()){var port=machine.port(name,"machine");assembly.exposePort(name,port.instanceId,port.portName);}
     var uses:Array<PanelUse> = [];
@@ -74,7 +74,7 @@ class HobberEnclosurePreview {
     }
     var qualificationIssues=EnclosureRules.check(uses,{process:WetMachining,maximumTemperatureC:60,oilMist:true,
       extractionProvided:false,drainageProvided:false,chamberControlProvided:false,boundaryGuardProvided:false});
-    return {assembly:assembly,shell:shell,report:{samples:fit.samples,angularPaddingMm:fit.paddingMm,excludedElectricalRack:fit.excluded,
+    return {assembly:assembly,shell:shell,machine:machine,report:{samples:fit.samples,angularPaddingMm:fit.paddingMm,excludedElectricalRack:fit.excluded,
       input:fit.layout.input,dimensionsMm:[fit.layout.width(),fit.layout.depth(),fit.layout.height()],doorStrokeMm:fit.layout.stroke,
       servicePanels:shell.servicePanelIds,serviceOpenings:shell.serviceAccess,seams:shell.seamMethod,qualificationIssues:qualificationIssues,
       evidence:"X/Y/Z endpoints, A one-degree grid with radius*half-step padding; B/C descendants bounded by rotation-centred spheres",
@@ -86,14 +86,28 @@ class HobberEnclosurePreview {
       if(StringTools.startsWith(o.id,"machine/")&&external(o.id.substr("machine/".length)))o.visible=false;
     return scene;
   }
-  public static function enclosed():haxe.io.Bytes return SceneArtifact.encode(defaultView(AssemblyPreview.scene(assembled().assembly,"hobber-enclosed")));
+  public static function runtimeScene(assembly:MachineAssembly,machine:FlexsplineHobber,stroke:Float):materia.project.SceneArtifact.SceneArtifactData {
+    var scene=defaultView(AssemblyPreview.scene(assembly,"hobber-enclosed"));
+    if(scene.machineMotion==null)scene.machineMotion={belts:[]};
+    var axes=["machine/X","machine/Y","machine/Z","machine/swivel/A","machine/spindle/B","machine/table/C"];
+    scene.machineMotion.hobbing={module:machine.spec.module,teeth:machine.spec.teeth,width:machine.spec.faceWidth,pressureAngle:machine.spec.pressureAngle,
+      starts:machine.hob.design.starts,gashes:machine.hob.design.gashes,outside:32,length:40,wall:0.6,radialStep:0.1,axialStep:0.25,
+      tolerance:0.001,feed:5,cuttingSpeed:300,axes:axes,stock:"machine/blank",controllerHz:4000,cupLength:40,cupEndThickness:2};
+    scene.machineMotion.enclosureGuard={doorJoint:"enclosure/door/slide",closedSensor:"enclosure/door/closed",openSensor:"enclosure/door/open",
+      spindleJoints:[axes[4],axes[5]],axisJoints:axes.slice(0,4),stroke:stroke*0.001,setupSpeedLimit:0.025,
+      timeoutSeconds:10,lockTravelSeconds:0.05,linearStandstillTolerance:1e-5,rotaryStandstillTolerance:1e-4,standstillConfirmationSeconds:0.25};
+    return scene;
+  }
+  public static function enclosed():haxe.io.Bytes {
+    var fitted=assembled();return SceneArtifact.encode(runtimeScene(fitted.assembly,fitted.machine,fitted.shell.layout.stroke));
+  }
   public static function inspection():haxe.io.Bytes {
     var scene=SceneArtifact.decode(enclosed());
     if(scene.assemblyDefinition!=null)for(o in scene.assemblyDefinition.occurrences)if(StringTools.startsWith(o.id,"enclosure/"))o.visible=false;
     return SceneArtifact.encode(scene);
   }
   public static function main():Void {
-    var fitted=assembled(),scene=defaultView(AssemblyPreview.scene(fitted.assembly,"hobber-enclosed"));
+    var fitted=assembled(),scene=runtimeScene(fitted.assembly,fitted.machine,fitted.shell.layout.stroke);
     var root=Sys.getCwd();while(!sys.FileSystem.exists(root+"/machinekit/examples/flexspline-hobber/FlexsplineHobber.hx")){
       var parent=haxe.io.Path.directory(root);if(parent==root||parent.length==0)throw "Cannot locate hobber worktree";root=parent;}
     var output=root+"/machinekit/examples/flexspline-hobber/build/enclosure";sys.FileSystem.createDirectory(haxe.io.Path.directory(output));sys.FileSystem.createDirectory(output);
