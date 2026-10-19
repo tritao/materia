@@ -49,7 +49,53 @@ class CadFeatureEdgeTests {
     check(data.strokeSegments.length==all,"Scene publishes All mode to live CAD geometry");
     scene.setCadEdgeMode(Shaded);check(data.strokeSegments.length==0,"Scene publishes Shaded mode");
     check(scene.revision==revision && scene.environmentRevision==environment,"Display changes leave document and physics revisions unchanged");
-    scene.dispose();cylinder.close();
+    scene.dispose();
+    var generated:Map<String,nativekit.scene.GeometryData> = ["profile"=>data];
+    var members:Array<app.SceneObjectData> = [for(i in 0...2) {
+      id:'post$i',label:'Post $i',type:"cad-preview",x:i*0.1,y:0.0,z:0.0,
+      width:0.04,height:0.8,depth:0.04,collisionEnabled:false,dynamicBody:false,
+      mass:1.0,red:0.7,green:0.7,blue:0.7,visible:true,meshSnapshot:"profile"
+    }];
+    var loaded=new EditorScene(members,null,null,generated);
+    check(data.strokeSegments.length==features,"Batch loading applies the initial Feature mode");
+    loaded.setCadEdgeMode(Shaded);
+    check(data.strokeSegments.length==0,"Shaded reaches shared batch-loaded assembly geometry");
+    loaded.setCadEdgeMode(All);
+    check(data.strokeSegments.length==all,"All restores batch-loaded assembly edges");
+    loaded.setCadEdgeMode(Feature);
+    check(data.strokeSegments.length==features,"Feature restores batch-loaded assembly edges");
+    loaded.setCadEdgeMode(Shaded);
+    var later:CadGeometryData=cast app.CadPreviewGeometry.fromArtifact(sample(true),[0,-1,0],[1,1,0],0.001);
+    generated.set("later",later);
+    var next:app.SceneObjectData=Reflect.copy(members[0]);
+    next.id="later";next.meshSnapshot="later";
+    loaded.addObjects([next]);
+    check(later.strokeSegments.length==0,"A later batch inherits the active Shaded mode");
+    loaded.setCadEdgeMode(All);
+    check(later.strokeSegments.length==1,"Later batch geometry participates in subsequent mode changes");
+    loaded.setCadEdgeMode(Shaded);
+    var detached:CadGeometryData=cast app.CadPreviewGeometry.fromArtifact(sample(true),[0,-1,0],[1,1,0],0.001);
+    loaded.setRuntimeGeometry("post0",detached);
+    check(detached.strokeSegments.length==0,"Runtime CAD replacements inherit Shaded mode");
+    loaded.setRuntimeGeometry("post0",new nativekit.scene.GeometryData());
+    loaded.setCadEdgeMode(All);
+    check(detached.strokeSegments.length==0,"Replaced CAD data no longer receives display updates");
+    loaded.clearRuntimeGeometry("post0");
+    loaded.setCadEdgeMode(Shaded);
+    check(data.strokeSegments.length==0,"Restored shared assembly geometry remains registered");
+    loaded.setCadEdgeMode(Feature);
+    check(data.strokeSegments.length==features,"Restored assembly geometry retains its feature edges");
+    loaded.dispose();cylinder.close();
+
+    var growing=new CadGeometryData([], [0,0,0], 1);
+    growing.setEdgeMode(Shaded);
+    growing.addCadStroke([0,0,0,1,0,0],1,true);
+    check(growing.strokeSegments.length==0,"Edges appended in Shaded mode stay hidden");
+    growing.setEdgeMode(All);
+    growing.addCadStroke([0,0,0,0,1,0],2,false);
+    check(growing.strokeSegments.length==2,"All mode includes newly appended smooth edges");
+    growing.setEdgeMode(Feature);
+    check(growing.strokeSegments.length==1,"Feature mode consistently filters appended edges");
     Sys.println('CAD feature edge checks passed: $checks');
   }
 }

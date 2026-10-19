@@ -162,9 +162,26 @@ class EditorScene {
   final cadDisplayGeometry:Map<String,{geometry:Geometry,data:CadGeometryData}> = [];
 
   function setGeometryData(geometry:Geometry,data:GeometryData):Void {
+    var cad = prepareCadDisplayGeometry(data);
+    scene.setGeometryData(geometry,data);
+    trackCadDisplayGeometry(geometry,cad);
+  }
+
+  /** Apply display state before publishing either a single resource or a batch. */
+  function prepareCadDisplayGeometry(data:GeometryData):Null<CadGeometryData> {
     var cad:Null<CadGeometryData> = Std.isOfType(data,CadGeometryData) ? cast data : null;
     if(cad!=null)cad.setEdgeMode(cadEdgeMode);
-    scene.setGeometryData(geometry,data);
+    return cad;
+  }
+
+  function createGeometryBatch(data:Array<GeometryData>):Array<Geometry> {
+    var cad = [for(item in data) prepareCadDisplayGeometry(item)];
+    var geometries = scene.createGeometryBatch(data);
+    for(index in 0...geometries.length)trackCadDisplayGeometry(geometries[index],cad[index]);
+    return geometries;
+  }
+
+  function trackCadDisplayGeometry(geometry:Geometry,cad:Null<CadGeometryData>):Void {
     // Generation-bearing resource IDs distinguish disposed handles and shared CAD geometry.
     var key=haxe.Int64.toStr(geometry.id().get_value());
     if(cad!=null)cadDisplayGeometry.set(key,{geometry:geometry,data:cad});
@@ -484,7 +501,7 @@ class EditorScene {
     profileLoadEnd("geometryData", preparationStarted);
 
     var geometryStarted = profileLoadStart();
-    var geometries = scene.createGeometryBatch(geometryData);
+    var geometries = createGeometryBatch(geometryData);
     profileLoadEnd("geometryBatchCreatePublish", geometryStarted);
     var materialStarted = profileLoadStart();
     var materials = scene.createMaterialBatch(materialData);
