@@ -1795,7 +1795,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         workspace.open("cnc", "inspector");workspace.activate("cnc");invalidateView();
       })),
       new DockPanelContent("cnc", function(_) return cncPanel.build(simulation, appearance.theme.tokens,
-        printerLink.connected() || printerLink.error != null ? printerLink.summary() : null))
+        printerLink.connected() || printerLink.error != null ? printerLink.summary() : null, session))
     ];
 
     result.setDefaultLayout(EditorWorkspaceLayout.defaultLayout());

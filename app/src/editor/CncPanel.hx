@@ -1,7 +1,7 @@
 package app.editor;
 
 import app.ApplicationSimulation;
-import app.CncProgramPlayer;
+import app.ProjectDocumentSession;
 import haxeon.ui.Color;
 import haxeon.ui.Insets;
 import haxeon.ui.LayoutAxis;
@@ -30,25 +30,39 @@ class CncPanel {
   /** The line the operator picked to restart at; 0 for none. */
   public var selectedLine(default, null):Int = 0;
   var followedLine = 0;
+  var source:Null<String>;
+  var generation = -1;
 
   public function new() {}
 
   /** `printer` is the line about a printer the editor is connected to (its state, progress and temperatures), if any. */
-  public function build(simulation:ApplicationSimulation, tokens:ThemeTokens, ?printer:String):View {
+  public function build(simulation:ApplicationSimulation, tokens:ThemeTokens, ?printer:String, ?project:ProjectDocumentSession):View {
     var style = fill();
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
     style.childGap = 8.0;
     style.background = tokens.surface;
     var player = simulation.toolpathPlayer();
-    var heading = new KeyedView("heading", new Text(player == null ? "CNC PROGRAM" : player.title(), null, tokens.textSecondary,
+    var cnc=project==null?null:project.cncJob,print=project==null?null:project.printJob;
+    var text=player!=null?player.sourceLines().join("\n"):cnc!=null?cnc.source:print!=null?print.source:null;
+    var nextGeneration=project==null?-1:project.generation;
+    if(source!=text||generation!=nextGeneration) {
+      source=text;generation=nextGeneration;selectedLine=0;followedLine=0;scroll.jumpTo(0,0);
+    }
+    var heading = new KeyedView("heading", new Text(player == null ? (print!=null?"PRINT PROGRAM":"CNC PROGRAM") : player.title(), null, tokens.textSecondary,
       TextStyleOverride.text(11.0, 0.8)));
     var link = new KeyedView("printer", new Text(printer == null ? "" : "Printer: " + printer));
     var linked = printer != null;
     if (player == null) {
-      var empty = new KeyedView("empty", new Text("Play a project with a machining or print job to run its program here."));
-      return linked ? new Column("cnc-panel", [heading, link, empty], style) : new Column("cnc-panel", [heading, empty], style);
+      var items=[heading];if(linked)items.push(link);
+      if(text==null)items.push(new KeyedView("empty",new Text("This project has no machining or print program.")));
+      else {
+        model.show(text,0,tokens.selectionField);
+        items.push(new KeyedView("status",new Text("Ready · Play to start")));
+        items.push(new KeyedView("gcode",programList()));
+      }
+      return new Column("cnc-panel",items,style);
     }
-    model.show(player.sourceLines(), player.currentLine, tokens.selectionField);
+    model.show(text??"", player.currentLine, tokens.selectionField);
     // Follow the running line, keeping a few lines of context above it.
     if (player.currentLine > 0 && player.currentLine != followedLine) {
       followedLine = player.currentLine;
@@ -56,7 +70,7 @@ class CncPanel {
     }
     var held = player.held(), failure = player.failure;
     var status = failure != null ? 'Stopped: $failure' :
-      (player.finished() ? "Completed" : held ? "Held" : "Running") + (player.currentLine > 0 ? ' · line ${player.currentLine}' : "") +
+      (player.finished() ? "Completed" : !player.hasStarted() ? "Ready" : !simulation.isRunning() ? "Paused" : held ? "Held" : "Running") + (player.currentLine > 0 ? ' · line ${player.currentLine}' : "") +
       player.statusDetail() + ' · speed ${Math.round(player.speedOverride * 100)}%';
     var hold = new Button("Hold", null, () -> simulation.control(() -> player.hold()), "cnc-hold");
     hold.enabled = !held && failure == null;
@@ -73,15 +87,17 @@ class CncPanel {
     buttonsStyle.childGap = 6.0;
     var speed = new Slider("cnc-speed", "Speed override", player.speedOverride, 0.05, 2.0, 0.05,
       value -> simulation.control(() -> player.setSpeedOverride(value)));
-    var listStyle = fill();
-    listStyle.clipVertical = true;
-    var list = new ListView("cnc-gcode", model, listStyle, scroll, 300.0, selectedLine - 1,
-      index -> selectedLine = index + 1);
+    var list = programList();
     var buttons = new KeyedView("buttons", new Row("cnc-buttons", [new KeyedView("hold", hold),
       new KeyedView("resume", resume), new KeyedView("restart", restart)], buttonsStyle));
     var state = new KeyedView("status", new Text(status)), speedRow = new KeyedView("speed", speed), gcode = new KeyedView("gcode", list);
     return linked ? new Column("cnc-panel", [heading, state, link, buttons, speedRow, gcode], style) :
       new Column("cnc-panel", [heading, state, buttons, speedRow, gcode], style);
+  }
+
+  function programList():View {
+    var style=fill();style.clipVertical=true;
+    return new ListView("cnc-gcode",model,style,scroll,300.0,selectedLine-1,index -> selectedLine=index+1);
   }
 
   static function fill():LayoutStyle {
@@ -95,15 +111,17 @@ class CncPanel {
 /** A program's G-code lines, numbered, with the executing line tinted. */
 private class GcodeListModel implements ListViewModel {
   var lines:Array<String> = [];
+  var source:Null<String>;
   var running = 0;
   var tint:Null<Color> = null;
   var version = 0;
 
   public function new() {}
 
-  public function show(lines:Array<String>, running:Int, tint:Color):Void {
-    if (lines.length != this.lines.length || running != this.running) version++;
-    this.lines = lines;
+  public function show(source:String, running:Int, tint:Color):Void {
+    if (source != this.source || running != this.running || tint != this.tint) version++;
+    if(source!=this.source)this.lines=source.split("\n");
+    this.source=source;
     this.running = running;
     this.tint = tint;
   }
