@@ -72,8 +72,9 @@ hydraulic strain or pressure prediction. Cutting starts after seating/clamping;
 unloading starts only after the spindle stops and X/Y/Z return to the loading pose.
 
 The HB-D11 foundation is a 930 × 800 × 800 mm monolithic plinth on three rigid
-levelling feet, with the tooth band 1000 mm above the floor. The Ø220 mm table
-bearing and lighter column retain explicitly assumed engineering ratings.
+levelling feet, with the tooth band 1000 mm above the floor. The default bought DD table has a Ø200 mm face, 210 mm height and Ø40 mm bore;
+unpublished accuracy/stiffness and mounting details remain assumed. The built-up
+table remains selectable through the same interface. See PURCHASED_TABLE_REPORT.json.
 See [MACHINE_DESIGN.md](MACHINE_DESIGN.md#heavy-plinth-acceptance-hb-d11) for mass,
 support and preliminary stiffness evidence. The app's machining time excludes
 the illustrative loading/unloading sequence.

@@ -1,3 +1,4 @@
+import machinekit.hobbing.FoundationLayout;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.structural.CastingCells;
 import machinekit.structural.CastingFeatures;
@@ -45,7 +46,7 @@ class FlexsplineHobberBaseReport {
       var ov=beam(a,a,oldMoving*9.80665,e*oldI),ot=beam(180,a,oldMoving*9.80665,e*oldI),
         nv=beam(a,a,moving*9.80665,e*newI,span),nt=beam(180,a,moving*9.80665,e*newI,span);
       // 121 mm hob above X guide plane; 233 mm work above table mount.
-      var oldError=[(121*ov[1]-233*ot[1])*1000,(ov[0]-ot[0])*1000],newError=[(121*nv[1]-233*nt[1])*1000,(nv[0]-nt[0])*1000];
+      var oldError=[(121*ov[1]-233*ot[1])*1000,(ov[0]-ot[0])*1000],newError=[(121*nv[1]-(363-FoundationLayout.TABLE_SEAT)*nt[1])*1000,(nv[0]-nt[0])*1000];
       for(k in 0...2){oldLo[k]=Math.min(oldLo[k],oldError[k]);oldHi[k]=Math.max(oldHi[k],oldError[k]);newLo[k]=Math.min(newLo[k],newError[k]);newHi[k]=Math.max(newHi[k],newError[k]);}
       var rear=(allX/total+180)/span,front=1-rear,skew=(allY/total)/330;
       var reactions=[(front-skew)/2,(front+skew)/2,rear];
@@ -62,9 +63,9 @@ class FlexsplineHobberBaseReport {
       baseToMovingMassRatio:{X:body.massProperties().mass/moving,Y:body.massProperties().mass/movingY,Z:body.massProperties().mass/movingZ},
       column:{beforeCastingKg:oldColumn,afterCastingKg:machine.column.body.massProperties().mass,beforeAssemblyKg:oldColumn+oldInserts,afterAssemblyKg:columnKg},
       beforeLoadingRevision:Reflect.field(raw,"beforeLoadingRevision"),dimensionsMm:[body.parameterNumber("width"),body.parameterNumber("depth"),body.parameterNumber("height")],workingHeightMm:work,feet:{count:3,radialSpacingMm:span,frontTangentialSpacingMm:660,heightMm:47,worstReactionN:worstFoot,assumedTargetPerFootN:15000,vibrationMounts:false},
-      table:{bearingOutsideMm:machine.table.bearing.parameterNumber("outside"),bearingBoreMm:machine.table.bearing.parameterNumber("bore"),housingOutsideMm:270,axialRunoutMm:machine.table.bearing.axialRunout,momentStiffnessNmPerRad:machine.table.bearing.momentStiffness,basis:"larger geometry, existing error/stiffness bounds retained Assumed; no catalogue qualification or automatic accuracy gain"},
+      table:{form:Std.isOfType(machine.table,machinekit.motion.PurchasedRotaryTable)?"purchased":"built",faceDiameterMm:machine.tableSpec.number("faceDiameter"),heightMm:machine.tableSpec.number("height"),throughBoreMm:machine.tableSpec.number("bore"),seatWorkZMm:FoundationLayout.TABLE_SEAT,fieldValues:machine.tableSpec.report(),basis:"per-field catalog/measured/assumed data; face/flange/centering provisional; bearing construction not claimed"},
       coolantReservedLitres:7.92,beam:{youngsNPerMm2:e,spanMm:span,oldMinimumIyMm4:oldI,newMinimumIyMm4:newI,
         oldChangeBoundUm:oldRange,newChangeBoundUm:newRange,atHalfModulusChangeBoundUm:2*newRange,assumedProfileAllocationUm:allocation,passed:true,samples:samples,
-        basis:"Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; full mechanism X25..retract evaluated by exact prismatic COM translation, reference moving mass; old 210 mm bed uses its original 860 mm support span over the new X range; previous heavy-plinth/full-stroke result is retained separately; 121/233 mm guide/table Abbe heights; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open."}};
+        basis:"Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; full mechanism X25..retract evaluated by exact prismatic COM translation, reference moving mass; old 210 mm bed uses its original 860 mm support span over the new X range; previous heavy-plinth/full-stroke result is retained separately; 121 mm guide Abbe height; current work-to-table-seat lever follows TABLE_SEAT; old table lever233 mm; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open."}};
   }
 }

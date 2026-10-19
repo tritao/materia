@@ -25,7 +25,8 @@ class FlexsplineHobber extends MachineAssembly {
   public final mandrel:ExpandingMandrel;
   public final bed:MineralCastBed;
   public final column:MineralCastColumn;
-  public final table:RotaryTable;
+  public final table:machinekit.assembly.MachineAssembly;
+  public final tableSpec:machinekit.motion.RotaryAxisSpec;
   public final spindle:HobSpindle;
   public final swivel:SwivelHead;
   public final travel:Array<HobberTravel>;
@@ -34,7 +35,7 @@ class FlexsplineHobber extends MachineAssembly {
   public final mountContacts:Array<{parent:String,child:String}> = [];
   final zero:Map<String,AssemblyFrame> = [];
   var driverNumber=0;
-  public function new(?spec:GearSpec,gashes:Int=12,detailedHob:Bool=false){
+  public function new(?spec:GearSpec,gashes:Int=12,detailedHob:Bool=false,?rotaryAxis:machinekit.motion.PrecisionRotaryAxis){
     super();this.spec=spec==null?new GearSpec(0.3,200,8,20*Math.PI/180):spec;
     if(this.spec.internal)throw "external hobbing machine requires external gear";
     var profile=new ToothProfile(this.spec);hob=Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),1,32,gashes),this.spec,40,16,false,detailedHob);
@@ -42,15 +43,25 @@ class FlexsplineHobber extends MachineAssembly {
     includeAt("bed",bed,F.translation(HobberXLayout.front().bedCentre,0,-590));
     for(i in 0...3)fixAt("foot"+i,new machinekit.structural.LevelingFoot(),F.translation(i<2?HobberXLayout.FOOT_FRONT:HobberXLayout.front().footRear,i==0?-330:i==1?330:0,-637),"bed/foot"+i,
       F.alongY(i<2?HobberXLayout.FOOT_FRONT:HobberXLayout.front().footRear,i==0?-330:i==1?330:0,-590,0,0,1));
-    var tableMotor=new TorqueMotor(new ComponentValues().setNumber("torqueConstant",2).setNumber("backEmfConstant",2/Math.sqrt(3)));
-    table=new RotaryTable(tableMotor,new CrossedRollerBearing(new ComponentValues().setNumber("outside",220).setNumber("bore",180).setNumber("height",20)));includeAt("table",table,F.translation(0,0,130));
-    fixed("table-mount","bed/tablePlate","top","table/housing","mount");precisionMounts.push({name:"table-mount",parent:"bed/tablePlate"});
-    var diameter=2*(this.spec.rootRadius()-0.6),seat=115.0;
-    mandrel=new ExpandingMandrel(new ComponentValues().setNumber("outside",diameter-0.05).setNumber("workSeat",seat)
-      .setNumber("height",seat+Math.max(16,this.spec.faceWidth+8)+2).setNumber("sleeveStart",seat).setNumber("sleeveLength",Math.max(16,this.spec.faceWidth+8))
-      .setNumber("stopDiameter",diameter+0.6).setBoolean("separateSleeve",true).setNumber("baseDiameter",Math.max(80,diameter+10)).setNumber("baseHeight",40));
-    fixAt("mandrel",mandrel,F.translation(0,0,248),"table/platen",F.alongY(0,20,248,0,0,1));
-    fixAt("mandrelSleeve",new MandrelSleeve(new ComponentValues().setNumber("outside",diameter-0.05).setNumber("wall",mandrel.parameterNumber("sleeveWall")).setNumber("height",mandrel.parameterNumber("sleeveLength"))),F.translation(0,0,248+mandrel.parameterNumber("sleeveStart")),"mandrel");
+    var installed:machinekit.motion.PrecisionRotaryAxis=rotaryAxis==null?new machinekit.motion.PurchasedRotaryTable():rotaryAxis;
+    table=installed.assembly();tableSpec=installed.specification();
+    var tableBase=FoundationLayout.TABLE_FACE-tableSpec.number("height"),seat=FoundationLayout.TABLE_SEAT;
+    if(tableBase<seat)throw "Rotary-axis height exceeds reserved table well; resize foundation seat before installation";
+    var tableParent="bed/tablePlate";
+    if(tableBase>seat){
+      fixAt("tableAdapter",new machinekit.motion.PurchasedRotaryPart(new ComponentValues().setToken("variant","adapter").setNumber("adapterHeight",tableBase-seat).setNumber("adapterOutside",tableSpec.number("housingDiameter"))),F.translation(0,0,seat),tableParent);
+      precisionMounts.push({name:"tableAdapter-mount",parent:tableParent});tableParent="tableAdapter";
+    }
+    includeAt("table",table,F.translation(0,0,tableBase));
+    fixed("table-mount",tableParent,"top","table/"+tableSpec.mountPart,"mount");
+    if(tableParent=="bed/tablePlate")precisionMounts.push({name:"table-mount",parent:tableParent});
+    for(name in table.portNames()){var port=table.port(name,"table");exposePort("table."+name,port.instanceId,port.portName);}
+    var diameter=2*(this.spec.rootRadius()-0.6),workSeat=363-FoundationLayout.TABLE_FACE;
+    mandrel=new ExpandingMandrel(new ComponentValues().setNumber("outside",diameter-0.05).setNumber("workSeat",workSeat)
+      .setNumber("height",workSeat+Math.max(16,this.spec.faceWidth+8)+2).setNumber("sleeveStart",workSeat).setNumber("sleeveLength",Math.max(16,this.spec.faceWidth+8))
+      .setNumber("stopDiameter",diameter+0.6).setBoolean("separateSleeve",true).setNumber("baseDiameter",Math.max(tableSpec.number("facePcd")+30,diameter+10)).setNumber("baseHeight",25).setNumber("baseBore",40).setNumber("baseBoreDepth",20).setNumber("basePilotDiameter",tableSpec.number("centeringDiameter")).setNumber("basePilotDepth",tableSpec.number("centeringDiameter")>0?3:0).setNumber("baseBoltPcd",tableSpec.number("facePcd")));
+    fixAt("mandrel",mandrel,F.translation(0,0,FoundationLayout.TABLE_FACE),"table/"+tableSpec.workPart,F.alongY(0,20,FoundationLayout.TABLE_FACE,0,0,1));
+    fixAt("mandrelSleeve",new MandrelSleeve(new ComponentValues().setNumber("outside",diameter-0.05).setNumber("wall",mandrel.parameterNumber("sleeveWall")).setNumber("height",mandrel.parameterNumber("sleeveLength"))),F.translation(0,0,FoundationLayout.TABLE_FACE+mandrel.parameterNumber("sleeveStart")),"mandrel");
     workOrigin=F.compose(MACHINE_FROM_WORK,F.translation(0,0,363));
     var blank=new FlexsplineCupBlank(new ComponentValues().setNumber("outside",2*this.spec.tipRadius()).setNumber("bore",diameter).setNumber("bodyOutside",2*this.spec.rootRadius()).setNumber("bandWidth",this.spec.faceWidth));
     fixAt("blank",blank,F.translation(0,0,363),"mandrel");
@@ -104,7 +115,7 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("outboard",new OutboardSupport(new ComponentValues().setNumber("height",30).setNumber("seatLength",9)),F.fromRotationMatrix(centre,-85,363,e0),"Yplate",F.alongY(centre+30,-100,363,1,0,0));
     fixAt("outboardBearing",new FloatingRadialBearing(),F.fromRotationMatrix(centre,-95.5,363,e0),"outboard");
     mountContacts.push({parent:"outboard",child:"outboardBearing"});mountContacts.push({parent:"spindle/arbor",child:"outboardBearing"});
-    var supply=new ThreePhaseRectifier(new AcMains(ThreePhase,new AcRmsVoltage(400),50),new DcCurrent(40),6,240,120,100,10000);
+    var supply=new ThreePhaseRectifier(new AcMains(ThreePhase,new AcRmsVoltage(400),50),new DcCurrent(40),6,240,120,100,15000);
     fixAt("electricalPanel",new HobberSaddle("electrical-panel"),F.translation(-650,100,0),"bed/liftLeft");
     fixAt("powerSupply",supply,F.translation(-650,30,20),"electricalPanel");exposePort("mains","powerSupply","mains");
     fixAt("XdriveFrame",new HobberSaddle("GE-X-drive"),F.translation(centre,0,0),"bed/driveSeat",F.alongY((HobberXLayout.front().motorFace+HobberXLayout.front().deckStart)/2,0,140,0,0,1));
@@ -118,9 +129,9 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("chipTray",new HobberSaddle("GE-chip-tray"),F.identity(),"bed/tablePlate");
     fixAt("coolantPort",new HobberSaddle("GE-coolant"),F.translation(centre,0,363),"Yplate",F.alongY(centre+45,40,435,1,0,0));
     // Enclosure envelope reserved; panels omitted for the current open inspection layout.
-    bind("table-drive",C,"table/motor");bind("swivel-drive",A,"swivel/motor");bind("hob-drive",B,"spindle/motor",true);
+    bind("table-drive",C,"table/"+tableSpec.drivePart);bind("swivel-drive",A,"swivel/motor");bind("hob-drive",B,"spindle/motor",true);
     // Feedback belongs to the outer drives; the cartridge encoders are also exposed as sensors.
-    addEncoder("table-feedback",C,"table/encoder","table-drive");
+    addEncoder("table-feedback",C,"table/"+tableSpec.encoderPart,"table-drive");
     addEncoder("hob-master",B,"spindle/encoder","hob-drive");
     bindMotorBrake("swivel-drive","swivel/clamp","swivel.clampRelease","swivel.clampReleased",1000,30);
     FoundationIntegrity.check(bed).throwIfErrors();FoundationIntegrity.check(column).throwIfErrors();FoundationIntegrity.checkMounts(this,precisionMounts).throwIfErrors();
@@ -178,7 +189,7 @@ class FlexsplineHobber extends MachineAssembly {
   }
   function bind(id:String,joint:String,motor:String,process:Bool=false):Void {
     driverNumber++;var driver=id+"-driver";
-    fixAt(driver,new MotorDriver("GENERIC-400V-SERVO-AMP",new PhaseRmsCurrent(20)),F.translation(-790+((driverNumber-1)%3)*140,50,200+Std.int((driverNumber-1)/3)*250),"electricalPanel");
+    fixAt(driver,new MotorDriver("GENERIC-400V-SERVO-AMP",new PhaseRmsCurrent(id=="table-drive"?tableSpec.number("peakCurrent"):20)),F.translation(-790+((driverNumber-1)%3)*140,50,200+Std.int((driverNumber-1)/3)*250),"electricalPanel");
     connectPorts(id+"-power","powerSupply","power"+driverNumber,driver,"power");
     addMotor(id,joint,motor,driver,1,null,process?{speedChannel:"hob.speed",directionChannel:"hob.direction",radiansPerSpeedUnit:2*Math.PI/60}:null);
   }

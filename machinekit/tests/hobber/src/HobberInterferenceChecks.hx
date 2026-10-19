@@ -55,7 +55,12 @@ class HobberInterferenceChecks {
             if(!cutting)unexpected++;
             var row={sample:index,a:first.id,b:second.id,volumeMm3:volume,cutting:cutting,
               directJoints:[for(j in definition.joints)if((j.parent==first.id&&j.child==second.id)||(j.child==first.id&&j.parent==second.id))j.id]};
-            overlaps.push(row);if(!cutting)Sys.println("HOBBER_SOLID_OVERLAP "+haxe.Json.stringify(row));
+            overlaps.push(row);if(!cutting){
+              var sa=cache.posed(first.component,poses[a]),sb=cache.posed(second.component,poses[b]),common=sa.intersect(sb);sa.close();sb.close();
+              var local=PosedParts.moved(common,materia.assembly.AssemblyFrames.inverse(FlexsplineHobber.MACHINE_FROM_WORK));common.close();
+              var bb=PosedParts.boxOf(local);local.close();
+              Sys.println("HOBBER_SOLID_OVERLAP "+haxe.Json.stringify({pair:row,workFrameBoundsMm:bb}));
+            }
           }
         }
         completed++;save();Sys.println('HOBBER_INTERFERENCE_PROGRESS samples=$completed/${samples.length} unexpected=$unexpected seconds=${Sys.time()-began}');Sys.stdout().flush();

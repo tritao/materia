@@ -477,6 +477,15 @@ Positioning and repeatability figures alone do not qualify a hobbing table.
     | RTV230-070 | 320 | 30 | 65 / 309 | 120 / 150 (water, oil clamp) | 300 kg | ±5″ / ±2″ |
     | RTV385-050 | 356 | 60 | 390 / 735 | 60 / 100 (water) | 400 kg | 10″ / 4″ |
 
+    Additional catalogue transcription supplied in the 2026-10-19 design review:
+    total height **210 mm**, mass **52 kg** (distinct from the 50 kg payload),
+    continuous/peak **3.43/17.9 A rms**, natural cooling and **220/380 VAC**
+    driver. The bought-form hobber seed uses these as `Catalog`, with this note
+    as provenance; the supplier outline/certificate has not been independently
+    validated here. Face bolt pattern, centring, flange, runout/NRRO,
+    interpolation, low-speed ripple/cogging, seal drag, stiffness and thermal
+    behaviour remain unpublished/assumed pending vendor answers or measurements.
+
     **RTV210-050 is the first candidate for the hobber C table.** IP67 suggests
     contact seals; ask about drag and a low-drag option. No runout,
     interpolation-error or ripple data is published.

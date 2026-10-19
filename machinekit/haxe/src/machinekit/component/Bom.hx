@@ -4,6 +4,7 @@ package machinekit.component;
 class Bom {
 	final byPartNumber:Map<String, BomItem> = [];
 	final order:Array<String> = [];
+	final includedOwners:Array<String> = [];
 
 	public function new() {}
 
@@ -26,11 +27,15 @@ class Bom {
 		}
 	}
 
-	public function addComponent(component:MachineComponent, quantity:Int = 1):Void
-		add(component.bom, quantity);
+	public function addComponent(component:MachineComponent, quantity:Int = 1):Void {
+		if(quantity<=0)throw "BOM component quantity must be positive";
+		var included=IncludedInPurchase.of(component);
+		if(included==null)add(component.bom, quantity);else includedOwners.push(included.ownerPartNumber);
+	}
 
 	/** Lines in first-added order. */
 	public function lines():Array<BomItem> {
+		for(owner in includedOwners)if(!byPartNumber.exists(owner))throw 'Included purchase owner missing from BOM: $owner';
 		var result:Array<BomItem> = [];
 		for (partNumber in order) {
 			var item = byPartNumber.get(partNumber);

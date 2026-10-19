@@ -45,7 +45,7 @@ class FlexsplineHobberBudget {
     var faceEndpoints=Sys.getEnv("HOBBER_BUDGET_LEGACY_ENDS")!="1";
     var grid=RingStock.fromGearBlank(s,wall.wall,radialStep,axialStep),passes=motion.schedule(grid.grid);grid.dispose();
     var knots=[for(row in sync)row[0]].concat([for(row in force)row[0]]);
-    var metadata={moduleMm:s.module,teeth:s.teeth,faceWidthMm:s.faceWidth,threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,
+    var metadata={tableSignature:machine.tableSpec.signature(),tableFields:machine.tableSpec.report(),tableScope:"Installed rotary data; syncBasis identifies the independent assumed plant, not measured bought-table servo response",moduleMm:s.module,teeth:s.teeth,faceWidthMm:s.faceWidth,threads:threads,sweepToleranceMm:tolerance,pathToleranceMm:tolerance/16,
       radialStepMm:radialStep,axialStepMm:axialStep,windows:passes.length,sourceIds:[for(source in sources)source.id],
       forceSettings:inputs.force,forceInterpolation:inputs.forceInterpolation,syncBasis:inputs.syncBasis,
       supportStiffnessNPerMm:support.stiffness,scope:"complete HB8 feed stroke; fixed baseline HB10 load history; simulated HB7 servo, assumed plant; m0.3 ISO extrapolation only"};

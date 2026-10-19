@@ -70,7 +70,7 @@ confirmation.
 | X moving mass | 81.71 kg | 127.98 kg |
 | Z moving mass | 106.79 kg | 41.10 kg |
 | Y moving mass | 18.01 kg | 14.03 kg |
-| Machine mass | 351.61 kg | 1038.15 kg |
+| Machine mass | 351.61 kg | 1034.40 kg |
 | Bed footprint (radial × tangential) | 650 × 750 mm | 930 × 800 mm |
 | Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1510 × 800 mm |
 | X continuous thrust margin, same assumed demand basis | 911.15 N | 888.01 N |
@@ -104,7 +104,7 @@ The target envelope is flexspline outside diameter 25–140 mm, face width up to
 20 mm. The X mechanism spans 25..110 mm with fixture-dependent cutting soft limits;
 front loading retracts to 110 mm. Z spans -10..190 mm, Y ±10 mm,
 and A ±15°. Guide checks include block length, end margins and overtravel.
-An integral 40 mm flange and mandrel base replaces the stacked riser assembly;
+An integral low-profile flange and mandrel base replaces the stacked riser assembly;
 it preserves the work-frame tooth-band datum (Z=363 mm), now 1000 mm above the floor, and tilt clearance. The mandrel sleeve continues
 to support the toothed rim.
 
@@ -143,33 +143,76 @@ thermal behaviour and detailed manufacturing release remain open plan items.
 
 ## Heavy plinth acceptance (HB-D11)
 
-The casting is 774.49 kg; the base assembly is 802.86 kg and the complete machine
-is 1038.15 kg. The casting-to-moving-mass ratios are 6.05:1 (X), 55.21:1 (Y)
-and 18.85:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
+The casting is 748.12 kg; the base assembly is 776.28 kg and the complete machine
+is 1034.40 kg. The casting-to-moving-mass ratios are 5.85:1 (X), 53.33:1 (Y)
+and 18.20:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
 from 37.28 to 31.75 kg; its insert-equipped assembly falls from 55.50 to 49.97 kg.
 X moves 127.98 kg including the complete column/head. The three support points
 span 690 mm radially and 660 mm across the front. Positive reactions are checked
 through X travel against an assumed 15 kN target per foot; no vibration pads
 are fitted. Floor, pad and screw compliance remain unqualified.
 
-The table now has an assumed Ø220 × Ø180 × 20 mm crossed-roller bearing,
-Ø270 mm housing and Ø240 mm platen with an integral hollow bearing hub.
-The bearing retains the existing assumed 2 µm axial TIR and 1 MN·m/rad moment
-stiffness. Increasing its diameter does not establish better accuracy. HB11's
-axial source is retained; a separate radial-load-induced bearing-tilt source and
-analytic signature checks are added. Frozen earlier HB11 cases do not include
-this new tilt contribution; its full source/combined acceptance remains open.
-The completed HB10 radial window peak (16.99 N, not the tangential peak) implies
-3.09 µrad tilt and about 0.55 µm radial motion at the work datum under that
-assumed stiffness. The variation across the 8 mm face is about 0.025 µm.
-These are load-model bounds, not measured table performance.
+The default C table is a bought 200 mm-face, 210 mm-height, 40 mm-bore DD
+unit seeded from the Demat RTV210-050-class purchase data in
+[STRAIN_WAVE_RESEARCH.md](../../STRAIN_WAVE_RESEARCH.md#suppliers-and-prices-collected-2026-10-19).
+Its 52 kg catalogue mass is split into 44 kg fixed and 8 kg rotating envelopes
+for simulation only; the split and 0.04 kg·m² rotor inertia are assumed. The
+rotor is included in the single purchased-unit BOM line. Its internal bearing
+construction is not inferred from the face diameter. `PrecisionRotaryAxis`
+(RA-D8) also accepts the built-up `RotaryTable`; a ground steel adapter fills
+its smaller height so both forms retain the same work datum. Persistence and
+interface parity are checked.
+
+The larger mounting/fixture envelope needs a deeper table well. The seat top is
+655 mm above the floor (work Z=18), table face 865 mm and toothed rim 1000 mm.
+The integral fixture shoulder is 135 mm above the face. Its 25 mm-thick six-lobed
+flange has a 140 mm hub and six 30 mm lugs on provisional PCD160, clocked 30°
+away from the Y guides; M8 clearance/counterbore holes sit inside the lugs. A
+100 × 3 mm pilot and the mating face pocket are provisional. These features
+await the vendor drawing; they are not published mounting dimensions. The
+40 mm bore remains clear through the table/insert/base access and into a 20 mm
+fixture recess for a rotary union; actual plumbing/union design is not fitted.
+
+Catalogue entries are 54.9/223 Nm, 3.43/17.9 A rms, 200/234 rpm, 50 kg payload,
+±5″ positioning, ±2″ repeatability, 6 bar air clamp, natural cooling, IP67,
+52 kg and 220/380 VAC driver input. Additional envelope/current/mass details
+are the user's 2026-10-19 catalogue transcription; source confirmation and the
+outline drawing remain required. A conservative Ø260 flange/Ø200 barrel is
+assumed. The six M10 mount holes on PCD230 are provisional and externally
+accessible above the flange. Required air, clamp-release/feedback, encoder,
+driver-input and union services are exposed as ports. Port/fitting/cable details,
+real clamp interlocking/failure behaviour and encoder protocol are uncommissioned;
+the simulation assumes the table clamp released for hobbing. The existing generic
+400 VAC supply/driver uses an assumed ±10% allowance on the 380 VAC nameplate.
+The model's simultaneous peak regeneration check needs 12.33 kW; its declared
+braking allowance is 15 kW, with pulse energy/duty/resistor selection still open.
+
+Every numeric table value has an individual `ValueBasis` and reason, including
+unpublished runout/NRRO, interpolation, cogging/ripple, seal drag, stiffness,
+inertia, electrical constants, thermal values and mounting interfaces. See
+[PURCHASED_TABLE_REPORT.json](PURCHASED_TABLE_REPORT.json) for the complete list.
+Positioning/repeatability are never substituted for runout. Total runout is
+split between periodic and non-repeatable shares without adding NRRO twice.
+HB11 adds explicit interpolation, speed ripple, cogging, seal drag, NRRO and
+radial compliance sources, using the installed description for either form.
+Seal drag also consumes continuous torque reserve.
+
+The **conditional analytic table-only pitch screen is extrapolated grade 9**
+for the reference m0.3 part, dominated by the assumed 0.1% once-per-revolution
+speed ripple: Fp bound about 64.0 µm versus the extrapolated class-6 limit 23 µm.
+Keeping the other assumed bounds would require ripple ≤0.0317% for that pitch
+allocation. This is not a simulated full cut, an overall gear grade or a vendor
+accuracy claim. Full source/combined HB11 grading remains open; frozen earlier
+batches describe the preceding built-up table. New budget reports identify the
+installed table fields/signature and retain the independent assumed-plant sync
+basis. Bench measurements at 15 rpm are needed before qualification.
 
 [BASELINE_FOUNDATIONS.json](BASELINE_FOUNDATIONS.json) preserves the previous
 210 mm bed's CAD geometry/masses and the preceding full-stroke heavy plinth.
 `base-report` uses a simply supported beam, minimum net section and E=35 GPa
 (assumed). Across the new full mechanism X25..110 range, the old bed retains
 its original 860 mm support span and changes by 0.132 µm; the shortened plinth
-uses its 690 mm span and changes by 0.00196 µm (0.00392 µm at half modulus).
+uses its 690 mm span and changes by 0.00240 µm (0.00479 µm at half modulus).
 The previous 1100 mm plinth changed by 0.00628 µm across X45.2..250; that
 historical result is retained separately, not compared as equal travel.
 The new bound is below the explicitly allocated 1.9 µm profile share.

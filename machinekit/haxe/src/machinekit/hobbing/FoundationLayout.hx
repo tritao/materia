@@ -11,6 +11,9 @@ typedef InsertLocation={id:String,role:String,width:Float,depth:Float,height:Flo
 
 /** Design-specific insert layout, not a casting process model. Coordinates relative to casting body. */
 class FoundationLayout {
+  public static inline final TABLE_FACE=228.0; // lowered 20 mm to clear the wider fixture flange at A +/-15
+  public static inline final TABLE_SEAT=TABLE_FACE-210.0;
+  public static inline final TABLE_WELL_FLOOR=TABLE_SEAT-10.0;
   public static inline final PLINTH_HEIGHT=800.0;
   public static inline final UPPER_OFFSET=590.0;
   public static inline final BED_RAIL_CENTRE=220.0;
@@ -47,12 +50,13 @@ class FoundationLayout {
       if(kind=="bed"){
         var centre=HobberXLayout.front().bedCentre;
         cores=machinekit.structural.CastingCells.outsideColumns(bedCores(cores),[[-140.0-centre,-140,140-centre,140]]);
-        cores.push(CastingFeatures.box("work-well",410,350,100,-45-centre,0,120+UPPER_OFFSET));
-        cores.push(CastingFeatures.box("chip-drain",280,180,80,-50-centre,0,40+UPPER_OFFSET));
+        cores.push(CastingFeatures.box("work-well",410,350,220-TABLE_WELL_FLOOR,-45-centre,0,TABLE_WELL_FLOOR+UPPER_OFFSET));
+        cores.push(CastingFeatures.box("chip-drain",280,180,80,-50-centre,0,TABLE_WELL_FLOOR-80+UPPER_OFFSET));
         cores.push(CastingFeatures.box("X-drive-channel",HobberXLayout.front().bedRear+1-(HobberXLayout.front().deckStart-12.5),110,90,(HobberXLayout.front().bedRear+1+HobberXLayout.front().deckStart-12.5)/2-centre,0,130+UPPER_OFFSET));
         cores.push(CastingFeatures.box("coolant-reserved-volume",120,220,300,-215-centre,0,150));
         cores.push(CastingFeatures.box("coolant-front-access",40,240,320,-285-centre,0,140));
-        cores.push(CastingFeatures.box("chip-downcomer",80,100,510,-200-centre,0,200));
+        cores.push(CastingFeatures.box("chip-downcomer",80,100,TABLE_WELL_FLOOR+390,-200-centre,0,200));
+        cores.push(CastingFeatures.box("rotary-union-access",40,40,TABLE_SEAT+UPPER_OFFSET+1,-centre,0,0));
         cores.push(CastingFeatures.box("cable-route",HobberXLayout.front().bedLength-200,30,40,0,300,500));
       }else cores.push(CastingFeatures.box("head-recess",240,100,502,0,60,-1));
     }
@@ -69,7 +73,7 @@ class FoundationLayout {
     if(!legacy){
       if(kind=="bed"){
         var centre=HobberXLayout.front().bedCentre;
-        add("tablePlate","table seat",280,280,20,-centre,0,110+UPPER_OFFSET);
+        add("tablePlate","table seat",280,280,20,-centre,0,TABLE_SEAT-20+UPPER_OFFSET);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"preloaded column guide seat",width:BED_RAIL_SEAT_WIDTH,depth:HobberXLayout.front().railLength,height:20,
           pose:F.fromRotationMatrix(HobberXLayout.front().railStart+HobberXLayout.front().railLength/2-centre,side*BED_RAIL_CENTRE,200+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1])});
         out.push({id:"driveSeat",role:"central X screw channel seat",width:100,depth:HobberXLayout.front().motorFace-HobberXLayout.front().deckStart,height:20,pose:F.fromRotationMatrix((HobberXLayout.front().motorFace+HobberXLayout.front().deckStart)/2-centre,0,120+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1])});
@@ -103,5 +107,5 @@ class FoundationLayout {
     return out;
   }
   public static function insert(row:InsertLocation):CastInsert return new CastInsert(new ComponentValues().setNumber("width",row.width)
-    .setNumber("depth",row.depth).setNumber("height",row.height).setToken("role",row.role));
+    .setNumber("depth",row.depth).setNumber("height",row.height).setNumber("boreDiameter",row.id=="tablePlate"?40:0).setToken("role",row.role));
 }

@@ -47,7 +47,7 @@ class FlexsplineHobberChecks {
     var ring=new stockkit.hobbing.RingCompliance(machine.spec.rootRadius()-0.3,0.6,machine.spec.faceWidth,210000,1000,"explicit test fixture stiffness");
     var sync=new stockkit.hobbing.HobbingErrorSource("sync","runtime observations","test zero measured following error",(t,a)->a);
     var errors=FlexsplineHobberErrors.sources(machine,t->20,ring,sync);
-    check(errors.length==14,"HB11 installed parts expose independently selectable error sources");
+    check(errors.length==21,"HB11 installed parts expose independently selectable error sources");
     var mandrelError=errors.filter(e->e.id=="mandrel")[0];
     near(mandrelError.apply(0,new HobbingAxes(46,0,4,0,0,0)).pose().get_translation(0),46-machine.mandrel.eccentricity,1e-12,"part eccentricity controls physical work offset");
     check(errors.filter(e->e.id=="wall")[0].basis.indexOf("explicit test fixture stiffness")>=0,"wall support assumption stays in budget provenance");
@@ -227,9 +227,9 @@ class FlexsplineHobberChecks {
       sweepToleranceMm:tolerance,threads:Reflect.field(report,"threads"),fineFullStrokeValidated:Reflect.field(report,"fineFullStrokeValidated")==true,forceStudyValidated:validated,acceptanceBasis:Reflect.field(report,"acceptanceBasis")}));
     supportSensitivity(meanKnown?thicknessMean:number("radialN"),range,number("radialN"),
       meanKnown?thicknessMeanBasis:"legacy peak-only report: mean and varying range conservatively bounded by radial peak; actual mean unavailable",meanKnown,history,validated,settings);
-    var b=machine.spindle.motor,c=machine.table.motor;
+    var b=machine.spindle.motor,c=machine.tableSpec;
     var bTorque=b.continuousTorque*reserve,bPower=b.continuousTorque*b.ratedSpeed*reserve;
-    var cTorque=c.continuousTorque*reserve;
+    var cTorque=c.continuousTorque*reserve-c.number("sealDrag")-c.number("sealDragRipple")-c.number("coggingTorque");
     check(cam.rpm*2*Math.PI/60<=b.maxSpeed&&cam.tableRpm*2*Math.PI/60<=c.maxSpeed,"reference process speeds within installed limits");
     check(number("torqueNm")<=bTorque&&number("powerW")<=bPower,"measured reference spindle loads retain 20 percent reserve");
     check(number("tableTorqueBoundNm")<=cTorque,"measured reference table torque bound retains 20 percent reserve");
@@ -245,6 +245,7 @@ class FlexsplineHobberChecks {
     Sys.println('Reference load ratings: $assertions checks passed');
   }
   public static function main():Void {
+    if(Sys.args().indexOf("purchased-table")>=0){HobberPurchasedTableChecks.run();return;}
     if(Sys.args().indexOf("loading-sizing")>=0){HobberLoadingSizing.run();return;}
     if(Sys.args().indexOf("table-tilt-checks")>=0){HobberTableTiltChecks.run();return;}
     if(Sys.args().indexOf("base-report")>=0){Sys.println(haxe.Json.stringify(FlexsplineHobberBaseReport.measure(new FlexsplineHobber())));return;}

@@ -7,7 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Rotary table platen. Reference row is Assumed; dimensions are simplified envelopes. */
 class TablePlaten extends MachineComponent {
   public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
-    P.quantity("outside",160,"mm"),
+    P.quantity("outside",160,"mm"),P.length("faceBoltPcd",0),
     P.quantity("bore",30,"mm"),
     P.quantity("height",20,"mm"),P.quantity("stemDiameter",0,"mm"),P.quantity("stemBore",0,"mm"),P.quantity("stemHeight",0,"mm")]);
   static var recipe:Null<ComponentType>;

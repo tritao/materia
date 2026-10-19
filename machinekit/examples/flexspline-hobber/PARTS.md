@@ -129,7 +129,7 @@ the existing transmission resolver. Linear scales provide 10,000 counts/mm
 three-phase rectifier/bus; explicit winding ratings are checked by the existing
 motor/driver power model. Ratings, fixtures and travel are design assumptions.
 
-The reference's work shoulder is 115 mm above the table platen (including an integral 40 mm base), allowing end feed
+The reference's work shoulder is 135 mm above the table platen (including an integral 25 mm six-lobed base), allowing end feed
 and tilted-tool clearance. Its mandrel is sized from the cup's inner root/wall
 geometry; other reference parts rebuild the fixture to match. X's lower soft bound
 also accounts for that fixture radius. X retracts to 110 mm for front loading, Y is ±10 mm, Z is
@@ -197,3 +197,16 @@ provide 47 mm support height; their 15 kN per-foot target is assumed. The
 lightened column casting is 31.75 kg. The work-frame-to-machine transform also
 raises the assembly 637 mm, putting the tooth band 1000 mm above the floor.
 See MACHINE_DESIGN.md and LAYOUT_REPORT.json for current mass/stiffness evidence.
+
+
+The default installed C axis is now `PurchasedRotaryTable`, with generic recipe
+`machinekit.motion.purchased-rotary-part`: Ø200 face, 210 mm height, Ø40 bore,
+52 kg complete purchase, split into fixed/rotating envelopes for kinematics.
+`PrecisionRotaryAxis` also accepts the built-up `RotaryTable`. The purchase
+appears once in the BOM; its rotor is included, with mass/inertia still present.
+See PURCHASED_TABLE_REPORT.json for individual `Catalog`/`Assumed`/`Measured`
+values, provisional interfaces and the conditional grade-9 pitch-bound screen.
+The seat is 18 mm in work Z (floor655); face floor865, work band floor1000.
+The default supplier candidate and source are documented in MACHINE_DESIGN.md;
+vendor names are absent from code identifiers. No supplier bearing construction
+or mounted accuracy is implied by the envelope.

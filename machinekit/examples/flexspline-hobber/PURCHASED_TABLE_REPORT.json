@@ -1,0 +1,1233 @@
+{
+  "assertions": 126,
+  "purchaseFields": [
+    {
+      "basis": "Catalog",
+      "name": "faceDiameter",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "mm",
+      "value": 200
+    },
+    {
+      "basis": "Catalog",
+      "name": "height",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "mm",
+      "value": 210
+    },
+    {
+      "basis": "Catalog",
+      "name": "bore",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "mm",
+      "value": 40
+    },
+    {
+      "basis": "Catalog",
+      "name": "mass",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "kg",
+      "value": 52
+    },
+    {
+      "basis": "Catalog",
+      "name": "continuousTorque",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "N m",
+      "value": 54.9
+    },
+    {
+      "basis": "Catalog",
+      "name": "peakTorque",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "N m",
+      "value": 223
+    },
+    {
+      "basis": "Catalog",
+      "name": "continuousCurrent",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "A rms",
+      "value": 3.43
+    },
+    {
+      "basis": "Catalog",
+      "name": "peakCurrent",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "A rms",
+      "value": 17.9
+    },
+    {
+      "basis": "Catalog",
+      "name": "ratedSpeed",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "rad/s",
+      "value": 20.943951023931955
+    },
+    {
+      "basis": "Catalog",
+      "name": "maxSpeed",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "rad/s",
+      "value": 24.504422698000386
+    },
+    {
+      "basis": "Catalog",
+      "name": "loadCapacity",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "kg",
+      "value": 50
+    },
+    {
+      "basis": "Catalog",
+      "name": "absoluteAccuracy",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate. Published positioning accuracy; not NRRO or interpolation error.",
+      "unit": "rad",
+      "value": 2.42406840554768e-05
+    },
+    {
+      "basis": "Catalog",
+      "name": "repeatability",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "rad",
+      "value": 9.69627362219072e-06
+    },
+    {
+      "basis": "Catalog",
+      "name": "clampPressure",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "Pa",
+      "value": 600000
+    },
+    {
+      "basis": "Catalog",
+      "name": "driverAcLow",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "V rms",
+      "value": 220
+    },
+    {
+      "basis": "Catalog",
+      "name": "driverAcHigh",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "V rms",
+      "value": 380
+    },
+    {
+      "basis": "Catalog",
+      "name": "ingressRating",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "IP code",
+      "value": 67
+    },
+    {
+      "basis": "Catalog",
+      "name": "naturalCooling",
+      "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+      "unit": "boolean",
+      "value": 1
+    },
+    {
+      "basis": "Assumed",
+      "name": "housingDiameter",
+      "reason": "Conservative clearance envelope; only the face diameter is published. Vendor outline required.",
+      "unit": "mm",
+      "value": 260
+    },
+    {
+      "basis": "Assumed",
+      "name": "barrelDiameter",
+      "reason": "Provisional cylindrical housing under the face; outline drawing required.",
+      "unit": "mm",
+      "value": 200
+    },
+    {
+      "basis": "Assumed",
+      "name": "flangeThickness",
+      "reason": "Provisional accessible flange outside the barrel; vendor drawing required.",
+      "unit": "mm",
+      "value": 15
+    },
+    {
+      "basis": "Assumed",
+      "name": "faceThickness",
+      "reason": "Envelope split for kinematic presentation, not an internal construction drawing.",
+      "unit": "mm",
+      "value": 20
+    },
+    {
+      "basis": "Assumed",
+      "name": "rotatingMass",
+      "reason": "Unpublished rotor/platen mass allocation within the catalog 52 kg total.",
+      "unit": "kg",
+      "value": 8
+    },
+    {
+      "basis": "Assumed",
+      "name": "rotorInertia",
+      "reason": "8 kg rotating allocation at an effective 71 mm radius; bench identification required.",
+      "unit": "kg m2",
+      "value": 0.04
+    },
+    {
+      "basis": "Assumed",
+      "name": "radialRunout",
+      "reason": "Purchase target, unpublished; not inferred from positioning accuracy.",
+      "unit": "mm TIR",
+      "value": 0.002
+    },
+    {
+      "basis": "Assumed",
+      "name": "axialRunout",
+      "reason": "Purchase target, unpublished; retain earlier HB11 2 um TIR screen.",
+      "unit": "mm TIR",
+      "value": 0.002
+    },
+    {
+      "basis": "Assumed",
+      "name": "radialNrro",
+      "reason": "Unpublished target; non-repeatable sequence modeled explicitly, no vendor qualification.",
+      "unit": "mm peak",
+      "value": 0.0003
+    },
+    {
+      "basis": "Assumed",
+      "name": "axialNrro",
+      "reason": "Unpublished target; non-repeatable sequence modeled explicitly.",
+      "unit": "mm peak",
+      "value": 0.0003
+    },
+    {
+      "basis": "Assumed",
+      "name": "interpolationError",
+      "reason": "Unpublished half-arcsecond target; assumed 4096-fold harmonic.",
+      "unit": "rad peak",
+      "value": 2.42406840554768e-06
+    },
+    {
+      "basis": "Assumed",
+      "name": "encoderCounts",
+      "reason": "23-bit absolute target; encoder interface and actual resolution require confirmation.",
+      "unit": "counts/revolution",
+      "value": 8388608
+    },
+    {
+      "basis": "Assumed",
+      "name": "coggingTorque",
+      "reason": "Low-speed disturbance allowance; 48th harmonic, bench measurement required.",
+      "unit": "N m peak",
+      "value": 0.1
+    },
+    {
+      "basis": "Assumed",
+      "name": "speedRipple",
+      "reason": "0.1 percent once-per-turn ripple at 10-20 rpm; measurement required.",
+      "unit": "fraction peak",
+      "value": 0.001
+    },
+    {
+      "basis": "Assumed",
+      "name": "sealDrag",
+      "reason": "IP67 does not establish seal type; conservative contact-seal allowance.",
+      "unit": "N m mean",
+      "value": 0.5
+    },
+    {
+      "basis": "Assumed",
+      "name": "sealDragRipple",
+      "reason": "20 percent drag variation, twice per turn; not measured.",
+      "unit": "N m peak",
+      "value": 0.1
+    },
+    {
+      "basis": "Assumed",
+      "name": "servoTorsionalStiffness",
+      "reason": "Quasistatic closed-loop disturbance rejection used only by explicit seal/cogging error sources.",
+      "unit": "N m/rad",
+      "value": 200000
+    },
+    {
+      "basis": "Assumed",
+      "name": "momentStiffness",
+      "reason": "Retain former HB11 moment-stiffness screen; purchased bearing type is not claimed.",
+      "unit": "N m/rad",
+      "value": 1000000
+    },
+    {
+      "basis": "Assumed",
+      "name": "radialStiffness",
+      "reason": "Unpublished bearing/housing target; conservative static compliance screen.",
+      "unit": "N/mm",
+      "value": 100000
+    },
+    {
+      "basis": "Assumed",
+      "name": "axialStiffness",
+      "reason": "Unpublished bearing/housing target; axial load envelope must be stated separately.",
+      "unit": "N/mm",
+      "value": 100000
+    },
+    {
+      "basis": "Assumed",
+      "name": "pivotBelowFace",
+      "reason": "Unpublished bearing centre, 60 mm below table face; sensitivity required.",
+      "unit": "mm",
+      "value": 60
+    },
+    {
+      "basis": "Assumed",
+      "name": "torqueConstant",
+      "reason": "Continuous torque/current quotient only; peak quotient differs, not a measured motor constant.",
+      "unit": "N m/A rms",
+      "value": 16.005830903790088
+    },
+    {
+      "basis": "Assumed",
+      "name": "backEmfConstant",
+      "reason": "Power-consistent sinusoidal motor convention derived from assumed Kt.",
+      "unit": "V/(rad/s)",
+      "value": 9.240970780906839
+    },
+    {
+      "basis": "Assumed",
+      "name": "phaseResistance",
+      "reason": "Unpublished winding resistance, retained simulation reference.",
+      "unit": "ohm",
+      "value": 0.3
+    },
+    {
+      "basis": "Assumed",
+      "name": "clampHoldingTorque",
+      "reason": "Procurement target above peak motor torque; air pressure alone does not establish holding torque.",
+      "unit": "N m",
+      "value": 300
+    },
+    {
+      "basis": "Assumed",
+      "name": "thermalExpansion",
+      "reason": "Effective steel-rich axial expansion; housing/material stack unknown, HB14 thermal model input.",
+      "unit": "1/K",
+      "value": 1.2e-05
+    },
+    {
+      "basis": "Assumed",
+      "name": "heatAt15Rpm",
+      "reason": "Lumped low-speed winding/iron/drive heat allowance; seal power is separate; duty measurement required.",
+      "unit": "W",
+      "value": 10
+    },
+    {
+      "basis": "Assumed",
+      "name": "thermalResistance",
+      "reason": "Natural-cooling lumped thermal estimate, requires duty/temperature measurement.",
+      "unit": "K/W",
+      "value": 0.2
+    },
+    {
+      "basis": "Assumed",
+      "name": "thermalCapacity",
+      "reason": "52 kg x 450 J/kg/K effective heat capacity, mixed materials unconfirmed.",
+      "unit": "J/K",
+      "value": 23400
+    },
+    {
+      "basis": "Assumed",
+      "name": "facePcd",
+      "reason": "Provisional six M8 holes on this PCD, clocked 30 degrees; vendor drawing required.",
+      "unit": "mm",
+      "value": 160
+    },
+    {
+      "basis": "Assumed",
+      "name": "centeringDiameter",
+      "reason": "Provisional 3 mm-deep female face pilot with matching mandrel spigot; vendor drawing required.",
+      "unit": "mm",
+      "value": 100
+    },
+    {
+      "basis": "Assumed",
+      "name": "flangePcd",
+      "reason": "Provisional six M10 flange holes, 30 degree clocking, 15 mm flange; vendor drawing required.",
+      "unit": "mm",
+      "value": 230
+    },
+    {
+      "basis": "Assumed",
+      "name": "driverAcTolerance",
+      "reason": "380 VAC +/-10 percent includes site's 400 VAC; actual driver approval required.",
+      "unit": "fraction",
+      "value": 0.1
+    }
+  ],
+  "forms": [
+    {
+      "form": "purchased",
+      "prediction": {
+        "scope": "Conditional analytic table-only pitch/runout bound, not a cut-derived or overall gear grade. Harmonics/phases/compliance assumed. Full source/combined HB11 cut remains open.",
+        "conditionalWorstPitchGrade": 9,
+        "isoClass": null,
+        "outsideIsoScope": [
+          "module outside 0.5..70 mm"
+        ],
+        "rows": [
+          {
+            "parameter": "Fp",
+            "boundUm": 63.999678559089055,
+            "extrapolatedGrade": 9,
+            "class6LimitUm": 23
+          },
+          {
+            "parameter": "fp",
+            "boundUm": 1.2371518645687105,
+            "extrapolatedGrade": 1,
+            "class6LimitUm": 7.5
+          },
+          {
+            "parameter": "Fr",
+            "boundUm": 2.3397934114275816,
+            "extrapolatedGrade": 1,
+            "class6LimitUm": 21
+          }
+        ],
+        "harmonicPhaseBounds": [
+          {
+            "amplitude": 2.42406840554768e-05,
+            "id": "absoluteAccuracy",
+            "order": 4
+          },
+          {
+            "amplitude": 2.42406840554768e-06,
+            "id": "interpolationError",
+            "order": 4096
+          },
+          {
+            "amplitude": 0.001,
+            "id": "speedRipple",
+            "order": 1
+          },
+          {
+            "amplitude": 5e-07,
+            "id": "coggingTorque",
+            "order": 48
+          },
+          {
+            "amplitude": 5e-07,
+            "id": "sealDragRipple",
+            "order": 2
+          }
+        ],
+        "sealMeanPhaseOffsetRad": 2.5e-06,
+        "maximumOncePerTurnSpeedRippleFractionForClass6Fp": 0.0003166720240151824,
+        "forceBasis": "HB10 measured radial gash-window peak 16.989670571 N; not tangential force or instantaneous peaks",
+        "fields": [
+          {
+            "basis": "Catalog",
+            "name": "faceDiameter",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "mm",
+            "value": 200
+          },
+          {
+            "basis": "Catalog",
+            "name": "height",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "mm",
+            "value": 210
+          },
+          {
+            "basis": "Catalog",
+            "name": "bore",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "mm",
+            "value": 40
+          },
+          {
+            "basis": "Catalog",
+            "name": "mass",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "kg",
+            "value": 52
+          },
+          {
+            "basis": "Catalog",
+            "name": "continuousTorque",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "N m",
+            "value": 54.9
+          },
+          {
+            "basis": "Catalog",
+            "name": "peakTorque",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "N m",
+            "value": 223
+          },
+          {
+            "basis": "Catalog",
+            "name": "continuousCurrent",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "A rms",
+            "value": 3.43
+          },
+          {
+            "basis": "Catalog",
+            "name": "peakCurrent",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "A rms",
+            "value": 17.9
+          },
+          {
+            "basis": "Catalog",
+            "name": "ratedSpeed",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "rad/s",
+            "value": 20.943951023931955
+          },
+          {
+            "basis": "Catalog",
+            "name": "maxSpeed",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "rad/s",
+            "value": 24.504422698000386
+          },
+          {
+            "basis": "Catalog",
+            "name": "loadCapacity",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "kg",
+            "value": 50
+          },
+          {
+            "basis": "Catalog",
+            "name": "absoluteAccuracy",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate. Published positioning accuracy; not NRRO or interpolation error.",
+            "unit": "rad",
+            "value": 2.42406840554768e-05
+          },
+          {
+            "basis": "Catalog",
+            "name": "repeatability",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "rad",
+            "value": 9.69627362219072e-06
+          },
+          {
+            "basis": "Catalog",
+            "name": "clampPressure",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "Pa",
+            "value": 600000
+          },
+          {
+            "basis": "Catalog",
+            "name": "driverAcLow",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "V rms",
+            "value": 220
+          },
+          {
+            "basis": "Catalog",
+            "name": "driverAcHigh",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "V rms",
+            "value": 380
+          },
+          {
+            "basis": "Catalog",
+            "name": "ingressRating",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "IP code",
+            "value": 67
+          },
+          {
+            "basis": "Catalog",
+            "name": "naturalCooling",
+            "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+            "unit": "boolean",
+            "value": 1
+          },
+          {
+            "basis": "Assumed",
+            "name": "housingDiameter",
+            "reason": "Conservative clearance envelope; only the face diameter is published. Vendor outline required.",
+            "unit": "mm",
+            "value": 260
+          },
+          {
+            "basis": "Assumed",
+            "name": "barrelDiameter",
+            "reason": "Provisional cylindrical housing under the face; outline drawing required.",
+            "unit": "mm",
+            "value": 200
+          },
+          {
+            "basis": "Assumed",
+            "name": "flangeThickness",
+            "reason": "Provisional accessible flange outside the barrel; vendor drawing required.",
+            "unit": "mm",
+            "value": 15
+          },
+          {
+            "basis": "Assumed",
+            "name": "faceThickness",
+            "reason": "Envelope split for kinematic presentation, not an internal construction drawing.",
+            "unit": "mm",
+            "value": 20
+          },
+          {
+            "basis": "Assumed",
+            "name": "rotatingMass",
+            "reason": "Unpublished rotor/platen mass allocation within the catalog 52 kg total.",
+            "unit": "kg",
+            "value": 8
+          },
+          {
+            "basis": "Assumed",
+            "name": "rotorInertia",
+            "reason": "8 kg rotating allocation at an effective 71 mm radius; bench identification required.",
+            "unit": "kg m2",
+            "value": 0.04
+          },
+          {
+            "basis": "Assumed",
+            "name": "radialRunout",
+            "reason": "Purchase target, unpublished; not inferred from positioning accuracy.",
+            "unit": "mm TIR",
+            "value": 0.002
+          },
+          {
+            "basis": "Assumed",
+            "name": "axialRunout",
+            "reason": "Purchase target, unpublished; retain earlier HB11 2 um TIR screen.",
+            "unit": "mm TIR",
+            "value": 0.002
+          },
+          {
+            "basis": "Assumed",
+            "name": "radialNrro",
+            "reason": "Unpublished target; non-repeatable sequence modeled explicitly, no vendor qualification.",
+            "unit": "mm peak",
+            "value": 0.0003
+          },
+          {
+            "basis": "Assumed",
+            "name": "axialNrro",
+            "reason": "Unpublished target; non-repeatable sequence modeled explicitly.",
+            "unit": "mm peak",
+            "value": 0.0003
+          },
+          {
+            "basis": "Assumed",
+            "name": "interpolationError",
+            "reason": "Unpublished half-arcsecond target; assumed 4096-fold harmonic.",
+            "unit": "rad peak",
+            "value": 2.42406840554768e-06
+          },
+          {
+            "basis": "Assumed",
+            "name": "encoderCounts",
+            "reason": "23-bit absolute target; encoder interface and actual resolution require confirmation.",
+            "unit": "counts/revolution",
+            "value": 8388608
+          },
+          {
+            "basis": "Assumed",
+            "name": "coggingTorque",
+            "reason": "Low-speed disturbance allowance; 48th harmonic, bench measurement required.",
+            "unit": "N m peak",
+            "value": 0.1
+          },
+          {
+            "basis": "Assumed",
+            "name": "speedRipple",
+            "reason": "0.1 percent once-per-turn ripple at 10-20 rpm; measurement required.",
+            "unit": "fraction peak",
+            "value": 0.001
+          },
+          {
+            "basis": "Assumed",
+            "name": "sealDrag",
+            "reason": "IP67 does not establish seal type; conservative contact-seal allowance.",
+            "unit": "N m mean",
+            "value": 0.5
+          },
+          {
+            "basis": "Assumed",
+            "name": "sealDragRipple",
+            "reason": "20 percent drag variation, twice per turn; not measured.",
+            "unit": "N m peak",
+            "value": 0.1
+          },
+          {
+            "basis": "Assumed",
+            "name": "servoTorsionalStiffness",
+            "reason": "Quasistatic closed-loop disturbance rejection used only by explicit seal/cogging error sources.",
+            "unit": "N m/rad",
+            "value": 200000
+          },
+          {
+            "basis": "Assumed",
+            "name": "momentStiffness",
+            "reason": "Retain former HB11 moment-stiffness screen; purchased bearing type is not claimed.",
+            "unit": "N m/rad",
+            "value": 1000000
+          },
+          {
+            "basis": "Assumed",
+            "name": "radialStiffness",
+            "reason": "Unpublished bearing/housing target; conservative static compliance screen.",
+            "unit": "N/mm",
+            "value": 100000
+          },
+          {
+            "basis": "Assumed",
+            "name": "axialStiffness",
+            "reason": "Unpublished bearing/housing target; axial load envelope must be stated separately.",
+            "unit": "N/mm",
+            "value": 100000
+          },
+          {
+            "basis": "Assumed",
+            "name": "pivotBelowFace",
+            "reason": "Unpublished bearing centre, 60 mm below table face; sensitivity required.",
+            "unit": "mm",
+            "value": 60
+          },
+          {
+            "basis": "Assumed",
+            "name": "torqueConstant",
+            "reason": "Continuous torque/current quotient only; peak quotient differs, not a measured motor constant.",
+            "unit": "N m/A rms",
+            "value": 16.005830903790088
+          },
+          {
+            "basis": "Assumed",
+            "name": "backEmfConstant",
+            "reason": "Power-consistent sinusoidal motor convention derived from assumed Kt.",
+            "unit": "V/(rad/s)",
+            "value": 9.240970780906839
+          },
+          {
+            "basis": "Assumed",
+            "name": "phaseResistance",
+            "reason": "Unpublished winding resistance, retained simulation reference.",
+            "unit": "ohm",
+            "value": 0.3
+          },
+          {
+            "basis": "Assumed",
+            "name": "clampHoldingTorque",
+            "reason": "Procurement target above peak motor torque; air pressure alone does not establish holding torque.",
+            "unit": "N m",
+            "value": 300
+          },
+          {
+            "basis": "Assumed",
+            "name": "thermalExpansion",
+            "reason": "Effective steel-rich axial expansion; housing/material stack unknown, HB14 thermal model input.",
+            "unit": "1/K",
+            "value": 1.2e-05
+          },
+          {
+            "basis": "Assumed",
+            "name": "heatAt15Rpm",
+            "reason": "Lumped low-speed winding/iron/drive heat allowance; seal power is separate; duty measurement required.",
+            "unit": "W",
+            "value": 10
+          },
+          {
+            "basis": "Assumed",
+            "name": "thermalResistance",
+            "reason": "Natural-cooling lumped thermal estimate, requires duty/temperature measurement.",
+            "unit": "K/W",
+            "value": 0.2
+          },
+          {
+            "basis": "Assumed",
+            "name": "thermalCapacity",
+            "reason": "52 kg x 450 J/kg/K effective heat capacity, mixed materials unconfirmed.",
+            "unit": "J/K",
+            "value": 23400
+          },
+          {
+            "basis": "Assumed",
+            "name": "facePcd",
+            "reason": "Provisional six M8 holes on this PCD, clocked 30 degrees; vendor drawing required.",
+            "unit": "mm",
+            "value": 160
+          },
+          {
+            "basis": "Assumed",
+            "name": "centeringDiameter",
+            "reason": "Provisional 3 mm-deep female face pilot with matching mandrel spigot; vendor drawing required.",
+            "unit": "mm",
+            "value": 100
+          },
+          {
+            "basis": "Assumed",
+            "name": "flangePcd",
+            "reason": "Provisional six M10 flange holes, 30 degree clocking, 15 mm flange; vendor drawing required.",
+            "unit": "mm",
+            "value": 230
+          },
+          {
+            "basis": "Assumed",
+            "name": "driverAcTolerance",
+            "reason": "380 VAC +/-10 percent includes site's 400 VAC; actual driver approval required.",
+            "unit": "fraction",
+            "value": 0.1
+          }
+        ]
+      }
+    },
+    {
+      "form": "built",
+      "prediction": {
+        "scope": "Conditional analytic table-only pitch/runout bound, not a cut-derived or overall gear grade. Harmonics/phases/compliance assumed. Full source/combined HB11 cut remains open.",
+        "conditionalWorstPitchGrade": 9,
+        "isoClass": null,
+        "outsideIsoScope": [
+          "module outside 0.5..70 mm"
+        ],
+        "rows": [
+          {
+            "parameter": "Fp",
+            "boundUm": 63.07601393309188,
+            "extrapolatedGrade": 9,
+            "class6LimitUm": 23
+          },
+          {
+            "parameter": "fp",
+            "boundUm": 1.1670389873306484,
+            "extrapolatedGrade": 1,
+            "class6LimitUm": 7.5
+          },
+          {
+            "parameter": "Fr",
+            "boundUm": 2.3397934114275816,
+            "extrapolatedGrade": 1,
+            "class6LimitUm": 21
+          }
+        ],
+        "harmonicPhaseBounds": [
+          {
+            "amplitude": 9.69627362219072e-06,
+            "id": "absoluteAccuracy",
+            "order": 4
+          },
+          {
+            "amplitude": 2.42406840554768e-06,
+            "id": "interpolationError",
+            "order": 4096
+          },
+          {
+            "amplitude": 0.001,
+            "id": "speedRipple",
+            "order": 1
+          },
+          {
+            "amplitude": 1.5e-07,
+            "id": "coggingTorque",
+            "order": 48
+          },
+          {
+            "amplitude": 0,
+            "id": "sealDragRipple",
+            "order": 2
+          }
+        ],
+        "sealMeanPhaseOffsetRad": 0,
+        "maximumOncePerTurnSpeedRippleFractionForClass6Fp": 0.0003320664344484687,
+        "forceBasis": "HB10 measured radial gash-window peak 16.989670571 N; not tangential force or instantaneous peaks",
+        "fields": [
+          {
+            "basis": "Assumed",
+            "name": "faceDiameter",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 240
+          },
+          {
+            "basis": "Assumed",
+            "name": "height",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 118
+          },
+          {
+            "basis": "Assumed",
+            "name": "bore",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 40
+          },
+          {
+            "basis": "Derived",
+            "name": "mass",
+            "reason": "CAD volumes x declared densities; constituent densities and geometry carry their own assumptions.",
+            "unit": "kg",
+            "value": 31.848241100958425
+          },
+          {
+            "basis": "Assumed",
+            "name": "continuousTorque",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N m",
+            "value": 10
+          },
+          {
+            "basis": "Assumed",
+            "name": "peakTorque",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N m",
+            "value": 30
+          },
+          {
+            "basis": "Assumed",
+            "name": "continuousCurrent",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "A rms",
+            "value": 5
+          },
+          {
+            "basis": "Assumed",
+            "name": "peakCurrent",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "A rms",
+            "value": 15
+          },
+          {
+            "basis": "Assumed",
+            "name": "ratedSpeed",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "rad/s",
+            "value": 6.283185307179585
+          },
+          {
+            "basis": "Assumed",
+            "name": "maxSpeed",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "rad/s",
+            "value": 12.56637061435917
+          },
+          {
+            "basis": "Assumed",
+            "name": "loadCapacity",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "kg",
+            "value": 50
+          },
+          {
+            "basis": "Assumed",
+            "name": "absoluteAccuracy",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "rad",
+            "value": 9.69627362219072e-06
+          },
+          {
+            "basis": "Assumed",
+            "name": "repeatability",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "rad",
+            "value": 9.69627362219072e-06
+          },
+          {
+            "basis": "Assumed",
+            "name": "clampPressure",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "Pa",
+            "value": 600000
+          },
+          {
+            "basis": "Assumed",
+            "name": "driverAcLow",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "V rms",
+            "value": 220
+          },
+          {
+            "basis": "Assumed",
+            "name": "driverAcHigh",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "V rms",
+            "value": 380
+          },
+          {
+            "basis": "Assumed",
+            "name": "ingressRating",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "IP code",
+            "value": 67
+          },
+          {
+            "basis": "Assumed",
+            "name": "naturalCooling",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "boolean",
+            "value": 1
+          },
+          {
+            "basis": "Assumed",
+            "name": "housingDiameter",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 270
+          },
+          {
+            "basis": "Assumed",
+            "name": "barrelDiameter",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 200
+          },
+          {
+            "basis": "Assumed",
+            "name": "flangeThickness",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 15
+          },
+          {
+            "basis": "Assumed",
+            "name": "faceThickness",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 20
+          },
+          {
+            "basis": "Derived",
+            "name": "rotatingMass",
+            "reason": "Built platen CAD mass, not purchased internals.",
+            "unit": "kg",
+            "value": 9.835007129475136
+          },
+          {
+            "basis": "Assumed",
+            "name": "rotorInertia",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "kg m2",
+            "value": 0.003
+          },
+          {
+            "basis": "Assumed",
+            "name": "radialRunout",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm TIR",
+            "value": 0.002
+          },
+          {
+            "basis": "Assumed",
+            "name": "axialRunout",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm TIR",
+            "value": 0.002
+          },
+          {
+            "basis": "Assumed",
+            "name": "radialNrro",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm peak",
+            "value": 0.0003
+          },
+          {
+            "basis": "Assumed",
+            "name": "axialNrro",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm peak",
+            "value": 0.0003
+          },
+          {
+            "basis": "Assumed",
+            "name": "interpolationError",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "rad peak",
+            "value": 2.42406840554768e-06
+          },
+          {
+            "basis": "Assumed",
+            "name": "encoderCounts",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "counts/revolution",
+            "value": 8388608
+          },
+          {
+            "basis": "Assumed",
+            "name": "coggingTorque",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N m peak",
+            "value": 0.03
+          },
+          {
+            "basis": "Assumed",
+            "name": "speedRipple",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "fraction peak",
+            "value": 0.001
+          },
+          {
+            "basis": "Assumed",
+            "name": "sealDrag",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N m mean",
+            "value": 0
+          },
+          {
+            "basis": "Assumed",
+            "name": "sealDragRipple",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N m peak",
+            "value": 0
+          },
+          {
+            "basis": "Assumed",
+            "name": "servoTorsionalStiffness",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N m/rad",
+            "value": 200000
+          },
+          {
+            "basis": "Assumed",
+            "name": "momentStiffness",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N m/rad",
+            "value": 1000000
+          },
+          {
+            "basis": "Assumed",
+            "name": "radialStiffness",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N/mm",
+            "value": 100000
+          },
+          {
+            "basis": "Assumed",
+            "name": "axialStiffness",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N/mm",
+            "value": 100000
+          },
+          {
+            "basis": "Assumed",
+            "name": "pivotBelowFace",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 65
+          },
+          {
+            "basis": "Assumed",
+            "name": "torqueConstant",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N m/A rms",
+            "value": 2
+          },
+          {
+            "basis": "Assumed",
+            "name": "backEmfConstant",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "V/(rad/s)",
+            "value": 1.1547005383792517
+          },
+          {
+            "basis": "Assumed",
+            "name": "phaseResistance",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "ohm",
+            "value": 0.3
+          },
+          {
+            "basis": "Assumed",
+            "name": "clampHoldingTorque",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "N m",
+            "value": 300
+          },
+          {
+            "basis": "Assumed",
+            "name": "thermalExpansion",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "1/K",
+            "value": 1.2e-05
+          },
+          {
+            "basis": "Assumed",
+            "name": "heatAt15Rpm",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "W",
+            "value": 10
+          },
+          {
+            "basis": "Assumed",
+            "name": "thermalResistance",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "K/W",
+            "value": 0.2
+          },
+          {
+            "basis": "Assumed",
+            "name": "thermalCapacity",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "J/K",
+            "value": 23400
+          },
+          {
+            "basis": "Assumed",
+            "name": "facePcd",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 160
+          },
+          {
+            "basis": "Assumed",
+            "name": "centeringDiameter",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 0
+          },
+          {
+            "basis": "Assumed",
+            "name": "flangePcd",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "mm",
+            "value": 230
+          },
+          {
+            "basis": "Assumed",
+            "name": "driverAcTolerance",
+            "reason": "Built-up reference assembly; constituent engineering assumptions, not catalogue qualification.",
+            "unit": "fraction",
+            "value": 0.1
+          }
+        ]
+      }
+    }
+  ],
+  "geometryInterface": "provisional until vendor drawing; 6 bar air and encoder/driver services declared, no hydraulic/clamp solver",
+  "unionClearDiameterMm": 39.98,
+  "scope": "Bought/built interface, persistence and analytic pitch/runout screen. Not full HB11 cut or overall ISO grade; module 0.3 is outside the ISO formula scope.",
+  "installedLayout": {
+    "tableSeatFloorMm": 655,
+    "tableFaceFloorMm": 865,
+    "toothBandFloorMm": 1000,
+    "fixtureStandOffMm": 135,
+    "fixtureFlangeThicknessMm": 25,
+    "throughBoreMm": 40,
+    "faceInterface": "Assumed six M8 holes PCD160, 30 degree clocking; diameter100 x3 female pilot. Provisional pending vendor drawing.",
+    "mountInterface": "Assumed flange diameter260 x15, six M10 holes PCD230. Provisional pending vendor drawing."
+  },
+  "validation": {
+    "assemblyAssertions": 949,
+    "tableAssertions": 126,
+    "rangeAssertions": 1318,
+    "loadingAssertions": 6666,
+    "fullPlayback": {
+      "cutWindows": 982,
+      "machiningSeconds": 6.496250000003457,
+      "fixtureEnvelopeContacts": 0,
+      "inspectionAndReset": "passed",
+      "scope": "Coarse demonstration, not grading"
+    },
+    "sourceReference": "STRAIN_WAVE_RESEARCH.md#suppliers-and-prices",
+    "partAssertions": 1044,
+    "partGeometryAssertions": 127
+  }
+}

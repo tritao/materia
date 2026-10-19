@@ -10,32 +10,53 @@ class FlexsplineHobberErrors {
     if(sync.id!="sync")throw "hobber budget needs an explicitly identified runtime/diagnostic sync source";
     if(Math.abs(wall.radius-(machine.spec.rootRadius()-wall.wall/2))>1e-8||Math.abs(wall.width-machine.spec.faceWidth)>1e-8)
       throw "wall compliance does not match blank geometry";
-    var poses=machine.solvedPoses(),centre=machine.table.bearing.massProperties().centreOfMass;
-    var bearingInWork=materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(poses.get("blank")),poses.get("table/bearing"));
-    var pivotDepth= -materia.assembly.AssemblyFrames.transformPoint(bearingInWork,centre.x,centre.y,centre.z).z;
-    var table=machine.table,arbor=machine.spindle.arbor,tool=machine.hob;
+    var table=machine.tableSpec,arbor=machine.spindle.arbor,tool=machine.hob;
+    var pivotDepth=machine.mandrel.parameterNumber("workSeat")+table.number("pivotBelowFace");
+    var tablePart="table/"+table.errorPart,encoderPart="table/"+table.encoderPart;
     var outboard:machinekit.hobbing.OutboardSupport=cast machine.components().filter(m->m.id=="outboard")[0].component;
     var supportRadial=HobbingErrorSource.hobRadial("outboard",outboard.parameterNumber("radialRunout"));
-    var encoderRadius=(table.encoder.parameterNumber("outside")+table.encoder.parameterNumber("bore"))/4;
     var radial=HobbingErrorSource.hobRadial("spindle/arbor",arbor.parameterNumber("radialRunout"));
     var toolRadial=HobbingErrorSource.hobRadial("hob",tool.parameterNumber("radialRunout"));
     var axial=HobbingErrorSource.hobAxial("spindle/arbor",arbor.parameterNumber("axialRunout"));
     var toolAxial=HobbingErrorSource.hobAxial("hob",tool.parameterNumber("axialRunout"));
     if(Math.abs(tool.design.rake)>1e-12&&tool.parameterNumber("profileError")>0)throw "assumed profile waveform supports zero rake only";
     var sources=[HobbingErrorSource.workEccentricity("mandrel","mandrel",machine.mandrel.eccentricity),
-      HobbingErrorSource.workEccentricity("table-radial","table/bearing",table.bearing.radialRunout/2),
-      HobbingErrorSource.tableAxial("table/bearing",table.bearing.axialRunout),
-      HobbingErrorSource.tableTilt("table/bearing",table.bearing.parameterNumber("momentStiffness"),pivotDepth,pivotDepth+machine.spec.faceWidth/2,radialForce),
-      HobbingErrorSource.encoder("table/encoder",table.encoder.eccentricity,encoderRadius),
-      HobbingErrorSource.graduation("table/encoder",table.encoder.angularAccuracy,4),
+      HobbingErrorSource.workEccentricity("table-radial",tablePart,Math.max(0,table.number("radialRunout")/2-table.number("radialNrro"))),
+      HobbingErrorSource.tableAxial(tablePart,Math.max(0,table.number("axialRunout")-2*table.number("axialNrro"))),
+      HobbingErrorSource.tableTilt(tablePart,table.number("momentStiffness"),pivotDepth,pivotDepth+machine.spec.faceWidth/2,radialForce),
+      HobbingErrorSource.encoder(encoderPart,0,50), // net positioning data already includes installed encoder eccentricity
+
+      HobbingErrorSource.graduation(encoderPart,table.number("absoluteAccuracy"),4),
       radial,axial,
       new HobbingErrorSource("tool-radial",toolRadial.part,toolRadial.basis,toolRadial.apply),
       new HobbingErrorSource("tool-axial",toolAxial.part,toolAxial.basis,toolAxial.apply),
       HobbingErrorSource.profile("hob",tool.parameterNumber("profileError"),tool.design.axialPitch),sync,
       new HobbingErrorSource("outboard-radial","outboard",supportRadial.basis+"; parallel-axis approximation, no shaft bending",supportRadial.apply),
       wall.source("blank + mandrel contact",radialForce)];
+    // Additional purchased/built table disturbances retain their individual provenance.
+    function angular(id:String,field:String,order:Float,amplitude:Float):Void {
+      sources.push(new HobbingErrorSource(id,tablePart,field+"="+table.number(field)+" "+table.basis(field)+"; "+table.reason(field)+"; assumed order "+order,(t,a)->
+        new stockkit.hobbing.HobbingAxes(a.x,a.y,a.z,a.a,a.b,a.c+amplitude*Math.sin(order*a.c),a.offset)));
+    }
+    angular("table-interpolation","interpolationError",4096,table.number("interpolationError"));
+    angular("table-speed-ripple","speedRipple",1,table.number("speedRipple")); // integrate fractional sinusoidal speed ripple per C radian
+    angular("table-cogging","coggingTorque",48,table.number("coggingTorque")/table.number("servoTorsionalStiffness"));
+    sources.push(new HobbingErrorSource("table-seal-drag",tablePart,
+      "Assumed closed-loop compliance: mean drag "+table.number("sealDrag")+" N m + twice-turn ripple "+table.number("sealDragRipple")+" N m, divided by "+table.number("servoTorsionalStiffness")+" N m/rad; "+table.reason("sealDrag"),
+      (t,a)->new stockkit.hobbing.HobbingAxes(a.x,a.y,a.z,a.a,a.b,a.c-(table.number("sealDrag")+table.number("sealDragRipple")*Math.cos(2*a.c))/table.number("servoTorsionalStiffness"),a.offset)));
+    sources.push(new HobbingErrorSource("table-nrro-radial",tablePart,"Assumed non-repeating quasiperiodic bounded radial surrogate; periodic share reduced to retain total TIR; "+table.reason("radialNrro"),(t,a)->{
+      var offset=a.offset==null?new stockkit.hobbing.HobbingPoseOffset():a.offset.copy();
+      offset.workX+=table.number("radialNrro")*Math.cos(a.c*1.41421356237);offset.workY+=table.number("radialNrro")*Math.sin(a.c*1.41421356237);
+      return new stockkit.hobbing.HobbingAxes(a.x,a.y,a.z,a.a,a.b,a.c,offset);}));
+    sources.push(new HobbingErrorSource("table-nrro-axial",tablePart,"Assumed non-repeatable bounded axial sequence; "+table.reason("axialNrro"),(t,a)->{
+      var offset=a.offset==null?new stockkit.hobbing.HobbingPoseOffset():a.offset.copy();
+      offset.workZ+=table.number("axialNrro")*Math.sin(a.c*1.41421356237);return new stockkit.hobbing.HobbingAxes(a.x,a.y,a.z,a.a,a.b,a.c,offset);}));
+    sources.push(new HobbingErrorSource("table-radial-compliance",tablePart,"Assumed Fr/radialStiffness; "+table.reason("radialStiffness"),(t,a)->{
+      var offset=a.offset==null?new stockkit.hobbing.HobbingPoseOffset():a.offset.copy(),d=radialForce(t)/table.number("radialStiffness");
+      offset.workX+=d*Math.cos(a.c);offset.workY-=d*Math.sin(a.c);return new stockkit.hobbing.HobbingAxes(a.x,a.y,a.z,a.a,a.b,a.c,offset);}));
     var members=machine.components();
     return [for(source in sources){var basis=source.basis;
+      if(StringTools.startsWith(source.id,"table-")||StringTools.startsWith(source.part,"table/"))basis+="; installed rotary-axis field provenance: "+haxe.Json.stringify(table.report());
       for(member in members)if(member.id==source.part){
         var part=machinekit.component.EngineeringMetadata.of(member.component);
         if(part==null)continue;

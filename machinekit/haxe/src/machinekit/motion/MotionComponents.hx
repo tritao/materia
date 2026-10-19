@@ -11,6 +11,7 @@ class MotionComponents {
 		registry.register(RotaryEncoderRing.recipeType());
 		registry.register(LinearBearing.recipeType());
 		registry.register(PillowBlock.recipeType());
+		registry.register(PurchasedRotaryPart.recipeType());
 		registry.register(LinearRail.recipeType());
 		registry.register(LinearRailBlock.recipeType());
         registry.register(HiwinHgh15ca.referenceRecipeType());

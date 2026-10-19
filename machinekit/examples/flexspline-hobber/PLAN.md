@@ -116,8 +116,10 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
 **HB-D1. A vertical work table with a moving column (Mitsubishi GE class): axes C, B, X, Y, Z, A.**
 - Pure hobbing. Hard turning, bore datums and thin-wall turning belong to
   `machinekit/examples/lathe/PLAN.md`, a separate machine/session.
-- C retains the direct-drive `RotaryTable`: torque motor, crossed roller,
-  ring encoder/full closed loop and the specified non-contact seal arrangement.
+- C defaults to a bought DD table seeded from the RTV210-050-class data: Ø200
+  face, 210 mm height, Ø40 bore, 52 kg. `PrecisionRotaryAxis` (RA-D8) also accepts
+  the built-up `RotaryTable`. Keep unpublished encoder, runout, low-speed ripple,
+  stiffness and seal drag explicitly Assumed; IP67 does not establish seal type.
 - X moves the complete column on preloaded HGR25 bed guides toward the table;
   a 16×5 ground ball screw (C5 procurement target, assumed), preloaded nut and
   linear scale provide radial infeed. Size X from cutting centre distance plus
@@ -165,7 +167,7 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
   ≥ 5:1 (5–10:1 design aim, assumed), with machine mass around 1–1.5 t.
 - Use one monolithic, ribbed, partly hollow mineral-cast plinth, starting around
   1100 × 800 × 650 mm and 600–900 kg. The sized front-loading design is
-  930 × 800 × 800 mm, casting 774.49 kg; retain ≥5:1 X mass ratio after shortening.
+  930 × 800 × 800 mm, casting 748.12 kg; retain ≥5:1 X mass ratio after shortening.
   Derive rail/screw/base length from travel, blocks, end margins, overtravel and
   the fixed motor envelope. Put the heavy solid section at the bottom,
   pockets/ribs higher. Size it using the working height and stiffness estimate;
@@ -178,8 +180,12 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
   volume thermally separated from the guides and cable routing inside the base.
 - Lighten the moving column with hollow/ribbed geometry; keep the X drive on
   the bed. Report column mass before/after. Increase C's crossed-roller bearing
-  to about Ø200–250 mm with matching housing; keep the fixture as low as ±15°
-  clearance allows. Recheck HB11 table-axial and tilt assumptions for this size.
+  to about Ø200–250 mm for the built-up alternative; the default bought unit uses
+  its published envelope without inventing bearing internals. Its deeper well puts
+  the face at 865 mm and the integral fixture shoulder at 1000 mm; 135 mm stand-off,
+  25 mm lobed flange and provisional pilot/bolt pattern clear A ±15°. Preserve
+  Ø40 union access and provide 6 bar air, driver and encoder services. Recheck
+  HB11 axial/tilt and explicit seal-drag sources from the installed description.
 - HB6 reports base/machine mass, mass ratio per axis, work height, foot spacing,
   bearing size and old/new hob-to-work displacement change over X travel from
   the moving column's weight. Use an explicit assumed-stiffness beam/plate model
@@ -428,7 +434,7 @@ r 30 mm. HB7 and HB11 must show this.
   - `RotaryEncoderRing`: counts, accuracy, eccentricity, as error-source fields.
 - `machinekit.hobbing`:
   - `RotaryTable`: torque motor, crossed roller, ring encoder, clamp.
-  - Add a bought-table form alongside the built-up `RotaryTable`, selectable by
+  - Bought-table form alongside the built-up `RotaryTable`, selectable by
     the machine through the same table interfaces. One catalogue component carries
     radial/axial runout (total and non-repeatable), absolute accuracy and encoder
     interpolation error, cogging and speed ripple at 10–20 rpm, seal drag,
@@ -445,7 +451,7 @@ r 30 mm. HB7 and HB11 must show this.
     for the purchase specification, candidates and prices. Follow HB-D10: no vendor
     names in code identifiers; use a generic seed id plus that document reference.
     Vendor/model strings may appear only in recipe data/descriptions if permitted
-    by repository convention. This bought-form extension remains planned work.
+    by repository convention. The bought form is now the default; see the installed-table progress entry below.
   - `HobSpindle`: motorised direct drive, angular-contact pair, HSK-E interface.
   - `HobArbor` + `OutboardSupport`.
   - `Hob`: the part from a `gearkit.HobDesign`.
@@ -540,7 +546,7 @@ r 30 mm. HB7 and HB11 must show this.
   - spindle power is below its rating with the margin stated.
 
 **HB11. Error sources and budget (HB-D7).**
-- Support both built-up and bought C-table forms as the source of table errors,
+- Support both built-up and bought C-table forms as the source of table errors, including an explicit seal-drag source,
   retaining each value's provenance. Compare candidate predicted grades before
   purchase using stated catalogue/assumed inputs, then rerun with bench-measured
   values. Predictions using unpublished assumptions are conditional, not supplier
@@ -962,7 +968,7 @@ Validation results (Release native core, pinned Haxeon host):
   - two starts / 4 gashes: **4 facets**, 6.543 micrometre variation.
   Doubling gashes reduced the variation **3.80x**; doubling starts increased it **3.98x**.
   Mean measured complete-facet depth/oracle ratios were **0.979 / 0.915 / 1.067** respectively.
-- Reference m0.3/z200, hob OD32/12 gashes, zero-feed full-depth pitch slice, three radial
+- Reference m 0.3/z200, hob OD32/12 gashes, zero-feed full-depth pitch slice, three radial
   circles around r30: every one of the **200 teeth** is within **0.2 micrometre** of nominal
   thickness 0.471238898 mm. At this particular phase, pitch-thickness differences are at the
   floating-point floor; this is not a physical sub-nanometre accuracy claim. Two path refinements
@@ -1401,9 +1407,9 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   sibling machine-tending cache. Override `HOBBER_NATIVE_CACHE` (the directory
   containing `app`, `cadkit`, etc.) and `HOBBER_STOCK_NATIVE` if needed. A missing
   cache is reported; the runner does not silently launch a full dependency build.
-- Force smoke: complete m0.3/z40/1 mm cut, 391 windows, **72.13 N**, **360.66 W**,
+- Force smoke: complete m 0.3/z40/1 mm cut, 391 windows, **72.13 N**, **360.66 W**,
   **1.154 Nm** hob torque; 20% spindle reserve and volume conservation pass in
-  about **5 s**. This is a small-part check, not the m0.3/z200 reference acceptance.
+  about **5 s**. This is a small-part check, not the m 0.3/z200 reference acceptance.
 - Error smoke: m1/z20/2 mm baseline, three isolated sources and all combined;
   **Fr 7.896 µm**, **Fp 8.505 µm**, **ffalpha 3.889 µm**. Four physical signature/
   superposition checks pass in about **51–55 s**. Sampling is diagnostic, not ISO
@@ -1463,7 +1469,7 @@ machinekit/examples/flexspline-hobber/check-quick.sh
   thickness shift against an **assumed +/-5 um flexspline thickness tolerance**;
   report the mean displacement as compensable X infeed. Allocate 20% of class-6
   Falpha and single-pitch fp to the varying wall contribution inside HB11. These
-  ISO formulas are engineering extrapolations at m0.3, not an ISO qualification.
+  ISO formulas are engineering extrapolations at m 0.3, not an ISO qualification.
 - The reference sleeve region is explicitly 71..87 mm in mandrel coordinates.
   Assembly transforms place the toothed band at 75..83 mm, radial bore clearance
   0.025 mm. The model checks axial coverage, expansion travel and provisional
@@ -1486,7 +1492,7 @@ machinekit/examples/flexspline-hobber/check-quick.sh
 - Rechecks: **264 machine/adapter**, **18 force**, **24 HB11 model** assertions pass.
   The four small physical wall-source cuts (baseline and three stiffnesses) pass
   thickness-response checks, with changes **1.043/0.313/0.104 um**. This is an m1
-  integration fixture, not the m0.3 reference inspection. Evidence:
+  integration fixture, not the m 0.3 reference inspection. Evidence:
   `/tmp/flexspline-hb11-{support-split,machine-split,wall-cuts}.log`.
 
 
@@ -2531,3 +2537,70 @@ Focused runtime-geometry checks also pass: transforms retain the GPU geometry,
 update bounds, skip unchanged publications, survive material mesh updates and
 compose with live parent poses for picking/rendering. Clearing/deleting runtime
 parts restores the authored geometry and leaves document/physics revisions stable.
+
+
+### Rebase and default bought C table (2026-10-19)
+
+Rebased onto local main `219966f2d` (which includes origin/main), retaining the
+main motion families and the hobber's supplier guide recipes. Frozen reference
+cuts/providers are untouched. `PrecisionRotaryAxis` implements RA-D8: the default
+`PurchasedRotaryTable` and selectable built-up `RotaryTable` expose the same
+C/mount/work, drive/encoder and specification interface. The bought unit is one
+BOM purchase with separate static/rotating simulation envelopes; total mass52 kg
+is catalogue data, the 44/8 kg split and 0.04 kg·m² rotating inertia are assumed.
+Every numeric field persists its own `ValueBasis`, units and reason; a Measured
+bench value/basis survives recipe reconstruction.
+
+The seed uses the supplied RTV210-050-class catalogue transcription (in
+STRAIN_WAVE_RESEARCH.md): face200, height210, bore40 mm; 54.9/223 Nm,
+3.43/17.9 A rms, 200/234 rpm, payload50 kg, positioning±5″/repeat±2″, air6 bar,
+natural cooling, IP67, mass52 kg, driver220/380 VAC. Ø260 housing flange,
+Ø200 barrel, face/flange bolt patterns, pilot, encoder resolution/protocol,
+runout/NRRO, interpolation, ripple/cogging, drag, stiffness, inertia, electrical
+constants and thermal values remain explicitly Assumed. No internal bearing
+layout or certified accuracy is invented. The provisional six M10 flange holes
+are accessible outside the barrel; vendor drawings are a commissioning gate.
+
+The exact-solid audit required a lower table face to clear the wider fixture at
+A±15°/low Z. The ground seat is at work Z18/floor655 mm, face floor865 mm and
+toothed rim floor1000 mm. The integral fixture has a 135 mm stand-off, 25 mm
+six-lobed flange, six recessed M8 fasteners on provisional PCD160 at30°, and a
+100×3 mm pilot. Matching collision hulls retain the scallops. Nominal Ø40 union
+access passes through casting/insert/table and a 20 mm fixture recess; no union
+or plumbing is fitted. Required 6 bar air, release/feedback, encoder, driver and
+union services are exposed; the simulation assumes an unclamped table, without
+claiming commissioned clamp I/O or failure behaviour. The generic 400 VAC plant
+requires an assumed±10% 380 VAC allowance. Its simultaneous peak-regeneration
+check requires12.33 kW; the stated braking allowance is15 kW, with pulse/duty/
+resistor selection open.
+
+Current mass: casting748.12 kg, insert-equipped base776.28 kg, machine1034.40 kg;
+X/Y/Z moving127.98/14.03/41.10 kg. Casting-to-moving ratios5.85/53.33/18.20 meet
+the X≥5 target. The updated seat lever is included in the assumed beam estimate:
+0.00240 µm over full X travel, 0.00479 µm at half modulus. FEA remains open.
+
+HB11 reads the installed description and adds interpolation, speed ripple,
+cogging, seal drag, radial/axial NRRO and radial compliance (21 sources total).
+Periodic runout excludes the NRRO allocation so total TIR is not double-counted.
+Seal drag consumes drive reserve. New full-budget metadata records the table
+signature/fields and retains the independent assumed-plant sync basis. Earlier
+frozen batches describe the old built-up table and do not qualify this default.
+
+The conditional **analytic table-only pitch/runout bound corresponds to
+extrapolated grade 9** on m 0.3: Fp≈64.0 µm versus class-6 extrapolated limit 23 µm,
+dominated by the Assumed0.1% once-per-turn ripple. Under the other stated bounds,
+that ripple must be ≤0.0317% to fit this pitch allocation. This is not a simulated
+full-cut grade, an overall ISO class or supplier qualification. Full source/
+combined HB11 grading and bench measurements remain open. The complete values,
+assumptions and screen are in PURCHASED_TABLE_REPORT.json.
+
+Validation so far:949 mechanical/persistence assertions,126 interface/BOM/
+Measured-value/union-access/source checks,1318 size-range checks and6666 cup/
+gripper checks pass. Both complete85-pose grids pass (20,880 coarse and20,864
+reference evaluated pairs, zero unintended volume above0.001 mm³). The short
+reference frame/cut/load regression retains its1e−8 mm/rad,1e−8 mm and1e−6 N
+limits. Front loading still derives110 mm retract; top alternative145 mm.
+
+Bought-table app acceptance: the complete loading, coarse cutting, unloading, inspection and reset playback passes (982 windows, 6.49625 s machining, zero fixture-envelope contacts). Current layout checks pass 949 assembly, 126 bought/built interface, 1318 range and 6666 loading assertions; both 85-pose exact-solid grids have zero unexpected intersections. See `PURCHASED_TABLE_REPORT.json` and `LAYOUT_REPORT.json`. Frozen earlier HB11 jobs remain historical built-table studies, not acceptance of the new table.
+
+Final post-rebase component checks: 1044 component assertions and 127 geometry assertions pass. Bought/built parity and the 949-assertion assembly suite were rerun after removing form-specific service routing; installation uses rotary-axis mount/work metadata and exported services.
