@@ -7,6 +7,40 @@ static baseline at the center pose, both support bounds, and a conditional
 tool-to-workpiece compliance budget. This does not qualify machining accuracy.
 The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN.md).
 
+## Current qualified serial follow-up
+
+The nine-pose undamped upper-bound **modal numerical gate passes** with
+`solverThreads: 1`, 12 modes, both supports and 40/30 mm meshes at every pose.
+All 15 minimum-section probes pass at both levels; Jacobians are positive.
+Maximum frequency-order refinement change is **2.992%**, below 5%.
+The four-thread experiments later in this record are provisional audit data.
+Their apparent third-level mesh needs do not apply to this serial matrix.
+
+| Serial mode order | Three-point range, Hz | Four-spring range, Hz |
+| --- | --- | --- |
+| 1 | 47.431–49.678 | 41.460–44.312 |
+| 2 | 60.751–65.657 | 45.976–48.905 |
+| 3 | 75.015–78.693 | 75.942–78.655 |
+
+First-mode travel changes are −2.49…+2.13% / −3.52…+3.12%, with shape MAC
+≥0.9938 / 0.9835. First-three-mode MAC stays ≥0.935. The four-spring second
+mode's continuous column residual spans 0.0739–0.1070, crossing the arbitrary
+0.1 flag at some upper poses without a new mode appearing. Its tracked
+frequency changes −3.31…+2.85%, with MAC ≥0.973. The ~78 Hz center mode has
+65% / 80% of kinetic energy in the Z-drive lumped group; it is a coupled mode,
+not automatically pure column bending. Reported kinetic localization does not
+locate strain energy.
+
+Pose/shape tracking, effective masses, relative nose/bar motion, point-mass
+kinetic localization and rotation/tooth-pass frequency-equality speeds are in
+`build/fem/nine-pose-serial/modal-report.md` / `.json`.
+Aggregate JSON SHA256:
+`e860a8a455a503f7c18bd2694abcfe07872815594ce4ac76293d3a81c7253b5b`.
+Physical modal acceptance awaits declared spindle/motor/axis excitation bands
+and joint uncertainty. The serial nine-pose nose/test-bar static sweep has
+started. Tool-context budgets and the casting-share/lightening decision remain
+pending; no `MillFrameLayout` geometry has been edited.
+
 ## Gate status
 
 - Solver-fixture gate: passed, including the common Gmsh-to-C3D10 deck path,
