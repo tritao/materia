@@ -1,4 +1,16 @@
-# Bench mill and mineral-cast machine design
+# Mill and mineral-cast machine design
+
+Use **`materia.project.json`** as the main project. Its `small` entrypoint is the
+Small configuration with the selected Y drive; `compact-vmc` is the Compact VMC
+layout with the same complete Z and spindle assemblies, including drawbar and
+pneumatic release. `spindle-drive` is the editable motor study. `legacy-machining`
+and `enclosed` retain the older machining demos. Older project files remain
+compatibility shortcuts to this shared build, rather than independent designs.
+Run `haxeon.json` to check and generate `build/mill/small.mtrg` and `large.mtrg`.
+
+Open the source project and use the **Configuration** selector to choose **Small**
+or **Compact VMC**. Stop simulation before switching. Opening a generated `.mtrg`
+file gives a single scene and does not expose the project selector.
 
 The working legacy `BenchMill` has 250 mm X, 150 mm Y and 250 mm Z travel.
 `MillFramePreview` develops a separate mechanical concept with 250 mm X, 160 mm Y and 250 mm Z travel.
@@ -409,3 +421,9 @@ Each column side now uses one continuous steel Z mounting strip for the rail
 and both bearing anchors. The `railSeat`, `bearingLowerFace` and
 `bearingUpperFace` regions retain their mounting datums on `column/railZLeft`
 and `column/railZRight`. FEM bearing loads still use only the upper 20 mm region.
+
+The [Compact VMC capacity study](CAPACITY_STUDY.md) derives a
+400 × 300 × 380 mm working envelope with a 700 × 400 mm table. Open
+`materia.capacity.project.json` for its movable packaging preview. It has its own
+build outputs and does not replace the smaller mill. Drives, structural stiffness
+and finished-machine capacity still require qualification at the larger size.

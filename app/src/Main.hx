@@ -619,6 +619,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final telemetry:TelemetryPanel;
   final missionPanel = new app.editor.MissionPanel();
   public var missionController(default, null):MissionController;
+  public var projectVariants(default,null):ProjectVariantController;
   final cncPanel = new app.editor.CncPanel();
   final machineControlPanel = new app.editor.MachineControlPanel();
   static inline var MAX_LOG_LINES:Int = 1000;
@@ -784,14 +785,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (chooser == null) complete(null, "File dialogs require the desktop host");
       else chooser.choose(save, path, complete);
     }, documentChanged, commitActiveDrag, cancelActiveDrag);
-    missionController = new MissionController(session, simulation, documents.requestRun, invalidateView,
+    projectVariants = new ProjectVariantController(session, simulation, documents.requestRun, invalidateView,
       function() { documentChanged(); commands.execute("scene.fit-all"); },
-      function() return documents.blocked(),
+      function() return documents.blocked());
+    missionController = new MissionController(session,simulation,invalidateView,
       function(id) { scene.selectTreeKey("project:" + id); invalidateView(); });
-    documents.busy = function() return startLoading != null || missionController.isLoading() || simulationBuild != null || simulationStop != null;
+    documents.busy = function() return startLoading != null || projectVariants.isLoading() || simulationBuild != null || simulationStop != null;
     documents.openArtifact = openProjectInBackground;
     if (hostContext != null) hostContext.onCloseRequested = function(close) {
-      missionController.cancel();
+      projectVariants.cancel();
       // A running build must not keep the window from closing: cancel it and let the normal prompt run.
       if (startJob != null) {
         startJob.control.cancel();
@@ -1050,7 +1052,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function tick():Void {
     pollSimulationStop();
     pollSimulationBuild();
-    missionController.tick();
+    projectVariants.tick();
     var queued = startLoading;
     if (queued != null) {
       var job = startJob;
@@ -1311,7 +1313,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       simulationStop = null;
     }
     if (simulationBuild != null) { simulationBuild.close(); simulationBuild = null; }
-    missionController.cancel();
+    projectVariants.cancel();
     if (projectUiExtension != null) projectUiExtension.dispose();
     if (sceneCollision != null) sceneCollision.dispose();
     sceneCollision = null;
@@ -1754,6 +1756,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("sensors", "Sensors", false, true, IconName.Radar));
     result.register(new DockPanelDescriptor("console", "Console", true, true, IconName.Terminal));
     result.register(new DockPanelDescriptor("telemetry", "Telemetry", true, true, IconName.Activity));
+    result.register(new DockPanelDescriptor("project", "Project", true, true, IconName.Activity));
     result.register(new DockPanelDescriptor("mission", "Mission", true, true, IconName.Activity));
     result.register(new DockPanelDescriptor("cnc", "CNC", true, true, IconName.Terminal));
 
@@ -1787,6 +1790,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":dark=" + appearance.dark),
       new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, appearance.theme.tokens.surface,
         appearance.theme.tokens.textSecondary, simulation)),
+      new DockPanelContent("project", function(_) return app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"project-panel")),
       new DockPanelContent("mission", function(_) return missionPanel.build(missionController, appearance.theme.tokens)),
       new DockPanelContent("cnc", function(_) return cncPanel.build(simulation, appearance.theme.tokens,
         printerLink.connected() || printerLink.error != null ? printerLink.summary() : null))
@@ -2031,14 +2035,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new StackChild("scene", content, 0.0, 0.0, 0, LayoutAxis.grow(), LayoutAxis.grow()),
       new StackChild("view-angle", viewAngle, 10.0, 10.0, 1)
     ];
-    var missionState = missionController.snapshot();
-    if (missionState.mission != null || missionState.jobs.length > 0) {
-      var overlayWidth = Math.max(120.0, Math.min(300.0, (availableWidth > 0 ? availableWidth : 400.0) - 20.0));
-      layers.push(new StackChild("mission-controls",
-        app.editor.MissionJobView.build(missionController, appearance.theme.tokens, "viewport-mission", function() {
-          workspace.open("mission", workspace.isOpen("sensors") ? "sensors" : "inspector");
-          workspace.activate("mission"); invalidateView();
-        }), 10.0, 54.0, 2, LayoutAxis.fixed(overlayWidth), LayoutAxis.fit(), false));
+    var missionState = missionController.snapshot(),variantState=projectVariants.snapshot();
+    var sceneControls:Array<KeyedView> = [];
+    if(variantState.variants.length>0||variantState.error!=null)
+      sceneControls.push(new KeyedView("project",app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"viewport-project")));
+    if(missionState.mission!=null)
+      sceneControls.push(new KeyedView("mission",app.editor.MissionStatusView.build(missionController,appearance.theme.tokens,"viewport-mission",function() {
+        workspace.open("mission",workspace.isOpen("sensors")?"sensors":"inspector");
+        workspace.activate("mission");invalidateView();
+      })));
+    if(sceneControls.length>0) {
+      var overlayStyle=new LayoutStyle();overlayStyle.width=LayoutAxis.grow();overlayStyle.childGap=10;
+      overlayStyle.padding=new Insets(10,10,10,10);overlayStyle.background=appearance.theme.tokens.surfaceRaised;
+      var width=Math.max(120.0,Math.min(300.0,(availableWidth>0?availableWidth:400.0)-20.0));
+      layers.push(new StackChild("project-controls",new Column("viewport-project-controls",sceneControls,overlayStyle),
+        10,54,2,LayoutAxis.fixed(width),LayoutAxis.fit(),false));
     }
     var canvas:View = new Stack("perspective-canvas-overlay", layers);
     return new Column("perspective-with-toolbar", [

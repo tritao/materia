@@ -4,6 +4,8 @@ package app;
 typedef ProjectSceneRecord = {
   var version:Int;
   var reference:String;
+  @:optional var variantId:String;
+  /** Legacy project-job selection. Mutually exclusive with variantId. */
   @:optional var jobId:String;
   var overrides:Array<ProjectFieldOverride>;
   var removed:Array<String>;

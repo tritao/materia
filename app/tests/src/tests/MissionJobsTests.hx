@@ -66,22 +66,22 @@ class MissionJobsTests {
       physical:null, recipeDocument:null, projectJob:"single-seam", missions:null};
     editor.session.openGeneratedProject(generated, source);
     editor.documentChanged();
-    var controller = editor.missionController;
-    check(controller.snapshot().selectedJob == "single-seam", "controller reads installed selection");
-    check(controller.snapshot().jobs.length == 5, "controller exposes project jobs");
+    var controller = editor.projectVariants;
+    check(controller.snapshot().selected == "single-seam", "controller reads installed selection");
+    check(controller.snapshot().variants.length == 5, "controller exposes project jobs");
     var saved = directory + "/selected.materia";
     editor.session.save(saved);
     var record = SceneCodec.decodeProjectRoot(Json.parse(File.getContent(saved)));
     check(record != null && record.jobId == "single-seam", "saved documents retain job selection");
     var frame = new LayoutFrame(800, 600);
-    var panel = editor.ui.submit(new MissionPanel().build(controller, editor.appearance.theme.tokens), frame);
-    check(findLabel(panel, "Mission job") != null, "panel contains shared job selector");
+    var panel = editor.ui.submit(new MissionPanel().build(editor.missionController, editor.appearance.theme.tokens), frame);
+    check(findLabel(panel, "Scene preset") == null, "mission panel does not select project scenes");
     var overlay = editor.ui.submit(editor.viewportWithControls(new Text("Scene"), 800), frame);
-    check(findLabel(overlay, "Mission job") != null && find(overlay, "viewport-mission-steps") != null,
-      "viewport overlay exposes the same selector and details action");
+    check(findLabel(overlay, "Scene preset") != null && find(overlay, "viewport-mission-steps") == null,
+      "project overlay selects legacy scene presets without inventing a mission");
 
     var originalDocument = editor.session.document;
-    controller.selectJob("multipass");
+    controller.select("multipass");
     check(controller.isLoading() && !controller.snapshot().switchAllowed, "job preparation locks switching");
     check(editor.session.document == originalDocument && editor.session.projectJob == "single-seam", "loading retains the installed scene");
     var deadline = Sys.time() + 10.0;
@@ -90,10 +90,10 @@ class MissionJobsTests {
     check(editor.session.document == originalDocument && editor.session.projectJob == "single-seam", "failed job preserves document and selection");
     check(editor.simulation.rebuild(editor.sensors, editor.scene, editor.session), "simulation fixture builds");
     check(!controller.snapshot().switchAllowed, "paused simulation locks job switching");
-    controller.selectJob("complete");
+    controller.select("complete");
     check(!controller.isLoading(), "locked selection starts no build");
     editor.simulation.clear();
-    controller.selectJob("complete"); controller.cancel(); controller.tick();
+    controller.select("complete"); controller.cancel(); controller.tick();
     check(!controller.isLoading() && editor.session.document == originalDocument, "cancelled job cannot replace the scene");
     editor.dispose(); fonts.dispose();
     FileSystem.deleteFile(saved); FileSystem.deleteFile(source);
@@ -107,12 +107,12 @@ class MissionJobsTests {
     check(editor.session.projectJob == "single-seam" && editor.session.missions != null, "real seam job installs");
     var original = editor.session.document;
     var originalMission = Json.stringify(editor.session.missions[0]);
-    editor.missionController.selectJob("multipass");
+    editor.projectVariants.select("multipass");
     check(editor.session.document == original, "real job retains current document during preparation");
     var deadline = Sys.time() + 240.0;
-    while (editor.missionController.isLoading() && Sys.time() < deadline) { editor.tick(); Sys.sleep(0.01); }
-    check(!editor.missionController.isLoading() && editor.missionController.snapshot().error == null,
-      "real job replacement succeeds: " + editor.missionController.snapshot().error);
+    while (editor.projectVariants.isLoading() && Sys.time() < deadline) { editor.tick(); Sys.sleep(0.01); }
+    check(!editor.projectVariants.isLoading() && editor.projectVariants.snapshot().error == null,
+      "real job replacement succeeds: " + editor.projectVariants.snapshot().error);
     check(editor.session.projectJob == "multipass" && editor.session.document != original &&
       Json.stringify(editor.session.missions[0]) != originalMission, "replacement installs selected process and mission");
     var file = directory + "/real-job.materia";

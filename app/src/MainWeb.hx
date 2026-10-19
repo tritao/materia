@@ -137,7 +137,7 @@ class MainWeb {
         mode: app.mode.id,
         examples: [for (entry in ExampleCatalog.available()) entry.id],
         exampleFailure: @:privateAccess app.startFailure,
-        projectJob: app.session.projectJob,
+        projectVariant:app.session.projectVariant, projectJob: app.session.projectJob,
         robotMotionCount: app.session.robotMotions.length,
         dynamicParts: [for (record in app.scene.records()) if (record.dynamicBody == true) record.id],
         simulationRunning: app.simulation.isRunning(),

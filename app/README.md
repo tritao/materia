@@ -123,26 +123,44 @@ current step until you scroll away; **Follow current step** resumes following. U
 shared Play/Pause, Step, Reset, and Stop controls to run the simulation. Mission steps
 are read-only here.
 
-Projects can declare named jobs in their source manifest. A job selects an entrypoint,
-so its geometry, process settings and mission are loaded together. The viewport card
-and Mission panel share a job selector; **Show steps** opens the panel. Switching is
-available before simulation starts, and locked while running or paused. Jobs build
-in the background with Cancel; a failed or cancelled build leaves the current scene
-intact. Saved `.materia` documents retain the selected job ID.
+## Project configurations and views
 
-The stationary Robot welding cards are presets of one project with five jobs:
-`complete`, `single-seam`, `tube-post`, `woven-seam`, and `multipass`. Existing projects
-without job metadata keep their default entrypoint. Source manifests declare jobs as:
+Project variants select complete generated scenes independently of runtime missions.
+Use **Configuration**, **Study**, and **Demo** in the viewport card or **Project**
+panel. These selectors are separate from the Mission panel and never create a
+mission or playback status for a plain machine. Open the source `.project.json`;
+a prebuilt `.mtrg` contains only the selected geometry and cannot regenerate another
+configuration. Source selection is locked while simulation is running or paused.
 
 ```json
-"defaultJob": "single-seam",
-"jobs": [{"id": "single-seam", "label": "Single seam",
-          "summary": "Plate T-joint", "entrypoint": "seam"}]
+"defaultVariant": "small",
+"variants": [
+  {"id": "small", "label": "Small", "kind": "configuration",
+   "summary": "Small machine", "entrypoint": "small"},
+  {"id": "compact-vmc", "label": "Compact VMC", "kind": "configuration",
+   "summary": "Larger machine study", "entrypoint": "compact-vmc"},
+  {"id": "spindle", "label": "Spindle drive", "kind": "study",
+   "summary": "Motor study", "entrypoint": "spindle-drive"}
+]
 ```
 
-Each job's `entrypoint` names an existing entry in `entrypoints`. Job IDs are unique;
-`defaultJob` must name one. Source job selection is unavailable for prebuilt `.mtrg`
-artifacts, which contain an already generated scene.
+IDs must be unique, entrypoints must exist, and `defaultVariant` must name a variant.
+Kinds are `configuration`, `study`, or `demo`. Only one scene variant is installed
+at a time: selecting a study does not imply that it inherits the selected machine
+configuration. Empty inactive selectors make that distinction visible.
+
+The project controller builds replacements in the background with Cancel. Failure,
+cancellation, document changes and simulation locks preserve the installed scene
+and selection. Saved `.materia` documents store `variantId` in project-record version
+2; older applications reject that version instead of silently loading the default
+geometry. Portable artifact metadata also retains the selected variant.
+
+Existing `jobs`/`defaultJob` manifests, including the robot welder's seam presets,
+remain supported and appear as **Scene preset** in the Project UI. Runtime mission
+steps stay in Mission. Legacy `jobId` documents retain their format; if their source
+has migrated to variants, reopening regenerates the matching variant and the next
+save writes version 2. A manifest must not mix `variants` and legacy `jobs` lists.
+Projects with neither keep their `defaultEntrypoint`.
 
 
 ## Workers in scene documents

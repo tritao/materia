@@ -39,7 +39,7 @@ class MissionPanel {
     style.childGap = 8.0;
     style.background = tokens.surface;
     var items = [new KeyedView("heading", new Text("MISSION", null, tokens.textSecondary))];
-    items.push(new KeyedView("job", MissionJobView.build(controller, tokens, "mission-panel-job")));
+    items.push(new KeyedView("status", MissionStatusView.build(controller, tokens, "mission-panel-status")));
     // A cell with several robot controllers runs one program on each; the panel follows one at a time.
     if (state.programs.length > 1) for (id in state.programs)
       items.push(new KeyedView("program-" + id, new Button((id == state.selectedProgram ? "● " : "○ ") + id, null,

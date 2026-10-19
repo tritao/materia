@@ -1,24 +1,113 @@
 {
-	"format": "materia.project",
-	"version": 1,
-	"name": "Bench mill",
-	"defaultEntrypoint": "mill",
-	"build": {
-		"system": "haxeon",
-		"manifest": "haxeon.json"
-	},
-	"entrypoints": {
-		"mill": {
-			"kind": "cad-preview",
-			"module": "BenchMillPreview",
-			"function": "mill",
-			"cache": {"inputs": []}
-		},
-		"enclosed": {
-			"kind": "cad-preview",
-			"module": "BenchMillPreview",
-			"function": "enclosed",
-			"cache": {"inputs": []}
-		}
-	}
+  "format": "materia.project",
+  "version": 1,
+  "name": "Mill",
+  "defaultEntrypoint": "small",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
+  "entrypoints": {
+    "small": {
+      "kind": "cad-preview",
+      "module": "MillProject",
+      "function": "small",
+      "cache": {
+        "inputs": [
+          "MillProject.hx",
+          "MillFramePreview.hx",
+          "../../haxe/src/machinekit/milling/MillFrame.hx",
+          "../../haxe/src/machinekit/milling/MillXYStage.hx",
+          "../../haxe/src/machinekit/milling/MillZAxis.hx",
+          "../../haxe/src/machinekit/milling/MillZAxisLayout.hx",
+          "../../haxe/src/machinekit/milling/MillSpindleHead.hx"
+        ]
+      }
+    },
+    "enclosed": {
+      "kind": "cad-preview",
+      "module": "BenchMillPreview",
+      "function": "enclosed",
+      "cache": {
+        "inputs": []
+      }
+    },
+    "legacy-machining": {
+      "kind": "cad-preview",
+      "module": "BenchMillPreview",
+      "function": "mill",
+      "cache": {
+        "inputs": []
+      }
+    },
+    "compact-vmc": {
+      "kind": "cad-preview",
+      "module": "MillProject",
+      "function": "large",
+      "cache": {
+        "inputs": [
+          "MillProject.hx",
+          "MillFramePreview.hx",
+          "../../haxe/src/machinekit/milling/MillFrame.hx",
+          "../../haxe/src/machinekit/milling/MillXYStage.hx",
+          "../../haxe/src/machinekit/milling/MillZAxis.hx",
+          "../../haxe/src/machinekit/milling/MillZAxisLayout.hx",
+          "../../haxe/src/machinekit/milling/MillSpindleHead.hx",
+          "MillCapacityStudy.hx",
+          "../../haxe/src/machinekit/milling/MillCapacityLayout.hx"
+        ]
+      }
+    },
+    "spindle-drive": {
+      "kind": "cad-preview",
+      "documentInput": true,
+      "reconcilesSavedRecipe": true,
+      "module": "MillMotorStudy",
+      "function": "preview",
+      "cache": {
+        "inputs": [
+          "MillMotorStudy.hx",
+          "MillFramePreview.hx"
+        ]
+      }
+    }
+  },
+  "defaultVariant": "small",
+  "variants": [
+    {
+      "id": "small",
+      "label": "Small",
+      "entrypoint": "small",
+      "summary": "250 × 160 × 250 mm. Complete mechanical mill with selected Y drive and shared spindle.",
+      "kind": "configuration"
+    },
+    {
+      "id": "compact-vmc",
+      "label": "Compact VMC",
+      "entrypoint": "compact-vmc",
+      "summary": "400 × 300 × 380 mm. Complete Z and spindle; X/Y drive integration and sizing remain pending.",
+      "kind": "configuration"
+    },
+    {
+      "id": "spindle-drive",
+      "label": "Spindle drive study",
+      "entrypoint": "spindle-drive",
+      "summary": "Editable Leadshine spindle-drive study on the reference mill.",
+      "kind": "study"
+    },
+    {
+      "id": "legacy-machining",
+      "label": "Legacy machining demo",
+      "entrypoint": "legacy-machining",
+      "summary": "Original bearing-block machining demo.",
+      "kind": "demo"
+    },
+    {
+      "id": "enclosed",
+      "label": "Legacy enclosed demo",
+      "entrypoint": "enclosed",
+      "summary": "Original enclosed mill and vise machining demo.",
+      "kind": "demo"
+    }
+  ]
 }

@@ -118,6 +118,7 @@ typedef SceneArtifactView = {
 typedef SceneArtifactProject = {
   /** Preferred orbit angle when opening the generated assembly; radians, Z up. */
   @:optional var initialView:SceneArtifactView;
+  @:optional var variant:String;
   @:optional var job:String;
   var dynamicParts:Array<String>;
   var motions:Array<SceneArtifactProjectMotion>;
@@ -1003,6 +1004,14 @@ class SceneArtifact {
   public static function decodeProject(raw:Dynamic):SceneArtifactProject {
     var parts:Dynamic = Reflect.field(raw, "dynamicParts"), motions:Dynamic = Reflect.field(raw, "motions");
     var job:Dynamic = Reflect.field(raw, "job");
+    var variant:Dynamic=Reflect.field(raw,"variant");
+    if(variant!=null&&(!Std.isOfType(variant,String)||StringTools.trim(variant).length==0||variant.length>500))
+      throw "Invalid artifact project variant";
+    if(variant!=null) {
+      var variantText:String=variant;
+      for(i in 0...variantText.length)if(variantText.charCodeAt(i)==0)throw "Invalid artifact project variant";
+    }
+    if(variant!=null&&job!=null)throw "Artifact project cannot select both a variant and a legacy job";
     if (!Std.isOfType(parts, Array) || !Std.isOfType(motions, Array) ||
         (job != null && (!Std.isOfType(job, String) || job.length == 0 || job.length > 500)))
       throw "Invalid artifact project settings";
@@ -1035,7 +1044,7 @@ class SceneArtifact {
       if (Math.abs(pitch) > 1.48) throw "Invalid project initial view pitch";
       view = {yaw: yaw, pitch: pitch};
     }
-    return {job: job, dynamicParts: dynamicParts, motions: tracks, initialView: view};
+    return {variant:variant,job: job, dynamicParts: dynamicParts, motions: tracks, initialView: view};
   }
 
   static function validateProject(project:SceneArtifactProject, data:SceneArtifactData):Void {
