@@ -57,7 +57,7 @@ class HobberEnclosurePreview {
       // Conservative plinth cutout, with a 10 mm gasket/trim reservation around the casting footprint.
       var opening:PartBox={minX:plinth.minX-10,minY:plinth.minY-10,minZ:plinth.minZ,maxX:plinth.maxX+10,maxY:plinth.maxY+10,maxZ:plinth.maxZ};
       var floor=plinth.maxZ;
-      var result={layout:new EnclosureLayout({swept:swept,loading:loading,plinth:opening,floorZ:floor,margin:75,openingWidth:600}),
+      var result={layout:new EnclosureLayout({swept:swept,loading:loading,plinth:opening,floorZ:floor,margin:75,openingWidth:400,opposedDoors:true}),
         samples:samples,paddingMm:padding,excluded:[for(m in members)if(external(m.id))m.id]};
       cache.close();return result;
     }catch(error:Dynamic){cache.close();throw error;}
@@ -69,16 +69,17 @@ class HobberEnclosurePreview {
     var uses:Array<PanelUse> = [];
     for(m in shell.components())if(Std.isOfType(m.component,machinekit.enclosure.EnclosurePanel)){
       var panel:machinekit.enclosure.EnclosurePanel=cast m.component;
-      var zones:Array<EnclosureZone> = m.id=="door/leaf"?[Window,Impact,Splash]:StringTools.startsWith(m.id,"tray")?[Chute]:[Splash];
+      var zones:Array<EnclosureZone> = (m.id=="door/leaf"||m.id=="door/leftLeaf")?[Window,Impact,Splash]:StringTools.startsWith(m.id,"tray")?[Chute]:[Splash];
       uses.push({panelId:m.id,construction:panel.construction,zones:zones,edgesSealed:false,seamsSealed:false});
     }
     var qualificationIssues=EnclosureRules.check(uses,{process:WetMachining,maximumTemperatureC:60,oilMist:true,
       extractionProvided:false,drainageProvided:false,chamberControlProvided:false,boundaryGuardProvided:false});
     return {assembly:assembly,shell:shell,machine:machine,report:{samples:fit.samples,angularPaddingMm:fit.paddingMm,excludedElectricalRack:fit.excluded,
-      input:fit.layout.input,dimensionsMm:[fit.layout.width(),fit.layout.depth(),fit.layout.height()],doorStrokeMm:fit.layout.stroke,
+      input:fit.layout.input,dimensionsMm:[fit.layout.width(),fit.layout.depth(),fit.layout.height()],doorStrokeMm:fit.layout.stroke,doorLeaves:2,doorDrive:"Proposed bought rod-style electric actuator, at least 210 mm usable stroke, plus passive opposite-run belt; ideal coupling only, hardware not sized",
+      doorGuide:{track:"Captured steel roller channel, nominal assumed envelope",trackWidthMm:44,slotWidthMm:8,rollerDiameterMm:22,rollersPerLeaf:4,hangersPerLeaf:2,lowerGuide:"Two stationary UHMW shoes per side with overlapping channel engagement",cover:"Removable steel splash hood",wheelSpinModeled:false,mountingDetail:"Bracket bores, fasteners, axle retention and frame attachments remain fabrication work"},
       servicePanels:shell.servicePanelIds,serviceOpenings:shell.serviceAccess,seams:shell.seamMethod,qualificationIssues:qualificationIssues,
       evidence:"X/Y/Z endpoints, A one-degree grid with radius*half-step padding; B/C descendants bounded by rotation-centred spheres",
-      assumptions:"75 mm clearance; 600 mm opening; OD140 side-jaw reservation; 100 mm mist opening; 60 C process and oil-mist rule assessment assumed. Robot, seals, retention and flow not qualified."}};
+      assumptions:"75 mm clearance; 400 mm opening; opposed belt-coupled leaves; OD140 side-jaw reservation; 100 mm mist opening; 60 C process and oil-mist rule assessment assumed. Robot, seals, retention and flow not qualified."}};
   }
   /** Hide the complete external electrical rack in default views while retaining its geometry. */
   public static function defaultView(scene:materia.project.SceneArtifact.SceneArtifactData):materia.project.SceneArtifact.SceneArtifactData {

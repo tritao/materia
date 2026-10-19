@@ -10,8 +10,9 @@ The envelope is padded by the maximum axis-to-box-corner radius times half the
 angular step. The separately mounted electrical rack stays outside this shell;
 acceptance nevertheless checks enclosure collisions against it too.
 
-Initial fit: approximately 1472 × 1103 × 787 mm clear shell size above the plinth,
-a 600 mm loading opening and a 610 mm door stroke. The tray interface datum is
+Opposed-door fit: approximately 973 × 1103 × 787 mm clear shell size above the plinth,
+a 400 mm loading opening and a 210 mm stroke per leaf. The previous single-leaf
+fit was 1472 mm wide; splitting the opening removes its large right-hand parking bay. The tray interface datum is
 847 mm in the machine frame. Clearance is an assumed 75 mm, not a qualified
 containment distance. The front reservation encloses the OD140 side-jaw envelope
 from the existing loading study and extends outward through the enclosure; it
@@ -67,7 +68,7 @@ near-pair checks. The exported scene was reopened and visually checked.
 consumer for its stop, cutting permission, and setup-motion permission outputs.
 The exported assembly contains `enclosure/door/closed` and `enclosure/door/open`
 coordinate switches with 0.5 mm end windows. The kinematic actuator is bounded
-to 0–610 mm at an assumed 200 mm/s; it does not model pneumatic force or stopping
+to 0–210 mm at an assumed 200 mm/s; it does not model pneumatic force or stopping
 distance and does not select physical actuator hardware.
 
 An open request removes cut permission and requests a stop. The lock stays
@@ -121,13 +122,77 @@ Run the native integration check (using this branch's native libraries):
 /home/joao/dev/materia-cache/tools/heavy-run --mem 6G --need 5G --label enclosure-live -- env HAXEON_COMPILER_SERVER=0 ./haxeon/scripts/haxeon run --jobs=1 --project=app/tests/enclosure-guard/haxeon.json
 ```
 
-Validation: 43 shared-controller assertions and 971 fitted-door assertions pass.
+Validation: 43 shared-controller assertions and 371 fitted-door assertions pass.
 The CAD acceptance passes 48 machine/door states, 624 exact near-pair checks,
 21 leaf-travel samples, loading/service clearances and assembly save/reopen.
 
-Live native acceptance passes 18,798 assertions using the fitted coarse hobber:
+Prior single-leaf live native acceptance passed 18,798 assertions using the fitted coarse hobber:
 artifact binding validation, native end switches and lock feedback, no automatic
 cut on Play, actual hob-spindle rotation, controlled stop before unlock, door
 reclosure, no access/reset restart, boundary interruption, native E-stop feedback
 and operator-panel actions. Contact collisions are disabled in this controller
 fixture; the separate CAD clearance checks remain the geometry evidence.
+
+
+## Opposed sliding doors and proposed actuation
+
+Two 200 mm wide leaves meet at the centre of the 400 mm opening. Each travels
+210 mm outward, leaving 10 mm beyond its opening edge. The loading reservation
+is 190 mm wide (OD140 plus 25 mm side jaws on each side), giving 105 mm lateral
+allowance per side at the doorway. This remains an assumed gripper envelope.
+The existing 75 mm chamber clearance is retained.
+
+Proposed actuation: one bought rod-style electric actuator with at least 210 mm
+usable stroke drives one leaf. A passive endless belt links the second leaf to
+the opposite run. Its motor, feedback, speed, force and duty cycle are selected
+from the eventual supplier drawing; no actuator rating is claimed yet. The
+actuator carries push/pull loads, while the door suspension carries door weight.
+The actuator is separate from the guard locks.
+
+The modeled suspension uses a 44 mm wide steel captured track with an 8 mm
+bottom slot. Two hangers per leaf carry paired nominal 608 rollers (22 x 7 mm)
+on removable 8 mm shoulder axles, with M8 washer spacers and an M6 washer/nut
+retainer. Roller bottoms sit on the lower track lips; the roof leaves 4 mm
+anti-lift clearance. Each hanger neck has 1 mm side clearance in the slot.
+These are assumed design envelopes for selecting an industrial roller kit, not
+supplier-qualified load ratings. Roller spin is omitted from the kinematic model.
+End stops bound the open stroke, and a removable 2 mm steel splash hood covers
+the front and top of the track. The T-slot enclosure frame remains its support.
+
+Each leaf has a downward-open bottom channel. Two stationary UHMW guide shoes
+per side transfer engagement as the short leaf travels, with 2 mm nominal side
+and roof clearance. They sit outside the loading corridor; no track crosses the
+loading threshold. The CAD acceptance checks shoe engagement throughout travel,
+moving suspension/track clearances, and the open loading corridor.
+
+The track, hangers, axles, rollers, channels, shoes, stops and splash hood are
+separate persisted parts. Bracket bores, adjustment slots, mounting fasteners,
+retainer locking method and attachment fasteners for track/shoes remain fabrication
+details; the bracket/axle seat is an intentional nominal mounting overlap.
+The belt and rod actuator are not yet modeled or included as selected hardware.
+The retained 200 mm/s leaf speed and 400 mm/s² acceleration are assumptions.
+A trapezoidal 210 mm move at those limits takes about 1.55 s, before
+unlock/standstill delays. The simple kinematic adapter advances at constant
+speed; the live runtime owns acceleration limits.
+
+The existing guard controls the master joint; the second leaf follows through
+the assembly coupling. Its current end-switch simulation assumes an intact
+coupling. Physical closed/locked sensing must cover both leaves so belt/clamp
+failure cannot leave an undetected opening. Include monitored closing-edge
+protection and separate guard locking; motor current alone is not a guard lock.
+These hardware details remain open, as with the original single-leaf design.
+
+Actuation references (architecture examples, not selected products):
+[DICTATOR belt-operated double-leaf doors](https://en.dictator.de/products/door-drives-gate-drives/operators-sliding-doors/dictamat-900-21/)
+and [Mayser monitored safety edges](https://www.mayser.com/en/safetytechnology/safety-edges/closing-safety-edge).
+
+
+Current opposed-door acceptance: 48 machine/door states, 624 exact machine/shell
+near-pair checks, 21 suspension-travel samples with both lower channels engaged,
+loading and service clearances, mass and save/reopen all pass. The fitted guard
+passes 371 assertions. The complete collision scene builds, and live native
+control passes 10,493 assertions covering opening/reclosure, cut gating,
+controlled access stop, reset, boundary interruption and E-stop. Runtime contact
+qualification remains separate; controller motion is tested with contacts
+turned off, as in the preceding single-leaf fixture. See
+`ENCLOSURE_CHECKS_REPORT.json` and `ENCLOSURE_LAYOUT_REPORT.json`.

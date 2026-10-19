@@ -1,0 +1,13 @@
+{
+  "samples": 48,
+  "exactNearPairs": 624,
+  "doorTravelSamples": 21,
+  "doorSweepPairs": 1460,
+  "lowerGuidesEngaged": true,
+  "loadingCorridorClear": true,
+  "saveReopen": true,
+  "fittedGuardAssertions": 371,
+  "liveNativeAssertions": 10493,
+  "liveNativePassed": true,
+  "scope": "Nominal assumed roller guide geometry and simulated guarding; supplier load ratings, attachment bores/fasteners and actuator selection remain open."
+}

@@ -28,16 +28,31 @@ class HobberEnclosureChecks {
           samples++;
         }
       }
-      // Check the moving leaf against its own stationary shell throughout the stroke.
-      var leaf=[for(p in panels)if(p.id=="enclosure/door/leaf")p][0],doorSweepPairs=0;
+      // Check both leaves and their suspension against stationary shell/track/shoes.
+      var leaves=[for(p in panels)if(p.id=="enclosure/door/leaf"||p.id=="enclosure/door/leftLeaf")p],doorSweepPairs=0;
+      if(leaves.length!=2)throw "Expected two opposed door leaves";
+      var moving=[for(p in panels)if(StringTools.startsWith(p.id,"enclosure/door/right")||StringTools.startsWith(p.id,"enclosure/door/left")||p.id=="enclosure/door/leaf")p];
+      var movingIds=[for(p in moving)p.id];
       for(step in 0...21) {
         state.setJoint("enclosure/door/slide",shell.layout.stroke*step/20);state.forwardKinematics();
-        var pose=state.worldPose(leaf.id);
-        for(p in panels)if(p.id!=leaf.id) {
-          var other=state.worldPose(p.id);
-          if(PosedParts.apart(cache.box(leaf.component,pose),cache.box(p.component,other),0))continue;
-          doorSweepPairs++;
-          if(cache.overlap(leaf.component,pose,p.component,other)>0.001)throw 'Door travel interferes with ${p.id} at sample $step';
+        if(Math.abs(state.joint("enclosure/door/leftSlide")+state.joint("enclosure/door/slide"))>1e-8)throw "Door leaves lost synchronization";
+        for(prefix in ["right","left"]) {
+          var channel=[for(p in moving)if(p.id=="enclosure/door/"+prefix+"LowerChannel")p][0];
+          var box=cache.box(channel.component,state.worldPose(channel.id)),engaged=false;
+          for(p in panels)if(StringTools.startsWith(p.id,"enclosure/door/guide")) {
+            var shoe=cache.box(p.component,state.worldPose(p.id)),centre=(shoe.minX+shoe.maxX)/2;
+            if(centre-3>=box.minX&&centre+3<=box.maxX)engaged=true;
+          }
+          if(!engaged)throw 'Lower guide disengaged from $prefix leaf at sample $step';
+        }
+        for(leaf in moving) {
+          var pose=state.worldPose(leaf.id);
+          for(p in panels)if(movingIds.indexOf(p.id)<0) {
+            var other=state.worldPose(p.id);
+            if(PosedParts.apart(cache.box(leaf.component,pose),cache.box(p.component,other),0))continue;
+            doorSweepPairs++;
+            if(cache.overlap(leaf.component,pose,p.component,other)>0.001)throw 'Door travel ${leaf.id} interferes with ${p.id} at sample $step';
+          }
         }
       }
       state.setJoint("enclosure/door/slide",shell.layout.stroke);state.forwardKinematics();
@@ -70,7 +85,7 @@ class HobberEnclosureChecks {
       sys.io.File.saveBytes(out+"/hobber.mtrg",materia.project.SceneArtifact.encode(scene));
       sys.io.File.saveContent(out+"/guard-checks.json",haxe.Json.stringify(guardReport,null,"  "));
       sys.io.File.saveContent(out+"/layout.json",haxe.Json.stringify(fitted.report,null,"  "));
-      sys.io.File.saveContent(out+"/checks.json",haxe.Json.stringify({samples:samples,exactNearPairs:checked,doorTravelSamples:21,doorSweepPairs:doorSweepPairs,loadingCorridorClear:true,saveReopen:true},null,"  "));
+      sys.io.File.saveContent(out+"/checks.json",haxe.Json.stringify({samples:samples,exactNearPairs:checked,doorTravelSamples:21,doorSweepPairs:doorSweepPairs,lowerGuidesEngaged:true,loadingCorridorClear:true,saveReopen:true},null,"  "));
     }catch(error:Dynamic){cache.close();throw error;}
   }
 }

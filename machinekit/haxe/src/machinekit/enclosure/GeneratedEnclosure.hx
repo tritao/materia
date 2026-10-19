@@ -40,8 +40,9 @@ class GeneratedEnclosure extends MachineAssembly {
     add("trayRearLip",new EnclosurePanel(w,30,"steel-2"),F.translation(cx,layout.rearY,floor-4));
     for(side in [-1,1])add(side<0?"trayLeftLip":"trayRightLip",new EnclosurePanel(d,30,"steel-2"),
       F.fromRotationMatrix(side<0?layout.lowX:layout.highX,cy,floor-4,[0,-1,0,1,0,0,0,0,1]));
-    var pose=F.translation(layout.doorX,layout.frontY-50,floor+30);
-    include("door",new SlidingDoor(layout.doorWidth,h-30),pose);
+    var pose=F.translation(layout.doorX,layout.frontY-(layout.input.opposedDoors==true?80:50),floor+30);
+    if(layout.input.opposedDoors==true)include("door",new OpposedSlidingDoor(layout.doorWidth,h-30),pose);
+    else include("door",new SlidingDoor(layout.doorWidth,h-30),pose);
     addMemberConnector("frame/post00","door",F.compose(F.inverse(root),pose));
     addMate("door-mount","fixed","frame/post00","door","door/rail","mount");
   }

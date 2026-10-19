@@ -22,7 +22,8 @@
       "minZ": 940
     },
     "margin": 75,
-    "openingWidth": 600,
+    "openingWidth": 400,
+    "opposedDoors": true,
     "plinth": {
       "maxX": 410.0000000000001,
       "maxY": 640.0000000000001,
@@ -41,11 +42,25 @@
     }
   },
   "dimensionsMm": [
-    1471.5870672635915,
+    973.1741345271829,
     1103.174134527183,
     786.5870672635915
   ],
-  "doorStrokeMm": 610,
+  "doorStrokeMm": 210,
+  "doorLeaves": 2,
+  "doorDrive": "Proposed bought rod-style electric actuator, at least 210 mm usable stroke, plus passive opposite-run belt; ideal coupling only, hardware not sized",
+  "doorGuide": {
+    "cover": "Removable steel splash hood",
+    "hangersPerLeaf": 2,
+    "lowerGuide": "Two stationary UHMW shoes per side with overlapping channel engagement",
+    "mountingDetail": "Bracket bores, fasteners, axle retention and frame attachments remain fabrication work",
+    "rollerDiameterMm": 22,
+    "rollersPerLeaf": 4,
+    "slotWidthMm": 8,
+    "track": "Captured steel roller channel, nominal assumed envelope",
+    "trackWidthMm": 44,
+    "wheelSpinModeled": false
+  },
   "servicePanels": [
     "hobService",
     "swivelService"
@@ -64,10 +79,10 @@
     },
     {
       "bounds": {
-        "maxX": 1385,
+        "maxX": 886.5870672635915,
         "maxY": 666.5870672635915,
         "maxZ": 1583.5870672635915,
-        "minX": 975,
+        "minX": 476.5870672635915,
         "minY": -336.5870672635915,
         "minZ": 897
       },
@@ -387,16 +402,44 @@
       "panelId": "door/leaf",
       "rule": "sealed-seams",
       "zone": "Splash"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "door/leftLeaf",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "door/leftLeaf",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Polycarbonate alone does not qualify a viewing assembly",
+      "panelId": "door/leftLeaf",
+      "rule": "window-qualification",
+      "zone": "Window"
+    },
+    {
+      "message": "Supply a construction rating/test covering demand, thickness, joints and mounting",
+      "panelId": "door/leftLeaf",
+      "rule": "impact-qualification",
+      "zone": "Impact"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "door/leftLeaf",
+      "rule": "coolant-qualification",
+      "zone": "Splash"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "door/leftLeaf",
+      "rule": "sealed-seams",
+      "zone": "Splash"
     }
   ],
   "evidence": "X/Y/Z endpoints, A one-degree grid with radius*half-step padding; B/C descendants bounded by rotation-centred spheres",
-  "assumptions": "75 mm clearance; 600 mm opening; OD140 side-jaw reservation; 100 mm mist opening; 60 C process and oil-mist rule assessment assumed. Robot, seals, retention and flow not qualified.",
-  "acceptance": {
-    "samples": 48,
-    "exactNearPairs": 648,
-    "loadingCorridorClear": true,
-    "saveReopen": true,
-    "serviceOpeningsClear": true
-  },
-  "mechanicalSourceRevision": "7fb67d507f66cf190cd6d3fa63cc67d5c9fb4526"
+  "assumptions": "75 mm clearance; 400 mm opening; opposed belt-coupled leaves; OD140 side-jaw reservation; 100 mm mist opening; 60 C process and oil-mist rule assessment assumed. Robot, seals, retention and flow not qualified."
 }

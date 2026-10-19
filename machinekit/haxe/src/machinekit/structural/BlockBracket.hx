@@ -17,18 +17,43 @@ typedef BracketBlock = {min:Array<Float>, max:Array<Float>};
  * switch or a sensor off the member it is bolted to. Its blocks are given in its own frame.
  */
 class BlockBracket extends MachineComponent {
+	final label:String;
+	static var recipe:Null<machinekit.component.ComponentType>;
 	public final blocks:Array<BracketBlock>;
 
 	public function new(name:String, blocks:Array<BracketBlock>, material:String = "aluminium 6061") {
-		if (blocks.length == 0) throw 'Bracket "$name" needs a block';
-		for (block in blocks) for (i in 0...3) if (!(block.max[i] - block.min[i] > 0)) throw 'Bracket "$name" has an empty block';
+		if (blocks==null || blocks.length == 0) throw 'Bracket "$name" needs a block';
+		for (block in blocks) {
+			if(block.min==null||block.max==null||block.min.length!=3||block.max.length!=3)throw "Bracket needs three dimensional corners";
+			for (i in 0...3) if (!Math.isFinite(block.min[i]+block.max[i]) || !(block.max[i] - block.min[i] > 0)) throw 'Bracket "$name" has an empty or nonfinite block';
+		}
 		var key = [for (block in blocks) [for (i in 0...3) Dimension.format(block.min[i]) + ":" + Dimension.format(block.max[i])].join(",")].join(";");
 		super('BRACKET-${name.toUpperCase().split(" ").join("-")}-${key}', name, material, true);
+		this.label=name;
 		this.blocks = [for (block in blocks) {min: block.min.copy(), max: block.max.copy()}];
 		// Preserve the space inside an L-shaped support in simulation and planning.
 		addFacet(CollisionHullFacet.fromBoxes([for (block in this.blocks)
 			[block.min[0], block.min[1], block.min[2], block.max[0], block.max[1], block.max[2]]]));
 	}
+
+	static function readBlocks(text:String):Array<BracketBlock> {
+		var raw:Array<Dynamic> = haxe.Json.parse(text);
+		return [for(item in raw) {
+			var low:Array<Dynamic> = item.min,high:Array<Dynamic> = item.max;
+			{min:[for(v in low)Std.parseFloat(Std.string(v))],max:[for(v in high)Std.parseFloat(Std.string(v))]};
+		}];
+	}
+
+	public static function recipeType():machinekit.component.ComponentType {
+		if(recipe==null)recipe=new machinekit.component.ComponentType("machinekit.structural.block-bracket",[
+			machinekit.component.ComponentRecipeSupport.text("label","bracket"),
+			machinekit.component.ComponentRecipeSupport.text("blocks",'[{"min":[0,0,0],"max":[10,10,10]}]')
+		],v->new BlockBracket(v.token("label"),readBlocks(v.token("blocks"))),true);
+		return recipe;
+	}
+	override public function componentType():Null<machinekit.component.ComponentType> return recipeType();
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues()
+		.setToken("label",label).setToken("blocks",haxe.Json.stringify(blocks)).setToken("material",materialSpec());
 
 	override public function hasGeometry():Bool return true;
 

@@ -23,6 +23,7 @@ class MachineKitComponents {
 		registry.register(machinekit.structural.LevelingFoot.recipeType());
 		registry.register(machinekit.structural.LevelingSeat.recipeType());
 		registry.register(machinekit.structural.RectTubeMember.recipeType());
+		registry.register(machinekit.structural.BlockBracket.recipeType());
 		registry.register(machinekit.structural.ProfileMember.tslotRecipeType());
 		registry.register(machinekit.structural.ProfileMember.drawingRecipeType());
 		registry.register(machinekit.structural.SlideInSlotNut.recipeType());

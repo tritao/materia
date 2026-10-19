@@ -9,6 +9,7 @@ typedef EnclosureLayoutInput = {
   var floorZ:Float;
   var margin:Float;
   var openingWidth:Float;
+  @:optional var opposedDoors:Bool;
 }
 
 /** A front-loading shell fitted to declared swept bounds; all dimensions in machine-frame mm. */
@@ -28,8 +29,8 @@ class EnclosureLayout {
         throw "Enclosure layout needs finite nonempty bounds";
     if(!(input.margin>=50)||!(input.openingWidth>0)||!Math.isFinite(input.margin+input.openingWidth+input.floorZ))throw "Invalid enclosure layout allowances";
     this.input=input;doorX=(input.loading.minX+input.loading.maxX)/2;
-    doorWidth=Math.max(input.openingWidth,input.loading.maxX-input.loading.minX+2*input.margin);stroke=doorWidth+10;
-    lowX=Math.min(input.swept.minX-input.margin,doorX-doorWidth/2-input.margin);
+    doorWidth=Math.max(input.openingWidth,input.loading.maxX-input.loading.minX+2*input.margin);stroke=(input.opposedDoors==true?doorWidth/2:doorWidth)+10;
+    lowX=Math.min(input.swept.minX-input.margin,doorX-doorWidth/2-(input.opposedDoors==true?stroke:0)-input.margin);
     highX=Math.max(input.swept.maxX+input.margin,doorX+doorWidth/2+stroke+input.margin);
     frontY=input.swept.minY-input.margin;rearY=input.swept.maxY+input.margin;
     roofZ=Math.max(input.swept.maxZ,input.loading.maxZ)+input.margin;
