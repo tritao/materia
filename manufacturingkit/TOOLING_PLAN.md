@@ -11,6 +11,10 @@ Status: phase 1 implemented. Panel generation and physical qualification remain 
   The initial contract supports mm inputs, convex additive prisms and box cuts;
   unsupported units must be converted before entering the contract.
 - [ ] Phase 2: panel geometry, joints and fit coupon.
+  In progress: phase 1 closed vocabularies converted to enum abstracts; tooling
+  codec version 2 rejects version 1. Original insert role labels remain source
+  descriptions alongside the typed role. The uncommitted panel prototype is being
+  reconciled to exact line/arc operations, CadKit drawings and swept blocking.
 - [ ] Phase 3: single-pocket box mold, end to end.
 - [ ] Phase 4: mill base mold review assembly.
 - [ ] Phase 5: assembly validation and fabrication package.

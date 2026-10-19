@@ -1,6 +1,11 @@
 package materia.tooling;
 
 import haxe.Json;
+import materia.tooling.ToolingEnums.ToolingLengthUnit;
+import materia.tooling.ToolingEnums.CoatedFace;
+import materia.tooling.ToolingEnums.StockDirection;
+import materia.tooling.ToolingEnums.InsertRole;
+import materia.tooling.ToolingEnums.InsertFinish;
 import haxe.crypto.Sha256;
 import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -19,7 +24,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 1;
+	public static inline var VERSION = 2;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -84,7 +89,7 @@ class ToolingCodec {
 			}
 		}
 		for (i in inserts) if (!referenced.exists(i.id)) throw 'Missing recess for insert ${i.id}';
-		return {id: string(raw, "id"), revision: revision(raw), lengthUnit: "mm",
+		return {id: string(raw, "id"), revision: revision(raw), lengthUnit: ToolingLengthUnit.Millimetres,
 			envelope: envelope, features: features, inserts: inserts};
 	}
 
@@ -119,12 +124,12 @@ class ToolingCodec {
 	}
 
 	static function readInsert(raw:Dynamic):CastingToolingInsert {
-		object(raw, ["id", "width", "depth", "height", "boreDiameter", "pose", "role", "positionTolerance", "finish"], "insert");
+		object(raw, ["id", "width", "depth", "height", "boreDiameter", "pose", "role", "sourceRole", "positionTolerance", "finish"], "insert");
 		var w = positive(raw, "width"), d = positive(raw, "depth"), bore = nonnegative(raw, "boreDiameter");
 		if (bore >= Math.min(w, d)) throw "Insert bore consumes its seat";
 		return {id: string(raw, "id"), width: w, depth: d, height: positive(raw, "height"), boreDiameter: bore,
-			pose: frame(raw, "pose"), role: string(raw, "role"), positionTolerance: positive(raw, "positionTolerance"),
-			finish: string(raw, "finish")};
+			pose: frame(raw, "pose"), role: insertRole(string(raw, "role")), sourceRole: string(raw, "sourceRole"), positionTolerance: positive(raw, "positionTolerance"),
+			finish: insertFinish(string(raw, "finish"))};
 	}
 
 	static function readSetup(raw:Dynamic, input:CastingToolingInput):CastingSetup {
@@ -174,7 +179,7 @@ class ToolingCodec {
 			"compressionStrainFraction", "maximumTemperatureC", "evidence"], "core stock");
 		var thickness = positive(p, "measuredThickness"), variation = nonnegative(p, "thicknessVariation");
 		if (variation >= thickness) throw "Panel thickness variation consumes stock";
-		var face = string(p, "coatedFace");
+		var face = coatedFace(string(p, "coatedFace"));
 		if (["positive-z", "negative-z", "both", "none"].indexOf(face) < 0) throw "Invalid coated face";
 		var rotations:Array<Int> = [];
 		for (value in array(p, "allowedRotations", 2)) {
@@ -184,7 +189,7 @@ class ToolingCodec {
 			rotations.push(rotation);
 		}
 		rotations.sort(Reflect.compare);
-		var direction = string(p, "directionConstraint");
+		var direction = stockDirection(string(p, "directionConstraint"));
 		if (rotations.length == 0 || (direction != "free" && direction != "width-aligned") ||
 			(direction == "width-aligned" && rotations.indexOf(90) >= 0)) throw "Invalid panel direction constraint";
 		var strength = nullableNumber(c, "compressionStrengthPa", true), strain = nullableNumber(c, "compressionStrainFraction", true);
@@ -203,6 +208,26 @@ class ToolingCodec {
 			resinSpec: string(raw, "resinSpec"), releaseSpec: string(raw, "releaseSpec"),
 			adhesiveSpec: string(raw, "adhesiveSpec"), processEvidence: evidence(raw, "processEvidence")};
 	}
+
+	public static function coatedFace(value:String):CoatedFace return switch value {
+        case "positive-z": CoatedFace.PositiveZ; case "negative-z": CoatedFace.NegativeZ;
+        case "both": CoatedFace.Both; case "none": CoatedFace.Uncoated;
+        default: throw "Invalid coated face";
+    };
+    public static function stockDirection(value:String):StockDirection return switch value {
+        case "free": StockDirection.Free; case "width-aligned": StockDirection.WidthAligned;
+        default: throw "Invalid panel direction constraint";
+    };
+    public static function insertRole(value:String):InsertRole return switch value {
+        case "generic-mount": InsertRole.GenericMount; case "guide-seat": InsertRole.GuideSeat;
+        case "bearing-seat": InsertRole.BearingSeat; case "column-mount": InsertRole.ColumnMount;
+        case "leveling-seat": InsertRole.LevelingSeat; case "hatch-mount": InsertRole.HatchMount;
+        default: throw "Invalid insert role";
+    };
+    public static function insertFinish(value:String):InsertFinish return switch value {
+        case "ground-after-casting": InsertFinish.GroundAfterCasting;
+        default: throw "Invalid insert finish";
+    };
 
 	static function object(raw:Dynamic, fields:Array<String>, label:String):Void {
 		if (raw == null || !Reflect.isObject(raw) || Std.isOfType(raw, Array) || Std.isOfType(raw, String))
@@ -307,7 +332,7 @@ class ToolingCodec {
 	}
 
 	/** Sort object keys as well as named records so field construction order is irrelevant. */
-	static function canonical(value:Dynamic):String {
+	public static function canonical(value:Dynamic):String {
 		if (value == null) return "null";
 		if (Std.isOfType(value, String) || Std.isOfType(value, Bool) || Std.isOfType(value, Float) || Std.isOfType(value, Int))
 			return Json.stringify(value);

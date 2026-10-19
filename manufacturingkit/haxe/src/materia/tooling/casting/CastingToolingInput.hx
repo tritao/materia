@@ -2,6 +2,9 @@ package materia.tooling.casting;
 
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.tooling.ToolingPrism;
+import materia.tooling.ToolingEnums.ToolingLengthUnit;
+import materia.tooling.ToolingEnums.InsertRole;
+import materia.tooling.ToolingEnums.InsertFinish;
 
 enum abstract CastingFeatureKind(String) to String {
 	var Void = "void";
@@ -32,9 +35,11 @@ typedef CastingToolingInsert = {
 	var height:Float;
 	var boreDiameter:Float;
 	var pose:AssemblyFrame;
-	var role:String;
+	var role:InsertRole;
+	/** Original source label, preserved without using it as a closed vocabulary. */
+	var sourceRole:String;
 	var positionTolerance:Float;
-	var finish:String;
+	var finish:InsertFinish;
 }
 
 /** A detached, machine-independent design snapshot. Right-handed source coordinates.
@@ -43,7 +48,7 @@ typedef CastingToolingInsert = {
 typedef CastingToolingInput = {
 	var id:String;
 	var revision:Int;
-	var lengthUnit:String;
+	var lengthUnit:ToolingLengthUnit;
 	var envelope:Array<ToolingPrism>;
 	var features:Array<CastingToolingFeature>;
 	var inserts:Array<CastingToolingInsert>;

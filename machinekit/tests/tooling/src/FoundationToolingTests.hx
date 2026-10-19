@@ -10,6 +10,11 @@ import machinekit.structural.MineralFoundation.CastInsertPlacement;
 import machinekit.tooling.FoundationToolingAdapter;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingCodec;
+import materia.tooling.ToolingEnums.ToolingLengthUnit;
+import materia.tooling.ToolingEnums.CoatedFace;
+import materia.tooling.ToolingEnums.StockDirection;
+import materia.tooling.ToolingEnums.InsertRole;
+import materia.tooling.ToolingEnums.InsertFinish;
 import materia.tooling.ToolingDocument;
 import materia.tooling.casting.CastingToolingInput;
 import materia.tooling.casting.CastingSetup.CoreStrategy;
@@ -47,7 +52,7 @@ class FoundationToolingTests {
 				{featureId: f.id, strategy: SacrificialEPS, withdrawal: null}]},
 			recipe: {id: "test-only-recipe", revision: 1,
 				panel: {materialSpec: "test board", nominalThickness: 18, measuredThickness: 18,
-					thicknessVariation: 0, width: 2440, height: 1220, coatedFace: "both", allowedRotations: [0,90], directionConstraint: "free"},
+					thicknessVariation: 0, width: 2440, height: 1220, coatedFace: CoatedFace.Both, allowedRotations: [0,90], directionConstraint: StockDirection.Free},
 				core: {materialSpec: "test EPS", width: 1000, depth: 500, height: 100,
 					densityKgM3: null, compressionStrengthPa: null, compressionStrainFraction: null,
 					maximumTemperatureC: null, evidence: []},

@@ -1,6 +1,11 @@
 import haxe.Json;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingCodec;
+import materia.tooling.ToolingEnums.ToolingLengthUnit;
+import materia.tooling.ToolingEnums.CoatedFace;
+import materia.tooling.ToolingEnums.StockDirection;
+import materia.tooling.ToolingEnums.InsertRole;
+import materia.tooling.ToolingEnums.InsertFinish;
 import materia.tooling.ToolingDocument;
 import materia.tooling.ToolingRecipe;
 import materia.tooling.ToolingReview;
@@ -20,17 +25,17 @@ class ToolingTests {
 	}
 
 	static function fixture():ToolingDocument {
-		var input:CastingToolingInput = {id: "sample-foundation", revision: 1, lengthUnit: "mm",
+		var input:CastingToolingInput = {id: "sample-foundation", revision: 1, lengthUnit: ToolingLengthUnit.Millimetres,
 			envelope: [{id: "body", profile: [{x: -100, y: -90}, {x: 100, y: -90}, {x: 100, y: 90}, {x: -100, y: 90}],
 				height: 100, pose: F.identity()}],
 			features: [
 				{id: "pocket", kind: Void, insertId: null, width: 100, depth: 80, height: 61, pose: F.translation(0, 0, -1)},
 				{id: "insert-seat", kind: InsertRecess, insertId: "seat", width: 40, depth: 30, height: 20, pose: F.translation(80, 0, 90)}
 			], inserts: [{id: "seat", width: 40, depth: 30, height: 20, boreDiameter: 8,
-				pose: F.translation(80, 0, 90), role: "rail seat", positionTolerance: 0.01, finish: "ground after casting"}]};
+				pose: F.translation(80, 0, 90), role: InsertRole.GuideSeat, sourceRole: "rail seat", positionTolerance: 0.01, finish: InsertFinish.GroundAfterCasting}]};
 		var recipe:ToolingRecipe = {id: "eps-panel-study", revision: 1,
 			panel: {materialSpec: "melamine-faced particleboard, study", nominalThickness: 18, measuredThickness: 17.8,
-				thicknessVariation: 0.2, width: 2440, height: 1220, coatedFace: "both", allowedRotations: [0,90], directionConstraint: "free"},
+				thicknessVariation: 0.2, width: 2440, height: 1220, coatedFace: CoatedFace.Both, allowedRotations: [0,90], directionConstraint: StockDirection.Free},
 			core: {materialSpec: "EPS grade unselected", width: 1000, depth: 500, height: 100,
 				densityKgM3: null, compressionStrengthPa: null, compressionStrainFraction: null,
 				maximumTemperatureC: null, evidence: []},
@@ -76,7 +81,7 @@ class ToolingTests {
 			var raw:Dynamic = Json.parse(encoded); edit(raw);
 			rejects(() -> ToolingCodec.decode(Json.stringify(raw)), expected);
 		}
-		corrupt(r -> { r.version = 2; }, "Unsupported tooling format");
+		corrupt(r -> { r.version = 1; }, "Unsupported tooling format");
 		corrupt(r -> { r.version = 1.5; }, "Expected tooling integer");
 		corrupt(r -> { r.document.input.lengthUnit = "inch"; }, "explicit mm");
 		corrupt(r -> { r.document.input.revision = 0; }, "revision must be positive");
@@ -98,6 +103,8 @@ class ToolingTests {
 		corrupt(r -> { items(r.document.input.features)[1].insertId = "seat"; }, "cannot reference an insert");
 		corrupt(r -> { items(r.document.input.features).splice(0, 1); }, "Missing recess");
 		corrupt(r -> { items(r.document.input.inserts)[0].boreDiameter = 40; }, "bore consumes");
+		corrupt(r -> { items(r.document.input.inserts)[0].role = "unrecognized"; }, "Invalid insert role");
+		corrupt(r -> { items(r.document.input.inserts)[0].finish = "ground after casting"; }, "Invalid insert finish");
 		corrupt(r -> { r.document.input.envelope = new Array<Dynamic>(); }, "needs an envelope");
 		corrupt(r -> { r.document.input.envelope = [for (_ in 0...513) items(r.document.input.envelope)[0]]; }, "Too many tooling records");
 		corrupt(r -> { r.document.setup.features = new Array<Dynamic>(); }, "Missing core strategy");

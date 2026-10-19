@@ -2,6 +2,9 @@ package machinekit.tooling;
 
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingCodec;
+import materia.tooling.ToolingEnums.ToolingLengthUnit;
+import materia.tooling.ToolingEnums.InsertRole;
+import materia.tooling.ToolingEnums.InsertFinish;
 import materia.tooling.ToolingPrism;
 import materia.tooling.ToolingPrism.ToolingPoint2;
 import materia.tooling.casting.CastingToolingInput;
@@ -38,8 +41,8 @@ class FoundationToolingAdapter {
 		for (row in foundation.insertLocations()) {
 			var i = row.part.values();
 			inserts.push({id: row.id, width: i.number("width"), depth: i.number("depth"), height: i.number("height"),
-				boreDiameter: i.number("boreDiameter"), pose: row.pose, role: i.token("role"),
-				positionTolerance: i.number("positionTolerance"), finish: i.token("finish")});
+				boreDiameter: i.number("boreDiameter"), pose: row.pose, role: sourceRole(i.token("role")), sourceRole: i.token("role"),
+				positionTolerance: i.number("positionTolerance"), finish: i.token("finish") == "ground after casting" ? InsertFinish.GroundAfterCasting : throw "Unsupported source insert finish"});
 			// MineralFoundation owns this ID convention for its generated full-box cuts.
 			recesses.set('insert-${row.id}', row.id);
 		}
@@ -49,7 +52,16 @@ class FoundationToolingAdapter {
 			features.push({id: f.id, kind: insertId == null ? Void : InsertRecess, insertId: insertId,
 				width: f.width, depth: f.depth, height: f.height, pose: f.pose});
 		}
-		return ToolingCodec.inputSnapshot({id: id, revision: revision, lengthUnit: "mm",
+		return ToolingCodec.inputSnapshot({id: id, revision: revision, lengthUnit: ToolingLengthUnit.Millimetres,
 			envelope: envelope, features: features, inserts: inserts});
 	}
+    static function sourceRole(label:String):InsertRole return switch label {
+        case "rail seat", "Y guide seat", "Z guide seat": InsertRole.GuideSeat;
+        case "Y drive bearing seat", "Z bearing mount anchor": InsertRole.BearingSeat;
+        case "column mounting anchor — nominal M12 tap drill", "column sole clamping pad", "column sole pad": InsertRole.ColumnMount;
+        case "leveling screw seat", "foundation foot seat": InsertRole.LevelingSeat;
+        case "rear motor hatch anchor": InsertRole.HatchMount;
+        default: InsertRole.GenericMount;
+    };
+
 }

@@ -52,6 +52,9 @@ joinery, removal-path validation and fabrication exports are subsequent stages.
   Named collections and object fields are canonicalized for stable fingerprints;
   profile vertices retain geometric order. UTF-8 document size is limited to
   2 MiB, named collections to 512 records and convex profiles to 64 vertices.
+  Codec version 2 uses enum abstracts for units, insert roles/finish and stock
+  coating/direction. Version 1 is rejected; there is no compatibility reader.
+  An insert's original design label is preserved separately as `sourceRole`.
 - Bind `setup.sourceFingerprint` using `ToolingCodec.inputFingerprint(input)`.
   Source changes invalidate that binding even if the revision was not updated.
   `recipeFingerprint` and `documentFingerprint` identify other manufacturing-input
