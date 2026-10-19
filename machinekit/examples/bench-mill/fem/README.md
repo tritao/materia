@@ -21,9 +21,12 @@ Their apparent third-level mesh needs do not apply to this serial matrix.
 | 1 | 47.431–49.678 | 41.460–44.312 |
 | 2 | 60.751–65.657 | 45.976–48.905 |
 | 3 | 75.015–78.693 | 75.942–78.655 |
+| 4 | 82.769–87.365 | 84.083–92.007 |
+| 5 | 111.501–130.289 | 112.225–122.262 |
+| 6 | 146.405–157.562 | 123.847–131.141 |
 
 First-mode travel changes are −2.49…+2.13% / −3.52…+3.12%, with shape MAC
-≥0.9938 / 0.9835. First-three-mode MAC stays ≥0.935. The four-spring second
+≥0.9938 / 0.9835. First-three nearest casting-sample MAC values stay ≥0.935. Several higher/nearby modes share a best casting-only target; physical identity requires the mass-motion/phase evidence. The four-spring second
 mode's continuous column residual spans 0.0739–0.1070, crossing the arbitrary
 0.1 flag at some upper poses without a new mode appearing. Its tracked
 frequency changes −3.31…+2.85%, with MAC ≥0.973. The ~78 Hz center mode has
@@ -642,3 +645,22 @@ uncertainty review, even if nominal casting shares stay below target.
 Source/code hashes, every pose and nose/bar motion ratios are retained in
 `build/fem/nine-pose-serial/excitation-context.json`, SHA256
 `87196d7cb8832156152c1d98854d3fbe4aedbf0e13ebd5b67d910682699871dc`.
+
+
+### Mode-order and identity interpretation
+
+The qualified spectrum is reported by ascending frequency order. The existing
+nearest casting-sample MAC is an unweighted shape diagnostic and allows shared
+targets: center modes 3 and 4 can both prefer one corner mode. In total there
+are 11 shared targets across the corner/support mappings. Therefore its apparent
+10–13% matched fourth-mode decrease does not establish a distinct physical mode
+shift. Use the actual spectral orders, full displacement fields and lumped-mass
+motion when interpreting mixed families. No automatic physical mode naming or
+acceptance follows from these scores.
+The fourth spectral order spans 82.769–87.365 Hz / 84.083–92.007 Hz. Higher
+orders vary more: the three-point fifth order spans 111.501–130.289 Hz against
+122.089 Hz at center (−8.67…+6.72%). The first-three-order ranges alone do not
+summarize the whole low-frequency spectrum. `mode-identity-notes.json` records
+all first-six-order ranges and shared casting-MAC targets under
+`build/fem/nine-pose-serial`; SHA256
+`a0c4e2c8148ac4dc79517dc6218abb13486f834d99a1783440619cd22939db33`.
