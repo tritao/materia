@@ -37,7 +37,7 @@ Run the focused CAD acceptance from the worktree root:
 /home/joao/dev/materia-cache/tools/heavy-run --mem 4G --need 3G --label hobber-enclosure -- env HAXEON_COMPILER_SERVER=0 CADKIT_OCCT_DIR=/home/joao/dev/materia-cache/occt-f1dc4efb-release ./haxeon/scripts/haxeon run --jobs=1 --project=machinekit/examples/flexspline-hobber/haxeon.enclosure-checks.json
 ```
 
-Outputs under `build/enclosure/`: `hobber.scene`, `layout.json`, `checks.json`.
+Outputs under `build/enclosure/`: `hobber.mtrg`, `layout.json`, `checks.json`.
 Acceptance checks 48 machine/door positions, exact near-pair intersections,
 the loading reservation, removable service openings, the round port cut and
 mass, collision aperture proxy and assembly save/reopen. It is sampled clearance

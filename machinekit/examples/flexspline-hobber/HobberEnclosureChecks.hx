@@ -53,7 +53,7 @@ class HobberEnclosureChecks {
       var scene=machinekit.assembly.AssemblyPreview.scene(assembly,"hobber-enclosed"),root=Sys.getCwd();
       while(!sys.FileSystem.exists(root+"/machinekit/examples/flexspline-hobber/FlexsplineHobber.hx"))root=haxe.io.Path.directory(root);
       var out=root+"/machinekit/examples/flexspline-hobber/build/enclosure";sys.FileSystem.createDirectory(haxe.io.Path.directory(out));sys.FileSystem.createDirectory(out);
-      sys.io.File.saveBytes(out+"/hobber.scene",materia.project.SceneArtifact.encode(scene));
+      sys.io.File.saveBytes(out+"/hobber.mtrg",materia.project.SceneArtifact.encode(scene));
       sys.io.File.saveContent(out+"/layout.json",haxe.Json.stringify(fitted.report,null,"  "));
       sys.io.File.saveContent(out+"/checks.json",haxe.Json.stringify({samples:samples,exactNearPairs:checked,loadingCorridorClear:true,saveReopen:true},null,"  "));
     }catch(error:Dynamic){cache.close();throw error;}

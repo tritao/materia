@@ -91,7 +91,7 @@ class HobberEnclosurePreview {
     var root=Sys.getCwd();while(!sys.FileSystem.exists(root+"/machinekit/examples/flexspline-hobber/FlexsplineHobber.hx")){
       var parent=haxe.io.Path.directory(root);if(parent==root||parent.length==0)throw "Cannot locate hobber worktree";root=parent;}
     var output=root+"/machinekit/examples/flexspline-hobber/build/enclosure";sys.FileSystem.createDirectory(haxe.io.Path.directory(output));sys.FileSystem.createDirectory(output);
-    sys.io.File.saveBytes(output+"/hobber.scene",SceneArtifact.encode(scene));
+    sys.io.File.saveBytes(output+"/hobber.mtrg",SceneArtifact.encode(scene));
     sys.io.File.saveContent(output+"/layout.json",haxe.Json.stringify(fitted.report,null,"  "));
     Sys.println("Hobber enclosure scene and layout report written");
   }
