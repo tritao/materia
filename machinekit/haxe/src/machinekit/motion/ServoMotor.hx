@@ -97,6 +97,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 				rotorInertia: row.rotorInertia, encoderCounts: row.encoderCounts, bodyDiameter: row.bodyDiameter,
 				bodyLength: row.bodyLength, shaftDiameter: row.shaftDiameter, shaftLength: row.shaftLength,
 				electrical: highVoltageWinding(row.ratedTorque, row.ratedSpeed)});
+			for (name in LeadshineServo.catalog().designations()) table.push(LeadshineServo.model(name).rating);
 		}
 		return table;
 	}
@@ -109,8 +110,9 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 		return namedRecipe;
 	}
 
-	/** The generic servo named `designation`. */
+	/** Named generic or Leadshine servo. Vendor rows retain their catalog provenance. */
 	public static function model(designation:String, basis:machinekit.transmission.ValueBasis = Assumed):ServoMotor {
+		if (LeadshineServo.catalog().exists(designation)) return LeadshineServo.model(designation);
 		for (rating in ratings()) if (rating.designation == designation) return basis == Assumed ? new CatalogServoMotor(rating) : new ServoMotor(rating, basis);
 		throw 'Unknown servo motor "$designation"; known: ${[for (rating in ratings()) rating.designation].join(", ")}';
 	}

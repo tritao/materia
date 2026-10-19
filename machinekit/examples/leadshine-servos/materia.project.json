@@ -1,0 +1,15 @@
+{
+  "format": "materia.project",
+  "version": 1,
+  "name": "Leadshine ELM1 / ELM2 servo motors",
+  "defaultEntrypoint": "viewport",
+  "build": {"system": "haxeon", "manifest": "haxeon.json"},
+  "entrypoints": {
+    "viewport": {
+      "kind": "cad-preview",
+      "module": "LeadshineServos",
+      "function": "preview",
+      "cache": {"inputs": ["LeadshineServos.hx"]}
+    }
+  }
+}
