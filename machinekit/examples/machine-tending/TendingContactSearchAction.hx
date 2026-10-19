@@ -20,6 +20,7 @@ class TendingContactSearchAction {
   final speedLimit:Float;
   final totalSpeedLimit:Float;
   final stableRequired:Int;
+  final restGapLimit:Null<Float>;
   var elapsed=0.0;
   var holdElapsed=0.0;
   var stable=0;
@@ -29,6 +30,9 @@ class TendingContactSearchAction {
     forceLimit=policy.forceLimitN;threshold=policy.contactThresholdN;speedLimit=policy.speedLimitMmPerSecond;
     totalSpeedLimit=policy.totalPointSpeedLimitMmPerSecond;
     stableRequired=policy.stableSamples;
+    restGapLimit=Reflect.hasField(policy,"restGapLimitMm") ? (cast policy.restGapLimitMm:Float) : null;
+    if(restGapLimit!=null && (!Math.isFinite(restGapLimit) || restGapLimit<=0 || restGapLimit>0.01 || expected.length!=1))
+      throw "Touch-and-rest locating needs one stop and at most 0.01 mm observed gap";
     if(expected==null || expected.length==0 || stableRequired<1 || policy.numericalPenetrationLimitMm!=0.001)
       throw "Invalid locating identity or penetration policy";
     for(i in 0...expected.length)if(expected[i]==null || expected[i].length==0 || expected.indexOf(expected[i])!=i)throw "Invalid contact search identity";
@@ -42,7 +46,7 @@ class TendingContactSearchAction {
     }
   }
   public function observe(dt:Float,travelMm:Float,contacts:Array<String>,forceN:Float,penetrationMm:Float,
-      speedMmPerSecond:Float,atRest:Bool,?totalPointSpeedMmPerSecond:Float):Void {
+      speedMmPerSecond:Float,atRest:Bool,?totalPointSpeedMmPerSecond:Float,?observedGapMm:Float):Void {
     if(stopped || complete)return;
     var totalSpeed:Float=totalPointSpeedMmPerSecond==null ? speedMmPerSecond : (cast totalPointSpeedMmPerSecond:Float);
     elapsed+=dt;if(holding)holdElapsed+=dt;
@@ -60,7 +64,12 @@ class TendingContactSearchAction {
       for(name in contacts)if(expected.indexOf(name)<0)stop("unexpected locating contact: "+name);
       if(stopped)return;
       if(loaded)holding=true;
-      if(holding && loaded && atRest)stable++;else stable=0;
+      var nearStop=false;
+      if(holding && restGapLimit!=null) {
+        if(observedGapMm==null || !Math.isFinite(observedGapMm) || observedGapMm< -0.001) {stop("invalid observed stop gap");return;}
+        nearStop=observedGapMm<=restGapLimit;
+      }
+      if(holding && (restGapLimit!=null ? nearStop : loaded) && atRest)stable++;else stable=0;
       if(stable>=stableRequired)complete=true;
     }
   }
@@ -134,6 +143,25 @@ class TendingContactSearchAction {
     if(Math.abs(load.resultantN-other.resultantN)>1e-12)throw "Body ordering changed measured resultant";
     var rejected=false;try contactLoad(forces,99,[0.0,0,1]) catch(_:Dynamic)rejected=true;
     if(!rejected)throw "Unrelated-body force was accepted";
-    return 20;
+    var datum:Dynamic=haxe.Json.parse(haxe.Json.stringify(p));datum.restGapLimitMm=0.01;
+    var recoiled=new TendingContactSearchAction(datum);
+    recoiled.observe(0.01,0.5,[p.contact],0.2,0.0001,0.005,false,0.005,-0.0001);
+    for(_ in 0...10)recoiled.observe(0.01,0.5,[],0,0,0,true,0,0.002);
+    if(!recoiled.complete || recoiled.stopped)throw "Measured touch followed by bounded stationary recoil did not locate";
+    var untouched=new TendingContactSearchAction(datum);
+    for(_ in 0...10)untouched.observe(0.01,0.5,[],0,0,0,true,0,0.002);
+    if(untouched.holding || untouched.complete)throw "Near-stop geometry fabricated a touch";
+    for(gap in [0.011,0.02]) {
+      var distant=new TendingContactSearchAction(datum);
+      distant.observe(0.01,0.5,[p.contact],0.2,0,0,false,0,0);
+      for(_ in 0...10)distant.observe(0.01,0.5,[],0,0,0,true,0,gap);
+      if(distant.complete)throw "Touch history admitted excessive recoil";
+      distant.observe(2.1,0.5,[],0,0,0,true,0,gap);
+      if(!distant.stopped)throw "Distant contact hold failed to latch a stop";
+    }
+    var missingGap=new TendingContactSearchAction(datum);
+    missingGap.observe(0.01,0.5,[p.contact],0.2,0,0,true);
+    if(!missingGap.stopped)throw "Touch-and-rest locating admitted missing gap observation";
+    return 25;
   }
 }

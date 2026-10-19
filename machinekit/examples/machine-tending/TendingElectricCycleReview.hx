@@ -96,6 +96,7 @@ class TendingElectricCycleReview {
           row.withdrawal.supportSeparationRequired=true;
           row.withdrawal.complete=false;
         }
+        if(clearanceFirst && row.station=="vise-load" && row.locating!=null)row.locating.restGapLimitMm=0.01;
         row.guardLimits=guardLimits(row,input,clearanceFirst);
         row.runtimeProfile=TendingElectricRuntimeProfile.bind(row,input);
         if(clearanceFirst && row.station=="vise-load" && row.runtimeProfile.locating==null)

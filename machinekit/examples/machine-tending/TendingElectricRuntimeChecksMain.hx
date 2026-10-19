@@ -23,7 +23,7 @@ class TendingElectricRuntimeChecksMain {
         if(Reflect.hasField(report,"placementStrategy") && report.placementStrategy=="clearance-first and guarded locating") {
           if(profile.seating.orientationConstraint!="support-normal" || profile.clamping.orientationConstraint!="full-pose")
             throw "Vise support level and final jaw orientation must remain separate checks";
-          if(profile.locating==null || profile.locating.limits.commandCorridorClear!=true || profile.locating.limits.returnCorridorClear!=true)
+          if(profile.locating==null || profile.locating.limits.commandCorridorClear!=true || profile.locating.limits.returnCorridorClear!=true || profile.locating.limits.restGapLimitMm!=0.01)
             throw "Vise locating needs checked insertion and return corridors";
           var samples:Array<Array<Float>> = cast profile.locating.samples;
           if(samples.length<2 || !TendingElectricRuntimeProfile.same(samples[0],incoming[incoming.length-1].to))

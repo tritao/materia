@@ -573,7 +573,7 @@ class TendingElectricAccess {
               search.close();
               locatingReview={commandCorridorClear:true,returnCorridorClear:true,returnPolicy:"reverse executed search samples",clearanceMm:0.5,
                 commandTravelMm:0.65,contact:"mill/mill/vise/endStop",forceLimitN:5.0,
-                contactThresholdN:0.05,commandSpeedMmPerSecond:0.02,speedLimitMmPerSecond:0.1,totalPointSpeedLimitMmPerSecond:0.5,timeoutSeconds:90.0,
+                contactThresholdN:0.05,restGapLimitMm:0.01,commandSpeedMmPerSecond:0.02,speedLimitMmPerSecond:0.1,totalPointSpeedLimitMmPerSecond:0.5,timeoutSeconds:90.0,
                 numericalPenetrationLimitMm:0.001,stableSamples:10,simulationOnly:true,hardwareQualified:false};
             }
             var guardedEdges:Array<Int> = [],exitFailure:Null<String> = null,exitFailed=-1;

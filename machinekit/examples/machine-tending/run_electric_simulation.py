@@ -60,8 +60,8 @@ def main():
     args = parser.parse_args()
     if (args.gripper_check or args.servo_check or args.withdraw_smoke or args.placement_smoke or args.seat_settling_check or args.seat_yaw_clamp_check or args.locating_smoke or args.tray_placement_smoke or args.vise_pickup_smoke) and args.deterministic:
         parser.error("the physical adapter checks require MuJoCo")
-    if args.locating_offset_check and args.locating_smoke != 'b':
-        parser.error("the grasp-offset regression requires --locating-smoke b")
+    if args.locating_offset_check and args.locating_smoke is None:
+        parser.error("the grasp-offset regression requires --locating-smoke a or b")
     if (args.locating_smoke or args.seat_yaw_clamp_check or args.tray_placement_smoke or args.vise_pickup_smoke) and not args.clearance_first:
         parser.error("the locating and yaw/clamp checks require --clearance-first")
     native = REPO / 'app/build/host/native/app'

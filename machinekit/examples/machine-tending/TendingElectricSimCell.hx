@@ -409,14 +409,19 @@ class TendingElectricSimCell {
       if(held)peakHeldPoint=Math.max(peakHeldPoint,pointSpeed);else peakApproachClosing=Math.max(peakApproachClosing,speed);
       var stockTravel=-((body.pose.x-stockStart.x)*axis.x+(body.pose.y-stockStart.y)*axis.y+(body.pose.z-stockStart.z)*axis.z)*1000;
       if(Math.max(pointSpeed,cast observed.speedMmPerSecond)>0.001)rest=false;
-      action.observe(0.01,Math.max(0,Math.max(travel,stockTravel)),observed.contacts,force,observed.penetrationMm,speed,rest,pointSpeed);
+      var gap:Null<Float> = null;
+      if(Reflect.hasField(policy,"restGapLimitMm") && (held || force>=policy.contactThresholdN)) {
+        if(expected.length!=1 || !fixtures.exists(expected[0]))throw "Touch-and-rest locating needs its physical stop";
+        gap=TendingGraspRegistration.observedGapMm(harness.simulation,object,cast fixtures.get(expected[0]));
+      }
+      action.observe(0.01,Math.max(0,Math.max(travel,stockTravel)),observed.contacts,force,observed.penetrationMm,speed,rest,pointSpeed,gap);
       if(action.stopped){
         observations.push({caseReference:profile.caseReference,side:sideOf(profile),slot:slot,time:harness.simulation.simulationTime(),travelMm:travel,
           forceN:force,totalForceN:totalForce,maximumContactForceN:maximumContactForce,summedContactMagnitudesN:sumContactMagnitudes,penetrationMm:observed.penetrationMm,
           stockPointSpeedBoundMmPerSecond:pointSpeed,closingPointSpeedBoundMmPerSecond:closingSpeed,flangeSpeedMmPerSecond:observed.speedMmPerSecond,
           measuredClosingSpeedLimitMmPerSecond:policy.speedLimitMmPerSecond,
           totalPointSpeedLimitMmPerSecond:policy.totalPointSpeedLimitMmPerSecond,commandSpeedMmPerSecond:commandSpeed,
-          failure:action.failure,simulationOnly:true});
+          observedStopGapMm:gap,failure:action.failure,simulationOnly:true});
         driver.stopAndHold();throw action.failure;
       }
       if(action.holding && !held){driver.holdAtContact();held=true;}
@@ -428,7 +433,7 @@ class TendingElectricSimCell {
         driver.minimumMotionSeconds=0;stoppedSearches.set(profile.caseReference,{samples:returnSamples,limits:policy});
         observations.push({caseReference:profile.caseReference,side:sideOf(profile),slot:slot,time:harness.simulation.simulationTime(),travelMm:travel,
           forceN:force,totalForceN:totalForce,maximumContactForceN:maximumContactForce,summedContactMagnitudesN:sumContactMagnitudes,penetrationMm:observed.penetrationMm,stockPointSpeedBoundMmPerSecond:pointSpeed,
-          stableSamples:policy.stableSamples,policy:policy,
+          observedStopGapMm:gap,stableSamples:policy.stableSamples,policy:policy,
           peakApproachClosingSpeedMmPerSecond:peakApproachClosing,peakHeldPointSpeedMmPerSecond:peakHeldPoint,
           peakTotalPointSpeedMmPerSecond:peakTotalPoint,
           joints:driver.joints(),pose:harness.simulation.objectPose(object),simulationOnly:true});return;

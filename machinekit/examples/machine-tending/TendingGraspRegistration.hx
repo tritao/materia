@@ -45,6 +45,23 @@ class TendingGraspRegistration {
       translationMm:[(stock.x-nominal.x)*1000,(stock.y-nominal.y)*1000,(stock.z-nominal.z)*1000],
       poseSource:"simulation observation; hardware sensing uncommissioned",hardwareQualified:false};
   }
+  /** Uninflated closest hull distance at observed poses, with no simulation mutation. */
+  public static function observedGapMm(sim:Simulation,a:SimObject,b:SimObject):Float {
+    var world=new NativeCollisionWorld();
+    try {
+      var ba=world.addBody(0),bb=world.addBody(1),identity=new CollisionPose(0,0,0,0,0,0,1);
+      world.setBodyPose(ba,pose(objectFrame(sim,a)));world.setBodyPose(bb,pose(objectFrame(sim,b)));
+      var aa=[for(vertices in pieces(a))world.add(ba,identity,Convex(vertices))];
+      var ab=[for(vertices in pieces(b))world.add(bb,identity,Convex(vertices))];
+      var pairs=[for(i in aa)for(j in ab)new collisionkit.CollisionPair(i,j,ba,bb)],minimum=1e100;
+      if(pairs.length==0)throw "Stop-gap query needs both physical hulls";
+      for(row in world.pairDistances(pairs)) {
+        if(!Math.isFinite(row.distance))throw "Stop-gap query is unproven";
+        minimum=Math.min(minimum,row.distance*1000);
+      }
+      world.dispose();return minimum;
+    } catch(error:Dynamic){world.dispose();throw error;}
+  }
   public static function solveWrist(scene:TendingElectricSimScene,sim:Simulation,target:AssemblyFrame,from:Array<Float>):Array<Float> {
     var base:cadbridge.AssemblySimulationBridge.AssemblyPartLink=cast scene.arm.partLinks.get("baseFlange");
     var relative=AssemblyFrames.compose(AssemblyFrames.inverse(physical(sim,base.link)),target);

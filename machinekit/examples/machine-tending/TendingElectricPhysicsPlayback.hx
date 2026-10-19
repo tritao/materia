@@ -59,7 +59,7 @@ class TendingElectricPhysicsPlayback {
     if(traySide!=null && (!clearanceFirst || ["a","b"].indexOf(traySide)<0))throw "Tray placement check requires a clearance-first gripper side";
     var locatingSide:Null<String> =null;
     for(arg in Sys.args())if(StringTools.startsWith(arg,"--locating-smoke="))locatingSide=arg.substr("--locating-smoke=".length);
-    if(locatingOffsetCheck && locatingSide!="b")throw "The measured-grasp regression requires locating gripper B";
+    if(locatingOffsetCheck && locatingSide==null)throw "The measured-grasp regression requires a locating gripper side";
     if(locatingSide!=null && (!clearanceFirst || ["a","b"].indexOf(locatingSide)<0))throw "Locating check requires a clearance-first gripper side";
     var mode=smoke ? "withdrawal-smoke" : placementSmoke ? "placement-smoke" : settlingCheck ? "seat-settling-check" : "four-part-cycle";
     var reportFile=smoke ? "electric-physics-withdrawal-smoke.json" : placementSmoke ? "electric-physics-placement-smoke.json" : settlingCheck ? "electric-physics-seat-settling.json" : "electric-physics-playback.json";
@@ -67,7 +67,7 @@ class TendingElectricPhysicsPlayback {
     if(locatingSide!=null){mode="seeded-locating-smoke/"+locatingSide;reportFile="electric-physics-locating-smoke-"+locatingSide+".json";}
     if(pickupSide!=null){mode="seeded-vise-pickup-with-companion/"+pickupSide;reportFile="electric-physics-vise-pickup-"+pickupSide+".json";}
     if(traySide!=null){mode="seeded-tray-placement/"+traySide;reportFile="electric-physics-tray-placement-"+traySide+".json";}
-    if(locatingOffsetCheck){mode="seeded-locating-grasp-error/b";reportFile="electric-physics-locating-offset-b.json";}
+    if(locatingOffsetCheck){mode="seeded-locating-grasp-error/"+locatingSide;reportFile="electric-physics-locating-offset-"+locatingSide+".json";}
     if(clearanceFirst)reportFile=StringTools.replace(reportFile,".json","-clearance-first.json");
     var seed:Array<Float> = cast review.park;
     if(smoke) {
@@ -200,6 +200,9 @@ class TendingElectricPhysicsPlayback {
           var rx=-Math.sin(0.00183/2),ry=0.000009,rz=Math.sin(0.00056/2);
           setup=materia.assembly.AssemblyFrames.compose(setup,{x:0.0,y:0.0,z:-0.82,
             qx:rx,qy:ry,qz:rz,qw:Math.sqrt(1-rx*rx-ry*ry-rz*rz)});
+          if(locatingSide=="a")setup=materia.assembly.AssemblyFrames.compose(
+            {x:load.x+axis.x*clearance,y:load.y+axis.y*clearance,z:load.z+axis.z*clearance,qx:load.qx,qy:load.qy,qz:load.qz,qw:load.qw},
+            {x:-0.004,y:-0.0217,z:-0.8837,qx:0.00010727455,qy:0.00072687094,qz:0.00003848764,qw:0.99999972933});
         }
         var object:nativekit.sim.SimObject=cast cell.stock.get(slot);
         cell.harness.stop();object.teleport(TendingElectricSimCell.pose(setup));

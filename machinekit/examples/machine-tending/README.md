@@ -506,7 +506,12 @@ bounds. These are explicit, uncommissioned simulation limits.
 Positive axial load above 0.05 N requests a controlled hold on the first loaded
 contact sample. The closing-speed limit applies during free approach; the total
 point-speed ceiling also bounds elastic settling during contact and hold. Ten
-stationary, loaded samples below 0.001 mm/s admit release. The unused trajectory
+stationary samples below 0.001 mm/s admit release. Tray placement requires
+support load throughout those samples. For horizontal vise locating, a measured
+touch followed by an uninflated closest-hull gap of at most 0.01 mm admits
+stationary elastic recoil without resuming motion. This uses observed poses and
+compound physical hulls; proximity without a measured touch never qualifies.
+The unused trajectory
 is discarded; contact loss never resumes the search. Axial load, resultant force
 and each individual contact force are limited to 5 N. Resultants add world-axis
 vectors with the correct selected-body sign; opposing friction components are
@@ -556,7 +561,7 @@ synthetic overlapping query controls run in the yaw/clamp check without moving a
 physical object. Live contact penetration remains limited to 0.001 mm.
 
 ```sh
-python3 machinekit/examples/machine-tending/run_electric_simulation.py --clearance-first --locating-smoke a
+python3 machinekit/examples/machine-tending/run_electric_simulation.py --clearance-first --locating-smoke a --locating-offset-check
 python3 machinekit/examples/machine-tending/run_electric_simulation.py --clearance-first --locating-smoke b --locating-offset-check
 python3 machinekit/examples/machine-tending/run_electric_simulation.py --clearance-first --vise-pickup-smoke b
 python3 machinekit/examples/machine-tending/run_electric_simulation.py --clearance-first --tray-placement-smoke a
@@ -574,6 +579,15 @@ companion payload or the complete sequence. The separate vise-pickup check
 physically settles and clamps an offset blank, collects the companion through
 its tray route, then checks observed registration and loaded extraction. It
 excludes the primary blank's earlier loading and machining cycle.
+
+A later full run passed the corrected B extraction and stopped during the third
+load when the first light stop contact recoiled during position hold. The
+preserved report is `build/electric-physics-third-load-locating-baseline.json`.
+The horizontal touch-and-rest check addresses that distinction; it does not
+relax support-load, force, speed or penetration checks. The focused A regression
+using that low, tilted grasp passes locating, release, supported settling,
+withdrawal and the final full-pose clamp check, even after the contact load
+recoils to zero.
 
 The open-vise support check constrains the stock's bottom normal to 0.001 rad and
 requires positive load on both parallels, low velocity and the existing position
