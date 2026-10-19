@@ -38,7 +38,7 @@ Aggregate JSON SHA256:
 `e860a8a455a503f7c18bd2694abcfe07872815594ce4ac76293d3a81c7253b5b`.
 Physical modal acceptance awaits declared spindle/motor/axis excitation bands
 and joint uncertainty. The serial nine-pose nose/test-bar static sweep has
-started. Tool-context budgets and the casting-share/lightening decision remain
+passed center spindle-nose; test-bar and travel cases are running. Tool-context budgets and the casting-share/lightening decision remain
 pending; no `MillFrameLayout` geometry has been edited.
 
 ## Gate status
@@ -553,3 +553,39 @@ byte-identical input (SHA256 `dd462ed3a8206511d000a227a461245e1d0a1f17487d59d5fa
 Thus the earlier apparent third-level refinement needs are provisional too;
 serial mesh comparisons decide which levels are needed. Five serial poses
 currently pass on 40/30 mm meshes, including `xminus_yplus_zupper` at 2.41%.
+
+
+### Qualified serial center spindle-nose static gate
+
+The 40/30 mm spindle-nose reference passes both supports and all numerical,
+energy/sensitivity and thickness checks; maximum unit-response refinement change
+is **1.3792%**. Casting shares of the machine loop (no tool) are:
+
+| Support | X | Y | Z |
+| --- | --- | --- | --- |
+| Three-point | 17.37% | 14.27% | 14.16% |
+| Four springs | 15.84% | 14.27% | 14.16% |
+
+This is below the provisional 30% target at this pose/reference; test-bar and
+travel maxima still determine the geometry decision. Qualified report:
+`build/fem/nine-pose-serial/center/spindle-nose/report.json`, SHA256
+`77f90efc7757ae422a5d87fdf1c41b5ac3c825e853fced9d06511aba3e86890f`.
+
+The earlier RF calibration deficit was observed with unqualified four-thread
+execution. Serial hard-seat reactions recover the displacement-derived preloads
+within 7.06e-6 relative difference. The serial fast path uses that reaction estimate
+with the applied-nodal-load correction, accepts it only after the actual spring
+model passes gravity equilibrium and the original 1e-6 mm loaded-height gate,
+and deterministically falls back to the measured 4×4 foot flexibility if a gravity
+calibration gate fails. Unit-case numerical failures still stop the study.
+Each calibration's raw deck/result hashes and accepted/rejected method are recorded.
+
+The complete center comparison has **bit-identical compliance matrices** on all
+four mesh/support combinations. Maximum fast-path loaded height is 1.14e-7 mm;
+no fallback was needed. The preceding flexibility-only qualified run is preserved
+intact at `build/fem/center-nose-influence-qualified`, including source snapshots
+and an archive-location mapping. The raw reaction/spring comparison is under
+`build/fem/serial-reaction-calibration`. All **37 Python tests** pass, including
+the correction for a loaded constrained reference reporting RF=0. Modal analysis
+has no gravity/precompression; this subsequent static calibration change does
+not alter the already qualified modal decks or results.

@@ -1,6 +1,7 @@
 """Solve and compare bonded-frame compliance meshes with explicit idealized joints/supports."""
 
 import argparse
+import copy
 import importlib
 import json
 import math
@@ -18,7 +19,7 @@ from tet_fixture import verify
 from spring_fixture import verify as verify_springs
 from compliance_budget import budget, tool_case_packet
 from provenance import capture_sources
-from leveling import add_influence_steps, offsets_from_tables
+from leveling import add_influence_steps, offsets_from_tables, offsets_from_reactions
 from leveling_fixture import verify as verify_leveling
 from independent_static import run_independent
 
@@ -187,21 +188,47 @@ def main():
                 support_output.mkdir(parents=True,exist_ok=True)
                 print(f"Solving {support_name}; log: {support_output / 'solver.log'}",flush=True)
                 offsets = {}
+                leveling_check = None
                 stiffness = config["supportConfigurations"][support_name]["verticalSpringNPerMm"]
-                if stiffness:
-                    calibration = support_output / "leveling-influence"
+                used_flexibility = args.threads != 1
+                def calibrate(flexibility):
+                    calibration = support_output / ("leveling-influence" if flexibility else "leveling-reference")
                     calibration.mkdir(exist_ok=True)
+                    calibration_config = copy.deepcopy(config)
+                    if not flexibility:
+                        bound = calibration_config["supportConfigurations"][support_name]
+                        bound["verticalSpringNPerMm"] = 0
+                        for dofs in bound["constraints"].values():
+                            if 3 not in dofs: dofs.append(3)
                     def write_leveling():
-                        model = write_deck(mesh,packet,config,calibration,support_name,gravity_only=True)
-                        return add_influence_steps(calibration/"frame.inp",model)
+                        model = write_deck(mesh,packet,calibration_config,calibration,support_name,gravity_only=True)
+                        return add_influence_steps(calibration/"frame.inp",model) if flexibility else model
                     level_model = solve_case(calibration,write_leveling)
-                    level_tables = read_results((calibration/"frame.dat").read_text(),5)
-                    offsets, leveling_check = offsets_from_tables(level_model,level_tables)
-                model = solve_case(support_output,lambda:write_deck(mesh,packet,config,support_output,support_name,ground_offsets=offsets))
-                text=(support_output/"frame.dat").read_text()
-                tables=read_results(text,len(model["cases"]))
-                energy=read_energies(text,len(model["cases"]),model["energyGroups"])
-                solution=assess(packet,config,model,tables,energy)
+                    level_tables = read_results((calibration/"frame.dat").read_text(),5 if flexibility else 1)
+                    values, check = (offsets_from_tables(level_model,level_tables) if flexibility else
+                                     offsets_from_reactions(level_model,level_tables,stiffness))
+                    check.update(inputSha256=level_model["inputSha256"],resultSha256=digest(calibration/"frame.dat"),
+                                 independentLoadCases=level_model["independentLoadCases"])
+                    return values, check
+                if stiffness:
+                    offsets, leveling_check = calibrate(used_flexibility)
+                for attempt in range(2):
+                    model = solve_case(support_output,lambda:write_deck(mesh,packet,config,support_output,support_name,ground_offsets=offsets))
+                    text=(support_output/"frame.dat").read_text()
+                    tables=read_results(text,len(model["cases"]))
+                    energy=read_energies(text,len(model["cases"]),model["energyGroups"])
+                    try:
+                        solution=assess(packet,config,model,tables,energy)
+                    except ValueError as error:
+                        # A deterministic calibration fallback, never a numerical unit-case retry.
+                        gravity_failure = str(error).startswith(("Four-spring leveling height", "Force/moment balance failed for gravity", "Gravity requires a tensile foot reaction"))
+                        if not stiffness or used_flexibility or not gravity_failure: raise
+                        rejected = {"reason":str(error),"calibration":leveling_check}
+                        offsets, leveling_check = calibrate(True)
+                        leveling_check["rejectedReferenceCalibration"] = rejected
+                        used_flexibility = True
+                        continue
+                    break
                 supports[support_name]={"levelingCalibration":leveling_check if stiffness else None,"model":model,"solution":solution,"resultSha256":digest(support_output/"frame.dat")}
             result = {"sizeMm": size, "nodes": len(mesh["nodes"]), "elements": sum(len(v) for v in mesh["elements"].values()),
                       "meshSha256": mesh["meshSha256"], "supports": supports,

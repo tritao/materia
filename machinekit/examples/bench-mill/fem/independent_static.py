@@ -1,9 +1,7 @@
-"""Execute static load cases from undeformed state in separate CCX processes.
+"""Run each static load case from the undeformed state in its own CCX process.
 
-CCX's nonlinear rigid-body MPC bookkeeping can retain step history even with
-linear elastic materials and NLGEOM absent. Each input below contains one step;
-raw step times stay at 0–1. Only the derived concatenated DAT relabels case time. Raw decks/logs/
-DAT files are retained, hashed and cited; root DAT/log are explicit concatenations.
+Raw step times stay at 0–1. Only the derived concatenated DAT relabels case
+time. Raw decks, logs and DAT files are retained, hashed and cited.
 """
 import json
 from pathlib import Path

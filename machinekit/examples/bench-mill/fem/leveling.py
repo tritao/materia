@@ -1,8 +1,8 @@
-"""Level the four-spring model from its measured linear foot flexibility.
+"""Checked support preloads with a displacement-based calibration fallback.
 
-Rigid-reference RF output is not used to determine preload. The five-case deck
-keeps the actual spring-supported boundary conditions, then measures each foot's
-vertical response to unit forces at all four feet.
+Reference-force estimates are accepted only after the actual spring model
+passes its gravity equilibrium and loaded-height gates. The fallback measures
+all four foot flexibilities without relying on rigid-reference force output.
 """
 from frame_solver import read_results, solve_small
 from packet import digest
@@ -37,3 +37,16 @@ def offsets_from_tables(model, tables):
     return offsets, {'method': 'Five-case spring-model displacement influence solve; no rigid-reference RF calibration',
         'unleveledFootHeightsMm': dict(zip(stations, heights)), 'footFlexibilityMmPerN': flexibility,
         'symmetryRelativeError': symmetry, 'preloadsN': dict(zip(stations, preloads))}
+
+
+def offsets_from_reactions(model, tables, stiffness):
+    """Candidate preloads; acceptance still requires spring-model gravity gates."""
+    forces = {}
+    for station in model['supportConstraints']:
+        node = model['references']['foot-' + station]['translation']
+        forces[station] = tables[1, 'forces', 'SUPPORTS'][node][2] - model['gravityReferenceLoads'].get(str(node)+':3', 0)
+    if any(v <= 0 for v in forces.values()):
+        raise ValueError('Four-point leveling requires foot tension')
+    return {s:f/stiffness for s,f in forces.items()}, {
+        'method': 'Serial hard-seat reference forces minus applied nodal loads; accepted only after spring-model gravity equilibrium and loaded-height gates',
+        'preloadsN': forces}

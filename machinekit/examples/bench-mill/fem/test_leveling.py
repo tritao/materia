@@ -1,5 +1,5 @@
 import unittest
-from leveling import offsets_from_tables
+from leveling import offsets_from_tables, offsets_from_reactions
 
 
 class LevelingTests(unittest.TestCase):
@@ -17,3 +17,17 @@ class LevelingTests(unittest.TestCase):
         self.assertEqual(check['symmetryRelativeError'],0)
         tables[2,'displacements','SUPPORTS'][2]=(0,0,1)
         with self.assertRaisesRegex(ValueError,'reciprocity'):offsets_from_tables(model,tables)
+
+
+class ReferenceCalibrationTests(unittest.TestCase):
+    def test_direct_reference_load_is_not_a_support_reaction(self):
+        # A constrained loaded reference can report RF=0: the support still
+        # carries its 100 N applied gravity. The CLOAD correction is essential.
+        model = {'supportConstraints':{'a':[3]},'references':{'foot-a':{'translation':1}},
+                 'gravityReferenceLoads':{'1:3':-100}}
+        tables = {(1,'forces','SUPPORTS'):{1:(0,0,0)}}
+        offsets, check = offsets_from_reactions(model,tables,100000)
+        self.assertAlmostEqual(offsets['a'],.001)
+        self.assertEqual(check['preloadsN']['a'],100)
+        tables[1,'forces','SUPPORTS'][1]=(0,0,-101)
+        with self.assertRaisesRegex(ValueError,'tension'):offsets_from_reactions(model,tables,100000)
