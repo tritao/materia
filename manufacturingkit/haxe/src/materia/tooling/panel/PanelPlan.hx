@@ -44,6 +44,8 @@ typedef PanelPlan = {
     var operations:Array<PanelOperation>;
     var minimumLigament:Float;
     var contactFace:ContactFace;
+    /** Explicit contact-skin cuts; the consuming fixture/mold must classify each. */
+    var ?contactOpenings:Array<String>;
     var labelSide:MachiningSide;
     var labelX:Float;
     var labelY:Float;

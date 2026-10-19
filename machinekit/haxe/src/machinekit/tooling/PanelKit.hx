@@ -13,7 +13,7 @@ import machinekit.tooling.SweptRemoval.RemovalReport;
 import machinekit.tooling.SweptRemoval.RemovalMember;
 
 class PanelKit {
-    public static function assembly(plan:PanelAssemblyRecord,exploded:Bool=false):MachineAssembly {
+    public static function assembly(plan:PanelAssemblyRecord,exploded:Bool=false,material:String="birch plywood"):MachineAssembly {
         PanelAssemblyPlan.validate(plan);
         var assembly=new MachineAssembly();
         var separation=0.0;
@@ -32,7 +32,7 @@ class PanelKit {
         for(i in 0...plan.members.length) {
             var m=plan.members[i],pose=F.compose(F.identity(),m.pose);
             if(exploded){pose.x+=m.withdrawal.x*(i+1)*separation;pose.y+=m.withdrawal.y*(i+1)*separation;pose.z+=m.withdrawal.z*(i+1)*separation;}
-            assembly.addComponent(m.panel.id,ToolingPanel.fromPlan(m.panel),pose);
+            assembly.addComponent(m.panel.id,ToolingPanel.fromPlan(m.panel,material),pose);
         }
         if(!exploded)for(j in plan.joints) {
             assembly.addMemberConnector(j.fixedId,j.id+"-fixed",j.fixedFrame);

@@ -22,6 +22,7 @@ class MachineKitComponents {
 		registry.register(machinekit.structural.CastInsert.recipeType());
 		registry.register(machinekit.tooling.ToolingPanel.recipeType());
 		registry.register(machinekit.tooling.ToolingPin.recipeType());
+		registry.register(machinekit.tooling.ToolingBlock.recipeType());
 		return registry;
 	}
 

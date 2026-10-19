@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "machinekit-tooling-tests" },
 	"entry": "FoundationToolingTests",
-	"sourceRoots": ["src"],
+	"sourceRoots": ["src", "../../examples/box-mold"],
 	"dependencies": { "machinekit": { "path": "../.." } },
 	"target": "host",
 	"outputDir": "build"

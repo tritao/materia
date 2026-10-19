@@ -33,6 +33,8 @@ class MaterialLibrary {
     material("polycarbonate", "Polycarbonate", [0.58, 0.74, 0.79], 0.0, 0.2, 1200, "polycarbonate"),
     material("polyurethane", "Polyurethane", [0.26, 0.34, 0.37], 0.0, 0.65, 1200, "polyurethane PU"),
     material("plywood-birch", "Birch plywood", [0.70, 0.55, 0.34], 0.0, 0.72, 680, "birch plywood"),
+    toolingEPS(),
+    toolingBoard(),
     mineralCast(),
     material("cast-iron", "Cast iron", [0.35, 0.37, 0.39], 0.60, 0.55, 7200, "cast iron"),
     material("bronze", "Bronze", [0.55, 0.38, 0.20], 0.70, 0.38, 8800, "bronze"),
@@ -40,6 +42,16 @@ class MaterialLibrary {
     material("spring-steel", "Spring steel", [0.56, 0.58, 0.60], 0.75, 0.38, 7850, "spring steel"),
     sheetSteel(), sheetAluminium()
   ];
+
+  /** Display/BOM assumptions only; supplier lot data belongs in tooling stock records. */
+  static function toolingEPS():MaterialDef {
+    var result=material("tooling-eps","EPS tooling (nominal)",[0.93,0.94,0.95],0,0.95,20,"EPS tooling");
+    result.physical.propertiesAssumed=true;return result;
+  }
+  static function toolingBoard():MaterialDef {
+    var result=material("tooling-coated-board","Coated particleboard (nominal)",[0.85,0.83,0.73],0,0.65,650,"coated particleboard");
+    result.physical.propertiesAssumed=true;return result;
+  }
 
   /** Assumed epoxy-granite bulk inputs, for checks that explicitly consume them.
       eta=0.02 uses an assumed cast-iron reference eta=0.0025 (8x); not a modal result. */

@@ -1,0 +1,9 @@
+{
+  "version":1,
+  "package":{"name":"machinekit-box-mold-example"},
+  "entry":"BoxMoldPreview",
+  "sourceRoots":["."],
+  "dependencies":{"machinekit":{"path":"../.."}},
+  "target":"host",
+  "outputDir":"build/runner"
+}

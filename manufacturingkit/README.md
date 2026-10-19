@@ -128,3 +128,28 @@ pin recipes are registered in the default MachineKit registry.
 
 The [generic joinery example](../machinekit/examples/panel-tooling/README.md)
 generates the coupon, exact drawings and assembled/exploded preview scenes.
+
+
+### Single-pocket box mold
+
+`materia.tooling.casting.BoxMoldPlanner.plan(document)` builds the explicit
+orthogonal single-pocket template from a validated `ToolingDocument`: five
+panels, EPS/covering geometry, a ruled block cutting definition, an insert
+fixture and classified contact cuts. `BoxMoldCodec` version 1 stores the strict
+source document and resolved records and verifies regeneration on load. It
+rejects unknown versions and hand-edited generated records. Dimensions remain
+millimetres and profiles remain finished geometry, without cutter compensation.
+
+Panel codec version 2 persists `contactOpenings`. Typed constructors may omit the
+list for an intact skin; JSON must carry it. Naming an opening permits CAD to
+represent it but does not qualify it: the consuming mold must supply a matching
+`PenetrationPlan`. The box planner checks references and cutting definitions;
+MachineKit checks seal containment, contact coverage, source reconstruction and
+continuous swept blocking graphs. ManufacturingKit emits no CAD or drawing text.
+
+See [box-mold example](../machinekit/examples/box-mold/README.md). The initial
+supported template has one rectangular envelope, one fill-accessible EPS pocket
+and one bed-facing insert with an explicitly selected M6 fixing study. Reusable
+formers and nonorthogonal setups are rejected. Physical qualification remains
+pending, including a broad-area core restraint, accurate independent insert
+datums, anchorage, finishing stock, material/process evidence and handling.

@@ -153,5 +153,6 @@ class ToolingTests {
 			"evidence references alone never qualify process");
 		Sys.println('ToolingTests: $assertions assertions passed');
 		PanelTests.run();
+		BoxPlannerTests.run(fixture());
 	}
 }

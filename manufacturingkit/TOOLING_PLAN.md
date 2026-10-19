@@ -1,6 +1,6 @@
 # Reusable panel tooling and mineral-casting molds
 
-Status: phases 1 and 2 implemented. Mold generation and physical qualification remain pending.
+Status: phases 1–3 implemented. The single-pocket mold is a geometry review; full machine molds and physical qualification remain pending.
 
 ## Implementation progress
 
@@ -24,7 +24,23 @@ Status: phases 1 and 2 implemented. Mold generation and physical qualification r
   STEP/SVG/DXF/recipe records and a numbered fit coupon. Reports explicitly cover
   the panels after loose closure hardware is removed. Physical fit and loads
   remain unqualified.
-- [ ] Phase 3: single-pocket box mold, end to end.
+- [x] Phase 3: single-pocket box mold, end to end.
+  `BoxMoldPlanner` consumes the adapter/setup/recipe document and emits five
+  thickness-driven panels, a covered EPS block with ruled cutting definition,
+  a bed-facing insert fixture and nine classified contact cuts. Outer wall
+  tongues locate in blind bed sockets, behind continuous casting-contact lands.
+  `BoxMoldCodec` version 1 verifies complete deterministic regeneration; panel
+  codec version 2 requires named contact openings (unclassified mold cuts fail).
+  Registered block recipes, nominal EPS/coated-board display materials and
+  `machinekit/examples/box-mold/` provide assembled/exploded scenes, STEP,
+  shared-operation SVG/DXF drawings, reconstruction and ordered procedures.
+  Exact boundary coverage, sealing margins and assembly/demolding sweeps are
+  checked. Tests cover both 18.0/17.8 mm stock and two setup orientations,
+  source-CAD symmetric difference, persistence, bad holes/seals and trapped walls.
+  The template explicitly supports one rectangular envelope, one open-top core
+  and an M6 fixing study; unsupported geometry fails. Physical core restraint,
+  independent insert-datum accuracy, thread/seal qualification, anchorage,
+  finishing allowance, process loads and handling remain pending.
 - [ ] Phase 4: mill base mold review assembly.
 - [ ] Phase 5: assembly validation and fabrication package.
 - [ ] Phase 6: mill column and independent pedestal example.
@@ -604,3 +620,19 @@ editing UI are follow-on work. Preserve extension points for them without implem
 placeholder subsystems. The initial release succeeds when the shared libraries
 produce complete, reproducible and honestly validated mold kits for the two mill
 castings and the independent pedestal.
+
+
+Phase 3 review entry point (independent of the mill):
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/box-mold/haxeon.json
+python3 machinekit/examples/box-mold/render_review.py
+```
+
+Its generated review package stays under `machinekit/examples/box-mold/build/review/`.
+The optional renderer consumes exported CAD triangles; NumPy and Matplotlib are
+only preview dependencies. The neutral planner and codec retain the ProjectKit-only
+package boundary. Assembly installs the bed first, using its downward approach;
+demolding allows bed withdrawal downward after fixing release and EPS breakup.
+These are separate swept blocking graphs, not an assumed reversal of one physical
+process. Exploded offsets are for visual inspection and do not establish removal.

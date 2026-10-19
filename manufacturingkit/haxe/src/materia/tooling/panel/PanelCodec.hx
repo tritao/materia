@@ -16,7 +16,7 @@ import materia.tooling.panel.PanelPlan.PanelCurveKind;
 /** Strict exact local-part recipe, separate from occurrence placement and qualification. */
 class PanelCodec {
     public static function encode(panel:PanelPlan):String {
-        var text=ToolingCodec.canonical({format:"materia.tooling-panel",version:1,panel:snapshot(panel)})+"\n";
+        var text=ToolingCodec.canonical({format:"materia.tooling-panel",version:2,panel:snapshot(panel)})+"\n";
         if(haxe.io.Bytes.ofString(text).length>262144)throw "Panel record exceeds size limit";
         return text;
     }
@@ -24,8 +24,10 @@ class PanelCodec {
     public static function decode(text:String):PanelPlan {
         if(text==null || haxe.io.Bytes.ofString(text).length>262144)throw "Panel record exceeds size limit";
         var r:Dynamic=Json.parse(text);obj(r,["format","version","panel"]);
-        if(s(r,"format")!="materia.tooling-panel" || n(r,"version")!=1)throw "Unsupported panel format/version";
-        return read(Reflect.field(r,"panel"));
+        if(s(r,"format")!="materia.tooling-panel" || n(r,"version")!=2)throw "Unsupported panel format/version";
+        var panel=Reflect.field(r,"panel");
+        if(!Std.isOfType(Reflect.field(panel,"contactOpenings"),Array))throw "Missing/invalid panel contactOpenings";
+        return read(panel);
     }
     public static function snapshot(panel:PanelPlan):PanelPlan return read(panel);
     public static function side(v:String):MachiningSide return switch v {
@@ -39,7 +41,19 @@ class PanelCodec {
         case "rebate":Rebate;case "drill":Drill;default:throw "Unsupported panel operation kind";
     };
     static function read(r:Dynamic):PanelPlan {
-        obj(r,["id","revision","stock","operations","minimumLigament","contactFace","labelSide","labelX","labelY"]);
+        // Optional only at the typed constructor boundary; version 2 JSON always carries it.
+        if(Reflect.field(r,"contactOpenings")==null) {
+            var missingOpenings:Array<String> = [];
+            r=Reflect.copy(r);Reflect.setField(r,"contactOpenings",missingOpenings);
+        }
+        obj(r,["id","revision","stock","operations","minimumLigament","contactFace","contactOpenings","labelSide","labelX","labelY"]);
+        var openings:Array<String> = [];
+        for(v in arr(r,"contactOpenings",128)) {
+            if(!Std.isOfType(v,String))throw "Invalid contact opening";
+            var id:String=cast v;identifier(id);
+            if(openings.indexOf(id)>=0)throw "Duplicate contact opening";openings.push(id);
+        }
+        openings.sort(Reflect.compare);
         var raw=Reflect.field(r,"stock");
         obj(raw,["materialSpec","nominalThickness","measuredThickness","thicknessVariation","width","height","coatedFace","allowedRotations","directionConstraint"]);
         var rotations:Array<Int> = [];
@@ -55,7 +69,7 @@ class PanelCodec {
         var p:PanelPlan={id:s(r,"id"),revision:Std.int(revision),
             stock:{materialSpec:s(raw,"materialSpec"),nominalThickness:pos(raw,"nominalThickness"),measuredThickness:t,
                 thicknessVariation:variation,width:pos(raw,"width"),height:pos(raw,"height"),coatedFace:coating,allowedRotations:rotations,directionConstraint:direction},
-            operations:[],minimumLigament:pos(r,"minimumLigament"),contactFace:contact(s(r,"contactFace")),labelSide:side(s(r,"labelSide")),labelX:n(r,"labelX"),labelY:n(r,"labelY")};
+            operations:[],contactOpenings:openings,minimumLigament:pos(r,"minimumLigament"),contactFace:contact(s(r,"contactFace")),labelSide:side(s(r,"labelSide")),labelX:n(r,"labelX"),labelY:n(r,"labelY")};
         identifier(p.id);
         if(p.contactFace!=ContactFace.None && coating!=CoatedFace.Both && (p.contactFace:String)!=(coating:String))throw "Uncoated contact face";
         var ids=new Map<String,Bool>(),setups=new Map<String,String>();
@@ -81,7 +95,7 @@ class PanelCodec {
             if(op.depth>t || (op.through && op.depth!=t) || (!op.through && op.depth>=t))throw "Invalid cut depth/through";
             if((op.kind==OutsideProfile || op.kind==InsideProfile) && !op.through)throw "Profile operation must be through";
             if((op.kind==Pocket || op.kind==Rebate) && (op.through || t-op.depth<p.minimumLigament))throw "Pocket leaves insufficient shelf";
-            if(op.kind!=OutsideProfile && p.contactFace!=ContactFace.None && (op.through || (op.side:String)==(p.contactFace:String)))throw "Cut pierces contact skin";
+            if(op.kind!=OutsideProfile && p.contactFace!=ContactFace.None && (op.through || (op.side:String)==(p.contactFace:String)) && openings.indexOf(op.id)<0)throw "Cut pierces contact skin";
             if(op.reliefToolDiameter!=null) {
                 if(op.reliefToolDiameter!=op.toolDiameter)throw "Relief cutter must match operation tool";
                 for(seg in contour) {
@@ -101,6 +115,7 @@ class PanelCodec {
             }
             p.operations.push(op);
         }
+        for(id in openings)if(!ids.exists(id) || p.operations.filter(o->o.id==id && o.kind!=OutsideProfile).length!=1)throw "Unknown contact opening";
         p.operations.sort((a,b)->Reflect.compare(a.id,b.id));
         var outline=PanelContours.outside(p),b=PanelGeometry.bounds(outline);
         if(Math.abs(b.x)>1e-7 || Math.abs(b.y)>1e-7)throw "Panel blank origin must be lower-left";
