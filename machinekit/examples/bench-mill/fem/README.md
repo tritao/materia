@@ -7,8 +7,8 @@ springs. Numerical qualification does not establish machining accuracy.
 The serial nine-pose modal and static numerical gates pass. All 18 nose/bar
 static studies pass both support bounds and two resolved quadratic mesh levels.
 Maximum casting share is **18.792%** of the machine loop excluding
-the job-dependent tool, against the provisional **30%** target. Three center
-cutter contacts and their material budgets are pending. Physical modal
+the job-dependent tool, against the provisional **30%** target. All eight center
+tool-case budgets pass, including explicit steel/carbide cutter options. Physical modal
 acceptance remains open; no `MillFrameLayout` geometry has been edited.
 
 ## Current qualified serial follow-up
@@ -51,8 +51,7 @@ casting-motion peak and 66.2% of kinetic energy is in meshed solids, so this
 mode warrants a relative-path/operating-band review. Mode-shape ratios describe
 normalized eigenvectors. Declared machining/motor/axis bands and joint/material
 uncertainty remain required. See `build/fem/nine-pose-serial/excitation-context.md`. The serial nine-pose nose/test-bar static sweep has
-passed all eighteen decision-reference studies. Tool-context budgets remain
-pending. The modal operating-band review is open; no CAD geometry has changed.
+passed all eighteen decision-reference studies. All eight center tool-context budgets pass. The modal operating-band review is open; no CAD geometry has changed.
 
 ## Qualified center decision budgets
 
@@ -74,8 +73,8 @@ geometry decision uses the nine-pose maxima below and still requires modal
 operating-band review. No geometry change has been made. The bar report is
 `build/fem/nine-pose-serial/center/test-bar-20/report.json`, SHA256
 `dc99cc07ed78e313c401c93862acff37742efb31ca631a0a7c2d7d27bba85cc7`.
-All eighteen travel/reference static studies now pass. Contextual cutter budgets will reuse their
-three center contact solutions for steel/carbide variants after the travel sweep.
+All eighteen travel/reference static studies now pass. Contextual cutter budgets reuse their three center contact solutions for
+steel/carbide variants; the qualified results appear below.
 
 
 ## Qualified nine-pose static gate
@@ -103,6 +102,35 @@ element-group energy/sensitivity checks at every pose.
 Aggregate: `build/fem/nine-pose-serial/report.json`; SHA256 `b84c5ab338a8868008aa99cd280e25730a8a426b9d0b50821f9732082f8c7164`.
 The ~132.75 Hz corner mode and missing declared operating bands still prevent
 a claim of physical modal acceptance or selection of a lightened design.
+
+## Qualified tool-case budget gate
+
+Center pose; casting shares use the machine loop excluding the job-dependent
+tool. Only spindle-nose and test-bar rows govern the casting decision.
+
+| Case | Support | Casting X/Y/Z | Full-loop worst ±500 N | Machine-only worst ±500 N |
+| --- | --- | --- | --- | --- |
+| spindle-nose | soft-three-point | 17.37%/14.27%/14.16% | 112.464 µm | 112.464 µm |
+| spindle-nose | stiff-four-springs | 15.84%/14.27%/14.16% | 112.045 µm | 112.045 µm |
+| test-bar-20 | soft-three-point | 14.23%/10.48%/13.26% | 132.064 µm | 123.490 µm |
+| test-bar-20 | stiff-four-springs | 13.08%/10.48%/13.26% | 131.684 µm | 123.117 µm |
+| cutter-6-steel | soft-three-point | 12.36%/8.73%/13.22% | 411.765 µm | 135.171 µm |
+| cutter-6-steel | stiff-four-springs | 11.39%/8.73%/13.22% | 411.365 µm | 134.809 µm |
+| cutter-6-carbide | soft-three-point | 12.36%/8.73%/13.22% | 230.412 µm | 135.171 µm |
+| cutter-6-carbide | stiff-four-springs | 11.39%/8.73%/13.22% | 230.024 µm | 134.809 µm |
+| cutter-10-steel | soft-three-point | 11.18%/7.67%/13.22% | 264.827 µm | 144.823 µm |
+| cutter-10-steel | stiff-four-springs | 10.32%/7.67%/13.22% | 264.451 µm | 144.470 µm |
+| cutter-10-carbide | soft-three-point | 11.18%/7.67%/13.22% | 186.309 µm | 144.823 µm |
+| cutter-10-carbide | stiff-four-springs | 10.32%/7.67%/13.22% | 185.944 µm | 144.470 µm |
+| cutter-16-steel | soft-three-point | 9.48%/6.22%/13.22% | 225.303 µm | 163.475 µm |
+| cutter-16-steel | stiff-four-springs | 8.78%/6.22%/13.22% | 224.954 µm | 163.136 µm |
+| cutter-16-carbide | soft-three-point | 9.48%/6.22%/13.22% | 184.979 µm | 163.475 µm |
+| cutter-16-carbide | stiff-four-springs | 8.78%/6.22%/13.22% | 184.635 µm | 163.136 µm |
+
+Component-by-component compliance and tool fractions, material/stick-out
+assumptions and FE group energies are retained in `build/fem/tool-cases-serial/report.md`.
+JSON SHA256: `a79a500edfca8ad5ae80e6c1c90309f211e2bac0c291c658f5170837bbe10035`.
+This is a conditional catalogue budget, not measured accuracy or modal acceptance.
 
 ## Conditional lightening parameter proposal
 
