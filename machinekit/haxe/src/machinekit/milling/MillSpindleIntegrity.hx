@@ -6,14 +6,23 @@ import machinekit.assembly.*;
 import machinekit.assembly.PosedParts.PartBox;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
+typedef MillSpindleXYEnvelope = {
+ final xHalfTravel:Float;
+ final yHalfTravel:Float;
+ final member:String->Bool;
+ final table:String->Bool;
+ final fixed:String->Bool;
+ final cuttingTarget:Null<String>;
+}
+
 private typedef SpindleAuditSolid = {id:String, part:Part, bounds:PartBox};
 
 /** Actual payload geometry and continuous fixed-structure sweeps. Nominal
  * threads and intended belt/tooth contact are named exclusions, not global skips. */
 class MillSpindleIntegrity {
-	public static function checkPayload(assembly:MachineAssembly, layout:MillZAxisLayout):Diagnostics {
+	public static function checkPayload(assembly:MachineAssembly, layout:MillZAxisLayout,?xyEnvelope:MillSpindleXYEnvelope):Diagnostics {
 		var cache = new PosedParts(), owned:Array<Part> = [], result:Diagnostics;
-		try result = run(assembly, layout, cache, owned) catch (error:Dynamic) {
+		try result = run(assembly, layout, cache, owned,xyEnvelope) catch (error:Dynamic) {
 			for (part in owned) if (!part.shape.isClosed()) part.close();
 			cache.close(); throw error;
 		}
@@ -44,9 +53,15 @@ class MillSpindleIntegrity {
 		envelope.close(); cache.close(); return out;
 	}
 
-	static function run(assembly:MachineAssembly, l:MillZAxisLayout, cache:PosedParts, owned:Array<Part>):Diagnostics {
+	static function run(assembly:MachineAssembly, l:MillZAxisLayout, cache:PosedParts, owned:Array<Part>,xyEnvelope:Null<MillSpindleXYEnvelope>):Diagnostics {
 		var out = new Diagnostics(), poses:Map<String,AssemblyFrame> = assembly.solvedPoses();
-		var xyLayout = new MillXYStageLayout(l.frame,l.spindleY,l.profile);
+		if(xyEnvelope==null) {
+			var xyLayout = new MillXYStageLayout(l.frame,l.spindleY,l.profile);
+			xyEnvelope={xHalfTravel:xyLayout.xHalfTravel,yHalfTravel:xyLayout.yHalfTravel,
+			 member:id -> StringTools.startsWith(id,"xyStage/"),
+			 table:id -> MillXYStageIntegrity.tableMember(id.substr(8)),
+			 fixed:id -> MillXYStageIntegrity.yFixed(id.substr(8)),cuttingTarget:null};
+		}
 		var payload:Array<SpindleAuditSolid> = [], fixed:Array<SpindleAuditSolid> = [],
 			head:Array<SpindleAuditSolid> = [], xy:Array<SpindleAuditSolid> = [];
 		function keep(id:String,part:Part):SpindleAuditSolid {
@@ -60,10 +75,10 @@ class MillSpindleIntegrity {
 			else if (StringTools.startsWith(id,"zAxis/")) {
 				var row = keep(id,cache.posed(member.component,poses.get(id)));
 				if (MillZAxis.isTranslating(id.substr(6))) head.push(row); else fixed.push(row);
-			} else if (StringTools.startsWith(id,"xyStage/")) {
+			} else if (xyEnvelope.member(id)) {
 				var b = cache.box(member.component,poses.get(id)), localId = id.substr(8);
-				var dx = MillXYStageIntegrity.tableMember(localId) ? 2*xyLayout.xHalfTravel : 0.0;
-				var dy = MillXYStageIntegrity.yFixed(localId) ? 0.0 : 2*xyLayout.yHalfTravel;
+				var dx = xyEnvelope.table(id) ? 2*xyEnvelope.xHalfTravel : 0.0;
+				var dy = xyEnvelope.fixed(id) ? 0.0 : 2*xyEnvelope.yHalfTravel;
 				xy.push(keep(id,Part.box(b.maxX-b.minX+dx,b.maxY-b.minY+dy,b.maxZ-b.minZ)
 					.translated(new Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ))));
 			}
@@ -90,7 +105,7 @@ class MillSpindleIntegrity {
 				.translated(new Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ+l.lower));
 			var sweep=keep(member.id,swept);
 			for (other in fixed) noOverlap(out,sweep,other,'spindle sweep ${member.id}/${other.id}');
-			for (other in xy) noOverlap(out,sweep,other,'XYZ payload sweep ${member.id}/${other.id}');
+			for (other in xy) if(member.id!="tool"||other.id!=xyEnvelope.cuttingTarget) noOverlap(out,sweep,other,'XYZ payload sweep ${member.id}/${other.id}');
 		}
 		return out;
 	}

@@ -9,29 +9,7 @@ import materia.project.SceneArtifact;
 
 /** Selected Y drive in the real mill frame and XY stage, including the existing X return drive. */
 class MillYServoChecks {
- public static function preview():haxe.io.Bytes {
-  var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=new HiwinHgh15ca(),z=MillFramePreview.zLayout(reference,f,guide);
-  var l=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,true),frame=new MillFrame(f,z,l),stage=new MillXYStage(l);
-  var assembly=new MachineAssembly();assembly.include("frame",frame);assembly.include("xyStage",stage);
-  var poses:Map<String,AssemblyFrame> = frame.solvedPoses();
-  assembly.addMemberConnector("frame/base/driveYFixed","stageSeat",F.compose(F.inverse(poses.get("base/driveYFixed")),stage.zeroPose("fixedPedestalY")));
-  assembly.addMemberConnector("xyStage/fixedPedestalY","frameSeat",F.identity());
-  assembly.addMate("y-drive-on-frame","fixed","frame/base/driveYFixed","stageSeat","xyStage/fixedPedestalY","frameSeat");
-  var model=new AssemblyModel("mm");assembly.addTo(model,"");
-  var parts:Array<materia.project.SceneArtifact.SceneArtifactPart> = [];
-  for(m in assembly.components()){
-   var geometry=m.component.geometry(),mass:MassProperties;
-   if((Std.isOfType(m.component,HzMotionComponent)&&m.id=="xyStage/floatingBearingY")||Std.isOfType(m.component,HiwinHgh15ca)){
-    var physical=geometry.massProperties();
-    mass=new MassProperties(physical.volume*1e-9*7850,physical.centerOfMass,machinekit.component.MassProperties.MassSource.Computed(Preview));
-   }else mass=m.component.massProperties();
-   parts.push(AssemblyPreview.part(m.id,m.component.description,geometry,m.component.materialId,null,mass));
-  }
-  return SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:parts,assemblyDefinition:model.definition("mill-selected-y-drive"),
-   recipeDiagnostics:["Selected Leadshine/HZMotion Y drive in the mechanical mill frame. BF12 installed ring is a nominal DIN471 envelope.",
-   "BF12 and detailed HGH15CA masses: preview uses steel-volume estimates only; excluded from sizing. Y drive stiffness is unspecified; lead is kinematic only.",
-   "Coupling remains a dimensional reference, with no selected supplier SKU. This is not a manufacturing release."]});
- }
+ public static function preview():haxe.io.Bytes return MillProject.small();
 
  static function check(ok:Bool,message:String):Void {if(!ok)throw message;}
  static function checkDetailedBlockSection():Void {

@@ -69,6 +69,22 @@ class MillFramePreview {
 	public static function concept(reference:BenchMill, frame:MillFrame, ?motorAdjustment:Float, ?drive:machinekit.milling.MillSpindleDrivePart):MachineAssembly {
 		var result = structure(frame);
 		var spindleLayout:MillZAxisLayout = frame.zAxis;
+		attachSpindle(reference,result,spindleLayout,motorAdjustment,drive);
+		if (frame.xyAxis == null) throw "Full mill concept needs XY steel drive seats";
+		var xy = new MillXYStage(frame.xyAxis);
+		result.include("xyStage", xy);
+		var framePoses:Map<String, AssemblyFrame> = frame.solvedPoses();
+		result.addMemberConnector("frame/base/driveYFixed", "stageSeat",
+			F.compose(F.inverse(framePoses.get("base/driveYFixed")), xy.zeroPose("fixedPedestalY")));
+		result.addMemberConnector("xyStage/fixedPedestalY", "frameSeat", F.identity());
+		result.addMate("xy-on-base", "fixed", "frame/base/driveYFixed", "stageSeat", "xyStage/fixedPedestalY", "frameSeat");
+
+		return result;
+	}
+
+	/** Complete shared spindle payload for both machine configurations. */
+	public static function attachSpindle(reference:BenchMill,result:MachineAssembly,spindleLayout:MillZAxisLayout,
+		?motorAdjustment:Float,?drive:machinekit.milling.MillSpindleDrivePart):Void {
 		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout,motorAdjustment,drive);
 		var spindleOrigin = spindleParts.gauge;
 		var tool = new machinekit.milling.FlatEndMill(new machinekit.component.ComponentValues().setNumber("diameter",reference.tool.diameter)
@@ -78,19 +94,10 @@ class MillFramePreview {
 		spindleParts.addMemberConnector("tool","seat",F.identity());
 		spindleParts.addMate("tool-in-holder","fixed","holder","toolSeat","tool","seat");
 		result.include("spindle", spindleParts);
-		if (frame.xyAxis == null) throw "Full mill concept needs XY steel drive seats";
-		var xy = new MillXYStage(frame.xyAxis);
-		result.include("xyStage", xy);
-		var framePoses:Map<String, AssemblyFrame> = frame.solvedPoses();
-		result.addMemberConnector("frame/base/driveYFixed", "stageSeat",
-			F.compose(F.inverse(framePoses.get("base/driveYFixed")), xy.zeroPose("fixedPedestalY")));
-		result.addMemberConnector("xyStage/fixedPedestalY", "frameSeat", F.identity());
-		result.addMate("xy-on-base", "fixed", "frame/base/driveYFixed", "stageSeat", "xyStage/fixedPedestalY", "frameSeat");
-		var axis = new MillZAxis(frame.zAxis);
+		var axis = new MillZAxis(spindleLayout);
 		result.addMemberConnector("zAxis/head", "spindlePayload", F.compose(F.inverse(axis.zeroPose("head")), spindleOrigin));
 		result.addMemberConnector("spindle/spindle", "headSeat", F.identity());
 		result.addMate("spindle-on-head", "fixed", "zAxis/head", "spindlePayload", "spindle/spindle", "headSeat");
-		return result;
 	}
 
 	static function writeServiceStudy(assembly:MachineAssembly, layout:MillZAxisLayout, directory:String):Void {

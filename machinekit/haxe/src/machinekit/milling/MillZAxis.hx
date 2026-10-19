@@ -66,28 +66,25 @@ class MillZAxis extends AxisBuilder {
 			var name = side < 0 ? "Left" : "Right";
 			var pose = F.compose(F.translation(side * f.zRailSpacing / 2, f.columnFront - l.block.spec.railHeight,
 				f.railPlane + f.zRailStart), railPose);
-			attach('rail$name', LinearRail.metric(l.profile, f.zRailLength), pose, "fixedMount");
+			attach('rail$name', l.rail, pose, "fixedMount");
 		}
 		carriage = new MillZCarriage(new ComponentValues().setNumber("width", l.carriageWidth).setNumber("height", l.carriageHeight)
 			.setNumber("thickness", l.carriageThickness).setNumber("nutReach", l.screwY - l.carriageBack)
 			.setNumber("nutCentreZ", l.carriageHeight / 2).setNumber("nutPlate", l.nutPlateThickness)
-			.setNumber("headBoltX", l.carriageWidth / 2 - 12)
+			.setNumber("headBoltX", l.headValues.number("boltX")).setNumber("headBoltZ", l.headValues.get("boltZ") == null ? 42 : l.headValues.number("boltZ"))
 			.setNumber("railSpacing", f.zRailSpacing).setNumber("blockSpan", l.blockSpan).setToken("profile", l.profile));
 		var blockPoses:Array<AssemblyFrame> = [];
 		for (side in [-1, 1]) for (span in [-l.blockSpan, l.blockSpan]) blockPoses.push(
 			F.compose(F.translation(side * f.zRailSpacing / 2, f.columnFront - l.block.spec.railHeight, l.headCentre + span), railPose));
 		slide({id: "z", lower: l.lower, upper: 0, initial: 0}, "railLeft", "blockLeftLower", l.block, blockPoses[0],
-			{x: 0, y: 0, z: 1}, blockPoses.slice(1));
+			{x: 0, y: 0, z: 1}, blockPoses.slice(1), l.overtravel);
 		attach("carriage", carriage, F.translation(0, l.carriageBack, l.headCentre - l.carriageHeight / 2), "blockLeftLower");
 		var names = ["blockLeftLower", "blockLeftUpper", "blockRightLower", "blockRightUpper"];
 		for (i in 1...names.length) attach(names[i], l.block, blockPoses[i], "carriage");
 		attach("nut", l.nut, down(0, l.screwY, l.headCentre + l.nut.bodyLength / 2), "carriage");
-		head = new MillZHead(new ComponentValues().setNumber("width", 180).setNumber("spindleDiameter",90).setBoolean("bt30Mounts",true).setBoolean("centeredMotor",true).setNumber("height", l.headHeight)
-			.setNumber("rootExtension", l.headRootExtension).setNumber("rearWidth", l.carriageWidth).setNumber("boltX", l.carriageWidth / 2 - 12)
-			.setNumber("reach", l.headBack - l.spindleY + Bt30Cartridge.DIAMETER / 2 + 10)
-			.setNumber("spindleReach", l.headBack - l.spindleY));
+		head = new MillZHead(l.headValues);
 		attach("head", head, F.translation(0, l.headBack, l.headBottom), "carriage");
-		for (side in [-1, 1]) for (row in [-1, 1]) attach('headBolt$side$row', SocketHeadCapScrew.metric("M6", 16),
+		for (side in [-1, 1]) for (row in [-1, 1]) attach('headBolt$side$row', SocketHeadCapScrew.metric("M6", l.headBoltLength),
 			F.fromRotationMatrix(side * head.parameterNumber("boltX"), l.headBack - head.parameterNumber("rearPlate") + MillZHead.COUNTERBORE_DEPTH,
 				l.headCentre + row * head.parameterNumber("boltZ"),
 				[1,0,0, 0,0,-1, 0,1,0]), "head");

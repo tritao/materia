@@ -1,20 +1,26 @@
 {
   "format": "materia.project",
   "version": 1,
-  "name": "Mill with selected Leadshine Y drive",
+  "name": "Mill — Small (shortcut)",
   "defaultEntrypoint": "mill-y-servo",
   "build": {
     "system": "haxeon",
-    "manifest": "haxeon.y-servo.json"
+    "manifest": "haxeon.json"
   },
   "entrypoints": {
     "mill-y-servo": {
       "kind": "cad-preview",
-      "module": "MillYServoChecks",
-      "function": "preview",
+      "module": "MillProject",
+      "function": "small",
       "cache": {
         "inputs": [
-          "MillYServoChecks.hx"
+          "MillProject.hx",
+          "MillFramePreview.hx",
+          "../../haxe/src/machinekit/milling/MillFrame.hx",
+          "../../haxe/src/machinekit/milling/MillXYStage.hx",
+          "../../haxe/src/machinekit/milling/MillZAxis.hx",
+          "../../haxe/src/machinekit/milling/MillZAxisLayout.hx",
+          "../../haxe/src/machinekit/milling/MillSpindleHead.hx"
         ]
       }
     }

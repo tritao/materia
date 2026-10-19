@@ -15,7 +15,8 @@ MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run --project machinekit/examples/be
 ```
 
 The run writes `build/y-servo/checks.json`, `xy-stage.assembly.json` and
-`mill-y-servo.mtrg` in this example. The preview includes the actual frame and XY
+`mill-y-servo.mtrg` in this example. The preview now delegates to the main project and includes the complete Z and
+spindle assemblies as well as the actual frame and XY
 stage with a fixed mating connection to the drive insert. Its BF12 and HGH15CA masses are
 explicit visualization estimates and is excluded from engineering sizing.
 

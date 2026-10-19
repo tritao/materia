@@ -32,6 +32,12 @@ class MillZAxisChecks {
 		var reference = new BenchMill(false, false), f = MillFramePreview.layout(reference);
 		var l = MillFramePreview.zLayout(reference, f), frame = new MillFrame(f, l, new MillXYStageLayout(f, l.spindleY, BenchMill.RAIL)), axis = new MillZAxis(l);
 		axis.validate(); frame.validate();
+		rejects(() -> new MillZAxisLayout(f,l.headBottom,l.headHeight,l.spindleY,l.lower,l.profile,null,l.crossDriveZ,
+			{carriageWidth:1}), "reject carriage narrower than guide footprint");
+		rejects(() -> new MillZAxisLayout(f,l.headBottom,l.headHeight,l.spindleY,l.lower,l.profile,null,l.crossDriveZ,
+			{headBoltLength:12}), "reject insufficient head bolt engagement");
+		rejects(() -> new MillZAxisLayout(f,l.headBottom,l.headHeight,l.spindleY,l.lower,l.profile,null,l.crossDriveZ,
+			{overtravelLimit:Math.NaN}), "reject nonfinite Z overtravel");
 		near(axis.axisOvertravel("z"), l.overtravel, "all four blocks determine guide overtravel");
 		var poses:Map<String, AssemblyFrame> = axis.solvedPoses();
 		near(pose(poses, "screw").x, 0, "screw centred between rails");
