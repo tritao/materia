@@ -20,6 +20,7 @@ import materia.assembly.AssemblyFrames;
  * two mounting locations and rail axis are exact interface data from the profile catalog. CAD
  * frame: the block is centred on z=0, with its rail-facing side at y=0. */
 @:allow(machinekit.motion.HiwinHgh15ca)
+@:allow(machinekit.motion.HgBlock)
 class LinearRailBlock extends MachineComponent {
 	public final spec:LinearRailProfileSpec;
 

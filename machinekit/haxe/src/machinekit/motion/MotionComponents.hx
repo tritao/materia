@@ -10,6 +10,12 @@ class MotionComponents {
 		registry.register(LinearRail.recipeType());
 		registry.register(LinearRailBlock.recipeType());
         registry.register(HiwinHgh15ca.referenceRecipeType());
+        registry.register(HgRail.referenceRecipeType());
+        registry.register(HgBlock.referenceRecipeType());
+        registry.register(VallderScrewSupport.referenceRecipeType());
+        registry.register(SfuNut.familyRecipeType());
+        registry.register(SfuDrawingScrew.drawingRecipeType());
+        registry.register(DsgNutHousing.familyRecipeType());
 		registry.register(NemaStepper.namedRecipeType());
 		registry.register(NemaStepper.genericRecipeType());
 		registry.register(ServoMotor.namedRecipeType());

@@ -20,6 +20,7 @@ import materia.assembly.AssemblyFrames;
 /** A cut length of profile rail. HGR15 preview includes the HGR15R running section
  * and bores; other profiles remain nominal. Mounting holes expose named connectors. CAD frame: the
  * rail cross-section is centred on x=0, spans y=-railHeight..0, and runs along +Z. */
+@:allow(machinekit.motion.HgRail)
 class LinearRail extends MachineComponent {
 	public final spec:LinearRailProfileSpec;
 	public final length:Float;

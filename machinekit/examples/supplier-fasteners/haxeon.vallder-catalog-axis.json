@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "configurable-axis-checks"
+  },
+  "entry": "VallderCatalogAxisChecks",
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/suppliers/configurable-axis-checks"
+}

@@ -9,6 +9,9 @@ from vallder import DEFAULT_OUTPUT, now, write_json
 from hardware import build as hardware_review
 from motor_mounts import build as motor_mount_review
 from sfu16 import build as sfu16_review
+from hg import build as hg_review
+from supports import build as supports_review
+from sfu_family import build as sfu_family_review
 
 
 def build(output):
@@ -23,20 +26,9 @@ def build(output):
         "type_id": m["type_id"], "values": m["values"], "required_inputs": [],
         "geometry_source": "generator", "compatibility": "review_required",
         "head_dimension_check": m["head_dimension_check"], "source_url": m["source_url"]} for m in fasteners]
-    # Rail-only SKU: length is a design input, not an invented supplier variant.
-    parent = next(p for p in catalog["products"] if p["supplier_product_id"] == 39276)
-    rail_row = next(row for table in parent["specification_tables"] for row in table if row and row[0] == "HGR_15")
-    rail_variants = [v for v in catalog["variants"] if v["parent_id"] == parent["supplier_product_id"] and v["sku"] == rail_row[-1]]
-    if len(rail_variants) != 1 or [rail_row[i] for i in (4,5,9,10)] != ["15", "15", "60", "20"]:
-        raise ValueError("HGR15 evidence changed; review binding")
-    rail = rail_variants[0]
-    recipes.append({"supplier_id": "vallder", "sku": rail["sku"], "supplier_product_id": rail["supplier_product_id"],
-        "parent_id": parent["supplier_product_id"], "type_id": "machinekit.motion.linear-rail",
-        "values": {"profile": "HGR15"}, "required_inputs": ["length"], "geometry_source": "generator",
-        "compatibility": "review_required", "source_url": parent["url"], "table_row": rail_row,
-        "limits": ["Default first hole is 20 mm from the end; custom/symmetrical cutting is not represented",
-                   "Cut length and cutting charges require a quote; per-metre price is not a per-piece price",
-                   "Generic running section is not a manufacturer-matched raceway"]})
+    hg = hg_review(catalog)
+    recipes.extend(hg["recipes"])
+    write_json(output / "hg.json", hg)
     hardware = hardware_review(catalog)
     recipes.extend(hardware["recipes"])
     write_json(output / "hardware.json", hardware)
@@ -79,12 +71,28 @@ def build(output):
     recipes.extend(motor_mounts["recipes"])
     sfu16 = sfu16_review(catalog, library)
     write_json(output / "sfu16.json", sfu16)
+    # Keep the established BF12 binding; the family recipe supplies the other 19 checked variants.
     recipes.extend(sfu16["recipes"])
+    supports = supports_review(catalog, library)
+    write_json(output / "supports.json", supports)
+    support_checks = {c["sha256"]: c for c in supports.get("interface_checks", [])}
+    for asset in library:
+        check = support_checks.get(asset["sha256"])
+        if check:
+            asset["mounting_bore_check"] = check
+            if check["mounting_pattern_passes"]:
+                asset["mounting_frame_status"] = "pinned_mounting_axes_checked"
+
+    bound_ids = {r["supplier_product_id"] for r in recipes}
+    recipes.extend(r for r in supports["recipes"] if r["supplier_product_id"] not in bound_ids)
+    sfu_family = sfu_family_review(catalog)
+    write_json(output / "sfu-family.json", sfu_family)
+    bound_ids = {r["supplier_product_id"] for r in recipes}
+    recipes.extend(r for r in sfu_family["recipes"] if r["supplier_product_id"] not in bound_ids)
     write_json(output / "recipes.json", {"schema_version": 1, "recipes": recipes})
     by_parent = {}
     for recipe in recipes:
-        if recipe["geometry_source"] == "generator":
-            by_parent.setdefault(recipe["parent_id"], []).append(recipe)
+        by_parent.setdefault(recipe["parent_id"], []).append(recipe)
     # BK/BF files use the established X-across/Y-up/Z-shaft reference frame.
     # Validate the base plane against h and envelope against B/H; do not infer bores from splines.
     support_interfaces = []
@@ -114,12 +122,13 @@ def build(output):
                     "base_plane_y_mm": -shaft_height, "base_plane_face_indices": [p["face"] for p in planes],
                     "width_comparison": {"table_mm": width, "cad_mm": dimensions[0], "matches": abs(width-dimensions[0])<0.02},
                     "height_comparison": {"table_mm": height, "cad_mm": dimensions[1], "matches": abs(height-dimensions[1])<0.02},
-                    "mounting_bores_status": "unverified", "shaft_fit_status": "unverified", "compatibility_verified": False}
+                    "mounting_bores_status": "cad_probe_passed" if support_checks.get(asset["sha256"], {}).get("mounting_pattern_passes") else "unverified",
+                    "shaft_fit_status": "unverified", "compatibility_verified": False}
                 support_interfaces.append(entry)
                 asset["interface_audit"] = entry
     write_json(output / "cad/library.json", {"schema_version": 1, "generated_at": now(), "assets": library})
-    write_json(output / "support-interface-review.json", {"scope": "Base-plane and envelope checks only; mounting bores and shaft fit unqualified",
-               "supports": support_interfaces})
+    write_json(output / "support-interface-review.json", {"scope": "Pinned mounting-axis bore probes plus BK/BF base planes/envelopes; axial seating and preload unqualified",
+               "supports": support_interfaces, "mounting_axis_checks": supports.get("interface_checks", [])})
     products = []
     for entry in audit["products"]:
         product_id = entry["supplier_product_id"]
@@ -128,9 +137,13 @@ def build(output):
         family_recipes = by_parent.get(product_id, [])
         drawing_section = ready_sections.get(product_id)
         gaps = []
-        if family_recipes or drawing_section:
+        generator_recipes = [r for r in family_recipes if r["geometry_source"] == "generator"]
+        if generator_recipes or drawing_section:
             status = "generator_available"
             gaps.append("Supplier compatibility remains unverified")
+        elif family_recipes:
+            status = "supplier_component_available"
+            gaps.append("Named recipe interfaces available; remaining fit and mechanical checks are recipe-specific")
         elif valid:
             status = "supplier_geometry_available"
             gaps.append("Mounting frames and mechanical properties need qualification")
@@ -144,7 +157,7 @@ def build(output):
         if drawing_section:
             gaps.append("Drawing-derived section: explicit cut length and material/alloy qualification required; price per metre needs a quote")
         if product_id in (2348, 2378):
-            gaps.append("Existing ScrewSupportUnit assumes BK12 height 43 / BF12 bore 12; table states BK12 height 42 / BF12 bore 10")
+            gaps.append("Legacy generic ScrewSupportUnit is not a supplier binding: use explicit supplier recipes where available; table/CAD conflicts are recorded per variant")
         if assets and not valid:
             gaps.append("See native validation results before using linked CAD")
         variants = [v for v in catalog["variants"] if v["parent_id"] == product_id]
@@ -153,11 +166,17 @@ def build(output):
             recipe = next((r for r in family_recipes if r["supplier_product_id"] == variant["supplier_product_id"]), None)
             matched_assets = sorted({a["asset_id"] for a in valid if variant["supplier_product_id"] in a["variant_ids"]})
             variant_coverage.append({"id": variant["supplier_product_id"], "sku": variant["sku"],
-                "geometry_source": "generator" if recipe else "supplier_cad" if matched_assets else "unresolved",
+                "geometry_source": recipe["geometry_source"] if recipe else "supplier_cad" if matched_assets else "unresolved",
+                "component_type_id": recipe["type_id"] if recipe else None,
+                "recipe_available": recipe is not None,
+                "interface_status": recipe.get("interface_status", "recipe_defined") if recipe else "unverified",
+                "recipe_values": recipe["values"] if recipe else None,
+                "required_inputs": recipe["required_inputs"] if recipe else [],
                 "asset_ids": matched_assets, "compatibility_verified": False})
         products.append({"product_id": product_id, "name": entry["name"], "url": entry["url"], "status": status,
-            "generator_skus": [r["sku"] for r in family_recipes] + ([drawing_section["sku"]] if drawing_section else []),
-            "geometry_source": ("tslot_section_variant" if drawing_section.get("system_id") else "drawing_extrusion") if drawing_section else "generator" if family_recipes else None,
+            "generator_skus": [r["sku"] for r in generator_recipes] + ([drawing_section["sku"]] if drawing_section else []),
+            "geometry_source": ("tslot_section_variant" if drawing_section.get("system_id") else "drawing_extrusion") if drawing_section else "generator" if generator_recipes else family_recipes[0]["geometry_source"] if family_recipes else None,
+            "component_skus": [r["sku"] for r in family_recipes],
             "profile_family_id": drawing_section.get("family_id") if drawing_section else None,
             "validated_asset_ids": sorted({a["asset_id"] for a in valid}),
             "candidate_families": entry["candidate_families"], "gaps": gaps, "variants": variant_coverage})
@@ -168,6 +187,7 @@ def build(output):
         "validated_unique_assets": len({a["asset_id"] for a in library if a["usable_geometry"]}),
         "registered_generator_bindings": sum(r["geometry_source"] == "generator" for r in recipes),
         "registered_supplier_cad_bindings": sum(r["geometry_source"] == "supplier_cad" for r in recipes),
+        "registered_reference_cad_bindings": sum(r["geometry_source"] == "reference_cad" for r in recipes),
         "validated_drawing_generators": len(ready_sections),
         "shared_tslot_families": len({s["family_id"] for s in ready_sections.values() if s.get("system_id")}),
         "all_inventory_complete": inventory["complete"] and validation["complete"] and

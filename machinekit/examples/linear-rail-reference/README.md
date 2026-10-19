@@ -1,5 +1,7 @@
 # HGR15R / HGH15CA supplier reference
 
+For the expanded HG, BK/BF/FK/FF, SFU and DSG recipes, see [motion families](FAMILIES.md).
+
 This example compares nominal envelopes, a generated HGR15R running profile, and public supplier CAD.
 Download the pinned references, then run the CAD checks and export:
 
