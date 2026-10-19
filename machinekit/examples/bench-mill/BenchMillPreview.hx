@@ -22,10 +22,10 @@ class BenchMillPreview {
 		var part = block.geometry(ComponentDetail.Preview);
 		var program = BearingBlockJob.program(mill, block, part);
 		scene.parts.push(AssemblyPreview.part(TARGET_PART, "Finished bearing block", part, block.materialId, 0.002));
-		scene.machining = {program: program, axes: ["x", "y", "z"], spindle: "spindle", channelScope: "",
+		scene.machining = {mission: MillMachiningSetup.MISSION, program: program, axes: ["x", "y", "z"], spindle: "spindle", channelScope: "",
 			workOffset: [for (v in mill.workOffset()) v / 1000],
 			tools: [for (tool in mill.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
-			stocks: ["stock"], toolPart: "tool", loadedTool: 1, target: TARGET_PART, loop: true,
+			stocks: ["stock"], toolPart: "tool", loadedTool: 1, target: TARGET_PART, loop: false,
 			controller: {stepTickHz: BenchMill.STEP_TICK_HZ}};
 		return SceneArtifact.encode(scene);
 	}
@@ -40,10 +40,10 @@ class BenchMillPreview {
 		var part = block.geometry(ComponentDetail.Preview);
 		var program = BearingBlockJob.program(mill, block, part, cell.loadPosition);
 		scene.parts.push(AssemblyPreview.part(TARGET_PART, "Finished bearing block", part, block.materialId, 0.002));
-		scene.machining = {program: program, axes: ["mill/x", "mill/y", "mill/z"], spindle: "mill/spindle", channelScope: "mill",
+		scene.machining = {mission: MillMachiningSetup.MISSION, program: program, axes: ["mill/x", "mill/y", "mill/z"], spindle: "mill/spindle", channelScope: "mill",
 			workOffset: [for (v in mill.workOffset()) v / 1000],
 			tools: [for (tool in mill.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
-			stocks: ["mill/stock"], toolPart: "mill/tool", loadedTool: 1, target: TARGET_PART, loop: true,
+			stocks: ["mill/stock"], toolPart: "mill/tool", loadedTool: 1, target: TARGET_PART, loop: false,
 			controller: {stepTickHz: BenchMill.STEP_TICK_HZ}, controllerId: "cncController"};
 		return SceneArtifact.encode(scene);
 	}

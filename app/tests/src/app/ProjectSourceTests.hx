@@ -4338,8 +4338,9 @@ class ProjectSourceTests {
 
   /** The enclosure's pressure-clamped vise holds the bearing-block job. */
   static function checkEnclosedMillProject(root:String):Void {
-    var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.enclosed.project.json");
-    var generated = MateriaProjectRunner.loadProject(manifest);
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.bench.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest,null,null,"enclosed");
+    check(generated.projectVariant == "enclosed", "enclosed bench mill loads from its own project");
     check(generated.controllers != null && generated.controllers.length == 1 &&
       generated.controllers[0].id == "cncController", "enclosed mill exports its wired CNC controller");
     var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
@@ -4356,7 +4357,9 @@ class ProjectSourceTests {
       'assembly bridge keeps the 32 mm vise cylinder force in newtons, got $viseEffort');
     check([for (joint in model.joints) if (joint.type == JointType.Prismatic) joint].length == 5,
       "enclosed project retains three mill axes, door and jaw");
-    check(generated.cncJob != null, "enclosed mill exports its clamped bearing-block job");
+    check(generated.cncJob != null && generated.cncJob.mission != null &&
+      generated.cncJob.mission.id == "bearing-block" && !generated.cncJob.loop,
+      "enclosed mill exports a named, finite bearing-block mission");
     var state = new AssemblyState(definition);
     var opening = state.worldConnector("chipTray", "doorOpening");
     var datum = state.worldConnector("mill/vise/body", "datum");

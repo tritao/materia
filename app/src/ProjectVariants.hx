@@ -8,7 +8,7 @@ typedef ProjectVariant = {
   var label:String;
   var summary:String;
   var entrypoint:String;
-  /** Configuration, study and demo replace a project scene; job is the legacy schema. */
+  /** Configuration and study replace a project scene; job is the legacy schema. */
   var kind:String;
 }
 
@@ -27,7 +27,10 @@ class ProjectVariants {
     for(value in (cast raw:Array<Dynamic>)) {
       var id=text(value,"id"),entry=text(value,"entrypoint"),kind=text(value,"kind");
       if(seen.exists(id))throw 'Duplicate project variant "$id"';
-      if(["configuration","study","demo"].indexOf(kind)<0)throw 'Unknown project variant kind "$kind"';
+      // Older demos selected whole scenes. Preserve their IDs as configurations;
+      // runtime tasks belong to the scene's missions, not a separate chooser.
+      if(kind=="demo")kind="configuration";
+      if(["configuration","study"].indexOf(kind)<0)throw 'Unknown project variant kind "$kind"';
       if(entries==null||Reflect.field(entries,entry)==null)throw 'Unknown variant entrypoint "$entry"';
       seen.set(id,true);
       result.push({id:id,label:text(value,"label"),summary:text(value,"summary"),entrypoint:entry,kind:kind});

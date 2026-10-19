@@ -33,7 +33,8 @@ class ProjectVariantsTests {
   Sys.setCwd(haxe.io.Path.directory(haxe.io.Path.directory(haxe.io.Path.directory(mainFile))));
   var source=app.editor.WorkerAssetPath.resolve("app/tests/fixtures/project-variants/materia.project.json");
   var root:Dynamic=Json.parse(File.getContent(source));
-  check(ProjectVariants.decode(root).length==4,"configuration/study/demo variants decode");
+  check(ProjectVariants.decode(root).length==4,"variants decode with legacy scene compatibility");
+  check(ProjectVariants.decode(root).filter(v->v.id=="demo")[0].kind=="configuration","legacy demo scenes migrate to configurations");
   check(ProjectVariants.entrypoint(root,null)=="small","default variant resolves");
   check(ProjectSourceLoader.executionRequirement(source,"large").entrypoint=="large","loader resolves variant independently of missions");
   rejects(()->ProjectVariants.selected(root,"unknown"),"unknown variant rejected");
@@ -49,7 +50,14 @@ class ProjectVariantsTests {
   rejects(()->ProjectVariants.decode(bad),"missing entrypoint rejected");
   check(ProjectVariants.entrypoint({defaultEntrypoint:"old"},null)=="old","projects without variants remain valid");
   var mill:Dynamic=Json.parse(File.getContent(app.editor.WorkerAssetPath.resolve("machinekit/examples/bench-mill/materia.project.json")));
-  check(ProjectVariants.decode(mill).filter(v->v.kind=="configuration").length==2,"mill exposes two actual configurations");
+  check(ProjectVariants.decode(mill).filter(v->v.kind=="configuration").length==2,"mill exposes only Small and Compact VMC configurations");
+  check(ProjectVariants.decode(mill).filter(v->v.kind=="demo").length==0,"mill has no demo scene category");
+  check(ProjectVariants.decode(mill).filter(v->v.id=="enclosed").length==0,"enclosed bench mill is outside the Small/VMC chooser");
+  var bench:Dynamic=Json.parse(File.getContent(app.editor.WorkerAssetPath.resolve("machinekit/examples/bench-mill/materia.bench.project.json")));
+  var benchVariants=ProjectVariants.decode(bench);
+  check(benchVariants.length==2&&benchVariants[0].id=="bench"&&benchVariants[1].id=="enclosed","bench project owns open and enclosed machines");
+  check(ProjectVariants.entrypoint(bench,null)=="bench","bench project defaults to the bench mill");
+  rejects(()->ProjectVariants.selected(bench,"small"),"bench project cannot select the Small/VMC design");
   check(Reflect.field(mill,"jobs")==null,"mill no longer describes configurations as jobs");
 
   var fonts=haxeon.ui.FontCollection.create();fonts.add(app.editor.WorkerAssetPath.resolve("haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"));
@@ -61,7 +69,7 @@ class ProjectVariantsTests {
   var original=editor.session.document,smallGeometry=editor.scene.records()[0].width;
   var frame=new LayoutFrame(800,600);
   var ui=editor.ui.submit(editor.viewportWithControls(new Text("Scene"),800),frame);
-  check(find(ui,"Configuration")&&find(ui,"Study")&&find(ui,"Demo"),"project selector separates configuration/study/demo");
+  check(find(ui,"Configuration")&&find(ui,"Study")&&!find(ui,"Demo"),"project selector separates configurations and studies without a demo chooser");
   check(!find(ui,"Mission job"),"configuration UI has no mission-job selector");
   var mission=editor.ui.submit(new MissionPanel().build(editor.missionController,editor.appearance.theme.tokens),frame);
   check(!find(mission,"Configuration"),"mission panel does not manage project configurations");

@@ -3,27 +3,30 @@
 Use **`materia.project.json`** as the main project. Its `small` entrypoint is the
 Small configuration with the selected Y drive; `compact-vmc` is the Compact VMC
 layout with the same complete Z and spindle assemblies, including drawbar and
-pneumatic release. `spindle-drive` is the editable motor study. `legacy-machining`
-and `enclosed` entrypoints retain the older machining demos. Older project files remain
-compatibility shortcuts to this shared build, rather than independent designs.
+pneumatic release. `spindle-drive` is the editable motor study. The older bench
+mill and enclosed cell belong to their own project. Shared model code and build
+tooling remain in this directory.
 Run `haxeon.json` to check and generate `build/mill/small.mtrg` and `large.mtrg`.
 
 Open the source project and use the **Configuration** selector to choose **Small**
-or **Compact VMC**. Stop simulation before switching. Opening a generated `.mtrg`
-file gives a single scene and does not expose the project selector.
+or **Compact VMC**. Stop simulation before switching. Opening a generated `.mtrg` file gives a single scene and does not expose the project selector.
 
-Both configurations include **Machine bearing block**, a named CNC mission. Play
+Small and Compact VMC include **Machine bearing block**, a named CNC mission. Play
 runs the shared bearing-block program once; the Mission panel follows its actual
 CNC execution state and the CNC panel provides feed hold, resume and program
 inspection. Stock, toe clamps, work offset and effective tool length are derived
 from each configuration's table and BT30 spindle. The Compact VMC setup adds a
-riser where needed to reach the blank. The old `legacy-machining` entrypoint is
-retained for compatibility, but its duplicate demo is removed from the chooser.
-The enclosed cell remains a separate demo; its loader and pneumatic vise are not
-part of this shared standalone setup.
+riser where needed to reach the blank.
+Open **`materia.bench.project.json`** for the independent **Bench mill** project,
+with **Open bench mill** and **Enclosed cell** configurations. The enclosed cell
+adds its pneumatic vise and door. Its bearing-block program is also a named,
+single-pass mission. The legacy standalone entrypoint uses the same mission identity and finite execution.
+The Start page has separate **Mill** and **Bench mills** cards. The spindle-drive
+study belongs to the Small/VMC project. There is no Demo selector: configurations
+select hardware, studies select design setups, and the Mission panel presents the task loaded with the machine.
 
-These are **kinematic machining previews**: axis commands use explicit 20 mm/s
-velocity and 100 mm/s² acceleration assumptions. They do not qualify motor sizing,
+The Small and Compact VMC missions are **kinematic machining previews**:
+axis commands use explicit 20 mm/s velocity and 100 mm/s² acceleration assumptions. They do not qualify motor sizing,
 cutting forces, structural performance or production capacity. The capacity-only
 preview keeps its fixture envelope and contains no cutting mission.
 

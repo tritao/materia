@@ -55,11 +55,20 @@ class StartPageTests {
     check(browser.filtered(all).length == 0, "search and category compose");
     browser.search("");
     var machining = browser.filtered(all);
-    check(machining.length == 3, "router, bench mills and press brake form three machining families");
+    check(machining.length == 4, "mill, bench mills, router and press brake form separate machining families");
     var mills = [for (family in machining) if (family.id == "bench-mills") family];
     check(mills.length == 1 && mills[0].examples.length == 2 &&
       mills[0].examples[0].id == "bench-mill" && mills[0].examples[1].id == "enclosed-bench-mill",
       "both bench mill variants share exactly one card");
+    var modernMills = [for (family in machining) if (family.id == "mill") family];
+    check(modernMills.length == 1 && modernMills[0].examples.length == 1,
+      "Small and Compact VMC have their own project card, separate from bench mills");
+    var benchEntry=ExampleCatalog.find("bench-mill");
+    if(benchEntry==null)throw "Bench mill entry is missing";
+    switch benchEntry.kind {
+      case Project(path): check(StringTools.endsWith(path,"materia.bench.project.json"),"bench mill card opens its own project");
+      default: throw "Bench mill must open a source project";
+    }
     var presses = [for (family in machining) if (family.id == "press-brake") family];
     check(presses.length == 1 && presses[0].examples.length == 1 && presses[0].examples[0].id == "press-brake",
       "the press brake remains directly accessible in its own machining card");

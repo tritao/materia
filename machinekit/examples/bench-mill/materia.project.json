@@ -27,22 +27,6 @@
         ]
       }
     },
-    "enclosed": {
-      "kind": "cad-preview",
-      "module": "BenchMillPreview",
-      "function": "enclosed",
-      "cache": {
-        "inputs": []
-      }
-    },
-    "legacy-machining": {
-      "kind": "cad-preview",
-      "module": "BenchMillPreview",
-      "function": "mill",
-      "cache": {
-        "inputs": []
-      }
-    },
     "compact-vmc": {
       "kind": "cad-preview",
       "module": "MillProject",
@@ -100,13 +84,6 @@
       "entrypoint": "spindle-drive",
       "summary": "Editable Leadshine spindle-drive study on the reference mill.",
       "kind": "study"
-    },
-    {
-      "id": "enclosed",
-      "label": "Legacy enclosed demo",
-      "entrypoint": "enclosed",
-      "summary": "Original enclosed mill and vise machining demo.",
-      "kind": "demo"
     }
   ]
 }

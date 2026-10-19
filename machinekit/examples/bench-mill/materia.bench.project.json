@@ -1,0 +1,45 @@
+{
+  "format": "materia.project",
+  "version": 1,
+  "name": "Bench mill",
+  "defaultEntrypoint": "bench",
+  "defaultVariant": "bench",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
+  "entrypoints": {
+    "bench": {
+      "kind": "cad-preview",
+      "module": "BenchMillPreview",
+      "function": "mill",
+      "cache": {
+        "inputs": []
+      }
+    },
+    "enclosed": {
+      "kind": "cad-preview",
+      "module": "BenchMillPreview",
+      "function": "enclosed",
+      "cache": {
+        "inputs": []
+      }
+    }
+  },
+  "variants": [
+    {
+      "id": "bench",
+      "label": "Open bench mill",
+      "entrypoint": "bench",
+      "kind": "configuration",
+      "summary": "Servo bench mill with ballscrew axes and toe-clamped bearing-block machining mission."
+    },
+    {
+      "id": "enclosed",
+      "label": "Enclosed cell",
+      "entrypoint": "enclosed",
+      "summary": "Bench mill in a cabinet with pneumatic door and vise. Includes the bearing-block machining mission.",
+      "kind": "configuration"
+    }
+  ]
+}

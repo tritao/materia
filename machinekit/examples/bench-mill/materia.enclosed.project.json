@@ -1,7 +1,7 @@
 {
   "format": "materia.project",
   "version": 1,
-  "name": "Mill \u2014 legacy enclosure (shortcut)",
+  "name": "Bench mill — enclosed cell (shortcut)",
   "defaultEntrypoint": "enclosure",
   "build": {
     "system": "haxeon",

@@ -21,9 +21,9 @@ import haxeon.ui.widgets.text.Text;
 class ProjectVariantView {
   public static function build(controller:ProjectVariantController,tokens:ThemeTokens,key:String):View {
     var state=controller.snapshot(),rows:Array<KeyedView> = [];
-    for(group in ["configuration","study","demo","job"]) {
+    for(group in ["configuration","study","job"]) {
       var variants=state.variants.filter(v->v.kind==group);if(variants.length==0)continue;
-      var label=switch(group){case "configuration":"Configuration";case "study":"Study";case "demo":"Demo";default:"Scene preset";};
+      var label=switch(group){case "configuration":"Configuration";case "study":"Study";default:"Scene preset";};
       var active=variants.filter(v->v.id==state.selected).length==1;
       var options=[new SelectOption<String>("choose", "Choose "+label.toLowerCase()+"…", "")];
       for(variant in variants)options.push(new SelectOption<String>("variant-"+variant.id,variant.label,variant.id));
