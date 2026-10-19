@@ -11,7 +11,7 @@ size the axis assemblies. Castings and separately itemized steel interfaces use
 shared `MineralFoundation` recipes; other machine families keep their own layouts.
 
 The reference base is 520 × 909 × 220 mm. The Y motor sits in a rear service bay beneath the column, with a continuous
-60 mm casting roof and side supports. The column is 320 × 260 × 768 mm. Guide/bearing inserts stand 4 mm proud
+60 mm casting roof and side supports. The column is 320 × 260 × 833 mm. Guide/bearing inserts stand 4 mm proud
 of the casting, with 16 mm embedded thickness. Core openings, walls, dimensions
 and materials remain design assumptions requiring process and structural review.
 
@@ -68,29 +68,31 @@ hardware. Its tapered steel head has a 234 mm rear flange, a 120 mm nose, two ro
 of side windows and continuous top/bottom chords. Four nominal M6 × 16 bolts
 attach the flange to blind carriage taps, with straight tool access beside the
 180 mm rear body. Spindle reach remains fixed. The head carries the BT30 packaging study and
-its braced rear-corner belt motor. Nominal structural clearance is 3 mm. The X/Y geometric overrun
+its braced centered rear belt motor. Nominal structural clearance is 3 mm. The X/Y geometric overrun
 reserves are 7/2 mm; these are not established stopping distances.
 
 ## BT30 spindle packaging study
 
 `MillSpindleHead` now owns the cartridge, holder, drawbar, spring stack,
-gripper/pull stud, reaction frame, pneumatic cylinder/rod/piston, rear-corner
+gripper/pull stud, reaction frame, pneumatic cylinder/rod/piston, centered rear
 motor, belt and motor carrier. The legacy ER20 machine keeps its independent
 motion/control example. All new parts have rebuild recipes.
 
-The study targets 2.2 kW at 8000 rpm with a 1:1 HTD5M drive: 40T pulleys, a nominal 540 mm belt and 170 mm centers.
+The study targets 2.2 kW at 8000 rpm with a 1:1 HTD5M drive: 40T pulleys, a nominal 440 mm belt and 120 mm centers.
 Its stated 5000 N/mm cord rigidity per width is an assumption. Its compact motor is
 an **assumed** Ø90 × 160 mm body with a 110 mm flange; it is not the motor in the
 Automation Technology kit. The cartridge uses the DAIYA reference's Ø90 body
 and Ø125 flange, with explicitly assumed axial interfaces and mounting pattern.
 The nominal 7:24 taper is packaging geometry, not a toleranced BT30 interface.
 
-The motor sits behind and to the right of the cartridge on a braced steel
-carrier bolted to the head. Four slotted mounting holes provide ±8 mm plate
+The motor sits on the centerline behind the release assembly on a braced steel
+carrier with two side supports and four M6 head anchors. Recessed M5 heads keep
+the motor fasteners clear of the belt. Four slotted mounting holes provide ±5 mm fore–aft
 adjustment. A sliding register slot and tension screw, clearance for reaction-frame posts, actual
-mounting bolts and separate pulleys make the fit reviewable. A bolted belt guard encloses the drive. Both ±8 mm adjustment endpoints are
-checked for interference. Belt selection, cable connectors and motor removal
-still need supplier and service-envelope qualification.
+mounting bolts and separate pulleys make the fit reviewable. A bolted belt guard encloses the drive. Both ±5 mm adjustment endpoints are
+checked against the full machine for interference. At the upper Z stop and nominal tension, a 50 mm upward
+withdrawal envelope checks motor removal after removing the guard, belt, pulley and
+motor fasteners. Belt selection and cable connectors still need supplier qualification.
 
 The four-post release frame bears on the stationary cartridge rear housing.
 It carries an assumed double-acting cylinder with a 100 mm bore envelope,
@@ -226,17 +228,18 @@ inspection and assembly instructions from the final geometry.
 
 ## Separate column joint and structural access
 
-The 320 mm column now has a 440 mm wide inverted-T foot, with a 60 mm high
-sole and tapered shoulders reaching the upright at 120 mm. `MineralCasting`
+The 320 mm column now has a 440 mm wide inverted-T foot, with a 90 mm high
+vertical skirt and tapered shoulders reaching the upright at 150 mm. `MineralCasting`
 supports this optional structural foot as saved geometry; old recipes retain
 their original box bodies. Base and column remain distinct castings.
 
-Four nominal M12 × 35 clamps sit in open access wells, each bearing on a steel
+Four nominal M12 × 35 clamps sit in side-entry pockets in the vertical skirt, each bearing on a steel
 sole pad and engaging a separate embedded steel base anchor. The pattern is
 380 mm across and 140 mm fore/aft. Machined pad pairs allow alignment/shimming;
 anchor development, joint preload/strength and permanent locating features
 remain engineering inputs. The central Y motor bay and rear extraction path
-remain open.
+remain open. The taper stays closed above the pockets. A modeled Ø12 mm L-key
+clears each bolt through the side opening; the bolt axes and steel seats stay vertical.
 
 The Y beds stand 20 mm above the lowered side and center fields, while the
 finished rail plane stays at 224 mm. A retained island supports the front

@@ -12,7 +12,7 @@ class MillZHead extends MachineComponent {
 	public static inline var COUNTERBORE_DEPTH:Float = 6.5;
 	static var recipe:Null<ComponentType>;
 	public static function parameters():Array<ComponentParameter> return [
-			P.length("spindleDiameter",70), P.flag("bt30Mounts",false),
+			P.length("spindleDiameter",70), P.flag("bt30Mounts",false),P.flag("centeredMotor",false),
 			P.length("width", 180), P.length("reach", 204), P.length("height", 130),
 			P.length("noseWidth", 120), P.length("rearWidth", 180), P.length("rootExtension", 0), P.length("rearPlate", 12), P.length("boltX", 65), P.length("boltZ", 42),
 			P.length("spindleReach", 159), P.length("plate", 14), P.length("wall", 12)];
@@ -64,7 +64,11 @@ class MillZHead extends MachineComponent {
 				tools.push(Part.cylinderAlongY(5.5, -rearPlate - 1, -rearPlate + COUNTERBORE_DEPTH, x, z));
 			}
 		if (values().boolean("bt30Mounts")) {
-			for (y in [-spindle+58,-spindle+88]) tools.push(Part.cylinderSpan(2.5,h-12,h+1,55,y));
+			if (values().boolean("centeredMotor")) {
+				for (x in [-MillSpindleMotorLayout.FOOT_BOLT_X,MillSpindleMotorLayout.FOOT_BOLT_X])
+					for (y in [MillSpindleMotorLayout.FOOT_BOLT_FRONT,MillSpindleMotorLayout.FOOT_BOLT_REAR])
+						tools.push(Part.cylinderSpan(2.5,h-12,h+1,x,-spindle+y));
+			} else for (y in [-spindle+58,-spindle+88]) tools.push(Part.cylinderSpan(2.5,h-12,h+1,55,y));
 			for (i in 0...6) { var a=i*Math.PI/3; tools.push(Part.cylinderSpan(2.5,-1,12,53.5*Math.cos(a),-spindle+53.5*Math.sin(a))); }
 		}
 		var raw = Solids.union(pieces), nose = parameterNumber("noseWidth");
@@ -78,7 +82,7 @@ class MillZHead extends MachineComponent {
 			var z = upper ? h : 0, outer = upper ? h + extension : -extension;
 			var rib = Part.prism([new Vector(0,z),new Vector(collarRear/2,z),new Vector(0,outer)], -wall/2, wall/2);
 			root.push(machinekit.assembly.PosedParts.moved(rib,
-				materia.assembly.AssemblyFrames.fromRotationMatrix(side*(w/2-2*wall),0,0,[0,0,1, 1,0,0, 0,1,0]))); rib.close();
+				materia.assembly.AssemblyFrames.fromRotationMatrix(side*(upper && values().boolean("centeredMotor")?50:w/2-2*wall),0,0,[0,0,1, 1,0,0, 0,1,0]))); rib.close();
 		}
 		return Solids.cut(Solids.union(root), tools);
 	}

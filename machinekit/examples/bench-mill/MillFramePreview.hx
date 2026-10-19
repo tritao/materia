@@ -59,10 +59,10 @@ class MillFramePreview {
 		return result;
 	}
 
-	public static function concept(reference:BenchMill, frame:MillFrame):MachineAssembly {
+	public static function concept(reference:BenchMill, frame:MillFrame, ?motorAdjustment:Float):MachineAssembly {
 		var result = structure(frame);
 		var spindleLayout:MillZAxisLayout = frame.zAxis;
-		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout);
+		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout,motorAdjustment);
 		var spindleOrigin = spindleParts.gauge;
 		var tool = new machinekit.milling.FlatEndMill(new machinekit.component.ComponentValues().setNumber("diameter",reference.tool.diameter)
 			.setNumber("fluteLength",reference.tool.fluteLength).setNumber("stickout",reference.tool.stickout));
@@ -124,7 +124,8 @@ class MillFramePreview {
 		var report = {status: "mechanical XYZ concept; not qualified for manufacture", units: "mm",
 			travel: [{axis:"x",travel:2*xy.xHalfTravel},{axis:"y",travel:2*xy.yHalfTravel},{axis:"z",travel:-z.lower}],
 			base: {width: l.baseWidth, depth: l.baseDepth, height: l.baseHeight, railPlane: l.railPlane},
-			column: {width: l.columnWidth, depth: l.columnDepth, height: l.columnHeight, railFaceY: l.columnFront},
+			column: {width: l.columnWidth, depth: l.columnDepth, height: l.columnHeight, railFaceY: l.columnFront,
+				footShoulderMm: MillFrameLayout.COLUMN_FOOT_SHOULDER,footHeightMm: MillFrameLayout.COLUMN_FOOT_HEIGHT,clampAccess:"vertical side face"},
 			xyFullStrokeStructuralClearance: "passed conservative Cartesian-product CAD swept-volume audit",
 			zFullStrokeStructuralClearance: "passed conservative CAD swept-volume audit",
 			xy: {tableTop: xy.tableTop, saddleHeight: MillXYStageLayout.SADDLE_HEIGHT, tableRibDepth: MillXYStageLayout.RISER_HEIGHT, xOvertravel: xy.xOvertravel, yOvertravel: xy.yOvertravel, yScrewZ: xy.yScrewZ, yMotorFace: xy.yMotorFace, yBayRoof: l.roof, yBayLocation: "lower column", yServiceRear: xy.yServiceRear},

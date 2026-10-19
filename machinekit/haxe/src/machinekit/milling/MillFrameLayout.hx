@@ -33,6 +33,9 @@ typedef MillFrameOptions = {
  * Dimensions are a design concept, not material/process or stiffness qualification.
  */
 class MillFrameLayout {
+	public static inline var COLUMN_FOOT_SHOULDER:Float = 90;
+	public static inline var COLUMN_FOOT_HEIGHT:Float = 150;
+	public static inline var COLUMN_ACCESS_TOP:Float = 80;
 	public final yRailSpacing:Float;
 	public final yRailStart:Float;
 	public final yRailLength:Float;

@@ -20,6 +20,15 @@ class Bt30SpindleMotor extends ServoMotor {
 	}
 	override public function componentType():Null<ComponentType> return recipeType();
 	override public function values():ComponentValues return new ComponentValues().setToken("material",materialSpec());
+	/** Continuous axial envelope, retaining the narrower body above its flange. */
+	public function axialEnvelope(minOffset:Float,maxOffset:Float,includeShaft:Bool=false):Part {
+		if (!Math.isFinite(minOffset) || !Math.isFinite(maxOffset) || minOffset>maxOffset) throw "Invalid motor axial envelope";
+		var parts=[Part.cylinderSpan(rating.bodyDiameter/2,-rating.bodyLength+minOffset,maxOffset),
+			Part.box(110,110,10+maxOffset-minOffset).translated(new Vector(0,0,-10+minOffset)),
+			Part.cylinderSpan(20,minOffset,2+maxOffset)];
+		if (includeShaft) parts.push(Part.cylinderSpan(rating.shaftDiameter/2,minOffset,rating.shaftLength+maxOffset));
+		return Solids.union(parts);
+	}
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var tools=[]; for (x in [-30.0,30.0]) for (y in [-30.0,30.0]) tools.push(Part.cylinderSpan(2.1,-8,1,x,y));
 		return Solids.cut(Solids.union([super.geometry(detail),Part.box(110,110,10).translated(new Vector(0,0,-10)),

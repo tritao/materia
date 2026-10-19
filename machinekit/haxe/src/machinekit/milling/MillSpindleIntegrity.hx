@@ -21,6 +21,27 @@ class MillSpindleIntegrity {
 		cache.close(); return result;
 	}
 
+	/** Motor withdrawal after removing its belt, pulley, fasteners and guard. */
+	public static function checkMotorRemoval(assembly:MachineAssembly):Diagnostics {
+		var out=new Diagnostics(), cache=new PosedParts(), poses=assembly.solvedPoses();
+		var local=new Bt30SpindleMotor().axialEnvelope(-50,0,true);
+		var envelope=PosedParts.moved(local,poses.get("spindle/motor")); local.close();
+		var sweep:SpindleAuditSolid={id:"motor removal",part:envelope,bounds:PosedParts.boxOf(envelope)};
+		try {
+			for (member in assembly.components()) {
+				var id=member.id;
+				if (id=="spindle/motor" || id=="spindle/motorShaft" || id=="spindle/motorPulley" || id=="spindle/belt" ||
+					id=="spindle/beltGuard" || id=="spindle/tensionScrew" || StringTools.startsWith(id,"spindle/motorBolt") ||
+					StringTools.startsWith(id,"spindle/guardBolt")) continue;
+				var part=cache.posed(member.component,poses.get(id));
+				try noOverlap(out,sweep,{id:id,part:part,bounds:PosedParts.boxOf(part)},'motor withdrawal/$id')
+				catch(e:Dynamic) { part.close(); throw e; }
+				part.close();
+			}
+		} catch(e:Dynamic) { envelope.close(); cache.close(); throw e; }
+		envelope.close(); cache.close(); return out;
+	}
+
 	static function run(assembly:MachineAssembly, l:MillZAxisLayout, cache:PosedParts, owned:Array<Part>):Diagnostics {
 		var out = new Diagnostics(), poses:Map<String,AssemblyFrame> = assembly.solvedPoses();
 		var xyLayout = new MillXYStageLayout(l.frame,l.spindleY,l.profile);
@@ -56,8 +77,13 @@ class MillSpindleIntegrity {
 			}
 			// The extruded bounding box contains this part throughout its Z stroke.
 			var b = member.bounds;
-			var sweep = keep(member.id,Part.box(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ-l.lower)
-				.translated(new Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ+l.lower)));
+			var swept:Part;
+			if (member.id=="motor") {
+				var local=new Bt30SpindleMotor().axialEnvelope(0,-l.lower);
+				swept=PosedParts.moved(local,poses.get("spindle/motor")); local.close();
+			} else swept=Part.box(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ-l.lower)
+				.translated(new Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ+l.lower));
+			var sweep=keep(member.id,swept);
 			for (other in fixed) noOverlap(out,sweep,other,'spindle sweep ${member.id}/${other.id}');
 			for (other in xy) noOverlap(out,sweep,other,'XYZ payload sweep ${member.id}/${other.id}');
 		}

@@ -143,8 +143,9 @@ class MillFrame extends MachineAssembly {
 			footWidth, footDepth, l.insertThickness, "column sole pad",
 			down(sx * (flared ? (l.columnWidth+l.columnFootWidth)/4 : l.columnWidth/2-l.wall), sy * (l.columnDepth / 2 - l.roof), l.insertThickness)));
 		if (flared) for (row in columnInserts) if (StringTools.startsWith(row.id,"foot")) {
-			columnVoids.push(CastingFeatures.box('bolt-access-${row.id}',36,46,l.columnHeight+1,
-				row.pose.x,row.pose.y,l.insertThickness));
+			var side=row.pose.x<0?-1:1, inner=Math.abs(row.pose.x)-20, outer=l.columnFootWidth/2+1;
+			columnVoids.push(CastingFeatures.box('bolt-access-${row.id}',outer-inner,46,
+				MillFrameLayout.COLUMN_ACCESS_TOP-l.insertThickness,side*(inner+outer)/2,row.pose.y,l.insertThickness));
 		}
 		if (flared) {
 			columnInserts = [for (row in columnInserts) StringTools.startsWith(row.id,"foot") ? {
@@ -152,7 +153,7 @@ class MillFrame extends MachineAssembly {
 					.setNumber("height",l.insertThickness).setNumber("boreDiameter",13).setToken("role","column sole clamping pad"))} : row];
 		}
 		var columnValues = body(l.columnWidth,l.columnDepth,l.columnHeight,columnVoids);
-		if (flared) columnValues.setNumber("footWidth",l.columnFootWidth).setNumber("footHeight",120).setNumber("footShoulder",60);
+		if (flared) columnValues.setNumber("footWidth",l.columnFootWidth).setNumber("footHeight",MillFrameLayout.COLUMN_FOOT_HEIGHT).setNumber("footShoulder",MillFrameLayout.COLUMN_FOOT_SHOULDER);
 		column = new MineralFoundation(columnValues, columnInserts, "footLeftFront");
 		include("column", column, F.translation(0, l.columnCentreY, l.railPlane));
 		// Mating frames coincide; the physical finished faces oppose each other.

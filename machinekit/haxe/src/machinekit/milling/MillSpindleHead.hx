@@ -17,9 +17,9 @@ class MillSpindleHead extends MachineAssembly {
 	public final gauge:AssemblyFrame;
 	public function new(l:MillZAxisLayout,?motorAdjustment:Float) {
 		super();
-		// A 540 mm / 108-tooth belt with equal 40T pulleys has 170 mm centres.
-		var adjustment:Float = motorAdjustment ?? (Math.sqrt(170*170-78*78)-150);
-		if (!Math.isFinite(adjustment) || Math.abs(adjustment)>8) throw "Spindle belt adjustment exceeds its slots";
+		// A 440 mm / 88-tooth belt with equal 40T pulleys has 120 mm centres.
+		var adjustment:Float = motorAdjustment ?? 0;
+		if (!Math.isFinite(adjustment) || Math.abs(adjustment)>MillSpindleMotorLayout.ADJUSTMENT) throw "Spindle belt adjustment exceeds its slots";
 		gauge = F.translation(0,l.spindleY,l.headBottom-Bt30Cartridge.SEAT);
 		addComponent("spindle",new Bt30Cartridge(),gauge);
 		rotating("rotor",new MillPowerDrawbarPart(new ComponentValues().setToken("role","rotor")),gauge,"spindle","rotor-turn");
@@ -37,22 +37,25 @@ class MillSpindleHead extends MachineAssembly {
 		for (x in [-50.0,50.0]) for (y in [-50.0,50.0]) fixed('cylinderBolt$x-$y',SocketHeadCapScrew.metric("M8",16),F.fromRotationMatrix(x,l.spindleY+y,gauge.z+322,[1,0,0, 0,-1,0, 0,0,-1]),"reactionFrame");
 		var motor = new Bt30SpindleMotor();
 		var face = gauge.z+282, mountBottom = l.headBottom+l.headHeight;
-		fixed("motorCarrier",new MillSpindleMotorMount(new ComponentValues().setNumber("height",face-12-mountBottom)),F.translation(0,l.spindleY,mountBottom),"spindle");
-		var motorPose = F.fromRotationMatrix(150+adjustment,l.spindleY+78,face,[-1,0,0, 0,1,0, 0,0,-1]);
+		fixed("motorCarrier",new MillSpindleMotorMount(new ComponentValues().setNumber("height",face-12-mountBottom).setBoolean("centered",true)),F.translation(0,l.spindleY,mountBottom),"spindle");
+		var motorPose = F.fromRotationMatrix(0,l.spindleY+MillSpindleMotorLayout.CENTRES+adjustment,face,[-1,0,0, 0,1,0, 0,0,-1]);
 		fixed("motor",motor,motorPose,"motorCarrier");
 		rotating("motorShaft",motor.shaft(),motorPose,"motor","motor-turn");
 		var pulley = new TimingPulley(HTD5M,40,20,18);
 		fixed("spindlePulley",pulley,F.translation(0,l.spindleY,gauge.z+251),"rotor");
-		fixed("motorPulley",pulley,F.translation(150+adjustment,l.spindleY+78,gauge.z+251),"motorShaft");
-		fixed("tensionScrew",SocketHeadCapScrew.metric("M6",27-adjustment),F.fromRotationMatrix(232,l.spindleY+78,gauge.z+288,[0,0,1, 1,0,0, 0,1,0]),"motorCarrier");
-		fixed("beltGuard",new MillSpindleBeltGuard(),gauge,"motorCarrier");
-		for (p in [[94.0,108.0],[165.0,121.0]]) fixed('guardBolt${p[0]}',SocketHeadCapScrew.metric("M4",10),
-			F.fromRotationMatrix(p[0],l.spindleY+p[1],gauge.z+268,[1,0,0, 0,-1,0, 0,0,-1]),"beltGuard");
-		var dx=150.0+adjustment,dy=78.0,centres=Math.sqrt(dx*dx+dy*dy),angle=Math.atan2(dy,dx);
+		fixed("motorPulley",pulley,F.translation(0,l.spindleY+MillSpindleMotorLayout.CENTRES+adjustment,gauge.z+251),"motorShaft");
+		fixed("tensionScrew",SocketHeadCapScrew.metric("M6",40),F.fromRotationMatrix(MillSpindleMotorLayout.TENSION_X,l.spindleY+MillSpindleMotorLayout.TENSION_SEAT_Y+adjustment,gauge.z+288,[1,0,0, 0,0,-1, 0,1,0]),"motorCarrier");
+		fixed("beltGuard",new MillSpindleBeltGuard(new ComponentValues().setBoolean("centered",true)),gauge,"motorCarrier");
+		for (x in [-MillSpindleMotorLayout.GUARD_BOLT_X,MillSpindleMotorLayout.GUARD_BOLT_X]) fixed('guardBolt$x',SocketHeadCapScrew.metric("M4",10),
+			F.fromRotationMatrix(x,l.spindleY+MillSpindleMotorLayout.GUARD_BOLT_Y,gauge.z+268,[1,0,0, 0,-1,0, 0,0,-1]),"beltGuard");
+		var centres=MillSpindleMotorLayout.CENTRES+adjustment;
 		fixed("belt",TimingBelt.twoPulley(HTD5M,40,40,centres,15,5000),
-			F.fromRotationMatrix(0,l.spindleY,gauge.z+252.5,[Math.cos(angle),-Math.sin(angle),0, Math.sin(angle),Math.cos(angle),0, 0,0,1]),"spindle");
-		for (y in [58.0,88.0]) fixed('carrierBolt$y',SocketHeadCapScrew.metric("M6",20),F.translation(55,l.spindleY+y,mountBottom+10),"motorCarrier");
-		for (x in [120.0,180.0]) for (y in [48.0,108.0]) fixed('motorBolt$x-$y',SocketHeadCapScrew.metric("M5",20),F.fromRotationMatrix(x+adjustment,l.spindleY+y,face-12,[1,0,0, 0,-1,0, 0,0,-1]),"motorCarrier");
+			F.fromRotationMatrix(0,l.spindleY,gauge.z+252.5,[0,-1,0, 1,0,0, 0,0,1]),"spindle");
+		for (x in [-MillSpindleMotorLayout.FOOT_BOLT_X,MillSpindleMotorLayout.FOOT_BOLT_X])
+			for (y in [MillSpindleMotorLayout.FOOT_BOLT_FRONT,MillSpindleMotorLayout.FOOT_BOLT_REAR])
+				fixed('carrierBolt$x-$y',SocketHeadCapScrew.metric("M6",20),F.translation(x,l.spindleY+y,mountBottom+10),"motorCarrier");
+		for (x in [-30.0,30.0]) for (y in [90.0,150.0]) fixed('motorBolt$x-$y',SocketHeadCapScrew.metric("M5",14),
+			F.fromRotationMatrix(x,l.spindleY+y+adjustment,face-6,[1,0,0, 0,-1,0, 0,0,-1]),"motorCarrier");
 		addMemberConnector("spindlePulley","beltPlane",Solids.axial(0,0,1.5));
 		addMemberConnector("motorPulley","beltPlane",Solids.axial(0,0,1.5));
 		addBeltPath({belt:"belt",wraps:[{instanceId:"spindlePulley",connectorName:"beltPlane"},{instanceId:"motorPulley",connectorName:"beltPlane"}]});

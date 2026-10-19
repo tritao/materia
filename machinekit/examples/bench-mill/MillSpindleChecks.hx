@@ -17,6 +17,12 @@ class MillSpindleChecks {
 		assembly.validate();
 		MillSpindleIntegrity.checkPayload(assembly,l).throwIfErrors();
 		check(true,"actual payload and full XYZ stroke are clear");
+		MillSpindleIntegrity.checkMotorRemoval(assembly).throwIfErrors();
+		check(true,"motor withdraws upward 50 mm at nominal tension after drive disassembly");
+		var zero:Map<String,AssemblyFrame> =assembly.solvedPoses();
+		var motorPose:AssemblyFrame=zero.get("spindle/motor");
+		near(motorPose.x,0,"spindle motor lies on machine centerline");
+		near(motorPose.y-l.spindleY,MillSpindleMotorLayout.CENTRES,"motor sits behind release assembly");
 		for (candidate in [assembly,MachineAssembly.decode(assembly.encode(),MachineKitComponents.standard())]) {
 			var model=new AssemblyModel("mm"); candidate.addTo(model,"");
 			var state=new AssemblyState(model.definition("bt30-package"));
@@ -34,23 +40,31 @@ class MillSpindleChecks {
 			near(state.worldPose("spindle/tool").z,zeroTool+l.lower,"complete spindle follows Z");
 			near(state.worldPose("spindle/tool").z,(new MillXYStageLayout(f,l.spindleY,BenchMill.RAIL)).tableTop,"lower Z stop preserves original tool-tip/table datum");
 		}
-		for (adjustment in [-8.0,8.0]) {
-			var packageStudy=new MachineAssembly(); packageStudy.include("spindle",new MillSpindleHead(l,adjustment));
+		for (adjustment in [-MillSpindleMotorLayout.ADJUSTMENT,MillSpindleMotorLayout.ADJUSTMENT]) {
+			var packageStudy=MillFramePreview.concept(reference,frame,adjustment);
 			MillSpindleIntegrity.checkPayload(packageStudy,l).throwIfErrors(); check(true,"belt adjustment endpoint clears its carrier and guard");
 		}
 		var cache=new PosedParts(), poses:Map<String,AssemblyFrame> =assembly.solvedPoses();
 		for (pair in [["zAxis/head","spindle/motorCarrier"],["spindle/motorCarrier","spindle/motor"],
+			["spindle/tensionScrew","spindle/motor"],
 			["zAxis/head","spindle/spindle"],["spindle/spindle","spindle/reactionFrame"],["spindle/reactionFrame","spindle/cylinder"],["spindle/beltGuard","spindle/motorCarrier"]]) {
 			var members=assembly.components(), a=members.filter(m->m.id==pair[0])[0],b=members.filter(m->m.id==pair[1])[0];
 			var first=cache.posed(a.component,poses.get(a.id)),second=cache.posed(b.component,poses.get(b.id));
 			near(first.distance(second),0,'physical support ${pair[0]}/${pair[1]}'); first.close(); second.close();
 		}
-		cache.close();
+		var carrierMember=assembly.components().filter(m->m.id=="spindle/motorCarrier")[0];
+		var carrier=cache.posed(carrierMember.component,poses.get(carrierMember.id));
+		for (x in [-MillSpindleMotorLayout.FOOT_BOLT_X,MillSpindleMotorLayout.FOOT_BOLT_X])
+			for (y in [MillSpindleMotorLayout.FOOT_BOLT_FRONT,MillSpindleMotorLayout.FOOT_BOLT_REAR]) {
+				var tool=cadkit.modeling.Part.cylinderSpan(3,l.headBottom+l.headHeight+13,l.headBottom+l.headHeight+110,x,l.spindleY+y);
+				var common=carrier.intersect(tool); near(common.volume(),0,"carrier anchor has vertical Allen-key access"); common.close(); tool.close();
+			}
+		carrier.close(); cache.close();
 		for (m in assembly.components()) if (StringTools.startsWith(m.id,"spindle/")) {
 			var p=m.component.geometry(); check(p.valid(), 'valid spindle solid ${m.id}');
 			check(p.solidCount()==(m.id=="spindle/springs"?16:1),'connected spindle part ${m.id}'); p.close();
 		}
-		var guard=new MillSpindleBeltGuard().geometry(), faceted=false;
+		var guard=new MillSpindleBeltGuard(new machinekit.component.ComponentValues().setBoolean("centered",true)).geometry(), faceted=false;
 		for (i in 0...guard.shape.subshapeCount(CadKit.ShapeKind.Face)) {
 			var face=guard.shape.subshape(CadKit.ShapeKind.Face,i);
 			if (face.surfaceKind()==CadKit.SurfaceKind.Plane) {

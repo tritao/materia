@@ -70,9 +70,15 @@ class MillFrameChecks {
 			var id = side+end;
 			var bolt:AssemblyFrame = poses.get('columnBolt$id');
 			var blank = frame.column.body.geometry(), casting = PosedParts.moved(blank,poses.get("column/casting")); blank.close();
-			var access = cadkit.modeling.Part.cylinderSpan(15,bolt.z+12,layout.railPlane+150,bolt.x,bolt.y);
-			var common = casting.intersect(access); near(common.volume(),0,"column bolt has straight tool access");
-			common.close(); access.close(); casting.close();
+			var side=bolt.x<0?-1:1;
+			var bit=cadkit.modeling.Part.cylinderSpan(6,bolt.z+6,layout.railPlane+68,bolt.x,bolt.y);
+			var handle=cadkit.modeling.Part.cylinderAlong(6,new cadkit.modeling.Vector(bolt.x,bolt.y,layout.railPlane+68),
+				new cadkit.modeling.Vector(side,0,0),layout.columnFootWidth/2-Math.abs(bolt.x)+60);
+			for (access in [bit,handle]) {
+				var common=casting.intersect(access); near(common.volume(),0,"column bolt has side-entry L-key access"); common.close(); access.close();
+			}
+			var blocked=cadkit.modeling.Part.cylinderSpan(6,bolt.z+12,layout.railPlane+180,bolt.x,bolt.y);
+			var common=casting.intersect(blocked); check(common.volume()>1,"column taper stays closed above the bolt"); common.close(); blocked.close(); casting.close();
 			near(bolt.z,layout.railPlane+layout.insertThickness,"clamp head bears on steel sole");
 			check(bolt.z-35 < layout.railPlane && bolt.z-35 > layout.railPlane-layout.insertThickness,"clamp engages embedded steel anchor");
 		}
