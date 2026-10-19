@@ -37,7 +37,7 @@ class LinearRailBlock extends MachineComponent {
 			!(spec.blockHolePitchC > 0) || spec.blockHolePitchC > spec.blockWidth ||
 			spec.blockHeight <= spec.railHeight)
 			throw 'Linear rail profile "${spec.designation}" has invalid block dimensions';
-		var designation = '${spec.family}-${spec.designation}-BLOCK';
+		var designation = '${spec.family}-${spec.designation}-BLOCK'+referenceSuffix;
 		var customName = '${spec.family}-${spec.designation}-BW${Dimension.format(spec.blockWidth)}-BH${Dimension.format(spec.blockHeight)}' +
 			'-BL${Dimension.format(spec.blockLength)}-B${Dimension.format(spec.blockHolePitchB)}' +
 			'-C${Dimension.format(spec.blockHolePitchC)}-M${spec.blockMountScrew}';

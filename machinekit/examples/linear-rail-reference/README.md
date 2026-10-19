@@ -41,6 +41,17 @@ var block = new machinekit.motion.HiwinHgh15ca(pathToPinnedStep);
 block.close();
 ```
 
+For a saved assembly, `new HiwinHgh15ca()` selects the registered
+`machinekit.motion.hgh15ca-reference` recipe. It imports lazily, returns owned
+geometry copies and retains no imported native CAD owner between calls. The
+asset path comes from `MATERIA_HGH15CA_STEP` or the prepared directory under
+`MATERIA_ROOT`; the file hash and mounting frame are checked on load. Material
+is locked to unspecified for this recipe because the model contains several
+materials. Explicit-path constructors retain their original code-only API and
+caller-owned CAD lifetime. The mounting-hole thread depth is 5 mm (M4 x 5),
+consistent with the HGH15CA dimensional table; it is not inferred from a plain
+cylindrical hole in the STEP file.
+
 The wrapper retains the existing HGR15 block's rail, axis, top and four mount
 connectors, and is distinguished from the nominal block in geometry/BOM identity.
 It imports once, then returns owned copies from `geometry(Preview)`. The caller

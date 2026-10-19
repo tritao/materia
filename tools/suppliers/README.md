@@ -419,6 +419,42 @@ The source is an OpenBuilds reference, not a claim about StepperOnline or Leadsh
 construction. It has no inherited StepperOnline electrical ratings. Existing
 motor recipe IDs and named StepperOnline variants retain their own identities.
 
+The worked axis now uses tapped receiving parts instead of external hex nuts:
+twelve M6 through taps in the 12 mm base, five M4 x 12 mm taps per riser,
+and six M5 plus four M6 through taps in the nut bracket. Their CAD bores retain
+separate named internal-thread annotations. Aluminium joints require at least
+1.5 screw diameters of nominal engagement in this example; this is a design
+criterion, not a load qualification. The four rail-block screws per side use
+2.5 mm-deep carriage counterbores and M4 x 12 screws, giving 4.5 mm engagement
+and 0.5 mm clearance within the published M4 x 5 mm block thread depth.
+The v2 fabrication recipe is distinct from v1; saved recipes lacking a revision
+continue to rebuild the original clearance-hole parts.
+
+`machinekit.motion.hgh15ca-reference` is a saveable, hash-pinned detailed block
+reference using the existing `HiwinHgh15ca` CAD wrapper. It retains the rail,
+top and mount connectors, and includes the sides and seals omitted by the generic
+box. The geometry is the Matis-hosted HIWIN reference, dimensionally compatible
+with Vallder's HGH_15CA table; it is not presented as Vallder's own STEP file or
+a claim about the purchased item's manufacturer. Prepare it with
+`python3 machinekit/examples/linear-rail-reference/prepare.py` before generation.
+Saved recipes load on demand from `MATERIA_HGH15CA_STEP`, or the reference example's
+build directory below `MATERIA_ROOT`. No network download occurs while modeling.
+Explicit-path, code-only callers retain their previous ownership API.
+
+Run the connection and legacy-persistence regressions with:
+
+```sh
+MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run \
+  --project machinekit/examples/supplier-fasteners/haxeon.axis-connections.json
+```
+
+Detailed block clearance also requires the riser-to-base M6 heads to be recessed.
+The v2 risers use the M6 catalog counterbore (11 mm diameter, 6.4 mm deep), with
+centres 14 mm from the riser centreline, leaving 2.5 mm to the outside edge.
+M6 x 40 screws engage 9.4 mm into the base and their heads sit 0.4 mm below the
+riser's rail mounting plane. Expanded checks include the detailed block wings
+against these nearby fasteners at all three tested travel positions.
+
 ## HZMotion motor mounts and screw supports
 
 The HZMotion catalog is separate from the Vallder import. Its reviewed reference

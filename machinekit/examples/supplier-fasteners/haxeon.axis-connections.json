@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "axis-connection-checks"
+  },
+  "entry": "RbkAxisConnectionChecks",
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/suppliers/axis-connection-checks"
+}

@@ -17,8 +17,7 @@ typedef AxisHardware = {
     var engagement:Float;
     var availableDepth:Float;
     var interfacePair:String;
-    var through:Bool;
-    var nutStack:Float;
+    var minimumEngagement:Float;
 }
 
 /** Worked supplier-intended SFU1605/RBK12-57/BF12 axis, 200 mm travel.
@@ -55,7 +54,7 @@ class RbkSfuAxis extends MachineAssembly {
         addComponent("carriage",new RbkAxisPart("carriage"));addMate("plate-bracket","fixed","bracket","plate","carriage","base");
         addComponent("ballNut",nut);addMate("nut-bracket","fixed","bracket","nut","ballNut","mountFace");
         for(side in ["Left","Right"]) {
-            addComponent("block"+side,LinearRailBlock.metric("HGR15"));
+            addComponent("block"+side,new HiwinHgh15ca());
             addMate("block-carriage-"+side,"fixed","carriage","guide"+side,"block"+side,"top");
             addConstraint("block-rail-"+side,"prismatic","rail"+side,"axis","block"+side,"rail");
         }
@@ -67,14 +66,15 @@ class RbkSfuAxis extends MachineAssembly {
         var meta:Dynamic=mount.interfaceMetadata(),baseHoles:Array<Dynamic> = meta.base_holes;
         for(i in 0...baseHoles.length) {
             var h=baseHoles[i],recess:Float=h.counterbore_depth_mm==null ? 0 : h.counterbore_depth_mm;
-            through("rbkBolt"+i,"M6",h.z==40 ? 50 : 60,"base",F.alongY(h.x,h.top_y_mm-recess,h.z,0,1,0),
-                h.z==40 ? 39 : 47,"rbk/base");
+            var grip:Float=h.top_y_mm-recess;
+            tappedBolt("rbkBolt"+i,"M6",h.z==40 ? 40 : 45,"base",F.alongY(h.x,grip,h.z,0,1,0),
+                grip,12,"rbk/base",h.z==40);
         }
-        for(i in 0...2) through("bfBolt"+i,"M6",55,"base",F.alongY(i==0 ? -23 : 23,31,433.5,0,1,0),43,"bf12/base");
-        for(side in [-1,1]) for(z in [110.0,390]) through('riser-$side-$z',"M6",60,"base",F.alongY(side*83,37,z,0,1,0),49,"riser/base");
+        for(i in 0...2) tappedBolt("bfBolt"+i,"M6",40,"base",F.alongY(i==0 ? -23 : 23,31,433.5,0,1,0),31,12,"bf12/base");
+        for(side in [-1,1]) for(z in [110.0,390]) tappedBolt('riser-$side-$z',"M6",40,"base",F.alongY(side*(67+RbkAxisPart.RISER_BOLT_OFFSET),RbkAxisPart.riserBoltSeat(),z,0,1,0),RbkAxisPart.riserBoltSeat(),12,"riser/base");
         for(side in ["Left","Right"]) for(z in [20.0,80,140,200,260]) {
             var x=side=="Left" ? -67.0 : 67.0;
-            bolt('rail-$side-$z',"M4",20,"base",F.alongY(x,46.7,z+100,0,1,0),9.7,12,"rail/riser");
+            bolt('rail-$side-$z',"M4",20,"base",F.alongY(x,46.7,z+100,0,1,0),9.7,12,"rail/riser",6);
         }
         for(p in NemaStepper.model("OPENBUILDS-NEMA23-56").boltPattern()) {
             var id='motor-${hardware.length}';
@@ -83,11 +83,11 @@ class RbkSfuAxis extends MachineAssembly {
         }
         var points=nut.boltPattern();
         for(i in 0...points.length) {
-            var p=points[i];through("nutBolt"+i,"M5",30,"bracket",F.alongY(p.x,25+p.y,0,0,0,-1),20,"nut/bracket");
+            var p=points[i];tappedBolt("nutBolt"+i,"M5",20,"bracket",F.alongY(p.x,25+p.y,0,0,0,-1),10,10,"nut/bracket",true);
         }
-        for(x in [-30.0,30]) for(z in [-10.0,10]) through('foot-$x-$z',"M6",30,"carriage",F.alongY(x,10,z,0,1,0),20,"carriage/bracket");
+        for(x in [-30.0,30]) for(z in [-10.0,10]) tappedBolt('foot-$x-$z',"M6",20,"carriage",F.alongY(x,10,z,0,1,0),10,10,"carriage/bracket");
         for(side in [-67.0,67]) for(x in [-13.0,13]) for(z in [-13.0,13])
-            bolt('block-$side-$x-$z',"M4",16,"carriage",F.alongY(side+x,10,z,0,1,0),10,6,"carriage/block (assumed 6 mm thread depth)");
+            bolt('block-$side-$x-$z',"M4",12,"carriage",F.alongY(side+x,7.5,z,0,1,0),7.5,HiwinHgh15ca.MOUNT_THREAD_DEPTH,"carriage/block",4);
         bolt("clampA","M4",10,"coupling",F.alongY(0,12.5,6,0,1,0),9.825,10,"coupling/motor shaft contact");
         bolt("clampB","M4",8,"coupling",F.alongY(0,12.5,34,0,1,0),7.5,8,"coupling/screw shaft contact");
     }
@@ -97,18 +97,19 @@ class RbkSfuAxis extends MachineAssembly {
         addMemberConnector(id,"installation",Solids.axial(0,0,0));
         addMate(id+"-fixed","fixed",parent,id+"-seat",id,"installation");
     }
-    function bolt(id:String,size:String,length:Float,parent:String,seat:AssemblyFrame,grip:Float,depth:Float,pair:String):Void {
+    function bolt(id:String,size:String,length:Float,parent:String,seat:AssemblyFrame,grip:Float,depth:Float,pair:String,minimum:Float=0):Void {
         var part=SocketHeadCapScrew.metric(size,length);attach(id,part,parent,seat);
-        hardware.push({id:id,size:size,length:length,grip:grip,engagement:length-grip,availableDepth:depth,interfacePair:pair,through:false,nutStack:0});
+        hardware.push({id:id,size:size,length:length,grip:grip,engagement:length-grip,availableDepth:depth,interfacePair:pair,minimumEngagement:minimum==0 ? 1.3*part.diameter : minimum});
     }
-    function through(id:String,size:String,length:Float,parent:String,seat:AssemblyFrame,grip:Float,pair:String):Void {
-        bolt(id,size,length,parent,seat,grip,0,pair);
-        var washer=FlatWasher.metric(size),nut=HexNut.metric(size);
-        var record=hardware[hardware.length-1];
-        record.through=true;record.availableDepth=0;record.nutStack=washer.thickness+nut.spec.height;
-        var w=F.compose(seat,F.translation(0,-grip-washer.thickness,0));
-        var n=F.compose(seat,F.translation(0,-grip-washer.thickness-nut.spec.height,0));
-        attach(id+"-washer",washer,parent,w);attach(id+"-nut",nut,parent,n);
+    /** Threads live in the fabricated receiving part; the purchased part keeps its clearance holes. */
+    function tappedBolt(id:String,size:String,length:Float,parent:String,seat:AssemblyFrame,grip:Float,depth:Float,pair:String,washer:Bool=false):Void {
+        var headSeat=seat,stack=grip;
+        if(washer) {
+            var flat=FlatWasher.metric(size);
+            attach(id+"-washer",flat,parent,seat);
+            stack+=flat.thickness;headSeat=F.compose(seat,F.translation(0,flat.thickness,0));
+        }
+        bolt(id,size,length,parent,headSeat,stack,depth,pair,1.5*SocketHeadCapScrew.metric(size,length).diameter);
     }
     public function setTravel(state:AssemblyState,value:Float):Void {
         if(!Math.isFinite(value) || value<0 || value>200) throw "Travel must be between 0 and 200 mm";

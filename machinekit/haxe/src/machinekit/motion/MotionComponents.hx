@@ -9,6 +9,7 @@ class MotionComponents {
 		registry.register(PillowBlock.recipeType());
 		registry.register(LinearRail.recipeType());
 		registry.register(LinearRailBlock.recipeType());
+        registry.register(HiwinHgh15ca.referenceRecipeType());
 		registry.register(NemaStepper.namedRecipeType());
 		registry.register(NemaStepper.genericRecipeType());
 		registry.register(ServoMotor.namedRecipeType());

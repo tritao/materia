@@ -53,9 +53,20 @@ class RbkSfuAxisChecks {
         motorPart.close();
         var comparisons:Array<Array<String>> = [["rbk","screw"],["rbk","coupling"],["rbk","base"],["bf12","screw"],["bf12","base"],
             ["coupling","motor"],["coupling","screw"],["ballNut","screw"],["ballNut","bracket"],["bracket","base"],
-            ["bracket","riserLeft"],["bracket","riserRight"],["carriage","rbk"],["carriage","bf12"],["blockLeft","railLeft"],["blockRight","railRight"]];
+            ["bracket","riserLeft"],["bracket","riserRight"],["carriage","rbk"],["carriage","bf12"],["blockLeft","railLeft"],["blockRight","railRight"],["blockLeft","riserLeft"],["blockRight","riserRight"],
+            ["blockLeft","carriage"],["blockRight","carriage"],["blockLeft","bracket"],["blockRight","bracket"]];
         for(h in axis.hardware) if(h.interfacePair=="motor/rbk") {
             comparisons.push(["motor",h.id]);comparisons.push(["motor",h.id+"-washer"]);
+        }
+        // Actual block wings and seals can encounter nearby fasteners omitted by the old envelope.
+        for(h in axis.hardware) {
+            if(h.interfacePair=="riser/base")for(side in ["Left","Right"]) {
+                comparisons.push(["block"+side,h.id]);
+            }
+            if(h.interfacePair=="carriage/block")comparisons.push(["carriage",h.id]);
+            if(h.interfacePair=="nut/bracket")comparisons.push(["ballNut",h.id]);
+            if(h.interfacePair=="rbk/base")comparisons.push(["rbk",h.id]);
+            if(h.interfacePair=="bf12/base")comparisons.push(["bf12",h.id]);
         }
         var results:Array<Dynamic> = [],failures=0;
         for(travel in [0.0,100,200]) {
@@ -79,22 +90,22 @@ class RbkSfuAxisChecks {
         var engagements:Array<Dynamic> = [];
         for(h in axis.hardware) {
             var clamp=StringTools.startsWith(h.interfacePair,"coupling/");
-            var valid=h.through ? h.engagement>=h.nutStack : (clamp ? h.engagement>0 && h.engagement<1 :
-                h.engagement>=1.3*Std.parseFloat(h.size.substr(1)) && h.engagement<=h.availableDepth);
+            var valid=clamp ? h.engagement>0 && h.engagement<1 :
+                h.engagement>=h.minimumEngagement && h.engagement<=h.availableDepth;
             var status=valid ? "nominal_dimensions_pass" : "review_required";
             engagements.push({id:h.id,size:h.size,length_mm:h.length,grip_mm:h.grip,engagement_mm:h.engagement,
-                available_depth_mm:h.through ? null : h.availableDepth,nut_stack_mm:h.nutStack,status:status,interfacePair:h.interfacePair});
+                available_depth_mm:h.availableDepth,minimum_engagement_mm:h.minimumEngagement,status:status,interfacePair:h.interfacePair});
             check(status=="nominal_dimensions_pass","Nominal screw engagement "+h.id);
         }
         sys.io.File.saveContent(dir+"rbk-sfu1605-axis.assembly.json",saved);
         sys.io.File.saveContent(dir+"rbk-sfu1605-axis.bom.json",haxe.Json.stringify(before,null,"  "));
-        sys.io.File.saveContent(dir+"rbk-sfu1605-axis-checks.json",haxe.Json.stringify({schema_version:1,compatibility_basis:"supplier_intended",
+        sys.io.File.saveContent(dir+"rbk-sfu1605-axis-checks.json",haxe.Json.stringify({schema_version:2,compatibility_basis:"supplier_intended",
             custom_end_machining:false,clearance_checks:results,geometry_clashes:failures,fasteners:engagements,
             reference_discrepancies:["RBK CAD outer sleeve/bearing stack spans 25.5 mm versus standard 25 mm plain journal; screw unchanged",
                 "SFU1605 nut SKU1035001 uses 46 mm drawing length; 42 mm calculator value not used"],
             limits:["Nominal CAD clearance checks do not establish bearing preload or shaft fit tolerances",
                 "Motor is the bd_warehouse OpenBuilds NEMA23 reference, not the StepperOnline or Leadshine product",
-                "M4 rail-block depth 6 mm and riser thread depth 12 mm are explicit reference design assumptions",
+                "HGH15CA mounting threads use the Vallder M4x5 table; detailed CAD is the pinned HIWIN distributor reference, not Vallder CAD; fabricated aluminium taps use 1.5D nominal minimum engagement",
                 "Small screw end fillets/chamfers and grease fitting are not modeled"]},null,"  "));
         for(p in prototypes) p.close();
         check(failures==0,"Axis model clashes require review; see rbk-sfu1605-axis-checks.json");
