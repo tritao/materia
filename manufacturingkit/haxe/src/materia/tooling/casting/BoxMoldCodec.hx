@@ -4,7 +4,7 @@ import haxe.Json;
 import haxe.crypto.Sha256;
 import materia.tooling.ToolingCodec;
 
-/** Version 3 persists this explicit template and its resolved records. On load all records
+/** Version 4 persists this explicit template and its resolved records. On load all records
  * must equal regeneration from the strict source/setup/recipe document. No native resources.
  * Hand-edited generated plans are deliberately rejected; edit the source document instead.
  */
@@ -27,7 +27,7 @@ class BoxMoldCodec {
 				Reflect.setField(resolved, key, Reflect.field(p, key));
 		return ToolingCodec.canonical({
 			format: "materia.box-mold",
-			version: 3,
+			version: 4,
 			supportOptions: p.supportOptions,
 			source: Json.parse(ToolingCodec.encode(p.document)),
 			resolved: resolved
@@ -38,7 +38,7 @@ class BoxMoldCodec {
 		if (text == null || haxe.io.Bytes.ofString(text).length > 2097152)
 			throw "Mold record exceeds size limit";
 		var raw:Dynamic = Json.parse(text);
-		if (raw == null || Reflect.field(raw, "format") != "materia.box-mold" || Reflect.field(raw, "version") != 3)
+		if (raw == null || Reflect.field(raw, "format") != "materia.box-mold" || Reflect.field(raw, "version") != 4)
 			throw "Unsupported mold format/version";
 		var document = ToolingCodec.decode(Json.stringify(Reflect.field(raw, "source"))),
 			p = BoxMoldPlanner.plan(document, CoreSupports.options(Reflect.field(raw, "supportOptions")));

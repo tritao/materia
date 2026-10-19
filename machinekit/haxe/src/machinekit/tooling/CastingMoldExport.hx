@@ -46,9 +46,12 @@ class CastingMoldExport {
 			fingerprint: CastingMoldCodec.fingerprint(p),
 			geometry: review,
 			changeRequests: p.changeRequests,
-			limitations: "REVIEW ONLY. Datum fixtures require qualified attachments; bores are protected envelopes in removal checks. Release fasteners, masks and adhesive before the corresponding straight withdrawals. Compaction, anchorage, precision replication/grouting, loads and handling remain pending."
+			limitations: "REVIEW ONLY. Datum fixtures require qualified attachments; steel bores, temporary masks and fixture pins are modeled in the swept graphs. Release accessible fasteners and adhesive as applicable; withdraw masks and fixture pins in the checked order. Compaction, anchorage, precision replication/grouting, loads and handling remain pending."
 		});
 		data(dir + "/feature-inventory.json", p.features);
+		data(dir + "/demolding-steps.json", review.demoldingSteps);
+		data(dir + "/handling.json", review.handling);
+		data(dir + "/diagnostics.json", ToolingDiagnostics.fromValidation(p.validation).items);
 		data(dir + "/design-change-requests.json", p.changeRequests);
 		data(dir + "/process-options.json", p.options);
 		for (m in p.panels.members.concat(p.supportPanels)) {
@@ -77,6 +80,7 @@ class CastingMoldExport {
 				var local = cutting.block, part = ToolingVolume.geometryOf({
 					id: id,
 					material: EPSStock,
+					cuts: [],
 					profiles: [],
 					pieces: [local]
 				});
@@ -125,17 +129,19 @@ class CastingMoldExport {
 			+ "\n\nREVIEW ONLY. Not approved for fabrication.\n\n"
 			+ "1. Qualify stock, EPS, adhesive/covering/release compatibility, compaction, closure and brace loads before pouring.\n"
 			+
-			"2. Resolve all design-change requests, especially fixture attachments, precision allowances and lifting/flip points. Datum fixtures place inserts nominally; they do not establish final precision.\n"
+			"2. Resolve all blocking validation records and design-change requests, including tooling fixture qualification, precision allowances and lifting/flip points. Datum fixtures place inserts nominally; they do not establish final precision.\n"
 			+
 			"3. Cut/laminate EPS with the specified interlayer glue lines. Permanently bond carriers to each shared bridge; prebond the row's cores to that fixture.\n\n"
 			+ coreList.join("\n")
 			+ "\n\n"
 			+ "4. Geometric installation order: "
 			+ review.assembly.assemblyOrder.join(" -> ")
-			+ ". Install pins and clamp bolts afterwards. Clamp support rails and outer walls with qualified external closures.\n"
 			+
-			"5. Independently locate and secure every insert to its datum fixture. Resolve pending temporary threads/clamps and mask/protect bores. Seams and square router-corner cleanup need a declared process.\n"
-			+ "6. After cure, release loose hardware, masks and EPS/carrier adhesive as applicable. Geometric removal order: "
+			". Fixture pins and bore masks are included in that order; fit loose clamp bolts afterwards. Clamp support rails and outer walls with qualified external closures.\n"
+			+
+			"5. Qualify lateral location and secure every insert to its bed-referenced nominal support. Resolve pending temporary threads/clamps and mask/protect bores. Seams and router-relief sealing profiles need a qualified process.\n"
+			+
+			"6. After cure, release accessible loose fixings and EPS/carrier adhesive as applicable. Pins and bore masks remain in the checked removal order. Geometric removal order: "
 			+ review.demolding.removalOrder.join(" -> ")
 			+ ". These are full straight-translation sweeps; mechanical release and EPS breakup are manual prerequisites.\n"
 			+

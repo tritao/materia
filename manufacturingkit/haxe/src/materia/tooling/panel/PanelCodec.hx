@@ -16,7 +16,7 @@ import materia.tooling.panel.PanelPlan.PanelCurveKind;
 /** Strict exact local-part recipe, separate from occurrence placement and qualification. */
 class PanelCodec {
 	public static function encode(panel:PanelPlan):String {
-		var text = ToolingCodec.canonical({format: "materia.tooling-panel", version: 2, panel: snapshot(panel)}) + "\n";
+		var text = ToolingCodec.canonical({format: "materia.tooling-panel", version: 3, panel: snapshot(panel)}) + "\n";
 		if (haxe.io.Bytes.ofString(text).length > 262144)
 			throw "Panel record exceeds size limit";
 		return text;
@@ -30,7 +30,7 @@ class PanelCodec {
 			throw "Panel record exceeds size limit";
 		var r:Dynamic = Json.parse(text);
 		obj(r, ["format", "version", "panel"]);
-		if (s(r, "format") != "materia.tooling-panel" || n(r, "version") != 2)
+		if (s(r, "format") != "materia.tooling-panel" || n(r, "version") != 3)
 			throw "Unsupported panel format/version";
 		var panel = Reflect.field(r, "panel");
 		if (!Std.isOfType(Reflect.field(panel, "contactOpenings"), Array))
@@ -161,30 +161,7 @@ class PanelCodec {
 			throw "Uncoated contact face";
 		var ids = new Map<String, Bool>(), setups = new Map<String, String>();
 		for (o in arr(r, "operations", 128)) {
-			obj(o, [
-				"id",
-				"kind",
-				"contour",
-				"side",
-				"setupId",
-				"depth",
-				"through",
-				"toolDiameter",
-				"reliefToolDiameter"
-			]);
-			var contour = contourSnapshot(Reflect.field(o, "contour"));
-			var relief = Reflect.field(o, "reliefToolDiameter");
-			var op:PanelOperation = {
-				id: s(o, "id"),
-				kind: kind(s(o, "kind")),
-				contour: contour,
-				side: side(s(o, "side")),
-				setupId: s(o, "setupId"),
-				depth: pos(o, "depth"),
-				through: flag(o, "through"),
-				toolDiameter: pos(o, "toolDiameter"),
-				reliefToolDiameter: relief == null ? null : pos(o, "reliefToolDiameter")
-			};
+			var op = operationSnapshot(o), contour = op.contour;
 			identifier(op.id);
 			identifier(op.setupId);
 			if (setups.exists(op.setupId) && setups.get(op.setupId) != (op.side : String))
@@ -205,33 +182,23 @@ class PanelCodec {
 				&& (op.through || (op.side : String) == (p.contactFace : String))
 				&& openings.indexOf(op.id) < 0)
 				throw "Cut pierces contact skin";
-			if (op.reliefToolDiameter != null) {
-				if (op.reliefToolDiameter != op.toolDiameter)
-					throw "Relief cutter must match operation tool";
-				for (seg in contour) {
-					var c = seg.center;
-					if (c != null && Math.abs(2 * PanelContours.distance(c, seg.start) - op.toolDiameter) > 1e-7)
-						throw "Relief radius does not match cutter";
-				}
-			}
-			if (op.kind == Drill) {
-				var first = contour[0], c = first.center;
-				if (c == null)
-					throw "Drill needs an exact circle";
-				var diameter = 2 * PanelContours.distance(c, first.start);
-				for (seg in contour) {
-					var center = seg.center;
-					if (center == null
-						|| PanelContours.distance(center, c) > 1e-7
-						|| Math.abs(2 * PanelContours.distance(center, seg.start) - diameter) > 1e-7)
-						throw "Drill needs an exact circle";
-				}
-				if (Math.abs(op.toolDiameter - diameter) > 1e-7
-					|| Math.abs(PanelGeometry.area(contour) - Math.PI * diameter * diameter / 4) > 1e-6)
-					throw "Drill tool does not match circle";
-			}
+
 			p.operations.push(op);
 		}
+		for (op in p.operations)
+			if (op.accessVia != null) {
+				var parents = p.operations.filter(v -> v.id == op.accessVia);
+				if (parents.length != 1)
+					throw "Unknown operation access pocket";
+				var parent = parents[0],
+					bounds = PanelGeometry.bounds(op.contour);
+				if ((parent.kind != Pocket && parent.kind != Rebate)
+					|| parent.through
+					|| parent.side != op.side
+					|| op.depth <= parent.depth
+					|| !PanelGeometry.containsRect(parent.contour, bounds.x, bounds.y, bounds.width, bounds.height))
+					throw "Invalid operation access pocket";
+			}
 		for (id in openings)
 			if (!ids.exists(id) || p.operations.filter(o -> o.id == id && o.kind != OutsideProfile).length != 1)
 				throw "Unknown contact opening";
@@ -260,11 +227,11 @@ class PanelCodec {
 				} else if (!PanelGeometry.containsRect(outline, q.x - m, q.y - m, q.width + 2 * m, q.height + 2 * m))
 					throw "Insufficient panel edge ligament";
 				for (other in p.operations)
-					if (other.id < op.id && other.kind != OutsideProfile) {
+					if (other.id < op.id && other.kind != OutsideProfile && op.accessVia != other.id && other.accessVia != op.id) {
 						var a = PanelGeometry.bounds(other.contour),
 							dx = Math.max(0, Math.max(a.x - q.x - q.width, q.x - a.x - a.width));
 						var dy = Math.max(0, Math.max(a.y - q.y - q.height, q.y - a.y - a.height));
-						if (Math.sqrt(dx * dx + dy * dy) < m)
+						if (Math.sqrt(dx * dx + dy * dy) < m && PanelGeometry.distanceBetween(op.contour, other.contour) < m - 1e-7)
 							throw "Insufficient ligament between cuts";
 					}
 			}
@@ -314,6 +281,70 @@ class PanelCodec {
 			}
 			if (!open)
 				throw "Cutter cannot cut sharp internal corner: " + op.id;
+		}
+	}
+
+	public static function operationSnapshot(o:Dynamic):PanelOperation {
+		obj(o, [
+			"id",
+			"kind",
+			"contour",
+			"side",
+			"setupId",
+			"depth",
+			"through",
+			"toolDiameter",
+			"reliefToolDiameter",
+			"accessVia"
+		]);
+		var contour = contourSnapshot(Reflect.field(o, "contour"));
+		var relief = Reflect.field(o, "reliefToolDiameter");
+		var op:PanelOperation = {
+			id: s(o, "id"),
+			kind: kind(s(o, "kind")),
+			contour: contour,
+			side: side(s(o, "side")),
+			setupId: s(o, "setupId"),
+			depth: pos(o, "depth"),
+			through: flag(o, "through"),
+			toolDiameter: pos(o, "toolDiameter"),
+			reliefToolDiameter: relief == null ? null : pos(o, "reliefToolDiameter"),
+			accessVia: Reflect.field(o, "accessVia") == null ? null : s(o, "accessVia")
+		};
+		identifier(op.id);
+		identifier(op.setupId);
+		validateToolGeometry(op);
+		if (op.kind == InsideProfile || op.kind == Pocket)
+			cutterFit(op, []);
+		return op;
+	}
+
+	static function validateToolGeometry(op:PanelOperation):Void {
+		var contour = op.contour;
+		if (op.reliefToolDiameter != null) {
+			if (op.reliefToolDiameter != op.toolDiameter)
+				throw "Relief cutter must match operation tool";
+			for (seg in contour) {
+				var c = seg.center;
+				if (c != null && Math.abs(2 * PanelContours.distance(c, seg.start) - op.toolDiameter) > 1e-7)
+					throw "Relief radius does not match cutter";
+			}
+		}
+		if (op.kind == Drill) {
+			var first = contour[0], c = first.center;
+			if (c == null)
+				throw "Drill needs an exact circle";
+			var diameter = 2 * PanelContours.distance(c, first.start);
+			for (seg in contour) {
+				var center = seg.center;
+				if (center == null
+					|| PanelContours.distance(center, c) > 1e-7
+					|| Math.abs(2 * PanelContours.distance(center, seg.start) - diameter) > 1e-7)
+					throw "Drill needs an exact circle";
+			}
+			if (Math.abs(op.toolDiameter - diameter) > 1e-7
+				|| Math.abs(PanelGeometry.area(contour) - Math.PI * diameter * diameter / 4) > 1e-6)
+				throw "Drill tool does not match circle";
 		}
 	}
 

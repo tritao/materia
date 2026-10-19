@@ -77,6 +77,8 @@ class FoundationToolingTests {
 						if (f.kind == "void") {
 							featureId: f.id,
 							strategy: SacrificialEPS,
+							draftDegrees: 0,
+							priority: 0,
 							withdrawal: null
 						}
 				]
@@ -109,6 +111,10 @@ class FoundationToolingTests {
 				jointLiningAllowance: 0.0,
 				jointMachiningAllowance: 0.05,
 				coreWireAxis: materia.tooling.ToolingRecipe.CoreWireAxis.Y,
+				adhesiveLineThickness: 0.2,
+				mixDensityKgM3: 2400,
+				steelDensityKgM3: 7850,
+				handlingLoadFactor: 1.5,
 				hardware: {
 					insertBoreDiameter: 5,
 					insertClearanceDiameter: 7,
@@ -125,7 +131,15 @@ class FoundationToolingTests {
 					supportClearanceDiameter: 7,
 					secondaryPinTravel: 2,
 					padDepth: 54,
-					labelOffset: 8
+					labelOffset: 8,
+					datumThickness: 8,
+					datumPostWidth: 20,
+					formerFlangeThickness: 12,
+					formerFlangeMargin: 10,
+					fixturePinDiameter: 3,
+					fixturePinEmbed: 3,
+					fixturePinSpacing: 8,
+					fixtureSlotToolDiameter: 3
 				},
 				jointClearance: 0.3,
 				linerThickness: 0.1,
@@ -234,6 +248,11 @@ class FoundationToolingTests {
 		check(unknownMessage.indexOf("Unknown source insert role") >= 0, "unknown source roles fail explicitly");
 		equivalent(new machinekit.hobbing.MineralCastBed(), "hobber-bed");
 		equivalent(new machinekit.hobbing.MineralCastColumn(), "hobber-column");
+		var finished = new CastInsert(new ComponentValues().setToken("finish", "replicated after casting"));
+		var finishFoundation = new MineralFoundation(values, [{id: "finished", part: finished, pose: F.identity()}]);
+		check(FoundationToolingAdapter.snapshot(finishFoundation, "finish-contract", 1)
+			.inserts[0].finish == materia.tooling.ToolingEnums.InsertFinish.ReplicatedAfterCasting,
+			"typed source finishing route survives adapter");
 		Sys.println('FoundationToolingTests: $assertions assertions passed');
 		PanelNativeTests.run();
 		BoxMoldTests.run();

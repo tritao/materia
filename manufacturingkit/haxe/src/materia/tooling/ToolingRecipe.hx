@@ -29,6 +29,14 @@ typedef ToolingHardware = {
 	var secondaryPinTravel:Float;
 	var padDepth:Float;
 	var labelOffset:Float;
+	var datumThickness:Float;
+	var datumPostWidth:Float;
+	var formerFlangeThickness:Float;
+	var formerFlangeMargin:Float;
+	var fixturePinDiameter:Float;
+	var fixturePinEmbed:Float;
+	var fixturePinSpacing:Float;
+	var fixtureSlotToolDiameter:Float;
 }
 
 typedef ToolingRecipe = {
@@ -44,6 +52,10 @@ typedef ToolingRecipe = {
 	var jointMachiningAllowance:Float;
 	var hardware:ToolingHardware;
 	var coreWireAxis:CoreWireAxis;
+	var adhesiveLineThickness:Float;
+	var mixDensityKgM3:Float;
+	var steelDensityKgM3:Float;
+	var handlingLoadFactor:Float;
 	var linerThickness:Float;
 	var routerDiameter:Float;
 	var minimumLigament:Float;

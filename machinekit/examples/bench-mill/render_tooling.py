@@ -58,7 +58,7 @@ for cutaway in (False, True):
         ax.set_box_aspect(high - low + 30); ax.view_init(elev=32, azim=-55)
         ax.set_title("Assembled" + (" — south/west walls hidden" if cutaway and index == 1 else "") if index == 1 else "Exploded review")
         ax.set(xlabel="X (mm)", ylabel="Y (mm)", zlabel="Z (mm)")
-    fig.suptitle("Bench-mill base mold — six EPS cores, detail formers and independent insert datums")
+    fig.suptitle("Bench-mill base mold — six EPS cores, detail formers and nominal bed-referenced insert supports")
     fig.text(.5, .02, "REVIEW ONLY: fixture attachments, replication/grout allowances, anchorage, compaction, loads and handling remain pending.", ha="center", fontsize=9)
     fig.tight_layout(rect=(0, .05, 1, .95))
     target = root / ("mold-cutaway.png" if cutaway else "mold-review.png")

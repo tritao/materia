@@ -23,6 +23,7 @@ class ToolingVolume extends MachineComponent {
 			P.text("volume", MoldVolumeCodec.encode({
 				id: "former",
 				material: materia.tooling.casting.CastingMoldPlan.MoldPartMaterial.FormerStock,
+				cuts: [],
 				profiles: [],
 				pieces: [
 					{
@@ -96,7 +97,18 @@ class ToolingVolume extends MachineComponent {
 				});
 				parts.push(solid);
 			}
-			return Solids.union(parts);
+			var result = Solids.union(parts);
+			parts.push(result);
+			var cuts:Array<Part> = [];
+			for (c in v.cuts) {
+				var local = PanelCad.prism(c.operation, 0, c.operation.depth);
+				parts.push(local);
+				var world = machinekit.assembly.PosedParts.moved(local, c.pose);
+				parts.push(world);
+				local.close();
+				cuts.push(world);
+			}
+			return Solids.cut(result, cuts);
 		});
 	}
 }

@@ -16,6 +16,21 @@ import materia.tooling.casting.MoldPlan.CorePlan;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.casting.MoldPlan.PenetrationPlan;
 
+private typedef BridgeRegistration = {
+	var receiver:PanelPlan;
+	var bridge:PanelPlan;
+	var receiverOrigin:{x:Float, y:Float};
+	var bridgeOrigin:{x:Float, y:Float};
+	var pin:{x:Float, y:Float};
+	var bolt:{x:Float, y:Float};
+	var secondary:Bool;
+	var angle:Float;
+	var receiverPinId:String;
+	var bridgePinId:String;
+	var receiverBoltId:String;
+	var bridgeBoltId:String;
+}
+
 /** Two explicit support templates; neither establishes adhesive or structural qualification. */
 class CoreSupports {
 	public static function defaults(r:ToolingRecipe):CoreSupportOptions
@@ -23,7 +38,7 @@ class CoreSupports {
 			mode: Auto,
 			embedDepth: r.panel.measuredThickness / 3,
 			fitClearance: r.jointClearance,
-			adhesiveThickness: 0.2
+			adhesiveThickness: r.adhesiveLineThickness
 		};
 
 	public static function options(raw:Dynamic):CoreSupportOptions {
@@ -210,34 +225,23 @@ class CoreSupports {
 			var y = north ? b.y + b.depth + 2 * t : b.y - 2 * t,
 				pinx = cx - bw / 4,
 				boltx = cx + bw / 4;
-			pad.operations.push(PanelJoints.operation("locating-pin", Drill,
-				PanelContours.circle(pinx - px, y - py, (hw.locatingPinDiameter + o.fitClearance) / 2), t, hw.locatingPinDiameter + o.fitClearance));
-			pad.operations.push(PanelJoints.operation("clamp-bolt", Drill, PanelContours.circle(boltx - px, y - py, hw.supportClearanceDiameter / 2), t,
-				hw.supportClearanceDiameter));
-			var contour = north ? PanelContours.placed(PanelContours.obround(0, 0, hw.locatingPinDiameter + hw.secondaryPinTravel + o.fitClearance,
-				hw.locatingPinDiameter + o.fitClearance),
-				Math.PI / 2, pinx
-				- bridgeX, y
-				- bridgeY) : PanelContours.circle(pinx - bridgeX, y - bridgeY, (hw.locatingPinDiameter + o.fitClearance) / 2);
-			bridge.operations.push(PanelJoints.operation(north ? "secondary-slot" : "primary-pin", north ? InsideProfile : Drill, contour, t,
-				north ? tool : hw.locatingPinDiameter + o.fitClearance));
-			bridge.operations.push(PanelJoints.operation(north ? "north-bolt" : "south-bolt", Drill,
-				PanelContours.circle(boltx - bridgeX, y - bridgeY, hw.supportClearanceDiameter / 2), t, hw.supportClearanceDiameter));
+			registration({
+				receiver: pad,
+				bridge: bridge,
+				receiverOrigin: {x: px, y: py},
+				bridgeOrigin: {x: bridgeX, y: bridgeY},
+				pin: {x: pinx, y: y},
+				bolt: {x: boltx, y: y},
+				secondary: north,
+				angle: Math.PI / 2,
+				receiverPinId: "locating-pin",
+				bridgePinId: north ? "secondary-slot" : "primary-pin",
+				receiverBoltId: "clamp-bolt",
+				bridgeBoltId: north ? "north-bolt" : "south-bolt"
+			}, r, o.fitClearance);
 			var prefix = materia.tooling.ToolingIds.derive("", c.id, north ? "-north" : "-south");
-			s.hardware.push({
-				id: materia.tooling.ToolingIds.derive("", prefix, "-pin"),
-				kind: LocatingPin,
-				pose: F.translation(pinx, y, b.z + b.height),
-				diameter: hw.locatingPinDiameter,
-				length: 2 * t
-			});
-			s.hardware.push({
-				id: materia.tooling.ToolingIds.derive("", prefix, "-bolt"),
-				kind: ClampBolt,
-				pose: F.translation(boltx, y, b.z + b.height + 2 * t),
-				diameter: hw.supportScrewDiameter,
-				length: 2 * t
-			});
+			supportHardware(s.hardware, materia.tooling.ToolingIds.derive("", prefix, "-pin"), materia.tooling.ToolingIds.derive("", prefix, "-bolt"),
+				{x: pinx, y: y}, {x: boltx, y: y}, b.z + b.height, r);
 			placed(pad, px, py, b.z + b.height);
 		}
 		placed(carrier, c.foam.x, c.foam.y, b.z + b.height);
@@ -284,5 +288,133 @@ class CoreSupports {
 			+ Math.abs(p.qy)
 			+ Math.abs(p.qz) > 1e-7 || Math.abs(Math.abs(p.qw) - 1) > 1e-8)
 			throw "Invalid foot cutting definition";
+	}
+
+	public static function sharedBridges(b:MoldBox, r:ToolingRecipe, cores:Array<materia.tooling.casting.CastingMoldPlan.CastingMoldCore>,
+			panels:Array<PanelPlacement>, hardware:Array<materia.tooling.casting.CoreSupport.SupportHardware>):Void {
+		if (cores.length == 0)
+			return;
+		var t = r.panel.measuredThickness,
+			l = r.minimumLigament,
+			edge = 2 * l + r.routerDiameter,
+			pad = r.hardware.padDepth;
+		var rows:Array<Float> = [];
+		for (c in cores) {
+			var y = c.cavity.y + c.cavity.depth / 2;
+			if (rows.filter(v -> Math.abs(v - y) < 1e-7).length == 0)
+				rows.push(y);
+		}
+		rows.sort(Reflect.compare);
+		function place(panel:materia.tooling.panel.PanelPlan, x:Float, y:Float, z:Float):Void
+			panels.push({
+				panel: PanelCodec.snapshot(panel),
+				pose: F.translation(x, y, z),
+				withdrawal: {
+					x: 0,
+					y: 0,
+					z: 1
+				}
+			});
+		var rails = [];
+		for (right in [false, true]) {
+			var x = right ? b.x + b.width : b.x - pad - edge,
+				y = b.y - t - edge;
+			var rail = PanelJoints.blank(right ? "bridge-right-rail" : "bridge-left-rail", pad + edge, b.depth + 2 * t + 2 * edge, r.panel, r.routerDiameter,
+				l);
+			rail.labelX = right ? pad + edge - 2 * r.hardware.labelOffset : 2 * r.hardware.labelOffset;
+			rail.operations.push(PanelJoints.operation("wall-top-socket", Rebate,
+				PanelContours.relievedRectangle(right ? t / 2 : pad + edge - t / 2, (b.depth + 2 * t + 2 * edge) / 2, t + r.jointClearance,
+					b.depth + r.jointClearance, r.routerDiameter / 2),
+				t / 2, r.routerDiameter, MachiningSide.NegativeZ, false, r.routerDiameter));
+			rails.push({
+				panel: rail,
+				x: x,
+				y: y,
+				right: right
+			});
+		}
+		for (index in 0...rows.length) {
+			var y = rows[index],
+				width = Math.min(r.hardware.minimumBridgeWidth, [
+					for (c in cores)
+						if (Math.abs(c.cavity.y + c.cavity.depth / 2 - y) < 1e-7) c.cavity.depth
+				][0] / 2);
+			var id = "core-bridge-" + index,
+				beam = PanelJoints.blank(id, b.width + 2 * (pad + edge), width, r.panel, r.routerDiameter, l),
+				bx = b.x - pad - edge,
+				by = y - width / 2;
+			beam.labelY = width / 2;
+			for (rail in rails) {
+				var x = rail.right ? b.x + b.width + 2 * t : b.x - 2 * t,
+					py = y - width / 4,
+					byy = y + width / 4,
+					d = r.hardware.locatingPinDiameter + r.jointClearance;
+				registration({
+					receiver: rail.panel,
+					bridge: beam,
+					receiverOrigin: {x: rail.x, y: rail.y},
+					bridgeOrigin: {x: bx, y: by},
+					pin: {x: x, y: py},
+					bolt: {x: x, y: byy},
+					secondary: rail.right,
+					angle: 0,
+					receiverPinId: "pin-" + index,
+					bridgePinId: rail.right ? "secondary-slot" : "primary-pin",
+					receiverBoltId: "bolt-" + index,
+					bridgeBoltId: rail.right ? "right-bolt" : "left-bolt"
+				}, r, r.jointClearance);
+				supportHardware(hardware, id
+					+ (rail.right ? "-right-pin" : "-left-pin"), id
+					+ (rail.right ? "-right-bolt" : "-left-bolt"), {x: x, y: py},
+					{x: x, y: byy}, b.z
+					+ b.height, r);
+			}
+			place(beam, bx, by, b.z + b.height + t);
+			for (c in cores)
+				if (Math.abs(c.cavity.y + c.cavity.depth / 2 - y) < 1e-7) {
+					c.bridgeId = id;
+					var f = c.foamLayers[0];
+					c.bridgeBondAreaMm2 = f.width * width;
+					place(PanelJoints.blank(c.carrierId, f.width, f.depth, r.panel, r.routerDiameter, l), f.x, f.y, b.z + b.height);
+				}
+		}
+		for (rail in rails)
+			place(rail.panel, rail.x, rail.y, b.z + b.height);
+	}
+
+	static function registration(s:BridgeRegistration, r:ToolingRecipe, clearance:Float):Void {
+		var h = r.hardware,
+			d = h.locatingPinDiameter + clearance,
+			t = r.panel.measuredThickness;
+		var pinX = s.pin.x - s.receiverOrigin.x,
+			pinY = s.pin.y - s.receiverOrigin.y;
+		s.receiver.operations.push(PanelJoints.operation(s.receiverPinId, Drill, PanelContours.circle(pinX, pinY, d / 2), t, d));
+		s.receiver.operations.push(PanelJoints.operation(s.receiverBoltId, Drill,
+			PanelContours.circle(s.bolt.x - s.receiverOrigin.x, s.bolt.y - s.receiverOrigin.y, h.supportClearanceDiameter / 2), t, h.supportClearanceDiameter));
+		var x = s.pin.x - s.bridgeOrigin.x, y = s.pin.y - s.bridgeOrigin.y;
+		var contour = s.secondary ? PanelContours.placed(PanelContours.obround(0, 0, d + h.secondaryPinTravel, d), s.angle, x,
+			y) : PanelContours.circle(x, y, d / 2);
+		s.bridge.operations.push(PanelJoints.operation(s.bridgePinId, s.secondary ? InsideProfile : Drill, contour, t, s.secondary ? r.routerDiameter : d));
+		s.bridge.operations.push(PanelJoints.operation(s.bridgeBoltId, Drill,
+			PanelContours.circle(s.bolt.x - s.bridgeOrigin.x, s.bolt.y - s.bridgeOrigin.y, h.supportClearanceDiameter / 2), t, h.supportClearanceDiameter));
+	}
+
+	static function supportHardware(out:Array<SupportHardware>, pinId:String, boltId:String, pin:{x:Float, y:Float}, bolt:{x:Float, y:Float}, z:Float,
+			r:ToolingRecipe):Void {
+		var t = r.panel.measuredThickness;
+		out.push({
+			id: pinId,
+			kind: LocatingPin,
+			pose: F.translation(pin.x, pin.y, z),
+			diameter: r.hardware.locatingPinDiameter,
+			length: 2 * t
+		});
+		out.push({
+			id: boltId,
+			kind: ClampBolt,
+			pose: F.translation(bolt.x, bolt.y, z + 2 * t),
+			diameter: r.hardware.supportScrewDiameter,
+			length: 2 * t
+		});
 	}
 }

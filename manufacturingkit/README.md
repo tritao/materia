@@ -53,7 +53,7 @@ and the full fabrication/CAM package remain subsequent stages.
   Named collections and object fields are canonicalized for stable fingerprints;
   profile vertices retain geometric order. UTF-8 document size is limited to
   2 MiB, named collections to 512 records and convex profiles to 64 vertices.
-  Codec version 3 requires explicit hardware choices, fit allowances, core wire axis,
+  Codec version 4 requires explicit hardware choices, fit allowances, core wire axis,
   fill height and freeboard. Closed vocabularies are typed; earlier versions are
   rejected with no compatibility reader.
   An insert's original design label is preserved separately as `sourceRole`.
@@ -136,12 +136,12 @@ generates the coupon, exact drawings and assembled/exploded preview scenes.
 `materia.tooling.casting.BoxMoldPlanner.plan(document)` builds the explicit
 orthogonal single-pocket template from a validated `ToolingDocument`: five
 panels, EPS/covering geometry, a ruled block cutting definition, an insert
-fixture and classified contact cuts. `BoxMoldCodec` version 3 stores the strict
+fixture and classified contact cuts. `BoxMoldCodec` version 4 stores the strict
 source document and resolved records and verifies regeneration on load. It
 rejects unknown versions and hand-edited generated records. Dimensions remain
 millimetres and profiles remain finished geometry, without cutter compensation.
 
-Panel codec version 2 requires `contactOpenings` in typed records and JSON.
+Panel codec version 3 requires `contactOpenings` in typed records and JSON.
 Use an empty list for an intact skin. Naming an opening permits CAD to
 represent it but does not qualify it: the consuming mold must supply a matching
 `PenetrationPlan`. The box planner checks references, insert seal margins and cutting definitions;
@@ -160,8 +160,8 @@ datums, anchorage, finishing stock, material/process evidence and handling.
 Core supports are reusable neutral records in `casting.CoreSupport` and generated
 by `CoreSupports`. Pass optional `CoreSupportOptions` to `BoxMoldPlanner.plan`;
 defaults use `Auto`, one-third measured stock for embed depth, recipe joint
-clearance and a 0.2 mm adhesive line. The options codec validates closed enum modes,
-finite dimensions and unknown fields; mold codec version 3 persists them and
+clearance and the declared recipe adhesive-line thickness. The options codec validates closed enum modes,
+finite dimensions and unknown fields; mold codec version 4 persists them and
 rejects earlier versions. Auto chooses a bed socket when the cavity opens onto the bed,
 otherwise a bridge when it opens onto the fill face. Explicit incompatible modes
 fail without changing the source casting.
@@ -190,13 +190,13 @@ geometry is one rectangular envelope with axis-aligned cuts and downward-facing
 insert mounting faces. EPS pockets must open at the fill face; rigid details use
 explicit X-side or Z withdrawal directions. Unsupported layouts fail.
 
-`CastingMoldOptions` includes typed precision routes, replication evidence fields,
+`CastingMoldOptions` includes typed precision routes, replication evidence fields (implemented fields only),
 grouted-joint inputs, `CompactionSpec`, per-insert `InsertAnchorage`, and handling
 requirements. Missing evidence remains pending. Nonempty anchorage geometry is
 rejected until a corresponding source-adapter revision can describe it; it is
 never silently added to the casting. Precision allowances never move source
-inserts. `CastingMoldCodec` version 2 stores and verifies complete regeneration;
-`MoldVolumeCodec` version 2 stores finite boxes and exact operation-derived sealing
+inserts. `CastingMoldCodec` version 3 stores and verifies complete regeneration;
+`MoldVolumeCodec` version 3 stores finite boxes and exact operation-derived sealing
 profiles for rebuildable CAD. A side former fills its router reliefs with the same
 profile that cuts the panel window; those exterior sealing sections preserve
 source geometry and allow straight withdrawal.
@@ -226,3 +226,27 @@ release treatment. Core cutting records declare entry/exit faces and a selectabl
 X/Y/Z wire direction. The current box templates support full-height fill with
 zero freeboard and reject other fill setups explicitly. Bridge pads/rails stay
 outside the open fill footprint.
+
+
+Phase 4 review decisions are explicit: feature draft and priority, a declared
+inserts/EPS/datums/priority/ID overlap rule, unsupported-feature records, source
+finish validation, source-to-service orientation and typed lifting qualification.
+Zero-draft rigid box details request a split/draft/sacrificial alternative; the
+planner never fabricates positive draft from an unchanged source box. Missing
+machining or replication allowance produces a source-interface request. Dam and
+pour-group fields are removed until their geometry and checks are implemented.
+
+Nominal datum supports have pin/slot receivers, tool-only threads and sealed bed
+penetrations. They remain bed-referenced; insert XY clamping, accuracy and access
+need qualification. Receiver cuts store explicit `PanelOperation` records, sharing
+the contour codec/CAD path with panel machining. Pocket-floor drills name their
+access pocket, while unrelated cuts still undergo exact line/arc ligament checks.
+Steel bores, masks and fixture pins participate in their actual removal sequence.
+Casting mass/CoM includes bored steel and recipe mix density; flip/reorientation
+is derived and appears after withdrawal, with qualification status.
+
+Run the full mill acceptance suite without generating all exports:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/tests/tooling/haxeon.mill.json
+```

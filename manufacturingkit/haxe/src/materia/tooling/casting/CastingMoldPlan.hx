@@ -22,17 +22,24 @@ typedef MoldVolumeProfile = {
 	var subtract:Array<MoldBox>;
 }
 
+typedef MoldVolumeCut = {
+	var operation:materia.tooling.panel.PanelPlan.PanelOperation;
+	var pose:AssemblyFrame;
+}
+
 typedef MoldVolume = {
 	var id:String;
 	var material:MoldPartMaterial;
 	var pieces:Array<MoldBox>;
 	var profiles:Array<MoldVolumeProfile>;
+	var cuts:Array<MoldVolumeCut>;
 }
 
 enum abstract FeatureToolingKind(String) to String {
 	var EPSFeature = "eps";
 	var FormerFeature = "former";
 	var InsertFeature = "insert";
+	var UnsupportedFeature = "unsupported";
 }
 
 typedef FeatureTooling = {
@@ -58,6 +65,7 @@ typedef MoldFormer = {
 	var volume:MoldVolume;
 	var featureIds:Array<String>;
 	var withdrawal:{x:Float, y:Float, z:Float};
+	var draftDegrees:Float;
 }
 
 enum abstract MoldOpeningKind(String) to String {
@@ -86,9 +94,7 @@ typedef PrecisionInterface = {
 	var masterReference:Null<String>;
 	var masterFlatnessMm:Null<Float>;
 	var releaseSpec:Null<String>;
-	var damGeometry:Array<MoldBox>;
 	var holeProtectionReference:Null<String>;
-	var pourGroup:Null<String>;
 	var evidence:Array<String>;
 }
 
@@ -127,7 +133,6 @@ typedef InsertAnchorage = {
 
 enum abstract DesignChangeKind(String) to String {
 	var LiftingPoints = "lifting-points";
-	var FixtureAttachment = "fixture-attachment";
 	var DraftOrSplit = "draft-or-split";
 	var InterfaceAllowance = "interface-allowance";
 }
@@ -149,13 +154,41 @@ typedef GroutedJoint = {
 	var cureBeforeTorqueEvidence:Array<String>;
 }
 
+enum abstract OverlapRule(String) to String {
+	var ReservedThenPriority = "inserts-eps-datums-then-priority-id";
+}
+
+enum abstract LiftingMethod(String) to String {
+	var CastInPoints = "cast-in-points";
+	var ExternalCradle = "external-cradle";
+}
+
+typedef LiftingQualification = {
+	var method:LiftingMethod;
+	var equipmentReference:String;
+	var capacityKg:Float;
+	var verifiedMassKg:Float;
+	var centerOfMass:{x:Float, y:Float, z:Float};
+	var positionToleranceMm:Float;
+	var attachmentIds:Array<String>;
+	var verificationReference:String;
+}
+
+typedef HandlingPlan = {
+	var requiresFlip:Bool;
+	var moldToService:AssemblyFrame;
+	var castingMassKg:Float;
+	var centerOfMassMoldMm:{x:Float, y:Float, z:Float};
+}
+
 typedef CastingMoldOptions = {
 	var groutedJoints:Array<GroutedJoint>;
 	var precision:Array<PrecisionInterface>;
 	var compaction:CompactionSpec;
 	var anchorage:Array<InsertAnchorage>;
-	var requiresFlip:Bool;
-	var liftingEvidence:Array<String>;
+	var serviceOrientation:AssemblyFrame;
+	var overlapRule:OverlapRule;
+	var liftingEvidence:Array<LiftingQualification>;
 }
 
 typedef MoldInsertFixture = {
@@ -165,6 +198,13 @@ typedef MoldInsertFixture = {
 	var mountingFace:AssemblyFrame;
 	var withdrawal:{x:Float, y:Float, z:Float};
 	var attachmentEvidence:Array<String>;
+	var lateralLocation:{primaryId:String, secondaryId:String, baselineMm:Float};
+	var receiverThreadSpec:String;
+	var fixingId:String;
+	var penetrations:Array<materia.tooling.casting.MoldPlan.PenetrationPlan>;
+	var boreMask:Null<SupportHardware>;
+	var assemblyClearance:{x:Float, y:Float, z:Float};
+	var boreMaskWithdrawal:Null<{x:Float, y:Float, z:Float}>;
 }
 
 typedef CastingMoldPlan = {
@@ -172,6 +212,7 @@ typedef CastingMoldPlan = {
 	var document:ToolingDocument;
 	var sourceFingerprint:String;
 	var options:CastingMoldOptions;
+	var handling:HandlingPlan;
 	var envelope:MoldBox;
 	var cavity:MoldBox;
 	var panels:PanelAssemblyRecord;

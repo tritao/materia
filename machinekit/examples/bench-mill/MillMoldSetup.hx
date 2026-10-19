@@ -35,22 +35,7 @@ class MillMoldSetup {
 				fillHeightMm: height,
 				freeboardMm: 0,
 				sourceToMold: F.fromRotationMatrix(0, 0, height, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
-				features: [
-					for (f in input.features)
-						if (f.kind == "void") {
-							featureId: f.id,
-							strategy: StringTools.startsWith(f.id, "underside-") ? SacrificialEPS : ReusableFormer,
-							withdrawal: StringTools.startsWith(f.id, "underside-") ? null : StringTools.startsWith(f.id, "foot-access-") ? {
-								x: f.pose.x < 0 ? -1.0 : 1.0,
-								y: 0.0,
-								z: 0.0
-							} : StringTools.startsWith(f.id, "foot-stem-") ? {
-								x: 0.0,
-								y: 0.0,
-								z: 1.0
-								} : {x: 0.0, y: 0.0, z: -1.0}
-						}
-				]
+				features: [for (f in input.features) if (f.kind == "void") strategy(f.id)]
 			},
 			recipe: {
 				id: "mill-base-panel-eps-review",
@@ -70,6 +55,10 @@ class MillMoldSetup {
 				jointLiningAllowance: 0.0,
 				jointMachiningAllowance: 0.05,
 				coreWireAxis: materia.tooling.ToolingRecipe.CoreWireAxis.Y,
+				adhesiveLineThickness: 0.2,
+				mixDensityKgM3: 2400,
+				steelDensityKgM3: 7850,
+				handlingLoadFactor: 1.5,
 				hardware: {
 					insertBoreDiameter: 5,
 					insertClearanceDiameter: 7,
@@ -86,7 +75,15 @@ class MillMoldSetup {
 					supportClearanceDiameter: 7,
 					secondaryPinTravel: 2,
 					padDepth: 54,
-					labelOffset: 8
+					labelOffset: 8,
+					datumThickness: 8,
+					datumPostWidth: 20,
+					formerFlangeThickness: 12,
+					formerFlangeMargin: 10,
+					fixturePinDiameter: 3,
+					fixturePinEmbed: 3,
+					fixturePinSpacing: 8,
+					fixtureSlotToolDiameter: 3
 				},
 				jointClearance: 0.2,
 				linerThickness: 0.1,
@@ -97,6 +94,37 @@ class MillMoldSetup {
 				adhesiveSpec: "pending EPS compatible adhesive",
 				processEvidence: []
 			}
+		};
+	}
+
+	public static function strategy(id:String):materia.tooling.casting.CastingSetup.CastingFeatureStrategy {
+		var strategy:materia.tooling.casting.CastingSetup.CoreStrategy;
+		var direction:Null<{x:Float, y:Float, z:Float}>;
+		switch id {
+			case "underside-0-0", "underside-0-1", "underside-1-0", "underside-1-1", "underside-2-0", "underside-2-1":
+				strategy = SacrificialEPS;
+				direction = null;
+			case "foot-access-LeftFront", "foot-access-LeftRear":
+				strategy = ReusableFormer;
+				direction = {x: -1, y: 0, z: 0};
+			case "foot-access-RightFront", "foot-access-RightRear":
+				strategy = ReusableFormer;
+				direction = {x: 1, y: 0, z: 0};
+			case "foot-stem-LeftFront", "foot-stem-LeftRear", "foot-stem-RightFront", "foot-stem-RightRear":
+				strategy = ReusableFormer;
+				direction = {x: 0, y: 0, z: 1};
+			case "guide-shoulder-outside--1", "guide-shoulder-outside-1", "between-y-shoulders", "front-y-bearing-seat", "rear-y-drive-seat":
+				strategy = ReusableFormer;
+				direction = {x: 0, y: 0, z: -1};
+			default:
+				throw "No mill tooling strategy for feature: " + id;
+		}
+		return {
+			featureId: id,
+			strategy: strategy,
+			withdrawal: direction,
+			draftDegrees: 0,
+			priority: 0
 		};
 	}
 
@@ -123,9 +151,7 @@ class MillMoldSetup {
 						masterReference: null,
 						masterFlatnessMm: null,
 						releaseSpec: null,
-						damGeometry: [],
 						holeProtectionReference: null,
-						pourGroup: null,
 						evidence: []
 					}
 			],
@@ -148,7 +174,8 @@ class MillMoldSetup {
 						evidence: []
 					}
 			],
-			requiresFlip: true,
+			serviceOrientation: materia.assembly.AssemblyFrames.identity(),
+			overlapRule: ReservedThenPriority,
 			liftingEvidence: []
 		};
 	}

@@ -43,6 +43,9 @@ typedef PanelOperation = {
 
 	/** If present, the operation must use this same tool in CAM. */
 	var reliefToolDiameter:Null<Float>;
+
+	/** Explicit deeper cut reached through an existing pocket/rebate. */
+	var accessVia:Null<String>;
 }
 
 /** Local part only; its one outside-profile operation owns the exact outline.

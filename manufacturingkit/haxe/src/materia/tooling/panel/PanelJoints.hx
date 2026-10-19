@@ -134,7 +134,8 @@ class PanelJoints {
 			depth: depth,
 			through: through,
 			toolDiameter: tool,
-			reliefToolDiameter: relief
+			reliefToolDiameter: relief,
+			accessVia: null
 		};
 
 	public static function blank(id:String, width:Float, height:Float, stock:PanelStockSpec, router:Float = 6, ligament:Float = 6):PanelPlan

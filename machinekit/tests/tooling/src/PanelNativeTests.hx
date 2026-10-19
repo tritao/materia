@@ -157,6 +157,19 @@ class PanelNativeTests {
 				throw "Missing restored pose";
 			near(restoredPose.z, plan.members[1].pose.z, "assembly placement survives reconstruction");
 		}
+		var floor = PanelJoints.blank("fixture-floor", 120, 120, stock);
+		var seat = PanelJoints.operation("seat", Pocket, PanelContours.relievedRectangle(50, 50, 40, 40, 3), 8, 6, MachiningSide.PositiveZ, false, 6);
+		var fixing = PanelJoints.operation("fixing", Drill, PanelContours.circle(50, 50, 3.5), stock.measuredThickness, 7);
+		fixing.accessVia = seat.id;
+		floor.operations.push(seat);
+		floor.operations.push(fixing);
+		var floorSolid = ToolingPanel.fromPlan(floor).geometry();
+		near(floorSolid.volume(),
+			120 * 120 * stock.measuredThickness - PanelGeometry.area(seat.contour) * 8 - Math.PI * 3.5 * 3.5 * (stock.measuredThickness - 8),
+			"drill through pocket floor removes shared air once");
+		floorSolid.close();
+		fixing.accessVia = "missing";
+		rejects(() -> PanelCodec.encode(floor), "Unknown operation access pocket");
 		// Include the physical pins; panel-only pairs cannot test pin blocking.
 		for (zeroClearance in [false, true]) {
 			var pair = PanelJoints.pinBolt("physical-pins", stock);

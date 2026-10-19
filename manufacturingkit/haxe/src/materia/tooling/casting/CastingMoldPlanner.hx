@@ -74,6 +74,7 @@ class CastingMoldPlanner {
 				}
 		];
 		var result:CastingMoldPlan = {
+			handling: CastHandling.plan(d, o, e),
 			id: materia.tooling.ToolingIds.derive("", d.input.id, "-mold"),
 			document: d,
 			sourceFingerprint: ToolingCodec.documentFingerprint(d),
@@ -117,14 +118,16 @@ class CastingMoldPlanner {
 						throw "Shared bridge needs internal fill-open EPS pocket: " + f.id;
 					if (BoxVolumes.volume(BoxVolumes.subtract([cb], insertBoxes.concat(epsBoxes))) < BoxMoldPlanner.volume(cb) - 1e-5)
 						throw "Intersecting EPS/insert cavities need an explicit allocation";
-					var g = 0.2, cover = r.linerThickness, foam:MoldBox = {
-						x: cb.x + cover,
-						y: cb.y + cover,
-						z: cb.z + cover,
-						width: cb.width - 2 * cover,
-						depth: cb.depth - 2 * cover,
-						height: cb.height - cover - g
-					};
+					var g = r.adhesiveLineThickness,
+						cover = r.linerThickness,
+						foam:MoldBox = {
+							x: cb.x + cover,
+							y: cb.y + cover,
+							z: cb.z + cover,
+							width: cb.width - 2 * cover,
+							depth: cb.depth - 2 * cover,
+							height: cb.height - cover - g
+						};
 					if (foam.width <= 0 || foam.depth <= 0 || foam.height <= 0 || foam.width > r.core.width || foam.depth > r.core.depth)
 						throw "EPS block exceeds stock";
 					var layers:Array<MoldBox> = [],
@@ -158,10 +161,24 @@ class CastingMoldPlanner {
 					});
 					result.features.push({featureId: f.id, kind: EPSFeature, memberIds: [id]});
 					epsBoxes.push(cb);
-				} else if (s.strategy != CoreStrategy.ReusableFormer)
-					throw "Unsupported feature strategy: " + f.id;
+				} else if (s.strategy == CoreStrategy.Unsupported || s.draftDegrees > 0) {
+					result.features.push({featureId: f.id, kind: UnsupportedFeature, memberIds: []});
+					request(result, "unsupported-" + f.id, DraftOrSplit, [f.id],
+						"Select a supported split/sacrificial strategy or supply drafted source geometry for this feature.",
+						"tooling.feature.unsupported." + f.id, true);
+				}
 			}
-		buildBridges(result);
+		CoreSupports.sharedBridges(result.cavity, r, result.cores, result.supportPanels, result.hardware);
+		// Priority is explicit: inserts, EPS and datum supports are reserved first;
+		// rigid formers then resolve by descending authored priority and sorted IDs.
+		var ordered = d.input.features.copy();
+		ordered.sort((a, b) -> {
+			var aa = d.setup.features.filter(v -> v.featureId == a.id),
+				bb = d.setup.features.filter(v -> v.featureId == b.id);
+			var ap = aa.length == 0 ? 0 : aa[0].priority,
+				bp = bb.length == 0 ? 0 : bb[0].priority;
+			return ap == bp ? Reflect.compare(a.id, b.id) : Reflect.compare(bp, ap);
+		});
 		// Datum fixtures occupy negative space only. Their overlap with casting is checked in CAD.
 		for (i in d.input.inserts) {
 			var pose = F.compose(d.setup.sourceToMold, i.pose),
@@ -172,19 +189,21 @@ class CastingMoldPlanner {
 				throw "Missing insert body";
 			if (normal.z > -1 + 1e-8)
 				throw "Box datum fixtures currently require downward mounting faces";
+			var dt = r.hardware.datumThickness, pw = r.hardware.datumPostWidth;
+			var pocketId:Null<String> = null;
 			var pad:MoldBox = {
 				x: body.x,
 				y: body.y,
-				z: face.z - 8,
+				z: face.z - dt,
 				width: body.width,
 				depth: body.depth,
-				height: 8
+				height: dt
 			}, pieces = [pad], withdrawal = {
 				x: 0.0,
 				y: 0.0,
 				z: -1.0
 			};
-			var access = d.input.features.filter(f -> f.kind == CastingFeatureKind.Void
+			var access = ordered.filter(f -> f.kind == CastingFeatureKind.Void
 				&& d.setup.features.filter(s -> s.featureId == f.id
 					&& s.strategy == CoreStrategy.ReusableFormer
 					&& s.withdrawal != null
@@ -198,40 +217,40 @@ class CastingMoldPlanner {
 				pad = dir.x > 0 ? {
 					x: body.x,
 					y: body.y,
-					z: face.z - 8,
+					z: face.z - dt,
 					width: b.x + b.width + 3 * t - body.x,
 					depth: body.depth,
-					height: 8
+					height: dt
 				} : {
 					x: b.x - 3 * t,
 					y: body.y,
-					z: face.z - 8,
+					z: face.z - dt,
 					width: body.x + body.width - b.x + 3 * t,
 					depth: body.depth,
-					height: 8
+					height: dt
 					};
 				pieces = [pad];
 			} else {
-				var baseZ = Math.min(face.z - 8, b.z - 8),
-					height = face.z - 8 - baseZ;
+				var baseZ = Math.min(face.z - dt, b.z - dt),
+					height = face.z - dt - baseZ;
 				if (height > 1e-8)
 					pieces.push({
-						x: face.x - 10,
-						y: face.y - 10,
+						x: face.x - pw / 2,
+						y: face.y - pw / 2,
 						z: baseZ,
-						width: 20,
-						depth: 20,
+						width: pw,
+						depth: pw,
 						height: height
 					});
 				if (face.z <= b.z + 1e-7) {
-					var inset = r.routerDiameter + r.minimumLigament;
+					var inset = r.routerDiameter / 2 + r.minimumLigament;
 					pad = {
 						x: body.x + inset,
 						y: body.y + inset,
-						z: face.z - 8,
+						z: face.z - dt,
 						width: body.width - 2 * inset,
 						depth: body.depth - 2 * inset,
-						height: 8
+						height: dt
 					};
 					if (pad.width <= r.routerDiameter || pad.depth <= r.routerDiameter)
 						throw "Insert too small for sealed relieved datum socket: " + i.id;
@@ -240,22 +259,23 @@ class CastingMoldPlanner {
 				var socket:MoldBox = face.z <= b.z + 1e-7 ? {
 					x: pad.x,
 					y: pad.y,
-					z: b.z - 8,
+					z: b.z - dt,
 					width: pad.width,
 					depth: pad.depth,
-					height: 8.0
+					height: dt
 				} : {
-					x: face.x - 10,
-					y: face.y - 10,
-					z: b.z - 8,
-					width: 20.0,
-					depth: 20.0,
-					height: 8.0
+					x: face.x - pw / 2,
+					y: face.y - pw / 2,
+					z: b.z - dt,
+					width: pw,
+					depth: pw,
+					height: dt
 					};
 				var op = PanelJoints.operation(materia.tooling.ToolingIds.derive("datum-", i.id), Pocket,
 					PanelContours.relievedRectangle(socket.x - bed.pose.x + socket.width / 2, socket.y - bed.pose.y + socket.depth / 2, socket.width,
 						socket.depth, r.routerDiameter / 2),
-					8, r.routerDiameter, MachiningSide.PositiveZ, false, r.routerDiameter);
+					dt, r.routerDiameter, MachiningSide.PositiveZ, false, r.routerDiameter);
+				pocketId = op.id;
 				bed.panel.operations.push(op);
 				bed.panel.contactOpenings.push(op.id);
 				result.openings.push({
@@ -269,29 +289,18 @@ class CastingMoldPlanner {
 			var datum:MoldVolume = {
 				id: materia.tooling.ToolingIds.derive("datum-", i.id),
 				material: SteelStock,
+				cuts: [],
 				profiles: [],
 				pieces: BoxVolumes.subtract(pieces, [])
 			};
-			result.fixtures.push({
-				insertId: i.id,
-				datums: BoxMoldPlanner.datums(face, i.width, i.depth),
-				datum: datum,
-				mountingFace: face,
-				withdrawal: withdrawal,
-				attachmentEvidence: []
-			});
+			DatumFixtures.add(result, i, face, datum, withdrawal, bed, pocketId);
 			result.features.push({
 				featureId: d.input.features.filter(f -> f.kind == CastingFeatureKind.InsertRecess && f.insertId == i.id)[0].id,
 				kind: InsertFeature,
 				memberIds: [materia.tooling.ToolingIds.derive("insert-", i.id), datum.id]
 			});
-			result.changeRequests.push({
-				id: materia.tooling.ToolingIds.derive("attachment-", i.id),
-				kind: FixtureAttachment,
-				sourceIds: [i.id],
-				reason: "Provide and qualify detachable fixing/clamping to the independent datum fixture; existing bore is not assumed to be a fixture thread.",
-				blockingChecks: ["insert-fixture-attachment", "thread-protection"]
-			});
+			result.validation.push(materia.tooling.ToolingValidation.ToolingReadiness.pending("tooling.fixture.attachment." + i.id, [i.id],
+				"Bed pins register the nominal support only. Qualify insert XY location/clamping, tooling threads, datum accuracy and bore-mask release; no casting hole/thread is assumed."));
 		}
 		var fixtures:Array<MoldBox> = [];
 		for (f in result.fixtures)
@@ -306,9 +315,11 @@ class CastingMoldPlanner {
 				volume: {
 					id: id,
 					material: FormerStock,
+					cuts: [],
 					profiles: [],
 					pieces: group
 				},
+				draftDegrees: 0,
 				featureIds: [],
 				withdrawal: {
 					x: 0,
@@ -317,10 +328,10 @@ class CastingMoldPlanner {
 				}
 			});
 		}
-		for (f in d.input.features)
+		for (f in ordered)
 			if (f.kind == CastingFeatureKind.Void) {
 				var s = d.setup.features.filter(s -> s.featureId == f.id)[0];
-				if (s.strategy != CoreStrategy.ReusableFormer)
+				if (s.strategy != CoreStrategy.ReusableFormer || s.draftDegrees > 0)
 					continue;
 				var cb = BoxVolumes.intersection(featureBox(d, f), e);
 				if (cb == null)
@@ -342,12 +353,12 @@ class CastingMoldPlanner {
 					}
 					add = [extended];
 					var flange:MoldBox = {
-						x: direction.x > 0 ? side + t : side - t - 12,
-						y: cb.y - 10,
-						z: cb.z - 10,
-						width: 12,
-						depth: cb.depth + 20,
-						height: cb.height + 20
+						x: direction.x > 0 ? side + t : side - t - r.hardware.formerFlangeThickness,
+						y: cb.y - r.hardware.formerFlangeMargin,
+						z: cb.z - r.hardware.formerFlangeMargin,
+						width: r.hardware.formerFlangeThickness,
+						depth: cb.depth + 2 * r.hardware.formerFlangeMargin,
+						height: cb.height + 2 * r.hardware.formerFlangeMargin
 					};
 					add.push(flange);
 					var inverse = F.inverse(wall.pose),
@@ -387,9 +398,11 @@ class CastingMoldPlanner {
 						volume: {
 							id: id,
 							material: FormerStock,
+							cuts: [],
 							profiles: profiles,
 							pieces: groups[index]
 						},
+						draftDegrees: s.draftDegrees,
 						featureIds: [f.id],
 						withdrawal: {
 							x: direction.x,
@@ -404,8 +417,7 @@ class CastingMoldPlanner {
 						for (former in result.formers)
 							if (former.volume.pieces.filter(p -> BoxVolumes.intersection(p, cb) != null).length > 0) former.volume.id
 					];
-					if (ids.length == 0)
-						throw "Feature has no tooling owner: " + f.id;
+					// Final ownership below also includes reserved EPS, inserts and supports.
 				}
 				result.features.push({featureId: f.id, kind: FormerFeature, memberIds: ids});
 				for (p in pieces)
@@ -420,33 +432,60 @@ class CastingMoldPlanner {
 			}
 		for (m in panels.members)
 			m.panel = PanelCodec.snapshot(m.panel);
-		if (o.requiresFlip && o.liftingEvidence.length == 0)
-			result.changeRequests.push({
-				id: "handling-lift-and-flip",
-				kind: LiftingPoints,
-				sourceIds: [d.input.id],
-				reason: "Upside-down casting needs qualified lift/flip points and handling equipment before release.",
-				blockingChecks: ["handling", "demolding-handling"]
-			});
-		for (seat in o.precision)
-			if (seat.route == PrecisionRoute.Replicated && seat.allowance == null)
-				result.changeRequests.push({
-					id: "replication-" + seat.insertId,
-					kind: InterfaceAllowance,
-					sourceIds: [seat.insertId],
-					reason: "Specify replication allowance below the final plane and obtain a source revision if the current nominal insert must move; the mold does not establish final alignment.",
-					blockingChecks: ["precision-replication"]
-				});
+		for (feature in result.features)
+			if (feature.kind == FormerFeature) {
+				var source = d.input.features.filter(f -> f.id == feature.featureId)[0],
+					cb = BoxVolumes.intersection(featureBox(d, source), e);
+				if (cb == null)
+					throw "Missing cavity in ownership allocation";
+				feature.memberIds = [];
+				for (former in result.formers)
+					if (former.volume.pieces.filter(v -> BoxVolumes.intersection(v, cb) != null).length > 0) {
+						feature.memberIds.push(former.volume.id);
+						if (former.featureIds.indexOf(source.id) < 0)
+							former.featureIds.push(source.id);
+					}
+				for (core in result.cores)
+					if (BoxVolumes.intersection(core.cavity, cb) != null)
+						feature.memberIds.push(core.id);
+				for (fixture in result.fixtures)
+					if (fixture.datum.pieces.filter(v -> BoxVolumes.intersection(v, cb) != null).length > 0)
+						feature.memberIds.push(fixture.datum.id);
+				for (insert in d.input.inserts)
+					if (BoxVolumes.intersection(bodies.get(insert.id), cb) != null)
+						feature.memberIds.push(materia.tooling.ToolingIds.derive("insert-", insert.id));
+				feature.memberIds.sort(Reflect.compare);
+				if (feature.memberIds.length == 0) {
+					feature.kind = UnsupportedFeature;
+					request(result, "unallocated-" + source.id, DraftOrSplit, [source.id],
+						"Feature has no supported physical tooling owner; choose an explicit alternative.", "tooling.feature.unsupported." + source.id, true);
+				}
+			}
+		for (strategy in d.setup.features)
+			if (strategy.strategy == CoreStrategy.ReusableFormer && strategy.draftDegrees == 0)
+				request(result, "draft-" + strategy.featureId, DraftOrSplit, [strategy.featureId],
+					"Zero-draft rigid former requires source draft, a split, or a sacrificial alternative before physical release.",
+					"tooling.former.draft." + strategy.featureId);
+		if (result.handling.requiresFlip && !CastHandling.qualified(d, o, result.handling))
+			request(result, "handling-lift-and-flip", LiftingPoints, [d.input.id],
+				"Provide verified lifting/flip equipment and source lifting points or a qualified external cradle.", "tooling.handling.flip");
+		for (seat in o.precision) {
+			var source = d.input.inserts.filter(i -> i.id == seat.insertId)[0];
+			if (seat.route != PrecisionRoute.AsCast && (seat.allowance == null || seat.allowance <= 0))
+				request(result, "allowance-" + seat.insertId, InterfaceAllowance, [seat.insertId],
+					"Specify finishing stock and a source revision where needed for the selected machining/replication route.",
+					"tooling.precision.allowance." + seat.insertId);
+			if (seat.route != sourceRoute(source.finish))
+				request(result, "finish-" + seat.insertId, InterfaceAllowance, [seat.insertId],
+					"Selected finish route differs from source finish intent; approve a source finish revision.",
+					"tooling.precision.source-finish." + seat.insertId);
+		}
 		for (j in o.groutedJoints)
 			if (j.gapMm == null)
-				result.changeRequests.push({
-					id: "grout-" + j.id,
-					kind: InterfaceAllowance,
-					sourceIds: j.insertIds,
-					reason: "Define grout gap, jacking/squaring, bolt sleeves and cure-before-torque; obtain source interface changes before manufacturing.",
-					blockingChecks: ["grouted-joint"]
-				});
-		result.validation = [
+				request(result, "grout-" + j.id, InterfaceAllowance, j.insertIds,
+					"Define grout gap, jacking, sleeves and cure-before-torque; obtain source changes if needed.", "tooling.grouted-joint." + j.id);
+
+		result.validation = result.validation.concat([
 			materia.tooling.ToolingValidation.ToolingReadiness.pending("closure-loads", [d.input.id],
 				"Wall/pad clamps, braces and uplift capacity require qualification"),
 			materia.tooling.ToolingValidation.ToolingReadiness.pending("insert-fixtures", [for (i in d.input.inserts) i.id],
@@ -456,106 +495,35 @@ class CastingMoldPlanner {
 			materia.tooling.ToolingValidation.ToolingReadiness.pending("precision-interfaces", [d.input.id],
 				"Replication and grout interfaces require evidence"),
 			materia.tooling.ToolingValidation.ToolingReadiness.pending("anchorage-compaction", [d.input.id], "Anchorage and compaction loads require evidence")
-		];
-		for (request in result.changeRequests)
-			result.validation.push(materia.tooling.ToolingValidation.ToolingReadiness.pending("design-change-" + request.id, request.sourceIds,
-				request.reason));
+		]);
 		result.fabrication = materia.tooling.ToolingValidation.ToolingReadiness.evaluate(result.validation);
 		validate(result);
 		return result;
 	}
 
-	static function buildBridges(p:CastingMoldPlan):Void {
-		if (p.cores.length == 0)
-			return;
-		var b = p.cavity, r = p.document.recipe, t = r.panel.measuredThickness, l = r.minimumLigament, edge = 2 * l + r.routerDiameter,
-			pad = r.hardware.padDepth;
-		var rows:Array<Float> = [];
-		for (c in p.cores) {
-			var y = c.cavity.y + c.cavity.depth / 2;
-			if (rows.filter(v -> Math.abs(v - y) < 1e-7).length == 0)
-				rows.push(y);
+	public static function sourceRoute(finish:materia.tooling.ToolingEnums.InsertFinish):PrecisionRoute
+		return switch finish {
+			case GroundAfterCasting, MachinedAfterCasting: PrecisionRoute.Machined;
+			case ReplicatedAfterCasting: PrecisionRoute.Replicated;
+			case SourceAsCast: PrecisionRoute.AsCast;
+			default: throw "Unsupported source precision finish";
+		};
+
+	static function request(p:CastingMoldPlan, id:String, kind:DesignChangeKind, ids:Array<String>, message:String, rule:String,
+			unsupported:Bool = false):Void {
+		p.changeRequests.push({
+			id: materia.tooling.ToolingIds.derive("", id),
+			kind: kind,
+			sourceIds: ids.copy(),
+			reason: message,
+			blockingChecks: [rule]
+		});
+		var check = materia.tooling.ToolingValidation.ToolingReadiness.pending(rule, ids, message);
+		if (unsupported) {
+			check.status = materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported;
+			check.severity = materia.tooling.ToolingDiagnostic.ToolingSeverity.Error;
 		}
-		rows.sort(Reflect.compare);
-		function place(panel:materia.tooling.panel.PanelPlan, x:Float, y:Float, z:Float):Void
-			p.supportPanels.push({
-				panel: PanelCodec.snapshot(panel),
-				pose: F.translation(x, y, z),
-				withdrawal: {
-					x: 0,
-					y: 0,
-					z: 1
-				}
-			});
-		var rails = [];
-		for (right in [false, true]) {
-			var x = right ? b.x + b.width : b.x - pad - edge,
-				y = b.y - t - edge;
-			var rail = PanelJoints.blank(right ? "bridge-right-rail" : "bridge-left-rail", pad + edge, b.depth + 2 * t + 2 * edge, r.panel, r.routerDiameter,
-				l);
-			rail.labelX = right ? pad + edge - 16 : 16;
-			rail.operations.push(PanelJoints.operation("wall-top-socket", Rebate,
-				PanelContours.relievedRectangle(right ? t / 2 : pad + edge - t / 2, (b.depth + 2 * t + 2 * edge) / 2, t + r.jointClearance,
-					b.depth + r.jointClearance, r.routerDiameter / 2),
-				t / 2, r.routerDiameter, MachiningSide.NegativeZ, false, r.routerDiameter));
-			rails.push({
-				panel: rail,
-				x: x,
-				y: y,
-				right: right
-			});
-		}
-		for (index in 0...rows.length) {
-			var y = rows[index],
-				width = Math.min(r.hardware.minimumBridgeWidth, [
-					for (c in p.cores)
-						if (Math.abs(c.cavity.y + c.cavity.depth / 2 - y) < 1e-7) c.cavity.depth
-				][0] / 2);
-			var id = "core-bridge-" + index,
-				beam = PanelJoints.blank(id, b.width + 2 * (pad + edge), width, r.panel, r.routerDiameter, l),
-				bx = b.x - pad - edge,
-				by = y - width / 2;
-			beam.labelY = width / 2;
-			for (rail in rails) {
-				var x = rail.right ? b.x + b.width + 2 * t : b.x - 2 * t,
-					py = y - width / 4,
-					byy = y + width / 4,
-					d = r.hardware.locatingPinDiameter + r.jointClearance;
-				rail.panel.operations.push(PanelJoints.operation("pin-" + index, Drill, PanelContours.circle(x - rail.x, py - rail.y, d / 2), t, d));
-				rail.panel.operations.push(PanelJoints.operation("bolt-" + index, Drill,
-					PanelContours.circle(x - rail.x, byy - rail.y, r.hardware.supportClearanceDiameter / 2), t, r.hardware.supportClearanceDiameter));
-				beam.operations.push(PanelJoints.operation(rail.right ? "secondary-slot" : "primary-pin", rail.right ? InsideProfile : Drill,
-					rail.right ? PanelContours.obround(x - bx, py - by, r.hardware.locatingPinDiameter + r.hardware.secondaryPinTravel + r.jointClearance,
-						d) : PanelContours.circle(x - bx, py - by, d / 2),
-					t, rail.right ? r.routerDiameter : d));
-				beam.operations.push(PanelJoints.operation(rail.right ? "right-bolt" : "left-bolt", Drill,
-					PanelContours.circle(x - bx, byy - by, r.hardware.supportClearanceDiameter / 2), t, r.hardware.supportClearanceDiameter));
-				p.hardware.push({
-					id: id + (rail.right ? "-right-pin" : "-left-pin"),
-					kind: LocatingPin,
-					pose: F.translation(x, py, b.z + b.height),
-					diameter: r.hardware.locatingPinDiameter,
-					length: 2 * t
-				});
-				p.hardware.push({
-					id: id + (rail.right ? "-right-bolt" : "-left-bolt"),
-					kind: ClampBolt,
-					pose: F.translation(x, byy, b.z + b.height + 2 * t),
-					diameter: r.hardware.supportScrewDiameter,
-					length: 2 * t
-				});
-			}
-			place(beam, bx, by, b.z + b.height + t);
-			for (c in p.cores)
-				if (Math.abs(c.cavity.y + c.cavity.depth / 2 - y) < 1e-7) {
-					c.bridgeId = id;
-					var f = c.foamLayers[0];
-					c.bridgeBondAreaMm2 = f.width * width;
-					place(PanelJoints.blank(c.carrierId, f.width, f.depth, r.panel, r.routerDiameter, l), f.x, f.y, b.z + b.height);
-				}
-		}
-		for (rail in rails)
-			place(rail.panel, rail.x, rail.y, b.z + b.height);
+		p.validation.push(check);
 	}
 
 	public static function validate(p:CastingMoldPlan):Void {
@@ -573,6 +541,9 @@ class CastingMoldPlanner {
 				joints: []
 			});
 		CastingMoldOptionsCodec.snapshot(p.options);
+		if (ToolingCodec.canonical(p.handling) != ToolingCodec.canonical(CastHandling.plan(p.document, p.options, p.envelope)))
+			throw "Stale source-derived handling plan";
+		DatumFixtures.validate(p);
 		var members = new Map<String, Bool>();
 		function member(id:String):Void {
 			materia.tooling.panel.PanelCodec.identifier(id);
@@ -593,12 +564,35 @@ class CastingMoldPlanner {
 			member(f.datum.id);
 		for (i in p.document.input.inserts)
 			member(materia.tooling.ToolingIds.derive("insert-", i.id));
+		var ruleIds = [for (v in p.validation) v.rule];
+		for (strategy in p.document.setup.features)
+			if (strategy.strategy == CoreStrategy.ReusableFormer
+				&& strategy.draftDegrees == 0
+				&& ruleIds.indexOf("tooling.former.draft." + strategy.featureId) < 0)
+				throw "Zero-draft former needs a release validation";
+		for (seat in p.options.precision) {
+			var source = p.document.input.inserts.filter(i -> i.id == seat.insertId)[0];
+			if (seat.route != sourceRoute(source.finish) && ruleIds.indexOf("tooling.precision.source-finish." + seat.insertId) < 0)
+				throw "Finish route differs from source without a change request";
+			if (seat.route != PrecisionRoute.AsCast
+				&& (seat.allowance == null || seat.allowance <= 0)
+				&& ruleIds.indexOf("tooling.precision.allowance." + seat.insertId) < 0)
+				throw "Finishing allowance needs a validation decision";
+		}
+		for (request in p.changeRequests)
+			for (rule in request.blockingChecks)
+				if (ruleIds.indexOf(rule) < 0)
+					throw "Design change references unknown validation rule: " + rule;
+		for (feature in p.features)
+			if (feature.kind == UnsupportedFeature
+				&& p.validation.filter(v -> v.status == "unsupported" && v.affectedIds.indexOf(feature.featureId) >= 0).length == 0)
+				throw "Unsupported feature needs blocking validation";
 		var ids = new Map<String, Bool>();
 		for (f in p.features) {
 			for (id in f.memberIds)
 				if (!members.exists(id))
 					throw "Unknown feature tooling member";
-			if (ids.exists(f.featureId) || f.memberIds.length == 0)
+			if (ids.exists(f.featureId) || (f.memberIds.length == 0 && f.kind != UnsupportedFeature))
 				throw "Invalid feature ownership";
 			ids.set(f.featureId, true);
 		}

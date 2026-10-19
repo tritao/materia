@@ -213,14 +213,12 @@ class BoxMoldPlanner {
 					datums: datums(face, insert.width, insert.depth),
 					precision: {
 						insertId: insert.id,
-						route: Machined,
+						route: CastingMoldPlanner.sourceRoute(insert.finish),
 						allowance: null,
 						masterReference: null,
 						masterFlatnessMm: null,
 						releaseSpec: null,
-						damGeometry: [],
 						holeProtectionReference: null,
-						pourGroup: null,
 						evidence: []
 					}
 				}

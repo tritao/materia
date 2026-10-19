@@ -93,7 +93,7 @@ class FoundationToolingAdapter {
 				role: sourceRole(i.token("role")),
 				sourceRole: i.token("role"),
 				positionTolerance: i.number("positionTolerance"),
-				finish: i.token("finish") == "ground after casting" ? InsertFinish.GroundAfterCasting : throw "Unsupported source insert finish"
+				finish: sourceFinish(i.token("finish"))
 			});
 			// MineralFoundation owns this ID convention for its generated full-box cuts.
 			recesses.set('insert-${row.id}', row.id);
@@ -120,6 +120,15 @@ class FoundationToolingAdapter {
 			inserts: inserts
 		});
 	}
+
+	static function sourceFinish(label:String):InsertFinish
+		return switch label {
+			case "ground after casting": InsertFinish.GroundAfterCasting;
+			case "machined after casting": InsertFinish.MachinedAfterCasting;
+			case "replicated after casting": InsertFinish.ReplicatedAfterCasting;
+			case "as cast": InsertFinish.SourceAsCast;
+			default: throw "Unsupported source insert finish: " + label;
+		};
 
 	static function sourceRole(label:String):InsertRole
 		return switch label {

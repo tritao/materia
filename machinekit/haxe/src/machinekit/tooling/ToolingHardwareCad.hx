@@ -19,4 +19,12 @@ class ToolingHardwareCad {
 			F.compose(pose, F.translation(0, 0, -grip - washer.thickness)));
 		a.addComponent(materia.tooling.ToolingIds.derive("", id, "-nut"), nut, F.compose(pose, F.translation(0, 0, -grip - washer.thickness - nut.height)));
 	}
+
+	/** A cut-to-length study screw into a tooling support, never an invented insert thread. */
+	public static function fixtureScrew(a:MachineAssembly, id:String, diameter:Float, length:Float, pose:AssemblyFrame):Void {
+		var thread = "M" + Std.string(diameter),
+			washer = FlatWasher.metric(thread);
+		a.addComponent(id, SocketHeadCapScrew.metric(thread, length + washer.thickness), F.compose(pose, F.translation(0, 0, washer.thickness)));
+		a.addComponent(materia.tooling.ToolingIds.derive("", id, "-washer"), washer, pose);
+	}
 }

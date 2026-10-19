@@ -13,6 +13,12 @@ typedef CastingFeatureStrategy = {
 	var featureId:String;
 	var strategy:CoreStrategy;
 
+	/** Actual source draft; box sources with positive draft require a source revision. */
+	var draftDegrees:Float;
+
+	/** Higher priority owns overlap first; IDs resolve equal priorities. */
+	var priority:Int;
+
 	/** Required for reusable formers. EPS may use null for breakup removal. */
 	var withdrawal:Null<{
 		var x:Float;

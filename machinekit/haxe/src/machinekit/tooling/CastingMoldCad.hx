@@ -19,7 +19,18 @@ import materia.tooling.casting.CoreSupport.SupportHardwareKind;
 import machinekit.tooling.SweptRemoval.RemovalMember;
 import machinekit.tooling.SweptRemoval.RemovalReport;
 
+enum abstract DemoldingStepKind(String) to String {
+	var ReleaseHardware = "release-hardware";
+	var Withdraw = "withdraw";
+	var FlipToService = "flip-to-service";
+}
+
+typedef MoldDemoldingStep = {var id:String; var kind:DemoldingStepKind; var memberIds:Array<String>; var dependsOn:Array<String>; var status:materia.tooling.ToolingDiagnostic.ToolingCheckStatus;}
+typedef CastingMoldAssessment = {var diagnostics:machinekit.assembly.Diagnostics; var geometry:Null<CastingMoldReview>;}
+
 typedef CastingMoldReview = {
+	var handling:HandlingPlan;
+	var demoldingSteps:Array<MoldDemoldingStep>;
 	var symmetricDifferenceMm3:Float;
 	var sourceVolumeMm3:Float;
 	var reconstructedVolumeMm3:Float;
@@ -72,12 +83,79 @@ class CastingMoldCad {
 				parts.push(ToolingVolume.geometryOf(f.volume));
 			for (f in p.fixtures)
 				parts.push(ToolingVolume.geometryOf(f.datum));
-			// Full envelopes include the protected insert bores; thread masks are a
-			// declared release prerequisite, not permission for resin to enter bores.
+			// Full envelopes include bores protected during pouring. Their actual
+			// masks are separate members in the assembly and demolding graphs.
 			for (i in p.document.input.inserts)
 				parts.push(box(insertBox(p, i.id)));
 			return Solids.cut(parts[0], parts.slice(1));
 		});
+	}
+
+	public static function steel(p:CastingMoldPlan, id:String):Part {
+		var i = p.document.input.inserts.filter(i -> i.id == id)[0];
+		var component = new CastInsert(new ComponentValues().setNumber("width", i.width)
+			.setNumber("depth", i.depth)
+			.setNumber("height", i.height)
+			.setNumber("boreDiameter", i.boreDiameter));
+		var local = component.geometry();
+		try {
+			var out = PosedParts.moved(local, F.compose(p.document.setup.sourceToMold, i.pose));
+			local.close();
+			return out;
+		} catch (e:Dynamic) {
+			local.close();
+			throw e;
+		}
+	}
+
+	public static function assess(p:CastingMoldPlan):CastingMoldAssessment {
+		CastingMoldPlanner.validate(p);
+		var diagnostics = ToolingDiagnostics.fromValidation(p.validation);
+		if (p.features.filter(f -> f.kind == UnsupportedFeature).length > 0)
+			return {diagnostics: diagnostics, geometry: null};
+		return {diagnostics: diagnostics, geometry: review(p)};
+	}
+
+	static function steps(p:CastingMoldPlan, order:Array<String>):Array<MoldDemoldingStep> {
+		var result:Array<MoldDemoldingStep> = [
+			{
+				id: "release-loose-tooling",
+				kind: ReleaseHardware,
+				memberIds: [
+					for (h in p.hardware)
+						if (h.kind != SupportHardwareKind.FixturePin && h.kind != SupportHardwareKind.BoreMask) h.id
+				],
+				dependsOn: [],
+				status: materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending
+			}
+		];
+		var previous = "release-loose-tooling";
+		for (id in order) {
+			var stepId = materia.tooling.ToolingIds.derive("withdraw-", id);
+			result.push({
+				id: stepId,
+				kind: Withdraw,
+				memberIds: [id],
+				dependsOn: [previous],
+				status: materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass
+			});
+			previous = stepId;
+		}
+		if (p.handling.requiresFlip)
+			result.push({
+				id: "flip-to-service",
+				kind: FlipToService,
+				memberIds: ["cured-casting"],
+				dependsOn: [previous],
+				status: materia.tooling.casting.CastHandling.qualified(p.document, p.options,
+					p.handling) ? materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass : materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending
+			});
+		return result;
+	}
+
+	static function maskId(f:MoldInsertFixture):Null<String> {
+		var mask = f.boreMask;
+		return mask == null ? null : mask.id;
 	}
 
 	static function insertBox(p:CastingMoldPlan, id:String):MoldBox {
@@ -130,6 +208,7 @@ class CastingMoldCad {
 			a.addComponent(c.id, ToolingVolume.fromVolume({
 				id: c.id,
 				material: EPSStock,
+				cuts: [],
 				profiles: [],
 				pieces: c.foamLayers
 			}), pose);
@@ -165,19 +244,22 @@ class CastingMoldCad {
 		}
 		if (!exploded) {
 			for (h in p.hardware) {
-				if (h.kind == SupportHardwareKind.LocatingPin)
+				if (h.kind == SupportHardwareKind.LocatingPin
+					|| h.kind == SupportHardwareKind.BoreMask
+					|| h.kind == SupportHardwareKind.FixturePin)
 					a.addComponent(h.id, new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length)), h.pose);
+				else if (h.kind == SupportHardwareKind.FixtureScrew)
+					ToolingHardwareCad.fixtureScrew(a, h.id, h.diameter, h.length, h.pose);
 				else {
 					ToolingHardwareCad.throughBolt(a, h.id, h.diameter, h.length, h.pose);
 				}
 			}
 			var poses = a.solvedPoses(), inverse = F.inverse(poses.get("bed"));
+			a.addMemberConnector("bed", "tooling-origin", F.identity());
 			for (row in a.components())
 				if (p.panels.members.filter(m -> m.panel.id == row.id).length == 0) {
-					a.addMemberConnector("bed", materia.tooling.ToolingIds.derive("", row.id, "-datum"), F.compose(inverse, poses.get(row.id)));
-					a.addMemberConnector(row.id, "tooling-datum", F.identity());
-					a.addMate(materia.tooling.ToolingIds.derive("", row.id, "-positioned"), "fixed", "bed",
-						materia.tooling.ToolingIds.derive("", row.id, "-datum"), row.id, "tooling-datum");
+					a.addMemberConnector(row.id, "tooling-datum", F.inverse(F.compose(inverse, poses.get(row.id))));
+					a.addMate(materia.tooling.ToolingIds.derive("", row.id, "-positioned"), "fixed", "bed", "tooling-origin", row.id, "tooling-datum");
 				}
 		}
 		return a;
@@ -276,6 +358,25 @@ class CastingMoldCad {
 			references.push(excess);
 			difference = missing.volume() + excess.volume();
 			ov = original.volume();
+			var physical = original.massProperties(),
+				mass = physical.volume * p.document.recipe.mixDensityKgM3 * 1e-9;
+			var mx = mass * physical.centerOfMass.x,
+				my = mass * physical.centerOfMass.y,
+				mz = mass * physical.centerOfMass.z;
+			for (i in p.document.input.inserts) {
+				var shape = steel(p, i.id);
+				references.push(shape);
+				var properties = shape.massProperties(),
+					kg = properties.volume * p.document.recipe.steelDensityKgM3 * 1e-9;
+				mass += kg;
+				mx += kg * properties.centerOfMass.x;
+				my += kg * properties.centerOfMass.y;
+				mz += kg * properties.centerOfMass.z;
+			}
+			var center = p.handling.centerOfMassMoldMm;
+			if (Math.abs(mass - p.handling.castingMassKg) > 1e-5
+				|| Math.abs(mx / mass - center.x) + Math.abs(my / mass - center.y) + Math.abs(mz / mass - center.z) > 1e-5)
+				throw "Casting mass/CoM differs from exact CAD with steel bores";
 			rv = rebuilt.volume();
 			if (difference > 1e-3)
 				throw "Casting reconstruction differs by " + difference + " mm3";
@@ -355,10 +456,28 @@ class CastingMoldCad {
 				parts.push(shape);
 				members.push({id: c.id, part: shape, direction: new Vector(0, 0, 1)});
 			}
+			for (h in p.hardware)
+				if (h.kind == SupportHardwareKind.FixturePin || h.kind == SupportHardwareKind.BoreMask) {
+					var local = new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length)).geometry();
+					parts.push(local);
+					var shape = PosedParts.moved(local, h.pose);
+					parts.push(shape);
+					parts.remove(local);
+					local.close();
+					var direction = new Vector(0, 0, -1);
+					if (h.kind == SupportHardwareKind.BoreMask) {
+						var fixture = p.fixtures.filter(f -> maskId(f) == h.id)[0],
+							v = fixture.boreMaskWithdrawal;
+						if (v == null)
+							throw "Missing bore-mask removal direction";
+						direction = new Vector(v.x, v.y, v.z);
+					}
+					members.push({id: h.id, part: shape, direction: direction});
+				}
 			coverage(p, parts);
 			var castingPieces = [source(p)];
 			for (i in p.document.input.inserts)
-				castingPieces.push(box(insertBox(p, i.id)));
+				castingPieces.push(steel(p, i.id));
 			var cured = Solids.union(castingPieces);
 			parts.push(cured);
 			members.push({id: "cured-casting", part: cured, direction: new Vector(0, 0, 1)});
@@ -395,7 +514,7 @@ class CastingMoldCad {
 				groups.push({id: materia.tooling.ToolingIds.derive("", id, "-loaded"), members: ids});
 			}
 			for (i in p.document.input.inserts) {
-				var shape = box(insertBox(p, i.id));
+				var shape = steel(p, i.id);
 				parts.push(shape);
 				members.push({
 					id: materia.tooling.ToolingIds.derive("insert-", i.id),
@@ -404,10 +523,21 @@ class CastingMoldCad {
 				});
 			}
 			members[0].direction = new Vector(0, 0, 1);
+			for (member in members) {
+				var fixtures = p.fixtures.filter(f -> f.datum.id == member.id);
+				if (fixtures.length == 1) {
+					var v = fixtures[0].assemblyClearance;
+					member.direction = new Vector(v.x, v.y, v.z);
+				}
+				if (p.hardware.filter(h -> h.id == member.id
+					&& (h.kind == SupportHardwareKind.FixturePin || h.kind == SupportHardwareKind.BoreMask))
+					.length == 1)
+					member.direction = new Vector(0, 0, p.hardware.filter(h -> h.id == member.id)[0].kind == SupportHardwareKind.FixturePin ? -1 : 1);
+			}
 			// Before casting, bed-facing tooling can approach downward from the open
 			// fill side. After cure those same pieces leave below the released bed.
 			for (m in members)
-				if (m.direction.z < -0.9)
+				if (m.direction.z < -0.9 && p.hardware.filter(h -> h.id == m.id && h.kind == SupportHardwareKind.FixturePin).length == 0)
 					m.direction = new Vector(0, 0, 1);
 			var assemblyMotions = [
 				for (m in members)
@@ -421,8 +551,11 @@ class CastingMoldCad {
 			Sys.println("Checking full assembly sweeps for " + members.length + " members");
 			var assembly = SweptRemoval.analyze(members, 1e-4);
 			for (part in parts)
-				part.close();
+				if (!part.shape.isClosed())
+					part.close();
 			return {
+				handling: p.handling,
+				demoldingSteps: steps(p, demolding.removalOrder),
 				symmetricDifferenceMm3: difference,
 				sourceVolumeMm3: ov,
 				reconstructedVolumeMm3: rv,
@@ -437,7 +570,8 @@ class CastingMoldCad {
 			};
 		} catch (e:Dynamic) {
 			for (part in parts)
-				part.close();
+				if (!part.shape.isClosed())
+					part.close();
 			throw e;
 		}
 	}

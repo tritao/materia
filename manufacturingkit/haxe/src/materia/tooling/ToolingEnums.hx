@@ -30,6 +30,9 @@ enum abstract InsertRole(String) to String {
 
 enum abstract InsertFinish(String) to String {
 	var GroundAfterCasting = "ground-after-casting";
+	var MachinedAfterCasting = "machined-after-casting";
+	var ReplicatedAfterCasting = "replicated-after-casting";
+	var SourceAsCast = "as-cast";
 }
 
 enum abstract MachiningSide(String) to String {

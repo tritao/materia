@@ -5,12 +5,13 @@ import materia.tooling.panel.PanelCodec;
 import materia.tooling.casting.CastingMoldPlan.MoldVolume;
 import materia.tooling.casting.CastingMoldPlan.MoldPartMaterial;
 import materia.tooling.casting.CastingMoldPlan.MoldVolumeProfile;
+import materia.tooling.casting.CastingMoldPlan.MoldVolumeCut;
 import materia.tooling.casting.MoldPlan.MoldBox;
 
 /** Exact boxes and operation-derived sealing profiles; no tessellation or compensation. */
 class MoldVolumeCodec {
 	public static function encode(v:MoldVolume):String {
-		var s = ToolingCodec.canonical({format: "materia.mold-volume", version: 2, volume: snapshot(v)});
+		var s = ToolingCodec.canonical({format: "materia.mold-volume", version: 3, volume: snapshot(v)});
 		if (haxe.io.Bytes.ofString(s).length > 524288)
 			throw "Mold volume exceeds limit";
 		return s;
@@ -21,7 +22,7 @@ class MoldVolumeCodec {
 			throw "Mold volume exceeds limit";
 		var r:Dynamic = haxe.Json.parse(s);
 		object(r, ["format", "version", "volume"]);
-		if (Reflect.field(r, "format") != "materia.mold-volume" || Reflect.field(r, "version") != 2)
+		if (Reflect.field(r, "format") != "materia.mold-volume" || Reflect.field(r, "version") != 3)
 			throw "Unsupported mold volume format";
 		return read(Reflect.field(r, "volume"));
 	}
@@ -84,8 +85,25 @@ class MoldVolumeCodec {
 		];
 	}
 
+	static function frame(raw:Dynamic):materia.assembly.AssemblyRecord.AssemblyFrame {
+		object(raw, ["x", "y", "z", "qx", "qy", "qz", "qw"]);
+		var pose:materia.assembly.AssemblyRecord.AssemblyFrame = {
+			x: number(raw, "x"),
+			y: number(raw, "y"),
+			z: number(raw, "z"),
+			qx: number(raw, "qx"),
+			qy: number(raw, "qy"),
+			qz: number(raw, "qz"),
+			qw: number(raw, "qw")
+		};
+		materia.assembly.AssemblyCodec.validateFrame(pose);
+		if (Math.abs(pose.qx * pose.qx + pose.qy * pose.qy + pose.qz * pose.qz + pose.qw * pose.qw - 1) > 1e-8)
+			throw "Mold profile needs unit frame";
+		return pose;
+	}
+
 	static function read(r:Dynamic):MoldVolume {
-		object(r, ["id", "material", "pieces", "profiles"]);
+		object(r, ["id", "material", "pieces", "profiles", "cuts"]);
 		var material:MoldPartMaterial = switch text(r, "material") {
 			case "eps": EPSStock;
 			case "steel": SteelStock;
@@ -94,22 +112,36 @@ class MoldVolumeCodec {
 		};
 		var pieces = boxes(array(r, "pieces", 2048)),
 			profiles:Array<MoldVolumeProfile> = [];
+		for (i in 0...pieces.length)
+			for (j in i + 1...pieces.length)
+				if (BoxVolumes.intersection(pieces[i], pieces[j]) != null)
+					throw "Mold volume pieces overlap";
+		pieces.sort((a, b) -> {
+			for (key in ["x", "y", "z", "width", "depth", "height"]) {
+				var compare = Reflect.compare(Reflect.field(a, key), Reflect.field(b, key));
+				if (compare != 0)
+					return compare;
+			}
+			return 0;
+		});
+		var cuts:Array<MoldVolumeCut> = [], cutIds = new Map<String, Bool>();
+		for (c in array(r, "cuts", 128)) {
+			object(c, ["operation", "pose"]);
+			var operation = PanelCodec.operationSnapshot(Reflect.field(c, "operation")),
+				id = operation.id;
+			if (cutIds.exists(id)
+				|| operation.accessVia != null
+				|| (operation.kind != materia.tooling.panel.PanelPlan.PanelOperationKind.Drill
+					&& operation.kind != materia.tooling.panel.PanelPlan.PanelOperationKind.Pocket))
+				throw "Invalid/duplicate mold cut";
+			cutIds.set(id, true);
+			cuts.push({operation: operation, pose: frame(Reflect.field(c, "pose"))});
+		}
+		cuts.sort((a, b) -> Reflect.compare(a.operation.id, b.operation.id));
+
 		for (p in array(r, "profiles", 32)) {
 			object(p, ["panelId", "operationId", "contour", "pose", "depth", "subtract"]);
-			var raw = Reflect.field(p, "pose");
-			object(raw, ["x", "y", "z", "qx", "qy", "qz", "qw"]);
-			var pose:materia.assembly.AssemblyRecord.AssemblyFrame = {
-				x: number(raw, "x"),
-				y: number(raw, "y"),
-				z: number(raw, "z"),
-				qx: number(raw, "qx"),
-				qy: number(raw, "qy"),
-				qz: number(raw, "qz"),
-				qw: number(raw, "qw")
-			};
-			materia.assembly.AssemblyCodec.validateFrame(pose);
-			if (Math.abs(pose.qx * pose.qx + pose.qy * pose.qy + pose.qz * pose.qz + pose.qw * pose.qw - 1) > 1e-8)
-				throw "Mold profile needs unit frame";
+			var pose = frame(Reflect.field(p, "pose"));
 			var depth = number(p, "depth");
 			if (depth <= 0)
 				throw "Invalid mold profile depth";
@@ -128,7 +160,8 @@ class MoldVolumeCodec {
 			id: text(r, "id"),
 			material: material,
 			pieces: pieces,
-			profiles: profiles
+			profiles: profiles,
+			cuts: cuts
 		};
 	}
 }

@@ -24,7 +24,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 3;
+	public static inline var VERSION = 4;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -217,7 +217,7 @@ class ToolingCodec {
 		var used = new Map<String, Bool>();
 		var features:Array<CastingFeatureStrategy> = [];
 		for (f in array(raw, "features")) {
-			object(f, ["featureId", "strategy", "withdrawal"], "feature strategy");
+			object(f, ["featureId", "strategy", "withdrawal", "draftDegrees", "priority"], "feature strategy");
 			var id = string(f, "featureId");
 			if (!byId.exists(id) || used.exists(id))
 				throw 'Unknown, duplicate or insert-recess strategy $id';
@@ -247,7 +247,17 @@ class ToolingCodec {
 			}
 			if (strategy == ReusableFormer && direction == null)
 				throw "Reusable former needs a withdrawal direction";
-			features.push({featureId: id, strategy: strategy, withdrawal: direction});
+			var draft = nonnegative(f, "draftDegrees"),
+				priority = integer(f, "priority");
+			if (draft >= 90)
+				throw "Draft must be below 90 degrees";
+			features.push({
+				featureId: id,
+				strategy: strategy,
+				withdrawal: direction,
+				draftDegrees: draft,
+				priority: priority
+			});
 		}
 		for (id in byId.keys())
 			if (!used.exists(id))
@@ -276,6 +286,10 @@ class ToolingCodec {
 			"jointClearance",
 			"linerThickness",
 			"routerDiameter",
+			"adhesiveLineThickness",
+			"mixDensityKgM3",
+			"steelDensityKgM3",
+			"handlingLoadFactor",
 			"coreWireAxis",
 			"hardware",
 			"jointLiningAllowance",
@@ -304,7 +318,15 @@ class ToolingCodec {
 			"supportClearanceDiameter",
 			"secondaryPinTravel",
 			"padDepth",
-			"labelOffset"
+			"labelOffset",
+			"datumThickness",
+			"datumPostWidth",
+			"formerFlangeThickness",
+			"formerFlangeMargin",
+			"fixturePinDiameter",
+			"fixturePinEmbed",
+			"fixturePinSpacing",
+			"fixtureSlotToolDiameter"
 		], "tooling hardware");
 		var hardware:materia.tooling.ToolingRecipe.ToolingHardware = {
 			insertBoreDiameter: positive(hw, "insertBoreDiameter"),
@@ -322,7 +344,15 @@ class ToolingCodec {
 			supportClearanceDiameter: positive(hw, "supportClearanceDiameter"),
 			secondaryPinTravel: positive(hw, "secondaryPinTravel"),
 			padDepth: positive(hw, "padDepth"),
-			labelOffset: positive(hw, "labelOffset")
+			labelOffset: positive(hw, "labelOffset"),
+			datumThickness: positive(hw, "datumThickness"),
+			datumPostWidth: positive(hw, "datumPostWidth"),
+			formerFlangeThickness: positive(hw, "formerFlangeThickness"),
+			formerFlangeMargin: positive(hw, "formerFlangeMargin"),
+			fixturePinDiameter: positive(hw, "fixturePinDiameter"),
+			fixturePinEmbed: positive(hw, "fixturePinEmbed"),
+			fixturePinSpacing: positive(hw, "fixturePinSpacing"),
+			fixtureSlotToolDiameter: positive(hw, "fixtureSlotToolDiameter")
 		};
 		if (hardware.insertClearanceDiameter <= hardware.insertScrewDiameter
 			|| hardware.supportClearanceDiameter <= hardware.supportScrewDiameter)
@@ -370,6 +400,8 @@ class ToolingCodec {
 			throw "Invalid panel direction constraint";
 		if (nonnegative(raw, "jointClearance") + 1e-8 < variation + nonnegative(raw, "jointLiningAllowance") + nonnegative(raw, "jointMachiningAllowance"))
 			throw "Joint clearance below stock variation and allowances";
+		if (positive(raw, "handlingLoadFactor") < 1)
+			throw "Handling load factor must be at least one";
 		var strength = nullableNumber(c, "compressionStrengthPa", true),
 			strain = nullableNumber(c, "compressionStrainFraction", true);
 		if ((strength == null) != (strain == null) || (strain != null && strain >= 1))
@@ -399,6 +431,10 @@ class ToolingCodec {
 				maximumTemperatureC: nullableNumber(c, "maximumTemperatureC", false),
 				evidence: evidence(c, "evidence")
 			},
+			adhesiveLineThickness: positive(raw, "adhesiveLineThickness"),
+			mixDensityKgM3: positive(raw, "mixDensityKgM3"),
+			steelDensityKgM3: positive(raw, "steelDensityKgM3"),
+			handlingLoadFactor: positive(raw, "handlingLoadFactor"),
 			coreWireAxis: switch string(raw, "coreWireAxis") {
 				case "x":
 					materia.tooling.ToolingRecipe.CoreWireAxis.X;
@@ -473,10 +509,11 @@ class ToolingCodec {
 
 	public static function insertFinish(value:String):InsertFinish
 		return switch value {
-			case "ground-after-casting":
-				InsertFinish.GroundAfterCasting;
-			default:
-				throw "Invalid insert finish";
+			case "ground-after-casting": InsertFinish.GroundAfterCasting;
+			case "machined-after-casting": InsertFinish.MachinedAfterCasting;
+			case "replicated-after-casting": InsertFinish.ReplicatedAfterCasting;
+			case "as-cast": InsertFinish.SourceAsCast;
+			default: throw "Invalid insert finish";
 		};
 
 	static function object(raw:Dynamic, fields:Array<String>, label:String):Void {

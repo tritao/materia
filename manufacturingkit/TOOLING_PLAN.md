@@ -56,7 +56,7 @@ Status: phases 1–4 implemented. The single-pocket and full mill-base molds are
   `MillFramePreview` foundation instance. The single-pocket and full-base planners
   share `MoldPanels`. Exact orthogonal volume allocation splits overlapping
   details into 14 connected formers, with six laminated EPS cores on two shared
-  bridges and twelve independent datum fixtures at their actual heights.
+  bridges and twelve bed-registered nominal steel supports at their actual heights.
   `CastingMoldCodec` and `MoldVolumeCodec` persist rebuildable neutral records;
   `ToolingVolume`, `CastingMoldCad` and `CastingMoldExport` realize/export them.
   The dedicated `haxeon.tooling.json` emits review artifacts under
@@ -65,8 +65,9 @@ Status: phases 1–4 implemented. The single-pocket and full mill-base molds are
   graphs pass. Tests reject lost pockets, displaced datums, unclassified cuts
   and an inward-trapped foot former, and cover stock variation and optional XY
   interfaces. Process records include replication/grouting, compaction and
-  per-insert anchorage. Eighteen open requests cover fixture attachments,
-  replication/grout allowances and lifting/flip provisions. Those interfaces,
+  per-insert anchorage. Source requests cover draft/split decisions, finish intent,
+  machining/replication/grout allowances and lifting/flip provisions. Fixture
+  attachments and insert XY clamping remain tooling validation work. Those interfaces,
   clamps, materials/process evidence, loads and handling remain unqualified;
   no source geometry is altered and fabrication readiness is false.
 - [x] Review hardening of phases 1–4: explicit recipe hardware and fit allowances;
@@ -83,6 +84,23 @@ Status: phases 1–4 implemented. The single-pocket and full mill-base molds are
   from the same panel operations so routed reliefs neither leak nor trap formers.
   Validation: 160 pure tooling, 336 native tooling, 653 drawing, 51 full-base,
   49 casting, 54 sheet-cutting and 215 mill-frame assertions pass.
+- [x] Phase 4 review: explicit feature allow-list, draft and overlap priorities;
+  unsupported features retain blocking records/requests. Finishing routes match
+  source intent or request a revision, with allowances required for machining and
+  replication. Unimplemented dam/pour fields are removed. Service orientation
+  derives reorientation, with resin/bored-steel mass/CoM and typed lifting evidence.
+  Nominal supports add round/slot locators, recipe fixings and sealed bed cuts;
+  through-bed pins and bore masks join the exact graphs rather than an assumed release.
+  CoreSupports owns shared bridge registration/hardware. Volume pieces are
+  disjoint/canonically ordered, grout IDs unique, and all change requests reference
+  real validation codes bridged into `machinekit.assembly.Diagnostics`.
+  `machinekit/tests/tooling/haxeon.mill.json` registers the mill acceptance suite.
+  Current formats: tooling 4, panel 3, box mold 4, casting mold 3, mold volume 3;
+  older formats have no compatibility readers. Physical qualification stays pending.
+  Validation: 183 pure tooling, 339 native tooling, 151 full-mill, 49 casting
+  and 27 design-interface assertions pass. The box example and full mill review
+  package regenerate; the complete hardware assembly restores exactly using one
+  shared bed datum, within the assembly connector limit.
 - [ ] Phase 5: assembly validation and fabrication package.
 - [ ] Phase 6: design-stage moldability feedback and casting process analysis.
 - [ ] Phase 7: mill column and independent pedestal example.
