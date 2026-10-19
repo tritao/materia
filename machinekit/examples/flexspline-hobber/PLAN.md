@@ -2164,3 +2164,12 @@ Removal verification: 796 mechanical/persistence assertions pass. Recomputed
 machine mass is 343.27 kg; moving masses and drive margins are unchanged. The
 previous clearance/app evidence covers the guarded superset; no full cut rerun
 was needed for removing these stationary parts.
+
+### Visible coarse cutting scene (2026-10-19)
+
+Added `cutting.scene.json` with the rack hidden and enabled the relieved tooth
+display on the module-1, 40-tooth demonstration hob. The display uses the shared
+hob solid tessellation; the physical envelope and cutting definition are unchanged.
+The regenerated app cut passes: 982 gash windows, 6.00275 s total simulated cycle,
+3.60091 s cutting feed, zero cutter/fixture collisions, sync error 0.00393175 arcsec.
+This is an ungraded coarse demonstration, not full-reference HB12 acceptance.

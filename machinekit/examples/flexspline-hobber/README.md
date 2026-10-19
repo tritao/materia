@@ -21,3 +21,11 @@ matching HGR25R X rail profile. Before generating it on a fresh checkout, run
 are pinned and saved in component recipes; no runtime downloads occur. The X
 screw is centred between the bed rails in a recessed channel, with its motor at
 the rear. Channel covers remain a design provision.
+
+### Watch a coarse cut
+
+Open `cutting.scene.json` in Materia. It selects the cutting project, hides the
+separate electrical rack, and displays the hob's relieved teeth. Press **F5** to
+play/pause (or use the toolbar), **Shift+F5** to reset, and **Home** to fit the machine. Frame or zoom
+into the hob and blank to see the teeth emerge from the stock. This is the
+module-1, 40-tooth demonstration; it is not a reference-part grading run.
