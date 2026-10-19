@@ -37,6 +37,7 @@ class CamKitTests {
       Sys.println('Additive slicer tests passed (${AdditiveSlicerTests.run()} assertions)');
       return;
     }
+    CamToolingPanelTests.run();
     var placement:materia.sheet.SheetPartPlacement = {
       id: "gantry-bracket", requirementId: "bracket", x: 10.0, y: 10.0,
       width: 20.0, height: 10.0, rotation: 0, regionId: "sheet-a"

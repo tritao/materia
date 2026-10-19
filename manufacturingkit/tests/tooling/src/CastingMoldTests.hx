@@ -71,6 +71,7 @@ class CastingMoldTests {
 		var o = options(d),
 			p = CastingMoldPlanner.plan(d, o),
 			s = CastingMoldCodec.encode(p);
+		FabricationTests.run(p);
 		check(CastingMoldCodec.encode(CastingMoldCodec.decode(s)) == s, "multi-core canonical regeneration");
 		check(p.features.length == d.input.features.length && p.cores.length == 1, "complete source ownership");
 		var cuts = [for (f in d.input.features) CastingMoldPlanner.featureBox(d, f)],

@@ -11,6 +11,9 @@ import toolpathkit.path.Point3;
 
 /** One simple closed XY boundary, in machine metres. */
 class CamContour {
+  /** Optional exact CAD boundary in metres. Vertices remain the declared chordal representation. */
+  public var exactBoundary:Null<Array<cadkit.sheetmetal.Segment>> = null;
+  public var chordTolerance:Float = 0.00005;
   public final vertices:Array<Point3>;
   public final z:Float;
   public final signedArea:Float;

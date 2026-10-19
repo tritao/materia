@@ -250,3 +250,44 @@ Run the full mill acceptance suite without generating all exports:
 ```sh
 ./haxeon/scripts/haxeon run --project=machinekit/tests/tooling/haxeon.mill.json
 ```
+
+
+### Fabrication review packages (phase 5)
+
+`materia.tooling.export.ToolingFabrication.plan(castingPlan, fabricationSpec)`
+adds neutral panel blank requirements, deterministic bounding-blank shelf layouts,
+fit and pin/slot locator coupons, replacement groups, load estimates and typed
+fabrication checks. `FabricationSpecCodec` version 1 validates the authored
+process/load inputs and rejects unknown fields/versions. Its fingerprint includes
+the complete casting source/setup/recipe/options fingerprint and normalized
+fabrication inputs. No sheet inventory is allocated or consumed.
+
+The spec declares a registered sheet-material ID (separate from the supplier
+stock description), gravity, load factor, resin solvent family, EPS-based adhesive,
+assessed cure peak/evidence, compatibility evidence, additional compaction peak
+pressure, support/material properties, brace sections, fastener hardware IDs and
+per-core restraint/bearing capacities. Missing data produces pending checks.
+Styrene-bearing resin with EPS and a cure peak at/above the EPS limit fail.
+The assessed peak is an input until phase 6 computes cure reports; it is not
+inferred from a resin name. The load report integrates no fluid dynamics:
+hydrostatic peak head and gross displaced-volume uplift are baseline estimates.
+No EPS-weight credit is used; core volumes are allocated once in sorted ID order.
+
+Rectangular uncut isotropic panels use a Navier simply-supported uniform-load
+plate estimate; braces use uniform-load simply-supported beam estimates.
+Cutouts, tabs, rebates and localized carrier/bridge loads require a qualified
+model. Fastener reaction shares require actual planned hardware IDs, declared
+allowable capacities and distribution evidence. Evidence references do not turn
+an undeclared compaction method into a pass. Existing unresolved source requests
+and qualification records remain blocking.
+
+`machinekit.tooling.ToolingFabricationExport` uses existing CadKit drawing
+writers for coupon and sheet-layout SVG/DXF. It emits panel/operation, EPS,
+embedded-insert, former/fixture and hardware CSV, plus a physical trial template.
+Hardware lengths and the aggregated BOM come from the same standard components
+as the CAD assembly; a planned grip is not reported as a bolt purchase length.
+`ToolingPackageManifest` hashes every artifact, verifies file hashes and the
+package fingerprint, and normalizes only generated STEP header timestamps.
+See the [mill fabrication entry point](../machinekit/examples/bench-mill/TOOLING_README.md).
+CamKit owns `CamToolingPanels`; neither this library nor MachineKit gains a CAM
+dependency. Coupon fabrication and physical evidence collection require a shop.

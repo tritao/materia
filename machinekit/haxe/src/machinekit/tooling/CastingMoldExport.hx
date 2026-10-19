@@ -37,6 +37,8 @@ class CastingMoldExport {
 		text(path, Json.stringify(value, null, "\t") + "\n");
 
 	public static function write(p:CastingMoldPlan, dir:String, review:machinekit.tooling.CastingMoldCad.CastingMoldReview):Void {
+		if (review.fingerprint != CastingMoldCodec.fingerprint(p))
+			throw "Stale casting mold review";
 		sys.FileSystem.createDirectory(dir);
 		var encoded = CastingMoldCodec.encode(p);
 		CastingMoldCodec.decode(encoded);
@@ -68,7 +70,7 @@ class CastingMoldExport {
 		for (c in p.cores)
 			for (index in 0...c.foamLayers.length) {
 				var b = c.foamLayers[index],
-					id = materia.tooling.ToolingIds.derive("", c.id, "-layer-") + index,
+					id = materia.tooling.ToolingIds.derive("", c.id, "-layer-" + index),
 					cutting = CoreSupports.cutting(b, p.document.recipe.coreWireAxis);
 				data(dir + "/" + id + ".cutting.json", {
 					featureId: c.featureId,
@@ -85,12 +87,18 @@ class CastingMoldExport {
 					pieces: [local]
 				});
 				step(dir + "/" + id + ".step", part);
+
+				var direction = cutting.wireDirection;
+				var profileWidth = direction.x > 0.5 ? b.depth : b.width;
+				var profileHeight = direction.z > 0.5 ? b.depth : b.height;
+				var span = direction.x > 0.5 ? b.width : direction.y > 0.5 ? b.depth : b.height;
+				var axis = direction.x > 0.5 ? "+X" : direction.y > 0.5 ? "+Y" : "+Z";
 				var drawing = new Drawing2D([
-					Curve(Outline, Segment.line(new Point2(0, 0), new Point2(b.width, 0))),
-					Curve(Outline, Segment.line(new Point2(b.width, 0), new Point2(b.width, b.height))),
-					Curve(Outline, Segment.line(new Point2(b.width, b.height), new Point2(0, b.height))),
-					Curve(Outline, Segment.line(new Point2(0, b.height), new Point2(0, 0))),
-					Label(Text, new Point2(0, b.height + 8), 3, id + " wire +Y; span " + b.depth + " mm; no kerf compensation"),
+					Curve(Outline, Segment.line(new Point2(0, 0), new Point2(profileWidth, 0))),
+					Curve(Outline, Segment.line(new Point2(profileWidth, 0), new Point2(profileWidth, profileHeight))),
+					Curve(Outline, Segment.line(new Point2(profileWidth, profileHeight), new Point2(0, profileHeight))),
+					Curve(Outline, Segment.line(new Point2(0, profileHeight), new Point2(0, 0))),
+					Label(Text, new Point2(0, profileHeight + 8), 3, id + " wire " + axis + "; span " + span + " mm; no kerf compensation"),
 					Label(Text, new Point2(0, -8), 3, "REVIEW ONLY: EPS grade and adhesive unqualified")
 				]);
 				text(dir + "/" + id + ".svg", Svg.write(drawing));

@@ -56,8 +56,9 @@ space without changing the casting or moving its steel inserts. Precision rail
 and screw-bearing seats follow the reviewed **replicated** route; their actual
 allowances, masters, flatness evidence and hole protection are pending. Source
 finish mismatches and missing machining/replication stock produce change requests.
-Dam geometry and pour groups are deferred to their actual phase 5 CAD/checks;
-no unused fields imply they have been implemented. The column joint has a separate pending grout-gap, jacking, sleeve and
+Precision masters, dams and hole plugs require resolved source allowances and
+process choices. The fabrication package reports these missing tooling routes;
+no unused geometry fields imply that they have been implemented. The column joint has a separate pending grout-gap, jacking, sleeve and
 cure-before-torque record. Requests flag any source-interface changes needed;
 this generator does not invent replication or grout clearance in the machine.
 
@@ -103,4 +104,70 @@ EPS/adhesive/release/cure evidence, insert anchorage, replication/grout allowanc
 compaction, closure/brace/bridge loads and qualified lifting/flip provisions.
 The review always reports fabrication readiness as false; a correct geometric
 mold is not a structural or process qualification. Phase 5 adds the fabrication
-and load/access checks; phase 8 supplies physical evidence.
+review and load/access checks below; phase 8 supplies physical evidence.
+
+
+## Fabrication review package (phase 5)
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fabrication.json -- --checks
+./app/run-built.sh --project="$PWD/machinekit/examples/bench-mill/build/tooling/base-fabrication/mold.mtrg" --perspective
+```
+
+`MillFabricationSetup` declares process/load inputs and study CAM settings. Its
+resin/adhesive compatibility, assessed cure peak, compaction pressure, material
+properties, support/connection capacities and shop workholding are deliberately
+unqualified. The entry uses `build/fabrication-runner/` and generates into a fresh
+staging directory. It publishes `build/tooling/base-fabrication/` only after the
+export and manifest verification succeed. No stock inventory or machine is changed.
+
+The package contains the full phase 4 CAD/drawings/assembly and these additions:
+
+- Nineteen panel/coupon blank requirements, with source IDs/revisions, measured
+  thickness, original bounds, margin and permitted rotations. The sheet bridge
+  retains a registered material ID and an explicit `sheet-stock.json`; the supplier
+  stock description stays in the panel recipe. Shelf layouts are
+  rectangular blank planning aids, not contour nests or executable sheet plans.
+- Per-panel and combined operation CSV; EPS layers, embedded steel inserts,
+  former/fixture pieces and hardware lists, with reusable/per-casting groups.
+  Hardware CSV and aggregated BOM use actual assembly component lengths and
+  washer/nut counts; the raw grip/engagement plan is retained separately.
+  Unspecified process consumable quantities are not guessed.
+- Fit-coupon receiver/plug and round/slot locator-coupon pairs, with STEP,
+  SVG/DXF, panel recipes, CAM and a recipe/package-linked `coupon-trial.csv`.
+  `coupon-instructions.md` explains the measurements and representative core
+  retention trials. Cutting and measuring these pieces requires the shop.
+- Twenty-five LinuxCNC programs, one per declared panel face/setup. Exact
+  operation IDs remain in `cam-programs.json` and CAM provenance. Tool diameter,
+  stock, fixtures, work origin, XY reflection and machine travel are retained.
+  `cam-settings.json` explicitly labels the feeds/RPM/tool library and travel as
+  study values. An empty fixture list is not qualified workholding. The final
+  outside cut needs a qualified retention/release method.
+- `load-estimates.json`: peak-head panel loads, gross displaced-mix core uplift
+  and local carrier/bridge demands. Additional compaction pressure is a supplied
+  input, not inferred from vibration frequency. Uncut isotropic rectangles can
+  use the declared simply-supported plate model; tabs/cutouts/rebates and local
+  support loads require a qualified model. Missing brace, fastener and core
+  capacities are per-rule pending results. No EPS-weight credit is used.
+- `fabrication-validation.json` and Diagnostics vocabulary in
+  `fabrication-diagnostics.json`. Styrene/EPS and a cure peak at the declared
+  core limit fail outright; missing evidence, compaction or restraints stay
+  pending. Source design requests and fixture/finishing qualification remain
+  blockers. The new report does not overwrite the phase 4 review status.
+- A versioned `manifest.json` containing source/fabrication/package fingerprints,
+  every generated file's byte count and SHA-256, validation and separate readiness.
+  Only STEP header timestamps are normalized for reproducibility. Verification
+  catches modified artifacts; `--checks` includes a tamper/restore regression.
+
+CAM uses the same finished contours as CAD and drawings. CamKit retains the exact
+boundary for cutter compensation, then samples its centreline to the declared
+20 micrometre chord tolerance. Cutter-radius reliefs need separate vertical
+entries when their centre disappears from a normal offset; CamKit checks the
+complete cutter disc against the exact source face before adding those entries
+under the same operation. The actual tool must be suitable for axial entry.
+ManufacturingKit never compensates profiles or emits SVG/DXF.
+
+For a quicker list/CAM check, use `-- --records-only --checks`. It writes a
+separate `build/tooling/base-fabrication-records/` directory and explicitly keeps
+its CAD/sequence check pending. Use the full command for the complete review.
+The existing phase 4 entry remains a geometry-only export without G-code.

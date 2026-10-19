@@ -29,6 +29,7 @@ typedef MoldDemoldingStep = {var id:String; var kind:DemoldingStepKind; var memb
 typedef CastingMoldAssessment = {var diagnostics:machinekit.assembly.Diagnostics; var geometry:Null<CastingMoldReview>;}
 
 typedef CastingMoldReview = {
+	var fingerprint:String;
 	var handling:HandlingPlan;
 	var demoldingSteps:Array<MoldDemoldingStep>;
 	var symmetricDifferenceMm3:Float;
@@ -554,6 +555,7 @@ class CastingMoldCad {
 				if (!part.shape.isClosed())
 					part.close();
 			return {
+				fingerprint: materia.tooling.casting.CastingMoldCodec.fingerprint(p),
 				handling: p.handling,
 				demoldingSteps: steps(p, demolding.removalOrder),
 				symmetricDifferenceMm3: difference,

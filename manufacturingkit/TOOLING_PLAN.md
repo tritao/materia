@@ -1,6 +1,6 @@
 # Reusable panel tooling and mineral-casting molds
 
-Status: phases 1–4 implemented. The single-pocket and full mill-base molds are geometry reviews; fabrication and physical qualification remain pending.
+Status: phases 1–5 implemented as review tooling. The fabrication package reports unresolved process, structural, fixture and finishing requirements; physical qualification remains pending.
 
 ## Implementation progress
 
@@ -101,7 +101,39 @@ Status: phases 1–4 implemented. The single-pocket and full mill-base molds are
   and 27 design-interface assertions pass. The box example and full mill review
   package regenerate; the complete hardware assembly restores exactly using one
   shared bed datum, within the assembly connector limit.
-- [ ] Phase 5: assembly validation and fabrication package.
+- [x] Phase 5: assembly validation and fabrication review package.
+  `tooling.export.ToolingFabrication` adds versioned process/load inputs, typed
+  material/temperature checks, peak-head pressure and gross core uplift, declared
+  rectangular plate/brace/fastener capacity estimates, and per-core restraint
+  checks. Missing data stays pending; cutout plates and localized support loads
+  need qualified models. Styrene/EPS and assessed cure peaks at the EPS limit fail.
+  Exact sequence/coverage/reconstruction checks remain the CAD gate.
+  Neutral sheet requirements and deterministic shelf layouts retain part IDs and
+  revisions without inventory mutation or contour-nesting claims. The package
+  includes per-panel operation CSV, EPS/steel/hardware lists, reusable/consumable
+  groups, fit and round/slot locator coupons, and a fingerprinted physical trial
+  template. ManufacturingKit still imports only ProjectKit and writes no drawings.
+  `CamToolingPanels` maps operations 1:1 onto CamJob profile/pocket/drill, uses
+  declared tool/feed/setup/stock/fixtures/travel and exports checked LinuxCNC
+  programs through the existing CncWriter. Underside reflection, pocket-access
+  prerequisites and last outside cuts are explicit. Exact arcs are retained as
+  optional CamContour boundary metadata: CamKit's exact native offset is needed
+  because polygon offsets reject cutter-radius reliefs. Isolated matched-radius
+  relief centres get disc-checked vertical entries within the same operation;
+  output centrelines retain the declared chord tolerance. No compensation is
+  applied to neutral profiles. This extension replaces the original polyline-only
+  offset assumption for tooling; general arc-native IR is deferred.
+  `haxeon.fabrication.json -- --checks` generates a fresh full package under
+  `build/tooling/base-fabrication/`, with hashed manifest/verification and a
+  normalized STEP timestamp for repeatable output. Shop feeds/workholding,
+  non-panel machining, precision masters/dams/plugs, source change requests and
+  physical qualification remain explicit blockers rather than fabricated data.
+  Validation: 216 pure tooling, 105 panel-CAM, 12,456 existing CamKit, 339 native
+  tooling and 151 full-mill assertions pass. The sheet bridge passes the existing
+  sheet-plan validator. All 19 panel/coupon parts produce 25 checked programs;
+  the assembly-derived hardware BOM contains 76 pieces. Two full generations
+  have identical manifests and all 650 artifact hashes; tampering is rejected.
+  Source/reconstructed CAD symmetric difference is zero.
 - [ ] Phase 6: design-stage moldability feedback and casting process analysis.
 - [ ] Phase 7: mill column and independent pedestal example.
 - [ ] Phase 8: physical calibration and release.
@@ -164,7 +196,8 @@ Baseline at the start of implementation; the progress list above records changes
   inside profiles, pockets with depth steps and drilled holes, with stock/fixture
   checks and LinuxCNC export. `CamSheetProfiles` is the precedent for bridging
   ManufacturingKit records into CAM. CamKit and ToolpathKit work in metres and
-  `CamContour` is a polyline.
+  `CamContour` retains polyline vertices; phase 5 adds exact boundary metadata
+  for native cutter compensation of matched-radius reliefs.
 - The hot-wire foam cutter (`machinekit/examples/foam-cutter/PLAN.md`) plans a
   `camkit.foam.FoamJob` that accepts a CadKit solid or two paired profiles and
   checks ruledness between foam faces. It is not on main yet.
@@ -260,8 +293,9 @@ inferred from depth or shape. Parametric cut shapes (relieved rectangle, circle,
 obround) may be the stored form, provided each yields one exact line/arc contour
 through a single function shared by CAD, drawings and CAM. Contours keep exact arcs
 in the record; `CamToolingPanels` samples arcs to a declared chord tolerance
-while `CamContour` remains a polyline, and stops sampling once CamKit contours
-carry arcs. Profiles are finished geometry: CamKit applies cutter compensation.
+while `CamContour` retains a sampled representation and optional exact line/arc
+boundary metadata for CamKit compensation (added in phase 5 for matched-radius
+reliefs). Profiles are finished geometry: CamKit applies cutter compensation.
 
 `DesignChangeRequest` is how tooling asks for a casting change it may not make
 itself. Requests are reported against source IDs and block fabrication readiness
@@ -862,8 +896,8 @@ directories; commit source setups, small test fixtures and documentation.
 
 General BREP parting-surface discovery, arbitrary contour nesting, robotic mold
 assembly, wiring core cutting definitions into `FoamJob` (after foam-cutter lands
-on main), CNC posts beyond CamKit's LinuxCNC writer, arc contours in CamKit,
-rotational removal paths, automatic hardware optimization, automatic application
+on main), CNC posts beyond CamKit's LinuxCNC writer,
+general arc-native CAM IR, rotational removal paths, automatic hardware optimization, automatic application
 of design-change proposals, parting-surface search beyond listed orientations,
 the 3D cure tier unless a section needs it, the items under "Not modelled", mold
 FEM beyond what closed-form checks cannot cover, full structural qualification and app
@@ -905,3 +939,16 @@ are installed as groups, then EPS and reusable fixtures separate after bond rele
 The directional blocking graphs come from exact sweeps, not reversing one assumed
 physical process. Exact AABB rejection only removes pairs that cannot have a
 positive-volume intersection; the remaining pairs use native booleans.
+
+
+Phase 5 fabrication review and checks:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fabrication.json -- --checks
+./haxeon/scripts/haxeon run --project=camkit/tests/haxeon.json
+```
+
+The full package includes the existing CAD/sequence checks, declared load/process
+reports, per-panel checked LinuxCNC, lists, layouts and physical coupon templates.
+`-- --records-only --checks` writes an independent records/CAM package with CAD
+validation pending. Neither entry manufactures the coupon or releases the mold.

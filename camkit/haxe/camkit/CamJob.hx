@@ -71,9 +71,12 @@ class CamJob {
     var levels = depthLevels(contour.z, depth, stepDown);
     if (side != "on") offsetPath(contour, tool.diameter * 0.5,
       levels[0], side == "outside");
+    var reliefs = side == "on" ? new Array<Point3>() :
+      CamExactBoundary.reliefCenters(contour, tool.diameter * 0.5, side == "outside");
     var span = nextSpan(featureRef);
     selectTool(tool, span);
     for (level in levels) {
+      cutReliefs(reliefs, level, entryFeed, span);
       if (side == "on") cutLoop(contour, level, feed, entryFeed, span);
       else cutOffset(contour, tool.diameter * 0.5, level, feed,
         entryFeed, span, side == "outside");
@@ -116,6 +119,14 @@ class CamJob {
       throw "CAM pocket step-over must be positive and no larger than tool diameter";
     var entryFeed = checkedEntryFeed(feed, plungeFeed);
     var levels = depthLevels(contour.z, depth, stepDown);
+    var reliefs = CamExactBoundary.reliefCenters(contour, tool.diameter * 0.5, false);
+    if (contour.exactBoundary != null &&
+        offsetPath(contour, tool.diameter * 0.5, levels[0], false).length == 0) {
+      var span = nextSpan(featureRef);
+      selectTool(tool, span);
+      for (level in levels) cutReliefs(reliefs, level, entryFeed, span);
+      return this;
+    }
     if (hasConcaveCorner(contour)) {
       var radius = tool.diameter * 0.5;
       var passes = CamPocketPlanner.plan(contour, radius, stepOver);
@@ -124,6 +135,7 @@ class CamJob {
       selectTool(tool, span);
       for (index in 0...levels.length) {
         var level = levels[index];
+        cutReliefs(reliefs, level, entryFeed, span);
         var prior = index == 0 ? contour.z : levels[index - 1];
         cutPocketPasses(passes, level, prior, contour.z, feed,
           entryFeed, span);
@@ -156,6 +168,7 @@ class CamJob {
     if (rounds >= 10000) throw "CAM pocket exceeds 10000 clearing rings";
     for (index in 0...levels.length) {
       var level = levels[index];
+      cutReliefs(reliefs, level, entryFeed, span);
       var prior = index == 0 ? contour.z : levels[index - 1];
       for (ring in rings) cutPocketRing(ring, level, prior, contour.z,
         feed, entryFeed, span);
@@ -293,7 +306,7 @@ class CamJob {
 
   /** Expand hole centres into safe rapid, feed, and retract moves. */
   public function drill(holes:Array<Point3>, tool:Tool, depth:Float,
-      retractZ:Float, feed:Float):CamJob {
+      retractZ:Float, feed:Float, ?featureRef:String):CamJob {
     if (holes == null || holes.length == 0 || tool == null ||
         !Math.isFinite(depth) || !Math.isFinite(retractZ) ||
         !Math.isFinite(feed) || feed <= 0.0)
@@ -304,7 +317,7 @@ class CamJob {
           retractZ < hole.z || safeZ < retractZ)
         throw "CAM drill depth and retract must be below safe Z";
     }
-    var span = nextSpan();
+    var span = nextSpan(featureRef);
     selectTool(tool, span);
     for (hole in holes) {
       rapidToSafeXY(hole.x, hole.y, span);
@@ -345,6 +358,7 @@ class CamJob {
   function cutOffset(contour:CamContour, radius:Float, depth:Float,
       feed:Float, plungeFeed:Float, span:Provenance, outside:Bool):Void {
     var path = offsetPath(contour, radius, depth, outside);
+    if (path.length == 0) return;
     var first = toolpathkit.path.GeometryTools.pointAt(path[0], 0.0);
     rapidToSafeXY(first.x, first.y, span);
     feedTo(first, plungeFeed, span);
@@ -354,7 +368,17 @@ class CamJob {
 
   static function offsetPath(contour:CamContour, radius:Float,
       depth:Float, outside:Bool):Array<PathGeometry>
-    return GeometryOffset.profile(contour.vertices, radius, depth, outside);
+    return contour.exactBoundary == null ? GeometryOffset.profile(contour.vertices, radius, depth, outside)
+      : CamExactBoundary.offset(contour, radius, depth, outside);
+
+  function cutReliefs(centers:Array<Point3>, depth:Float, feed:Float,
+      span:Provenance):Void {
+    for (center in centers) {
+      rapidToSafeXY(center.x, center.y, span);
+      feedTo(new Point3(center.x, center.y, depth), feed, span);
+      rapid(new Point3(center.x, center.y, safeZ), span);
+    }
+  }
 
   function rapid(target:Point3, span:Provenance):Void {
     if (current.distanceTo(target) > 1e-12) {
