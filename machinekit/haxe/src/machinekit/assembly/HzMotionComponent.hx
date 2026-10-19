@@ -9,13 +9,15 @@ import machinekit.component.ComponentRecipeSupport as P;
 import machinekit.assembly.HzMotionCatalog.HzMotionSpec;
 import materia.assembly.AssemblyFrames as F;
 
-/** Drawing-backed purchased assemblies. Interfaces follow the pinned individual
- * drawings; webs, corners, seals and internal bearings are simplified. These are
- * not supplier STEP solids and must not be used to infer close tool clearances.
+/** Purchased-component interfaces from pinned drawings. Existing drawing recipes
+ * stay parametric; the separate supplier recipe enables only reviewed BF supports.
+ * Detailed CAD does not establish installed clip state or mechanical qualification.
  */
 class HzMotionComponent extends MachineComponent {
  public final spec:HzMotionSpec;
  public final bearingGrade:String;
+ public final geometrySource:String;
+ static var cadRecipe:Null<ComponentType>;
  static var recipe:Null<ComponentType>;
  public static function recipeType():ComponentType {
   if(recipe==null)recipe=new ComponentType("machinekit.assembly.hzmotion-drawing-component",[
@@ -24,13 +26,24 @@ class HzMotionComponent extends MachineComponent {
    P.choice("bearingGrade",["unspecified","C3","C4","C5"],"unspecified")],v->new HzMotionComponent(v.token("model"),v.token("revision"),v.token("bearingGrade")),true,false,null,false);
   return recipe;
  }
- public function new(model:String="M60D-BK12-C",?revision:String,bearingGrade:String="unspecified") {
+ public static function cadRecipeType():ComponentType {
+  if(cadRecipe==null)cadRecipe=new ComponentType("machinekit.assembly.hzmotion-supplier-component",[
+   P.choice("model",HzMotionCatalog.cadModels(),"BF12"),
+   P.choice("revision",[HzMotionCatalog.revision()],HzMotionCatalog.revision())],
+   v->new HzMotionComponent(v.token("model"),v.token("revision"),"unspecified","supplier-step"),true,false,null,false);
+  return cadRecipe;
+ }
+ public function new(model:String="M60D-BK12-C",?revision:String,bearingGrade:String="unspecified",geometrySource:String="drawing") {
   if(revision!=null&&revision!=HzMotionCatalog.revision())throw "Unknown HZMotion drawing revision";
   spec=HzMotionCatalog.get(model);
   if(["unspecified","C3","C4","C5"].indexOf(bearingGrade)<0)throw "Unknown bearing grade";
   if(bearingGrade!="unspecified"&&(spec.family=="A"||(spec.family=="BF"||spec.family=="EF")||spec.kind=="adapter"))throw "Part has no selectable fixed-end bearing grade";
+  if(geometrySource!="drawing"&&geometrySource!="supplier-step")throw "Unknown HZMotion geometry source";
+  if(geometrySource=="supplier-step")HzMotionCatalog.cadAsset(model);
+  this.geometrySource=geometrySource;
   this.bearingGrade=bearingGrade;
-  super('HZMOTION-$model-${spec.drawingRevision}-$bearingGrade','HZMotion $model — drawing model',"unspecified");
+  super('HZMOTION-$model-${spec.drawingRevision}-$bearingGrade'+(geometrySource=="supplier-step"?'-STEP-'+HzMotionCatalog.cadAsset(model).sha256:""),
+   'HZMotion $model — '+(geometrySource=="supplier-step"?"pinned supplier STEP":"drawing model"),"unspecified");
   lockManufacturingMaterial("unspecified");
   if(spec.kind=="mount"||spec.kind=="adapter") {
    addConnector("motor",Mount,Solids.axial(0,spec.shaftHeight,0));
@@ -50,8 +63,11 @@ class HzMotionComponent extends MachineComponent {
    addConnector("bearingBack",Axis,Solids.axial(0,spec.shaftHeight,10+half));
   }
  }
- override public function componentType():Null<ComponentType> return recipeType();
- override public function values():ComponentValues return new ComponentValues().setToken("model",spec.model).setToken("revision",spec.drawingRevision).setToken("bearingGrade",bearingGrade);
+ override public function componentType():Null<ComponentType> return geometrySource=="supplier-step"?cadRecipeType():recipeType();
+ override public function values():ComponentValues {
+  var v=new ComponentValues().setToken("model",spec.model).setToken("revision",spec.drawingRevision);
+  return geometrySource=="supplier-step"?v:v.setToken("bearingGrade",bearingGrade);
+ }
  override public function hasGeometry():Bool return true;
  override public function massProperties():MassProperties {
   var publishedMass=spec.massKg;
@@ -75,6 +91,17 @@ class HzMotionComponent extends MachineComponent {
   catch(e:Dynamic){raw.close();throw e;}
  }
  override public function geometry(detail:ComponentDetail=Preview):Part {
+  if(geometrySource=="supplier-step") {
+   var asset=HzMotionCatalog.cadAsset(spec.model),root=Sys.getEnv("MATERIA_ROOT");
+   var directory=Sys.getEnv("MATERIA_HZMOTION_ROOT");
+   if(directory==null)directory=root==null?"build/suppliers/hzmotion":root+"/build/suppliers/hzmotion";
+   var imported=new SupplierCadComponent(directory+"/cad/assets/"+asset.sha256+".step",asset.sha256,designation,description);
+   try {
+    var raw=imported.geometry();
+    try {var result=raw.translated(new Vector(asset.translation[0],asset.translation[1],asset.translation[2]));raw.close();imported.close();return result;}
+    catch(e:Dynamic){raw.close();throw e;}
+   }catch(e:Dynamic){imported.close();throw e;}
+  }
   return Solids.building([],tracked->{
    function keep(p:Part):Part {tracked.push(p);return p;}
    var s=spec,pieces:Array<Part> = [],cuts:Array<Part> = [],h=s.shaftHeight;

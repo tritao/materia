@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "package": {
+    "name": "hzmotion-cad-audit"
+  },
+  "entry": "HzMotionCadAudit",
+  "sources": [
+    "HzMotionCadAudit.hx"
+  ],
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "cadkit": {
+      "path": "../../../cadkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/suppliers/hzmotion-cad-audit"
+}

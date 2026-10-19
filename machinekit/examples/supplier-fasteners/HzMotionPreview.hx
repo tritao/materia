@@ -20,7 +20,7 @@ class HzMotionPreview {
  static function scene(assembly:MachineAssembly,id:String):SceneArtifactData {
   var model=new AssemblyModel("mm");assembly.addTo(model,"");
   var parts:Array<SceneArtifactPart> = [],messages:Array<String> = [
-   "Drawing-based HZMotion study; supplier STEP downloads require login. Undimensioned shapes are simplified.",
+   "HZMotion study: verified BF12/BF15 supplier STEP; other parts remain simplified drawing geometry.",
    "Catalog/preview is not a manufacturing release or verified motor/drive selection."];
   for(m in assembly.components()) {
    var geometry=m.component.geometry(),mass:MassProperties;
@@ -41,8 +41,9 @@ class HzMotionPreview {
   try {
    var assembly=new MachineAssembly(),i=0;
    for(name in HzMotionCatalog.models()) {
-    var values=new HzMotionComponent(name).values();
-    var definition=MachineKitDocuments.define(document,HzMotionComponent.recipeType(),values);
+    var component=new HzMotionComponent(name,null,"unspecified",HzMotionCatalog.cadModels().indexOf(name)>=0?"supplier-step":"drawing");
+    var values=component.values();
+    var definition=MachineKitDocuments.define(document,component.componentType(),values);
     var instance=document.createInstance('catalog$i',definition);
     instance.restoreProperty("machinekit.occurrence",TypedProperty.text("machinekit.occurrence",'catalog$i'));
     i++;
@@ -63,6 +64,7 @@ class HzMotionPreview {
  }
  public static function axisPreview():Bytes {
   var result=scene(new HzMotionAxis(),"hzmotion-y-drive");
+  result.recipeDiagnostics.push("Floating BF12 remains drawing geometry: the supplier retaining clip intersects the drawing screw groove by approximately 3.68 mm3; installed clip state remains unqualified.");
   result.recipeDiagnostics.push("Requires the HZMotion 51 mm screw-end profile; existing Vallder 54 mm end is not substituted.");
   result.recipeDiagnostics.push("Coupling is a reference geometry. Thread engagement, bearing preload, guides and actual mill placement remain unqualified.");
   return SceneArtifact.encode(result);

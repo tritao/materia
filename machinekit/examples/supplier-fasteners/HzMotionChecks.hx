@@ -39,6 +39,28 @@ class HzMotionChecks {
    check(saved.designation==component.designation,'Recipe identity $model');
    rows.push({model:model,solidCount:p.solidCount(),volumeMm3:p.volume(),source:HzMotionCatalog.sourceUrl(model),geometryBasis:s.geometryBasis});p.close();
   }
+  for(model in HzMotionCatalog.cadModels()) {
+   var component=new HzMotionComponent(model,null,"unspecified","supplier-step"),s=component.spec,p=component.geometry();
+   check(p.valid()&&p.solidCount()>1,"Supplier bearing assembly keeps separate solids");
+   var bounds=p.shape.bounds();
+   near(bounds.get_min().get_y(),0,"Normalized supplier base plane");
+   near(bounds.get_min().get_z(),0,"Normalized supplier front plane");
+   near(bounds.get_max().get_z(),20,"Normalized supplier support length");
+   for(hole in s.baseHoles){
+    var probe=Part.cylinderAlong(hole.diameter/2-0.1,new cadkit.modeling.Vector(hole.x,-1,hole.z),cadkit.modeling.Vector.Y(),s.rearHeight+2);
+    near(overlap(p,probe),0,"Supplier base hole matches connector");probe.close();
+   }
+   var bore=Part.cylinderSpan(s.shaftBore/2-0.1,6.5,13.5,0,s.shaftHeight);
+   near(overlap(p,bore),0,"Supplier shaft passage matches connector");bore.close();
+   var rebuilt=component.componentType().create(component.values());
+   check(rebuilt.designation==component.designation,"Saved supplier recipe retains pinned identity");
+   var rebuiltType:ComponentType=rebuilt.componentType();
+   check(rebuiltType.id!=HzMotionComponent.recipeType().id,"Drawing recipe remains distinct");
+   var unknown=false;try component.massProperties()catch(_:Dynamic)unknown=true;
+   check(unknown,"Detailed STEP does not invent engineering mass");p.close();
+  }
+  var blocked=false;try new HzMotionComponent("M60D-BK12-C",null,"unspecified","supplier-step")catch(_:Dynamic)blocked=true;
+  check(blocked,"Discrepant mount STEP is excluded from recipes");
   var copy=HzMotionCatalog.get("M60D-BK12-C");copy.pilot=999;
   near(HzMotionCatalog.get("M60D-BK12-C").pilot,50,"Catalog records cannot mutate the shared source");
   var modular=new MachineAssembly();modular.addComponent("bracket",new HzMotionComponent("M60D-FK12-A"));
@@ -61,6 +83,13 @@ class HzMotionChecks {
   var findings=HzMotionCatalog.motorFindings("M60D-BK12-C",motor);
   check(findings.length==1&&findings[0].indexOf("thread depth")>=0,"400 W nominal mounting dimensions match; thread depth remains unknown");
   check(HzMotionCatalog.motorFindings("M80E-BK15-C",motor).length>1,"Wrong frame is rejected");
+  var detailed=new HzMotionAxis(true),detailedPoses:Map<String,materia.assembly.AssemblyRecord.AssemblyFrame> = detailed.solvedPoses();
+  var detailedParts=detailed.components(),detailedCache=new PosedParts();
+  var interference=detailedCache.overlap(detailedParts.filter(m->m.id=="floating")[0].component,detailedPoses.get("floating"),
+   detailedParts.filter(m->m.id=="screw")[0].component,detailedPoses.get("screw"));
+  detailedCache.close();
+  check(interference>3.6&&interference<3.8,"Supplier BF12 retaining clip interference remains visible; do not silently replace assembly geometry");
+  rows.push({model:"BF12",supplierScrewIntersectionMm3:interference,status:"Blocked: STEP retaining clip intersects drawing screw groove"});
   HzMotionAxis.checkAndWrite(rows);
   Sys.println("HZMotion catalog geometry, compatibility and drive-stack checks passed");
  }

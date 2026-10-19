@@ -8,6 +8,7 @@ class AssemblyComponents {
 		registry.register(NemaMountPlate.recipeType());
 		registry.register(RbkMotorMount.recipeType());
 		registry.register(HzMotionComponent.recipeType());
+		registry.register(HzMotionComponent.cadRecipeType());
 		registry.register(machinekit.assembly.LinearAxis.Carriage.recipeType());
 	}
 }

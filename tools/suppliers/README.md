@@ -491,9 +491,12 @@ attempts remain recorded in the drawing reference. Run
 cache, or add `--offline` to verify it. Missing files prompt for credentials;
 credentials and session cookies are never saved. The downloader checks the STEP
 header, byte count and SHA-256 and rejects changed content. The cache is under
-`build/suppliers/hzmotion/cad/assets`. These are supplier reference files in their
-original coordinates; the drawing recipes have not been replaced or qualified
-against their detailed interfaces. No KK body/adapter CAD link was listed on the
+`build/suppliers/hzmotion/cad/assets`. BF12/BF15 have passed the interface checks below and now have a separate
+`machinekit.assembly.hzmotion-supplier-component` recipe. Their files remain
+unchanged; the component applies the recorded translation to its usual datums.
+Set `MATERIA_HZMOTION_ROOT` to relocate the supplier cache. Saved supplier recipes
+retain a distinct designation containing the pinned STEP hash. Existing drawing
+recipes remain available. No KK body/adapter CAD link was listed on the
 public KK page, and EF12 has not yet been downloaded.
 
 Open `machinekit/examples/supplier-fasteners/materia.hzmotion.project.json` in
@@ -509,7 +512,7 @@ assembly/document reconstruction. Bearing grade defaults to **unspecified**;
 C3/C4/C5 here are bearing configuration options, not a statement of ball-screw
 lead accuracy or an automatically qualified procurement SKU.
 
-Geometry is reconstructed from drawings, not manufacturer STEP. Pilot and shaft
+Drawing-recipe geometry is reconstructed from drawings. Pilot and shaft
 interfaces, published mounting patterns, overall dimensions and nominal shaft
 height are modeled. Undimensioned webs, recess depths, chamfers, bearing internals,
 seals, counterbores without published depths, dowels and adapter attachment details
@@ -542,3 +545,32 @@ They write `checks.json`, `y-drive.assembly.json` and `y-drive.bom.json`. There 
 no guide/carriage structure or attachment to the actual mill in this first drive
 stack. The reference's machine suitability records preserve the mill's X return
 belt and flag Z/hobber/lathe/router arrangements for independent selection.
+
+
+The STEP interface review is recorded per asset in `hzmotion-cad.json`.
+`M60D-BK12-C`, `M60D-EK12-C`, `M80E-BK15-C`, `M60D-FK12-A` and `FK12`
+are excluded from supplier component recipes pending source clarification.
+In particular, BK12-C has a 24.5 mm shaft height and different rear base-hole
+positions; changing only its coordinate system cannot reconcile those dimensions.
+The drawing-derived motor/fastener findings remain drawing-only evidence.
+
+BF12/BF15 supplier solids retain housing, bearing and retaining hardware as one
+purchased component. Their normalized base is Y=0, support front Z=0, shaft axis
+Z at Y=25/28, base holes X=+/-23/27 at Z=10. BF12 raw geometry is translated by
+(0,25,20), BF15 by (0,28,0). Native checks verify the shaft passage, mounting
+holes, bounding planes, saved identity and drive clearances. No material or
+engineering mass is inferred from detailed STEP. The gallery uses these two
+supplier models. The worked Y stack retains drawing BF12: the detailed supplier
+retaining clip overlaps the drawing screw groove by about 3.68053 mm3 (clip inner
+radius 4.65 vs simplified groove radius 4.8). Its installed/free-state and the
+groove specification require qualification. The native regression preserves this
+finding rather than modifying the supplier solid or inventing a deeper groove.
+
+Reproduce the raw cylindrical-face/bounds audit (no modeling-time network):
+
+```sh
+MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run --project machinekit/examples/supplier-fasteners/haxeon.hzmotion-cad.json
+```
+
+It writes `build/suppliers/hzmotion/cad/import-audit.json`. This verifies nominal
+assembly interfaces, not manufacturing tolerances or supplier load ratings.

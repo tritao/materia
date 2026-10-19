@@ -14,7 +14,13 @@ typedef HzMotionSpec = {
  var oppositeSupport:Null<String>;var endProfile:Null<String>;var geometryBasis:String;var drawingRevision:String;
 }
 typedef HzMotionCoverage = {var family:String;var motorInterface:String;var support:String;var sourcePage:Int;var status:String;}
+typedef HzMotionCadAsset = {var model:String;var sha256:String;var translation:Array<Float>;}
 class HzMotionCatalog {
+ public static function cadModels():Array<String> return [for(a in HzMotionData.cadAssets())a.model];
+ public static function cadAsset(model:String):HzMotionCadAsset {
+  for(a in HzMotionData.cadAssets())if(a.model==model)return a;
+  throw 'HZMotion STEP interfaces not verified for $model';
+ }
  public static function models():Array<String> return [for(p in HzMotionData.parts())p.model];
  public static function get(model:String):HzMotionSpec {
   for(p in HzMotionData.parts())if(p.model==model)return p;
