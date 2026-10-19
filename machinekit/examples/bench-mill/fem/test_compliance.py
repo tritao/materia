@@ -4,7 +4,7 @@ import math
 import unittest
 
 from compliance import reduce
-from compliance_budget import network
+from compliance_budget import network, tool_case_packet
 from frame_solver import cross, distribute_wrench
 
 
@@ -17,6 +17,23 @@ class ComplianceChecks(unittest.TestCase):
         self.assertAlmostEqual(abs(direction[1]),math.sqrt(.5))
         self.assertEqual(len(result['loadBoxCorners']),8)
         self.assertAlmostEqual(result['worstLoadBoxCorner']['normUm'],math.sqrt(1500**2*2+250**2))
+
+    def test_tool_case_moves_contact_without_changing_masses(self):
+        import json
+        from pathlib import Path
+        inputs=json.loads(Path(__file__).with_name('compliance-budget.json').read_text())
+        packet={'datums':{'toolTipMm':{'x':1,'y':2,'z':100}},'parts':[
+            {'id':'spindle/holder','boundsMm':{'minZ':200},'massKg':3}]}
+        nose=tool_case_packet(packet,inputs,'spindle-nose')
+        bar=tool_case_packet(packet,inputs,'test-bar-20')
+        cutter=tool_case_packet(packet,inputs,'cutter-6-carbide')
+        self.assertEqual(nose['datums']['toolTipMm']['z'],235)
+        self.assertEqual(bar['datums']['toolTipMm']['z'],195)
+        self.assertEqual(cutter['datums']['toolTipMm']['z'],180)
+        self.assertEqual(packet['datums']['toolTipMm']['z'],100)
+        self.assertEqual(nose['parts'],packet['parts'])
+        self.assertTrue(nose['analysisToolCase']['decisionCase'])
+        self.assertFalse(cutter['analysisToolCase']['decisionCase'])
 
     def test_nonreciprocal_compliance_fails(self):
         with self.assertRaisesRegex(ValueError,'symmetry'):

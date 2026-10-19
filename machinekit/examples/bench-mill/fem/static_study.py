@@ -10,13 +10,14 @@ import re
 import shutil
 import subprocess
 
-from frame_mesh import GMSH_VERSION, build_mesh
+from frame_mesh import GMSH_VERSION
+from mesh_cache import cached_mesh
 from frame_solver import assess, read_results, read_energies, run_solver, write_deck
 from packet import SOLVER_UNITS, digest, elastic_input, finite, validate
 from solver_fixtures import CCX_VERSION
 from tet_fixture import verify
 from spring_fixture import verify as verify_springs
-from compliance_budget import budget
+from compliance_budget import budget, tool_case_packet
 from provenance import capture_sources
 
 
@@ -107,8 +108,10 @@ def main():
     parser.add_argument("--config", type=Path, default=Path(__file__).with_name("frame-study.json"))
     parser.add_argument("--ccx", default="ccx")
     parser.add_argument("--budget",type=Path,default=Path(__file__).with_name("compliance-budget.json"))
+    parser.add_argument("--tool-case", help="Named compliance-budget tool case; moves both FE contact references")
     parser.add_argument("--sizes", nargs="+", type=float, default=[40, 30])
     parser.add_argument("--resume",action="store_true",help="Reuse completed solver outputs only when regenerated input bytes match")
+    parser.add_argument("--threads",type=int,choices=[1,2,4],default=1)
     parser.add_argument("--timeout", type=int, default=1800, help="Per-mesh solver timeout in seconds")
     parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / "build/fem/static-study")
     args = parser.parse_args()
@@ -128,8 +131,10 @@ def main():
         validated = validate(args.manifest)
         packet = json.loads(args.manifest.read_text())
         config = json.loads(args.config.read_text())
+        if args.tool_case:
+            packet = tool_case_packet(packet,json.loads(args.budget.read_text()),args.tool_case)
         validate_config(config)
-        source_names=("static_study.py","frame_mesh.py","frame_solver.py","packet.py","tet_fixture.py","spring_fixture.py","ccx_deck.py","mesh_resolution.py","compliance.py","compliance_budget.py","provenance.py","solver_fixtures.py")
+        source_names=("static_study.py","mesh_cache.py","frame_mesh.py","frame_solver.py","packet.py","tet_fixture.py","spring_fixture.py","ccx_deck.py","mesh_resolution.py","compliance.py","compliance_budget.py","provenance.py","solver_fixtures.py")
         source_hashes={name:digest(Path(__file__).with_name(name)) for name in source_names}
         provenance_output=args.output.resolve()/"provenance"
         source_build=capture_sources(Path(__file__).resolve().parents[4],provenance_output)
@@ -154,10 +159,10 @@ def main():
         spring_fixture = verify_springs(ccx,args.output/"spring-verification")
         def solve_case(output, write):
             previous_input=digest(output/"frame.inp") if (output/"frame.inp").exists() else None
-            previous_result=(output/"frame.dat").exists() and (output/"solver.log").exists() and "Job finished" in (output/"solver.log").read_text()
+            previous_result=(output/"frame.dat").exists() and (output/"solver.log").exists() and "Job finished" in (output/"solver.log").read_text() and "*ERROR" not in (output/"solver.log").read_text().upper() and re.search(rf"Using up to\s+{args.threads}\s+cpu",(output/"solver.log").read_text()) is not None
             model=write()
             if not (args.resume and previous_result and previous_input==model["inputSha256"]):
-                run_solver(ccx,output,args.timeout)
+                run_solver(ccx,output,args.timeout,args.threads)
             else:
                 print(f"Reusing identical completed deck: {output}",flush=True)
             return model
@@ -169,7 +174,7 @@ def main():
             gmsh.initialize()
             gmsh.logger.start()
             try:
-                mesh = build_mesh(gmsh, packet, args.manifest, config, size, output)
+                mesh = cached_mesh(gmsh, packet, args.manifest, config, size, output)
             finally:
                 gmsh_messages=gmsh.logger.get()
                 (output/"gmsh.log").write_text("\n".join(gmsh_messages)+"\n")
@@ -209,7 +214,7 @@ def main():
             result = {"sizeMm": size, "nodes": len(mesh["nodes"]), "elements": sum(len(v) for v in mesh["elements"].values()),
                       "meshSha256": mesh["meshSha256"], "supports": supports,
                       "gmshLibrarySha256": mesh["gmshLibrarySha256"], "minimumJacobianDeterminant": mesh["minimumJacobianDeterminant"],
-                      "bonds": mesh["bonds"], "patches": mesh["patches"],"meshPartitions":mesh["partitions"],"throughThickness":mesh["throughThickness"],"gmshWarnings":[line for line in gmsh_messages if "Warning" in line or "Error" in line]}
+                      "bonds": mesh["bonds"], "patches": mesh["patches"],"meshPartitions":mesh["partitions"],"throughThickness":mesh["throughThickness"],"gmshWarnings":mesh.get("cachedGmshWarnings",[line for line in gmsh_messages if "Warning" in line or "Error" in line])}
             if size == args.sizes[-1]:
                 check_output=output/"base-stiffening-check"
                 check_output.mkdir(exist_ok=True)
@@ -240,7 +245,10 @@ def main():
         soft=fine["soft-three-point"]["solution"]["worstLoadBoxCorner"]["normUm"]
         stiff=fine["stiff-four-springs"]["solution"]["worstLoadBoxCorner"]["normUm"]
         support_difference={"softWorstLoadBoxUm":soft,"stiffWorstLoadBoxUm":stiff,"changeRelativeToStiff":(soft-stiff)/stiff}
-        decision="Proceed to geometry screening" if any(s["complianceBudget"]["geometryEligible"] for s in fine.values()) else "Defer geometry; casting share below provisional target in every direction under both support bounds"
+        eligible=[s["complianceBudget"]["geometryEligible"] for s in fine.values()]
+        decision=("Context tool case; no geometry decision" if all(v is None for v in eligible) else
+                  "Casting share reaches target; assess stiffness candidates" if any(eligible) else
+                  "Casting share below target for this decision case; lightening requires modal and travel screening")
         if source_hashes!={name:digest(Path(__file__).with_name(name)) for name in source_names} or configuration_hash!=digest(args.config) or packet_hash!=digest(args.manifest) or budget_hash!=digest(args.budget):
             raise ValueError("Analysis sources or inputs changed during solve; rerun with --resume to verify identical decks")
         change = convergence(results)
@@ -249,10 +257,10 @@ def main():
                   "sourceManifestPath":str(original_manifest),"frozenManifestPath":str(args.manifest),"geometryDecision":decision,"supportDifference":support_difference,"analysisSources":source_build,"geometrySourceBuild":packet["provenance"]["sourceBuild"],"budgetConfigurationSha256":digest(args.budget),
                   "converged": converged, "units": SOLVER_UNITS, "responseUnits": "micrometres",
                   "packetDensityMassChecks":validated["densityMassChecks"],"manifestSha256": validated["manifestSha256"], "configurationSha256": digest(args.config), "configuration": config,
-                  "solverVersion": version.stdout.strip(), "solverSha256": digest(ccx),
+                  "solverThreads":args.threads,"solverVersion": version.stdout.strip(), "solverSha256": digest(ccx),
                   "tetVerification": fixture,"supportSpringVerification":spring_fixture,
                   "sourceSha256":source_hashes,
-                  "jointsMm": packet["jointsMm"], "convergence": change, "meshes": results}
+                  "toolCase":packet.get("analysisToolCase"),"analysisContactMm":packet["datums"]["toolTipMm"],"jointsMm": packet["jointsMm"], "convergence": change, "meshes": results}
         report_path.write_text(json.dumps(report, indent=2) + "\n")
         (args.output / "report.md").write_text(markdown(report))
         print(f"{report['status']}; report: {report_path}")

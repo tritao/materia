@@ -89,6 +89,7 @@
   "frameShareTarget": {
     "maximumFraction": 0.3,
     "source": "Provisional engineering target",
-    "rationale": "At 30% casting share, a 20% casting compliance reduction improves total loop compliance by only 6%; defer geometry below this share in all directions under both support bounds."
+    "rationale": "Provisional 30% casting contribution to the machine loop; assess nose and short stiff test bar. Cutter cases are context only. Low share permits lightening studies after modal and travel gates, not an automatic stiffness increase.",
+    "decisionBasis": "Machine loop excluding job-dependent cutter: spindle nose and short stiff test bar, both supports and all travel poses"
   }
 }

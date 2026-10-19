@@ -40,7 +40,18 @@ reference, and all lumped-network lever arms, to the selected contact.
 `tool_cases.py build/fem/tool-cases` combines converged studies; material-only
 changes reuse the identical FE contact solution. It reports total and
 machine-loop-without-tool budgets separately and judges casting share on the
-latter for the two decision cases only. Numerical tool-case studies are pending.
+latter for the two decision cases only. The machine-only decision contract passes a known masking test: total-loop
+casting share 3.1%, tool share 90%, machine-only casting share 31%; the revised
+decision detects the 30% target. Context cutters cannot trigger it, and mixed
+CAD packets are rejected. All 25 Python tests pass. Numerical tool-case results
+remain pending.
+
+The repeatable sequence is `pose_sweep.py build/fem/modal-poses --output
+build/fem/nine-pose-upper-bound --ccx PATH --threads 4 --resume` (paths shown
+relative to this example). It runs all nine modal studies before the two static
+decision cases at all nine poses. `sweep_report.py` compares them; `tool_cases.py`
+adds the contextual cutter material variants after their three center FE contact
+studies. All studies enter the shared heavy-job queue independently.
 
 The modal mass/coupling analytical gate passes: six modes of a spring-supported
 platform with a full mass/inertia attachment match analytical frequencies to

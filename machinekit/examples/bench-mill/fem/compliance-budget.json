@@ -80,5 +80,98 @@
   "supports": {
     "source": "The selected FEM support configuration and SUPPORT_SPRINGS strain energy",
     "assumption": "Support compliance is already in frame FEM; split it out by energy, never add the same support in series again."
-  }
+  },
+  "toolMaterials": {
+    "steel": {
+      "youngsPa": 210000000000.0,
+      "source": "Explicit study assumption, nominal steel modulus; matches machined-steel baseline"
+    },
+    "carbide": {
+      "youngsPa": 600000000000.0,
+      "source": "Explicit sensitivity assumption for cemented carbide; grade/binder-dependent, not a selected tool specification"
+    },
+    "source": "Explicit elastic-modulus sensitivity assumptions, per material below"
+  },
+  "toolCases": [
+    {
+      "id": "spindle-nose",
+      "decisionCase": true,
+      "diameterMm": 0,
+      "stickOutMm": 0,
+      "holderLengthMm": 0,
+      "material": "steel",
+      "inertiaFraction": 1,
+      "source": "Rigid spindle gauge reference; no holder or tool compliance"
+    },
+    {
+      "id": "test-bar-20",
+      "decisionCase": true,
+      "diameterMm": 20,
+      "stickOutMm": 40,
+      "holderLengthMm": 0,
+      "material": "steel",
+      "inertiaFraction": 1,
+      "source": "Assumed solid integral steel test bar, 40 mm below spindle gauge; assumed taper contact retained"
+    },
+    {
+      "id": "cutter-6-steel",
+      "decisionCase": false,
+      "diameterMm": 6,
+      "stickOutMm": 20,
+      "holderLengthMm": 35,
+      "material": "steel",
+      "inertiaFraction": 0.5,
+      "source": "Study stick-out assumption, roughly 3 diameters; fluted effective inertia = half solid circle; not a job prescription"
+    },
+    {
+      "id": "cutter-6-carbide",
+      "decisionCase": false,
+      "diameterMm": 6,
+      "stickOutMm": 20,
+      "holderLengthMm": 35,
+      "material": "carbide",
+      "inertiaFraction": 0.5,
+      "source": "Study stick-out assumption, roughly 3 diameters; fluted effective inertia = half solid circle; not a job prescription"
+    },
+    {
+      "id": "cutter-10-steel",
+      "decisionCase": false,
+      "diameterMm": 10,
+      "stickOutMm": 30,
+      "holderLengthMm": 35,
+      "material": "steel",
+      "inertiaFraction": 0.5,
+      "source": "Study stick-out assumption, roughly 3 diameters; fluted effective inertia = half solid circle; not a job prescription"
+    },
+    {
+      "id": "cutter-10-carbide",
+      "decisionCase": false,
+      "diameterMm": 10,
+      "stickOutMm": 30,
+      "holderLengthMm": 35,
+      "material": "carbide",
+      "inertiaFraction": 0.5,
+      "source": "Study stick-out assumption, roughly 3 diameters; fluted effective inertia = half solid circle; not a job prescription"
+    },
+    {
+      "id": "cutter-16-steel",
+      "decisionCase": false,
+      "diameterMm": 16,
+      "stickOutMm": 45,
+      "holderLengthMm": 35,
+      "material": "steel",
+      "inertiaFraction": 0.5,
+      "source": "Study stick-out assumption, roughly 3 diameters; fluted effective inertia = half solid circle; not a job prescription"
+    },
+    {
+      "id": "cutter-16-carbide",
+      "decisionCase": false,
+      "diameterMm": 16,
+      "stickOutMm": 45,
+      "holderLengthMm": 35,
+      "material": "carbide",
+      "inertiaFraction": 0.5,
+      "source": "Study stick-out assumption, roughly 3 diameters; fluted effective inertia = half solid circle; not a job prescription"
+    }
+  ]
 }

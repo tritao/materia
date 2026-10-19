@@ -34,6 +34,20 @@ def network(springs, point, active=range(6)):
     return groups,solutions,rows
 
 
+def tool_case_packet(packet, inputs, case_id):
+    """Change analysis contact only; physical CAD/mass records remain unchanged."""
+    import copy
+    case = next(c for c in inputs['toolCases'] if c['id'] == case_id)
+    result = copy.deepcopy(packet)
+    holder = next(p for p in packet['parts'] if p['id'] == 'spindle/holder')
+    gauge = holder['boundsMm']['minZ'] + inputs['toolHolder']['neckLengthMm']
+    point = result['datums']['toolTipMm']
+    point['z'] = gauge - case['holderLengthMm'] - case['stickOutMm']
+    result['analysisToolCase'] = case
+    result['analysisContactNote'] = 'Rigid workpiece extends to the selected contact; CAD tool masses unchanged in this static-only comparison.'
+    return result
+
+
 def budget(packet, study, inputs, solution):
     for name,value in inputs.items():
         if isinstance(value,dict) and not any('source' in k.lower() for k in value):
@@ -104,27 +118,36 @@ def budget(packet, study, inputs, solution):
         for i in (0,1): springs.append(('spindle-bearings',(point[0],point[1],gauge+offset),unit[i],bearing['radialPairNPerUm']*500))
     springs.append(('spindle-bearings',(point[0],point[1],gauge+bearing['stationOffsetsAboveGaugeMm'][0]),unit[2],bearing['axialPairNPerUm']*1000))
     for group,matrix in network(springs,point,range(5))[0].items(): add(group,matrix)
-    holder=inputs['toolHolder'];tool=inputs['tool']
+    holder=inputs['toolHolder'];tool=inputs['tool'];case=packet.get('analysisToolCase')
     holder_e=study['materials'][parts['spindle/holder']['materialId']]['youngsPa']*1e-6
     tool_e=study['materials'][parts['spindle/tool']['materialId']]['youngsPa']*1e-6
     bounds=parts['spindle/tool']['boundsMm']
     stick=bounds['maxZ']-bounds['minZ'];diameter=(bounds['maxX']-bounds['minX'])
-    area=math.pi*diameter**2/4;inertia=math.pi*diameter**4/64*tool['inertiaFraction']
+    if case:
+        stick,diameter=case['stickOutMm'],case['diameterMm']
+        tool_e=inputs['toolMaterials'][case['material']]['youngsPa']*1e-6
+    area=math.pi*diameter**2/4 if diameter else 1
+    fraction=case['inertiaFraction'] if case else tool['inertiaFraction']
+    inertia=math.pi*diameter**4/64*fraction if diameter else 1
     tool_bend=1000*stick**3/(3*tool_e*inertia)
     tool_axial=1000*stick/(tool_e*area)
     add('tool',[[tool_bend,0,0],[0,tool_bend,0],[0,0,tool_axial]])
-    length=holder['neckLengthMm'];inertia=math.pi*(holder['outerDiameterMm']**4-holder['boreDiameterMm']**4)/64
-    area=math.pi*(holder['outerDiameterMm']**2-holder['boreDiameterMm']**2)/4
+    length=case['holderLengthMm'] if case else holder['neckLengthMm'];bore=diameter if case else holder['boreDiameterMm'];inertia=math.pi*(holder['outerDiameterMm']**4-bore**4)/64
+    area=math.pi*(holder['outerDiameterMm']**2-bore**2)/4
     holder_bend=1000*((length+stick)**3-stick**3)/(3*holder_e*inertia)
     contact=1/holder['taperTranslationNPerUm']+1000*(length+stick)**2/holder['taperRotationNmmPerRad']
     axial=1000*length/(holder_e*area)+1/holder['taperTranslationNPerUm']
-    add('tool-holder',[[holder_bend+contact,0,0],[0,holder_bend+contact,0],[0,0,axial]])
+    if not case or case['id']!='spindle-nose':
+        add('tool-holder',[[holder_bend+contact,0,0],[0,holder_bend+contact,0],[0,0,axial]])
     total=[[sum(matrix[i][j] for matrix in groups.values()) for j in range(3)] for i in range(3)]
     shares={axis:{group:matrix[i][i]/total[i][i] for group,matrix in groups.items()} for i,axis in enumerate('xyz')}
     casting_shares={axis:sum(details[axis][g] for g in ('BASE_CASTING','COLUMN_CASTING'))/total[i][i] for i,axis in enumerate('xyz')}
-    return {'status':inputs['status'],'inputData':inputs,'componentComplianceUmPerN':groups,'directionalShares':shares,
+    machine=[[total[i][j]-groups['tool'][i][j] for j in range(3)] for i in range(3)]
+    machine_shares={axis:sum(details[axis][g] for g in ('BASE_CASTING','COLUMN_CASTING'))/machine[i][i] for i,axis in enumerate('xyz')}
+    return {'castingMachineLoopShares':machine_shares,'machineLoopExcludingTool':reduce_compliance(machine,study['cuttingForceN']),'status':inputs['status'],'inputData':inputs,'componentComplianceUmPerN':groups,'directionalShares':shares,
             'frameEnergyDiagonalUmPerN':details,'castingLoopShares':casting_shares,
-            'geometryEligible':any(v>=study['frameShareTarget']['maximumFraction'] for v in casting_shares.values()),
+            'geometryEligible':any(v>=study['frameShareTarget']['maximumFraction'] for v in machine_shares.values()) if case and case['decisionCase'] else None,
+            'toolCase':case,'decisionBasis':'Machine loop at spindle nose and short test bar; job-dependent cutters are context only',
             'frameShareTarget':study['frameShareTarget'],'toolStickOutMm':stick,'toolDiameterMm':diameter,
             'supportAccounting':'Support springs and foot-floor deformation remain inside frame-fem and are split by FE energy; no duplicate series spring.',
             **reduce_compliance(total,study['cuttingForceN'])}

@@ -14,7 +14,8 @@ The castings are one element in series with guides, screw/nut/bearing drives,
 the X belt return, the column clamp, spindle bearings, tool holder, fixture and
 supports. The study first establishes **how much of the tool-to-workpiece
 compliance the castings carry**. Casting geometry work is justified only if
-that share is significant (see step 4).
+that share is significant (see step 4). If that share is small, mass reduction
+may instead justify lightening, subject to the modal and travel gates.
 
 Start with a linear static model and an undamped modal model. Add detailed
 contact, thermal distortion, forced vibration, fatigue, and insert anchorage
@@ -202,14 +203,22 @@ at the study stick-out, and the bracketed support. Use catalogue values with
 their source and preload class. Put the frame compliance from the step 3
 upper-bound model in series with these springs.
 
-Report each element's share of the total compliance in each direction. Use the
+Report each element's share of the total compliance in each direction.
+Judge the frame-share target on the **machine loop excluding the job-dependent
+cutting tool**, using a spindle-nose rigid reference (no holder stick-out) and
+a short stiff test bar (nominal 20 mm steel, 40 mm gauge). Report 6, 10 and
+16 mm cutters with declared stick-outs as context, with steel and carbide as
+explicit material options. Re-evaluate FE load points and spring lever arms for
+each case; removing a tool spring from the old cutter-tip result is insufficient. Use the
 budget to set a provisional frame target, e.g. "frame contributes at most N% of
 loop compliance", so that step 7 has a stopping criterion. Record the target
 and its rationale in the study configuration.
 
 **Gate:** the budget states each input's source and is repeated with the soft
 and stiff bounds. If the castings carry a small share in every direction under
-both bounds, step 7 is deferred, and joint/guide/drive work takes priority.
+both bounds, stiffness-increasing candidates are deferred. After modal and
+travel screening, lightening candidates may use the remaining frame-share
+budget, with candidate parameters proposed before geometry edits.
 
 ### 5. Run baseline static cases
 
@@ -252,7 +261,9 @@ element quality and solver warnings.
 ### 6. Run modal and uncertainty studies
 
 With the same masses and boundary conditions, solve undamped eigenmodes for
-the no-cutting-load machine at representative poses. Represent mass-only
+the no-cutting-load upper-bound frame at center and all eight travel corners.
+Run this modal matrix before the nine-pose static sweep, then report whether
+the casting share or low column-bending modes worsen at the travel extremes. Represent mass-only
 components as point masses with their inertia tensors at their centres of
 mass. Attach each one to its represented ancestor through a distributing
 coupling, and export the inertia tensors in the packet. Rigid moving
@@ -281,8 +292,13 @@ values before setting release limits.
 
 ### 7. Make geometry changes as controlled candidates
 
-Proceed only when the step 4 budget shows the castings carry a significant
-share of loop compliance, measured against the recorded frame target.
+Stiffness-increasing geometry proceeds when the step 4 machine-loop budget
+shows a significant casting share. If the share remains well below target and
+modal/travel gates pass, propose lightening candidates instead: wall, roof and
+rib thickness reductions within MillFrameLayout. Propose parameters for review
+before editing geometry. Screen mass reduction against the recorded share
+target and relevant mode frequencies; frequency acceptance remains provisional
+until operating bands and physical measurements exist.
 
 Start with parameters already owned by `MillFrameLayout`: `wall`, `roof`,
 `baseHeight`, `columnWidth`, `columnDepth`, `columnFootWidth`, `seatWidth`, and
@@ -297,7 +313,11 @@ finalists.
 For every candidate, run `MillFrameChecks`, `MillXYStageIntegrity`,
 `MillZAxisIntegrity`, `MillSpindleIntegrity`, assembly clearance/service checks,
 and the same FEM case matrix. Reject invalid solids, lost insert support,
-blocked motor/bolt access, reduced travel, or a worse worst-case deflection.
+blocked motor/bolt access, or reduced travel. For stiffness candidates reject
+a worse worst-case deflection. For lightening candidates, allow the explicitly
+budgeted compliance increase only while machine-loop casting share and modal
+frequency screens remain satisfied; record that tradeoff rather than claiming
+a stiffness improvement.
 Rank surviving candidates by worst relative displacement (frame-only and with
 the step 4 budget), relevant modal frequency range, casting mass, and added
 fabrication complexity. Show a Pareto table; do not pick a single score until
@@ -314,10 +334,14 @@ properties, obtain better joint data before selecting geometry.
 The first useful milestone is the assembly-aware export, the upper-bound
 static baseline at one pose (compliance matrix, strain-energy decomposition,
 reactions, and a mesh convergence table), and the step 4 compliance budget,
-all in an automatically generated report. The second milestone adds the
-assembly model, the full pose matrix, both support bounds, the contact check,
-the modal study, and uncertainty ranges. The third adds geometry candidates
-and a comparison report, if the budget justifies them. Each report must point
+all in an automatically generated report. The next milestone corrects the
+tool-reference budget, then runs upper-bound modes at all nine poses before
+the nine-pose static sweep, under both supports. Report low column modes and
+machine-loop casting share at the extremes. Conditional lightening parameter
+proposals follow those gates; do not edit layout geometry before review.
+The assembly model, contact check and joint/material uncertainty ranges remain
+subsequent work needed before selecting or qualifying a physical design.
+Geometry candidate comparisons use the applicable budget and modal gates. Each report must point
 to the source revision, manifest/hash, solver version, material data, boundary
 conditions, mesh settings, warnings, and exact case IDs. Keep small analytical
 solver fixtures and exporter contract tests in version control. Large solver
