@@ -601,8 +601,25 @@ park. Their peak carried-point separation speeds are 0.0502 mm/s (A) and
 0.0712 mm/s (B), below the 1 mm/s limit. Continuous observed-geometry checks
 cover 16 guarded edges on either side and 116/106 free return edges for A/B.
 Both focused tray support-search checks also pass at the final 0.05 mm/s
-command speed. Physical validation of the complete strategy remains pending
-until the full four-part cycle passes.
+command speed.
+
+The complete clearance-first MuJoCo run passes all 52 operations, four CNC
+start/ready handshakes and four deliveries, finishing at 2688.23 simulated seconds
+with both grippers and the vise empty and the arm at reviewed park. No guard or
+retention fault occurred. All four observed registrations and guarded/free
+extraction proofs pass; the highest guarded carried-point speed is 0.05785 mm/s,
+within its 1 mm/s limit. The third locating action confirms a measured touch and
+stationary stop gap after its light contact load recoils to zero. The 5 N search
+force limit and 0.001 mm penetration limit remain unchanged.
+
+The full report is `build/electric-physics-playback-clearance-first.json`;
+`build/electric-clearance-validation-summary.json` records its hash, frozen input
+records and validation counts. The runtime contract checks pass 28 round trips,
+1308 edges, nine latched-fault checks, 25 contact-search checks, three shared-datum
+checks and five seating-constraint checks. These results validate the modeled
+headless cycle; `programReady`, `hardwareReady` and `fullCycleQualified` remain
+false because hardware limits, flexible cable dynamics, prescribed fixture motion
+and the timed CNC cutting model are not commissioned production behavior.
 
 The headless host and application share `SimulatedContactSurfaces` for hard-fixture
 contact compliance. The electric host's metal finger friction remains an explicit
