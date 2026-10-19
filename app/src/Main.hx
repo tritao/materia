@@ -1500,11 +1500,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       items.push(new KeyedView("undo", toolbarAction("toolbar-undo", "editor.undo", "Undo", IconName.Undo, compact)));
       items.push(new KeyedView("redo", toolbarAction("toolbar-redo", "editor.redo", "Redo", IconName.Redo, compact)));
     }
-    items.push(new KeyedView("space", new Spacer("toolbar-space", LayoutAxis.grow(),
-      LayoutAxis.fixed(1.0))));
-    var documentLabel = shortenLabel(session.label(), compact ? 18 : 30);
-    items.push(new KeyedView("status", new Text(documentLabel, null, appearance.theme.tokens.textSecondary,
-      TextStyleOverride.text(12.0))));
+    items.push(new KeyedView("status", new app.editor.DocumentPathLabel(
+      app.editor.DocumentPathLabel.documentPath(session))));
     var more = new Button(compact ? "" : "More", null, function() {
       toolbarMenuVisible = !toolbarMenuVisible;
       invalidateView();

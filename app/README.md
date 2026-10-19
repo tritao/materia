@@ -231,7 +231,10 @@ compiles the program with CncKit and streams it to the machine through MotionKit
   disk. Play or Step enters Simulate, and Design returns to the mode it came from.
 - New (`Ctrl+N`) starts a fresh scene; in demo mode it restores the starter objects.
 - Open (`Ctrl+O`), Save (`Ctrl+S`), and Save As (`Ctrl+Shift+S`) use native file
-  dialogs. The toolbar shows the current filename and `*` for unsaved changes.
+  dialogs. The toolbar uses its available width for the full document path (or
+  generated source path) and `*` for unsaved changes. Paths that do not fit are
+  shortened from the left, preserving the filename; hover or focus reveals the
+  complete path in an overlay only while the inline label is truncated.
 - New, Open, and window close ask Save / Discard / Cancel when edits are unsaved.
   Cancelling a chooser or a failed save keeps the current document open.
 - Docking preferences remain separate and save automatically. The command
