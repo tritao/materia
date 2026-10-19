@@ -36,8 +36,14 @@ kinetic localization and rotation/tooth-pass frequency-equality speeds are in
 `build/fem/nine-pose-serial/modal-report.md` / `.json`.
 Aggregate JSON SHA256:
 `e860a8a455a503f7c18bd2694abcfe07872815594ce4ac76293d3a81c7253b5b`.
-Physical modal acceptance awaits declared spindle/motor/axis excitation bands
-and joint uncertainty. The serial nine-pose nose/test-bar static sweep has
+Physical modal acceptance remains open. The BT30 concept's 8,000 rpm limit
+corresponds to 133.333 Hz rotation; at `xplus_yminus_zupper`, the four-spring
+mode 7 is **132.751 Hz**, only **0.437%** away. Its last refinement changes
+**1.885%**, exceeding that separation. The normalized nose gap is 0.498 of the
+casting-motion peak and 66.2% of kinetic energy is in meshed solids, so this
+mode warrants a relative-path/operating-band review. Mode-shape ratios describe
+normalized eigenvectors. Declared machining/motor/axis bands and joint/material
+uncertainty remain required. See `build/fem/nine-pose-serial/excitation-context.md`. The serial nine-pose nose/test-bar static sweep has
 passed both center decision cases; travel cases are running. Tool-context budgets and the casting-share/lightening decision remain
 pending; no `MillFrameLayout` geometry has been edited.
 
@@ -613,3 +619,26 @@ band review. No geometry change has been made. The bar report is
 `dc99cc07ed78e313c401c93862acff37742efb31ca631a0a7c2d7d27bba85cc7`.
 The first travel corner is running. Contextual cutter budgets will reuse their
 three center contact solutions for steel/carbide variants after the travel sweep.
+
+
+### Code-derived excitation reference
+
+The analyzed BT30 assembly sets a speed cap of 8,000 rpm in
+[MillSpindleHead.hx](../../../haxe/src/machinekit/milling/MillSpindleHead.hx),
+matching the nominal motor rating in [MillDesignStudy.hx](../MillDesignStudy.hx).
+This provides a design reference point; actual cutting-speed bands and flute
+counts remain undeclared. `excitation_context.py --rpm 8000 --flutes 2 --source
+PATH --note TEXT` hashes source files and the qualified modal aggregate, verifies
+all nine original serial reports, and reports the closest computed modes.
+Two flutes are explicit context. At this point rotation is 133.333 Hz and the
+contextual tooth-pass frequency is 266.667 Hz.
+The closest rotation-mode separations are 2.284% (three-point) and 0.437%
+(four springs); closest two-flute separations are 8.443% and 6.799%.
+These distances do not establish operating clearance or forced-response amplitude.
+The 132.751 Hz upper-corner mode changes from 135.301 Hz on the coarse mesh;
+its 1.885% refinement change is larger than the 0.437% rotation-frequency gap.
+The lightening gate therefore remains conditional on modal operating-band and
+uncertainty review, even if nominal casting shares stay below target.
+Source/code hashes, every pose and nose/bar motion ratios are retained in
+`build/fem/nine-pose-serial/excitation-context.json`, SHA256
+`87196d7cb8832156152c1d98854d3fbe4aedbf0e13ebd5b67d910682699871dc`.
