@@ -23,6 +23,11 @@ class HobbingStock {
   public var report(default,null):String="Cutting";
   final centerMetres:Array<Float>;
   final config:SceneArtifactHobbing;
+  final initialBand:nativekit.scene.GeometryData;
+  final cupBody:Null<nativekit.scene.GeometryData>;
+  var displayedBand:nativekit.scene.GeometryData;
+  var lastLift=1e30;
+  var lastBlank=false;
   var previewPasses=-1;
   var lastPreviewTime=-1e30;
   var finalPreview=false;
@@ -44,6 +49,14 @@ class HobbingStock {
     forces=new HobbingForces(stock,spec.pitchRadius(),spec.pressureAngle,1);
     stream.onPass=(pass,start,end)->{forces.afterPass(pass,start,end,config.outside/2);};
     preview=new RingPreviewWorker(stock);maxBytes=stock.bytes()+forces.retainedBytes();
+    initialBand=ringGeometry(stock.contour());displayedBand=initialBand;
+    var height=config.cupLength,thickness=config.cupEndThickness;
+    if(height==null)cupBody=null;
+    else {
+      var cupHeight:Float=cast height,end:Float=thickness==null?2:cast thickness;
+      if(!Math.isFinite(cupHeight)||end<=0||cupHeight<=config.width+end)throw "Invalid cup body dimensions";
+      cupBody=HobbingCupDisplay.body(stock.grid.radiusMin,spec.rootRadius(),config.width,cupHeight,end,centerMetres);
+    }
   }
   public function follow(time:Float,axes:HobbingAxes):Void {
     if(!streamStopped){
@@ -86,9 +99,16 @@ class HobbingStock {
     var i=0;while(i<trace.filtered.length){values.push(Std.string(Math.round(trace.filtered[i]*1000)/1000));i+=stride;}
     return values.join(" ");
   }
-  public function geometry():Null<GeometryData> {
+  public function geometry(liftMm:Float=0,blank:Bool=false):Null<GeometryData> {
     if(stream.passes!=previewPasses&&(finalPreview||stream.lastTime-lastPreviewTime>=0.1)&&preview.refresh()){previewPasses=stream.passes;lastPreviewTime=stream.lastTime;finalPreview=false;}
-    var mesh=preview.take();if(mesh==null)return null;
+    var mesh=preview.take();
+    if(mesh==null&&lastLift==liftMm&&lastBlank==blank)return null;
+    if(mesh!=null)displayedBand=ringGeometry(mesh);
+    lastLift=liftMm;lastBlank=blank;
+    var band=blank?initialBand:displayedBand;
+    return cupBody==null?HobbingCupDisplay.shifted(band,liftMm/1000):HobbingCupDisplay.combine(band,cupBody,centerMetres,spec.rootRadius(),config.width,liftMm);
+  }
+  function ringGeometry(mesh:stockkit.StockMesh):GeometryData {
     var positions=Bytes.alloc(mesh.vertexCount*12);
     for(i in 0...mesh.vertexCount)for(axis in 0...3)positions.setFloat(i*12+axis*4,mesh.positions.getFloat(i*12+axis*4)/1000-centerMetres[axis]);
     var g=new GeometryData();g.addStream(1,2,positions,mesh.vertexCount,12);g.addStream(2,2,mesh.normals,mesh.vertexCount,12);

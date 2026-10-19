@@ -10,7 +10,7 @@ class ExpandingMandrel extends MachineComponent {
     P.quantity("outside",59,"mm"),
     P.quantity("bore",12,"mm"),
     P.quantity("height",50,"mm"),P.length("baseDiameter",0),P.length("baseHeight",0),
-    P.quantity("workSeat",30,"mm"),
+    P.quantity("workSeat",30,"mm"),P.quantity("stopDiameter",0,"mm"),P.flag("separateSleeve",false),
     P.quantity("expansion",0.05,"mm"),
     P.quantity("sleeveWall",1.5,"mm"),
     P.quantity("sleeveLength",16,"mm"),
@@ -48,6 +48,18 @@ class ExpandingMandrel extends MachineComponent {
     if(parameterNumber("sleeveStart")+parameterNumber("sleeveLength")>parameterNumber("height")||parameterNumber("sleeveWall")>=parameterNumber("outside")/2||parameterNumber("radialFitGap")<0
       ||parameterNumber("sleevePoisson")<=0||parameterNumber("sleevePoisson")>=0.5)throw "invalid sleeve/contact design";
     addConnector("work",Mount,Solids.axial(0,0,parameterNumber("workSeat")));
+    // Separate axial envelopes preserve real external shoulders. A single hull
+    // bridges the large base to the sleeve cap and invents material at the cut.
+    // Internal bores/oil cavities remain conservatively filled in collision only.
+    var hulls:Array<Array<Float>> = [],r=parameterNumber("outside")/2,baseHeight=parameterNumber("baseHeight"),height=parameterNumber("height");
+    function section(radius:Float,lo:Float,hi:Float):Void {if(hi>lo)hulls.push(CollisionHullFacet.cylinder(radius,lo,hi));}
+    if(baseHeight>0)section(parameterNumber("baseDiameter")/2,0,baseHeight);
+    if(v.boolean("separateSleeve")){
+      var start=parameterNumber("sleeveStart"),end=start+parameterNumber("sleeveLength");
+      section(r,baseHeight,start);section(r-parameterNumber("sleeveWall")-parameterNumber("oilCavity"),Math.max(baseHeight,start),end);section(r,Math.max(baseHeight,end),height);
+    }else section(r,baseHeight,height);
+    if(parameterNumber("stopDiameter")>0)section(parameterNumber("stopDiameter")/2,parameterNumber("workSeat")-2,parameterNumber("workSeat"));
+    addFacet(new CollisionHullFacet(hulls));
   }
   override public function componentType():Null<ComponentType>return recipeType();
   public var clampingPressure(get,never):Float;
@@ -61,6 +73,11 @@ class ExpandingMandrel extends MachineComponent {
   override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
     {
       var stem=ComponentEnvelopes.annular(values());
+      if(parameterNumber("stopDiameter")>0)stem=Solids.union([stem,Solids.cut(cadkit.modeling.Part.cylinderSpan(parameterNumber("stopDiameter")/2,parameterNumber("workSeat")-2,parameterNumber("workSeat")),
+        [cadkit.modeling.Part.cylinderSpan(parameterNumber("bore")/2,parameterNumber("workSeat")-2.1,parameterNumber("workSeat")+0.1)])]);
+      if(values().boolean("separateSleeve"))stem=Solids.cut(stem,[Solids.cut(
+        cadkit.modeling.Part.cylinderSpan(parameterNumber("outside")/2+0.1,parameterNumber("sleeveStart"),parameterNumber("sleeveStart")+parameterNumber("sleeveLength")),
+        [cadkit.modeling.Part.cylinderSpan(parameterNumber("outside")/2-parameterNumber("sleeveWall")-parameterNumber("oilCavity"),parameterNumber("sleeveStart")-0.1,parameterNumber("sleeveStart")+parameterNumber("sleeveLength")+0.1)])]);
       if(parameterNumber("baseHeight")==0)return stem;
       if(parameterNumber("baseDiameter")<parameterNumber("outside")||parameterNumber("baseHeight")>=parameterNumber("workSeat"))throw "invalid integral mandrel base";
       var base=Solids.cut(cadkit.modeling.Part.cylinderSpan(parameterNumber("baseDiameter")/2,0,parameterNumber("baseHeight")),

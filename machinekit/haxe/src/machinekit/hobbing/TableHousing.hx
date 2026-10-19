@@ -9,7 +9,7 @@ class TableHousing extends MachineComponent {
   public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
     P.quantity("outside",180,"mm"),
     P.quantity("bore",80,"mm"),
-    P.quantity("height",80,"mm")]);
+    P.quantity("height",80,"mm"),P.quantity("bearingSeat",120,"mm"),P.quantity("bearingWidth",16,"mm")]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
     if(recipe==null)recipe=new ComponentType("machinekit.hobbing.table-housing",parameters(),v -> new TableHousing(v));
@@ -31,9 +31,11 @@ class TableHousing extends MachineComponent {
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
-    return Solids.cut(ComponentEnvelopes.annular(values()),[
-      cadkit.modeling.Part.cylinderSpan(75,-0.1,45),
-      cadkit.modeling.Part.cylinderSpan(60,45,61)]);
+    {
+    var tools=[cadkit.modeling.Part.cylinderSpan(75,-0.1,45),cadkit.modeling.Part.cylinderSpan(parameterNumber("bearingSeat")/2,45,45+parameterNumber("bearingWidth"))];
+    if(parameterNumber("bearingSeat")>120)tools.push(cadkit.modeling.Part.cylinderSpan(parameterNumber("bearingSeat")/2,45+parameterNumber("bearingWidth"),parameterNumber("height")+0.1));
+    return Solids.cut(ComponentEnvelopes.annular(values()),tools);
+  }
   override public function componentType():Null<ComponentType>return recipeType();
 
 

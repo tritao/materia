@@ -15,10 +15,439 @@
     "members": 99
   },
   "after": {
+    "collisionShapes": {
+      "authoredPlusDefaultTotal": 664,
+      "parts": [
+        {
+          "part": "bed/casting",
+          "hulls": 81
+        },
+        {
+          "part": "bed/tablePlate",
+          "hulls": 1
+        },
+        {
+          "part": "bed/railLeft",
+          "hulls": 1
+        },
+        {
+          "part": "bed/railRight",
+          "hulls": 1
+        },
+        {
+          "part": "bed/driveSeat",
+          "hulls": 1
+        },
+        {
+          "part": "bed/liftLeft",
+          "hulls": 1
+        },
+        {
+          "part": "bed/liftRight",
+          "hulls": 1
+        },
+        {
+          "part": "bed/foot0",
+          "hulls": 1
+        },
+        {
+          "part": "bed/foot1",
+          "hulls": 1
+        },
+        {
+          "part": "bed/foot2",
+          "hulls": 1
+        },
+        {
+          "part": "foot0",
+          "hulls": 1
+        },
+        {
+          "part": "foot1",
+          "hulls": 1
+        },
+        {
+          "part": "foot2",
+          "hulls": 1
+        },
+        {
+          "part": "table/housing",
+          "hulls": 1
+        },
+        {
+          "part": "table/motor",
+          "hulls": 1
+        },
+        {
+          "part": "table/bearing",
+          "hulls": 1
+        },
+        {
+          "part": "table/clamp",
+          "hulls": 1
+        },
+        {
+          "part": "table/encoder",
+          "hulls": 1
+        },
+        {
+          "part": "table/platen",
+          "hulls": 1
+        },
+        {
+          "part": "mandrel",
+          "hulls": 5
+        },
+        {
+          "part": "mandrelSleeve",
+          "hulls": 1
+        },
+        {
+          "part": "blank",
+          "hulls": 1
+        },
+        {
+          "part": "railXLeft",
+          "hulls": 1
+        },
+        {
+          "part": "railXRight",
+          "hulls": 1
+        },
+        {
+          "part": "Xbridge",
+          "hulls": 45
+        },
+        {
+          "part": "blockXLeft",
+          "hulls": 1
+        },
+        {
+          "part": "blockXLeftFront",
+          "hulls": 1
+        },
+        {
+          "part": "blockXRight",
+          "hulls": 1
+        },
+        {
+          "part": "blockXRightFront",
+          "hulls": 1
+        },
+        {
+          "part": "column/casting",
+          "hulls": 41
+        },
+        {
+          "part": "column/basePlate",
+          "hulls": 1
+        },
+        {
+          "part": "column/railLeft",
+          "hulls": 1
+        },
+        {
+          "part": "column/railRight",
+          "hulls": 1
+        },
+        {
+          "part": "column/driveSeat",
+          "hulls": 1
+        },
+        {
+          "part": "column/liftLeft",
+          "hulls": 1
+        },
+        {
+          "part": "column/liftRight",
+          "hulls": 1
+        },
+        {
+          "part": "railZLeft",
+          "hulls": 1
+        },
+        {
+          "part": "railZRight",
+          "hulls": 1
+        },
+        {
+          "part": "Zplate",
+          "hulls": 43
+        },
+        {
+          "part": "blockZLeft",
+          "hulls": 1
+        },
+        {
+          "part": "blockZLeftUpper",
+          "hulls": 1
+        },
+        {
+          "part": "blockZRight",
+          "hulls": 1
+        },
+        {
+          "part": "blockZRightUpper",
+          "hulls": 1
+        },
+        {
+          "part": "swivel/housing",
+          "hulls": 1
+        },
+        {
+          "part": "swivel/bearing",
+          "hulls": 1
+        },
+        {
+          "part": "swivel/motor",
+          "hulls": 1
+        },
+        {
+          "part": "swivel/clamp",
+          "hulls": 1
+        },
+        {
+          "part": "swivel/head",
+          "hulls": 1
+        },
+        {
+          "part": "swivelPlate",
+          "hulls": 1
+        },
+        {
+          "part": "railYLeft",
+          "hulls": 1
+        },
+        {
+          "part": "railYRight",
+          "hulls": 1
+        },
+        {
+          "part": "Yplate",
+          "hulls": 223
+        },
+        {
+          "part": "blockYLeft",
+          "hulls": 1
+        },
+        {
+          "part": "blockYLeftFront",
+          "hulls": 1
+        },
+        {
+          "part": "blockYRight",
+          "hulls": 1
+        },
+        {
+          "part": "blockYRightFront",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/housing",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/motor",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/frontBearing",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/encoder",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/rearBearing",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/shaft",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/arbor",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/drawbar",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/bearingLocknut",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/bearingRetainer",
+          "hulls": 1
+        },
+        {
+          "part": "hob",
+          "hulls": 1
+        },
+        {
+          "part": "outboard",
+          "hulls": 1
+        },
+        {
+          "part": "outboardBearing",
+          "hulls": 1
+        },
+        {
+          "part": "electricalPanel",
+          "hulls": 1
+        },
+        {
+          "part": "powerSupply",
+          "hulls": 1
+        },
+        {
+          "part": "XdriveFrame",
+          "hulls": 40
+        },
+        {
+          "part": "ZdriveFrame",
+          "hulls": 48
+        },
+        {
+          "part": "YdriveFrame",
+          "hulls": 41
+        },
+        {
+          "part": "Xmotor",
+          "hulls": 1
+        },
+        {
+          "part": "Xscrew",
+          "hulls": 1
+        },
+        {
+          "part": "Xnut",
+          "hulls": 1
+        },
+        {
+          "part": "Xfixed",
+          "hulls": 1
+        },
+        {
+          "part": "Xfloating",
+          "hulls": 1
+        },
+        {
+          "part": "Xcoupling",
+          "hulls": 1
+        },
+        {
+          "part": "Xmotor-shaft",
+          "hulls": 1
+        },
+        {
+          "part": "Xscale",
+          "hulls": 1
+        },
+        {
+          "part": "Xdrive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "Zmotor",
+          "hulls": 1
+        },
+        {
+          "part": "Zscrew",
+          "hulls": 1
+        },
+        {
+          "part": "Znut",
+          "hulls": 1
+        },
+        {
+          "part": "Zfixed",
+          "hulls": 1
+        },
+        {
+          "part": "Zfloating",
+          "hulls": 1
+        },
+        {
+          "part": "Zcoupling",
+          "hulls": 1
+        },
+        {
+          "part": "Zmotor-shaft",
+          "hulls": 1
+        },
+        {
+          "part": "Zscale",
+          "hulls": 1
+        },
+        {
+          "part": "Zdrive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "Ymotor",
+          "hulls": 1
+        },
+        {
+          "part": "Yscrew",
+          "hulls": 1
+        },
+        {
+          "part": "Ynut",
+          "hulls": 1
+        },
+        {
+          "part": "Yfixed",
+          "hulls": 1
+        },
+        {
+          "part": "Yfloating",
+          "hulls": 1
+        },
+        {
+          "part": "Ycoupling",
+          "hulls": 1
+        },
+        {
+          "part": "Ymotor-shaft",
+          "hulls": 1
+        },
+        {
+          "part": "Yscale",
+          "hulls": 1
+        },
+        {
+          "part": "Ydrive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "chipTray",
+          "hulls": 1
+        },
+        {
+          "part": "coolantPort",
+          "hulls": 1
+        },
+        {
+          "part": "table-drive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "swivel-drive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "hob-drive-driver",
+          "hulls": 1
+        }
+      ]
+    },
     "installedPoseEnvelopeMm": {
-      "radial": 1640.0000000000002,
+      "radial": 1680,
       "scope": "initial pose including separate electrical rack; CAD envelope bounds",
-      "tangential": 650
+      "tangential": 800
     },
     "headStackMm": {
       "swivelBearingFrontFace": 114,
@@ -30,51 +459,529 @@
     },
     "drives": [
       {
-        "thrustMarginN": 885.9677944358531,
+        "thrustMarginN": 888.0092563108531,
         "axis": "X",
-        "movingMassKg": 132.06441112829384,
+        "movingMassKg": 127.9814873782938,
         "continuousThrustWith20PercentReserveN": 1152,
-        "designDemandN": 266.0322055641469,
+        "designDemandN": 263.9907436891469,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 907.7217438291449,
+        "thrustMarginN": 909.3780888359331,
         "axis": "Y",
-        "movingMassKg": 14.57409555131043,
+        "movingMassKg": 14.028913051310433,
         "continuousThrustWith20PercentReserveN": 1152,
-        "designDemandN": 244.27825617085514,
+        "designDemandN": 242.62191116406694,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 1531.2073987953218,
+        "thrustMarginN": 1536.431981396759,
         "axis": "Z",
-        "movingMassKg": 41.60348912640654,
+        "movingMassKg": 41.09657537640654,
         "continuousThrustWith20PercentReserveN": 2159.9999999999995,
-        "designDemandN": 628.7926012046779,
+        "designDemandN": 623.5680186032405,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       }
     ],
     "bedFootprintRadialTangentialMm": [
-      1000,
-      650
+      1100,
+      800
     ],
     "guideToHobMm": {
-      "X": 121.00000000000011,
+      "X": 121,
       "Y": 70.00000000000011,
       "Z": 161.00000000000006
     },
     "movingMassKg": {
-      "X": 132.06441112829384,
-      "Y": 14.57409555131043,
-      "Z": 41.60348912640654
+      "X": 127.9814873782938,
+      "Y": 14.028913051310433,
+      "Z": 41.09657537640654
     },
-    "machineMassKg": 425.2969700793913,
-    "members": 99
+    "machineMassKg": 1161.2688626961556,
+    "members": 106
   },
-  "validation": {
+  "open": [
+    "Z guide offset 161 mm is 11 mm beyond the approximate 150 mm target; needed for the front-mounted stack.",
+    "Compact concentric swivel motor/bearing/clamp dimensions, ratings and manufacturing fits need supplier confirmation.",
+    "No structural/modal qualification or class-6 claim from this layout audit.",
+    "Sampled grid is not a continuous swept-volume proof.",
+    "Hob axial retention hardware and manufacturing fits remain open as recorded by installation checks.",
+    "Moving bellows and complete enclosure/coolant containment remain provisions.",
+    "Full-reference HB12 cycle and grade are not established by the coarse app cut."
+  ],
+  "centralXDrive": {
+    "screwCentreHeightMm": 180,
+    "tangentialOffsetMm": 0,
+    "channelWidthMm": 110,
+    "channelZmm": [
+      130,
+      220
+    ],
+    "motor": "rear; screw axis points towards table",
+    "support": "steel deck on separate cast-in steel channel-floor insert, ground after casting",
+    "chipGuardToInsertClearanceMm": 2.5,
+    "cover": "open design provision"
+  },
+  "railSeatDesign": {
+    "bedGuideSpacingMm": 370,
+    "steelInsertWidthMm": 50,
+    "beamCoreExclusionWidthMm": 110,
+    "beamMinimumWidthAtWellMm": 90,
+    "wellOpeningWidthMm": 300,
+    "castTopZmm": 210,
+    "steelMountingFaceZmm": 220,
+    "assembly": "tray and guides before moving column/head; steel seats ground after casting",
+    "massChangeKg": {
+      "fixedCasting": 79.5096,
+      "Xcarriage": 1.4287,
+      "total": 80.9383
+    }
+  },
+  "spindleCartridge": {
+    "interface": "ASSUMED-TF20; not HSK",
+    "gaugeFaceAxialMm": 180,
+    "bearingPairAxialIntervalsMm": [
+      [
+        129,
+        146
+      ],
+      [
+        146,
+        163
+      ]
+    ],
+    "shaftJournalDiameterMm": 25,
+    "taperLengthMm": 20,
+    "taperDiametersMm": [
+      16,
+      20
+    ],
+    "noseAndFlangeDiameterMm": 40,
+    "drawbarDiameterMm": 6,
+    "drivePins": {
+      "count": 2,
+      "diameterMm": 4,
+      "pcdMm": 28,
+      "engagementMm": 2
+    },
+    "retention": "housing shoulder and removable front gland; shaft shoulder and rear locknut; rear-access drawbar",
+    "basis": "Assumed design; thread helices, fits, bearing preload, contact grinding and strength qualification remain open"
+  },
+  "baseAcceptance": {
+    "baseCastingKg": 884.6184,
+    "baseAssemblyKg": 921.8117,
+    "machineKg": 1161.2688626961556,
+    "baseToMovingMassRatio": {
+      "X": 6.912080943278947,
+      "Y": 63.056802530925104,
+      "Z": 21.525355626295255
+    },
+    "column": {
+      "afterAssemblyKg": 49.96585,
+      "afterCastingKg": 31.745999999999995,
+      "beforeAssemblyKg": 55.499650000000024,
+      "beforeCastingKg": 37.27980000000002
+    },
+    "dimensionsMm": [
+      1100,
+      800,
+      800
+    ],
+    "workingHeightMm": 1000,
+    "feet": {
+      "assumedTargetPerFootN": 15000,
+      "count": 3,
+      "frontTangentialSpacingMm": 660,
+      "heightMm": 47,
+      "radialSpacingMm": 860,
+      "vibrationMounts": false,
+      "worstReactionN": 5046.786259260345
+    },
+    "table": {
+      "axialRunoutMm": 0.002,
+      "basis": "larger geometry, existing error/stiffness bounds retained Assumed; no catalogue qualification or automatic accuracy gain",
+      "bearingBoreMm": 180,
+      "bearingOutsideMm": 220,
+      "housingOutsideMm": 270,
+      "momentStiffnessNmPerRad": 1000000
+    },
+    "coolantReservedLitres": 7.92,
+    "beam": {
+      "assumedProfileAllocationUm": 1.9000000000000001,
+      "atHalfModulusChangeBoundUm": 0.01255430153706397,
+      "basis": "Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; old same support span to isolate casting change; 121/233 mm guide/table Abbe heights; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open.",
+      "newChangeBoundUm": 0.006277150768531985,
+      "newMinimumIyMm4": 16179886126.207409,
+      "oldChangeBoundUm": 0.39887608079244286,
+      "oldMinimumIyMm4": 262747548.55643028,
+      "passed": true,
+      "samples": [
+        {
+          "xMm": 45.2,
+          "movingLoadWorkXMm": 249.53962151579572,
+          "oldRelativeRadialVerticalUm": [
+            -1.250154231490643,
+            0.7624893626058796
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.019673795880150648,
+            0.011999367520283851
+          ],
+          "footReactionN": [
+            3330.0733019956497,
+            3310.1794345625835,
+            4747.90455580102
+          ]
+        },
+        {
+          "xMm": 55.440000000000005,
+          "movingLoadWorkXMm": 259.77962151579555,
+          "oldRelativeRadialVerticalUm": [
+            -1.2686651354218037,
+            0.7688354372104214
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.019965103733474075,
+            0.012099236299083332
+          ],
+          "footReactionN": [
+            3322.6012640977215,
+            3302.7073872875476,
+            4762.848640973985
+          ]
+        },
+        {
+          "xMm": 65.68,
+          "movingLoadWorkXMm": 270.0196215157956,
+          "oldRelativeRadialVerticalUm": [
+            -1.2854135046121586,
+            0.772254828085745
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.02022867441017654,
+            0.012153047578060764
+          ],
+          "footReactionN": [
+            3315.1292292627977,
+            3295.235336949503,
+            4777.792726146952
+          ]
+        },
+        {
+          "xMm": 75.92000000000002,
+          "movingLoadWorkXMm": 280.2596215157957,
+          "oldRelativeRadialVerticalUm": [
+            -1.3003552048983822,
+            0.7727368440335898
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.02046381336673796,
+            0.012160633108813702
+          ],
+          "footReactionN": [
+            3307.657196791141,
+            3287.763284248193,
+            4792.73681131992
+          ]
+        },
+        {
+          "xMm": 86.16,
+          "movingLoadWorkXMm": 290.4996215157956,
+          "oldRelativeRadialVerticalUm": [
+            -1.3134461021171497,
+            0.7702851981212749
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.020669826059638234,
+            0.012122051324235182
+          ],
+          "footReactionN": [
+            3300.1851657696766,
+            3280.2912300966914,
+            4807.680896492885
+          ]
+        },
+        {
+          "xMm": 96.4,
+          "movingLoadWorkXMm": 300.73962151579576,
+          "oldRelativeRadialVerticalUm": [
+            -1.3246420621051371,
+            0.7649180076816942
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.0208460179453573,
+            0.012037587338513756
+          ],
+          "footReactionN": [
+            3292.713135154419,
+            3272.819175538982,
+            4822.624981665852
+          ]
+        },
+        {
+          "xMm": 106.64000000000001,
+          "movingLoadWorkXMm": 310.9796215157957,
+          "oldRelativeRadialVerticalUm": [
+            -1.3338989506990198,
+            0.7566677943133158
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.02099169448037505,
+            0.011907752947133397
+          ],
+          "footReactionN": [
+            3285.241103864715,
+            3265.3471216557205,
+            4837.569066838818
+          ]
+        },
+        {
+          "xMm": 116.88000000000001,
+          "movingLoadWorkXMm": 321.21962151579606,
+          "oldRelativeRadialVerticalUm": [
+            -1.3411726337354728,
+            0.7455814838801861
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.02110616112117142,
+            0.011733286626873608
+          ],
+          "footReactionN": [
+            3277.769070880793,
+            3257.875069466675,
+            4852.513152011785
+          ]
+        },
+        {
+          "xMm": 127.12,
+          "movingLoadWorkXMm": 331.4596215157956,
+          "oldRelativeRadialVerticalUm": [
+            -1.3464189770511716,
+            0.7317204065119269
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.021188723324226295,
+            0.011515153535809355
+          ],
+          "footReactionN": [
+            3270.297035335823,
+            3250.4030198386786,
+            4867.457237184751
+          ]
+        },
+        {
+          "xMm": 137.36,
+          "movingLoadWorkXMm": 341.69962151579557,
+          "oldRelativeRadialVerticalUm": [
+            -1.3495938464827917,
+            0.7151602966037343
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.021238686546019618,
+            0.011254545513311065
+          ],
+          "footReactionN": [
+            3262.8249965941604,
+            3242.930973407376,
+            4882.401322357718
+          ]
+        },
+        {
+          "xMm": 147.60000000000002,
+          "movingLoadWorkXMm": 351.9396215157957,
+          "oldRelativeRadialVerticalUm": [
+            -1.3506531078670088,
+            0.6959912928163815
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.02125535624303129,
+            0.01095288108004467
+          ],
+          "footReactionN": [
+            3255.3529543087284,
+            3235.4589305198406,
+            4897.3454075306845
+          ]
+        },
+        {
+          "xMm": 157.84000000000003,
+          "movingLoadWorkXMm": 362.17962151579553,
+          "oldRelativeRadialVerticalUm": [
+            -1.3495526270404978,
+            0.6743179380762182
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.02123803787174123,
+            0.010611805437971578
+          ],
+          "footReactionN": [
+            3247.880908452354,
+            3227.9868912032507,
+            4912.289492703648
+          ]
+        },
+        {
+          "xMm": 168.08000000000004,
+          "movingLoadWorkXMm": 372.4196215157955,
+          "oldRelativeRadialVerticalUm": [
+            -1.3462482698399347,
+            0.6502591795751691
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.02118603688862936,
+            0.010233190470348657
+          ],
+          "footReactionN": [
+            3240.408859320209,
+            3220.5148551624275,
+            4927.233577876617
+          ]
+        },
+        {
+          "xMm": 178.32,
+          "movingLoadWorkXMm": 382.6596215157957,
+          "oldRelativeRadialVerticalUm": [
+            -1.340695902101994,
+            0.6239483687707337
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.021098658750175574,
+            0.009819134741728262
+          ],
+          "footReactionN": [
+            3232.93680750318,
+            3213.0428218064912,
+            4942.177663049582
+          ]
+        },
+        {
+          "xMm": 188.56,
+          "movingLoadWorkXMm": 392.8996215157955,
+          "oldRelativeRadialVerticalUm": [
+            -1.3328513896633527,
+            0.5955332613859907
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.0209752089128598,
+            0.009371963497958272
+          ],
+          "footReactionN": [
+            3225.4647538345152,
+            3205.5707903021903,
+            4957.121748222548
+          ]
+        },
+        {
+          "xMm": 198.8,
+          "movingLoadWorkXMm": 403.13962151579557,
+          "oldRelativeRadialVerticalUm": [
+            -1.3226705983606846,
+            0.5651760174095906
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.020814992833161954,
+            0.008894228666181966
+          ],
+          "footReactionN": [
+            3217.992699314612,
+            3198.0987596491254,
+            4972.065833395515
+          ]
+        },
+        {
+          "xMm": 209.04000000000002,
+          "movingLoadWorkXMm": 413.37962151579524,
+          "oldRelativeRadialVerticalUm": [
+            -1.3101093940306665,
+            0.5330532010957652
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.020617315967561962,
+            0.008388708854838183
+          ],
+          "footReactionN": [
+            3210.520645020714,
+            3190.626728770059,
+            4987.00991856848
+          ]
+        },
+        {
+          "xMm": 219.28000000000003,
+          "movingLoadWorkXMm": 423.61962151579564,
+          "oldRelativeRadialVerticalUm": [
+            -1.2951236425099715,
+            0.499355780964313
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.0203814837725397,
+            0.007858409353661134
+          ],
+          "footReactionN": [
+            3203.0485920096585,
+            3183.1546966081496,
+            5001.954003741445
+          ]
+        },
+        {
+          "xMm": 229.51999999999998,
+          "movingLoadWorkXMm": 433.85962151579577,
+          "oldRelativeRadialVerticalUm": [
+            -1.2776692096352773,
+            0.46428912980061915
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.020106801704575114,
+            0.007306562133680632
+          ],
+          "footReactionN": [
+            3195.5765412224805,
+            3175.6826622223593,
+            5016.898088914414
+          ]
+        },
+        {
+          "xMm": 239.76,
+          "movingLoadWorkXMm": 444.0996215157956,
+          "oldRelativeRadialVerticalUm": [
+            -1.2577019612432592,
+            0.428073024655639
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.01979257522014813,
+            0.00673662584722194
+          ],
+          "footReactionN": [
+            3188.104493399465,
+            3168.210624872409,
+            5031.842174087379
+          ]
+        },
+        {
+          "xMm": 250,
+          "movingLoadWorkXMm": 454.33962151579544,
+          "oldRelativeRadialVerticalUm": [
+            -1.235177763170592,
+            0.390941646845905
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.019438109775738635,
+            0.0061522858279057435
+          ],
+          "footReactionN": [
+            3180.632449013319,
+            3160.7385840855895,
+            5046.786259260345
+          ]
+        }
+      ],
+      "spanMm": 860,
+      "youngsNPerMm2": 35000
+    }
+  },
+  "previousRevisionValidation": {
     "mechanicalAssertions": 930,
     "partAssertions": 1032,
     "partGeometryAssertions": 121,
@@ -276,9 +1183,220 @@
         "fixtureContacts": 0,
         "inspectionFailure": null
       }
+    },
+    "cupHandling": {
+      "sampledLoadingPathChecks": 1782,
+      "collapsedRadialClearanceMm": 0.025,
+      "liftMm": 120,
+      "loadingXmm": 250,
+      "toothBandSupport": "full band; sleeve starts at work seat",
+      "cuttingClearance": {
+        "coarse": {
+          "scope": "changed cup and mandrel against all machine parts; unchanged pairs retain prior audit evidence",
+          "completed": 85,
+          "checked": 478,
+          "unexpected": 0,
+          "thresholdMm3": 0.001,
+          "poses": 85
+        },
+        "reference": {
+          "scope": "changed cup and mandrel against all machine parts; unchanged pairs retain prior audit evidence",
+          "completed": 85,
+          "checked": 478,
+          "unexpected": 0,
+          "thresholdMm3": 0.001,
+          "poses": 85
+        }
+      },
+      "pressureResponse": "illustrative only; no hydraulic deformation/contact solver"
     }
   },
-  "provenance": {
+  "validation": {
+    "mechanicalAssertions": 979,
+    "partAssertions": 1044,
+    "partGeometryAssertions": 127,
+    "sizeRangeAssertions": 1994,
+    "cupLoadingPathAssertions": 1890,
+    "tableTiltAssertions": 87,
+    "referenceFrame": {
+      "maxPoseDifferenceMmRad": 1.7763568394002505e-13,
+      "poseToleranceMmRad": 1e-08,
+      "maxArcDifferenceMm": 1.3176743646820595e-13,
+      "arcToleranceMm": 1e-08,
+      "maxForceDifferenceN": 1.4074430509936064e-10,
+      "forceToleranceN": 1e-06,
+      "scope": "short reference geometry cut; no full-reference grading claim"
+    },
+    "clearanceGrids": {
+      "coarse": {
+        "completed": 85,
+        "checked": 21696,
+        "unexpected": 0,
+        "thresholdMm3": 0.001,
+        "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
+      },
+      "reference": {
+        "completed": 85,
+        "checked": 21677,
+        "unexpected": 0,
+        "thresholdMm3": 0.001,
+        "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
+      }
+    },
+    "installedMandrelSensitivity": {
+      "basis": "Assumed: sleeve span [115,131] mm; toothed rim [115,123] mm, radial gap=0.02499999999999858 mm, rim supported=true; sleeve t=1.5 mm, end span L=16 mm, band=8 mm, mid-radius R=28.25 mm; E=210000 N/mm\u00b2, nu=0.3; D=E*t^3/[12(1-nu\u00b2)]; k_s=D*pi*R*[pi^4/(2L^3)+9L/(2R^4)+(4-nu)*pi\u00b2/(R\u00b2L)]; conforming steel harmonic half-space contact c=E*q/[4(1-nu\u00b2)]*factor, q=sqrt(4/R\u00b2+pi\u00b2/L\u00b2), factor=1, c=12041.710189094985 N/mm\u00b3; k_c=c*pi*R*integral_band cos\u00b2(pi*z/L) dz; 1/k=1/k_s+1/k_c; oil K=1500 N/mm\u00b2, cavity=0.5 mm: n=2 volume change and oil stiffness zero at first order; uniform oil k=8519999.276535518 N/mm only; radial fit gap=0.02499999999999858 mm, hoop seating pressure=9.867648210509268 MPa, remaining pressure=0.13235178949073223 MPa (end restraint omitted from seating check); full seated contact required; modal estimate, not measured stiffness or FEA; expansion sleeve/cavity are assumed design dimensions, envelope CAD does not resolve them",
+      "forceBasis": "radial time mean over material-engaged windows; full-stroke mean including air retained separately",
+      "forceSettings": {
+        "acceptanceBasis": "completed full stroke; <1% short reference-geometry fixture convergence; no fine full-stroke comparison",
+        "fineFullStrokeValidated": false,
+        "forceStudyValidated": true,
+        "historyCsv": "/home/joao/dev/materia-worktrees/flexspline-hobber/build/flexspline-reference-force-fast/passes.csv",
+        "pathToleranceMm": 0.000125,
+        "sweepToleranceMm": 0.002,
+        "threads": 4
+      },
+      "meanRadialForceN": 4.956327956639297,
+      "meanRadialForceUpperBoundN": 4.956327956639297,
+      "varyingRadialRangeBoundN": 16.989670571379065,
+      "peakRadialN": 16.989670571379055,
+      "radialStatistics": {
+        "radialMeanN": 3.0357105623817056,
+        "radialMinN": 0,
+        "radialPeakN": 16.989670571379065,
+        "radialRangeN": 16.989670571379065,
+        "radialStdDevN": 3.282393873176609,
+        "radialPeakDeviationFromMeanN": 13.95396000899736,
+        "activeSeconds": 94.56775563452715,
+        "activeMeanRadialN": 4.956327956639297,
+        "perPassRadialMinN": 0,
+        "perPassRadialMaxN": 9.442332958899588,
+        "perPassRadialMaxStepN": 5.80122657306748,
+        "perPassRadialRmsStepN": 0.7285037351697009,
+        "windows": 92151,
+        "startSeconds": 0,
+        "endSeconds": 154.3983859516267,
+        "basis": "radial force; time statistics of overlapping rectangular gash-window means, including air; per-pass steps use successive individual gash means; no instantaneous tooth peaks"
+      },
+      "forceValidated": true,
+      "forceComponents": "all displacement/stiffness inputs are radial N; tangential Fc is used only for cutting load/power checks",
+      "supportsToothedRim": true,
+      "bandStartMm": 115,
+      "bandEndMm": 123,
+      "sleeveStartMm": 115,
+      "sleeveEndMm": 131,
+      "actualRadialFitGapMm": 0.02499999999999858,
+      "supportApplied": true,
+      "seatingScreen": true,
+      "unsupportedRingNPerMm": 33.90471566452706,
+      "estimatedNPerMm": 83936.78528166225,
+      "profileAllocationUm": 1.9000000000000001,
+      "pitchAllocationUm": 1.5,
+      "toothThicknessTolerancePlusMinusUm": 5,
+      "thicknessBasis": "Assumed physical flexspline tolerance +/-5 um; mean compensable by X infeed; no ISO thickness class",
+      "varyingBasis": "geometry bounds on the load range about its time mean, in the 20 percent wall share of HB11 class-6 profile and single-pitch limits",
+      "outsideIsoScope": [
+        "module outside 0.5..70 mm"
+      ],
+      "rows": [
+        {
+          "factor": 0.3,
+          "meanDeflectionUm": 0.19656314461340277,
+          "meanThicknessErrorBoundUm": 0.14308626758608323,
+          "passes": true,
+          "peakRadialDeflectionUm": 0.6737938051461138,
+          "perPassMaxStepDeflectionUm": 0.23007100171599187,
+          "perPassRmsStepDeflectionUm": 0.028891749355638402,
+          "radialStdDevDeflectionUm": 0.13017654747948634,
+          "supportNPerMm": 25181.035584498673,
+          "varyingDeflectionRangeBoundUm": 0.6737938051461142,
+          "varyingPitchBoundUm": 0.49048177821229416,
+          "varyingProfileBoundUm": 1.3475876102922284,
+          "xCompensationMagnitudeUm": 0.19656314461340277
+        },
+        {
+          "factor": 1,
+          "meanDeflectionUm": 0.05902449958190272,
+          "meanThicknessErrorBoundUm": 0.04296632188054099,
+          "passes": true,
+          "peakRadialDeflectionUm": 0.20232858122185166,
+          "perPassMaxStepDeflectionUm": 0.0690863273036361,
+          "perPassRmsStepDeflectionUm": 0.008675690710566902,
+          "radialStdDevDeflectionUm": 0.039089757072153446,
+          "supportNPerMm": 83936.78528166225,
+          "varyingDeflectionRangeBoundUm": 0.20232858122185177,
+          "varyingPitchBoundUm": 0.14728316221213147,
+          "varyingProfileBoundUm": 0.40465716244370353,
+          "xCompensationMagnitudeUm": 0.05902449958190272
+        },
+        {
+          "factor": 3,
+          "meanDeflectionUm": 0.019680130671255347,
+          "meanThicknessErrorBoundUm": 0.014325963541612564,
+          "passes": true,
+          "peakRadialDeflectionUm": 0.0674610194949726,
+          "perPassMaxStepDeflectionUm": 0.02303497629905439,
+          "perPassRmsStepDeflectionUm": 0.002892675550945329,
+          "radialStdDevDeflectionUm": 0.013033427348589964,
+          "supportNPerMm": 251810.35584498674,
+          "varyingDeflectionRangeBoundUm": 0.06746101949497263,
+          "varyingPitchBoundUm": 0.04910760613884406,
+          "varyingProfileBoundUm": 0.13492203898994526,
+          "xCompensationMagnitudeUm": 0.019680130671255347
+        }
+      ],
+      "sufficientEffectiveSupportNPerMm": 17849.959043681854,
+      "sufficientNominalFor03RangeNPerMm": 59499.863478939515,
+      "acceptance": "wall allocation passed, dependent on assumed support/contact and force bounds",
+      "scope": "wall-only quasistatic mean/variation bounds; full HB11 combined-source budget and physical reference inspection remain open"
+    },
+    "tableTilt": {
+      "basis": "Assumed moment stiffness 1 MN m/rad; measured HB10 radial gash-window statistics, not instantaneous peaks; separate from axial TIR",
+      "radialPeakN": 16.989670571379065,
+      "activeMeanRadialN": 4.956327956639297,
+      "pivotDepthMm": 178,
+      "forceHeightMm": 182,
+      "peakTiltRad": 3.09212004399099e-06,
+      "peakWorkDatumRadialUm": 0.5503973678303963,
+      "across8mmBandUm": 0.02473696035192792,
+      "fullSourceAndCombinedBudget": "open; frozen HB11 runs exclude the added source"
+    },
+    "appCoarseCut": {
+      "completed": true,
+      "gashWindows": 982,
+      "cycleSeconds": 6.0027500000015905,
+      "cuttingSeconds": 3.6009120961748557,
+      "syncArcsec": 0.0027997152165717,
+      "fixtureContacts": 0,
+      "inspectionFailure": null,
+      "scope": "full coarse module-1/40-tooth app cut; no reference grade claim"
+    },
+    "cupHandling": {
+      "completed": true,
+      "windows": 982,
+      "machiningSeconds": 7.039749999997802,
+      "headRetracted": true,
+      "releasedAndLiftedMm": 120,
+      "stockPreservedAcrossInspectionViews": true,
+      "resetPassed": true,
+      "fixtureContacts": 0,
+      "illustrativeHandlingExcludedFromMachiningTime": true,
+      "fullHydraulicOrLooseBodySimulation": false
+    },
+    "collisionGeometry": {
+      "authoredPlusDefaultShapes": 664,
+      "runtimeCap": 768,
+      "castingCells": "exact orthogonal material union; adjacent cells coalesced without filling voids",
+      "saddleExtrusions": {
+        "linearDeflectionMm": 0.05,
+        "angularDeflectionRad": 0.5,
+        "holesRetained": true
+      },
+      "mandrel": "separate axial external sections; internal bores/oil cavities conservatively filled in collision only",
+      "cuttingAndMetrologySettingsChanged": false,
+      "additionalContactExclusions": false
+    }
+  },
+  "previousRevisionProvenance": {
     "baseCommit": "483c8052c84030c566acb20759ebedfdbdfbd999",
     "geometryAndChecksSourceSha256": {
       "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "4f17392eb8d0e321c754fdf3afddf2c29b3ef8ae870ecd9fba416ec74e17c468",
@@ -306,71 +1424,51 @@
     },
     "nativeProviders": "Existing providers reused read-only; frozen HB4/HB11 workers not rebuilt or signalled."
   },
-  "open": [
-    "Z guide offset 161 mm is 11 mm beyond the approximate 150 mm target; needed for the front-mounted stack.",
-    "Compact concentric swivel motor/bearing/clamp dimensions, ratings and manufacturing fits need supplier confirmation.",
-    "No structural/modal qualification or class-6 claim from this layout audit.",
-    "Sampled grid is not a continuous swept-volume proof.",
-    "Hob axial retention hardware and manufacturing fits remain open as recorded by installation checks.",
-    "Moving bellows and complete enclosure/coolant containment remain provisions.",
-    "Full-reference HB12 cycle and grade are not established by the coarse app cut."
-  ],
-  "centralXDrive": {
-    "screwCentreHeightMm": 180,
-    "tangentialOffsetMm": 0,
-    "channelWidthMm": 110,
-    "channelZmm": [
-      130,
-      220
-    ],
-    "motor": "rear; screw axis points towards table",
-    "support": "steel deck on separate cast-in steel channel-floor insert, ground after casting",
-    "chipGuardToInsertClearanceMm": 2.5,
-    "cover": "open design provision"
-  },
-  "railSeatDesign": {
-    "bedGuideSpacingMm": 370,
-    "steelInsertWidthMm": 50,
-    "beamCoreExclusionWidthMm": 110,
-    "beamMinimumWidthAtWellMm": 90,
-    "wellOpeningWidthMm": 300,
-    "castTopZmm": 210,
-    "steelMountingFaceZmm": 220,
-    "assembly": "tray and guides before moving column/head; steel seats ground after casting",
-    "massChangeKg": {
-      "fixedCasting": 79.5096,
-      "Xcarriage": 1.4287,
-      "total": 80.9383
-    }
-  },
-  "spindleCartridge": {
-    "interface": "ASSUMED-TF20; not HSK",
-    "gaugeFaceAxialMm": 180,
-    "bearingPairAxialIntervalsMm": [
-      [
-        129,
-        146
-      ],
-      [
-        146,
-        163
-      ]
-    ],
-    "shaftJournalDiameterMm": 25,
-    "taperLengthMm": 20,
-    "taperDiametersMm": [
-      16,
-      20
-    ],
-    "noseAndFlangeDiameterMm": 40,
-    "drawbarDiameterMm": 6,
-    "drivePins": {
-      "count": 2,
-      "diameterMm": 4,
-      "pcdMm": 28,
-      "engagementMm": 2
+  "provenance": {
+    "baseCommit": "3ac30c2fbbc0ddb6233bb5c02ad5531626a09ee7",
+    "geometryAndChecksSourceSha256": {
+      "app/src/CutterGeometry.hx": "51e730c0f3d5f3660b60b9a1c935d40e2376cc05303392e471d099b396ad4455",
+      "app/src/HobbingCupDisplay.hx": "9be32c7f41b96c07b257ab8c9add605f190959f0057a53dbc13fe23ebb517a58",
+      "app/src/HobbingHandling.hx": "c86a4214b787e32e329b4b2ec9501a93e9b9d3d27489fc40984fb58a36f75b0d",
+      "app/src/HobbingProgramPlayer.hx": "207dfc740a8e57b1e5d4b68ec6b621e2a551c1c295b6ea539aed2d7af458d53a",
+      "app/src/HobbingStock.hx": "cd6a306422fcfbabe41939826484d1684b1d161ef96261622f2f9ad4b9ea258f",
+      "app/src/editor/CncPanel.hx": "f8a5138450360c748fa8a7d3981f08a9523f2b4d7f3c0825bbd16073d4c7ed5f",
+      "app/src/editor/MachineControlPanel.hx": "576a025d663720db6396726647ed6d9f214aeec4d847ebf6ad0c1f73931e3d37",
+      "app/tests/src/app/ProjectSourceTests.hx": "6936cee82c02e90f7a4f6a36a3a1787893229b826f39ec6ab40977fc9953a5b2",
+      "app/tests/src/tests/AppTests.hx": "af6c1674ed70f65eaf529677f58c97f1fff9946a8724e5d5d8ec9e0062f4b212",
+      "app/tests/src/tests/HobbingHandlingTests.hx": "cecad287acd3d84f4363b34c5764e3e21e7ca8da64c360dca5468997dcbf8104",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "3882cbcadf03d3b2fe3cde4c9c8c16f5aec7cf083e05682e5bff6c80d8c02579",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberBaseReport.hx": "e23a27526c159c4c5aafbd9aea1788c71a4867abde7ad2ca1e8da459381f233d",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberErrors.hx": "71033e681ad34fa9a4573716be0712bf6fc2b51a6800d196137628ed2d7d6d1c",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberLayoutReport.hx": "364e29ac6292068ecab01cde5ef83200a2d95eb4627e5f0e99e13916b1d7e963",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberPreview.hx": "b711c9d955265a5ea61c1ff9e657fc0be0f917b5638bbf991bbb10c608c64567",
+      "machinekit/haxe/src/machinekit/component/ExtrusionCollision.hx": "71ca3dd52cbe7bd52ed73c41f1a9df88693e6f35dcd33a7e9c595bd781e942a7",
+      "machinekit/haxe/src/machinekit/component/MachineKitComponents.hx": "258abc8b5fcf77bd255ae08f898b0f983f0a9ed5f4a5dfc8f8918f0ff84f2025",
+      "machinekit/haxe/src/machinekit/hobbing/ExpandingMandrel.hx": "faffbb28e9546b5cc6e8ce9a181eaa7b8de932cc0bb6ba1ba3f8bea7ad18304b",
+      "machinekit/haxe/src/machinekit/hobbing/FlexsplineCupBlank.hx": "a73acc3962d71d5ceff7fc342bd4a8c921726ce711e13e53ea5f3dd2b295db5f",
+      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "0d46ea36e7594a3d903f8f48971a5d5aade6d8c2f44d86746769322883f52b36",
+      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "a488be32cdaa70a5e77c6d95dc32de23114b57662a7e5c61b6466dc817e95a24",
+      "machinekit/haxe/src/machinekit/hobbing/HobbingComponents.hx": "0c31815eb5d7cea1532a7af4eb2825bddddbc36d09576c90a5a557ed082a8812",
+      "machinekit/haxe/src/machinekit/hobbing/MandrelSleeve.hx": "65c2a3ebb037cae0d21e09b53e423045239225c0412377edfc715d669b0b7b2f",
+      "machinekit/haxe/src/machinekit/hobbing/RotaryTable.hx": "15f07b7b92bb674b12c0a1d3f28bfe2d44cb7cb0d7806feede099a60403f41e2",
+      "machinekit/haxe/src/machinekit/hobbing/TableHousing.hx": "c60b024cd0d03439ad204be01312d5baef3c3814898c1b04d94b5e2861ac5918",
+      "machinekit/haxe/src/machinekit/hobbing/TablePlaten.hx": "4d4e269f1a535d19438fba753245341c6650973b3d626bc7d255bfc9c2bb3572",
+      "machinekit/haxe/src/machinekit/structural/CastingCells.hx": "feb336c079b123df7467523fccf5797b0f46ef8189aceb4f9b197d053cf20293",
+      "machinekit/haxe/src/machinekit/structural/LevelingFoot.hx": "4ffc6b7967929f09a1f8d431f5225b1a10828ad5dc9a41f88c69c2221cc6b8ce",
+      "machinekit/haxe/src/machinekit/structural/MineralCasting.hx": "0bb3c449f5495ec43201dc85cfcd35d523d046c20e7153ad1cd48b4652fda092",
+      "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "2e28d055d19ed6eeadb3ed138e0884faa862d2787a5ea114b2b644a422d9ae8a",
+      "machinekit/tests/hobber/src/HobberGERangeChecks.hx": "6d054378a00d6a15c0bb20b61e82d5d1a6d6bbe28974375d2aa8450f34a8d29c",
+      "machinekit/tests/hobber/src/HobberInterferenceChecks.hx": "a18addd8d569ba3b602f2fe29ccdb85a4920f1a50b48d1e3b713cfb2c0caff27",
+      "machinekit/tests/hobber/src/HobberLoadingChecks.hx": "2dc75e66c4e8ae71369fbc5c522924de105b12a2cf256872b17102970aecc7a8",
+      "machinekit/tests/hobber/src/HobberTableTiltChecks.hx": "fd4d58f55145f43f1bcc4e12f2ee62aa2941846735c0b5e01bd09f1fb7d64355",
+      "machinekit/tests/hobbing/src/HobberPartTests.hx": "6afd98daa260a57f70559924ce3d95e4b8662505e59050262d9c37cfc3ce7ffe",
+      "projectkit/src/materia/project/SceneArtifact.hx": "e65ec039836496c70314081c5a9b3c6bbdac121ddd70ddae7ddc722dd23c4b80",
+      "stockkit/haxe/stockkit/hobbing/HobbingAxes.hx": "25db0683a4929f286b725ef0c95d4435dcb903bcb7a5879283e2ee1c3162348d",
+      "stockkit/haxe/stockkit/hobbing/HobbingErrorSource.hx": "78ea849d3c33abe69e00da7917238f6a16cc71bc4fdd1025b88235311aaa630b",
+      "stockkit/haxe/stockkit/hobbing/HobbingMotion.hx": "4910056ed94ec924b5916a74c01935e4430b94474bc8de6dbb2dfdb2d8ddafbc",
+      "stockkit/haxe/stockkit/hobbing/HobbingPoseOffset.hx": "b0f24540cfb7e35f1d191b2eb65d0bcea53512d1c623b05409ed37436397dd96"
     },
-    "retention": "housing shoulder and removable front gland; shaft shoulder and rear locknut; rear-access drawbar",
-    "basis": "Assumed design; thread helices, fits, bearing preload, contact grinding and strength qualification remain open"
+    "baselineFoundationsSha256": "cfd61d974404f1f2b25446a5d2bd95fdacce26663ebf8d10af9ac2263514b77b",
+    "frozenHB4HB11BinariesAndNativeProviders": "untouched"
   }
 }

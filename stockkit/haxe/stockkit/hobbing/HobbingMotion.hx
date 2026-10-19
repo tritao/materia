@@ -23,6 +23,7 @@ class HobbingMotion {
       var oa=a.axes.offset==null?new HobbingPoseOffset():a.axes.offset;
       var ob=b.axes.offset==null?new HobbingPoseOffset():b.axes.offset;
       offset=new HobbingPoseOffset();offset.workX=mix(oa.workX,ob.workX);offset.workY=mix(oa.workY,ob.workY);offset.workZ=mix(oa.workZ,ob.workZ);
+      offset.workTiltX=mix(oa.workTiltX,ob.workTiltX);offset.workTiltY=mix(oa.workTiltY,ob.workTiltY);offset.workPivotZ=mix(oa.workPivotZ,ob.workPivotZ);
       offset.toolX=mix(oa.toolX,ob.toolX);offset.toolY=mix(oa.toolY,ob.toolY);offset.toolZ=mix(oa.toolZ,ob.toolZ);
     }
     return new HobbingAxes(mix(a.axes.x,b.axes.x),mix(a.axes.y,b.axes.y),mix(a.axes.z,b.axes.z),

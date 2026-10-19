@@ -12,7 +12,7 @@ class HobberPartTests {
   static function near(a:Float,b:Float,tolerance:Float,label:String):Void check(Math.abs(a-b)<=tolerance,'$label: $a vs $b');
   static function rejects(fn:Void->Void,label:String):Void {var failed=false;try fn()catch(_:Dynamic)failed=true;check(failed,label);}
   static function members():Array<MachineComponent>return [new TorqueMotor(),new AngularContactBearing(),new CrossedRollerBearing(),new RotaryEncoderRing(),
-    new HobSpindlePart("shaft"),new HobSpindlePart("drawbar"),new HobSpindlePart("bearingRetainer"),new HobSpindlePart("bearingLocknut"),new Hob(),new HobArbor(),new OutboardSupport(),new ExpandingMandrel(),new RotaryClamp(),new TablePlaten(),new TableHousing(),new SpindleHousing(),new SwivelHousing(),new MineralCasting(),new CastInsert()];
+    new HobSpindlePart("shaft"),new HobSpindlePart("drawbar"),new HobSpindlePart("bearingRetainer"),new HobSpindlePart("bearingLocknut"),new FlexsplineCupBlank(),new MandrelSleeve(),new Hob(),new HobArbor(),new OutboardSupport(),new ExpandingMandrel(),new RotaryClamp(),new TablePlaten(),new TableHousing(),new SpindleHousing(),new SwivelHousing(),new MineralCasting(),new CastInsert()];
   public static function run():Void {
     var registry=MachineKitComponents.standard(),parts=members();
     var rendered=new Hob(new ComponentValues().setBoolean("renderTeeth",true));
@@ -41,8 +41,8 @@ class HobberPartTests {
     check(Std.isOfType(oldCasting,MineralCasting)&&oldCasting.componentType()==MineralCasting.recipeType(),"legacy casting migrates to shared recipe");
     near(oldCasting.massProperties().mass,49.992,1e-8,"legacy HB5 bed keeps its original recessed casting mass");
     near(oldCasting.parameterNumber("depth"),550,0,"legacy bed retains original footprint");
-    near(new MineralCastBed().body.parameterNumber("depth"),650,0,"current bed uses moving-column footprint");
-    near(new MineralCastBed().body.parameterNumber("width"),1000,0,"bed radial length covers loading retract");
+    near(new MineralCastBed().body.parameterNumber("depth"),800,0,"current bed uses moving-column footprint");
+    near(new MineralCastBed().body.parameterNumber("width"),1100,0,"bed radial length covers loading retract");
     near(new MineralCastColumn().body.parameterNumber("height"),500,0,"moving column height");
     var largeBearing=new CrossedRollerBearing(new ComponentValues().setNumber("outside",180).setNumber("bore",150));
     check(largeBearing.bom.partNumber!=new CrossedRollerBearing().bom.partNumber,"compact swivel bearing has a distinct BOM size");

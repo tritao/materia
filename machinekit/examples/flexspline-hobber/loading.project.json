@@ -1,0 +1,52 @@
+{
+  "format": "materia.project",
+  "version": 1,
+  "name": "Flexspline hobber \u2014 cup loading",
+  "defaultEntrypoint": "loading",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
+  "entrypoints": {
+    "hobber": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "hobber",
+      "cache": {
+        "inputs": []
+      }
+    },
+    "cutting": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "cutting",
+      "cache": {
+        "inputs": []
+      }
+    },
+    "hob-tool": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "hobTool",
+      "cache": {
+        "inputs": []
+      }
+    },
+    "detailed": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "detailed",
+      "cache": {
+        "inputs": []
+      }
+    },
+    "loading": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "loading",
+      "cache": {
+        "inputs": []
+      }
+    }
+  }
+}

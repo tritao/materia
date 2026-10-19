@@ -151,6 +151,32 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
   it must not be described as the vertical GE architecture. No claim is made
   that all horizontal machines have the same accuracy class.
 
+**HB-D11. A heavy monolithic base at working height.**
+- The former 1000 × 650 × 210 mm bed is too light relative to the moving column
+  and puts the tooth band at knee height. Target base-to-X-moving-mass ratio
+  ≥ 5:1 (5–10:1 design aim, assumed), with machine mass around 1–1.5 t.
+- Use one monolithic, ribbed, partly hollow mineral-cast plinth, starting around
+  1100 × 800 × 650 mm and 600–900 kg. Put the heavy solid section at the bottom,
+  pockets/ribs higher. Size it using the working height and stiffness estimate;
+  record any departure from that starting size. No welded stand or legs.
+- Put the tooth band around 1000 mm above the floor (950–1100 mm target), for
+  standing setup/inspection and later machine-tending. EN ISO 14738 / DIN 33406
+  are ergonomic references, not a compliance claim for this prototype.
+- Three widely spaced levelling feet provide determinate floor support; optional
+  vibration mounts must be stated, not assumed. Provide chip drainage, coolant
+  volume thermally separated from the guides and cable routing inside the base.
+- Lighten the moving column with hollow/ribbed geometry; keep the X drive on
+  the bed. Report column mass before/after. Increase C's crossed-roller bearing
+  to about Ø200–250 mm with matching housing; keep the fixture as low as ±15°
+  clearance allows. Recheck HB11 table-axial and tilt assumptions for this size.
+- HB6 reports base/machine mass, mass ratio per axis, work height, foot spacing,
+  bearing size and old/new hob-to-work displacement change over X travel from
+  the moving column's weight. Use an explicit assumed-stiffness beam/plate model
+  until Phase D FEA; this estimate decides whether the base is large enough.
+- **Rejected:** the floor-level 210 mm bed and a steel stand beneath a cast bed
+  (additional compliance/ringing). The GE15A's approximately 7 t is a scale
+  reference supplied in the review, not the target mass of this smaller machine.
+
 **HB-D2. The electronic gearbox is a controller relation, not a mechanical coupling.**
 - A real hobber has no mechanical link between hob and table. The table servo follows the hob
   encoder through the CNC (Fanuc EGB, Siemens EG).
@@ -380,7 +406,9 @@ r 30 mm. HB7 and HB11 must show this.
 
 ### Phase B: the machine and its control
 
-**HB5. Parts (HB-D1, HB-D10).**
+**HB5. Parts (HB-D1, HB-D10, HB-D11).**
+- Heavy monolithic plinth, three levelling feet, larger C bearing and matching
+  housing, and hollow/ribbed lightened moving column.
 - `machinekit.motion`:
   - `TorqueMotor`: frameless direct drive with continuous and peak torque, rotor inertia, cogging
     amplitude and pole count.
@@ -417,6 +445,9 @@ r 30 mm. HB7 and HB11 must show this.
   HB14 covers bed thermal behaviour as a lumped thermal mass.
 
 **HB6. The machine.**
+- HB-D11 acceptance: working height, three-foot support/spacing, base-to-moving
+  mass ratios (X ≥ 5:1), and old/new assumed-stiffness displacement change over
+  X travel, alongside the ordinary layout checks.
 - `FlexsplineHobber extends MachineAssembly`:
   - joints C (revolute, direct drive), B (continuous, process velocity), X, Y, Z (prismatic, ball
     screws, linear scales), A (revolute, clamped);
@@ -478,7 +509,7 @@ r 30 mm. HB7 and HB11 must show this.
 **HB11. Error sources and budget (HB-D7).**
 - Turn on each source from its part:
   - encoder eccentricity and graduation error;
-  - table radial and axial runout;
+  - table radial and axial runout; radial-load-induced tilt from the stated bearing moment stiffness (separate from axial TIR);
   - mandrel runout;
   - hob radial and axial runout and profile error;
   - servo sync (HB7 runtime);
@@ -533,7 +564,7 @@ r 30 mm. HB7 and HB11 must show this.
   from a smaller hob OD. Each must be checked against HB11's error budget; none is
   assumed to preserve accuracy for free.
 
-- Casting process model and structural/modal analysis (external FEA), first use: hobber bed modes vs gash frequency.
+- Casting process model and structural/modal analysis (external FEA), first targets: base/column deflection over X travel and modes versus ≈ 50 Hz spindle / 600 Hz gash excitations.
 - Double-circular-arc and S-tooth flexsplines; crowning and longitudinal modification.
 - Thermal growth (spindle and table heat, bed); hob wear and shift strategy.
 - G-code: a Fanuc-style EGB dialect in CncKit (writer and reader).
@@ -2262,3 +2293,77 @@ seconds, zero fixture contacts and no inspection failure. This is coarse-cut
 acceptance, not a new full-reference grade result. Updated masses and positive
 linear-drive thrust margins are in LAYOUT_REPORT.json. Materia was opened with
 the new artifact. Frozen HB4/HB11 binaries and native providers were untouched.
+
+### HB-D11 implemented — monolithic plinth and complete cup handling (2026-10-19)
+
+The vertical GE moving-column/head design is retained. HB-D11 now uses a
+1100 × 800 × 800 mm monolithic mineral-cast base on three 47 mm rigid levelling
+feet. The departure from the initial 650 mm height puts the tooth band at
+1000 mm without a taller fixture, stand or long legs. Exact CAD mass is
+884.62 kg for the casting, 921.81 kg for the base assembly and 1161.27 kg for
+the complete machine. X/Y/Z moving masses are 127.98 / 14.03 / 41.10 kg, giving
+casting-to-moving ratios 6.91 / 63.06 / 21.53. Column casting mass drops from
+37.28 to 31.75 kg (insert-equipped assembly 55.50 → 49.97 kg).
+
+The three supports span 860 mm radially and 660 mm across the front; all
+reactions remain positive through X travel, with a 5.05 kN maximum against an
+assumed 15 kN target per foot. No vibration mounts are fitted. The base includes
+a 7.92 L coolant-tank reservation, drain/downcomer, front service opening and
+cable route. Plumbing, tank lining and thermal isolation remain provisions.
+The C bearing is Ø220 × Ø180 × 20 mm, housing Ø270 and platen Ø240 with an
+integral hollow hub. Existing 2 µm axial TIR and 1 MN·m/rad moment stiffness
+remain Assumed; larger geometry does not qualify better accuracy.
+
+`BASELINE_FOUNDATIONS.json` preserves the old 210 mm bed. The `base-report`
+command checks native CAD volume against the orthogonal material-cell union,
+mass ratios, work height, foot reactions and an assumed E=35 GPa beam model.
+Across 21 X positions, its combined relative radial/vertical displacement-change
+bound is 0.399 µm for the old bed and 0.00628 µm for the new base; the latter is
+0.0126 µm at half E, below the stated 1.9 µm profile allocation. Both pass this
+simplified allocation; it does not by itself reject the old base. Floor/feet,
+local inserts, joints, torsion and modes need Phase D FEA, first targeting
+base/column deflection across X and the approximately 50/600 Hz excitations.
+
+The wider table required a larger tray opening, chamfered lower Y-saddle corners
+and clearance above the wider X carriage for the Z motor. The external load
+path and four Y block mounts remain intact. Native checks pass 979 assembly,
+1044 component/persistence, 127 geometry and 1994 size-range assertions. Coarse
+and reference full 85-pose X/Y/Z/A grids pass 21,696 / 21,677 candidate checks
+with zero unintended overlaps above 0.001 mm³. Top-loading cup checks pass
+1890 samples. The short reference-frame cut retains the existing 1e-8 mm/rad
+pose, 1e-8 mm arc and 1e-6 N load tolerances. Guide offsets remain X121 / Y70 /
+Z161 mm; the Z target departure is still explicitly recorded.
+
+HB11 now includes a separate load-induced table-tilt source, about the installed
+bearing centre, distinct from axial TIR. Its transform, orthonormality, zero-load
+parity and recorded-motion interpolation pass 87 signature assertions. The HB10
+radial window peak of 16.99 N gives an assumed 3.09 µrad tilt and about 0.55 µm
+radial motion at the work datum; the change across an 8 mm band is about
+0.025 µm. Its full source/combined HB11 budget remains open; frozen earlier
+cases exclude this added source. The installed sleeve spans 115–131 mm and
+supports the full 115–123 mm reference band. Recomputing the measured radial
+mean/variation stiffness sweep at ×0.3/×1/×3 still passes the wall allocation,
+conditional on assumed support/contact. Static measured-load drive reserve
+checks pass, and the report updates moving-mass acceleration/gravity demand.
+
+The former annular blank is replaced by a one-piece, assumed 40 mm cup with
+2 mm closed end and 0.6 mm body wall. `loading.scene.json` adds guided top
+loading, nominal sleeve take-up, the actual coarse tooth-band cut, head
+withdrawal and unloading, plus Blank/Clamped/Finished/section inspection.
+Handling and sleeve expansion are presentational, not loose-body or hydraulic
+simulation. RingStock retains the cut band while the unmachined wall/end stay
+visible. Machining time excludes the illustrative handling timeline.
+
+HB6/HB9 app acceptance on the new base completes 982 measured gash windows in
+6.00275 simulated seconds, with zero fixture contacts and no inspection failure;
+coarse synchronization is 0.00280 arcsec. It establishes app integration and
+material removal, not a reference ISO grade. The full handling sequence also passes: 982 windows in a 7.03975 s machining
+program (including the longer initial approach), followed by measured X withdrawal,
+release/lift-out, preserved-stock inspection views and reset. Collision geometry uses
+exact coalesced orthogonal casting cells, hole-preserving saddle extrusion
+pieces (0.05 mm / 0.5 rad collision tessellation), and separate mandrel axial
+envelopes rather than a hull bridging its shoulder. The latter conservatively
+fills internal bores/cavities in collision only. CAD mass/shape and cutting
+settings are unchanged by these collision representations. The project remains
+below the 768-shape runtime cap, without increasing it or adding contact
+exclusions. Frozen HB4/HB11 cuts and native providers were left untouched.

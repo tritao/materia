@@ -32,7 +32,7 @@ class FlexsplineHobberLayoutReport {
         var fill=id=="hob"?"#e4a33a":id.indexOf("swivel")>=0?"#85b9de":"#c5ccd0";
         // Show the central load path, rather than an off-axis nut carrier's enclosing box.
         if(id=="Zplate"){x0=135;x1=148;z0=-65;z1=170;}
-        if(id=="Yplate"){x0=45;x1=57;z0=-95;z1=95;}
+        if(id=="Yplate"){x0=45;x1=57;z0=-75;z1=95;}
         if(id=="column/casting")x0=276; // Central recess: the rear wall, not its side cheeks.
         function rect(a:Float,c:Float,d:Float,e:Float):Void lines.push('<rect x="'+px(a)+'" y="'+py(e)+'" width="'+((c-a)*1.2)+'" height="'+((e-d)*1.05)+'" fill="'+fill+'" fill-opacity="0.55" stroke="#334455"/>');
         if(id=="swivel/housing"){
@@ -61,6 +61,9 @@ class FlexsplineHobberLayoutReport {
     var tool:materia.assembly.AssemblyRecord.AssemblyFrame=F.compose(poses.get("hob"),machine.hob.connector("centre").frame),offsets:Map<String,Float> = [];
     for(axis in ["X","Y","Z"]){var rail=members.filter(m->Std.isOfType(m.component,machinekit.motion.LinearRail)&&m.id.indexOf("rail"+axis)==0)[0];
       var frame:materia.assembly.AssemblyRecord.AssemblyFrame=poses.get(rail.id);var normal=F.transformVector(frame,0,1,0);offsets.set(axis,Math.abs((tool.x-frame.x)*normal.x+(tool.y-frame.y)*normal.y+(tool.z-frame.z)*normal.z));}
+    var collisionPieces:Array<Dynamic> = [],collisionTotal=0;
+    for(m in members){var facet=machinekit.component.CollisionHullFacet.of(m.component),count=facet==null?1:facet.hulls.length;
+      collisionTotal+=count;collisionPieces.push({part:m.id,hulls:count});}
     var moving:Map<String,Float> = [];
     for(axis in ["X","Y","Z"]){var root=def.joints.filter(j->j.id==axis)[0].child,ids:Map<String,Bool> = [];ids.set(root,true);
       var changed=true;while(changed){changed=false;for(j in def.joints)if(ids.exists(j.parent)&&!ids.exists(j.child)){ids.set(j.child,true);changed=true;}}
@@ -79,6 +82,6 @@ class FlexsplineHobberLayoutReport {
     var canonical=F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
     try {for(m in members){var b=cache.box(m.component,F.compose(canonical,poses.get(m.id)));loX=Math.min(loX,b.minX);hiX=Math.max(hiX,b.maxX);loY=Math.min(loY,b.minY);hiY=Math.max(hiY,b.maxY);}}
     catch(e:Dynamic){cache.close();throw e;}cache.close();
-    return {installedPoseEnvelopeMm:{radial:hiX-loX,tangential:hiY-loY,scope:"initial pose including separate electrical rack; CAD envelope bounds"},headStackMm:{yGuidePlane:70,swivelBearingFrontFace:114,swivelOutputFace:100,zSaddleFront:135,zGuidePlane:161,verticalGuideSeparation:120},drives:drives,bedFootprintRadialTangentialMm:[1000,650],guideToHobMm:{X:offsets.get("X"),Y:offsets.get("Y"),Z:offsets.get("Z")},movingMassKg:{X:moving.get("X"),Y:moving.get("Y"),Z:moving.get("Z")},machineMassKg:total,members:members.length};
+    return {collisionShapes:{authoredPlusDefaultTotal:collisionTotal,parts:collisionPieces},installedPoseEnvelopeMm:{radial:hiX-loX,tangential:hiY-loY,scope:"initial pose including separate electrical rack; CAD envelope bounds"},headStackMm:{yGuidePlane:70,swivelBearingFrontFace:114,swivelOutputFace:100,zSaddleFront:135,zGuidePlane:161,verticalGuideSeparation:120},drives:drives,bedFootprintRadialTangentialMm:[machine.bed.body.parameterNumber("width"),machine.bed.body.parameterNumber("depth")],guideToHobMm:{X:offsets.get("X"),Y:offsets.get("Y"),Z:offsets.get("Z")},movingMassKg:{X:moving.get("X"),Y:moving.get("Y"),Z:moving.get("Z")},machineMassKg:total,members:members.length};
   }
 }

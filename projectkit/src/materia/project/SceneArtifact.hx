@@ -163,6 +163,19 @@ typedef SceneArtifactProjectMotion = {
   @:id(15) var axes:Array<String>;
   @:id(16) var stock:String;
   @:id(17) var controllerHz:Float;
+  @:id(18) @:optional var cupLength:Float;
+  @:id(19) @:optional var cupEndThickness:Float;
+  @:id(20) @:optional var handling:SceneArtifactHobbingHandling;
+}
+
+/** Authored handling illustration, millimetres; not a deformation/contact model. */
+@:wire typedef SceneArtifactHobbingHandling = {
+  @:id(1) var sleeve:String;
+  @:id(2) var outside:Float;
+  @:id(3) var wall:Float;
+  @:id(4) var length:Float;
+  @:id(5) var radialTravel:Float;
+  @:id(6) var retractX:Float;
 }
 
 /** Press travel and gauge setup use millimetres; axis planning converts to SI once. */

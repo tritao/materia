@@ -38,6 +38,9 @@ class MineralCasting extends MachineComponent {
 			v.number("footHeight") >= v.number("height"))) throw "Casting foot needs a wider sole and a tapered shoulder";
 		super("MINERAL-CASTING", "Mineral casting (purchase by casting mass, kg)", "mineral cast", false, v);
 		voids = cuts;
+    var orthogonal=true;for(cut in cuts)if(!CastingCells.orthogonal(cut))orthogonal=false;
+    if(orthogonal&&v.number("cornerChamfer")==0&&v.number("footWidth")==0)
+      addFacet(CollisionHullFacet.fromBoxes(CastingCells.material(v.number("width"),v.number("depth"),v.number("height"),cuts)));
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Mount, Solids.axial(0, 0, parameterNumber("height")));
 	}

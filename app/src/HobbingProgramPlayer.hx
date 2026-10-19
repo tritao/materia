@@ -15,6 +15,15 @@ import toolpathkit.motion.*;
 /** HB8 program executed through the ordinary plan runtime; cuts only measured after-step state. */
 class HobbingProgramPlayer implements SessionMember implements SimulationStepObserver {
   public final job:HobbingJob;
+  public final handling:Null<HobbingHandling>;
+  public var cutCompleted(default,null)=false;
+  public var cutStarted(default,null)=false;
+  public var headRetracted(default,null)=false;
+  var handlingStart=-1.0;
+  var unloadStart=-1.0;
+  var sleeveDisplay=-1.0;
+  final sleeveCenter:Array<Float>;
+  final withdrawal:Null<motionkit.program.MotionProgram>;
   public var stock(default,null):HobbingStock;
   public var failure(default,null):Null<String> = null;
   public var completed(default,null):Bool=false;
@@ -38,6 +47,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   final trace:Bool=Sys.getEnv("HOBBER_TRACE")=="1";
   var traceTime=-1.0;
   public function new(config:SceneArtifactHobbing,robot:AssemblyRobot,simulation:Simulation,session:SimSession,project:ProjectDocumentSession) {
+    handling=config.handling==null?null:new HobbingHandling();
     this.config=config;this.robot=robot;this.simulation=simulation;this.session=session;this.project=project;
     indices=[for(id in config.axes)[for(j in 0...robot.model.joints.length)if(robot.model.joints[j].id==id)j][0]];
     var definition=project.projectAssemblyDefinition;if(definition==null)throw "Hobbing needs assembly placement";
@@ -63,6 +73,18 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
       case PositionJoint(id,position,span):var at=config.axes.indexOf(id);toolpathkit.path.ToolpathOp.PositionJoint(id,position-(at<0?0:offsets[at]),span);
       case _:op;
     }]);if(lowered.program==null)throw "Empty hobbing program";program=lowered.program;
+    var hc=config.handling;
+    var handlingSpan=toolpathkit.path.Provenance.cam(0,"loading clearance");
+    withdrawal=hc==null?null:new ToolpathLowering(binding).lower([
+      toolpathkit.path.ToolpathOp.SetSetup("hobber-axes",handlingSpan),
+      toolpathkit.path.ToolpathOp.PositionJoint(config.axes[0],hc.retractX/1000-offsets[0],handlingSpan),
+      toolpathkit.path.ToolpathOp.End(handlingSpan)]).program;
+    if(hc!=null){
+      var sleeveId=hc.sleeve;
+      var sleeve=definition.occurrences.filter(o->o.id==sleeveId)[0];
+      if(sleeve==null)throw "Handling sleeve is absent";
+      var sc=project.assemblyPreviewCenter(sleeve.definition);sleeveCenter=[for(v in sc)v*project.assemblyUnitMetres()];
+    }else sleeveCenter=[0.0,0,0];
     motion=newMotion();stock=new HobbingStock(config,centerMetres);observerId=simulation.addStepObserver(this);
   }
   function newMotion():ManipulatorMotion return new ManipulatorMotion(robot.robot,compiler,input,()->robot.runtime.pollEvents());
@@ -76,22 +98,45 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   public function feed():Void {
     if(completed||failure!=null||disposed)return;
     try{
-      if(!started){startTime=session.simulationTime();motion.run(program);started=true;}
-      motion.update(session.fixedTimestep());failure=motion.failure;
-      if(motion.completed){completed=true;elapsed=session.simulationTime()-startTime;stock.finish(elapsed,syncError);}
+      var now=session.simulationTime();
+      if(handling!=null&&handling.inspection!="sequence")return;
+      if(handling!=null&&!cutStarted){
+        if(handlingStart<0)handlingStart=now;
+        if(!handling.load(now-handlingStart))return;
+      }
+      if(!started){startTime=now;motion.run(program);started=true;cutStarted=true;}
+      if(!cutCompleted){
+        if(handling!=null)handling.cutting();
+        motion.update(session.fixedTimestep());failure=motion.failure;
+        if(motion.completed){
+          cutCompleted=true;elapsed=now-startTime;stock.finish(elapsed,syncError);
+          if(handling==null){completed=true;return;}
+          var retract=withdrawal;if(retract==null)throw "Missing head withdrawal program";
+          motion.run(retract);handling.retracting();
+        }
+      }else if(handling!=null&&!headRetracted){
+        handling.retracting();motion.update(session.fixedTimestep());failure=motion.failure;
+        if(motion.completed){
+          var x=(robot.robot.snapshot().positions.get(indices[0])+offsets[0])*1000;
+          var hc=config.handling;if(hc==null)throw "Handling configuration absent";
+          if(Math.abs(x-hc.retractX)>0.01)throw "Head has not reached loading clearance";
+          headRetracted=true;unloadStart=now;
+        }
+      }else if(handling!=null)completed=handling.unload(now-unloadStart);
     }catch(e:Dynamic){failure=Std.string(e);motion.abort();}
   }
   public function afterSimulationStep(timestamp:Int64):Void {
-    if(!started||completed||failure!=null||disposed)return;
+    if(!started||cutCompleted||completed||failure!=null||disposed)return;
     try{
       var q=robot.robot.snapshot().positions;
       var axes=new HobbingAxes((q.get(indices[0])+offsets[0])*1000,(q.get(indices[1])+offsets[1])*1000,(q.get(indices[2])+offsets[2])*1000,q.get(indices[3])+offsets[3],q.get(indices[4])+offsets[4],q.get(indices[5])+offsets[5]);
       stock.follow(Int64.toFloat(timestamp)*1e-9,axes);
       if(trace&&session.simulationTime()-traceTime>=0.25){traceTime=session.simulationTime();
-        var contactCount=-1;
-        try{contactCount=simulation.robotContacts(robot.runtime).length;}catch(ignored:Dynamic){}
+        var contactCount=-1;var pairs:Array<Dynamic> = [];
+        try{var contacts=simulation.robotContacts(robot.runtime);contactCount=contacts.length;
+          for(contact in contacts)if(contact.active)pairs.push({a:robot.model.links[contact.linkIndex].id,b:contact.otherLink<0?"environment":robot.model.links[contact.otherLink].id,distanceM:contact.distance});}catch(ignored:Dynamic){}
         Sys.println("HOBBER_TRACE "+haxe.Json.stringify({t:traceTime,x:axes.x,z:axes.z,b:axes.b,c:axes.c,
-          cSet:robot.robot.snapshot().setpointPositions.get(indices[5])+offsets[5],contacts:contactCount,
+          cSet:robot.robot.snapshot().setpointPositions.get(indices[5])+offsets[5],contacts:contactCount,contactPairs:pairs,
           expected:axes.b*config.starts/config.teeth+job.passes[0].tablePhase,
           removed:stock.forces.last==null?0:stock.forces.last.removedVolume}));
       }
@@ -102,8 +147,31 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
       if(stock.maxBytes>128*1024*1024||stock.stream.peakFrames>4096)throw "Hobbing allocation budget exceeded";
     }catch(e:Dynamic){failure=Std.string(e);motion.abort();}
   }
-  public function present():Void{if(disposed)return;var geometry=stock.geometry();if(geometry!=null)project.scene.setRuntimeGeometry("project:"+config.stock,geometry);}
+  /** Inspection is paused and view-only; never resets or rewrites the cut stock. */
+  public function inspectCup(mode:String):Void {
+    if(handling==null)throw "This scene has no cup handling demonstration";
+    if(mode!="sequence"&&cutStarted&&!completed)throw "Finish or reset the handling sequence before inspecting another state";
+    if(mode=="finished"&&!cutCompleted)throw "No finished cut is available";
+    handling.inspect(mode);present();
+  }
+  public function present():Void {
+    if(disposed)return;
+    var lift=handling==null?0:handling.displayedLift(),blank=handling!=null&&(handling.inspection=="blank"||handling.inspection=="clamped");
+    var geometry=stock.geometry(lift,blank);if(geometry!=null)project.scene.setRuntimeGeometry("project:"+config.stock,geometry);
+    if(handling!=null){
+      var clamp=handling.displayedClamp();
+      if(clamp!=sleeveDisplay){
+        var h=config.handling;if(h==null)throw "Handling configuration absent";
+        var outer=h.outside/2+clamp*h.radialTravel,inner=h.outside/2-h.wall+clamp*h.radialTravel;
+        var sleeve=CutterGeometry.sectionGeometry([{r:inner,z:0.0},{r:outer,z:0.0},{r:outer,z:h.length},{r:inner,z:h.length},{r:inner,z:0.0}],
+          (x,y,z)->[x/1000-sleeveCenter[0],y/1000-sleeveCenter[1],z/1000-sleeveCenter[2]],(x,y,z)->[x,y,z]);
+        project.scene.setRuntimeGeometry("project:"+h.sleeve,sleeve);sleeveDisplay=clamp;
+      }
+    }
+  }
   public function beforeReset():Void{if(motion.running)motion.abort();}
-  public function reset():Void{stock.dispose();stock=new HobbingStock(config,centerMetres);motion=newMotion();started=false;completed=false;failure=null;syncError=0;elapsed=0;}
+  public function reset():Void{stock.dispose();stock=new HobbingStock(config,centerMetres);motion=newMotion();started=false;cutStarted=false;cutCompleted=false;headRetracted=false;completed=false;failure=null;syncError=0;elapsed=0;
+    handlingStart=-1;unloadStart=-1;sleeveDisplay=-1;
+    if(handling!=null){handling.inspect("sequence");handling.load(0);}}
   public function dispose():Void{if(disposed)return;beforeReset();disposed=true;simulation.removeStepObserver(observerId);stock.dispose();}
 }

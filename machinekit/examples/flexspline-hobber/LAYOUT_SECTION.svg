@@ -2,15 +2,15 @@
 <rect width="1120" height="900" fill="white"/><g font-family="sans-serif" font-size="14" stroke-width="1.2">
 <text x="30" y="28">GE hobber — dimensioned radial section (schematic), mm</text>
 <text x="30" y="50">Central mounting section; Y-offset guides, spindle and hob projected. Not a manufacturing drawing.</text>
-<rect x="551.2" y="131.64999999999992" width="132.00000000000006" height="525.0000000000001" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<rect x="551.2" y="131.64999999999986" width="132.00000000000014" height="525.0000000000001" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="95">column/casting: radial 276..386 mm</text>
 <rect x="382" y="401.5" width="15.6" height="246.75" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="117">Zplate: radial 135..148 mm</text>
-<rect x="413.19999999999976" y="147.40000000000003" width="18.000000000000274" height="504" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<rect x="413.1999999999998" y="147.39999999999998" width="18.000000000000274" height="504" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="139">railZLeft: radial 161..176 mm</text>
-<rect x="431.1999999999997" y="147.40000000000003" width="24.000000000000135" height="504" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<rect x="431.1999999999998" y="147.39999999999998" width="24.000000000000135" height="504" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="161">column/railLeft: radial 176..196 mm</text>
-<rect x="397.5999999999999" y="547.449999895" width="28.44000011960404" height="64.78500010500001" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<rect x="397.59999999999997" y="547.449999895" width="28.44000011960404" height="64.78500010500001" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="183">blockZLeft: radial 148..171.7 mm</text>
 <rect x="376" y="632.5" width="6" height="63" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
 <rect x="364" y="674.5" width="12" height="21" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
@@ -19,37 +19,37 @@
 <rect x="364" y="464.5" width="12" height="21" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
 <rect x="352" y="464.5" width="12" height="10.5" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="205">swivel/housing: radial 110..135 mm</text>
-<rect x="356.79999999999995" y="485.5" width="19.2" height="15.75" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
-<rect x="356.79999999999995" y="658.75" width="19.2" height="15.75" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
+<rect x="356.80000000000007" y="485.5" width="19.2" height="15.75" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
+<rect x="356.80000000000007" y="658.75" width="19.2" height="15.75" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="227">swivel/bearing: radial 114..130 mm</text>
-<rect x="352" y="501.25" width="24" height="36.75" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
-<rect x="352" y="622" width="24" height="36.75" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
+<rect x="352.00000000000006" y="501.25" width="24" height="36.75" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
+<rect x="352.00000000000006" y="622" width="24" height="36.75" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="249">swivel/motor: radial 110..130 mm</text>
 <rect x="352" y="475" width="12.000000000000068" height="10.5" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
 <rect x="352" y="674.5" width="12.000000000000068" height="10.5" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="271">swivel/clamp: radial 110..120 mm</text>
-<rect x="339.99999999999994" y="475" width="12.000000000000068" height="52.5" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
-<rect x="339.99999999999994" y="632.5" width="12.000000000000068" height="52.5" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
+<rect x="340" y="475" width="12.000000000000068" height="52.5" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
+<rect x="340" y="632.5" width="12.000000000000068" height="52.5" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="293">swivel/head: radial 100..110 mm</text>
-<rect x="322" y="480.25000000000006" width="18.000000000000032" height="199.5" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
+<rect x="322.00000000000006" y="480.2500000000001" width="18.000000000000032" height="199.5" fill="#85b9de" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="315">swivelPlate: radial 85..100 mm</text>
-<rect x="304" y="635.124999999999" width="18" height="15.750000000001135" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<rect x="304.0000000000001" y="635.1249999999991" width="18" height="15.750000000001135" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="337">railYLeft: radial 70..85 mm</text>
-<rect x="304" y="509.124999999999" width="18" height="15.750000000001135" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<rect x="304.0000000000001" y="509.1249999999989" width="18" height="15.750000000001135" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="359">railYRight: radial 70..85 mm</text>
-<rect x="288.40000000000003" y="625.15" width="28.440000119604033" height="35.700000000000124" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<rect x="288.4000000000001" y="625.15" width="28.44000011960404" height="35.700000000000124" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="381">blockYLeft: radial 57..80.7 mm</text>
-<rect x="288.4" y="499.1499999999999" width="28.440000119604033" height="35.700000000000124" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<rect x="288.40000000000003" y="499.14999999999986" width="28.44000011960404" height="35.700000000000124" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="403">blockYRight: radial 57..80.7 mm</text>
-<rect x="274" y="480.25" width="14.399999999999999" height="199.5" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<rect x="274" y="480.25" width="14.399999999999999" height="178.5" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="425">Yplate: radial 45..57 mm</text>
-<ellipse cx="220.00000000000003" cy="580.0000000000001" rx="54.000000000000014" ry="47.250000000000014" fill="none" stroke="#334455" stroke-dasharray="5 3"/>
+<ellipse cx="220.00000000000009" cy="580.0000000000001" rx="54.000000000000014" ry="47.250000000000014" fill="none" stroke="#334455" stroke-dasharray="5 3"/>
 <text x="740" y="447">spindle/housing: radial -45..45 mm</text>
-<ellipse cx="219.99999999999997" cy="580" rx="19.200000000000006" ry="16.800000000000008" fill="none" stroke="#334455" stroke-dasharray="5 3"/>
+<ellipse cx="220" cy="580" rx="19.2" ry="16.8" fill="none" stroke="#334455" stroke-dasharray="5 3"/>
 <text x="740" y="469">hob: radial -16..16 mm</text>
-<rect x="69.25000000000009" y="700.7500000000001" width="192" height="21" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
-<text x="740" y="491">table/platen: radial -125.62..34.38 mm</text>
-<rect x="117.25000000000007" y="563.2" width="96" height="137.55" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<rect x="21.250000000000142" y="700.75" width="288" height="55.650000000000006" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
+<text x="740" y="491">table/platen: radial -165.62..74.38 mm</text>
+<rect x="117.25000000000014" y="561.1" width="96" height="139.65" fill="#c5ccd0" fill-opacity="0.55" stroke="#334455"/>
 <text x="740" y="513">mandrel: radial -85.62..-5.62 mm</text>
 <rect x="443.2" y="131.64999999999998" width="120" height="525" fill="none" stroke="#667788" stroke-dasharray="6 4"/><text x="740" y="565">Dashed column cheek: Y-offset projection</text>
 <path d="M 220 80 V 680" stroke="#aa4433" stroke-dasharray="6 4"/><text x="120" y="670">hob centre radial = 0</text>

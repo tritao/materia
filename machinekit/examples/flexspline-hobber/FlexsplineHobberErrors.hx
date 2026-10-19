@@ -10,6 +10,9 @@ class FlexsplineHobberErrors {
     if(sync.id!="sync")throw "hobber budget needs an explicitly identified runtime/diagnostic sync source";
     if(Math.abs(wall.radius-(machine.spec.rootRadius()-wall.wall/2))>1e-8||Math.abs(wall.width-machine.spec.faceWidth)>1e-8)
       throw "wall compliance does not match blank geometry";
+    var poses=machine.solvedPoses(),centre=machine.table.bearing.massProperties().centreOfMass;
+    var bearingInWork=materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(poses.get("blank")),poses.get("table/bearing"));
+    var pivotDepth= -materia.assembly.AssemblyFrames.transformPoint(bearingInWork,centre.x,centre.y,centre.z).z;
     var table=machine.table,arbor=machine.spindle.arbor,tool=machine.hob;
     var outboard:machinekit.hobbing.OutboardSupport=cast machine.components().filter(m->m.id=="outboard")[0].component;
     var supportRadial=HobbingErrorSource.hobRadial("outboard",outboard.parameterNumber("radialRunout"));
@@ -22,6 +25,7 @@ class FlexsplineHobberErrors {
     var sources=[HobbingErrorSource.workEccentricity("mandrel","mandrel",machine.mandrel.eccentricity),
       HobbingErrorSource.workEccentricity("table-radial","table/bearing",table.bearing.radialRunout/2),
       HobbingErrorSource.tableAxial("table/bearing",table.bearing.axialRunout),
+      HobbingErrorSource.tableTilt("table/bearing",table.bearing.parameterNumber("momentStiffness"),pivotDepth,pivotDepth+machine.spec.faceWidth/2,radialForce),
       HobbingErrorSource.encoder("table/encoder",table.encoder.eccentricity,encoderRadius),
       HobbingErrorSource.graduation("table/encoder",table.encoder.angularAccuracy,4),
       radial,axial,

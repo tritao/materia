@@ -4231,27 +4231,34 @@ class ProjectSourceTests {
   }
 
   /** Exercise the saved scene, asynchronous preparation and desktop playback together. */
-  static function checkHobberInteractive(root:String):Void {
+  static function checkHobberInteractive(root:String,loading:Bool=false):Void {
+    tests.HobbingHandlingTests.run();
     var scene=Sys.getEnv("HOBBER_GUI_SCENE");
-    if(scene==null)scene=root+"/machinekit/examples/flexspline-hobber/cutting.scene.json";
+    if(scene==null)scene=root+"/machinekit/examples/flexspline-hobber/"+(loading?"loading.scene.json":"cutting.scene.json");
     var fonts=FontCollection.create();fonts.add(root+"/haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
     var editor=new ReferenceEditorApp(fonts,"/tmp/hobber-interactive-"+Sys.getPid()+".json");
     editor.simulation.backgroundPacing=true;
     try {
       editor.session.open(scene);editor.documentChanged();
+      var openDeadline=Sys.time()+180;
+      while(editor.openingProject()&&Sys.time()<openDeadline){editor.tick();Sys.sleep(0.005);}
+      check(!editor.openingProject(),"Loading scene finishes project generation");
       var original=editor.scene.info("project:blank").bounds();
       editor.commands.execute("sim.play");
       var deadline=Sys.time()+60;
       while(editor.simulationBuild!=null&&Sys.time()<deadline){editor.tick();Sys.sleep(0.005);}
       var player=editor.simulation.hobbingPlayer();
-      if(player==null)throw "Saved cutting scene did not install hobbing player";
-      deadline=Sys.time()+90;
+      if(player==null)throw "Saved cutting scene did not install hobbing player: "+editor.simulation.error+"; "+editor.logLines.join(" | ");
+      deadline=Sys.time()+(loading?180:120);
       while(!player.completed&&player.failure==null&&Sys.time()<deadline){editor.tick();Sys.sleep(0.005);}
       editor.simulation.stop();editor.tick();
       player.stock.preview.wait();player.present();
       var visible=editor.scene.info("project:blank").bounds();
+      Sys.println("HOBBER_PLAYBACK_STATE "+haxe.Json.stringify({completed:player.completed,failure:player.failure,phase:player.handling==null?"cut-only":player.handling.phase,elapsed:player.elapsed,windows:player.stock.stream.passes}));
+      check(player.failure==null,"Desktop hobbing failure: "+player.failure);
       check(original.valid&&visible.valid,"Stock display has valid bounds");
-      check(Math.abs(original.minZ-visible.minZ)<1e-5&&Math.abs(original.maxZ-visible.maxZ)<1e-5,
+      var lift=loading?0.120:0;
+      check(Math.abs(original.minZ+lift-visible.minZ)<1e-5&&Math.abs(original.maxZ+lift-visible.maxZ)<1e-5,
         'Runtime stock stays at fixture height: original ${original.minZ}..${original.maxZ}, visible ${visible.minZ}..${visible.maxZ}');
       check(editor.simulation.timestep==1.0/4000,"Prepared playback retains the hobbing controller timestep");
       Sys.println("HOBBER_INTERACTIVE "+haxe.Json.stringify({completed:player.completed,failure:player.failure,
@@ -4259,6 +4266,18 @@ class ProjectSourceTests {
       check(player.failure==null,"Desktop hobbing failure: "+player.failure);
       check(player.completed,"Desktop playback completes the cutting job");
       check(player.stock.forces.maxTangential>0,"Desktop playback removes material");
+      if(loading){
+        var handling=player.handling;if(handling==null)throw "Handling timeline missing";
+        check(player.cutCompleted&&player.headRetracted,"Cut finishes and head retracts before unload");
+        check(handling.clamp==0&&handling.liftMm==120,"Finished cup lifted after release");
+        var intervals=player.stock.stock.intervalCount();
+        player.inspectCup("clamped");var clamped=editor.scene.info("project:blank").bounds();
+        check(Math.abs(clamped.minZ-original.minZ)<1e-5&&Math.abs(clamped.maxZ-original.maxZ)<1e-5,"Clamped inspection shows complete cup at fixture");
+        player.inspectCup("blank");player.inspectCup("finished");
+        check(player.stock.stock.intervalCount()==intervals,"Inspection preserves actual cut stock");
+        check(editor.simulation.reset(),"Loading demo resets");
+        check(!player.completed&&!player.cutStarted&&handling.clamp==0&&handling.liftMm==120,"Reset restores handling timeline");
+      }
     }catch(e:Dynamic){editor.dispose();fonts.dispose();throw e;}
     editor.dispose();fonts.dispose();
   }
@@ -7350,7 +7369,8 @@ class ProjectSourceTests {
       suite("welder", checkRobotWelder),
       suite("mates", checkMates),
       suite("flexspline-hobber", checkFlexsplineHobber),
-      suite("flexspline-hobber-interactive", checkHobberInteractive),
+      suite("flexspline-hobber-interactive", root -> checkHobberInteractive(root)),
+      suite("flexspline-hobber-loading", root -> checkHobberInteractive(root,true)),
       suite("bench-mill", root -> checkBenchMill(root)),
       focused("bench-mill-fine", root -> checkBenchMill(root,0.005)),
       suite("enclosed-mill", checkEnclosedMillProject),

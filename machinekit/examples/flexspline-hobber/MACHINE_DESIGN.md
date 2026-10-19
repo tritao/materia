@@ -9,19 +9,24 @@ remain assumed inputs.
 
 ## Coordinates and load path
 
-`MACHINE_FROM_WORK` is an explicit +90° rotation about C. Work-frame radial X
+`MACHINE_FROM_WORK` is an explicit +90° rotation about C and a 637 mm floor-height translation. Work-frame radial X
 therefore becomes global Y; the untilted hob axis becomes global X. All cutting,
 synchronisation and force calculations retain their work-frame conventions.
 The frame regression compares actual assembled poses, cut boundaries and loads
 with the analytic reference chain, rather than changing the cutting definition.
 
-The bed is 1000 × 650 × 210 mm, with a work well and drain below the table.
+The base is one 1100 × 800 × 800 mm monolithic mineral casting, supported on
+three 47 mm rigid levelling feet. Its top is 847 mm above the floor and the tooth
+band is at 1000 mm. The initial 650 mm plinth height would leave the band at
+850 mm with this low fixture; the taller casting raises the work without adding
+a stand, long legs or a taller fixture. The casting retains an 85 mm sole,
+upper ribs/pockets, a work well and drainage passages below the table.
 The bed has two continuous longitudinal casting beams under the
-50 mm rail-seat inserts. Bed guides are spaced 370 mm apart (centres ±185 mm),
+50 mm rail-seat inserts. Bed guides are spaced 440 mm apart (centres ±220 mm),
 and the carriage is widened to suit. Lightening cores stay outside 110 mm beam
-bands; the chip well leaves at least 90 mm beam width at the guide seats.
+bands; the chip well leaves at least 50 mm beam width at the guide seats.
 Each complete bed rail-seat footprint is backed by solid casting down to the sole;
-the work well remains 300 mm wide throughout for top-down chip-tray installation.
+the work well is 350 mm wide throughout for top-down chip-tray installation.
 The steel top faces deliberately stand 10 mm above the casting for rail mounting.
 Full-footprint solid checks verify the bed load beams and at least 10 mm of backing
 behind both column rail inserts. No rail mounting face overhangs a casting cavity.
@@ -45,12 +50,12 @@ HGR25R rails; Z/Y retain the verified analytical HGR15R running profile. These
 portable recipes require explicit local supplier-asset preparation. The source
 CAD does not qualify load ratings or mixed-material carriage mass.
 
-The X screw runs centrally between the bed rails, at Z=180 mm, in a 110 mm wide
+The X screw runs centrally between the bed rails, at floor Z=817 mm (work-frame Z=180 mm), in a 110 mm wide
 recessed casting channel. Its nut carrier drops from the carriage into the channel;
 a steel deck mounts to a separate ground-after-casting steel insert. The fixed
 support and motor sit at the rear; the screw axis points towards the table.
 The screw transmission sign follows that reversed axis. The insert starts beyond
-the chip guard, with 2.5 mm nominal radial clearance. A channel cover/bellows remains
+the chip guard, with 5.5 mm nominal radial clearance. A channel cover/bellows remains
 a design provision; the exposed mechanism is an inspection model.
 
 Ground screws and linear scales serve
@@ -62,15 +67,15 @@ confirmation.
 | X guide-plane to hob centre | 347 mm | 121 mm |
 | Z guide-plane to hob centre | 325 mm | 161 mm |
 | Y guide-plane to hob centre | 137 mm | 70 mm |
-| X moving mass | 81.71 kg | 132.06 kg |
-| Z moving mass | 106.79 kg | 41.60 kg |
-| Y moving mass | 18.01 kg | 14.57 kg |
-| Machine mass | 351.61 kg | 425.30 kg |
-| Bed footprint (radial × tangential) | 650 × 750 mm | 1000 × 650 mm |
-| Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1640 × 650 mm |
-| X continuous thrust margin, same assumed demand basis | 911.15 N | 886.51 N |
-| Y continuous thrust margin, same assumed demand basis | 897.29 N | 911.02 N |
-| Z continuous thrust margin, same assumed demand basis | 859.36 N | 1542.40 N |
+| X moving mass | 81.71 kg | 127.98 kg |
+| Z moving mass | 106.79 kg | 41.10 kg |
+| Y moving mass | 18.01 kg | 14.03 kg |
+| Machine mass | 351.61 kg | 1161.27 kg |
+| Bed footprint (radial × tangential) | 650 × 750 mm | 1100 × 800 mm |
+| Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1680 × 800 mm |
+| X continuous thrust margin, same assumed demand basis | 911.15 N | 888.01 N |
+| Y continuous thrust margin, same assumed demand basis | 897.29 N | 909.38 N |
+| Z continuous thrust margin, same assumed demand basis | 859.36 N | 1536.43 N |
 
 The initial moving-column revision had a 125 mm Z guide offset but retained the
 old underhung head. The front-mounted head needs 36 mm more radial space: its
@@ -99,7 +104,7 @@ The target envelope is flexspline outside diameter 25–140 mm, face width up to
 20 mm. X retracts to 250 mm for top loading; Z spans -10..190 mm, Y ±10 mm,
 and A ±15°. Guide checks include block length, end margins and overtravel.
 An integral 40 mm flange and mandrel base replaces the stacked riser assembly;
-it preserves tooth-band height (Z=363 mm) and tilt clearance. The mandrel sleeve continues
+it preserves the work-frame tooth-band datum (Z=363 mm), now 1000 mm above the floor, and tilt clearance. The mandrel sleeve continues
 to support the toothed rim.
 
 The spindle locates the arbor axially. The outboard 15 × 32 × 9 mm radial bearing
@@ -135,11 +140,48 @@ reference cycle-time acceptance. Frozen HB4/HB11 cuts use their original layout
 and remain separate evidence. Structural/modal analysis, spindle/mandrel sag,
 thermal behaviour and detailed manufacturing release remain open plan items.
 
-The continuous bed beams add 79.51 kg to the fixed casting, and the wider carriage
-adds 1.43 kg to X. Total calculated machine mass is now 424.21 kg (previously
-343.27 kg). X moving mass is 130.98 kg and its assumed-demand continuous thrust
-margin remains 886.51 N. Y/Z masses and margins are unchanged. Structural/modal
-qualification remains open; these are geometry and mass checks.
+## Heavy plinth acceptance (HB-D11)
+
+The casting is 884.62 kg; the base assembly is 921.81 kg and the complete machine
+is 1161.27 kg. The casting-to-moving-mass ratios are 6.91:1 (X), 63.06:1 (Y)
+and 21.53:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
+from 37.28 to 31.75 kg; its insert-equipped assembly falls from 55.50 to 49.97 kg.
+X moves 127.98 kg including the complete column/head. The three support points
+span 860 mm radially and 660 mm across the front. Positive reactions are checked
+through X travel against an assumed 15 kN target per foot; no vibration pads
+are fitted. Floor, pad and screw compliance remain unqualified.
+
+The table now has an assumed Ø220 × Ø180 × 20 mm crossed-roller bearing,
+Ø270 mm housing and Ø240 mm platen with an integral hollow bearing hub.
+The bearing retains the existing assumed 2 µm axial TIR and 1 MN·m/rad moment
+stiffness. Increasing its diameter does not establish better accuracy. HB11's
+axial source is retained; a separate radial-load-induced bearing-tilt source and
+analytic signature checks are added. Frozen earlier HB11 cases do not include
+this new tilt contribution; its full source/combined acceptance remains open.
+The completed HB10 radial window peak (16.99 N, not the tangential peak) implies
+3.09 µrad tilt and about 0.55 µm radial motion at the work datum under that
+assumed stiffness. The variation across the 8 mm face is about 0.025 µm.
+These are load-model bounds, not measured table performance.
+
+[BASELINE_FOUNDATIONS.json](BASELINE_FOUNDATIONS.json) preserves the previous
+210 mm bed's CAD geometry/masses. `base-report` compares that bed and this
+plinth using a simply supported beam over the same 860 mm span, the minimum
+net section and E=35 GPa (assumed). It samples the actual moving CAD mass centre
+across X travel and combines relative vertical displacement and Abbe rotation.
+The estimated change falls from 0.399 µm to about 0.0063 µm, or 0.0126 µm at
+half the assumed modulus, below the explicitly allocated 1.9 µm profile share.
+Both beds pass this simplified allocation: this calculation alone does not
+prove the old bed unacceptable. The old mass ratio and work height motivate
+the redesign. Local insert/contact flexibility, joints, torsion, foot/floor
+compliance and dynamics are excluded. Phase D FEA must check these and modes
+against approximately 50/600 Hz excitation.
+
+The casting reserves 7.92 L for a separate coolant tank below and forward of
+the guide seats, with a connecting drain and front service opening. Cable
+routing has its own upper passage. Tank lining, plumbing, thermal isolation
+and coolant temperature control are design provisions, not solved thermal
+performance. Lifting hardware remains deferred; existing insert placeholders
+are not qualified lifting points.
 
 ## Foundation assembly sequence
 
@@ -192,7 +234,34 @@ remain manufacturing design requirements; the CAD does not qualify them. In
 particular, simultaneous taper/face contact must be specified and verified during
 manufacture. The existing runout assumptions are retained, not requalified.
 
-The cartridge adds 1.086 kg: total mass 425.297 kg; moving X/Y/Z masses
+Before HB-D11, the cartridge added 1.086 kg: total mass 425.297 kg; moving X/Y/Z masses
 132.064 / 14.574 / 41.603 kg. Continuous thrust margins under the existing assumed
 demand are X 885.968 N, Y 907.722 N, Z 1531.207 N. Guide-to-hob offsets and bed
-footprint are unchanged.
+footprint were unchanged by that cartridge change; current masses are in the HB-D11 table above.
+
+
+### Cup and top loading
+
+The workpiece is now a one-piece cup blank rather than an annular band: the
+open/toothed end is the unchanged Z=0 work datum, the closed end is Z=40 mm,
+with a 2 mm end plate and a 0.6 mm non-toothed wall below the tooth-root radius.
+These body dimensions are assumed; no production flexspline drawing is claimed.
+Only the tooth band is subtracted/inspected by RingStock; the unmachined body/end
+are retained in the display and full CAD mass/collision model.
+
+The integral mandrel has a 2 mm-high axial stop immediately below the work seat,
+with a 0.3 mm radial rim-support land. The sleeve is a separate child part;
+the body is recessed for it and its assumed 0.5 mm oil cavity. Sleeve start is
+now the work seat, so the stop is below the active sleeve and the complete
+4/8 mm tooth band remains supported. Collapsed radial bore clearance is 0.025 mm.
+The head retracts to X=250 mm for the 120 mm top-loading path. Loading-path
+sampling and cutting grids cover coarse and reference models; see LAYOUT_REPORT.json.
+
+The app handling timeline is explicitly presentational: no gripper, pressure
+solver or loose-body collision integration. The cup is held in the fixture's
+simulation model, and the handling view offsets its displayed mesh while the
+spindle is stopped. The cut is gated until seating/clamping; the release/lift
+is gated until measured X reaches loading clearance after spindle stop. Blank,
+Clamped and Finished views preserve native cut stock and authored assembly state.
+Sleeve motion shows the nominal radial fit take-up without exaggeration; it
+must not be used to qualify pressure, strain, clamping distortion or support stiffness.

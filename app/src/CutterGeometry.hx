@@ -36,11 +36,16 @@ class CutterGeometry {
 				}
 		}
 		section.push({r: 0.0, z: profile.height()});
-		// Each section edge is a band of quads with its own normals, so edges stay crisp.
+		return sectionGeometry(section,place,turn);
+	}
+
+	/** Display mesh for an ordered, optionally open radial/axial section. */
+	public static function sectionGeometry(section:Array<{r:Float,z:Float}>,place:(Float,Float,Float)->Array<Float>,turn:(Float,Float,Float)->Array<Float>,sides:Int=SIDES):GeometryData {
+		// Each section edge has its own normals; no smoothing across physical corners.
 		var bands = [for (index in 0...section.length - 1)
 			if (Math.abs(section[index].r - section[index + 1].r) + Math.abs(section[index].z - section[index + 1].z) > 1e-12)
 				index];
-		var vertices = bands.length * (SIDES + 1) * 2, triangles = bands.length * SIDES * 2;
+		var vertices = bands.length * (sides + 1) * 2, triangles = bands.length * sides * 2;
 		var positions = Bytes.alloc(vertices * 12), normals = Bytes.alloc(vertices * 12);
 		var colors = Bytes.alloc(vertices * 4), indices = Bytes.alloc(triangles * 12);
 		var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
@@ -52,8 +57,8 @@ class CutterGeometry {
 			var dr = b.r - a.r, dz = b.z - a.z, size = Math.sqrt(dr * dr + dz * dz);
 			var nr = dz / size, nz = -dr / size;
 			var first = vertex;
-			for (side in 0...SIDES + 1) {
-				var angle = 2 * Math.PI * side / SIDES, c = Math.cos(angle), s = Math.sin(angle);
+			for (side in 0...sides + 1) {
+				var angle = 2 * Math.PI * side / sides, c = Math.cos(angle), s = Math.sin(angle);
 				var normal = turn(nr * c, nr * s, nz);
 				for (end in [a, b]) {
 					var point = place(end.r * c, end.r * s, end.z);
@@ -67,7 +72,7 @@ class CutterGeometry {
 					vertex++;
 				}
 			}
-			for (side in 0...SIDES) {
+			for (side in 0...sides) {
 				var lower = first + side * 2, next = first + side * 2 + 2;
 				for (corner in [lower, next, lower + 1, lower + 1, next, next + 1]) {
 					indices.setInt32(triangle * 4, corner);

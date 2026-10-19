@@ -25,6 +25,17 @@ class HobbingErrorSource {
     amplitude(tir);return new HobbingErrorSource("table-axial",part,'assumed axial TIR $tir mm /2, once per C turn',(t,a)->
       shifted(a,o->{o.workZ+=tir/2*Math.cos(a.c);}));
   }
+  /** Load-induced tilt, separate from axial TIR. Force is machine-radial N;
+      bearing pivot depth/force height mm, moment stiffness Nm/rad. */
+  public static function tableTilt(part:String,stiffness:Float,pivotDepth:Float,forceHeight:Float,radialForce:Float->Float):HobbingErrorSource {
+    if(!Math.isFinite(stiffness)||stiffness<=0)throw "table moment stiffness required";
+    amplitude(pivotDepth);amplitude(forceHeight);
+    return new HobbingErrorSource("table-tilt",part,'Assumed load tilt Fr*$forceHeight mm / ($stiffness Nm/rad); bearing pivot $pivotDepth mm below work datum; distinct from axial TIR',(t,a)->{
+      var force=radialForce(t);amplitude(force);var theta=force*forceHeight/(1000*stiffness);
+      return shifted(a,o->{if((o.workTiltX!=0||o.workTiltY!=0)&&o.workPivotZ!= -pivotDepth)throw "incompatible table tilt pivots";
+        o.workPivotZ= -pivotDepth;o.workTiltX-=theta*Math.sin(a.c);o.workTiltY-=theta*Math.cos(a.c);});
+    });
+  }
   public static function hobRadial(part:String,tir:Float):HobbingErrorSource {
     amplitude(tir);return new HobbingErrorSource("hob-radial",part,'radial TIR $tir mm /2, offset fixed to B rotor',(t,a)->
       shifted(a,o->{o.toolX+=tir/2;}));

@@ -91,7 +91,7 @@ class CncPanel {
     var data = new HobbingReportData(), stock = player.stock;
     data.complete = player.completed;
     data.failure = player.failure;
-    data.status = player.failure != null ? "Stopped" : player.completed ? "Cycle complete" : "Cutting";
+    data.status = player.failure != null ? "Stopped" : player.handling!=null ? player.handling.phase : player.completed ? "Cycle complete" : "Cutting";
     data.seconds = player.elapsed;
     data.syncArcsec = player.syncError * 648000 / Math.PI;
     data.contacts = stock.collisions;

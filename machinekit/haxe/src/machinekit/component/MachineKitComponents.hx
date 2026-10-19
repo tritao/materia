@@ -18,6 +18,7 @@ class MachineKitComponents {
 		machinekit.printing.PrintingComponents.register(registry);
 		machinekit.assembly.AssemblyComponents.register(registry);
 		machinekit.control.ControlComponents.register(registry);
+		registry.register(machinekit.structural.LevelingFoot.recipeType());
 		registry.register(machinekit.structural.RectTubeMember.recipeType());
 		registry.register(machinekit.structural.ProfileMember.tslotRecipeType());
 		registry.register(machinekit.structural.ProfileMember.drawingRecipeType());

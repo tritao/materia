@@ -11,7 +11,9 @@ typedef InsertLocation={id:String,role:String,width:Float,depth:Float,height:Flo
 
 /** Design-specific insert layout, not a casting process model. Coordinates relative to casting body. */
 class FoundationLayout {
-  public static inline final BED_RAIL_CENTRE=185.0;
+  public static inline final PLINTH_HEIGHT=800.0;
+  public static inline final UPPER_OFFSET=590.0;
+  public static inline final BED_RAIL_CENTRE=220.0;
   public static inline final BED_RAIL_SEAT_WIDTH=50.0;
   public static inline final BED_RAIL_BEAM_WIDTH=110.0;
 
@@ -34,18 +36,23 @@ class FoundationLayout {
     return result;
   }
   public static function dimensions(kind:String,legacy:Bool=false):Array<Float> return switch kind {
-    case "bed": legacy?[650.0,550,120]:[1000.0,650,210]; case "column": legacy?[200.0,180,600]:[400.0,200,500];
+    case "bed": legacy?[650.0,550,120]:[1100.0,800,PLINTH_HEIGHT]; case "column": legacy?[200.0,180,600]:[400.0,200,500];
     default: throw "Unknown hobber foundation kind";
   };
   public static function bodyValues(kind:String,legacy:Bool=false):ComponentValues {
     var d = dimensions(kind,legacy);
-    var cores=CastingFeatures.grid(d[0],d[1],d[2],kind=="bed"?30:25,20,20,25);
+    var cores=legacy?CastingFeatures.grid(d[0],d[1],d[2],kind=="bed"?30:25,20,20,25):kind=="bed"?
+      CastingFeatures.grid(d[0],d[1],d[2],25,85,25,35,2,1):CastingFeatures.grid(d[0],d[1],d[2],20,20,20,20);
     if(!legacy){
       if(kind=="bed"){
-        cores=bedCores(cores);
-        cores.push(CastingFeatures.box("work-well",410,300,100,-295,0,120));
-        cores.push(CastingFeatures.box("chip-drain",280,180,80,-300,0,40));
-        cores.push(CastingFeatures.box("X-drive-channel",625,110,90,187.5,0,130));
+        cores=machinekit.structural.CastingCells.outsideColumns(bedCores(cores),[[-390.0,-140,-110,140]]);
+        cores.push(CastingFeatures.box("work-well",410,350,100,-295,0,120+UPPER_OFFSET));
+        cores.push(CastingFeatures.box("chip-drain",280,180,80,-300,0,40+UPPER_OFFSET));
+        cores.push(CastingFeatures.box("X-drive-channel",676,110,90,213,0,130+UPPER_OFFSET));
+        cores.push(CastingFeatures.box("coolant-reserved-volume",120,220,300,-465,0,150));
+        cores.push(CastingFeatures.box("coolant-front-access",40,240,320,-535,0,140));
+        cores.push(CastingFeatures.box("chip-downcomer",80,100,510,-450,0,200));
+        cores.push(CastingFeatures.box("cable-route",800,30,40,50,300,500));
       }else cores.push(CastingFeatures.box("head-recess",240,100,502,0,60,-1));
     }
     return new ComponentValues().setNumber("width",d[0]).setNumber("depth",d[1]).setNumber("height",d[2])
@@ -60,11 +67,12 @@ class FoundationLayout {
       out.push({id:id,role:role,width:w,depth:d,height:h,pose:F.translation(x,y,z)});
     if(!legacy){
       if(kind=="bed"){
-        add("tablePlate","table seat",180,180,20,-250,0,110);
+        add("tablePlate","table seat",280,280,20,-250,0,110+UPPER_OFFSET);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"preloaded column guide seat",width:BED_RAIL_SEAT_WIDTH,depth:680,height:20,
-          pose:F.fromRotationMatrix(110,side*BED_RAIL_CENTRE,200,[0.0,1,0,-1,0,0,0,0,1])});
-        out.push({id:"driveSeat",role:"central X screw channel seat",width:100,depth:600,height:20,pose:F.fromRotationMatrix(192.5,0,120,[0.0,1,0,-1,0,0,0,0,1])});
-        for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,-400,side*310,180);
+          pose:F.fromRotationMatrix(110,side*BED_RAIL_CENTRE,200+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1])});
+        out.push({id:"driveSeat",role:"central X screw channel seat",width:100,depth:590,height:20,pose:F.fromRotationMatrix(197.5,0,120+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1])});
+        for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,-400,side*310,180+UPPER_OFFSET);
+        for(i in 0...3)add("foot"+i,"levelling foot anchor",80,80,30,i<2?-430:430,i==0?-330:i==1?330:0,0);
       }else{
         add("basePlate","column carriage sole",380,100,20,0,-40,-10);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"Z rail seat",width:35,depth:480,height:20,

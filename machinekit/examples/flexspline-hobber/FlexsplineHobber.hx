@@ -16,7 +16,7 @@ typedef HobberTravel={id:String,lower:Float,upper:Float,initial:Float};
     CAD and prismatic coordinates mm; rotary coordinates rad. Nested joint IDs are explicit. */
 class FlexsplineHobber extends MachineAssembly {
   /** Work-frame +X (radial) -> machine +Y; work-frame -Y (hob) -> machine +X. */
-  public static final MACHINE_FROM_WORK=F.fromRotationMatrix(0,0,0,[0.0,-1,0,1,0,0,0,0,1]);
+  public static final MACHINE_FROM_WORK=F.fromRotationMatrix(0,0,637,[0.0,-1,0,1,0,0,0,0,1]);
   public static final C="table/C";
   public static final B="spindle/B";
   public static final A="swivel/A";
@@ -39,17 +39,20 @@ class FlexsplineHobber extends MachineAssembly {
     if(this.spec.internal)throw "external hobbing machine requires external gear";
     var profile=new ToothProfile(this.spec);hob=Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),1,32,gashes),this.spec,40,16,false,detailedHob);
     bed=new MineralCastBed();column=new MineralCastColumn();
-    includeAt("bed",bed,F.translation(250,0,0));
+    includeAt("bed",bed,F.translation(250,0,-590));
+    for(i in 0...3)fixAt("foot"+i,new machinekit.structural.LevelingFoot(),F.translation(i<2?-180:680,i==0?-330:i==1?330:0,-637),"bed/foot"+i,
+      F.alongY(i<2?-180:680,i==0?-330:i==1?330:0,-590,0,0,1));
     var tableMotor=new TorqueMotor(new ComponentValues().setNumber("torqueConstant",2).setNumber("backEmfConstant",2/Math.sqrt(3)));
-    table=new RotaryTable(tableMotor);includeAt("table",table,F.translation(0,0,130));
+    table=new RotaryTable(tableMotor,new CrossedRollerBearing(new ComponentValues().setNumber("outside",220).setNumber("bore",180).setNumber("height",20)));includeAt("table",table,F.translation(0,0,130));
     fixed("table-mount","bed/tablePlate","top","table/housing","mount");precisionMounts.push({name:"table-mount",parent:"bed/tablePlate"});
     var diameter=2*(this.spec.rootRadius()-0.6),seat=115.0;
     mandrel=new ExpandingMandrel(new ComponentValues().setNumber("outside",diameter-0.05).setNumber("workSeat",seat)
-      .setNumber("height",seat+this.spec.faceWidth+8).setNumber("sleeveStart",seat-4).setNumber("sleeveLength",Math.max(16,this.spec.faceWidth+8))
-      .setNumber("baseDiameter",Math.max(80,diameter+10)).setNumber("baseHeight",40));
+      .setNumber("height",seat+Math.max(16,this.spec.faceWidth+8)+2).setNumber("sleeveStart",seat).setNumber("sleeveLength",Math.max(16,this.spec.faceWidth+8))
+      .setNumber("stopDiameter",diameter+0.6).setBoolean("separateSleeve",true).setNumber("baseDiameter",Math.max(80,diameter+10)).setNumber("baseHeight",40));
     fixAt("mandrel",mandrel,F.translation(0,0,248),"table/platen",F.alongY(0,20,248,0,0,1));
+    fixAt("mandrelSleeve",new MandrelSleeve(new ComponentValues().setNumber("outside",diameter-0.05).setNumber("wall",mandrel.parameterNumber("sleeveWall")).setNumber("height",mandrel.parameterNumber("sleeveLength"))),F.translation(0,0,248+mandrel.parameterNumber("sleeveStart")),"mandrel");
     workOrigin=F.compose(MACHINE_FROM_WORK,F.translation(0,0,363));
-    var blank=new TablePlaten(new ComponentValues().setNumber("outside",2*this.spec.tipRadius()).setNumber("bore",2*(this.spec.rootRadius()-0.6)).setNumber("height",this.spec.faceWidth));
+    var blank=new FlexsplineCupBlank(new ComponentValues().setNumber("outside",2*this.spec.tipRadius()).setNumber("bore",diameter).setNumber("bodyOutside",2*this.spec.rootRadius()).setNumber("bandWidth",this.spec.faceWidth));
     fixAt("blank",blank,F.translation(0,0,363),"mandrel");
     var minX=Math.max(25,mandrel.parameterNumber("outside")/2+hob.design.outsideDiameter/2+0.2);
     var cutDistance=this.spec.pitchRadius()+hob.design.pitchDiameter/2+this.spec.profileShift*this.spec.module;
@@ -109,8 +112,8 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("ZdriveFrame",new HobberSaddle("GE-Z-drive"),F.translation(centre+36,0,0),"column/driveSeat",F.alongY(centre+246,-210,535,0,-1,0));
     precisionMounts.push({name:"ZdriveFrame-mount",parent:"column/driveSeat"});
     fixAt("YdriveFrame",new HobberSaddle("GE-Y-drive"),F.translation(centre,0,363),"swivelPlate",F.alongY(centre+85,-105,458,-1,0,0));
-    drive("X","XdriveFrame","Xbridge",[-1.0,0,0],F.translation(centre+250,0,180),450,350);
-    drive("Z","ZdriveFrame","Zplate",[0.0,0,1],F.translation(centre+136,-250,550),400);
+    drive("X","XdriveFrame","Xbridge",[-1.0,0,0],F.translation(centre+250,0,180),430,350);
+    drive("Z","ZdriveFrame","Zplate",[0.0,0,1],F.translation(centre+136,-250,575),400);
     drive("Y","YdriveFrame","Yplate",[0.0,-1,0],F.translation(centre+70,0,508),250);
     fixAt("chipTray",new HobberSaddle("GE-chip-tray"),F.identity(),"bed/tablePlate");
     fixAt("coolantPort",new HobberSaddle("GE-coolant"),F.translation(centre,0,363),"Yplate",F.alongY(centre+45,40,435,1,0,0));

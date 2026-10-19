@@ -21,10 +21,11 @@ class HobberGERangeChecks {
         state.setJoint("X",250);state.setJoint("Z",190);
         for(a in [-Math.PI/12,0.0,Math.PI/12]){state.setJoint(FlexsplineHobber.A,a);state.forwardKinematics();
           for(member in machine.components()){
-            if(member.id=="mandrel"||member.id=="blank")continue; // Intended loading/locating interfaces.
-            var b=cache.box(member.component,state.worldPose(member.id));
+            if(member.id=="mandrel"||member.id=="mandrelSleeve"||member.id=="blank")continue; // Intended loading/locating interfaces.
+            var pose=F.compose(F.inverse(FlexsplineHobber.MACHINE_FROM_WORK),state.worldPose(member.id));
+            var b=cache.box(member.component,pose);
             if(!(b.minX>=80||b.maxX<=-80||b.minY>=80||b.maxY<=-80||b.maxZ<=363)){
-              var solid=cache.posed(member.component,state.worldPose(member.id));
+              var solid=cache.posed(member.component,pose);
               var opening=cadkit.modeling.Part.cylinderSpan(80,363,1200),volume=PosedParts.sharedVolume(solid,opening);
               solid.close();opening.close();if(volume>0.001)
                 throw 'part obstructs reserved top-loading cylinder: ${member.id}, OD=${2*spec.tipRadius()}';

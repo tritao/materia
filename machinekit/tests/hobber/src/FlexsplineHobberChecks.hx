@@ -47,7 +47,7 @@ class FlexsplineHobberChecks {
     var ring=new stockkit.hobbing.RingCompliance(machine.spec.rootRadius()-0.3,0.6,machine.spec.faceWidth,210000,1000,"explicit test fixture stiffness");
     var sync=new stockkit.hobbing.HobbingErrorSource("sync","runtime observations","test zero measured following error",(t,a)->a);
     var errors=FlexsplineHobberErrors.sources(machine,t->20,ring,sync);
-    check(errors.length==13,"HB11 installed parts expose independently selectable error sources");
+    check(errors.length==14,"HB11 installed parts expose independently selectable error sources");
     var mandrelError=errors.filter(e->e.id=="mandrel")[0];
     near(mandrelError.apply(0,new HobbingAxes(46,0,4,0,0,0)).pose().get_translation(0),46-machine.mandrel.eccentricity,1e-12,"part eccentricity controls physical work offset");
     check(errors.filter(e->e.id=="wall")[0].basis.indexOf("explicit test fixture stiffness")>=0,"wall support assumption stays in budget provenance");
@@ -142,8 +142,8 @@ class FlexsplineHobberChecks {
   public static function installedSupport(machine:FlexsplineHobber):MandrelRadialSupport {
     var model=new AssemblyModel("mm");machine.addTo(model,"");var state=model.initialState();state.forwardKinematics();
     var pose=F.compose(F.inverse(state.worldPose("mandrel")),state.worldPose("blank"));
-    var blank:TablePlaten=cast machine.components().filter(m->m.id=="blank")[0].component;
-    // The authored annular blank and mandrel share +Z and the table axis.
+    var blank:machinekit.hobbing.FlexsplineCupBlank=cast machine.components().filter(m->m.id=="blank")[0].component;
+    // The authored cup tooth band and mandrel share +Z and the table axis.
     check(Math.abs(pose.x)+Math.abs(pose.y)<1e-8,"rim and mandrel axes coincide");
     return new MandrelRadialSupport(machine.mandrel,machine.spec.faceWidth,pose.z,blank.parameterNumber("bore")/2);
   }
@@ -245,6 +245,9 @@ class FlexsplineHobberChecks {
     Sys.println('Reference load ratings: $assertions checks passed');
   }
   public static function main():Void {
+    if(Sys.args().indexOf("table-tilt-checks")>=0){HobberTableTiltChecks.run();return;}
+    if(Sys.args().indexOf("base-report")>=0){Sys.println(haxe.Json.stringify(FlexsplineHobberBaseReport.measure(new FlexsplineHobber())));return;}
+    if(Sys.args().indexOf("loading-checks")>=0){HobberLoadingChecks.run();return;}
     if(Sys.args().length>1&&Sys.args()[0]=="layout-section"){FlexsplineHobberLayoutReport.writeSection(new FlexsplineHobber(),Sys.args()[1]);return;}
     if(Sys.args().length>0&&Sys.args()[0]=="ge-range"){HobberGERangeChecks.run();return;}
     if(Sys.args().length>1&&Sys.args()[0]=="scene-bounds"){Sys.println(haxe.Json.stringify(FlexsplineHobberLayoutReport.sceneBounds(Sys.args()[1])));return;}

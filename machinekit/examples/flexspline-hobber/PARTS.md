@@ -64,8 +64,8 @@ and empty verified-field lists.
 - `SwivelHead extends MachineAssembly`: direct servo, crossed-roller support, housing,
   moving head and clamp. A is ±45°, with 15°/s rated and 30°/s maximum speed.
   The static 100 N m clamp rating remains separate from the drive's joint effort.
-- `MineralCastBed`: 1000 × 650 × 210 mm ribbed casting, with steel rail seats,
-  a table plate, used drive seat and lifting points as child parts.
+- `MineralCastBed`: 1100 × 800 × 800 mm monolithic ribbed casting, with steel rail seats,
+  a table plate, used drive seat and three levelling-foot anchors as child parts; lifting hardware is deferred.
 - `MineralCastColumn`: 400 × 200 × 500 mm ribbed casting and separate steel base,
   rail seats, a side Z-drive seat, lifting inserts, 290 mm Z rail spacing. All precision mounts
   are insert faces, with 0.01 mm assumed position tolerance and ground-after-casting
@@ -174,9 +174,24 @@ section; Y/Z use the verified HGR15R generator. The supplier recipes persist sou
 hashes and share the existing rail/top/mount connectors. Assets are prepared by
 `linear-rail-reference/prepare.py`; CAD-derived homogeneous-steel mass is assumed.
 
-Rail-seat support revision: the bed has continuous casting beams (110 mm core-free bands, at least 90 mm at the well) below the
-50 mm guide inserts, with bed guides spaced 370 mm apart and a matching wider
-carriage. The 300 mm chip-well opening is preserved for tray installation. Bed
+Rail-seat support revision: the bed has continuous casting beams (110 mm core-free bands, at least 50 mm at the well) below the
+50 mm guide inserts, with bed guides spaced 440 mm apart and a matching wider
+carriage. The 350 mm chip-well opening is preserved for tray installation. Bed
 rail inserts have full-footprint support to the sole; column seats have at least
 10 mm backing. The exposed 10 mm steel mounting land is intentional. Fit the
 tray and align the rails before installing the moving column/head.
+
+
+`FlexsplineCupBlank` is the single-piece physical workpiece recipe, including
+its open toothed rim, thin body wall and closed end. `MandrelSleeve` is a separate
+steel child/BOM part on the mandrel; the mandrel body includes the axial stop
+and cavity/recess. The loading scene illustrates radial sleeve take-up only;
+pressure deformation and seals remain unqualified.
+
+HB-D11 installs a Ø220 × Ø180 × 20 mm C bearing (the generic component row
+above retains its Ø120 reference default), Ø270 housing and Ø240 platen with
+an integral hollow hub. Three `machinekit.structural.LevelingFoot` components
+provide 47 mm support height; their 15 kN per-foot target is assumed. The
+lightened column casting is 31.75 kg. The work-frame-to-machine transform also
+raises the assembly 637 mm, putting the tooth band 1000 mm above the floor.
+See MACHINE_DESIGN.md and LAYOUT_REPORT.json for current mass/stiffness evidence.

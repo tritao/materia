@@ -39,6 +39,14 @@
       "cache": {
         "inputs": []
       }
+    },
+    "loading": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "loading",
+      "cache": {
+        "inputs": []
+      }
     }
   }
 }

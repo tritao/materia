@@ -62,6 +62,29 @@ class MachineControlPanel {
     style.padding=new Insets(12,12,12,12);
     var rows:Array<KeyedView> = [new KeyedView("heading",app.sectionHeading("MACHINE CONTROL"))];
     var viewport=app.perspectiveViewport;
+    var cup=app.simulation.hobbingPlayer();
+    if(cup!=null&&cup.handling!=null){
+      var safe=!cup.cutStarted||cup.completed;
+      rows.push(new KeyedView("cup-status",new Text(cup.handling.inspection=="sequence"?cup.handling.phase:"Inspection: "+cup.handling.inspection)));
+      rows.push(new KeyedView("cup-note",new Text("Guided loading; sleeve expansion illustrative. Reset → Play replays.")));
+      var views:Array<KeyedView> = [];
+      for(mode in ["blank","clamped","finished"]){
+        var name=mode;
+        var button=new Button(name.substr(0,1).toUpperCase()+name.substr(1),null,()->{
+          app.simulation.stop();cup.inspectCup(name);if(viewport!=null&&viewport.sectionActive()){viewport.clearSection();viewport.fitAll();}app.invalidateView();
+        },"cup-view-"+name);
+        button.enabled=safe&&(name!="finished"||cup.cutCompleted);
+        views.push(new KeyedView(name,button));
+      }
+      rows.push(new KeyedView("cup-views",new Row("cup-views",views,ReferenceEditorApp.actionRowStyle())));
+      var resume=new Button("Continue sequence",null,()->{cup.inspectCup("sequence");if(viewport!=null&&viewport.sectionActive()){viewport.clearSection();viewport.fitAll();}app.simulation.start();app.invalidateView();},"cup-continue");
+      resume.enabled=!cup.completed;
+      var section=new Button("Clamped section",null,()->{app.simulation.stop();cup.inspectCup("clamped");if(viewport!=null)viewport.inspectObject("project:blank");app.invalidateView();},"cup-section");
+      section.enabled=safe;
+      rows.push(new KeyedView("cup-actions",new Row("cup-actions",[new KeyedView("continue",resume),new KeyedView("section",section)],ReferenceEditorApp.actionRowStyle())));
+    }else if(app.session.machineMotion!=null&&app.session.machineMotion.hobbing!=null&&app.session.machineMotion.hobbing.handling!=null){
+      rows.push(new KeyedView("cup-start",new Text("Press Play to load, clamp, cut and unload the cup.")));
+    }
     if(viewport!=null && viewport.sectionActive()) {
       var close=new Button("Close section",null,()->{viewport.clearSection();app.invalidateView();},"machine-section-close");
       var flip=new Button("Flip side",null,()->{viewport.flipSection();app.invalidateView();},"machine-section-flip");

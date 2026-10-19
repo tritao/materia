@@ -30,6 +30,18 @@ class HobbingAxes {
       for(i in 0...3){var delta=-work[i];for(j in 0...3)delta+=values[3*i+j]*tool[j];
         if(!Math.isFinite(delta))throw "non-finite hobbing pose error";
         values[9+i]+=delta;}
+      if(offset.workTiltX!=0||offset.workTiltY!=0){
+        // Inverse of Rx(tiltX)*Ry(tiltY), about the bearing centre.
+        var cx=Math.cos(offset.workTiltX),sx=Math.sin(offset.workTiltX),
+          cy=Math.cos(offset.workTiltY),sy=Math.sin(offset.workTiltY);
+        for(v in [offset.workTiltX,offset.workTiltY,offset.workPivotZ])if(!Math.isFinite(v))throw "non-finite table tilt";
+        for(j in 0...4){var i=j==3?9:j,xx=values[i],yy=values[j==3?10:3+j],
+          zz=values[j==3?11:6+j]-(j==3?offset.workPivotZ:0);
+          var ry=cx*yy+sx*zz,rz=-sx*yy+cx*zz;
+          values[i]=cy*xx-sy*rz;values[j==3?10:3+j]=ry;
+          values[j==3?11:6+j]=sy*xx+cy*rz+(j==3?offset.workPivotZ:0);
+        }
+      }
     }
     return values;
   }

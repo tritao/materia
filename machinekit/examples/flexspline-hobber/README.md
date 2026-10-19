@@ -31,7 +31,7 @@ into the hob and blank to see the teeth emerge from the stock. This is the
 module-1, 40-tooth demonstration; it is not a reference-part grading run.
 
 The electrical rack, power supply and six drive modules are hidden by default in
-all complete-machine entrypoints (`hobber`, `detailed`, `cutting`), including direct
+all complete-machine entrypoints (`hobber`, `detailed`, `cutting`, `loading`), including direct
 generated-artifact opens. Visibility is authored per occurrence and survives
 saving/reopening; the components, BOM and electrical connections remain present.
 They can be shown again from the scene hierarchy. Saved inspection/cutting view
@@ -41,3 +41,38 @@ The hob spindle now includes a hollow shaft, nose, opposed bearings near the
 tool, bearing retention and a drawbar-retained taper-and-face arbor with drive
 pins. It is an assumed custom interface, not a qualified HSK interface; see
 [MACHINE_DESIGN.md](MACHINE_DESIGN.md#hob-spindle-cartridge-2026-10-19).
+
+
+### Cup loading demonstration
+
+Open [loading.scene.json](loading.scene.json) and press **Play**. The head starts
+at X=250 mm. A one-piece cup (open end/toothed rim down, closed end up) lowers
+120 mm over the collapsed sleeve onto the axial stop, clamps, runs the actual
+coarse tooth-band cut, retracts the head, releases and lifts out. **Reset → Play**
+replays it. The original quick [cutting.scene.json](cutting.scene.json) remains
+available without the handling sequence.
+
+The Machine panel provides **Blank**, **Clamped**, **Finished** and **Clamped
+section** inspection views. Inspection is available before cutting or after the
+sequence completes. **Continue sequence** returns from a paused inspection view.
+Sectioning is view-only; close it with **Close section**. Inspection does not
+reset or replace the actual cut stock.
+
+The earlier blank was only an annular tooth band. It is now a single CAD cup
+with a 40 mm overall length, 2 mm closed end and 0.6 mm wall below the tooth
+roots (assumed dimensions). Material removal and metrology still operate on the
+toothed band; the unmachined cup wall/end remain visible in the runtime mesh.
+This demo uses module 1, 40 teeth and a 4 mm band, not the precision reference.
+
+Loading is a guided kinematic illustration, without a robot or loose-body
+contact dynamics. The separate sleeve closes the nominal 25 µm radial fit gap
+at true display scale; its expansion is explicitly illustrative, not a solved
+hydraulic strain or pressure prediction. Cutting starts after seating/clamping;
+unloading starts only after the spindle stops and X returns to loading clearance.
+
+The HB-D11 foundation is a 1100 × 800 × 800 mm monolithic plinth on three rigid
+levelling feet, with the tooth band 1000 mm above the floor. The Ø220 mm table
+bearing and lighter column retain explicitly assumed engineering ratings.
+See [MACHINE_DESIGN.md](MACHINE_DESIGN.md#heavy-plinth-acceptance-hb-d11) for mass,
+support and preliminary stiffness evidence. The app's machining time excludes
+the illustrative loading/unloading sequence.
