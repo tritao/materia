@@ -12,8 +12,13 @@ enum abstract CoreStrategy(String) to String {
 typedef CastingFeatureStrategy = {
 	var featureId:String;
 	var strategy:CoreStrategy;
+
 	/** Required for reusable formers. EPS may use null for breakup removal. */
-	var withdrawal:Null<{var x:Float; var y:Float; var z:Float;}>;
+	var withdrawal:Null<{
+		var x:Float;
+		var y:Float;
+		var z:Float;
+	}>;
 }
 
 /** Mold +Z is upward, gravity is -Z and the open fill face faces +Z.
@@ -24,6 +29,12 @@ typedef CastingSetup = {
 	var revision:Int;
 	var sourceFingerprint:String;
 	var sourceToMold:AssemblyFrame;
+
+	/** Absolute mold Z of the final mix surface, and extra containment above it. */
+	var fillHeightMm:Float;
+
+	var freeboardMm:Float;
+
 	/** Exactly one strategy per ordinary void; insert recesses are handled by fixtures. */
 	var features:Array<CastingFeatureStrategy>;
 }

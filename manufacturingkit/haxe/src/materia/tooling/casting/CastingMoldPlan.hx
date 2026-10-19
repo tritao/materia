@@ -7,37 +7,182 @@ import materia.tooling.panel.PanelAssemblyPlan.PanelPlacement;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.casting.CoreSupport.SupportHardware;
 
-enum abstract MoldPartMaterial(String) to String {var EPSStock="eps";var SteelStock="steel";var FormerStock="former";}
-typedef MoldVolume = {var id:String;var material:MoldPartMaterial;var pieces:Array<MoldBox>;}
-enum abstract FeatureToolingKind(String) to String {var EPSFeature="eps";var FormerFeature="former";var InsertFeature="insert";}
-typedef FeatureTooling = {var featureId:String;var kind:FeatureToolingKind;var memberIds:Array<String>;}
+enum abstract MoldPartMaterial(String) to String {
+	var EPSStock = "eps";
+	var SteelStock = "steel";
+	var FormerStock = "former";
+}
+
+typedef MoldVolumeProfile = {
+	var panelId:String;
+	var operationId:String;
+	var contour:Array<materia.tooling.panel.PanelPlan.PanelSegment>;
+	var pose:materia.assembly.AssemblyRecord.AssemblyFrame;
+	var depth:Float;
+	var subtract:Array<MoldBox>;
+}
+
+typedef MoldVolume = {
+	var id:String;
+	var material:MoldPartMaterial;
+	var pieces:Array<MoldBox>;
+	var profiles:Array<MoldVolumeProfile>;
+}
+
+enum abstract FeatureToolingKind(String) to String {
+	var EPSFeature = "eps";
+	var FormerFeature = "former";
+	var InsertFeature = "insert";
+}
+
+typedef FeatureTooling = {
+	var featureId:String;
+	var kind:FeatureToolingKind;
+	var memberIds:Array<String>;
+}
+
 typedef CastingMoldCore = {
-    var id:String;var featureId:String;var cavity:MoldBox;var foamLayers:Array<MoldBox>;
-    var coveringThickness:Float;var adhesiveThickness:Float;var carrierId:String;var bridgeId:String;
-    var bondAreaMm2:Float;var bridgeBondAreaMm2:Float;
+	var id:String;
+	var featureId:String;
+	var cavity:MoldBox;
+	var foamLayers:Array<MoldBox>;
+	var coveringThickness:Float;
+	var adhesiveThickness:Float;
+	var carrierId:String;
+	var bridgeId:String;
+	var bondAreaMm2:Float;
+	var bridgeBondAreaMm2:Float;
 }
-typedef MoldFormer = {var volume:MoldVolume;var featureIds:Array<String>;var withdrawal:{x:Float,y:Float,z:Float};}
-enum abstract MoldOpeningKind(String) to String {var ExteriorOpening="outside-casting";var ToolingOpening="tooling-sealed";}
-typedef MoldOpening = {var panelId:String;var operationId:String;var kind:MoldOpeningKind;var sealingIds:Array<String>;var sealSpec:String;}
-enum abstract PrecisionRoute(String) to String {var Replicated="replicated";var Machined="machined";var AsCast="as-cast";}
+
+typedef MoldFormer = {
+	var volume:MoldVolume;
+	var featureIds:Array<String>;
+	var withdrawal:{x:Float, y:Float, z:Float};
+}
+
+enum abstract MoldOpeningKind(String) to String {
+	var ExteriorOpening = "outside-casting";
+	var ToolingOpening = "tooling-sealed";
+}
+
+typedef MoldOpening = {
+	var panelId:String;
+	var operationId:String;
+	var kind:MoldOpeningKind;
+	var sealingIds:Array<String>;
+	var sealSpec:String;
+}
+
+enum abstract PrecisionRoute(String) to String {
+	var Replicated = "replicated";
+	var Machined = "machined";
+	var AsCast = "as-cast";
+}
+
 typedef PrecisionInterface = {
-    var insertId:String;var route:PrecisionRoute;var allowance:Null<Float>;
-    var masterReference:Null<String>;var masterFlatnessMm:Null<Float>;var releaseSpec:Null<String>;
-    var damGeometry:Array<MoldBox>;var holeProtectionReference:Null<String>;var pourGroup:Null<String>;var evidence:Array<String>;
+	var insertId:String;
+	var route:PrecisionRoute;
+	var allowance:Null<Float>;
+	var masterReference:Null<String>;
+	var masterFlatnessMm:Null<Float>;
+	var releaseSpec:Null<String>;
+	var damGeometry:Array<MoldBox>;
+	var holeProtectionReference:Null<String>;
+	var pourGroup:Null<String>;
+	var evidence:Array<String>;
 }
-enum abstract CompactionMethod(String) to String {var Undeclared="undeclared";var VibrationTable="vibration-table";var ExternalVibrators="external-vibrators";var InternalPoker="internal-poker";var NoCompaction="none";}
-typedef CompactionSpec = {var method:CompactionMethod;var bedInterfaceReference:Null<String>;var frequencyHz:Null<Float>;var amplitudeMm:Null<Float>;var durationSeconds:Null<Float>;var evidence:Array<String>;}
-enum abstract AnchorageKind(String) to String {var Pending="pending";var Studs="studs";var Undercut="undercut";var BondedKeys="bonded-keys";}
-typedef InsertAnchorage = {var insertId:String;var kind:AnchorageKind;var geometry:Array<MoldBox>;var pulloutN:Null<Float>;var shearN:Null<Float>;var evidence:Array<String>;}
-enum abstract DesignChangeKind(String) to String {var LiftingPoints="lifting-points";var FixtureAttachment="fixture-attachment";var DraftOrSplit="draft-or-split";var InterfaceAllowance="interface-allowance";}
-typedef DesignChangeRequest = {var id:String;var kind:DesignChangeKind;var sourceIds:Array<String>;var reason:String;var blockingChecks:Array<String>;}
-typedef GroutedJoint = {var id:String;var insertIds:Array<String>;var gapMm:Null<Float>;var jackingReference:Null<String>;var boltSleeveReference:Null<String>;var cureBeforeTorqueEvidence:Array<String>;}
-typedef CastingMoldOptions = {var groutedJoints:Array<GroutedJoint>;var precision:Array<PrecisionInterface>;var compaction:CompactionSpec;var anchorage:Array<InsertAnchorage>;var requiresFlip:Bool;var liftingEvidence:Array<String>;}
-typedef MoldInsertFixture = {var insertId:String;var datum:MoldVolume;var mountingFace:AssemblyFrame;var withdrawal:{x:Float,y:Float,z:Float};var attachmentEvidence:Array<String>;}
+
+enum abstract CompactionMethod(String) to String {
+	var Undeclared = "undeclared";
+	var VibrationTable = "vibration-table";
+	var ExternalVibrators = "external-vibrators";
+	var InternalPoker = "internal-poker";
+	var NoCompaction = "none";
+}
+
+typedef CompactionSpec = {
+	var method:CompactionMethod;
+	var bedInterfaceReference:Null<String>;
+	var frequencyHz:Null<Float>;
+	var amplitudeMm:Null<Float>;
+	var durationSeconds:Null<Float>;
+	var evidence:Array<String>;
+}
+
+enum abstract AnchorageKind(String) to String {
+	var Pending = "pending";
+	var Studs = "studs";
+	var Undercut = "undercut";
+	var BondedKeys = "bonded-keys";
+}
+
+typedef InsertAnchorage = {
+	var insertId:String;
+	var kind:AnchorageKind;
+	var geometry:Array<MoldBox>;
+	var pulloutN:Null<Float>;
+	var shearN:Null<Float>;
+	var evidence:Array<String>;
+}
+
+enum abstract DesignChangeKind(String) to String {
+	var LiftingPoints = "lifting-points";
+	var FixtureAttachment = "fixture-attachment";
+	var DraftOrSplit = "draft-or-split";
+	var InterfaceAllowance = "interface-allowance";
+}
+
+typedef DesignChangeRequest = {
+	var id:String;
+	var kind:DesignChangeKind;
+	var sourceIds:Array<String>;
+	var reason:String;
+	var blockingChecks:Array<String>;
+}
+
+typedef GroutedJoint = {
+	var id:String;
+	var insertIds:Array<String>;
+	var gapMm:Null<Float>;
+	var jackingReference:Null<String>;
+	var boltSleeveReference:Null<String>;
+	var cureBeforeTorqueEvidence:Array<String>;
+}
+
+typedef CastingMoldOptions = {
+	var groutedJoints:Array<GroutedJoint>;
+	var precision:Array<PrecisionInterface>;
+	var compaction:CompactionSpec;
+	var anchorage:Array<InsertAnchorage>;
+	var requiresFlip:Bool;
+	var liftingEvidence:Array<String>;
+}
+
+typedef MoldInsertFixture = {
+	var insertId:String;
+	var datums:materia.tooling.casting.MoldPlan.InsertDatums;
+	var datum:MoldVolume;
+	var mountingFace:AssemblyFrame;
+	var withdrawal:{x:Float, y:Float, z:Float};
+	var attachmentEvidence:Array<String>;
+}
+
 typedef CastingMoldPlan = {
-    var id:String;var document:ToolingDocument;var sourceFingerprint:String;var options:CastingMoldOptions;
-    var envelope:MoldBox;var cavity:MoldBox;var panels:PanelAssemblyRecord;var supportPanels:Array<PanelPlacement>;
-    var cores:Array<CastingMoldCore>;var formers:Array<MoldFormer>;var fixtures:Array<MoldInsertFixture>;
-    var features:Array<FeatureTooling>;var openings:Array<MoldOpening>;var hardware:Array<SupportHardware>;
-    var changeRequests:Array<DesignChangeRequest>;var pending:Array<String>;
+	var id:String;
+	var document:ToolingDocument;
+	var sourceFingerprint:String;
+	var options:CastingMoldOptions;
+	var envelope:MoldBox;
+	var cavity:MoldBox;
+	var panels:PanelAssemblyRecord;
+	var supportPanels:Array<PanelPlacement>;
+	var cores:Array<CastingMoldCore>;
+	var formers:Array<MoldFormer>;
+	var fixtures:Array<MoldInsertFixture>;
+	var features:Array<FeatureTooling>;
+	var openings:Array<MoldOpening>;
+	var hardware:Array<SupportHardware>;
+	var changeRequests:Array<DesignChangeRequest>;
+	var validation:Array<materia.tooling.ToolingValidation>;
+	var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
 }

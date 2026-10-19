@@ -38,7 +38,7 @@ Status: phases 1–4 implemented. The single-pocket and full mill-base molds are
   checked. Tests cover both 18.0/17.8 mm stock and two setup orientations,
   source-CAD symmetric difference, persistence, bad holes/seals and trapped walls.
   The template explicitly supports one rectangular envelope, one open-top core
-  and an M6 fixing study; unsupported geometry fails. Physical core restraint,
+  and recipe-selected insert fixing hardware; unsupported geometry fails. Physical core restraint,
   independent insert-datum accuracy, thread/seal qualification, anchorage,
   finishing allowance, process loads and handling remain pending.
   Follow-up: core support selection now covers bed-open sockets and suspended
@@ -69,6 +69,20 @@ Status: phases 1–4 implemented. The single-pocket and full mill-base molds are
   replication/grout allowances and lifting/flip provisions. Those interfaces,
   clamps, materials/process evidence, loads and handling remain unqualified;
   no source geometry is altered and fabrication readiness is false.
+- [x] Review hardening of phases 1–4: explicit recipe hardware and fit allowances;
+  required contact openings; neutral seal-margin checks and typed sealing faces,
+  plugs, datums and precision routes; fill height/freeboard and selectable core
+  cutting faces/direction; structured validation and separate readiness. Exact
+  internal cutter-fit and rebate ligament checks apply without a relief flag.
+  Joint records validate mating dimensions, not only frames. Shared bounded IDs,
+  R12/NCName layer checks, SCC-only cycle diagnostics and sorted blocking edges
+  are enforced. Native throw paths close owned resources. Regression fixtures
+  include physical pins, sliding contact and member permutations. Codecs reject
+  old encodings: tooling 3, box mold 3, casting mold 2, mold volume 2; panel 2
+  remains the required-contact-opening format. Side former sealing profiles derive
+  from the same panel operations so routed reliefs neither leak nor trap formers.
+  Validation: 160 pure tooling, 336 native tooling, 653 drawing, 51 full-base,
+  49 casting, 54 sheet-cutting and 215 mill-frame assertions pass.
 - [ ] Phase 5: assembly validation and fabrication package.
 - [ ] Phase 6: design-stage moldability feedback and casting process analysis.
 - [ ] Phase 7: mill column and independent pedestal example.

@@ -20,48 +20,128 @@ import machinekit.structural.CastingFeatures;
  */
 class FoundationToolingAdapter {
 	public static function snapshot(foundation:MineralFoundation, id:String, revision:Int):CastingToolingInput {
-		if (foundation == null) throw "Foundation tooling adapter needs a foundation";
+		if (foundation == null)
+			throw "Foundation tooling adapter needs a foundation";
 		var v = foundation.body.values();
-		var x = v.number("width")/2, y = v.number("depth")/2, c = v.number("cornerChamfer");
-		if (c < 0) throw "Unsupported negative casting chamfer";
-		var profile:Array<ToolingPoint2> = c == 0 ? [
-			{x: -x, y: -y}, {x: x, y: -y}, {x: x, y: y}, {x: -x, y: y}
-		] : [
-			{x: -x+c, y: -y}, {x: x-c, y: -y}, {x: x, y: -y+c}, {x: x, y: y-c},
-			{x: x-c, y: y}, {x: -x+c, y: y}, {x: -x, y: y-c}, {x: -x, y: -y+c}
+		var x = v.number("width") / 2,
+			y = v.number("depth") / 2,
+			c = v.number("cornerChamfer");
+		if (c < 0)
+			throw "Unsupported negative casting chamfer";
+		var profile:Array<ToolingPoint2> = c == 0 ? [{x: -x, y: -y}, {x: x, y: -y}, {x: x, y: y}, {x: -x, y: y}] : [
+			{
+				x: -x + c,
+				y: -y
+			},
+			{x: x - c, y: -y},
+			{x: x, y: -y + c},
+			{x: x, y: y - c},
+			{x: x - c, y: y},
+			{x: -x + c, y: y},
+			{
+				x: -x,
+				y: y - c
+			},
+			{
+				x: -x,
+				y: -y + c
+			}
 		];
-		var envelope:Array<ToolingPrism> = [{id: "body", profile: profile, height: v.number("height"), pose: F.identity()}];
+		var envelope:Array<ToolingPrism> = [
+			{
+				id: "body",
+				profile: profile,
+				height: v.number("height"),
+				pose: F.identity()
+			}
+		];
 		if (v.number("footWidth") > 0) {
-			var f = v.number("footWidth")/2, top = v.number("footHeight"), shoulder = v.number("footShoulder");
-			envelope.push({id: "foot", profile: [{x: -f, y: 0}, {x: f, y: 0}, {x: f, y: shoulder},
-				{x: x, y: top}, {x: -x, y: top}, {x: -f, y: shoulder}], height: 2*y,
-				pose: F.fromRotationMatrix(0, y, 0, [1,0,0, 0,0,-1, 0,1,0])});
+			var f = v.number("footWidth") / 2,
+				top = v.number("footHeight"),
+				shoulder = v.number("footShoulder");
+			envelope.push({
+				id: "foot",
+				profile: [
+					{x: -f, y: 0},
+					{x: f, y: 0},
+					{x: f, y: shoulder},
+					{x: x, y: top},
+					{
+						x: -x,
+						y: top
+					},
+					{
+						x: -f,
+						y: shoulder
+					}
+				],
+				height: 2 * y,
+				pose: F.fromRotationMatrix(0, y, 0, [1, 0, 0, 0, 0, -1, 0, 1, 0])
+			});
 		}
-		var inserts:Array<CastingToolingInsert> = [], recesses = new Map<String, String>();
+		var inserts:Array<CastingToolingInsert> = [],
+			recesses = new Map<String, String>();
 		for (row in foundation.insertLocations()) {
 			var i = row.part.values();
-			inserts.push({id: row.id, width: i.number("width"), depth: i.number("depth"), height: i.number("height"),
-				boreDiameter: i.number("boreDiameter"), pose: row.pose, role: sourceRole(i.token("role")), sourceRole: i.token("role"),
-				positionTolerance: i.number("positionTolerance"), finish: i.token("finish") == "ground after casting" ? InsertFinish.GroundAfterCasting : throw "Unsupported source insert finish"});
+			inserts.push({
+				id: row.id,
+				width: i.number("width"),
+				depth: i.number("depth"),
+				height: i.number("height"),
+				boreDiameter: i.number("boreDiameter"),
+				pose: row.pose,
+				role: sourceRole(i.token("role")),
+				sourceRole: i.token("role"),
+				positionTolerance: i.number("positionTolerance"),
+				finish: i.token("finish") == "ground after casting" ? InsertFinish.GroundAfterCasting : throw "Unsupported source insert finish"
+			});
 			// MineralFoundation owns this ID convention for its generated full-box cuts.
 			recesses.set('insert-${row.id}', row.id);
 		}
 		var features:Array<CastingToolingFeature> = [];
 		for (f in CastingFeatures.decode(v.token("voids"))) {
 			var insertId = recesses.get(f.id);
-			features.push({id: f.id, kind: insertId == null ? Void : InsertRecess, insertId: insertId,
-				width: f.width, depth: f.depth, height: f.height, pose: f.pose});
+			features.push({
+				id: f.id,
+				kind: insertId == null ? Void : InsertRecess,
+				insertId: insertId,
+				width: f.width,
+				depth: f.depth,
+				height: f.height,
+				pose: f.pose
+			});
 		}
-		return ToolingCodec.inputSnapshot({id: id, revision: revision, lengthUnit: ToolingLengthUnit.Millimetres,
-			envelope: envelope, features: features, inserts: inserts});
+		return ToolingCodec.inputSnapshot({
+			id: id,
+			revision: revision,
+			lengthUnit: ToolingLengthUnit.Millimetres,
+			envelope: envelope,
+			features: features,
+			inserts: inserts
+		});
 	}
-    static function sourceRole(label:String):InsertRole return switch label {
-        case "rail seat", "Y guide seat", "Z guide seat": InsertRole.GuideSeat;
-        case "Y drive bearing seat", "Z bearing mount anchor": InsertRole.BearingSeat;
-        case "column mounting anchor — nominal M12 tap drill", "column sole clamping pad", "column sole pad": InsertRole.ColumnMount;
-        case "leveling screw seat", "foundation foot seat": InsertRole.LevelingSeat;
-        case "rear motor hatch anchor": InsertRole.HatchMount;
-        default: InsertRole.GenericMount;
-    };
 
+	static function sourceRole(label:String):InsertRole
+		return switch label {
+			case "rail seat", "Y guide seat", "Z guide seat":
+				InsertRole.GuideSeat;
+			case "Y drive bearing seat", "Z bearing mount anchor":
+				InsertRole.BearingSeat;
+			case "column mounting anchor — nominal M12 tap drill", "column sole clamping pad", "column sole pad":
+				InsertRole.ColumnMount;
+			case "leveling screw seat", "foundation foot seat":
+				InsertRole.LevelingSeat;
+			case "rear motor hatch anchor":
+				InsertRole.HatchMount;
+			case "table plate":
+				InsertRole.TableMount;
+			case "threaded bush":
+				InsertRole.ThreadedAnchor;
+			case "lifting point":
+				InsertRole.LiftingMount;
+			case "column plate":
+				InsertRole.ColumnMount;
+			default:
+				throw 'Unknown source insert role: $label';
+		};
 }

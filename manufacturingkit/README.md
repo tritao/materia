@@ -53,8 +53,9 @@ and the full fabrication/CAM package remain subsequent stages.
   Named collections and object fields are canonicalized for stable fingerprints;
   profile vertices retain geometric order. UTF-8 document size is limited to
   2 MiB, named collections to 512 records and convex profiles to 64 vertices.
-  Codec version 2 uses enum abstracts for units, insert roles/finish and stock
-  coating/direction. Version 1 is rejected; there is no compatibility reader.
+  Codec version 3 requires explicit hardware choices, fit allowances, core wire axis,
+  fill height and freeboard. Closed vocabularies are typed; earlier versions are
+  rejected with no compatibility reader.
   An insert's original design label is preserved separately as `sourceRole`.
 - Bind `setup.sourceFingerprint` using `ToolingCodec.inputFingerprint(input)`.
   Source changes invalidate that binding even if the revision was not updated.
@@ -135,21 +136,22 @@ generates the coupon, exact drawings and assembled/exploded preview scenes.
 `materia.tooling.casting.BoxMoldPlanner.plan(document)` builds the explicit
 orthogonal single-pocket template from a validated `ToolingDocument`: five
 panels, EPS/covering geometry, a ruled block cutting definition, an insert
-fixture and classified contact cuts. `BoxMoldCodec` version 2 stores the strict
+fixture and classified contact cuts. `BoxMoldCodec` version 3 stores the strict
 source document and resolved records and verifies regeneration on load. It
 rejects unknown versions and hand-edited generated records. Dimensions remain
 millimetres and profiles remain finished geometry, without cutter compensation.
 
-Panel codec version 2 persists `contactOpenings`. Typed constructors may omit the
-list for an intact skin; JSON must carry it. Naming an opening permits CAD to
+Panel codec version 2 requires `contactOpenings` in typed records and JSON.
+Use an empty list for an intact skin. Naming an opening permits CAD to
 represent it but does not qualify it: the consuming mold must supply a matching
-`PenetrationPlan`. The box planner checks references and cutting definitions;
-MachineKit checks seal containment, contact coverage, source reconstruction and
+`PenetrationPlan`. The box planner checks references, insert seal margins and cutting definitions;
+MachineKit checks contact coverage, source reconstruction and
 continuous swept blocking graphs. ManufacturingKit emits no CAD or drawing text.
 
 See [box-mold example](../machinekit/examples/box-mold/README.md). The initial
 supported template has one rectangular envelope, one bed-accessible or fill-accessible EPS pocket
-and one bed-facing insert with an explicitly selected M6 fixing study. Reusable
+and one bed-facing insert with recipe-selected bore, thread, screw and clearance
+diameters. The example selects M6; the library does not infer a thread from a hole. Reusable
 formers and nonorthogonal setups are rejected. Physical qualification remains
 pending, including a broad-area core restraint, accurate independent insert
 datums, anchorage, finishing stock, material/process evidence and handling.
@@ -159,8 +161,8 @@ Core supports are reusable neutral records in `casting.CoreSupport` and generate
 by `CoreSupports`. Pass optional `CoreSupportOptions` to `BoxMoldPlanner.plan`;
 defaults use `Auto`, one-third measured stock for embed depth, recipe joint
 clearance and a 0.2 mm adhesive line. The options codec validates closed enum modes,
-finite dimensions and unknown fields; mold codec version 2 persists them and
-rejects version 1. Auto chooses a bed socket when the cavity opens onto the bed,
+finite dimensions and unknown fields; mold codec version 3 persists them and
+rejects earlier versions. Auto chooses a bed socket when the cavity opens onto the bed,
 otherwise a bridge when it opens onto the fill face. Explicit incompatible modes
 fail without changing the source casting.
 
@@ -193,8 +195,11 @@ grouted-joint inputs, `CompactionSpec`, per-insert `InsertAnchorage`, and handli
 requirements. Missing evidence remains pending. Nonempty anchorage geometry is
 rejected until a corresponding source-adapter revision can describe it; it is
 never silently added to the casting. Precision allowances never move source
-inserts. `CastingMoldCodec` version 1 stores and verifies complete regeneration;
-`MoldVolumeCodec` version 1 stores finite exact box volumes for rebuildable CAD.
+inserts. `CastingMoldCodec` version 2 stores and verifies complete regeneration;
+`MoldVolumeCodec` version 2 stores finite boxes and exact operation-derived sealing
+profiles for rebuildable CAD. A side former fills its router reliefs with the same
+profile that cuts the panel window; those exterior sealing sections preserve
+source geometry and allow straight withdrawal.
 
 MachineKit realizes and exports the neutral records through `CastingMoldCad`,
 `ToolingVolume` and `CastingMoldExport`. Exact bounds only prune impossible
@@ -205,3 +210,19 @@ blocking graphs, including the loaded and released bridge groups.
 See [mill base tooling](../machinekit/examples/bench-mill/TOOLING_README.md) for
 commands, generated artifacts, scope and unresolved physical checks. This phase
 emits review geometry and drawings, not CAM or fabrication approval.
+
+
+Review hardening: `PanelJoint` records and validates tab/slot, seat and pin mating
+sizes in addition to frames. Clearance must cover measured stock variation plus
+declared lining and machining allowances. All internal profiles/pockets/rebates
+check cutter radii and slot width, and rebates participate in ligament checks.
+`ToolingIds` owns the common ID vocabulary and bounded derived names.
+
+Mold plans carry `ToolingValidation` records and separate `FabricationReadiness`,
+never infer readiness from codec or CAD success. Missing physical qualification
+remains pending. Insert fixtures declare support datums and a precision route;
+penetrations declare a sealing face, seal material and bore plug separately from
+release treatment. Core cutting records declare entry/exit faces and a selectable
+X/Y/Z wire direction. The current box templates support full-height fill with
+zero freeboard and reject other fill setups explicitly. Bridge pads/rails stay
+outside the open fill footprint.
