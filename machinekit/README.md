@@ -475,7 +475,7 @@ axis.validateInstallation();
 Construction checks motor pilot and mounting-hole clearance, shaft engagement,
 screw/nut thread identity, end-stack connector datums, nut flange pattern, rail/block
 interfaces, thread depth, travel envelopes, and nominal fastener engagement.
-`validateInstallation()` additionally checks 60 required-clearance pairs at the start,
+`validateInstallation()` additionally checks up to 60 required-clearance pairs at the start,
 midpoint, and end of travel. `installationClearances()` returns the individual results.
 These are nominal geometric checks, not bearing-preload or load qualifications.
 
@@ -497,8 +497,33 @@ MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run \
 ```
 
 Outputs are under `build/suppliers/configurable-axis/extended-300.*`, with results in
-`checks.json`. The second-supplier motor trial uses the existing StepperOnline
-`23HS22-2804S` model. Its nominal interfaces fit, but its simplified motor housing
-intersects the mounting heads. The report keeps that trial blocked pending better
-supplier geometry; no unverified relief is cut into the model to force a pass.
-The working extended configuration retains the detailed OpenBuilds motor.
+`checks.json`. The original extended configuration retains the OpenBuilds motor.
+A second configuration, `stepperonline-300.*`, uses `23HS22-2804S` with an independent
+native analytic profile measured from a hash-pinned public distributor STEP.
+It has the measured 5 mm flange, 57 mm housing with R4 corner relief, and 21 mm
+D shaft. Generation does not import or download the reference file.
+
+The independent CAD comparison is prepared and checked with:
+
+```sh
+python3 tools/suppliers/stepperonline_motor.py
+MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run \
+  --project machinekit/examples/supplier-fasteners/haxeon.stepperonline-motor.json
+```
+
+Source pins, measured datums, drawing comparisons and omissions live in
+`tools/suppliers/stepperonline-23hs22.json`; downloaded assets and the audit report
+live under `build/suppliers/stepperonline/`. The CAD reference is a 2018 distributor
+file checked against the StepperOnline drawing, not a claim that every production
+revision is identical. Cables, casing screws and small chamfers are omitted.
+
+Both source and generated solids show the same obstruction from ISO7089 M4 washers:
+their 9 mm outside diameter exceeds the R4 corner clearance. The second axis uses
+bare M4x12 socket heads on the 5 mm flange, with 7 mm receiving-thread engagement.
+Set `ScrewAxisComponents.motorWasher` through its final constructor argument
+(`false`) for this installation; the default remains `true` for the OpenBuilds
+configuration. Both geometries clear the bare 7 mm heads. Installation checks
+include washers only when present. The second axis runs 168 checks (56 pairs at
+three positions), exports its own STEP/Materia/BOM files, and retains its motor and
+hardware choices through save/reload. This is nominal CAD qualification only; it
+does not establish preload, tolerances, cable routing or a torque rating.

@@ -17,7 +17,7 @@ class OpenBuildsMotorChecks {
         var restored=NemaStepper.namedRecipeType().create(new ComponentValues().setToken("model","OPENBUILDS-NEMA23-56"));
         check(restored.geometryKey()==motor.geometryKey(),"Named recipe retains OpenBuilds identity");
         check(motor.rating()==null,"Do not inherit StepperOnline electrical ratings");
-        check(NemaStepper.model("23HS22-2804S").variant.housingProfile==null,"Do not relabel OpenBuilds construction as StepperOnline");
+        check(NemaStepper.model("23HS22-2804S").variant.housingProfile!="openbuilds-nema23-v1","Do not relabel OpenBuilds construction as StepperOnline");
         part.close();trace("OpenBuilds motor geometry and recipe checks passed");
     }
 }

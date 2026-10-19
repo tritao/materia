@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "stepperonline-motor-checks"
+  },
+  "entry": "StepperOnlineMotorChecks",
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/suppliers/stepperonline-motor-checks"
+}

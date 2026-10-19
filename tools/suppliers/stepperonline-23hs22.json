@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "model": "23HS22-2804S",
+  "profile": "stepperonline-23hs22-cad2018-v1",
+  "assets": [
+    {
+      "kind": "step",
+      "path": "cad/23HS22-2804S.step",
+      "url": "https://www.oyostepper.es/download.php?act=download&filename=23HS22-2804S.STEP",
+      "sha256": "2683a79867bfd965b62b3fc73803ce65c430efbecf5678f793347f19f188f793",
+      "basis": "Public Oyostepper product download; SolidWorks 2014 STEP AP214, file timestamp 2018-03-06. Distributor reference, not a claim that current production is identical."
+    },
+    {
+      "kind": "svg",
+      "path": "23HS22-2804S_Dimension.svg",
+      "url": "https://www.stepperonline.ca/image/catalog/dimensions/23HS22-2804S_Dimension.svg",
+      "sha256": "c19e0384d8f129b22d1ff53a765dc9493712b346fd0e4f627f4e3375b2f616be",
+      "basis": "Dimension drawing linked by the StepperOnline Canadian product page."
+    }
+  ],
+  "normalization": {"translationMm": [0, 0, -56], "rotation": [1,0,0,0,1,0,0,0,1]},
+  "measuredCadMm": {
+    "bodyFace": 57,
+    "bodyLength": 56,
+    "flangeDepth": 5,
+    "mountPitch": 47.14,
+    "mountHoleDiameter": 5.1,
+    "pilotDiameter": 38.1,
+    "pilotHeight": 1.6,
+    "shaftDiameter": 6.35,
+    "shaftLength": 21,
+    "shaftFlatPlaneX": 2.675,
+    "shaftFlatStart": 6,
+    "housingOuterHalfWidth": 28.5,
+    "housingOuterRadius": 4,
+    "housingOuterArcCenter": [24.5, 15.57],
+    "housingReliefRadius": 4,
+    "housingReliefArcCenter": [23.57, 23.57]
+  },
+  "drawingComparison": [
+    "57 mm CAD body is inside the StepperOnline drawing's 57.3 mm maximum envelope.",
+    "47.14 mm pitch, 21 mm shaft, 38.1 mm pilot, 1.6 mm pilot height and shaft flat agree with the StepperOnline drawing.",
+    "5.1 mm CAD mounting bores are inside the drawing's 5.2 +/- 0.25 mm tolerance. The generator follows the pinned CAD's 5.1 mm bore.",
+    "The separate older Oyostepper PDF specifies 47 +/- 0.1 mm and different casing screw positions; it is not used to override the audited STEP or the StepperOnline mounting drawing."
+  ],
+  "omittedFromGenerator": ["Electrical lead exit and wires", "Casing screws and their internal bores", "Small edge and shaft-tip chamfers", "0.01 mm cap/stack seams"],
+  "qualification": "Nominal mechanical reference and installation clearances only; production tolerances, torque/preload and cable routing are not qualified. Electrical ratings are unchanged."
+}

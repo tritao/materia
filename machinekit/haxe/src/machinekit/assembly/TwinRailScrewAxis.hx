@@ -92,8 +92,9 @@ class TwinRailScrewAxis extends MachineAssembly {
         }
         for(p in selected.motor.boltPattern()) {
             var id='motor-${hardware.length}';
-            bolt(id,"M4",12,"base",F.alongY(p.x,25+p.y,-selected.motor.variant.mountHoleDepth-0.8,0,0,-1),selected.motor.variant.mountHoleDepth+0.8,12,"motor/rbk");
-            attach(id+"-washer",FlatWasher.metric("M4"),"base",F.alongY(p.x,25+p.y,-selected.motor.variant.mountHoleDepth-0.8,0,0,1));
+            var grip=selected.motor.variant.mountHoleDepth+(selected.motorWasher ? 0.8 : 0);
+            bolt(id,"M4",12,"base",F.alongY(p.x,25+p.y,-grip,0,0,-1),grip,12,"motor/rbk");
+            if(selected.motorWasher)attach(id+"-washer",FlatWasher.metric("M4"),"base",F.alongY(p.x,25+p.y,-grip,0,0,1));
         }
         var points=nut.boltPattern();
         for(i in 0...points.length) {
@@ -141,7 +142,7 @@ class TwinRailScrewAxis extends MachineAssembly {
             ["blockLeft","railLeft"],["blockRight","railRight"],["blockLeft","riserLeft"],["blockRight","riserRight"],
             ["blockLeft","carriage"],["blockRight","carriage"],["blockLeft","bracket"],["blockRight","bracket"]];
         for(h in hardware) {
-            if(h.interfacePair=="motor/rbk"){pairs.push(["motor",h.id]);pairs.push(["motor",h.id+"-washer"]);}
+            if(h.interfacePair=="motor/rbk"){pairs.push(["motor",h.id]);if(entries.exists(h.id+"-washer"))pairs.push(["motor",h.id+"-washer"]);}
             if(h.interfacePair=="riser/base")for(side in ["Left","Right"])pairs.push(["block"+side,h.id]);
             if(h.interfacePair=="carriage/block")pairs.push(["carriage",h.id]);
             if(h.interfacePair=="nut/bracket")pairs.push(["ballNut",h.id]);

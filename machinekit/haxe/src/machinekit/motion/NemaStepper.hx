@@ -57,9 +57,10 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 				{designation: "17HS19-1684S1", frame: 17, bodyFace: 42.0, bodyLength: 48.0,
 					shaftDiameter: 5.0, shaftLength: 24.0, pilotHeight: 2.0,
 					mountScrew: "M3", tappedMount: true, mountHoleDepth: 4.5},
-				{designation: "23HS22-2804S", frame: 23, bodyFace: 57.3, bodyLength: 56.0,
+				{designation: "23HS22-2804S", frame: 23, bodyFace: 57.0, bodyLength: 56.0,
 					shaftDiameter: 6.35, shaftLength: 21.0, pilotHeight: 1.6,
-					mountScrew: "M5", tappedMount: false, mountHoleDepth: 5.0},
+					mountScrew: "M5", tappedMount: false, mountHoleDepth: 5.0,
+                    mountHoleDiameter:5.1,housingProfile:StepperOnline23Geometry.PROFILE},
 				{designation:"OPENBUILDS-NEMA23-56",frame:23,bodyFace:56.4,bodyLength:56,
                     shaftDiameter:6.35,shaftLength:20.6,pilotHeight:1.6,mountScrew:"M5",tappedMount:false,
                     mountHoleDepth:4.8,mountHoleDiameter:5.1,housingProfile:"openbuilds-nema23-v1"},
@@ -76,7 +77,10 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 				case "OPENBUILDS-NEMA23-56": "https://github.com/gumyr/bd_warehouse/blob/e6ae6e7bae74cb3a50cbde395930ba24a1051f88/src/bd_warehouse/open_builds.py";
                 case "23HS22-2804S": "https://www.omc-stepperonline.com/nema-23-bipolar-1-8deg-1-26nm-178-4oz-in-2-8a-2-5v-57x57x56mm-4-wires-23hs22-2804s";
 				default: "https://www.omc-stepperonline.com/nema-34-cnc-stepper-motor-4-5nm-637-25oz-in-5-5a-86x86x80mm-key-way-shaft-34hs31-5504s";
-			}, standard: null, standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
+			}, standard: null, standardEdition: null, dimensionKind: spec.designation=="23HS22-2804S" ? Mixed : Unverified, conformance: NominalEnvelope,
+                sources: spec.designation=="23HS22-2804S" ? [
+                    "https://www.oyostepper.es/download.php?act=download&filename=23HS22-2804S.STEP",
+                    "https://www.stepperonline.ca/image/catalog/dimensions/23HS22-2804S_Dimension.svg"] : [],
 				verifiedFields: ["bodyFace", "bodyLength", "shaftDiameter", "shaftLength"]}));
 		return variantTable;
 	}
@@ -142,10 +146,16 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 			|| !(spec.pilotDiameter < spec.boltSpacing * Math.sqrt(2)) || !(variant.shaftDiameter > 0)
 			|| !(variant.shaftLength > variant.pilotHeight) || !(variant.pilotHeight > 0))
 			throw 'NEMA ${spec.frame} interface or motor variant has inconsistent dimensions';
-        if(variant.housingProfile!=null && (variant.housingProfile!="openbuilds-nema23-v1" || variant.frame!=23 ||
+        if(variant.housingProfile=="openbuilds-nema23-v1" && (variant.frame!=23 ||
             variant.bodyFace!=56.4 || variant.shaftDiameter!=6.35 || variant.shaftLength!=20.6 ||
             variant.pilotHeight!=1.6 || variant.mountHoleDepth!=4.8 || variant.mountHoleDiameter!=5.1 ||
             variant.tappedMount || variant.mountScrew!="M5" || spec.boltSpacing!=47.14 || spec.pilotDiameter!=38.1 || spec.face!=56.4)) throw "Inconsistent OpenBuilds motor profile";
+        if(variant.housingProfile==StepperOnline23Geometry.PROFILE && (variant.frame!=23 || variant.bodyFace!=57 ||
+            variant.shaftDiameter!=6.35 || variant.shaftLength!=21 || variant.pilotHeight!=1.6 ||
+            variant.mountHoleDepth!=5 || variant.mountHoleDiameter!=5.1 || variant.tappedMount || variant.mountScrew!="M5" ||
+            spec.boltSpacing!=47.14 || spec.pilotDiameter!=38.1 || variant.bodyLength<16))throw "Inconsistent StepperOnline motor profile";
+        if(variant.housingProfile!=null && variant.housingProfile!="openbuilds-nema23-v1" &&
+            variant.housingProfile!=StepperOnline23Geometry.PROFILE)throw "Unknown motor housing profile";
 		SocketHeadCapScrew.catalog().get(variant.mountScrew);
 		var customName = '${variant.designation}-IF${Dimension.format(spec.face)}x${Dimension.format(spec.boltSpacing)}x${Dimension.format(spec.pilotDiameter)}' +
 			'-B${Dimension.format(variant.bodyFace)}x${Dimension.format(variant.bodyLength)}-S${Dimension.format(variant.shaftDiameter)}x${Dimension.format(variant.shaftLength)}' +
@@ -271,6 +281,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
         if(variant.housingProfile=="openbuilds-nema23-v1") return OpenBuildsNema23Geometry.build(bodyLength);
+        if(variant.housingProfile==StepperOnline23Geometry.PROFILE) return StepperOnline23Geometry.build(bodyLength);
 		var ownedParts:Array<Part> = [];
 		return Solids.building(ownedParts, tracked -> {
 			var half = variant.bodyFace / 2;

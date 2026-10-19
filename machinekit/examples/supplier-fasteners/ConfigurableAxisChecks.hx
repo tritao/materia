@@ -57,16 +57,24 @@ class ConfigurableAxisChecks {
         var saved=axis.encode(),loaded=MachineAssembly.decode(saved,MachineKitComponents.standard());
         check(bom(axis)==bom(loaded),"Second supplier configuration preserves saved BOM");
         check(bom(axis)!=bom(baseline),"Second motor and lengths produce distinct engineering requirements");
-        // The existing StepperOnline envelope passes nominal interfaces but has no rear flange relief.
-        // Record the actual obstruction; do not quietly cut the motor to make this assembly pass.
-        var candidate=new TwinRailScrewAxis(layout,RbkSfuAxis.componentsFor(layout,"23HS22-2804S"));
-        var candidatePoses=candidate.solvedPoses(),candidateParts:Map<String,MachineComponent> = [];
-        for(entry in candidate.components())candidateParts.set(entry.id,entry.component);
-        var candidateCache=new PosedParts(),obstruction=0.0;
+        // The independent supplier CAD audit proves that bare M4 heads clear this motor;
+        // ISO7089 M4 washers do not fit its R4 corner relief.
+        var candidate=new TwinRailScrewAxis(layout,RbkSfuAxis.componentsFor(layout,"23HS22-2804S",false));
+        candidate.validate();
+        var secondSaved=candidate.encode(),secondLoaded=MachineAssembly.decode(secondSaved,MachineKitComponents.standard());
+        check(bom(candidate)==bom(secondLoaded),"Second supplier motor and bare-head installation survive reload");
+        var supplierClearances=candidate.installationClearances();
+        check(supplierClearances.length==168,"Second motor retains 56 required-clearance pairs at three states");
+        for(row in supplierClearances)check(row.intersectionMm3<0.001,"Second supplier clash "+row.a+"/"+row.b);
+        var secondState=new AssemblyState(secondLoaded.definition());
+        for(travel in [0.0,150,300]) {
+            candidate.setTravel(secondState,travel);var poses=secondLoaded.solvedPoses(secondState),bracket=poses.get("bracket");
+            check(bracket!=null && Math.abs(bracket.z-140-travel)<1e-6,"Second supplier carriage follows travel");
+            check(Math.abs(secondState.joint("screwTurn")+travel*2*Math.PI/5)<1e-6,"Second supplier retains screw lead");
+        }
         for(h in candidate.hardware)if(h.interfacePair=="motor/rbk")
-            obstruction+=candidateCache.overlap(candidateParts.get("motor"),candidatePoses.get("motor"),candidateParts.get(h.id),candidatePoses.get(h.id));
-        candidateCache.close();
-        check(obstruction>0.001,"Second supplier trial correctly exposes unqualified motor envelope");
+            check(h.grip==5 && h.engagement==7 && h.engagement<=h.availableDepth,"Bare M4x12 has 7 mm receiving-thread engagement");
+        Sys.println("Second supplier axis passed all travel states");
         var state=new AssemblyState(loaded.definition());
         for(h in axis.hardware) {
             var clamp=StringTools.startsWith(h.interfacePair,"coupling/");
@@ -96,9 +104,23 @@ class ConfigurableAxisChecks {
         for(joint in definition.joints)if(joint.id=="travel")joint.driven=true;
         scene.project={dynamicParts:[],motions:[],initialView:{yaw:Math.PI-0.9652516631899266,pitch:0.5639426413606289}};
         sys.io.File.saveBytes(output+"extended-300.mtrg",SceneArtifact.encode(scene));
+        sys.io.File.saveContent(output+"stepperonline-300.assembly.json",secondSaved);
+        sys.io.File.saveContent(output+"stepperonline-300.bom.json",haxe.Json.stringify(candidate.billOfMaterials().lines(),null,"  "));
+        sys.io.File.saveContent(output+"stepperonline-300.sourcing.json",haxe.Json.stringify(new SourcingPlan().lines(candidate.billOfMaterials()),null,"  "));
+        var secondScene=AssemblyPreview.scene(secondLoaded,"stepperonline-300-axis"),secondDefinition=secondScene.assemblyDefinition;
+        if(secondDefinition==null)throw "Missing second assembly definition";
+        for(joint in secondDefinition.joints)if(joint.id=="travel")joint.driven=true;
+        secondScene.project={dynamicParts:[],motions:[],initialView:{yaw:Math.PI-0.9652516631899266,pitch:0.5639426413606289}};
+        sys.io.File.saveBytes(output+"stepperonline-300.mtrg",SceneArtifact.encode(secondScene));
+        var exportState=new AssemblyState(secondLoaded.definition()),exportPoses=secondLoaded.solvedPoses(exportState),cache=new PosedParts();
+        var placed:Array<cadkit.modeling.Part> = [],shapes:Array<cadkit.Shape> = [];
+        for(entry in secondLoaded.components()) {var part=cache.posed(entry.component,exportPoses.get(entry.id));placed.push(part);shapes.push(part.shape);}
+        var compound=cadkit.Shape.compound(shapes);compound.exportStep(output+"stepperonline-300.step");compound.close();
+        for(part in placed)part.close();cache.close();
         sys.io.File.saveContent(output+"checks.json",haxe.Json.stringify({checks:checks,clearances:clearances,
-            supplierTrial:{motor:"23HS22-2804S",status:"blocked_by_simplified_motor_geometry",motorHeadIntersectionMm3:obstruction,
-                reason:"Existing motor envelope omits housing relief behind mounting flange. No supplier motor was modified to force a pass."},
+            supplierTrial:{motor:"23HS22-2804S",status:"nominal_cad_checks_pass",clearances:supplierClearances,
+                installation:"M4x12 socket heads directly on the 5 mm flange; 7 mm receiving-thread engagement; no ISO7089 M4 washers",
+                geometryBasis:"Pinned 2018 distributor STEP and StepperOnline dimension drawing; native analytic profile"},
             motor:selected.motor.designation,travelMm:layout.travel,screwLengthMm:layout.screwLength,railLengthMm:layout.railLength,
             railSpacingMm:layout.railSpacing,basis:"Nominal interface and CAD checks; mixed-supplier configuration, not load qualification"},null,"  "));
         Sys.println("Configurable axis checks passed: "+checks);
