@@ -158,6 +158,8 @@ class MillFemExport {
 				var mass = component.massProperties(), c = mass.centreOfMass;
 				if (!Math.isFinite(mass.mass) || mass.mass <= 0) throw 'Invalid FEM mass: $id';
 				var centre = F.transformPoint(pose,c.x,c.y,c.z);
+                var inertia = mass.inertia == null ? null : mass.inertia.rotated(pose.qx,pose.qy,pose.qz,pose.qw);
+                var inertiaSource = mass.inertia == null ? "missing" : "component centroidal tensor rotated to world axes";
 				var solid = exportSolid(id), file:Null<String> = null, digest:Null<String> = null;
 				var volume:Null<Float> = null, bounds:Dynamic = null;
 				{
@@ -167,6 +169,13 @@ class MillFemExport {
 						if (!part.valid() || (solid && part.solidCount() != 1) || !Math.isFinite(volume) || volume <= 0)
 							throw 'FEM solid must be valid, connected and positive-volume: $id';
 						bounds = PosedParts.boxOf(part);
+                    if (inertia == null) {
+                        var physical = part.massProperties();
+                        if (Math.abs(physical.centerOfMass.x-centre.x)+Math.abs(physical.centerOfMass.y-centre.y)+Math.abs(physical.centerOfMass.z-centre.z)>1e-5)
+                            throw 'Declared FEM mass needs an explicit centroidal tensor when its COM differs from CAD: $id';
+                        inertia = physical.inertiaAtDensity(mass.mass/physical.volume);
+                        inertiaSource = "assumed CAD mass distribution scaled to declared component mass";
+                    }
 						if(solid) {
 						file = StringTools.replace(id,"/","__") + ".step";
 						part.shape.exportStep(folder + "/" + file);
@@ -182,6 +191,7 @@ class MillFemExport {
                 var massSource = switch(mass.source) {case Computed(_):"Computed"; case Declared:"Declared";};
 				parts.push({id:id, parentId:parents.get(id), materialId:material.id, representation:solid?"solid":"mass-only",
 					poseMm:pose, massKg:mass.mass, massSource:massSource, centreOfMassMm:centre, volumeMm3:volume,
+                    centroidalInertiaKgMm2World:inertia, inertiaSource:inertiaSource,
 					boundsMm:bounds, stepFile:file, stepSha256:digest});
 			}
 			for (foundation in [{id:"base",value:frame.base},{id:"column",value:frame.column}])
@@ -233,7 +243,7 @@ class MillFemExport {
 			castingMassKg:{base:frame.base.castingByWeight().kg,column:frame.column.castingByWeight().kg},
 			studyEnvelope:{cuttingForcePerAxisN:500,payloadKg:20,payloadHeightMm:50,accelerationMPerS2:1,
 				gravityMPerS2:9.80665,cuttingContactAssigned:false},
-			pending:["mesh and elastic material inputs including Poisson ratio", "guide and drive load-path stiffness", "insert bonds and column clamp contact/preload", "foot/floor restraints", "cutting contact and workpiece attachment", "mass-only component attachment and inertia for modal study"]};
+			pending:["mesh and elastic material inputs including Poisson ratio", "guide and drive load-path stiffness", "insert bonds and column clamp contact/preload", "foot/floor restraints", "cutting contact and workpiece attachment"]};
 		File.saveContent(manifestPath,haxe.Json.stringify(result,null,"  ")+"\n");
 		File.saveContent(folder+"/mill-frame-concept.json",referenceText);
 		return result;
@@ -242,7 +252,7 @@ class MillFemExport {
 	public static function main():Void {
 		var mill = build(), zLayout:MillZAxisLayout = mill.frame.zAxis;
 		var name = "center", x = 0.0, y = 0.0, z = zLayout.lower / 2;
-        var verifyRepeat=false;
+        var verifyRepeat=false, poseMatrix=false;
 		var args = Sys.args(), i = 0;
 		while (i < args.length) {
 			var flag = args[i++];
@@ -253,6 +263,9 @@ class MillFemExport {
 				case "--x": x = coordinate(value);
 				case "--y": y = coordinate(value);
 				case "--z": z = coordinate(value);
+                case "--pose-matrix":
+                    if(value!="true" && value!="false")throw "--pose-matrix requires true or false";
+                    poseMatrix=value=="true";
                 case "--verify-repeat":
                     if(value!="true" && value!="false")throw "--verify-repeat requires true or false";
                     verifyRepeat=value=="true";
@@ -261,7 +274,21 @@ class MillFemExport {
 		}
 		if (!~/^[A-Za-z0-9_-]+$/.match(name)) throw "FEM packet name must contain letters, digits, underscores or hyphens";
 		var folder = root()+"/"+DIRECTORY+"/build/fem/"+name;
-		var repeatPath=folder+"/repeat-verification.json";
+		if(poseMatrix) {
+            ensure(folder);
+            MillFramePreview.writeReport(mill.assembly,mill.frame,folder,false);
+            var entries:Array<Dynamic> =[{id:"center",x:0.0,y:0.0,z:zLayout.lower/2}];
+            for(px in [-125.0,125.0])for(py in [-80.0,80.0])for(pz in [zLayout.lower,0.0])
+                entries.push({id:"x"+(px<0?"minus":"plus")+"_y"+(py<0?"minus":"plus")+"_z"+(pz<0?"lower":"upper"),x:px,y:py,z:pz});
+            for(entry in entries) {
+                var target=folder+"/"+entry.id;
+                var record=write(mill.assembly,mill.frame,state(mill.assembly,entry.x,entry.y,entry.z),target,null,folder+"/mill-frame-concept.json");
+                Sys.println('FEM pose packet: $target/manifest.json');
+            }
+            File.saveContent(folder+"/poses.json",haxe.Json.stringify(entries,null,"  ")+"\n");
+            return;
+        }
+        var repeatPath=folder+"/repeat-verification.json";
         if(FileSystem.exists(repeatPath))FileSystem.deleteFile(repeatPath);
         var pose=state(mill.assembly,x,y,z);
         ensure(folder);

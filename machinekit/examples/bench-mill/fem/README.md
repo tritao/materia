@@ -52,7 +52,19 @@ supplies the off-diagonal mass sparsity missing for MPC-coupled `MASS` elements
 in CalculiX 2.21; omitting it fails this fixture. The platform has explicit
 0.1 kg per support node as well as the 12 kg inertia attachment.
 
-Modal export, frame modes and the nine-pose sweep are not yet qualified.
+Modal export gate passed on all 224 parts: native component centroidal tensors
+rotated into world coordinates, physical positive/triangle checks, packet mass
+and concept checks, and byte-identical manifest/STEP repeat export. No assumed
+CAD fallback was needed in this packet. The retained `modal-center` packet SHA256
+is `5f31a21c2645cb06e7bcce07bfcda6d86d6d79e1d0cd82ba9d5cb5e9893b5229`.
+`MillFemExport --pose-matrix true --name NAME` exports center and eight corners
+from one loaded build. Frame modes and the nine-pose sweep remain unqualified.
+
+The root filesystem filled during concurrent work. Generated FEM artifacts were
+moved intact to `/media/joao/DEV/materia-fem-runs/bench-mill-20261019`, with the
+usual ignored `build/fem` path retained as a symlink. Cited baseline hashes and
+provenance are preserved. A tool-case stiff-support run interrupted by disk
+exhaustion is not counted as evidence and must finish on resumption.
 Frequency stability is a numerical gate; acceptance against spindle/tooth-pass,
 motor and axis excitation requires declared operating bands. No lightening
 candidate is selected and no `MillFrameLayout` geometry has been edited.
