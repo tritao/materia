@@ -87,6 +87,27 @@ class EnclosureRuntimeTests {
       var panel=app.editor.EnclosureGuardPanel.build(simulation);check(panel!=null,"Runtime exposes operator guard controls");
       var tree=editor.ui.submit(panel,new haxeon.ui.LayoutFrame(900,600));
       check(has(tree,"Open door")&&has(tree,"Close door")&&has(tree,"Start cut")&&has(tree,"Reset guard"),"Operator panel contains door and cutting actions");
+      editor.session.openGeneratedProject(loaded,"door-design-preview");
+      var machinePanel=new app.editor.MachineControlPanel(),frame=new haxeon.ui.LayoutFrame(900,1600);
+      tree=editor.ui.submit(machinePanel.build(editor),frame);
+      check(has(tree,"ENCLOSURE · DESIGN PREVIEW")&&has(tree,"Open door")&&has(tree,"Close door"),"Door controls exist before Play");
+      check(!has(tree,"Start cut")&&!editor.simulation.isActive(),"Design preview does not expose cutting or initialize simulation");
+      var history=editor.session.document.history.undoCount;
+      function click(label:String):Void {
+        var root=editor.ui.submit(machinePanel.build(editor),frame),node=find(root,label);
+        if(node==null)throw 'Missing preview action $label';
+        var b=node.globalBounds();editor.ui.pointerDown(b.x+b.width/2,b.y+b.height/2,0);editor.ui.pointerUp(b.x+b.width/2,b.y+b.height/2,0);
+      }
+      function position(id:String):Float return app.MachineControlModel.axes(editor.session).filter(a->a.id==id)[0].value;
+      click("Open door");
+      check(Math.abs(position("enclosure/door/slide")-fitted.shell.layout.stroke)<1e-6,"Preview opens master leaf without Play");
+      check(Math.abs(position("enclosure/door/leftSlide")+fitted.shell.layout.stroke)<1e-6,"Preview moves the coupled opposite leaf");
+      check(editor.session.document.history.undoCount==history+1,"Preview is one undoable pose edit");
+      editor.session.document.undo();check(Math.abs(position("enclosure/door/slide"))<1e-6,"Undo restores closed doors");
+      editor.session.document.redo();click("Close door");
+      check(Math.abs(position("enclosure/door/slide"))<1e-6&&Math.abs(position("enclosure/door/leftSlide"))<1e-6,"Preview close restores both leaves");
+      check(!editor.simulation.isActive(),"Preview never starts simulation");
+      check(has(editor.ui.submit(machinePanel.build(editor),frame),"ENCLOSURE · DESIGN PREVIEW"),"Preview remains available after repeated actions");
       editor.dispose();fonts.dispose();
       simulation.dispose();project.dispose();
     } catch(e:Dynamic){simulation.dispose();project.dispose();throw e;}
@@ -106,6 +127,10 @@ class EnclosureRuntimeTests {
     shapes[3].shape.geometry=collisionkit.CollisionGeometry.Sphere(1);
     rejected=false;try{robotkit.runtime.SimulationCollisionPacking.pack(shapes,pairs,3,1);}catch(_:Dynamic){rejected=true;}
     check(rejected,"Paired or primitive shapes cannot spill into hull storage");
+  }
+  static function find(n:haxeon.ui.core.RenderNode,label:String):Null<haxeon.ui.core.RenderNode> {
+    if(n.semantics!=null&&n.semantics.label==label)return n;
+    for(child in n.children){var result=find(child,label);if(result!=null)return result;}return null;
   }
   static function has(n:haxeon.ui.core.RenderNode,label:String):Bool {
     if(n.semantics!=null&&n.semantics.label==label)return true;

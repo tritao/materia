@@ -61,7 +61,15 @@ class MachineControlPanel {
     var style = new LayoutStyle();style.width=LayoutAxis.grow();style.childGap=8;
     style.padding=new Insets(12,12,12,12);
     var rows:Array<KeyedView> = [new KeyedView("heading",app.sectionHeading("MACHINE CONTROL"))];
-    var guardPanel=EnclosureGuardPanel.build(app.simulation);
+    var guardPanel=app.simulation.isActive()?EnclosureGuardPanel.build(app.simulation):
+      EnclosureGuardPanel.preview(app.session,editable,(id,value)->{
+        try {
+          cancelGesture();
+          MachineControlModel.set(app.session,id,value,
+            !app.simulation.isActive()&&app.session.scriptOwnership==null&&!app.documents.blocked());
+          error=null;app.documentChanged();
+        }catch(failure:Dynamic){error=Std.string(failure);app.invalidateView();}
+      });
     if(guardPanel!=null)rows.push(new KeyedView("enclosure-guard",guardPanel));
     var viewport=app.perspectiveViewport;
     var cup=app.simulation.hobbingPlayer();

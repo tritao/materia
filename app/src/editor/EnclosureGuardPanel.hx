@@ -12,6 +12,25 @@ import haxeon.ui.widgets.text.Text;
 
 /** Commands are queued to the playback owner; feedback is a coherent published image. */
 class EnclosureGuardPanel {
+  /** Design previews edit the document pose; they never create a simulation or grant cut permission. */
+  public static function preview(session:app.ProjectDocumentSession,editable:Bool,set:(String,Float)->Void):Null<View> {
+    var motion=session.machineMotion,config=motion==null?null:motion.enclosureGuard;
+    if(config==null)return null;
+    var axes=app.MachineControlModel.axes(session).filter(a->a.id==config.doorJoint);
+    if(axes.length!=1)return null;
+    var axis=axes[0],closed=Math.abs(axis.value)<0.5,opened=Math.abs(axis.value-config.stroke*1000)<0.5;
+    var style=new LayoutStyle();style.width=LayoutAxis.grow();style.childGap=6;
+    var open=new Button("Open door",null,()->set(config.doorJoint,config.stroke*1000),"guard-preview-open");
+    var close=new Button("Close door",null,()->set(config.doorJoint,0),"guard-preview-close");
+    open.enabled=editable&&!opened;close.enabled=editable&&!closed;
+    return new Column("enclosure-preview",[
+      new KeyedView("heading",new Text("ENCLOSURE · DESIGN PREVIEW")),
+      new KeyedView("status",new Text('Door ${opened?"open":closed?"closed":"partly open"}')),
+      new KeyedView("actions",new Row("guard-preview-actions",[new KeyedView("open",open),new KeyedView("close",close)],style)),
+      new KeyedView("hint",new Text(editable?"Preview geometry only. Press Play for guarded operation.":"Stop simulation or release project control to preview the doors."))
+    ],style);
+  }
+
   public static function build(simulation:ApplicationSimulation):Null<View> {
     var guard=simulation.enclosureController();if(guard==null)return null;
     var s=guard.status(),style=new LayoutStyle();style.width=LayoutAxis.grow();style.childGap=6;
@@ -24,7 +43,7 @@ class EnclosureGuardPanel {
     action("Close door","guard-close",live&&!s.fault&&s.phase=="Open",guard.requestClose);
     action("Start cut","guard-start",live&&s.canStart,guard.requestCut);
     action("Reset guard","guard-reset",live&&s.fault&&s.closed&&s.locked&&s.axesStandstill&&s.spindleStandstill,guard.resetGuard);
-    var rows:Array<KeyedView> = [new KeyedView("heading",new Text("ENCLOSURE GUARD")),new KeyedView("status",new Text(s.message)),
+    var rows:Array<KeyedView> = [new KeyedView("heading",new Text("ENCLOSURE · SIMULATION")),new KeyedView("status",new Text(s.message)),
       new KeyedView("door-feedback",new Text('Door ${s.open?"open":s.closed?"closed":"moving"} · ${s.locked?"locked":"unlocked"}')),
       new KeyedView("motion-feedback",new Text('Spindle ${s.spindleStandstill?"stopped":"stop unconfirmed"} · axes ${s.axesStandstill?"stopped":"stop unconfirmed"}')),
       new KeyedView("door-actions",new Row("guard-door-actions",controls.slice(0,2),style)),

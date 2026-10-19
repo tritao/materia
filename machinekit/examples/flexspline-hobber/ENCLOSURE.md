@@ -97,8 +97,11 @@ moving leaf against stationary enclosure parts at 21 positions across its stroke
 `build/enclosure/guard-checks.json` records the controller simulation results.
 Lock feedback and spindle/axis standstill are independent simulated inputs in
 these checks; commands and elapsed time never substitute for their confirmation.
-The desktop's manual joint slider remains a geometry preview. In the enclosed
-scene, press Play and use the Machine panel's enclosure controls: Open door,
+The Machine panel shows Open door and Close door before Play, under
+`ENCLOSURE · DESIGN PREVIEW`. These are undoable geometry poses, including the
+coupled leaf, and do not start simulation or change the saved initial pose.
+During simulation the panel is labelled `ENCLOSURE · SIMULATION` and uses the
+measured guard controller. In the enclosed scene, press Play and use Open door,
 Close door and Start cut. Cutting requires a fresh Start cut after closed/locked
 confirmation. Opening during a cut requests a controlled stop and waits for
 measured spindle and axis standstill before releasing the independent simulated
@@ -229,3 +232,7 @@ Generate the checked comparison and section drawing from the worktree root:
 Outputs: `build/base-interface/interface.json` and `interface.svg` beneath this
 example directory. The SVG shows the casting plan, interrupted rear seal route,
 and raised/flush edge sections at the same scale.
+
+Editor preview acceptance: the extended live/UI fixture passes 10,502 assertions,
+including controls before Play, coupled-leaf motion, Undo/Redo and closing without
+starting simulation. The existing live guard checks remain in the same fixture.
