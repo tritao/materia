@@ -9,7 +9,7 @@ class ExpandingMandrel extends MachineComponent {
   public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
     P.quantity("outside",59,"mm"),
     P.quantity("bore",12,"mm"),
-    P.quantity("height",50,"mm"),
+    P.quantity("height",50,"mm"),P.length("baseDiameter",0),P.length("baseHeight",0),
     P.quantity("workSeat",30,"mm"),
     P.quantity("expansion",0.05,"mm"),
     P.quantity("sleeveWall",1.5,"mm"),
@@ -59,5 +59,12 @@ class ExpandingMandrel extends MachineComponent {
 
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
-    return ComponentEnvelopes.annular(values());
+    {
+      var stem=ComponentEnvelopes.annular(values());
+      if(parameterNumber("baseHeight")==0)return stem;
+      if(parameterNumber("baseDiameter")<parameterNumber("outside")||parameterNumber("baseHeight")>=parameterNumber("workSeat"))throw "invalid integral mandrel base";
+      var base=Solids.cut(cadkit.modeling.Part.cylinderSpan(parameterNumber("baseDiameter")/2,0,parameterNumber("baseHeight")),
+        [cadkit.modeling.Part.cylinderSpan(parameterNumber("bore")/2,-0.1,parameterNumber("baseHeight")+0.1)]);
+      return Solids.union([stem,base]);
+    }
 }

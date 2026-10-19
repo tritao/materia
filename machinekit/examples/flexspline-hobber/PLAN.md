@@ -113,20 +113,40 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
 
 ## Decisions
 
-**HB-D1. A vertical work axis, with the hob head on a column: axes C, B, X, Y, Z, A.**
-- C: work table, direct-drive torque motor, crossed-roller bearing, ring encoder, full closed loop.
-- B: hob spindle, direct-drive motorised spindle, velocity-commanded, its encoder is the gear
-  master.
-- X: radial infeed (sets tooth depth and thickness). Z: axial feed along the work axis.
-  Y: tangential hob shift along the hob axis (spreads wear).
-- A: hob swivel to the hob lead angle (plus helix angle for helical gears). Positioned, then
-  clamped. It is not interpolated during cutting.
-- This mirrors the small-module hobbers in the research notes (GE15FRplus, K 160). The cutting
-  force is tens of newtons, so the design is about rotational accuracy (table runout, encoder,
-  sync), not rigidity.
-- **Rejected:** a horizontal work axis (worse for cup blanks on a mandrel and for loading);
-  converting a 5-axis mill (no electronic gearbox; the table cannot follow a 3000 rpm master at
-  servo rate).
+**HB-D1. A vertical work table with a moving column (Mitsubishi GE class): axes C, B, X, Y, Z, A.**
+- Pure hobbing. Hard turning, bore datums and thin-wall turning belong to
+  `machinekit/examples/lathe/PLAN.md`, a separate machine/session.
+- C retains the direct-drive `RotaryTable`: torque motor, crossed roller,
+  ring encoder/full closed loop and the specified non-contact seal arrangement.
+- X moves the complete column on preloaded HGR25 bed guides toward the table;
+  a 16×5 ground ball screw (C5 procurement target, assumed), preloaded nut and
+  linear scale provide radial infeed. X retracts to 250 mm for top loading.
+- Z is on the recessed column face, with 200 mm travel. A is bolted directly to
+  the Z saddle, radial pivot through the hob-centre line. Y uses twin rails.
+  Target range: flexspline OD 25–140 mm, faces up to 20 mm.
+- Target hob-centre distance from the nearest X and Z guide planes ≤ about
+  150 mm. Report actual guide-plane offsets and moving masses, not an inferred
+  structural accuracy. Structural/modal adequacy remains a Phase D open check.
+- The outboard roller/needle support is radially stiff, nominally zero-clearance,
+  and axially floating; the spindle end is the axial locator. Do not install a
+  deep-groove bearing or a second axially locating preloaded pair there.
+- The riser and mandrel base are integral, retaining the height needed for ±15°
+  swivel clearance. Provide coolant flushing, a sloped table guard and chip tray,
+  rail protection and enclosure/top-loading provisions; later robot loading
+  reuses machine-tending.
+- Machine radial direction is global Y and hob axis global X. Apply the explicit
+  constant Rz(+90°) from the logical work frame; retain `HobbingAxes` equations
+  in the work frame and regress cut geometry, synchronisation and force loads.
+- Precision foundation mounts land on cast-in steel inserts using shared
+  `machinekit.structural` recipes. All rail-seat inserts must carry guides.
+- [MHI's GE15FRplus paper](https://www.mhi.com/technology/review/sites/g/files/jwhtju2326/files/media/pdf/e573030.pdf)
+  reports DD/full-loop table control, 0.3 µm table NRRO and ISO class 1 pitch
+  on its stated m0.5 example. Those are reference benchmarks, not our ratings.
+- **Rejected:** the overhead X bridge (≈350 mm guide offsets, single Y rail);
+  horizontal turn-and-hob for this project, since turning belongs to the lathe.
+  [EMAG identifies K 160 as horizontal](https://www.emag.com/products-services/machines/gear-cutting-machines/gear-hobbing-machines/horizontal-gear-hobbing-machines/koepfer-k-160/):
+  it must not be described as the vertical GE architecture. No claim is made
+  that all horizontal machines have the same accuracy class.
 
 **HB-D2. The electronic gearbox is a controller relation, not a mechanical coupling.**
 - A real hobber has no mechanical link between hob and table. The table servo follows the hob
@@ -1969,7 +1989,7 @@ batch after saving that case. Do not start a second batch beside the live one.
   manufacturing-fit tolerances remain unspecified. No full cut or metrology/error
   qualification was rerun or claimed for this scene inspection.
 
-### Layout hold and HB4/HB11 follow-up (2026-10-19)
+### Layout hold and HB4/HB11 follow-up (2026-10-19, superseded below)
 
 - The horizontal-layout proposal is **on hold** at the user's request. No layout
   direction is confirmed; the current scene/layout remains unchanged. Turning is
@@ -1995,3 +2015,20 @@ batch after saving that case. Do not start a second batch beside the live one.
   the earlier local-boundary diagnostic does not establish full-circle acceptance.
   `build/flexspline-hb4-refined/postrun-review.json` records this result. Inspect
   these final worst circles before committing to another expensive full rerun.
+
+### Confirmed moving-column revision — work in progress (2026-10-19)
+
+The confirmed vertical GE-class decision above supersedes the earlier layout
+hold and horizontal proposal. Source now has moving-column X, direct Z/A mounting,
+twin Y rails, an integral fixture base and floating radial outboard support.
+Enclosure panels are omitted for inspection; the electrical rack is hidden by
+`inspection.scene.json` visibility overrides without deleting its wiring.
+
+This checkpoint is not layout acceptance. Mechanical tests passed 766 assertions
+and a short assembled/analytic work-frame cut agrees within 1e-8 mm/rad pose,
+1e-8 mm arc and 1e-6 N load tolerances. The full travel-grid audit still reports
+interferences; the loading check also needs exact-solid handling of hollow
+objects rather than their enclosing boxes. The desktop rebuild is blocked by
+the checkout's Haxeon transport API mismatch. HB6/HB9, final masses and footprint,
+clearance acceptance and documentation reconciliation remain open. Frozen
+HB11/HB4 providers and workers were not rebuilt for this revision.

@@ -19,4 +19,6 @@ typedef LinearRailProfileSpec = {
 	var railMountScrew:String;
 	/** Assumed static capacity of one block in N; not a verified vendor rating. */
 	var staticLoadCapacity:Float;
+    /** Assumed procurement target, not a measured or simulated preload. */
+    @:optional var preloadTarget:String;
 }

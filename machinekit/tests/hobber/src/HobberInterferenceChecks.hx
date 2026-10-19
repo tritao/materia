@@ -22,8 +22,8 @@ class HobberInterferenceChecks {
     samples.push({x:setup.joint("X"),y:setup.joint("Y"),z:setup.joint("Z"),a:setup.joint(FlexsplineHobber.A)});
     var job=FlexsplineHobberCam.job(machine);
     for(pass in job.passes)for(z in [pass.zStart,pass.zEnd])samples.push({x:pass.centreDistance,y:pass.shift,z:z,a:-machine.hob.design.leadAngle});
-    if(sweep)for(x in [machine.travel[0].lower,(machine.travel[0].lower+100)/2,100.0])
-      for(y in [-10.0,0,10])for(z in [-10.0,25,60])for(a in [-Math.PI/12,0.0,Math.PI/12])samples.push({x:x,y:y,z:z,a:a});
+    if(sweep)for(x in [machine.travel[0].lower,(machine.travel[0].lower+machine.travel[0].upper)/2,machine.travel[0].upper])
+      for(y in [-10.0,0,10])for(z in [-10.0,90,190])for(a in [-Math.PI/12,0.0,Math.PI/12])samples.push({x:x,y:y,z:z,a:a});
     function save():Void sys.io.File.saveContent(output+"/overlaps.json",haxe.Json.stringify({reference:reference,
       scope:sweep?"conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof":"exact CAD common volume at initial, CAM inspection and pass endpoints",
       samples:samples,completed:completed,members:members.length,checked:checked,thresholdMm3:0.001,

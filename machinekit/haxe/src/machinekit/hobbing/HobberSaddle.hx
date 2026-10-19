@@ -11,7 +11,7 @@ import materia.assembly.AssemblyFrames as F;
 class HobberSaddle extends MachineComponent {
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return [
-    P.choice("design",["Z-saddle","X-bridge","A-yoke","Y-saddle","electrical-panel","X-drive","Z-drive","Y-drive"],"Z-saddle")];
+    P.choice("design",["GE-X-carriage","GE-Z-saddle","GE-X-drive","GE-Z-drive","GE-chip-tray","GE-guard","GE-enclosure","GE-coolant", "Z-saddle","X-bridge","A-yoke","Y-saddle","electrical-panel","X-drive","Z-drive","Y-drive"],"Z-saddle")];
   public static function recipeType():ComponentType {
     if(recipe==null)recipe=new ComponentType("machinekit.hobbing.saddle",parameters(),v->new HobberSaddle(v.token("design")));
     return recipe;
@@ -33,6 +33,31 @@ class HobberSaddle extends MachineComponent {
   static function boreY(radius:Float,y0:Float,y1:Float,x:Float,z:Float):Part return Part.cylinderAlongY(radius,y0,y1,x,z);
   override public function geometry(detail:ComponentDetail=Preview):Part {
     return switch values().token("design") {
+      case "GE-X-carriage": Solids.union([
+        box(240,350,-185,185,260,280),box(48,350,-185,-140,260,280),box(48,350,140,185,260,280),
+        Solids.cut(box(277.5,297.5,195,275,215,280),[boreX(8.2,277.4,297.6,250,240)]),box(277.5,297.5,165,195,260,280)]);
+      case "GE-Z-saddle": Solids.union([
+        box(200,220,-110,110,-100,180),box(99,220,-110,-100,-100,180),box(99,220,100,110,-100,180),
+        box(99,112,-175,-100,-50,232),box(99,112,100,175,-50,160),
+        Solids.cut(box(75,112,-270,-125,214.5,232),[Part.cylinderSpan(8.2,214.4,232.1,100,-250)])]);
+      case "GE-X-drive": Solids.union([box(125,620,210,295,210,215),box(125,620,290,295,215,250),
+        Solids.cut(box(120,125,205,295,215,285),[boreX(7.1,119.9,125.1,250,240)])]);
+      case "GE-Z-drive": Solids.union([box(165,255,-230,-210,295,862),box(55,145,-280,-275,420,862),
+        Solids.cut(box(55,220,-295,-210,415,420),[Part.cylinderSpan(9.6,414.9,420.1,100,-250)]),
+        box(55,220,-275,-210,857,862),box(35,95,-300,-290,420,862)]);
+      case "GE-chip-tray": Solids.union([Part.revolve([{r:95.0,z:220.0},{r:140.0,z:150.0},{r:140.0,z:125.0},{r:138.0,z:125.0},{r:138.0,z:150.0},{r:95.0,z:218.0}]),Solids.cut(Solids.union([box(-245,90,-145,145,121,125),box(-245,90,-149,-145,121,150),box(-245,90,145,149,121,150)]),[box(-91,91,-91,91,120,131)])]);
+      case "GE-guard": {
+        var pieces:Array<Part> = [];
+        for(side in [-1,1])for(span in [[20.0,60.0],[610.0,700.0]]){
+          var y=side*165;pieces.push(box(span[0],span[1],y-35,y+35,255,258));
+          for(edge in [-1,1]){var cy=y+edge*33.5;pieces.push(box(span[0],span[1],cy-1.5,cy+1.5,220,255));
+            var a=edge<0?y-35:y+14,b=edge<0?y-14:y+35;pieces.push(box(span[0],span[1],a,b,220,223));}
+        }
+        // Four separate end shields are one BOM set; moving bellows remain a reserved provision.
+        Solids.union(pieces);
+      }
+      case "GE-coolant": Solids.cut(box(-46,-34,30,50,80,104),[Part.cylinderSpan(2,79.9,104.1,-40,40)]);
+      case "GE-enclosure": Solids.union([box(-270,780,-360,-356,0,950),box(-270,780,356,360,0,950),box(776,780,-360,360,0,950)]);
       // Origin at X=0,Y=0,Z=655: rail block tops Y=152, X rail bases Z=655.
       case "Z-saddle": Solids.union([
         Solids.cut(box(-100,240,-65,142,-20,0),[box(-80,180,67,115,-20.1,0.1)]),box(-100,100,142,152,-55,140),
@@ -46,7 +71,7 @@ class HobberSaddle extends MachineComponent {
         Solids.cut(box(27.5,47.5,205,275,263,360),[boreX(8.2,27.4,47.6,240,287),box(27.4,47.6,204.9,227,307,360.1)])]);
       // Origin at cutter centre; machined back face X=90 meets swivel head.
       case "A-yoke": Solids.union([
-        box(70,90,-100,100,0,172),box(-160,90,-120,120,152,172)]);
+        box(70,90,-100,100,0,172),box(-70,90,-120,120,152,172),box(-160,-70,-45,45,152,172)]);
       // Ceiling below Y rail blocks; bored saddles seat the actual spindle OD.
       case "Y-saddle": Solids.union([
         box(-60,60,-120,240,104,124),

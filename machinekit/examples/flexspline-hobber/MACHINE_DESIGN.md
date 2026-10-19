@@ -1,90 +1,83 @@
-# Hobber mechanical layout
+# GE-class moving-column hobber
 
-The machine uses a rear column, overhead Z/X saddle, side-mounted A cartridge,
-underhung Y spindle saddle and a forward outboard bearing. Work and cutter datums
-remain compatible with `HobbingAxes`; relocating supports must not move those datums.
-All designed steel dimensions and structural properties are assumed engineering
-inputs. This is a checked CAD layout, not a released manufacturing drawing set.
+This is a pure vertical hobber. The direct-drive C table is fixed; X moves the
+column towards the table on twin bed guides, Z moves the head on the column,
+A swivels directly on the Z saddle, and Y shifts the hob on twin rails.
+Turning belongs to the separate lathe plan. This checked design is not a released
+manufacturing drawing set: stiffness, guide preload, fits and drive friction
+remain assumed inputs.
 
-## Datums and load path
+## Coordinates and load path
 
-Coordinates are millimetres, with X radial infeed, Z parallel to the work axis,
-and Y along the untilted hob spindle. The table centre is (0, -160); the tooth-band
-start is Z=363, above a 40 mm fixture riser. A pivots about X through that cutter-centre line.
+`MACHINE_FROM_WORK` is an explicit +90° rotation about C. Work-frame radial X
+therefore becomes global Y; the untilted hob axis becomes global X. All cutting,
+synchronisation and force calculations retain their work-frame conventions.
+The frame regression compares actual assembled poses, cut boundaries and loads
+with the analytic reference chain, rather than changing the cutting definition.
 
-| Interface | Geometry |
-|---|---|
-| Bed | 650 × 750 × 120 mineral cast, with separately listed cast-in steel inserts |
-| Column | 200 × 180 × 850, origin (0, 280, 140); front insert faces Y=180 |
-| Z guides | Two HGR15 rails, X=±55, axis Y=165, Z=205..955; two blocks per rail, 110 mm longitudinal spacing |
-| Z saddle | Block mounting plane Y=152; horizontal X rail mounting deck Z=695 |
-| X guides | Two HGR15 rails, Y=±45, X=-80..220, axis Z=710; two blocks per rail, 100 mm longitudinal spacing |
-| X bridge | Block mounting face Z=723; closed steel box crossbeam and side upright; swivel mounting plane X=200 before X translation |
-| A yoke | Machined mounting face X=90 at the swivel head; overhead roof Z=515..535 |
-| Y guide | Inverted HGR15 rail, axis Z=500, Y=-40..-280; two blocks separated by 100 mm |
-| Y saddle | Block mounting plane Z=487; two bored Ø90 spindle saddles and an outboard-support hanger |
-| Outboard | Housing Y=-245..-275; centred 6002 bearing, 15 × 32 × 9; Ø15 stepped arbor nose |
+The bed is 1000 × 650 × 210 mm, with a work well and drain below the table.
+Its table seat, two column rail seats, drive seat and lifting points use shared
+`machinekit.structural` casting recipes and separately listed steel inserts.
+Precision mounts land on inserts, never on mineral cast. The recessed column is
+400 × 200 × 500 mm, on a steel carriage and twin preloaded HGR25 bed rails.
+Z uses twin 480 mm HGR15 rails with four blocks. A bolts directly to its saddle;
+Y uses twin HGR15 rails and four blocks. Ground screws and linear scales serve
+all three translations; screw manufacturing grades and preload need procurement
+confirmation.
 
-The rail base and block-top datums are different: HGR15 rail height is 15 mm,
-assembled block height 28 mm. Mounts explicitly use these offsets. Four blocks on
-Z and X, and two on Y, provide separated supports for carriage moments. Rail checks
-include block half-length, 20 mm end margins and the declared 5 mm overtravel.
+| Quantity | Previous overhead bridge | Moving column |
+|---|---:|---:|
+| X guide-plane to hob centre | 347 mm | 121 mm |
+| Z guide-plane to hob centre | 325 mm | 125 mm |
+| Y guide-plane to hob centre | 137 mm | 137 mm |
+| X moving mass | 81.71 kg | See generated layout report |
+| Z moving mass | 106.79 kg | See generated layout report |
+| Y moving mass | 18.01 kg | See generated layout report |
+| Machine mass | 351.61 kg | See generated layout report |
 
-A 40 mm steel riser lifts the mandrel and the complete cutter/stage datums together.
-It keeps the spindle and saddle clear of the table at the full ±15 degree tilt,
-without changing the sleeve-to-tooth-band support or cutter-to-work kinematics.
+Offsets are distances to the nearest guide plane, not predictions of angular
+stiffness. Masses include generated bodies at their stated material densities;
+`layout-metrics` reports the current masses and continuous-drive thrust margins.
+Drive demand includes 0.5 m/s² acceleration, Z gravity, assumed 100 N process load
+and 100 N friction, with 20% continuous-thrust reserve. These assumptions do not
+replace the HB10 measured-load report or modal analysis.
 
-The X bridge passes outside the fixed X deck. Its nut carrier passes through a
-longitudinal deck slot. The A/Y swing sits below the overhead X drive tray. The
-column sits behind the spindle's rear swept envelope. These are designed clear
-lanes; there are no cuts made by subtracting arbitrary neighbouring parts.
+## Travel, fixture and support
 
-## Drives and interfaces
+The target envelope is flexspline outside diameter 25–140 mm, face width up to
+20 mm. X retracts to 250 mm for top loading; Z spans -10..190 mm, Y ±10 mm,
+and A ±15°. Guide checks include block length, end margins and overtravel.
+An integral 40 mm flange and mandrel base replaces the stacked riser assembly;
+it preserves tooth-band height and tilt clearance. The mandrel sleeve continues
+to support the toothed rim.
 
-Each screw has fixed/floating bearing seats, a motor mounting plate with shaft
-passage, a nut flange seat with screw passage, and a backed linear-scale strip.
-X and Y retain assumed 400 W servos. Z uses the assumed 750 W family for the larger
-moving structure; its larger shaft has its own mounting passage, coupling clearance and 60 mm input
-journal (50 mm on X/Y). `BallScrew` persists this journal dimension and uses it
-in geometry and axial compliance. Drive ratings
-must be evaluated against the generated physical masses, not the old box model.
+The spindle locates the arbor axially. The outboard 15 × 32 × 9 mm radial bearing
+is explicitly axially floating (±1 mm assumed allowance); its 22 mm journal
+provides the required float margin. It is not a second locating bearing pair.
+Fits, retention hardware, lubrication and demonstrated radial stiffness remain
+manufacturing-design work.
 
-The spindle remains at the original gauge line; only the arbor's forward extension
-changes. Its 175 mm length ends in a 20 mm long Ø15 bearing journal. The hob stays
-at Y=-140..-180. The outboard housing has a 9 mm bearing recess and Ø16.2 shaft
-passage, rather than an empty Ø32 through bore. Bearing fits, retention and spindle
-preload still require detailed manufacturing design.
+## Chips and enclosure
 
-Rails, table, column and Z-drive frame land on steel inserts. Finished insert
-positions and tolerances remain explicit in the shared structural components.
-The casting body is never the precision mounting surface. The larger bed/column
-use shared `machinekit.structural` recipes. Legacy HB5 recipes retain their original
-foundation dimensions and insert locations when loaded.
+A sloped annular table guard drains into the tray below the work. A drilled
+coolant-manifold placeholder reserves flushing provision. Four rigid rail-end
+shields cover non-travelled guide segments; moving bellows are a reserved
+provision, not a validated fabricated guard. The enclosure recipe reserves
+the machine envelope and top loading opening; its panels are currently omitted
+from the assembly at the user’s request for unobstructed inspection. Door interlocks,
+fluid containment and a complete conveyor are not implemented.
 
-The electrical hardware is on a separate floor-supported backplate. Six drives
-have 20 mm lateral gaps, with the rectifier below. This rack is an assembly-layout
-item; enclosure, cooling, wiring, guards and service access are detailed design work.
+## Acceptance and remaining work
 
-## Verification and scope
+Mechanical checks cover mounted-solid contact, insert-only precision mounts,
+rail margins, connected fabricated saddles and persistence. Exact-solid audits
+check the initial/cutting poses and the declared X/Y/Z/A grid, permitting only
+the intentional hob/blank cutting intersection. A grid is sampled clearance
+evidence, not a continuous swept-volume proof.
 
-Run `./machinekit/examples/flexspline-hobber/check-layout.sh` for physical contacts,
-connected weldments, full assembly save/reload, guide alignment/end margins,
-cutting kinematics and exact-solid audits. `initial` omits the travel grid.
-The check reuses native providers without rebuilding them. Paths can be supplied
-with `HOBBER_NATIVE_CACHE`, `HOBBER_STOCK_NATIVE` and `HOBBER_LAYOUT_EVIDENCE`.
-
-The exact audit includes fixed neighbours and joint neighbours. Fixed rigid pairs
-are intersected once and reuse their invariant common volume; they are never
-excluded. The only permitted positive common volume is hob/blank cutting engagement.
-Tolerance is 0.001 mm³. Travel samples cover the initial pose and all combinations
-of lower/middle/upper X/Y/Z and A=-15/0/+15 degrees, for both gear configurations.
-B/C remain at zero in this mechanical grid; rotating detail envelopes need separate
-qualification. This is **sampled clearance**, not a continuous swept-volume or tolerance-stack proof.
-
-The raised structure, longer arbor and changed moving masses require new physical
-stiffness, gravity-load, modal and thermal assessment before machine acceptance.
-Bolt patterns, weld preparation, ground-seat tolerances, support retention, guards,
-homing and end stops must be detailed before fabrication. Phase D owns structural/
-modal FEA, including the approximately 600 Hz gash excitation; HB14 owns lumped
-thermal behaviour. The existing HB4/HB11 numerical cuts keep their frozen artifacts
-and original scope; they do not certify this new structure's stiffness.
+HB6 now concerns this moving-column assembly, integrated fixture, twin Y rails,
+floating outboard support and chip/loading provisions. HB9's app smoke check is
+a coarse physical cut; it cannot establish reference ISO grade or HB12's full
+reference cycle-time acceptance. Frozen HB4/HB11 cuts use their original layout
+and remain separate evidence. Structural/modal analysis, spindle/mandrel sag,
+thermal behaviour and detailed manufacturing release remain open plan items.

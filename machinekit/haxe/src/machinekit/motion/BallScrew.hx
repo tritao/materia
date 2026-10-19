@@ -17,9 +17,11 @@ class BallScrew extends LeadScrew {
 	public static inline var JOURNAL_LENGTH:Float = 25;
 	public static inline var INPUT_JOURNAL_LENGTH:Float = 50;
 	public final inputJournalLength:Float;
-	public function new(length:Float, inputJournalLength:Float = INPUT_JOURNAL_LENGTH) {
+    /** Procurement requirement only; ground does not certify a lead-error grade. */
+    public final ground:Bool;
+	public function new(length:Float, inputJournalLength:Float = INPUT_JOURNAL_LENGTH, ground:Bool = false) {
 		super(race(), length);
-		this.inputJournalLength = inputJournalLength;
+		this.inputJournalLength = inputJournalLength;this.ground=ground;
 		if (!Math.isFinite(inputJournalLength) || inputJournalLength < JOURNAL_LENGTH) throw "Input journal must accommodate its bearing seat";
 		if (length <= inputJournalLength + JOURNAL_LENGTH) throw "Ball screw needs a race between its journals";
 		addConnector("retainer", Mount, machinekit.component.Solids.axial(0, 0, BallScrewRetainer.STATION));
@@ -76,10 +78,10 @@ class BallScrew extends LeadScrew {
 	static var ballRecipe:Null<ComponentType>;
 	public static function ballRecipeType():ComponentType {
 		if (ballRecipe == null) ballRecipe = new ComponentType("machinekit.motion.ball-screw",
-			[ComponentRecipeSupport.length("length", 400),ComponentRecipeSupport.length("inputJournalLength",INPUT_JOURNAL_LENGTH)], v -> new BallScrew(v.number("length"),v.number("inputJournalLength")));
+			[ComponentRecipeSupport.length("length", 400),ComponentRecipeSupport.length("inputJournalLength",INPUT_JOURNAL_LENGTH),ComponentRecipeSupport.flag("ground",false)], v -> new BallScrew(v.number("length"),v.number("inputJournalLength"),v.boolean("ground")));
 		return ballRecipe;
 	}
 	override public function componentType():Null<ComponentType> return ballRecipeType();
 	override public function values():ComponentValues return new ComponentValues()
-		.setNumber("length", totalLength).setNumber("inputJournalLength",inputJournalLength).setToken("material", materialSpec());
+		.setNumber("length", totalLength).setNumber("inputJournalLength",inputJournalLength).setBoolean("ground",ground).setToken("material", materialSpec());
 }

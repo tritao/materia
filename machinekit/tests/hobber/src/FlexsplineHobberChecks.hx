@@ -67,7 +67,7 @@ class FlexsplineHobberChecks {
     var model=new AssemblyModel("mm");machine.addTo(model,"");var state=model.initialState();
     var parts=new PosedParts();
     try {
-      for(x in [machine.travel[0].lower,100.0])for(y in [-10.0,10])for(z in [-10.0,60])for(a in [-Math.PI/12,Math.PI/12]){
+      for(x in [machine.travel[0].lower,machine.travel[0].upper])for(y in [-10.0,10])for(z in [-10.0,190])for(a in [-Math.PI/12,Math.PI/12]){
         var b=0.73,c=1.13;state.setJoint("X",x);state.setJoint("Y",y);state.setJoint("Z",z);
         state.setJoint(FlexsplineHobber.A,a);state.setJoint(FlexsplineHobber.B,b);state.setJoint(FlexsplineHobber.C,c);state.forwardKinematics();
         var actual=machine.hobToWork(state),expected=new HobbingAxes(x,y,z,a,b,c).pose();
@@ -81,10 +81,10 @@ class FlexsplineHobberChecks {
           for(id in ["mandrel","table/platen"]){var p=machine.components().filter(m->m.id==id)[0].component;
             var fixture=parts.posed(p,state.worldPose(id));
             try {
-              // Native bounds prove separating planes: radial for the cylindrical mandrel,
-              // axial for the table. This is a conservative clearance lower bound.
-              var toolBox=cutter.shape.bounds(),fixtureBox=fixture.shape.bounds();
-              var gap=id=="mandrel"?toolBox.get_min().get_x()-fixtureBox.get_max().get_x():toolBox.get_min().get_z()-fixtureBox.get_max().get_z();
+              // The integral flange is wider than the sleeve but below the tool.
+              // Check the actual solids rather than a whole-fixture radial AABB.
+              var volume=PosedParts.sharedVolume(cutter,fixture),gap=cutter.distance(fixture);
+              check(volume<1e-6,'hob intersects $id at travel corner: $volume mm3');
               check(gap>0.05,'hob clearance from $id at travel corner: $gap mm');
             }catch(e:Dynamic){fixture.close();throw e;}fixture.close();}
         }catch(e:Dynamic){cutter.close();throw e;}cutter.close();
@@ -245,6 +245,10 @@ class FlexsplineHobberChecks {
     Sys.println('Reference load ratings: $assertions checks passed');
   }
   public static function main():Void {
+    if(Sys.args().length>0&&Sys.args()[0]=="ge-range"){HobberGERangeChecks.run();return;}
+    if(Sys.args().length>1&&Sys.args()[0]=="scene-bounds"){Sys.println(haxe.Json.stringify(FlexsplineHobberLayoutReport.sceneBounds(Sys.args()[1])));return;}
+    if(Sys.args().length>0&&Sys.args()[0]=="ge-frame"){HobberGEFrameChecks.run();return;}
+    if(Sys.args().length>0&&Sys.args()[0]=="layout-metrics"){Sys.println(haxe.Json.stringify(FlexsplineHobberLayoutReport.measure(new FlexsplineHobber())));return;}
     if(Sys.args().length>0&&Sys.args()[0]=="installation"){HobberInstallationChecks.run();return;}
     if(Sys.args().length>0&&Sys.args()[0]=="interferences"){HobberInterferenceChecks.run();return;}
     if(Sys.args().length>0&&Sys.args()[0]=="reference-budget"){FlexsplineHobberBudget.run(Sys.args().slice(1));return;}

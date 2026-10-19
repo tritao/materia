@@ -1,5 +1,5 @@
 import materia.assembly.AssemblyFrames as F;
-import machinekit.standard.DeepGrooveBearing;
+import machinekit.hobbing.FloatingRadialBearing;
 import gearkit.GearSpec;
 import stockkit.hobbing.HobbingAxes;
 
@@ -59,12 +59,12 @@ class HobberInstallationChecks {
         near(tool.x,0,"tool/arbor coaxial X");near(tool.y,0,"tool/arbor coaxial Y");near(tool.z,seatStart,"tool begins at seat datum");
         var axis=F.transformVector(tool,0,0,1);near(axis.x,0,"tool axis X");near(axis.y,0,"tool axis Y");near(axis.z,1,"tool axis Z");
         near(tool.z+hob.parameterNumber("height"),seatEnd,"tool ends at seat datum");
-        var bearing:DeepGrooveBearing=cast machine.components().filter(m->m.id=="outboardBearing")[0].component;
+        var bearing:FloatingRadialBearing=cast machine.components().filter(m->m.id=="outboardBearing")[0].component;
         var support=F.compose(F.inverse(state.worldPose("spindle/arbor")),state.worldPose("outboardBearing"));
         near(support.x,0,"support bearing coaxial X");near(support.y,0,"support bearing coaxial Y");
         var supportAxis=F.transformVector(support,0,0,1);near(supportAxis.z,1,"support bearing axis");
-        near(bearing.bore,arbor.parameterNumber("supportDiameter"),"support journal nominal bore fit");
-        check(support.z>=arbor.parameterNumber("height")-arbor.parameterNumber("supportLength")-1e-8&&support.z+bearing.width<=arbor.parameterNumber("height")+1e-8,"bearing width lands on support journal");
+        near(bearing.parameterNumber("bore"),arbor.parameterNumber("supportDiameter"),"support journal nominal bore fit");
+        check(support.z>=arbor.parameterNumber("height")-arbor.parameterNumber("supportLength")-1e-8&&support.z+bearing.parameterNumber("height")<=arbor.parameterNumber("height")+1e-8,"bearing width lands on support journal");
       }
       mounts();
       var actual=machine.hobToWork(state),expected=new HobbingAxes(state.joint("X"),state.joint("Y"),state.joint("Z"),state.joint(FlexsplineHobber.A),0,state.joint(FlexsplineHobber.C)).poseValues();
@@ -82,7 +82,7 @@ class HobberInstallationChecks {
       check(touches>0&&minR<machine.spec.tipRadius(),"generating rake edges reach toothed rim at inspection setup");
       var tilt=state.joint(FlexsplineHobber.A),phase=state.joint(FlexsplineHobber.C);
       var poses=0;
-      for(x in [machine.travel[0].lower,(machine.travel[0].lower+100)/2,100.0])for(y in [-10.0,0,10])for(z in [-10.0,25,60])for(a in [-Math.PI/12,0.0,Math.PI/12])for(b in [0.0,0.73,Math.PI]){
+      for(x in [machine.travel[0].lower,(machine.travel[0].lower+machine.travel[0].upper)/2,machine.travel[0].upper])for(y in [-10.0,0,10])for(z in [-10.0,90,190])for(a in [-Math.PI/12,0.0,Math.PI/12])for(b in [0.0,0.73,Math.PI]){
         state.setJoint("X",x);state.setJoint("Y",y);state.setJoint("Z",z);state.setJoint(FlexsplineHobber.A,a);state.setJoint(FlexsplineHobber.B,b);state.forwardKinematics();mounts();poses++;
       }
       rows.push({reference:reference,poses:poses,toolSeatStartMm:seatStart,toolSeatEndMm:seatEnd,boreMm:hob.parameterNumber("bore"),nominalDiametralClearanceMm:0,spindleHousingAxialGapMm:nearGap,outboardHousingAxialGapMm:farGap,
