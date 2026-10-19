@@ -100,7 +100,7 @@ class ViewportCoordinatesTests {
         ui.events.pointerMove(x,y);
         check(viewport.hoveredId()=="target","hover uses viewport-local layout coordinates");
         ui.events.pointerDown(x,y,0);
-        check(scene.selectedId=="target" && viewport.objectDrag!=null,"press selects and grabs the visible object");
+        check(viewport.objectDrag==null,"press waits for click release or drag threshold");
         ui.events.pointerMove(x+36,y-18);
         ui.events.pointerUp(x+36,y-18,0);
         var target=scene.object("target");

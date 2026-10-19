@@ -15,6 +15,7 @@ import materia.assembly.AssemblyDefinition;
  * keep parts in one body; moving joints nest bodies under their carrier. Explicit include paths
  * group sibling bodies and the parts inside each body without changing physical ownership.
  */
+@:access(app.EditorScene)
 class EditorSceneTree implements TreeViewModel {
   public var canChangeVisibility:Null<Void->Bool>;
   public var onVisibilityChanged:Null<Void->Void>;
@@ -28,7 +29,10 @@ class EditorSceneTree implements TreeViewModel {
   var syncedTreeKey:String = "";
   /** Complete root-to-row path; includes every rigid-body group and a CAD feature's owning part. */
   public function selectionPath():Array<String> {
-    var key = selectionKey();
+    return objectPath(selectionKey());
+  }
+  /** Authored tree path for a physical object, independent of expansion and search. */
+  public function objectPath(key:String):Array<String> {
     if (key == "scene") return ["scene"];
     var path = [key], cursor = key;
     var marker = cursor.indexOf(":feature:");
@@ -48,16 +52,45 @@ class EditorSceneTree implements TreeViewModel {
     syncedSelectionRevision=scene.selectionRevision;syncedSelectionKey=key;syncedTreeKey=tree.key;
   }
   public function selectKey(key:String):Void {
+    var previous = selectionKey();
     if (isGroup(key)) {
       scene.select("scene");selectedGroup=key;groupSelectionRevision=scene.selectionRevision;
-    } else { selectedGroup=null;scene.selectTreeKey(key); }
+      if (previous != key) {
+        // Publish the new tree-only selection as well as its 3D highlight.
+        groupSelectionRevision=scene.selectionRevision+1;
+        scene.refreshSelectionRevision();
+      }
+    } else {
+      selectedGroup=null;
+      if(!scene.selectTreeKey(key) && previous!=selectionKey())scene.refreshSelectionRevision();
+    }
+  }
+  /** One level per completed click; an unrelated selection starts again at the outer group. */
+  public function pickedKey(id:String, continueDrill:Bool):String {
+    var path=objectPath(id);
+    if(path.length<2)return "scene";
+    var index=continueDrill ? path.indexOf(selectionKey()) : -1;
+    return path[Std.int(Math.min(path.length-1,index<1 ? 1 : index+1))];
+  }
+  var selectedMembersKey="";
+  var selectedMembers:Array<String> =[];
+  public function selectedObjects():Array<String> {
+    var key=selectionKey();
+    // Authored membership is fixed for this tree's lifetime; moving or hiding a member does not change it.
+    if(key!=selectedMembersKey) {selectedMembersKey=key;selectedMembers=key=="scene" ? [] : visibilityMembers(key);}
+    return selectedMembers;
   }
   /** Resolve the whole subtree, independent of filtering and expansion. CAD features have no separate object visibility. */
   public function visibilityMembers(key:String):Array<String> {
+    var marker=key.indexOf(":feature:");
+    if(marker>=0)key=key.substr(0,marker);
     if (key=="scene") return [for(item in scene.items()) item.id];
-    var result:Array<String> = [];
+    if(!visibilityGroup(key))return scene.object(key)==null ? [] : [key];
+    var objectIds:Map<String,Bool> =[];for(item in scene.items())objectIds.set(item.id,true);
+    var visited:Map<String,Bool> =[],result:Array<String> = [];
     function visit(id:String):Void {
-      if(scene.object(id)!=null && result.indexOf(id)<0) result.push(id);
+      if(visited.exists(id))return;visited.set(id,true);
+      if(objectIds.exists(id)) result.push(id);
       var descendants=children.get(id);
       if(descendants!=null)for(child in descendants)visit(child);
     }
@@ -185,6 +218,7 @@ class EditorSceneTree implements TreeViewModel {
    */
   public function new(scene:EditorScene, ?definition:AssemblyDefinition, ?generatedLabels:Map<String, String>) {
     this.scene = scene;
+    scene.selectionObjects=selectedObjects;
     this.generatedLabels = generatedLabels == null ? new Map() : generatedLabels;
     if (definition == null) return;
     var bodies = AssemblyBodies.of(definition);

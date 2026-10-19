@@ -188,6 +188,14 @@ acceleration); `workOffset` is G54 in machine coordinates, in the assembly's uni
 compiles the program with CncKit and streams it to the machine through MotionKit
 (`CncProgramPlayer`); a compile or travel error fails the simulation build.
 
+In the 3D viewport, a completed left click selects the outer group under the pointer.
+Repeated clicks at the same point descend one hierarchy level at a time, stopping at the part;
+clicking elsewhere or changing the view starts again at the outer group. A drag moves the part
+without drilling. The Scene tree expands ancestors and scrolls to the selected row. Space in the
+viewport or tree toggles the selection's visibility using the eye button's undoable operation;
+a hidden part or group stays selected so a second press shows it again. Holding Space does not
+repeat the toggle, and typing in a text field does not change visibility.
+
 - The hierarchy's Add menu groups primitive, CAD, feature, and import commands.
   Search filters objects by name or type and includes matching CAD features.
   Duplicate (`Ctrl+D`) and Delete sit beside Add; double-click a tree row to frame

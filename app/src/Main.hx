@@ -807,9 +807,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
       else finishClose();
     };
     treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
+    treeModel.canChangeVisibility = function() return !documents.blocked();
+    treeModel.onVisibilityChanged = function() {commands.refresh();invalidateView();};
     if (hostContext != null) {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
         hostContext);
+      perspectiveViewport.selectionTree=treeModel;
       perspectiveViewport.setSampleCount(antialiasing);
       perspectiveViewport.setLightingPreset(lightingPreset);
       var preferredView = session.initialView;
@@ -2234,11 +2237,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
         workspace.activate("machine-control");
       }
       treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
+      treeModel.canChangeVisibility = function() return !documents.blocked();
+      treeModel.onVisibilityChanged = function() {commands.refresh();invalidateView();};
       treeModel.setFilter(hierarchySearch);
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :
         new EditorPerspectiveViewport("scene-perspective", scene, hostContext);
       if (perspectiveViewport != null) {
+        perspectiveViewport.selectionTree=treeModel;
         perspectiveViewport.setSampleCount(antialiasing);
         perspectiveViewport.setLightingPreset(lightingPreset);
         var preferredView = session.initialView;

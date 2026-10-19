@@ -184,15 +184,19 @@ class ScenePresentation {
         }
       }
     }
-    var selected = owner.object(owner.selectedId);
+    var selectedObjects=owner.selectionObjects;
+    var selectedIds=selectedObjects==null ? [owner.selectedId] : selectedObjects();
     var selection = new SelectionSet();
-    if (selected != null) {
+    var selectedKeys:Map<String,Bool> = [];
+    for(id in selectedIds)selectedKeys.set(id,true);
+    for(selected in owner.objects) {
+      if(!selectedKeys.exists(selected.id))continue;
       var workerVisual = owner.workerVisuals.get(selected.id);
       if (workerVisual == null) selection.add(owner.runtimeFor(selected.id).node);
       else for (node in workerVisual.character.model.primitiveNodes) selection.add(node);
+      threadHighlights.set(selected.id, selectionMaterial);
     }
     view.applySelection(selection, selectionMaterial);
-    if (selected != null) threadHighlights.set(selected.id, selectionMaterial);
     var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
       ? null : faceHoverNodes.get(hoveredId);
     var faceHoverShown = faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex;

@@ -270,6 +270,8 @@ class EditorScene {
   public var selectionRevision(get, never):Int;
   function get_selectionRevision():Int return selection.revision;
   public var onSelectionChanged:Null<Void->Void> = null;
+  /** Optional hierarchy selection, including members of a selected assembly group. */
+  public var selectionObjects:Null<Void->Array<String>> = null;
   var disposed:Bool = false;
 
   function profileLoadStart():Float

@@ -38,6 +38,17 @@ class EditorPerspectiveViewport implements View {
 
   public final key:String;
   final scene:EditorScene;
+  public var selectionTree:Null<EditorSceneTree> = null;
+  var lastPickId = "";
+  var lastPickKey = "";
+  var lastPickX = 0.0;
+  var lastPickY = 0.0;
+  var lastPickCameraRevision = -1;
+  var pressLocalX = 0.0;
+  var pressLocalY = 0.0;
+  var pressObjectId = "scene";
+  var pressButton = -1;
+  var dragAttempted = false;
   final host:UiHostContext;
   var renderer:Null<SceneRenderer> = null;
   final style:LayoutStyle;
@@ -657,7 +668,20 @@ class EditorPerspectiveViewport implements View {
     return Math.acos(Math.max(-1.0,Math.min(1.0,dot)));
   }
 
-  function selectAt(localX:Float,localY:Float):String {
+  function selectAt(localX:Float,localY:Float, drill:Bool=false):String {
+    var tree=selectionTree;
+    if(drill && tree!=null) {
+      var hit=pick(localX,localY);
+      var again=hit==lastPickId && tree.selectionKey()==lastPickKey && camera.revision==lastPickCameraRevision &&
+        Math.abs(localX-lastPickX)<5 && Math.abs(localY-lastPickY)<5;
+      var key=tree.pickedKey(hit,again);
+      if(key!=hit || key=="scene") tree.selectKey(key);
+      else selectAt(localX,localY,false);
+      lastPickId=hit;lastPickKey=tree.selectionKey();lastPickX=localX;lastPickY=localY;lastPickCameraRevision=camera.revision;
+      host.requestFrame();return hit;
+    }
+    lastPickId="";
+
     if(!editingEnabled()){var id=pick(localX,localY);scene.select(id);return id;}
     fitCameraClipRange();
     var ray=camera.screenRay(localX,localY,viewportWidth,viewportHeight);
@@ -1100,16 +1124,9 @@ class EditorPerspectiveViewport implements View {
       }
       navigationPointer = event.pointerId;
       navigationMode = 7; // Selection without camera movement.
-      if (event.button == 0) {
-        var hit = pick(event.localX, event.localY);
-        if (hit != "scene"&&editingEnabled()) {
-          selectAt(event.localX,event.localY);
-          objectDrag = PerspectiveSceneDrag.begin(scene, camera, hit, event.localX, event.localY,
-            viewportWidth, viewportHeight, gridSnapEnabled, gridStep);
-          if (objectDrag != null) navigationMode = 3;
-          else if (beginAssemblyDrag(event.localX, event.localY)) navigationMode = 5;
-        }
-      }
+      pressLocalX=event.localX;pressLocalY=event.localY;pressButton=event.button;
+      pressObjectId=event.button==0 ? pick(event.localX,event.localY) : "scene";
+      dragAttempted=false;
       pointerX = event.x; pointerY = event.y;
       pointerStartX = event.x; pointerStartY = event.y; pointerMoved = false;
       event.capturePointer(); event.preventDefault(); event.stopPropagation();
@@ -1124,6 +1141,14 @@ class EditorPerspectiveViewport implements View {
       pointerX = event.x; pointerY = event.y;
       if (Math.abs(event.x - pointerStartX) >= 3.0 || Math.abs(event.y - pointerStartY) >= 3.0)
         pointerMoved = true;
+      if(navigationMode==7 && pointerMoved && !dragAttempted && pressButton==0 && editingEnabled() && pressObjectId!="scene") {
+        dragAttempted=true;
+        selectAt(pressLocalX,pressLocalY);
+        objectDrag=PerspectiveSceneDrag.begin(scene,camera,pressObjectId,pressLocalX,pressLocalY,
+          viewportWidth,viewportHeight,gridSnapEnabled,gridStep);
+        if(objectDrag!=null)navigationMode=3;
+        else if(beginAssemblyDrag(pressLocalX,pressLocalY))navigationMode=5;
+      }
       var sketchDrag = sketchRectangleDrag;
       if (navigationMode == 1) {
         var pivot = orbitPivot;
@@ -1190,8 +1215,8 @@ class EditorPerspectiveViewport implements View {
         }
         sketchRectangleDrag = null;
         sketchDragRevision++;
-      } else if (event.kind == UiEventKind.PointerUp && navigationMode == 7 && !pointerMoved)
-        selectAt(event.localX,event.localY);
+      } else if (event.kind == UiEventKind.PointerUp && navigationMode == 7 && !pointerMoved && pressButton==0)
+        selectAt(event.localX,event.localY,true);
       navigationPointer = null; navigationMode = 0;
       clearFlyKeys();
       if (wasOrbiting) host.requestFrame();
@@ -1215,11 +1240,12 @@ class EditorPerspectiveViewport implements View {
       host.requestFrame();
       event.preventDefault(); event.stopPropagation();
     });
-    node.on(UiEventKind.KeyUp, function(event:UiEvent) { flyKey(event, false); });
-    node.on(UiEventKind.KeyRepeat, function(event:UiEvent) { flyKey(event, true); });
+    node.on(UiEventKind.KeyUp, function(event:UiEvent) { if(!visibilityKey(event))flyKey(event, false); });
+    node.on(UiEventKind.KeyRepeat, function(event:UiEvent) { if(!visibilityKey(event))flyKey(event, true); });
     node.on(UiEventKind.Blur, function(_) { clearFlyKeys(); });
     node.on(UiEventKind.FocusLost, function(_) { clearFlyKeys(); });
     node.on(UiEventKind.KeyDown, function(event:UiEvent) {
+      if(visibilityKey(event))return;
       if (flying() && event.key == UiKey.Escape) {
         clearFlyKeys();
         event.cancelPointerCapture(); event.preventDefault(); event.stopPropagation();
@@ -1259,6 +1285,18 @@ class EditorPerspectiveViewport implements View {
       navigationPointer = null; navigationMode = 0;
       event.releasePointer(); event.preventDefault(); event.stopPropagation();
     });
+  }
+
+  function visibilityKey(event:UiEvent):Bool {
+    if(event.key!=UiKey.Space || event.modifiers!=0 || flying() || scene.hasActiveSketchEdit())return false;
+    event.preventDefault();event.stopPropagation();
+    if(event.kind==UiEventKind.KeyDown && navigationPointer==null && matePick==null && editingEnabled()) {
+      var tree=selectionTree;
+      if(tree!=null) {if(tree.selectionKey()!="scene")tree.toggleVisibility(tree.selectionKey());}
+      else if(scene.selectedId!="scene")app.editor.SceneVisibility.toggle(scene,scene.selectedId,[scene.selectedId],false);
+      clearHover();host.requestFrame();
+    }
+    return true;
   }
 
   function sketchPlanePoint(localX:Float, localY:Float):Null<Vector> {
