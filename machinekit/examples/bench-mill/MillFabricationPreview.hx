@@ -51,13 +51,14 @@ class MillFabricationPreview {
 		var destination = root + "/build/tooling/" + name,
 			dir = destination + "-stage";
 		removeGenerated(dir);
-		sys.FileSystem.createDirectory(dir);
+		machinekit.tooling.ToolingFiles.directory(dir);
 		var frame = MillMoldSetup.frame(),
 			p = CastingMoldPlanner.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
 		var f = ToolingFabrication.plan(p, MillFabricationSetup.spec());
 		var process = processSpec(p.document.recipe);
 		if (process.recipeFingerprint != ToolingCodec.recipeFingerprint(p.document.recipe))
 			throw "Stale process recipe fingerprint";
+		materia.tooling.process.CastingProcessAnalysis.validateSectionSources(p.document, process);
 		var checks:Array<ToolingValidation> = [];
 		var geometricReview:Null<machinekit.tooling.CastingMoldCad.CastingMoldReview> = null;
 		if (!recordsOnly) {
@@ -68,6 +69,7 @@ class MillFabricationPreview {
 			if (Sys.args().indexOf("--checks") >= 0)
 				MillMoldChecks.run(frame, p, review);
 			CastingMoldExport.write(p, dir, review);
+			machinekit.tooling.MoldPlayback.write(p, review, dir);
 			checks.push(ToolingLoads.check("fabrication.geometry-and-sequence", [p.document.input.id], ToolingCheckStatus.Pass,
 				"Exact source reconstruction, boundary coverage, assembly/demolding sweeps and portable assembly restoration passed.", [review.fingerprint]));
 		} else {
@@ -151,6 +153,7 @@ class MillFabricationPreview {
 		sys.io.File.saveContent(dir + "/machining-instructions.md",
 			"# Panel machining review\n\nPrograms are LinuxCNC review outputs in mm. Settings originate in metres and m/s. Do not substitute relief cutters without regenerating the plan.\n\nEach program uses G54 with Z0 at the face being machined. XY starts at the raw blank lower left; the finished bounding profile is offset by the declared blank margin. Negative-Z setups reflect X about the finished profile midline: flip about local Y and re-establish the origin. Operation order clears named access pockets first and releases the outside profile last, after other faces. CAM checks supplied stock, fixtures and travel; an empty fixture list does not qualify workholding.\n\nRetain the part for the final contour with a qualified fixture/spoilboard or tabs specified by a revised operation plan. Through cuts stop at the declared stock bottom; no undeclared breakthrough allowance is applied. Fit-coupon programs and locator-coupon programs use the same settings. Resolve every blocking fabrication-validation.json record before fabrication release.\n");
 		checks = checks.concat(machinekit.tooling.ToolingProcessExport.write(p, process, f.spec.gravityMps2, dir, geometricReview));
+		MillMoldStudy.write(MillMoldStudy.study(frame, geometricReview, !recordsOnly, process), dir);
 		ToolingPackageManifest.write(dir, f, checks);
 		ToolingPackageManifest.verify(dir);
 		if (Sys.args().indexOf("--checks") >= 0) {

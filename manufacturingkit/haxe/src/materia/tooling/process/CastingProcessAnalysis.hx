@@ -16,6 +16,7 @@ typedef CastingProcessReport = {
 	var spec:CastingProcessSpec;
 	var fill:FillReport;
 	var cure:CureReport;
+	var sections:OrthogonalSections.OrthogonalSectionReport;
 	var validation:Array<materia.tooling.ToolingValidation>;
 	var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
 }
@@ -24,6 +25,18 @@ typedef CastingProcessReport = {
  * its requests or substitute a separate geometry/readiness decision.
  */
 class CastingProcessAnalysis {
+	public static function validateSectionSources(document:materia.tooling.ToolingDocument, spec:CastingProcessSpec):Void {
+		var knownIds = [document.input.id];
+		for (feature in document.input.features)
+			knownIds.push(feature.id);
+		for (insert in document.input.inserts)
+			knownIds.push(insert.id);
+		for (section in spec.sections)
+			for (id in section.sourceIds)
+				if (knownIds.indexOf(id) < 0)
+					throw "Unknown cure section source: " + id;
+	}
+
 	public static function analyze(p:CastingMoldPlan, raw:CastingProcessSpec, gravityMps2:Float):CastingProcessReport {
 		CastingMoldPlanner.validate(p);
 		var spec = ProcessSpecCodec.snapshot(raw);
@@ -41,18 +54,16 @@ class CastingProcessAnalysis {
 		var fill = FillAnalysis.analyze(p.document.input.id, sourceFingerprint, fingerprint, resin, boundaries,
 			[for (c in p.cores) {id: c.id, boxes: [c.cavity]}], p.document.setup.fillHeightMm, p.document.recipe.mixDensityKgM3, gravityMps2,
 			spec.pourRateMm3PerSecond, spec.maximumAirEscapeWidthMm);
-		var knownIds = [p.document.input.id];
-		for (f in p.document.input.features)
-			knownIds.push(f.id);
-		for (i in p.document.input.inserts)
-			knownIds.push(i.id);
-		for (s in spec.sections)
-			for (id in s.sourceIds)
-				if (knownIds.indexOf(id) < 0)
-					throw "Unknown cure section source: " + id;
+		validateSectionSources(p.document, spec);
 		var cure = CureAnalysis.analyze(p.document.input.id, sourceFingerprint, fingerprint, spec, p.document.recipe.mixDensityKgM3,
 			p.document.recipe.core.maximumTemperatureC, p.cores.length > 0);
-		var validation = p.validation.concat(fill.validation).concat(cure.validation);
+		var sections = OrthogonalSections.analyze(p.document.input.id, sourceFingerprint, resin, boundaries);
+		var sectionChecks = sections.validation;
+		if (cure.validation.filter(v -> v.rule == "process.cure.adiabatic-bound"
+			&& v.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass)
+			.length > 0)
+			sectionChecks = sectionChecks.filter(v -> v.rule != "process.sections.junction-thickness");
+		var validation = p.validation.concat(fill.validation).concat(cure.validation).concat(sectionChecks);
 		validation.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		return {
 			version: 1,
@@ -61,6 +72,7 @@ class CastingProcessAnalysis {
 			spec: spec,
 			fill: fill,
 			cure: cure,
+			sections: sections,
 			validation: validation,
 			fabrication: materia.tooling.ToolingValidation.ToolingReadiness.evaluate(validation)
 		};

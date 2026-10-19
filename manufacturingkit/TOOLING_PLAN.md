@@ -155,10 +155,28 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   Process checks join the existing fabrication manifest and Diagnostics without
   clearing planner requests. The mill's supplier properties, temperatures,
   margin, ceiling-width limit and section definitions are intentionally unknown.
-  Remaining phase 6 work: automatic section/junction extraction, fast castability
-  rules and concrete source proposals, effort/orientation studies and sequence
-  playback; no phase 6 completion or physical release is claimed.
-  Validation: 492 pure tooling assertions (276 process), 361 native tooling
+  Further phase 6 work adds `MoldOrientationStudy`: explicit candidate documents
+  run the real planner, fabrication checks and source fill/cure analyses, with
+  fingerprint-bound CAD assessments supplied by MachineKit. Deterministic ranking
+  prioritizes completed planning/CAD checks, then failures, unsupported rules,
+  source requests and pending checks. Effort reports production panels/unique
+  geometry, production-only blank sheet utilization, EPS consumption, formers,
+  logical hardware stacks and handling mass/flip; failed planning has no invented
+  effort values. The mill compares inverted/upright/side-on setups, preserving
+  feature withdrawal directions under rotation. Alternatives retain the current
+  support policy: failure requests support redesign, not an inherent impossibility.
+  `OrthogonalSections` extracts complete opposing-face material spans along all
+  three axes, with exact volume coverage and source face ownership. Partition
+  sizes are not wall thickness. A span becomes a `CureSection` only with explicit
+  thermal boundaries; nonrectangular junction inscribed thickness stays unsupported.
+  `MoldPlayback` emits static scenes from the exact checked assembly/demolding
+  orders and expands grouped fixtures/hardware explicitly. It retains the cured
+  casting at withdrawal clearance and shows the service-orientation endpoint;
+  pending loose fixings, release and lift/flip qualifications are not cleared.
+  Remaining phase 6 work: complex junction/3D thermal coverage, fast castability
+  rules and concrete source proposals, and column orientation/design-study
+  integration. No phase 6 completion or physical release is claimed.
+  Process-foundation validation: 492 pure tooling assertions (276 process), 361 native tooling
   assertions (22 independent process/CAD) and 151 full-mill assertions pass.
   Two full generations have byte-identical manifests and all 654 artifact hashes,
   including the external `--process-spec` input path; 25 programs pass CAM checks. The current
@@ -166,6 +184,18 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   agrees with CAD. Readiness remains false: 22 passing and 147 pending records,
   including undeclared broad-ceiling/cure inputs and the existing qualification
   and source-change requirements.
+  Orientation/section/playback validation: 524 pure, 367 native and 239 full-mill
+  assertions pass. The package contains 156 checked-order scene snapshots and
+  815 hashed artifacts, with 25 checked CNC programs. Two final generations have
+  byte-identical manifests and all 815 hashes, and the assembled/released scenes
+  open successfully in Materia. Inverted is the preferred
+  review setup under the existing support policy; upright/side-on fail the
+  fill-open shared bridge requirement while still producing source fill/cure
+  reports. All three have no topological air trap in this model. Planar spans
+  reconstruct native BREP fixtures by symmetric difference on each axis. Static
+  visual-only scenes retain pending release/flip states and do not substitute
+  viewer collision boxes for the exact saved review. Actual final readiness is
+  false: 23 passing, 147 pending and one unsupported junction-thickness rule.
 - [ ] Phase 7: mill column and independent pedestal example.
 - [ ] Phase 8: physical calibration and release.
 

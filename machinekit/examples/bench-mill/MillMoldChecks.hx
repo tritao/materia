@@ -164,6 +164,45 @@ class MillMoldChecks {
 		]), "inward foot former trapped against actual casting");
 		former.close();
 		castingPart.close();
+		var review = report;
+		var memberIds = [for (m in CastingMoldCad.assembly(p).components()) m.id];
+		var playback = machinekit.tooling.MoldPlayback.frames(p, review, memberIds);
+		var install = playback.filter(f -> f.phase == machinekit.tooling.MoldPlayback.MoldPlaybackPhase.Assembly);
+		var demold = playback.filter(f -> f.phase == machinekit.tooling.MoldPlayback.MoldPlaybackPhase.Demolding);
+		check(install.length == review.assembly.assemblyOrder.length + 1, "one playback snapshot per installation plus explicit loose-hardware step");
+		for (i in 0...review.assembly.assemblyOrder.length)
+			check(install[i].stepId == review.assembly.assemblyOrder[i], "playback preserves the actual checked assembly order");
+		check(demold.length == review.demoldingSteps.length, "playback uses the actual demolding steps including release/flip");
+		check(install[install.length - 1].visibleMemberIds.length == memberIds.length, "final installation snapshot contains every hardware component");
+		check(demold[demold.length - 1].visibleMemberIds.join(",") == "cured-casting", "final scene retains the released casting");
+		check(demold[demold.length - 1].status == review.demoldingSteps[review.demoldingSteps.length - 1].status,
+			"pending lift qualification stays visible in playback");
+		memberIds.reverse();
+		check(materia.tooling.ToolingCodec.canonical(playback) == materia.tooling.ToolingCodec.canonical(machinekit.tooling.MoldPlayback.frames(p, review,
+			memberIds)),
+			"playback deterministic under member permutation");
+		var savedFingerprint = review.fingerprint, staleError = "";
+		review.fingerprint = "stale";
+		try
+			machinekit.tooling.MoldPlayback.frames(p, review, memberIds)
+		catch (error:Dynamic)
+			staleError = Std.string(error);
+		review.fingerprint = savedFingerprint;
+		check(staleError.indexOf("Stale playback review") >= 0, "playback rejects stale CAD evidence");
+		var missingError = "";
+		try
+			machinekit.tooling.MoldPlayback.frames(p, review, memberIds.filter(id -> id != "bed"))
+		catch (error:Dynamic)
+			missingError = Std.string(error);
+		check(missingError.indexOf("Unknown playback member: bed") >= 0, "playback cannot silently omit a checked member");
+		var group = review.assemblyGroups[0], cycleError = "";
+		group.members.push(group.id);
+		try
+			machinekit.tooling.MoldPlayback.frames(p, review, memberIds)
+		catch (error:Dynamic)
+			cycleError = Std.string(error);
+		group.members.pop();
+		check(cycleError.indexOf("Cyclic playback group") >= 0, "playback reports cyclic group expansion");
 		Sys.println('MillMoldChecks: $assertions assertions passed');
 	}
 }

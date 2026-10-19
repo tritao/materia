@@ -335,5 +335,20 @@ refinement. Independent native CAD fixtures verify fill volumes and connectivity
 ./haxeon/scripts/haxeon run --project=machinekit/tests/tooling/haxeon.process.json
 ```
 
-Automatic section extraction, broader design rules/proposals, orientation studies
-and sequence playback are still outstanding in phase 6.
+`OrthogonalSections` now extracts opposing-face planar material spans with exact
+three-axis coverage and source IDs, independently of Boolean box partition sizes.
+`cureSection` uses those dimensions only after the caller supplies explicit thermal
+boundaries. Complex junction inscribed thickness stays unsupported; rectangular
+solids have an exact shortest-dimension result. The report is part of process
+validation and does not clear thermal calibration or geometric coverage requirements.
+
+`MoldOrientationStudy` compares explicit same-source candidates with real mold,
+fabrication and process checks. MachineKit supplies fingerprint-bound continuous
+CAD/sweep assessments. Deterministic ranking and effort metrics expose failures,
+pending inputs, source requests, production blank yield, cores/formers, logical
+hardware stacks and handling mass/flip. Unknown geometry stays unchecked; failed
+planning never receives invented fabrication metrics. The mill example supplies
+three orientations and static checked-order playback scenes.
+
+Broader design rules/proposals, complex junction/3D thermal coverage and column
+orientation/design-study integration are still outstanding in phase 6.

@@ -306,6 +306,7 @@ class ProcessTests {
 		check(!integrated.fabrication.ready, "analysis cannot clear existing mold blockers");
 		s.recipeFingerprint = haxe.crypto.Sha256.encode("stale");
 		rejects(() -> CastingProcessAnalysis.analyze(p, s, 9.80665), "Stale process recipe");
+		OrientationSectionTests.run(p, spec());
 		Sys.println('ProcessTests: $assertions assertions passed');
 	}
 }

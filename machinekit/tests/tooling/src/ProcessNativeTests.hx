@@ -1,6 +1,8 @@
 import cadkit.modeling.Part;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.process.FillAnalysis;
+import materia.tooling.process.OrthogonalSections;
+import materia.tooling.process.OrthogonalSections.SectionAxis;
 import machinekit.tooling.ToolingBlock;
 import machinekit.component.Solids;
 
@@ -52,6 +54,24 @@ class ProcessNativeTests {
 				var below = source.intersect(mask);
 				owned.push(below);
 				check(Math.abs(below.volume() - level.mixVolumeMm3) < 1e-7, "fill curve agrees with independent BREP intersection at " + level.heightMm);
+			}
+			var sections = OrthogonalSections.analyze("fixture", "source", cells, []);
+			for (axis in [SectionAxis.X, SectionAxis.Y, SectionAxis.Z]) {
+				var pieces:Array<Part> = [];
+				for (span in sections.spans)
+					if (span.axis == axis)
+						for (strip in span.strips) {
+							var part = ToolingBlock.placedBox(strip);
+							owned.push(part);
+							pieces.push(part);
+						}
+				var rebuilt = Part.fuseAll(pieces);
+				owned.push(rebuilt);
+				var missing = source.subtract(rebuilt),
+					extra = rebuilt.subtract(source);
+				owned.push(missing);
+				owned.push(extra);
+				check(missing.volume() + extra.volume() < 1e-7, "opposing-face sections reconstruct BREP by symmetric difference on axis " + axis);
 			}
 			var mask = ToolingBlock.placedBox({
 				x: -1,

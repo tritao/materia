@@ -196,9 +196,10 @@ coverage and thermocouple calibration remain blocking. The existing assessed
 cure-peak/material check is retained. All new checks enter the final hashed
 manifest and fabrication Diagnostics alongside the existing design requests.
 
-This implements the process-analysis foundation, not all of phase 6. Automatic
-section extraction, design-rule/proposal and orientation studies, and sequence
-playback remain outstanding. The mold is still a review package.
+The process analysis now includes extracted opposing-face planar spans, the
+orientation comparison and checked-order playback described below. Complex
+junction thickness, design-rule/proposal and column studies remain outstanding.
+The mold is still a review package.
 
 
 To supply declared process properties, copy `casting-process-spec.json` outside
@@ -212,3 +213,43 @@ Use supplier/trial references for the actual mix rather than generic resin data:
 An old recipe fingerprint, unknown field/model or invalid physical input is
 rejected. Review exports may contain failing checks; always read final manifest
 readiness. No command executes a CNC program or accepts physical qualification.
+
+
+## Orientation comparison, sections and sequence scenes
+
+The full fabrication package now contains `orientation-comparison.json` and
+`.md`, `section-geometry.json`, `sequence-playback.json` and a `sequence/` folder
+of `.mtrg` snapshots. `sequence/README.md` lists scenes in order. The snapshots
+show states after each checked installation/removal, including prebonded groups,
+loose hardware, the cured casting and the final service-orientation endpoint.
+They are visual-only (no collision proxies or dynamics); exact collision and
+removal evidence remains in `review.json`. They do not simulate adhesion, EPS
+breakup, fastening or a flip trajectory.
+
+The comparison can also run independently:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.mold-study.json
+```
+
+This compares the same source and recipe in inverted, upright and side-on
+orientations under the existing feature strategies and support policy. The
+current inversion has a complete mold and exact CAD/swept-graph check. Upright
+avoids a flip, but upright/side-on cannot use the current fill-open shared core
+bridges. They need alternative support/fixture designs before a complete mold
+can be assessed. Source fill/cure reports remain available even if planning fails;
+failed candidates have no fabricated effort or source-change counts. Comparison
+never changes the selected setup or grants fabrication approval.
+
+`OrthogonalSections` measures continuous material between opposing planar faces
+on all three axes. It merges through Boolean partition boundaries, preserves
+source face IDs and verifies each axis covers the full mix volume. The output
+can supply `CureSection` thickness/source IDs when actual thermal boundary data
+are declared. Chord lengths do not establish a complex junction's inscribed
+thickness; that check remains unsupported instead of crediting a thin fragment.
+
+Authored thermal section/boundary assignments apply to the selected orientation.
+Alternative candidates reuse material properties but require their own boundary
+assignments; the comparison does not silently rotate heat sinks or convection.
+Records-only exports contain no sequence scenes and leave every candidate's CAD
+assessment pending.

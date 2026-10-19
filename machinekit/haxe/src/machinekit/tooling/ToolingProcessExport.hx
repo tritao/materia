@@ -13,7 +13,7 @@ class ToolingProcessExport {
 	public static function write(p:CastingMoldPlan, spec:CastingProcessSpec, gravityMps2:Float, dir:String,
 			review:Null<machinekit.tooling.CastingMoldCad.CastingMoldReview>):Array<ToolingValidation> {
 		var report = CastingProcessAnalysis.analyze(p, spec, gravityMps2);
-		var checks = report.fill.validation.concat(report.cure.validation);
+		var checks = report.validation.filter(v -> StringTools.startsWith(v.rule, "process."));
 		if (review == null)
 			checks.push(FillAnalysis.check("process.fill.cad-volume-agreement", [p.document.input.id], ToolingCheckStatus.Pending,
 				"Records-only fill geometry has not been cross-checked against reconstructed/source CAD.", []));
@@ -32,6 +32,7 @@ class ToolingProcessExport {
 		sys.io.File.saveContent(dir + "/casting-process-spec.json", materia.tooling.process.ProcessSpecCodec.encode(report.spec));
 		sys.io.File.saveContent(dir + "/fill-analysis.json", ToolingCodec.canonical(report.fill) + "\n");
 		sys.io.File.saveContent(dir + "/cure-analysis.json", ToolingCodec.canonical(report.cure) + "\n");
+		sys.io.File.saveContent(dir + "/section-geometry.json", ToolingCodec.canonical(report.sections) + "\n");
 		sys.io.File.saveContent(dir + "/process-diagnostics.json", ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items) + "\n");
 		return checks;
 	}
