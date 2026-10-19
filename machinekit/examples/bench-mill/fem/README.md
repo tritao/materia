@@ -5,6 +5,15 @@ datums, verifies CalculiX with analytical fixtures, and meshes the two mineral
 castings independently. It does not yet calculate assembled-machine stiffness.
 The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN.md).
 
+## Gate status
+
+- Solver-fixture gate: passed, including the common Gmsh-to-C3D10 deck path,
+  known prescribed translation/rotation, and reference-node reaction correction.
+  The provenance upgrade required by step 1 is still being implemented.
+- Export comparison and build/submodule provenance: in progress.
+- The bonded-frame upper-bound static model, bracketed supports, energy
+  decomposition and compliance budget are WIP; no stiffness result is qualified yet.
+
 ## Export and check the CAD packet
 
 Run from the repository root. These Haxe configurations share their compiler
@@ -65,13 +74,24 @@ parts, wrong units, double pose application, invalid elasticity and results.
 
 The pilot pins CalculiX **2.21** and Gmsh **4.12.2**. `solver_fixtures.py`
 requires an explicit available CalculiX executable and refuses another version.
-It uses only Python's standard library. `packet.elastic_input` converts Pa and
+The complete fixture gate also requires the pinned Gmsh environment.
+`packet.elastic_input` converts Pa and
 kg/m³ into MPa and tonne/mm³ for the consistent mm/N/tonne/s solver system.
 The CAD packet keeps mm/kg/Pa labels; a solver adapter must use the conversion.
 
 ```sh
-python3 machinekit/examples/bench-mill/fem/solver_fixtures.py --ccx /path/to/ccx
+python3 -m venv machinekit/examples/bench-mill/build/fem/venv
+machinekit/examples/bench-mill/build/fem/venv/bin/python -m pip install -r machinekit/examples/bench-mill/fem/requirements.txt
+machinekit/examples/bench-mill/build/fem/venv/bin/python machinekit/examples/bench-mill/fem/solver_fixtures.py --ccx /path/to/ccx
 ```
+
+The report also includes a Gmsh C3D10 tension case through the same
+`tet10_order`, node/element/equation writers and solver runner used by the
+frame. Its reference-node load tests the correction `reaction = RF - CLOAD`.
+A second case prescribes both translation and rotation about an offset
+reference and checks every coupled node against `u = t + theta × r`.
+Both known-answer checks pass; the rotation fixture's maximum discrepancy
+was 5e-9 mm in the initial verification.
 
 The generated `build/fem/fixtures/report.json` records version, executable/input/
 output hashes, displacements, reactions, force/moment equilibrium and mesh
@@ -95,7 +115,7 @@ dpkg-deb -x calculix-ccx_2.21-1_amd64.deb calculix
 dpkg-deb -x libspooles2.2t64_2.2-14.1build2_amd64.deb calculix
 cd ../../../../../..
 LD_LIBRARY_PATH="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
-  python3 machinekit/examples/bench-mill/fem/solver_fixtures.py \
+  machinekit/examples/bench-mill/build/fem/venv/bin/python machinekit/examples/bench-mill/fem/solver_fixtures.py \
   --ccx "$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/bin/ccx"
 ```
 

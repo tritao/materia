@@ -1,6 +1,7 @@
 """CalculiX installation/unit checks; these fixtures do not analyze the mill."""
 
 import argparse
+import importlib
 import json
 import math
 import os
@@ -164,13 +165,22 @@ def main():
         change = abs(beams[-1]["displacementMm"] - beams[-2]["displacementMm"]) / abs(beams[-1]["displacementMm"])
         if change > .05:
             raise ValueError("Cantilever mesh convergence exceeds 5%")
+        gmsh = importlib.import_module("gmsh")
+        if gmsh.__version__ != "4.12.2":
+            raise ValueError("Gmsh 4.12.2 is required for the C3D10/coupling gate")
+        from tet_fixture import verify
+        tetrahedral = verify(gmsh, ccx, args.output / "tet-verification")
         result = {"status": "fixture checks passed; mill not solved", "units": SOLVER_UNITS,
                   "solverVersion": version.stdout.strip(), "solverSha256": digest(ccx),
                   "fixtureGeneratorSha256": digest(Path(__file__)), "tension": tension,
-                  "cantilever": beams, "lastRefinementRelativeChange": change}
+                  "cantilever": beams, "lastRefinementRelativeChange": change,
+                  "tet10AndCouplingVerification": tetrahedral,
+                  "deckSourceSha256": digest(Path(__file__).with_name("ccx_deck.py")),
+                  "tetFixtureSourceSha256": digest(Path(__file__).with_name("tet_fixture.py")),
+                  "gmshVersion": gmsh.__version__, "gmshLibrarySha256": digest(Path(gmsh.libpath))}
         report.write_text(json.dumps(result, indent=2) + "\n")
         print(f"Fixture checks passed; report: {report}")
-    except (ValueError, OSError, subprocess.TimeoutExpired) as error:
+    except (ValueError, OSError, ImportError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f"FEM solver check failed: {error}\n")
 
 
