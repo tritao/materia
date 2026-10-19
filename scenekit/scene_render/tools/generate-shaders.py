@@ -26,7 +26,7 @@ BLOCKS = {
         (3, "lighting_uniforms", "vec4 light_position_type[32]; vec4 light_direction_range[32]; "
                                  "vec4 light_color_intensity[32]; vec4 light_cones[32]; "
                                  "vec4 ambient_sky; vec4 ambient_ground; vec4 lighting_mode; "
-                                 "vec4 camera_position; vec4 camera_view_direction; mat4 ao_inverse_view_projection; "
+                                 "vec4 camera_position; vec4 camera_view_direction; "
                                  "vec4 ao_params; vec4 ao_viewport"),
         (2, "clip_params", "vec4 clip_planes[32]; vec4 clip_plane_count")),
     ("stroke", "vertex"): ((1, "view_params", "mat4 view_projection"),
@@ -36,7 +36,8 @@ BLOCKS = {
     ("workplane", "fragment"): ((0, "grid_params", "vec4 grid_eye_spacing; vec4 grid_forward; "
                                                    "vec4 grid_right; vec4 grid_up"),),
     ("pick", "vertex"): ((1, "view_params", "mat4 view_projection"),),
-    ("pick", "fragment"): ((2, "clip_params", "vec4 clip_planes[32]; vec4 clip_plane_count"),),
+    ("pick", "fragment"): ((0, "pick_output_params", "vec4 pick_output"),
+                               (2, "clip_params", "vec4 clip_planes[32]; vec4 clip_plane_count")),
     ("postprocess", "fragment"): ((0, "postprocess_params", "vec4 color_params; "
                                                      "vec4 distortion_params"),
                                       (1, "postprocess_random", "ivec4 random_params")),
@@ -63,7 +64,7 @@ def stage_source(program: str, stage: str) -> str:
             source = source.replace(f"uniform sampler2D {name};", "", 1)
             blocks.append(f"layout(binding={slot}) uniform texture2D {name}_image;")
             sampler = f"{program}_sampler"
-            if name == "ao_depth_texture":
+            if name == "ao_position_texture":
                 sampler = "ao_sampler"
                 blocks.append("layout(binding=1) uniform sampler ao_sampler;")
             source = re.sub(r"\btexture\(" + name + r"\s*,",

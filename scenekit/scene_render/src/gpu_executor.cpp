@@ -90,12 +90,11 @@ struct LightingUniformData {
     std::array<float, 4> lighting_mode{}; // x = studio shading, y = light count, z = environment reflection
     std::array<float, 4> camera_position{}; // xyz = world-space eye, w = perspective
     std::array<float, 4> camera_view_direction{0.0f, 0.0f, 1.0f, 0.0f};
-    std::array<float, 16> ao_inverse_view_projection{};
     std::array<float, 4> ao_params{};
     std::array<float, 4> ao_viewport{};
 };
 
-static_assert(sizeof(LightingUniformData) == sizeof(float) * (32 * 4 * 4 + 44));
+static_assert(sizeof(LightingUniformData) == sizeof(float) * (32 * 4 * 4 + 28));
 
 struct PostProcessUniformData {
     std::array<float, 4> color_params{};
@@ -444,6 +443,7 @@ struct NativeKitGpuExecutor::State {
     nkgpu_shader stroke_shader{};
     nkgpu_shader pick_shader{};
     nkgpu_pipeline pick_pipeline{};
+    nkgpu_pipeline ao_position_pipeline{};
     nkgpu_shader postprocess_shader{};
     nkgpu_pipeline postprocess_pipeline{};
     nkgpu_buffer postprocess_vertex_buffer{};
@@ -466,6 +466,8 @@ struct NativeKitGpuExecutor::State {
     nkgpu_image pick_color{};
     nkgpu_image pick_subelement{};
     nkgpu_image pick_depth_value{};
+    nkgpu_image ao_position{};
+    std::uint32_t ao_width = 0, ao_height = 0;
     nkgpu_image pick_depth{};
     nkgpu_image default_image{};
     nkgpu_sampler default_sampler{};
@@ -557,6 +559,8 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_image_destroy(renderer, pick_color);
         if (renderer.id && pick_subelement.id)
             (void)nkgpu_image_destroy(renderer, pick_subelement);
+        if (renderer.id && ao_position.id)
+            (void)nkgpu_image_destroy(renderer, ao_position);
         if (renderer.id && pick_depth_value.id)
             (void)nkgpu_image_destroy(renderer, pick_depth_value);
         if (renderer.id && pick_depth.id)
@@ -572,6 +576,8 @@ struct NativeKitGpuExecutor::State {
         if (renderer.id && ao_sampler.id) (void)nkgpu_sampler_destroy(renderer, ao_sampler);
         if (renderer.id && shader.id)
             (void)nkgpu_shader_destroy(renderer, shader);
+        if (renderer.id && ao_position_pipeline.id)
+            (void)nkgpu_pipeline_destroy(renderer, ao_position_pipeline);
         if (renderer.id && pick_pipeline.id)
             (void)nkgpu_pipeline_destroy(renderer, pick_pipeline);
         if (renderer.id && pick_shader.id)
@@ -600,6 +606,7 @@ struct NativeKitGpuExecutor::State {
         shader = {};
         ao_sampler = {};
         pick_pipeline = {};
+        ao_position_pipeline = {};
         pick_shader = {};
         postprocess_pipeline = {};
         postprocess_shader = {};
@@ -618,6 +625,8 @@ struct NativeKitGpuExecutor::State {
         pick_color = {};
         pick_subelement = {};
         pick_depth_value = {};
+        ao_position = {};
+        ao_width = ao_height = 0;
         pick_depth = {};
         default_image = {};
         default_sampler = {};
@@ -757,7 +766,8 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool
             (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(LightingUniformData))) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 3, 0, "lighting_uniforms",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 139)) != NKGPU_OK ||
+                                           NKGPU_UNIFORMTYPE_FLOAT4,
+                                           sizeof(LightingUniformData) / sizeof(std::array<float, 4>))) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                            "base_color_texture_image_scene_sampler")) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 1, 0, NKGPU_SHADERSTAGE_FRAGMENT,
@@ -769,7 +779,7 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool
             (result = nkgpu_shader_texture(shader_builder, 4, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                            "emissive_texture_image_scene_sampler")) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 5, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                           "ao_depth_texture_image_ao_sampler")) != NKGPU_OK ||
+                                           "ao_position_texture_image_ao_sampler")) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 2, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(ClipUniformData))) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 2, 0, "clip_params",
@@ -1101,7 +1111,7 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
             (result = nkgpu_apply_image(state.renderer, 4, material_gpu->second.images[4])) !=
                 NKGPU_OK ||
             (result = nkgpu_apply_image(state.renderer, 5, lighting_data.ao_params[1] > 0.0f
-                ? state.pick_depth_value : material_gpu->second.images[3])) != NKGPU_OK ||
+                ? state.ao_position : material_gpu->second.images[3])) != NKGPU_OK ||
             (result = nkgpu_apply_sampler(state.renderer, 1, state.ao_sampler)) != NKGPU_OK ||
             (result = nkgpu_apply_sampler(state.renderer, 0, material_gpu->second.sampler)) !=
                 NKGPU_OK ||
@@ -1168,8 +1178,9 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
 }
 
 template <class StateT>
-bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats) {
-    if (state.pick_pipeline.id)
+bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool position_output = false) {
+    auto &pipeline = position_output ? state.ao_position_pipeline : state.pick_pipeline;
+    if (pipeline.id)
         return true;
 
     const auto sources =
@@ -1198,6 +1209,10 @@ bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats) {
                                                  sizeof(float) * 16)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_params",
                                            NKGPU_UNIFORMTYPE_FLOAT4, 4)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                                                 sizeof(float) * 4)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 0, 0, "pick_output_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 1)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 2, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(ClipUniformData))) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 2, 0, "clip_params",
@@ -1236,9 +1251,10 @@ bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats) {
                                               NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
         (result = nkgpu_pipeline_color_target(pipeline_builder, 1, NKGPU_IMAGEFORMAT_RGBA8,
                                               NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_color_target(pipeline_builder, 2, NKGPU_IMAGEFORMAT_R32F,
-                                              NKGPU_COLORMASK_R, nullptr)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_end(pipeline_builder, &state.pick_pipeline)) != NKGPU_OK)
+        (result = nkgpu_pipeline_color_target(pipeline_builder, 2,
+                                              position_output ? NKGPU_IMAGEFORMAT_RGBA32F : NKGPU_IMAGEFORMAT_R32F,
+                                              position_output ? NKGPU_COLORMASK_RGBA : NKGPU_COLORMASK_R, nullptr)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
         return set_failure(state, stats, result);
     return true;
 }
@@ -1315,6 +1331,28 @@ bool ensure_pick_targets(StateT &state, std::uint32_t width, std::uint32_t heigh
     }
     state.pick_width = width;
     state.pick_height = height;
+    return true;
+}
+
+// AO owns a sampled position target only when enabled. The picking depth/readback
+// contract remains unchanged, and the same mesh/clip pass supplies both outputs.
+template <class StateT>
+bool ensure_ao_position_target(StateT &state, std::uint32_t width, std::uint32_t height,
+                               GpuExecutionStats &stats) {
+    if (state.ao_position.id && state.ao_width == width && state.ao_height == height) return true;
+    if (state.ao_position.id) (void)nkgpu_image_destroy(state.renderer, state.ao_position);
+    state.ao_position = {};
+    nkgpu_image_desc position{};
+    position.struct_size = sizeof(position);
+    position.width = width;
+    position.height = height;
+    position.format = NKGPU_IMAGEFORMAT_RGBA32F;
+    position.usage = NKGPU_IMAGE_RENDER_TARGET | NKGPU_IMAGE_SAMPLED;
+    position.mip_count = position.sample_count = position.layer_count = 1;
+    const auto result = nkgpu_image_create_desc(state.renderer, &position, &state.ao_position);
+    if (result != NKGPU_OK) return set_failure(state, stats, result);
+    state.ao_width = width;
+    state.ao_height = height;
     return true;
 }
 
@@ -2437,18 +2475,21 @@ bool prepare_resources(StateT &state, const RenderPlan &plan, const SceneSnapsho
 /*
  * Renders every batch's pick geometry into the pick targets (ids, subelements
  * and depth) and submits the frame, leaving the targets ready to read back.
+ * The opaque AO variant writes surface positions instead of device depth.
  * On failure the frame is closed, state.last_result holds the result, and it
  * is returned.
  */
 template <class StateT>
 nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const SceneSnapshot &snapshot,
                               std::uint32_t width, std::uint32_t height, GpuExecutionStats &stats,
-                              bool opaque_only = false) {
+                              bool for_ao = false) {
     if (!ensure_pick_targets(state, width, height, stats))
+        return state.last_result;
+    if (for_ao && !ensure_ao_position_target(state, width, height, stats))
         return state.last_result;
     for (const auto &batch : state.batches) {
         const auto *material = snapshot.find_material(batch.key.material);
-        if (opaque_only && material && (material_is_invisible(*material->state) ||
+        if (for_ao && material && (material_is_invisible(*material->state) ||
             material_is_blended(*material->state) || material->state->alpha_mode == AlphaMode::Mask)) continue;
         const auto *resource = snapshot.find_geometry(batch.key.geometry);
         if (resource && state.geometry_resources.contains(resource->id) &&
@@ -2457,7 +2498,7 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
         if (geometry == state.geometry_resources.end() || !geometry->second.pick_buffer.id)
             continue;
         const auto element_count = geometry->second.pick_vertex_count;
-        if (element_count && !ensure_pick_pipeline(state, stats))
+        if (element_count && !ensure_pick_pipeline(state, stats, for_ao))
             return state.last_result;
     }
 
@@ -2486,10 +2527,10 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
     pass.colors[1].action.load_action = NKGPU_LOADACTION_CLEAR;
     pass.colors[1].action.store_action = NKGPU_STOREACTION_STORE;
     pass.colors[1].action.clear_color = {0.0f, 0.0f, 0.0f, 0.0f};
-    pass.colors[2].image = state.pick_depth_value;
+    pass.colors[2].image = for_ao ? state.ao_position : state.pick_depth_value;
     pass.colors[2].action.load_action = NKGPU_LOADACTION_CLEAR;
     pass.colors[2].action.store_action = NKGPU_STOREACTION_STORE;
-    pass.colors[2].action.clear_color = {1.0f, 0.0f, 0.0f, 0.0f};
+    pass.colors[2].action.clear_color = {for_ao ? 0.0f : 1.0f, 0.0f, 0.0f, 0.0f};
     pass.depth_stencil = state.pick_depth;
     pass.depth_stencil_action.load_action = NKGPU_LOADACTION_CLEAR;
     pass.depth_stencil_action.store_action = NKGPU_STOREACTION_STORE;
@@ -2504,9 +2545,10 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
         return fail_frame(result);
 
     const auto clip_data = clip_uniform_data(plan);
+    const std::array<float, 4> pick_output{for_ao ? 1.0f : 0.0f, 0, 0, 0};
     for (const auto &batch : state.batches) {
         const auto *material = snapshot.find_material(batch.key.material);
-        if (opaque_only && material && (material_is_invisible(*material->state) ||
+        if (for_ao && material && (material_is_invisible(*material->state) ||
             material_is_blended(*material->state) || material->state->alpha_mode == AlphaMode::Mask)) continue;
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
         if (geometry == state.geometry_resources.end() || !geometry->second.pick_buffer.id)
@@ -2514,7 +2556,9 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
         const auto element_count = geometry->second.pick_vertex_count;
         if (!element_count)
             continue;
-        if ((result = nkgpu_apply_pipeline(state.renderer, state.pick_pipeline)) != NKGPU_OK ||
+        if ((result = nkgpu_apply_pipeline(state.renderer, for_ao ? state.ao_position_pipeline : state.pick_pipeline)) != NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(state.renderer, 0,
+                 reinterpret_cast<const std::uint8_t *>(pick_output.data()), sizeof(pick_output))) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(
                  state.renderer, 1,
                  reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
@@ -3003,11 +3047,9 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     const auto clip_data = clip_uniform_data(plan);
     auto lighting_data = lighting_uniform_data(plan, snapshot);
     set_lighting_camera(lighting_data, plan);
-    if (use_ao && invert_matrix(plan.view_projection(), lighting_data.ao_inverse_view_projection)) {
+    if (use_ao) {
         lighting_data.ao_params = detail;
-        const auto backend = nkgpu_query_backend(state_->renderer);
-        const bool gl = backend == NKGPU_BACKEND_GLCORE || backend == NKGPU_BACKEND_GLES3;
-        lighting_data.ao_viewport = {1.0f / width, 1.0f / height, gl ? 1.0f : -1.0f, 0.0f};
+        lighting_data.ao_viewport = {1.0f / width, 1.0f / height, 0.0f, 0.0f};
     }
     if ((result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, samples, stats)) !=
         NKGPU_OK)

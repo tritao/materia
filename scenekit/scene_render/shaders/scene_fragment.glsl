@@ -14,7 +14,6 @@ uniform vec4 ambient_ground;
 uniform vec4 lighting_mode;
 uniform vec4 camera_position;
 uniform vec4 camera_view_direction;
-uniform mat4 ao_inverse_view_projection;
 uniform vec4 ao_params;
 uniform vec4 ao_viewport;
 uniform sampler2D base_color_texture;
@@ -22,7 +21,7 @@ uniform sampler2D metallic_roughness_texture;
 uniform sampler2D normal_texture;
 uniform sampler2D occlusion_texture;
 uniform sampler2D emissive_texture;
-uniform sampler2D ao_depth_texture;
+uniform sampler2D ao_position_texture;
 in vec3 world_position;
 in vec3 vertex_normal;
 in vec2 vertex_texcoord;
@@ -60,13 +59,11 @@ float screen_occlusion(vec3 N) {
             float radius = ring == 0 ? 0.35 : 0.8;
             vec2 uv = (floor(pixel + axis * radius_pixels * radius) + 0.5) * ao_viewport.xy;
             if (uv.x <= 0.0 || uv.x >= 1.0 || uv.y <= 0.0 || uv.y >= 1.0) continue;
-            float depth = texture(ao_depth_texture, uv).r;
-            if (depth >= 1.0) continue;
-            vec2 clip_xy = uv * 2.0 - 1.0;
-            clip_xy.y *= ao_viewport.z;
-            vec4 sample_h = ao_inverse_view_projection * vec4(clip_xy, depth * 2.0 - 1.0, 1.0);
-            if (abs(sample_h.w) < 1.0e-8) continue;
-            vec3 delta = sample_h.xyz / sample_h.w - world_position;
+            // Store positions directly: reconstructing from device depth becomes
+            // ill-conditioned when a close camera needs a very small near plane.
+            vec4 sample_position = texture(ao_position_texture, uv);
+            if (sample_position.w == 0.0) continue;
+            vec3 delta = sample_position.xyz - world_position;
             float distance_to_sample = length(delta);
             if (distance_to_sample < 1.0e-6 || distance_to_sample >= ao_params.x) continue;
             float horizon = max(dot(N, delta / distance_to_sample) - ao_params.z, 0.0);

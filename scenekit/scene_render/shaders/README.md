@@ -30,3 +30,9 @@ hidden edge through an occluding face. Keep depth interpolation in rasterization
 for per-sample MSAA depth tests; a fragment-depth override evaluates at the
 fragment center and can leak under closely spaced sloping surfaces. The stroke
 pipeline uses only a constant depth-unit bias to resolve coplanar ties.
+
+Ambient occlusion samples world-space surface positions from an on-demand RGBA32F
+prepass target. Its alpha channel marks valid samples. This avoids reconstructing
+positions from nonlinear device depth, which loses precision with very small near
+planes and can stripe an otherwise flat surface. Picking continues to write R32F
+device depth for its readback and unprojection.
