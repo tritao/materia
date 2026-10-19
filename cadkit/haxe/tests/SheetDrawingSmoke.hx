@@ -18,7 +18,7 @@ class SheetDrawingSmoke {
 	static function near(a:Float, b:Float, label:String):Void { check(Math.abs(a - b) < 1e-8, label + ": " + a + " != " + b); }
 	static function layer(name:String):DrawingLayer {
 		return switch (name) { case "OUTLINE": Outline; case "BEND_UP": BendUp; case "BEND_DOWN": BendDown;
-			case "ETCH": Etch; case "TEXT": Text; case _: throw "Unknown DXF layer " + name; };
+			case "ETCH": Etch; case "TEXT": Text; case "POCKET": Process("POCKET"); case _: throw "Unknown DXF layer " + name; };
 	}
 	static function value(fields:Map<Int, String>, code:Int):String {
 		var found = fields.get(code); if (found == null) throw "Missing DXF group " + code; return found;
@@ -65,7 +65,7 @@ class SheetDrawingSmoke {
 		for (i in 0...before.length) switch (before[i]) {
 			case Curve(owner, expected): switch (after[i]) {
 				case Curve(actualOwner, actual):
-					check(actualOwner == owner, "curve layer"); near(actual.length(), expected.length(), "exact curve length");
+					check(Drawing2D.layerName(actualOwner) == Drawing2D.layerName(owner), "curve layer"); near(actual.length(), expected.length(), "exact curve length");
 					if (!expected.isLine() && Math.abs(expected.sweep) > 2 * Math.PI - 1e-10) {
 						near(actual.arcCenter().distance(expected.arcCenter()), 0, "circle center"); near(actual.sweep, expected.sweep, "circle winding");
 					} else { near(actual.start.distance(expected.start), 0, "curve start"); near(actual.end.distance(expected.end), 0, "curve end"); near(actual.point(0.5).distance(expected.point(0.5)), 0, "arc midpoint"); }
@@ -89,6 +89,12 @@ class SheetDrawingSmoke {
 		for (sweep in [Math.PI / 3, -Math.PI / 3, 4 * Math.PI / 3, -4 * Math.PI / 3, 2 * Math.PI, -2 * Math.PI])
 			curves.push(Curve(Outline, Segment.arc(new Point2(17, -23), 4, 5.8, sweep)));
 		var curved = new Drawing2D(curves); compare(curved, read(Dxf.write(curved)));
+		var process = new Drawing2D([
+			Curve(Process("POCKET"), Segment.line(new Point2(0, 0), new Point2(10, 0))),
+			Curve(Process("POCKET"), Segment.arc(new Point2(10, 5), 5, -Math.PI / 2, Math.PI))]);
+		compare(process, read(Dxf.write(process)));
+		check(process.usedLayers().length == 6, "named layers are deduplicated by name");
+		check(Svg.write(process).indexOf('id="POCKET"') >= 0, "named process layer in SVG");
 		var annotated = new Drawing2D([Label(Text, new Point2(0, 0), 3, "A<&\"'>")]);
 		check(Svg.write(annotated).indexOf("A&lt;&amp;&quot;&apos;&gt;") >= 0, "SVG escapes authored text");
 		compare(annotated, read(Dxf.write(annotated)));

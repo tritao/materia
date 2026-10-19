@@ -1,0 +1,9 @@
+{
+    "version": 1,
+    "package": {"name": "cadkit-drawing-tests"},
+    "entry": "SheetDrawingSmoke",
+    "sourceRoots": ["."],
+    "dependencies": {"cadkit": {"path": "../.."}, "projectkit": {"path": "../../../projectkit"}},
+    "target": "host",
+    "outputDir": "build/drawing"
+}

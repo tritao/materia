@@ -31,9 +31,25 @@ class Drawing2D {
 			case BendDown: "BEND_DOWN";
 			case Etch: "ETCH";
 			case Text: "TEXT";
+			case Process(name):
+				if (name.length == 0 || name.length > 64) throw "Invalid drawing process layer";
+				for (i in 0...name.length)
+					if ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-".indexOf(name.charAt(i)) < 0)
+						throw "Invalid drawing process layer";
+				name;
 		};
 	}
 	public static function layers():Array<DrawingLayer> { return [Outline, BendUp, BendDown, Etch, Text]; }
+	/** Existing sheet layers plus named layers actually used by this drawing. */
+	public function usedLayers():Array<DrawingLayer> {
+		var result = layers(), names = [for (layer in result) layerName(layer)];
+		for (entity in entityData) {
+			var layer = switch entity { case Curve(owner, _): owner; case Label(owner, _, _, _): owner; };
+			var name = layerName(layer);
+			if (names.indexOf(name) < 0) { names.push(name); result.push(layer); }
+		}
+		return result;
+	}
 	public static function of(flat:FlatPattern):Drawing2D {
 		var entities:Array<DrawingEntity> = [];
 		for (region in flat.regions()) for (loop in region.loops()) for (segment in loop)

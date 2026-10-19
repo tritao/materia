@@ -25,12 +25,12 @@ class Svg {
 		var output = new StringBuf();
 		output.add('<svg xmlns="http://www.w3.org/2000/svg" width="' + width + 'mm" height="' + height + 'mm" viewBox="'
 			+ (bounds.minX - margin) + ' ' + (-bounds.maxY - margin) + ' ' + width + ' ' + height + '">\n');
-		for (layer in Drawing2D.layers()) {
+		for (layer in drawing.usedLayers()) {
 			var color = switch (layer) { case BendUp: "#2455ba"; case BendDown: "#b63434"; case Etch: "#777777"; case _: "#111111"; };
 			output.add('<g id="' + Drawing2D.layerName(layer) + '" fill="none" stroke="' + color + '" stroke-width="0.2">\n');
 			for (entity in drawing.entities()) switch (entity) {
-				case Curve(owner, segment): if (owner == layer) { output.add(curve(segment)); output.add("\n"); }
-				case Label(owner, position, textHeight, value): if (owner == layer) {
+				case Curve(owner, segment): if (Drawing2D.layerName(owner) == Drawing2D.layerName(layer)) { output.add(curve(segment)); output.add("\n"); }
+				case Label(owner, position, textHeight, value): if (Drawing2D.layerName(owner) == Drawing2D.layerName(layer)) {
 					output.add('<text x="' + position.x + '" y="' + -position.y + '" font-family="monospace" font-size="'
 						+ textHeight + '" fill="' + color + '" stroke="none"');
 					if (value.length > 0) output.add(' textLength="' + Drawing2D.textWidth(textHeight, value) + '" lengthAdjust="spacingAndGlyphs"');

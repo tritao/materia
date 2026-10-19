@@ -40,8 +40,8 @@ class Dxf {
 		var output = new StringBuf();
 		pair(output, 999, "Materia exact drawing; coordinates in millimetres");
 		pair(output, 0, "SECTION"); pair(output, 2, "HEADER"); pair(output, 9, "$ACADVER"); pair(output, 1, "AC1009"); pair(output, 0, "ENDSEC");
-		pair(output, 0, "SECTION"); pair(output, 2, "TABLES"); pair(output, 0, "TABLE"); pair(output, 2, "LAYER"); pair(output, 70, "5");
-		for (layer in Drawing2D.layers()) {
+		pair(output, 0, "SECTION"); pair(output, 2, "TABLES"); pair(output, 0, "TABLE"); pair(output, 2, "LAYER"); pair(output, 70, Std.string(drawing.usedLayers().length));
+		for (layer in drawing.usedLayers()) {
 			pair(output, 0, "LAYER"); pair(output, 2, Drawing2D.layerName(layer)); pair(output, 70, "0"); pair(output, 62, "7"); pair(output, 6, "CONTINUOUS");
 		}
 		pair(output, 0, "ENDTAB"); pair(output, 0, "ENDSEC"); pair(output, 0, "SECTION"); pair(output, 2, "ENTITIES");

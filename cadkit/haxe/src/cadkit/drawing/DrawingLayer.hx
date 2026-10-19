@@ -7,4 +7,6 @@ enum DrawingLayer {
 	BendDown;
 	Etch;
 	Text;
+	/** Named manufacturing process layer, independent of a particular consumer. */
+	Process(name:String);
 }
