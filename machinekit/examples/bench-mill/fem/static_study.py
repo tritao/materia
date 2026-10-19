@@ -1,7 +1,6 @@
 """Solve and compare bonded-frame compliance meshes with explicit idealized joints/supports."""
 
 import argparse
-import copy
 import importlib
 import json
 import math
@@ -19,6 +18,8 @@ from tet_fixture import verify
 from spring_fixture import verify as verify_springs
 from compliance_budget import budget, tool_case_packet
 from provenance import capture_sources
+from leveling import add_influence_steps, offsets_from_tables
+from leveling_fixture import verify as verify_leveling
 
 
 def validate_config(config):
@@ -134,7 +135,7 @@ def main():
         if args.tool_case:
             packet = tool_case_packet(packet,json.loads(args.budget.read_text()),args.tool_case)
         validate_config(config)
-        source_names=("static_study.py","mesh_cache.py","frame_mesh.py","frame_solver.py","packet.py","tet_fixture.py","spring_fixture.py","ccx_deck.py","mesh_resolution.py","compliance.py","compliance_budget.py","provenance.py","solver_fixtures.py")
+        source_names=("static_study.py","leveling.py","leveling_fixture.py","mesh_cache.py","frame_mesh.py","frame_solver.py","packet.py","tet_fixture.py","spring_fixture.py","ccx_deck.py","mesh_resolution.py","compliance.py","compliance_budget.py","provenance.py","solver_fixtures.py")
         source_hashes={name:digest(Path(__file__).with_name(name)) for name in source_names}
         provenance_output=args.output.resolve()/"provenance"
         source_build=capture_sources(Path(__file__).resolve().parents[4],provenance_output)
@@ -157,6 +158,7 @@ def main():
             raise ValueError(f"Expected Gmsh {GMSH_VERSION}")
         fixture = verify(gmsh, ccx, args.output / "tet-verification")
         spring_fixture = verify_springs(ccx,args.output/"spring-verification")
+        leveling_fixture = verify_leveling(ccx,args.output/"leveling-verification")
         def solve_case(output, write):
             previous_input=digest(output/"frame.inp") if (output/"frame.inp").exists() else None
             previous_result=(output/"frame.dat").exists() and (output/"solver.log").exists() and "Job finished" in (output/"solver.log").read_text() and "*ERROR" not in (output/"solver.log").read_text().upper() and re.search(rf"Using up to\s+{args.threads}\s+cpu",(output/"solver.log").read_text()) is not None
@@ -191,26 +193,20 @@ def main():
                 offsets = {}
                 stiffness = config["supportConfigurations"][support_name]["verticalSpringNPerMm"]
                 if stiffness:
-                    calibration_config = copy.deepcopy(config)
-                    bound = calibration_config["supportConfigurations"][support_name]
-                    bound["verticalSpringNPerMm"] = 0
-                    for dofs in bound["constraints"].values():
-                        if 3 not in dofs: dofs.append(3)
-                    calibration = support_output / "leveling"
+                    calibration = support_output / "leveling-influence"
                     calibration.mkdir(exist_ok=True)
-                    level_model = solve_case(calibration,lambda:write_deck(mesh,packet,calibration_config,calibration,support_name,gravity_only=True))
-                    level_tables = read_results((calibration/"frame.dat").read_text(),1)
-                    for station in bound["constraints"]:
-                        n = level_model["references"]["foot-"+station]["translation"]
-                        reaction = level_tables[1,"forces","SUPPORTS"][n][2]-level_model["gravityReferenceLoads"].get(str(n)+":3",0)
-                        if reaction <= 0: raise ValueError("Four-point leveling requires foot tension")
-                        offsets[station] = reaction/stiffness
+                    def write_leveling():
+                        model = write_deck(mesh,packet,config,calibration,support_name,gravity_only=True)
+                        return add_influence_steps(calibration/"frame.inp",model)
+                    level_model = solve_case(calibration,write_leveling)
+                    level_tables = read_results((calibration/"frame.dat").read_text(),5)
+                    offsets, leveling_check = offsets_from_tables(level_model,level_tables)
                 model = solve_case(support_output,lambda:write_deck(mesh,packet,config,support_output,support_name,ground_offsets=offsets))
                 text=(support_output/"frame.dat").read_text()
                 tables=read_results(text,len(model["cases"]))
                 energy=read_energies(text,len(model["cases"]),model["energyGroups"])
                 solution=assess(packet,config,model,tables,energy)
-                supports[support_name]={"model":model,"solution":solution,"resultSha256":digest(support_output/"frame.dat")}
+                supports[support_name]={"levelingCalibration":leveling_check if stiffness else None,"model":model,"solution":solution,"resultSha256":digest(support_output/"frame.dat")}
             result = {"sizeMm": size, "nodes": len(mesh["nodes"]), "elements": sum(len(v) for v in mesh["elements"].values()),
                       "meshSha256": mesh["meshSha256"], "supports": supports,
                       "gmshLibrarySha256": mesh["gmshLibrarySha256"], "minimumJacobianDeterminant": mesh["minimumJacobianDeterminant"],
@@ -258,7 +254,7 @@ def main():
                   "converged": converged, "units": SOLVER_UNITS, "responseUnits": "micrometres",
                   "packetDensityMassChecks":validated["densityMassChecks"],"manifestSha256": validated["manifestSha256"], "configurationSha256": digest(args.config), "configuration": config,
                   "solverThreads":args.threads,"solverVersion": version.stdout.strip(), "solverSha256": digest(ccx),
-                  "tetVerification": fixture,"supportSpringVerification":spring_fixture,
+                  "tetVerification": fixture,"supportSpringVerification":spring_fixture,"levelingInfluenceVerification":leveling_fixture,
                   "sourceSha256":source_hashes,
                   "toolCase":packet.get("analysisToolCase"),"analysisContactMm":packet["datums"]["toolTipMm"],"jointsMm": packet["jointsMm"], "convergence": change, "meshes": results}
         report_path.write_text(json.dumps(report, indent=2) + "\n")

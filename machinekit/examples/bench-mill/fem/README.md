@@ -453,3 +453,23 @@ not locate strain energy. Diagnostics are in each completed pose's
 `modal/mass-motion.md` / `.json`, and the modal matrix report links them.
 
 Nine-pose modal aggregate JSON SHA256: `36054d2c6938de2f8ee398117022653095993d43cc4f03206c9f7ccec34c8cea`.
+
+
+### Four-spring leveling correction
+
+The new spindle-nose static run exposed an inadequate calibration: rigid-reference
+RF-derived preloads missed loaded foot heights by up to 0.65 µm, and their gravity
+resultants did not close. This run failed its gate and is not cited as a passing
+static result. `leveling.py` now measures the actual four-spring model's vertical
+4×4 foot flexibility plus unloaded-preload gravity deflection, then solves for
+four positive compressive preloads. Reciprocity and the final loaded heights
+remain checked; no tolerance is relaxed. Unit-force steps retain zero preload.
+The coupled four-seat solver fixture recovers known preloads within 6.73e-7
+relative error (`build/fem/leveling-influence-fixture/report.json`); it runs in
+static preflight. All **33 Python tests** pass. On the center coarse frame the
+maximum residual loaded foot height is 4.25e-9 mm, below the original 1e-6 mm gate.
+The fine frame and travel sweep remain pending. Historical RF-calibrated spring
+results are superseded for gravity/leveling by this correction; their no-gravity
+linear unit-load matrices are retained as historical evidence only.
+The already completed modal decks have no gravity/precompression and are unaffected;
+the static helper change is recorded after their immutable source snapshots.
