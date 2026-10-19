@@ -1,6 +1,7 @@
 package app.editor;
 
 import app.ApplicationSimulation;
+import app.ProgramErrorMessage;
 import app.ProjectDocumentSession;
 import haxeon.ui.Color;
 import haxeon.ui.Insets;
@@ -32,6 +33,8 @@ class CncPanel {
   var followedLine = 0;
   var source:Null<String>;
   var generation = -1;
+  var errorDetails = false;
+  var lastFailure:Null<String>;
 
   public function new() {}
 
@@ -69,13 +72,15 @@ class CncPanel {
       scroll.jumpTo(scroll.offsetX, Math.max(0.0, (player.currentLine - 4) * ROW_HEIGHT));
     }
     var held = player.held(), failure = player.failure;
-    var status = failure != null ? 'Stopped: $failure' :
+    if (failure != lastFailure) { lastFailure = failure; errorDetails = false; }
+    var problem = failure == null ? null : ProgramErrorMessage.fromFailure(failure);
+    var status = problem != null ? problem.title + (player.currentLine > 0 ? ' · line ${player.currentLine}' : "") :
       (player.finished() ? "Completed" : !player.hasStarted() ? "Ready" : !simulation.isRunning() ? "Paused" : held ? "Held" : "Running") + (player.currentLine > 0 ? ' · line ${player.currentLine}' : "") +
       player.statusDetail() + ' · speed ${Math.round(player.speedOverride * 100)}%';
     var hold = new Button("Hold", null, () -> simulation.control(() -> player.hold()), "cnc-hold");
     hold.enabled = !held && failure == null;
     var resume = new Button("Resume", null, () -> simulation.control(() -> player.resume()), "cnc-resume");
-    resume.enabled = held;
+    resume.enabled = held && failure == null;
     var restart = new Button(selectedLine > 0 ? 'Restart at line $selectedLine' : "Restart at line", null,
       () -> {
         var line = selectedLine;
@@ -91,8 +96,18 @@ class CncPanel {
     var buttons = new KeyedView("buttons", new Row("cnc-buttons", [new KeyedView("hold", hold),
       new KeyedView("resume", resume), new KeyedView("restart", restart)], buttonsStyle));
     var state = new KeyedView("status", new Text(status)), speedRow = new KeyedView("speed", speed), gcode = new KeyedView("gcode", list);
-    return linked ? new Column("cnc-panel", [heading, state, link, buttons, speedRow, gcode], style) :
-      new Column("cnc-panel", [heading, state, buttons, speedRow, gcode], style);
+    var items:Array<KeyedView> = [heading, state];
+    if (problem != null) {
+      items.push(new KeyedView("recovery", new Text(problem.recovery)));
+      var reset = new Button("Reset program", null, () -> { simulation.reset(); }, "cnc-reset");
+      var details = new Button(errorDetails ? "Hide technical details" : "Technical details", null,
+        () -> errorDetails = !errorDetails, "cnc-error-details");
+      items.push(new KeyedView("recovery-actions", new Row("cnc-recovery", [new KeyedView("reset", reset), new KeyedView("details", details)], buttonsStyle)));
+      if (errorDetails) items.push(new KeyedView("error-details", new Text(failure)));
+    }
+    if (linked) items.push(link);
+    items.push(buttons); items.push(speedRow); items.push(gcode);
+    return new Column("cnc-panel", items, style);
   }
 
   function programList():View {

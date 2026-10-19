@@ -49,7 +49,7 @@ class MissionController {
     var machiningStatus="";
     if(machining!=null) {
       var cnc=simulation.cncPlayer();
-      machiningStatus=cnc==null?"Ready · Play to start":cnc.failure!=null?"Failed · "+cnc.failure:
+      machiningStatus=cnc==null?"Ready · Play to start":cnc.failure!=null?"Stopped · "+ProgramErrorMessage.fromFailure(cnc.failure).title:
         cnc.finished()?"Completed":!cnc.hasStarted()?"Ready · Play to start":!simulation.isRunning()?"Paused":cnc.held()?"Held":
         "Running"+(cnc.currentLine>0?" · line "+cnc.currentLine:"")+cnc.statusDetail();
     }

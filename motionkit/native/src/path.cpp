@@ -1328,8 +1328,15 @@ public:
                 speed_cap_count ? speed_caps[span] : 0.0, interpolation_margin * moving_boundary_margin, reference);
             const double begin = samples[span].s, length = samples[span + 1].s - begin;
             for (const double node : span_grid.nodes) {
+                const double position = begin + length * node;
+                // End-zone ramp nodes can round onto one another when the
+                // cruise interval is sub-ULP, or onto a sample boundary.
+                // Keep every authored anchor, but omit unrepresentable interior
+                // intervals before handing the strictly increasing grid to TOPPRA.
+                if (node != 0.0 && (position >= samples[span + 1].s ||
+                        position <= grid_values.back())) continue;
                 stage_span.push_back(static_cast<uint32_t>(span));
-                grid_values.push_back(begin + length * node);
+                grid_values.push_back(position);
             }
         }
         span_first.back() = stage_span.size();
