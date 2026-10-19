@@ -34,6 +34,8 @@ class ScenePresentation {
   public var renderNeedsRefresh:Bool = false;
   public var selectionMaterial:Material;
   public var hoverMaterial:Material;
+  final translucentHoverMaterials:Map<String, Material> = new Map();
+  final translucentSelectionMaterials:Map<String, Material> = new Map();
   /** Objects in collision, and objects nearer than the near distance (COLLISION.md CL8b). */
   public var collidingMaterial:Material;
   public var nearMaterial:Material;
@@ -106,6 +108,31 @@ class ScenePresentation {
     try previousSnapshot.dispose() catch (_:Dynamic) {}
   }
 
+  /** Create the catalogue's translucent highlights before the first immutable scene snapshot. */
+  public function initializeHighlightMaterials(owner:EditorScene):Void {
+    for (material in materia.project.MaterialLibrary.all()) {
+      var alpha = material.visual.alpha;
+      if (alpha == null || alpha >= 1.0) continue;
+      var highlight = owner.scene.createMaterial();
+      owner.scene.setMaterialData(highlight, MaterialData.opaque(0.45, 0.78, 1.0)
+        .setRoughness(0.55).setOpacity(alpha).setOpaque(false));
+      translucentHoverMaterials.set(material.id, highlight);
+      var selected = owner.scene.createMaterial();
+      owner.scene.setMaterialData(selected, MaterialData.opaque(1.0, 0.88, 0.35)
+        .setRoughness(0.7).setOpacity(alpha).setOpaque(false));
+      translucentSelectionMaterials.set(material.id, selected);
+    }
+  }
+
+  /** Highlights change tint while retaining each object's catalogue opacity. */
+  function highlightMaterialFor(owner:EditorScene, id:Null<String>, selected:Bool = false):Material {
+    var item = id == null ? null : owner.object(id);
+    var finish = item == null || item.appearance == null ? null : item.appearance;
+    var materials = selected ? translucentSelectionMaterials : translucentHoverMaterials;
+    var highlight = finish == null ? null : materials.get(finish.finish);
+    return highlight == null ? (selected ? selectionMaterial : hoverMaterial) : highlight;
+  }
+
   /** Ensures a hidden child node contains exactly one CAD or preview face for hover rendering. */
   public function ensureFaceHover(owner:EditorScene, id:String, faceIndex:Int):Void {
     var item = owner.object(id);
@@ -124,7 +151,7 @@ class ScenePresentation {
       transaction.setVisibility(node, false);
       transaction.setParent(node, owner.runtimeFor(id).node);
       transaction.setGeometry(node, geometry);
-      transaction.setMaterial(node, hoverMaterial);
+      transaction.setMaterial(node, highlightMaterialFor(owner, id));
       transaction.setTransform(node, Transform.identity());
       transaction.commit();
       faceHoverNodes.set(id, node);
@@ -192,29 +219,31 @@ class ScenePresentation {
     for(selected in owner.objects) {
       if(!selectedKeys.exists(selected.id))continue;
       var workerVisual = owner.workerVisuals.get(selected.id);
-      if (workerVisual == null) selection.add(owner.runtimeFor(selected.id).node);
-      else for (node in workerVisual.character.model.primitiveNodes) selection.add(node);
-      threadHighlights.set(selected.id, selectionMaterial);
+      var selectedMaterial = highlightMaterialFor(owner, selected.id, true);
+      if (workerVisual == null) selection.add(owner.runtimeFor(selected.id).node, selectedMaterial);
+      else for (node in workerVisual.character.model.primitiveNodes) selection.add(node, selectedMaterial);
+      threadHighlights.set(selected.id, selectedMaterial);
     }
     view.applySelection(selection, selectionMaterial);
+    var highlightMaterial = highlightMaterialFor(owner, hoveredId);
     var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
       ? null : faceHoverNodes.get(hoveredId);
     var faceHoverShown = faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex;
     if (faceHoverShown) {
       // The face node is hidden in the scene and shown only in this presentation view.
       view.setVisibility(faceHoverNode, true);
-      view.setMaterial(faceHoverNode, hoverMaterial);
-      view.applyHover(null, hoverMaterial);
+      view.setMaterial(faceHoverNode, highlightMaterial);
+      view.applyHover(null, highlightMaterial);
     } else {
       var hovered = hoveredId == null ? null : owner.object(hoveredId);
       // A worker's own node is an invisible pick proxy; highlight the character it stands for.
       var hoveredWorker = hovered == null ? null : owner.workerVisuals.get(hovered.id);
       if (hoveredWorker != null)
-        view.applyHoverNodes(hoveredWorker.character.model.primitiveNodes, hoverMaterial);
+        view.applyHoverNodes(hoveredWorker.character.model.primitiveNodes, highlightMaterial);
       else
-        view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, hoverMaterial);
+        view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, highlightMaterial);
     }
-    if (hoveredId != null && hoveredId != owner.selectedId && !faceHoverShown) threadHighlights.set(hoveredId, hoverMaterial);
+    if (hoveredId != null && hoveredId != owner.selectedId && !faceHoverShown) threadHighlights.set(hoveredId, highlightMaterial);
     threads.show(owner, view, cosmeticThreads, threadHighlights);
     if (poses != null) {
       var poseNodes:Array<NodeId> = [];
