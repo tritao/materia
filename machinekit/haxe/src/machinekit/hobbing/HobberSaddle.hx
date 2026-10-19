@@ -12,13 +12,16 @@ class HobberSaddle extends MachineComponent {
   final designId:String;
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return [
-    P.choice("design",["GE-X-carriage","GE-Z-saddle","GE-X-drive","GE-Z-drive","GE-chip-tray","GE-enclosure","GE-coolant", "GE-swivel-plate","GE-Y-saddle","GE-Y-drive","electrical-panel"],"GE-Z-saddle")];
+    P.choice("design",["GE-X-carriage","GE-Z-saddle","GE-X-drive","GE-Z-drive","GE-chip-tray","GE-enclosure","GE-coolant", "GE-swivel-plate","GE-Y-saddle","GE-Y-drive","electrical-panel"],"GE-Z-saddle"),
+    P.quantity("tableFaceDiameter",200,"mm"),P.quantity("tableHousingDiameter",260,"mm"),
+    P.quantity("tableFaceHeight",228,"mm"),P.quantity("tableSeatHeight",18,"mm")];
   public static function recipeType():ComponentType {
-    if(recipe==null)recipe=new ComponentType("machinekit.hobbing.saddle",parameters(),v->new HobberSaddle(v.token("design")));
+    if(recipe==null)recipe=new ComponentType("machinekit.hobbing.saddle",parameters(),v->new HobberSaddle(v.token("design"),v));
     return recipe;
   }
-  public function new(design:String){
-    var v=P.resolve(parameters(),new ComponentValues().setToken("design",design));
+  public function new(design:String,?values:ComponentValues){
+    var supplied=values==null?new ComponentValues():values.copy();supplied.setToken("design",design);
+    var v=P.resolve(parameters(),supplied);
     super("HOBBER-"+design,"Designed steel "+design+"; machined seats, assumed structural adequacy","steel",false,v);
     designId=design;
     addConnector("datum",Mount,F.identity());
@@ -65,7 +68,14 @@ class HobberSaddle extends MachineComponent {
       case "GE-Z-drive": [box(165,255,-230,-210,295,887),box(55,145,-280,-275,445,887),
         Solids.cut(box(55,220,-295,-210,440,445),[Part.cylinderSpan(9.6,439.9,445.1,100,-250)]),
         box(55,220,-275,-210,882,887),box(35,95,-300,-290,445,887)];
-      case "GE-chip-tray": [Part.revolve([{r:142.0,z:225.0},{r:147.0,z:164.0},{r:147.0,z:139.0},{r:145.0,z:139.0},{r:145.0,z:164.0},{r:140.0,z:223.0}]),Solids.cut(Solids.union([box(-245,90,-170,170,135,139),box(-245,90,-174,-170,135,164),box(-245,90,170,174,135,164)]),[box(-141,141,-141,141,134,145)])];
+      case "GE-chip-tray":
+        // Removable stationary skirt: 5 mm radial face clearance, 15 mm housing
+        // clearance and 2 mm sheet. The lower skirt covers the full table height.
+        var lip=parameterNumber("tableFaceDiameter")/2+5;
+        var skirt=Math.max(parameterNumber("tableHousingDiameter")/2+15,lip+5);
+        var top=parameterNumber("tableFaceHeight")-3,bottom=parameterNumber("tableSeatHeight")+2;
+        var shoulder=Math.max(bottom+5,top-61);
+        [Part.revolve([{r:lip+2,z:top},{r:skirt+2,z:shoulder},{r:skirt+2,z:bottom},{r:skirt,z:bottom},{r:skirt,z:shoulder},{r:lip,z:top-2}]),Solids.cut(Solids.union([box(-245,90,-170,170,135,139),box(-245,90,-174,-170,135,164),box(-245,90,170,174,135,164)]),[box(-skirt,skirt,-skirt,skirt,134,165)])];
       case "GE-coolant": [Solids.cut(box(33,45,30,50,60,84),[boreX(2,32.9,45.1,40,72)])];
       case "GE-enclosure": [box(-270,780,-360,-356,0,950),box(-270,780,356,360,0,950),box(776,780,-360,360,0,950)];
       case "electrical-panel": [box(-210,210,-10,0,0,850),box(-230,230,-150,50,0,20)];

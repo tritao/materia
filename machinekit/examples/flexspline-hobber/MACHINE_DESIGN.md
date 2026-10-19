@@ -70,7 +70,7 @@ confirmation.
 | X moving mass | 81.71 kg | 127.98 kg |
 | Z moving mass | 106.79 kg | 41.10 kg |
 | Y moving mass | 18.01 kg | 14.03 kg |
-| Machine mass | 351.61 kg | 1034.40 kg |
+| Machine mass | 351.61 kg | 1036.11 kg |
 | Bed footprint (radial × tangential) | 650 × 750 mm | 930 × 800 mm |
 | Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1510 × 800 mm |
 | X continuous thrust margin, same assumed demand basis | 911.15 N | 888.01 N |
@@ -116,7 +116,13 @@ manufacturing-design work.
 
 ## Chips and enclosure
 
-A sloped annular table guard drains into the tray below the work. A drilled
+A sloped annular table guard drains into the tray below the work. Its recipe now
+uses the installed table face, housing and height rather than the old fixed
+cone. The stationary lip clears the rotating face radially by 5 mm and sits
+3 mm below it; the 2 mm skirt clears the housing by at least 15 mm and extends
+to 2 mm above the table seat. For the default table this gives a Ø210 mm
+opening and Ø294 mm lower outside diameter, covering the full 210 mm housing.
+Removal/fastening details remain manufacturing-design work. A drilled
 coolant-manifold placeholder reserves flushing provision. The stationary rail-end
 shields have been removed at the user’s request. Rails, blocks and the central
 screw remain exposed; bellows with suitable chip protection and attached end
@@ -144,7 +150,7 @@ thermal behaviour and detailed manufacturing release remain open plan items.
 ## Heavy plinth acceptance (HB-D11)
 
 The casting is 748.12 kg; the base assembly is 776.28 kg and the complete machine
-is 1034.40 kg. The casting-to-moving-mass ratios are 5.85:1 (X), 53.33:1 (Y)
+is 1036.11 kg. The casting-to-moving-mass ratios are 5.85:1 (X), 53.33:1 (Y)
 and 18.20:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
 from 37.28 to 31.75 kg; its insert-equipped assembly falls from 55.50 to 49.97 kg.
 X moves 127.98 kg including the complete column/head. The three support points

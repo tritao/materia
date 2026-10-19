@@ -2604,3 +2604,18 @@ limits. Front loading still derives110 mm retract; top alternative145 mm.
 Bought-table app acceptance: the complete loading, coarse cutting, unloading, inspection and reset playback passes (982 windows, 6.49625 s machining, zero fixture-envelope contacts). Current layout checks pass 949 assembly, 126 bought/built interface, 1318 range and 6666 loading assertions; both 85-pose exact-solid grids have zero unexpected intersections. See `PURCHASED_TABLE_REPORT.json` and `LAYOUT_REPORT.json`. Frozen earlier HB11 jobs remain historical built-table studies, not acceptance of the new table.
 
 Final post-rebase component checks: 1044 component assertions and 127 geometry assertions pass. Bought/built parity and the 949-assertion assembly suite were rerun after removing form-specific service routing; installation uses rotary-axis mount/work metadata and exported services.
+
+### Installed-table chip guard correction (2026-10-19)
+
+The circular chip guard now follows the selected C table face diameter, housing
+envelope, seat and face heights. It closes the old oversized opening around
+the rotating face and extends the skirt down around the taller bought housing.
+Nominal clearance is 5 mm at the face and at least 15 mm at the housing; sheet
+thickness is 2 mm. Persistence retains these recipe inputs. The reference
+85-pose changed-guard audit checks 407 candidate pairs with zero unexpected
+intersections, including A ±15°, and all 949 assembly assertions pass. Machine
+mass becomes 1036.11 kg; moving masses and base ratios are unchanged. Guard
+fastening/removal detail remains open manufacturing work.
+The regenerated loading/cutting scene also passes full playback, inspection and
+reset: 982 windows, 6.49625 s machining and zero fixture-envelope contacts.
+The refreshed scene is open in Materia.
