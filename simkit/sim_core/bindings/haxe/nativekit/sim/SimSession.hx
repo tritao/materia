@@ -395,6 +395,26 @@ class SimSession {
         return new SimFrame(result.out_frame);
     }
 
+    /** Capture all world contacts, including workpiece/fixture pairs outside a robot's links. */
+    public function contacts():Array<SimContact> {
+        ensureLive();
+        var frame = capture();
+        try {
+            var count = NativeKitSim.nksim_frame_get_contact_count(frame.nativeHandle());
+            SimWorld.check(count.status, "session.contactCount");
+            var result:Array<SimContact> = [];
+            for (i in 0...haxe.Int64.toInt(count.out_count)) {
+                var value = new nksim_contact();value.set_struct_size(nksim_contact.size());
+                var fetched = NativeKitSim.nksim_frame_get_contact(frame.nativeHandle(), haxe.Int64.ofInt(i), value);
+                SimWorld.check(fetched.status, "session.contact");value = fetched.out_contact;
+                result.push({bodyA:value.get_body_a().rawValue(),bodyB:value.get_body_b().rawValue(),
+                    distance:value.get_distance(),active:value.get_active()!=0,wrenchValid:value.get_wrench_valid()!=0,
+                    force:[for (axis in 0...3)value.get_force_on_body_a(axis)]});
+            }
+            frame.dispose();return result;
+        } catch (error:Dynamic) {frame.dispose();throw error;}
+    }
+
     public function dispose():Void {
         if (disposed)
             return;

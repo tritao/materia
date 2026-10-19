@@ -1879,6 +1879,17 @@ nksim_result NKSIM_CALL nksim_frame_get_clock(nksim_frame frame, nksim_clock *ou
     return NKSIM_OK;
 }
 
+nksim_result NKSIM_CALL nksim_frame_get_contact_count(nksim_frame frame, uint64_t *out_count) {
+    if (!out_count) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto value = nksim::frames().get(frame);
+    return value ? nksim_snapshot_get_contact_count(value->snapshot, out_count) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result NKSIM_CALL nksim_frame_get_contact(nksim_frame frame, uint64_t index, nksim_contact *out_contact) {
+    const auto value = nksim::frames().get(frame);
+    return value ? nksim_snapshot_get_contact(value->snapshot, index, out_contact) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 nksim_result NKSIM_CALL nksim_frame_get_body_state(nksim_frame frame, nksim_body body,
                                                    nksim_body_state *out_state) {
     if (!out_state || !nksim::valid_struct_size(out_state->struct_size, sizeof(*out_state)))

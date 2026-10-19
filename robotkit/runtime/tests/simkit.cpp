@@ -1269,6 +1269,35 @@ void shape_descriptor_without_pose_keeps_default_placement() {
     assert(std::abs(pose.position[0] - 1.0) < 1e-9);
 }
 
+// Stopped poses include externally owned coupling followers. Seeding only the
+// leader can leave the second jaw embedded in stock before the first tick.
+void stopped_pose_seeds_coupled_follower() {
+    SessionFixture fixture(0.01);
+    auto model = blueprint(913);
+    model.joint_count = 2;
+    model.link_count = 3;
+    model.links[2] = model.links[1];
+    model.joints[0].type = RK_RUNTIME_JOINT_PRISMATIC;
+    model.joints[1] = model.joints[0];
+    model.joints[1].joint = 1;
+    model.joints[1].child_link = 2;
+    model.external_joint[0] = model.external_joint[1] = 1;
+    model.process_joint[0] = model.process_joint[1] = 1;
+    model.coupling_count = 1;
+    model.couplings[0] = {0, 1, 1.0, 0.0};
+    assert(rk_robot_runtime_blueprint_validate(&model) == RK_OK);
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, nullptr, &robot) == RK_OK);
+    const double opened[] = {-0.025, -0.025};
+    assert(rk_simulation_set_joint_positions(fixture.simulation, 0, opened, 2) == RK_OK);
+    for (uint32_t link_index : {1u, 2u}) {
+        rk_simulation_pose link{};
+        link.struct_size = sizeof(link);
+        assert(rk_simulation_get_link_pose(fixture.simulation, 0, link_index, &link) == RK_OK);
+        assert(std::abs(link.position[2] + 0.025) < 1e-9);
+    }
+}
+
 // Exercise the physical endpoint path, including displacement accumulated after
 // the first motor holds. The Haxe homing-cycle test must cover sensor sequencing separately.
 void dual_home_removes_one_millimetre_startup_racking(bool full_targets) {
@@ -1611,6 +1640,7 @@ int main() {
     dual_home_removes_one_millimetre_startup_racking(true);
     dual_home_removes_one_millimetre_startup_racking(false);
     shape_descriptor_without_pose_keeps_default_placement();
+    stopped_pose_seeds_coupled_follower();
     convex_link_and_box_link_build();
     shared_world_steps_once();
     realtime_presentation_keeps_one_revision();

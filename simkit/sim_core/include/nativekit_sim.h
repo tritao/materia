@@ -124,7 +124,16 @@ typedef struct nksim_world_desc {
     double fixed_timestep;
     uint32_t physics_substeps;
     double gravity[3];
-    uint64_t reserved[4];
+    /** Friction/normal constraint impedance ratio; zero keeps the backend default.
+     * MuJoCo: use with elliptic cones to reduce regularization-induced grasp creep. */
+    double friction_impedance_ratio;
+    /** Optional friction-only no-slip postprocessing iterations (MuJoCo); zero disables. */
+    uint32_t noslip_iterations;
+    uint32_t reserved0;
+    /** Optional arena+stack memory budget in bytes (MuJoCo); zero keeps its default. */
+    uint64_t arena_memory_bytes;
+    /** Optional constraint optimizer termination tolerance (MuJoCo); zero keeps its defaults. */
+    double solver_tolerance;
     /* Zero selects backend defaults. The complete current descriptor is required. */
     uint32_t integrator; /**< NKSIM_INTEGRATOR_*. */
     uint32_t friction_cone; /**< NKSIM_FRICTION_CONE_*. */

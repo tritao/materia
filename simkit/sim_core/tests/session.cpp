@@ -11,6 +11,8 @@
 #include <thread>
 #include <vector>
 #include <memory>
+#include <limits>
+#include <cstddef>
 
 namespace {
 
@@ -71,6 +73,39 @@ nksim_pose actor_pose(nksim_session session, nksim_actor actor, uint32_t part) {
 }
 
 bool near(double a, double b, double tolerance = 1e-5) { return std::abs(a - b) < tolerance; }
+
+void captured_contacts_are_immutable_and_checked() {
+    Space space;
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.motion_type = NKSIM_MOTION_STATIC;
+    desc.shape.type = NKSIM_SHAPE_BOX;
+    desc.shape.parameters[0] = desc.shape.parameters[1] = desc.shape.parameters[2] = 0.5;
+    desc.pose = pose_at(0, 0, -0.5);
+    nksim_object floor = 0, stock = 0;
+    assert(nksim_session_create_object(space.session, &desc, &floor) == NKSIM_OK);
+    desc.motion_type = NKSIM_MOTION_KINEMATIC;desc.mass = 0;
+    desc.pose = pose_at(0, 0, 0.49);
+    assert(nksim_session_create_object(space.session, &desc, &stock) == NKSIM_OK);
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    nksim_frame frame = 0;
+    assert(nksim_session_capture(space.session, &frame) == NKSIM_OK);
+    uint64_t count = 0;
+    assert(nksim_frame_get_contact_count(frame, &count) == NKSIM_OK && count > 0);
+    const auto original = count;
+    nksim_contact contact{};contact.struct_size = sizeof(contact);
+    assert(nksim_frame_get_contact(frame, 0, &contact) == NKSIM_OK);
+    assert(contact.body_a != 0 && contact.body_b != 0 && contact.body_a != contact.body_b);
+    assert(nksim_frame_get_contact(frame, count, &contact) != NKSIM_OK);
+    assert(nksim_frame_get_contact_count(frame, nullptr) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_session_stop(space.session) == NKSIM_OK);
+    auto away = pose_at(0, 0, 5);
+    assert(nksim_session_teleport_object(space.session, stock, &away) == NKSIM_OK);
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    assert(nksim_frame_get_contact_count(frame, &count) == NKSIM_OK && count == original);
+    nksim_frame_destroy(frame);
+    assert(nksim_frame_get_contact_count(frame, &count) == NKSIM_ERROR_INVALID_HANDLE);
+}
 
 void objects_follow_their_motion_type() {
     Space space;
@@ -760,6 +795,36 @@ void planes_and_cylinders_are_objects() {
 }
 
 int main() {
+    // Solver extensions consume reserved slots without changing the existing ABI.
+    static_assert(sizeof(nksim_world_desc) == 96);
+    static_assert(offsetof(nksim_world_desc, integrator) == 80);
+    {
+        nkscene_scene scene = 0;
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        nksim_world_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.scene = scene;
+        desc.fixed_timestep = 0.01;
+        desc.physics_substeps = 1;
+        nksim_world world = 0;
+        for (double ratio : {-1.0, std::numeric_limits<double>::quiet_NaN(),
+                             std::numeric_limits<double>::infinity()}) {
+            desc.friction_impedance_ratio = ratio;
+            assert(nksim_world_create(&desc, &world) == NKSIM_ERROR_INVALID_ARGUMENT);
+        }
+        desc.friction_impedance_ratio = 10.0;
+        desc.noslip_iterations = 2;
+        for (double tolerance : {-1.0, std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::infinity()}) {
+            desc.solver_tolerance = tolerance;
+            assert(nksim_world_create(&desc, &world) == NKSIM_ERROR_INVALID_ARGUMENT);
+        }
+        desc.solver_tolerance = 1e-10;
+        desc.arena_memory_bytes = 128u * 1024u * 1024u;
+        assert(nksim_world_create(&desc, &world) == NKSIM_OK);
+        nksim_world_destroy(world);
+        nkscene_scene_destroy(scene);
+    }
     // A completed background builder hands an unstarted world to the UI owner.
     {
         std::unique_ptr<Space> prepared;
@@ -904,6 +969,7 @@ int main() {
                reported == 0);
         assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
     }
+    captured_contacts_are_immutable_and_checked();
     planes_and_cylinders_are_objects();
     objects_follow_their_motion_type();
     presence_counts_only_free_boxes_in_its_volume();

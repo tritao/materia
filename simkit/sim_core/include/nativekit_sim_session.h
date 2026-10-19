@@ -281,6 +281,11 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_capture(
 NKSIM_API void NKSIM_CALL nksim_frame_destroy(nksim_frame frame);
 NKSIM_API nksim_result NKSIM_CALL nksim_frame_get_clock(
     nksim_frame frame, nksim_clock *out_clock NK_INOUT);
+/** Contacts from the same immutable physics snapshot as this frame's body poses. */
+NKSIM_API nksim_result NKSIM_CALL nksim_frame_get_contact_count(
+    nksim_frame frame, uint64_t *out_count NK_OUT);
+NKSIM_API nksim_result NKSIM_CALL nksim_frame_get_contact(
+    nksim_frame frame, uint64_t index, nksim_contact *out_contact NK_INOUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_frame_get_body_state(
     nksim_frame frame, nksim_body body, nksim_body_state *out_state NK_INOUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_frame_get_object_pose(

@@ -920,6 +920,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         binding->squaring_hold_.assign(blueprint.joint_count, 0);
         binding->squaring_position_.assign(blueprint.joint_count, 0.0);
         binding->servo_.assign(blueprint.joint_count, rk_robot_joint_servo{});
+        binding->servo_feedforward_.assign(blueprint.joint_count,0.0);
 
         binding->passive_.assign(blueprint.joint_count, 0);
         binding->step_ = fixed_timestep_;
@@ -1703,11 +1704,28 @@ rk_result Simulation::set_joint_positions(uint32_t robot_index, const double *po
             return RK_ERROR_INVALID_ARGUMENT;
     }
     for (uint32_t joint = 0; joint < count; ++joint) {
-        if (!binding->actuated_joints_[joint]) continue;
+        // A pose seeds passive/coupled coordinates too; motor ownership only
+        // controls drive commands. Leaving a follower at zero can spawn it
+        // through a workpiece and generate a large first-step contact impulse.
+        if (blueprint.joints[joint].type == RK_RUNTIME_JOINT_FIXED) continue;
         if (nksim_joint_set_state(world, binding->joints_[joint], positions[joint], 0.0) != NKSIM_OK)
             return RK_ERROR_BACKEND;
     }
     binding->reset_sensors();
+    return RK_OK;
+}
+
+rk_result Simulation::set_servo_feedforward(uint32_t robot_index, uint32_t joint, double effort) {
+    Lock lock(session_);
+    if (robot_index >= bindings_.size() || !std::isfinite(effort)) return RK_ERROR_INVALID_ARGUMENT;
+    auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    const auto &blueprint = runtimes_[robot_index]->blueprint();
+    if (joint >= binding->servo_.size() || binding->servo_[joint].stiffness <= 0.0) return RK_ERROR_INVALID_ARGUMENT;
+    const auto &limits = blueprint.joints[joint];
+    if ((limits.limit_flags & RK_LIMIT_EFFORT) && std::abs(effort) > limits.max_effort)
+        return RK_ERROR_INVALID_ARGUMENT;
+    binding->servo_feedforward_[joint] = effort;
     return RK_OK;
 }
 
@@ -1740,6 +1758,7 @@ rk_result Simulation::drive_process_joint(uint32_t robot_index, uint32_t joint,
         target.mode = NKSIM_JOINT_TARGET_SERVO;
         target.stiffness = gains.stiffness;
         target.damping = gains.damping;
+        target.feedforward = binding->servo_feedforward_[joint];
         target.velocity = velocity;
     }
     return nksim_session_submit_joint_targets(session_, &target, 1) == NKSIM_OK

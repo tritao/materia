@@ -55,6 +55,10 @@ class SimulationSpace {
 			options.frictionCone = solver.frictionCone;
 			options.solverIterations = solver.solverIterations;
 			options.lineSearchIterations = solver.lineSearchIterations;
+			options.frictionImpedanceRatio = solver.frictionImpedanceRatio;
+			options.noslipIterations = solver.noslipIterations;
+			options.solverTolerance = solver.solverTolerance;
+			options.arenaMemoryBytes = solver.arenaMemoryBytes;
 		}
 		var scene = Scene.create();
 		var integrator = options.integrator == null ? NativeKitSimConstants.NKSIM_INTEGRATOR_DEFAULT : options.integrator;

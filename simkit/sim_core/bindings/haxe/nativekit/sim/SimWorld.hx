@@ -51,6 +51,14 @@ class SimWorld {
             if (options.solverIterations != null) desc.set_solver_iterations(options.solverIterations);
             if (options.lineSearchIterations != null)
                 desc.set_line_search_iterations(options.lineSearchIterations);
+            if (options.frictionImpedanceRatio != null)
+                desc.set_friction_impedance_ratio(options.frictionImpedanceRatio);
+            if (options.noslipIterations != null) desc.set_noslip_iterations(options.noslipIterations);
+            if (options.solverTolerance != null) desc.set_solver_tolerance(options.solverTolerance);
+            if (options.arenaMemoryBytes != null) {
+                if (options.arenaMemoryBytes < 0) throw "Simulation arena memory must be nonnegative";
+                desc.set_arena_memory_bytes(haxe.Int64.ofInt(options.arenaMemoryBytes));
+            }
         }
         return desc;
     }

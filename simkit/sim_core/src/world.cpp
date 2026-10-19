@@ -1330,7 +1330,10 @@ nksim_result create_world_with_backend(const nksim_world_desc &provided,
     if (!valid_struct_size(provided.struct_size, sizeof(provided)))
         return NKSIM_ERROR_INVALID_ARGUMENT;
     const auto &desc = provided;
-    if (desc.integrator > NKSIM_INTEGRATOR_RK4 || desc.friction_cone > NKSIM_FRICTION_CONE_ELLIPTIC)
+    if (desc.integrator > NKSIM_INTEGRATOR_RK4 || desc.friction_cone > NKSIM_FRICTION_CONE_ELLIPTIC ||
+        !std::isfinite(desc.friction_impedance_ratio) || desc.friction_impedance_ratio < 0.0 ||
+        !std::isfinite(desc.solver_tolerance) || desc.solver_tolerance < 0.0 ||
+        desc.noslip_iterations > static_cast<uint32_t>(std::numeric_limits<int>::max()))
         return NKSIM_ERROR_INVALID_ARGUMENT;
     if (!out_world ||
         !finite_positive(desc.fixed_timestep) || desc.physics_substeps == 0 ||

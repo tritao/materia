@@ -14,6 +14,9 @@ class BodyState {
     public final linearVelocityX:Float;
     public final linearVelocityY:Float;
     public final linearVelocityZ:Float;
+    public final angularVelocityX:Float;
+    public final angularVelocityY:Float;
+    public final angularVelocityZ:Float;
     public final sleeping:Bool;
 
     private function new(value:nksim_body_state) {
@@ -27,6 +30,9 @@ class BodyState {
         linearVelocityX = value.get_linear_velocity(0);
         linearVelocityY = value.get_linear_velocity(1);
         linearVelocityZ = value.get_linear_velocity(2);
+        angularVelocityX = value.get_angular_velocity(0);
+        angularVelocityY = value.get_angular_velocity(1);
+        angularVelocityZ = value.get_angular_velocity(2);
         sleeping = value.get_sleeping() != 0;
     }
 

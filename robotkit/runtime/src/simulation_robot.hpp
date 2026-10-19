@@ -38,6 +38,7 @@ public:
         std::fill(slip_.begin(), slip_.end(), 0.0);
         std::fill(squaring_offset_.begin(), squaring_offset_.end(), 0.0);
         std::fill(counter_origin_.begin(), counter_origin_.end(), 0.0);
+        std::fill(servo_feedforward_.begin(), servo_feedforward_.end(), 0.0);
         std::fill(squaring_hold_.begin(), squaring_hold_.end(), 0);
         pending_targets_.clear();
         staged_valid_ = false;
@@ -120,6 +121,7 @@ private:
     std::vector<double> squaring_position_;
     /** Servo gains per joint: a joint with stiffness runs as a servo on its position targets. */
     std::vector<rk_robot_joint_servo> servo_;
+    std::vector<double> servo_feedforward_;
     /** Joints that only move through couplings to a servo joint: they get no targets of their own. */
     std::vector<uint8_t> passive_;
     // Joints a virtual device does not drive: the loads of a compliant coupling (a belt's carriage) move as the

@@ -917,6 +917,12 @@ class Simulation {
   }
 
   /** `maxEffort` is the controller's limit for this command, within the joint's rating; zero applies the rating. */
+  /** Model-based bias for simulated position/trajectory servo control. Direct servo commands carry their own bias. */
+  public function setServoFeedforward(robotIndex:Int, joint:Int, effort:Float):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_set_servo_feedforward(owner.borrow(),robotIndex,joint,effort),"simulation.setServoFeedforward");
+  }
+
   public function driveProcessJoint(robotIndex:Int, joint:Int, position:Float, velocity:Float, maxEffort:Float = 0):Void {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_drive_process_joint(owner.borrow(), robotIndex, joint, position, velocity,

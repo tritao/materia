@@ -651,7 +651,8 @@ RK_API rk_result RK_CALL rk_simulation_get_omni_drive_state(
     rk_simulation simulation, uint32_t robot_index,
     rk_simulation_omni_drive_state *out_state RK_INOUT);
 /**
- * Places one attached robot's joints at positions, in joint order, as a pose
+ * Places one attached robot's joints, including passive/coupled followers,
+ * at positions in joint order as a pose
  * to start from, such as a humanoid's standing keyframe. Velocities become
  * zero. Accepted only while the simulation is stopped, like
  * rk_simulation_teleport_robot(); reset returns joints to zero. Fixed joints
@@ -665,6 +666,9 @@ RK_API rk_result RK_CALL rk_simulation_set_joint_positions(
  * controller's force or torque limit for this command, positive and within the joint's rating; zero applies the
  * rating itself.
  */
+/** Simulation controller bias added to position/trajectory servo targets, within the joint effort rating. */
+RK_API rk_result RK_CALL rk_simulation_set_servo_feedforward(
+    rk_simulation simulation, uint32_t robot_index, uint32_t joint, double effort);
 RK_API rk_result RK_CALL rk_simulation_drive_process_joint(
     rk_simulation simulation, uint32_t robot_index, uint32_t joint,
     double position, double velocity, double max_effort);

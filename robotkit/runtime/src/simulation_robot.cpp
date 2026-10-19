@@ -207,6 +207,7 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
             target.mode = NKSIM_JOINT_TARGET_SERVO;
             target.stiffness = gains.stiffness;
             target.damping = gains.damping;
+            target.feedforward = servo_feedforward_[source.joint];
             if (index < RK_MAX_SERVO_JOINTS) {
                 target.velocity = command.servos[index].velocity;
             }

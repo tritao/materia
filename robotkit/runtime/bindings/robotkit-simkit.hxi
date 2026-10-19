@@ -165,6 +165,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * controller's force or torque limit for this command, positive and within the joint's rating; zero applies the
 	 * rating itself.
 	 */
+	extern fn rk_simulation_set_servo_feedforward(simulation: rk_simulation, robot_index: u32, joint: u32, effort: f64) -> rk_result;
 	extern fn rk_simulation_drive_process_joint(simulation: rk_simulation, robot_index: u32, joint: u32, position: f64, velocity: f64, max_effort: f64) -> rk_result;
 	/**
 	 * Drives one attached robot's kinematic base to a pose for the next tick.

@@ -373,6 +373,12 @@ rk_result RK_CALL rk_simulation_spring_process_joint(rk_simulation simulation,
                  : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_set_servo_feedforward(rk_simulation simulation,
+    uint32_t robot_index, uint32_t joint, double effort) {
+    const auto value = resolve(simulation);
+    return value ? value->set_servo_feedforward(robot_index, joint, effort) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_drive_process_joint(rk_simulation simulation,
     uint32_t robot_index, uint32_t joint, double position, double velocity, double max_effort) {
     const auto value = resolve(simulation);

@@ -1,24 +1,12 @@
 package app;
 
-/** Explicit, assumed contact response for hard pneumatic machine fixtures. */
+/** Application facade for the shared machine-fixture contact assumptions. */
 class SimulationContactSurfaces {
-  /** Assumed hard fixture contact; matches MuJoCo's 2·dt floor at the 0.25 ms drive substep. */
-  public static inline final PNEUMATIC_FIXTURE_TIME_CONSTANT:Float = 0.0005;
-
+  public static inline final PNEUMATIC_FIXTURE_TIME_CONSTANT:Float = robotkit.runtime.SimulatedContactSurfaces.HARD_FIXTURE_TIME_CONSTANT;
   public static function robotPart():robotkit.model.CollisionShape.ContactSurface
-    return new robotkit.model.CollisionShape.ContactSurface(null, 0,
-      PNEUMATIC_FIXTURE_TIME_CONSTANT, 1.0);
-
-  /** Contact parameters carried by the physical replaceable grip pads. */
-  public static function gripperFinger(frictionCoefficient:Float):robotkit.model.CollisionShape.ContactSurface {
-    if (!(frictionCoefficient > 0.0) || !Math.isFinite(frictionCoefficient))
-      throw "Gripper pad friction must be finite and positive";
-    return new robotkit.model.CollisionShape.ContactSurface([frictionCoefficient, 0.0, 0.0], 3,
-      PNEUMATIC_FIXTURE_TIME_CONSTANT, 1.0);
-  }
-
-  public static function environmentPart(
-      filter:nativekit.sim.SimContactFilter = nativekit.sim.SimContactFilter.Layers):nativekit.sim.SimContactSurface
-    return new nativekit.sim.SimContactSurface(null, 0,
-      PNEUMATIC_FIXTURE_TIME_CONSTANT, 1.0, filter);
+    return robotkit.runtime.SimulatedContactSurfaces.robotPart();
+  public static function gripperFinger(frictionCoefficient:Float):robotkit.model.CollisionShape.ContactSurface
+    return robotkit.runtime.SimulatedContactSurfaces.gripperFinger(frictionCoefficient);
+  public static function environmentPart(filter:nativekit.sim.SimContactFilter=nativekit.sim.SimContactFilter.Layers):nativekit.sim.SimContactSurface
+    return robotkit.runtime.SimulatedContactSurfaces.environmentPart(filter);
 }

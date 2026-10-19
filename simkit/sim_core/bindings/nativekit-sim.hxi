@@ -124,6 +124,8 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_frame_destroy(frame: nksim_frame) -> void;
 	extern fn nksim_frame_get_actor_pose(frame: nksim_frame, actor: nksim_actor, part: u32, out_pose: ptr<nksim_pose> @inout) -> nksim_result;
 	extern fn nksim_frame_get_body_state(frame: nksim_frame, body: nksim_body, out_state: ptr<nksim_body_state> @inout) -> nksim_result;
+	extern fn nksim_frame_get_contact_count(frame: nksim_frame, out_count: ptr<u64> @out) -> nksim_result;
+	extern fn nksim_frame_get_contact(frame: nksim_frame, index: u64, out_contact: ptr<nksim_contact> @inout) -> nksim_result;
 	extern fn nksim_frame_get_clock(frame: nksim_frame, out_clock: ptr<nksim_clock> @inout) -> nksim_result;
 	extern fn nksim_frame_get_object_pose(frame: nksim_frame, object: nksim_object, out_pose: ptr<nksim_pose> @inout) -> nksim_result;
 	/**
@@ -696,7 +698,8 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		simulation_time: f64 @offset(24);
 		fixed_timestep: f64 @offset(32);
 		gravity: array<f64, 3> @offset(40);
-		reserved: array<u64, 2> @offset(64);
+		arena_memory_bytes: u64 @offset(64);
+		solver_tolerance: f64 @offset(72);
 	}
 	struct nksim_shape_desc @layout(56, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -756,7 +759,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		fixed_timestep: f64 @offset(8);
 		physics_substeps: u32 @offset(16);
 		gravity: array<f64, 3> @offset(24);
-		reserved: array<u64, 4> @offset(48);
+		friction_impedance_ratio: f64 @offset(48);
+		noslip_iterations: u32 @offset(56);
+		reserved0: u32 @offset(60);
+		arena_memory_bytes: u64 @offset(64);
+		solver_tolerance: f64 @offset(72);
 		/**
 		 * < NKSIM_INTEGRATOR_*.
 		 */

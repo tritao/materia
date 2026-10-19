@@ -384,6 +384,8 @@ public:
             return NKSIM_ERROR_OUT_OF_MEMORY;
         spec->compiler.degree = 0; // SimKit joint limits are SI radians.
         spec->nuser_geom = kGeomUser;
+        if (desc.arena_memory_bytes != 0)
+            spec->memory = static_cast<mjtSize>(desc.arena_memory_bytes);
         // The hook is process-wide and idempotent; models that are not ours get MuJoCo's own test from it.
         mjcb_contactfilter = &contact_filter;
         spec->option.gravity[0] = desc.gravity[0];
@@ -403,6 +405,13 @@ public:
             spec->option.iterations = static_cast<int>(desc.solver_iterations);
         if (desc.line_search_iterations != 0)
             spec->option.ls_iterations = static_cast<int>(desc.line_search_iterations);
+        if (desc.friction_impedance_ratio != 0.0)
+            spec->option.impratio = desc.friction_impedance_ratio;
+        spec->option.noslip_iterations = static_cast<int>(desc.noslip_iterations);
+        if (desc.solver_tolerance != 0.0) {
+            spec->option.tolerance = desc.solver_tolerance;
+            spec->option.noslip_tolerance = desc.solver_tolerance;
+        }
         return rebuild();
     }
 
@@ -1081,9 +1090,7 @@ public:
             mj_step(model, data);
             // MuJoCo can auto-reset an unstable state and return finite values.
             // Treat that as a failed tick instead of presenting a fresh fling.
-            if (data->warning[mjWARN_BADQPOS].number || data->warning[mjWARN_BADQVEL].number ||
-                data->warning[mjWARN_BADQACC].number || data->warning[mjWARN_BADCTRL].number)
-                return NKSIM_ERROR_BACKEND;
+            if (failed_dynamics()) return NKSIM_ERROR_BACKEND;
         }
         // Any reaction mj_step computed back onto a kinematic root's free
         // joint (it has real mass so the contact solve treats it like any
@@ -1096,6 +1103,7 @@ public:
         // and so read_contacts() sees contacts recomputed from the final,
         // exact kinematic placement above rather than the last substep's.
         mj_forward(model, data);
+        if (failed_dynamics()) return NKSIM_ERROR_BACKEND;
         derived_stale = false;
         std::fill(data->xfrc_applied, data->xfrc_applied + model->nbody * 6, 0.0);
         return NKSIM_OK;
@@ -1180,10 +1188,17 @@ public:
         return NKSIM_OK;
     }
 
+    bool failed_dynamics() const {
+        return data && (data->warning[mjWARN_CNSTRFULL].number || data->warning[mjWARN_CONTACTFULL].number ||
+            data->warning[mjWARN_BADQPOS].number || data->warning[mjWARN_BADQVEL].number ||
+            data->warning[mjWARN_BADQACC].number || data->warning[mjWARN_BADCTRL].number);
+    }
+
     nksim_result read_contacts(std::vector<nksim::BackendContact> &out) override {
         out.clear();
         if (!model || !data) return NKSIM_OK;
         refresh_derived();
+        if (failed_dynamics()) return NKSIM_ERROR_BACKEND;
         std::unordered_set<std::uint64_t> reported_pairs;
         const auto pair_key = [](int first, int second) {
             const auto low = static_cast<std::uint32_t>(std::min(first, second));
@@ -1616,7 +1631,15 @@ private:
         derived_stale = false;
         rebuild_servo_coordinates();
         apply_joint_targets();
+        // A topology rebuild is not a physics tick. The authored joint-zero
+        // pose may intersect itself before the stopped robot is seeded. Build
+        // kinematics/inertia here, but do not solve that temporary contact set.
+        // Normal stepping (or a subsequent explicit state refresh) solves the
+        // constraints after the caller has finished placing the assembly.
+        const auto disableflags = model->opt.disableflags;
+        model->opt.disableflags |= mjDSBL_CONSTRAINT;
         mj_forward(model, data);
+        model->opt.disableflags = disableflags;
         rebuild_coupling_responses();
         rebuild_brake_responses();
         return NKSIM_OK;

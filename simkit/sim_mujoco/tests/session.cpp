@@ -87,6 +87,14 @@ void actor_pushes_dynamic_object_without_being_pushed() {
     assert(nksim_frame_get_actor_pose(frame, actor, 0, &walker) == NKSIM_OK);
     // 1.5 s in: exactly on its trajectory despite the contact.
     assert(std::abs(walker.position[0] - 1.5) < 1e-6 && std::abs(walker.position[1]) < 1e-9);
+    uint64_t contact_count = 0;
+    assert(nksim_frame_get_contact_count(frame, &contact_count) == NKSIM_OK && contact_count > 0);
+    nksim_contact contact{};contact.struct_size = sizeof(contact);
+    assert(nksim_frame_get_contact(frame, 0, &contact) == NKSIM_OK);
+    assert(contact.wrench_valid && contact.body_a != contact.body_b);
+    const auto retained_count = contact_count;
+    assert(nksim_session_step(session, 0, nullptr) == NKSIM_OK);
+    assert(nksim_frame_get_contact_count(frame, &contact_count) == NKSIM_OK && contact_count == retained_count);
     const auto shoved = object_pose(frame, crate);
     // The crate stays ahead of the capsule's front surface and on the floor.
     assert(shoved.position[0] > 1.5 + 0.15 + 0.2 - 0.05);
