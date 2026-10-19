@@ -76,3 +76,23 @@ bearing and lighter column retain explicitly assumed engineering ratings.
 See [MACHINE_DESIGN.md](MACHINE_DESIGN.md#heavy-plinth-acceptance-hb-d11) for mass,
 support and preliminary stiffness evidence. The app's machining time excludes
 the illustrative loading/unloading sequence.
+
+### Post-plinth reference budget
+
+The current HB11 run is in `build/flexspline-reference-budget-plinth`.
+`review.md` / `review.json` summarize completed inspections; `progress.json`
+lists missing cases. The background units are `flexspline-hb11-plinth-budget`
+and `flexspline-hb11-plinth-review` (`journalctl --user -u UNIT -f`).
+
+To resume after the unit has stopped, use the same frozen evidence and provider:
+
+```sh
+python3 machinekit/examples/flexspline-hobber/run-plinth-budget.py \
+  build/flexspline-reference-budget-plinth \
+  --previous build/flexspline-reference-budget-parallel \
+  --native build/flexspline-shared-sweep/native-pair
+```
+
+The runner refuses changed binary/input/settings fingerprints. Do not replace
+its frozen binary during a run. HB4 convergence and HB12 reference acceptance
+remain open; a completed numerical budget does not establish ISO certification.

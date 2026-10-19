@@ -2367,3 +2367,36 @@ fills internal bores/cavities in collision only. CAD mass/shape and cutting
 settings are unchanged by these collision representations. The project remains
 below the 768-shape runtime cap, without increasing it or adding contact
 exclusions. Frozen HB4/HB11 cuts and native providers were left untouched.
+
+### HB11 post-plinth runs started; HB4 convergence still open (2026-10-19)
+
+Review found 12/15 completed cases in the earlier batch. Its wall case is still
+running; table-axial and combined have no valid completed inspection. Preserve
+all existing evidence and the older wall process. The old review file was stale;
+it must not be read as acceptance of the later completed cases or missing cuts.
+
+A separate `build/flexspline-reference-budget-plinth` run freezes the current
+compiled checks and the validated paired native provider. It reuses only the
+12 unchanged baseline/independent-source inspections, retaining their hashes.
+It reruns combined, table-tilt, table-axial and wall: the sleeve/contact stiffness
+is now 83936.7853 N/mm and the combined source set includes table tilt. The
+analytic work-frame geometry, other source amplitudes/functions and frozen
+force/sync inputs are unchanged. This remains the assumed unloaded HB7 plant,
+not a loaded full-machine following-error qualification.
+
+`run-plinth-budget.py` runs two cases concurrently, four threads each, with a
+5 GiB process-group limit and memory headroom checks. Fine settings are retained:
+radial/axial spacing 0.0015/0.04 mm, sweep tolerance 0.000025 mm, path tolerance
+0.0000015625 mm, full 92,151-window stroke and physical face endpoints. Completed
+cuts are restartable only with matching execution fingerprints, validated settings,
+finite inspections and a completed-cut log. An altered-binary resume guard was
+checked and rejected before any cut or reuse. The script assembles the updated
+budget after all four cases finish. A separate review watcher updates review.json
+and review.md, without importing the older combined face-end supplement.
+
+HB4's last full-face run remains open: level 5 total-circle change was
+0.0000617216 mm against 0.00005 mm required. Local boundary diagnostics do not
+close that acceptance. Do not relax the tolerance or claim reference grading
+from the coarse app demo. HB12 remains pending the completed current HB11 budget,
+HB4 convergence and the measured reference-cycle breakdown (prototype target
+≤3 min). No native providers or older running cuts were rebuilt or stopped.
