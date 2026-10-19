@@ -484,8 +484,17 @@ under `build/suppliers/hzmotion/raw`. It rejects changed PDF content rather than
 silently updating dimensions. `--write-haxe` explicitly regenerates typed runtime
 records; `--check` verifies them without network access. Prices and ordering
 identities are not inferred from geometry model names. The recorded supplier STEP
-links currently return HTTP 403 with “Login required to download CAD files”.
-No failed download is treated as an asset or worked around with a guessed file.
+links require an authenticated supplier account. Seven selected STEP files are now
+pinned separately in `hzmotion-cad.json`; their original failed unauthenticated
+attempts remain recorded in the drawing reference. Run
+`python3 tools/suppliers/hzmotion_cad.py` to fill the ignored, hash-addressed CAD
+cache, or add `--offline` to verify it. Missing files prompt for credentials;
+credentials and session cookies are never saved. The downloader checks the STEP
+header, byte count and SHA-256 and rejects changed content. The cache is under
+`build/suppliers/hzmotion/cad/assets`. These are supplier reference files in their
+original coordinates; the drawing recipes have not been replaced or qualified
+against their detailed interfaces. No KK body/adapter CAD link was listed on the
+public KK page, and EF12 has not yet been downloaded.
 
 Open `machinekit/examples/supplier-fasteners/materia.hzmotion.project.json` in
 Materia. The default catalog entry shows editable model/revision/bearing-grade

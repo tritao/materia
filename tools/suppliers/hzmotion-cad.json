@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "geometryStatus": "Supplier STEP references; original coordinate systems, interface qualification pending. Drawing recipes remain unchanged.",
+  "assets": [
+    {
+      "model": "M60D-BK12-C",
+      "url": "https://www.hzmotion.com/downloads/1784624575899-M60D-BK12-C.step",
+      "supplierDesignation": "M60D- BK12-C3",
+      "sha256": "aa90581f9b8b5efed4a02cd195d9edd0737f6ddbf130cf0ffbca8f6edb686b48",
+      "bytes": 3701392,
+      "downloadedAt": "2026-10-19T14:03:21.286907+00:00",
+      "importAudit": {
+        "kernel": "CadKit / OpenCascade",
+        "volumeMm3": 105402.71649866684,
+        "boundsMinMm": [
+          -32.5000001,
+          -30.000000001410005,
+          0.9999999999999997
+        ],
+        "boundsMaxMm": [
+          32.5000001,
+          30.000000101393802,
+          84.50000010033241
+        ]
+      }
+    },
+    {
+      "model": "M60D-EK12-C",
+      "url": "https://www.hzmotion.com/downloads/1784624583651-M60D-EK12-C.step",
+      "supplierDesignation": "M60D- EK12-C3",
+      "sha256": "85c6a3f1bc50145005db293b45901ae668c42dd89b13c10eeeceb0a1584b28af",
+      "bytes": 3649101,
+      "downloadedAt": "2026-10-19T14:03:30.492042+00:00",
+      "importAudit": {
+        "kernel": "CadKit / OpenCascade",
+        "volumeMm3": 114833.4195267128,
+        "boundsMinMm": [
+          -35.00000010000001,
+          -30.000000001410005,
+          0.9999999999999997
+        ],
+        "boundsMaxMm": [
+          35.0000001,
+          30.000000101393802,
+          84.50000010000002
+        ]
+      }
+    },
+    {
+      "model": "M80E-BK15-C",
+      "url": "https://www.hzmotion.com/downloads/1784624649844-M80E-BK15-C.step",
+      "supplierDesignation": "M80E- BK15-C3",
+      "sha256": "cc8e49d9861330d5bb01342578dfb880e7020c1aa065aa1c7a7b807168af318b",
+      "bytes": 3710903,
+      "downloadedAt": "2026-10-19T14:03:36.196194+00:00",
+      "importAudit": {
+        "kernel": "CadKit / OpenCascade",
+        "volumeMm3": 196392.6782726489,
+        "boundsMinMm": [
+          -44.000000000000014,
+          -43,
+          0.9999998999763532
+        ],
+        "boundsMaxMm": [
+          44.000000000000014,
+          43,
+          109.00000000003729
+        ]
+      }
+    },
+    {
+      "model": "M60D-FK12-A",
+      "url": "https://www.hzmotion.com/downloads/1784624592913-M60D-FK12-A.step",
+      "supplierDesignation": "M60D-FK12-A",
+      "sha256": "f39985658f00f32588a5c1a544d69297191aff347085220119ec282f26b3864e",
+      "bytes": 2332731,
+      "downloadedAt": "2026-10-19T14:03:39.765128+00:00",
+      "importAudit": {
+        "kernel": "CadKit / OpenCascade",
+        "volumeMm3": 82819.16958288962,
+        "boundsMinMm": [
+          -32.5000001,
+          -30.000000000007198,
+          1.99999960798317
+        ],
+        "boundsMaxMm": [
+          32.50000010000001,
+          30.000000100000005,
+          76.00000010031665
+        ]
+      }
+    },
+    {
+      "model": "FK12",
+      "url": "https://www.hzmotion.com/downloads/1784564246641-FK12.step",
+      "supplierDesignation": "FK12-C3",
+      "sha256": "6963a8914af0b315e9320e0d61093643c63295eae1167fae88a969b850e71490",
+      "bytes": 3377230,
+      "downloadedAt": "2026-10-19T14:03:46.918610+00:00",
+      "importAudit": {
+        "kernel": "CadKit / OpenCascade",
+        "volumeMm3": 30940.406940142857,
+        "boundsMinMm": [
+          -22.000077461805812,
+          -0.5,
+          -22.000076149361526
+        ],
+        "boundsMaxMm": [
+          22.000074313322614,
+          34.500095274163435,
+          22.000082109934006
+        ]
+      }
+    },
+    {
+      "model": "BF12",
+      "url": "https://www.hzmotion.com/downloads/1784563890385-BF12.step",
+      "supplierDesignation": "BF12-C3",
+      "sha256": "85be1102d186b901fa8a8d7f65000777d18a4aa25082c2a0242e658746fcf559",
+      "bytes": 2426349,
+      "downloadedAt": "2026-10-19T14:03:50.867797+00:00",
+      "importAudit": {
+        "kernel": "CadKit / OpenCascade",
+        "volumeMm3": 35232.64535651596,
+        "boundsMinMm": [
+          -30.000000000000004,
+          -25,
+          -20.000000000000007
+        ],
+        "boundsMaxMm": [
+          30.000000000000004,
+          18.000000000000004,
+          4.440892098500626e-15
+        ]
+      }
+    },
+    {
+      "model": "BF15",
+      "url": "https://www.hzmotion.com/downloads/1784563892750-BF15.step",
+      "supplierDesignation": "BF15-C3",
+      "sha256": "4b4c9c572ddf8fd7aa31193754405e96c9768b6582f2295c17ebb80fd81873a1",
+      "bytes": 2420955,
+      "downloadedAt": "2026-10-19T14:03:54.505910+00:00",
+      "importAudit": {
+        "kernel": "CadKit / OpenCascade",
+        "volumeMm3": 45971.069916157685,
+        "boundsMinMm": [
+          -35,
+          -28.000000000000004,
+          -5.10702591327572e-15
+        ],
+        "boundsMaxMm": [
+          35,
+          20,
+          20.000000000000007
+        ]
+      }
+    }
+  ],
+  "unavailable": [
+    "KK86-FK10L and KK86-80EP-adapter: no CAD links on public KK series page",
+    "EF12: not in the selected public download manifest"
+  ]
+}
