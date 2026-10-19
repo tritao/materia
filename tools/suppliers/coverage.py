@@ -7,6 +7,7 @@ from pathlib import Path
 
 from vallder import DEFAULT_OUTPUT, now, write_json
 from hardware import build as hardware_review
+from motor_mounts import build as motor_mount_review
 
 
 def build(output):
@@ -67,6 +68,9 @@ def build(output):
                     "assembly_occurrences": asset["assembly_occurrences"],
                     "mounting_frame_status": "unverified", "compatibility_verified": False,
                     "table_evidence": reference["table_contexts"]})
+    # RBK downloads join through exact columns in its transposed specification table.
+    motor_mounts = motor_mount_review(catalog, library)
+    write_json(output / "motor-mounts.json", motor_mounts)
     # BK/BF files use the established X-across/Y-up/Z-shaft reference frame.
     # Validate the base plane against h and envelope against B/H; do not infer bores from splines.
     support_interfaces = []

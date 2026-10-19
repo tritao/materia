@@ -121,6 +121,53 @@ width/travel and the 8080 bracket's 40 mm hole pitch. Matching that pitch is onl
 a candidate for the shared 40 mm grid. Missing dimensions prevent full bracket
 models and screw/tool-access qualification; existing table hardware assumptions
 are not substituted for those supplier parts.
+
+### Motor mounts
+
+`machinekit.assembly.nema-mount-plate` makes the existing `NemaMountPlate`
+saveable in assemblies and editable documents. It retains the motor pilot and
+bolt-pattern cutout, bolt connectors and existing screw-engagement checks.
+Choose a named motor model, plate thickness and margin. Custom motor interfaces
+remain code-only, so they cannot reload with silently changed dimensions.
+
+An optional profile-side pattern adds four through holes, two on each of two
+parallel rails running along local Y on the plate's +Z face. `profileSystem`
+is `TSLOT-30-SLOT8` or `TSLOT-40-SLOT8`; `railSpacing` must be a positive grid
+multiple. `alongPitch` sets hole spacing along each rail, and
+`profileHoleDiameter` is the drilled clearance diameter. Increase `margin` to
+contain the holes. Validation reserves 2 mm hole/edge ligaments and rejects
+motor-hole overlaps and a nominal rail gap narrower than the pilot passage.
+`profileBolt1` through `profileBolt4` provide the mounting frames. These checks
+do not qualify supplier slots, nuts, screw engagement, driver access or loads.
+For a plain plate use `profileSystem=None` and zero profile-hole dimensions.
+
+```haxe
+var plate = new machinekit.assembly.NemaMountPlate(
+    machinekit.motion.NemaStepper.frame(23), 8, 30,
+    {systemId:"TSLOT-40-SLOT8", railSpacing:80, alongPitch:40, holeDiameter:6.6});
+```
+
+`coverage.py` writes `motor-mounts.json` and resolves all four RBK CAD variants
+by exact model, SKU and download columns in Vallder's transposed table. The
+validated asset hashes and paths are available through `cad/library.json` and
+the motor-mount bindings. Use `SupplierCadComponent` for those purchased parts;
+their mounting frames and mechanical interfaces remain unverified. Cube and
+other motor holders stay separate from custom square plates. DB57's listed
+38 mm opening is smaller than our 38.1 mm NEMA 23 pilot; DB86 has zero nominal
+pilot clearance. Both need tolerance review. Generic plates receive no inferred
+supplier SKU or offer.
+
+```sh
+python3 tools/suppliers/coverage.py
+MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run --project machinekit/examples/supplier-fasteners/haxeon.motor-mounts.json -- --supplier-cad
+```
+
+The native check covers NEMA 17/23/34 geometry, both profile grids, assembly and
+editable document round trips, invalid hole layouts and the existing four-screw
+NEMA 17 assembly. It saves `motor-mounts.assembly.json` and `motor-mounts.bom.json`.
+The optional `--supplier-cad` imports the four hash-pinned RBK assets and writes
+`supplier-motor-mounts.bom.json` with unselected Vallder offers. Purchased CAD
+remains code-only; it is not embedded in the saveable generic plate assembly.
 The example creates two assembly occurrences of each screw configuration,
 exercises the rail at 300 mm and writes:
 
