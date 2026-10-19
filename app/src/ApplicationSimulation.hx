@@ -870,12 +870,14 @@ class ApplicationSimulation {
     if (active == null) throw "Apply the pending simulation configuration first";
     if (!running) { pumpStamp = -1.0; presentationEpoch++; }
     running = true; presentAssemblyPhysics = true;
+    if(enclosureGuard!=null)enclosureGuard.setRunning(true);
     #if !wasm
     if (backgroundPacing && !playbackActive && motions == null && participants.length == 0 &&
         (workforce == null || workforce.ids().length == 0)) startPlayback();
     #end
   }
   public function stop():Void { stopPlayback(); var active = space; if (active != null) active.session.stop(); running = false; pumpStamp = -1.0;
+    if(enclosureGuard!=null)enclosureGuard.setRunning(false);
     if (tools != null) {tools.safeWelders(); tools.safeFeeders();}
     if (presentAssemblyPhysics) presentationEpoch++;
     presentAssemblyPhysics = false;
@@ -888,6 +890,7 @@ class ApplicationSimulation {
     // Members stop what they run while the robots' runtimes still answer; the session's reset starts them over.
     for (member in members) member.beforeReset();
     active.session.reset(); virtualDevicePrepared = false; running = false; presentAssemblyPhysics = false;
+    if(enclosureGuard!=null)enclosureGuard.setRunning(false);
     pumpStamp = -1.0;
     // The session's own reset has restored its objects and actors; what lives beside it follows.
     for (member in members) member.reset();

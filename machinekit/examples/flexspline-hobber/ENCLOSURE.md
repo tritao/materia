@@ -249,3 +249,23 @@ pass. The transition fixture previews both leaves open, prepares simulation,
 waits for confirmed Open access, and closes/locks through the live controller
 without granting cutting permission. Missing initial standstill still times out,
 and losing standstill after access is admitted still faults.
+
+The controller publishes an immutable `EnclosureGuardStatus` image. Its typed
+`state` is `paused`, `initializing`, `ready` or `faulted`; feedback sampling and
+completed startup confirmation are separate fields. `ready` means playback is
+running and startup feedback/standstill has been confirmed, not that cutting is
+permitted. Consumers use the published `canOpen`, `canClose`, `canStartCut`,
+`canReset`, `canResume` and `canResetSimulation` action flags. Guard readiness
+(`canStart`) and the guard's `allowCut` output remain available to deterministic
+stepping clients independently of realtime playback.
+
+Feedback images are published by the simulation owner, not reconstructed by the
+UI from mutable guard inputs. Transport transitions publish a new image under
+the same mutex; old images remain unchanged. Reset clears initialization and
+feedback freshness. Fault messages take priority even while paused. The panel
+renders the controller's messages and action flags without interpreting phase
+strings or querying playback state to infer guard readiness.
+
+Published-status acceptance: 15 contract assertions and 10,514 native/UI
+assertions pass, including immediate transport publications, preserved old
+snapshots, reset freshness and the open-design-pose transition.

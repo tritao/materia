@@ -12,13 +12,6 @@ import sys.thread.Mutex;
 import robotkit.runtime.Simulation;
 import motionkit.trajectory.Trajectory;
 
-typedef EnclosureGuardStatus = {
-  var phase:String; var message:String; var position:Float;
-  var closed:Bool; var open:Bool; var locked:Bool;
-  var spindleStandstill:Bool; var axesStandstill:Bool;
-  var canStart:Bool; var allowCut:Bool; var fault:Bool; var interrupted:Bool;
-}
-
 /** Live simulation PLC: measured door switches/velocities, separate lock actuator, and independent door-actuator ownership. */
 class EnclosureGuardPlayer implements SessionMember {
   public final config:SceneArtifactEnclosureGuard;
@@ -41,6 +34,9 @@ class EnclosureGuardPlayer implements SessionMember {
   var commanded=0.0;
   var commandedVelocity=0.0;
   var driveInitialized=false;
+  var feedbackSampled=false;
+  var initialized=false;
+  var playbackRunning=false;
   var pendingTarget:Null<Float>;
   var doorCommand:DoorCommand = Hold;
   var locked = false;
@@ -81,7 +77,7 @@ class EnclosureGuardPlayer implements SessionMember {
     if(robot.blueprint.processModelJoints.indexOf(doorIndex)<0)throw "Enclosure actuator must own its process joint";
     logic=new EnclosureGuard(config.setupSpeedLimit,config.timeoutSeconds);
     if(cutting!=null)cutting.setGuardPermission(false);
-    view=makeStatus("Waiting for door feedback",0);
+    view=new EnclosureGuardStatus(makeObservation("Waiting for door feedback",offset,0),false);
   }
   function joint(id:String):Int {
     for(j in 0...robot.model.joints.length)if(robot.model.joints[j].id==id)return j;
@@ -115,6 +111,7 @@ class EnclosureGuardPlayer implements SessionMember {
     var s=robot.robot.snapshot();
     if(session.simulationTime()<=0)return; // Native switches publish after the first physics tick.
     var closed=switchValue(s,config.closedSensor),open=switchValue(s,config.openSensor);
+    feedbackSampled=closed!=null&&open!=null&&Math.isFinite(s.positions.get(doorIndex))&&Math.isFinite(s.velocities.get(doorIndex));
     input.closed=closed==true;input.open=open==true;
     axesStillSeconds=stationary(s,axisIndices)?Math.min(config.standstillConfirmationSeconds,axesStillSeconds+session.fixedTimestep()):0;
     spindleStillSeconds=stationary(s,spindleIndices)?Math.min(config.standstillConfirmationSeconds,spindleStillSeconds+session.fixedTimestep()):0;
@@ -140,6 +137,7 @@ class EnclosureGuardPlayer implements SessionMember {
     input.locked=locked;input.reset=faultReset;faultReset=false;
     var previousFault=logic.fault;
     var nextOutput=logic.update(input,session.fixedTimestep());output=nextOutput;lockCommand=nextOutput.lock;
+    if(feedbackSampled&&input.axesStandstill&&input.spindleStandstill&&nextOutput.fault==None)initialized=true;
     if(nextOutput.fault!=None&&nextOutput.fault!=previousFault&&Sys.getEnv("ENCLOSURE_GUARD_TRACE")=="1")
       Sys.println("ENCLOSURE_GUARD "+haxe.Json.stringify({phase:Std.string(logic.phase),fault:Std.string(nextOutput.fault),time:session.simulationTime(),
         safety:s.safety,faultCode:s.faultCode,door:s.positions.get(doorIndex)+offset,doorVelocity:s.velocities.get(doorIndex),
@@ -171,19 +169,21 @@ class EnclosureGuardPlayer implements SessionMember {
     var limits=robot.model.joints[doorIndex].limits;
     commanded=Math.max(limits.lower,Math.min(limits.upper,commanded));
     simulation.driveProcessJoint(robotIndex,doorIndex,commanded,commandedVelocity);
+    publishObservation(s);
   }
   function disposeDoorTrajectory():Void {
     var trajectory=doorTrajectory;doorTrajectory=null;if(trajectory!=null)trajectory.dispose();
   }
 
-  function makeStatus(message:String,position:Float):EnclosureGuardStatus {
+  function makeObservation(message:String,position:Float,velocity:Float):app.EnclosureGuardStatus.EnclosureGuardObservation {
     var fault=output!=null&&output.fault!=None;
     return {phase:Std.string(logic.phase),message:message,position:position,closed:input.closed,open:input.open,
       locked:locked,spindleStandstill:input.spindleStandstill,axesStandstill:input.axesStandstill,
       canStart:!fault&&logic.phase==Secured&&cutting!=null&&cutting.canStartGuardedCut(),
-      allowCut:output!=null&&output.allowCut,fault:fault,interrupted:cutting!=null&&cutting.guardInterrupted};
+      allowCut:output!=null&&output.allowCut,fault:fault,interrupted:cutting!=null&&cutting.guardInterrupted,
+      feedbackSampled:feedbackSampled,initialized:initialized,doorMoving:Math.abs(velocity)>config.linearStandstillTolerance};
   }
-  public function present():Void {
+  function publishObservation(snapshot:RobotSnapshot):Void {
     var message=output!=null&&output.fault!=None?switch output.fault {
       case SafetyChain: "Guard stopped: check the E-stop and access boundary.";
       case InvalidFeedback: "Guard stopped: door feedback is missing or inconsistent.";
@@ -197,7 +197,7 @@ class EnclosureGuardPlayer implements SessionMember {
         cutting!=null&&cutting.guardInterrupted?"Door secured. Reset the simulation before restarting the interrupted cut.":
         cutting!=null&&cutting.completed?"Cut completed. Door closed and locked.":
         cutting!=null&&cutting.cutStarted?"Cut running. Door closed and locked.":"Door closed and locked. Ready for Start cut.";
-      case Stopping: "Stopping the machine. Door stays locked until spindle and axes stop.";
+      case Stopping: input.locked?"Stopping the machine. Door stays locked until spindle and axes stop.":"Waiting for spindle and axis standstill. Door motion and cutting are disabled.";
       case Unlocking: "Waiting for unlocked confirmation.";
       case Opening: "Opening door. Cutting is disabled.";
       case Open: "Door open. Cutting is disabled.";
@@ -205,14 +205,20 @@ class EnclosureGuardPlayer implements SessionMember {
       case Locking: "Waiting for locked confirmation.";
       case _: "Waiting for door feedback.";
     };
-    var next=makeStatus(message,robot.robot.snapshot().positions.get(doorIndex)+offset);
-    viewMutex.acquire();view=next;viewMutex.release();
+    var next=makeObservation(message,snapshot.positions.get(doorIndex)+offset,snapshot.velocities.get(doorIndex));
+    viewMutex.acquire();view=new EnclosureGuardStatus(next,playbackRunning);viewMutex.release();
+  }
+  /** The simulation owner already published its image; UI presentation never reads mutable inputs. */
+  public function present():Void {}
+  /** Called by the transport owner before playback starts or after its worker has stopped. */
+  public function setRunning(value:Bool):Void {
+    viewMutex.acquire();playbackRunning=value;view=view.withRunning(value);viewMutex.release();
   }
   public function status():EnclosureGuardStatus {viewMutex.acquire();var result=view;viewMutex.release();return result;}
   public function beforeReset():Void {disposeDoorTrajectory();if(cutting!=null)cutting.setGuardPermission(false);}
   public function reset():Void {
-    logic=new EnclosureGuard(config.setupSpeedLimit,config.timeoutSeconds);input=new GuardInput();output=null;
+    logic=new EnclosureGuard(config.setupSpeedLimit,config.timeoutSeconds);input=new GuardInput();output=null;feedbackSampled=false;initialized=false;
     disposeDoorTrajectory();pendingTarget=null;driveInitialized=false;commanded=0;commandedVelocity=0;doorCommand=Hold;locked=false;lockCommand=true;lockElapsed=0;boundaryClear=true;faultReset=false;axesStillSeconds=0;spindleStillSeconds=0;
-    if(cutting!=null)cutting.setGuardPermission(false);present();
+    if(cutting!=null)cutting.setGuardPermission(false);publishObservation(robot.robot.snapshot());
   }
 }

@@ -15,6 +15,7 @@ class EnclosureRuntimeTests {
     catch(e:Dynamic){Sys.println('Live enclosure runtime failed: $e');return 1;}
   }
   static function run():Void {
+    EnclosureGuardStatusTests.run();
     Sys.println("Building fitted guarded hobber");Sys.stdout().flush();
     var machine=new FlexsplineHobber(new gearkit.GearSpec(1,40,4,20*Math.PI/180),4);
     var fitted=HobberEnclosurePreview.assembled(machine);
@@ -42,6 +43,7 @@ class EnclosureRuntimeTests {
       Sys.println("Guarded native runtime built");Sys.stdout().flush();
       var guard=simulation.enclosureController(),cut=simulation.hobbingPlayer();
       if(guard==null||cut==null)throw "Guarded cutting player missing";
+      check(guard.status().state==app.EnclosureGuardStatus.EnclosureRuntimeState.Paused&&!guard.status().feedbackSampled&&!guard.status().initialized,"Prepared controller publishes paused, unsampled status");
       var observedRobot = @:privateAccess guard.robot;
       var hobIndex = @:privateAccess guard.spindleIndices[0];
       function hobTurning():Bool return Math.abs(observedRobot.robot.snapshot().velocities.get(hobIndex))>1;
@@ -53,6 +55,13 @@ class EnclosureRuntimeTests {
       }
       until(()->guard.status().canStart,2000,"Measured closed and lock feedback make runtime ready");
       check(!cut.cutStarted&&!guard.status().allowCut,"Play/stepping alone cannot start cutting");
+      until(()->guard.status().initialized,3000,"Controller confirms startup feedback and standstill");
+      check(guard.status().state==app.EnclosureGuardStatus.EnclosureRuntimeState.Paused&&!guard.status().canStartCut,"Stepping while paused does not enable playback actions");
+      simulation.start();var runningStatus=guard.status();
+      check(runningStatus.state==app.EnclosureGuardStatus.EnclosureRuntimeState.Ready&&runningStatus.canOpen,"Transport start publishes ready actions immediately");
+      simulation.stop();
+      check(guard.status().state==app.EnclosureGuardStatus.EnclosureRuntimeState.Paused&&guard.status().canResume&&!guard.status().canOpen,"Transport pause publishes disabled actions immediately");
+      check(runningStatus.state==app.EnclosureGuardStatus.EnclosureRuntimeState.Ready,"Previously published status remains immutable after pausing");
       guard.requestOpen();until(()->guard.status().open,50000,"Actual native door joint reaches open feedback");
       guard.requestCut();for(_ in 0...100)tick();
       check(!cut.cutStarted&&!guard.status().allowCut,"Door-open cut request cannot start the program");
@@ -72,6 +81,7 @@ class EnclosureRuntimeTests {
       guard.requestCut();for(_ in 0...100)tick();
       check(!guard.status().allowCut,"Interrupted stock requires explicit simulation reset before another cut");
       check(simulation.reset(),"Explicit reset restores the guarded runtime");
+      check(!guard.status().initialized&&!guard.status().feedbackSampled&&guard.status().state==app.EnclosureGuardStatus.EnclosureRuntimeState.Paused,"Reset clears initialization and stale feedback");
       until(()->guard.status().canStart,2000,"Reset waits for fresh lock feedback");
       check(!cut.cutStarted&&!guard.status().allowCut,"Reset cannot automatically restart cutting");
       guard.requestCut();until(()->cut.cutStarted,1000,"Fresh start after reset is accepted");
