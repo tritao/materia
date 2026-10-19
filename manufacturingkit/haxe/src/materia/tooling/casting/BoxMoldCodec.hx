@@ -4,26 +4,26 @@ import haxe.Json;
 import haxe.crypto.Sha256;
 import materia.tooling.ToolingCodec;
 
-/** Version 1 persists this explicit template and its resolved records. On load all records
+/** Version 2 persists this explicit template and its resolved records. On load all records
  * must equal regeneration from the strict source/setup/recipe document. No native resources.
  * Hand-edited generated plans are deliberately rejected; edit the source document instead.
  */
 class BoxMoldCodec {
     public static function encode(p:MoldPlan):String {
         BoxMoldPlanner.validate(p);
-        var regenerated=BoxMoldPlanner.plan(p.document);
+        var regenerated=BoxMoldPlanner.plan(p.document,p.supportOptions);
         if(ToolingCodec.canonical(p)!=ToolingCodec.canonical(regenerated))throw "Mold records differ from template regeneration";
         var text=record(p);
         if(haxe.io.Bytes.ofString(text).length>2097152)throw "Mold record exceeds size limit";
         return text;
     }
-    static function record(p:MoldPlan):String return ToolingCodec.canonical({format:"materia.box-mold",version:1,
+    static function record(p:MoldPlan):String return ToolingCodec.canonical({format:"materia.box-mold",version:2,supportOptions:p.supportOptions,
         source:Json.parse(ToolingCodec.encode(p.document)),resolved:p})+"\n";
     public static function decode(text:String):MoldPlan {
         if(text==null || haxe.io.Bytes.ofString(text).length>2097152)throw "Mold record exceeds size limit";
         var raw:Dynamic=Json.parse(text);
-        if(raw==null || Reflect.field(raw,"format")!="materia.box-mold" || Reflect.field(raw,"version")!=1)throw "Unsupported mold format/version";
-        var document=ToolingCodec.decode(Json.stringify(Reflect.field(raw,"source"))),p=BoxMoldPlanner.plan(document);
+        if(raw==null || Reflect.field(raw,"format")!="materia.box-mold" || Reflect.field(raw,"version")!=2)throw "Unsupported mold format/version";
+        var document=ToolingCodec.decode(Json.stringify(Reflect.field(raw,"source"))),p=BoxMoldPlanner.plan(document,CoreSupports.options(Reflect.field(raw,"supportOptions")));
         if(ToolingCodec.canonical(raw)!=ToolingCodec.canonical(Json.parse(record(p))))throw "Mold records differ from template regeneration";
         return p;
     }

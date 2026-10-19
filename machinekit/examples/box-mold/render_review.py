@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Render the exported CAD triangles in assembled and exploded poses (mm)."""
 import json
+import argparse
 from pathlib import Path
 import numpy as np
 import matplotlib
@@ -8,7 +9,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-root = Path(__file__).resolve().parent / "build/review"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--bed-core", action="store_true")
+args = parser.parse_args()
+root = Path(__file__).resolve().parent / ("build/review-bed" if args.bed_core else "build/review")
 fig = plt.figure(figsize=(14, 7))
 for index, name in enumerate(("assembled", "exploded"), 1):
     ax = fig.add_subplot(1, 2, index, projection="3d")

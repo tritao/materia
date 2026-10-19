@@ -10,12 +10,12 @@ import materia.tooling.panel.PanelJoints;
 
 /** Independent casting study; dimensions come from this foundation instance via the adapter. */
 class SinglePocketSetup {
-    public static function foundation():MineralFoundation return new MineralFoundation(
+    public static function foundation(bedCore:Bool=false):MineralFoundation return new MineralFoundation(
         new ComponentValues().setNumber("width",240).setNumber("depth",180).setNumber("height",100)
-            .setToken("voids",CastingFeatures.encode([CastingFeatures.box("pocket",100,80,61,0,0,-1)])),
+            .setToken("voids",CastingFeatures.encode([CastingFeatures.box("pocket",100,80,61,0,0,bedCore?40:-1)])),
         [{id:"seat",part:new CastInsert(new ComponentValues().setNumber("width",40).setNumber("depth",35).setNumber("height",15).setNumber("boreDiameter",5)),pose:F.translation(80,0,85)}]);
-    public static function document(thickness:Float=18,quarterTurn:Bool=false):ToolingDocument {
-        var input=FoundationToolingAdapter.snapshot(foundation(),"single-pocket-study",1),stock=PanelJoints.stock(thickness);
+    public static function document(thickness:Float=18,quarterTurn:Bool=false,bedCore:Bool=false):ToolingDocument {
+        var input=FoundationToolingAdapter.snapshot(foundation(bedCore),bedCore?"single-pocket-bed-study":"single-pocket-study",1),stock=PanelJoints.stock(thickness);
         stock.materialSpec="coated particleboard";
         return {input:input,setup:{id:quarterTurn?"inverted-quarter-turn":"inverted",revision:1,sourceFingerprint:ToolingCodec.inputFingerprint(input),
             sourceToMold:F.fromRotationMatrix(0,0,100,quarterTurn?[0,-1,0,-1,0,0,0,0,-1]:[1,0,0,0,-1,0,0,0,-1]),

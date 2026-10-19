@@ -29,7 +29,7 @@ Status: phases 1–3 implemented. The single-pocket mold is a geometry review; f
   thickness-driven panels, a covered EPS block with ruled cutting definition,
   a bed-facing insert fixture and nine classified contact cuts. Outer wall
   tongues locate in blind bed sockets, behind continuous casting-contact lands.
-  `BoxMoldCodec` version 1 verifies complete deterministic regeneration; panel
+  `BoxMoldCodec` version 2 verifies complete deterministic regeneration; panel
   codec version 2 requires named contact openings (unclassified mold cuts fail).
   Registered block recipes, nominal EPS/coated-board display materials and
   `machinekit/examples/box-mold/` provide assembled/exploded scenes, STEP,
@@ -41,6 +41,16 @@ Status: phases 1–3 implemented. The single-pocket mold is a geometry review; f
   and an M6 fixing study; unsupported geometry fails. Physical core restraint,
   independent insert-datum accuracy, thread/seal qualification, anchorage,
   finishing allowance, process loads and handling remain pending.
+  Follow-up: core support selection now covers bed-open sockets and suspended
+  carriers/bridges. The bed variant uses an inset EPS foot and explicit glue
+  lines in a blind socket within the cavity footprint. The bridge variant uses
+  registered top pads, round/slot locators and separate bolts; its permanently
+  bonded carrier/bridge moves as one fixture. Both produce rebuildable CAD and
+  cutting/drawing records, participate in full swept assembly/demolding graphs,
+  and preserve source casting geometry. Forcing either support through a solid
+  casting face fails. Geometry is provided; adhesive strength, EPS compression,
+  pad clamps and uplift/bridge capacity remain pending. `--bed-core` generates
+  a separate source variant under `build/review-bed/` for inspection.
 - [ ] Phase 4: mill base mold review assembly.
 - [ ] Phase 5: assembly validation and fabrication package.
 - [ ] Phase 6: mill column and independent pedestal example.

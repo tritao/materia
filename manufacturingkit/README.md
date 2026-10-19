@@ -135,7 +135,7 @@ generates the coupon, exact drawings and assembled/exploded preview scenes.
 `materia.tooling.casting.BoxMoldPlanner.plan(document)` builds the explicit
 orthogonal single-pocket template from a validated `ToolingDocument`: five
 panels, EPS/covering geometry, a ruled block cutting definition, an insert
-fixture and classified contact cuts. `BoxMoldCodec` version 1 stores the strict
+fixture and classified contact cuts. `BoxMoldCodec` version 2 stores the strict
 source document and resolved records and verifies regeneration on load. It
 rejects unknown versions and hand-edited generated records. Dimensions remain
 millimetres and profiles remain finished geometry, without cutter compensation.
@@ -148,8 +148,26 @@ MachineKit checks seal containment, contact coverage, source reconstruction and
 continuous swept blocking graphs. ManufacturingKit emits no CAD or drawing text.
 
 See [box-mold example](../machinekit/examples/box-mold/README.md). The initial
-supported template has one rectangular envelope, one fill-accessible EPS pocket
+supported template has one rectangular envelope, one bed-accessible or fill-accessible EPS pocket
 and one bed-facing insert with an explicitly selected M6 fixing study. Reusable
 formers and nonorthogonal setups are rejected. Physical qualification remains
 pending, including a broad-area core restraint, accurate independent insert
 datums, anchorage, finishing stock, material/process evidence and handling.
+
+
+Core supports are reusable neutral records in `casting.CoreSupport` and generated
+by `CoreSupports`. Pass optional `CoreSupportOptions` to `BoxMoldPlanner.plan`;
+defaults use `Auto`, one-third measured stock for embed depth, recipe joint
+clearance and a 0.2 mm adhesive line. The options codec validates closed enum modes,
+finite dimensions and unknown fields; mold codec version 2 persists them and
+rejects version 1. Auto chooses a bed socket when the cavity opens onto the bed,
+otherwise a bridge when it opens onto the fill face. Explicit incompatible modes
+fail without changing the source casting.
+
+A bed socket gets a classified `core-sealed` contact cut, inset laminated EPS
+foot and separate ruled cutting definition. A bridge gets four exact-operation
+panels, round/slot locating interfaces and separate external fixing hardware.
+The permanently bonded bridge/carrier is one removal group. Records include glue
+thickness, bond area, embed depth and pad closure requirements. CAD realizes these
+records and includes their full sweeps in both sequences. Geometric support does
+not imply adhesive, material, clamp or uplift qualification.
