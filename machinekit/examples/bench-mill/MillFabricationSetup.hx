@@ -29,6 +29,37 @@ class MillFabricationSetup {
 			couponClearancesMm: [0.1, 0.2, 0.3]
 		};
 
+	/** Unmeasured supplier/process properties remain null, never nominal resin data. */
+	public static function process(recipe:materia.tooling.ToolingRecipe):materia.tooling.process.CastingProcessSpec
+		return {
+			id: "mill-base-process-review",
+			revision: 1,
+			recipeFingerprint: materia.tooling.ToolingCodec.recipeFingerprint(recipe),
+			initialTemperatureC: null,
+			ambientTemperatureC: null,
+			temperatureMarginC: null,
+			pourRateMm3PerSecond: null,
+			maximumAirEscapeWidthMm: null,
+			cure: {
+				reference: recipe.resinSpec,
+				resinMassFraction: null,
+				heatOfReactionJPerKgResin: null,
+				mixSpecificHeatJPerKgK: null,
+				mixConductivityWPerMK: null,
+				resinMaximumTemperatureC: null,
+				kinetics: null,
+				evidence: []
+			},
+			sections: [],
+			solver: {
+				cells: 41,
+				timeStepSeconds: 30,
+				durationSeconds: 86400,
+				convergenceToleranceC: 0.000001,
+				maximumIterations: 100
+			}
+		};
+
 	public static function cam(panels:Array<PanelPlan>):PanelCamSettings {
 		var diameters:Array<Float> = [];
 		for (p in panels)

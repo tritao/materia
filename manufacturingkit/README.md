@@ -268,8 +268,8 @@ assessed cure peak/evidence, compatibility evidence, additional compaction peak
 pressure, support/material properties, brace sections, fastener hardware IDs and
 per-core restraint/bearing capacities. Missing data produces pending checks.
 Styrene-bearing resin with EPS and a cure peak at/above the EPS limit fail.
-The assessed peak is an input until phase 6 computes cure reports; it is not
-inferred from a resin name. The load report integrates no fluid dynamics:
+The assessed peak remains a qualified-input requirement; the process-analysis
+checks below do not silently replace it with an assumed resin value. The load report integrates no fluid dynamics:
 hydrostatic peak head and gross displaced-volume uplift are baseline estimates.
 No EPS-weight credit is used; core volumes are allocated once in sorted ID order.
 
@@ -291,3 +291,49 @@ package fingerprint, and normalizes only generated STEP header timestamps.
 See the [mill fabrication entry point](../machinekit/examples/bench-mill/TOOLING_README.md).
 CamKit owns `CamToolingPanels`; neither this library nor MachineKit gains a CAM
 dependency. Coupon fabrication and physical evidence collection require a shop.
+
+
+### Casting process analysis (phase 6 foundation)
+
+`materia.tooling.process.CastingProcessAnalysis.analyze(plan, spec, gravity)`
+extends the real mold validation with `FillReport` and `CureReport`. The strict
+`ProcessSpecCodec` version 1 is independent of existing source/mold/fabrication
+encodings; its required recipe fingerprint rejects stale process inputs. Actual
+material values, evidence, temperatures, pour rate, ceiling escape-width limit,
+thermal boundaries and slab definitions are declared or explicitly unknown.
+
+Fill analysis supports the planner's exact orthogonal geometry. It constructs
+disjoint resin cells from the envelope and complete source cuts, then evaluates
+air components at every critical event plane in the symbolic right-hand limit.
+Positive-area contact connects cells; edge/point contact does not vent them.
+Newly trapped components report limiting volume, source-owned ceiling faces and
+a candidate vent location. Vent routing/sealing is not generated automatically.
+Additional output levels cannot change pocket detection. Reports include ideal
+fill-volume/mass/time curves, peak liquid head and per-core gross buoyancy, with
+no EPS-weight credit. Trapped gas, paste transport and compaction are not fluid
+simulations. Connected ceiling bounding widths are conservative for irregular
+faces; an undeclared escape-width threshold cannot pass.
+
+Cure analysis starts with an adiabatic remaining-reaction bound, accounting for
+the hottest declared initial/ambient/boundary temperature. An excessive upper
+bound is pending, not proof of overheating. Declared slabs can use cell-centred
+implicit conduction coupled to first-order Arrhenius conversion, with insulated,
+convection/resistance or fixed-temperature boundaries. The reaction enthalpy is
+per kilogram of resin; heat capacity/conductivity/density describe the whole mix.
+Missing kinetics or thermal properties remain pending. A finite simulation also
+reports remaining reaction energy; stopping before the peak cannot clear a limit.
+Nonconvergence is unsupported. Real-section time/space convergence, geometric
+section/junction coverage and thermocouple calibration remain explicit blockers.
+No steel heat-sink or panel conductivity is inferred from a display material.
+
+The numerical fixtures verify insulated reaction energy, temperature-dependent
+reaction coupling, the analytical inert-slab Fourier series and timestep
+refinement. Independent native CAD fixtures verify fill volumes and connectivity:
+
+```sh
+./haxeon/scripts/haxeon run --project=manufacturingkit/tests/tooling/haxeon.json
+./haxeon/scripts/haxeon run --project=machinekit/tests/tooling/haxeon.process.json
+```
+
+Automatic section extraction, broader design rules/proposals, orientation studies
+and sequence playback are still outstanding in phase 6.

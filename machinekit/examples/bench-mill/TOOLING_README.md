@@ -171,3 +171,44 @@ For a quicker list/CAM check, use `-- --records-only --checks`. It writes a
 separate `build/tooling/base-fabrication-records/` directory and explicitly keeps
 its CAD/sequence check pending. Use the full command for the complete review.
 The existing phase 4 entry remains a geometry-only export without G-code.
+
+
+## Fill and cure checks (phase 6 foundation)
+
+The fabrication command also emits `casting-process-spec.json`,
+`fill-analysis.json`, `cure-analysis.json` and `process-diagnostics.json`.
+`MillFabricationSetup.process` binds these inputs to the exact mold recipe.
+Its supplier properties, mix/ambient temperatures, thermal margin, pour rate,
+air-escape width and slab definitions remain explicitly unknown.
+
+The current inverted base has no disconnected air component under the exact
+orthogonal flat-free-surface model. This does not qualify paste flow: the
+broad-ceiling escape-width check remains pending until its limit is declared.
+The fill volume is checked against the exact source CAD review in a full export;
+a records-only run leaves that agreement pending. Candidate vents on a failing
+fixture are suggestions, not automatically drilled or sealed tooling holes.
+
+Cure reports do not invent a resin heat output or claim that EPS is safe. They
+provide an environment-aware adiabatic bound when inputs exist, and a tested
+implicit 1D reaction/conduction solver for declared planar sections. Missing mix,
+kinetic and boundary data, actual-section numerical convergence, section/junction
+coverage and thermocouple calibration remain blocking. The existing assessed
+cure-peak/material check is retained. All new checks enter the final hashed
+manifest and fabrication Diagnostics alongside the existing design requests.
+
+This implements the process-analysis foundation, not all of phase 6. Automatic
+section extraction, design-rule/proposal and orientation studies, and sequence
+playback remain outstanding. The mold is still a review package.
+
+
+To supply declared process properties, copy `casting-process-spec.json` outside
+`build/`, preserve its recipe fingerprint and edit its explicit unknown values.
+Use supplier/trial references for the actual mix rather than generic resin data:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fabrication.json -- --process-spec /path/to/casting-process-spec.json --checks
+```
+
+An old recipe fingerprint, unknown field/model or invalid physical input is
+rejected. Review exports may contain failing checks; always read final manifest
+readiness. No command executes a CNC program or accepts physical qualification.

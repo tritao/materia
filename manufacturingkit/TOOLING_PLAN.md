@@ -1,6 +1,6 @@
 # Reusable panel tooling and mineral-casting molds
 
-Status: phases 1–5 implemented as review tooling. The fabrication package reports unresolved process, structural, fixture and finishing requirements; physical qualification remains pending.
+Status: phases 1–5 and the phase 6 process-analysis foundation are implemented as review tooling. The fabrication package reports unresolved process, structural, fixture and finishing requirements; physical qualification remains pending.
 
 ## Implementation progress
 
@@ -135,6 +135,37 @@ Status: phases 1–5 implemented as review tooling. The fabrication package repo
   have identical manifests and all 650 artifact hashes; tampering is rejected.
   Source/reconstructed CAD symmetric difference is zero.
 - [ ] Phase 6: design-stage moldability feedback and casting process analysis.
+  Process-analysis foundation implemented: independent strict `CastingProcessSpec`
+  version 1 binds resin/thermal/fill inputs to the exact recipe fingerprint.
+  `FillAnalysis` computes exact orthogonal event-plane connectivity, limiting
+  trapped volumes, source-owned ceilings and candidate vent points, ideal
+  level/volume/mass/head/time curves and per-core submerged uplift. It uses the
+  existing disjoint box algebra and symbolic right-hand limits, rather than
+  sampled heights or native offsets. Independent CadKit Boolean fixtures verify
+  the volumes and component topology; the full package cross-checks its resin
+  volume against the fingerprint-bound source CAD review. Non-orthogonal fill
+  geometry remains unsupported. Connected coplanar ceilings use a conservative
+  bounding-width rule; an unknown air-escape limit stays pending.
+  `CureAnalysis` adds an environment-aware adiabatic bound and coupled implicit
+  1D conduction/first-order Arrhenius reaction for explicitly declared slabs.
+  Insulated heating, nonlinear energy balance and inert-slab Fourier cooling
+  fixtures pass. Residual reaction heat prevents early-stop qualification;
+  missing data and actual-section numerical convergence/coverage/calibration
+  remain blocking, and nonconvergent solves report unsupported.
+  Process checks join the existing fabrication manifest and Diagnostics without
+  clearing planner requests. The mill's supplier properties, temperatures,
+  margin, ceiling-width limit and section definitions are intentionally unknown.
+  Remaining phase 6 work: automatic section/junction extraction, fast castability
+  rules and concrete source proposals, effort/orientation studies and sequence
+  playback; no phase 6 completion or physical release is claimed.
+  Validation: 492 pure tooling assertions (276 process), 361 native tooling
+  assertions (22 independent process/CAD) and 151 full-mill assertions pass.
+  Two full generations have byte-identical manifests and all 654 artifact hashes,
+  including the external `--process-spec` input path; 25 programs pass CAM checks. The current
+  inverted base has no topologically trapped air; its 70,107,544 mm3 mix region
+  agrees with CAD. Readiness remains false: 22 passing and 147 pending records,
+  including undeclared broad-ceiling/cure inputs and the existing qualification
+  and source-change requirements.
 - [ ] Phase 7: mill column and independent pedestal example.
 - [ ] Phase 8: physical calibration and release.
 
@@ -657,9 +688,14 @@ solid in mold coordinates, already checked against the source.
   feature IDs owning those faces and its highest point (the proposed vent) are
   reported.
 - Component topology changes only at critical heights: the z values of
-  vertices, horizontal faces and curved-face extrema. Evaluate just above each
-  critical height with CadKit booleans, so the result is exact for the supported
-  geometry, with no sampling. Unsupported surface kinds fail.
+  vertices, horizontal faces and curved-face extrema. For the implemented
+  orthogonal mold contract, exact disjoint-box algebra evaluates the symbolic
+  right-hand limit at each critical plane: ending cells disappear and surviving
+  cells retain their limiting volume. CadKit Boolean/component fixtures verify
+  this calculation independently. This replaces the initial native-only proposal
+  for orthogonal fill, avoids epsilon-height volume loss and needs no sampling.
+  General curved/sloped fill regions require a future CadKit event/extrema path;
+  they must not be approximated by bounding boxes.
 - Report the level-volume curve, resin mass, liquid head on each panel and the
   submerged volume, and so buoyancy, of each core at each level. With a declared
   pour rate, add a time axis. The load checks use the worst level, not only the
@@ -679,8 +715,8 @@ have gel and limit temperatures, and temperature differences move inserts.
 Three tiers, each run only when the previous one cannot pass:
 
 1. **Adiabatic bound.** Peak rise is at most w·H/c, from the resin mass fraction,
-   heat of reaction and mix specific heat, for any geometry. If initial
-   temperature plus this bound is below every limit by the recipe margin, the
+   heat of reaction and mix specific heat, for any geometry. If the maximum initial/ambient/boundary
+   temperature plus the remaining-reaction bound is below every limit by the recipe margin, the
    check passes without kinetics.
 2. **Section model.** Transient 1D conduction through each section, with heat
    generation from the `ResinCureSpec` kinetics and boundary conditions from the

@@ -256,5 +256,6 @@ class FoundationToolingTests {
 		Sys.println('FoundationToolingTests: $assertions assertions passed');
 		PanelNativeTests.run();
 		BoxMoldTests.run();
+		ProcessNativeTests.run();
 	}
 }

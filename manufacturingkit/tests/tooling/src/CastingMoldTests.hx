@@ -293,6 +293,7 @@ class CastingMoldTests {
 		var invalidRule = CastingMoldCodec.decode(s);
 		invalidRule.changeRequests[0].blockingChecks = ["missing-rule"];
 		rejects(() -> CastingMoldPlanner.validate(invalidRule), "change requests cannot name nonexistent validation rules");
+		ProcessTests.run(CastingMoldCodec.decode(s));
 		Sys.println('CastingMoldTests: $assertions assertions passed');
 	}
 }
