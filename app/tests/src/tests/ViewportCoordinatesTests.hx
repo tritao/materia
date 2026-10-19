@@ -90,6 +90,39 @@ class ViewportCoordinatesTests {
         if(anchor==null)throw "Zoom anchor is behind the camera";
         near(anchor.x,moved.x,"zoom preserves the cursor's surface anchor horizontally");
         near(anchor.y,moved.y,"zoom preserves the cursor's surface anchor vertically");
+        // Starting orbit chooses the visible surface without moving the camera.
+        var eye=viewport.camera.eyePosition(),focus=[viewport.camera.targetX,viewport.camera.targetY,viewport.camera.targetZ];
+        distance=viewport.camera.distance;
+        ui.pointerDown(bounds.x+anchor.x,bounds.y+anchor.y,2);
+        var pivot=viewport.orbitPivot;if(pivot==null)throw "Orbit did not choose a pivot";
+        for(i in 0...3) {
+          near(pivot[i],[hit.x,hit.y,hit.z][i],"orbit chooses the displayed surface after zoom and resize");
+          check(Math.abs(viewport.camera.eyePosition()[i]-eye[i])<1e-8,"orbit press keeps eye unchanged");
+        }
+        near(viewport.camera.targetX,focus[0],"orbit press does not recenter X");
+        near(viewport.camera.targetY,focus[1],"orbit press does not recenter Y");
+        near(viewport.camera.targetZ,focus[2],"orbit press does not recenter Z");
+        var radius=0.0;for(i in 0...3)radius+=Math.pow(eye[i]-pivot[i],2);
+        for(step in 1...4) {
+          ui.submit(layout,new LayoutFrame(size[0],size[1]));
+          ui.pointerMove(bounds.x+anchor.x+step*25,bounds.y+anchor.y+step*12);
+          check(viewport.orbitPivot==pivot,"orbit pivot stays fixed across view rebuilds");
+          var projected=viewport.camera.project(pivot[0],pivot[1],pivot[2],width,height);
+          if(projected==null)throw "Orbit pivot moved behind camera";
+          near(projected.x,anchor.x,"off-centre orbit pivot stays horizontally fixed");
+          near(projected.y,anchor.y,"off-centre orbit pivot stays vertically fixed");
+        }
+        ui.pointerUp(bounds.x+anchor.x+75,bounds.y+anchor.y+36,2);
+        var nextEye=viewport.camera.eyePosition(),nextRadius=0.0;
+        for(i in 0...3)nextRadius+=Math.pow(nextEye[i]-pivot[i],2);
+        near(nextRadius,radius,"orbit preserves distance from the surface pivot");
+        near(viewport.camera.distance,distance,"surface orbit preserves zoom");
+        check(viewport.pick(2,2)=="scene","empty-space orbit fixture misses geometry");
+        ui.pointerDown(bounds.x+2,bounds.y+2,2);
+        check(viewport.orbitPivot==pivot,"empty-space drag keeps the previous pivot");
+        ui.pointerMove(bounds.x+12,bounds.y+8);ui.pointerUp(bounds.x+12,bounds.y+8,2);
+        viewport.resetView();check(viewport.orbitPivot==null,"reset clears the surface pivot");
+
       }
     } catch(error:Dynamic) {ui.dispose();viewport.dispose();scene.dispose();throw error;}
     ui.dispose();viewport.dispose();scene.dispose();

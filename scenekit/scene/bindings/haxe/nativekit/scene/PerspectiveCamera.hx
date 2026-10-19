@@ -62,6 +62,23 @@ class PerspectiveCamera {
     revision++;
   }
 
+  /** Rotate around a world point without recentering it or changing the zoom.
+   * Rotating both the eye and view target preserves the pivot's screen position.
+   */
+  public function orbitAround(deltaX:Float, deltaY:Float, x:Float, y:Float, z:Float):Void {
+    var backward = viewDirection(), right = [-Math.sin(yaw), Math.cos(yaw), 0.0];
+    var up = cross(backward, right);
+    var offset = [targetX-x, targetY-y, targetZ-z];
+    var horizontal = dot(offset, right), vertical = dot(offset, up), depth = dot(offset, backward);
+    orbit(deltaX, deltaY);
+    backward = viewDirection();
+    right = [-Math.sin(yaw), Math.cos(yaw), 0.0];
+    up = cross(backward, right);
+    targetX = x + right[0]*horizontal + up[0]*vertical + backward[0]*depth;
+    targetY = y + right[1]*horizontal + up[1]*vertical + backward[1]*depth;
+    targetZ = z + right[2]*horizontal + up[2]*vertical + backward[2]*depth;
+  }
+
   /** Mouse-look turns around the eye rather than orbiting the target. */
   public function look(deltaX:Float, deltaY:Float):Void {
     var eye = eyePosition();

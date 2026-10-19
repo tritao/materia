@@ -185,7 +185,9 @@ compiles the program with CncKit and streams it to the machine through MotionKit
 - The Perspective tab renders extruded SceneKit geometry through the GPU.
   Visibility, object colours, depth, and the yellow selection highlight stay
   synchronized with the inspector.
-- Middle-drag or Alt+left-drag orbits; add Shift to pan. The wheel zooms toward the cursor. Frame selected
+- Middle-drag or Alt+left-drag orbits; add Shift to pan. The wheel zooms toward the cursor. Orbit starts at the surface under the cursor
+  and holds that pivot through the drag without recentering the view. Empty-space
+  drags retain the previous pivot. Frame selected
   fits the full 3D bounds and Reset view restores the default camera.
 - Perspective clicks use a camera ray against the boxes' 3D bounds. Left-dragging a
   selected box moves it on its current Z plane with snapping and one undo step.
@@ -547,6 +549,11 @@ Perspective diagnostics report render dimensions, GPU composition mode, CPU
 transfer bytes, and render latency in `app-state.json`. SceneKit renders into a
 shared GPU image that UIKit composites directly, without an RGBA readback. The
 interactive camera uses middle-drag orbit, Shift+middle-drag pan, and cursor-centered wheel zoom.
+Orbit chooses the visible surface under the cursor on press, preserving its screen
+position and the current zoom. The pivot stays fixed for the drag and its ring is
+drawn at that surface point. A drag starting in empty space retains the previous
+pivot; framing, fitting, standard views and Reset view restore the camera target as
+the fallback pivot.
 Alt+left-drag (with Shift for pan) is available without a middle button. Left input selects and edits.
 Hold the right mouse button for mouse-look and WASD flight; Q/E move down/up and Shift increases speed.
 Release the right button or press Escape to stop flying. Movement also stops when the window loses focus.

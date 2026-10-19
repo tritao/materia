@@ -65,6 +65,8 @@ class EditorPerspectiveViewport implements View {
   final camera:PerspectiveCamera = new PerspectiveCamera();
   var navigationPointer:Null<Int> = null;
   var navigationMode:Int = 0;
+  /** Last surface pivot, retained for empty-space drags and fixed during each gesture. */
+  var orbitPivot:Null<Array<Float>> = null;
   final flyKeys:Map<Int, Bool> = new Map();
   var flyFast:Bool = false;
   var sketchDragRevision:Int = 0;
@@ -311,10 +313,12 @@ class EditorPerspectiveViewport implements View {
 
   function orbiting():Bool return navigationPointer != null && navigationMode == 1;
 
-  /** Screen-sized ring at the actual camera target, drawn above scene geometry. */
+  /** Screen-sized ring at the actual orbit pivot, drawn above scene geometry. */
   function paintOrbitPivot(canvas:Canvas, width:Float, height:Float):Void {
     if (!orbiting()) return;
-    var point = camera.project(camera.targetX, camera.targetY, camera.targetZ, width, height);
+    var pivot = orbitPivot;
+    var point = pivot == null ? camera.project(camera.targetX, camera.targetY, camera.targetZ, width, height) :
+      camera.project(pivot[0], pivot[1], pivot[2], width, height);
     if (point == null) return;
     var path = new PathBuilder().roundRect(point.x - 6, point.y - 6, 12, 12, 6);
     canvas.strokeTransient(path.build(), Color.rgba(0.05, 0.06, 0.08, 0.85), 3.5);
@@ -332,11 +336,13 @@ class EditorPerspectiveViewport implements View {
     cpuTransferBytes: 0,
     lastRenderMilliseconds: lastRenderSeconds * 1000.0,
     averageRenderMilliseconds: renderCount == 0 ? 0.0 : totalRenderSeconds * 1000.0 / renderCount,
+    orbitPivot: orbitPivot,
     camera: {targetX: camera.targetX, targetY: camera.targetY, targetZ: camera.targetZ,
       yaw: camera.yaw, pitch: camera.pitch, distance: camera.distance}
   };
 
   public function frameSelected():Void {
+    orbitPivot = null;
     var selected = scene.object(scene.selectedId);
     if (selected != null) {
       var transform = displayTransform(selected);
@@ -350,6 +356,7 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function fitAll():Void {
+    orbitPivot = null;
     var items = scene.items();
     if (items.length == 0) { resetView(); return; }
     var minX = 1000000000.0, minY = 1000000000.0, minZ = 1000000000.0;
@@ -368,11 +375,13 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function resetView():Void {
+    orbitPivot = null;
     camera.reset();
     host.requestFrame();
   }
 
   public function setViewAngle(yaw:Float, pitch:Float):Void {
+    orbitPivot = null;
     camera.setAngle(yaw, pitch);
     host.requestFrame();
   }
@@ -989,6 +998,18 @@ class EditorPerspectiveViewport implements View {
 
   function aspect():Float return viewportWidth / viewportHeight;
 
+  function chooseOrbitPivot(localX:Float, localY:Float):Void {
+    fitCameraClipRange();
+    var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
+    var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
+      simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible);
+    var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
+      ray.directionX, ray.directionY, ray.directionZ);
+    if (hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z))
+      orbitPivot = [hit.x, hit.y, hit.z];
+    else if (orbitPivot == null) orbitPivot = [camera.targetX, camera.targetY, camera.targetZ];
+  }
+
   function installNavigation(node:RenderNode):Void {
     node.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (navigationPointer != null) return;
@@ -1010,7 +1031,7 @@ class EditorPerspectiveViewport implements View {
         navigationMode = (event.modifiers & UiModifier.Shift) != 0 ? 2 : 1;
         pointerX = pointerStartX = event.x; pointerY = pointerStartY = event.y;
         pointerMoved = false;
-        if (orbiting()) host.requestFrame();
+        if (orbiting()) {chooseOrbitPivot(event.localX, event.localY);host.requestFrame();}
         event.capturePointer(); event.preventDefault(); event.stopPropagation();
         return;
       }
@@ -1071,7 +1092,11 @@ class EditorPerspectiveViewport implements View {
       if (Math.abs(event.x - pointerStartX) >= 3.0 || Math.abs(event.y - pointerStartY) >= 3.0)
         pointerMoved = true;
       var sketchDrag = sketchRectangleDrag;
-      if (navigationMode == 1) camera.orbit(deltaX, deltaY);
+      if (navigationMode == 1) {
+        var pivot = orbitPivot;
+        if (pivot == null) camera.orbit(deltaX, deltaY);
+        else camera.orbitAround(deltaX, deltaY, pivot[0], pivot[1], pivot[2]);
+      }
       else if (navigationMode == 8) {
         flyFast = (event.modifiers & UiModifier.Shift) != 0;
         camera.look(deltaX, deltaY);
