@@ -36,3 +36,8 @@ generated-artifact opens. Visibility is authored per occurrence and survives
 saving/reopening; the components, BOM and electrical connections remain present.
 They can be shown again from the scene hierarchy. Saved inspection/cutting view
 overrides retain the same preference.
+
+The hob spindle now includes a hollow shaft, nose, opposed bearings near the
+tool, bearing retention and a drawbar-retained taper-and-face arbor with drive
+pins. It is an assumed custom interface, not a qualified HSK interface; see
+[MACHINE_DESIGN.md](MACHINE_DESIGN.md#hob-spindle-cartridge-2026-10-19).

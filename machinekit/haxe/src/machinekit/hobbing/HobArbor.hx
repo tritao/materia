@@ -4,7 +4,7 @@ import machinekit.motion.PrecisionErrors;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
-/** Hob arbor, HSK-E25 gauge interface. Reference row is Assumed; dimensions are simplified envelopes. */
+/** Hob arbor, assumed taper-and-face interface. Reference row is Assumed; dimensions are simplified envelopes. */
 class HobArbor extends MachineComponent {
   public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
     P.quantity("outside",16,"mm"),
@@ -20,10 +20,10 @@ class HobArbor extends MachineComponent {
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues>
-    return EngineeringMetadata.assumedCatalog("Hob arbor, HSK-E25 gauge interface","HOB-ARBOR-HSK-E25",parameters(),"machinekit/examples/flexspline-hobber/PLAN.md (assumed reference design)");
+    return EngineeringMetadata.assumedCatalog("Hob arbor, assumed taper-and-face interface","HOB-ARBOR-TF20",parameters(),"machinekit/examples/flexspline-hobber/PLAN.md (assumed reference design)");
   public function new(?overrides:ComponentValues) {
     var v=P.resolve(parameters(),overrides);
-    super("HOB-ARBOR-HSK-E25","Hob arbor, HSK-E25 gauge interface (reference envelope)","steel",false,v);
+    super("HOB-ARBOR-TF20","Hob arbor, assumed taper-and-face interface (reference envelope)","steel",false,v);
     if(v.get("material")!=null)setMaterial(v.token("material"));
     ComponentEnvelopes.validateAnnular(v);
     addConnector("mount",Mount,Solids.axial(0,0,0));
@@ -40,7 +40,7 @@ class HobArbor extends MachineComponent {
     addConnector("hobCentre",Axis,Solids.axial(0,0,centre));
     addConnector("support",Axis,Solids.axial(0,0,parameterNumber("height")));
   }
-  public function interfaceName():String return "HSK-E25";
+  public function interfaceName():String return "ASSUMED-TF20";
   override public function componentType():Null<ComponentType>return recipeType();
 
 
@@ -48,9 +48,12 @@ class HobArbor extends MachineComponent {
   override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
     {
       var length=parameterNumber("supportLength"),height=parameterNumber("height");
-      if(length==0)return ComponentEnvelopes.annular(values());
-      var body=Solids.union([cadkit.modeling.Part.cylinderSpan(parameterNumber("outside")/2,0,height-length),
-        cadkit.modeling.Part.cylinderSpan(parameterNumber("supportDiameter")/2,height-length,height)]);
-      return parameterNumber("bore")==0?body:Solids.cut(body,[cadkit.modeling.Part.cylinderSpan(parameterNumber("bore")/2,-0.1,height+0.1)]);
+
+      var sections=[cadkit.modeling.Part.revolve([{r:0.0,z:-20.0},{r:8.0,z:-20.0},{r:10.0,z:0.0},{r:20.0,z:0.0},{r:20.0,z:4.0},{r:0.0,z:4.0}]),cadkit.modeling.Part.cylinderSpan(parameterNumber("outside")/2,0,height-length)];
+      if(length>0)sections.push(cadkit.modeling.Part.cylinderSpan(parameterNumber("supportDiameter")/2,height-length,height));
+      var body=Solids.union(sections);
+      var tools=[cadkit.modeling.Part.cylinderSpan(3,-20.1,-8),cadkit.modeling.Part.cylinderSpan(2,0,4.1,14,0),cadkit.modeling.Part.cylinderSpan(2,0,4.1,-14,0)];
+      if(parameterNumber("bore")>0)tools.push(cadkit.modeling.Part.cylinderSpan(parameterNumber("bore")/2,-20.1,height+0.1));
+      return Solids.cut(body,tools);
     }
 }

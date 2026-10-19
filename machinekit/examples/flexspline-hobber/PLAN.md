@@ -2238,3 +2238,27 @@ inheritance checks. Direct project generation verifies all eight hidden occurren
 and loaded objects. Reopen/background playback passes without saved visibility
 overrides; the coarse cut completes 982 windows in 6.00275 simulated seconds with
 zero fixture contacts. Materia is open on the artifact with these defaults.
+
+
+### Supported hob spindle cartridge (2026-10-19)
+
+Replaced the unsupported-looking arbor/empty housing gauge connection with an
+assumed custom taper-and-face cartridge. B now drives the hollow shaft; the arbor
+is retained to its face. Added shaft journals, near-nose opposed bearings,
+housing and shaft shoulders, rear locknut, removable front gland, rear-access
+drawbar, mating taper/flange and integral drive pins. The shaft, drawbar, gland
+and locknut persist as separate recipe/BOM parts. The outboard remains axially
+floating. Removed the unsupported HSK-E25 designation; dimensions, assembly
+sequence and outstanding manufacturing qualifications are in MACHINE_DESIGN.md.
+
+Validation: 1,032 component/persistence assertions, 121 geometry assertions
+(including all cartridge-part pairs) and 930 assembly assertions passed.
+Coarse and reference 85-pose grids, including A ±15°, each check 3,762 candidate
+pairs involving the cartridge with zero unintended intersections above 0.001 mm³;
+unchanged pairs retain their prior audit evidence. The short frame regression
+passes at the existing 1e-8 mm/rad pose, 1e-8 mm cut-arc and 1e-6 N force limits.
+The regenerated app project completes 982 cutting windows in 6.00275 simulated
+seconds, zero fixture contacts and no inspection failure. This is coarse-cut
+acceptance, not a new full-reference grade result. Updated masses and positive
+linear-drive thrust margins are in LAYOUT_REPORT.json. Materia was opened with
+the new artifact. Frozen HB4/HB11 binaries and native providers were untouched.

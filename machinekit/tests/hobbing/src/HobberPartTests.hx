@@ -12,7 +12,7 @@ class HobberPartTests {
   static function near(a:Float,b:Float,tolerance:Float,label:String):Void check(Math.abs(a-b)<=tolerance,'$label: $a vs $b');
   static function rejects(fn:Void->Void,label:String):Void {var failed=false;try fn()catch(_:Dynamic)failed=true;check(failed,label);}
   static function members():Array<MachineComponent>return [new TorqueMotor(),new AngularContactBearing(),new CrossedRollerBearing(),new RotaryEncoderRing(),
-    new Hob(),new HobArbor(),new OutboardSupport(),new ExpandingMandrel(),new RotaryClamp(),new TablePlaten(),new TableHousing(),new SpindleHousing(),new SwivelHousing(),new MineralCasting(),new CastInsert()];
+    new HobSpindlePart("shaft"),new HobSpindlePart("drawbar"),new HobSpindlePart("bearingRetainer"),new HobSpindlePart("bearingLocknut"),new Hob(),new HobArbor(),new OutboardSupport(),new ExpandingMandrel(),new RotaryClamp(),new TablePlaten(),new TableHousing(),new SpindleHousing(),new SwivelHousing(),new MineralCasting(),new CastInsert()];
   public static function run():Void {
     var registry=MachineKitComponents.standard(),parts=members();
     var rendered=new Hob(new ComponentValues().setBoolean("renderTeeth",true));
@@ -94,7 +94,15 @@ class HobberPartTests {
     check(3*current*current*winding.phaseResistance<0.05*1500,"spindle assumed winding has coherent rated copper loss");
     check(spindle.frontBearing!=spindle.rearBearing,"spindle has two bearing instances");
     check(spindle.billOfMaterials().quantity(spindle.frontBearing.bom.partNumber)==2,"opposed bearings are two of the same BOM part");
-    check(spindle.interfaceName()==spindle.arbor.interfaceName(),"HSK-E gauge interface identity");
+    check(spindle.interfaceName()==spindle.arbor.interfaceName(),"assumed taper-and-face interface identity");
+    check(spindle.interfaceName()=="ASSUMED-TF20","no unsupported HSK designation");
+    check(spindle.definition().joints.filter(j->j.id=="B")[0].child=="shaft","B drives shaft; arbor is retained to its tool face");
+    var cartridgePoses=spindle.solvedPoses();
+    for(id in ["shaft","drawbar","bearingRetainer","bearingLocknut"])
+      check(cartridgePoses.exists(id),"cartridge load-path part present: "+id);
+    var arborBounds=spindle.arbor.geometry();
+    near(arborBounds.shape.bounds().get_min().get_z(),-20,1e-6,"arbor includes male taper behind unchanged gauge face");arborBounds.close();
+    rejects(()->new SpindleHousing(new ComponentValues().setNumber("height",190)),"unsupported cartridge dimensions refused");
     var a=head.definition().joints.filter(j->j.id=="A")[0];
     check(a.limits.lower==-Math.PI/4&&a.limits.upper==Math.PI/4,"swivel range");
     near(head.clamp.holdingTorque(),100,0,"stationary clamp rating separate from drive effort");
@@ -174,6 +182,9 @@ class HobberPartTests {
       var housing=members.filter(m->m.id=="housing")[0];
       try {
         for(m in members)if(m.id!="housing")near(cache.overlap(housing.component,poses.get("housing"),m.component,poses.get(m.id)),0,1e-6,'housing seat clears ${m.id}');
+      if(Std.isOfType(assembly,HobSpindle))for(i in 0...members.length)for(j in i+1...members.length)
+          near(cache.overlap(members[i].component,poses.get(members[i].id),members[j].component,poses.get(members[j].id)),0,1e-6,
+            "cartridge parts do not penetrate: "+members[i].id+" / "+members[j].id);
       }catch(e:Dynamic){cache.close();throw e;}
       cache.close();
     }

@@ -22,6 +22,7 @@ class SpindleHousing extends MachineComponent {
     super("HOB-SPINDLE-HOUSING","Hob spindle housing (reference envelope)","aluminium 6061",false,v);
     if(v.get("material")!=null)setMaterial(v.token("material"));
     ComponentEnvelopes.validateAnnular(v);
+    if(parameterNumber("bore")!=62||parameterNumber("height")!=180)throw "cartridge housing requires the 62 mm seats and 180 mm length";
     addConnector("mount",Mount,Solids.axial(0,0,0));
     addConnector("axis",Axis,Solids.axial(0,0,0));
     addConnector("top",Mount,Solids.axial(0,0,parameterNumber("height")));
@@ -31,8 +32,10 @@ class SpindleHousing extends MachineComponent {
   }
   override public function componentType():Null<ComponentType>return recipeType();
 
-  public function interfaceName():String return "HSK-E25";
+  public function interfaceName():String return "ASSUMED-TF20";
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
-    return ComponentEnvelopes.annular(values());
+    return Solids.cut(cadkit.modeling.Part.cylinderSpan(parameterNumber("outside")/2,0,180),[
+      cadkit.modeling.Part.cylinderSpan(31,-0.1,120),cadkit.modeling.Part.cylinderSpan(17,120,129),
+      cadkit.modeling.Part.cylinderSpan(31,129,180.1)]);
 }

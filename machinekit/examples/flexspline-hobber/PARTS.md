@@ -41,7 +41,7 @@ and empty verified-field lists.
   crossed-roller bearing, ring encoder, clamp and platen. C is continuous and its
   initial effort/speed limits come from the installed motor. Exposes `mount`/`work`.
 - `HobSpindle extends MachineAssembly`: housing, direct motor, opposed angular-contact
-  pair, master encoder and arbor. The motor is 1.5 kW continuous at 4000 rpm, limited
+  pair, hollow shaft, drawbar, retainers, master encoder and removable arbor. The motor is 1.5 kW continuous at 4000 rpm, limited
   to 8000 rpm, with a 0.0002 kg m² rotor. The two bearings remain two instances of
   the same BOM item; opposing orientation is a placement, not another bearing model.
   Exposes `mount`, `gaugeLine`, `hobCentre`. B is continuous.
@@ -75,12 +75,14 @@ and empty verified-field lists.
   Density is assumed 2400 kg/m³. The hob blank's carbide density is assumed 14,500 kg/m³. Both material
   definitions are available through ProjectKit's material library.
 
-`HSK-E25` identifies the spindle/arbor gauge interface. Type E is covered by
-[DIN 69893-5](https://www.dinmedia.de/en/standard/din-69893-5/378149482), and
-[the manufacturer's interface listing](https://shop.haimer.com/de/Werkzeugaufnahmen/HSK-Hohlschaftkegel-DIN-69893/HSK-E25/)
-confirms the E25 designation. These sources establish the interface name only.
-The current cylinder envelopes and gauge frames do not implement a conforming taper,
-drawbar, clamping mechanism or manufacturing interface. The choice of E25 is assumed.
+`ASSUMED-TF20` is a custom taper-and-face spindle/arbor interface, replacing the
+unimplemented HSK-E25 label. It includes a Ø25 hollow rotating spindle shaft,
+front opposed bearing pair, housing shoulder and removable front gland, shaft
+locknut, Ø40 nose/flange, 20 mm taper, Ø6 drawbar and two Ø4 drive pins. Shaft,
+drawbar, gland and locknut have separate persistent recipes/BOM entries. B drives
+the shaft; the removable arbor is fixed to its tool face. Thread helices, fits,
+preload and strength qualification remain open manufacturing requirements.
+See the dimensioned cartridge specification in MACHINE_DESIGN.md.
 
 No vendor names appear in identifiers or reference row designations. Clamp state,
 motor drivers/supplies, hydraulic services and complete X/Y/Z/C/B/A placement are

@@ -30,29 +30,29 @@
     },
     "drives": [
       {
-        "thrustMarginN": 886.5107723286296,
+        "thrustMarginN": 885.9677944358531,
         "axis": "X",
-        "movingMassKg": 130.97845534274086,
+        "movingMassKg": 132.06441112829384,
         "continuousThrustWith20PercentReserveN": 1152,
-        "designDemandN": 265.48922767137043,
+        "designDemandN": 266.0322055641469,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 911.0210379975994,
+        "thrustMarginN": 907.7217438291449,
         "axis": "Y",
-        "movingMassKg": 13.488139765757445,
+        "movingMassKg": 14.57409555131043,
         "continuousThrustWith20PercentReserveN": 1152,
-        "designDemandN": 240.97896200240064,
+        "designDemandN": 244.27825617085514,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 1542.3999649924913,
+        "thrustMarginN": 1531.2073987953218,
         "axis": "Z",
-        "movingMassKg": 40.51753334085356,
+        "movingMassKg": 41.60348912640654,
         "continuousThrustWith20PercentReserveN": 2159.9999999999995,
-        "designDemandN": 617.6000350075083,
+        "designDemandN": 628.7926012046779,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       }
@@ -62,22 +62,22 @@
       650
     ],
     "guideToHobMm": {
-      "X": 121.00000000000006,
-      "Y": 70.00000000000006,
-      "Z": 161
+      "X": 121.00000000000011,
+      "Y": 70.00000000000011,
+      "Z": 161.00000000000006
     },
     "movingMassKg": {
-      "X": 130.97845534274086,
-      "Y": 13.488139765757445,
-      "Z": 40.51753334085356
+      "X": 132.06441112829384,
+      "Y": 14.57409555131043,
+      "Z": 41.60348912640654
     },
-    "machineMassKg": 424.2110142938384,
-    "members": 95
+    "machineMassKg": 425.2969700793913,
+    "members": 99
   },
   "validation": {
-    "mechanicalAssertions": 914,
-    "partAssertions": 1000,
-    "partGeometryAssertions": 60,
+    "mechanicalAssertions": 930,
+    "partAssertions": 1032,
+    "partGeometryAssertions": 121,
     "loadingChecks": 1804,
     "loadingRange": "OD25/140 mm, face20 mm, X retract250 mm, reserved top cylinder radius80 mm",
     "nominalInstallation": {
@@ -227,6 +227,55 @@
       "displayPositionToleranceMetres": 1e-05,
       "controllerHz": 4000,
       "scope": "saved final cutting scene, asynchronous preparation, background playback, material removal and runtime stock alignment; coarse ungraded demonstration"
+    },
+    "spindleCartridge": {
+      "solidOverlapToleranceMm3": 0.001,
+      "coarse": {
+        "scope": "changed spindle cartridge against all parts at full travel grid; unchanged pairs retain prior audit evidence",
+        "completed": 85,
+        "checked": 3762,
+        "unexpected": 0,
+        "seconds": 22.516069889068604,
+        "thresholdMm3": 0.001,
+        "poses": 85,
+        "swivelRangeDeg": [
+          -15,
+          15
+        ]
+      },
+      "reference": {
+        "scope": "changed spindle cartridge against all parts at full travel grid; unchanged pairs retain prior audit evidence",
+        "completed": 85,
+        "checked": 3762,
+        "unexpected": 0,
+        "seconds": 20.970468997955322,
+        "thresholdMm3": 0.001,
+        "poses": 85,
+        "swivelRangeDeg": [
+          -15,
+          15
+        ]
+      },
+      "frameRegression": {
+        "threads": 1,
+        "sweepToleranceMm": 2e-05,
+        "cutPassToleranceMm": 5e-06,
+        "poseToleranceMmRad": 1e-08,
+        "maxPoseDifference": 1.7763568394002505e-13,
+        "arcToleranceMm": 1e-08,
+        "maxArcDifferenceMm": 1.3176743646820595e-13,
+        "forceToleranceN": 1e-06,
+        "maxForceDifferenceN": 1.4131273928796872e-10,
+        "cutCircles": 9,
+        "scope": "short reference-geometry cut using measured assembly transforms; no full-reference grade claim"
+      },
+      "appCoarseCut": {
+        "windows": 982,
+        "cycleSeconds": 6.0027500000015905,
+        "syncArcsec": 0.003931748009462176,
+        "fixtureContacts": 0,
+        "inspectionFailure": null
+      }
     }
   },
   "provenance": {
@@ -293,5 +342,35 @@
       "Xcarriage": 1.4287,
       "total": 80.9383
     }
+  },
+  "spindleCartridge": {
+    "interface": "ASSUMED-TF20; not HSK",
+    "gaugeFaceAxialMm": 180,
+    "bearingPairAxialIntervalsMm": [
+      [
+        129,
+        146
+      ],
+      [
+        146,
+        163
+      ]
+    ],
+    "shaftJournalDiameterMm": 25,
+    "taperLengthMm": 20,
+    "taperDiametersMm": [
+      16,
+      20
+    ],
+    "noseAndFlangeDiameterMm": 40,
+    "drawbarDiameterMm": 6,
+    "drivePins": {
+      "count": 2,
+      "diameterMm": 4,
+      "pcdMm": 28,
+      "engagementMm": 2
+    },
+    "retention": "housing shoulder and removable front gland; shaft shoulder and rear locknut; rear-access drawbar",
+    "basis": "Assumed design; thread helices, fits, bearing preload, contact grinding and strength qualification remain open"
   }
 }
