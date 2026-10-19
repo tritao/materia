@@ -4,6 +4,10 @@ The working legacy `BenchMill` has 250 mm X, 150 mm Y and 250 mm Z travel.
 `MillFramePreview` develops a separate mechanical concept with 250 mm X, 160 mm Y and 250 mm Z travel.
 Its output is a design study, not a machine released for manufacture.
 
+The [axis motor sizing study](AXIS_SIZING.md) derives XYZ torque, speed, inertia
+and Z holding loads from this mechanical model, including the alternative
+Leadshine spindle payloads and explicit load/duty assumptions.
+
 ## Current geometry
 
 `MillFrameLayout` owns casting datums. `MillXYStageLayout` and `MillZAxisLayout`
