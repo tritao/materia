@@ -1,11 +1,15 @@
 # Bench mill FEM tools
 
-The tools export and validate CAD packets, verify CalculiX with analytical
-fixtures, and solve a conformal casting/steel frame. The first useful milestone
-now passes: an upper-bound
-static baseline at the center pose, both support bounds, and a conditional
-tool-to-workpiece compliance budget. This does not qualify machining accuracy.
-The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN.md).
+Status and reproduction record for [FEM_PLAN.md](../FEM_PLAN.md). This study
+uses a bonded-frame, rigid-axis **upper-bound** model and assumed catalogue
+springs. Numerical qualification does not establish machining accuracy.
+
+The serial nine-pose modal gate passes. The serial static sweep has passed
+13 of 18 decision-reference studies, with a current maximum casting share of
+**17.723%** of the machine loop, below the provisional **30%** target. This is
+an interim maximum; the remaining five studies and three cutter contacts must
+finish before the full budget gate. Physical modal acceptance remains open.
+No `MillFrameLayout` geometry has been edited.
 
 ## Current qualified serial follow-up
 
@@ -13,7 +17,7 @@ The nine-pose undamped upper-bound **modal numerical gate passes** with
 `solverThreads: 1`, 12 modes, both supports and 40/30 mm meshes at every pose.
 All 15 minimum-section probes pass at both levels; Jacobians are positive.
 Maximum frequency-order refinement change is **2.992%**, below 5%.
-The four-thread experiments later in this record are provisional audit data.
+The retained four-thread experiments are unqualified audit data.
 Their apparent third-level mesh needs do not apply to this serial matrix.
 
 | Serial mode order | Three-point range, Hz | Four-spring range, Hz |
@@ -50,182 +54,127 @@ uncertainty remain required. See `build/fem/nine-pose-serial/excitation-context.
 passed both center decision cases; travel cases are running. Tool-context budgets and the casting-share/lightening decision remain
 pending; no `MillFrameLayout` geometry has been edited.
 
-## Gate status
+## Qualified center decision budgets
 
-- Solver-fixture gate: passed, including the common Gmsh-to-C3D10 deck path,
-  known prescribed translation/rotation, reference-node reaction correction,
-  and three analytical spring/leveling cases.
-  Root/submodule patch snapshots and loaded build identities are now captured.
-- Export gate: passed on 224 parts at center and a travel corner, including
-  same-build concept comparisons, per-part density checks, fixed-frame STEP
-  hashes across poses, and byte-identical full manifest/STEP repeat verification.
-  The Haxe datum contract passes 33 assertions and Python packet checks pass 14 tests.
-  An additional intermediate pose passes the 224-part comparison, with its
-  requested pose automatically added to the concept reference.
-- First-milestone numerical gate: passed at the center pose, including both
-  support bounds, all 15 thickness probes on two counted meshes, the full
-  compliance matrix/load-box reduction, equilibrium, reciprocity, scaling/sign
-  checks and a base-casting energy-sensitivity cross-check.
-- Geometry screening: the old cutter-dominated budget is superseded as a decision basis.
-  The 30% target is judged on the machine loop excluding the job-dependent tool,
-  at spindle nose and a 20 mm steel / 40 mm gauge test bar.
-  Nine-pose upper-bound modal convergence passes; new reference-point statics
-  and their travel screening are running. Assembly joints, contact/uncertainty
-  and physical modal acceptance remain open.
+Both center reference cases now pass serial 40/30 mm statics, both support
+bounds, minimum-section resolution and all numerical/energy checks. The test
+bar's maximum unit-response refinement change is **1.3925%**. Casting shares
+below use the machine loop excluding tool/bar bending; full loop values remain
+separate in each report.
 
-## Tool-reference and modal follow-up
+| Reference | Support | X | Y | Z |
+| --- | --- | --- | --- | --- |
+| Spindle nose | Three-point | 17.37% | 14.27% | 14.16% |
+| Spindle nose | Four springs | 15.84% | 14.27% | 14.16% |
+| Steel 20 mm / 40 mm bar | Three-point | 14.23% | 10.48% | 13.26% |
+| Steel 20 mm / 40 mm bar | Four springs | 13.08% | 10.48% | 13.26% |
 
-The machine-loop decision excludes the job-dependent tool. The revised budget
-uses `spindle-nose` (no holder stick-out) and `test-bar-20` (solid steel,
-20 mm diameter, 40 mm gauge). Context cases use 6/10/16 mm cutters at assumed
-20/30/45 mm stick-outs, in steel and explicitly assumed 600 GPa carbide.
-`static_study.py --tool-case NAME` moves the FE load and rigid-workpiece
-reference, and all lumped-network lever arms, to the selected contact.
-`tool_cases.py build/fem/tool-cases-serial` combines converged studies; material-only
-changes reuse the identical FE contact solution. It reports total and
-machine-loop-without-tool budgets separately and judges casting share on the
-latter for the two decision cases only. The machine-only decision contract passes a known masking test: total-loop
-casting share 3.1%, tool share 90%, machine-only casting share 31%; the revised
-decision detects the 30% target. Context cutters cannot trigger it, and mixed
-CAD packets are rejected. All 25 Python tests pass. Numerical tool-case results
-remain pending.
+The center maximum is **17.37%**, below the provisional 30% target. The casting
+geometry decision awaits the corresponding nine-pose maxima and modal operating
+band review. No geometry change has been made. The bar report is
+`build/fem/nine-pose-serial/center/test-bar-20/report.json`, SHA256
+`dc99cc07ed78e313c401c93862acff37742efb31ca631a0a7c2d7d27bba85cc7`.
+Thirteen of eighteen travel/reference static studies currently pass. Contextual cutter budgets will reuse their
+three center contact solutions for steel/carbide variants after the travel sweep.
 
-The repeatable sequence is `pose_sweep.py build/fem/modal-poses --output
-build/fem/nine-pose-serial --ccx PATH --threads 1 --resume` (paths shown
-relative to this example). It runs all nine modal studies before the two static
-decision cases at all nine poses. `sweep_report.py` compares them; `tool_cases.py`
-adds the contextual cutter material variants after their three center FE contact
-studies. All studies enter the shared heavy-job queue independently.
 
-The modal mass/coupling analytical gate passes: six modes of a spring-supported
-platform with a full mass/inertia attachment match analytical frequencies to
-2.41e-7 relative error. Three Python checks verify complete inertia (including
-products), physical triangle inequalities, and recovery of a known rigid motion
-by the distributing coupling. Six symmetric point masses reproduce each
-centroidal inertia; they add no stiffness. A zero-stiffness `SPRINGA` graph
-supplies the off-diagonal mass sparsity missing for MPC-coupled `MASS` elements
-in CalculiX 2.21; omitting it fails this fixture. The platform has explicit
-0.1 kg per support node as well as the 12 kg inertia attachment.
+## Tool cases and model contract
 
-Modal export gate passed on all 224 parts: native component centroidal tensors
-rotated into world coordinates, physical positive/triangle checks, packet mass
-and concept checks, and byte-identical manifest/STEP repeat export. No assumed
-CAD fallback was needed in this packet. The retained `modal-center` packet SHA256
-is `5f31a21c2645cb06e7bcce07bfcda6d86d6d79e1d0cd82ba9d5cb5e9893b5229`.
-`MillFemExport --pose-matrix true --name NAME` exports center and eight corners
-from one loaded build. All nine packets now pass the part/concept, mass/inertia and pose checks; all
-36 fixed-frame STEP hashes remain identical across the matrix. The pose index
-is `build/fem/modal-poses/poses.json`; center packet SHA256 is
+The casting decision uses the machine loop **excluding job-dependent tool
+bending**, evaluated at both the spindle nose and a solid steel 20 mm diameter,
+40 mm gauge test bar. The nose has no tool or holder stick-out. Context cases
+are 6/10/16 mm cutters at assumed 20/30/45 mm stick-outs, with 35 mm holder neck
+and effective cutter section inertia fraction 0.5. Steel (210 GPa) and carbide
+(600 GPa) are explicit assumed material options. Test-bar holder neck is zero;
+the taper connection remains. Each contact moves both FE reference points and
+catalogue-network lever arms. Merely removing the tool spring is insufficient.
+Full-loop and machine-only budgets are reported separately. Tool cases are
+center-pose context; the modal mass model retains the actual CAD tool.
+
+Material overrides are keyed by MaterialLibrary IDs: `mineral-cast` uses
+E=35 GPa, nu=0.25, density=2400 kg/m³; `machined-steel` uses E=210 GPa, nu=0.30,
+density=7850 kg/m³. Sources and assumptions are retained in `frame-study.json`
+and each report. Catalogue/joint stiffnesses remain conditional hardware
+proxies; supplier selection, casting modulus and joint/contact uncertainty are
+open inputs. The modal represented mass is 465.539 kg: 301.968 kg meshed,
+143.570 kg lumped, and 20 kg payload.
+
+## Qualification and provenance
+
+The fixture gate includes the real Gmsh C3D10/tet10_order/deck path and a known
+rigid-equation translation/rotation. The six-mode distributing mass/inertia
+fixture matches analytical frequencies to 2.41e-7 relative error. Full tensors,
+including products of inertia, are reproduced by six symmetric point masses.
+A zero-stiffness SPRINGA graph supplies MPC mass sparsity required by CalculiX
+2.21. A solid modal cantilever gives 830.100 Hz versus the Euler reference
+835.517 Hz (0.65%); its two meshes differ by 0.0043%. Run
+`modal_solid_fixture.py --ccx PATH` for that additional fixture. All 37 Python
+tests pass, including corrupt-cache, loaded-reference reaction, thread-count
+and tool-masking negative controls.
+
+All nine packets pass the 224-part concept comparison, per-part density/mass
+and full native inertia checks. The 36 fixed-frame STEP hashes are identical
+across poses. Repeat manifest/STEP exports are byte-identical. The center
+matrix packet SHA256 is
 `c96473be097a62a1410c45fdb45b3498d3e4bc53db26ed06ae366c4a52b7381e`.
-The modal travel comparison passes its numerical gate; the static comparison is running.
+The exporter captures root and relevant submodule working-tree patches,
+untracked sources, and loaded haxeon/CadKit/OCCT build identities. Reports
+retain frozen packet/source/config/binary hashes and raw solver evidence.
+Use fresh output names when reproducing cited runs.
 
-The root filesystem filled during concurrent work. Generated FEM artifacts were
-moved intact to `/media/joao/DEV/materia-fem-runs/bench-mill-20261019`, with the
-usual ignored `build/fem` path retained as a symlink. Cited baseline hashes and
-provenance are preserved. A tool-case stiff-support run interrupted by disk
-exhaustion is not counted as evidence and must finish on resumption.
-A second modal fixture checks solid density, units and C3D10 mass/stiffness
-through the real node reorder and deck writer: a 100×10×10 mm steel cantilever
-(E=210 GPa, artificial nu=0) gives **830.100 Hz**, versus the **835.517 Hz**
-Euler–Bernoulli slender-beam reference (0.65% difference, within 5%). The 944 /
-3,586-tet meshes differ by just **0.0043%**. The 3D model includes shear and
-rotary inertia absent from that Euler comparison. Run `modal_solid_fixture.py
---ccx PATH`; the small report is retained at
-`build/fem/modal-solid-fixture/report.json`, with source/binary hashes and
-root/submodule patch snapshots.
+Only **one-thread** solves qualify the aggregates. Four-thread experiments
+produced inconsistent results on identical decks: a static Z force residual
+was ~0.0113 N versus ~3.2e-12 N serial, and one modal frequency was 236.269 Hz
+versus 222.280 Hz serial. The cause is not established. Their retained
+`build/fem/nine-pose-upper-bound` output is audit evidence, not a qualified
+gate. Earlier four-thread status statements are superseded; Git retains the
+chronological record. Resume checks deck, successful solver log, exact mesh
+cache and thread count; mixed/missing/parallel thread reports are rejected.
 
-The center upper-bound modal numerical gate now passes for 12 modes and both
-supports on the 40/30 mm partitioned meshes. All thickness probes pass and
-Jacobian determinants are positive; maximum frequency-order mesh change is
-**2.55%**, below 5%. Total represented mass is **465.539 kg**, including 20 kg
-payload; all mass-only components retain their full centroidal inertia through
-exact symmetric point-mass constellations. Distributing attachments use their
-represented ancestor; head/table/foot ancestors remain physically rigid.
+Static unit cases execute independently at time 0–1. Derived combined DAT
+labels map to hashed raw case inputs/results. Four-spring leveling first
+estimates preload from hard-seat gravity reactions corrected by RF − CLOAD,
+then verifies actual loaded heights (<=1e-6 mm) and gravity equilibrium.
+A failed calibration gate falls back deterministically to measured 4×4 foot
+flexibility; failed unit-case numerical checks stop. At center both methods
+produce bit-identical compliance matrices on all four mesh/support combinations.
+The original flexibility-only run is preserved at
+`build/fem/center-nose-influence-qualified` with an archive-location map.
 
-| Fine mesh support | First six frequencies, Hz |
-| --- | --- |
-| Three-point | 48.643, 63.612, 77.587, 84.522, 122.089, 154.586 |
-| Four vertical springs | 42.973, 47.550, 78.022, 87.581, 119.864, 127.465 |
+Generated artifacts live behind the ignored `build/fem` symlink at
+`/media/joao/DEV/materia-fem-runs/bench-mill-20261019`. Completed static FRDs
+may be losslessly gzip-archived: `field-archives.json` records verified raw and
+compressed hashes and source report/deck identities. Inputs, DAT files and
+logs remain intact. Modal FRDs remain raw for mode-motion post-processing.
+The shared heavy-job queue and private resource guard preserve host memory
+headroom; do not lower the guards to force concurrent solves.
 
-The four-spring model adds low support-motion modes. Its first mode with the
-column-bending proxy above 0.1 is at 78.022 Hz; the three-point model has mixed
-column/support motion from 48.643 Hz. This proxy removes best-fit rigid motion
-at the column bottom before measuring the top residual; inspect mode shapes
-and crossings before identifying physical modes. No release limit follows.
-The report includes effective masses, participation, contact motion and SVG
-shape plots: `build/fem/modal-center-study/report.md` / `report.json`.
-Report JSON SHA256:
-`af7808033b7fbb77c45155ef34bb84d3eefd0fba45ee7a5449b1eb110774555a`.
-All cited analysis source hashes matched the files at the gate.
+## Run the pose and tool sweeps
 
-CalculiX accepts explicit `--threads 1|2|4` (default 1). The nine-pose runner
-requests 4 and records it in every report. On a byte-identical coarse frame
-deck, all 12 printed frequencies match the one-thread result exactly; elapsed
-time was 42.56 s versus 65.87 s. The six-mode analytical fixture also passes
-with 4 threads. This is an execution setting, not a stiffness change. A resume
-requires the same deck, successful log and requested thread count. Detailed
-comparison is retained in `build/fem/modal-thread-check/comparison.json`.
+From the repository root, export the matrix with the already loaded CAD build:
 
-Exact mesh snapshots now preserve binary floating-point values through JSON
-round trips and verify source/config/Gmsh/geometry hashes before reuse. The
-real coarse modal deck is byte-identical after cache reload. A cache-corruption
-negative control passes; all 23 Python tests pass. Interrupted solves still
-require an identical input deck and a completed solver log before reuse.
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fem.json -- --pose-matrix true --name repeat-poses
+```
 
-Frequency stability is a numerical gate; acceptance against spindle/tooth-pass,
-motor and axis excitation requires declared operating bands. No lightening
-candidate is selected and no `MillFrameLayout` geometry has been edited.
+With the pinned Python environment and CalculiX executable configured:
 
-## Recorded center baseline
+```sh
+fem_python="$PWD/machinekit/examples/bench-mill/build/fem/venv/bin/python"
+fem_ccx="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/bin/ccx"
+export LD_LIBRARY_PATH="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+"$fem_python" machinekit/examples/bench-mill/fem/pose_sweep.py machinekit/examples/bench-mill/build/fem/repeat-poses --output machinekit/examples/bench-mill/build/fem/repeat-study --ccx "$fem_ccx" --threads 1 --resume
+"$fem_python" machinekit/examples/bench-mill/fem/sweep_report.py machinekit/examples/bench-mill/build/fem/repeat-study
+python3 -m unittest discover -s machinekit/examples/bench-mill/fem -p 'test_*.py'
+```
 
-The run uses a frozen, validated 224-part packet at X=0, Y=0, Z=-125 mm.
-Later CAD edits/export commands do not replace this run's inputs. Both models
-bond the casting interfaces and use rigid moving axes; the numbers below are
-frame contributions. The budget adds the separately documented lumped springs.
-
-| Partitioned target | C3D10 elements | Soft support worst box | Stiff support worst box |
-| --- | --- | --- | --- |
-| 40 mm | 37,573 | 18.9162 µm | 18.6055 µm |
-| 30 mm | 60,372 | 19.1470 µm | 18.8306 µm |
-
-The maximum change in any unit-response vector is **1.40%**, against the 5%
-target. All 15 normal-section probes pass at both levels, with at least six
-quadratic tetrahedra intersected by each probe and conformal mid-planes imposing
-two normal layers. Final Jacobians are positive. The support bounds change the
-worst ±500 N-per-axis load-box response by **1.68%**. The 1% base-modulus increase
-reduces X compliance by 0.3460%, versus 0.3491% predicted from its strain energy
-(relative discrepancy **0.89%**, within the 2.5% gate).
-
-| Casting share of total loop | X | Y | Z |
-| --- | --- | --- | --- |
-| Soft three-point | 0.88% | 0.61% | 12.31% |
-| Stiff four-spring | 0.81% | 0.61% | 12.31% |
-
-These historical shares include the job-dependent 6 mm steel tool and must
-not decide casting geometry. The revised decision uses spindle-nose and short
-stiff test-bar cases, with the FE contact and all lever arms moved explicitly.
-Cutter cases (6/10/16 mm, assumed stick-outs 20/30/45 mm) are contextual; steel
-and an explicitly assumed 600 GPa carbide option are separate inputs.
-Lightening parameters will be proposed only after modal and travel screening;
-no MillFrameLayout geometry has been changed.
-The full matrices, principal directions, eight load-box corners, gravity
-reactions, element-group energy shares and source/preload assumptions are in
-`build/fem/partitioned-baseline/report.md` and `report.json`.
-
-Run identity (retain the generated frozen packet and provenance snapshots):
-
-- Packet SHA256: `1032888e88c98ab70be584909a01d441c785318233e030c2b4e945dbcd65698b`.
-- Configuration SHA256: `3041e949a49d1fe0a927b88bbd949fbabdb86c01e1604bc7c24e6c9fb5e11847`.
-- Report JSON SHA256: `9e91182f77eec121a17993e7d80b886f274a15add456716a29147beded850cf1`.
-- Geometry source revision: `c52c085e1f3222d9683ef32d887be6fe1c981bea`, with captured root patch
-  `f081166f0d35ed6f1933106fd8c8700107df72ee488d8a9c783c436f372b52e2`.
-- Analysis source revision: `af5e4d36ad4e68926969082f8afc58a622677eb2`, with captured root patch
-  `81c347de6a88faa778c3623aed66df6ae123909e60b19147985278196f48409d`.
-
-The report and its frozen packet also record initialized submodules' own
-patches, loaded haxeon/CadKit/OCCT build identities, Gmsh 4.12.2 and CalculiX
-2.21 binary hashes, case/deck/result hashes, and mesh warnings. No incomplete
-or unpartitioned pilot is counted in this convergence result.
+The pose driver completes all nine modal studies before the eighteen static
+nose/bar studies; `--stage modal` or `--stage static` resumes either stage.
+Each heavy study enters the shared queue. `tool_cases.py ROOT` combines two
+decision references plus three converged center steel-contact studies under
+ROOT (`spindle-nose`, `test-bar-20`, `cutter-6-steel`, `cutter-10-steel`,
+`cutter-16-steel`). Material-only carbide variants reuse the identical FE
+contact solutions, producing eight tool-case budgets in total.
 
 ## Export and check the CAD packet
 
@@ -235,8 +184,8 @@ output directory, so run them sequentially.
 ```sh
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.frame.json
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fem-tests.json
-./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fem.json
-python3 machinekit/examples/bench-mill/fem/packet.py machinekit/examples/bench-mill/build/fem/center/manifest.json
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fem.json -- --name repeat-center
+python3 machinekit/examples/bench-mill/fem/packet.py machinekit/examples/bench-mill/build/fem/repeat-center/manifest.json
 python3 machinekit/examples/bench-mill/fem/test_fem.py -v
 ```
 
@@ -244,15 +193,15 @@ The default pose is X=0, Y=0, Z=-125 mm. Other joint positions and packet names
 are explicit arguments; invalid coordinates or names fail before export:
 
 ```sh
-./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fem.json -- --name corner --x 125 --y 80 --z -250
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fem.json -- --name repeat-corner --x 125 --y 80 --z -250
 ```
 
 `MillFemExport` exports all frame members, including the separate steel inserts,
 clamp bolts and feet, plus the head, carriage, saddle and table. Other components
 retain their individual CAD/declared mass, centre of mass and pose as
 `mass-only` records. The static study allocates their gravity through rigid-axis references or
-least-norm force/moment transfer to the represented ancestor. Modal attachments
-and centroidal inertia tensors remain pending.
+least-norm force/moment transfer to the represented ancestor. Modal attachments retain full native centroidal inertia tensors, rotated into
+world axes and represented by symmetric point-mass constellations.
 
 The version-1 `manifest.json` contains:
 
@@ -360,7 +309,7 @@ Install Gmsh into an isolated environment under the generated output directory:
 ```sh
 python3 -m venv machinekit/examples/bench-mill/build/fem/venv
 machinekit/examples/bench-mill/build/fem/venv/bin/python -m pip install -r machinekit/examples/bench-mill/fem/requirements.txt
-machinekit/examples/bench-mill/build/fem/venv/bin/python machinekit/examples/bench-mill/fem/mesh_pilot.py machinekit/examples/bench-mill/build/fem/center/manifest.json
+machinekit/examples/bench-mill/build/fem/venv/bin/python machinekit/examples/bench-mill/fem/mesh_pilot.py machinekit/examples/bench-mill/build/fem/repeat-center/manifest.json
 ```
 
 The pilot validates the packet, imports each casting STEP, verifies its world
@@ -376,9 +325,10 @@ provides the import, mass, bounds and element-quality operations used here.
 ```sh
 LD_LIBRARY_PATH="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
   machinekit/examples/bench-mill/build/fem/venv/bin/python machinekit/examples/bench-mill/fem/static_study.py \
-  machinekit/examples/bench-mill/build/fem/center/manifest.json \
+  machinekit/examples/bench-mill/build/fem/repeat-center/manifest.json \
   --ccx "$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/bin/ccx" \
-  --sizes 40 30 --output machinekit/examples/bench-mill/build/fem/static-study
+  --sizes 40 30 --threads 1 --tool-case spindle-nose \
+  --output machinekit/examples/bench-mill/build/fem/repeat-static-study
 ```
 
 The driver freezes a validated copy of the packet under its output directory.
@@ -441,8 +391,9 @@ explicit assumptions for unselected hardware. The budget adds guides, screw/
 nut/support bearings, the X return belt reflected through its lead, clamp
 contact, spindle bearings, tool holder and the current tool to frame FEM.
 Supports already inside FEM are split by energy, without adding duplicate
-series compliance. A provisional 30% casting share target controls geometry
-screening for this pose, tool and assumed hardware. This is a conditional budget;
+series compliance. A provisional 30% casting share target is judged on the machine loop
+excluding the job-dependent tool, using the spindle nose and stiff test bar
+across the nine poses and both supports. This is a conditional budget;
 selected supplier data and joint measurements remain open inputs.
 
 The first-milestone numerical and budget gates pass for the frozen center run.
@@ -451,236 +402,3 @@ checks. The modal inertia/export and nine-pose numerical gates now pass;
 the revised static travel budget is running. Geometry candidates stay deferred
 until that budget and modal review justify them.
 
-The nine-pose four-thread **modal numerical gate is provisional pending serial verification** for all 12 modes, both supports,
-positive Jacobians and resolved minimum sections on every counted level.
-Maximum last-refinement frequency change across poses is **3.59%** (limit 5%).
-Two upper corners needed 27 mm third levels: `xminus_yplus_zupper` resolves
-6.42% (40→30) to 1.14% (30→27); `xplus_yplus_zupper` resolves 17.83% to 1.41%.
-Failed comparisons and pressure-interrupted solves are retained and not counted
-as passing evidence. The nine-pose nose/test-bar static sweep is now running.
-
-Lowest frequencies span **47.431–49.678 Hz** with three-point supports and
-**41.460–44.312 Hz** with four springs. Shape tracking of the center first mode
-has MAC ≥0.993 / 0.984 and frequency changes −2.49…+2.13% / −3.52…+3.12%.
-The third, Z-drive-coupled mode spans 75.015–78.693 Hz / 75.872–78.655 Hz
-(check the linked matrix for exact values). First-three-mode MAC stays ≥0.932.
-The four-spring second mode crosses the arbitrary 0.1 column residual flag
-at some upper corners: its continuous ratio changes from 0.0827 at center to
-0.0759–0.1070, with MAC ≥0.973. Thus the first flagged frequency can change
-from ~78 Hz to ~46 Hz without a new mode appearing. Use tracked shapes and
-continuous residuals, not that flag alone. Operating-band acceptance remains
-open; no candidate is selected.
-
-Full pose comparisons, source hashes, motion/kinetic diagnostics and individual
-mode-shape links: `build/fem/nine-pose-upper-bound/modal-report.md` / `.json`.
-The runner requires 10 GiB available at startup (4 GiB need plus 6 GiB reserve).
-`resource_guard.py` additionally monitors host pressure during the full run:
-below 4.5 GiB available it terminates only large private CCX processes within
-these output directories and `heavy-mill-*` scopes. It retries those pressure
-interruptions with exact-deck resume; numerical errors are not retried. Shared
-cgroup memory/no-swap limits and host earlyoom remain enabled. Active work
-and logs are under `build/fem/nine-pose-upper-bound` and
-`build/fem/follow-up-final.log`. No interrupted solve qualifies as evidence.
-
-Modal mass-motion post-processing now reads the native FRD generalized mass,
-checks mode/frequency and displacement normalization against the immutable
-solver report, and decomposes the exact lumped mass/inertia kinetic energy.
-The known six-mode platform reproduces its analytical kinetic fractions;
-fixed-width negative FRD fields and process ownership/retry controls are tested.
-All **32 Python tests** pass. Rigid reference-motion checks also verify spindle-nose/test-bar points and cancellation of a common rigid motion.
-
-At center, the ~78 Hz mode carries **65% (three-point) / 80% (four-spring)** of
-its kinetic energy in the 14.442 kg Z-drive mass group attached to
-`frame/column/driveUpperLeft`. The first two modes carry roughly 54–60% in the
-meshed frame. These are coupled modes; the casting shape proxy alone must not
-be used to call the ~78 Hz mode pure column bending. Kinetic localization does
-not locate strain energy. Diagnostics are in each completed pose's
-`modal/mass-motion.md` / `.json`, and the modal matrix report links them.
-
-Nine-pose modal aggregate JSON SHA256: `36054d2c6938de2f8ee398117022653095993d43cc4f03206c9f7ccec34c8cea`.
-
-
-### Four-spring leveling correction
-
-The new spindle-nose static run exposed an inadequate calibration: rigid-reference
-RF-derived preloads missed loaded foot heights by up to 0.65 µm, and their gravity
-resultants did not close. This run failed its gate and is not cited as a passing
-static result. `leveling.py` now measures the actual four-spring model's vertical
-4×4 foot flexibility plus unloaded-preload gravity deflection, then solves for
-four positive compressive preloads. Reciprocity and the final loaded heights
-remain checked; no tolerance is relaxed. Unit-force steps retain zero preload.
-The coupled four-seat solver fixture recovers known preloads within 6.73e-7
-relative error (`build/fem/leveling-influence-fixture/report.json`); it runs in
-static preflight. All **33 Python tests** pass. On the center coarse frame the
-maximum residual loaded foot height is 4.25e-9 mm, below the original 1e-6 mm gate.
-The fine frame and travel sweep remain pending. Historical RF-calibrated spring
-results are superseded for gravity/leveling by this correction; their no-gravity
-linear unit-load matrices are retained as historical evidence only.
-The already completed modal decks have no gravity/precompression and are unaffected;
-the static helper change is recorded after their immutable source snapshots.
-
-
-### Serial solver qualification in progress
-
-A repeated center static check exposed nondeterministic four-thread results:
-the identical isolated Z deck failed equilibrium with four threads, while its
-one-thread result recovers the previously consistent response and closes
-reactions near round-off. Isolating load cases alone did not cure this.
-The earlier one/four-thread modal spot comparison is insufficient to qualify
-all studies. Four-thread numerical gates are therefore provisional; a full
-serial nine-pose modal matrix will precede the serial static sweep.
-Raw four-thread results remain under `build/fem/nine-pose-upper-bound` for audit;
-replacement runs are `build/fem/nine-pose-serial` and `tool-cases-serial`.
-No geometry decision uses the provisional results. `pose_sweep.py` now defaults
-to one thread. Static cases also run in fresh processes at solver time zero;
-raw case DAT/deck/log hashes are recorded, with case-time relabeling only in
-an explicitly derived concatenated DAT. The known coupled-seat solver fixture
-passes that path; all **34 Python tests** pass. No gate tolerance is relaxed.
-
-
-Serial center modal numerical gate passes on both meshes/supports; maximum
-frequency-order refinement change remains 2.55%. Coarse frequencies and fine
-three-point frequencies match the archived four-thread results exactly; the
-fine four-spring maximum difference is 0.0031%. The full serial matrix remains
-in progress. Center serial report: `build/fem/nine-pose-serial/center/modal/report.json`,
-SHA256 `980b58cd4f3a541b6cf1ff4263a97799aadce97e6dbe1aa0233238ebcd4fd08c`.
-The byte-identical static-deck thread comparison is retained at
-`build/fem/static-thread-qualification/comparison.json`: force resultant ~0.0113 N
-with four threads versus ~3.2e-12 N with one thread. `--modal-size-map PATH`
-lets the runner explicitly request previously necessary third mesh levels per
-pose without relaxing any numerical checks.
-
-
-Only serial study execution is now qualified: the pose runner accepts one thread,
-resume rejects parallel/missing-thread reports, and both budget and travel
-aggregators require explicit `solverThreads: 1`. Standalone thread experiments
-remain available for diagnosis but cannot qualify these aggregate gates.
-Negative controls verify that a converged four-thread report cannot be reused
-or accepted for a tool budget; all **36 Python tests** pass. The serial rerun
-also changed one coarse modal frequency from 236.269 Hz to 222.280 Hz on a
-byte-identical input (SHA256 `dd462ed3a8206511d000a227a461245e1d0a1f17487d59d5fa5ab0d2c4c273e6`).
-Thus the earlier apparent third-level refinement needs are provisional too;
-serial mesh comparisons decide which levels are needed. Five serial poses
-currently pass on 40/30 mm meshes, including `xminus_yplus_zupper` at 2.41%.
-
-
-### Qualified serial center spindle-nose static gate
-
-The 40/30 mm spindle-nose reference passes both supports and all numerical,
-energy/sensitivity and thickness checks; maximum unit-response refinement change
-is **1.3792%**. Casting shares of the machine loop (no tool) are:
-
-| Support | X | Y | Z |
-| --- | --- | --- | --- |
-| Three-point | 17.37% | 14.27% | 14.16% |
-| Four springs | 15.84% | 14.27% | 14.16% |
-
-This is below the provisional 30% target at this pose/reference; test-bar and
-travel maxima still determine the geometry decision. Qualified report:
-`build/fem/nine-pose-serial/center/spindle-nose/report.json`, SHA256
-`77f90efc7757ae422a5d87fdf1c41b5ac3c825e853fced9d06511aba3e86890f`.
-
-The earlier RF calibration deficit was observed with unqualified four-thread
-execution. Serial hard-seat reactions recover the displacement-derived preloads
-within 7.06e-6 relative difference. The serial fast path uses that reaction estimate
-with the applied-nodal-load correction, accepts it only after the actual spring
-model passes gravity equilibrium and the original 1e-6 mm loaded-height gate,
-and deterministically falls back to the measured 4×4 foot flexibility if a gravity
-calibration gate fails. Unit-case numerical failures still stop the study.
-Each calibration's raw deck/result hashes and accepted/rejected method are recorded.
-
-The complete center comparison has **bit-identical compliance matrices** on all
-four mesh/support combinations. Maximum fast-path loaded height is 1.14e-7 mm;
-no fallback was needed. The preceding flexibility-only qualified run is preserved
-intact at `build/fem/center-nose-influence-qualified`, including source snapshots
-and an archive-location mapping. The raw reaction/spring comparison is under
-`build/fem/serial-reaction-calibration`. All **37 Python tests** pass, including
-the correction for a loaded constrained reference reporting RF=0. Modal analysis
-has no gravity/precompression; this subsequent static calibration change does
-not alter the already qualified modal decks or results.
-
-
-### Center decision-reference budget gate
-
-Both center reference cases now pass serial 40/30 mm statics, both support
-bounds, minimum-section resolution and all numerical/energy checks. The test
-bar's maximum unit-response refinement change is **1.3925%**. Casting shares
-below use the machine loop excluding tool/bar bending; full loop values remain
-separate in each report.
-
-| Reference | Support | X | Y | Z |
-| --- | --- | --- | --- | --- |
-| Spindle nose | Three-point | 17.37% | 14.27% | 14.16% |
-| Spindle nose | Four springs | 15.84% | 14.27% | 14.16% |
-| Steel 20 mm / 40 mm bar | Three-point | 14.23% | 10.48% | 13.26% |
-| Steel 20 mm / 40 mm bar | Four springs | 13.08% | 10.48% | 13.26% |
-
-The center maximum is **17.37%**, below the provisional 30% target. The casting
-geometry decision awaits the corresponding nine-pose maxima and modal operating
-band review. No geometry change has been made. The bar report is
-`build/fem/nine-pose-serial/center/test-bar-20/report.json`, SHA256
-`dc99cc07ed78e313c401c93862acff37742efb31ca631a0a7c2d7d27bba85cc7`.
-The first travel corner is running. Contextual cutter budgets will reuse their
-three center contact solutions for steel/carbide variants after the travel sweep.
-
-
-### Code-derived excitation reference
-
-The analyzed BT30 assembly sets a speed cap of 8,000 rpm in
-[MillSpindleHead.hx](../../../haxe/src/machinekit/milling/MillSpindleHead.hx),
-matching the nominal motor rating in [MillDesignStudy.hx](../MillDesignStudy.hx).
-This provides a design reference point; actual cutting-speed bands and flute
-counts remain undeclared. `excitation_context.py --rpm 8000 --flutes 2 --source
-PATH --note TEXT` hashes source files and the qualified modal aggregate, verifies
-all nine original serial reports, and reports the closest computed modes.
-Two flutes are explicit context. At this point rotation is 133.333 Hz and the
-contextual tooth-pass frequency is 266.667 Hz.
-The closest rotation-mode separations are 2.284% (three-point) and 0.437%
-(four springs); closest two-flute separations are 8.443% and 6.799%.
-These distances do not establish operating clearance or forced-response amplitude.
-The 132.751 Hz upper-corner mode changes from 135.301 Hz on the coarse mesh;
-its 1.885% refinement change is larger than the 0.437% rotation-frequency gap.
-The lightening gate therefore remains conditional on modal operating-band and
-uncertainty review, even if nominal casting shares stay below target.
-Source/code hashes, every pose and nose/bar motion ratios are retained in
-`build/fem/nine-pose-serial/excitation-context.json`, SHA256
-`87196d7cb8832156152c1d98854d3fbe4aedbf0e13ebd5b67d910682699871dc`.
-
-
-### Mode-order and identity interpretation
-
-The qualified spectrum is reported by ascending frequency order. The existing
-nearest casting-sample MAC is an unweighted shape diagnostic and allows shared
-targets: center modes 3 and 4 can both prefer one corner mode. In total there
-are 11 shared targets across the corner/support mappings. Therefore its apparent
-10–13% matched fourth-mode decrease does not establish a distinct physical mode
-shift. Use the actual spectral orders, full displacement fields and lumped-mass
-motion when interpreting mixed families. No automatic physical mode naming or
-acceptance follows from these scores.
-The fourth spectral order spans 82.769–87.365 Hz / 84.083–92.007 Hz. Higher
-orders vary more: the three-point fifth order spans 111.501–130.289 Hz against
-122.089 Hz at center (−8.67…+6.72%). The first-three-order ranges alone do not
-summarize the whole low-frequency spectrum. `mode-identity-notes.json` records
-all first-six-order ranges and shared casting-MAC targets under
-`build/fem/nine-pose-serial`; SHA256
-`a0c4e2c8148ac4dc79517dc6218abb13486f834d99a1783440619cd22939db33`.
-
-
-### Static travel sweep in progress
-
-Ten of eighteen serial decision-reference studies now pass: both nose and bar
-at center and the four negative-X travel corners. The largest completed casting
-share is **17.723%**, at `xminus_yplus_zupper`, `spindle-nose`,
-`soft-three-point`, axis X. The remaining positive-X corners and
-three contextual center cutter contacts are running; no full-travel casting
-or lightening gate is claimed yet.
-
-Completed static displacement fields are losslessly gzip archived to preserve
-storage headroom. `field-archives.json` in each completed study records original
-and compressed SHA256, source deck/report hashes and file sizes; decompression
-was hash-verified before removing the raw copy. Use `gzip -dk PATH/frame.frd.gz`
-when a raw static field is needed. Numerical `.dat`, `.inp`, solver logs and
-reports stay unchanged. Modal FRD files remain raw for modal post-processing.
-The first archival pass verified 253 fields and saved **2.459 GiB**. Generated
-archival tooling and its log are under `build/fem/archive_static_fields.py`
-and `static-field-archives.log`.
