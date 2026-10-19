@@ -29,9 +29,15 @@ class EnclosureRuntimeTests {
     check(rejected,"Artifact rejects hazardous-motion feedback bound to the door itself");
     var loaded=new ProjectArtifactLoader().load(SceneArtifact.encode(artifact));
     var project=new ProjectDocumentSession(null,false),simulation=new ApplicationSimulation(new RobotWorld(),ApplicationSimulation.MUJOCO);
-    for(object in loaded.objects)object.collisionEnabled=false; // CAD travel/clearance is separately checked.
     project.openGeneratedProject(loaded,"guard-runtime-test");
     try {
+      var fullScene=new ApplicationSimulation(new RobotWorld(),ApplicationSimulation.MUJOCO);
+      try {check(fullScene.rebuild(project.sensors,project.scene,project),"Full collision scene builds: "+fullScene.error);}
+      catch(e:Dynamic){fullScene.dispose();throw e;}
+      fullScene.dispose();
+      for(object in loaded.objects)object.collisionEnabled=false; // Isolate controller motion from contact qualification.
+      project.openGeneratedProject(loaded,"guard-runtime-test");
+      checkPacking();
       check(simulation.rebuild(project.sensors,project.scene,project),"Runtime builds: "+simulation.error);
       Sys.println("Guarded native runtime built");Sys.stdout().flush();
       var guard=simulation.enclosureController(),cut=simulation.hobbingPlayer();
@@ -84,6 +90,22 @@ class EnclosureRuntimeTests {
       editor.dispose();fonts.dispose();
       simulation.dispose();project.dispose();
     } catch(e:Dynamic){simulation.dispose();project.dispose();throw e;}
+  }
+  static function checkPacking():Void {
+    var shapes:Array<robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape> = [];
+    var points=[for(x in [-1.0,1.0])for(y in [-1.0,1.0])for(z in [-1.0,1.0])for(v in [x,y,z])v];
+    for(i in 0...4)shapes.push(new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(i,new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Convex(points))));
+    var surface=app.SimulationContactSurfaces.robotPart();
+    var pairs=[new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeContactPair(0,2,surface)];
+    var packed=robotkit.runtime.SimulationCollisionPacking.pack(shapes,pairs,3,1);
+    check(packed.hulls.length==1&&packed.hulls[0]==1&&packed.shapes.length==3,"Overflow uses an unpaired convex hull slot");
+    check(packed.shapeMap[0]==0&&packed.shapeMap[2]==1&&packed.shapeMap[3]==2,"Explicit contact pair indices survive packing");
+    var rejected=false;try{robotkit.runtime.SimulationCollisionPacking.pack(shapes,pairs,2,1);}catch(_:Dynamic){rejected=true;}
+    check(rejected,"Combined collision capacity remains bounded");
+    shapes[1].shape.geometry=collisionkit.CollisionGeometry.Sphere(1);
+    shapes[3].shape.geometry=collisionkit.CollisionGeometry.Sphere(1);
+    rejected=false;try{robotkit.runtime.SimulationCollisionPacking.pack(shapes,pairs,3,1);}catch(_:Dynamic){rejected=true;}
+    check(rejected,"Paired or primitive shapes cannot spill into hull storage");
   }
   static function has(n:haxeon.ui.core.RenderNode,label:String):Bool {
     if(n.semantics!=null&&n.semantics.label==label)return true;

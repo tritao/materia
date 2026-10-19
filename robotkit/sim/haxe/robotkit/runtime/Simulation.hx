@@ -425,19 +425,36 @@ class Simulation {
     }
     var shapes = blueprint.linkCollisionShapes;
     if (shapes.length > 0) {
-      if (shapes.length > RobotKitSimKitConstants.RK_MAX_LINK_SHAPES)
-        throw 'Simulation supports at most ${RobotKitSimKitConstants.RK_MAX_LINK_SHAPES} link collision shapes';
+      var packed=SimulationCollisionPacking.pack(shapes,blueprint.contactPairs,
+        RobotKitSimKitConstants.RK_MAX_LINK_SHAPES,RobotKitSimKitConstants.RK_MAX_LINK_HULLS);
       if (robotDesc == null) {
         robotDesc = new rk_simulation_robot_desc();
         robotDesc.set_struct_size(rk_simulation_robot_desc.size());
       }
-      robotDesc.set_link_shape_count(shapes.length);
-      for (index in 0...shapes.length) {
-        var source = shapes[index];
+      robotDesc.set_link_shape_count(packed.shapes.length);
+      for (index in 0...packed.shapes.length) {
+        var source = shapes[packed.shapes[index]];
         var invalid = source.shape.validate();
         if (invalid != null) throw invalid;
         var native = nativeShape(source.shape, source.link);
         robotDesc.set_link_shapes(index, native);
+      }
+      robotDesc.set_link_hull_count(packed.hulls.length);
+      for(index in 0...packed.hulls.length) {
+        var source=shapes[packed.hulls[index]],shape=source.shape;
+        var invalid=shape.validate();if(invalid!=null)throw invalid;
+        var hull=new rk_simulation_link_hull(),vertices=shape.convexVertices();
+        hull.set_link(source.link);hull.set_vertex_count(Std.int(vertices.length/3));
+        for(coordinate in 0...vertices.length)hull.set_vertices(coordinate,vertices[coordinate]);
+        var surface=shape.surface;
+        if(surface!=null) {
+          for(axis in 0...3)hull.set_friction(axis,surface.friction[axis]);
+          hull.set_friction_dimensions(surface.frictionDimensions);
+          hull.set_contact_time_constant(surface.contactTimeConstant);
+          hull.set_contact_damping_ratio(surface.contactDampingRatio);
+        }
+        hull.set_contact_filter(switch shape.contact {case Layers:0;case PairsOnly:1;case PairsAndEnvironment:2;});
+        robotDesc.set_link_hulls(index,hull);
       }
       var pairs = blueprint.contactPairs;
       if (pairs.length > RobotKitSimKitConstants.RK_MAX_CONTACT_PAIRS)
@@ -446,8 +463,8 @@ class Simulation {
       for (index in 0...pairs.length) {
         var pair = pairs[index];
         var native = new rk_simulation_contact_pair();
-        native.set_shape_a(pair.shapeA);
-        native.set_shape_b(pair.shapeB);
+        native.set_shape_a(packed.shapeMap[pair.shapeA]);
+        native.set_shape_b(packed.shapeMap[pair.shapeB]);
         for (axis in 0...3) native.set_friction(axis, pair.surface.friction[axis]);
         native.set_friction_dimensions(pair.surface.frictionDimensions);
         native.set_contact_time_constant(pair.surface.contactTimeConstant);

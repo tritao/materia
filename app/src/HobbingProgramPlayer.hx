@@ -102,7 +102,12 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     var bp=new MotionSystemBlueprint(robot.model,robot.blueprint,axes,session.fixedTimestep());
     var held=[config.axes[4]];
     var guardConfig=project.machineMotion==null?null:project.machineMotion.enclosureGuard;
-    if(guardConfig!=null)held.push(guardConfig.doorJoint);
+    if(guardConfig!=null) {
+      // A process actuator may carry mechanically coupled door leaves or shafts.
+      var owned=robot.blueprint.processJoints();
+      for(index in 0...owned.length)if(owned[index]&&held.indexOf(robot.model.joints[index].id)<0)
+        held.push(robot.model.joints[index].id);
+    }
     var planning=new ToolpathMotionBinding(binding,bp,null,null,held);compiler=planning.compiler;
     var lowered=new ToolpathLowering(binding).lower([for(op in job.program.ops)switch op{
       case PositionJoint(id,position,span):var at=config.axes.indexOf(id);toolpathkit.path.ToolpathOp.PositionJoint(id,position-(at<0?0:offsets[at]),span);
