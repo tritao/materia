@@ -19,7 +19,7 @@ With `detailed=false`, physical properties still use the conservative CAD envelo
 select `detailed=true` when detailed mass/inertia or CAD export is needed.
 
 Open `hob.project.json` for the isolated fine reference display, or
-`detailed.project.json` for the coarse machine with displayed teeth. Use
+`detailed.project.json` for the reference machine with displayed teeth. Use
 `hob-cad.project.json` for the actual detailed B-rep and its physical properties.
 The normal `materia.project.json` remains the fast cutting demonstration. Detailed
 views now generate the fused solid rather than an overlapping display approximation;
@@ -96,3 +96,28 @@ bytecode with `hob-mesh scene /path/to/hob.mtrg`. `hob-mesh reference` checks a
 short 12-gash reference solid; `hob-mesh` covers zero and both signs of rake on
 short, keyed, two-start tools. These checks retain 0.01 mm mesh deflection and
 0.0005 mm cutting-profile simplification.
+
+## Installed reference inspection
+
+`detailed.project.json` opens the complete reference machine at CAM's full-depth
+centre distance, zero hob shift, negative hob lead-angle tilt, mid-face height and
+planned table phase. The installed tool has the plain bore used by the arbor;
+the isolated sample's assumed keyway is not copied into the machine.
+
+`./check-layout.sh all` checks nominal coaxiality, the 40–80 mm arbor seat, bearing
+journal coverage, cutter/work transforms and generating-edge reach into the toothed
+rim for coarse and reference machines. It also audits the conservative hob blank
+against every machine part at the travel grid, inspection setup and CAM pass ends.
+The detailed body is clipped to that same outer cylinder, so the blank is a
+conservative clearance bound at every spindle angle. Sampled X/Y/Z/A clearance is
+not a continuous swept-volume proof. Tool/blank cutting engagement is allowed.
+
+An exported whole-machine scene can be checked with the hobber-test bytecode's
+`installation scene /path/to/scene.mtrg` command. It compares all exported member
+poses with the planned inspection setup and checks that the detailed hob vertices
+remain within the audited outer cylinder and mounting ends.
+
+Nominal bore/shaft diameters are both 16 mm. This is datum compatibility, not a
+specified manufacturing fit. Physical axial stops/spacers/retainers, retention
+capacity and fit tolerances are not modeled or qualified; axial retention remains
+open before fabrication or HB12 acceptance.

@@ -1941,3 +1941,30 @@ batch after saving that case. Do not start a second batch beside the live one.
   The isolated tool is open in Materia. Parts/persistence checks: 997 passed;
   short native CAD checks: 18,623 passed (maximum sampled edge error 0.303 µm).
   Packed timing-belt mesh regression checks also pass.
+
+### Installed detailed-hob inspection (2026-10-19)
+
+- `detailed.project.json` now shows the full reference machine at CAM's full-depth
+  setup: centre distance 45.625 mm, swivel −0.550° (negative hob lead angle),
+  Z = 4 mm (mid-face), and the planned table phase. The installed hob has its
+  actual plain bore; the isolated example's assumed keyway is not installed.
+- Nominal installation: 16 mm bore/arbor diameters, tool seat from 40 to 80 mm
+  on the arbor, coaxial tool and outboard bearing. Housing end clearances are
+  40 mm at the spindle and 65 mm at the outboard support. The bearing width
+  remains on the 15 mm support journal. Checks pass at 243 poses per configuration
+  (X/Y/Z/A grid × three spindle phases), with generating rake points reaching the
+  toothed rim at the CAM setup. Installation checks: 5,888; mechanical suite: 731.
+- Exact common-volume audits use the conservative hob blank at 85 poses per
+  configuration, adding the CAM inspection setup and pass entry/exit to the travel
+  grid and initial pose. Coarse/reference: 19,660/19,666 pair checks, zero unintended
+  intersections above 0.001 mm³, in 126.64/121.90 s. Tool/blank cutting engagement
+  is the sole allowed overlap. This is sampled clearance, not continuous sweep proof.
+- The exported reference scene passes all 99 member-pose comparisons and detailed
+  tool containment checks: 244,088 hob triangles, maximum radius 16 mm, ends 0–40 mm.
+  The body is clipped to the audited outer cylinder; its conservative clearance
+  bound covers all spindle phases. Evidence: `build/flexspline-installed/validation.json`.
+  `check-layout.sh` now includes the nominal installation checks.
+- **Open before fabrication/HB12:** nominal datum seating does not provide physical
+  axial retention. Stops/spacers/retainer hardware, retention capacity and bore/shaft
+  manufacturing-fit tolerances remain unspecified. No full cut or metrology/error
+  qualification was rerun or claimed for this scene inspection.

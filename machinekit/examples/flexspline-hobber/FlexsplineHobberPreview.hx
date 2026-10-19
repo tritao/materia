@@ -26,8 +26,18 @@ class FlexsplineHobberPreview {
     var rendered=AssemblyPreview.part("hob","Reference hob CAD",hob.geometry(machinekit.component.ComponentDetail.Preview),hob.materialId,0.01);
     return SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:[rendered]});
   }
+  /** Nominal full-depth reference setup, at the middle of the toothed face. */
+  public static function inspectionState(machine:FlexsplineHobber):cadkit.modeling.AssemblyState {
+    var model=new cadkit.modeling.AssemblyModel("mm");machine.addTo(model,"");
+    var state=model.initialState("flexspline-hobber-detailed"),job=FlexsplineHobberCam.job(machine),pass=job.passes[job.passes.length-1];
+    state.setJoint("X",pass.centreDistance);state.setJoint("Y",pass.shift);state.setJoint("Z",machine.spec.faceWidth/2);
+    state.setJoint(FlexsplineHobber.A,-machine.hob.design.leadAngle);state.setJoint(FlexsplineHobber.B,0);state.setJoint(FlexsplineHobber.C,pass.tablePhase);
+    state.forwardKinematics();return state;
+  }
   public static function detailed():Bytes {
-    return SceneArtifact.encode(AssemblyPreview.scene(new FlexsplineHobber(new gearkit.GearSpec(1,40,4,20*Math.PI/180),4,true),"flexspline-hobber-detailed"));
+    var machine=new FlexsplineHobber(null,12,true);
+    var data=AssemblyPreview.scene(machine,"flexspline-hobber-detailed");
+    data.assemblyState=inspectionState(machine).record();return SceneArtifact.encode(data);
   }
   public static function hobber():Bytes return SceneArtifact.encode(AssemblyPreview.scene(new FlexsplineHobber(),"flexspline-hobber"));
 }

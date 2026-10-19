@@ -23,6 +23,9 @@ mkdir -p "$layout_evidence"
 } > "$layout_evidence/provenance.txt"
 haxeon/.tools/hashlink/hl "$layout_evidence/main.hl" > "$layout_evidence/mechanical.log" 2>&1
 cat "$layout_evidence/mechanical.log"
+export HOBBER_INSTALLATION_EVIDENCE="$layout_evidence"
+haxeon/.tools/hashlink/hl "$layout_evidence/main.hl" installation > "$layout_evidence/installation.log" 2>&1
+cat "$layout_evidence/installation.log"
 for configuration in coarse reference; do
   mkdir -p "$layout_evidence/$configuration"
   export HOBBER_INTERFERENCE_EVIDENCE="$layout_evidence/$configuration"
