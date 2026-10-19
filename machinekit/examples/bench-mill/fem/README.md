@@ -406,10 +406,29 @@ Later work includes the distributing-coupling assembly model, all nine poses,
 uncertainty/contact checks and modal inertia tensors. Geometry candidates stay
 deferred until the compliance budget justifies them.
 
-The current nine-pose run has completed center and `xminus_yminus_zlower` on
-both meshes and supports. Host earlyoom terminated a fine-mesh solve at
+The current nine-pose run has completed center, `xminus_yminus_zlower` and
+`xminus_yminus_zupper` on both meshes and supports. Host earlyoom terminated a fine-mesh solve at
 `xminus_yminus_zupper`; it is not a numerical failure or a counted result.
-The runner now starts each heavy study only with 12 GiB available (4 GiB need
-plus 8 GiB reserve), and completed identical decks can be reused. Active work
+The runner requires 10 GiB available at startup (4 GiB need plus 6 GiB reserve).
+`resource_guard.py` additionally monitors host pressure during the full run:
+below 4.5 GiB available it terminates only large private CCX processes within
+these output directories and `heavy-mill-*` scopes. It retries those pressure
+interruptions with exact-deck resume; numerical errors are not retried. Shared
+cgroup memory/no-swap limits and host earlyoom remain enabled. Active work
 and logs are under `build/fem/nine-pose-upper-bound` and
 `build/fem/follow-up-resume.log`. No interrupted solve qualifies as evidence.
+
+Modal mass-motion post-processing now reads the native FRD generalized mass,
+checks mode/frequency and displacement normalization against the immutable
+solver report, and decomposes the exact lumped mass/inertia kinetic energy.
+The known six-mode platform reproduces its analytical kinetic fractions;
+fixed-width negative FRD fields and process ownership/retry controls are tested.
+All **31 Python tests** pass.
+
+At center, the ~78 Hz mode carries **65% (three-point) / 80% (four-spring)** of
+its kinetic energy in the 14.442 kg Z-drive mass group attached to
+`frame/column/driveUpperLeft`. The first two modes carry roughly 54–60% in the
+meshed frame. These are coupled modes; the casting shape proxy alone must not
+be used to call the ~78 Hz mode pure column bending. Kinetic localization does
+not locate strain energy. Diagnostics are in each completed pose's
+`modal/mass-motion.md` / `.json`, and the modal matrix report links them.

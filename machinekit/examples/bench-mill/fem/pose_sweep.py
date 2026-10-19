@@ -41,7 +41,7 @@ def main():
         records.append((entry,manifest))
     def study(script,manifest,output,extra):
         if args.resume and reusable(output/'report.json',manifest,args.config):return
-        command=[str(args.heavy_run),'--slots','4','--mem','6G','--need','4G','--margin','8G','--label','mill-pose-study','--',sys.executable,
+        command=[str(args.heavy_run),'--slots','4','--mem','6G','--need','4G','--margin','6G','--label','mill-pose-study','--',sys.executable,
             str(Path(__file__).with_name(script)),str(manifest),'--ccx',args.ccx,'--config',str(args.config),'--output',str(output),
             '--threads',str(args.threads),'--sizes',*[str(v) for v in args.sizes],*extra]
         print('Starting '+str(output),flush=True)
