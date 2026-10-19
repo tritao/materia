@@ -27,6 +27,7 @@ class AppTests {
     if (RuntimeGeometryTests.main() != 0) return 1;
     if (CosmeticThreadTests.main() != 0) return 1;
     if (MachineControlTests.main() != 0) return 1;
+    if (HobbingReportTests.main() != 0) return 1;
     if (WorkerObjectTests.main() != 0) return 1;
     if (SceneCollisionTests.main() != 0) return 1;
     ScriptedSetupTests.run();

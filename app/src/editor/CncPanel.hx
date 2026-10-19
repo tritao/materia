@@ -30,19 +30,6 @@ class CncPanel {
   /** The line the operator picked to restart at; 0 for none. */
   public var selectedLine(default, null):Int = 0;
   var followedLine = 0;
-  var plottedGear:Null<gearkit.GearMeasurement> = null;
-  var profilePlot=new haxeon.ui.plotting.PlotModel();
-  var leadPlot=new haxeon.ui.plotting.PlotModel();
-  function gearPlot(traces:Array<gearkit.GearTrace>):haxeon.ui.plotting.PlotModel {
-    var model=new haxeon.ui.plotting.PlotModel();
-    for(trace in traces.slice(0,2)){
-      var series=new haxeon.ui.plotting.PlotSeries('flank-${trace.flank}','Tooth ${trace.tooth}, flank ${trace.flank}',
-        trace.flank==0?Color.rgba(0.2,0.6,0.95,1):Color.rgba(0.2,0.8,0.5,1));
-      series.setPoints([for(i in 0...trace.x.length)new haxeon.ui.plotting.PlotPoint(trace.x[i],trace.filtered[i])]);model.addSeries(series);
-    }
-    return model;
-  }
-
   public function new() {}
 
   /** `printer` is the line about a printer the editor is connected to (its state, progress and temperatures), if any. */
@@ -53,20 +40,7 @@ class CncPanel {
     style.background = tokens.surface;
     var hobbing=simulation.hobbingPlayer();
     if(hobbing!=null){
-      var title=new KeyedView("hobbing-title",new Text("HOBBING · GEAR REPORT",null,tokens.textSecondary));
-      var status=hobbing.failure!=null?'Stopped: ${hobbing.failure}':hobbing.completed?hobbing.stock.report:
-        'Cutting · ${Math.round(hobbing.elapsed*100)/100} s · ${hobbing.stock.stream.passes} gash windows';
-      var children:Array<KeyedView> = [title,new KeyedView("hobbing-report",new Text(status))];
-      var measured=hobbing.stock.measurement;
-      if(measured!=null){
-        if(plottedGear!=measured){plottedGear=measured;profilePlot=gearPlot(measured.profiles);leadPlot=gearPlot(measured.helices);}
-        var plotStyle=new LayoutStyle();plotStyle.width=LayoutAxis.grow();plotStyle.height=LayoutAxis.fixed(120);
-        children.push(new KeyedView("profile-label",new Text("Profile · roll [mm] / deviation [µm] · both flanks")));
-        children.push(new KeyedView("profile-plot",new haxeon.ui.widgets.plotting.PlotView("hob-profile",profilePlot,plotStyle,"Gear profile traces")));
-        children.push(new KeyedView("lead-label",new Text("Lead · axial position [mm] / deviation [µm] · both flanks")));
-        children.push(new KeyedView("lead-plot",new haxeon.ui.widgets.plotting.PlotView("hob-lead",leadPlot,plotStyle,"Gear lead traces")));
-      }
-      return new Column("hobbing-panel",children,style);
+      return new HobbingGearReport(reportData(hobbing));
     }
     var player = simulation.toolpathPlayer();
     var heading = new KeyedView("heading", new Text(player == null ? "CNC PROGRAM" : player.title(), null, tokens.textSecondary,
@@ -111,6 +85,29 @@ class CncPanel {
     var state = new KeyedView("status", new Text(status)), speedRow = new KeyedView("speed", speed), gcode = new KeyedView("gcode", list);
     return linked ? new Column("cnc-panel", [heading, state, link, buttons, speedRow, gcode], style) :
       new Column("cnc-panel", [heading, state, buttons, speedRow, gcode], style);
+  }
+
+  static function reportData(player:app.HobbingProgramPlayer):HobbingReportData {
+    var data = new HobbingReportData(), stock = player.stock;
+    data.complete = player.completed;
+    data.failure = player.failure;
+    data.status = player.failure != null ? "Stopped" : player.completed ? "Cycle complete" : "Cutting";
+    data.seconds = player.elapsed;
+    data.syncArcsec = player.syncError * 648000 / Math.PI;
+    data.contacts = stock.collisions;
+    data.windows = stock.stream.passes;
+    data.poses = stock.stream.poses;
+    data.buffered = stock.stream.peakFrames;
+    data.stockKiB = Math.round(stock.maxBytes / 1024);
+    data.cutting = stock.forces.maxTangential;
+    data.radial = stock.forces.maxRadial;
+    data.power = stock.forces.maxPower;
+    data.hobTorque = stock.forces.maxHobTorque;
+    data.tableTorque = stock.forces.maxTableTorqueBound;
+    data.materialBasis = stock.forces.material.basis;
+    data.measurement = stock.measurement;
+    data.inspectionFailure = stock.measurementFailure;
+    return data;
   }
 
   static function fill():LayoutStyle {

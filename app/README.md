@@ -196,6 +196,13 @@ viewport or tree toggles the selection's visibility using the eye button's undoa
 a hidden part or group stays selected so a second press shows it again. Holding Space does not
 repeat the toggle, and typing in a text field does not change visibility.
 
+The hobber's CNC pane shows cycle metrics and inspection qualification before profile and
+lead charts. Charts stack in narrow panes and sit side by side from 760 logical pixels.
+Sampling, coverage, assessment warnings, load assumptions and run details expand independently.
+The raw-sample table previews the first tooth on both flanks in pages of 24 rows; **Copy all
+samples as CSV** includes every inspected tooth, both trace families, positions in mm and raw
+and filtered deviations in µm. Opening details does not rerun stock removal or inspection.
+
 - The hierarchy's Add menu groups primitive, CAD, feature, and import commands.
   Search filters objects by name or type and includes matching CAD features.
   Duplicate (`Ctrl+D`) and Delete sit beside Add; double-click a tree row to frame

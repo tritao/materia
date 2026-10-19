@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "package": {
+    "name": "hobbing-report-tests"
+  },
+  "entry": "tests.HobbingReportTests",
+  "sourceRoots": [
+    "src",
+    "../../processkit/tests/moonraker"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    },
+    "processkit": {
+      "path": "../../processkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "../build/hobbing-report-tests"
+}
