@@ -1,6 +1,6 @@
 # Reusable panel tooling and mineral-casting molds
 
-Status: phases 1–3 implemented. The single-pocket mold is a geometry review; full machine molds and physical qualification remain pending.
+Status: phases 1–4 implemented. The single-pocket and full mill-base molds are geometry reviews; fabrication and physical qualification remain pending.
 
 ## Implementation progress
 
@@ -51,7 +51,24 @@ Status: phases 1–3 implemented. The single-pocket mold is a geometry review; f
   casting face fails. Geometry is provided; adhesive strength, EPS compression,
   pad clamps and uplift/bridge capacity remain pending. `--bed-core` generates
   a separate source variant under `build/review-bed/` for inspection.
-- [ ] Phase 4: mill base mold review assembly.
+- [x] Phase 4: mill base mold review assembly.
+  `CastingMoldPlanner` classifies all 31 features and 12 inserts from the full
+  `MillFramePreview` foundation instance. The single-pocket and full-base planners
+  share `MoldPanels`. Exact orthogonal volume allocation splits overlapping
+  details into 14 connected formers, with six laminated EPS cores on two shared
+  bridges and twelve independent datum fixtures at their actual heights.
+  `CastingMoldCodec` and `MoldVolumeCodec` persist rebuildable neutral records;
+  `ToolingVolume`, `CastingMoldCad` and `CastingMoldExport` realize/export them.
+  The dedicated `haxeon.tooling.json` emits review artifacts under
+  `machinekit/examples/bench-mill/build/tooling/base/`. Actual foundation CAD
+  equivalence, boundary coverage and separate continuous assembly/demolding
+  graphs pass. Tests reject lost pockets, displaced datums, unclassified cuts
+  and an inward-trapped foot former, and cover stock variation and optional XY
+  interfaces. Process records include replication/grouting, compaction and
+  per-insert anchorage. Eighteen open requests cover fixture attachments,
+  replication/grout allowances and lifting/flip provisions. Those interfaces,
+  clamps, materials/process evidence, loads and handling remain unqualified;
+  no source geometry is altered and fabrication readiness is false.
 - [ ] Phase 5: assembly validation and fabrication package.
 - [ ] Phase 6: design-stage moldability feedback.
 - [ ] Phase 7: mill column and independent pedestal example.
@@ -685,7 +702,7 @@ Add dedicated configurations:
 ```
 
 The first two configurations are implemented in phase 1. The mill tooling entry
-point is planned for phase 4. `CamToolingPanels` tests join the existing CamKit
+point is implemented in phase 4; add `-- --checks` to run its focused acceptance cases. `CamToolingPanels` tests join the existing CamKit
 suite in phase 5. Existing regression commands are:
 
 ```sh
@@ -736,3 +753,21 @@ package boundary. Assembly installs the bed first, using its downward approach;
 demolding allows bed withdrawal downward after fixing release and EPS breakup.
 These are separate swept blocking graphs, not an assumed reversal of one physical
 process. Exploded offsets are for visual inspection and do not establish removal.
+
+
+Phase 4 full-base review and acceptance entry point:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.tooling.json -- --checks
+python3 machinekit/examples/bench-mill/render_tooling.py
+```
+
+See `machinekit/examples/bench-mill/TOOLING_README.md` for supported geometry,
+artifact frames, protected insert envelopes and unresolved physical interfaces.
+The generator uses a separate build directory from frame/FEM exports. Installation
+checks approach bed-facing tooling from above before casting; demolding checks
+withdraw it below the released bed after cure. Prebonded EPS/carrier/bridge rows
+are installed as groups, then EPS and reusable fixtures separate after bond release.
+The directional blocking graphs come from exact sweeps, not reversing one assumed
+physical process. Exact AABB rejection only removes pairs that cannot have a
+positive-volume intersection; the remaining pairs use native booleans.

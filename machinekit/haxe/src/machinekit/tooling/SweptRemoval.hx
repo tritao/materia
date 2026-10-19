@@ -85,14 +85,21 @@ class SweptRemoval {
             high=new Vector(Math.max(high.x,c.x),Math.max(high.y,c.y),Math.max(high.z,c.z));
         }
         var travel=high.subtract(low).length()+1,blocking:Array<PanelBlockingRelation> = [];
+        // Exact broad phase: disjoint bounds cannot contain a positive-volume intersection.
+        // The accepted pairs still use the complete boundary-face sweep and booleans.
+        function meets(a:Part,b:Part):Bool {
+            var x=a.shape.bounds(),y=b.shape.bounds(),al=Vector.fromNative(x.get_min()),ah=Vector.fromNative(x.get_max()),bl=Vector.fromNative(y.get_min()),bh=Vector.fromNative(y.get_max());
+            return Math.min(ah.x,bh.x)>Math.max(al.x,bl.x) && Math.min(ah.y,bh.y)>Math.max(al.y,bl.y) && Math.min(ah.z,bh.z)>Math.max(al.z,bl.z);
+        }
         for(i in 0...members.length)for(j in i+1...members.length) {
+            if(!meets(members[i].part,members[j].part))continue;
             var overlap=members[i].part.intersect(members[j].part),volume=overlap.volume();overlap.close();
             if(volume>contactVolumeToleranceMm3)throw 'Initial overlap ${members[i].id}/${members[j].id}';
         }
         for(a in members) {
             var swept=sweep(a.part,a.direction.scale(travel));
             try {
-                for(b in members)if(b.id!=a.id) {
+                for(b in members)if(b.id!=a.id && meets(swept,b.part)) {
                     var common=swept.intersect(b.part),volume=common.volume();common.close();
                     if(volume>contactVolumeToleranceMm3)blocking.push({movingId:a.id,blockerId:b.id});
                 }

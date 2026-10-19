@@ -171,3 +171,37 @@ The permanently bonded bridge/carrier is one removal group. Records include glue
 thickness, bond area, embed depth and pad closure requirements. CAD realizes these
 records and includes their full sweeps in both sequences. Geometric support does
 not imply adhesive, material, clamp or uplift qualification.
+
+
+### Multiple-core casting mold review
+
+`casting.CastingMoldPlanner.plan(document, options)` extends the explicit box
+workflow to multiple EPS cores, overlapping reusable formers and inserts at
+different heights. Both the single-pocket and multi-core planners use
+`MoldPanels.box` for the five-panel shell. ManufacturingKit remains ProjectKit-only.
+
+`BoxVolumes` resolves exact orthogonal unions/differences and separates connected
+formers into physical members. `CastingMoldPlan` retains every source feature's
+ownership, laminated EPS geometry, shared bridge/carrier allocation, independent
+datum volumes, named opening seals and design-change requests. Supported source
+geometry is one rectangular envelope with axis-aligned cuts and downward-facing
+insert mounting faces. EPS pockets must open at the fill face; rigid details use
+explicit X-side or Z withdrawal directions. Unsupported layouts fail.
+
+`CastingMoldOptions` includes typed precision routes, replication evidence fields,
+grouted-joint inputs, `CompactionSpec`, per-insert `InsertAnchorage`, and handling
+requirements. Missing evidence remains pending. Nonempty anchorage geometry is
+rejected until a corresponding source-adapter revision can describe it; it is
+never silently added to the casting. Precision allowances never move source
+inserts. `CastingMoldCodec` version 1 stores and verifies complete regeneration;
+`MoldVolumeCodec` version 1 stores finite exact box volumes for rebuildable CAD.
+
+MachineKit realizes and exports the neutral records through `CastingMoldCad`,
+`ToolingVolume` and `CastingMoldExport`. Exact bounds only prune impossible
+intersections; all accepted removal pairs still use boundary-face swept solids
+and boolean intersections. Installation and demolding use separate geometric
+blocking graphs, including the loaded and released bridge groups.
+
+See [mill base tooling](../machinekit/examples/bench-mill/TOOLING_README.md) for
+commands, generated artifacts, scope and unresolved physical checks. This phase
+emits review geometry and drawings, not CAM or fabrication approval.

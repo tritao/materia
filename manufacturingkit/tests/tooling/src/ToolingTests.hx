@@ -154,5 +154,6 @@ class ToolingTests {
 		Sys.println('ToolingTests: $assertions assertions passed');
 		PanelTests.run();
 		BoxPlannerTests.run(fixture());
+		CastingMoldTests.run(fixture());
 	}
 }
