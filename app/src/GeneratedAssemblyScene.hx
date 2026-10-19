@@ -8,6 +8,7 @@ import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 
 typedef GeneratedAssemblyScene = {
   @:optional var projectJob:String;
+  @:optional var inspectionCameras:Array<materia.project.SceneArtifact.SceneArtifactInspectionCamera>;
   @:optional var initialView:materia.project.SceneArtifact.SceneArtifactView;
   var objects:Array<SceneObjectData>;
   var geometryBySnapshot:Map<String, GeometryData>;

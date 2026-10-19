@@ -74,6 +74,39 @@ class EditorPerspectiveViewport implements View {
   var lastRenderSeconds:Float = 0.0;
   var totalRenderSeconds:Float = 0.0;
   final camera:PerspectiveCamera = new PerspectiveCamera();
+  var inspection:Null<materia.project.SceneArtifact.SceneArtifactInspectionCamera>;
+  var inspectionZoom:Float=1;
+  /** A camera-only view: no selection edits, independent visibility, steady world orientation. */
+  public function setInspectionCamera(preset:materia.project.SceneArtifact.SceneArtifactInspectionCamera,zoom:Float=1):Void {
+    var previous=inspection;
+    if(previous==null||previous.id!=preset.id||previous.anchor!=preset.anchor||previous.yaw!=preset.yaw||previous.pitch!=preset.pitch)
+      camera.setAngle(preset.yaw,preset.pitch);
+    if(previous==null||previous.id!=preset.id||previous.anchor!=preset.anchor||previous.span!=preset.span||
+      previous.offset.join(",")!=preset.offset.join(",")||previous.hiddenPrefixes.join(",")!=preset.hiddenPrefixes.join(",")||inspectionZoom!=zoom)lightingRevision++;
+    inspection=preset;inspectionZoom=zoom;
+  }
+  function inspectionHidden(id:String):Bool {
+    var preset=inspection;if(preset==null)return false;
+    for(prefix in preset.hiddenPrefixes)if(StringTools.startsWith(id,"project:"+prefix)||StringTools.startsWith(id,prefix))return true;
+    return false;
+  }
+  function inspectionView(view:SceneView):Void {
+    if(inspection==null)return;
+    view.clearSelectionOverrides();view.clearHoverOverrides();
+    for(item in scene.items())if(inspectionHidden(item.id)) {
+      view.setVisibility(scene.info(item.id).node(),false);
+      for(node in scene.runtimePartNodes(item.id))view.setVisibility(node,false);
+    }
+  }
+  function updateInspectionCamera():Void {
+    var preset=inspection;if(preset==null)return;
+    var item=scene.object("project:"+preset.anchor);if(item==null)item=scene.object(preset.anchor);
+    if(item==null)return;
+    var pose=simulationActive?simulationPoseById.get(item.id):null;
+    var point=app.editor.InspectionCameraModel.target(preset,pose==null?[item.x,item.y,item.z]:pose.position);
+    var distance=preset.span*0.5/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360)*1.15*Math.max(1,1/aspect());
+    camera.setTarget(point[0],point[1],point[2],Math.max(0.0001,distance));
+  }
   var navigationPointer:Null<Int> = null;
   var navigationMode:Int = 0;
   /** Last surface pivot, retained for empty-space drags and fixed during each gesture. */
@@ -189,7 +222,7 @@ class EditorPerspectiveViewport implements View {
         ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" +
         renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep +
         ":collisions:" + collisionRevision);
-      installNavigation(node);
+      if(inspection==null)installNavigation(node);
       return node;
     });
   }
@@ -201,6 +234,7 @@ class EditorPerspectiveViewport implements View {
 
   function paint(canvas:Canvas, geometry:ResolvedLayoutItem):Void {
     updateViewportSize(geometry.width, geometry.height);
+    updateInspectionCamera();
     ensureRenderer();
     var width = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.width))));
     var height = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.height))));
@@ -215,9 +249,11 @@ class EditorPerspectiveViewport implements View {
         viewportWidth != renderedViewportWidth || viewportHeight != renderedViewportHeight)) {
       var started = Sys.time();
       fitCameraClipRange();
-      var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
+      var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect(), -1, -1,
+        inspection == null ? 0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom))),
         simulationActive ? simulationPoses : null, hoveredObjectId, hoveredFaceIndex,
         collisionPairs, cosmeticThreadsVisible));
+      inspectionView(view);
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
       if (gridVisible && gridStep > 0.0) {
         var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
@@ -406,7 +442,7 @@ class EditorPerspectiveViewport implements View {
     var minX = 1000000000.0, minY = 1000000000.0, minZ = 1000000000.0;
     var maxX = -1000000000.0, maxY = -1000000000.0, maxZ = -1000000000.0;
     for (item in items) {
-      if (!scene.isVisible(item.id)) continue;
+      if (!scene.isVisible(item.id)||inspectionHidden(item.id)) continue;
       var transform = displayTransform(item);
       var bounds=transformedBounds(transform,item.width,item.height,item.depth);
       minX=Math.min(minX,bounds[0]);minY=Math.min(minY,bounds[1]);minZ=Math.min(minZ,bounds[2]);
@@ -715,7 +751,7 @@ class EditorPerspectiveViewport implements View {
   function fitCameraClipRange():Void {
     clipBounds.resize(0);
     for (item in scene.items()) {
-      if (!scene.isVisible(item.id)) continue;
+      if (!scene.isVisible(item.id)||inspectionHidden(item.id)) continue;
       if (simulationActive) {
         var index = clipBounds.length;
         if (index == clipBoundsScratch.length) clipBoundsScratch.push([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);

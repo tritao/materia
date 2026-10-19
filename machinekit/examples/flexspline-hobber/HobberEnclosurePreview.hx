@@ -97,6 +97,7 @@ class HobberEnclosurePreview {
     scene.machineMotion.enclosureGuard={doorJoint:"enclosure/door/slide",closedSensor:"enclosure/door/closed",openSensor:"enclosure/door/open",
       spindleJoints:[axes[4],axes[5]],axisJoints:axes.slice(0,4),stroke:stroke*0.001,setupSpeedLimit:0.025,
       timeoutSeconds:10,lockTravelSeconds:0.05,linearStandstillTolerance:1e-5,rotaryStandstillTolerance:1e-4,standstillConfirmationSeconds:0.25};
+    HobberInspectionViews.apply(scene,machine,"machine/");
     return scene;
   }
   public static function enclosed():haxe.io.Bytes {

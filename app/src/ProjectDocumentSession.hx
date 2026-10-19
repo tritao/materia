@@ -77,6 +77,7 @@ class ProjectDocumentSession {
   var initialAssemblyState:Null<AssemblyStateRecord> = null;
   /** Source definition bound to the runtime; compiled models own a separate snapshot. */
   var assemblyRuntimeDefinition:Null<AssemblyDefinition> = null;
+  public var inspectionCameras(default,null):Array<materia.project.SceneArtifact.SceneArtifactInspectionCamera> = [];
   public var initialView(default,null):Null<materia.project.SceneArtifact.SceneArtifactView> = null;
   public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
@@ -278,6 +279,7 @@ class ProjectDocumentSession {
       generated.printJob);
     projectJob = generated.projectJob;
     initialView = generated.initialView;
+    inspectionCameras=generated.inspectionCameras==null?[]:generated.inspectionCameras.copy();
   }
 
   /** Open generated geometry while retaining its source manifest. */
@@ -413,6 +415,7 @@ class ProjectDocumentSession {
     projectBaseline = baseline;
     projectJob = generated.projectJob;
     initialView = generated.initialView;
+    inspectionCameras=generated.inspectionCameras==null?[]:generated.inspectionCameras.copy();
     staleProjectEdits = diagnostics;
     staleProjectRecord = diagnostics.length == 0 ? null : project;
     installAssemblyRuntime(generated.assemblyDefinition, runtime,
@@ -1088,7 +1091,7 @@ class ProjectDocumentSession {
     scriptOwnership=nextOwnership;
     projectReference = null;
     projectJob = null;
-    initialView = null;
+    initialView = null;inspectionCameras=[];
     recipeDocument = null;
     projectBaseline = null;
     staleProjectEdits = [];

@@ -154,7 +154,7 @@ class Main {
     var args = Sys.args();
     for (arg in args)
       if (arg != "--reset-workspace" && arg != "--snapshot" && arg != "--simulate" &&
-          arg != "--lab" && arg != "--dark" && arg != "--perspective" && arg != "--demo" &&
+          arg != "--lab" && arg != "--dark" && arg != "--inspection-camera" && arg != "--perspective" && arg != "--demo" &&
           arg.indexOf("--story=") != 0 &&
           arg.indexOf("--width=") != 0 && arg.indexOf("--height=") != 0 &&
           arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
@@ -403,9 +403,10 @@ class Main {
       if (args.indexOf("--worker-demo=gallery") >= 0)
         editor.enableWorkerDemo(workerDemoSteps(args), true, ReferenceEditorApp.WORKER_GALLERY);
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
+      if (args.indexOf("--inspection-camera") >= 0) editor.openInspectionCamera();
       // Start shows for a plain launch; explicit documents, demos, and previews go straight to the model.
       var explicitContent = diagnostics.projectPath != null || diagnostics.setupScript != null ||
-        diagnostics.demo || diagnostics.componentLab || args.indexOf("--perspective") >= 0 ||
+        diagnostics.demo || diagnostics.componentLab || args.indexOf("--perspective") >= 0 || args.indexOf("--inspection-camera") >= 0 ||
         args.indexOf("--worker-demo=rack-to-table") >= 0 || args.indexOf("--worker-demo=gallery") >= 0 ||
         Lambda.exists(args, function(arg) return arg.indexOf("--character=") == 0);
       if (!explicitContent && editor.preferences.showStartPage) editor.showStartPage();
@@ -621,6 +622,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public var missionController(default, null):MissionController;
   final cncPanel = new app.editor.CncPanel();
   final machineControlPanel = new app.editor.MachineControlPanel();
+  final inspectionCamera = new app.editor.InspectionCameraPanel();
   static inline var MAX_LOG_LINES:Int = 1000;
   final logLines:Array<String>;
   // The console view edits nothing: it is a read-only text area over this document, so its text is
@@ -1321,6 +1323,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     world.close();
     if (files != null) files.dispose();
     if (perspectiveViewport != null) perspectiveViewport.dispose();
+    inspectionCamera.dispose();
     if (characterPreview != null) characterPreview.dispose();
     session.dispose();
     ui.dispose();
@@ -1749,6 +1752,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // Recognize legacy saved layouts; this panel is removed before the UI builds.
     result.register(new DockPanelDescriptor("viewport", "Viewport", false, true, IconName.Grid));
     result.register(new DockPanelDescriptor("perspective", "3D", false, true, IconName.Cube));
+    result.register(new DockPanelDescriptor("inspection-camera", "Inspection camera", true, true, IconName.Inspect));
     result.register(new DockPanelDescriptor("machine-control", "Machine", true, true, IconName.Sliders));
     result.register(new DockPanelDescriptor("inspector", "Inspector", false, true, IconName.Sliders));
     result.register(new DockPanelDescriptor("sensors", "Sensors", false, true, IconName.Radar));
@@ -1769,9 +1773,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
         function(_, width) return perspectivePanel(width),
         // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
         // none of its inputs changed: this key includes the current simulation presentation.
-        function() return perspectiveRevisionKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible +
+        function() return perspectiveRevisionKey() + ":inspection=" + inspectionCamera.presentationKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible +
           ":viewportPresentation=" + (perspectiveViewport == null ? "" : perspectiveViewport.presentationKey()) +
           ":collisions=" + collisionsVisible + "/" + collisionNearMillimetres),
+      new DockPanelContent("inspection-camera", function(_) return inspectionCamera.build(this)),
       new DockPanelContent("machine-control", function(_) return machineControlPanel.build(this)),
       new DockPanelContent("inspector", function(_) return inspectorPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
@@ -1970,6 +1975,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       viewportToolbarAction("viewport-fit-all", "scene.fit-all", "Fit", IconName.Inspect, compact)));
     if (!tiny) controls.push(new KeyedView("reset",
       viewportToolbarAction("viewport-reset", "scene.reset-perspective", "Reset", IconName.Cube, compact)));
+    var cameraButton=new Button("Camera",null,openInspectionCamera,"viewport-inspection-camera");
+    cameraButton.accessibilityLabel="Open inspection camera";
+    controls.push(new KeyedView("inspection-camera",cameraButton));
     var groupDivider = new Spacer("viewport-toolbar-group-divider", LayoutAxis.fixed(1.0),
       LayoutAxis.fixed(20.0));
     groupDivider.style.background = appearance.theme.tokens.border;
@@ -2040,6 +2048,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
           workspace.activate("mission"); invalidateView();
         }), 10.0, 54.0, 2, LayoutAxis.fixed(overlayWidth), LayoutAxis.fit(), false));
     }
+    if(inspectionCamera.overlay) {
+      var cameraWidth=Math.min(360.0,Math.max(180.0,availableWidth>0?availableWidth*0.4:320));
+      layers.push(new StackChild("inspection-camera-overlay",inspectionCamera.build(this,true),
+        Math.max(10,(availableWidth>0?availableWidth:400)-cameraWidth-10),54,3,LayoutAxis.fixed(cameraWidth),LayoutAxis.fixed(280)));
+    }
     var canvas:View = new Stack("perspective-canvas-overlay", layers);
     return new Column("perspective-with-toolbar", [
       new KeyedView("toolbar", toolbar),
@@ -2095,6 +2108,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
       return item == null ? id : item.label;
     });
     return pairs;
+  }
+
+  public function openInspectionCamera():Void {
+    inspectionCamera.showDocked();
+    if(!workspace.isOpen("inspection-camera"))workspace.dock("inspection-camera","perspective",haxeon.ui.docking.DockDropZone.Right);
+    workspace.activate("inspection-camera");invalidateView();
   }
 
   function perspectivePanel(availableWidth:Float = 0.0):View {
@@ -2240,6 +2259,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       treeModel.canChangeVisibility = function() return !documents.blocked();
       treeModel.onVisibilityChanged = function() {commands.refresh();invalidateView();};
       treeModel.setFilter(hierarchySearch);
+      inspectionCamera.dispose();
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :
         new EditorPerspectiveViewport("scene-perspective", scene, hostContext);

@@ -269,3 +269,12 @@ strings or querying playback state to infer guard readiness.
 Published-status acceptance: 15 contract assertions and 10,514 native/UI
 assertions pass, including immediate transport publications, preserved old
 snapshots, reset freshness and the open-design-pose transition.
+
+The 3D toolbar's **Camera** button opens a dockable inspection pane. The enclosed
+and cutting scenes provide **Tool contact**, **Workpiece** and **Loading** presets.
+Tool contact is a camera-only cutaway hiding the surrounding head and support.
+The first two follow the cup without spinning with it; Loading frames the
+mandrel. The enclosure is hidden only in this camera, leaving the main view and
+guard controller unchanged. **Picture in picture** uses the same camera inside
+the main viewport; **Dock** returns it to a pane. Presets are scene metadata in
+`HobberInspectionViews`, with world-aligned offsets in metres.

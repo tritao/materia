@@ -103,6 +103,13 @@ class PerspectiveCamera {
     revision++;
   }
 
+  /** Explicit metric focus, including small-part inspection below the navigation zoom floor. */
+  public function setTarget(x:Float,y:Float,z:Float,nextDistance:Float):Void {
+    if(!Math.isFinite(x+y+z+nextDistance)||nextDistance<0.0001)throw "Camera focus needs finite coordinates and positive distance";
+    if(targetX==x&&targetY==y&&targetZ==z&&distance==nextDistance)return;
+    targetX=x;targetY=y;targetZ=z;distance=nextDistance;revision++;
+  }
+
   /** Set a standard camera angle without changing the current focus or zoom. */
   public function setAngle(nextYaw:Float, nextPitch:Float):Void {
     yaw = nextYaw;
@@ -181,7 +188,7 @@ class PerspectiveCamera {
   }
 
   public function viewProjection(aspect:Float, nearOverride:Float = -1.0,
-      farOverride:Float = -1.0):Transform {
+      farOverride:Float = -1.0, fovYOverride:Float = 0.0):Transform {
     var eye = eyePosition();
     var forward = normalize([targetX - eye[0], targetY - eye[1], targetZ - eye[2]]);
     var side = normalize(cross(forward, [0.0, 0.0, 1.0]));
@@ -192,7 +199,8 @@ class PerspectiveCamera {
       -dot(side, eye), -dot(up, eye), dot(forward, eye), 1.0];
     var near = nearOverride > 0.0 ? nearOverride : clipNear;
     var far = farOverride > near ? farOverride : clipFar;
-    var scale = 1.0 / Math.tan(FOV_Y * Math.PI / 360.0);
+    var fov = fovYOverride > 0.0 ? clamp(fovYOverride, 1.0, 170.0) : FOV_Y;
+    var scale = 1.0 / Math.tan(fov * Math.PI / 360.0);
     var projection = [scale / Math.max(0.01, aspect), 0.0, 0.0, 0.0,
       0.0, scale, 0.0, 0.0,
       0.0, 0.0, (far + near) / (near - far), -1.0,

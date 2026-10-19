@@ -16,6 +16,7 @@ class FlexsplineHobberPreview {
     data.machineMotion.hobbing={module:1,teeth:40,width:4,pressureAngle:20*Math.PI/180,starts:1,gashes:4,outside:32,length:40,
       wall:0.6,radialStep:0.1,axialStep:0.25,tolerance:0.001,feed:5,cuttingSpeed:300,
       axes:["X","Y","Z","swivel/A","spindle/B","table/C"],stock:"blank",controllerHz:4000,cupLength:40,cupEndThickness:2};
+    HobberInspectionViews.apply(data,machine);
     return SceneArtifact.encode(mechanicalView(data));
   }
   /** Kinematic handling demonstration; the normal cutting scene remains fast. */

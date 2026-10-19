@@ -115,7 +115,16 @@ typedef SceneArtifactView = {
   var pitch:Float;
 }
 
+/** Inspection target is a world-aligned offset from the displayed anchor centre, in metres.
+ * Orientation is steady in world space, so a rotating part never spins the camera. */
+typedef SceneArtifactInspectionCamera = {
+  var id:String; var label:String; var anchor:String;
+  var offset:Array<Float>; var span:Float; var yaw:Float; var pitch:Float;
+  var hiddenPrefixes:Array<String>;
+}
+
 typedef SceneArtifactProject = {
+  @:optional var inspectionCameras:Array<SceneArtifactInspectionCamera>;
   /** Preferred orbit angle when opening the generated assembly; radians, Z up. */
   @:optional var initialView:SceneArtifactView;
   @:optional var job:String;
@@ -1093,7 +1102,34 @@ class SceneArtifact {
       if (Math.abs(pitch) > 1.48) throw "Invalid project initial view pitch";
       view = {yaw: yaw, pitch: pitch};
     }
-    return {job: job, dynamicParts: dynamicParts, motions: tracks, initialView: view};
+    var cameras:Array<SceneArtifactInspectionCamera> = [];
+    var rawCameras:Dynamic=Reflect.field(raw,"inspectionCameras");
+    if(rawCameras!=null) {
+      if(!Std.isOfType(rawCameras,Array))throw "Invalid inspection cameras";
+      for(c in (cast rawCameras:Array<Dynamic>)) {
+        var id:Dynamic=Reflect.field(c,"id"),label:Dynamic=Reflect.field(c,"label"),anchor:Dynamic=Reflect.field(c,"anchor");
+        for(v in [id,label,anchor])if(!Std.isOfType(v,String)||v.length==0||v.length>500)throw "Invalid inspection camera identity";
+        var offset:Dynamic=Reflect.field(c,"offset"),hidden:Dynamic=Reflect.field(c,"hiddenPrefixes");
+        if(!Std.isOfType(offset,Array)||(cast offset:Array<Dynamic>).length!=3||!Std.isOfType(hidden,Array))throw "Invalid inspection camera vectors";
+        var values:Array<Float> = [];
+        for(v in (cast offset:Array<Dynamic>)) {
+          if((!Std.isOfType(v,Float)&&!Std.isOfType(v,Int))||!Math.isFinite(v))throw "Invalid inspection camera offset";
+          values.push(v);
+        }
+        var span:Dynamic=Reflect.field(c,"span"),yaw:Dynamic=Reflect.field(c,"yaw"),pitch:Dynamic=Reflect.field(c,"pitch");
+        for(v in [span,yaw,pitch])if((!Std.isOfType(v,Float)&&!Std.isOfType(v,Int))||!Math.isFinite(v))throw "Invalid inspection camera framing";
+        if(span<0.0001||span>1000||Math.abs(pitch)>1.48)throw "Invalid inspection camera range";
+        var prefixes:Array<String> = [];
+        for(v in (cast hidden:Array<Dynamic>)) {
+          if(!Std.isOfType(v,String)||v.length==0||v.length>500)throw "Invalid inspection camera visibility prefix";
+          prefixes.push(v);
+        }
+        if(prefixes.length>64)throw "Too many inspection camera visibility prefixes";
+        cameras.push({id:id,label:label,anchor:anchor,offset:values,span:span,yaw:yaw,pitch:pitch,hiddenPrefixes:prefixes});
+      }
+    }
+    if(cameras.length>16)throw "Too many inspection cameras";
+    return {job: job, dynamicParts: dynamicParts, motions: tracks, initialView: view,inspectionCameras:rawCameras==null?null:cameras};
   }
 
   static function validateProject(project:SceneArtifactProject, data:SceneArtifactData):Void {
@@ -1102,6 +1138,11 @@ class SceneArtifact {
     var definition = data.assemblyDefinition == null ? null : AssemblyDefinitionFlattener.flattenView(data.assemblyDefinition);
     var occurrences = definition == null ? [for (part in data.parts) part.id] : [for (item in definition.occurrences) item.id];
     var joints = definition == null ? [] : [for (item in definition.joints) item.id];
+    var cameraIds:Map<String,Bool> = [];
+    if(project.inspectionCameras!=null)for(camera in project.inspectionCameras) {
+      if(occurrences.indexOf(camera.anchor)<0||cameraIds.exists(camera.id))throw "Invalid inspection camera anchor or duplicate id";
+      cameraIds.set(camera.id,true);
+    }
     var seen = new Map<String, Bool>();
     for (id in project.dynamicParts) {
       if (occurrences.indexOf(id) < 0 || seen.exists(id)) throw "Invalid project dynamic part";

@@ -739,3 +739,23 @@ scene files and required animation assets. Downloads support cancellation and re
 and OPFS retains both source artifacts and prepared scenes for later opens. The
 native build publishes the downloadable files; see [browser examples](web/README.md#examples-and-local-storage)
 for hosting, bundle reuse and checks.
+
+## Inspection camera
+
+The 3D toolbar's **Camera** button opens an independent inspection view beside
+3D. Drag its tab into another dock group, including the bottom panes; the
+workspace remembers its placement. **Picture in picture** moves that same view
+into the main viewport, and **Dock** returns it to a pane. `--inspection-camera`
+opens the pane at launch.
+
+Scene-authored presets choose a target, framing and camera-local hidden parts.
+The camera follows target translation while keeping its orientation steady when
+the part rotates. Zoom changes the lens rather than moving into the geometry.
+Both views show the same live simulation and stock; inspecting does not change
+selection, document visibility or history. Scenes without presets can inspect
+the selected part.
+
+Generated scenes may supply `project.inspectionCameras`: unique `id`, `label`,
+occurrence `anchor`, world-aligned `offset` in metres from its displayed centre,
+`span` in metres, `yaw`/`pitch` in radians, and `hiddenPrefixes` of occurrence ids.
+These presets are optional and use the existing scene artifact format.
