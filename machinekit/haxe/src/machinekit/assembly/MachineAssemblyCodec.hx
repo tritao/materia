@@ -242,6 +242,7 @@ class MachineAssemblyCodec {
 		var encoders = [for (entry in assembly.drives.encoders) DriveSystem.copyEncoder(entry, id -> id)];
 		encoders.sort((a, b) -> Reflect.compare(a.encoder, b.encoder));
 		return {members: members,
+			designRequirements: [for(r in assembly.designRequirementList) machinekit.design.DesignRequirements.copy(r,id->id)],
 			memberConnectors: [for (entry in assembly.mechanical.memberConnectors) {instanceId: entry.instanceId,
 				name: entry.name, frame: MachineAssembly.copyFrame(entry.frame)}],
 			connectorExposures: [for (entry in assembly.mechanical.connectorExposures) {name: entry.name,
@@ -394,6 +395,7 @@ class MachineAssemblyCodec {
 		for (coupling in level.couplings)
 			target.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset,
 				coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions, coupling.dampingRatio, coupling.stiffnessLaw, coupling.calibration);
+		if(machine.designRequirements!=null) for(r in machine.designRequirements) target.addDesignRequirement(r);
 		for (path in machine.beltPaths) target.addBeltPath(path);
 		// A transmission whose coupling is gone goes too. The rest take their ratios from their parts as
 		// they are now, not as they were saved; a change is reported.

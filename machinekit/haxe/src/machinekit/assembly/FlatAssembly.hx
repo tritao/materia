@@ -23,6 +23,7 @@ typedef BomEntry = {var item:BomItem; var quantity:Int; var mass:AssemblyBomMass
  */
 class FlatAssembly {
 	public final members:Array<MachineAssemblyComponent> = [];
+	public final designRequirements:Array<machinekit.design.DesignRequirement> = [];
 	/** Occurrences, connectors, joints and couplings with path ids; derived couplings once `derived`. */
 	public final definition:AssemblyDefinition;
 	public final connections:Array<PortConnectionRecord> = [];

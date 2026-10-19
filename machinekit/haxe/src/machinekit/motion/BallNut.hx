@@ -22,6 +22,9 @@ class BallNut extends LeadScrewNut {
 		this.preloaded = preloaded;
 		setMaterial("steel");
 		addConnector("lubricator", Mount, AssemblyFrames.alongY(0, flangeDiameter / 2, bodyLength + flangeThickness / 2, 0, 1, 0));
+		var holes:Array<machinekit.design.DesignInterfaces.HoleInterface> = [], i=0;
+		for(p in boltPattern()) holes.push({id:'flange${i++}',frame:AssemblyFrames.translation(p.x,p.y,bodyLength),radius:2.75,depth:flangeThickness,minWall:0.5,minClearance:0.3,thread:null,counterbore:null,approach:null});
+		addFacet(new machinekit.design.DesignInterfaces(holes,[{id:"grease",kind:LubricationPort,frame:AssemblyFrames.fromRotationMatrix(0,flangeDiameter/2,bodyLength+flangeThickness/2,[1,0,0,0,0,1,0,-1,0])}],[]));
 	}
 
 	/** Assumed exterior details; bore, flange face and bolt pattern retain their catalog datums. */

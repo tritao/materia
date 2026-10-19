@@ -43,6 +43,9 @@ class MillXYStageChecks {
 		var restored = MachineAssembly.decode(axis.encode(), MachineKitComponents.standard());
 		restored.validate();
 		check(restored.components().length == axis.components().length, "all stage recipes roundtrip");
+		check(restored.designRequirements().length==axis.designRequirements().length,"all design requirements roundtrip");
+		machinekit.design.AssemblyDesignChecks.check(restored).throwIfErrors();
+		check(true,"reloaded stage passes generic interface and service checks");
 		for (assembly in [cast(axis, MachineAssembly), restored]) {
 			var model = new AssemblyModel("mm");
 			assembly.addTo(model, "");
@@ -184,7 +187,7 @@ class MillXYStageChecks {
 		var blockedService=new MillXYStage(l);
 		blockedService.addComponent("greaseHandlingObstruction",new MillPanel(10,10,10),F.translation(0,l.centreY-l.saddleDepth/2-50,l.saddleBottom+90));
 		var serviceAudit=MillYNutDesignChecks.check(blockedService,frame);
-		check(serviceAudit.items.filter(item->item.code=="design.access-blocked" && item.subject.indexOf("grease connector handling/greaseHandlingObstruction")>=0).length>0,
+		check(serviceAudit.items.filter(item->item.code=="design.access-blocked" && item.subject.indexOf("grease connector handling")>=0 && item.subject.indexOf("greaseHandlingObstruction")>=0).length>0,
 			"production service audit rejects blocked connector handling space");
 		var uncut = MillXYStageIntegrity.check(axis, new MillFrame(f, z));
 		check(uncut.hasErrors(), "missing bearing steel seats rejected");

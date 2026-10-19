@@ -19,6 +19,7 @@ class MillCrossSaddle extends MachineComponent {
 		P.length("depth", 174),
 		P.length("height", 80),
 		P.flag("ribbed", false), P.flag("blockAccess",false), P.flag("nutBoss",false), P.flag("nutServiceAccess",false), P.length("guideSpacing",220), P.length("blockSpan",50.7), P.length("blockHolePitchB",26),P.length("blockHolePitchC",26),
+		P.length("crossRailSpacing",160), P.length("crossRailLength",450), P.length("crossRailWidth",15),
 		P.length("bore", 54), P.length("boreZ", 40), P.flag("motorPocket", true), P.flag("sidePockets", false)
 	];
 
@@ -46,8 +47,18 @@ class MillCrossSaddle extends MachineComponent {
 		super("MILL-CROSS-SADDLE", "Machined cross saddle", "cast iron", false, v);
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Face, Solids.axial(0, 0, v.number("height")));
+		if(v.boolean("nutServiceAccess")) addFacet(makeInterfaces());
 	}
 
+	function makeInterfaces():machinekit.design.DesignInterfaces {
+		var holes:Array<machinekit.design.DesignInterfaces.HoleInterface> = [], d=parameterNumber("depth"), h=parameterNumber("height");
+		for(p in MillYNutMount.anchors()) holes.push({id:'anchor${p.x}-${p.y}',frame:F.fromRotationMatrix(p.x,-d/2,p.y,[1,0,0,0,0,1,0,-1,0]),radius:2.5,depth:24.5,minWall:5,minClearance:0.4,counterbore:null,approach:null,
+			thread:{spec:machinekit.standard.FastenerThreads.coarse(6).mating(),tapDrill:5,usableDepth:22,cylindricalDepth:23,point:1.5,stock:MillYNutMount.BOSS_DEPTH,minEngagement:9,minTipGap:2,minBack:3}});
+		var material:Array<machinekit.design.DesignRequirement.DesignEnvelope> = [];
+		for(x in [-16.0,16.0]) material.push({id:'notch-cheek$x',frame:F.translation(x,-d/2+8,36),volume:BoxVolume(10,16,h-40)});
+		for(side in [-1,1]) material.push({id:'cross-rail-land$side',frame:F.translation(0,side*parameterNumber("crossRailSpacing")/2,h-3),volume:BoxVolume(parameterNumber("crossRailLength"),parameterNumber("crossRailWidth"),3)});
+		return new machinekit.design.DesignInterfaces(holes,[],material);
+	}
 	override public function componentType():Null<ComponentType> return recipeType();
 
 	override public function hasGeometry():Bool return true;
@@ -115,7 +126,8 @@ class MillCrossSaddle extends MachineComponent {
 			var relieved=Solids.cut(body,tools); pieces[0]=relieved;
 			body=Solids.union(pieces); tools=[];
 			tools.push(Part.cylinderAlongY(parameterNumber("bore")/2,-d/2-1,d/2+1,0,parameterNumber("boreZ")));
-			for(p in MillYNutMount.anchors()) tools.push(Part.cylinderAlongY(2.5,-d/2-1,-d/2+(values().boolean("nutServiceAccess")?24.5:22),p.x,p.y));
+			if(values().boolean("nutServiceAccess")) for(tool in machinekit.design.DesignInterfaces.of(this).drillingTools()) tools.push(tool);
+			else for(p in MillYNutMount.anchors()) tools.push(Part.cylinderAlongY(2.5,-d/2-1,-d/2+22,p.x,p.y));
 			for(p in MillYNutMount.pilots()) {
 				if(p.x<0) tools.push(Part.cylinderAlongY(3.05,-d/2-1,-d/2+10,p.x,p.y));
 				else tools.push(Solids.union([Part.cylinderAlongY(3.05,-d/2-1,-d/2+10,p.x-0.2,p.y),

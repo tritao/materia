@@ -34,6 +34,17 @@ class MillYNutMount extends MachineComponent {
 		if(v.boolean("serviceAccess") && !v.boolean("reinforced")) throw "Nut service slot requires reinforced adapter";
 		super("MILL-Y-NUT-MOUNT", v.boolean("reinforced")?"Registered Y nut saddle adapter":"Compact Y nut saddle mounting plate", "steel", false, v);
 		addConnector("mount", Mount, Solids.axial(0,0,0));
+		if(v.boolean("serviceAccess")) addFacet(makeInterfaces());
+	}
+	function makeInterfaces():machinekit.design.DesignInterfaces {
+		var holes:Array<machinekit.design.DesignInterfaces.HoleInterface> = [], i=0;
+		for(p in new BallNut().boltPattern()) holes.push({id:'flange${i++}',frame:materia.assembly.AssemblyFrames.translation(p.x,p.y,0),radius:2.1,depth:NUT_DRILL_DEPTH,minWall:3,minClearance:0.3,counterbore:null,
+			thread:{spec:machinekit.standard.FastenerThreads.coarse(5).mating(),tapDrill:4.2,usableDepth:NUT_THREAD_DEPTH,cylindricalDepth:8.5,point:1.5,stock:THICKNESS,minEngagement:5,minTipGap:1,minBack:2},approach:{radius:3,length:40}});
+		for(p in anchors()) holes.push({id:'anchor${p.x}-${p.y}',frame:materia.assembly.AssemblyFrames.fromRotationMatrix(p.x,p.y,THICKNESS,[1,0,0,0,-1,0,0,0,-1]),radius:3.3,depth:THICKNESS,minWall:4,minClearance:0.4,
+			counterbore:{radius:5.5,depth:THICKNESS-ANCHOR_SEAT,bearingDepth:1},thread:null,approach:null});
+		var datums:Array<machinekit.design.DesignInterfaces.DesignDatum> = [{id:"mount",frame:materia.assembly.AssemblyFrames.identity(),kind:AssemblyDatum}];
+		for(p in pilots()) datums.push({id:'pilot${p.x}',frame:materia.assembly.AssemblyFrames.translation(p.x,p.y,0),kind:LocatingRegister});
+		return new machinekit.design.DesignInterfaces(holes,datums,[]);
 	}
 	override public function componentType():Null<ComponentType> return recipeType();
 	override public function hasGeometry():Bool return true;
@@ -46,13 +57,14 @@ class MillYNutMount extends MachineComponent {
 				 Part.box(values().boolean("serviceAccess")?SERVICE_WIDTH:10,12,3).translated(new Vector(0,28,-2))]));
 			for(p in pilots()) pieces.push(Part.cylinderSpan(3,-8,1,p.x,p.y));
 			var cuts=[Part.cylinderSpan((nut.screwDiameter+2)/2,-1,THICKNESS+1)];
-			for(p in nut.boltPattern()) cuts.push(Part.cylinderSpan(2.1,-1,values().boolean("serviceAccess")?NUT_DRILL_DEPTH:10,p.x,p.y));
+			if (!values().boolean("serviceAccess")) for(p in nut.boltPattern()) cuts.push(Part.cylinderSpan(2.1,-1,10,p.x,p.y));
 			if (values().boolean("serviceAccess")) {
 				// Open, end-milled service slot, not a drilled hole tangent to an edge.
 				cuts.push(Part.cylinderSpan(SERVICE_WIDTH/2,-2,THICKNESS+1,0,SERVICE_BOTTOM+SERVICE_WIDTH/2));
 				cuts.push(Part.box(SERVICE_WIDTH,40,THICKNESS+3).translated(new Vector(0,SERVICE_BOTTOM+SERVICE_WIDTH/2+20,-2)));
 			}
-			for(p in anchors()) {
+			if(values().boolean("serviceAccess")) for(tool in machinekit.design.DesignInterfaces.of(this).drillingTools()) cuts.push(tool);
+			else for(p in anchors()) {
 				cuts.push(Part.cylinderSpan(3.3,-1,THICKNESS+1,p.x,p.y));
 				cuts.push(Part.cylinderSpan(5.5,ANCHOR_SEAT,THICKNESS+1,p.x,p.y));
 			}

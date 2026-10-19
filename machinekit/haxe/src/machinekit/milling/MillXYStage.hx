@@ -46,7 +46,7 @@ class MillXYStage extends AxisBuilder {
 			yp[0],
 			{x: 0, y: -1, z: 0},
 			yp.slice(1), l.yOvertravel);
-		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 58).setNumber("boreZ", 0).setNumber("depth", l.saddleDepth).setBoolean("ribbed", true).setBoolean("blockAccess",true).setBoolean("nutBoss",true).setBoolean("nutServiceAccess",true).setNumber("guideSpacing",f.yRailSpacing).setNumber("blockSpan",l.yBlockSpan).setNumber("blockHolePitchB",l.block.spec.blockHolePitchB).setNumber("blockHolePitchC",l.block.spec.blockHolePitchC));
+		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 58).setNumber("boreZ", 0).setNumber("depth", l.saddleDepth).setBoolean("ribbed", true).setBoolean("blockAccess",true).setBoolean("nutBoss",true).setBoolean("nutServiceAccess",true).setNumber("crossRailSpacing",l.xRailSpacing).setNumber("crossRailLength",l.xRailLength).setNumber("crossRailWidth",l.block.spec.railWidth).setNumber("guideSpacing",f.yRailSpacing).setNumber("blockSpan",l.yBlockSpan).setNumber("blockHolePitchB",l.block.spec.blockHolePitchB).setNumber("blockHolePitchC",l.block.spec.blockHolePitchC));
 		attach("saddle", saddle, F.translation(0, l.centreY, l.saddleBottom), "blockY0");
 		for (i in 1...4) attach('blockY$i', l.block, yp[i], "saddle");
 		for (i in 0...4) for (hole in 1...5) {
@@ -118,6 +118,7 @@ class MillXYStage extends AxisBuilder {
 			F.fromRotationMatrix(-226, l.centreY, l.saddleBottom, [0,1,0, -1,0,0, 0,0,1]), "motorMountX");
 		exposeConnector("mount", "fixedPedestalY", "mount");
 		exposeConnector("table", "table", "top");
+		MillYNutDesignChecks.declare(this);
 	}
 
 	/** Return the X motor into the saddle instead of widening the entire base for a direct-drive motor. */

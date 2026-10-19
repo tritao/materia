@@ -132,6 +132,10 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
 
 	override public function hasGeometry():Bool return true;
 
+	public function bearingFrame():materia.assembly.AssemblyRecord.AssemblyFrame
+		return {x:0,y:0,z:0,qx:1,qy:0,qz:0,qw:0};
+	public function headClearanceRadius():Float return spec.headDiameter/2;
+	public function headBearingRadius():Float return spec.headDiameter/2;
 	public function screwDrive():ScrewDrive return drive;
 	public function driveFrame():materia.assembly.AssemblyRecord.AssemblyFrame
 		return {x:0,y:0,z:spec.headHeight-spec.socketDepth,qx:1,qy:0,qz:0,qw:0};

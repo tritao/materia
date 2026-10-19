@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-design-interface-tests"
+  },
+  "entry": "DesignInterfaceTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/design-interfaces"
+}

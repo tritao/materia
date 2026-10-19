@@ -65,6 +65,17 @@ class MachineAssembly {
 	final massByDefinition:Map<String, MassProperties> = [];
 	var flatCache:Null<FlatAssembly>;
 
+	final designRequirementList:Array<machinekit.design.DesignRequirement> = [];
+	/** Requirements are portable data; copies prevent edits bypassing the flattened cache. */
+	public function addDesignRequirement(requirement:machinekit.design.DesignRequirement):Void {
+		var id=machinekit.design.DesignRequirements.id(requirement);
+		if(id==null || id.length==0) throw "Design requirement needs an id";
+		InstancePath.segment(id);
+		for(r in designRequirementList) if(machinekit.design.DesignRequirements.id(r)==id) throw 'Duplicate design requirement "$id"';
+		designRequirementList.push(machinekit.design.DesignRequirements.copy(requirement,same)); changed();
+	}
+	public function designRequirements():Array<machinekit.design.DesignRequirement>
+		return [for(r in flat().designRequirements) machinekit.design.DesignRequirements.copy(r,same)];
 	public function new() {}
 
 	// Saved form ------------------------------------------------------------------------------
@@ -116,6 +127,7 @@ class MachineAssembly {
 		for (entry in drives.cylinders) target.drives.cylinders.push(DriveSystem.copyCylinder(entry, same));
 		for (entry in drives.sensors) target.drives.sensors.push(DriveSystem.copySensor(entry, same));
 		for (entry in drives.switches) target.drives.switches.push(DriveSystem.copySwitch(entry, same));
+		for (r in designRequirementList) target.addDesignRequirement(r);
 		for (entry in inventory.items) target.inventory.items.push({item: copyBomItem(entry.item),
 			quantity: entry.quantity, mass: entry.mass});
 		target.changed();
@@ -915,6 +927,7 @@ class MachineAssembly {
 		if (top) for (entry in services.exposures) flat.portExposures.push({name: entry.name,
 			instanceId: entry.instanceId, portName: entry.portName});
 		for (entry in drives.transmissions) flat.transmissions.push(DriveSystem.copyTransmission(entry, map));
+		for (r in designRequirementList) flat.designRequirements.push(machinekit.design.DesignRequirements.copy(r,map));
 		for (entry in drives.beltPaths) flat.beltPaths.push(DriveSystem.copyBeltPath(entry, map));
 		for (entry in drives.motors) flat.motors.push(DriveSystem.copyMotor(entry, map));
 		for (entry in drives.encoders) flat.encoders.push(DriveSystem.copyEncoder(entry, map));

@@ -334,8 +334,16 @@ and retracted Z components, rather than just the saddle and guide rails.
 
 `machinekit.design.DesignChecks` supplies reusable minimum-dimension,
 actual-solid material-envelope, blind-fastener-stack, coaxiality and tool-path
-checks. `MillYNutDesignChecks` applies them during the normal XY integrity audit,
-so blocked access or inadequate material also fails preview/export generation.
+checks. `DesignInterfaces` facets on the adapter, saddle and ballnut declare local hole,
+port and material requirements. Their hole data also generate the machining
+tools. The stage saves `FastenerJoint` and `AccessPath` requirements, including
+bench phases and service joint positions. `AssemblyDesignChecks` evaluates them
+during the normal XY integrity audit, so blocked access or inadequate material
+also fails preview/export generation. `MillYNutDesignChecks` only supplies
+mill-specific assembly intent and the surrounding frame/head context.
+Requirements survive recipe round trips, snapshots and nested placement;
+member and joint references are remapped. See the shared design package README
+for the interface model and independent pump-fixture test command.
 The current study requires 3 mm around adapter M5 drillings, 4 mm around M6
 counterbores, 5 mm around casting taps and retained 10 mm saddle-notch cheeks.
 Both X rail mounting strips must retain a continuous 3 mm bearing land; the
