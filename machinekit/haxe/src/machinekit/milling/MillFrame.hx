@@ -51,7 +51,7 @@ class MillFrame extends MachineAssembly {
 				side*(shoulderOuter+width/2),l.yRailStart+l.yRailLength/2-l.baseCentreY,l.baseHeight-20));
 		}
 		if (xyAxis != null) {
-			var start = xyAxis.yFloatingY+xyAxis.floating.length/2+12, end = l.yRailStart+l.yRailLength;
+			var start = xyAxis.yFloatingY+xyAxis.yFloatingDepth/2+12, end = l.yRailStart+l.yRailLength;
 			baseVoids.push(CastingFeatures.box("between-y-shoulders",l.yRailSpacing-l.seatWidth-24,end-start,21,
 				0,(start+end)/2-l.baseCentreY,l.baseHeight-20));
 		}
@@ -61,16 +61,16 @@ class MillFrame extends MachineAssembly {
 				l.railPlane - l.insertThickness)));
 		if (xyAxis != null) for (end in ["Fixed", "Floating"]) {
 			var fixed = end == "Fixed", y = fixed ? xyAxis.yFixedY : xyAxis.yFloatingY;
-			baseInserts.push(insert('driveY$end', 100, fixed ? xyAxis.fixed.length : xyAxis.floating.length,
+			baseInserts.push(insert('driveY$end', 100, fixed ? xyAxis.yFixedDepth : xyAxis.yFloatingDepth,
 				l.insertThickness, "Y drive bearing seat", F.translation(0, y - l.baseCentreY, xyAxis.yMountPlane - l.insertThickness)));
 		}
 		if (xyAxis != null) {
 			var a = xyAxis;
-			var bayFront = a.yFixedY - a.fixed.length / 2 - a.clearance;
+			var bayFront = a.yFixedY - a.yFixedDepth / 2 - a.clearance;
 			// Only shallow bearing/motor-foot recesses remain in the base.
 			baseVoids.push(CastingFeatures.box("rear-y-drive-seat", a.yBayWidth, a.yServiceRear + 1 - bayFront,
 				l.baseHeight + 1 - a.yMountPlane, 0, (bayFront+a.yServiceRear+1)/2-l.baseCentreY, a.yMountPlane));
-			baseVoids.push(CastingFeatures.box("front-y-bearing-seat", 106, a.floating.length+2*a.clearance,
+			baseVoids.push(CastingFeatures.box("front-y-bearing-seat", 106, a.yFloatingDepth+2*a.clearance,
 				l.baseHeight + 1 - a.yMountPlane, 0, a.yFloatingY-l.baseCentreY, a.yMountPlane));
 		}
 
@@ -116,7 +116,14 @@ class MillFrame extends MachineAssembly {
 			}
 		}
 		if (xyAxis != null) {
-			var a = xyAxis, bayFront = a.yFixedY-a.fixed.length/2-a.clearance;
+			var a = xyAxis, bayFront = a.yFixedY-a.yFixedDepth/2-a.clearance;
+   if(a.supplierY) {
+    // The shorter selected motor moves the bracket rearward. Keep a real
+    // shaft passage through the web separating the Z channel and rear bay.
+    var tunnelFront=l.columnFront-1,tunnelBack=bayFront+1;
+    columnVoids.push(CastingFeatures.box("selected-y-shaft-passage",22,tunnelBack-tunnelFront,22,
+     0,(tunnelFront+tunnelBack)/2-l.columnCentreY,a.yScrewZ-l.railPlane-11));
+   }
 			columnVoids.push(CastingFeatures.box("rear-y-motor-bay", a.yBayWidth, a.yServiceRear+1-bayFront,
 				a.yBayTop-l.railPlane+1, 0, (bayFront+a.yServiceRear+1)/2-l.columnCentreY, -1));
 			for (sx in [-1,1]) for (z in [a.yHatchLowerZ,a.yHatchUpperZ]) columnInserts.push({

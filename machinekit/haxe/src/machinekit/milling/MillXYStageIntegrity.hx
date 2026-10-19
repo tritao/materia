@@ -67,6 +67,7 @@ class MillXYStageIntegrity {
 		for (m in components) if (tableMember(m.id)) {
 			var moving = sweep(axis, m.id, 2 * l.xHalfTravel, 0, owned, cache);
 			for (other in fixedX) {
+    if(checkedRunningPair(axis,m.id,other.id,out,cache))continue;
 				var fixed = cache.posed(other.component, axis.zeroPose(other.id));
 				owned.push(fixed);
 				noOverlap(out, moving, fixed, 'X sweep ${m.id}/${other.id}');
@@ -94,6 +95,7 @@ class MillXYStageIntegrity {
 		for (m in components) if (!yFixed(m.id)) {
 			var moving = sweep(axis, m.id, tableMember(m.id) ? 2 * l.xHalfTravel : 0, 2 * l.yHalfTravel, owned, cache);
 			for (other in fixedY) {
+    if(checkedRunningPair(axis,m.id,other.id,out,cache))continue;
 				var fixed = cache.posed(other.component, axis.zeroPose(other.id));
 				owned.push(fixed);
 				noOverlap(out, moving, fixed, 'XY sweep ${m.id}/${other.id}');
@@ -101,16 +103,18 @@ class MillXYStageIntegrity {
 			}
 			for (other in frameParts) noOverlap(out, moving, other.part, 'XY sweep ${m.id}/frame/${other.id}');
 			if (m.id == "saddle") {
-				var shaft = cache.posed(l.yScrew, axis.zeroPose("screwY"));
+				var shaft = cache.posed(l.yDriveScrew, axis.zeroPose("screwY"));
 				owned.push(shaft);
 				noOverlap(out, moving, shaft, "Y shaft clears the complete saddle sweep");
 				shaft.close();
 			}
 			moving.close();
 		}
-		// Remove the rear hatch and its screws before extracting the motor along +Y.
-		var withdrawal = l.yServiceRear - l.yMotorFace + l.motor.rating.shaftLength + l.clearance;
-		var extraction = [Part.cylinderAlongY(l.motor.rating.bodyDiameter / 2, l.yMotorFace,
+		// Remove the rear hatch, hatch screws and four motor mounting screws before extraction along +Y.
+		var withdrawal = l.yServiceRear - l.yMotorFace + l.yMotor.rating.shaftLength + l.clearance;
+		var extraction:Array<Part>;
+  if(l.supplierY){var local=l.yMotor.axialEnvelope(-withdrawal,0,true);extraction=[PosedParts.moved(local,axis.zeroPose("motorY"))];local.close();}
+  else extraction = [Part.cylinderAlongY(l.motor.rating.bodyDiameter / 2, l.yMotorFace,
 			l.yMotorFace + l.motor.rating.bodyLength + withdrawal, 0, l.yScrewZ),
 			Part.cylinderAlongY(l.motor.rating.shaftDiameter / 2, l.yMotorFace - l.motor.rating.shaftLength,
 				l.yMotorFace + withdrawal, 0, l.yScrewZ)];
@@ -118,7 +122,7 @@ class MillXYStageIntegrity {
 			owned.push(part);
 			for (other in frameParts) noOverlap(out, part, other.part, 'rear motor extraction/frame/${other.id}');
 			for (other in components) if (yFixed(other.id) && other.id != "motorY" && other.id != "motorShaftY" &&
-				other.id != "motorCoverY" && !StringTools.startsWith(other.id, "rearCoverBoltY")) {
+				other.id != "motorCoverY" && !StringTools.startsWith(other.id, "rearCoverBoltY") && !StringTools.startsWith(other.id,"motorYBolt")) {
 				var fixed = cache.posed(other.component, axis.zeroPose(other.id)); owned.push(fixed);
 				noOverlap(out, part, fixed, 'rear motor extraction/${other.id}'); fixed.close();
 			}
@@ -160,7 +164,31 @@ class MillXYStageIntegrity {
 		return out;
 	}
 
+ /** A translating detailed block surrounds its rail, so its bounding box cannot
+  * prove running clearance. Check the exact block against an undrilled, uniform
+  * rail section longer than the block: this is a superset of the real rail at
+  * every travel position. Other parts still use the conservative swept boxes.
+  */
+ static function checkedRunningPair(axis:MillXYStage,blockId:String,railId:String,out:Diagnostics,cache:PosedParts):Bool {
+  var block=axis.component(blockId),railComponent=axis.component(railId);
+  if(!Std.isOfType(block,machinekit.motion.HiwinHgh15ca)||!Std.isOfType(railComponent,machinekit.motion.LinearRail))return false;
+  var rail=cast(railComponent,machinekit.motion.LinearRail);
+  if(rail.spec.designation!="HGR15"||rail.spec.railWidth!=15||rail.spec.railHeight!=15)return false;
+  var railPose=axis.zeroPose(railId),blockPose=axis.zeroPose(blockId);
+  var relative=materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(railPose),blockPose);
+  var along=materia.assembly.AssemblyFrames.transformVector(relative,0,0,1),up=materia.assembly.AssemblyFrames.transformVector(relative,0,1,0);
+  if(Math.abs(relative.x)>1e-6||Math.abs(relative.y)>1e-6||Math.abs(along.z-1)>1e-6||Math.abs(up.y-1)>1e-6)return false;
+  var raw=machinekit.motion.Hgr15RailGeometry.build(200,[]);
+  var uniform=PosedParts.moved(raw,materia.assembly.AssemblyFrames.compose(railPose,materia.assembly.AssemblyFrames.translation(0,0,relative.z-100)));
+  raw.close();
+  var detailed=cache.posed(block,blockPose);
+  try {noOverlap(out,detailed,uniform,'Continuous running section $blockId/$railId');}
+  catch(e:Dynamic){detailed.close();uniform.close();throw e;}
+  detailed.close();uniform.close();return true;
+ }
+
 	static function expectedHatchThread(bolt:String, insert:String):Bool {
+  for(floating in [false,true])for(x in [-42.0,42])if(bolt=='seatYAnchor${floating}$x'&&insert==(floating?"base/driveYFloating":"base/driveYFixed"))return true;
 		for (end in ["Front", "Rear"]) for (side in [-1, 1]) for (name in ["Lower", "Upper"]) {
 			var prefix = end == "Front" ? "frontCoverBoltY" : "rearCoverBoltY";
 			if (bolt == '$prefix$side$name' && insert == '${end == "Rear" ? "column" : "base"}/hatch$end${side < 0 ? "Left" : "Right"}${name}') return true;

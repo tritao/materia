@@ -400,3 +400,7 @@ flange drive slots so spindle orientation is visible. These are assumed visual
 details rather than supplier-qualified cutting or drive geometry. In Materia,
 use **Inspect** beside a spindle joint in the Machine pane for a live section;
 this exposes drawbar and piston travel while leaving the generated CAD intact.
+
+The [selected Leadshine Y-drive variant](Y_SERVO.md) fits the checked HZMotion
+interfaces into this mechanical frame and stage. Open
+`materia.y-servo.project.json` for the assembled preview.

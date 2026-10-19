@@ -11,6 +11,11 @@ class MillXYStageLayout {
 	public static inline var RISER_HEIGHT:Float = 48;
 	public static inline var TABLE_HEIGHT:Float = 40;
 	public final frame:MillFrameLayout;
+ public final supplierY:Bool;
+ public final yMotor:ServoMotor;
+ public final yDriveScrew:LeadScrew;
+ public final yFixedDepth:Float;
+ public final yFloatingDepth:Float;
 	public final centreY:Float;
 	public final profile:String;
 	public final block:LinearRailBlock;
@@ -56,9 +61,14 @@ class MillXYStageLayout {
 
 	public static function stackHeight(profile:String):Float return 2 * LinearRailBlock.metric(profile).spec.blockHeight + SADDLE_HEIGHT + RISER_HEIGHT + TABLE_HEIGHT;
 
-	public function new(frame:MillFrameLayout, centreY:Float, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null) {
+	public function new(frame:MillFrameLayout, centreY:Float, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null,supplierY:Bool=false) {
 		if (frame == null || !Math.isFinite(centreY)) throw "XY stage needs finite matching frame datums";
 		this.frame = frame;
+  this.supplierY=supplierY;
+  var selectedY=LeadshineServo.model("ELM2H-0400LA60F");
+  yMotor=supplierY?selectedY:motor;
+  yFixedDepth=supplierY?83:fixed.length;
+  yFloatingDepth=supplierY?20:floating.length;
 		this.centreY = centreY;
 		this.profile = profile;
 		if (guideBlock != null && guideBlock.spec.designation != profile)
@@ -73,16 +83,17 @@ class MillXYStageLayout {
 		// Put the screw at the saddle underside, between the guides.
 		yScrewZ = saddleBottom;
 		yMountPlane = yScrewZ - 40;
-		yBayTop = yScrewZ + 33 + clearance;
+		yBayTop = yScrewZ + (supplierY?selectedY.spec.connectorHeight:33) + clearance;
 		yHatchLowerZ = frame.railPlane + 10; yHatchUpperZ = yBayTop + 10;
 		xMotorZ = saddleBottom + SADDLE_HEIGHT / 2;
 		xScrewZ = xRailPlane + 40;
 		yServiceRear = frame.columnCentreY + frame.columnDepth / 2;
-		yMotorFace = yServiceRear - motor.rating.bodyLength - clearance;
-		yScrewStart = yMotorFace - motor.rating.shaftLength;
-		yFixedY = yScrewStart - BallScrew.INPUT_JOURNAL_LENGTH + fixed.length / 2;
-		yFloatingY = frame.yRailStart + BallScrew.JOURNAL_LENGTH / 2;
+		yMotorFace = yServiceRear - yMotor.rating.bodyLength - clearance;
+		yScrewStart = yMotorFace - (supplierY?34:yMotor.rating.shaftLength);
+		yFixedY = supplierY?yMotorFace-41.5:yScrewStart - BallScrew.INPUT_JOURNAL_LENGTH + fixed.length / 2;
+		yFloatingY = frame.yRailStart + (supplierY?7:BallScrew.JOURNAL_LENGTH / 2);
 		yScrew = new BallScrew(yScrewStart - frame.yRailStart);
+  yDriveScrew=supplierY?new HzMotionDrawingScrew(yScrew.totalLength):yScrew;
 		var xReach = xBlockSpan + block.spec.blockLength / 2 + block.spec.railEndMargin;
 		var yReach = yBlockSpan + block.spec.blockLength / 2 + block.spec.railEndMargin;
 		var yRailRoom = Math.min(
@@ -91,8 +102,8 @@ class MillXYStageLayout {
 		);
 		// Hardware, not merely rail length, limits overrun. Keep 3 mm before the nut bracket or saddle reaches an end bearing.
 		var yRoom = Math.min(yRailRoom, Math.min(
-			centreY - yHalfTravel - saddleDepth / 2 - 12 - (yFloatingY + floating.length / 2) - clearance,
-			yFixedY - fixed.length / 2 - (centreY + yHalfTravel + saddleDepth / 2) - clearance));
+			centreY - yHalfTravel - saddleDepth / 2 - 12 - (yFloatingY + yFloatingDepth / 2) - clearance,
+			yFixedY - yFixedDepth / 2 - (centreY + yHalfTravel + saddleDepth / 2) - clearance));
 		// Retain 1 mm geometric separation at the overrun boundary; nominal separation is 3 mm.
 		yOvertravel = Math.min(yRoom, frame.columnFront - block.spec.railHeight - (centreY + yHalfTravel + tableDepth / 2) - 1);
 		xOvertravel = Math.min(
@@ -100,13 +111,13 @@ class MillXYStageLayout {
 			-xHalfTravel - nut.bodyLength - nut.flangeThickness - (xFixedX + fixed.length / 2) - clearance
 		);
 		if (frame.baseWidth / 2 < 245 + clearance || yMountPlane < frame.insertThickness + frame.wall ||
-			yMotorFace + motor.rating.bodyLength + clearance > yServiceRear || yBayWidth / 2 + frame.wall > frame.columnWidth / 2 - 1.5 * frame.wall)
+			yMotorFace + yMotor.rating.bodyLength + clearance > yServiceRear || yBayWidth / 2 + frame.wall > frame.columnWidth / 2 - 1.5 * frame.wall)
 			throw "Rear Y drive bay leaves insufficient column support, floor or service space";
 		if (xOvertravel <= 0 || yOvertravel <= 0 ||
 			frame.yRailSpacing / 2 - frame.seatWidth / 2 < yChannelWidth / 2 + clearance ||
 			xRailSpacing / 2 - block.spec.blockWidth / 2 < 42 + clearance ||
 			centreY + yHalfTravel + tableDepth / 2 + clearance > frame.columnFront - block.spec.railHeight ||
-			yFloatingY - floating.length / 2 < frame.front ||
+			yFloatingY - yFloatingDepth / 2 < frame.front ||
 			xScrewZ + 33 + clearance > tableBottom || block.spec.blockHeight + RISER_HEIGHT < 76)
 			throw "XY stage cannot fit its guides, rear direct drive and full table envelope";
 		var flangeLow = centreY - yHalfTravel - saddleDepth / 2;

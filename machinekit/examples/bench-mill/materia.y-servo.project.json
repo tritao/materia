@@ -1,0 +1,22 @@
+{
+  "format": "materia.project",
+  "version": 1,
+  "name": "Mill with selected Leadshine Y drive",
+  "defaultEntrypoint": "mill-y-servo",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.y-servo.json"
+  },
+  "entrypoints": {
+    "mill-y-servo": {
+      "kind": "cad-preview",
+      "module": "MillYServoChecks",
+      "function": "preview",
+      "cache": {
+        "inputs": [
+          "MillYServoChecks.hx"
+        ]
+      }
+    }
+  }
+}
