@@ -236,3 +236,16 @@ and raised/flush edge sections at the same scale.
 Editor preview acceptance: the extended live/UI fixture passes 10,502 assertions,
 including controls before Play, coupled-leaf motion, Undo/Redo and closing without
 starting simulation. The existing live guard checks remain in the same fixture.
+
+A prepared but paused simulation offers Resume simulation directly in the door
+panel. Until the first physics samples arrive it reports unsampled feedback,
+rather than claiming that the door is moving or unlocked. Opening a door in
+Design is retained when simulation is prepared; live guarding recognizes the
+open pose and can close/lock it after resuming. Guard faults remain visible while
+paused. Preparing or resuming never constitutes a fresh Start cut request.
+
+Open-pose startup acceptance: 52 shared guard checks and 10,507 live/UI checks
+pass. The transition fixture previews both leaves open, prepares simulation,
+waits for confirmed Open access, and closes/locks through the live controller
+without granting cutting permission. Missing initial standstill still times out,
+and losing standstill after access is admitted still faults.

@@ -93,6 +93,20 @@ class EnclosureGuardTests {
     require(o.fault==Timeout,"Repeated open pulses cannot postpone missing-lock-feedback timeout");
     g=new EnclosureGuard(0.025,0.1);i=ready();i.locked=false;o=g.update(i,0.11);
     require(o.fault==Timeout&&!o.allowCut,"Missing initial lock feedback is supervised");
+    g=new EnclosureGuard(0.025,1);i=ready();i.closed=false;i.open=true;i.locked=false;
+    i.spindleStandstill=false;i.axesStandstill=false;
+    for(_ in 0...5) {
+      o=g.update(i,0.01);
+      require(o.phase==Stopping&&o.fault==None&&o.stop&&!o.allowCut&&o.door==Hold,"Initially open guard waits for measured standstill without moving");
+    }
+    i.spindleStandstill=true;o=g.update(i,0.01);
+    require(o.phase==Stopping,"Spindle confirmation alone cannot admit initial access");
+    i.axesStandstill=true;o=g.update(i,0.01);
+    require(o.phase==Open&&o.fault==None&&!o.allowCut,"Confirmed initial open pose is accepted without a cut request");
+    i.axesStandstill=false;o=g.update(i,0.01);
+    require(o.fault==StandstillLost,"Actual loss of standstill after initial access still faults");
+    g=new EnclosureGuard(0.025,0.1);i=ready();i.closed=false;i.open=true;i.locked=false;i.axesStandstill=false;
+    o=g.update(i,0.11);require(o.fault==Timeout&&o.stop&&o.door==Hold,"Missing initial-open standstill confirmation times out");
     Sys.println('Enclosure guard: $checks checks passed');
   }
 }

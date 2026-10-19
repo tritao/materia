@@ -104,7 +104,24 @@ class EnclosureRuntimeTests {
       check(Math.abs(position("enclosure/door/leftSlide")+fitted.shell.layout.stroke)<1e-6,"Preview moves the coupled opposite leaf");
       check(editor.session.document.history.undoCount==history+1,"Preview is one undoable pose edit");
       editor.session.document.undo();check(Math.abs(position("enclosure/door/slide"))<1e-6,"Undo restores closed doors");
-      editor.session.document.redo();click("Close door");
+      editor.session.document.redo();
+      var previewSimulation=editor.simulation;
+      check(previewSimulation.rebuild(editor.session.sensors,editor.session.scene,editor.session),"Simulation builds from open design preview");
+      var previewGuard=previewSimulation.enclosureController();if(previewGuard==null)throw "Missing preview-transition guard";
+      var paused=app.editor.EnclosureGuardPanel.build(previewSimulation);if(paused==null)throw "Missing paused controls";
+      check(has(editor.ui.submit(paused,frame),"Resume simulation"),"Prepared paused simulation offers Resume beside the doors");
+      var initializing=0;
+      while(previewGuard.status().phase!="Open"&&initializing<10000&&!previewGuard.status().fault) {
+        previewSimulation.step();previewGuard.present();initializing++;
+      }
+      check(previewGuard.status().phase=="Open"&&previewGuard.status().open&&!previewGuard.status().closed&&!previewGuard.status().fault,"Open design pose reaches confirmed access after measured standstill");
+      check(!previewGuard.status().allowCut,"Starting with the door open never grants cut permission");
+      previewGuard.requestClose();var closing=0;
+      while((!previewGuard.status().closed||!previewGuard.status().locked)&&closing<15000&&!previewGuard.status().fault) {
+        previewSimulation.step();previewGuard.present();closing++;
+      }
+      check(previewGuard.status().closed&&previewGuard.status().locked&&!previewGuard.status().fault,"Guard can close and lock from open design preview");
+      previewSimulation.dispose();click("Close door");
       check(Math.abs(position("enclosure/door/slide"))<1e-6&&Math.abs(position("enclosure/door/leftSlide"))<1e-6,"Preview close restores both leaves");
       check(!editor.simulation.isActive(),"Preview never starts simulation");
       check(has(editor.ui.submit(machinePanel.build(editor),frame),"ENCLOSURE · DESIGN PREVIEW"),"Preview remains available after repeated actions");

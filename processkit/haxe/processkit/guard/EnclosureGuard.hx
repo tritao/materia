@@ -83,7 +83,10 @@ class EnclosureGuard {
       if(phase==Idle) {
         if(i.closed&&i.locked)enter(Secured);
         else if(i.closed&&!i.locked)enter(Locking);
-        else if(i.open&&!i.locked)enter(Open);
+        else if(i.open&&!i.locked) {
+          // An initially open guard still needs measured standstill confirmation.
+          wantOpen=true;enter(stationary?Open:Stopping);
+        }
       }
       if(phase==Secured&&(!i.closed||!i.locked))trip(GuardLost);
       var busy=phase==Stopping||phase==Unlocking||phase==Opening||phase==Closing||phase==Locking;
