@@ -3,6 +3,9 @@ package machinekit.hobbing;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.component.ComponentValues;
+import machinekit.structural.CastInsert;
+import machinekit.structural.CastingFeatures;
+import machinekit.structural.MineralFoundation.CastInsertPlacement;
 
 typedef InsertLocation={id:String,role:String,width:Float,depth:Float,height:Float,pose:AssemblyFrame};
 

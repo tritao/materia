@@ -2032,3 +2032,20 @@ objects rather than their enclosing boxes. The desktop rebuild is blocked by
 the checkout's Haxeon transport API mismatch. HB6/HB9, final masses and footprint,
 clearance acceptance and documentation reconciliation remain open. Frozen
 HB11/HB4 providers and workers were not rebuilt for this revision.
+
+### Main rebase (2026-10-19)
+
+Rebased onto local main `b7f0b79b6` (ahead of fetched origin/main), preserving its
+detailed HGR15 rails, supplier-block integration, ball nuts, screw races/journals
+and retainer recipes. BallScrew retains the hobber's configurable input journal
+and ground-screw procurement flag alongside main's detailed geometry. Shared
+structural foundations and the single mineral-cast material remain authoritative;
+PrecisionPart and duplicate casting classes remain removed. The working Haxeon
+checkout now matches main's recorded `9e37bf4a` revision; existing vendor changes
+were preserved. No native providers or frozen cut binaries were rebuilt.
+
+The rebased build passes 761 mechanical/persistence assertions (the enclosure's
+omission removes its checks) and the short assembled/analytic frame regression:
+max pose delta 1.85e-13 mm/rad, boundary delta 3.17e-13 mm and load delta
+1.82e-10 N, against unchanged 1e-8, 1e-8 mm and 1e-6 N criteria respectively.
+Full travel-grid acceptance and the remaining layout gates above stay open.
