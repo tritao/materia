@@ -70,7 +70,7 @@ Status: phases 1–4 implemented. The single-pocket and full mill-base molds are
   clamps, materials/process evidence, loads and handling remain unqualified;
   no source geometry is altered and fabrication readiness is false.
 - [ ] Phase 5: assembly validation and fabrication package.
-- [ ] Phase 6: design-stage moldability feedback.
+- [ ] Phase 6: design-stage moldability feedback and casting process analysis.
 - [ ] Phase 7: mill column and independent pedestal example.
 - [ ] Phase 8: physical calibration and release.
 
@@ -201,11 +201,11 @@ compatibility path for the old encoding.
 
 | Contract | Required contents |
 | --- | --- |
-| `ToolingRecipe` | ID/revision, panel/core stock, joint policy, process limits, fit allowances, seal/liner thickness, hardware choices |
+| `ToolingRecipe` | ID/revision, panel/core stock, joint policy, process limits, fit allowances, seal/liner thickness, hardware choices, resin cure spec, mix properties |
 | `PanelStockSpec` | Material reference, nominal and measured thickness, variation, coated face, stock dimensions, permitted rotations/direction |
 | `CoreStockSpec` | EPS grade reference, available block sizes, density, declared compression/temperature limits, layer adhesive, evidence references |
 | `CastingToolingInput` | Source ID/revision/hash, supported envelope, named void features, insert geometry/poses, precision datums |
-| `CastingSetup` | Source-to-mold transform, gravity/fill direction, open face, parting choices, feature overrides, support and finishing datums, compaction |
+| `CastingSetup` | Source-to-mold transform, gravity/fill direction, open face, parting choices, feature overrides, support and finishing datums, compaction, fill height, pour rate and pour points, initial/ambient temperature |
 | `CompactionSpec` | Method (vibration table, external vibrators, internal poker, none), mold-bed interface, declared frequency/amplitude/duration or pending, evidence |
 | `InsertAnchorage` | Insert reference, anchorage kind (studs, undercut, bonded keys), geometry, declared pull-out/shear capacity or pending, evidence |
 | `PanelPlan` | Stable ID, exact 2D profile, stock/thickness, mold pose, contact face, joints, operations, label zone, removal motion |
@@ -215,6 +215,9 @@ compatibility path for the old encoding.
 | `InsertFixturePlan` | Insert references, independent locating datums, fixing hardware, insert-sealed penetrations, threaded-hole protection, withdrawal and finishing allowance |
 | `PenetrationPlan` | Hole/slot reference, class (outside casting, insert-sealed, plugged, fill/vent opening), sealing face or plug, seal material |
 | `DesignChangeRequest` | Source feature/insert IDs, requested change (draft, lifting insert, split, radius, access), reason, blocking checks |
+| `ResinCureSpec` | Supplier/grade reference, solvent family, heat of reaction, kinetic model and parameters (or an adiabatic temperature-rise curve), resin mass fraction, mix density/specific heat/conductivity, gel and limit temperatures, evidence; each value or pending |
+| `FillReport` | Setup/source fingerprints, critical levels, level-volume curve, resin mass, trapped-air pockets (volume, ceiling faces, source/tooling IDs, proposed vent point), head and buoyancy per level, fill time when a pour rate is declared |
+| `CureReport` | Recipe/setup fingerprints, analysed sections (source IDs, thickness, boundary conditions), adiabatic bound, 1D peak temperature and time, margin to each limit, 3D result reference when run, validation evidence |
 | `MoldPlan` | Panels, formers, cores, fixtures, braces, hardware, penetrations, steps, change requests, assumptions and source provenance |
 | `ToolingValidation` | Rule ID, affected IDs, severity, evidence, and pass/fail/pending/unsupported status |
 | `ToolingManifest` | Format version, units, revisions/hashes, generated files, validation status, quantities and replacement groups |
@@ -341,9 +344,10 @@ compatibility and cure-temperature evidence for the actual resin/EPS/adhesive/
 release combination. Do not infer compatibility from the generic material name.
 Two combinations fail outright rather than waiting for evidence: a resin system
 declared as styrene-bearing (polyester, vinyl ester) with an EPS core or EPS-based
-adhesive, and a declared cure peak temperature at or above the core stock's
-declared maximum temperature. The resin record therefore declares solvent
-family and expected peak temperature for the section thickness, or pending.
+adhesive, and a cure peak temperature, from the cure analysis, at or above the
+core stock's declared maximum temperature. The recipe therefore declares the solvent family and a
+`ResinCureSpec`; peak temperatures come from the cure analysis below, and are
+pending when its inputs are.
 
 Restrain cores with broad plates or mechanical bridges connected to the outer
 tooling. Calculate displaced volume once for overlapping features. Show uplift
@@ -530,10 +534,11 @@ Four levels, cheapest first:
    - draft or a split on walls of features assigned to rigid formers, and a
      straight removal direction for every non-EPS feature in the setup;
    - minimum wall/rib thickness against the declared maximum aggregate size;
-   - maximum section thickness against the declared cure peak for that section
-     and the core stock temperature limit;
-   - closed pockets facing up in the fill orientation, which trap air, need a
-     declared vent or another orientation;
+   - maximum section thickness against the cure analysis's peak temperature for
+     that section and the core stock and resin limits;
+   - air traps found by the fill analysis need a vent or another orientation;
+     flat ceilings wider than the recipe's air-escape width are flagged even when
+     connected, since a vibrated paste does not drain air sideways reliably;
    - internal corner radii at least half the router diameter where formers or
      panels follow them, and at least the recipe's flow radius elsewhere;
    - insert cover depth, edge spacing and through-bed fixing access;
@@ -566,6 +571,89 @@ Recipe limits start as declared assumptions. When phase 8 evidence revises a
 recipe (aggregate size, achievable insert tolerance, minimum ligament, cure peak
 by section), the design rules use the revised values; feedback reports which
 recipe revision and evidence each threshold came from.
+
+## Casting process analysis
+
+Two analyses answer questions the mold and the design actually face: where air
+is trapped while filling, and how hot the casting gets while curing. Both feed
+the validation records and the castability rules; neither claims to predict mix
+flow, compaction or cure distortion.
+
+### Fill analysis
+
+Model filling as a rising flat free surface in the setup's fill orientation; the
+mix is not simulated as a fluid. The resin region is the reconstructed casting
+solid in mold coordinates, already checked against the source.
+
+- For a level h, the air region is the resin region above h. A connected
+  component of it that does not reach the open fill face is a trapped pocket,
+  first sealed at that level. Its volume, ceiling faces, the tooling or source
+  feature IDs owning those faces and its highest point (the proposed vent) are
+  reported.
+- Component topology changes only at critical heights: the z values of
+  vertices, horizontal faces and curved-face extrema. Evaluate just above each
+  critical height with CadKit booleans, so the result is exact for the supported
+  geometry, with no sampling. Unsupported surface kinds fail.
+- Report the level-volume curve, resin mass, liquid head on each panel and the
+  submerged volume, and so buoyancy, of each core at each level. With a declared
+  pour rate, add a time axis. The load checks use the worst level, not only the
+  full one: cores reach full uplift once submerged, and panels see full head at
+  the end of the fill.
+- A vent becomes a `PenetrationPlan` of class fill/vent through tooling, or a
+  `DesignChangeRequest` when it has to pass through the casting design.
+
+The flat free surface is an idealisation: a vibrated paste traps at least these
+pockets, and may trap more under broad flat ceilings. The air-escape-width rule
+covers that case, and phase 8 compares predicted pockets with demolded voids.
+
+### Cure temperature
+
+The exotherm matters because EPS softens near its declared limit, resin systems
+have gel and limit temperatures, and temperature differences move inserts.
+Three tiers, each run only when the previous one cannot pass:
+
+1. **Adiabatic bound.** Peak rise is at most w·H/c, from the resin mass fraction,
+   heat of reaction and mix specific heat, for any geometry. If initial
+   temperature plus this bound is below every limit by the recipe margin, the
+   check passes without kinetics.
+2. **Section model.** Transient 1D conduction through each section, with heat
+   generation from the `ResinCureSpec` kinetics and boundary conditions from the
+   mold: panel (board conductivity, thickness and convection), EPS (near
+   insulating), open face (convection) and steel inserts (heat sinks). Section
+   thicknesses come from the casting: distances between opposing planar faces for
+   walls and ribs, and the largest inscribed thickness at junctions. Other shapes
+   are unsupported until a medial-axis method exists. Implicit time stepping in
+   ManufacturingKit, verified against the adiabatic bound and the analytical
+   inert-slab cooling series before use. The 1D result is conservative for wall
+   interiors, not for junctions.
+3. **3D transient.** Only when a junction or thick block is within the recipe
+   margin after tier 2. Use the existing Gmsh/CalculiX pipeline and its
+   solver-fixture gate. Cure heat generation uses either a CalculiX DFLUX user
+   routine or a staggered external kinetics update, whichever passes the
+   adiabatic, 1D-slab and mesh-convergence fixtures; record the choice. Move the
+   shared deck writer out of the bench-mill example when this second consumer
+   needs it.
+
+Missing kinetics or mix properties leave tiers 2 and 3 pending; the adiabatic
+bound alone can still pass a check. Phase 8 thermocouples (thickest section
+centre, core surface, a panel face) validate peak temperature and time to peak
+within a declared tolerance, attached to the recipe revision.
+
+### Sequence playback
+
+The review package adds one scene per assembly and demolding step, taken from the
+validated orders, so trapped parts and awkward steps can be seen as well as read.
+This is presentation of existing results, not simulation.
+
+### Not modelled
+
+Flow simulation of the mix, particle simulation of compaction, cure shrinkage and
+residual-stress distortion, and demolding adhesion are not modelled. The mix is a
+vibrated, highly filled paste outside the validity of fluid filling models;
+compaction and adhesion need physical evidence; precision seats are replicated
+after cure, which absorbs most distortion. Mold structural FEM is used only for
+braced panels or large cutouts the closed-form checks cannot represent, and
+vibration pressure still comes from the compaction spec or measurement.
 
 ## Implementation phases and acceptance criteria
 
@@ -639,12 +727,14 @@ generation is stable. Missing material/process evidence, an undeclared
 compaction method or an open design-change request cannot become a passing
 fabrication check.
 
-### 6. Design-stage moldability feedback
+### 6. Design-stage moldability feedback and process analysis
 
 Implement the castability rules, the moldability report, proposals on
 `DesignChangeRequest`, effort metrics and the candidate-orientation comparison
-described under design-stage feedback. Expose them as foundation diagnostics and
-in `MillDesignStudy`.
+described under design-stage feedback. Add the fill analysis, the adiabatic and
+1D cure tiers with `ResinCureSpec`, `FillReport` and `CureReport`, and sequence
+playback scenes. Expose them as foundation diagnostics and in `MillDesignStudy`.
+The 3D cure tier is built only if a mill section fails tier 2's margin.
 
 Acceptance: each castability rule has a passing and a failing fixture with the
 offending feature ID reported; the moldability report for the mill base equals
@@ -653,6 +743,13 @@ lifting-insert or draft change yields a new casting revision that re-plans and
 clears the request; metrics are deterministic and change when a pocket is added;
 the orientation comparison ranks the base's inverted setup against at least two
 alternatives with reasons. No rule reads a threshold that is not in the recipe.
+Fill analysis finds the pocket in a fixture with a downward-facing ceiling, its
+volume matching the analytic value, and none in its vented variant; it is
+unchanged when evaluated at extra non-critical levels; core uplift peaks at
+submersion. The 1D cure model matches the adiabatic bound with insulated faces
+and the analytical inert-slab series with no reaction; missing kinetics yields
+pending, never pass. The base and column orientation comparison includes trapped
+air and cure margin.
 
 ### 7. Column and independent structure
 
@@ -669,10 +766,12 @@ mill-specific conditionals in the libraries. Existing frame geometry is unchange
 
 Fabricate a joint coupon and a representative small mold with EPS core, steel
 insert, covering, seam and restraint, using the phase 3 box where practical.
-Record actual dimensions, release behavior, core deformation, peak cure
-temperature, compaction method and its measured settings, and insert pull-out if
-tested. Adjust recipe values from evidence. Review full mold loads, handling,
-insert anchorage and finishing.
+Record actual dimensions, release behavior, core deformation, thermocouple
+traces (thickest section centre, core surface, a panel face), voids found at
+demold against the fill analysis's predicted pockets, compaction method and its
+measured settings, and insert pull-out if tested. Fit or confirm `ResinCureSpec`
+values from the traces and supplier data. Adjust recipe values from evidence.
+Review full mold loads, handling, insert anchorage and finishing.
 
 Acceptance: evidence is attached to the relevant recipe revision; full mill
 fabrication readiness is decided against its actual dimensions and loads. A small
@@ -686,9 +785,11 @@ meaningful checks. Do not mix unrelated machine or app work into these changes.
 
 Pure tests: unit/frame conversion, deterministic codec, joint fit across sheet
 thickness variation, sequence cycles, invalid/unsupported inputs and rectangular
-blank conversion, penetration classes and the hard resin/EPS rules. Geometric
+blank conversion, penetration classes, the hard resin/EPS rules, and the cure
+tiers against the adiabatic and inert-slab fixtures. Geometric
 tests: cavity equivalence, insert fixture placement, rebate/slot material, swept
-volumes and the blocking graph, and recipe reconstruction. Include negative
+volumes and the blocking graph, fill-analysis pockets at critical levels, and
+recipe reconstruction. Include negative
 geometries that would pass endpoint-only or bounding-box-only checks. CAM tests
 cover `PanelOperation` to CamKit mapping, arc sampling tolerance and CamKit's
 stock/fixture rejection of a bad setup.
@@ -731,8 +832,9 @@ General BREP parting-surface discovery, arbitrary contour nesting, robotic mold
 assembly, wiring core cutting definitions into `FoamJob` (after foam-cutter lands
 on main), CNC posts beyond CamKit's LinuxCNC writer, arc contours in CamKit,
 rotational removal paths, automatic hardware optimization, automatic application
-of design-change proposals, parting-surface search beyond listed orientations, full cure/flow/
-compaction simulation, FEM of the mold, full structural qualification and app
+of design-change proposals, parting-surface search beyond listed orientations,
+the 3D cure tier unless a section needs it, the items under "Not modelled", mold
+FEM beyond what closed-form checks cannot cover, full structural qualification and app
 editing UI are follow-on work. Preserve extension points for them without implementing
 placeholder subsystems. The initial release succeeds when the shared libraries
 produce complete, reproducible and honestly validated mold kits for the two mill
