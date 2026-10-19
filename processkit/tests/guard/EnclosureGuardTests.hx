@@ -91,6 +91,8 @@ class EnclosureGuardTests {
     g=new EnclosureGuard(0.025,0.1);i=ready();g.update(i,0.01);
     for(step in 0...12) {i.openRequest=step%2==0;o=g.update(i,0.01);}
     require(o.fault==Timeout,"Repeated open pulses cannot postpone missing-lock-feedback timeout");
+    g=new EnclosureGuard(0.025,0.1);i=ready();i.locked=false;o=g.update(i,0.11);
+    require(o.fault==Timeout&&!o.allowCut,"Missing initial lock feedback is supervised");
     Sys.println('Enclosure guard: $checks checks passed');
   }
 }

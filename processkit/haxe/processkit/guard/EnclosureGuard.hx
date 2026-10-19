@@ -82,6 +82,7 @@ class EnclosureGuard {
     if(fault==None) {
       if(phase==Idle) {
         if(i.closed&&i.locked)enter(Secured);
+        else if(i.closed&&!i.locked)enter(Locking);
         else if(i.open&&!i.locked)enter(Open);
       }
       if(phase==Secured&&(!i.closed||!i.locked))trip(GuardLost);
