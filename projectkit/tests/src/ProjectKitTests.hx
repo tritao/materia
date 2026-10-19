@@ -189,6 +189,10 @@ class ProjectKitTests {
     var model = definition();
     var decoded = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model));
     check(decoded.joints[0].role == AssemblyJointRole.Tree, "tree role round trip");
+    check(decoded.occurrences[1].visible != false,"Legacy occurrences default visible");
+    model.occurrences[1].visible=false;
+    var hidden=AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model));
+    check(hidden.occurrences[1].visible==false,"Authored occurrence visibility survives round trip");
     var springModel = definition();
     springModel.occurrences.push({id:"rotor",definition:"body",initialPose:frame});
     var motor = definition().joints[0];
@@ -204,6 +208,9 @@ class ProjectKitTests {
         joints:springModel.joints,couplings:springModel.couplings}]};
     var flatSpring = AssemblyDefinitionFlattener.flatten(AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(nestedSpring)));
     check(flatSpring.couplings[0].stiffnessLaw[0].coordinates[0].joint == "printer/hinge","nested compliance coordinate follows joint scope");
+    nestedSpring.occurrences[0].visible=false;
+    var hiddenInclude=AssemblyDefinitionFlattener.flatten(AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(nestedSpring)));
+    for(occurrence in hiddenInclude.occurrences)check(occurrence.visible==false,"Hidden include propagates to leaf occurrences");
     flatSpring.couplings[0].stiffnessLaw[0].coordinates[0].coefficient = 1.0;
     near(springModel.couplings[0].stiffnessLaw[0].coordinates[0].coefficient,0.0001,"flattened compliance owns its data");
     var response:AssemblyJointStop = {timeConstantSec: 0.001, dampingRatio: 1.0};

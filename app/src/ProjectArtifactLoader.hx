@@ -121,6 +121,7 @@ class ProjectArtifactLoader {
         addOccurrenceRecord(records, component, occurrence.id, occurrence.definition,
           poses.get(occurrence.id), componentUseCount.get(occurrence.definition),
           boundsByDefinition, geometryKeyByDefinition, scale);
+        if (occurrence.visible == false) records[records.length - 1].visible = false;
         // Empty authored hulls explicitly mark a visual-only assembly component.
         if (visualOnly.exists(occurrence.definition)) records[records.length - 1].collisionEnabled = false;
       }

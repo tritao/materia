@@ -4268,6 +4268,12 @@ class ProjectSourceTests {
     var manifest=FileSystem.fullPath(root+"/machinekit/examples/flexspline-hobber/materia.project.json");
     var generated=MateriaProjectRunner.loadProject(manifest);
     var definition=generated.assemblyDefinition;if(definition==null)throw "hobber has no assembly definition";
+    for(id in ["electricalPanel","powerSupply","Xdrive-driver","Ydrive-driver","Zdrive-driver","table-drive-driver","swivel-drive-driver","hob-drive-driver"]){
+      var occurrence=definition.occurrences.filter(o->o.id==id)[0];
+      check(occurrence!=null&&occurrence.visible==false,"Direct hobber project keeps electrical occurrence hidden: "+id);
+      var record=generated.objects.filter(o->o.id=="project:"+id)[0];
+      check(record!=null&&record.visible==false,"Artifact loader honours authored visibility: "+id);
+    }
     var model=AssemblySimulationBridge.toRobotModel(definition,generated.physical).model;
     check(model.actuators.length==6,"hobber exports six independently driven axes");
     for(axis in ["X","Y","Z"]){var limits=model.coupledLimits(axis,new SteadyLoads());

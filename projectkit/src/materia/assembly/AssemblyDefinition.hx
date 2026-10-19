@@ -96,6 +96,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) @:optional var grounded:Bool;
 	/** Include owning this occurrence; empty for the root assembly. */
 	@:id(6) @:optional var includePath:String;
+	/** Authored default visibility; omitted means visible. Does not remove physics or wiring. */
+	@:id(7) @:optional var visible:Bool;
 }
 
 /** A placement relation between two occurrence connectors (see `AssemblyMateKind`). */

@@ -219,7 +219,7 @@ class AssemblyDefinitionFlattener {
 			mates:Null<Array<AssemblyMate>>, library:Map<String, AssemblySubdefinition>, flat:AssemblyDefinition, active:Map<String, Bool>,
 			?actuators:Array<AssemblyActuator>, ?encoders:Array<AssemblyEncoder>,
 			?sensors:Array<AssemblySensor>,
-			?networks:Array<materia.assembly.AssemblyDefinition.AssemblyElasticNetwork>, ?switches:Array<materia.assembly.AssemblyDefinition.AssemblySwitch>):Map<String, FlatMember> {
+			?networks:Array<materia.assembly.AssemblyDefinition.AssemblyElasticNetwork>, ?switches:Array<materia.assembly.AssemblyDefinition.AssemblySwitch>, parentVisible:Bool = true):Map<String, FlatMember> {
 		if (definitions == null || occurrences == null || joints == null) throw "Nested assembly has missing members or joints";
 		var localDefinitions = new Map<String, AssemblyComponentDefinition>();
 		var emittedDefinitions = new Map<String, Bool>();
@@ -253,7 +253,7 @@ class AssemblyDefinitionFlattener {
 				active.set(nested.id, true);
 				var children = expand(path, worldPose, nested.definitions, nested.occurrences, nested.joints,
 					nested.couplings, nested.mates, library, flat, active, nested.actuators, nested.encoders,
-					nested.sensors, nested.elasticNetworks, nested.switches);
+					nested.sensors, nested.elasticNetworks, nested.switches, parentVisible && occurrence.visible != false);
 				active.remove(nested.id);
 				connectors = exposed(nested.exposedConnectors, children, path);
 			} else {
@@ -270,6 +270,7 @@ class AssemblyDefinitionFlattener {
 				flatOccurrence.includePath = occurrence.includePath == null || occurrence.includePath == ""
 					? prefix : scoped(prefix, occurrence.includePath);
 				if (occurrence.grounded == true) flatOccurrence.grounded = true;
+				if (!parentVisible || occurrence.visible == false) flatOccurrence.visible = false;
 				flat.occurrences.push(flatOccurrence);
 				for (connector in component.connectors)
 					connectors.set(connector.name, {occurrence: path, connector: connector.name});

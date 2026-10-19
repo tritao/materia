@@ -3,6 +3,12 @@ import machinekit.assembly.AssemblyPreview;
 import materia.project.SceneArtifact;
 
 class FlexsplineHobberPreview {
+  /** Scene defaults apply to direct artifact/project opens as well as saved view wrappers. */
+  public static function mechanicalView(data:materia.project.SceneArtifact.SceneArtifactData):materia.project.SceneArtifact.SceneArtifactData {
+    if(data.assemblyDefinition!=null)for(occurrence in data.assemblyDefinition.occurrences)
+      if(occurrence.id=="electricalPanel"||occurrence.id=="powerSupply"||StringTools.endsWith(occurrence.id,"-driver"))occurrence.visible=false;
+    return data;
+  }
   public static function cutting():Bytes {
     var machine=new FlexsplineHobber(new gearkit.GearSpec(1,40,4,20*Math.PI/180),4,true);
     var data=AssemblyPreview.scene(machine,"flexspline-hobber-cut");
@@ -10,7 +16,7 @@ class FlexsplineHobberPreview {
     data.machineMotion.hobbing={module:1,teeth:40,width:4,pressureAngle:20*Math.PI/180,starts:1,gashes:4,outside:32,length:40,
       wall:0.6,radialStep:0.1,axialStep:0.25,tolerance:0.001,feed:5,cuttingSpeed:300,
       axes:["X","Y","Z","swivel/A","spindle/B","table/C"],stock:"blank",controllerHz:4000};
-    return SceneArtifact.encode(data);
+    return SceneArtifact.encode(mechanicalView(data));
   }
   /** Full reference tool, isolated for close inspection; physical properties use the blank envelope. */
   public static function hobTool():Bytes {
@@ -37,7 +43,7 @@ class FlexsplineHobberPreview {
   public static function detailed():Bytes {
     var machine=new FlexsplineHobber(null,12,true);
     var data=AssemblyPreview.scene(machine,"flexspline-hobber-detailed");
-    data.assemblyState=inspectionState(machine).record();return SceneArtifact.encode(data);
+    data.assemblyState=inspectionState(machine).record();return SceneArtifact.encode(mechanicalView(data));
   }
-  public static function hobber():Bytes return SceneArtifact.encode(AssemblyPreview.scene(new FlexsplineHobber(),"flexspline-hobber"));
+  public static function hobber():Bytes return SceneArtifact.encode(mechanicalView(AssemblyPreview.scene(new FlexsplineHobber(),"flexspline-hobber")));
 }

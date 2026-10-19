@@ -2222,3 +2222,19 @@ regression completes all 982 windows in 6.00275 simulated seconds, with zero
 cutter/fixture contacts and stock display alignment verified. Materia was refreshed
 with the final guide spacing and casting. Frozen native providers were reused
 read-only; running metrology/budget workers were not rebuilt or signalled.
+
+### Persistent electrical visibility defaults (2026-10-19)
+
+The electrical rack, supply and six amplifiers are now hidden in the authored
+occurrence defaults for every complete-machine scene entrypoint. Direct project
+and artifact opens therefore match the saved inspection/cutting scenes. Geometry,
+BOM, wiring and drive participation remain intact; this is not cabinet construction
+or removal of electrical parts. Optional occurrence visibility survives the
+assembly codec and nested flattening, defaults to visible for existing scenes,
+and is honoured by the artifact loader.
+
+Validation: 378 ProjectKit assertions passed, including visibility codec and nested
+inheritance checks. Direct project generation verifies all eight hidden occurrences
+and loaded objects. Reopen/background playback passes without saved visibility
+overrides; the coarse cut completes 982 windows in 6.00275 simulated seconds with
+zero fixture contacts. Materia is open on the artifact with these defaults.

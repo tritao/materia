@@ -29,3 +29,10 @@ separate electrical rack, and displays the hob's relieved teeth. Press **F5** to
 play/pause (or use the toolbar), **Shift+F5** to reset, and **Home** to fit the machine. Frame or zoom
 into the hob and blank to see the teeth emerge from the stock. This is the
 module-1, 40-tooth demonstration; it is not a reference-part grading run.
+
+The electrical rack, power supply and six drive modules are hidden by default in
+all complete-machine entrypoints (`hobber`, `detailed`, `cutting`), including direct
+generated-artifact opens. Visibility is authored per occurrence and survives
+saving/reopening; the components, BOM and electrical connections remain present.
+They can be shown again from the scene hierarchy. Saved inspection/cutting view
+overrides retain the same preference.
