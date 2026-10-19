@@ -67,6 +67,7 @@ class EditorPerspectiveViewport implements View {
   var navigationMode:Int = 0;
   /** Last surface pivot, retained for empty-space drags and fixed during each gesture. */
   var orbitPivot:Null<Array<Float>> = null;
+  var sectionPlane:Null<Array<Float>> = null;
   final flyKeys:Map<Int, Bool> = new Map();
   var flyFast:Bool = false;
   var sketchDragRevision:Int = 0;
@@ -203,9 +204,9 @@ class EditorPerspectiveViewport implements View {
         viewportWidth != renderedViewportWidth || viewportHeight != renderedViewportHeight)) {
       var started = Sys.time();
       fitCameraClipRange();
-      var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
+      var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
         simulationActive ? simulationPoses : null, hoveredObjectId, hoveredFaceIndex,
-        collisionPairs, cosmeticThreadsVisible);
+        collisionPairs, cosmeticThreadsVisible));
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
       if (gridVisible && gridStep > 0.0) {
         var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
@@ -337,9 +338,41 @@ class EditorPerspectiveViewport implements View {
     lastRenderMilliseconds: lastRenderSeconds * 1000.0,
     averageRenderMilliseconds: renderCount == 0 ? 0.0 : totalRenderSeconds * 1000.0 / renderCount,
     orbitPivot: orbitPivot,
+    sectionPlane: sectionPlane,
     camera: {targetX: camera.targetX, targetY: camera.targetY, targetZ: camera.targetZ,
       yaw: camera.yaw, pitch: camera.pitch, distance: camera.distance}
   };
+
+  public function sectionActive():Bool return sectionPlane != null;
+
+  /** A view-only inspection plane; the document, meshes and joint limits stay intact. */
+  public function inspectObject(id:String):Void {
+    var item=scene.object(id);if(item==null)throw "No displayed part for this axis";
+    var bounds=transformedBounds(displayTransform(item),item.width,item.height,item.depth);
+    var x=(bounds[0]+bounds[3])/2,y=(bounds[1]+bounds[4])/2,z=(bounds[2]+bounds[5])/2;
+    var backward=camera.viewDirection(),length=Math.sqrt(backward[0]*backward[0]+backward[1]*backward[1]);
+    var nx=-backward[0]/length,ny=-backward[1]/length;
+    sectionPlane=[nx,ny,0,-nx*x-ny*y];
+    camera.frame(x,y,z,Math.max(0.08,bounds[3]-bounds[0]),Math.max(0.08,bounds[4]-bounds[1]),
+      Math.max(0.08,bounds[5]-bounds[2]),aspect());
+    orbitPivot=null;lightingRevision++;clearHover();host.requestFrame();
+  }
+
+  public function clearSection():Void {
+    if(sectionPlane==null)return;
+    sectionPlane=null;lightingRevision++;clearHover();host.requestFrame();
+  }
+
+  public function flipSection():Void {
+    var plane=sectionPlane;if(plane==null)return;
+    sectionPlane=[for(value in plane)-value];lightingRevision++;clearHover();host.requestFrame();
+  }
+
+  function sectionView(view:SceneView):SceneView {
+    var plane=sectionPlane;
+    if(plane!=null)view.addClipPlane(plane[0],plane[1],plane[2],plane[3]);
+    return view;
+  }
 
   public function frameSelected():Void {
     orbitPivot = null;
@@ -521,7 +554,7 @@ class EditorPerspectiveViewport implements View {
   function beginAssemblyDrag(localX:Float, localY:Float):Bool {
     fitCameraClipRange();
     var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
-    var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()), null, null, -1, null, cosmeticThreadsVisible);
+    var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()), null, null, -1, null, cosmeticThreadsVisible));
     var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
       ray.directionX, ray.directionY, ray.directionZ);
     if (hit.id == "scene" || !Math.isFinite(hit.x) || !Math.isFinite(hit.y) || !Math.isFinite(hit.z)) return false;
@@ -576,8 +609,8 @@ class EditorPerspectiveViewport implements View {
   public function pick(localX:Float, localY:Float):String {
     fitCameraClipRange();
     var ray=camera.screenRay(localX,localY,viewportWidth,viewportHeight);
-    var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),
-      simulationActive?simulationPoses:null, null, -1, null, cosmeticThreadsVisible);
+    var view=sectionView(scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),
+      simulationActive?simulationPoses:null, null, -1, null, cosmeticThreadsVisible));
     return scene.pickRayWithView(view,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
   }
@@ -591,9 +624,9 @@ class EditorPerspectiveViewport implements View {
     var ray = camera.screenRay(localX, localY, viewportWidth,
       viewportHeight);
     // A running simulation poses the scene, so hover must test the posed geometry, as picking does.
-    var hit = simulationActive
-      ? scene.hoverHitRayWithView(scene.configureRenderView(new SceneView(),
-          camera.viewProjection(aspect()), simulationPoses, null, -1, null, cosmeticThreadsVisible),
+    var hit = simulationActive || sectionPlane != null
+      ? scene.hoverHitRayWithView(sectionView(scene.configureRenderView(new SceneView(),
+          camera.viewProjection(aspect()), simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible)),
           ray.originX, ray.originY, ray.originZ, ray.directionX, ray.directionY, ray.directionZ)
       : scene.hoverHitRay(ray.originX, ray.originY, ray.originZ,
           ray.directionX, ray.directionY, ray.directionZ);
@@ -628,7 +661,7 @@ class EditorPerspectiveViewport implements View {
     if(!editingEnabled()){var id=pick(localX,localY);scene.select(id);return id;}
     fitCameraClipRange();
     var ray=camera.screenRay(localX,localY,viewportWidth,viewportHeight);
-    var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null, null, -1, null, cosmeticThreadsVisible);
+    var view=sectionView(scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null, null, -1, null, cosmeticThreadsVisible));
     return scene.selectRayWithView(view,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
   }
@@ -1001,8 +1034,8 @@ class EditorPerspectiveViewport implements View {
   function chooseOrbitPivot(localX:Float, localY:Float):Void {
     fitCameraClipRange();
     var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
-    var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
-      simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible);
+    var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
+      simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible));
     var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
       ray.directionX, ray.directionY, ray.directionZ);
     if (hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z))
@@ -1171,8 +1204,8 @@ class EditorPerspectiveViewport implements View {
     node.on(UiEventKind.Scroll, function(event:UiEvent) {
       if (navigationPointer != null) { event.preventDefault(); event.stopPropagation(); return; }
       var ray = camera.screenRay(event.localX, event.localY, viewportWidth, viewportHeight);
-      var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
-        simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible);
+      var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
+        simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible));
       var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
         ray.directionX, ray.directionY, ray.directionZ);
       var anchor = hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z)

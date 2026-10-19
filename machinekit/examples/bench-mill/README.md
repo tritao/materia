@@ -268,3 +268,10 @@ with the head and column. It no longer displays a blue reserved cylinder.
 The preview and STEP packet remain a mechanical design study; manufacturing
 qualification and installed lubrication, way covers, sensors and controls
 remain outstanding.
+
+The flat cutter preview includes nominal two-flute, 30-degree helical gullets; its
+Envelope detail retains the full clearance envelope. The BT30 holder has opposed
+flange drive slots so spindle orientation is visible. These are assumed visual
+details rather than supplier-qualified cutting or drive geometry. In Materia,
+use **Inspect** beside a spindle joint in the Machine pane for a live section;
+this exposes drawbar and piston travel while leaving the generated CAD intact.

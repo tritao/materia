@@ -31,6 +31,36 @@ class ViewportCoordinatesTests {
   static function fill():LayoutStyle {
     var style=new LayoutStyle();style.width=LayoutAxis.grow();style.height=LayoutAxis.grow();return style;
   }
+  static function sectionInspection():Void {
+    var scene=new EditorScene([{id:"part",label:"Part",type:"rectangle",x:0.0,y:0.0,z:0.0,
+      width:0.2,height:0.2,depth:0.4,collisionEnabled:false,dynamicBody:false,mass:1.0,
+      red:0.5,green:0.5,blue:0.5,visible:true}]);
+    var host=new UiHostContext(null,new NativeKitEvents(),function(){},function(){});
+    var viewport=new EditorPerspectiveViewport("section-test",scene,host,fill()),ui=new UiContext();
+    try {
+      ui.submit(viewport,new LayoutFrame(800,600));
+      var revision=scene.revision,key=viewport.presentationKey();
+      viewport.inspectObject("part");
+      check(viewport.sectionActive(),"inspection opens a section plane");
+      check(viewport.presentationKey()!=key,"inspection invalidates retained viewport");
+      var plane=viewport.sectionPlane;if(plane==null)throw "Missing section plane";
+      check(viewport.sectionView(new SceneView()).clipPlaneCount()==1,"section plane reaches rendering and picking views");
+      var ray=viewport.camera.screenRay(400,300,800,600);
+      var view=viewport.sectionView(scene.configureRenderView(new SceneView(),viewport.camera.viewProjection(800/600)));
+      var hit=scene.pickHitRayWithView(view,ray.originX,ray.originY,ray.originZ,ray.directionX,ray.directionY,ray.directionZ);
+      check(hit.id=="part","section picking reaches retained geometry");
+      check(plane[0]*hit.x+plane[1]*hit.y+plane[2]*hit.z+plane[3]>=-1e-6,"section picking excludes clipped front faces");
+      viewport.updateHover(400,300);check(viewport.hoveredId()=="part","section hover follows the clipped view");
+      key=viewport.presentationKey();viewport.flipSection();
+      var flipped=viewport.sectionPlane;if(flipped==null)throw "Missing flipped section";
+      for(i in 0...4)near(flipped[i],-plane[i],"flip reverses the section side");
+      check(viewport.presentationKey()!=key,"flip invalidates retained viewport");
+      viewport.clearSection();check(!viewport.sectionActive(),"close section restores the complete view");
+      check(viewport.sectionView(new SceneView()).clipPlaneCount()==0,"closed section leaves no clip planes");
+      check(scene.revision==revision,"section inspection does not edit scene geometry or visibility");
+      ui.dispose();viewport.dispose();scene.dispose();
+    }catch(error:Dynamic){ui.dispose();viewport.dispose();scene.dispose();throw error;}
+  }
   public static function main():Int {
     var scene=new EditorScene([{id:"target",label:"Target",type:"rectangle",x:0.3,y:-0.2,z:0.0,
       width:0.2,height:0.2,depth:0.2,collisionEnabled:false,dynamicBody:false,mass:1.0,
@@ -126,6 +156,7 @@ class ViewportCoordinatesTests {
       }
     } catch(error:Dynamic) {ui.dispose();viewport.dispose();scene.dispose();throw error;}
     ui.dispose();viewport.dispose();scene.dispose();
+    sectionInspection();
     SceneEditingTests.perspectiveHoverInput();
     SceneEditingTests.dockedNavigationInput();
     Sys.println('Viewport coordinates: $assertions assertions passed, plus hover and docked navigation regressions');

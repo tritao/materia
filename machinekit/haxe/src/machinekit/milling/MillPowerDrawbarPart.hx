@@ -37,7 +37,10 @@ class MillPowerDrawbarPart extends MachineComponent {
 		case "pullStud": Solids.union([Part.cylinderSpan(4,40,51),Part.cylinderSpan(5.4,51,55)]);
 		case "holder":
 			var taper = Part.revolve([{r:0.0,z:0.0},{r:15.875,z:0.0},{r:10.042,z:40.0},{r:0.0,z:40.0}]);
-			Solids.cut(Solids.union([taper,Part.cylinderSpan(23,-10,0),Part.cylinderSpan(17,-35,-10)]),[Part.cylinderSpan(3,-36,-5)]);
+			Solids.cut(Solids.union([taper,Part.cylinderSpan(23,-10,0),Part.cylinderSpan(17,-35,-10)]),
+				[Part.cylinderSpan(3,-36,-5),
+				 Part.box(10,8,11).translated(new Vector(23,0,-10)),
+				 Part.box(10,8,11).translated(new Vector(-23,0,-10))]);
 		case "reactionFrame":
 			var rows = [ring(70,22,242,250),Solids.cut(Part.box(140,120,8).translated(new Vector(0,0,322)),[Part.cylinderSpan(12,321,331)])];
 			for (x in [-60.0,60.0]) for (y in [-35.0,35.0]) rows.push(Part.cylinderSpan(6,249,323,x,y));

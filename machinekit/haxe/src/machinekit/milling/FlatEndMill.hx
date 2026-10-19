@@ -1,6 +1,9 @@
 package machinekit.milling;
 
 import cadkit.modeling.Part;
+import cadkit.modeling.Curve;
+import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
@@ -22,7 +25,27 @@ class FlatEndMill extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var radius=parameterNumber("diameter")/2,flute=parameterNumber("fluteLength"),stickout=parameterNumber("stickout");
-		if (stickout==flute) return Part.cylinderSpan(radius,0,flute);
-		return Solids.union([Part.cylinderSpan(radius,0,flute),Part.cylinderSpan(radius*0.9333333333,flute,stickout)]);
+		var blank=stickout==flute ? Part.cylinderSpan(radius,0,flute) :
+			Solids.union([Part.cylinderSpan(radius,0,flute),Part.cylinderSpan(radius*0.9333333333,flute,stickout)]);
+		if(detail==Envelope)return blank;
+		// Two assumed 30-degree helical gullets make orientation readable at preview fidelity.
+		// Keep the packaging envelope available separately from these nominal cutting details.
+		var cuts:Array<Part> =[];
+		try {
+			for(phase in [0.0,Math.PI]) {
+				var sections:Array<Curve> =[];
+				try {
+					var twist=flute*Math.tan(Math.PI/6)/radius;
+					var steps=Std.int(Math.min(96,Math.max(8,Math.ceil(twist/(Math.PI/12)))));
+					for(i in 0...steps+1) {
+						var z=-0.02+(flute+0.04)*i/steps,a=phase+z*Math.tan(Math.PI/6)/radius;
+						sections.push(Curve.circle(radius*0.48,new Plane(new Vector(radius*0.88*Math.cos(a),radius*0.88*Math.sin(a),z),Vector.X(),Vector.Z())));
+					}
+					cuts.push(Part.loft(sections));
+					for(section in sections)section.close();
+				}catch(error:Dynamic){for(section in sections)section.close();throw error;}
+			}
+			return Solids.cut(blank,cuts);
+		}catch(error:Dynamic){blank.close();for(cut in cuts)cut.close();throw error;}
 	}
 }

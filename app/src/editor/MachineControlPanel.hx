@@ -61,6 +61,12 @@ class MachineControlPanel {
     var style = new LayoutStyle();style.width=LayoutAxis.grow();style.childGap=8;
     style.padding=new Insets(12,12,12,12);
     var rows:Array<KeyedView> = [new KeyedView("heading",app.sectionHeading("MACHINE CONTROL"))];
+    var viewport=app.perspectiveViewport;
+    if(viewport!=null && viewport.sectionActive()) {
+      var close=new Button("Close section",null,()->{viewport.clearSection();app.invalidateView();},"machine-section-close");
+      var flip=new Button("Flip side",null,()->{viewport.flipSection();app.invalidateView();},"machine-section-flip");
+      rows.push(new KeyedView("section",new Row("machine-section",[new KeyedView("close",close),new KeyedView("flip",flip)],ReferenceEditorApp.actionRowStyle())));
+    }
     if (axes.length == 0) rows.push(new KeyedView("empty",new Text("Open a machine assembly with movable joints to test its travel.")));
     else {
       rows.push(new KeyedView("hint",new Text(editable ? "Move axes to check travel. Changes support Undo." :
@@ -136,6 +142,18 @@ class MachineControlPanel {
           controls.push(new KeyedView("value",new Row("machine-angle-value:"+id,
             [new KeyedView("field",field),new KeyedView("unit",new Text("°",unitStyle)),new KeyedView("apply",apply)],ReferenceEditorApp.actionRowStyle())));
         } else buttons.push(new KeyedView("set",apply));
+        if(viewport!=null) {
+          var inspect=new Button("Inspect",null,()->{
+            try {
+              var definition=app.session.projectAssemblyDefinition;
+              if(definition!=null)for(joint in definition.joints)if(joint.id==id){
+                viewport.inspectObject("project:"+joint.child);error=null;app.invalidateView();break;
+              }
+            }catch(failure:Dynamic){error=Std.string(failure);app.invalidateView();}
+          },"machine-axis:"+id+":inspect");
+          inspect.accessibilityLabel="Inspect "+id;
+          buttons.push(new KeyedView("inspect",inspect));
+        }
         if (minimum != null) button("min","Min",minimum);
         button("initial",rotary ? "Reset" : "Initial",axis.initial);
         if (axis.initial != 0 && (minimum == null || minimum <= 0) && (maximum == null || maximum >= 0)) button("zero","Zero",0);

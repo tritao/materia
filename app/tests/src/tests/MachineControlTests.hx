@@ -8,6 +8,7 @@ import materia.assembly.AssemblyFrames;
 
 @:access(app.Main.ReferenceEditorApp)
 @:access(app.ProjectDocumentSession)
+@:access(app.EditorScene)
 class MachineControlTests {
   static var checks=0;
   static function check(ok:Bool,message:String):Void {checks++;if(!ok)throw message;}
@@ -178,8 +179,75 @@ class MachineControlTests {
       editor.dispose();fonts.dispose();
     } catch(error:Dynamic){editor.dispose();fonts.dispose();throw error;}
   }
+  static function findControl(node:haxeon.ui.core.RenderNode,label:String):Null<haxeon.ui.core.RenderNode> {
+    if(node.semantics!=null && node.semantics.label==label)return node;
+    for(child in node.children){var found=findControl(child,label);if(found!=null)return found;}
+    return null;
+  }
+  static function nativePose(scene:app.EditorScene,id:String):Array<Float> {
+    var node=scene.snapshot.findNode(scene.runtimeFor("project:"+id).node);
+    if(node==null)throw "Missing native node: "+id;
+    var transform=node.worldTransform();return [for(i in 0...16)transform.element(i)];
+  }
+  static function spindleView(path:String):Void {
+    var fonts=haxeon.ui.FontCollection.create();fonts.add("haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf");
+    var editor=new app.Main.ReferenceEditorApp(fonts,null,null,null,null,null,null,null,true);
+    var session=editor.session,panel=new app.editor.MachineControlPanel(),frame=new haxeon.ui.LayoutFrame(360,2000);
+    try {
+      session.openGeneratedProject(app.ProjectSourceLoader.load(path),path);editor.documentChanged();
+      var host=new haxeon.ui.host.UiHostContext(fonts,new haxeon.platform.NativeKitEvents(),function(){},function(){});
+      var viewport=new app.EditorPerspectiveViewport("spindle-section-audit",session.scene,host);
+      editor.perspectiveViewport=viewport;
+      var housing=nativePose(session.scene,"spindle/spindle");
+      for(test in [{id:"spindle/rotor-turn",label:"Spindle rotation scrubber",parts:["rotor","holder","tool","motorShaft","spindlePulley","motorPulley"]},
+          {id:"spindle/drawbar-release",label:"spindle/drawbar-release position (mm)",parts:["drawbar","gripper"]},
+          {id:"spindle/pistonRod-release",label:"spindle/pistonRod-release position (mm)",parts:["pistonRod","piston"]}]) {
+        var sectionRoot=editor.ui.submit(panel.build(editor),frame),inspect=findControl(sectionRoot,"Inspect "+test.id);
+        if(inspect==null)throw "Missing axis inspection button: "+test.id;
+        var buttonBounds=inspect.globalBounds(),bx=buttonBounds.x+buttonBounds.width/2,by=buttonBounds.y+buttonBounds.height/2;
+        var inspectionHistory=session.document.history.undoCount;
+        editor.ui.pointerDown(bx,by,0);editor.ui.pointerUp(bx,by,0);
+        check(viewport.sectionActive(),"axis Inspect opens a live section: "+test.id);
+        check(session.document.history.undoCount==inspectionHistory,"Inspect does not change machine history");
+        var before=[for(part in test.parts)nativePose(session.scene,"spindle/"+part)];
+        var visual=session.scene.visualRevision,history=session.document.history.undoCount;
+        var root=editor.ui.submit(panel.build(editor),frame),control=findControl(root,test.label);
+        if(control==null)throw "Missing machine control: "+test.label;
+        var bounds=control.globalBounds(),x=bounds.x+10,y=bounds.y+bounds.height/2;
+        var rotary=test.id=="spindle/rotor-turn";
+        if(!rotary)x=bounds.x+10+(bounds.width-20)*0.2;
+        editor.ui.pointerDown(x,y,0);
+        var end=rotary ? x+47 : bounds.x+10+(bounds.width-20)*0.8;
+        editor.ui.pointerMove(end,y);editor.ui.submit(panel.build(editor),frame);editor.ui.pointerUp(end,y,0);
+        check(session.scene.visualRevision>visual,"spindle gesture invalidates rendered scene: "+test.id);
+        check(session.document.history.undoCount==history+1,"spindle pane gesture records one edit: "+test.id);
+        var axis=MachineControlModel.axes(session).filter(a->a.id==test.id)[0];
+        near(axis.value,rotary ? 47 : test.id=="spindle/drawbar-release" ? 3.6 : 5.2,"spindle pane changes its own joint");
+        for(i in 0...test.parts.length) {
+          var after=nativePose(session.scene,"spindle/"+test.parts[i]),changed=false;
+          for(j in 0...16)if(Math.abs(after[j]-before[i][j])>1e-8)changed=true;
+          check(changed,"native rendered transform moves: "+test.parts[i]);
+          if(!rotary)near(after[14]-before[i][14],-axis.value/1000,"native release travel is in metres");
+        }
+        var fixed=nativePose(session.scene,"spindle/spindle");
+        for(i in 0...16)near(fixed[i],housing[i],"spindle housing remains stationary");
+        Sys.println('Spindle view: ${test.id}=${axis.value}${axis.unit}; native transforms updated for ${test.parts.join(", ")}');
+        session.document.undo();
+        for(i in 0...test.parts.length) {
+          var restored=nativePose(session.scene,"spindle/"+test.parts[i]);
+          for(j in 0...16)near(restored[j],before[i][j],"undo restores native spindle transform");
+        }
+      }
+      var closeRoot=editor.ui.submit(panel.build(editor),frame),close=findControl(closeRoot,"Close section");
+      if(close==null)throw "Missing close section action";
+      var closeBounds=close.globalBounds();editor.ui.pointerDown(closeBounds.x+8,closeBounds.y+8,0);editor.ui.pointerUp(closeBounds.x+8,closeBounds.y+8,0);
+      check(!viewport.sectionActive(),"Machine pane closes inspection");
+      editor.dispose();fonts.dispose();Sys.println('Spindle view: $checks checks passed');
+    }catch(error:Dynamic){editor.dispose();fonts.dispose();throw error;}
+  }
   public static function main():Int {
     var args=Sys.args();if(args.length==2 && args[0]=="--responsiveness"){responsiveness(args[1]);return 0;}
+    if(args.length==2 && args[0]=="--spindle-view"){spindleView(args[1]);return 0;}
     var empty=new ProjectDocumentSession(null,false);check(MachineControlModel.axes(empty).length==0,"empty documents have no axes");empty.dispose();
     for(unit in ["mm","m"]) {
       var session=fixture(unit);

@@ -82,6 +82,12 @@ preview live and record one undo step on mouse release; cancellation restores
 the starting position without adding history. Coordinate edits reuse the compiled
 assembly topology, while keeping each preview configuration independent.
 
+**Inspect** beside an axis frames its moving part and opens a section through it.
+The section cuts away the near half of the view to expose internal movement.
+**Flip side** reverses the cut; **Close section** restores the complete model.
+Inspection affects the view and picking only; it does not alter geometry, joint
+limits, visibility settings or Undo history.
+
 Coupled screw/pulley joints and closure-dependent joints follow their driving axes.
 Manual editing is disabled while simulation or a script owns the machine. These
 are design-position controls, not live machine commands or a collision interlock.
