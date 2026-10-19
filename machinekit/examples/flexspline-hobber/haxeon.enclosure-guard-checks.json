@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "package": {
+    "name": "hobber-enclosure-guard-checks"
+  },
+  "entry": "HobberEnclosureGuardChecks",
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    },
+    "processkit": {
+      "path": "../../../processkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/enclosure-guard-run"
+}

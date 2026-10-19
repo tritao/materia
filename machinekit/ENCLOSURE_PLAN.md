@@ -284,7 +284,7 @@ EN0 ── EN1 ── EN2 ── EN3 ── EN4 ── EN5 ── EN6 ── EN7
 | EN2 | planned | |
 | EN3 | planned | |
 | EN4 | in progress: fitted front-loading generator and plinth/tray interface | |
-| EN5 | planned | |
+| EN5 | in progress: shared guard controller, end switches and fitted hobber kinematic adapter tested; live runtime/hardware binding remains | |
 | EN6 | planned | |
 | EN7 | in progress: current hobber geometry fitted; guard and qualification remain open | |
 | EN8 | planned | |
@@ -351,3 +351,19 @@ runner. Both rack checks and the renewed 48-state enclosure acceptance pass
 (624 exact near-pair checks). The transparent-window desktop was reopened with
 the updated scene and visually verified. The initial enclosure dimensions are
 unchanged because the external rack is excluded from shell sizing.
+
+### EN5 controller contract and fitted hobber adapter
+
+The shared `processkit.guard.EnclosureGuard` now models closed-and-locked cutting
+permission, standstill-confirmed unlock, independently confirmed lock feedback,
+hold-to-run setup with a configured speed limit, E-stop/boundary interruption,
+latched feedback faults/timeouts and explicit safe reset. Maintained cut requests
+do not automatically restart after access or reset.
+
+The generated sliding door exports closed/open joint switches and a 200 mm/s
+kinematic rate. `HobberEnclosureControl` consumes actual assembly joint position,
+requires a safety-output consumer, and preserves independent external lock and
+standstill feedback. Focused tests use the fitted 610 mm joint, sensor save/reopen,
+and simulated motion-permission consumption. These are simulation/control-contract
+tests; physical actuator/lock sizing, safety validation, the live cutting-runtime
+binding and the unchanged-timing bench-mill port remain follow-on work.

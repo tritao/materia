@@ -8,6 +8,7 @@ class HobberEnclosureChecks {
   public static function main():Void {
     HobberElectricalChecks.run(new FlexsplineHobber());
     var fitted=HobberEnclosurePreview.assembled(),assembly=fitted.assembly,shell=fitted.shell;
+    var guardReport=HobberEnclosureGuardChecks.run(assembly,shell.layout.stroke);
     if(assembly.validate().length!=0)throw "Enclosed hobber assembly does not validate";
     var model=new cadkit.modeling.AssemblyModel("mm");assembly.addTo(model,"");var state=model.initialState();
     var parts=assembly.components(),machine=[for(p in parts)if(StringTools.startsWith(p.id,"machine/"))p],panels=[for(p in parts)if(StringTools.startsWith(p.id,"enclosure/"))p];
@@ -25,6 +26,18 @@ class HobberEnclosureChecks {
             if(volume>0.001)throw 'Enclosure collision ${p.id} / ${m.id}: $volume mm3 at X$x Y$y Z$z A$a door$door';
           }
           samples++;
+        }
+      }
+      // Check the moving leaf against its own stationary shell throughout the stroke.
+      var leaf=[for(p in panels)if(p.id=="enclosure/door/leaf")p][0],doorSweepPairs=0;
+      for(step in 0...21) {
+        state.setJoint("enclosure/door/slide",shell.layout.stroke*step/20);state.forwardKinematics();
+        var pose=state.worldPose(leaf.id);
+        for(p in panels)if(p.id!=leaf.id) {
+          var other=state.worldPose(p.id);
+          if(PosedParts.apart(cache.box(leaf.component,pose),cache.box(p.component,other),0))continue;
+          doorSweepPairs++;
+          if(cache.overlap(leaf.component,pose,p.component,other)>0.001)throw 'Door travel interferes with ${p.id} at sample $step';
         }
       }
       state.setJoint("enclosure/door/slide",shell.layout.stroke);state.forwardKinematics();
@@ -55,8 +68,9 @@ class HobberEnclosureChecks {
       while(!sys.FileSystem.exists(root+"/machinekit/examples/flexspline-hobber/FlexsplineHobber.hx"))root=haxe.io.Path.directory(root);
       var out=root+"/machinekit/examples/flexspline-hobber/build/enclosure";sys.FileSystem.createDirectory(haxe.io.Path.directory(out));sys.FileSystem.createDirectory(out);
       sys.io.File.saveBytes(out+"/hobber.mtrg",materia.project.SceneArtifact.encode(scene));
+      sys.io.File.saveContent(out+"/guard-checks.json",haxe.Json.stringify(guardReport,null,"  "));
       sys.io.File.saveContent(out+"/layout.json",haxe.Json.stringify(fitted.report,null,"  "));
-      sys.io.File.saveContent(out+"/checks.json",haxe.Json.stringify({samples:samples,exactNearPairs:checked,loadingCorridorClear:true,saveReopen:true},null,"  "));
+      sys.io.File.saveContent(out+"/checks.json",haxe.Json.stringify({samples:samples,exactNearPairs:checked,doorTravelSamples:21,doorSweepPairs:doorSweepPairs,loadingCorridorClear:true,saveReopen:true},null,"  "));
     }catch(error:Dynamic){cache.close();throw error;}
   }
 }

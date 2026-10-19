@@ -27,8 +27,9 @@ The tray and panel seams carry an explicit seal/gasket fabrication requirement.
 Seals, the plinth transition, mounting/retention hardware, tray slope, coolant
 flow, extractor performance and impact/fire ratings remain unqualified. The
 layout report lists these rule violations; geometric clearance is not a claim
-of fluid containment or protective qualification. Door actuator/guard controls
-remain EN5 work. The opening collision proxy is exact for a rectangular cutout;
+of fluid containment or protective qualification. The shared EN5 guard controller and fitted-door kinematic adapter are implemented
+and exercised below. Hardware actuator/lock selection and live cutting-runtime
+binding remain separate work. The opening collision proxy is exact for a rectangular cutout;
 a round port uses a circumscribed-square aperture proxy, while its CAD is round.
 
 Run the focused CAD acceptance from the worktree root:
@@ -58,3 +59,47 @@ plate coverage and no device/device or device/stand penetration. Supplier hole
 patterns, fasteners, cable routing and electrical guarding remain design work.
 The renewed enclosure acceptance passes 48 machine/door states and 624 exact
 near-pair checks. The exported scene was reopened and visually checked.
+
+## Door control and guarding (EN5 simulation)
+
+`processkit.guard.EnclosureGuard` provides a reusable controller contract.
+`HobberEnclosureControl` binds it to `enclosure/door/slide` and requires a host
+consumer for its stop, cutting permission, and setup-motion permission outputs.
+The exported assembly contains `enclosure/door/closed` and `enclosure/door/open`
+coordinate switches with 0.5 mm end windows. The kinematic actuator is bounded
+to 0–610 mm at an assumed 200 mm/s; it does not model pneumatic force or stopping
+distance and does not select physical actuator hardware.
+
+An open request removes cut permission and requests a stop. The lock stays
+commanded until both spindle and axis standstill are confirmed. Opening then
+waits for separate unlocked feedback. Reclosing waits for the closed switch
+and independent lock confirmation before accepting a fresh cut request. A
+request held through opening, closing, a fault, or reset cannot restart a cut.
+A lost guard, invalid feedback, E-stop, boundary intrusion, or feedback timeout
+latches a stop. Reset requires closed-and-locked feedback, both standstill
+confirmations, a healthy safety chain, and released start/access requests.
+
+Door-open setup motion requires setup mode plus hold-to-run, spindle standstill,
+and measured axis speed within a configured limit. The hobber simulation uses
+an assumed 0.025 m/s policy limit; it never grants cutting/spindle permission in
+setup mode. This value is a model parameter, not a qualified machine safety limit.
+
+Run the focused controller and fitted-door checks:
+
+```sh
+./haxeon/scripts/haxeon run --jobs=1 --project=processkit/tests/guard/haxeon.json
+./haxeon/scripts/haxeon run --jobs=1 --project=machinekit/examples/flexspline-hobber/haxeon.enclosure-guard-checks.json
+```
+
+The full enclosure acceptance also checks the control adapter and samples the
+moving leaf against stationary enclosure parts at 21 positions across its stroke.
+`build/enclosure/guard-checks.json` records the controller simulation results.
+Lock feedback and spindle/axis standstill are independent simulated inputs in
+these checks; commands and elapsed time never substitute for their confirmation.
+The desktop's manual joint slider is a geometry preview, and the separate cutting
+entrypoints are not yet bound to this controller. No hardware safety qualification
+is claimed by this simulation.
+
+Validation: 42 shared-controller assertions and 971 fitted-door assertions pass.
+The CAD acceptance passes 48 machine/door states, 624 exact near-pair checks,
+21 leaf-travel samples, loading/service clearances and assembly save/reopen.
