@@ -11,7 +11,7 @@ import materia.assembly.AssemblyFrames as F;
 class HobberSaddle extends MachineComponent {
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return [
-    P.choice("design",["GE-X-carriage","GE-Z-saddle","GE-X-drive","GE-Z-drive","GE-chip-tray","GE-guard","GE-enclosure","GE-coolant", "GE-swivel-plate","GE-Y-saddle","GE-Y-drive","electrical-panel"],"GE-Z-saddle")];
+    P.choice("design",["GE-X-carriage","GE-Z-saddle","GE-X-drive","GE-Z-drive","GE-chip-tray","GE-enclosure","GE-coolant", "GE-swivel-plate","GE-Y-saddle","GE-Y-drive","electrical-panel"],"GE-Z-saddle")];
   public static function recipeType():ComponentType {
     if(recipe==null)recipe=new ComponentType("machinekit.hobbing.saddle",parameters(),v->new HobberSaddle(v.token("design")));
     return recipe;
@@ -56,16 +56,6 @@ class HobberSaddle extends MachineComponent {
         Solids.cut(box(55,220,-295,-210,415,420),[Part.cylinderSpan(9.6,414.9,420.1,100,-250)]),
         box(55,220,-275,-210,857,862),box(35,95,-300,-290,420,862)]);
       case "GE-chip-tray": Solids.union([Part.revolve([{r:95.0,z:220.0},{r:140.0,z:150.0},{r:140.0,z:125.0},{r:138.0,z:125.0},{r:138.0,z:150.0},{r:95.0,z:218.0}]),Solids.cut(Solids.union([box(-245,90,-145,145,121,125),box(-245,90,-149,-145,121,150),box(-245,90,145,149,121,150)]),[box(-91,91,-91,91,120,131)])]);
-      case "GE-guard": {
-        var pieces:Array<Part> = [];
-        for(side in [-1,1])for(span in [[20.0,60.0],[610.0,700.0]]){
-          var y=side*165;pieces.push(box(span[0],span[1],y-20,y+20,243.5,245.5));
-          for(edge in [-1,1]){var cy=y+edge*18.5;pieces.push(box(span[0],span[1],cy-1.5,cy+1.5,220,243.5));
-            var a=edge<0?y-20:y+14,b=edge<0?y-14:y+20;pieces.push(box(span[0],span[1],a,b,220,223));}
-        }
-        // Four separate end shields are one BOM set; moving bellows remain a reserved provision.
-        Solids.union(pieces);
-      }
       case "GE-coolant": Solids.cut(box(33,45,30,50,60,84),[boreX(2,32.9,45.1,40,72)]);
       case "GE-enclosure": Solids.union([box(-270,780,-360,-356,0,950),box(-270,780,356,360,0,950),box(776,780,-360,360,0,950)]);
       case "electrical-panel": Solids.union([box(-210,210,-10,0,0,850),box(-230,230,-150,50,0,20)]);

@@ -55,7 +55,7 @@ confirmation.
 | X moving mass | 81.71 kg | 129.55 kg |
 | Z moving mass | 106.79 kg | 40.52 kg |
 | Y moving mass | 18.01 kg | 13.49 kg |
-| Machine mass | 351.61 kg | 343.76 kg |
+| Machine mass | 351.61 kg | 343.27 kg |
 | Bed footprint (radial × tangential) | 650 × 750 mm | 1000 × 650 mm |
 | Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1640 × 650 mm |
 | X continuous thrust margin, same assumed demand basis | 911.15 N | 887.23 N |
@@ -101,9 +101,11 @@ manufacturing-design work.
 ## Chips and enclosure
 
 A sloped annular table guard drains into the tray below the work. A drilled
-coolant-manifold placeholder reserves flushing provision. Four rigid rail-end
-shields cover non-travelled guide segments; moving bellows are a reserved
-provision, not a validated fabricated guard. The enclosure recipe reserves
+coolant-manifold placeholder reserves flushing provision. The stationary rail-end
+shields have been removed at the user’s request. Rails, blocks and the central
+screw remain exposed; bellows with suitable chip protection and attached end
+frames are an open design item, including compressed-length checks at both
+travel limits. The enclosure recipe reserves
 the machine envelope and top loading opening; its panels are currently omitted
 from the assembly at the user’s request for unobstructed inspection. Door interlocks,
 fluid containment and a complete conveyor are not implemented.

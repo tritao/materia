@@ -33,7 +33,7 @@ class HobberDesignChecks {
         var gap=0.0;try gap=a.distance(b)catch(e:Dynamic){a.close();b.close();throw e;}
         a.close();b.close();count++;if(gap>0.000001)throw 'unsupported mount ${first.id}/${second.id}: $gap mm gap';
       }
-      for(m in members)if(Std.isOfType(m.component,HobberSaddle)&&m.component.values().token("design")!="GE-guard"){
+      for(m in members)if(Std.isOfType(m.component,HobberSaddle)){
         count++;if(cache.local(m.component).solidCount()!=1)throw 'disconnected designed weldment ${m.id}';
       }
       for(m in members)if(Std.isOfType(m.component,machinekit.motion.LinearRailBlock)){

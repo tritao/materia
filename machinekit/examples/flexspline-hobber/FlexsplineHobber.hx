@@ -113,7 +113,6 @@ class FlexsplineHobber extends MachineAssembly {
     drive("Z","ZdriveFrame","Zplate",[0.0,0,1],F.translation(centre+136,-250,550),400);
     drive("Y","YdriveFrame","Yplate",[0.0,-1,0],F.translation(centre+70,0,508),250);
     fixAt("chipTray",new HobberSaddle("GE-chip-tray"),F.identity(),"bed/tablePlate");
-    fixAt("railGuard",new HobberSaddle("GE-guard"),F.identity(),"bed/railLeft");
     fixAt("coolantPort",new HobberSaddle("GE-coolant"),F.translation(centre,0,363),"Yplate",F.alongY(centre+45,40,435,1,0,0));
     // Enclosure envelope reserved; panels omitted for the current open inspection layout.
     bind("table-drive",C,"table/motor");bind("swivel-drive",A,"swivel/motor");bind("hob-drive",B,"spindle/motor",true);

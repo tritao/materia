@@ -71,11 +71,11 @@
       "Y": 13.488139765757445,
       "Z": 40.51753334085356
     },
-    "machineMassKg": 343.7605132938386,
-    "members": 96
+    "machineMassKg": 343.2727142938386,
+    "members": 95
   },
   "validation": {
-    "mechanicalAssertions": 801,
+    "mechanicalAssertions": 796,
     "partAssertions": 1000,
     "partGeometryAssertions": 60,
     "loadingChecks": 1584,
@@ -174,20 +174,21 @@
       "profileSymmetricDifferenceLimitMm3": 0.02,
       "railBlockOverlapLimitMm3": 0.001,
       "scope": "pinned CAD fit, four cut lengths per series, mounting bores, recipe reconstruction, source revision rejection; uniform steel mass and load/preload ratings remain assumed"
-    }
+    },
+    "guardRemovalEvidence": "Stationary guards removed after the preceding 85-pose audits and app cut; remaining component geometry and poses unchanged. Those audits describe the guarded superset; not rerun for this deletion. Mechanical/persistence checks rerun: 796 assertions."
   },
   "provenance": {
-    "baseCommit": "50608cd46368a9d9b144532f9b3fd2c9917f613f",
+    "baseCommit": "5c64b36658bfa9f376a810260c0160a033d73909",
     "geometryAndChecksSourceSha256": {
-      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "d65d069e01bfbebc463dfc98753e7211f52351141582fea3bf44b7605c53ed31",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "4269464c81d52b3a530c0e59111507f01f5dfe43a86e1f882df143ef4231d073",
       "machinekit/examples/flexspline-hobber/FlexsplineHobberLayoutReport.hx": "6db47141cb898bba755073c037fcded6478e24379f515efa80a8d52e99a0a44a",
       "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "281095b5f91c02227529f9efea07faaec17b39b80af290401c47774e46f3b299",
-      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "0a830026a82d6674c56b542bee778984ea6848c12bd39bb5d3dc1de9c9d54d6d",
+      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "cb1208cadb20bd06aa9dc8c15fc85912bb10adc910bf122fb8f216d77a365526",
       "machinekit/haxe/src/machinekit/hobbing/SwivelHead.hx": "a40f69c47bdc11f07b53ac6a22680e83bc06c5d507289d7522ce7c419634e4b7",
       "machinekit/haxe/src/machinekit/hobbing/SwivelHousing.hx": "f8d5f214aaa9bff19158018b4ef93b790165c8cfc8d9ee473005f8d8a56e0b71",
       "machinekit/haxe/src/machinekit/motion/CrossedRollerBearing.hx": "2cd6f3e7817ff3b046097ec543849296539ea34bc779de417f31969c22af4a46",
       "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "444a04b6262d529534e47d556c03d2e681d69de88c9f996ed74d3f1bcc1ed08a",
-      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "a0b83dd38b7378f5bb630c5e68c7862ae412d180c8945fab57a0294ff1ee4d3f",
+      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "8f559a0291db690ef0403877da03da8344c99bc077ef096c97112ad92bbba267",
       "machinekit/tests/hobber/src/HobberGEFrameChecks.hx": "235210d127330f61e6fdd6c70b199c4fb219c5e44100250bc2737a7ec958218b",
       "machinekit/tests/hobber/src/HobberGERangeChecks.hx": "20bd7b6df87cf7f7147c7e89684cebcf4b21a8b2b50c95724111ee92ca2030d6",
       "machinekit/tests/hobbing/src/HobberPartTests.hx": "b60769546559cdfdbefb56ea53cf3a0a135bb9db2e96f46ee73fd5aeb956e54e",

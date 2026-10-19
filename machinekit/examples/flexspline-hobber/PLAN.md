@@ -2136,3 +2136,17 @@ for poses, 1e-8 mm for cut boundaries and 1e-6 N for loads. The supplier-referen
 checks and the new-layout app coarse cut pass. Updated X/Y/Z moving masses are
 129.55/13.49/40.52 kg; calculated machine mass is 343.76 kg, with the stated
 uniform-density supplier-CAD assumption.
+
+### Rail-end shields removed (2026-10-19)
+
+The user chose to remove the stationary rail-end shields rather than detail their
+fastenings. Removed the assembly member, BOM item and unused GE-guard recipe;
+the earlier end-shield acceptance above describes the previous layout. Rails,
+blocks and the central X screw are exposed in the inspection model. Bellows,
+attached end frames, chip protection and compressed-length checks at both travel
+limits remain open; no replacement cover is fitted in this change.
+
+Removal verification: 796 mechanical/persistence assertions pass. Recomputed
+machine mass is 343.27 kg; moving masses and drive margins are unchanged. The
+previous clearance/app evidence covers the guarded superset; no full cut rerun
+was needed for removing these stationary parts.
