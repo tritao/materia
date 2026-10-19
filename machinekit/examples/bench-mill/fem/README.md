@@ -65,6 +65,36 @@ moved intact to `/media/joao/DEV/materia-fem-runs/bench-mill-20261019`, with the
 usual ignored `build/fem` path retained as a symlink. Cited baseline hashes and
 provenance are preserved. A tool-case stiff-support run interrupted by disk
 exhaustion is not counted as evidence and must finish on resumption.
+The center upper-bound modal numerical gate now passes for 12 modes and both
+supports on the 40/30 mm partitioned meshes. All thickness probes pass and
+Jacobian determinants are positive; maximum frequency-order mesh change is
+**2.55%**, below 5%. Total represented mass is **465.539 kg**, including 20 kg
+payload; all mass-only components retain their full centroidal inertia through
+exact symmetric point-mass constellations. Distributing attachments use their
+represented ancestor; head/table/foot ancestors remain physically rigid.
+
+| Fine mesh support | First six frequencies, Hz |
+| --- | --- |
+| Three-point | 48.643, 63.612, 77.587, 84.522, 122.089, 154.586 |
+| Four vertical springs | 42.973, 47.550, 78.022, 87.581, 119.864, 127.465 |
+
+The four-spring model adds low support-motion modes. Its first mode with the
+column-bending proxy above 0.1 is at 78.022 Hz; the three-point model has mixed
+column/support motion from 48.643 Hz. This proxy removes best-fit rigid motion
+at the column bottom before measuring the top residual; inspect mode shapes
+and crossings before identifying physical modes. No release limit follows.
+The report includes effective masses, participation, contact motion and SVG
+shape plots: `build/fem/modal-center-study/report.md` / `report.json`.
+Report JSON SHA256:
+`af7808033b7fbb77c45155ef34bb84d3eefd0fba45ee7a5449b1eb110774555a`.
+All cited analysis source hashes matched the files at the gate.
+
+Exact mesh snapshots now preserve binary floating-point values through JSON
+round trips and verify source/config/Gmsh/geometry hashes before reuse. The
+real coarse modal deck is byte-identical after cache reload. A cache-corruption
+negative control passes; all 23 Python tests pass. Interrupted solves still
+require an identical input deck and a completed solver log before reuse.
+
 Frequency stability is a numerical gate; acceptance against spindle/tooth-pass,
 motor and axis excitation requires declared operating bands. No lightening
 candidate is selected and no `MillFrameLayout` geometry has been edited.
