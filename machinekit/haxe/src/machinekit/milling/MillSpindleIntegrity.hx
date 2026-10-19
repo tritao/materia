@@ -24,16 +24,8 @@ class MillSpindleIntegrity {
 	/** Motor withdrawal after removing its belt, pulley, fasteners and guard. */
 	public static function checkMotorRemoval(assembly:MachineAssembly):Diagnostics {
 		var out=new Diagnostics(), cache=new PosedParts(), poses=assembly.solvedPoses();
-		var motor=assembly.components().filter(m->m.id=="spindle/motor")[0].component;
-		var local:Part;
-		if(Std.isOfType(motor,Bt30SpindleMotor)) local=cast(motor,Bt30SpindleMotor).axialEnvelope(-50,0,true);
-		else if(Std.isOfType(motor,machinekit.motion.LeadshineServo)) local=cast(motor,machinekit.motion.LeadshineServo).axialEnvelope(-50,0,true);
-		else {
-			var b=cache.box(motor,materia.assembly.AssemblyFrames.identity(),Envelope);
-			var shaft=cast(motor,machinekit.motion.ServoMotor).rating.shaftLength;
-			local=Part.box(b.maxX-b.minX,b.maxY-b.minY,Math.max(b.maxZ,shaft)-b.minZ+50)
-				.translated(new Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ-50));
-		}
+		var motor=cast(assembly.components().filter(m->m.id=="spindle/motor")[0].component,machinekit.motion.ServoMotor);
+		var local=motor.axialEnvelope(-50,0,true);
 		var envelope=PosedParts.moved(local,poses.get("spindle/motor")); local.close();
 		var sweep:SpindleAuditSolid={id:"motor removal",part:envelope,bounds:PosedParts.boxOf(envelope)};
 		try {
@@ -90,11 +82,9 @@ class MillSpindleIntegrity {
 			var swept:Part;
 			var actualMotor:Null<machinekit.component.MachineComponent> =null;
 			if(member.id=="motor") for(m in assembly.components()) if(m.id=="spindle/motor") actualMotor=m.component;
-			if (member.id=="motor" && Std.isOfType(actualMotor,Bt30SpindleMotor)) {
-				var local=cast(actualMotor,Bt30SpindleMotor).axialEnvelope(0,-l.lower);
-				swept=PosedParts.moved(local,poses.get("spindle/motor")); local.close();
-			} else if(member.id=="motor" && Std.isOfType(actualMotor,machinekit.motion.LeadshineServo)) {
-				var local=cast(actualMotor,machinekit.motion.LeadshineServo).axialEnvelope(0,-l.lower);
+			if (actualMotor!=null) {
+				var motor=cast(actualMotor,machinekit.motion.ServoMotor);
+				var local=motor.axialEnvelope(0,-l.lower);
 				swept=PosedParts.moved(local,poses.get("spindle/motor")); local.close();
 			} else swept=Part.box(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ-l.lower)
 				.translated(new Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ+l.lower));

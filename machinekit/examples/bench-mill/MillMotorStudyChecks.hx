@@ -10,6 +10,22 @@ class MillMotorStudyChecks {
 	static function near(a:Float,b:Float,label:String):Void {if(!Math.isFinite(a)||Math.abs(a-b)>1e-6)throw '$label: $a != $b';}
 	public static function main():Void {
 		var c=MillMotorStudy.context();
+		// Mount consumers use the shared contract without knowing the vendor type.
+		for(name in machinekit.motion.LeadshineServo.catalog().designations()) {
+			var source=machinekit.motion.LeadshineServo.model(name);
+			var motor:machinekit.motion.ServoMotor=source,mount=motor.mounting();
+			if(mount==null)throw 'Missing mounting interface: $name';
+			near(mount.face,source.spec.face,"catalog mounting face");
+			near(mount.pilotDiameter,source.spec.pilotDiameter,"catalog pilot");
+			near(mount.holes.length,4,"catalog mounting holes");
+		}
+		var generic=machinekit.motion.ServoMotor.model("GENERIC-SERVO-400W");
+		if(generic.mounting()!=null)throw "Unspecified mounting must remain unknown";
+		var sweep=generic.axialEnvelope(-50,10,true),bounds=PosedParts.boxOf(sweep);
+		near(bounds.minZ,-generic.rating.bodyLength-50,"generic sweep lower limit");
+		near(bounds.maxZ,generic.rating.shaftLength+10,"generic sweep shaft limit");
+		sweep.close();
+
 		for(p in [{name:"ELM2L-1500LA100FT-H MS1AE",motor:80,spindle:30},
 			{name:"ELM2M-2000LB130F-H",motor:80,spindle:25},
 			{name:"ELM2M-2900LD180FT-H",motor:96,spindle:18}]) {

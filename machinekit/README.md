@@ -10,6 +10,17 @@ to 7.5 kW with published mounting dimensions, brake-dependent envelopes and keye
 shafts. See the [servo gallery](examples/leadshine-servos/README.md) for the
 Materia preview, STEP export, catalog provenance and approximation limits.
 
+Motor mounts consume `ServoMotor.mounting()`, a shared `ServoMounting` record
+with flange face size, thickness, pilot dimensions, hole diameter and hole coordinates
+in the Z=0 mounting face (mm). Leadshine supplies catalog dimensions; the assumed
+BT30 motor supplies its study dimensions. Motors without defined mounting data return
+`null`, so mount designers must reject or explicitly supply that missing interface.
+`ServoMotor.axialEnvelope(minOffset, maxOffset, includeShaft)` provides a continuous
+local-Z clearance sweep. Its default conservatively sweeps the envelope bounds;
+Leadshine and BT30 override it with tighter feature sweeps. Mount and clearance
+consumers do not need supplier type checks. Saved motor designations and recipes
+are unchanged.
+
 Recipe-backed components can pass resolved `ComponentValues` as the fifth
 `MachineComponent` constructor argument. `ComponentRecipeSupport.resolve(schema, overrides)`
 validates direct construction using the same resolver as `ComponentType.create`.

@@ -121,6 +121,10 @@ class LeadshineServo extends ServoMotor {
 		return result;
 	}
 
+	override public function mounting():ServoMotor.ServoMounting return {
+		face:spec.face,flangeThickness:spec.flangeThickness,pilotDiameter:spec.pilotDiameter,
+		pilotHeight:spec.pilotHeight,holeDiameter:spec.holeDiameter,holes:boltPattern()};
+
 	/** LA is the pitch-circle diameter, not the spacing of adjacent holes. */
 	public function boltPattern():Array<{x:Float, y:Float}> {
 		var h = spec.boltCircle / (2 * Math.sqrt(2));
@@ -143,7 +147,7 @@ class LeadshineServo extends ServoMotor {
 	/** Continuous local-Z sweep of the envelope, retaining the narrow pilot/shaft
 	 * and each connector's axial region rather than filling a single large box.
 	 */
-	public function axialEnvelope(minOffset:Float,maxOffset:Float,includeShaft:Bool=false):Part {
+	override public function axialEnvelope(minOffset:Float,maxOffset:Float,includeShaft:Bool=false):Part {
 		if(!Math.isFinite(minOffset)||!Math.isFinite(maxOffset)||minOffset>maxOffset)throw "Invalid servo axial sweep";
 		var owned:Array<Part> = [];
 		return Solids.building(owned,tracked->{

@@ -27,6 +27,18 @@ typedef ServoRating = {
 	var electrical:ServoElectricalRating;
 }
 
+/** Mounting face at Z=0; hole coordinates are in that face, dimensions in mm.
+ * Null mounting data means the interface has not been specified.
+ */
+typedef ServoMounting = {
+	var face:Float;
+	var flangeThickness:Float;
+	var pilotDiameter:Float;
+	var pilotHeight:Float;
+	var holeDiameter:Float;
+	var holes:Array<{x:Float,y:Float}>;
+}
+
 /**
  * A servo motor: rated and peak torque, rated and maximum speed, rotor inertia and the encoder counts
  * of its own feedback. Its actuator is a servo drive, so a planner relies on its peak torque and
@@ -165,6 +177,24 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 			assumed: ratingsBasis == Assumed ? ["servo ratings"] : null,
 			assumptions: ratingsBasis == Assumed ? [{quantity: "motor curve", label: "servo ratings"},
 				{quantity: "inertia", label: "servo ratings"}, {quantity: "speed limit", label: "servo ratings"}] : null};
+
+	/** Supplier or explicitly assumed mounting dimensions; never infer them from body size. */
+	public function mounting():Null<ServoMounting> return null;
+
+	/** Continuous local-Z clearance sweep. The default bounds the actual envelope;
+	 * families may override this with a tighter union of swept features.
+	 */
+	public function axialEnvelope(minOffset:Float,maxOffset:Float,includeShaft:Bool=false):Part {
+		if(!Math.isFinite(minOffset)||!Math.isFinite(maxOffset)||minOffset>maxOffset)throw "Invalid motor axial envelope";
+		var envelope=geometry(Envelope);
+		try {
+			var bounds=envelope.shape.bounds(),low=bounds.get_min(),high=bounds.get_max();
+			var top=includeShaft?Math.max(high.get_z(),rating.shaftLength):high.get_z();
+			var result=Part.box(high.get_x()-low.get_x(),high.get_y()-low.get_y(),top-low.get_z()+maxOffset-minOffset)
+				.translated(new cadkit.modeling.Vector((low.get_x()+high.get_x())/2,(low.get_y()+high.get_y())/2,low.get_z()+minOffset));
+			envelope.close();return result;
+		} catch(e:Dynamic) {envelope.close();throw e;}
+	}
 
 	/** The exposed rotating shaft is a separate part attached to the driven joint. */
 	public function shaft():SteppedShaft return new SteppedShaft([{diameter: rating.shaftDiameter, length: rating.shaftLength}]);

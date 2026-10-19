@@ -49,25 +49,17 @@ class MillSpindleDrivePart extends MachineComponent {
 	public function spindleTeeth():Int return parameterCount("spindleTeeth");
 	public function speedRatio():Float return motorTeeth()/spindleTeeth();
 	public function face():Float return parameterNumber("faceZ");
-	public function motorFace():Float {
-		var m=motor(); return Std.isOfType(m,LeadshineServo) ? cast(m,LeadshineServo).spec.face : 110;
+	function mounting():ServoMotor.ServoMounting {
+		var m=motor(),mount=m.mounting();
+		if(mount==null)throw 'Motor ${m.designation} has no mounting dimensions';
+		return mount;
 	}
-	public function flangeThickness():Float {
-		var m=motor(); return Std.isOfType(m,LeadshineServo) ? cast(m,LeadshineServo).spec.flangeThickness : 10;
-	}
-	public function pilotDiameter():Float {
-		var m=motor(); return Std.isOfType(m,LeadshineServo) ? cast(m,LeadshineServo).spec.pilotDiameter : 40;
-	}
-	public function pilotHeight():Float {
-		var m=motor(); return Std.isOfType(m,LeadshineServo) ? cast(m,LeadshineServo).spec.pilotHeight : 2;
-	}
-	public function mountingHoles():Array<{x:Float,y:Float}> {
-		var m=motor(); return Std.isOfType(m,LeadshineServo) ? cast(m,LeadshineServo).boltPattern()
-			: [{x:-30,y:-30},{x:30,y:-30},{x:30,y:30},{x:-30,y:30}];
-	}
-	public function holeDiameter():Float {
-		var m=motor(); return Std.isOfType(m,LeadshineServo) ? cast(m,LeadshineServo).spec.holeDiameter : 5.5;
-	}
+	public function motorFace():Float return mounting().face;
+	public function flangeThickness():Float return mounting().flangeThickness;
+	public function pilotDiameter():Float return mounting().pilotDiameter;
+	public function pilotHeight():Float return mounting().pilotHeight;
+	public function mountingHoles():Array<{x:Float,y:Float}> return mounting().holes;
+	public function holeDiameter():Float return mounting().holeDiameter;
 	public function screwSize():String {
 		var d=holeDiameter(); return d<5?"M4":d<6?"M5":d<7?"M6":d<10?"M8":"M12";
 	}
