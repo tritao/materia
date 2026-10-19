@@ -53,8 +53,9 @@ Status: phases 1–3 implemented. The single-pocket mold is a geometry review; f
   a separate source variant under `build/review-bed/` for inspection.
 - [ ] Phase 4: mill base mold review assembly.
 - [ ] Phase 5: assembly validation and fabrication package.
-- [ ] Phase 6: mill column and independent pedestal example.
-- [ ] Phase 7: physical calibration and release.
+- [ ] Phase 6: design-stage moldability feedback.
+- [ ] Phase 7: mill column and independent pedestal example.
+- [ ] Phase 8: physical calibration and release.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
 
@@ -365,7 +366,7 @@ Record per seat:
 
 Grouted joints record the gap, jacking/squaring method, bolt sleeves and cure
 before torque. Replication masters, dams and plugs are tooling items in the
-fabrication package. Phase 7 coupons cover replication thickness, flatness
+fabrication package. Phase 8 coupons cover replication thickness, flatness
 transfer and bond to the steel seat.
 
 ## Validation and readiness
@@ -497,6 +498,58 @@ blank cutting. Do not claim automatic contour nesting or consume sheet inventory
 as a side effect of generation. Preserve existing sheet codecs and execution
 semantics.
 
+## Design-stage moldability feedback
+
+The planner and its checks also inform the casting design, so problems are
+fixed in the design rather than worked around in the mold. Feedback never edits
+the casting: it reports against source feature and insert IDs, and the machine
+design accepts a change explicitly, producing a new casting revision whose
+fingerprint triggers re-planning.
+
+Four levels, cheapest first:
+
+1. **Castability rules.** Pure checks over `CastingToolingInput`, a setup and a
+   recipe, with no mold plan, fast enough to run on every design rebuild:
+   - draft or a split on walls of features assigned to rigid formers, and a
+     straight removal direction for every non-EPS feature in the setup;
+   - minimum wall/rib thickness against the declared maximum aggregate size;
+   - maximum section thickness against the declared cure peak for that section
+     and the core stock temperature limit;
+   - closed pockets facing up in the fill orientation, which trap air, need a
+     declared vent or another orientation;
+   - internal corner radii at least half the router diameter where formers or
+     panels follow them, and at least the recipe's flow radius elsewhere;
+   - insert cover depth, edge spacing and through-bed fixing access;
+   - lifting points for every handling step, from casting mass and centre of mass.
+   Thresholds come from the recipe, never from constants in the rules.
+2. **Moldability report.** Run the real planner and its validation on the
+   current design with a declared default setup and recipe, and report its
+   `ToolingValidation` records and `DesignChangeRequest`s. This finds what the
+   fast rules cannot: unsupported cores, trapped walls in the blocking graph,
+   unsealable inserts. It reuses the mold checks, so there is no second rule set.
+3. **Proposed changes.** A `DesignChangeRequest` may carry a concrete proposal:
+   a parameter ID with a new value (draft angle, corner radius, pocket depth
+   snapped to EPS layer thickness, wall height snapped to the sheet module) or a
+   new feature (lifting insert positions symmetric about the centre of mass).
+   The proposal is data; the machine design decides whether to apply it.
+4. **Effort metrics.** The planner reports panel count and unique panels, sheet
+   yield, rigid formers versus EPS cores, sacrificial EPS volume per casting,
+   assembly steps, hardware count, resin mass and open change requests. Design
+   studies compare variants on these beside stiffness. A setup comparison
+   evaluates an explicit list of candidate orientations (axis-aligned, rule-based)
+   and ranks them by failures and change requests; it does not search parting
+   surfaces.
+
+Rules, reports, proposals and metrics live in ManufacturingKit. MachineKit maps
+them into the `Diagnostics` used by `FoundationIntegrity.check`, keyed by source
+feature IDs so a later editor can highlight them; this release adds no app UI.
+`MillDesignStudy` writes the metrics alongside its existing outputs.
+
+Recipe limits start as declared assumptions. When phase 8 evidence revises a
+recipe (aggregate size, achievable insert tolerance, minimum ligament, cure peak
+by section), the design rules use the revised values; feedback reports which
+recipe revision and evidence each threshold came from.
+
 ## Implementation phases and acceptance criteria
 
 ### 1. Contracts and package boundaries
@@ -569,7 +622,22 @@ generation is stable. Missing material/process evidence, an undeclared
 compaction method or an open design-change request cannot become a passing
 fabrication check.
 
-### 6. Column and independent structure
+### 6. Design-stage moldability feedback
+
+Implement the castability rules, the moldability report, proposals on
+`DesignChangeRequest`, effort metrics and the candidate-orientation comparison
+described under design-stage feedback. Expose them as foundation diagnostics and
+in `MillDesignStudy`.
+
+Acceptance: each castability rule has a passing and a failing fixture with the
+offending feature ID reported; the moldability report for the mill base equals
+the phase 4/5 validation for the same setup and recipe; accepting a proposed
+lifting-insert or draft change yields a new casting revision that re-plans and
+clears the request; metrics are deterministic and change when a pocket is added;
+the orientation comparison ranks the base's inverted setup against at least two
+alternatives with reasons. No rule reads a threshold that is not in the recipe.
+
+### 7. Column and independent structure
 
 Add the column setup, stepped/flared envelope support, intersecting channels and
 side-removal details. Add a small mineral-cast pedestal example with different
@@ -580,7 +648,7 @@ the pedestal uses shared records/joints/planner with configuration only. Changin
 stock thickness, casting size, opening direction and core strategy requires no
 mill-specific conditionals in the libraries. Existing frame geometry is unchanged.
 
-### 7. Physical calibration and release
+### 8. Physical calibration and release
 
 Fabricate a joint coupon and a representative small mold with EPS core, steel
 insert, covering, seam and restraint, using the phase 3 box where practical.
@@ -645,7 +713,8 @@ directories; commit source setups, small test fixtures and documentation.
 General BREP parting-surface discovery, arbitrary contour nesting, robotic mold
 assembly, wiring core cutting definitions into `FoamJob` (after foam-cutter lands
 on main), CNC posts beyond CamKit's LinuxCNC writer, arc contours in CamKit,
-rotational removal paths, automatic hardware optimization, full cure/flow/
+rotational removal paths, automatic hardware optimization, automatic application
+of design-change proposals, parting-surface search beyond listed orientations, full cure/flow/
 compaction simulation, FEM of the mold, full structural qualification and app
 editing UI are follow-on work. Preserve extension points for them without implementing
 placeholder subsystems. The initial release succeeds when the shared libraries
