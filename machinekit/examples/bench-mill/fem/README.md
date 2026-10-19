@@ -38,7 +38,7 @@ Aggregate JSON SHA256:
 `e860a8a455a503f7c18bd2694abcfe07872815594ce4ac76293d3a81c7253b5b`.
 Physical modal acceptance awaits declared spindle/motor/axis excitation bands
 and joint uncertainty. The serial nine-pose nose/test-bar static sweep has
-passed center spindle-nose; test-bar and travel cases are running. Tool-context budgets and the casting-share/lightening decision remain
+passed both center decision cases; travel cases are running. Tool-context budgets and the casting-share/lightening decision remain
 pending; no `MillFrameLayout` geometry has been edited.
 
 ## Gate status
@@ -72,7 +72,7 @@ uses `spindle-nose` (no holder stick-out) and `test-bar-20` (solid steel,
 20/30/45 mm stick-outs, in steel and explicitly assumed 600 GPa carbide.
 `static_study.py --tool-case NAME` moves the FE load and rigid-workpiece
 reference, and all lumped-network lever arms, to the selected contact.
-`tool_cases.py build/fem/tool-cases` combines converged studies; material-only
+`tool_cases.py build/fem/tool-cases-serial` combines converged studies; material-only
 changes reuse the identical FE contact solution. It reports total and
 machine-loop-without-tool budgets separately and judges casting share on the
 latter for the two decision cases only. The machine-only decision contract passes a known masking test: total-loop
@@ -82,7 +82,7 @@ CAD packets are rejected. All 25 Python tests pass. Numerical tool-case results
 remain pending.
 
 The repeatable sequence is `pose_sweep.py build/fem/modal-poses --output
-build/fem/nine-pose-upper-bound --ccx PATH --threads 4 --resume` (paths shown
+build/fem/nine-pose-serial --ccx PATH --threads 1 --resume` (paths shown
 relative to this example). It runs all nine modal studies before the two static
 decision cases at all nine poses. `sweep_report.py` compares them; `tool_cases.py`
 adds the contextual cutter material variants after their three center FE contact
@@ -589,3 +589,27 @@ and an archive-location mapping. The raw reaction/spring comparison is under
 the correction for a loaded constrained reference reporting RF=0. Modal analysis
 has no gravity/precompression; this subsequent static calibration change does
 not alter the already qualified modal decks or results.
+
+
+### Center decision-reference budget gate
+
+Both center reference cases now pass serial 40/30 mm statics, both support
+bounds, minimum-section resolution and all numerical/energy checks. The test
+bar's maximum unit-response refinement change is **1.3925%**. Casting shares
+below use the machine loop excluding tool/bar bending; full loop values remain
+separate in each report.
+
+| Reference | Support | X | Y | Z |
+| --- | --- | --- | --- | --- |
+| Spindle nose | Three-point | 17.37% | 14.27% | 14.16% |
+| Spindle nose | Four springs | 15.84% | 14.27% | 14.16% |
+| Steel 20 mm / 40 mm bar | Three-point | 14.23% | 10.48% | 13.26% |
+| Steel 20 mm / 40 mm bar | Four springs | 13.08% | 10.48% | 13.26% |
+
+The center maximum is **17.37%**, below the provisional 30% target. The casting
+geometry decision awaits the corresponding nine-pose maxima and modal operating
+band review. No geometry change has been made. The bar report is
+`build/fem/nine-pose-serial/center/test-bar-20/report.json`, SHA256
+`dc99cc07ed78e313c401c93862acff37742efb31ca631a0a7c2d7d27bba85cc7`.
+The first travel corner is running. Contextual cutter budgets will reuse their
+three center contact solutions for steel/carbide variants after the travel sweep.
