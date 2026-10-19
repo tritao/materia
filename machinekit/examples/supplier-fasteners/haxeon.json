@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-supplier-fasteners"},
+  "entry": "SupplierFasteners",
+  "sourceRoots": ["."],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "../../../build/suppliers/fastener-example"
+}

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-supplier-cad-check"},
+  "entry": "SupplierCadCheck",
+  "sourceRoots": ["."],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "../../../build/suppliers/cad-validator"
+}

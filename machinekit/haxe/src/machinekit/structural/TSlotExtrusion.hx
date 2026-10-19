@@ -22,6 +22,11 @@ typedef TSlotProfileSpec = {
 	var tWidth:Float;
 	var headDepth:Float;
 	var boreDiameter:Float;
+	/** Optional explicit slot offsets on +X,+Y,-X,-Y; positive follows the rotated face tangent. */
+	@:optional var slots:Array<Array<Float>>;
+	@:optional var bores:Array<{x:Float,y:Float}>;
+	@:optional var systemId:String;
+	@:optional var gridPitch:Float;
 }
 
 /** T-slot aluminium extrusion profile. The numeric constructor remains a generic proportional
@@ -41,9 +46,22 @@ class TSlotExtrusion implements StructuralProfile {
 	public final headDepth:Float;
 	public final boreDiameter:Float;
 	public final family:Null<String>;
+	/** Shared dimensional system; does not assert cross-vendor hardware qualification. */
+	public final systemId:Null<String>;
+	public final sectionVariantId:Null<String>;
+	final sectionVariant:Null<StructuralProfile>;
+	final faceSlots:Array<Array<Float>>;
+	final borePositions:Array<{x:Float,y:Float}>;
+	final cellPitch:Null<Float>;
 
-	public function new(size:Float, ?profile:TSlotProfileSpec) {
-		if (!(size > 0)) throw "T-slot extrusion needs a positive size";
+	public function new(size:Float, ?profile:TSlotProfileSpec, ?sectionVariant:StructuralProfile) {
+		if (!(size > 0) || !Math.isFinite(size)) throw "T-slot extrusion needs a positive size";
+		this.sectionVariant=sectionVariant;
+		sectionVariantId=sectionVariant==null ? null : sectionVariant.profileDesignation();
+		systemId=profile==null ? null : profile.systemId;
+		cellPitch=profile==null ? null : profile.gridPitch;
+		faceSlots=profile!=null && profile.slots!=null ? [for(slots in profile.slots) slots.copy()] : [[0],[0],[0],[0]];
+		borePositions=profile!=null && profile.bores!=null ? [for(p in profile.bores) {x:p.x,y:p.y}] : [{x:0,y:0}];
 		if (profile != null) {
 			if (!(profile.width > 0) || !(profile.height > 0) || !(profile.slotWidth > 0) || !(profile.slotDepth > 0) ||
 				!(profile.throatDepth > 0) || !(profile.tWidth > profile.slotWidth) ||
@@ -58,7 +76,7 @@ class TSlotExtrusion implements StructuralProfile {
 			headDepth = profile.headDepth;
 			boreDiameter = profile.boreDiameter;
 			family = profile.family;
-			designation = profile.designation;
+			designation = profile.designation + (sectionVariantId==null ? "" : "-SECTION-"+sectionVariantId);
 			description = '${profile.family} aluminium extrusion ${Dimension.format(profile.width)}x${Dimension.format(profile.height)}';
 		} else {
 			this.size = size;
@@ -71,10 +89,58 @@ class TSlotExtrusion implements StructuralProfile {
 			boreDiameter = 0.15 * size;
 			family = null;
 			var sizeText = Dimension.format(size);
-			designation = 'GENERIC-TSLOT-${sizeText}x$sizeText';
+			designation = 'GENERIC-TSLOT-${sizeText}x$sizeText' + (sectionVariantId==null ? "" : "-SECTION-"+sectionVariantId);
 			description = 'Generic T-slot extrusion ${sizeText}x$sizeText';
 		}
+		if(faceSlots.length!=4) throw "T-slot layout requires four face lists";
+		for(face in 0...4) {
+			var span=face%2==0 ? height : this.size;
+			for(offset in faceSlots[face]) if(!Math.isFinite(offset) || Math.abs(offset)+tWidth/2>=span/2)
+				throw "Slot does not fit on the profile face";
+		}
+		for(p in borePositions) if(!Math.isFinite(p.x) || !Math.isFinite(p.y) ||
+			Math.abs(p.x)+boreDiameter/2>=this.size/2 || Math.abs(p.y)+boreDiameter/2>=height/2)
+			throw "Bore does not fit inside the profile";
+		if(sectionVariant!=null) {
+			var bounds=sectionVariant.sectionBounds();
+			if(Math.abs(bounds.minX+this.size/2)>0.02 || Math.abs(bounds.maxX-this.size/2)>0.02 ||
+				Math.abs(bounds.minY+height/2)>0.02 || Math.abs(bounds.maxY-height/2)>0.02)
+				throw "Section variant bounds differ from the profile family";
+		}
 	}
+
+	/** Supplier-neutral slot-8 layout candidates. Preview slot/bore dimensions are approximate;
+	 * use a measured section variant when internal shape matters. Existing catalog rows are unchanged.
+	 */
+	public static function forSystem(system:String,width:Float,height:Float,?section:StructuralProfile):TSlotExtrusion {
+		var pitch= switch system {
+			case "TSLOT-30-SLOT8": 30.0;
+			case "TSLOT-40-SLOT8": 40.0;
+			default: throw 'Unknown T-slot system "$system"';
+		};
+		var xs=centres(width,pitch),ys=centres(height,pitch);
+		var bores=[for(x in xs) for(y in ys) {x:x,y:y}];
+		return new TSlotExtrusion(width,{
+			designation:'$system-${Dimension.format(width)}x${Dimension.format(height)}',family:system,
+			width:width,height:height,slotWidth:8,slotDepth:pitch==30 ? 8 : 10,
+			throatDepth:2,headDepth:pitch==30 ? 6 : 8,tWidth:pitch==30 ? 16.5 : 20,
+			boreDiameter:pitch==30 ? 6.8 : 8.5,systemId:system,gridPitch:pitch,
+			slots:[ys,xs,ys,xs],bores:bores
+		},section);
+	}
+
+	static function centres(span:Float,pitch:Float):Array<Float> {
+		var count=Math.round(span/pitch);
+		if(!Math.isFinite(span) || span<=0 || count<1 || count>128 || Math.abs(span-count*pitch)>1e-8)
+			throw "Profile dimension must be a positive multiple of the system pitch";
+		return [for(i in 0...count) -span/2+pitch/2+i*pitch];
+	}
+
+	public function slotPositions(face:Int):Array<Float> {
+		if(face<0 || face>3) throw "Slot face must be between zero and three";
+		return faceSlots[face].copy();
+	}
+	public function boreCentres():Array<{x:Float,y:Float}> return [for(p in borePositions) {x:p.x,y:p.y}];
 
 	static function rows():Array<TSlotProfileSpec>
 		return [
@@ -108,7 +174,14 @@ class TSlotExtrusion implements StructuralProfile {
 		return {minX: -size / 2, maxX: size / 2, minY: -height / 2, maxY: height / 2};
 
 	public function geometry(length:Float):Part {
-		if (!(length > 0)) throw "T-slot extrusion needs a positive length";
+		if (!(length > 0) || !Math.isFinite(length)) throw "T-slot extrusion needs a positive length";
+		if(sectionVariant!=null) return sectionVariant.geometry(length);
+		return nominalGeometry(length);
+	}
+
+	/** Simplified shared layout; source section variants retain their own cavities and curved details. */
+	public function nominalGeometry(length:Float):Part {
+		if (!(length > 0) || !Math.isFinite(length)) throw "T-slot extrusion needs a positive length";
 		var ownedParts:Array<Part> = [];
 		return Solids.building(ownedParts, tracked -> {
 			var half = size / 2, halfHeight = height / 2;
@@ -117,11 +190,13 @@ class TSlotExtrusion implements StructuralProfile {
 			], 0, length);
 			tracked.push(body);
 			var tools:Array<Part> = [];
-			var bore = Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1);
-			tracked.push(bore);
-			tools.push(bore);
-			for (face in 0...4) {
-				var tool = Part.prism(slotPoints(face), -0.1, length + 0.1);
+			for(p in borePositions) {
+				var bore = Part.cylinderAlong(boreDiameter/2,new Vector(p.x,p.y,-0.1),Vector.Z(),length+0.2);
+				tracked.push(bore);
+				tools.push(bore);
+			}
+			for (face in 0...4) for(offset in faceSlots[face]) {
+				var tool = Part.prism(slotPoints(face,offset), -0.1, length + 0.1);
 				tracked.push(tool);
 				tools.push(tool);
 			}
@@ -135,14 +210,19 @@ class TSlotExtrusion implements StructuralProfile {
 	 * must use this value rather than the nominal catalog slotDepth. Faces rotate from +X. */
 	public function modeledSlotDepth(face:Int = 0):Float {
 		if (face < 0 || face > 3) throw "Slot face must be between zero and three";
+		if(sectionVariant!=null) throw "Drawing section slot depth requires measured interface data";
+		return nominalSlotDepth(face);
+	}
+
+	function nominalSlotDepth(face:Int):Float {
 		if (family == null) return slotDepth;
-		var faceHalf = (face % 2 == 0 ? height : size) / 2;
+		var faceHalf = cellPitch!=null ? cellPitch/2 : (face % 2 == 0 ? height : size) / 2;
 		var total = Math.min(slotDepth,faceHalf-tWidth/2-0.5);
 		return Math.max(0.1,total-headDepth)+headDepth;
 	}
 
 	/** T-slot notch tool for one face, rotated 90 degrees `face` times from the +X face. */
-	function slotPoints(face:Int):Array<Vector> {
+	function slotPoints(face:Int,offset:Float=0):Array<Vector> {
 		var half = size / 2, halfHeight = height / 2;
 		var faceHalf = face % 2 == 0 ? halfHeight : half;
 		var outer = (face % 2 == 0 ? half : halfHeight) + 1;
@@ -151,7 +231,7 @@ class TSlotExtrusion implements StructuralProfile {
 		var effectiveHeadDepth = headDepth;
 		var effectiveThroatDepth = throatDepth;
 		if (family != null) {
-			var totalDepth = modeledSlotDepth(face);
+			var totalDepth = nominalSlotDepth(face);
 			effectiveThroatDepth = Math.max(0.1, totalDepth - effectiveHeadDepth);
 		}
 		var points = [
@@ -161,7 +241,7 @@ class TSlotExtrusion implements StructuralProfile {
 			new Vector(outer - 1 - effectiveThroatDepth, slotWidth / 2), new Vector(outer, slotWidth / 2),
 		];
 		if (tWidth > 2 * faceHalf) throw 'T-slot profile slot is wider than face ${Dimension.format(faceHalf * 2)}';
-		return [for (p in points) rotate90(p, face)];
+		return [for (p in points) rotate90(new Vector(p.x,p.y+offset), face)];
 	}
 
 	static function rotate90(p:Vector, times:Int):Vector {

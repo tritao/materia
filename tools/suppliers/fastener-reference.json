@@ -1,0 +1,10 @@
+{
+  "scope": "Head diameter and height comparisons only; not a supplier certification or complete ISO conformance check",
+  "reviewed_on": "2026-10-19",
+  "sizes": {
+    "M4": {"head_diameter_mm": [6.78, 7.0], "head_height_mm": [3.82, 4.0], "source": "https://www.accu.co.uk/api/product-datasheet?id=151797"},
+    "M5": {"head_diameter_mm": [8.28, 8.5], "head_height_mm": [4.82, 5.0], "source": "https://www.accu.co.uk/api/product-datasheet?id=652689"},
+    "M6": {"head_diameter_mm": [9.78, 10.0], "head_height_mm": [5.70, 6.0], "source": "https://www.accu.co.uk/api/product-datasheet?id=2874"},
+    "M8": {"head_diameter_mm": [12.73, 13.0], "head_height_mm": [7.64, 8.0], "source": "https://www.accu.co.uk/api/product-datasheet?id=16118"}
+  }
+}
