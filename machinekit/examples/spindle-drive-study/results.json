@@ -1,0 +1,186 @@
+{
+  "status": "Provisional engineering targets; no motor, drive or machining accuracy is qualified",
+  "mill": {
+    "required_motor_mechanical_power_w_before_transmission_losses": 2315.789473684211,
+    "assumed_continuous_output_envelope": [
+      {
+        "spindle_rpm": 500,
+        "output_torque_nm": 7.002817496043395,
+        "output_power_w": 366.66666666666663
+      },
+      {
+        "spindle_rpm": 1000,
+        "output_torque_nm": 7.002817496043395,
+        "output_power_w": 733.3333333333333
+      },
+      {
+        "spindle_rpm": 1500,
+        "output_torque_nm": 7.002817496043395,
+        "output_power_w": 1100.0
+      },
+      {
+        "spindle_rpm": 3000,
+        "output_torque_nm": 7.002817496043395,
+        "output_power_w": 2200.0
+      },
+      {
+        "spindle_rpm": 4000,
+        "output_torque_nm": 5.252113122032546,
+        "output_power_w": 2200.0
+      },
+      {
+        "spindle_rpm": 6000,
+        "output_torque_nm": 3.5014087480216975,
+        "output_power_w": 2200.0
+      },
+      {
+        "spindle_rpm": 8000,
+        "output_torque_nm": 2.626056561016273,
+        "output_power_w": 2200.0
+      }
+    ],
+    "leadshine_rated_point_screen": [
+      {
+        "designation": "ELM2L-1500LA100FT-H",
+        "rated_rpm": 3000,
+        "maximum_rpm": 5000,
+        "rated_torque_nm": 4.9,
+        "mass_kg": 5.8,
+        "spindle_to_motor_speed_ratio_at_rated_point": 2.6666666666666665,
+        "spindle_output_torque_nm_at_8000_rpm_rated_motor_point": 1.7456250000000002,
+        "meets_mill_8000_rpm_output_point_only": false,
+        "motor_rpm_at_mill_minimum": 187.5,
+        "direct_drive_meets_hobber_maximum_speed": false,
+        "qualification": "Unqualified: continuous curve, low-speed cooling, shaft load, drive and packaging still required"
+      },
+      {
+        "designation": "ELM2M-2000LB130F-H",
+        "rated_rpm": 2500,
+        "maximum_rpm": 2800,
+        "rated_torque_nm": 7.7,
+        "mass_kg": 8.3,
+        "spindle_to_motor_speed_ratio_at_rated_point": 3.2,
+        "spindle_output_torque_nm_at_8000_rpm_rated_motor_point": 2.2859374999999997,
+        "meets_mill_8000_rpm_output_point_only": false,
+        "motor_rpm_at_mill_minimum": 156.25,
+        "direct_drive_meets_hobber_maximum_speed": false,
+        "qualification": "Unqualified: continuous curve, low-speed cooling, shaft load, drive and packaging still required"
+      },
+      {
+        "designation": "ELM2M-7500LD180FT-H",
+        "rated_rpm": 1500,
+        "maximum_rpm": 3000,
+        "rated_torque_nm": 48,
+        "mass_kg": 32.3,
+        "spindle_to_motor_speed_ratio_at_rated_point": 5.333333333333333,
+        "spindle_output_torque_nm_at_8000_rpm_rated_motor_point": 8.549999999999999,
+        "meets_mill_8000_rpm_output_point_only": true,
+        "motor_rpm_at_mill_minimum": 93.75,
+        "direct_drive_meets_hobber_maximum_speed": false,
+        "qualification": "Unqualified: continuous curve, low-speed cooling, shaft load, drive and packaging still required"
+      }
+    ]
+  },
+  "hobber": {
+    "radius_mm": 30.0,
+    "hob_rpm_for_300_m_per_min": 2984.155182973038,
+    "control_allocation_arcsec_at_pitch_circle": 6.875493541569879,
+    "budgets": [
+      {
+        "hob_rpm": 3000,
+        "table_rpm": 15.0,
+        "gash_frequency_hz": 600.0,
+        "terms_um_absolute_bound": {
+          "table_encoder_installed_accuracy": 0.29088820866572157,
+          "table_encoder_half_count": 0.011235210848771786,
+          "hob_encoder_installed_accuracy_referred_to_table": 0.04363323129985824,
+          "hob_encoder_half_count_referred_to_table": 0.02876213977285577,
+          "residual_timestamp_error": 0.04712388980384689,
+          "constant_velocity_prediction_error": 0.0004908738521234051,
+          "table_following_error": 0.29088820866572157,
+          "unmeasured_torsion": 0.14544410433286079
+        },
+        "sum_um_absolute_bound": 0.85846586724176,
+        "remaining_control_allocation_um": 0.14153413275824,
+        "within_provisional_control_allocation": true,
+        "maximum_uncompensated_delay_us_for_entire_allocation": 21.22065907891938,
+        "uncompensated_delay_error_um": {
+          "125": 5.890486225480861,
+          "250": 11.780972450961722,
+          "1000": 47.123889803846886
+        },
+        "controller_samples_per_gash": {
+          "4000": 6.666666666666667,
+          "8000": 13.333333333333334
+        }
+      },
+      {
+        "hob_rpm": 8000,
+        "table_rpm": 40.0,
+        "gash_frequency_hz": 1600.0,
+        "terms_um_absolute_bound": {
+          "table_encoder_installed_accuracy": 0.29088820866572157,
+          "table_encoder_half_count": 0.011235210848771786,
+          "hob_encoder_installed_accuracy_referred_to_table": 0.04363323129985824,
+          "hob_encoder_half_count_referred_to_table": 0.02876213977285577,
+          "residual_timestamp_error": 0.1256637061435917,
+          "constant_velocity_prediction_error": 0.0004908738521234051,
+          "table_following_error": 0.29088820866572157,
+          "unmeasured_torsion": 0.14544410433286079
+        },
+        "sum_um_absolute_bound": 0.9370056835815048,
+        "remaining_control_allocation_um": 0.06299431641849518,
+        "within_provisional_control_allocation": true,
+        "maximum_uncompensated_delay_us_for_entire_allocation": 7.9577471545947684,
+        "uncompensated_delay_error_um": {
+          "125": 15.707963267948964,
+          "250": 31.415926535897928,
+          "1000": 125.66370614359171
+        },
+        "controller_samples_per_gash": {
+          "4000": 2.5,
+          "8000": 5.0
+        }
+      }
+    ],
+    "tangential_force_sensitivity_not_a_load_prediction": [
+      {
+        "hob_rpm": 3000,
+        "assumed_tangential_force_n": 20,
+        "cutting_torque_nm": 0.32,
+        "cutting_power_w": 100.53096491487338
+      },
+      {
+        "hob_rpm": 3000,
+        "assumed_tangential_force_n": 50,
+        "cutting_torque_nm": 0.8,
+        "cutting_power_w": 251.32741228718348
+      },
+      {
+        "hob_rpm": 3000,
+        "assumed_tangential_force_n": 100,
+        "cutting_torque_nm": 1.6,
+        "cutting_power_w": 502.65482457436696
+      },
+      {
+        "hob_rpm": 8000,
+        "assumed_tangential_force_n": 20,
+        "cutting_torque_nm": 0.32,
+        "cutting_power_w": 268.082573106329
+      },
+      {
+        "hob_rpm": 8000,
+        "assumed_tangential_force_n": 50,
+        "cutting_torque_nm": 0.8,
+        "cutting_power_w": 670.2064327658226
+      },
+      {
+        "hob_rpm": 8000,
+        "assumed_tangential_force_n": 100,
+        "cutting_torque_nm": 1.6,
+        "cutting_power_w": 1340.4128655316451
+      }
+    ],
+    "continuous_output_torque_nm_at_maximum_rpm_target": 1.7904931097838226
+  }
+}

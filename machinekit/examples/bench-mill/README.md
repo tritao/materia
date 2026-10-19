@@ -117,6 +117,11 @@ reserves are 7/2 mm; these are not established stopping distances.
 
 ## BT30 spindle packaging study
 
+The [spindle drive requirements study](../spindle-drive-study/README.md) defines a
+provisional 500–8000 rpm output envelope, compares vector-drive and servo options,
+and screens modeled Leadshine motors. Its first sourcing target is a 3 kW class
+spindle-duty system; this has not replaced or qualified the compact motor below.
+
 `MillSpindleHead` now owns the cartridge, holder, drawbar, spring stack,
 gripper/pull stud, reaction frame, pneumatic cylinder/rod/piston, centered rear
 motor, belt and motor carrier. The legacy ER20 machine keeps its independent

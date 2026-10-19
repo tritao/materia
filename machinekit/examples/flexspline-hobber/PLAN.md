@@ -258,6 +258,12 @@ appear only as sources in docs.
 
 ## Reference numbers (assumed until checked against a datasheet or a measurement)
 
+The [spindle drive requirements study](../spindle-drive-study/README.md) expands
+these references into a provisional 1 µm tangential control-error allocation,
+timing/encoder requirements and 3000/8000 rpm calculations. It compares vector
+and servo B drives while retaining HB-D1/HB-D2. The bounds require measurement;
+they neither implement HB7 nor establish an ISO grade.
+
 | Quantity | Value | Source |
 |---|---|---|
 | Reference part | m 0.3, z 200, d 60 mm, face 8 mm, wall 0.6 mm | derived from size-25 class; wall assumed |
