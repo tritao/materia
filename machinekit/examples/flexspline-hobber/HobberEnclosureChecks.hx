@@ -51,7 +51,7 @@ class HobberEnclosureChecks {
       cache.close();
       Sys.println('Hobber enclosure passed: $samples machine/door samples, $checked exact near-pair checks, loading corridor, port, mass and save/reopen');
       // Export only after acceptance, using the checked fit rather than sizing against a different model.
-      var scene=machinekit.assembly.AssemblyPreview.scene(assembly,"hobber-enclosed"),root=Sys.getCwd();
+      var scene=HobberEnclosurePreview.defaultView(machinekit.assembly.AssemblyPreview.scene(assembly,"hobber-enclosed")),root=Sys.getCwd();
       while(!sys.FileSystem.exists(root+"/machinekit/examples/flexspline-hobber/FlexsplineHobber.hx"))root=haxe.io.Path.directory(root);
       var out=root+"/machinekit/examples/flexspline-hobber/build/enclosure";sys.FileSystem.createDirectory(haxe.io.Path.directory(out));sys.FileSystem.createDirectory(out);
       sys.io.File.saveBytes(out+"/hobber.mtrg",materia.project.SceneArtifact.encode(scene));

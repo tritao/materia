@@ -80,14 +80,20 @@ class HobberEnclosurePreview {
       evidence:"X/Y/Z endpoints, A one-degree grid with radius*half-step padding; B/C descendants bounded by rotation-centred spheres",
       assumptions:"75 mm clearance; 600 mm opening; OD140 side-jaw reservation; 100 mm mist opening; 60 C process and oil-mist rule assessment assumed. Robot, seals, retention and flow not qualified."}};
   }
-  public static function enclosed():haxe.io.Bytes return SceneArtifact.encode(AssemblyPreview.scene(assembled().assembly,"hobber-enclosed"));
+  /** Hide the complete external electrical rack in default views while retaining its geometry. */
+  public static function defaultView(scene:materia.project.SceneArtifact.SceneArtifactData):materia.project.SceneArtifact.SceneArtifactData {
+    if(scene.assemblyDefinition!=null)for(o in scene.assemblyDefinition.occurrences)
+      if(StringTools.startsWith(o.id,"machine/")&&external(o.id.substr("machine/".length)))o.visible=false;
+    return scene;
+  }
+  public static function enclosed():haxe.io.Bytes return SceneArtifact.encode(defaultView(AssemblyPreview.scene(assembled().assembly,"hobber-enclosed")));
   public static function inspection():haxe.io.Bytes {
     var scene=SceneArtifact.decode(enclosed());
     if(scene.assemblyDefinition!=null)for(o in scene.assemblyDefinition.occurrences)if(StringTools.startsWith(o.id,"enclosure/"))o.visible=false;
     return SceneArtifact.encode(scene);
   }
   public static function main():Void {
-    var fitted=assembled(),scene=AssemblyPreview.scene(fitted.assembly,"hobber-enclosed");
+    var fitted=assembled(),scene=defaultView(AssemblyPreview.scene(fitted.assembly,"hobber-enclosed"));
     var root=Sys.getCwd();while(!sys.FileSystem.exists(root+"/machinekit/examples/flexspline-hobber/FlexsplineHobber.hx")){
       var parent=haxe.io.Path.directory(root);if(parent==root||parent.length==0)throw "Cannot locate hobber worktree";root=parent;}
     var output=root+"/machinekit/examples/flexspline-hobber/build/enclosure";sys.FileSystem.createDirectory(haxe.io.Path.directory(output));sys.FileSystem.createDirectory(output);
