@@ -450,3 +450,55 @@ and manufacturing checks. The PA12 material's 1000 kg/m³ density is a nominal
 planning estimate, not a supplier/print-lot certificate. Required hardware is declared
 per part; the assembly must explicitly instantiate it, rather than silently treating
 it as part of the polymer's material or mass.
+
+## Configurable purchased-support screw axis
+
+`TwinRailScrewAxis` extracts the Vallder worked axis into a reusable installation
+with explicit `ScrewAxisLayout` and `ScrewAxisComponents` inputs. It complements
+`LinearAxis`: this template includes the drawing-checked RBK12-57 support stack,
+SFU16 end machining, twin HGR15 guides, fabricated base/risers/carriage, and installed
+fasteners. It currently supports that interface family; it does not accept arbitrary
+BF12 supports or motor frames based on their names alone. The floating support is
+currently the pinned Vallder BF12 implementation.
+
+```haxe
+var layout = new ScrewAxisLayout(300, 500, 400, 160); // travel, screw, rail, spacing in mm
+var selected = new ScrewAxisComponents(
+    new RbkMotorMount("RBK12-57"), NemaStepper.model("OPENBUILDS-NEMA23-56"),
+    new VallderSfu1605Screw(layout.screwLength), new VallderSfu1605Nut(),
+    new VallderBf12Support(), LinearRail.metric("HGR15", layout.railLength),
+    new HiwinHgh15ca(), HiwinHgh15ca.MOUNT_THREAD_DEPTH);
+var axis = new TwinRailScrewAxis(layout, selected);
+axis.validateInstallation();
+```
+
+Construction checks motor pilot and mounting-hole clearance, shaft engagement,
+screw/nut thread identity, end-stack connector datums, nut flange pattern, rail/block
+interfaces, thread depth, travel envelopes, and nominal fastener engagement.
+`validateInstallation()` additionally checks 60 required-clearance pairs at the start,
+midpoint, and end of travel. `installationClearances()` returns the individual results.
+These are nominal geometric checks, not bearing-preload or load qualifications.
+
+The fabrication and coupling recipes are registered in `MachineKitComponents.standard()`;
+`MachineAssembly.decode(axis.encode(), MachineKitComponents.standard())` preserves the
+selected components, geometry dimensions, travel limits, and lead coupling. The old
+`RbkSfuAxis` example retains its original part identities and legacy recipes.
+
+Purchasing remains optional through `SourcingPlan.lines(axis.billOfMaterials())`.
+Changing an offer does not replace a component or establish mechanical compatibility.
+Select another engineering component explicitly, then validate the new installation.
+
+Run the regression and generate a 300 mm travel / 500 mm screw / 400 mm rail /
+160 mm spacing Materia project, assembly JSON, BOM and optional sourcing overlay:
+
+```sh
+MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run \
+  --project machinekit/examples/supplier-fasteners/haxeon.configurable-axis.json
+```
+
+Outputs are under `build/suppliers/configurable-axis/extended-300.*`, with results in
+`checks.json`. The second-supplier motor trial uses the existing StepperOnline
+`23HS22-2804S` model. Its nominal interfaces fit, but its simplified motor housing
+intersects the mounting heads. The report keeps that trial blocked pending better
+supplier geometry; no unverified relief is cut into the model to force a pass.
+The working extended configuration retains the detailed OpenBuilds motor.
