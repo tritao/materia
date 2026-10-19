@@ -59,10 +59,10 @@ class MillFramePreview {
 		return result;
 	}
 
-	public static function concept(reference:BenchMill, frame:MillFrame, ?motorAdjustment:Float):MachineAssembly {
+	public static function concept(reference:BenchMill, frame:MillFrame, ?motorAdjustment:Float, ?drive:machinekit.milling.MillSpindleDrivePart):MachineAssembly {
 		var result = structure(frame);
 		var spindleLayout:MillZAxisLayout = frame.zAxis;
-		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout,motorAdjustment);
+		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout,motorAdjustment,drive);
 		var spindleOrigin = spindleParts.gauge;
 		var tool = new machinekit.milling.FlatEndMill(new machinekit.component.ComponentValues().setNumber("diameter",reference.tool.diameter)
 			.setNumber("fluteLength",reference.tool.fluteLength).setNumber("stickout",reference.tool.stickout));

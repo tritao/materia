@@ -140,6 +140,23 @@ class LeadshineServo extends ServoMotor {
 		return Part.prism([new Vector(x-w/2, y-d/2), new Vector(x+w/2, y-d/2),
 			new Vector(x+w/2, y+d/2), new Vector(x-w/2, y+d/2)], z0, z1);
 
+	/** Continuous local-Z sweep of the envelope, retaining the narrow pilot/shaft
+	 * and each connector's axial region rather than filling a single large box.
+	 */
+	public function axialEnvelope(minOffset:Float,maxOffset:Float,includeShaft:Bool=false):Part {
+		if(!Math.isFinite(minOffset)||!Math.isFinite(maxOffset)||minOffset>maxOffset)throw "Invalid servo axial sweep";
+		var owned:Array<Part> = [];
+		return Solids.building(owned,tracked->{
+			var f=spec.face,l=spec.bodyLength,t=spec.flangeThickness;
+			tracked.push(box(f,f,-l+minOffset,maxOffset));
+			tracked.push(Part.cylinderSpan(spec.pilotDiameter/2,minOffset,spec.pilotHeight+maxOffset));
+			tracked.push(box(0.28*f,2*(spec.connectorHeight-f/2),-t-0.30*f+minOffset,-t-0.08*f+maxOffset,0,f/2));
+			tracked.push(box(0.24*f,2*(spec.connectorHeight-f/2),-l+0.08*f+minOffset,-l+0.27*f+maxOffset,0,f/2));
+			if(includeShaft)tracked.push(Part.cylinderSpan(spec.shaftDiameter/2,minOffset,spec.shaftLength+maxOffset));
+			return Solids.union(tracked.copy());
+		});
+	}
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var owned:Array<Part> = [];
 		return Solids.building(owned, tracked -> {
@@ -155,18 +172,24 @@ class LeadshineServo extends ServoMotor {
 				for (p in boltPattern()) holes.push(keep(Part.cylinderSpan(spec.holeDiameter/2, -t-0.1, 0.1, p.x, p.y), 'bolt${i++}'));
 				flange = Solids.cut(flange, holes); tracked.push(flange); parts.push(flange);
 				// Undimensioned cover proportions and longitudinal ribs are visual approximations.
-				var rear = Math.min(0.22*l, 0.3*f), half = f/2-1, c = 0.12*f;
+				// Recessed extrusion corners leave the flange through-holes accessible.
+				var rear = Math.min(0.22*l, 0.3*f), half = f/2-1, c = 0.30*f;
 				parts.push(keep(Part.prism([new Vector(-half+c,-half),new Vector(half-c,-half),
 					new Vector(half,-half+c),new Vector(half,half-c),new Vector(half-c,half),
 					new Vector(-half+c,half),new Vector(-half,half-c),new Vector(-half,-half+c)], -l+rear, -t), "housing"));
 				parts.push(keep(box(0.88*f, 0.88*f, -l, -l+rear), "encoderCover"));
 				for (side in [-1,1]) for (i in 0...5) {
-					var offset = (i-2)*f*0.11;
+					var offset = (i-2)*f*0.09;
 					parts.push(keep(box(f*0.035, f*0.055, -l+rear, -t, side*(f/2-f*0.0175), offset), 'ribX${side}_${i}'));
 					parts.push(keep(box(f*0.055, f*0.035, -l+rear, -t, offset, side*(f/2-f*0.0175)), 'ribY${side}_${i}'));
 				}
 			}
-			parts.push(keep(Part.cylinderSpan(spec.pilotDiameter/2, 0, spec.pilotHeight), "pilot"));
+			var pilot=keep(Part.cylinderSpan(spec.pilotDiameter/2, 0, spec.pilotHeight), "pilot");
+			if(detail==Preview) {
+				var bore=keep(Part.cylinderSpan(spec.shaftDiameter/2+0.05,-0.1,spec.pilotHeight+0.1),"shaftBore");
+				pilot=Solids.cut(pilot,[bore]);tracked.push(pilot);
+			}
+			parts.push(pilot);
 			// Two connector envelopes remain within published maximum LH; their exact positions are estimated.
 			parts.push(keep(box(0.28*f, 2*(spec.connectorHeight-f/2), -t-0.30*f, -t-0.08*f, 0, f/2), "powerConnector"));
 			parts.push(keep(box(0.24*f, 2*(spec.connectorHeight-f/2), -l+0.08*f, -l+0.27*f, 0, f/2), "encoderConnector"));

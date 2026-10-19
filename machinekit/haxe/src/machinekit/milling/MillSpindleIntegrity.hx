@@ -24,12 +24,22 @@ class MillSpindleIntegrity {
 	/** Motor withdrawal after removing its belt, pulley, fasteners and guard. */
 	public static function checkMotorRemoval(assembly:MachineAssembly):Diagnostics {
 		var out=new Diagnostics(), cache=new PosedParts(), poses=assembly.solvedPoses();
-		var local=new Bt30SpindleMotor().axialEnvelope(-50,0,true);
+		var motor=assembly.components().filter(m->m.id=="spindle/motor")[0].component;
+		var local:Part;
+		if(Std.isOfType(motor,Bt30SpindleMotor)) local=cast(motor,Bt30SpindleMotor).axialEnvelope(-50,0,true);
+		else if(Std.isOfType(motor,machinekit.motion.LeadshineServo)) local=cast(motor,machinekit.motion.LeadshineServo).axialEnvelope(-50,0,true);
+		else {
+			var b=cache.box(motor,materia.assembly.AssemblyFrames.identity(),Envelope);
+			var shaft=cast(motor,machinekit.motion.ServoMotor).rating.shaftLength;
+			local=Part.box(b.maxX-b.minX,b.maxY-b.minY,Math.max(b.maxZ,shaft)-b.minZ+50)
+				.translated(new Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ-50));
+		}
 		var envelope=PosedParts.moved(local,poses.get("spindle/motor")); local.close();
 		var sweep:SpindleAuditSolid={id:"motor removal",part:envelope,bounds:PosedParts.boxOf(envelope)};
 		try {
 			for (member in assembly.components()) {
 				var id=member.id;
+				if(StringTools.startsWith(id,"spindle/motorNut")) continue;
 				if (id=="spindle/motor" || id=="spindle/motorShaft" || id=="spindle/motorPulley" || id=="spindle/belt" ||
 					id=="spindle/beltGuard" || id=="spindle/tensionScrew" || StringTools.startsWith(id,"spindle/motorBolt") ||
 					StringTools.startsWith(id,"spindle/guardBolt")) continue;
@@ -78,8 +88,13 @@ class MillSpindleIntegrity {
 			// The extruded bounding box contains this part throughout its Z stroke.
 			var b = member.bounds;
 			var swept:Part;
-			if (member.id=="motor") {
-				var local=new Bt30SpindleMotor().axialEnvelope(0,-l.lower);
+			var actualMotor:Null<machinekit.component.MachineComponent> =null;
+			if(member.id=="motor") for(m in assembly.components()) if(m.id=="spindle/motor") actualMotor=m.component;
+			if (member.id=="motor" && Std.isOfType(actualMotor,Bt30SpindleMotor)) {
+				var local=cast(actualMotor,Bt30SpindleMotor).axialEnvelope(0,-l.lower);
+				swept=PosedParts.moved(local,poses.get("spindle/motor")); local.close();
+			} else if(member.id=="motor" && Std.isOfType(actualMotor,machinekit.motion.LeadshineServo)) {
+				var local=cast(actualMotor,machinekit.motion.LeadshineServo).axialEnvelope(0,-l.lower);
 				swept=PosedParts.moved(local,poses.get("spindle/motor")); local.close();
 			} else swept=Part.box(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ-l.lower)
 				.translated(new Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ+l.lower));

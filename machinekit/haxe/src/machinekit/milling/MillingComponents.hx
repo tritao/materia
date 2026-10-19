@@ -31,6 +31,8 @@ class MillingComponents {
 		registry.register(Bt30SpindleMotor.recipeType());
 		registry.register(MillPowerDrawbarPart.recipeType());
 		registry.register(MillSpindleMotorMount.recipeType());
+		registry.register(MillSpindleDrivePart.recipeType());
+		registry.register(MillSpindleDrivePart.recipeType("guard"));
 		registry.register(SpindleCartridge.recipeType());
 		registry.register(SpindleCartridge.Er20Holder.recipeType());
 		registry.register(SpindleMotor.recipeType());
