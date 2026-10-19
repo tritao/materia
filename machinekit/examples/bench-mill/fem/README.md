@@ -8,7 +8,8 @@ The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN
 ## Gate status
 
 - Solver-fixture gate: passed, including the common Gmsh-to-C3D10 deck path,
-  known prescribed translation/rotation, and reference-node reaction correction.
+  known prescribed translation/rotation, reference-node reaction correction,
+  and three analytical spring/leveling cases.
   Root/submodule patch snapshots and loaded build identities are now captured.
 - Export comparison: 214 parts and three datums pass at the center pose; repeat geometry hashes pass. The corner pose also passes. Full manifest identity across a stable source/build state remains to be recorded; concurrent source changes correctly alter provenance.
 - The bonded-frame upper-bound static model, bracketed supports, energy
@@ -96,7 +97,11 @@ The report also includes a Gmsh C3D10 tension case through the same
 frame. Its reference-node load tests the correction `reaction = RF - CLOAD`.
 A second case prescribes both translation and rotation about an offset
 reference and checks every coupled node against `u = t + theta × r`.
-Both known-answer checks pass; the rotation fixture's maximum discrepancy
+The spring fixture checks unloaded support settlement, self-weight leveling via
+equivalent initial spring forces, and a separate unit load increment. Ground
+DOFs remain zero in that formulation.
+
+Both C3D10 known-answer checks pass; the rotation fixture's maximum discrepancy
 was 5e-9 mm in the initial verification.
 
 The generated `build/fem/fixtures/report.json` records version, executable/input/

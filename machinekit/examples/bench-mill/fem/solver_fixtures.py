@@ -168,12 +168,16 @@ def main():
         gmsh = importlib.import_module("gmsh")
         if gmsh.__version__ != "4.12.2":
             raise ValueError("Gmsh 4.12.2 is required for the C3D10/coupling gate")
+        from spring_fixture import verify as verify_springs
+        springs=verify_springs(ccx,args.output/"spring-verification")
         from tet_fixture import verify
         tetrahedral = verify(gmsh, ccx, args.output / "tet-verification")
         result = {"status": "fixture checks passed; mill not solved", "units": SOLVER_UNITS,
                   "solverVersion": version.stdout.strip(), "solverSha256": digest(ccx),
                   "fixtureGeneratorSha256": digest(Path(__file__)), "tension": tension,
                   "cantilever": beams, "lastRefinementRelativeChange": change,
+                  "supportSpringVerification":springs,
+                  "springFixtureSourceSha256":digest(Path(__file__).with_name("spring_fixture.py")),
                   "tet10AndCouplingVerification": tetrahedral,
                   "deckSourceSha256": digest(Path(__file__).with_name("ccx_deck.py")),
                   "tetFixtureSourceSha256": digest(Path(__file__).with_name("tet_fixture.py")),
