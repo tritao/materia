@@ -45,7 +45,7 @@ class MillXYStageIntegrity {
 		}
 		if (id == "saddle") {
 			// Extrude the saddle section over the full Y interval.
-			var saddle = new MillCrossSaddle(axis.saddle.values().setNumber("depth", l.saddleDepth + dy).setBoolean("motorPocket", false).setBoolean("ribbed",false).setBoolean("blockAccess",false).setBoolean("nutBoss",false));
+			var saddle = new MillCrossSaddle(axis.saddle.values().setNumber("depth", l.saddleDepth + dy).setBoolean("motorPocket", false).setBoolean("ribbed",false).setBoolean("blockAccess",false).setBoolean("nutBoss",false).setBoolean("nutServiceAccess",false));
 			var part = cache.posed(saddle, axis.zeroPose(id));
 			owned.push(part);
 			return part;
@@ -148,6 +148,8 @@ class MillXYStageIntegrity {
 			"table/head",
 			"Table enters the lower Z head envelope"
 		);
+		var design = MillYNutDesignChecks.check(axis,frame);
+		for (item in design.items) out.add(item.severity,item.code,item.subject,item.message);
 		var mounts = FoundationIntegrity.checkMounts(frame,
 			[{name: "Y fixed bearing pedestal", parent: "base/driveYFixed"}, {
 			name: "Y floating bearing pedestal",

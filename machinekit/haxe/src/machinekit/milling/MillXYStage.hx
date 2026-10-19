@@ -46,7 +46,7 @@ class MillXYStage extends AxisBuilder {
 			yp[0],
 			{x: 0, y: -1, z: 0},
 			yp.slice(1), l.yOvertravel);
-		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 58).setNumber("boreZ", 0).setNumber("depth", l.saddleDepth).setBoolean("ribbed", true).setBoolean("blockAccess",true).setBoolean("nutBoss",true).setNumber("guideSpacing",f.yRailSpacing).setNumber("blockSpan",l.yBlockSpan).setNumber("blockHolePitchB",l.block.spec.blockHolePitchB).setNumber("blockHolePitchC",l.block.spec.blockHolePitchC));
+		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 58).setNumber("boreZ", 0).setNumber("depth", l.saddleDepth).setBoolean("ribbed", true).setBoolean("blockAccess",true).setBoolean("nutBoss",true).setBoolean("nutServiceAccess",true).setNumber("guideSpacing",f.yRailSpacing).setNumber("blockSpan",l.yBlockSpan).setNumber("blockHolePitchB",l.block.spec.blockHolePitchB).setNumber("blockHolePitchC",l.block.spec.blockHolePitchC));
 		attach("saddle", saddle, F.translation(0, l.centreY, l.saddleBottom), "blockY0");
 		for (i in 1...4) attach('blockY$i', l.block, yp[i], "saddle");
 		for (i in 0...4) for (hole in 1...5) {
@@ -55,7 +55,7 @@ class MillXYStage extends AxisBuilder {
 		}
 		var yFace = l.centreY - l.saddleDepth / 2;
 		var nutMountPose=F.compose(y,F.translation(0,0,l.yScrewStart-yFace));
-		attach("nutBracketY",new MillYNutMount(new ComponentValues().setBoolean("reinforced",true)),nutMountPose,"saddle");
+		attach("nutBracketY",new MillYNutMount(new ComponentValues().setBoolean("reinforced",true).setBoolean("serviceAccess",true)),nutMountPose,"saddle");
 		for(p in MillYNutMount.anchors()) attach('nutBracketYBolt${p.x}-${p.y}',SocketHeadCapScrew.metric("M6",MillYNutMount.ANCHOR_LENGTH),
 			F.compose(nutMountPose,F.translation(p.x,p.y,MillYNutMount.ANCHOR_SEAT)),"nutBracketY");
 		var nutBolt=0;

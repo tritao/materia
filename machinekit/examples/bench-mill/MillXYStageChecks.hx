@@ -19,6 +19,7 @@ class MillXYStageChecks {
 
 	public static function main():Void {
 		AxisBuilderChecks.run();
+		assertions += MillDesignCheckTests.run();
 		var reference = new BenchMill(false, false), f = MillFramePreview.layout(reference), z = MillFramePreview.zLayout(
 			reference,
 			f
@@ -112,9 +113,27 @@ class MillXYStageChecks {
 		motorBody.close(); saddleBody.close(); rebuiltSaddle.close();
 		var adapter=cache.posed(axis.component("nutBracketY"),poses.get("nutBracketY"));
 		var rebuiltAdapter=cache.posed(restored.components().filter(m->m.id=="nutBracketY")[0].component,poses.get("nutBracketY"));
-		near(rebuiltAdapter.volume(),adapter.volume(),"registered adapter and pilots survive recipe rebuild"); rebuiltAdapter.close();
+		near(rebuiltAdapter.volume(),adapter.volume(),"registered adapter, service slot and pilots survive recipe rebuild"); rebuiltAdapter.close();
 		var nutBody=cache.posed(axis.component("nutY"),poses.get("nutY"));
 		var nutSaddle=cache.posed(axis.saddle,poses.get("saddle"));
+		var legacyAdapter=cache.posed(new MillYNutMount(new machinekit.component.ComponentValues().setBoolean("reinforced",true)),poses.get("nutBracketY"));
+		var legacySaddle=axis.saddle.values().setBoolean("nutServiceAccess",false);
+		var oldHost=new MillCrossSaddle(legacySaddle).geometry();
+		var ring=machinekit.component.Solids.cut(cadkit.modeling.Part.cylinderSpan(8,36,76,0,-l.saddleDepth/2+5),
+			[cadkit.modeling.Part.cylinderSpan(5,35,77,0,-l.saddleDepth/2+5)]);
+		var rejected=new machinekit.assembly.Diagnostics();
+		machinekit.design.DesignChecks.material(rejected,"old grease bore minimum 3 mm wall",ring,oldHost);
+		check(rejected.hasErrors(),"actual tangent grease bore fails minimum wall check"); ring.close(); oldHost.close();
+		var badNotch=machinekit.component.Solids.cut(axis.saddle.geometry(),[cadkit.modeling.Part.cylinderSpan(10,24,81,0,-l.saddleDepth/2+6)]);
+		var railLand=cadkit.modeling.Part.box(l.xRailLength,l.block.spec.railWidth,3).translated(new cadkit.modeling.Vector(0,-l.xRailSpacing/2,77));
+		var railSupport=new machinekit.assembly.Diagnostics();
+		machinekit.design.DesignChecks.material(railSupport,"rail mounting land",railLand,badNotch);
+		check(railSupport.hasErrors(),"over-deep service notch is rejected beneath X rail mounting land"); railLand.close(); badNotch.close();
+		var front:AssemblyFrame=poses.get("nutBracketY");
+		var blockedGrease=cadkit.modeling.Part.box(10,65,72.9).translated(new cadkit.modeling.Vector(0,front.y-25,l.saddleBottom+27.1));
+		var blockedAccess=new machinekit.assembly.Diagnostics();
+		machinekit.design.DesignChecks.access(blockedAccess,"front grease approach",blockedGrease,[{id:"old adapter",part:legacyAdapter}]);
+		check(blockedAccess.hasErrors(),"old closed adapter rejects front grease tool approach"); blockedGrease.close(); legacyAdapter.close();
 		var nutPose:AssemblyFrame=poses.get("nutY");
 		near(nutPose.x,0,"Y nut remains centered between guide rails");
 		near(nutPose.z,l.yScrewZ,"Y nut stays coaxial with the screw");
@@ -162,6 +181,11 @@ class MillXYStageChecks {
 		var audit = MillXYStageIntegrity.check(axis, frame);
 		audit.throwIfErrors();
 		check(!audit.hasErrors(), "continuous full Cartesian stroke audit");
+		var blockedService=new MillXYStage(l);
+		blockedService.addComponent("greaseHandlingObstruction",new MillPanel(10,10,10),F.translation(0,l.centreY-l.saddleDepth/2-50,l.saddleBottom+90));
+		var serviceAudit=MillYNutDesignChecks.check(blockedService,frame);
+		check(serviceAudit.items.filter(item->item.code=="design.access-blocked" && item.subject.indexOf("grease connector handling/greaseHandlingObstruction")>=0).length>0,
+			"production service audit rejects blocked connector handling space");
 		var uncut = MillXYStageIntegrity.check(axis, new MillFrame(f, z));
 		check(uncut.hasErrors(), "missing bearing steel seats rejected");
 		check(uncut.items.filter(item -> item.code == "mill-xy.full-stroke-collision").length > 0, "unrecessed frame collides with raised Y drive");

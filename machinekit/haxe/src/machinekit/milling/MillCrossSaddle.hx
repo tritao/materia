@@ -18,7 +18,7 @@ class MillCrossSaddle extends MachineComponent {
 		P.length("width", 450),
 		P.length("depth", 174),
 		P.length("height", 80),
-		P.flag("ribbed", false), P.flag("blockAccess",false), P.flag("nutBoss",false), P.length("guideSpacing",220), P.length("blockSpan",50.7), P.length("blockHolePitchB",26),P.length("blockHolePitchC",26),
+		P.flag("ribbed", false), P.flag("blockAccess",false), P.flag("nutBoss",false), P.flag("nutServiceAccess",false), P.length("guideSpacing",220), P.length("blockSpan",50.7), P.length("blockHolePitchB",26),P.length("blockHolePitchC",26),
 		P.length("bore", 54), P.length("boreZ", 40), P.flag("motorPocket", true), P.flag("sidePockets", false)
 	];
 
@@ -42,6 +42,7 @@ class MillCrossSaddle extends MachineComponent {
 		if(v.boolean("nutBoss") && (!v.boolean("ribbed") || !v.boolean("blockAccess") || v.number("height")<72 ||
 			v.number("boreZ")!=0 || v.number("guideSpacing")/2-(v.number("blockHolePitchC")+20)/2<MillYNutMount.BOSS_WIDTH/2+12))
 			throw "Nut boss needs the underside screw datum and separated guide service webs";
+		if(v.boolean("nutServiceAccess") && !v.boolean("nutBoss")) throw "Nut service notch requires reinforced nut boss";
 		super("MILL-CROSS-SADDLE", "Machined cross saddle", "cast iron", false, v);
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Face, Solids.axial(0, 0, v.number("height")));
@@ -114,14 +115,17 @@ class MillCrossSaddle extends MachineComponent {
 			var relieved=Solids.cut(body,tools); pieces[0]=relieved;
 			body=Solids.union(pieces); tools=[];
 			tools.push(Part.cylinderAlongY(parameterNumber("bore")/2,-d/2-1,d/2+1,0,parameterNumber("boreZ")));
-			for(p in MillYNutMount.anchors()) tools.push(Part.cylinderAlongY(2.5,-d/2-1,-d/2+22,p.x,p.y));
+			for(p in MillYNutMount.anchors()) tools.push(Part.cylinderAlongY(2.5,-d/2-1,-d/2+(values().boolean("nutServiceAccess")?24.5:22),p.x,p.y));
 			for(p in MillYNutMount.pilots()) {
 				if(p.x<0) tools.push(Part.cylinderAlongY(3.05,-d/2-1,-d/2+10,p.x,p.y));
 				else tools.push(Solids.union([Part.cylinderAlongY(3.05,-d/2-1,-d/2+10,p.x-0.2,p.y),
 					Part.cylinderAlongY(3.05,-d/2-1,-d/2+10,p.x+0.2,p.y),
 					Part.box(0.4,11,6.1).translated(new Vector(p.x,-d/2+4.5,p.y-3.05))]));
 			}
-			tools.push(Part.cylinderSpan(5,24,h+1,0,-d/2+5));
+			if (values().boolean("nutServiceAccess")) {
+				tools.push(Part.box(20,2,h-23).translated(new Vector(0,-d/2,24)));
+				tools.push(Part.cylinderSpan(10,24,h+1,0,-d/2+1));
+			} else tools.push(Part.cylinderSpan(5,24,h+1,0,-d/2+5));
 		}
 		var raw=Solids.cut(body,tools);
 		if (!values().boolean("blockAccess") && !values().boolean("nutBoss")) return raw;

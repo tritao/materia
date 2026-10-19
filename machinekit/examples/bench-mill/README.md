@@ -325,11 +325,46 @@ saddle, before installing the ballscrew assembly; in-place nut extraction is not
 claimed. These interfaces follow the existing generic SFU1605 study dimensions,
 not a verified supplier drawing.
 
-A dedicated Ø10 mm grease-access passage reaches the existing radial fitting.
-The Ø8 mm coupler envelope is checked with X parked at +125 mm and Y centered,
-clearing the saddle and X guides/blocks. The guide-block access pockets stay
-open. This is a geometry and assembly-access revision; FEM and a quantified
-stiffness comparison are deferred.
+The former edge-tangent Ø10 grease hole is replaced by a deliberately open,
+20 mm wide saddle service notch and a 14 mm wide, rounded-bottom slot in the
+adapter. The adapter is still one connected part. A slim grease extension can
+enter from the front without removing the table. Service pose: X +125 mm,
+Y zero, Z retracted. The access audit includes all XY components, frame parts
+and retracted Z components, rather than just the saddle and guide rails.
+
+`machinekit.design.DesignChecks` supplies reusable minimum-dimension,
+actual-solid material-envelope, blind-fastener-stack, coaxiality and tool-path
+checks. `MillYNutDesignChecks` applies them during the normal XY integrity audit,
+so blocked access or inadequate material also fails preview/export generation.
+The current study requires 3 mm around adapter M5 drillings, 4 mm around M6
+counterbores, 5 mm around casting taps and retained 10 mm saddle-notch cheeks.
+Both X rail mounting strips must retain a continuous 3 mm bearing land; the
+notch stops before the front rail footprint.
+Blind M5 taps have 8 mm usable thread, 8.5 mm cylindrical drilling plus a
+conservative 1.5 mm drill-point allowance, leaving 2 mm behind the drill.
+M5 ×16 screws engage 6 mm and have 2 mm to the usable thread end. The CAD bore
+conservatively includes the drill-point envelope as a full-diameter cylinder.
+M6 casting drill envelopes include their 1.5 mm point allowance too.
+
+The assembly checks cover bench access to six nut screws, front access to four
+installed adapter screws, and continuous nut/pilot insertion envelopes into the
+saddle. The sequence installs the ballnut/adapter with its screw before final
+bearing attachment; it does not require stripping the ballnut off its screw or
+claim removal with the entire drive assembled.
+
+The assumed lubrication service tool has an 8 mm slim extension, 10 mm elbow,
+and 40 mm handling space outside the front face. Additional clearance is built
+into the swept envelopes (10/12/42 mm respectively). Checks include the front
+approach, the coupler mouth actually surrounding the nipple, a 5 mm disconnect
+stroke, and elbow/hose/handling space. A separate 52 mm bend envelope reserves
+a 20 mm hose centreline bend radius with 5 mm tube radius and 1 mm clearance. These are explicit tool requirements,
+not a claim that an unspecified commercial grease gun fits. A supplier tool or
+remote lubrication kit still needs selecting and its dimensions substituting.
+Tests deliberately reject thin walls, nearby cavities, short/bottoming screws,
+misaligned axes and obstructed tool approaches; the previous grease-hole and
+closed-adapter geometries are also rejection fixtures. All dimensions are
+process-specific study limits, not strength qualification. FEM and quantified
+stiffness comparison remain deferred.
 
 The upper Z motor stand has a broad bolted foot, open cheeks, motor register,
 mounting bolts and removable front coupling guard. The motor can lift away
