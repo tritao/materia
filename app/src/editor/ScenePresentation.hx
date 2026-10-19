@@ -262,6 +262,11 @@ class ScenePresentation {
       kind:String = ""):MaterialData {
     var finish = appearance == null ? Appearances.neutral() : appearance;
     var result = MaterialData.opaque(red, green, blue).setMetallic(finish.metallic).setRoughness(finish.roughness);
+    var material = materia.project.MaterialLibrary.get(finish.finish);
+    if (material != null && material.visual.alpha != null) {
+      var alpha:Float = material.visual.alpha;
+      result.setOpacity(alpha).setOpaque(alpha >= 1.0);
+    }
     if (kind == "human-worker") result.setOpacity(0.0).setOpaque(false);
     return result;
   }
