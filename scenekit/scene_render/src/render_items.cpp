@@ -227,6 +227,7 @@ HighlightTints::HighlightTints(const SceneSnapshot &snapshot, const SceneView &v
                 colors[value.node] = {color[0], color[1], color[2], 1.0f};
             }
     };
+    load(diagnostic_, view.diagnostic_material_overrides);
     load(selection_, view.selection_material_overrides);
     load(hover_, view.hover_material_overrides);
 }
@@ -241,9 +242,11 @@ std::array<float, 4> HighlightTints::resolve(Colors &colors, NodeId node) {
 }
 
 std::array<float, 4> HighlightTints::tint(NodeId node) {
-    // Hover wins over selection; each layer inherits the nearest ancestor's tint.
+    // Hover wins over selection, then diagnostics; each layer inherits the nearest ancestor's tint.
     const auto hovered = resolve(hover_, node);
-    return hovered[3] != 0 ? hovered : resolve(selection_, node);
+    if (hovered[3] != 0) return hovered;
+    const auto selected = resolve(selection_, node);
+    return selected[3] != 0 ? selected : resolve(diagnostic_, node);
 }
 
 EffectiveState effective_state(const SceneSnapshot &snapshot, const SceneView &view) {
@@ -380,6 +383,11 @@ std::uint64_t presentation_signature(const SceneView &view) noexcept {
     }
     add(view.material_overrides.size());
     for (const auto &override : view.material_overrides) {
+        add(override.node.value);
+        add(override.material.value);
+    }
+    add(view.diagnostic_material_overrides.size());
+    for (const auto &override : view.diagnostic_material_overrides) {
         add(override.node.value);
         add(override.material.value);
     }

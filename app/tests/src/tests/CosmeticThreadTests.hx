@@ -214,10 +214,16 @@ class CosmeticThreadTests {
       var child = scene.presentation.threads.nodesFor("thread")[0];
       scene.select("thread");
       var selected = scene.configureRenderView(new SceneView(), Transform.identity());
-      check(selected.materialOverrideCount() == 2, "selection highlights the part and thread child");
+      check(selected.selectionOverrideCount() == 1 && selected.materialOverrideValues().length == 0,
+        "selection tint is inherited by the thread child without replacing its textured material");
       scene.select("scene");
       var hovered = scene.configureRenderView(new SceneView(), Transform.identity(), null, "thread");
-      check(hovered.materialOverrideCount() == 2, "whole-object hover highlights the child");
+      check(hovered.hoverOverrideCount() == 1 && hovered.materialOverrideValues().length == 0,
+        "hover tint is inherited by the thread child without replacing its textured material");
+      var diagnostic = scene.configureRenderView(new SceneView(), Transform.identity(), null, null, -1,
+        [new app.SceneCollision.SceneCollisionPair("thread","environment",-0.001,[0,0,0],[0,0,0],true)]);
+      check(diagnostic.diagnosticTintValues().length == 1 && diagnostic.materialOverrideValues().length == 0,
+        "diagnostic tint reaches thread children through the parent and keeps their textures");
       var hidden = scene.configureRenderView(new SceneView(), Transform.identity(), null, null, -1, null, false);
       check(hidden.visibilityOverrideValues()[0].get_visible() == 0, "the view setting hides threads");
       scene.configureRenderView(new SceneView(), Transform.identity());

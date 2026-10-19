@@ -10,6 +10,7 @@ class SceneView {
 	var materialOverrides:Array<nkscene_render_material_override> = [];
 	var selectionOverrides:Array<nkscene_render_material_override> = [];
 	var hoverOverrides:Array<nkscene_render_material_override> = [];
+	var diagnosticOverrides:Array<nkscene_render_material_override> = [];
 	var isolatedSources:Array<nkscene_entity_id> = [];
 	var isolatedNodes:Array<nkscene_node_id> = [];
 	var sourceVisibilityOverrides:Array<nkscene_render_source_visibility_override> = [];
@@ -225,6 +226,22 @@ class SceneView {
 		return this;
 	}
 
+	/** Tints a diagnostic subtree without replacing its material; selection and hover win. */
+	public function setDiagnosticTint(node:NodeId, material:Material):SceneView {
+		setMaterialOverride(diagnosticOverrides, node, material);
+		value.set_diagnostic_overrides(diagnosticOverrides);
+		return this;
+	}
+
+	public function clearDiagnosticTints():SceneView {
+		diagnosticOverrides.resize(0);
+		value.set_diagnostic_overrides(diagnosticOverrides);
+		return this;
+	}
+
+	public function diagnosticTintValues():Array<nkscene_render_material_override>
+		return diagnosticOverrides.copy();
+
 	@:allow(SelectionSet)
 	function setSelectionMaterial(node:NodeId, material:Material):SceneView {
 		setMaterialOverride(selectionOverrides, node, material);
@@ -346,6 +363,7 @@ class SceneView {
 	}
 
 	public function clearOverrides():SceneView {
+		clearDiagnosticTints();
 		visibilityOverrides.resize(0);
 		materialOverrides.resize(0);
 		selectionOverrides.resize(0);
@@ -416,7 +434,7 @@ class SceneView {
 		return visibilityOverrides.length;
 
 	public function materialOverrideCount():Int
-		return materialOverrides.length + selectionOverrides.length + hoverOverrides.length;
+		return materialOverrides.length + diagnosticOverrides.length + selectionOverrides.length + hoverOverrides.length;
 
 	public function selectionOverrideCount():Int
 		return selectionOverrides.length;

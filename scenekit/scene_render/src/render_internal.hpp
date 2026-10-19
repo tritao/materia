@@ -17,7 +17,7 @@ struct EffectiveState {
 class HighlightTints {
     const SceneSnapshot &snapshot_;
     using Colors = std::unordered_map<NodeId, std::array<float, 4>>;
-    Colors selection_, hover_;
+    Colors diagnostic_, selection_, hover_;
     std::array<float, 4> resolve(Colors &, NodeId);
   public:
     HighlightTints(const SceneSnapshot &, const SceneView &);

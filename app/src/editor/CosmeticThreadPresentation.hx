@@ -99,14 +99,12 @@ class CosmeticThreadPresentation {
   /** Called after an atomic edit has retired this object's nodes. */
   public function release(owner:EditorScene, id:String):Void remove(owner, id);
 
-  public function show(owner:EditorScene, view:SceneView, visible:Bool, highlights:Map<String, Material>):Void {
+  public function show(owner:EditorScene, view:SceneView, visible:Bool):Void {
     for (id in groups.keys()) {
       var item = owner.object(id);
       var group:ThreadGroup = cast groups.get(id);
       for (entry in group.nodes) {
         view.setVisibility(entry.node, visible && item != null && SceneVisibility.shown(item.visible, item.hiddenBy));
-        var highlight = highlights.get(id);
-        if (highlight != null) view.setMaterial(entry.node, highlight);
       }
     }
   }

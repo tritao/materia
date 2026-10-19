@@ -28,6 +28,7 @@ bool isolation_only(const SceneView &view) noexcept {
     return !view.include_invisible && view.filter.source_visibility_overrides.empty() &&
            view.filter.source_material_overrides.empty() && view.visibility_overrides.empty() &&
            view.material_overrides.empty() && view.selection_material_overrides.empty() &&
+           view.diagnostic_material_overrides.empty() &&
            view.hover_material_overrides.empty() &&
            (!view.filter.isolated_sources.empty() || !view.filter.isolated_nodes.empty());
 }
@@ -76,10 +77,12 @@ void render_internal::capture_view_policy(RenderPlan &plan, const SceneView &vie
     plan.view_override_nodes_.clear();
     plan.view_override_nodes_.reserve(
         view.visibility_overrides.size() + view.material_overrides.size() +
-        view.selection_material_overrides.size() + view.hover_material_overrides.size());
+        view.diagnostic_material_overrides.size() + view.selection_material_overrides.size() + view.hover_material_overrides.size());
     for (const auto &override : view.visibility_overrides)
         plan.view_override_nodes_.push_back(override.node);
     for (const auto &override : view.material_overrides)
+        plan.view_override_nodes_.push_back(override.node);
+    for (const auto &override : view.diagnostic_material_overrides)
         plan.view_override_nodes_.push_back(override.node);
     for (const auto &override : view.selection_material_overrides)
         plan.view_override_nodes_.push_back(override.node);
@@ -107,6 +110,7 @@ void render_internal::capture_view_policy(RenderPlan &plan, const SceneView &vie
         !view.include_invisible && view.filter.isolated_sources.empty() &&
         view.filter.isolated_nodes.empty() && view.visibility_overrides.empty() &&
         view.material_overrides.empty() && view.selection_material_overrides.empty() &&
+        view.diagnostic_material_overrides.empty() &&
         view.hover_material_overrides.empty() &&
         (!view.filter.source_visibility_overrides.empty() ||
          !view.filter.source_material_overrides.empty());
@@ -201,6 +205,7 @@ RenderUpdate update(RenderPlan &plan, const SceneSnapshot &snapshot, const Chang
         !view.include_invisible && view.filter.isolated_sources.empty() &&
         view.filter.isolated_nodes.empty() && view.visibility_overrides.empty() &&
         view.material_overrides.empty() && view.selection_material_overrides.empty() &&
+        view.diagnostic_material_overrides.empty() &&
         view.hover_material_overrides.empty() &&
         (!view.filter.source_visibility_overrides.empty() ||
          !view.filter.source_material_overrides.empty());
@@ -432,6 +437,8 @@ RenderUpdate update(RenderPlan &plan, const SceneSnapshot &snapshot, const Chang
         for (const auto &override : view.visibility_overrides)
             add_current_target(override.node);
         for (const auto &override : view.material_overrides)
+            add_current_target(override.node);
+        for (const auto &override : view.diagnostic_material_overrides)
             add_current_target(override.node);
         for (const auto &override : view.selection_material_overrides)
             add_current_target(override.node);
@@ -842,6 +849,7 @@ RenderUpdate update(RenderPlan &plan, const SceneSnapshot &snapshot, const Chang
         };
         // Include retired overrides so clearing or moving a highlight restores its old subtree.
         for (const auto node : plan.view_override_nodes_) add_subtree(node);
+        for (const auto &value : view.diagnostic_material_overrides) add_subtree(value.node);
         for (const auto &value : view.selection_material_overrides) add_subtree(value.node);
         for (const auto &value : view.hover_material_overrides) add_subtree(value.node);
         if (hierarchy_changed)

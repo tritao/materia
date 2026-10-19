@@ -177,6 +177,8 @@ struct SceneView {
     std::vector<VisibilityOverride> visibility_overrides;
     /** Base presentation material overrides. */
     std::vector<MaterialOverride> material_overrides;
+    /** Diagnostic RGB tint, inherited by descendants below selection and hover. */
+    std::vector<MaterialOverride> diagnostic_material_overrides;
     /** Selection RGB tint, inherited by descendants; preserves source surface and alpha. */
     std::vector<MaterialOverride> selection_material_overrides;
     /** Hover RGB tint, inherited by descendants and taking precedence over selection. */
@@ -211,6 +213,12 @@ struct SceneView {
     void set_selection_material_override(NodeId node, MaterialId material) {
         set_material_override_in(selection_material_overrides, node, material);
     }
+
+    void set_diagnostic_material_override(NodeId node, MaterialId material) {
+        set_material_override_in(diagnostic_material_overrides, node, material);
+    }
+
+    void clear_diagnostic_material_overrides() noexcept { diagnostic_material_overrides.clear(); }
 
     void set_hover_material_override(NodeId node, MaterialId material) {
         set_material_override_in(hover_material_overrides, node, material);

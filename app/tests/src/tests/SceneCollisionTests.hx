@@ -16,7 +16,6 @@ import nativekit.scene.Transform;
 /** The editor's collision world over plain scene objects (COLLISION.md CL8a) and how it is shown (CL8b). */
 @:access(app.EditorScene)
 @:access(app.editor.ScenePresentation)
-@:access(nativekit.scene.MaterialData)
 @:access(app.Main.ReferenceEditorApp)
 @:access(app.EditorPerspectiveViewport)
 class SceneCollisionTests {
@@ -38,23 +37,9 @@ class SceneCollisionTests {
   }
 
   static function run():Void {
-    translucentDiagnostics();
     world();
     shown();
     editor();
-  }
-
-  static function translucentDiagnostics():Void {
-    var finish=materia.project.MaterialLibrary.appearance("polycarbonate");
-    for(colliding in [false,true]) {
-      var data=app.editor.ScenePresentation.diagnosticMaterialData(finish,"cad-preview",colliding);
-      check(Math.abs(data.value.get_opacity()-0.18)<1e-6,"Diagnostic colours preserve polycarbonate opacity");
-      check((data.value.get_flags() & NativeKitScene.NativeKitSceneConstants.NKS_MATERIAL_OPAQUE)==0,
-        "Diagnostic colours keep translucent surfaces in the blended pass");
-      check(Math.abs(data.value.get_roughness()-finish.roughness)<1e-6,"Diagnostic colours preserve surface finish");
-      var solid=app.editor.ScenePresentation.diagnosticMaterialData(materia.project.Appearance.Appearances.neutral(),"cad-preview",colliding);
-      check(solid.value.get_opacity()==1,"Opaque parts stay opaque under diagnostics");
-    }
   }
 
   static function world():Void {
@@ -106,17 +91,20 @@ class SceneCollisionTests {
       'the toolbar line names the closest pair (${SceneCollision.summary(pairs, id -> id)})');
     check(SceneCollision.summary([], id -> id) == null, "nothing to report, no line");
     function tinted(?with:Array<app.SceneCollision.SceneCollisionPair>):Int
-      return scene.configureRenderView(new SceneView(), Transform.identity(), null, null, -1, with).materialOverrideValues().length;
+      return scene.configureRenderView(new SceneView(), Transform.identity(), null, null, -1, with).diagnosticTintValues().length;
     scene.select("scene");
     check(tinted(pairs) == 4, 'all four objects are tinted (${tinted(pairs)})');
-    scene.renderSnapshot();
-    check(!scene.presentation.presentationStale,"New diagnostic materials are published before rendering");
-    var materials=scene.presentation.diagnosticMaterials;
-    var cachedCount=[for(_ in materials) 1].length;
-    tinted(pairs);
-    check([for(_ in materials) 1].length==cachedCount,"Diagnostic materials are reused across frames");
+    var original=scene.runtimeFor("a").material.id().get_value();
+    var view=scene.configureRenderView(new SceneView(),Transform.identity(),null,null,-1,pairs);
+    check(view.materialOverrideValues().length==0,"Diagnostics tint instead of replacing source materials");
+    check(scene.runtimeFor("a").material.id().get_value()==original,"Diagnostic colours retain source material identity");
+    scene.configureRenderView(view,Transform.identity());
+    check(view.diagnosticTintValues().length==0,"Reusing a view clears retired diagnostic tints");
+    scene.configureRenderView(view,Transform.identity(),null,null,-1,pairs);
+    view.clearOverrides();
+    check(view.diagnosticTintValues().length==0,"Clearing view overrides clears diagnostic tints");
     scene.select("a");
-    check(tinted(pairs) == 3, "the selected object keeps its selection highlight");
+    check(tinted(pairs) == 4, "Diagnostic tints stay below the independent selection layer");
     check(tinted() == 0, "without pairs nothing is tinted");
 
     var host = new UiHostContext(null, new NativeKitEvents(), function() {}, function() {});
@@ -140,7 +128,9 @@ class SceneCollisionTests {
 
   /** CL8b in the editor: the setting turns it on and off, and a simulation hides it. */
   static function editor():Void {
-    var app = new ReferenceEditorApp();
+    var directory="build/collision-ui-test-"+Std.string(Sys.time());
+    sys.FileSystem.createDirectory(directory);
+    var app = new ReferenceEditorApp(null,directory+"/workspace.json");
     var ids:Array<String> = [];
     for (x in [0.0, 0.08]) {
       check(app.scene.createRectangle(), "the editor creates a box");

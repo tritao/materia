@@ -62,6 +62,10 @@ hemisphere so recess walls read distinctly. The perspective viewport adds subtle
 screen-space ambient occlusion within 25 mm and broadens highlights with a
 studio roughness floor. The Soft preset reduces occlusion and softens highlights
 further. These are display settings; authored part materials are unchanged.
+Collision and near-distance indicators use an RGB tint below selection and hover.
+They retain each surface's material, opacity, alpha mask and textures, including
+cosmetic thread meshes. Clearing an indicator restores the original colour.
+
 Occlusion affects indirect light on opaque geometry, preserves transparent
 backgrounds, and ignores blended/masked surfaces as occluders. It uses visible
 depth, so hidden surfaces and subpixel recesses cannot contribute.

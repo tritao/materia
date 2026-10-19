@@ -163,7 +163,7 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		visible_items: u64 @offset(80);
 		culled_items: u64 @offset(88);
 	}
-	struct nkscene_render_view @layout(504, 8) {
+	struct nkscene_render_view @layout(520, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		root: nkscene_node_id @offset(8);
 		include_invisible: u32 @offset(16);
@@ -220,6 +220,8 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		 * Optional studio detail: AO radius in world units, strength [0,1], angular bias [0,1], roughness floor [0,1].
 		 */
 		studio_surface_detail: array<f32, 4> @offset(484);
+		diagnostic_overrides: ptr<const<nkscene_render_material_override>> @offset(504) @borrowed @length_field("diagnostic_override_count");
+		diagnostic_override_count: u32 @offset(512);
 	}
 	struct nkscene_render_visibility_override @layout(16, 8) {
 		node: nkscene_node_id @offset(0);

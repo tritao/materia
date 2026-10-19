@@ -137,6 +137,9 @@ typedef struct nkscene_render_view {
     float workplane_grid_up[4];
     /** Optional studio detail: AO radius in world units, strength [0,1], angular bias [0,1], roughness floor [0,1]. */
     float studio_surface_detail[4];
+    /** RGB-only diagnostic tint; selection and hover take precedence. Source materials are retained. */
+    const nkscene_render_material_override *diagnostic_overrides NK_BORROWED_ARRAY(diagnostic_override_count);
+    uint32_t diagnostic_override_count;
 } nkscene_render_view;
 
 /* ------------------------------------------------------------------------- */

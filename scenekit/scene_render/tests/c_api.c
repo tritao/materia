@@ -138,6 +138,19 @@ int main(void) {
     view.camera_world_position[2] = 2.0f;
     view.camera_view_direction[2] = 1.0f;
     nkscene_render_plan plan = {0};
+    /* Appended tint fields are optional for older callers, validated for new ones. */
+    view.diagnostic_override_count = 1;
+    assert(nkscene_render_plan_compile(snapshot, &view, &plan) == NKS_ERROR_INVALID_ARGUMENT);
+    view.struct_size = offsetof(nkscene_render_view, diagnostic_overrides);
+    assert(nkscene_render_plan_compile(snapshot, &view, &plan) == NKS_OK);
+    nkscene_render_plan_destroy(plan);
+    view.struct_size = sizeof(view);
+    nkscene_render_material_override diagnostic = {node, material};
+    view.diagnostic_overrides = &diagnostic;
+    assert(nkscene_render_plan_compile(snapshot, &view, &plan) == NKS_OK);
+    nkscene_render_plan_destroy(plan);
+    view.diagnostic_overrides = NULL;
+    view.diagnostic_override_count = 0;
     view.camera_view_direction[2] = 0.0f;
     assert(nkscene_render_plan_compile(snapshot, &view, &plan) == NKS_ERROR_INVALID_ARGUMENT);
     view.camera_view_direction[2] = 1.0f;

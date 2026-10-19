@@ -73,6 +73,11 @@ void highlight_alpha_regression(nkgpu_renderer renderer) {
     };
     const auto normal = pixel();
     assert(std::abs(normal[3] - 61) <= 2); // 0.8 base alpha * 0.3 opacity
+    view.set_diagnostic_material_override(group, blue);
+    auto diagnostic_update = nkscene::refresh(plan, scene->snapshot(), view);
+    assert(!diagnostic_update.plan_rebuilt && diagnostic_update.rebuilt_batches == 0);
+    const auto diagnostic = pixel();
+    assert(diagnostic[3] == normal[3] && diagnostic[2] > diagnostic[0]);
     view.set_selection_material_override(group, yellow);
     auto update = nkscene::refresh(plan, scene->snapshot(), view);
     assert(!update.plan_rebuilt && update.rebuilt_batches == 0);
@@ -90,10 +95,14 @@ void highlight_alpha_regression(nkgpu_renderer renderer) {
     assert(std::abs(edited[3] - 122) <= 2);
     view.clear_hover_material_overrides(); view.clear_selection_material_overrides();
     nkscene::refresh(plan, scene->snapshot(), view);
+    const auto fallback = pixel();
+    assert(fallback[3] == edited[3] && fallback[2] > fallback[0]);
+    view.clear_diagnostic_material_overrides();
+    nkscene::refresh(plan, scene->snapshot(), view);
     const auto cleared = pixel();
     assert(cleared[3] == edited[3] && cleared != edited);
     // Fully invisible and alpha-masked surfaces remain invisible when highlighted.
-    view.set_selection_material_override(group, yellow);
+    view.set_diagnostic_material_override(group, yellow);
     surface.edit_state().opacity = 0;
     scene->publish(); nkscene::refresh(plan, scene->snapshot(), view);
     assert(pixel()[3] == 0);

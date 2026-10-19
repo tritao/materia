@@ -34,8 +34,9 @@ class ScenePresentation {
   public var renderNeedsRefresh:Bool = false;
   public var selectionMaterial:Material;
   public var hoverMaterial:Material;
-  /** Cached diagnostic colours with the source finish and alpha (COLLISION.md CL8b). */
-  final diagnosticMaterials:Map<String,Material> = [];
+  /** RGB swatches only; the renderer retains every surface's authored material. */
+  public var collidingMaterial:Material;
+  public var nearMaterial:Material;
   public final faceHoverNodes:Map<String, NodeId> = new Map();
   public final faceHoverGeometries:Map<String, Geometry> = new Map();
   public final faceHoverIndexes:Map<String, Int> = new Map();
@@ -162,8 +163,8 @@ class ScenePresentation {
       ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1,
       ?collisions:Array<app.SceneCollision.SceneCollisionPair>, cosmeticThreads:Bool = true):SceneView {
     if (cosmeticThreads) threads.ensure(owner);
-    var threadHighlights:Map<String, Material> = [];
     view.setViewProjection(viewProjection);
+    view.clearDiagnosticTints();
     if (collisions != null) {
       // Red for objects in a colliding pair, amber for objects only near; the selection and the hovered
       // object keep their own highlight.
@@ -175,11 +176,11 @@ class ScenePresentation {
           if (!colliding.exists(pair.b)) colliding.set(pair.b, false);
         }
       }
-      for (id in colliding.keys()) if (id != owner.selectedId && id != hoveredId) {
+      for (id in colliding.keys()) {
         var runtime = bridge.runtime(id);
         if (runtime != null) {
-          var highlight = diagnosticMaterial(owner, owner.object(id), colliding.get(id) == true);
-          view.setMaterial(runtime.node, highlight); threadHighlights.set(id, highlight);
+          var highlight = colliding.get(id) == true ? collidingMaterial : nearMaterial;
+          view.setDiagnosticTint(runtime.node, highlight);
         }
       }
     }
@@ -213,7 +214,7 @@ class ScenePresentation {
       else
         view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, highlightMaterial);
     }
-    threads.show(owner, view, cosmeticThreads, threadHighlights);
+    threads.show(owner, view, cosmeticThreads);
     if (poses != null) {
       var poseNodes:Array<NodeId> = [];
       var poseTransforms:Array<Transform> = [];
@@ -254,27 +255,6 @@ class ScenePresentation {
       view.replacePoses(poseNodes, poseTransforms);
     }
     return view;
-  }
-
-  /** Diagnostic colours retain the authored surface finish and transparency. */
-  function diagnosticMaterial(owner:EditorScene, item:EditorSceneObject, colliding:Bool):Material {
-    var finish = item.appearance == null ? Appearances.neutral() : item.appearance;
-    var key = haxeon.wire.JsonWire.encode([finish.finish, Std.string(finish.metallic),
-      Std.string(finish.roughness), item.kind, colliding ? "collision" : "near"]);
-    var cached = diagnosticMaterials.get(key);
-    if(cached!=null)return cached;
-    var material = owner.scene.createMaterial();
-    owner.scene.setMaterialData(material,diagnosticMaterialData(finish,item.kind,colliding));
-    diagnosticMaterials.set(key,material);
-    // The renderer must see newly allocated materials in its next snapshot.
-    presentationStale = true;
-    requireRenderRefresh();
-    return material;
-  }
-
-  static function diagnosticMaterialData(finish:Appearance, kind:String, colliding:Bool):MaterialData {
-    var color = colliding ? [0.92,0.22,0.2] : [1.0,0.66,0.18];
-    return materialFor(color[0],color[1],color[2],finish,kind);
   }
 
   public static function materialFor(red:Float, green:Float, blue:Float, appearance:Null<Appearance>,

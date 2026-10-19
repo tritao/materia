@@ -1240,13 +1240,20 @@ void highlights_preserve_authored_materials() {
     assert(scene->commit(configure, changes) == NKS_OK);
     configure.close();
     nkscene::SceneView view;
-    view.set_selection_material_override(group, yellow);
+    view.set_diagnostic_material_override(group, blue);
     auto plan = nkscene::compile(scene->snapshot(), view);
     const std::array<float, 4> selected{1, 1, 0, 1}, hovered{0, 0, 1, 1}, none{};
     auto item = [&](nkscene::NodeId node) -> const nkscene::RenderItem & {
         return plan.items()[plan.item_index(node)];
     };
     assert(item(window).material == glass && item(panel).material == solid);
+    assert(item(window).highlight_tint == hovered && item(panel).highlight_tint == hovered);
+    view.set_diagnostic_material_override(window, yellow);
+    auto diagnostic_update = nkscene::refresh(plan, scene->snapshot(), view);
+    assert(!diagnostic_update.plan_rebuilt && diagnostic_update.rebuilt_batches == 0);
+    assert(item(window).highlight_tint == selected && item(panel).highlight_tint == hovered);
+    view.set_selection_material_override(group, yellow);
+    nkscene::refresh(plan, scene->snapshot(), view);
     assert(item(window).highlight_tint == selected && item(panel).highlight_tint == selected);
     view.set_hover_material_override(window, blue);
     auto update = nkscene::refresh(plan, scene->snapshot(), view);
@@ -1271,6 +1278,10 @@ void highlights_preserve_authored_materials() {
     assert((item(face).highlight_tint == std::array<float, 4>{1, 0, 1, 1}));
     view.clear_hover_material_overrides();
     view.clear_selection_material_overrides();
+    nkscene::refresh(plan, scene->snapshot(), view);
+    assert(item(window).highlight_tint == selected);
+    assert((item(panel).highlight_tint == std::array<float, 4>{1, 0, 1, 1}));
+    view.clear_diagnostic_material_overrides();
     nkscene::refresh(plan, scene->snapshot(), view);
     assert(item(window).highlight_tint == none && item(face).highlight_tint == none);
     assert(item(window).material == glass && item(panel).material == solid);
