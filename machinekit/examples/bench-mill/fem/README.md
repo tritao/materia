@@ -664,3 +664,23 @@ summarize the whole low-frequency spectrum. `mode-identity-notes.json` records
 all first-six-order ranges and shared casting-MAC targets under
 `build/fem/nine-pose-serial`; SHA256
 `a0c4e2c8148ac4dc79517dc6218abb13486f834d99a1783440619cd22939db33`.
+
+
+### Static travel sweep in progress
+
+Ten of eighteen serial decision-reference studies now pass: both nose and bar
+at center and the four negative-X travel corners. The largest completed casting
+share is **17.723%**, at `xminus_yplus_zupper`, `spindle-nose`,
+`soft-three-point`, axis X. The remaining positive-X corners and
+three contextual center cutter contacts are running; no full-travel casting
+or lightening gate is claimed yet.
+
+Completed static displacement fields are losslessly gzip archived to preserve
+storage headroom. `field-archives.json` in each completed study records original
+and compressed SHA256, source deck/report hashes and file sizes; decompression
+was hash-verified before removing the raw copy. Use `gzip -dk PATH/frame.frd.gz`
+when a raw static field is needed. Numerical `.dat`, `.inp`, solver logs and
+reports stay unchanged. Modal FRD files remain raw for modal post-processing.
+The first archival pass verified 253 fields and saved **2.459 GiB**. Generated
+archival tooling and its log are under `build/fem/archive_static_fields.py`
+and `static-field-archives.log`.
