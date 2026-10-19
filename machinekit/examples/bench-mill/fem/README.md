@@ -4,12 +4,12 @@ Status and reproduction record for [FEM_PLAN.md](../FEM_PLAN.md). This study
 uses a bonded-frame, rigid-axis **upper-bound** model and assumed catalogue
 springs. Numerical qualification does not establish machining accuracy.
 
-The serial nine-pose modal gate passes. The serial static sweep has passed
-13 of 18 decision-reference studies, with a current maximum casting share of
-**17.723%** of the machine loop, below the provisional **30%** target. This is
-an interim maximum; the remaining five studies and three cutter contacts must
-finish before the full budget gate. Physical modal acceptance remains open.
-No `MillFrameLayout` geometry has been edited.
+The serial nine-pose modal and static numerical gates pass. All 18 nose/bar
+static studies pass both support bounds and two resolved quadratic mesh levels.
+Maximum casting share is **18.792%** of the machine loop excluding
+the job-dependent tool, against the provisional **30%** target. Three center
+cutter contacts and their material budgets are pending. Physical modal
+acceptance remains open; no `MillFrameLayout` geometry has been edited.
 
 ## Current qualified serial follow-up
 
@@ -51,8 +51,8 @@ casting-motion peak and 66.2% of kinetic energy is in meshed solids, so this
 mode warrants a relative-path/operating-band review. Mode-shape ratios describe
 normalized eigenvectors. Declared machining/motor/axis bands and joint/material
 uncertainty remain required. See `build/fem/nine-pose-serial/excitation-context.md`. The serial nine-pose nose/test-bar static sweep has
-passed both center decision cases; travel cases are running. Tool-context budgets and the casting-share/lightening decision remain
-pending; no `MillFrameLayout` geometry has been edited.
+passed all eighteen decision-reference studies. Tool-context budgets remain
+pending. The modal operating-band review is open; no CAD geometry has changed.
 
 ## Qualified center decision budgets
 
@@ -70,19 +70,45 @@ separate in each report.
 | Steel 20 mm / 40 mm bar | Four springs | 13.08% | 10.48% | 13.26% |
 
 The center maximum is **17.37%**, below the provisional 30% target. The casting
-geometry decision awaits the corresponding nine-pose maxima and modal operating
-band review. No geometry change has been made. The bar report is
+geometry decision uses the nine-pose maxima below and still requires modal
+operating-band review. No geometry change has been made. The bar report is
 `build/fem/nine-pose-serial/center/test-bar-20/report.json`, SHA256
 `dc99cc07ed78e313c401c93862acff37742efb31ca631a0a7c2d7d27bba85cc7`.
-Thirteen of eighteen travel/reference static studies currently pass. Contextual cutter budgets will reuse their
+All eighteen travel/reference static studies now pass. Contextual cutter budgets will reuse their
 three center contact solutions for steel/carbide variants after the travel sweep.
 
+
+## Qualified nine-pose static gate
+
+Maximum casting share: **18.792%**, `xplus_yplus_zlower`, `soft-three-point`, `spindle-nose`, X.
+All nominal shares below 30%: **True**. These results remain conditional on casting and catalogue/joint stiffness assumptions.
+
+| Pose | Three-point maximum | Four-spring maximum |
+| --- | --- | --- |
+| center | 17.374% | 15.844% |
+| xminus_yminus_zlower | 13.748% | 13.200% |
+| xminus_yminus_zupper | 14.682% | 14.682% |
+| xminus_yplus_zlower | 16.791% | 14.758% |
+| xminus_yplus_zupper | 17.723% | 16.136% |
+| xplus_yminus_zlower | 15.457% | 14.848% |
+| xplus_yminus_zupper | 14.682% | 14.682% |
+| xplus_yplus_zlower | 18.792% | 16.545% |
+| xplus_yplus_zupper | 18.566% | 16.136% |
+
+Each entry is the maximum over X/Y/Z and the two decision references.
+The reports retain full C matrices, principal directions, ±500 N load-box
+corners, support differences, reciprocity, sign/scaling, equilibrium and
+element-group energy/sensitivity checks at every pose.
+
+Aggregate: `build/fem/nine-pose-serial/report.json`; SHA256 `b84c5ab338a8868008aa99cd280e25730a8a426b9d0b50821f9732082f8c7164`.
+The ~132.75 Hz corner mode and missing declared operating bands still prevent
+a claim of physical modal acceptance or selection of a lightened design.
 
 ## Conditional lightening parameter proposal
 
 [lightening-candidates.json](lightening-candidates.json) records proposed
 parameters only; none is evaluated or selected and CAD geometry is unchanged.
-The full static-share gate and modal operating-band review remain prerequisites.
+The static-share gate is complete; modal operating-band review remains a prerequisite.
 
 | Parameter family | Baseline | Proposed levels | Constraint |
 | --- | --- | --- | --- |
@@ -421,5 +447,5 @@ selected supplier data and joint measurements remain open inputs.
 The first-milestone numerical and budget gates pass for the frozen center run.
 Later work includes the distributing-coupling assembly model and uncertainty/contact
 checks. The modal inertia/export and nine-pose numerical gates now pass;
-the revised static travel budget is running. Geometry candidates stay deferred
+the revised static travel budget passes. Geometry candidates stay deferred
 until that budget and modal review justify them.
