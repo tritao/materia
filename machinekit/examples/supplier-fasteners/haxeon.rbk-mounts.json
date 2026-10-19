@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-rbk-interface-checks"},
+  "entry": "RbkMountChecks",
+  "sourceRoots": ["."],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "../../../build/suppliers/rbk-interface-checks"
+}

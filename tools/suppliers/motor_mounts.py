@@ -1,8 +1,36 @@
 #!/usr/bin/env python3
 """Separate custom motor plates from exact supplier CAD and interface evidence."""
 from pathlib import PurePosixPath
+from pathlib import Path
 from urllib.parse import urlsplit
 import re
+import json
+
+
+def attach_interfaces(bindings, references):
+    """A changed STEP stays usable as raw CAD, but never inherits old mounting frames."""
+    recipes = []
+    for binding in bindings:
+        reference = next((r for r in references if r['sku'] == binding['sku']), None)
+        if reference is None or binding['geometry_kind'] != 'supplier_cad':
+            continue
+        if binding['name'] != reference['model'] + '-motor-bracket':
+            raise ValueError('Pinned RBK interface model/SKU mismatch')
+        cad = binding['cad']
+        if len(cad) != 1 or cad[0]['sha256'] != reference['asset_sha256']:
+            binding['interface_status'] = 'asset_revision_needs_measurement'
+            continue
+        binding['interface_status'] = 'pinned_cad_and_drawing_datums'
+        binding['mounting_frame_status'] = 'pinned_named_datums'
+        binding['interfaces'] = reference
+        binding['type_id'] = 'machinekit.assembly.rbk-motor-mount'
+        binding['recipe_values'] = {'model': reference['model'], 'revision': reference['revision']}
+        recipes.append({'supplier_id': 'vallder', 'sku': binding['sku'],
+            'supplier_product_id': binding['supplier_product_id'], 'parent_id': 6718,
+            'type_id': binding['type_id'], 'values': binding['recipe_values'], 'required_inputs': [],
+            'geometry_source': 'supplier_cad', 'compatibility': 'review_required',
+            'asset_sha256': reference['asset_sha256'], 'source_url': binding['source_url']})
+    return recipes
 
 
 def bind_rbk(catalog, assets):
@@ -87,5 +115,8 @@ def build(catalog, assets):
             'drawing_urls': p['description_links'], 'compatibility_verified': False,
             'limits': ['Asymmetric plate/bent bracket geometry differs from the generic square plate',
                        'Profile-side features need full dimensional and clearance qualification']})
+    references = json.loads(Path(__file__).with_name('rbk-interfaces.json').read_text())['interfaces']
+    recipes = attach_interfaces(bindings, references)
     return {'schema_version': 1, 'generic_recipe_type': 'machinekit.assembly.nema-mount-plate',
-            'generic_plate_offer_policy': 'Custom made part; no Vallder SKU inferred', 'bindings': bindings}
+            'generic_plate_offer_policy': 'Custom made part; no Vallder SKU inferred', 'bindings': bindings,
+            'recipes': recipes}

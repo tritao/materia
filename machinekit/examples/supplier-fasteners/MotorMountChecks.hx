@@ -9,7 +9,8 @@ import cadkit.parametric.DocumentCodec;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
 import materia.assembly.AssemblyFrames;
-import machinekit.component.SupplierCadComponent;
+import machinekit.assembly.RbkMotorMount;
+import machinekit.component.SupplierRecipeLibrary;
 import machinekit.component.SourcingPlan;
 
 class MotorMountChecks {
@@ -87,13 +88,16 @@ class MotorMountChecks {
         var catalog:Dynamic=haxe.Json.parse(sys.io.File.getContent(dir+"catalog.json"));
         var bindings:Array<Dynamic> = report.bindings,variants:Array<Dynamic> = catalog.variants;
         var assembly=new MachineAssembly(),plan=new SourcingPlan(),count=0;
+        RbkMotorMount.setSupplierDirectory(dir);
+        var library=new SupplierRecipeLibrary(sys.io.File.getContent(dir+"recipes.json"),MachineKitComponents.defaultRegistry());
         for(binding in bindings) if(binding.geometry_kind=="supplier_cad") {
             var assets:Array<Dynamic> = binding.cad;
             check(assets.length==1,"RBK binding has exactly one validated STEP asset");
             var asset=assets[0];
-            var part=new SupplierCadComponent(dir+asset.file,asset.sha256,"VALLDER-"+binding.sku,binding.name);
+            var part=library.create("vallder",binding.sku);
             var shape=part.geometry();check(shape.valid() && shape.volume()>0,"Bound supplier CAD loads correctly");shape.close();
-            assembly.addComponent("rbk-"+binding.sku,part);
+            assembly.addComponent("rbk-"+binding.sku,part,AssemblyFrames.translation(count*180,0,0));
+            check(part.connector("motor")!=null && part.connector("base")!=null,"Supplier recipe has named mounting frames");
             var variant:Dynamic=null;
             for(v in variants) if(v.supplier_product_id==binding.supplier_product_id) variant=v;
             check(variant!=null,"Bound RBK offer uses an exact catalogue variant");
@@ -104,12 +108,13 @@ class MotorMountChecks {
                 productUrl:variant.url,observedAt:variant.source.fetched_at,currency:price.currency_code,
                 currencyMinorUnit:price.currency_minor_unit,unitPriceMinor:minor,taxBasis:variant.price.tax_basis,
                 inStock:variant.availability.is_in_stock==true,compatibilityVerified:false});
-            part.close();count++;
+            count++;
         }
         check(count==4,"Four RBK variant bindings checked");
         var lines=plan.lines(assembly.billOfMaterials());
         for(line in lines) check(line.selected==null && line.offers.length==1,"Supplier choice remains optional");
         sys.io.File.saveContent(dir+"supplier-motor-mounts.bom.json",haxe.Json.stringify(lines,null,"  "));
+        sys.io.File.saveContent(dir+"supplier-motor-mounts.assembly.json",assembly.encode());
         trace('Supplier motor CAD and optional sourcing checks passed: $count RBK variants');
     }
 }

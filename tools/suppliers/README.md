@@ -150,8 +150,8 @@ var plate = new machinekit.assembly.NemaMountPlate(
 `coverage.py` writes `motor-mounts.json` and resolves all four RBK CAD variants
 by exact model, SKU and download columns in Vallder's transposed table. The
 validated asset hashes and paths are available through `cad/library.json` and
-the motor-mount bindings. Use `SupplierCadComponent` for those purchased parts;
-their mounting frames and mechanical interfaces remain unverified. Cube and
+the motor-mount bindings. The four reviewed revisions also bind to the saveable
+`machinekit.assembly.rbk-motor-mount` recipe described below. Cube and
 other motor holders stay separate from custom square plates. DB57's listed
 38 mm opening is smaller than our 38.1 mm NEMA 23 pilot; DB86 has zero nominal
 pilot clearance. Both need tolerance review. Generic plates receive no inferred
@@ -165,9 +165,80 @@ MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run --project machinekit/examples/su
 The native check covers NEMA 17/23/34 geometry, both profile grids, assembly and
 editable document round trips, invalid hole layouts and the existing four-screw
 NEMA 17 assembly. It saves `motor-mounts.assembly.json` and `motor-mounts.bom.json`.
-The optional `--supplier-cad` imports the four hash-pinned RBK assets and writes
-`supplier-motor-mounts.bom.json` with unselected Vallder offers. Purchased CAD
-remains code-only; it is not embedded in the saveable generic plate assembly.
+The optional `--supplier-cad` loads the four pinned RBK recipes and writes
+`supplier-motor-mounts.bom.json` with unselected Vallder offers and
+`supplier-motor-mounts.assembly.json` with their engineering definitions.
+
+### RBK mounting interfaces
+
+`RbkMotorMount("RBK12-57")` also supports `RBK15-57`, `RBK15-86` and `RBK17-86`.
+Each revision pins a specific STEP hash and reviewed interface metadata from
+`rbk-interfaces.json`; regenerate the runtime catalogue explicitly with
+`python3 tools/suppliers/rbk_interfaces.py --write-haxe`. Running that script
+without the flag checks that source metadata and runtime data agree. A changed
+supplier asset does not inherit the old mounting frames or recipe binding.
+Published revisions are immutable; retain the old entry and introduce a new
+revision when changing its asset or interface datums.
+
+The shared local frame is **X across, Y up, Z from motor to bearing**. The motor
+mounting face is Z=0, the base bearing plane is Y=0. Named connectors are:
+
+| Connector | Datum and joint-axis direction |
+| --- | --- |
+| `base` | Origin on the base plane beneath the motor centre; +Y up |
+| `motor` | Motor face centre at the shaft height; +Z into the mount |
+| `shaftAxis` | Coaxial reference at the motor face; +Z, without a shaft seating offset |
+| `motorBolt1`–`motorBolt4` | Measured CAD thread-hole axes on the motor face; +Z |
+| `baseBolt1`–`baseBolt6` | Measured CAD hole centres on Y=0; +Y (four holes on RBK17-86) |
+| `baseAux1`–`baseAux2` | RBK17-86 auxiliary holes; +Y |
+
+```haxe
+var support = new machinekit.assembly.RbkMotorMount("RBK15-57");
+machine.addComponent("support", support);
+machine.addComponent("motor", machinekit.motion.NemaStepper.frame(23));
+machine.addMate("motor-to-support", "fixed", "support", "motor", "motor", "mountFace");
+```
+
+Alternatively instantiate the exact SKU through
+`SupplierRecipeLibrary.create("vallder", "1173002")` and the default registry.
+Geometry loads lazily, verifies the asset hash and applies the pinned coordinate
+transform. Saved assemblies/documents store model and revision, with no absolute
+cache path. The deployment must retain the STEP files under
+`cad/assets/<sha256>.step`. Configure the supplier directory with
+`RbkMotorMount.setSupplierDirectory(path)`, `MATERIA_VALLDER_ROOT`, or
+`MATERIA_ROOT` (defaulting to the workspace's `build/suppliers/vallder`).
+
+`interfaceMetadata()` returns a defensive copy including pilot diameter/recess,
+motor thread size/depth where known, base-hole/counterbore dimensions, source
+drawing/hash, shaft height and limitations. The motor flanges protrude below
+the bearing plane by **5, 2, 15 and 4 mm**, respectively. Base plates must end
+behind the flange or provide a relief. The 57 variants use M4 mounting threads;
+the 86 variants use M6. Do not infer the bracket thread from the motor's default
+mounting screw. Unknown thread depths remain null; listed depths are drawing
+values, not measured effective engagement. Counterbore dimensions follow the
+CAD. Screw lengths, driver access, tolerances, bearing preload, shaft axial seating, materials/density
+and load ratings still require engineering qualification. The imported compound
+contains the supplier's bearing/hardware geometry and is treated as rigid.
+Automatic threaded fastenings are not inferred from STEP faces.
+
+The pinned CAD and supplier drawings disagree in some base details: the first
+hole pair on both RBK15 models uses 58 mm CAD pitch versus 54 mm in the drawings;
+RBK17-86 auxiliary holes use 70 mm CAD pitch versus 54 mm drawn. RBK12-57 has
+four modeled counterbores rather than the six indicated. Connectors follow the
+measured CAD; metadata retains the drawing values and discrepancies. Confirm
+the physical part before manufacturing mating plates from either source.
+
+```sh
+MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run --project machinekit/examples/supplier-fasteners/haxeon.rbk-mounts.json
+```
+
+The focused check compares connector planes and passage probes with the pinned
+solids, tests motor/base clearance, then exercises named mating and saved
+assemblies. It writes `rbk-interface-checks.json` and
+`rbk-mounted-motors.assembly.json`. Source compatibility remains unverified;
+these checks establish nominal CAD interfaces, not a complete machine rating.
+Add `-- --persistence-only` to check bearing-axis alignment, named mating and
+editable document/assembly round trips without repeating the full clearance sweep.
 The example creates two assembly occurrences of each screw configuration,
 exercises the rail at 300 mm and writes:
 
@@ -300,3 +371,50 @@ The example also runs sourcing checks for optional selection, multiple suppliers
 SKU-to-part mismatches, stock status, integer price calculations, defensive
 copies and unchanged engineering BOM identity. Python tests cover the catalogue
 join, table extraction, pagination, caching and failed-output preservation.
+
+The drawing-based SFU16 bindings in `sfu16.json` use Vallder's standard machined
+SFU1605 ends (10 mm coupling, 12 mm fixed journal, 10 mm floating journal),
+SKU1035001 nut (46 mm overall, offset flange), and SKU1013002 BF12 (10 mm bore).
+These are separate recipes; existing generic BallScrew/BallNut/support recipes
+retain their defaults. Changed BF12 CAD hashes do not inherit measured datums.
+Supplier-intended compatibility is the working assumption. The RBK CAD's 25.5 mm
+bearing/sleeve stack versus the standard 25 mm journal is recorded as a reference
+seating discrepancy and does not produce a custom machining requirement.
+
+Run the worked axis and its checks with:
+
+```sh
+MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run \
+  --project machinekit/examples/supplier-fasteners/haxeon.sfu-axis.json -- --export-step
+```
+
+This builds a 400 mm screw / 200 mm travel reference axis with RBK12-57, BF12,
+NEMA23, coupling, nut bracket, twin HGR15 guides, base, risers and installed
+fasteners. It writes `rbk-sfu1605-axis.assembly.json`, `.bom.json`, `.step`, and
+`rbk-sfu1605-axis-checks.json` in the supplier output directory. Reload the saved
+assembly with `RbkSfuAxis.registry()` (it includes the example's fabricated parts
+and coupling). These fabricated parts are an example machine design, not changes
+to purchased components. Travel is kinematic only: RBK axial stiffness/preload
+has not been specified. The report checks selected part pairs at three travel
+positions and nominal fastener engagement; it is not a swept collision, driver
+access, load capacity, or tolerance qualification. Motor envelope/access and
+assumed tapped depths remain explicit limits.
+
+The worked axis uses `OPENBUILDS-NEMA23-56`, a separate named motor variant.
+Its native analytic geometry is adapted from bd_warehouse's StepperMotor at
+revision `e6ae6e7bae74cb3a50cbde395930ba24a1051f88` (Apache-2.0; attribution and
+license in `machinekit/third-party/bd_warehouse`). It preserves the shaped housing,
+0.1 mm inset stack, end caps, 4.8 mm front flange and mounting ears, 5.1 mm
+clearance holes, pilot and D shaft. It does not drill cylindrical access channels
+through a generic motor body. The shaft tip is 20.6 mm from the mounting face;
+the example coupling and fastener seats use that variant's dimensions.
+
+`tools/suppliers/openbuilds_motor_reference.py` documents the isolated environment
+and executes the pinned original generator to export an independent STEP and
+measurement record. Run `haxeon.openbuilds-motor.json` in the example directory
+for the native geometry/recipe regression: its fused solid volume agrees with
+the independently generated original within 0.01 mm³. The complete axis additionally
+checks installed motor bolts/washers, a 5 mm axial driver approach, and travel.
+The source is an OpenBuilds reference, not a claim about StepperOnline or Leadshine
+construction. It has no inherited StepperOnline electrical ratings. Existing
+motor recipe IDs and named StepperOnline variants retain their own identities.

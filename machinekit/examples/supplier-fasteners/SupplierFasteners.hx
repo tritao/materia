@@ -28,10 +28,7 @@ class SupplierFasteners {
         var output = root + "/build/suppliers/vallder";
         var input:Dynamic = haxe.Json.parse(sys.io.File.getContent(output + "/fasteners.json"));
         var mappings:Array<Dynamic> = input.mappings;
-        var registry = new ComponentRegistry();
-        registry.register(SocketHeadCapScrew.recipeType());
-        registry.register(LinearRail.recipeType());
-        registry.register(machinekit.structural.SlideInSlotNut.recipeType());
+        var registry = machinekit.component.MachineKitComponents.standard();
         var library = new SupplierRecipeLibrary(sys.io.File.getContent(output + "/recipes.json"),registry);
         var assembly = new MachineAssembly(), plan = new SourcingPlan();
         var geometry:Array<Dynamic> = [];

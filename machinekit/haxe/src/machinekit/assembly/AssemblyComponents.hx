@@ -6,6 +6,7 @@ import machinekit.component.ComponentRegistry;
 class AssemblyComponents {
 	public static function register(registry:ComponentRegistry):Void {
 		registry.register(NemaMountPlate.recipeType());
+		registry.register(RbkMotorMount.recipeType());
 		registry.register(machinekit.assembly.LinearAxis.Carriage.recipeType());
 	}
 }

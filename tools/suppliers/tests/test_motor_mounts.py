@@ -4,6 +4,8 @@ import sys
 import unittest
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import motor_mounts
+import json
+import rbk_interfaces
 
 
 def fixture():
@@ -25,6 +27,25 @@ def fixture():
 
 
 class MotorMountTests(unittest.TestCase):
+    def test_only_exact_cad_revision_gets_mounting_recipe(self):
+        catalog, assets = fixture()
+        bindings = motor_mounts.bind_rbk(catalog, assets)
+        reference = {'sku': 'first', 'model': 'RBK12-57', 'revision': 'test-v1', 'asset_sha256': 'one'}
+        recipes = motor_mounts.attach_interfaces(bindings, [reference])
+        self.assertEqual(recipes[0]['values'], {'model': 'RBK12-57', 'revision': 'test-v1'})
+        self.assertEqual(recipes[0]['geometry_source'], 'supplier_cad')
+        self.assertFalse(bindings[0]['compatibility_verified'])
+        bindings = motor_mounts.bind_rbk(catalog, assets)
+        reference['asset_sha256'] = 'new-untested-cad'
+        self.assertEqual(motor_mounts.attach_interfaces(bindings, [reference]), [])
+        self.assertNotIn('type_id', bindings[0])
+        self.assertEqual(bindings[0]['interface_status'], 'asset_revision_needs_measurement')
+
+    def test_runtime_metadata_is_generated_from_reviewed_reference(self):
+        data = json.loads(rbk_interfaces.REFERENCE.read_text())
+        self.assertEqual(rbk_interfaces.TARGET.read_text(), rbk_interfaces.render(data))
+        self.assertEqual(len({r['asset_sha256'] for r in data['interfaces']}), 4)
+
     def test_transposed_columns_bind_only_exact_model_sku_and_file(self):
         catalog, assets = fixture()
         bindings = motor_mounts.bind_rbk(catalog, assets)

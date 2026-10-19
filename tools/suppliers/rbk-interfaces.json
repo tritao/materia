@@ -1,0 +1,471 @@
+{
+  "schema_version": 1,
+  "coordinate_system": "X across, Y up, Z motor-to-bearing; motor face Z=0; base seating plane Y=0",
+  "interfaces": [
+    {
+      "model": "RBK12-57",
+      "revision": "vallder-rbk-v1",
+      "sku": "1173001",
+      "asset_sha256": "ddd8cd342c35ade3d661dccb62a794b53860e07892c180d6bdcdb877bf034608",
+      "drawing_url": "https://vallder.com/wp-content/uploads/2023/03/products-rbk12-57-motor-bracket-1.jpg",
+      "drawing_sha256": "2e1c062bcc446c39eb0ec8b37474eb7f8a2ad354e3019b3f76ed4c87360a9663",
+      "raw_motor_face_x": -55.4231963291962,
+      "raw_orientation": "x_shaft_y_up",
+      "raw_base_y": -37,
+      "shaft_height_mm": 25,
+      "motor_flange_thickness_mm": 12,
+      "underhang_mm": 5,
+      "pilot_diameter_mm": 38.1,
+      "pilot_recess_depth_mm": 6,
+      "motor_thread": "M4",
+      "motor_thread_depth_mm": 12,
+      "motor_thread_root_radius_mm": 1.65,
+      "motor_bolts_xy": [
+        [
+          -23.5820111526,
+          1.4179888474
+        ],
+        [
+          -23.5820111526,
+          48.5820111526
+        ],
+        [
+          23.5820111526,
+          1.4179888474
+        ],
+        [
+          23.5820111526,
+          48.5820111526
+        ]
+      ],
+      "base_holes": [
+        {
+          "x": -23,
+          "z": 40,
+          "diameter": 6.7,
+          "counterbore_diameter": null,
+          "drawing_x": -23,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 27,
+          "counterbore_depth_mm": null
+        },
+        {
+          "x": 23,
+          "z": 40,
+          "diameter": 6.7,
+          "counterbore_diameter": null,
+          "drawing_x": 23,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 27,
+          "counterbore_depth_mm": null
+        },
+        {
+          "x": -23,
+          "z": 70,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": -23,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 37,
+          "counterbore_depth_mm": 2
+        },
+        {
+          "x": 23,
+          "z": 70,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": 23,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 37,
+          "counterbore_depth_mm": 2
+        },
+        {
+          "x": -23,
+          "z": 83,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": -23,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 37,
+          "counterbore_depth_mm": 2
+        },
+        {
+          "x": 23,
+          "z": 83,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": 23,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 37,
+          "counterbore_depth_mm": 2
+        }
+      ],
+      "auxiliary_holes": [],
+      "shaft_diameter_mm": 12,
+      "bearing": "6001ZZ",
+      "limits": [
+        "CAD assembly includes bearings and fasteners; no homogeneous material/density assumed",
+        "Shaft axis is a coaxial reference, not an axial shaft seating datum",
+        "Thread depths only where explicitly dimensioned; load ratings, bearing preload and screw torque unqualified",
+        "CAD/drawing disagreements require physical confirmation before manufacturing mating hardware"
+      ],
+      "motor_thread_depth_basis": "supplier_drawing_only",
+      "discrepancies": [
+        "Drawing labels six counterbores; CAD has four. The pair at Z=40 has plain chamfered through holes."
+      ]
+    },
+    {
+      "model": "RBK15-57",
+      "revision": "vallder-rbk-v1",
+      "sku": "1173002",
+      "asset_sha256": "ccb0ea03c257e301d682d454e8940b96b76add1667a187e120d3b8b8dc46d78f",
+      "drawing_url": "https://vallder.com/wp-content/uploads/2023/03/products-rbk15-57-motor-bracket-1.jpg",
+      "drawing_sha256": "0d8d10407e0dc5c279ce67775601697e77aa914a6777afd5923be488c3ea70d7",
+      "raw_motor_face_x": -68.8493322745696,
+      "raw_orientation": "x_shaft_z_up",
+      "raw_base_y": 0,
+      "shaft_height_mm": 28,
+      "motor_flange_thickness_mm": 9,
+      "underhang_mm": 2,
+      "pilot_diameter_mm": 38.1,
+      "pilot_recess_depth_mm": 6,
+      "motor_thread": "M4",
+      "motor_thread_depth_mm": 10,
+      "motor_thread_root_radius_mm": 1.65,
+      "motor_bolts_xy": [
+        [
+          -23.5820111526,
+          4.4179888474
+        ],
+        [
+          -23.5820111526,
+          51.5820111526
+        ],
+        [
+          23.5820111526,
+          4.4179888474
+        ],
+        [
+          23.5820111526,
+          51.5820111526
+        ]
+      ],
+      "base_holes": [
+        {
+          "x": -29,
+          "z": 32,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": -27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 33,
+          "counterbore_depth_mm": 2
+        },
+        {
+          "x": 29,
+          "z": 32,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": 27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 33,
+          "counterbore_depth_mm": 2
+        },
+        {
+          "x": -27,
+          "z": 77,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": -27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 33,
+          "counterbore_depth_mm": 2
+        },
+        {
+          "x": 27,
+          "z": 77,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": 27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 33,
+          "counterbore_depth_mm": 2
+        },
+        {
+          "x": -27,
+          "z": 92,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": -27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 33,
+          "counterbore_depth_mm": 2
+        },
+        {
+          "x": 27,
+          "z": 92,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": 27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 33,
+          "counterbore_depth_mm": 2
+        }
+      ],
+      "auxiliary_holes": [],
+      "shaft_diameter_mm": 15,
+      "bearing": "6002ZZ",
+      "limits": [
+        "CAD assembly includes bearings and fasteners; no homogeneous material/density assumed",
+        "Shaft axis is a coaxial reference, not an axial shaft seating datum",
+        "Thread depths only where explicitly dimensioned; load ratings, bearing preload and screw torque unqualified",
+        "CAD/drawing disagreements require physical confirmation before manufacturing mating hardware"
+      ],
+      "motor_thread_depth_basis": "supplier_drawing_only",
+      "discrepancies": [
+        "First base-hole pair has 58 mm CAD pitch versus 54 mm in the drawing. Other pairs use 54 mm."
+      ]
+    },
+    {
+      "model": "RBK15-86",
+      "revision": "vallder-rbk-v1",
+      "sku": "1173003",
+      "asset_sha256": "848d66635d1dc950c59ad2e6e917f320bfd17f24bbeb0d92505b467c1a4a3038",
+      "drawing_url": "https://vallder.com/wp-content/uploads/2023/03/products-rbk15-86-motor-bracket-1.jpg",
+      "drawing_sha256": "3f76593ab6cdb3e7740c0283916155428a1fcd0e5875cb5043689e62cbe8b6df",
+      "raw_motor_face_x": -54,
+      "raw_orientation": "x_shaft_z_up",
+      "raw_base_y": 0,
+      "shaft_height_mm": 28,
+      "motor_flange_thickness_mm": 11,
+      "underhang_mm": 15,
+      "pilot_diameter_mm": 73,
+      "pilot_recess_depth_mm": 6,
+      "motor_thread": "M6",
+      "motor_thread_depth_mm": null,
+      "motor_thread_root_radius_mm": 2.5,
+      "motor_bolts_xy": [
+        [
+          -34.7896536344,
+          -6.7896536344
+        ],
+        [
+          -34.7896536344,
+          62.7896536344
+        ],
+        [
+          34.7896536344,
+          -6.7896536344
+        ],
+        [
+          34.7896536344,
+          62.7896536344
+        ]
+      ],
+      "base_holes": [
+        {
+          "x": -29,
+          "z": 42,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": -27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 39,
+          "counterbore_depth_mm": 1
+        },
+        {
+          "x": 29,
+          "z": 42,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": 27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 39,
+          "counterbore_depth_mm": 1
+        },
+        {
+          "x": -27,
+          "z": 87,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": -27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 39,
+          "counterbore_depth_mm": 1
+        },
+        {
+          "x": 27,
+          "z": 87,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": 27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 39,
+          "counterbore_depth_mm": 1
+        },
+        {
+          "x": -27,
+          "z": 102,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": -27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 39,
+          "counterbore_depth_mm": 1
+        },
+        {
+          "x": 27,
+          "z": 102,
+          "diameter": 6.7,
+          "counterbore_diameter": 11,
+          "drawing_x": 27,
+          "drawing_diameter_mm": 6.6,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 39,
+          "counterbore_depth_mm": 1
+        }
+      ],
+      "auxiliary_holes": [],
+      "shaft_diameter_mm": 15,
+      "bearing": "6002ZZ",
+      "limits": [
+        "CAD assembly includes bearings and fasteners; no homogeneous material/density assumed",
+        "Shaft axis is a coaxial reference, not an axial shaft seating datum",
+        "Thread depths only where explicitly dimensioned; load ratings, bearing preload and screw torque unqualified",
+        "CAD/drawing disagreements require physical confirmation before manufacturing mating hardware"
+      ],
+      "motor_thread_depth_basis": "unknown",
+      "discrepancies": [
+        "First base-hole pair has 58 mm CAD pitch versus 54 mm in the drawing. Other pairs use 54 mm."
+      ]
+    },
+    {
+      "model": "RBK17-86",
+      "revision": "vallder-rbk-v1",
+      "sku": "1173004",
+      "asset_sha256": "fa8272982122b628385d7f4076a7b34a7e982b896935663778c16d1d8493719e",
+      "drawing_url": "https://vallder.com/wp-content/uploads/2023/03/products-rbk17-86-motor-bracket-1.jpg",
+      "drawing_sha256": "86473887ae8544f92073fd5327c6de4ccd959545e1c37d74b40911aebf585887",
+      "raw_motor_face_x": -59,
+      "raw_orientation": "x_shaft_z_up",
+      "raw_base_y": 0,
+      "shaft_height_mm": 39,
+      "motor_flange_thickness_mm": 13,
+      "underhang_mm": 4,
+      "pilot_diameter_mm": 73,
+      "pilot_recess_depth_mm": 5,
+      "motor_thread": "M6",
+      "motor_thread_depth_mm": null,
+      "motor_thread_root_radius_mm": 2.5,
+      "motor_bolts_xy": [
+        [
+          -34.7896536344,
+          4.2103463656
+        ],
+        [
+          -34.7896536344,
+          73.7896536344
+        ],
+        [
+          34.7896536344,
+          4.2103463656
+        ],
+        [
+          34.7896536344,
+          73.7896536344
+        ]
+      ],
+      "base_holes": [
+        {
+          "x": -35,
+          "z": 46,
+          "diameter": 9.1,
+          "counterbore_diameter": 14,
+          "drawing_x": -35,
+          "drawing_diameter_mm": 9,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 48,
+          "counterbore_depth_mm": 8.5
+        },
+        {
+          "x": 35,
+          "z": 46,
+          "diameter": 9.1,
+          "counterbore_diameter": 14,
+          "drawing_x": 35,
+          "drawing_diameter_mm": 9,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 48,
+          "counterbore_depth_mm": 8.5
+        },
+        {
+          "x": -35,
+          "z": 106,
+          "diameter": 9.1,
+          "counterbore_diameter": 14,
+          "drawing_x": -35,
+          "drawing_diameter_mm": 9,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 48,
+          "counterbore_depth_mm": 8.5
+        },
+        {
+          "x": 35,
+          "z": 106,
+          "diameter": 9.1,
+          "counterbore_diameter": 14,
+          "drawing_x": 35,
+          "drawing_diameter_mm": 9,
+          "evidence": "CAD circular edges; supplier drawing nominal diameter retained separately",
+          "top_y_mm": 48,
+          "counterbore_depth_mm": 8.5
+        }
+      ],
+      "auxiliary_holes": [
+        {
+          "x": -35,
+          "z": 68.5,
+          "diameter": 6,
+          "drawing_x": -27,
+          "evidence": "CAD circular edges"
+        },
+        {
+          "x": 35,
+          "z": 68.5,
+          "diameter": 6,
+          "drawing_x": 27,
+          "evidence": "CAD circular edges"
+        }
+      ],
+      "shaft_diameter_mm": 17,
+      "bearing": "6203ZZ",
+      "limits": [
+        "CAD assembly includes bearings and fasteners; no homogeneous material/density assumed",
+        "Shaft axis is a coaxial reference, not an axial shaft seating datum",
+        "Thread depths only where explicitly dimensioned; load ratings, bearing preload and screw torque unqualified",
+        "CAD/drawing disagreements require physical confirmation before manufacturing mating hardware"
+      ],
+      "motor_thread_depth_basis": "unknown",
+      "discrepancies": [
+        "Auxiliary holes have 70 mm CAD pitch versus 54 mm in the drawing."
+      ]
+    }
+  ]
+}

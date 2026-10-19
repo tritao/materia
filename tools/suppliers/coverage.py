@@ -8,6 +8,7 @@ from pathlib import Path
 from vallder import DEFAULT_OUTPUT, now, write_json
 from hardware import build as hardware_review
 from motor_mounts import build as motor_mount_review
+from sfu16 import build as sfu16_review
 
 
 def build(output):
@@ -39,10 +40,6 @@ def build(output):
     hardware = hardware_review(catalog)
     recipes.extend(hardware["recipes"])
     write_json(output / "hardware.json", hardware)
-    write_json(output / "recipes.json", {"schema_version": 1, "recipes": recipes})
-    by_parent = {}
-    for recipe in recipes:
-        by_parent.setdefault(recipe["parent_id"], []).append(recipe)
     profile_path, profile_validation = output / "profiles.json", output / "profile-validation.json"
     sections = json.loads(profile_path.read_text())["profiles"] if profile_path.exists() else []
     section_checks = json.loads(profile_validation.read_text()) if profile_validation.exists() else []
@@ -71,6 +68,23 @@ def build(output):
     # RBK downloads join through exact columns in its transposed specification table.
     motor_mounts = motor_mount_review(catalog, library)
     write_json(output / "motor-mounts.json", motor_mounts)
+    for binding in motor_mounts["bindings"]:
+        if "type_id" not in binding:
+            continue
+        for asset in library:
+            if asset["product_id"] == 6718 and asset["sha256"] == binding["interfaces"]["asset_sha256"]:
+                asset["mounting_frame_status"] = "pinned_named_datums"
+                asset["interface_revision"] = binding["recipe_values"]["revision"]
+                asset["component_type_id"] = binding["type_id"]
+    recipes.extend(motor_mounts["recipes"])
+    sfu16 = sfu16_review(catalog, library)
+    write_json(output / "sfu16.json", sfu16)
+    recipes.extend(sfu16["recipes"])
+    write_json(output / "recipes.json", {"schema_version": 1, "recipes": recipes})
+    by_parent = {}
+    for recipe in recipes:
+        if recipe["geometry_source"] == "generator":
+            by_parent.setdefault(recipe["parent_id"], []).append(recipe)
     # BK/BF files use the established X-across/Y-up/Z-shaft reference frame.
     # Validate the base plane against h and envelope against B/H; do not infer bores from splines.
     support_interfaces = []
@@ -152,7 +166,9 @@ def build(output):
         "downloads": dict(Counter(d["status"] for d in inventory["downloads"])),
         "unique_step_assets": len({a["asset_id"] for a in library}),
         "validated_unique_assets": len({a["asset_id"] for a in library if a["usable_geometry"]}),
-        "registered_generator_bindings": len(recipes), "validated_drawing_generators": len(ready_sections),
+        "registered_generator_bindings": sum(r["geometry_source"] == "generator" for r in recipes),
+        "registered_supplier_cad_bindings": sum(r["geometry_source"] == "supplier_cad" for r in recipes),
+        "validated_drawing_generators": len(ready_sections),
         "shared_tslot_families": len({s["family_id"] for s in ready_sections.values() if s.get("system_id")}),
         "all_inventory_complete": inventory["complete"] and validation["complete"] and
                                   {a["id"] for d in inventory["downloads"] for a in d.get("assets", [])} == set(checked)}

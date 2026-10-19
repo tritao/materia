@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-vallder-sfu-axis-preview"
+  },
+  "entry": "RbkSfuAxisPreview",
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/suppliers/sfu-axis-preview"
+}

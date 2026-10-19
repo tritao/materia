@@ -26,6 +26,8 @@ typedef ScrewNutDimensions = {
 	var flangeThickness:Float;
 	var boltCircleDiameter:Float;
 	var mountScrew:String;
+	/** Flange start on the barrel; absent retains the legacy end flange. */
+	var ?flangeOffset:Float;
 }
 
 /** ACME/trapezoidal lead screw nut: a flanged block with a bore matching the screw diameter and
@@ -45,6 +47,8 @@ class LeadScrewNut extends MachineComponent {
 	public final bodyLength:Float;
 	public final flangeDiameter:Float;
 	public final flangeThickness:Float;
+	public final flangeOffset:Float;
+	public final overallLength:Float;
 	public final boltCircleDiameter:Float;
 	public final boltCount:Int;
 	public final mountScrew:String;
@@ -64,6 +68,8 @@ class LeadScrewNut extends MachineComponent {
 		var bodyDia = dimensions == null ? screwDiameter * (flanged ? 1.3 : 1.2) : dimensions.bodyDiameter;
 		var bodyLen = dimensions == null ? screwDiameter * 2 : dimensions.bodyLength;
 		var flangeThick = dimensions == null ? Math.max(3, screwDiameter * 0.3) : dimensions.flangeThickness;
+		var offset=dimensions==null || dimensions.flangeOffset==null ? bodyLen : dimensions.flangeOffset;
+		if(!Math.isFinite(offset) || offset<0 || offset>bodyLen) throw "Nut flange must start on the barrel";
 		var mountScrewSize = dimensions == null ? (screwDiameter <= 8 ? "M3" : screwDiameter <= 12 ? "M4" : "M5") : dimensions.mountScrew;
 		var screw = SocketHeadCapScrew.catalog().get(mountScrewSize);
 		// Holes keep 1 mm of material to the body and the screw heads 1 mm to the flange rim.
@@ -84,6 +90,8 @@ class LeadScrewNut extends MachineComponent {
 		bodyLength = bodyLen;
 		flangeDiameter = flanged ? flangeDia : bodyDia;
 		flangeThickness = flanged ? flangeThick : 0;
+		flangeOffset=offset;
+		overallLength=Math.max(bodyLength,flanged ? flangeOffset+flangeThickness : bodyLength);
 		boltCircleDiameter = flanged ? 2 * boltRadius : 0;
 		this.boltCount = flanged ? boltCount : 0;
 		this.flanged = flanged;
@@ -91,10 +99,10 @@ class LeadScrewNut extends MachineComponent {
 		explicitDimensions = dimensions != null;
 		mountScrew = mountScrewSize;
 		addConnector("bore", Axis, Solids.axial(0, 0, bodyLength / 2));
-		addConnector("mountFace", Face, Solids.axial(0, 0, bodyLength + flangeThickness));
+		addConnector("mountFace", Face, Solids.axial(0, 0, flangeOffset + flangeThickness));
 		var i = 1;
 		for (point in boltPattern())
-			addConnector('mount${i++}', Mount, Solids.axial(point.x, point.y, bodyLength + flangeThickness));
+			addConnector('mount${i++}', Mount, Solids.axial(point.x, point.y, flangeOffset + flangeThickness));
 	}
 
 	/** Assumed reversal clearance, mm: plain bronze 0.15, preloaded 0.05, ball nut 0.01. */
@@ -160,16 +168,16 @@ class LeadScrewNut extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Solids.named(Part.cylinderSpan(bodyDiameter / 2, 0, bodyLength), "body");
 		if (!flanged) return Solids.cut(body, [threadedBore(bodyLength)]);
-		var flange = Solids.named(Part.cylinderSpan(flangeDiameter / 2, bodyLength, bodyLength + flangeThickness), "flange");
+		var flange = Solids.named(Part.cylinderSpan(flangeDiameter / 2, flangeOffset, flangeOffset + flangeThickness), "flange");
 		var solidPart = Solids.union([body, flange]);
-		var boreTool = threadedBore(bodyLength + flangeThickness);
+		var boreTool = threadedBore(overallLength);
 		if (detail == Envelope) return Solids.cut(solidPart, [boreTool]);
 		var screw = mountScrewPart(10);
 		var tools = [boreTool];
 		var bolt = 1;
 		for (point in boltPattern())
-			tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, bodyLength - 0.1,
-				bodyLength + flangeThickness + 0.1, point.x, point.y), "bolt" + bolt++));
+			tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, flangeOffset - 0.1,
+				flangeOffset + flangeThickness + 0.1, point.x, point.y), "bolt" + bolt++));
 		return Solids.cut(solidPart, tools);
 	}
 
