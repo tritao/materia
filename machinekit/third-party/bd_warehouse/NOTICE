@@ -1,0 +1,7 @@
+OpenBuilds NEMA 23 geometry adapted from bd_warehouse by Gumyr.
+Copyright 2024 Gumyr. Licensed under Apache-2.0; see LICENSE.
+Source: https://github.com/gumyr/bd_warehouse/blob/e6ae6e7bae74cb3a50cbde395930ba24a1051f88/src/bd_warehouse/open_builds.py
+Adaptation: native Haxe/CadKit construction with the same analytic housing arcs,
+0.1 mm inset stack, 11 mm end caps, 4.8 mm flange, 5.1 mm mounting holes,
+38.1 mm pilot and 6.35 mm D shaft. Body and shaft fused and refined with topology history for MachineKit use.
+No connector/wiring geometry or electrical ratings are inferred.
