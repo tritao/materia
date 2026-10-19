@@ -21,6 +21,7 @@ class VallderScrewSupport extends MachineComponent {
   super("VALLDER-"+model+"-CAD-"+s.sha256.substr(0,12),"Vallder "+model+" with included bearing/hardware","unspecified");
   spec=s;lockManufacturingMaterial("unspecified");
   addConnector("shaft",Axis,Solids.axial(0,0,0));
+  for(datum in Vallder15SupportSeats.datums(model,s.sha256))addConnector(datum.name,Axis,Solids.axial(0,0,datum.z));
   if(s.base) {
    addConnector("base",Mount,F.translation(0,-s.shaftHeight,0));
   } else {

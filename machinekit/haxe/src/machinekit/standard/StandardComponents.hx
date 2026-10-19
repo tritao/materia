@@ -9,6 +9,7 @@ class StandardComponents {
 		registry.register(SocketHeadCapScrew.recipeType());
 		registry.register(HexBolt.recipeType());
 		registry.register(HexNut.recipeType());
+        registry.register(FinePitchNut.recipeType());
 		registry.register(FlatWasher.recipeType());
 		registry.register(ParallelKey.recipeType());
 		registry.register(RetainingRing.recipeType());

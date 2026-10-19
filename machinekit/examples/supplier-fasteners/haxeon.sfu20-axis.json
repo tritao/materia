@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "configurable-axis-checks"
+  },
+  "entry": "SupportedSfu20AxisChecks",
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/suppliers/sfu20-axis-checks"
+}
