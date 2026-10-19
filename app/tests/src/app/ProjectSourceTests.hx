@@ -4230,6 +4230,39 @@ class ProjectSourceTests {
     }
   }
 
+  /** Exercise the saved scene, asynchronous preparation and desktop playback together. */
+  static function checkHobberInteractive(root:String):Void {
+    var scene=Sys.getEnv("HOBBER_GUI_SCENE");
+    if(scene==null)scene=root+"/machinekit/examples/flexspline-hobber/cutting.scene.json";
+    var fonts=FontCollection.create();fonts.add(root+"/haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
+    var editor=new ReferenceEditorApp(fonts,"/tmp/hobber-interactive-"+Sys.getPid()+".json");
+    editor.simulation.backgroundPacing=true;
+    try {
+      editor.session.open(scene);editor.documentChanged();
+      var original=editor.scene.info("project:blank").bounds();
+      editor.commands.execute("sim.play");
+      var deadline=Sys.time()+60;
+      while(editor.simulationBuild!=null&&Sys.time()<deadline){editor.tick();Sys.sleep(0.005);}
+      var player=editor.simulation.hobbingPlayer();
+      if(player==null)throw "Saved cutting scene did not install hobbing player";
+      deadline=Sys.time()+90;
+      while(!player.completed&&player.failure==null&&Sys.time()<deadline){editor.tick();Sys.sleep(0.005);}
+      editor.simulation.stop();editor.tick();
+      player.stock.preview.wait();player.present();
+      var visible=editor.scene.info("project:blank").bounds();
+      check(original.valid&&visible.valid,"Stock display has valid bounds");
+      check(Math.abs(original.minZ-visible.minZ)<1e-5&&Math.abs(original.maxZ-visible.maxZ)<1e-5,
+        'Runtime stock stays at fixture height: original ${original.minZ}..${original.maxZ}, visible ${visible.minZ}..${visible.maxZ}');
+      check(editor.simulation.timestep==1.0/4000,"Prepared playback retains the hobbing controller timestep");
+      Sys.println("HOBBER_INTERACTIVE "+haxe.Json.stringify({completed:player.completed,failure:player.failure,
+        elapsed:player.elapsed,windows:player.stock.stream.passes,report:player.stock.report,logs:editor.logLines}));
+      check(player.failure==null,"Desktop hobbing failure: "+player.failure);
+      check(player.completed,"Desktop playback completes the cutting job");
+      check(player.stock.forces.maxTangential>0,"Desktop playback removes material");
+    }catch(e:Dynamic){editor.dispose();fonts.dispose();throw e;}
+    editor.dispose();fonts.dispose();
+  }
+
   /** HB6 acceptance: generation, derived drives and a short zero-command MuJoCo hold. */
   static function checkFlexsplineHobber(root:String):Void {
     var manifest=FileSystem.fullPath(root+"/machinekit/examples/flexspline-hobber/materia.project.json");
@@ -7311,6 +7344,7 @@ class ProjectSourceTests {
       suite("welder", checkRobotWelder),
       suite("mates", checkMates),
       suite("flexspline-hobber", checkFlexsplineHobber),
+      suite("flexspline-hobber-interactive", checkHobberInteractive),
       suite("bench-mill", root -> checkBenchMill(root)),
       focused("bench-mill-fine", root -> checkBenchMill(root,0.005)),
       suite("enclosed-mill", checkEnclosedMillProject),

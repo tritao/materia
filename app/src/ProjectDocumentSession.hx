@@ -91,6 +91,7 @@ class ProjectDocumentSession {
     return descriptors == null ? null : cadkit.parametric.GeometricConnectors.planarFaces(descriptors);
   }
 
+  /** Preview centre in assembly CAD units; multiply by assemblyUnitMetres() for scene metres. */
   public function assemblyPreviewCenter(definitionId:String):Null<Array<Float>> {
     var centers = assemblyLocalCentersByDefinition;
     var value = centers == null ? null : centers.get(definitionId);

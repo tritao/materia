@@ -2173,3 +2173,21 @@ hob solid tessellation; the physical envelope and cutting definition are unchang
 The regenerated app cut passes: 982 gash windows, 6.00275 s total simulated cycle,
 3.60091 s cutting feed, zero cutter/fixture collisions, sync error 0.00393175 arcsec.
 This is an ungraded coarse demonstration, not full-reference HB12 acceptance.
+
+### Interactive stock display corrected (2026-10-19)
+
+The first visible-demo claim missed a display-units bug: `assemblyPreviewCenter`
+is in assembly CAD units, while the dynamic stock mesh is in scene metres. The
+2 mm axial preview-centre offset was subtracted as 2 m, so the stock displayed
+about 1.998 m below its fixture even while the simulation removed material.
+Convert the preview centre once through `assemblyUnitMetres`, name the stock
+interface explicitly in metres, and preserve it on reset. Also copy the prepared
+simulation timestep when installing its background-built state; the prior 10 ms
+editor timestep disagreed with the installed 0.25 ms hobbing session.
+
+A new `flexspline-hobber-interactive` regression opens the saved cutting scene,
+uses asynchronous preparation and background playback, completes 982 windows,
+asserts material removal and checks the runtime stock's axial bounds against the
+original blank (10 µm display-position allowance). It also checks the installed
+4 kHz timestep. The corrected desktop build was opened on the coarse cutting job.
+The preceding headless acceptance alone did not establish visible stock removal.

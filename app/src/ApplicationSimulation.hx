@@ -766,6 +766,7 @@ class ApplicationSimulation {
     appliedDocumentRevision = prepared.appliedDocumentRevision;
     appliedEnvironmentRevision = prepared.appliedEnvironmentRevision;
     appliedBackend = prepared.appliedBackend;
+    timestep = prepared.timestep;
     appliedTimestep = prepared.appliedTimestep;
     appliedParticipantRevision = participantRevision;
     collisionWarnings = prepared.collisionWarnings;

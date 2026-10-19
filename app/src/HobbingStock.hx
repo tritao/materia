@@ -21,7 +21,7 @@ class HobbingStock {
   public var maxBytes(default,null):Float=0;
   public var collisions(default,null):Int=0;
   public var report(default,null):String="Cutting";
-  final center:Array<Float>;
+  final centerMetres:Array<Float>;
   final config:SceneArtifactHobbing;
   var previewPasses=-1;
   var lastPreviewTime=-1e30;
@@ -29,8 +29,9 @@ class HobbingStock {
   var disposed=false;
   var lastMaster=0.0;
   var streamStopped=false;
-  public function new(config:SceneArtifactHobbing,center:Array<Float>) {
-    this.config=config;this.center=center.copy();
+  /** RingStock coordinates are mm; the centred scene-geometry offset is explicitly metres. */
+  public function new(config:SceneArtifactHobbing,centerMetres:Array<Float>) {
+    this.config=config;this.centerMetres=centerMetres.copy();
     spec=new GearSpec(config.module,config.teeth,config.width,config.pressureAngle);
     hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),config.starts,config.outside,config.gashes);
     stock=RingStock.fromGearBlank(spec,config.wall,config.radialStep,config.axialStep);stock.setThreads(1);
@@ -89,11 +90,11 @@ class HobbingStock {
     if(stream.passes!=previewPasses&&(finalPreview||stream.lastTime-lastPreviewTime>=0.1)&&preview.refresh()){previewPasses=stream.passes;lastPreviewTime=stream.lastTime;finalPreview=false;}
     var mesh=preview.take();if(mesh==null)return null;
     var positions=Bytes.alloc(mesh.vertexCount*12);
-    for(i in 0...mesh.vertexCount)for(axis in 0...3)positions.setFloat(i*12+axis*4,mesh.positions.getFloat(i*12+axis*4)/1000-center[axis]);
+    for(i in 0...mesh.vertexCount)for(axis in 0...3)positions.setFloat(i*12+axis*4,mesh.positions.getFloat(i*12+axis*4)/1000-centerMetres[axis]);
     var g=new GeometryData();g.addStream(1,2,positions,mesh.vertexCount,12);g.addStream(2,2,mesh.normals,mesh.vertexCount,12);
     g.addStream(6,4,mesh.colors,mesh.vertexCount,4);g.setIndexBuffer(mesh.indices,mesh.triangleCount*3);
-    g.setBounds(-stock.grid.radiusMax/1000-center[0],-stock.grid.radiusMax/1000-center[1],stock.grid.zMin/1000-center[2],
-      stock.grid.radiusMax/1000-center[0],stock.grid.radiusMax/1000-center[1],stock.grid.zMax/1000-center[2]);return g;
+    g.setBounds(-stock.grid.radiusMax/1000-centerMetres[0],-stock.grid.radiusMax/1000-centerMetres[1],stock.grid.zMin/1000-centerMetres[2],
+      stock.grid.radiusMax/1000-centerMetres[0],stock.grid.radiusMax/1000-centerMetres[1],stock.grid.zMax/1000-centerMetres[2]);return g;
   }
   public function dispose():Void{if(disposed)return;disposed=true;preview.dispose();forces.dispose();sweep.dispose();stock.dispose();}
 }

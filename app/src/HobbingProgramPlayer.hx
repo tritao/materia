@@ -25,7 +25,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   final simulation:Simulation;
   final session:SimSession;
   final project:ProjectDocumentSession;
-  final center:Array<Float>;
+  final centerMetres:Array<Float>;
   final indices:Array<Int>;
   final offsets:Array<Float>;
   final observerId:Int;
@@ -44,7 +44,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     var placement=new cadkit.modeling.AssemblyState(definition,project.projectAssemblyState);
     offsets=[for(i in 0...6)placement.joint(config.axes[i])*(i<3?project.assemblyUnitMetres():1.0)];
     var component=definition.occurrences.filter(o->o.id==config.stock)[0].definition;
-    var c=project.assemblyPreviewCenter(component);center=c==null?[0.0,0,0]:c.copy();
+    var c=project.assemblyPreviewCenter(component);centerMetres=c==null?[0.0,0,0]:[for(value in c)value*project.assemblyUnitMetres()];
     var spec=new GearSpec(config.module,config.teeth,config.width,config.pressureAngle);
     var hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),config.starts,config.outside,config.gashes);
     var settings=new HobbingSettings();settings.feedPerRevolution=config.feed;settings.cuttingSpeed=config.cuttingSpeed;
@@ -63,7 +63,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
       case PositionJoint(id,position,span):var at=config.axes.indexOf(id);toolpathkit.path.ToolpathOp.PositionJoint(id,position-(at<0?0:offsets[at]),span);
       case _:op;
     }]);if(lowered.program==null)throw "Empty hobbing program";program=lowered.program;
-    motion=newMotion();stock=new HobbingStock(config,center);observerId=simulation.addStepObserver(this);
+    motion=newMotion();stock=new HobbingStock(config,centerMetres);observerId=simulation.addStepObserver(this);
   }
   function newMotion():ManipulatorMotion return new ManipulatorMotion(robot.robot,compiler,input,()->robot.runtime.pollEvents());
   function input(channel:String):Null<EventValue> {
@@ -104,6 +104,6 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   }
   public function present():Void{if(disposed)return;var geometry=stock.geometry();if(geometry!=null)project.scene.setRuntimeGeometry("project:"+config.stock,geometry);}
   public function beforeReset():Void{if(motion.running)motion.abort();}
-  public function reset():Void{stock.dispose();stock=new HobbingStock(config,center);motion=newMotion();started=false;completed=false;failure=null;syncError=0;elapsed=0;}
+  public function reset():Void{stock.dispose();stock=new HobbingStock(config,centerMetres);motion=newMotion();started=false;completed=false;failure=null;syncError=0;elapsed=0;}
   public function dispose():Void{if(disposed)return;beforeReset();disposed=true;simulation.removeStepObserver(observerId);stock.dispose();}
 }
