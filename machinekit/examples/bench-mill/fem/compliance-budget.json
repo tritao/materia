@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "status": "Conditional catalogue-proxy budget; hardware supplier/preload selection remains open",
+  "guides": {
+    "blockRadialNPerUm": 365,
+    "rangeNPerUm": [
+      196,
+      483
+    ],
+    "preload": "HG15C ZA; Z0 and ZB bound the catalogue radial stiffness",
+    "source": "https://www.hiwin.com/wp-content/uploads/Linear_Guideway-E.pdf",
+    "location": "Table 2-1-13, radial stiffness HG15C",
+    "assumption": "HG15C is a catalogue proxy for the unselected HGR15-compatible blocks; the same stiffness in both transverse directions is an assumed equivalent. No along-rail spring."
+  },
+  "drives": {
+    "nutNPerUm": 317.73546,
+    "preload": "R16-5B1 FDI double nut, 10% dynamic load; 32.4 kgf/um times 9.80665",
+    "nutSource": "https://www.hiwin.com/wp-content/uploads/HIWIN-Ballscrew-Catalog.pdf",
+    "nutLocation": "FDI double-nut R16-5B1 rigidity table",
+    "supportBearingNPerUm": 750,
+    "bearingPreload": "15 BSB 47 DF pair, 2.1 kN preload",
+    "bearingSource": "https://s3.amazonaws.com/www.motionusa.com/hiwin/2018_Ballscrew_Bearing.pdf",
+    "bearingLocation": "HIWIN manufacturer catalogue, rigidity table (DF: 0.75 kN/um)",
+    "shaftRootDiameterMm": 12.324,
+    "leadMm": 5,
+    "assumption": "FDI nut and 15 mm support pair are stiffness proxies, not drop-in SFU1605/BK12 selections. Shaft root diameter is the R16-5B1 catalogue proxy. Fixed-to-nut length comes from packet COM separation; bearing/nut housing deformation is omitted.",
+    "shaftModulusSource": "frame-study.json materials entry keyed by each screw part MaterialLibrary ID"
+  },
+  "beltX": {
+    "axialRigidityN": 75000,
+    "widthMm": 15,
+    "specificRigidityNPerMmWidth": 5000,
+    "teeth": 20,
+    "pitchMm": 5,
+    "source": "machinekit/haxe/src/machinekit/milling/MillXYStage.hx: TimingBelt.twoPulley(...,15,5000)",
+    "status": "Existing code assumption, not measured catalogue stiffness for the molded belt",
+    "catalogueProxyAxialRigidityN": [
+      141800,
+      309706
+    ],
+    "catalogueProxySource": "https://www.gates.com/content/dam/documents-library/catalogs/thermoplastic-polyurethane-belt-catalogue-en.pdf",
+    "catalogueProxyLocation": "HTD5 15 mm open-ended/welded belt: aramid and steel SL specific stiffness",
+    "assumption": "Two pretensioned equal straight spans; no slack, tooth compliance or motor/servo wind-up. Gates cord constructions are different products and only a sensitivity proxy. Ktheta=2*EA*r^2/span; kAxial=Ktheta*(2*pi/lead)^2."
+  },
+  "columnClamp": {
+    "normalNPerUmPerPad": 500,
+    "tangentialNPerUmPerPad": 200,
+    "scaleRange": [
+      0.25,
+      4
+    ],
+    "source": "Explicit study bracket; no clamp preload/contact measurement exists",
+    "assumption": "Four discrete pad springs; CAD pad stiffness is already in FEM. These springs add contact compliance only; closed, sticking contact assumed."
+  },
+  "spindleBearings": {
+    "radialPairNPerUm": 249,
+    "axialPairNPerUm": 43,
+    "preload": "SNR 7006CVUJ74 level 7, 85 N",
+    "source": "https://eshop.ntn-snr.com/en/product/7006CVUJ74-SNR/7006CVUJ74",
+    "stationOffsetsAboveGaugeMm": [
+      70,
+      190
+    ],
+    "assumption": "Catalogue proxy, not selected BT30 cartridge internals. Pair radial stiffness is split equally over two assumed stations; axial pair stiffness acts at the front station. No shaft bending; spin about Z carries no cutting torque in this force-only budget."
+  },
+  "toolHolder": {
+    "neckLengthMm": 35,
+    "outerDiameterMm": 34,
+    "boreDiameterMm": 6,
+    "taperTranslationNPerUm": 200,
+    "taperRotationNmmPerRad": 100000000,
+    "source": "MillPowerDrawbarPart holder geometry and packet material ID; E from matching frame-study.json material. Taper contact springs are explicit study assumptions.",
+    "assumption": "Uniform annular neck beam plus assumed taper translation/rotation; no claim of measured holder rigidity. Tool stick-out is read from packet bounds."
+  },
+  "tool": {
+    "inertiaFraction": 0.5,
+    "source": "Packet steel tool material ID and geometry; modulus from matching frame-study.json material; flute inertia fraction is an explicit study assumption",
+    "assumption": "Steel cutter matching the CAD material assignment; cantilever from holder nose, effective bending inertia half the circular section and solid axial area. A carbide tool requires an explicit material override."
+  },
+  "supports": {
+    "source": "The selected FEM support configuration and SUPPORT_SPRINGS strain energy",
+    "assumption": "Support compliance is already in frame FEM; split it out by energy, never add the same support in series again."
+  }
+}

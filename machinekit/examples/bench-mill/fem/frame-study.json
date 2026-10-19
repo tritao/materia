@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "model": "upper-bound-bonded-frame-rigid-axes",
+  "description": "Upper-bound frame stiffness: bonded inserts/pads, rigid moving axes and kinematic guide/drive patch equations. Patch coupling stiffens the rail/seat regions.",
+  "materials": {
+    "mineral-cast": {
+      "youngsPa": 35000000000,
+      "poissonRatio": 0.25,
+      "densityKgPerM3": 2400,
+      "assumed": true,
+      "source": "MaterialLibrary modulus/density; Poisson ratio is an explicit study assumption",
+      "overrides": [
+        {
+          "property": "poissonRatio",
+          "source": "Explicit study assumption; no library value"
+        }
+      ]
+    },
+    "machined-steel": {
+      "youngsPa": 210000000000,
+      "poissonRatio": 0.3,
+      "densityKgPerM3": 7850,
+      "assumed": true,
+      "source": "Study isotropic machined-steel assumption: E=210 GPa, nu=0.30; density=7850 kg/m3 retained from MaterialLibrary. No material certificate supplied.",
+      "overrides": [
+        {
+          "property": "poissonRatio",
+          "source": "Explicit study assumption; no library value"
+        },
+        {
+          "property": "youngsPa",
+          "source": "Explicit study steel modulus; no library value"
+        }
+      ]
+    }
+  },
+  "footContactRadiusMm": 14,
+  "cuttingForceN": 500,
+  "payloadKg": 20,
+  "gravityMPerS2": 9.80665,
+  "equilibriumRelativeTolerance": 0.0001,
+  "meshRelativeTolerance": 0.05,
+  "limitations": [
+    "Casting-to-insert interfaces and the four column pad pairs are perfectly bonded; no preload, slip, uplift or anchorage strength is calculated",
+    "Moving X/Y stage, Z carriage/head, spindle, tool and workholding are rigid; guides transmit transverse loads and drives carry their axis loads without elastic compliance",
+    "Foot annuli represent physically rigid nuts, with all foot rotations free; support configurations bracket a three-point mount and four assumed vertical springs.",
+    "Cutting forces are applied at coincident tool/workpiece reference points; a rigid fixture reaches the current tool-tip height above the table",
+    "Gravity of omitted components is transferred to the nearest represented ancestor, conserving force and moment; static self-weight is only an assumed assembly allocation",
+    "All elastic properties are assumed; this solve supplies frame compliance for this pose and these boundary conditions"
+  ],
+  "supportConfigurations": {
+    "soft-three-point": {
+      "description": "Three point kinematic bound; foot rotations free and fourth foot vertically free",
+      "constraints": {
+        "LeftFront": [
+          1,
+          2,
+          3
+        ],
+        "LeftRear": [
+          1,
+          3
+        ],
+        "RightFront": [],
+        "RightRear": [
+          3
+        ]
+      },
+      "verticalSpringNPerMm": 0
+    },
+    "stiff-four-springs": {
+      "description": "Four vertical springs leveled under self-weight; foot rotations free",
+      "constraints": {
+        "LeftFront": [
+          1,
+          2
+        ],
+        "LeftRear": [
+          1
+        ],
+        "RightFront": [],
+        "RightRear": []
+      },
+      "verticalSpringNPerMm": 100000,
+      "source": "Assumed stiff support bracket, not measured foot stiffness",
+      "leveling": "Zero loaded foot heights under self-weight; spring precompression Ri/k is represented by equal/opposite equivalent initial spring forces (calibrated four-seat gravity reactions). Ground DOFs stay zero."
+    }
+  },
+  "frameShareTarget": {
+    "maximumFraction": 0.3,
+    "source": "Provisional engineering target",
+    "rationale": "At 30% casting share, a 20% casting compliance reduction improves total loop compliance by only 6%; defer geometry below this share in all directions under both support bounds."
+  }
+}

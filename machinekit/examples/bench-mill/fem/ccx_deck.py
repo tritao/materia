@@ -74,5 +74,5 @@ def run_solver(ccx, output, timeout):
                                 stdout=log, stderr=subprocess.STDOUT, timeout=timeout)
     text = (output / "solver.log").read_text()
     if result.returncode or "*ERROR" in text.upper() or "Job finished" not in text:
-        raise ValueError(f"Static solver failed; see {output / 'solver.log'}")
+        raise ValueError(f"Static solver failed (exit {result.returncode}); see {output / 'solver.log'}")
     return text

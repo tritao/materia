@@ -1,9 +1,10 @@
 # Bench mill FEM tools
 
-The current implementation exports a geometry packet, validates its physical
-datums, verifies CalculiX with analytical fixtures, and meshes the two mineral
-castings independently. The upper-bound assembled solve is being verified; no
-whole-machine accuracy result is qualified.
+The tools export and validate CAD packets, verify CalculiX with analytical
+fixtures, and solve a conformal casting/steel frame. The first useful milestone
+now passes: an upper-bound
+static baseline at the center pose, both support bounds, and a conditional
+tool-to-workpiece compliance budget. This does not qualify machining accuracy.
 The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN.md).
 
 ## Gate status
@@ -16,8 +17,61 @@ The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN
   same-build concept comparisons, per-part density checks, fixed-frame STEP
   hashes across poses, and byte-identical full manifest/STEP repeat verification.
   The Haxe datum contract passes 33 assertions and Python packet checks pass 14 tests.
-- The bonded-frame upper-bound static model, bracketed supports, energy
-  decomposition and compliance budget are WIP; no stiffness result is qualified yet.
+  An additional intermediate pose passes the 224-part comparison, with its
+  requested pose automatically added to the concept reference.
+- First-milestone numerical gate: passed at the center pose, including both
+  support bounds, all 15 thickness probes on two counted meshes, the full
+  compliance matrix/load-box reduction, equilibrium, reciprocity, scaling/sign
+  checks and a base-casting energy-sensitivity cross-check.
+- Geometry screening: deferred by the provisional 30% casting-share target.
+  Assembly joints, the nine-pose sweep, contact/uncertainty and modal work remain open.
+
+## Recorded center baseline
+
+The run uses a frozen, validated 224-part packet at X=0, Y=0, Z=-125 mm.
+Later CAD edits/export commands do not replace this run's inputs. Both models
+bond the casting interfaces and use rigid moving axes; the numbers below are
+frame contributions. The budget adds the separately documented lumped springs.
+
+| Partitioned target | C3D10 elements | Soft support worst box | Stiff support worst box |
+| --- | --- | --- | --- |
+| 40 mm | 37,573 | 18.9162 µm | 18.6055 µm |
+| 30 mm | 60,372 | 19.1470 µm | 18.8306 µm |
+
+The maximum change in any unit-response vector is **1.40%**, against the 5%
+target. All 15 normal-section probes pass at both levels, with at least six
+quadratic tetrahedra intersected by each probe and conformal mid-planes imposing
+two normal layers. Final Jacobians are positive. The support bounds change the
+worst ±500 N-per-axis load-box response by **1.68%**. The 1% base-modulus increase
+reduces X compliance by 0.3460%, versus 0.3491% predicted from its strain energy
+(relative discrepancy **0.89%**, within the 2.5% gate).
+
+| Casting share of total loop | X | Y | Z |
+| --- | --- | --- | --- |
+| Soft three-point | 0.88% | 0.61% | 12.31% |
+| Stiff four-spring | 0.81% | 0.61% | 12.31% |
+
+These conditional shares fall below the 30% target in every world direction
+under both supports. For this pose and the current 6 mm steel tool, prioritize
+better tool, spindle, drive and joint inputs before casting geometry changes.
+The full matrices, principal directions, eight load-box corners, gravity
+reactions, element-group energy shares and source/preload assumptions are in
+`build/fem/partitioned-baseline/report.md` and `report.json`.
+
+Run identity (retain the generated frozen packet and provenance snapshots):
+
+- Packet SHA256: `1032888e88c98ab70be584909a01d441c785318233e030c2b4e945dbcd65698b`.
+- Configuration SHA256: `3041e949a49d1fe0a927b88bbd949fbabdb86c01e1604bc7c24e6c9fb5e11847`.
+- Report JSON SHA256: `9e91182f77eec121a17993e7d80b886f274a15add456716a29147beded850cf1`.
+- Geometry source revision: `c52c085e1f3222d9683ef32d887be6fe1c981bea`, with captured root patch
+  `f081166f0d35ed6f1933106fd8c8700107df72ee488d8a9c783c436f372b52e2`.
+- Analysis source revision: `af5e4d36ad4e68926969082f8afc58a622677eb2`, with captured root patch
+  `81c347de6a88faa778c3623aed66df6ae123909e60b19147985278196f48409d`.
+
+The report and its frozen packet also record initialized submodules' own
+patches, loaded haxeon/CadKit/OCCT build identities, Gmsh 4.12.2 and CalculiX
+2.21 binary hashes, case/deck/result hashes, and mesh warnings. No incomplete
+or unpartitioned pilot is counted in this convergence result.
 
 ## Export and check the CAD packet
 
@@ -42,8 +96,9 @@ are explicit arguments; invalid coordinates or names fail before export:
 `MillFemExport` exports all frame members, including the separate steel inserts,
 clamp bolts and feet, plus the head, carriage, saddle and table. Other components
 retain their individual CAD/declared mass, centre of mass and pose as
-`mass-only` records. These records still need an attachment/load-transfer model;
-they are not already connected finite elements or modal inertia tensors.
+`mass-only` records. The static study allocates their gravity through rigid-axis references or
+least-norm force/moment transfer to the represented ancestor. Modal attachments
+and centroidal inertia tensors remain pending.
 
 The version-1 `manifest.json` contains:
 
@@ -162,7 +217,7 @@ Jacobian determinants and mesh volume within 0.1% of CAD volume. Generated
 a geometry/toolchain pilot, not a converged structural mesh. The [Gmsh API](https://gmsh.info/doc/texinfo/)
 provides the import, mass, bounds and element-quality operations used here.
 
-## Upper-bound static study (verification in progress)
+## Run the upper-bound static study
 
 ```sh
 LD_LIBRARY_PATH="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
@@ -179,11 +234,14 @@ come from the frozen input packet. `--resume` reuses a completed solve only when
 the regenerated input deck is byte-identical; all result gates are evaluated again.
 On this shared workstation, run large meshes through the machine-wide
 `/home/joao/dev/materia-cache/tools/heavy-run` queue with adequate memory headroom.
-An unpartitioned 20 mm solve was terminated by the host's earlyoom service when available memory
+An unpartitioned 20 mm solve was terminated by the host's earlyoom service
+when available memory
 fell below its threshold; that incomplete run is not a passed result.
 
 `frame-study.json` keys materials by `mineral-cast` and `machined-steel`, retains
-library densities and records assumed elastic overrides. Every packet part gets
+library densities and records assumed elastic overrides. The nominal steel
+values agree with the [ECCS reference values (§5.2.1)](https://www.steelconstruct.com/wp-content/uploads/PROGRESS_Design_guide_final-version.pdf);
+applying them to unspecified machined steel remains a study assumption. Every packet part gets
 a density/volume/mass comparison. The solver separately checks each meshed part's
 density against its packet mass. Computed masses must agree; an explicitly
 declared catalogue mass is retained and its density comparison is reported.
@@ -214,13 +272,15 @@ One base-casting stiffening solve cross-checks its X energy sensitivity.
 
 The mesher inserts conformal planes at the minimum sections' mid-depth,
 without changing material volume. These impose two quadratic layers without
-uniformly refining every long wall. Every counted convergence level must pass CAD-derived normal section probes
+uniformly refining every long wall. Every counted convergence level must pass
+CAD-derived normal section probes
 through the thin floors, walls, ribs and roofs: at least two quadratic elements
-and no sampled element chord exceeding half the section thickness. The original unpartitioned 40 mm
+and no sampled element chord exceeding half the section thickness. The original
+unpartitioned 40 mm
 pilot fails this gate and does not count toward convergence. Partitioned levels
 are checked separately. Reports retain
-Gmsh warnings and final Jacobian checks. Stresses at interface/constraint edges
-and joint tractions are not qualified by these displacement checks.
+Gmsh warnings and final Jacobian checks. Stress/traction output and local
+qualification at interface/constraint edges remain pending.
 
 `compliance-budget.json` records catalogue proxies, preload classes, links and
 explicit assumptions for unselected hardware. The budget adds guides, screw/
@@ -231,8 +291,7 @@ series compliance. A provisional 30% casting share target controls geometry
 screening for this pose, tool and assumed hardware. This is a conditional budget;
 selected supplier data and joint measurements remain open inputs.
 
-The remaining first-milestone gates are the two counted mesh levels, both
-support bounds, the energy cross-check and their generated budget/report.
+The first-milestone numerical and budget gates pass for the frozen center run.
 Later work includes the distributing-coupling assembly model, all nine poses,
 uncertainty/contact checks and modal inertia tensors. Geometry candidates stay
 deferred until the compliance budget justifies them.
