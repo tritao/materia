@@ -1,0 +1,1639 @@
+{
+  "schemaVersion": 1,
+  "revision": "hzmotion-pdf-2025-04-09-v1",
+  "sources": {
+    "motor": {
+      "url": "https://www.hzmotion.com/pdf/Motor_Bracket.pdf",
+      "sha256": "ee3cb72a3237f2f1e99315ae67333b60adf60309114c917379490b3a081840ff",
+      "pages": 25
+    },
+    "support": {
+      "url": "https://www.hzmotion.com/pdf/Ballscrew_support_unit.pdf",
+      "sha256": "43c7b5cf162da1a9ae31db4264a5a5f8f5ff1caa03904361262a306951b8fff0",
+      "pages": 34
+    }
+  },
+  "coordinateSystem": "mounts: X across, Y up, motor mounting plane Z=0, screw toward +Z; BF: base Y=0, front Z=0; FK: flange front Z=0, axis at X=Y=0; adapter: motor face Z=0, body engagement toward +Z",
+  "coverage": [
+    {
+      "family": "A",
+      "motorInterface": "38A",
+      "support": "FKA06",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "38A",
+      "support": "FKA08",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "38A",
+      "support": "FK10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "38A",
+      "support": "FK12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "40B",
+      "support": "FKA06",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "40B",
+      "support": "FKA08",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "40B",
+      "support": "FK10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "40B",
+      "support": "FK12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60C",
+      "support": "FK10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60C",
+      "support": "FK12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60C",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60D",
+      "support": "FK10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60D",
+      "support": "FK12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60D",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60D",
+      "support": "FKA20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60DP",
+      "support": "FK10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60DP",
+      "support": "FK12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60DP",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "60DP",
+      "support": "FKA20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "80E",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "80E",
+      "support": "FKA20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "80EP",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "80EP",
+      "support": "FKA20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "85F",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "A",
+      "motorInterface": "85F",
+      "support": "FKA20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "B",
+      "motorInterface": "116S",
+      "support": "FK25",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "B",
+      "motorInterface": "130G",
+      "support": "FK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "B",
+      "motorInterface": "130G",
+      "support": "FK25",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "B",
+      "motorInterface": "130G",
+      "support": "MBK15DF",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "B",
+      "motorInterface": "130G",
+      "support": "MBK17DF",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "B",
+      "motorInterface": "130G",
+      "support": "MBK20DF",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "B",
+      "motorInterface": "180H",
+      "support": "WBK25DF",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "B",
+      "motorInterface": "180H",
+      "support": "WBK25DFD",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "B",
+      "motorInterface": "180H",
+      "support": "WBK30DF",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "B",
+      "motorInterface": "180H",
+      "support": "WBK30DFD",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "H",
+      "motorInterface": "60D",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "H",
+      "motorInterface": "60DP",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "H",
+      "motorInterface": "80E",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "H",
+      "motorInterface": "80EP",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "38A",
+      "support": "FKA06",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "38A",
+      "support": "FKA08",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "38A",
+      "support": "FKA10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "38A",
+      "support": "FKA12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "40B",
+      "support": "FKA06",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "40B",
+      "support": "FKA08",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "40B",
+      "support": "FKA10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "40B",
+      "support": "FKA12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60C",
+      "support": "FKA10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60C",
+      "support": "FKA12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60C",
+      "support": "FKA15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60D",
+      "support": "FKA10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60D",
+      "support": "FKA12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60D",
+      "support": "FKA15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60D",
+      "support": "FKA20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60DP",
+      "support": "FKA10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60DP",
+      "support": "FKA12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60DP",
+      "support": "FKA15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "60DP",
+      "support": "FKA20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "80E",
+      "support": "FKA15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "80E",
+      "support": "FKA20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "80EP",
+      "support": "FKA15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "80EP",
+      "support": "FKA20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "85F",
+      "support": "FKA15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "L",
+      "motorInterface": "85F",
+      "support": "FKA20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "60D",
+      "support": "BK12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "60D",
+      "support": "EK12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "60D",
+      "support": "BK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "60D",
+      "support": "EK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "60DP",
+      "support": "BK12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "60DP",
+      "support": "EK12",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "60DP",
+      "support": "BK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "60DP",
+      "support": "EK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "80E",
+      "support": "BK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "80E",
+      "support": "EK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "80E",
+      "support": "AK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "80E",
+      "support": "AK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "80EP",
+      "support": "BK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "80EP",
+      "support": "EK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "80EP",
+      "support": "AK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "80EP",
+      "support": "AK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "90X",
+      "support": "BK25",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "90X",
+      "support": "EK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "90X",
+      "support": "AK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "90X",
+      "support": "AK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100Y",
+      "support": "BK25",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100Y",
+      "support": "BK30",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100Y",
+      "support": "EK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100Y",
+      "support": "AK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100Y",
+      "support": "SBK25",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100Y",
+      "support": "SBK25D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100Y",
+      "support": "SBK30",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100Y",
+      "support": "SBK30D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100YP",
+      "support": "BK25",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100YP",
+      "support": "BK30",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100YP",
+      "support": "EK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100YP",
+      "support": "AK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100YP",
+      "support": "SBK25",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100YP",
+      "support": "SBK25D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100YP",
+      "support": "SBK30",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "100YP",
+      "support": "SBK30D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "116S",
+      "support": "BK30",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "116S",
+      "support": "EK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "116S",
+      "support": "AK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "116S",
+      "support": "SBK25",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "116S",
+      "support": "SBK25D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "116S",
+      "support": "SBK30",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "116S",
+      "support": "SBK30D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "130G",
+      "support": "BK30",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "130G",
+      "support": "EK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "130G",
+      "support": "AK20",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "130G",
+      "support": "SBK25",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "130G",
+      "support": "SBK25D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "130G",
+      "support": "SBK30",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "130G",
+      "support": "SBK30D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "165Y",
+      "support": "SBK35D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "165Y",
+      "support": "SBK40D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "165S",
+      "support": "SBK35D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "165S",
+      "support": "SBK40D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "165G",
+      "support": "SBK35D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "165G",
+      "support": "SBK40D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "165YP",
+      "support": "SBK35D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "C",
+      "motorInterface": "165YP",
+      "support": "SBK40D",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "38A",
+      "support": "FK06",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "38A",
+      "support": "FK08",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "38A",
+      "support": "FK10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "40B",
+      "support": "FK06",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "40B",
+      "support": "FK08",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "40B",
+      "support": "FK10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "60C",
+      "support": "FK08",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "60C",
+      "support": "FK10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "60DP",
+      "support": "FK10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "80E",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "80EP",
+      "support": "FK10",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "80EP",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    },
+    {
+      "family": "KK",
+      "motorInterface": "85F",
+      "support": "FK15",
+      "sourcePage": 3,
+      "status": "coverage-matrix-only"
+    }
+  ],
+  "parts": [
+    {
+      "model": "M60D-BK12-C",
+      "kind": "mount",
+      "family": "C",
+      "page": 12,
+      "source": "motor",
+      "integrated": true,
+      "face": 60,
+      "pilot": 50,
+      "pcd": 70,
+      "thread": "M5",
+      "threadDepth": null,
+      "pilotDepth": 6,
+      "length": 83,
+      "shaftHeight": 25,
+      "width": 65,
+      "flange": 6,
+      "rearStart": 50.5,
+      "rearEnd": 80,
+      "rearWidth": 34,
+      "rearHeight": 42,
+      "shaftBore": 12,
+      "shoulderZ": 85,
+      "massKg": 0.79,
+      "baseHoles": [
+        {
+          "x": -25,
+          "z": 24,
+          "diameter": 7
+        },
+        {
+          "x": -25,
+          "z": 64,
+          "diameter": 6.6
+        },
+        {
+          "x": -25,
+          "z": 77,
+          "diameter": 6.6
+        },
+        {
+          "x": 25,
+          "z": 24,
+          "diameter": 7
+        },
+        {
+          "x": 25,
+          "z": 64,
+          "diameter": 6.6
+        },
+        {
+          "x": 25,
+          "z": 77,
+          "diameter": 6.6
+        }
+      ],
+      "pilotTolerance": "H7",
+      "shaftTolerance": "g6",
+      "geometryBasis": "drawing-based nominal interfaces; undimensioned webs, reliefs and bearing internals simplified",
+      "bearing": "7001A",
+      "bearingArrangement": "DF",
+      "maxAxialLoadKgf": 243,
+      "oppositeSupport": "BF12",
+      "endProfile": "C-BK12",
+      "runningMassIncluded": "housing, bearings and supplied internal hardware; no motor/coupling",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingQualified": false,
+      "approximateFields": [
+        "housing webs",
+        "corner chamfers",
+        "bearing internal geometry",
+        "unpublished pilot depths"
+      ]
+    },
+    {
+      "model": "M60D-EK12-C",
+      "kind": "mount",
+      "family": "C",
+      "page": 13,
+      "source": "motor",
+      "integrated": true,
+      "face": 60,
+      "pilot": 50,
+      "pcd": 70,
+      "thread": "M5",
+      "threadDepth": null,
+      "pilotDepth": 6,
+      "length": 83,
+      "shaftHeight": 25,
+      "width": 70,
+      "flange": 6,
+      "rearStart": 50.5,
+      "rearEnd": 80,
+      "rearWidth": 34,
+      "rearHeight": 42,
+      "shaftBore": 12,
+      "shoulderZ": 85,
+      "massKg": 0.84,
+      "baseHoles": [
+        {
+          "x": -26,
+          "z": 32,
+          "diameter": 9
+        },
+        {
+          "x": -26,
+          "z": 72,
+          "diameter": 9
+        },
+        {
+          "x": 26,
+          "z": 32,
+          "diameter": 9
+        },
+        {
+          "x": 26,
+          "z": 72,
+          "diameter": 9
+        }
+      ],
+      "pilotTolerance": "H7",
+      "shaftTolerance": "g6",
+      "geometryBasis": "drawing-based nominal interfaces; undimensioned webs, reliefs and bearing internals simplified",
+      "bearing": "7001A",
+      "bearingArrangement": "DF",
+      "maxAxialLoadKgf": 243,
+      "oppositeSupport": "EF12",
+      "endProfile": "C-BK12",
+      "runningMassIncluded": "housing, bearings and supplied internal hardware; no motor/coupling",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingQualified": false,
+      "approximateFields": [
+        "housing webs",
+        "corner chamfers",
+        "bearing internal geometry",
+        "unpublished pilot depths"
+      ]
+    },
+    {
+      "model": "M60D-FK12-A",
+      "kind": "mount",
+      "family": "A",
+      "page": 6,
+      "source": "motor",
+      "integrated": false,
+      "face": 60,
+      "pilot": 50,
+      "pcd": 70,
+      "thread": "M5",
+      "threadDepth": null,
+      "pilotDepth": 5,
+      "length": 74,
+      "shaftHeight": 25,
+      "width": 65,
+      "flange": 5,
+      "rearStart": 57,
+      "rearEnd": 74,
+      "rearWidth": 65,
+      "rearHeight": 47,
+      "shaftBore": 36,
+      "shoulderZ": null,
+      "massKg": 0.66,
+      "baseHoles": [
+        {
+          "x": -25,
+          "z": 24,
+          "diameter": 6.6
+        },
+        {
+          "x": -25,
+          "z": 44,
+          "diameter": 6.6
+        },
+        {
+          "x": 25,
+          "z": 24,
+          "diameter": 6.6
+        },
+        {
+          "x": 25,
+          "z": 44,
+          "diameter": 6.6
+        }
+      ],
+      "pilotTolerance": "H7",
+      "shaftTolerance": "g6",
+      "geometryBasis": "drawing-based nominal interfaces; undimensioned webs, reliefs and bearing internals simplified",
+      "bearing": null,
+      "bearingArrangement": null,
+      "maxAxialLoadKgf": null,
+      "oppositeSupport": null,
+      "endProfile": null,
+      "runningMassIncluded": "bracket only; separate FK12 required",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingQualified": false,
+      "approximateFields": [
+        "housing webs",
+        "corner chamfers",
+        "bearing internal geometry",
+        "unpublished pilot depths"
+      ]
+    },
+    {
+      "model": "KK86-FK10L",
+      "kind": "mount",
+      "family": "KK",
+      "page": 24,
+      "source": "motor",
+      "integrated": true,
+      "face": 62,
+      "pilot": 50,
+      "pcd": 70,
+      "thread": "M5",
+      "threadDepth": 10,
+      "pilotDepth": 3.5,
+      "length": 87,
+      "shaftHeight": 30,
+      "width": 85,
+      "flange": 3.5,
+      "rearStart": 64,
+      "rearEnd": 87,
+      "rearWidth": 85,
+      "rearHeight": 62,
+      "shaftBore": 12,
+      "shoulderZ": null,
+      "massKg": 1.43,
+      "baseHoles": [
+        {
+          "x": -22.5,
+          "z": 31,
+          "diameter": 5.5
+        },
+        {
+          "x": -22.5,
+          "z": 49,
+          "diameter": 5.5
+        },
+        {
+          "x": 22.5,
+          "z": 31,
+          "diameter": 5.5
+        },
+        {
+          "x": 22.5,
+          "z": 49,
+          "diameter": 5.5
+        }
+      ],
+      "pilotTolerance": "H7",
+      "shaftTolerance": "g6",
+      "geometryBasis": "drawing-based nominal interfaces; undimensioned webs, reliefs and bearing internals simplified",
+      "bearing": "7001A",
+      "bearingArrangement": "DF",
+      "maxAxialLoadKgf": 243,
+      "oppositeSupport": null,
+      "endProfile": "KK86-FK10L",
+      "runningMassIncluded": "supplier total base assembly; adapter mass unspecified",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingQualified": false,
+      "approximateFields": [
+        "housing webs",
+        "corner chamfers",
+        "bearing internal geometry",
+        "unpublished pilot depths"
+      ]
+    },
+    {
+      "model": "KK86-80EP-adapter",
+      "kind": "adapter",
+      "family": "KK",
+      "page": 24,
+      "source": "motor",
+      "integrated": true,
+      "face": 80,
+      "pilot": 70,
+      "pcd": 90,
+      "thread": "M5",
+      "threadDepth": 10,
+      "pilotDepth": null,
+      "length": 12,
+      "shaftHeight": 0,
+      "width": 80,
+      "flange": 12,
+      "rearStart": 0,
+      "rearEnd": 12,
+      "rearWidth": 80,
+      "rearHeight": 80,
+      "shaftBore": 50,
+      "shoulderZ": null,
+      "massKg": null,
+      "baseHoles": [],
+      "pilotTolerance": "H7",
+      "shaftTolerance": "g6",
+      "geometryBasis": "drawing-based nominal interfaces; undimensioned webs, reliefs and bearing internals simplified",
+      "bearing": null,
+      "bearingArrangement": null,
+      "maxAxialLoadKgf": null,
+      "oppositeSupport": null,
+      "endProfile": null,
+      "runningMassIncluded": "adapter only; mass not published",
+      "bodyPilot": 50,
+      "bodyPilotLength": 3.5,
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingQualified": false,
+      "approximateFields": [
+        "housing webs",
+        "corner chamfers",
+        "bearing internal geometry",
+        "unpublished pilot depths",
+        "unpublished pilot recess depth",
+        "adapter attachment to KK body not yet qualified"
+      ]
+    },
+    {
+      "model": "M80E-BK15-C",
+      "kind": "mount",
+      "family": "C",
+      "page": 14,
+      "source": "motor",
+      "integrated": true,
+      "face": 86,
+      "pilot": 70,
+      "pcd": 90,
+      "thread": "M6",
+      "threadDepth": null,
+      "pilotDepth": 6,
+      "length": 108,
+      "shaftHeight": 28,
+      "width": 86,
+      "flange": 6,
+      "rearStart": 67,
+      "rearEnd": 103,
+      "rearWidth": 40,
+      "rearHeight": 48,
+      "shaftBore": 15,
+      "shoulderZ": 109,
+      "massKg": 1.39,
+      "baseHoles": [
+        {
+          "x": -29,
+          "z": 42,
+          "diameter": 6.6
+        },
+        {
+          "x": -29,
+          "z": 87,
+          "diameter": 6.6
+        },
+        {
+          "x": -29,
+          "z": 102,
+          "diameter": 6.6
+        },
+        {
+          "x": 29,
+          "z": 42,
+          "diameter": 6.6
+        },
+        {
+          "x": 29,
+          "z": 87,
+          "diameter": 6.6
+        },
+        {
+          "x": 29,
+          "z": 102,
+          "diameter": 6.6
+        }
+      ],
+      "pilotTolerance": "H7",
+      "shaftTolerance": "g6",
+      "geometryBasis": "drawing-based nominal interfaces; undimensioned webs, reliefs and bearing internals simplified",
+      "bearing": "7002A",
+      "bearingArrangement": "DF",
+      "maxAxialLoadKgf": 279,
+      "oppositeSupport": "BF15",
+      "endProfile": "C-BK15",
+      "runningMassIncluded": "housing, bearings and supplied internal hardware; no motor/coupling",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingQualified": false,
+      "approximateFields": [
+        "housing webs",
+        "corner chamfers",
+        "bearing internal geometry",
+        "unpublished pilot depths"
+      ]
+    },
+    {
+      "model": "BF12",
+      "kind": "support",
+      "family": "BF",
+      "source": "support",
+      "page": 11,
+      "integrated": true,
+      "face": 0,
+      "pilot": 0,
+      "pcd": 0,
+      "thread": "",
+      "threadDepth": null,
+      "pilotDepth": 0,
+      "length": 20,
+      "shaftHeight": 25,
+      "width": 60,
+      "flange": 0,
+      "rearStart": 0,
+      "rearEnd": 20,
+      "rearWidth": 34,
+      "rearHeight": 43,
+      "sideHeight": 32.5,
+      "shaftBore": 10,
+      "shoulderZ": null,
+      "massKg": null,
+      "baseHoles": [
+        {
+          "x": -23.0,
+          "z": 10,
+          "diameter": 6.6
+        },
+        {
+          "x": 23.0,
+          "z": 10,
+          "diameter": 6.6
+        }
+      ],
+      "bearing": "6000ZZ",
+      "bearingArrangement": "single floating",
+      "maxAxialLoadKgf": null,
+      "oppositeSupport": null,
+      "endProfile": null,
+      "runningMassIncluded": "housing and single bearing; mass unspecified",
+      "geometryBasis": "drawing-based; internal rolling elements and chamfers omitted",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingQualified": false,
+      "approximateFields": [
+        "housing webs",
+        "corner chamfers",
+        "bearing internal geometry",
+        "unpublished pilot depths"
+      ]
+    },
+    {
+      "model": "BF15",
+      "kind": "support",
+      "family": "BF",
+      "source": "support",
+      "page": 11,
+      "integrated": true,
+      "face": 0,
+      "pilot": 0,
+      "pcd": 0,
+      "thread": "",
+      "threadDepth": null,
+      "pilotDepth": 0,
+      "length": 20,
+      "shaftHeight": 28,
+      "width": 70,
+      "flange": 0,
+      "rearStart": 0,
+      "rearEnd": 20,
+      "rearWidth": 40,
+      "rearHeight": 48,
+      "sideHeight": 38,
+      "shaftBore": 15,
+      "shoulderZ": null,
+      "massKg": null,
+      "baseHoles": [
+        {
+          "x": -27.0,
+          "z": 10,
+          "diameter": 6.6
+        },
+        {
+          "x": 27.0,
+          "z": 10,
+          "diameter": 6.6
+        }
+      ],
+      "bearing": "6002ZZ",
+      "bearingArrangement": "single floating",
+      "maxAxialLoadKgf": null,
+      "oppositeSupport": null,
+      "endProfile": null,
+      "runningMassIncluded": "housing and single bearing; mass unspecified",
+      "geometryBasis": "drawing-based; internal rolling elements and chamfers omitted",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingQualified": false,
+      "approximateFields": [
+        "housing webs",
+        "corner chamfers",
+        "bearing internal geometry",
+        "unpublished pilot depths"
+      ]
+    },
+    {
+      "model": "FK12",
+      "kind": "support",
+      "family": "FK",
+      "source": "support",
+      "page": 20,
+      "integrated": true,
+      "face": 44,
+      "pilot": 36,
+      "pcd": 44,
+      "thread": "",
+      "threadDepth": null,
+      "pilotDepth": 17,
+      "length": 27,
+      "shaftHeight": 0,
+      "width": 44,
+      "flange": 10,
+      "rearStart": 0,
+      "rearEnd": 27,
+      "rearWidth": 44,
+      "rearHeight": 44,
+      "shaftBore": 12,
+      "shoulderZ": null,
+      "massKg": null,
+      "baseHoles": [],
+      "bearing": "7001A",
+      "bearingArrangement": "DF",
+      "maxAxialLoadKgf": null,
+      "oppositeSupport": null,
+      "endProfile": null,
+      "runningMassIncluded": "support assembly; mass unspecified",
+      "geometryBasis": "drawing-based flange and bearing interfaces; internals simplified",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingQualified": false,
+      "approximateFields": [
+        "housing webs",
+        "corner chamfers",
+        "bearing internal geometry",
+        "unpublished pilot depths"
+      ]
+    },
+    {
+      "model": "EF12",
+      "kind": "support",
+      "family": "EF",
+      "source": "support",
+      "page": 8,
+      "integrated": true,
+      "face": 0,
+      "pilot": 0,
+      "pcd": 0,
+      "thread": "",
+      "threadDepth": null,
+      "pilotDepth": 0,
+      "length": 20,
+      "shaftHeight": 25,
+      "width": 70,
+      "flange": 0,
+      "rearStart": 0,
+      "rearEnd": 20,
+      "rearWidth": 36,
+      "rearHeight": 43,
+      "sideHeight": 24,
+      "shaftBore": 10,
+      "shoulderZ": null,
+      "massKg": null,
+      "baseHoles": [
+        {
+          "x": -26,
+          "z": 10,
+          "diameter": 9
+        },
+        {
+          "x": 26,
+          "z": 10,
+          "diameter": 9
+        }
+      ],
+      "bearing": "6000ZZ",
+      "bearingArrangement": "single floating",
+      "maxAxialLoadKgf": null,
+      "oppositeSupport": null,
+      "endProfile": null,
+      "runningMassIncluded": "housing and single bearing; mass unspecified",
+      "geometryBasis": "drawing-based; internal rolling elements and chamfers omitted",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingQualified": false,
+      "approximateFields": [
+        "housing webs",
+        "corner chamfers",
+        "bearing internal geometry",
+        "unpublished pilot depths"
+      ]
+    }
+  ],
+  "cadDownloads": [
+    {
+      "model": "M60D-BK12-C",
+      "url": "https://www.hzmotion.com/downloads/1784624575899-M60D-BK12-C.step",
+      "status": 403,
+      "supplierDesignation": "M60D- BK12-C3"
+    },
+    {
+      "model": "M60D-EK12-C",
+      "url": "https://www.hzmotion.com/downloads/1784624583651-M60D-EK12-C.step",
+      "status": 403,
+      "supplierDesignation": "M60D- EK12-C3"
+    },
+    {
+      "model": "M80E-BK15-C",
+      "url": "https://www.hzmotion.com/downloads/1784624649844-M80E-BK15-C.step",
+      "status": 403,
+      "supplierDesignation": "M80E- BK15-C3"
+    },
+    {
+      "model": "M60D-FK12-A",
+      "url": "https://www.hzmotion.com/downloads/1784624592913-M60D-FK12-A.step",
+      "status": 403,
+      "supplierDesignation": "M60D-FK12-A"
+    },
+    {
+      "model": "FK12",
+      "url": "https://www.hzmotion.com/downloads/1784564246641-FK12.step",
+      "status": 403,
+      "supplierDesignation": "FK12-C3"
+    },
+    {
+      "model": "BF12",
+      "url": "https://www.hzmotion.com/downloads/1784563890385-BF12.step",
+      "status": 403,
+      "supplierDesignation": "BF12-C3"
+    },
+    {
+      "model": "BF15",
+      "url": "https://www.hzmotion.com/downloads/1784563892750-BF15.step",
+      "status": 403,
+      "supplierDesignation": "BF15-C3"
+    }
+  ],
+  "discrepancies": [
+    "Motor PDF p4 flange F=5 for 60D differs from C drawing F=6; individual model drawing governs",
+    "Motor PDF p4 lists PCD115 for 130G while individual drawings use145; index only, no generated 130G geometry",
+    "Supplier website model strings include spacing/suffix inconsistencies; no procurement SKU inferred from geometry name",
+    "KK base screw-end drawing and specific adapter combinations require axial stack verification; not a Vallder SFU1605 drop-in",
+    "KK86 adapter pilot recess depth is not explicitly identified; generated recess is visual-only and compatibility remains unqualified"
+  ],
+  "machineSuitability": [
+    {
+      "machine": "bench-mill",
+      "axis": "Y",
+      "candidate": "M60D-BK12-C",
+      "status": "motor interface matches; screw end and full installation require checks"
+    },
+    {
+      "machine": "bench-mill",
+      "axis": "Z",
+      "candidate": "KK86-FK10L + KK86-80EP-adapter",
+      "status": "pilot/PCD candidate; smaller M5 fasteners and shaft stack unqualified"
+    },
+    {
+      "machine": "bench-mill",
+      "axis": "X",
+      "candidate": null,
+      "status": "retain return belt; integrated coaxial bracket is not a substitution"
+    },
+    {
+      "machine": "flexspline-hobber",
+      "candidate": "60D/80E arrangements",
+      "status": "separate worktree; extended screw ends and drive frames require independent checks"
+    },
+    {
+      "machine": "lathe",
+      "candidate": "C or A",
+      "status": "planned machine; loads and screw selection pending"
+    },
+    {
+      "machine": "sheet-router",
+      "candidate": "Z screw only",
+      "status": "planned XY rack drives do not use coaxial screw mounts"
+    }
+  ]
+}

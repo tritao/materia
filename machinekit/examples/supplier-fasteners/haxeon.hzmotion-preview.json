@@ -1,0 +1,5 @@
+{
+ "version":1,"package":{"name":"machinekit-hzmotion-preview"},"entry":"HzMotionPreview",
+ "sourceRoots":["."],"dependencies":{"machinekit":{"path":"../.."}},
+ "target":"host","outputDir":"../../../build/suppliers/hzmotion-preview"
+}

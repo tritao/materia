@@ -76,13 +76,16 @@ class LeadScrew extends MachineComponent {
 
 	public final thread:LeadScrewThread;
 	public final totalLength:Float;
+	final hasCustomDesignation:Bool;
 
-	public function new(thread:LeadScrewThread, length:Float) {
+	/** A supplier-specific end profile may provide its own BOM designation. */
+	public function new(thread:LeadScrewThread, length:Float, ?designation:String) {
 		if (thread == null) throw "Lead screw needs a thread specification";
 		if (!(length > 0) || !Math.isFinite(length)) throw "Lead screw needs a positive length";
-		super('LEADSCREW-${thread.designation}-L${Dimension.format(length)}',
+		super(designation ?? 'LEADSCREW-${thread.designation}-L${Dimension.format(length)}',
 			'Lead screw ${thread.designation}, ${Dimension.format(length)} mm long', "steel");
 		this.thread = thread;
+		hasCustomDesignation = designation != null;
 		totalLength = length;
 		addConnector("input", Axis, Solids.axial(0, 0, 0));
 		addConnector("output", Axis, Solids.axial(0, 0, length));
@@ -145,7 +148,7 @@ class LeadScrew extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return Std.isExactType(this, LeadScrew) ? recipeType() : null;
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, LeadScrew) && !hasCustomDesignation ? recipeType() : null;
 
 	override public function values():ComponentValues {
 		return ComponentRecipeSupport.threadValues(this.thread).setNumber("length", this.totalLength)

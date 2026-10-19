@@ -1,0 +1,8 @@
+{
+ "format":"materia.project","version":1,"name":"HZMotion mounts and Leadshine Y-drive study",
+ "defaultEntrypoint":"catalog","build":{"system":"haxeon","manifest":"haxeon.hzmotion-preview.json"},
+ "entrypoints":{
+  "catalog":{"kind":"cad-preview","module":"HzMotionPreview","function":"preview","documentInput":true,"reconcilesSavedRecipe":true,"cache":{"inputs":["HzMotionPreview.hx","HzMotionAxis.hx"]}},
+  "axis":{"kind":"cad-preview","module":"HzMotionPreview","function":"axisPreview","cache":{"inputs":["HzMotionAxis.hx","HzMotionPreview.hx"]}}
+ }
+}

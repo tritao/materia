@@ -418,3 +418,82 @@ checks installed motor bolts/washers, a 5 mm axial driver approach, and travel.
 The source is an OpenBuilds reference, not a claim about StepperOnline or Leadshine
 construction. It has no inherited StepperOnline electrical ratings. Existing
 motor recipe IDs and named StepperOnline variants retain their own identities.
+
+## HZMotion motor mounts and screw supports
+
+The HZMotion catalog is separate from the Vallder import. Its reviewed reference
+is `hzmotion-reference.json`, with source-PDF SHA-256 hashes, page references,
+135 coverage-matrix combinations across A/B/C/H/L/KK, and ten modeled parts:
+
+- `M60D-BK12-C`, `M60D-EK12-C`, `M60D-FK12-A`, `M80E-BK15-C`;
+- `KK86-FK10L` and the separate `KK86-80EP-adapter`;
+- `BF12`, `BF15`, `EF12` and `FK12` supports.
+
+Coverage entries are a discovery index, not claims of current stock, CAD availability
+or dimensional interchangeability. Individual model drawings govern geometry.
+The reference retains discrepancies: for example, the general flange table's
+60D thickness differs from the BK12-C drawing, and its 130G bolt circle differs
+from the larger individual drawings. No 130G geometry is generated from that row.
+
+```sh
+python3 tools/suppliers/hzmotion.py --write-haxe
+python3 tools/suppliers/hzmotion.py --offline --check
+python3 -m unittest discover -s tools/suppliers/tests -p test_hzmotion.py
+MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run --project machinekit/examples/supplier-fasteners/haxeon.hzmotion.json
+MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run --project machinekit/examples/supplier-fasteners/haxeon.hzmotion-preview.json
+```
+
+The importer pins and caches `Motor_Bracket.pdf` and `Ballscrew_support_unit.pdf`
+under `build/suppliers/hzmotion/raw`. It rejects changed PDF content rather than
+silently updating dimensions. `--write-haxe` explicitly regenerates typed runtime
+records; `--check` verifies them without network access. Prices and ordering
+identities are not inferred from geometry model names. The recorded supplier STEP
+links currently return HTTP 403 with “Login required to download CAD files”.
+No failed download is treated as an asset or worked around with a guessed file.
+
+Open `machinekit/examples/supplier-fasteners/materia.hzmotion.project.json` in
+Materia. The default catalog entry shows editable model/revision/bearing-grade
+recipes. The axis entry shows a separate worked Leadshine Y-drive stack.
+The command-line preview also writes `catalog.mtrg` and `y-drive.mtrg` under
+`build/suppliers/hzmotion`. Saved preview reconstruction is exercised by the run.
+
+`HzMotionComponent` is the reusable component recipe. `HzMotionCatalog` exposes
+fresh typed records and compares its receiving interface with
+`ServoMotor.mounting()`. Model, drawing revision and selected bearing grade survive
+assembly/document reconstruction. Bearing grade defaults to **unspecified**;
+C3/C4/C5 here are bearing configuration options, not a statement of ball-screw
+lead accuracy or an automatically qualified procurement SKU.
+
+Geometry is reconstructed from drawings, not manufacturer STEP. Pilot and shaft
+interfaces, published mounting patterns, overall dimensions and nominal shaft
+height are modeled. Undimensioned webs, recess depths, chamfers, bearing internals,
+seals, counterbores without published depths, dowels and adapter attachment details
+are simplified or omitted. In particular, the 80EP adapter's pilot depth and
+smaller M5 fasteners remain unqualified. Close tool-access or machining decisions
+must await exact CAD/controlled drawings. The C/KK unit is one purchased assembly:
+its bearings and included locking hardware are not added to the BOM a second time.
+The locking hardware is not independently articulated in these rigid models.
+
+Published assembly masses are retained where available; the center of mass is a
+geometric estimate and inertia is not declared. Parts without published masses
+reject engineering `massProperties()` calls. The preview alone uses explicitly
+identified steel-volume estimates for those parts, so it can be opened; those
+values must not be propagated into machine sizing.
+
+The first Y-drive study combines `ELM2H-0400LA60F`, `M60D-BK12-C`, a reference
+D25/L32 coupling with 14/10 mm bores, a nut and BF12. It uses an explicitly named
+`HzMotionDrawingScrew` machining requirement from Motor_Bracket.pdf p10:
+51 mm fixed end, 12 mm bearing seat, M12x1 locking thread and a 10x15 mm coupling
+seat. **This is not the Vallder SFU1605 with its 54 mm fixed end.** Neither that
+supplier model nor the current mill was modified to make it fit. Shaft end gap
+is 4 mm and nominal engagement is 14 mm per hub; the coupling is not a selected
+supplier SKU. Nominal M5 screw penetration is 5.4 mm, but effective bracket thread
+depth is unpublished, so fastening is not manufacturing-qualified.
+
+The focused checks verify all ten solids, pilot/base passages, catalog isolation,
+known/unknown mass behavior, modular FK12 seating, motor-frame mismatches, drive
+clearances, saved BOM identities and right-hand 5 mm-lead motion at 0/100/200 mm.
+They write `checks.json`, `y-drive.assembly.json` and `y-drive.bom.json`. There is
+no guide/carriage structure or attachment to the actual mill in this first drive
+stack. The reference's machine suitability records preserve the mill's X return
+belt and flag Z/hobber/lathe/router arrangements for independent selection.
