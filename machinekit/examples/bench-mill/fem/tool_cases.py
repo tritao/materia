@@ -36,14 +36,14 @@ def collect(directory,inputs_path,config_path):
         sources[source_case]=digest(path)
     decision=[r for r in rows if r['toolCase']['decisionCase']]
     above=any(s['geometryEligible'] for r in decision for s in r['supports'].values())
-    return {'status':'Tool-case budget gate passed; travel and modal gates remain separate',
+    return {'postprocessorSha256':digest(Path(__file__)),'massConvention':'CAD component masses and COMs are held fixed across virtual static tool cases; only contact position and lumped tool/holder compliance change. Modal masses use the CAD tool, not each contextual cutter.', 'status':'Tool-case budget gate passed; travel and modal gates remain separate',
         'decisionBasis':'Machine loop excluding tool; spindle-nose and short stiff test bar under both supports',
         'castingShareReachesTarget':above,'frameShareTarget':study['frameShareTarget'],'cases':rows,
         'inputSha256':digest(inputs_path),'configurationSha256':digest(config_path),'sourceReports':sources}
 
 
 def markdown(report):
-    lines=['# Machine-loop and tool-case compliance budget','',report['decisionBasis'],'',
+    lines=['# Machine-loop and tool-case compliance budget','',report['decisionBasis'],'',report['massConvention'],'',
         '| Tool case | Support | Casting X/Y/Z, excluding tool | Total worst ±500 N box | Machine-loop worst box |',
         '| --- | --- | --- | --- | --- |']
     for row in report['cases']:

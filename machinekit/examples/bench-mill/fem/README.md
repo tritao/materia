@@ -80,6 +80,16 @@ moved intact to `/media/joao/DEV/materia-fem-runs/bench-mill-20261019`, with the
 usual ignored `build/fem` path retained as a symlink. Cited baseline hashes and
 provenance are preserved. A tool-case stiff-support run interrupted by disk
 exhaustion is not counted as evidence and must finish on resumption.
+A second modal fixture checks solid density, units and C3D10 mass/stiffness
+through the real node reorder and deck writer: a 100×10×10 mm steel cantilever
+(E=210 GPa, artificial nu=0) gives **830.100 Hz**, versus the **835.517 Hz**
+Euler–Bernoulli slender-beam reference (0.65% difference, within 5%). The 944 /
+3,586-tet meshes differ by just **0.0043%**. The 3D model includes shear and
+rotary inertia absent from that Euler comparison. Run `modal_solid_fixture.py
+--ccx PATH`; the small report is retained at
+`build/fem/modal-solid-fixture/report.json`, with source/binary hashes and
+root/submodule patch snapshots.
+
 The center upper-bound modal numerical gate now passes for 12 modes and both
 supports on the 40/30 mm partitioned meshes. All thickness probes pass and
 Jacobian determinants are positive; maximum frequency-order mesh change is
@@ -395,3 +405,11 @@ The first-milestone numerical and budget gates pass for the frozen center run.
 Later work includes the distributing-coupling assembly model, all nine poses,
 uncertainty/contact checks and modal inertia tensors. Geometry candidates stay
 deferred until the compliance budget justifies them.
+
+The current nine-pose run has completed center and `xminus_yminus_zlower` on
+both meshes and supports. Host earlyoom terminated a fine-mesh solve at
+`xminus_yminus_zupper`; it is not a numerical failure or a counted result.
+The runner now starts each heavy study only with 12 GiB available (4 GiB need
+plus 8 GiB reserve), and completed identical decks can be reused. Active work
+and logs are under `build/fem/nine-pose-upper-bound` and
+`build/fem/follow-up-resume.log`. No interrupted solve qualifies as evidence.
