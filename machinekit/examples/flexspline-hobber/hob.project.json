@@ -1,0 +1,20 @@
+{
+  "format": "materia.project",
+  "version": 1,
+  "name": "Flexspline hobber \u2014 detailed hob",
+  "defaultEntrypoint": "hob-tool",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
+  "entrypoints": {
+    "hob-tool": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "hobTool",
+      "cache": {
+        "inputs": []
+      }
+    }
+  }
+}

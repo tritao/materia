@@ -15,6 +15,10 @@ class HobberPartTests {
     new Hob(),new HobArbor(),new OutboardSupport(),new ExpandingMandrel(),new RotaryClamp(),new TablePlaten(),new TableHousing(),new SpindleHousing(),new SwivelHousing(),new MineralCasting(),new CastInsert()];
   public static function run():Void {
     var registry=MachineKitComponents.standard(),parts=members();
+    var rendered=new Hob(new ComponentValues().setBoolean("renderTeeth",true));
+    check(ComponentDisplayMesh.of(rendered)!=null,"detailed display has the CAD tessellation facet");
+    var detailed=new Hob(new ComponentValues().setBoolean("renderTeeth",true).setBoolean("detailed",true));
+    check(ComponentDisplayMesh.of(detailed)==null,"detailed CAD uses its existing mesh without rebuilding the solid");
     var journal=new BallScrew(200,60),rebuiltJournal:BallScrew=cast BallScrew.ballRecipeType().create(journal.values());
     near(rebuiltJournal.inputJournalLength,60,0,"custom bearing journal survives recipe reconstruction");
     near(journal.axialComplianceBetween(40,80),20/(200000*Math.PI*12*12/4)+20/(200000*Math.PI*13*13/4),1e-15,"axial load crosses the actual machined journal/race boundary");
@@ -171,5 +175,5 @@ class HobberPartTests {
     }
     Sys.println('Hobber geometry: $assertions assertions passed');
   }
-  public static function main():Void {if(Sys.args().length>0&&Sys.args()[0]=="geometry")geometry();else run();}
+  public static function main():Void {if(Sys.args().length>0&&Sys.args()[0]=="hob-mesh"){HobMeshTests.run();return;}if(Sys.args().length>0&&Sys.args()[0]=="hob-detail"){HobGeometryTests.run();return;}if(Sys.args().length>0&&Sys.args()[0]=="geometry")geometry();else run();}
 }

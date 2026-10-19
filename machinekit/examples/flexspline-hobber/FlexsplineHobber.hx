@@ -32,10 +32,10 @@ class FlexsplineHobber extends MachineAssembly {
   public final mountContacts:Array<{parent:String,child:String}> = [];
   final zero:Map<String,AssemblyFrame> = [];
   var driverNumber=0;
-  public function new(?spec:GearSpec,gashes:Int=12){
+  public function new(?spec:GearSpec,gashes:Int=12,detailedHob:Bool=false){
     super();this.spec=spec==null?new GearSpec(0.3,200,8,20*Math.PI/180):spec;
     if(this.spec.internal)throw "external hobbing machine requires external gear";
-    var profile=new ToothProfile(this.spec);hob=Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),1,32,gashes),this.spec);
+    var profile=new ToothProfile(this.spec);hob=Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),1,32,gashes),this.spec,40,16,false,detailedHob);
     bed=new MineralCastBed();column=new MineralCastColumn();
     includeAt("bed",bed,F.identity());
     var tableMotor=new TorqueMotor(new ComponentValues().setNumber("torqueConstant",2).setNumber("backEmfConstant",2/Math.sqrt(3)));

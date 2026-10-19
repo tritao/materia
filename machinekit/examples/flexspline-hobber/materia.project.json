@@ -23,6 +23,22 @@
       "cache": {
         "inputs": []
       }
+    },
+    "hob-tool": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "hobTool",
+      "cache": {
+        "inputs": []
+      }
+    },
+    "detailed": {
+      "kind": "cad-preview",
+      "module": "FlexsplineHobberPreview",
+      "function": "detailed",
+      "cache": {
+        "inputs": []
+      }
     }
   }
 }

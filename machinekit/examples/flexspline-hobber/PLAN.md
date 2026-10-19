@@ -1917,3 +1917,27 @@ batch after saving that case. Do not start a second batch beside the live one.
   keep their original geometry-independent/numerical scope; they do not qualify
   the new steel structure, longer arbor or changed moving masses. No running
   reference process or frozen native provider was changed.
+
+### Detailed hob CAD and display (2026-10-19)
+
+- `HobSolid` constructs a single fused tool from the generating rake sections,
+  with helical lands, straight gashes, assumed backing relief, bore, optional
+  keyway and clipped mounting ends. Default machine/cutting envelopes stay fast.
+- The detailed display tessellates that same fused solid. The separate overlapping
+  core/land display construction and its end-cap fans were removed. Sharp normal
+  seams retain coincident positions; mesh topology is checked after a 1 nm weld.
+- Checks cover manifold edges and consistent winding, connected genus-one topology,
+  duplicate/collapsed triangles, normals, mounting-end bounds and mesh/CAD volume
+  agreement within 0.5%. Short tools cover zero and both signs of rake, two starts,
+  keyed bores and the 12-gash reference. Native CAD edge samples remain within
+  the configured 0.5 µm profile simplification tolerance.
+- Backing/relief dimensions remain explicitly assumed; this is no claim of supplier
+  grinding accuracy, sharpening kinematics, a new metrology grade or HB12 acceptance.
+  See `HOB_GEOMETRY.md` and `check-hob.sh` for representations and focused checks.
+- The actual full-length keyed reference scene also passes: 122,034 welded
+  vertices, 244,068 triangles, one closed genus-one shell and positive signed
+  volume 20,819.54475 mm³. Its initial CAD/scene generation took about four minutes
+  and peaked around 4.5 GiB; subsequent opens can use Materia's artifact cache.
+  The isolated tool is open in Materia. Parts/persistence checks: 997 passed;
+  short native CAD checks: 18,623 passed (maximum sampled edge error 0.303 µm).
+  Packed timing-belt mesh regression checks also pass.

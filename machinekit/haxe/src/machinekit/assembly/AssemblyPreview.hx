@@ -73,6 +73,8 @@ class AssemblyPreview {
           displayBelt(rendered, belt, moving.length == 0 ? belt.wraps()[0].side :
             moving[0].wraps[moving[0].driverWrap].side);
         }
+        var display=machinekit.component.ComponentDisplayMesh.of(entry.component);
+        if(display!=null)displayMesh(rendered,display.build());
         parts.push(rendered);
 			}
 			definitionByOccurrence.set(entry.id, definitionId);
@@ -98,6 +100,10 @@ class AssemblyPreview {
 
   static function displayBelt(part:SceneArtifactPart, belt:machinekit.transmission.TimingBelt, side:Int):Void {
     var mesh = machinekit.transmission.TimingBeltMesh.build(belt, 0.0, side);
+    displayMesh(part,mesh);
+  }
+
+  static function displayMesh(part:SceneArtifactPart,mesh:machinekit.component.ComponentDisplayMesh.ComponentDisplayMeshData):Void {
     var vertices = haxe.io.Bytes.alloc(mesh.positions.length * 8), normals = haxe.io.Bytes.alloc(mesh.normals.length * 8);
     var indices = haxe.io.Bytes.alloc(mesh.indices.length * 4);
     for (i in 0...mesh.positions.length) vertices.setDouble(i * 8, mesh.positions[i]);

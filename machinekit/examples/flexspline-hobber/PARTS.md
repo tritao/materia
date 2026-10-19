@@ -53,8 +53,10 @@ and empty verified-field lists.
 - `Hob`: blank envelope of OD 32, bore 16, length 40 mm; its `design` is an actual
   GearKit conjugate rack/HobDesign. `Hob.fromDesign(design, target)` preserves the
   generating profile, starts, gashes, rake and root height and verifies the recreated
-  rake points. The CAD blank does not represent helical teeth, relief or sharpening;
-  cutting continues to use GearKit's actual rake regions.
+  rake points. Optional detailed CAD adds helical lands, gashes, assumed backing
+  relief and an optional keyway. Its display is tessellated from the fused solid;
+  the lightweight blank remains available. Cutting uses the unchanged rake regions.
+  See [HOB_GEOMETRY.md](HOB_GEOMETRY.md) for assumptions and accuracy limits.
 - `ExpandingMandrel`: OD 59, bore 12, length 50 mm, work shoulder at 30 mm, expansion
   0.05 mm, operating/maximum pressures 10/15 MPa. Eccentricity amplitude is 0.004 mm
   and clamping distortion bound 0.002 mm. The expansion is a capacity, not a solved
