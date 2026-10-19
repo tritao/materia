@@ -58,7 +58,11 @@ and concept checks, and byte-identical manifest/STEP repeat export. No assumed
 CAD fallback was needed in this packet. The retained `modal-center` packet SHA256
 is `5f31a21c2645cb06e7bcce07bfcda6d86d6d79e1d0cd82ba9d5cb5e9893b5229`.
 `MillFemExport --pose-matrix true --name NAME` exports center and eight corners
-from one loaded build. Frame modes and the nine-pose sweep remain unqualified.
+from one loaded build. All nine packets now pass the part/concept, mass/inertia and pose checks; all
+36 fixed-frame STEP hashes remain identical across the matrix. The pose index
+is `build/fem/modal-poses/poses.json`; center packet SHA256 is
+`c96473be097a62a1410c45fdb45b3498d3e4bc53db26ed06ae366c4a52b7381e`.
+The complete modal/static travel comparison remains pending.
 
 The root filesystem filled during concurrent work. Generated FEM artifacts were
 moved intact to `/media/joao/DEV/materia-fem-runs/bench-mill-20261019`, with the
@@ -88,6 +92,14 @@ shape plots: `build/fem/modal-center-study/report.md` / `report.json`.
 Report JSON SHA256:
 `af7808033b7fbb77c45155ef34bb84d3eefd0fba45ee7a5449b1eb110774555a`.
 All cited analysis source hashes matched the files at the gate.
+
+CalculiX accepts explicit `--threads 1|2|4` (default 1). The nine-pose runner
+requests 4 and records it in every report. On a byte-identical coarse frame
+deck, all 12 printed frequencies match the one-thread result exactly; elapsed
+time was 42.56 s versus 65.87 s. The six-mode analytical fixture also passes
+with 4 threads. This is an execution setting, not a stiffness change. A resume
+requires the same deck, successful log and requested thread count. Detailed
+comparison is retained in `build/fem/modal-thread-check/comparison.json`.
 
 Exact mesh snapshots now preserve binary floating-point values through JSON
 round trips and verify source/config/Gmsh/geometry hashes before reuse. The

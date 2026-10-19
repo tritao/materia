@@ -184,6 +184,8 @@ def main():
     parser.add_argument('manifest',type=Path);parser.add_argument('--ccx',required=True)
     parser.add_argument('--config',type=Path,default=Path(__file__).with_name('frame-study.json'))
     parser.add_argument('--output',type=Path,required=True);parser.add_argument('--sizes',nargs='+',type=float,default=[40,30])
+    parser.add_argument('--threads',type=int,choices=[1,2,4],default=1)
+    parser.add_argument('--resume',action='store_true')
     parser.add_argument('--modes',type=int,default=12);parser.add_argument('--timeout',type=int,default=1800)
     args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
     (args.output/'report.json').unlink(missing_ok=True)
@@ -201,8 +203,8 @@ def main():
     ccx=Path(shutil.which(args.ccx)).resolve()
     version=subprocess.run([str(ccx),'-v'],capture_output=True,text=True,timeout=10)
     if version.returncode not in (0,201) or not re.search(r'Version\s+2\.21\b',version.stdout):raise ValueError('CalculiX 2.21 required')
-    fixture=verify(ccx,args.output/'fixture')
-    source_names=tuple(sorted(p.name for p in Path(__file__).parent.glob('*.py') if not p.name.startswith('test_')))
+    fixture=verify(ccx,args.output/'fixture',args.threads)
+    source_names=('modal_study.py','modal_mass.py','modal_fixture.py','frame_solver.py','frame_mesh.py','ccx_deck.py','mesh_resolution.py','packet.py','compliance.py','provenance.py','static_study.py','solver_fixtures.py','tet_fixture.py','spring_fixture.py','compliance_budget.py','mesh_cache.py')
     hashes={n:digest(Path(__file__).with_name(n)) for n in source_names}
     input_hash=digest(args.manifest);config_hash=digest(args.config)
     sources=capture_sources(Path(__file__).resolve().parents[4],args.output.resolve()/'provenance')
@@ -219,13 +221,18 @@ def main():
         if not mesh['throughThickness']['allSectionsResolved']:raise ValueError('Unresolved thin sections')
         supports={}
         for name in config['supportConfigurations']:
-            directory=output/name;model=write_modal(mesh,packet,config,directory,name,args.modes)
-            run_solver(ccx,directory,args.timeout)
+            directory=output/name
+            previous=digest(directory/'frame.inp') if (directory/'frame.inp').exists() else None
+            completed=(directory/'frame.dat').exists() and (directory/'solver.log').exists() and 'Job finished' in (directory/'solver.log').read_text() and '*ERROR' not in (directory/'solver.log').read_text().upper() and re.search(rf'Using up to\s+{args.threads}\s+cpu',(directory/'solver.log').read_text()) is not None
+            model=write_modal(mesh,packet,config,directory,name,args.modes)
+            if not (args.resume and completed and previous==model['inputSha256']):run_solver(ccx,directory,args.timeout,args.threads)
+            else:print('Reusing completed identical modal deck '+str(directory),flush=True)
             text=(directory/'frame.dat').read_text();modes=assess_modal(text,model)
             shape_svg(model,modes,directory/'mode-shapes.svg')
             supports[name]={'model':model,'modes':modes,'participation':modal_tables(text),'shapePlot':'mode-shapes.svg','resultSha256':digest(directory/'frame.dat')}
             print(f'{size:g} {name}: {[m["frequencyHz"] for m in modes]}',flush=True)
         results.append({'sizeMm':size,'supports':supports,'meshSha256':mesh['meshSha256'],'minimumJacobianDeterminant':mesh['minimumJacobianDeterminant'],'gmshLibrarySha256':mesh['gmshLibrarySha256'],'gmshWarnings':[line for line in messages if 'Warning' in line or 'Error' in line],'throughThickness':mesh['throughThickness']})
+        (output/'result.json').write_text(json.dumps(results[-1],indent=2)+'\n')
     change=None
     if len(results)>=2:
         change=max(abs(a['frequencyHz']/b['frequencyHz']-1) for name in config['supportConfigurations']
@@ -236,7 +243,7 @@ def main():
         'modeTrackingNote':'Frequency-order convergence only; crossing/degenerate modes require subspace/MAC review across poses.',
         'analysisSources':sources,'sourceSha256':hashes,'manifestSha256':validated['manifestSha256'],
         'packetDensityMassChecks':validated['densityMassChecks'],'frozenManifestPath':str(args.manifest),'geometrySourceBuild':packet['provenance']['sourceBuild'],'configurationSha256':digest(args.config),
-        'solverVersion':version.stdout.strip(),'gmshVersion':gmsh.__version__,'solverSha256':digest(ccx),'fixture':fixture,'jointsMm':packet['jointsMm'],'meshes':results}
+        'solverThreads':args.threads,'solverVersion':version.stdout.strip(),'gmshVersion':gmsh.__version__,'solverSha256':digest(ccx),'fixture':fixture,'jointsMm':packet['jointsMm'],'meshes':results}
     (args.output/'report.json').write_text(json.dumps(report,indent=2)+'\n')
     (args.output/'report.md').write_text(markdown(report))
     return 0 if report['converged'] else 2

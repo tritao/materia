@@ -65,10 +65,12 @@ def tet10_order(gmsh):
     return order
 
 
-def run_solver(ccx, output, timeout):
+def run_solver(ccx, output, timeout, threads=1):
     for suffix in (".dat", ".frd", ".sta", ".cvg"):
         (output / ("frame" + suffix)).unlink(missing_ok=True)
-    env = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
+    if threads not in (1,2,4):
+        raise ValueError("CalculiX thread count must be 1, 2 or 4")
+    env = dict(os.environ, OMP_NUM_THREADS=str(threads), OPENBLAS_NUM_THREADS="1")
     with (output / "solver.log").open("w") as log:
         result = subprocess.run([str(ccx), "-i", "frame"], cwd=output, env=env,
                                 stdout=log, stderr=subprocess.STDOUT, timeout=timeout)
