@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-local-spindle-catalog"},
+  "entry": "ExportLocalMotors",
+  "sourceRoots": ["."],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/catalog"
+}

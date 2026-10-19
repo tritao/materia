@@ -9,7 +9,7 @@ class LeadshineServoTests {
 	}
 	public static function main():Void {
 		var names = LeadshineServo.catalog().designations();
-		if (names.length != 54) throw "Expected 54 ELM1/ELM2 variants";
+		if (names.length != 55) throw "Expected 54 PDF variants and one explicit MS1AE variant";
 		MachineKitComponents.standard();
 		for (name in names) {
 			var motor = LeadshineServo.model(name), spec = motor.spec;
@@ -61,6 +61,23 @@ class LeadshineServoTests {
 		near(LeadshineServo.model("ELM2H-1800LD130F-HD").spec.maxRpm, 2000, "220 V high inertia max rpm");
 		near(LeadshineServo.model("ELM2H-1800LD130FT-H").spec.maxRpm, 3000, "380 V high inertia max rpm");
 		near(LeadshineServo.model("ELM2L-1000LA100FT-H").spec.maxRpm, 6000, "Low inertia max rpm");
+		var variant = LeadshineServo.model("ELM2L-1500LA100FT-H MS1AE");
+		near(variant.spec.voltage,400,"MS1AE page voltage");
+		near(variant.ratedPhaseCurrent(),4.5,"MS1AE page current");
+		if (LeadshineServo.model("ELM2L-1500LA100FT-H").studyContinuousTorque(3000) != null)
+			throw "Curve must not leak from MS1AE into the older PDF row";
+		var curve = machinekit.motion.LeadshineTorqueCurves.studyCurve(variant.designation);
+		if (curve == null || curve.operatingConditionsVerified) throw "Variant graph match is not qualification";
+		var baseTorque:Float = variant.studyContinuousTorque(3000) ?? 0;
+		var topTorque:Float = variant.studyContinuousTorque(5000) ?? 0;
+		near(baseTorque,4.66871764,"Continuous ordinate includes vertical and horizontal reading allowances");
+		near(topTorque,1.95930564,"Digitized continuous endpoint with reading allowances");
+		if (baseTorque <= topTorque || topTorque <= 0) throw "Continuous torque must fall above base";
+		if (variant.studyContinuousTorque(5001) != null || variant.studyContinuousTorque(-1) != null) throw "Curve must not extrapolate";
+		if (machinekit.motion.LeadshineTorqueCurves.qualifiedContinuousTorque(variant.designation,3000) != null)
+			throw "Unknown operating conditions must prevent qualification";
+		for (name in ["ELM2M-2900LD180FT-H","ELM2M-7500LD180FT-H"])
+			if (LeadshineServo.model(name).studyContinuousTorque(1500) != null) throw "Conflicting graphs must remain blocked";
 		for (args in [{t:0.0,c:0.2},{t:10.0,c:-1.0},{t:Math.NaN,c:0.2}]) {
 			var rejected = false;
 			try motor.mountingCutout(args.t,args.c) catch (_:Dynamic) rejected = true;

@@ -5,7 +5,7 @@ MachineKit is a Haxe-only layer of machine components above CadKit. A
 BOM line. `addTo(model, id)` registers an instance and its connectors on a
 CadKit `AssemblyModel`, so components mate through the existing assembly API.
 
-`machinekit.motion.LeadshineServo` models 54 ELM1/ELM2 variants from 50 W
+`machinekit.motion.LeadshineServo` models 55 ELM1/ELM2 variants from 50 W
 to 7.5 kW with published mounting dimensions, brake-dependent envelopes and keyed
 shafts. See the [servo gallery](examples/leadshine-servos/README.md) for the
 Materia preview, STEP export, catalog provenance and approximation limits.

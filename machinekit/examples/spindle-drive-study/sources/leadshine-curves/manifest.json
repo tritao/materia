@@ -1,0 +1,53 @@
+{
+  "source": "Leadshine manufacturer product pages",
+  "records": [
+    {
+      "model": "ELM2L-1500LA100FT-H",
+      "page_variant": "MS1AE",
+      "page_url": "https://www.leadshine.com/product-detail/ELM2L-1500LA100FT-H%20MS1AE.html",
+      "image_url": "https://www.leadshine.com/downUeditor/image/20221228/c03de53501f442b45c2ed4f5b53b6106.png",
+      "file": "ELM2L-1500LA100FT-H-MS1AE.png",
+      "review": "Page identifies MS1AE; current data specify 400 VAC and 4.5 Arms, whereas the local older PDF row specifies 380 VAC and 5.1 Arms. Do not assume the same winding/revision.",
+      "sha256": "7eef869efe5f4d7806dadfad492ce992ee923e884707b23494ba4599ff4a896c",
+      "retrieved_on": "2026-10-19",
+      "status": "matched_page_variant_conditions_unverified",
+      "numeric_curve_imported": true,
+      "matched_local_designation": "ELM2L-1500LA100FT-H MS1AE",
+      "operating_conditions_verified": false
+    },
+    {
+      "model": "ELM2M-2900LD180FT-H",
+      "page_variant": null,
+      "page_url": "https://www.leadshine.com/product-detail/ELM2M-2900LD180FT-H.html",
+      "image_url": "https://www.leadshine.com/downUeditor/image/20240202/512c1ce74e42d58bd28d78bc2ecea7d1.png",
+      "file": "ELM2M-2900LD180FT-H.png",
+      "review": "Graph intermittent plateau 46.5 Nm conflicts with page table peak 30 Nm and local older PDF peak 55.8 Nm. Page also differs in voltage, rotor inertia and mass.",
+      "sha256": "b01579e52b73cc74756e761f38cb5380bfd1d848dec1c1396e951335f4923473",
+      "retrieved_on": "2026-10-19",
+      "status": "blocked_rating_conflict_and_schematic_axes",
+      "numeric_curve_imported": true,
+      "matched_local_designation": null,
+      "operating_conditions_verified": false
+    },
+    {
+      "model": "ELM2M-7500LD180FT-H",
+      "page_variant": null,
+      "page_url": "https://www.leadshine.com/product-detail/ELM2M-7500LD180FT-H.html",
+      "image_url": "https://www.leadshine.com/downUeditor/image/20240202/bcf95580bac59a64ec824f4460dabef3.png",
+      "file": "ELM2M-7500LD180FT-H.png",
+      "review": "Rated and peak torque labels match local values (48/119 Nm), but the page specifies 400 VAC, inertia 99.45 x 10^-4 kg m2 and mass 32 kg, versus local 380 VAC, 130 x 10^-4 kg m2 and 32.3 kg. Revision/conditions require reconciliation.",
+      "sha256": "57d2a3c2dd95442024e537d059f9b84772c223bc14611f946a1d995d0cbb20b5",
+      "retrieved_on": "2026-10-19",
+      "status": "blocked_revision_conflict_and_schematic_axes",
+      "numeric_curve_imported": true,
+      "matched_local_designation": null,
+      "operating_conditions_verified": false
+    }
+  ],
+  "mechanical_reference": {
+    "model": "ELM2L-1500LA100FT-H MS1AE",
+    "source": "https://www.leadshine.com/downUeditor/image/20221228/213ea440eddb0308bef74f32a2ce1a34.png",
+    "file": "ELM2L-1500LA100FT-H-MS1AE-mechanical.png",
+    "review": "Drawing agrees with inherited nominal 100 mm face, 178 mm body, 45 mm shaft length, 24 mm shaft, 95 mm pilot and 115 mm bolt circle; tolerances and other simplifications remain as documented."
+  }
+}

@@ -8,7 +8,15 @@
     "maximum_rpm": 8000,
     "transmission_efficiency": 0.95,
     "speed_regulation_fraction_target": 0.01,
-    "sample_rpm": [500, 1000, 1500, 3000, 4000, 6000, 8000]
+    "sample_rpm": [
+      500,
+      1000,
+      1500,
+      3000,
+      4000,
+      6000,
+      8000
+    ]
   },
   "hobber": {
     "basis": "Existing flexspline reference geometry, 3000 rpm reference and 8000 rpm maximum. Force sweep, 1 um control-error allocation and component error bounds below are assumptions requiring validation.",
@@ -20,7 +28,11 @@
     "reference_hob_rpm": 3000,
     "maximum_hob_rpm": 8000,
     "spindle_output_power_w_target": 1500,
-    "tangential_force_samples_n": [20, 50, 100],
+    "tangential_force_samples_n": [
+      20,
+      50,
+      100
+    ],
     "control_error_limit_um": 1.0,
     "table_encoder_counts_per_rev": 8388608,
     "table_encoder_installed_accuracy_arcsec_bound": 2.0,
@@ -31,14 +43,16 @@
     "unmodeled_hob_acceleration_rpm_per_s_bound": 1000,
     "table_following_error_arcsec_bound": 2.0,
     "unmeasured_torsion_arcsec_bound": 1.0,
-    "loop_rate_samples_hz": [4000, 8000],
-    "uncompensated_latency_samples_us": [125, 250, 1000]
+    "loop_rate_samples_hz": [
+      4000,
+      8000
+    ],
+    "uncompensated_latency_samples_us": [
+      125,
+      250,
+      1000
+    ]
   },
-  "leadshine_candidates": [
-    {"designation": "ELM2L-1500LA100FT-H", "rated_rpm": 3000, "maximum_rpm": 5000, "rated_torque_nm": 4.9, "mass_kg": 5.8},
-    {"designation": "ELM2M-2000LB130F-H", "rated_rpm": 2500, "maximum_rpm": 2800, "rated_torque_nm": 7.7, "mass_kg": 8.3},
-    {"designation": "ELM2M-7500LD180FT-H", "rated_rpm": 1500, "maximum_rpm": 3000, "rated_torque_nm": 48, "mass_kg": 32.3}
-  ],
   "sources": {
     "mill": "../bench-mill/README.md#bt30-spindle-packaging-study",
     "hobber": "../flexspline-hobber/PLAN.md#reference-numbers-assumed-until-checked-against-a-datasheet-or-a-measurement",
@@ -46,5 +60,23 @@
     "vector_drive_capability": "https://www.yaskawa.com/products/drives/industrial-ac-drives/general-purpose-drives/a1000-drive",
     "industrial_spindle_example": "https://www.haascnc.com/productivity/spindles.html",
     "rotary_axis_feedback": "https://www.heidenhain.com/fileadmin/pdf/en/01_Products/Technische_Dokumentation/TI_Positioning_accuracy_of_rotary_axes_en.pdf"
+  },
+  "local_catalog": "local-motors.json",
+  "hobber_simulation": {
+    "basis": "Conditional digitized MS1AE continuous curve, unverified operating conditions and assumed table/controller plant; not measured behavior or HB7",
+    "master_motor_designation": "ELM2L-1500LA100FT-H MS1AE",
+    "duration_s": 0.4,
+    "integration_substeps": 8,
+    "hob_load_inertia_kg_m2": 0.0001,
+    "table_inertia_kg_m2": 0.01,
+    "master_speed_bandwidth_hz": 100,
+    "table_bandwidth_hz": 100,
+    "table_damping_ratio": 1,
+    "assumed_table_continuous_torque_nm": 2,
+    "load_step_time_s": 0.12,
+    "tangential_force_n": 50,
+    "gash_torque_fraction": 0.2,
+    "jitter_frequency_hz": 80,
+    "evaluate_after_s": 0.05
   }
 }

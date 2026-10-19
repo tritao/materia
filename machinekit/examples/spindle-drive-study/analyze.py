@@ -21,6 +21,21 @@ def arcsec_radians(value):
     return value * math.pi / (180 * 3600)
 
 
+def study_curve_torque(curve, rpm):
+    """Conditional raster ordinate with reading allowances; never extrapolate."""
+    if curve is None or curve["matchedDesignation"] is None or not math.isfinite(rpm):
+        return None
+    points = curve["continuous"]
+    if not points[0]["rpm"] <= rpm <= points[-1]["rpm"]:
+        return None
+    slope = max(abs((b["torqueNm"]-a["torqueNm"])/(b["rpm"]-a["rpm"])) for a,b in zip(points,points[1:]))
+    allowance = curve["torqueReadingUncertaintyNm"] + slope*curve["speedReadingUncertaintyRpm"]
+    for a,b in zip(points,points[1:]):
+        if rpm <= b["rpm"]:
+            return max(0,a["torqueNm"]+(b["torqueNm"]-a["torqueNm"])*(rpm-a["rpm"])/(b["rpm"]-a["rpm"])-allowance)
+    return None
+
+
 def mill_point(spec, rpm):
     # Constant torque below the assumed base speed; constant power above it.
     torque = spec["output_power_w"] / omega(max(spec["base_rpm"], rpm))
@@ -60,7 +75,7 @@ def hob_budget(spec, rpm):
                                              for hz in spec["loop_rate_samples_hz"]}}
 
 
-def analyze(inputs):
+def analyze(inputs, catalog=None):
     mill, hob = inputs["mill"], inputs["hobber"]
     if not 0 < mill["minimum_rpm"] <= mill["base_rpm"] <= mill["maximum_rpm"]:
         raise ValueError("Invalid mill speed range")
@@ -73,17 +88,40 @@ def analyze(inputs):
         if isinstance(value, (int, float)) and (not math.isfinite(value) or value <= 0):
             raise ValueError(f"Invalid hobber {key}")
     eta = mill["transmission_efficiency"]
+    if catalog is None:
+        catalog = json.loads((HERE / inputs["local_catalog"]).read_text())
+    allocation = catalog["baseline"]["envelope"]
     candidate_rows = []
-    for candidate in inputs["leadshine_candidates"]:
+    for row in catalog["motors"]:
+        spec = row["spec"]
+        candidate = {"designation":spec["designation"], "rated_rpm":spec["ratedRpm"],
+                     "maximum_rpm":spec["maxRpm"], "rated_torque_nm":spec["ratedTorque"],
+                     "mass_kg":spec["mass"], "voltage":spec["voltage"], "brake":spec["brake"]}
         # Only the published rated point is used: no invented torque curve above base speed.
         ratio = mill["maximum_rpm"] / candidate["rated_rpm"]
         output_torque = candidate["rated_torque_nm"] * eta / ratio
+        curve = row.get("study_continuous_curve")
+        curve_screen = []
+        if curve is not None:
+            for point in [mill_point(mill,rpm) for rpm in mill["sample_rpm"]]:
+                torque = study_curve_torque(curve,point["spindle_rpm"]/ratio)
+                available = None if torque is None else torque*eta/ratio
+                curve_screen.append({"spindle_rpm":point["spindle_rpm"],"motor_rpm":point["spindle_rpm"]/ratio,
+                                     "study_output_torque_nm":available,
+                                     "meets_required_torque_conditionally":None if available is None else available >= point["output_torque_nm"]})
         candidate_rows.append({**candidate,
+            "curve_evidence_status":[c["status"] for c in row.get("curve_evidence",[])],
+            "continuous_curve_qualified":row["continuous_torque_curve_verified"],
+            "conditional_curve_screen_not_qualification":curve_screen,
             "spindle_to_motor_speed_ratio_at_rated_point": ratio,
-            "spindle_output_torque_nm_at_8000_rpm_rated_motor_point": output_torque,
+            "spindle_output_torque_nm_at_maximum_rpm_rated_motor_point": output_torque,
             "meets_mill_8000_rpm_output_point_only": output_torque >= mill_point(mill, mill["maximum_rpm"])["output_torque_nm"],
             "motor_rpm_at_mill_minimum": mill["minimum_rpm"] / ratio,
             "direct_drive_meets_hobber_maximum_speed": candidate["maximum_rpm"] >= hob["maximum_hob_rpm"],
+            "envelope_mm":row["envelope"],
+            "exceeds_existing_motor_aabb_axes":[axis for axis in ["width_mm", "depth_mm", "height_mm"]
+                                                if row["envelope"][axis] > allocation[axis] + 1e-6],
+            "mount_and_shaft_interface":"Not qualified; AABB containment does not establish mount, pulley or collision compatibility",
             "qualification": "Unqualified: continuous curve, low-speed cooling, shaft load, drive and packaging still required"})
     force_rows = []
     for rpm in [hob["reference_hob_rpm"], hob["maximum_hob_rpm"]]:
@@ -94,6 +132,11 @@ def analyze(inputs):
     return {
         "status": inputs["status"],
         "mill": {"required_motor_mechanical_power_w_before_transmission_losses": mill["output_power_w"] / eta,
+                 "local_model_baseline":catalog["baseline"],
+                 "catalog_source":inputs["local_catalog"],
+                 "motors_screened":len(candidate_rows),
+                 "rated_point_and_aabb_survivors":[r["designation"] for r in candidate_rows
+                                                  if r["meets_mill_8000_rpm_output_point_only"] and not r["exceeds_existing_motor_aabb_axes"]],
                  "assumed_continuous_output_envelope": [mill_point(mill, rpm) for rpm in mill["sample_rpm"]],
                  "leadshine_rated_point_screen": candidate_rows},
         "hobber": {"radius_mm": hob["module_mm"] * hob["teeth"] / 2,

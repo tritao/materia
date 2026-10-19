@@ -16,6 +16,7 @@ import materia.assembly.AssemblyDefinition.AssemblyActuator;
  */
 class LeadshineServo extends ServoMotor {
 	public static inline final SOURCE = "https://www.leadshine.com/upfiles/downloads/006a40c553d0c6fc60a1221d6a764222_1675822261873.pdf";
+	public static inline final MS1AE_SOURCE = "https://www.leadshine.com/product-detail/ELM2L-1500LA100FT-H%20MS1AE.html";
 	static var table:Null<Catalog<LeadshineServoSpec>>;
 	static var recipe:Null<ComponentType>;
 	public final spec:LeadshineServoSpec;
@@ -58,7 +59,13 @@ class LeadshineServo extends ServoMotor {
 					mass: brake ? brakedMasses[i] : masses[i]});
 			}
 			for (row in LeadshineServoLargeCatalog.rows()) rows.push(row);
-			table = new Catalog("Leadshine servo", s -> s.designation, rows, s -> ({source: SOURCE,
+			// Exact page variant; keep the older PDF row and saved designation intact.
+			var pageVariant:LeadshineServoSpec = cast Reflect.copy(rows.filter(r -> r.designation == "ELM2L-1500LA100FT-H")[0]);
+			pageVariant.designation = "ELM2L-1500LA100FT-H MS1AE";
+			pageVariant.voltage = 400; pageVariant.ratedCurrent = 4.5; pageVariant.peakCurrent = 13.5;
+			rows.push(pageVariant);
+			table = new Catalog("Leadshine servo", s -> s.designation, rows, s -> ({source: s.designation == pageVariant.designation ? MS1AE_SOURCE : SOURCE,
+				sources: s.designation == pageVariant.designation ? [SOURCE, MS1AE_SOURCE] : [SOURCE],
 				standard: null, standardEdition: null, dimensionKind: Mixed, conformance: NominalEnvelope,
 				verifiedFields: ["face", "bodyLength", "shaftDiameter", "shaftLength", "boltCircle", "holeDiameter",
 					"flangeThickness", "pilotDiameter", "pilotHeight", "connectorHeight", "keyLength", "keyWidth", "keyFloor",
@@ -100,6 +107,13 @@ class LeadshineServo extends ServoMotor {
 	/** No verified winding constants: prevent simulation from treating estimates as vendor data. */
 	override public function electricalRating():Null<ServoElectricalRating> return null;
 	override public function ratedPhaseCurrent():Float return spec.ratedCurrent;
+	public function torqueCurveEvidence():Array<LeadshineTorqueCurves.LeadshineTorqueCurve>
+		return LeadshineTorqueCurves.evidenceFor(spec.designation);
+	/** Explicit study-only ordinate; null for unmatched variants and speeds outside the graph. */
+	public function studyContinuousTorque(rpm:Float):Null<Float> {
+		var curve = LeadshineTorqueCurves.studyCurve(spec.designation);
+		return curve == null ? null : LeadshineTorqueCurves.studyTorque(curve,rpm);
+	}
 	override public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator {
 		var result = super.actuator(id, joint, volts, margin, current);
 		result.assumed = ["servo torque-speed interpolation"];

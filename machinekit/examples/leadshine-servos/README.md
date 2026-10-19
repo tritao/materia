@@ -13,7 +13,8 @@ var shaft = motor.shaft(); // separate keyed rotating part
 var plateTool = motor.mountingCutout(10);
 ```
 
-The catalog contains 54 variants, with F without brake or E with brake:
+The catalog contains 54 PDF variants plus the explicit 400 VAC
+`ELM2L-1500LA100FT-H MS1AE` page variant (55 total), with F without brake or E with brake:
 
 | Family | Power | Supply | Drawing face LC |
 | --- | --- | --- | --- |
@@ -30,6 +31,11 @@ The 7.5 kW row has 48 Nm rated torque and 119 Nm peak, a 42 mm shaft and a
 10–12 mm key width across the 180 mm family (key height is 8 mm).
 The catalog does not include the 380 VAC 80 mm winding variants or models absent
 from the cited datasheet.
+
+The [curve import](../spindle-drive-study/sources/leadshine-curves/README.md) adds
+separate continuous/intermittent evidence. The MS1AE model has a conditional
+`studyContinuousTorque(rpm)` API with digitization allowances. Its operating
+conditions remain unverified; conflicting graphs are not assigned to PDF rows.
 
 `ServoMotor.ratings()` includes the new designations, and both factories retain
 the vendor recipe on serialization. Saved generic motors remain generic.

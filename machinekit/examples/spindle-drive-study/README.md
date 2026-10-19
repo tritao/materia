@@ -1,10 +1,17 @@
 # Spindle drive requirements: BT30 mill and flexspline hobber
 
-Study date: 2026-10-19. The working choice is a spindle-duty motor with a vector
-drive for each cutting spindle, and a position-controlled torque motor for the
-hobber work table. The drive must expose the feedback and control functions
-required below. This chooses an architecture and provisional performance targets;
-it does not qualify a motor, drive, existing CAD envelope or machining accuracy.
+Study date: 2026-10-19. Analysis now reads all 55 local Leadshine motor models and
+the executable BT30 reference model. No locally modeled motor passes both the
+mill's rated output-point screen and its existing motor-envelope size screen.
+Eight 180 mm-frame variants pass the output point alone; none fits the current
+compact allocation by these size comparisons. No local Leadshine row reaches
+the hobber's 8000 rpm maximum directly.
+
+Spindle-duty vector systems remain a possible architecture, but we have not
+modeled or qualified a supplier VFD/motor pair. The hobber work table remains a
+position-controlled torque-motor concept. Its physical motor, drive and measured
+response are absent locally. The reduced-order simulation below explicitly uses
+an assumed table plant rather than silently treating an axis servo as that table.
 
 The mill needs a useful continuous torque range. The hobber needs a measured-angle
 electronic gearbox. A general-purpose VFD with an rpm command alone cannot provide
@@ -35,6 +42,75 @@ to tooth error; it is not a complete gear tolerance or an ISO grade claim.
 
 Inputs and their provenance are in [requirements.json](requirements.json).
 Numerical results are in [results.json](results.json).
+
+Manufacturer torque-speed graph images have now been downloaded for three
+catalog designations. See [curve evidence and revision conflicts](sources/leadshine-curves/README.md).
+They distinguish continuous and intermittent regions. The explicit MS1AE variant
+now has a conditional digitized continuous curve with reading allowances; its
+operating conditions remain unverified. Other conflicting graphs stay blocked.
+
+## Executable local inputs and dynamic study
+
+[ExportLocalMotors.hx](ExportLocalMotors.hx) calls `LeadshineServo.catalog()` and
+constructs each motor's `Envelope` geometry. It also constructs the existing
+`Bt30SpindleMotor`, exporting its rating and envelope. The generated
+[local-motors.json](local-motors.json) replaces the earlier three manually copied
+motor rows. Continuous/intermittent evidence and exact-variant curve matches
+are exported from the model too. The source of truth is the Haxe catalog; the snapshot is a reproducible
+bridge to the Python analysis. Use the native check command below to detect model
+changes before checking the derived results.
+
+The existing BT30 motor's bounding box is 110 × 110 × 162 mm, including its flange
+and pilot but excluding the exposed shaft. Candidate comparisons use the same
+housing/pilot convention and include connector envelopes. These are **size-only
+screens in each motor's local frame**: a smaller bounding box does not establish
+mounting compatibility, actual clearances, shaft/pulley fit, connector access or
+payload acceptability. Geometry is not substituted into the mill assembly.
+The full 55-row screen and failed bounding-box axes are in `results.json`.
+
+[simulate_hob.py](simulate_hob.py) drives the reference-speed hob with local
+`ELM2L-1500LA100FT-H MS1AE` inertia, rated torque, maximum speed and 23-bit feedback
+resolution. It numerically integrates a speed-PI-controlled motor and an assumed
+PD-controlled table, delayed/quantized master capture, velocity estimation and
+phase extrapolation. The controller uses measured master angle; error is evaluated
+against the true master and table angles, not their quantized readings.
+
+The run applies an assumed 50 N tangential cutting load at 0.12 s, with 20% gash
+torque ripple. Tool inertia, gains and the table inertia/torque limit are explicit
+assumptions in `requirements.json`. Motor torque is limited by the lesser of rated torque and the digitized
+continuous curve after reading allowances. The page variant is identified but
+its operating conditions are unverified; no transient peak rating is used to
+claim continuous operation. A fixed ratio of 1:200 applies to the reference
+spur gear. This is an isolated model study, not production electronic-gearing
+code, drive tuning, a VFD model or completion of HB7.
+
+| Scenario (3000 hob rpm unless stated) | Peak true control phase error | Master status |
+| --- | --- | --- |
+| 4 kHz capture, 250 µs delay, no prediction | 12.000 µm | Rotating |
+| 4 kHz capture, prediction, 1 µs timestamp residual | 0.237 µm | Rotating |
+| 8 kHz capture, same 250 µs delay, no prediction | 12.000 µm | Rotating |
+| 8 kHz capture, prediction, 1 µs timestamp residual | 0.238 µm | Rotating |
+| 8 kHz capture, prediction, 10 µs timestamp residual | 0.488 µm | Rotating |
+| 4500 rpm, 8 kHz capture, prediction, 50 N load | 0.303 µm | Rotating, descending continuous curve |
+| 8 kHz capture, prediction, 400 N overload | 3.402 µm | Stalls; scenario terminated |
+
+![Local hob master and assumed table simulation](hob-simulation.png)
+
+Full-rate peak/RMS results, saturation fractions and decimated traces are in
+[hob-simulation.json](hob-simulation.json). Recorded traces are for inspection,
+not gash-frequency spectral analysis. Installed encoder errors are sinusoidal
+with fixed phase; these runs do not exercise every combination of the bounded
+error allocation. The optimistic fast inner table loop has ideal velocity
+feedback. Torsion, sensor filtering, packet loss, cogging, thermal effects and a
+measured C-drive transfer function are absent. Therefore the simulated peak can
+be below the arithmetic worst-case budget, and increasing jitter to 10 µs need
+not fail this particular filtered trajectory even though it fails the bounded
+allocation. The small predicted errors are **not** a qualified hardware result.
+
+The overloaded master is allowed to slow, while C follows measured B. On stall,
+the calculation stops instead of extending the cutting-load model into reverse
+rotation. This diagnoses insufficient motor torque; it does not implement a
+machine fault-stop or restart sequence.
 
 ## Mill: provisional continuous output envelope
 
@@ -74,7 +150,8 @@ phase error and recovery are demonstrated with the actual controller.
 
 ## Screening the modeled Leadshine alternatives
 
-The following uses only published rated torque at rated speed, a belt speed
+All local rows are screened; these three illustrate the results. The calculation
+uses only the local catalog's rated torque at rated speed, a belt speed
 increase to 8000 rpm, and the assumed 95% efficiency. It does not extend rated
 torque to maximum speed or use transient peak torque as continuous cutting torque.
 
@@ -93,7 +170,10 @@ direct-drive maximum-speed requirement either. Belt-driving the hob would be
 a deliberate change to its direct-drive architecture and error budget.
 
 Source: [Leadshine ELM1/ELM2 datasheet, pp. 9–16](https://www.leadshine.com/upfiles/downloads/006a40c553d0c6fc60a1221d6a764222_1675822261873.pdf).
-Other catalog rows have not been exhaustively screened here.
+The complete screen uses local model values, not a separately maintained vendor table.
+The explicit MS1AE variant additionally has a conditional continuous-curve screen
+over every requested spindle speed, rather than only the rated operating point.
+It still fails the mill torque and envelope requirements. Qualification remains false.
 
 ## Hobber: power and synchronization requirements
 
@@ -191,22 +271,35 @@ demonstrate the 1 µm phase-error allocation using an independent measurement
 reference or reconciled metrology uncertainty. Stop/restart, reversal, missed
 samples, loss of synchronization and loaded acceleration require explicit tests.
 
-The present outcome is **conditional architecture selection**, not a purchase
-list. The mill's first sourcing target is a 3 kW class spindle-duty vector system;
-the hobber's is an 8000 rpm, 1.5 kW useful-output spindle plus the specified
-measured-angle EGB and C-axis servo. Actual cutting requirements, supply and
-manufacturer evidence can change either target. Existing CAD and runtime bindings
-remain as they were; these requirements do not add a VFD simulation or implement HB7.
+The present outcome is **no locally qualified replacement**, with specific failed
+screens and missing data. The 3 kW class vector system and 8000 rpm / 1.5 kW hob
+spindle describe gaps in the local catalog, not selected hardware. The next local
+model work is to provide verified continuous curves and a physical C-table
+motor/drive model, then evaluate the controller response and actual assembly
+interfaces. Existing CAD and runtime bindings remain as they were.
 
 ## Reproduce
 
 From the repository root:
 
 ```sh
+LOCAL_MOTOR_CATALOG_OUTPUT="$PWD/machinekit/examples/spindle-drive-study/local-motors.json" ./haxeon/scripts/haxeon run --project machinekit/examples/spindle-drive-study/haxeon.catalog.json
+LOCAL_MOTOR_CATALOG_OUTPUT="$PWD/machinekit/examples/spindle-drive-study/local-motors.json" LOCAL_MOTOR_CATALOG_CHECK=1 ./haxeon/scripts/haxeon run --project machinekit/examples/spindle-drive-study/haxeon.catalog.json
+python3 machinekit/examples/spindle-drive-study/digitize_curves.py --check
 python3 machinekit/examples/spindle-drive-study/analyze.py --check
 python3 machinekit/examples/spindle-drive-study/analyze.py --plot
+python3 machinekit/examples/spindle-drive-study/simulate_hob.py --check
+python3 machinekit/examples/spindle-drive-study/simulate_hob.py --plot
 ```
 
-The first command checks the committed numeric results and reference identities;
-the second regenerates results and the standalone figure (matplotlib required).
+The first two commands regenerate/check the model snapshot. The Python commands
+check or regenerate calculations, time-domain traces and standalone figures.
+Only plotting requires matplotlib.
 No external Python packages are required for numerical calculation.
+
+Native curve/catalog checks passed in an isolated copy of committed MachineKit
+plus the curve changes, because an unrelated in-progress structural-profile
+edit currently prevents the full workspace Haxe build. The isolated checks cover
+55 geometries/recipes, variant isolation, declining torque, no extrapolation and
+rejection of unverified or conflicting data. Python calculations and simulations
+run directly in this workspace.
