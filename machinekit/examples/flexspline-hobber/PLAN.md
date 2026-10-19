@@ -513,6 +513,20 @@ r 30 mm. HB7 and HB11 must show this.
 
 ### Phase D: later
 
+- [ ] Deferred lifting design: replace the current lifting insert blocks with recessed,
+  cast-in steel threaded sockets in reinforced casting bosses, flush with the surface
+  and closed with removable plugs. Fit rated removable lifting eyes or swivel hoist
+  rings only for lifting. Include mechanical pull-out retention on each embedded
+  anchor; do not use an unreinforced hole in mineral cast or a smooth embedded block.
+  Locate lifting points fore and aft around the calculated centre of mass for explicit
+  bed-only, column-only and assembled-machine lifting configurations, including axis
+  parking positions and exclusion of the separate electrical rack. Check anchor
+  pull-out/breakout strength, surrounding casting, sling angles, unequal leg loading,
+  hardware ratings, sling/tool access and clearance. Record lifting/assembly
+  instructions and acceptance evidence before designating any point usable for
+  lifting. Current blocks remain placeholders; implementation is deferred at the
+  user's request (2026-10-19).
+
 - Reference-part total cycle time **≤ 2 min** remains a later goal. Candidate levers:
   higher cutting speed with a carbide hob (e.g. up to the GE15FRplus 800 m/min class),
   a two-start hob, coarser roughing feed with a finishing pass, and shorter overrun
