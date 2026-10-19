@@ -1,6 +1,22 @@
 # Reusable panel tooling and mineral-casting molds
 
-Status: implementation plan; no tooling implementation or physical qualification yet.
+Status: phase 1 implemented. Panel generation and physical qualification remain pending.
+
+## Implementation progress
+
+- [x] Phase 1: neutral input/setup/stock records, strict versioned codec, stable
+  fingerprints, typed input review, and the MachineKit foundation adapter.
+  ManufacturingKit retains its ProjectKit-only dependency. CAD equivalence checks
+  cover box/chamfered/flared envelopes, rotated inserts and existing hobber layouts.
+  The initial contract supports mm inputs, convex additive prisms and box cuts;
+  unsupported units must be converted before entering the contract.
+- [ ] Phase 2: panel geometry, joints and fit coupon.
+- [ ] Phase 3: mill base mold review assembly.
+- [ ] Phase 4: assembly validation and fabrication package.
+- [ ] Phase 5: mill column and independent pedestal example.
+- [ ] Phase 6: physical calibration and release.
+
+See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
 
 ## Objective and first deliverable
 
@@ -24,6 +40,8 @@ joinery. Thickness, brace spacing, foam strength, resin compatibility and cure
 behavior require evidence before fabrication approval.
 
 ## Existing code and constraints
+
+Baseline at the start of implementation; the progress list above records changes.
 
 - `machinekit.structural.MineralCasting` owns the casting envelope and box voids;
   its recipe also supports chamfered corners and a widened, tapered foot.
@@ -402,7 +420,8 @@ Add dedicated configurations:
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.tooling.json
 ```
 
-Those configurations are planned files. Existing regression commands are:
+The first two configurations are implemented in phase 1. The mill tooling entry
+point is planned for phase 3. Existing regression commands are:
 
 ```sh
 ./haxeon/scripts/haxeon run --project=manufacturingkit/tests/haxeon.json

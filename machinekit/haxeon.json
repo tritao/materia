@@ -5,6 +5,7 @@
 	"scopeSourceRoots": false,
 	"dependencies": {
 		"projectkit": { "path": "../projectkit" },
+		"manufacturingkit": { "path": "../manufacturingkit" },
 		"cadkit": { "path": "../cadkit" },
 		"collisionkit-native": { "path": "../collisionkit/native" }
 	},

@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-tooling-tests" },
+	"entry": "FoundationToolingTests",
+	"sourceRoots": ["src"],
+	"dependencies": { "machinekit": { "path": "../.." } },
+	"target": "host",
+	"outputDir": "build"
+}
