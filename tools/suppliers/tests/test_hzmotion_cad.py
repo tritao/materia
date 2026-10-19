@@ -8,10 +8,10 @@ import hzmotion_cad
 
 
 class HzMotionCadTests(unittest.TestCase):
-    def test_only_reviewed_supports_are_enabled(self):
+    def test_only_reviewed_interfaces_are_enabled(self):
         records = json.loads(hzmotion_cad.MANIFEST.read_text())['assets']
         enabled = [a for a in records if a['interfaceReview']['status'] == 'verified-reference']
-        self.assertEqual({a['model'] for a in enabled}, {'BF12', 'BF15'})
+        self.assertEqual({a['model'] for a in enabled}, {'M60D-BK12-C', 'BF12', 'BF15'})
         self.assertTrue(all('normalization' in a for a in enabled))
         self.assertTrue(all('normalization' not in a for a in records if a not in enabled))
 

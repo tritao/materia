@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": "hzmotion-pdf-2025-04-09-v1",
+  "revision": "hzmotion-pdf-2025-04-09-v2",
   "sources": {
     "motor": {
       "url": "https://www.hzmotion.com/pdf/Motor_Bracket.pdf",
@@ -993,12 +993,12 @@
           "diameter": 7
         },
         {
-          "x": -25,
+          "x": -23,
           "z": 64,
           "diameter": 6.6
         },
         {
-          "x": -25,
+          "x": -23,
           "z": 77,
           "diameter": 6.6
         },
@@ -1008,12 +1008,12 @@
           "diameter": 7
         },
         {
-          "x": 25,
+          "x": 23,
           "z": 64,
           "diameter": 6.6
         },
         {
-          "x": 25,
+          "x": 23,
           "z": 77,
           "diameter": 6.6
         }
@@ -1027,7 +1027,7 @@
       "oppositeSupport": "BF12",
       "endProfile": "C-BK12",
       "runningMassIncluded": "housing, bearings and supplied internal hardware; no motor/coupling",
-      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v2",
       "drawingQualified": false,
       "approximateFields": [
         "housing webs",
@@ -1091,7 +1091,7 @@
       "oppositeSupport": "EF12",
       "endProfile": "C-BK12",
       "runningMassIncluded": "housing, bearings and supplied internal hardware; no motor/coupling",
-      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v2",
       "drawingQualified": false,
       "approximateFields": [
         "housing webs",
@@ -1155,7 +1155,7 @@
       "oppositeSupport": null,
       "endProfile": null,
       "runningMassIncluded": "bracket only; separate FK12 required",
-      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v2",
       "drawingQualified": false,
       "approximateFields": [
         "housing webs",
@@ -1219,7 +1219,7 @@
       "oppositeSupport": null,
       "endProfile": "KK86-FK10L",
       "runningMassIncluded": "supplier total base assembly; adapter mass unspecified",
-      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v2",
       "drawingQualified": false,
       "approximateFields": [
         "housing webs",
@@ -1264,7 +1264,7 @@
       "runningMassIncluded": "adapter only; mass not published",
       "bodyPilot": 50,
       "bodyPilotLength": 3.5,
-      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v2",
       "drawingQualified": false,
       "approximateFields": [
         "housing webs",
@@ -1340,7 +1340,7 @@
       "oppositeSupport": "BF15",
       "endProfile": "C-BK15",
       "runningMassIncluded": "housing, bearings and supplied internal hardware; no motor/coupling",
-      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v2",
       "drawingQualified": false,
       "approximateFields": [
         "housing webs",
@@ -1393,7 +1393,7 @@
       "endProfile": null,
       "runningMassIncluded": "housing and single bearing; mass unspecified",
       "geometryBasis": "drawing-based; internal rolling elements and chamfers omitted",
-      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v2",
       "drawingQualified": false,
       "approximateFields": [
         "housing webs",
@@ -1446,7 +1446,7 @@
       "endProfile": null,
       "runningMassIncluded": "housing and single bearing; mass unspecified",
       "geometryBasis": "drawing-based; internal rolling elements and chamfers omitted",
-      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v2",
       "drawingQualified": false,
       "approximateFields": [
         "housing webs",
@@ -1487,7 +1487,7 @@
       "endProfile": null,
       "runningMassIncluded": "support assembly; mass unspecified",
       "geometryBasis": "drawing-based flange and bearing interfaces; internals simplified",
-      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v2",
       "drawingQualified": false,
       "approximateFields": [
         "housing webs",
@@ -1540,7 +1540,7 @@
       "endProfile": null,
       "runningMassIncluded": "housing and single bearing; mass unspecified",
       "geometryBasis": "drawing-based; internal rolling elements and chamfers omitted",
-      "drawingRevision": "hzmotion-pdf-2025-04-09-v1",
+      "drawingRevision": "hzmotion-pdf-2025-04-09-v2",
       "drawingQualified": false,
       "approximateFields": [
         "housing webs",
@@ -1635,5 +1635,43 @@
       "candidate": "Z screw only",
       "status": "planned XY rack drives do not use coaxial screw mounts"
     }
-  ]
+  ],
+  "legacyRevision": "hzmotion-pdf-2025-04-09-v1",
+  "legacyOverrides": {
+    "M60D-BK12-C": {
+      "baseHoles": [
+        {
+          "x": -25,
+          "z": 24,
+          "diameter": 7
+        },
+        {
+          "x": -25,
+          "z": 64,
+          "diameter": 6.6
+        },
+        {
+          "x": -25,
+          "z": 77,
+          "diameter": 6.6
+        },
+        {
+          "x": 25,
+          "z": 24,
+          "diameter": 7
+        },
+        {
+          "x": 25,
+          "z": 64,
+          "diameter": 6.6
+        },
+        {
+          "x": 25,
+          "z": 77,
+          "diameter": 6.6
+        }
+      ],
+      "pilotDepth": 6
+    }
+  }
 }

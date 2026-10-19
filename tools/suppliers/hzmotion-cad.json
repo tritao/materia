@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "geometryStatus": "BF12/BF15 interfaces verified for reference assembly placement; other assets quarantined from component recipes pending source discrepancy resolution.",
+  "geometryStatus": "BK12-C and BF12/BF15 mounting interfaces checked against planar faces and holes; installed BF12 ring is an explicitly separate nominal DIN471 envelope.",
   "assets": [
     {
       "model": "M60D-BK12-C",
@@ -24,12 +24,31 @@
         ]
       },
       "interfaceReview": {
-        "status": "blocked-source-discrepancy",
+        "status": "verified-reference",
         "notes": [
-          "Shaft height 24.5 mm vs drawing 25 mm.",
-          "Motor face raw Z84; normalize by X=-rawX, Y=rawY+24.5, Z=84-rawZ.",
-          "Rear base holes raw X=+/-23, Z7.5/20.5 -> normalized Z76.5/63.5; drawing uses X=+/-25, Z77/64.",
-          "Bearing D12 bore spans raw Z7..22; drawing screw shoulder seating has not been qualified."
+          "Planar base Y=-25 and motor face Z84.5 match the 25 mm shaft height. Earlier bore-end measurements mistook chamfers for seating planes.",
+          "PDF p12 P1=46 confirms rear holes X=+/-23; the old catalog transcription incorrectly used P=50 for all holes.",
+          "Motor pilot D50 has a 6 mm nominal recess (raw78.5..84.5); base holes at normalized Z24/64/77.",
+          "Normalization rotates 180 degrees about Y and translates (0,25,84.5). No supplier geometry modified.",
+          "Front base holes: STEP D6.6 vs PDF S=7. Both clear the selected M6 screws; the discrepancy remains recorded and is not treated as a precision locating fit."
+        ]
+      },
+      "normalization": {
+        "translationMm": [
+          0,
+          25,
+          84.5
+        ],
+        "rotation": [
+          -1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          -1
         ]
       }
     },
@@ -55,11 +74,9 @@
         ]
       },
       "interfaceReview": {
-        "status": "blocked-source-discrepancy",
+        "status": "not-enabled",
         "notes": [
-          "Base is not a consistent plane: rear reaches raw Y=-25, web mounting bores start at -24.5.",
-          "Motor face raw Z84, pilot radius25 spans Z78.5..84.",
-          "Base holes X=+/-26, raw Z12.5/52.5 -> face-relative Z71.5/31.5 vs drawing 72/32."
+          "Previous base-height and face-offset claims were based on chamfered bore limits and are withdrawn. Planar-face audit matches nominal shaft heights and face datums. Other interfaces have not yet been enabled."
         ]
       }
     },
@@ -85,11 +102,9 @@
         ]
       },
       "interfaceReview": {
-        "status": "blocked-source-discrepancy",
+        "status": "not-enabled",
         "notes": [
-          "Base planar bore limits raw Y=-27.6 vs drawing shaft height28.",
-          "Motor face raw Z108.5; pilot radius35 spans Z103..108.5.",
-          "Raw overall width88 vs drawing width86."
+          "Previous base-height and face-offset claims were based on chamfered bore limits and are withdrawn. Planar-face audit matches nominal shaft heights and face datums. Other interfaces have not yet been enabled."
         ]
       }
     },
@@ -115,10 +130,9 @@
         ]
       },
       "interfaceReview": {
-        "status": "blocked-source-discrepancy",
+        "status": "not-enabled",
         "notes": [
-          "Shaft height24.5 vs drawing25.",
-          "Motor face raw Z75.5; base bores raw Z32/52 -> face-relative43.5/23.5 vs drawing44/24."
+          "Previous base-height and face-offset claims were based on chamfered bore limits and are withdrawn. Planar-face audit matches nominal shaft heights and face datums. Other interfaces have not yet been enabled."
         ]
       }
     },
@@ -185,6 +199,20 @@
           25,
           20
         ]
+      },
+      "installedApproximation": {
+        "basis": "Local RetainingRing.forShaft(10), nominal DIN471 installed envelope; not supplier-controlled elastic geometry",
+        "retainedSolidIndices": [
+          0,
+          1
+        ],
+        "replacedSolidIndex": 2,
+        "pinnedSolidCount": 3,
+        "grooveDiameterMm": 9.6,
+        "ringOutsideMm": 15,
+        "ringThicknessMm": 1,
+        "normalizedStartZMm": 14,
+        "extraBomLine": false
       }
     },
     {

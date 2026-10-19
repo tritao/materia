@@ -40,6 +40,7 @@ class HzMotionChecks {
    rows.push({model:model,solidCount:p.solidCount(),volumeMm3:p.volume(),source:HzMotionCatalog.sourceUrl(model),geometryBasis:s.geometryBasis});p.close();
   }
   for(model in HzMotionCatalog.cadModels()) {
+   if(model=="M60D-BK12-C")continue;
    var component=new HzMotionComponent(model,null,"unspecified","supplier-step"),s=component.spec,p=component.geometry();
    check(p.valid()&&p.solidCount()>1,"Supplier bearing assembly keeps separate solids");
    var bounds=p.shape.bounds();
@@ -59,8 +60,11 @@ class HzMotionChecks {
    var unknown=false;try component.massProperties()catch(_:Dynamic)unknown=true;
    check(unknown,"Detailed STEP does not invent engineering mass");p.close();
   }
-  var blocked=false;try new HzMotionComponent("M60D-BK12-C",null,"unspecified","supplier-step")catch(_:Dynamic)blocked=true;
+  var blocked=false;try new HzMotionComponent("M60D-EK12-C",null,"unspecified","supplier-step")catch(_:Dynamic)blocked=true;
   check(blocked,"Discrepant mount STEP is excluded from recipes");
+  var oldDrawing=new HzMotionComponent("M60D-BK12-C","hzmotion-pdf-2025-04-09-v1");
+  near(oldDrawing.spec.baseHoles[2].x,-25,"Saved v1 drawing retains its historical transcription");
+  check(oldDrawing.componentType().create(oldDrawing.values()).designation==oldDrawing.designation,"Legacy drawing revision still reconstructs");
   var copy=HzMotionCatalog.get("M60D-BK12-C");copy.pilot=999;
   near(HzMotionCatalog.get("M60D-BK12-C").pilot,50,"Catalog records cannot mutate the shared source");
   var modular=new MachineAssembly();modular.addComponent("bracket",new HzMotionComponent("M60D-FK12-A"));
@@ -83,7 +87,7 @@ class HzMotionChecks {
   var findings=HzMotionCatalog.motorFindings("M60D-BK12-C",motor);
   check(findings.length==1&&findings[0].indexOf("thread depth")>=0,"400 W nominal mounting dimensions match; thread depth remains unknown");
   check(HzMotionCatalog.motorFindings("M80E-BK15-C",motor).length>1,"Wrong frame is rejected");
-  var detailed=new HzMotionAxis(true),detailedPoses:Map<String,materia.assembly.AssemblyRecord.AssemblyFrame> = detailed.solvedPoses();
+  var detailed=new HzMotionAxis(true,"as-supplied"),detailedPoses:Map<String,materia.assembly.AssemblyRecord.AssemblyFrame> = detailed.solvedPoses();
   var detailedParts=detailed.components(),detailedCache=new PosedParts();
   var interference=detailedCache.overlap(detailedParts.filter(m->m.id=="floating")[0].component,detailedPoses.get("floating"),
    detailedParts.filter(m->m.id=="screw")[0].component,detailedPoses.get("screw"));

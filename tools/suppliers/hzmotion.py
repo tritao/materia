@@ -58,8 +58,13 @@ def render(data):
     # fresh records, so catalog consumers cannot mutate the pinned source table.
     parts = [{k: p[k] for k in RUNTIME_FIELDS} for p in data['parts']]
     cad = json.loads(REFERENCE.with_name('hzmotion-cad.json').read_text())
-    verified = [{'model': a['model'], 'sha256': a['sha256'], 'translation': a['normalization']['translationMm']}
+    verified = [{'model': a['model'], 'sha256': a['sha256'], 'translation': a['normalization']['translationMm'],
+                 'rotation': a['normalization'].get('rotation', [1,0,0,0,1,0,0,0,1])}
                 for a in cad['assets'] if a['interfaceReview']['status'] == 'verified-reference']
+    legacy = ' public static function legacyParts():Array<HzMotionSpec> {var rows=parts();for(p in rows){p.drawingRevision=' + literal(data['legacyRevision']) + ';'
+    for model, fields in data['legacyOverrides'].items():
+        legacy += 'if(p.model==' + literal(model) + '){' + ''.join('p.' + key + '=' + literal(value) + ';' for key, value in fields.items()) + '}'
+    legacy += '}return rows;}\n'
     return ('package machinekit.assembly;\n\n'
             'import machinekit.assembly.HzMotionCatalog.HzMotionSpec;\n'
             'import machinekit.assembly.HzMotionCatalog.HzMotionCoverage;\n'
@@ -72,7 +77,8 @@ def render(data):
             ' public static function coverage():Array<HzMotionCoverage> return [\n  '
             + ',\n  '.join(literal(p) for p in data['coverage']) + '\n ];\n'
             ' public static function discrepancies():Array<String> return ' + literal(data['discrepancies']) + ';\n'
-            ' public static function cadAssets():Array<HzMotionCadAsset> return ' + literal(verified) + ';\n'
+            + legacy
+            +             ' public static function cadAssets():Array<HzMotionCadAsset> return ' + literal(verified) + ';\n'
             '}\n')
 
 

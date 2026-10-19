@@ -17,33 +17,39 @@ class HzMotionComponent extends MachineComponent {
  public final spec:HzMotionSpec;
  public final bearingGrade:String;
  public final geometrySource:String;
+ public final clipState:String;
  static var cadRecipe:Null<ComponentType>;
  static var recipe:Null<ComponentType>;
  public static function recipeType():ComponentType {
   if(recipe==null)recipe=new ComponentType("machinekit.assembly.hzmotion-drawing-component",[
    P.choice("model",HzMotionCatalog.models(),"M60D-BK12-C"),
-   P.choice("revision",[HzMotionCatalog.revision()],HzMotionCatalog.revision()),
+   P.choice("revision",HzMotionCatalog.revisions(),HzMotionCatalog.revision()),
    P.choice("bearingGrade",["unspecified","C3","C4","C5"],"unspecified")],v->new HzMotionComponent(v.token("model"),v.token("revision"),v.token("bearingGrade")),true,false,null,false);
   return recipe;
  }
  public static function cadRecipeType():ComponentType {
   if(cadRecipe==null)cadRecipe=new ComponentType("machinekit.assembly.hzmotion-supplier-component",[
    P.choice("model",HzMotionCatalog.cadModels(),"BF12"),
-   P.choice("revision",[HzMotionCatalog.revision()],HzMotionCatalog.revision())],
-   v->new HzMotionComponent(v.token("model"),v.token("revision"),"unspecified","supplier-step"),true,false,null,false);
+   P.choice("revision",HzMotionCatalog.revisions(),HzMotionCatalog.revision()),P.choice("clipState",["as-supplied","installed-envelope"],"as-supplied")],
+   v->new HzMotionComponent(v.token("model"),v.token("revision"),"unspecified","supplier-step",v.token("clipState")),true,false,null,false);
   return cadRecipe;
  }
- public function new(model:String="M60D-BK12-C",?revision:String,bearingGrade:String="unspecified",geometrySource:String="drawing") {
-  if(revision!=null&&revision!=HzMotionCatalog.revision())throw "Unknown HZMotion drawing revision";
-  spec=HzMotionCatalog.get(model);
+ public function new(model:String="M60D-BK12-C",?revision:String,bearingGrade:String="unspecified",geometrySource:String="drawing",clipState:String="as-supplied") {
+  spec=HzMotionCatalog.get(model,revision);
   if(["unspecified","C3","C4","C5"].indexOf(bearingGrade)<0)throw "Unknown bearing grade";
   if(bearingGrade!="unspecified"&&(spec.family=="A"||(spec.family=="BF"||spec.family=="EF")||spec.kind=="adapter"))throw "Part has no selectable fixed-end bearing grade";
   if(geometrySource!="drawing"&&geometrySource!="supplier-step")throw "Unknown HZMotion geometry source";
-  if(geometrySource=="supplier-step")HzMotionCatalog.cadAsset(model);
+  if(geometrySource=="supplier-step") {
+   HzMotionCatalog.cadAsset(model);
+   if(model=="M60D-BK12-C"&&spec.drawingRevision!=HzMotionCatalog.revision())throw "BK12 STEP requires corrected v2 mounting datums";
+  }
+  if(clipState!="as-supplied"&&clipState!="installed-envelope")throw "Unknown retaining clip state";
+  if(clipState=="installed-envelope"&&(model!="BF12"||geometrySource!="supplier-step"))throw "Installed clip model requires supplier BF12";
+  this.clipState=clipState;
   this.geometrySource=geometrySource;
   this.bearingGrade=bearingGrade;
-  super('HZMOTION-$model-${spec.drawingRevision}-$bearingGrade'+(geometrySource=="supplier-step"?'-STEP-'+HzMotionCatalog.cadAsset(model).sha256:""),
-   'HZMotion $model — '+(geometrySource=="supplier-step"?"pinned supplier STEP":"drawing model"),"unspecified");
+  super('HZMOTION-$model-${spec.drawingRevision}-$bearingGrade'+(geometrySource=="supplier-step"?'-STEP-'+HzMotionCatalog.cadAsset(model).sha256+(clipState=="installed-envelope"?"-DIN471-INSTALLED":""):""),
+   'HZMotion $model — '+(geometrySource=="supplier-step"?(clipState=="installed-envelope"?"supplier STEP with nominal installed DIN471 ring":"pinned supplier STEP"):"drawing model"),"unspecified");
   lockManufacturingMaterial("unspecified");
   if(spec.kind=="mount"||spec.kind=="adapter") {
    addConnector("motor",Mount,Solids.axial(0,spec.shaftHeight,0));
@@ -66,7 +72,7 @@ class HzMotionComponent extends MachineComponent {
  override public function componentType():Null<ComponentType> return geometrySource=="supplier-step"?cadRecipeType():recipeType();
  override public function values():ComponentValues {
   var v=new ComponentValues().setToken("model",spec.model).setToken("revision",spec.drawingRevision);
-  return geometrySource=="supplier-step"?v:v.setToken("bearingGrade",bearingGrade);
+  return geometrySource=="supplier-step"?v.setToken("clipState",clipState):v.setToken("bearingGrade",bearingGrade);
  }
  override public function hasGeometry():Bool return true;
  override public function massProperties():MassProperties {
@@ -98,7 +104,21 @@ class HzMotionComponent extends MachineComponent {
    var imported=new SupplierCadComponent(directory+"/cad/assets/"+asset.sha256+".step",asset.sha256,designation,description);
    try {
     var raw=imported.geometry();
-    try {var result=raw.translated(new Vector(asset.translation[0],asset.translation[1],asset.translation[2]));raw.close();imported.close();return result;}
+    try {var r=asset.rotation,t=asset.translation;
+     var pose=materia.assembly.AssemblyFrames.fromRotationMatrix(t[0],t[1],t[2],r);
+     var result=machinekit.assembly.PosedParts.moved(raw,pose);
+     raw.close();imported.close();
+     if(clipState=="installed-envelope") {
+      try {
+       if(result.solidCount()!=3)throw "Pinned BF12 solid layout changed";
+       var pieces:Array<Part> = [];
+       for(i in 0...2)pieces.push(new Part(result.shape.subshape(CadKit.ShapeKind.Solid,i)));
+       var ring=machinekit.standard.RetainingRing.forShaft(10).geometry();
+       pieces.push(ring.translated(new Vector(0,25,14)));ring.close();
+       var installed=Solids.union(pieces);result.close();return installed;
+      }catch(e:Dynamic){result.close();throw e;}
+     }
+     return result;}
     catch(e:Dynamic){raw.close();throw e;}
    }catch(e:Dynamic){imported.close();throw e;}
   }

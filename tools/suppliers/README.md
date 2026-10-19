@@ -491,7 +491,7 @@ attempts remain recorded in the drawing reference. Run
 cache, or add `--offline` to verify it. Missing files prompt for credentials;
 credentials and session cookies are never saved. The downloader checks the STEP
 header, byte count and SHA-256 and rejects changed content. The cache is under
-`build/suppliers/hzmotion/cad/assets`. BF12/BF15 have passed the interface checks below and now have a separate
+`build/suppliers/hzmotion/cad/assets`. BK12-C/BF12/BF15 have passed the interface checks below and now have a separate
 `machinekit.assembly.hzmotion-supplier-component` recipe. Their files remain
 unchanged; the component applies the recorded translation to its usual datums.
 Set `MATERIA_HZMOTION_ROOT` to relocate the supplier cache. Saved supplier recipes
@@ -548,23 +548,32 @@ belt and flag Z/hobber/lathe/router arrangements for independent selection.
 
 
 The STEP interface review is recorded per asset in `hzmotion-cad.json`.
-`M60D-BK12-C`, `M60D-EK12-C`, `M80E-BK15-C`, `M60D-FK12-A` and `FK12`
-are excluded from supplier component recipes pending source clarification.
-In particular, BK12-C has a 24.5 mm shaft height and different rear base-hole
-positions; changing only its coordinate system cannot reconcile those dimensions.
-The drawing-derived motor/fastener findings remain drawing-only evidence.
+BK12-C is enabled after a planar-face review corrected our earlier audit:
+Y=-25 is the base and Z=84.5 the motor face. The previous 24.5 mm shaft-height
+claim came from a chamfered bore limit and is withdrawn. PDF p12 distinguishes
+P=50 from P1=46: rear mounting holes are X=+/-23, not +/-25. Drawing revision
+v2 corrects that transcription; saved v1 drawings retain their original geometry.
+The BK12 STEP requires v2 datums. Its normalization is a 180-degree rotation
+about Y followed by translation (0,25,84.5). The front base holes remain D6.6 in STEP vs D7 in the PDF; both clear the
+selected M6 fasteners, and the discrepancy remains recorded. The other three motor-mount STEP
+files have matching planar datums too, but are not yet enabled as components.
+FK12 remains an assembly reference pending complete seating verification.
 
 BF12/BF15 supplier solids retain housing, bearing and retaining hardware as one
 purchased component. Their normalized base is Y=0, support front Z=0, shaft axis
 Z at Y=25/28, base holes X=+/-23/27 at Z=10. BF12 raw geometry is translated by
-(0,25,20), BF15 by (0,28,0). Native checks verify the shaft passage, mounting
-holes, bounding planes, saved identity and drive clearances. No material or
-engineering mass is inferred from detailed STEP. The gallery uses these two
-supplier models. The worked Y stack retains drawing BF12: the detailed supplier
-retaining clip overlaps the drawing screw groove by about 3.68053 mm3 (clip inner
-radius 4.65 vs simplified groove radius 4.8). Its installed/free-state and the
-groove specification require qualification. The native regression preserves this
-finding rather than modifying the supplier solid or inventing a deeper groove.
+(0,25,20), BF15 by (0,28,0). The original BF12 clip's free-state inner radius
+4.65 intersects the screw groove radius4.8 by about 3.68053 mm3. This remains
+reproducible with `clipState=as-supplied`.
+
+A separate `clipState=installed-envelope` retains the supplier housing and
+bearing and replaces only its pinned clip solid with our nominal DIN471-10
+installed envelope (groove D9.6, thickness1, OD15, Z14..15). This is an assembly
+approximation, not an edited supplier STEP or an elasticity simulation. It has
+a distinct designation and saved state; no extra ring is double-counted in the
+purchased assembly BOM. The worked stack uses this installed state. No material
+or engineering mass is inferred from detailed STEP. Native checks preserve the
+original interference, verify the installed stack and retain saved identities.
 
 Reproduce the raw cylindrical-face/bounds audit (no modeling-time network):
 

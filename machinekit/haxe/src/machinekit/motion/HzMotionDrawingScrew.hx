@@ -24,11 +24,16 @@ class HzMotionDrawingScrew extends LeadScrew {
    tracked.push(Part.cylinderSpan(5,0,15));
    tracked.push(Part.cylinderSpan(5.4,15,27)); // Semantic M12x1 root; no helical thread.
    tracked.push(Part.cylinderSpan(6,27,51));
-   tracked.push(Part.cylinderSpan(8,51,totalLength-11));
+   tracked.push(Solids.named(Part.cylinderSpan(8,51,totalLength-11),"race"));
    tracked.push(Part.cylinderSpan(5,totalLength-11,totalLength-3));
    tracked.push(Part.cylinderSpan(4.8,totalLength-3,totalLength-1.85));
    tracked.push(Part.cylinderSpan(5,totalLength-1.85,totalLength));
-   return Solids.union(tracked.copy());
+   var body=Solids.union(tracked.copy());
+   if(detail==Envelope)return body;
+   try {
+    var result=new Part(cadkit.threads.Threads.attach(body.shape,"race:cyl.side",thread.threadSpec(),AxisMinimum));
+    body.close();return result;
+   }catch(e:Dynamic){body.close();throw e;}
   });
  }
  public static function recipeType():ComponentType {

@@ -14,7 +14,7 @@ typedef HzMotionSpec = {
  var oppositeSupport:Null<String>;var endProfile:Null<String>;var geometryBasis:String;var drawingRevision:String;
 }
 typedef HzMotionCoverage = {var family:String;var motorInterface:String;var support:String;var sourcePage:Int;var status:String;}
-typedef HzMotionCadAsset = {var model:String;var sha256:String;var translation:Array<Float>;}
+typedef HzMotionCadAsset = {var model:String;var sha256:String;var translation:Array<Float>;var rotation:Array<Float>;}
 class HzMotionCatalog {
  public static function cadModels():Array<String> return [for(a in HzMotionData.cadAssets())a.model];
  public static function cadAsset(model:String):HzMotionCadAsset {
@@ -22,8 +22,10 @@ class HzMotionCatalog {
   throw 'HZMotion STEP interfaces not verified for $model';
  }
  public static function models():Array<String> return [for(p in HzMotionData.parts())p.model];
- public static function get(model:String):HzMotionSpec {
-  for(p in HzMotionData.parts())if(p.model==model)return p;
+ public static function revisions():Array<String> return [revision(),"hzmotion-pdf-2025-04-09-v1"];
+ public static function get(model:String,?revision:String):HzMotionSpec {
+  var parts=revision==null||revision==HzMotionCatalog.revision()?HzMotionData.parts():revision=="hzmotion-pdf-2025-04-09-v1"?HzMotionData.legacyParts():[];
+  for(p in parts)if(p.model==model)return p;
   throw 'Unknown HZMotion drawing model $model';
  }
  public static function coverage():Array<HzMotionCoverage> return HzMotionData.coverage();

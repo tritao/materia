@@ -20,7 +20,7 @@ class HzMotionPreview {
  static function scene(assembly:MachineAssembly,id:String):SceneArtifactData {
   var model=new AssemblyModel("mm");assembly.addTo(model,"");
   var parts:Array<SceneArtifactPart> = [],messages:Array<String> = [
-   "HZMotion study: verified BF12/BF15 supplier STEP; other parts remain simplified drawing geometry.",
+   "HZMotion study: verified BK12-C/BF12/BF15 supplier interfaces; other parts remain drawing geometry.",
    "Catalog/preview is not a manufacturing release or verified motor/drive selection."];
   for(m in assembly.components()) {
    var geometry=m.component.geometry(),mass:MassProperties;
@@ -64,7 +64,7 @@ class HzMotionPreview {
  }
  public static function axisPreview():Bytes {
   var result=scene(new HzMotionAxis(),"hzmotion-y-drive");
-  result.recipeDiagnostics.push("Floating BF12 remains drawing geometry: the supplier retaining clip intersects the drawing screw groove by approximately 3.68 mm3; installed clip state remains unqualified.");
+  result.recipeDiagnostics.push("BF12 uses supplier housing/bearing with a nominal installed DIN471 ring envelope. The unmodified supplier clip remains available as a separate state and intersects the groove; elasticity and exact installed form are unqualified.");
   result.recipeDiagnostics.push("Requires the HZMotion 51 mm screw-end profile; existing Vallder 54 mm end is not substituted.");
   result.recipeDiagnostics.push("Coupling is a reference geometry. Thread engagement, bearing preload, guides and actual mill placement remain unqualified.");
   return SceneArtifact.encode(result);
@@ -78,7 +78,7 @@ class HzMotionPreview {
   var reopened=preview(decoded.recipeDocument),second=SceneArtifact.decode(reopened);
   if(second.parts.length!=HzMotionCatalog.models().length)throw "Saved catalog reconstruction changed part count";
   var editedDocument=DocumentCodec.decode(decoded.recipeDocument,false,false),edited=false;
-  for(element in editedDocument.allElements())if(element.kind=="instance"&&element.name=="catalog0") {
+  for(element in editedDocument.allElements())if(element.kind=="instance"&&element.name=="catalog1") {
    var instance=cast(element,cadkit.parametric.InstanceElement);
    var definition=editedDocument.definition(instance.definitionId);
    definition.setUserEditedTypedDefault("model","M80E-BK15-C");
@@ -87,10 +87,10 @@ class HzMotionPreview {
   if(!edited)throw "Missing editable catalog occurrence";
   var editedSaved=DocumentCodec.encode(editedDocument);MachineKitRecipes.forget(editedDocument);editedDocument.close();
   var editedScene=SceneArtifact.decode(preview(editedSaved)),changed=false;
-  for(part in editedScene.parts)if(part.id=="catalog0"&&part.name.indexOf("M80E-BK15-C")>=0)changed=true;
+  for(part in editedScene.parts)if(part.id=="catalog1"&&part.name.indexOf("M80E-BK15-C")>=0)changed=true;
   if(!changed)throw "Saved model selection did not rebuild visible geometry";
   var returned=DocumentCodec.decode(editedScene.recipeDocument,false,false),retained=false;
-  for(element in returned.allElements())if(element.kind=="instance"&&element.name=="catalog0") {
+  for(element in returned.allElements())if(element.kind=="instance"&&element.name=="catalog1") {
    var instance=cast(element,cadkit.parametric.InstanceElement),part=MachineKitRecipes.component(instance);
    if(part.values().token("model")=="M80E-BK15-C"&&part.values().token("bearingGrade")=="C4")retained=true;
   }
