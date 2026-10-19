@@ -41,8 +41,16 @@ class FlexsplineHobber extends MachineAssembly {
     var profile=new ToothProfile(this.spec);hob=Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),1,32,gashes),this.spec,40,16,false,detailedHob);
     bed=new MineralCastBed();column=new MineralCastColumn();
     includeAt("bed",bed,F.translation(HobberXLayout.front().bedCentre,0,-590));
-    for(i in 0...3)fixAt("foot"+i,new machinekit.structural.LevelingFoot(),F.translation(i<2?HobberXLayout.FOOT_FRONT:HobberXLayout.front().footRear,i==0?-330:i==1?330:0,-637),"bed/foot"+i,
-      F.alongY(i<2?HobberXLayout.FOOT_FRONT:HobberXLayout.front().footRear,i==0?-330:i==1?330:0,-590,0,0,1));
+    var footCentres=FoundationLayout.feet();
+    for(i in 0...footCentres.length){
+      var p=footCentres[i],x=p.x+HobberXLayout.front().bedCentre,y=p.y;
+      var roof=-590+machinekit.structural.CastingFootPocket.ROOF,plateBottom=roof-machinekit.structural.CastingFootPocket.PLATE_THICKNESS;
+      fixAt("footSeat"+i,new machinekit.structural.LevelingSeat(),F.translation(x,y,plateBottom),"bed/casting",F.alongY(x,y,roof,0,0,1));
+      var nutValues=new ComponentValues().setToken("variant","nut");
+      fixAt("footNut"+i,new machinekit.structural.LevelingSeat(nutValues),F.translation(x,y,plateBottom-19),"footSeat"+i,F.alongY(x,y,plateBottom,0,0,1));
+      fixAt("footLocknut"+i,new machinekit.structural.LevelingSeat(nutValues),F.translation(x,y,plateBottom-38),"footNut"+i,F.alongY(x,y,plateBottom-19,0,0,1));
+      fixAt("foot"+i,new machinekit.structural.LevelingFoot(new ComponentValues().setNumber("recessDepth",machinekit.structural.CastingFootPocket.ROOF)),F.translation(x,y,-637),"footNut"+i);
+    }
     var installed:machinekit.motion.PrecisionRotaryAxis=rotaryAxis==null?new machinekit.motion.PurchasedRotaryTable():rotaryAxis;
     table=installed.assembly();tableSpec=installed.specification();
     var tableBase=FoundationLayout.TABLE_FACE-tableSpec.number("height"),seat=FoundationLayout.TABLE_SEAT;

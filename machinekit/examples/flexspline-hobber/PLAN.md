@@ -167,7 +167,7 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
   ≥ 5:1 (5–10:1 design aim, assumed), with machine mass around 1–1.5 t.
 - Use one monolithic, ribbed, partly hollow mineral-cast plinth, starting around
   1100 × 800 × 650 mm and 600–900 kg. The sized front-loading design is
-  930 × 800 × 800 mm, casting 748.12 kg; retain ≥5:1 X mass ratio after shortening.
+  930 × 800 × 800 mm, casting 754.87 kg; retain ≥5:1 X mass ratio after shortening.
   Derive rail/screw/base length from travel, blocks, end margins, overtravel and
   the fixed motor envelope. Put the heavy solid section at the bottom,
   pockets/ribs higher. Size it using the working height and stiffness estimate;
@@ -175,7 +175,9 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
 - Put the tooth band around 1000 mm above the floor (950–1100 mm target), for
   standing setup/inspection and later machine-tending. EN ISO 14738 / DIN 33406
   are ergonomic references, not a compliance claim for this prototype.
-- Three widely spaced levelling feet provide determinate floor support; optional
+- Three widely spaced levelling feet in side-access cast pockets, with removable
+  steel roof-bearing plates and separate support/lock nuts, provide determinate
+  floor support. No embedded steel foot anchors or mineral-cast threads; optional
   vibration mounts must be stated, not assumed. Provide chip drainage, coolant
   volume thermally separated from the guides and cable routing inside the base.
 - Lighten the moving column with hollow/ribbed geometry; keep the X drive on
@@ -424,7 +426,8 @@ r 30 mm. HB7 and HB11 must show this.
 ### Phase B: the machine and its control
 
 **HB5. Parts (HB-D1, HB-D10, HB-D11).**
-- Heavy monolithic plinth, three levelling feet, larger C bearing and matching
+- Heavy monolithic plinth, three side-access cast-pocket levelling mounts with
+  removable steel plates and separate support/lock nuts, larger C bearing and matching
   housing, and hollow/ribbed lightened moving column.
 - `machinekit.motion`:
   - `TorqueMotor`: frameless direct drive with continuous and peak torque, rotor inertia, cogging
@@ -2619,3 +2622,30 @@ fastening/removal detail remains open manufacturing work.
 The regenerated loading/cutting scene also passes full playback, inspection and
 reset: 982 windows, 6.49625 s machining and zero fixture-envelope contacts.
 The refreshed scene is open in Materia.
+
+### Three accessible cast-pocket foot mounts (2026-10-19)
+
+Followed the mill frame's cast access-pocket and stem-passage technique, while
+using removable roof-bearing steel plates on the hobber. The three supports
+retain their original 690 × 660 mm triangle, 47 mm floor clearance and 1000 mm
+work height. Each has a 110 × 110 × 15 mm steel plate, two nominal M24×3 nuts,
+28 mm stem passage and a reserved solid boss with 70 mm roof thickness. Removed
+the three embedded steel anchors. Hardware is separately itemised and persists.
+
+The machine now weighs 1044.85 kg (casting 754.87 kg), with X base-to-moving-mass
+ratio 5.90. The assumed beam change over X is 0.00247 µm (0.00495 µm at half E).
+Maximum static foot reaction is 4.45 kN; mean roof bearing stress is 0.393 MPa
+assuming full contact. These are preliminary assumed-stiffness/static screens,
+not structural acceptance. Roof bedding/replication, local bending and creep,
+threads, lateral restraint and dynamic stability remain Phase D checks.
+
+Validation: 102 checks cover solid roof continuity, stem clearance, side wrench
+access, plate lowering/extraction, separate hardware and persistence. The changed
+casting/feet exact-solid audit passes 3910 candidate pairs over 85 poses with
+zero unexpected intersections; the assembly suite passes 961 assertions. Report:
+`FOOT_MOUNTS_REPORT.json`. Replacement requires the base unloaded and lifted,
+with the stem withdrawn before the plate is lowered and extracted sideways.
+
+The regenerated saved scene passes complete load/cut/unload playback, inspection
+and reset (982 windows, 6.49625 s machining, zero fixture-envelope contacts),
+and is open in Materia. Earlier frozen HB11 binaries were left untouched.

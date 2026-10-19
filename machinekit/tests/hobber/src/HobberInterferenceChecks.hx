@@ -6,6 +6,7 @@ import gearkit.GearSpec;
 class HobberInterferenceChecks {
   public static function run():Void {
     var output=Sys.getEnv("HOBBER_INTERFERENCE_EVIDENCE");if(output==null)throw "HOBBER_INTERFERENCE_EVIDENCE required";
+    var feet=Sys.args().indexOf("feet")>=0;
     var chipGuard=Sys.args().indexOf("chip-guard")>=0;
     var workholding=Sys.args().indexOf("workholding")>=0;
     var cartridge=Sys.args().indexOf("cartridge")>=0;
@@ -16,7 +17,7 @@ class HobberInterferenceChecks {
     var model=new AssemblyModel("mm");machine.addTo(model,"");var state=model.initialState();state.forwardKinematics();
     var members=machine.components(),definition=machine.definition(),cache=new PosedParts();
     var relativeVolumes:Map<String,Float> = [];
-    function changed(id:String):Bool return chipGuard?id=="chipTray":workholding?(id=="blank"||id=="mandrel"||id=="mandrelSleeve"):cartridge?StringTools.startsWith(id,"spindle/"):id=="bed/casting"||id=="bed/railLeft"||id=="bed/railRight"||id=="Xbridge"||StringTools.startsWith(id,"railX")||StringTools.startsWith(id,"blockX");
+    function changed(id:String):Bool return feet?(id=="bed/casting"||StringTools.startsWith(id,"foot")):chipGuard?id=="chipTray":workholding?(id=="blank"||id=="mandrel"||id=="mandrelSleeve"):cartridge?StringTools.startsWith(id,"spindle/"):id=="bed/casting"||id=="bed/railLeft"||id=="bed/railRight"||id=="Xbridge"||StringTools.startsWith(id,"railX")||StringTools.startsWith(id,"blockX");
     var groups:Map<String,String> = [],rigidVolumes:Map<String,Float> = [];
     for(m in members)groups.set(m.id,m.id);
     for(j in definition.joints)if(j.type==materia.assembly.AssemblyDefinition.AssemblyJointType.Fixed){
@@ -32,7 +33,7 @@ class HobberInterferenceChecks {
     if(sweep)for(x in [machine.travel[0].lower,(machine.travel[0].lower+machine.travel[0].upper)/2,machine.travel[0].upper])
       for(y in [-10.0,0,10])for(z in [-10.0,90,190])for(a in [-Math.PI/12,0.0,Math.PI/12])samples.push({x:x,y:y,z:z,a:a});
     function save():Void sys.io.File.saveContent(output+"/overlaps.json",haxe.Json.stringify({reference:reference,
-      scope:chipGuard?"changed table chip guard against all parts; unchanged pairs retain prior audit evidence":workholding?"changed cup and mandrel against all machine parts; unchanged pairs retain prior audit evidence":cartridge?"changed spindle cartridge against all parts at full travel grid; unchanged pairs retain prior audit evidence":railSupport?"changed bed casting, X rail seats, rails, blocks and widened carriage against all parts at full travel grid; unchanged pairs retain prior audit evidence":castingOnly?"changed bed casting against every other part at the full travel grid; unchanged pairs retain prior audit evidence":sweep?"conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof":"exact CAD common volume at initial, CAM inspection and pass endpoints",
+      scope:feet?"changed casting and foot hardware against all parts; unchanged pairs retain prior audit evidence":chipGuard?"changed table chip guard against all parts; unchanged pairs retain prior audit evidence":workholding?"changed cup and mandrel against all machine parts; unchanged pairs retain prior audit evidence":cartridge?"changed spindle cartridge against all parts at full travel grid; unchanged pairs retain prior audit evidence":railSupport?"changed bed casting, X rail seats, rails, blocks and widened carriage against all parts at full travel grid; unchanged pairs retain prior audit evidence":castingOnly?"changed bed casting against every other part at the full travel grid; unchanged pairs retain prior audit evidence":sweep?"conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof":"exact CAD common volume at initial, CAM inspection and pass endpoints",
       samples:samples,completed:completed,members:members.length,checked:checked,thresholdMm3:0.001,
       unexpected:unexpected,seconds:Sys.time()-began,overlaps:overlaps}));
     try {
@@ -40,7 +41,7 @@ class HobberInterferenceChecks {
         var s=samples[index];state.setJoint("X",s.x);state.setJoint("Y",s.y);state.setJoint("Z",s.z);state.setJoint(FlexsplineHobber.A,s.a);state.forwardKinematics();
         var poses=[for(m in members)state.worldPose(m.id)],boxes=[for(i in 0...members.length)cache.box(members[i].component,poses[i])];
         for(a in 0...members.length)for(b in a+1...members.length){
-          if((chipGuard||workholding||cartridge||railSupport)&&!changed(members[a].id)&&!changed(members[b].id))continue;
+          if((feet||chipGuard||workholding||cartridge||railSupport)&&!changed(members[a].id)&&!changed(members[b].id))continue;
           if(castingOnly&&members[a].id!="bed/casting"&&members[b].id!="bed/casting")continue;
           if(PosedParts.apart(boxes[a],boxes[b],0))continue;
           var first=members[a],second=members[b];checked++;

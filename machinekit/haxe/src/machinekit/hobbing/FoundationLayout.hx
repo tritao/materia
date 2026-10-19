@@ -38,6 +38,9 @@ class FoundationLayout {
     }
     return result;
   }
+  /** Three support centres in casting-local coordinates, kept fixed through X travel. */
+  public static function feet():Array<{x:Float,y:Float}> return [for(i in 0...3)
+    {x:(i<2?-1:1)*(HobberXLayout.front().bedLength/2-120),y:i==0?-330.0:i==1?330.0:0.0}];
   public static function dimensions(kind:String,legacy:Bool=false):Array<Float> return switch kind {
     case "bed": legacy?[650.0,550,120]:[HobberXLayout.front().bedLength,800,PLINTH_HEIGHT]; case "column": legacy?[200.0,180,600]:[400.0,200,500];
     default: throw "Unknown hobber foundation kind";
@@ -50,6 +53,11 @@ class FoundationLayout {
       if(kind=="bed"){
         var centre=HobberXLayout.front().bedCentre;
         cores=machinekit.structural.CastingCells.outsideColumns(bedCores(cores),[[-140.0-centre,-140,140-centre,140]]);
+        for(p in feet())cores=machinekit.structural.CastingFootPocket.reserve(cores,p.x,p.y);
+        var feet=feet();for(i in 0...feet.length){var p=feet[i];
+          var edge=i<2?(p.y<0?-401.0:401.0):d[0]/2+1;
+          for(feature in machinekit.structural.CastingFootPocket.features("foot"+i,p.x,p.y,edge,i==2))cores.push(feature);
+        }
         cores.push(CastingFeatures.box("work-well",410,350,220-TABLE_WELL_FLOOR,-45-centre,0,TABLE_WELL_FLOOR+UPPER_OFFSET));
         cores.push(CastingFeatures.box("chip-drain",280,180,80,-50-centre,0,TABLE_WELL_FLOOR-80+UPPER_OFFSET));
         cores.push(CastingFeatures.box("X-drive-channel",HobberXLayout.front().bedRear+1-(HobberXLayout.front().deckStart-12.5),110,90,(HobberXLayout.front().bedRear+1+HobberXLayout.front().deckStart-12.5)/2-centre,0,130+UPPER_OFFSET));
@@ -78,7 +86,6 @@ class FoundationLayout {
           pose:F.fromRotationMatrix(HobberXLayout.front().railStart+HobberXLayout.front().railLength/2-centre,side*BED_RAIL_CENTRE,200+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1])});
         out.push({id:"driveSeat",role:"central X screw channel seat",width:100,depth:HobberXLayout.front().motorFace-HobberXLayout.front().deckStart,height:20,pose:F.fromRotationMatrix((HobberXLayout.front().motorFace+HobberXLayout.front().deckStart)/2-centre,0,120+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1])});
         for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,-150-centre,side*310,180+UPPER_OFFSET);
-        for(i in 0...3)add("foot"+i,"levelling foot anchor",80,80,30,(i<2?-1:1)*(HobberXLayout.front().bedLength/2-120),i==0?-330:i==1?330:0,0);
       }else{
         add("basePlate","column carriage sole",380,100,20,0,-40,-10);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"Z rail seat",width:35,depth:480,height:20,

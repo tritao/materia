@@ -16,7 +16,7 @@ The frame regression compares actual assembled poses, cut boundaries and loads
 with the analytic reference chain, rather than changing the cutting definition.
 
 The base is one 930 × 800 × 800 mm monolithic mineral casting, supported on
-three 47 mm rigid levelling feet. Its top is 847 mm above the floor and the tooth
+three rigid levelling feet with 47 mm nominal floor clearance. Its top is 847 mm above the floor and the tooth
 band is at 1000 mm. The initial 650 mm plinth height would leave the band at
 850 mm with this low fixture; the taller casting raises the work without adding
 a stand, long legs or a taller fixture. The casting retains an 85 mm sole,
@@ -70,7 +70,7 @@ confirmation.
 | X moving mass | 81.71 kg | 127.98 kg |
 | Z moving mass | 106.79 kg | 41.10 kg |
 | Y moving mass | 18.01 kg | 14.03 kg |
-| Machine mass | 351.61 kg | 1036.11 kg |
+| Machine mass | 351.61 kg | 1044.85 kg |
 | Bed footprint (radial × tangential) | 650 × 750 mm | 930 × 800 mm |
 | Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1510 × 800 mm |
 | X continuous thrust margin, same assumed demand basis | 911.15 N | 888.01 N |
@@ -149,14 +149,39 @@ thermal behaviour and detailed manufacturing release remain open plan items.
 
 ## Heavy plinth acceptance (HB-D11)
 
-The casting is 748.12 kg; the base assembly is 776.28 kg and the complete machine
-is 1036.11 kg. The casting-to-moving-mass ratios are 5.85:1 (X), 53.33:1 (Y)
-and 18.20:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
+The casting is 754.87 kg; the base assembly is 778.51 kg and the complete machine
+is 1044.85 kg. The casting-to-moving-mass ratios are 5.90:1 (X), 53.81:1 (Y)
+and 18.37:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
 from 37.28 to 31.75 kg; its insert-equipped assembly falls from 55.50 to 49.97 kg.
 X moves 127.98 kg including the complete column/head. The three support points
 span 690 mm radially and 660 mm across the front. Positive reactions are checked
 through X travel against an assumed 15 kN target per foot; no vibration pads
 are fitted. Floor, pad and screw compliance remain unqualified.
+
+The three mounts now use side-access cast pockets, following the mill frame's
+access-pocket/stem-passage technique. The mill's existing seat is cast in; the
+hobber instead uses a removable 110 × 110 × 15 mm ground steel plate registered
+under the pocket roof. Two separate nominal M24×3 nuts below the plate carry and
+lock the adjustment. The screw pushes the plate upward against the casting roof;
+there are no embedded steel foot anchors or threads in mineral cast.
+
+The pocket floor is 40 mm above the casting bottom, its plate bearing roof is
+at 160 mm, and a solid local boss retains 70 mm of roof material. A 28 mm cast
+stem passage clears the nominal 24 mm screw. The registered plate recess has
+0.5 mm nominal clearance per side. The two front mounts open outward through
+the side walls; the rear mount opens through the rear wall. Exact-solid checks
+cover an 80 mm-wide wrench corridor for both nuts and plate lowering/extraction.
+Replacement requires unloading and lifting the base, withdrawing the stem,
+lowering the plate 20 mm and sliding it out sideways; supports are never removed
+under machine weight. Floor clearance, support centres and the 1000 mm tooth-band
+height are unchanged. Nominal foot/stem envelope height is now 232 mm.
+
+Maximum static reaction is 4.45 kN across 21 X positions; mean roof bearing stress
+is about 0.393 MPa assuming full plate contact outside the stem passage. Full-area
+contact needs a replicated/bedded roof bearing face, using a removable released
+master; no machining of the mineral casting is specified. Bedding, roof bending,
+creep, thread strength, lateral restraint, floor compliance and dynamic tipping
+remain unqualified. See [FOOT_MOUNTS_REPORT.json](FOOT_MOUNTS_REPORT.json).
 
 The default C table is a bought 200 mm-face, 210 mm-height, 40 mm-bore DD
 unit seeded from the Demat RTV210-050-class purchase data in
@@ -218,7 +243,7 @@ basis. Bench measurements at 15 rpm are needed before qualification.
 `base-report` uses a simply supported beam, minimum net section and E=35 GPa
 (assumed). Across the new full mechanism X25..110 range, the old bed retains
 its original 860 mm support span and changes by 0.132 µm; the shortened plinth
-uses its 690 mm span and changes by 0.00240 µm (0.00479 µm at half modulus).
+uses its 690 mm span and changes by 0.00247 µm (0.00495 µm at half modulus).
 The previous 1100 mm plinth changed by 0.00628 µm across X45.2..250; that
 historical result is retained separately, not compared as equal travel.
 The new bound is below the explicitly allocated 1.9 µm profile share.
