@@ -5,6 +5,8 @@ from pathlib import Path
 import urllib.request
 
 ASSETS = {
+    "HGH25CA": "d1928e51da8a04694e98678ece89710cef6fa22dad3a6ddac47e54261fa491c6",
+    "HGR25R": "a5c25503c681841fbbee95b24a1ebcd890afcf2001b074ee4a5b817e1fc07909",
     "HGH15CA": "3bc285a6e79d23be1a5d6408382785361402575449bf40175d2319b27a55c9d8",
     "HGR15R": "2897086393c72de3ca2a1af658da9e471bfbe38e234605e89dbb8497283e4351",
 }

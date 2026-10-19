@@ -14,3 +14,10 @@ rack hidden. Its drives and power wiring remain in the underlying assembly.
 
 The head has a front-mounted compact swivel and vertical twin-rail Y stage.
 [LAYOUT_SECTION.svg](LAYOUT_SECTION.svg) shows the dimensioned radial stack.
+
+The inspection assembly now selects full supplier HGH15CA/HGH25CA blocks and a
+matching HGR25R X rail profile. Before generating it on a fresh checkout, run
+`python3 machinekit/examples/linear-rail-reference/prepare.py`. Asset revisions
+are pinned and saved in component recipes; no runtime downloads occur. The X
+screw is centred between the bed rails in a recessed channel, with its motor at
+the rear. Channel covers remain a design provision.

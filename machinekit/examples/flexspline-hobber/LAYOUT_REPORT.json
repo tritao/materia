@@ -16,9 +16,9 @@
   },
   "after": {
     "installedPoseEnvelopeMm": {
-      "radial": 1630,
+      "radial": 1640.0000000000002,
       "scope": "initial pose including separate electrical rack; CAD envelope bounds",
-      "tangential": 682.0000000000001
+      "tangential": 650
     },
     "headStackMm": {
       "swivelBearingFrontFace": 114,
@@ -30,29 +30,29 @@
     },
     "drives": [
       {
-        "thrustMarginN": 888.2832523661427,
+        "thrustMarginN": 887.2251223286296,
         "axis": "X",
-        "movingMassKg": 127.43349526771446,
+        "movingMassKg": 129.54975534274087,
         "continuousThrustWith20PercentReserveN": 1152,
-        "designDemandN": 263.7167476338572,
+        "designDemandN": 264.7748776713704,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 911.9661993369266,
+        "thrustMarginN": 911.0210379975994,
         "axis": "Y",
-        "movingMassKg": 13.177041884720607,
+        "movingMassKg": 13.488139765757445,
         "continuousThrustWith20PercentReserveN": 1152,
-        "designDemandN": 240.0338006630734,
+        "designDemandN": 240.97896200240064,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 1548.812718943668,
+        "thrustMarginN": 1542.3999649924913,
         "axis": "Z",
-        "movingMassKg": 39.89533757877988,
+        "movingMassKg": 40.51753334085356,
         "continuousThrustWith20PercentReserveN": 2159.9999999999995,
-        "designDemandN": 611.1872810563316,
+        "designDemandN": 617.6000350075083,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       }
@@ -67,18 +67,18 @@
       "Z": 161
     },
     "movingMassKg": {
-      "X": 127.43349526771446,
-      "Y": 13.177041884720607,
-      "Z": 39.89533757877988
+      "X": 129.54975534274087,
+      "Y": 13.488139765757445,
+      "Z": 40.51753334085356
     },
-    "machineMassKg": 343.67417547447616,
+    "machineMassKg": 343.7605132938386,
     "members": 96
   },
   "validation": {
-    "mechanicalAssertions": 775,
+    "mechanicalAssertions": 801,
     "partAssertions": 1000,
     "partGeometryAssertions": 60,
-    "loadingChecks": 1532,
+    "loadingChecks": 1584,
     "loadingRange": "OD25/140 mm, face20 mm, X retract250 mm, reserved top cylinder radius80 mm",
     "nominalInstallation": {
       "assertions": 5888,
@@ -137,18 +137,20 @@
       {
         "reference": false,
         "completed": 85,
-        "checked": 18657,
+        "checked": 19446,
         "unexpected": 0,
         "thresholdMm3": 0.001,
-        "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
+        "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof",
+        "seconds": 664.1736860275269
       },
       {
         "reference": true,
         "completed": 85,
-        "checked": 18633,
+        "checked": 19431,
         "unexpected": 0,
         "thresholdMm3": 0.001,
-        "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
+        "scope": "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof",
+        "seconds": 692.6405091285706
       }
     ],
     "appCoarseCut": {
@@ -161,23 +163,43 @@
       "stockBytes": 969168,
       "bufferedSamples": 619,
       "gashWindows": 982
+    },
+    "supplierGuideChecks": {
+      "profiles": [
+        "HGR15R/HGH15CA",
+        "HGR25R/HGH25CA"
+      ],
+      "carriages": 12,
+      "passed": true,
+      "profileSymmetricDifferenceLimitMm3": 0.02,
+      "railBlockOverlapLimitMm3": 0.001,
+      "scope": "pinned CAD fit, four cut lengths per series, mounting bores, recipe reconstruction, source revision rejection; uniform steel mass and load/preload ratings remain assumed"
     }
   },
   "provenance": {
-    "baseCommit": "f1f9935c7741ae0ab5c4553845d7cfc0fa6f4a28",
+    "baseCommit": "50608cd46368a9d9b144532f9b3fd2c9917f613f",
     "geometryAndChecksSourceSha256": {
-      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "d1642cf6d26a6aed2fc1a3214877c408425fad4e9f1f52f74f1edff73d7bc6e0",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "d65d069e01bfbebc463dfc98753e7211f52351141582fea3bf44b7605c53ed31",
       "machinekit/examples/flexspline-hobber/FlexsplineHobberLayoutReport.hx": "6db47141cb898bba755073c037fcded6478e24379f515efa80a8d52e99a0a44a",
-      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "591d338556cf600563e6d2329ba1aca476a95a102142a46b7ab3f3b76a9a567d",
-      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "cdf49e12cc2f99fa1f4f0a5c672b022ba5e6afe866fe0ecd673eb95a0b4d1735",
+      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "281095b5f91c02227529f9efea07faaec17b39b80af290401c47774e46f3b299",
+      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "0a830026a82d6674c56b542bee778984ea6848c12bd39bb5d3dc1de9c9d54d6d",
       "machinekit/haxe/src/machinekit/hobbing/SwivelHead.hx": "a40f69c47bdc11f07b53ac6a22680e83bc06c5d507289d7522ce7c419634e4b7",
       "machinekit/haxe/src/machinekit/hobbing/SwivelHousing.hx": "f8d5f214aaa9bff19158018b4ef93b790165c8cfc8d9ee473005f8d8a56e0b71",
       "machinekit/haxe/src/machinekit/motion/CrossedRollerBearing.hx": "2cd6f3e7817ff3b046097ec543849296539ea34bc779de417f31969c22af4a46",
       "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "444a04b6262d529534e47d556c03d2e681d69de88c9f996ed74d3f1bcc1ed08a",
-      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "4d2d569116f4c92fe4e7c3868d1d81a791915b381a4faa695fb62ec68e78a7df",
+      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "a0b83dd38b7378f5bb630c5e68c7862ae412d180c8945fab57a0294ff1ee4d3f",
       "machinekit/tests/hobber/src/HobberGEFrameChecks.hx": "235210d127330f61e6fdd6c70b199c4fb219c5e44100250bc2737a7ec958218b",
       "machinekit/tests/hobber/src/HobberGERangeChecks.hx": "20bd7b6df87cf7f7147c7e89684cebcf4b21a8b2b50c95724111ee92ca2030d6",
-      "machinekit/tests/hobbing/src/HobberPartTests.hx": "b60769546559cdfdbefb56ea53cf3a0a135bb9db2e96f46ee73fd5aeb956e54e"
+      "machinekit/tests/hobbing/src/HobberPartTests.hx": "b60769546559cdfdbefb56ea53cf3a0a135bb9db2e96f46ee73fd5aeb956e54e",
+      "machinekit/haxe/src/machinekit/motion/SupplierRailAssets.hx": "9592728d2f99dec5f54173fff6105467b4f1e2400523756abfe3d5df0f72d822",
+      "machinekit/haxe/src/machinekit/motion/SupplierRailBlock.hx": "fb66ad37ad065078be392d1ce31b6a32d6050ca884d1eb689dd7c5a102a0ee90",
+      "machinekit/haxe/src/machinekit/motion/HiwinHgr25Rail.hx": "b1a5b3fb8806995ef975084d9f1500da2400fca072229ec98424d034dd73f1c1",
+      "machinekit/haxe/src/machinekit/motion/HiwinHgh15ca.hx": "dd0254518e2452a631b88d1ca996a7a030b38f19590a6534a67f35c305499c7a",
+      "machinekit/haxe/src/machinekit/motion/LinearRail.hx": "48cc1358bba6d78eabc5ac9a93e422ee5cd362222eac59e2f8153973d4de34df",
+      "machinekit/haxe/src/machinekit/motion/LinearRailBlock.hx": "47c3fea6d7a8372b88bd7cd29f49cfd57814fa5254a283a91ef2ffd0fe203319",
+      "machinekit/haxe/src/machinekit/motion/MotionComponents.hx": "dc068a7de9fc7d95ce7d9bdf3df3c9d31e52b2df57c1052cc58cee6cc8611c19",
+      "machinekit/examples/linear-rail-reference/RailReferenceChecks.hx": "9cfea4c0d0a76d17a4580fb514d6455d31ebf1b418ef89cb65e76d0ceb829dd5",
+      "machinekit/examples/linear-rail-reference/prepare.py": "c10dd9d59feb2c8e4871dce5070e88d84e2505fd02a1314e4200ff4637ead7e3"
     },
     "nativeProviders": "Existing providers reused read-only; frozen HB4/HB11 workers not rebuilt or signalled."
   },
@@ -189,5 +211,18 @@
     "Hob axial retention hardware and manufacturing fits remain open as recorded by installation checks.",
     "Moving bellows and complete enclosure/coolant containment remain provisions.",
     "Full-reference HB12 cycle and grade are not established by the coarse app cut."
-  ]
+  ],
+  "centralXDrive": {
+    "screwCentreHeightMm": 180,
+    "tangentialOffsetMm": 0,
+    "channelWidthMm": 110,
+    "channelZmm": [
+      130,
+      220
+    ],
+    "motor": "rear; screw axis points towards table",
+    "support": "steel deck on separate cast-in steel channel-floor insert, ground after casting",
+    "chipGuardToInsertClearanceMm": 2.5,
+    "cover": "open design provision"
+  }
 }

@@ -1,4 +1,4 @@
-# HGR15R / HGH15CA supplier reference
+# HGR15R / HGH15CA and HGR25R / HGH25CA supplier references
 
 For the expanded HG, BK/BF/FK/FF, SFU and DSG recipes, see [motion families](FAMILIES.md).
 
@@ -69,7 +69,7 @@ is centred at Z=0 in its STEP and is shifted +75 mm for our start-at-zero frame.
 The generated HGR15 preview uses an analytic line/arc section measured from the
 pinned HGR15R model, with 4.5 mm through holes and 7.5 mm counterbores, 5.3 mm deep.
 It needs no STEP file at runtime. Envelope detail remains a conservative box;
-other profile sizes retain their nominal geometry until separately verified.
+the explicit `HiwinHgr25Rail` component extrudes an undrilled section of the pinned HGR25R model and adds its cut-length drilling pattern. Other profiles retain nominal geometry.
 
 The checks compare generated CAD against the supplier rail using matching holes,
 then check carriage clearance at three travel positions on each of 150, 237, 440
@@ -115,3 +115,26 @@ The hybrid export checks added fitting material and all three retaining kits
 against the other installed parts at 27 combinations of XYZ stops/midpoints.
 This sampled check supplements the geometry tests; it does not replace a complete
 continuous swept-volume audit of the detailed mill.
+
+## Portable supplier components
+
+`SupplierRailBlock("HGR15")` and `SupplierRailBlock("HGR25")` select full HGH15CA
+and HGH25CA supplier exteriors. `HiwinHgh15ca` remains a convenience constructor.
+`HiwinHgr25Rail(length)` selects the matching supplier-derived 25-series rail.
+Both recipes persist the profile/length, material and pinned source SHA-256;
+CAD paths are resolved locally rather than saved in assemblies. Registration is
+lazy and needs no assets. Geometry generation requires `prepare.py` first, or
+`MACHINEKIT_SUPPLIER_CAD` pointing at the four verified `.step` files. There are
+no downloads or nominal-geometry fallbacks during reconstruction.
+
+The additional pinned references, retrieved 2026-10-19, are:
+
+- [HGH25CA.STP](https://www.matis.sk/data/CAD_modely/05_Kolejnicova_vedeni/HG/HGH25CA.STP),
+  SHA-256 `d1928e51da8a04694e98678ece89710cef6fa22dad3a6ddac47e54261fa491c6`.
+- [HGR25R.STP](https://www.matis.sk/data/CAD_modely/05_Kolejnicova_vedeni/HG/HGR25R.STP),
+  SHA-256 `a5c25503c681841fbbee95b24a1ebcd890afcf2001b074ee4a5b817e1fc07909`.
+
+Checks include supplier-profile equivalence, four 25-series cut lengths, carriage
+travel clearance, mounting bores, revision rejection and recipe reconstruction.
+Supplier CAD has simplified internals: uniform steel-density mass and catalogue
+load/preload assumptions remain engineering estimates.

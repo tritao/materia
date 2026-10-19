@@ -35,7 +35,7 @@ class HobberSaddle extends MachineComponent {
     return switch values().token("design") {
       case "GE-X-carriage": Solids.union([
         box(240,386,-185,185,260,280),box(60,386,-185,-140,260,280),box(60,386,140,185,260,280),
-        Solids.cut(box(277.5,297.5,255,335,215,280),[boreX(8.2,277.4,297.6,310,240)]),box(277.5,297.5,165,255,260,280)]);
+        Solids.cut(box(202.5,222.5,-35,35,155,280),[boreX(8.2,202.4,222.6,0,180)]),box(202.5,260,-35,35,260,280)]);
       case "GE-Z-saddle": Solids.union([
         box(135,148,-175,175,-65,170),box(135,148,-190,-175,140,232),
         Solids.cut(box(111,148,-270,-175,214.5,232),[Part.cylinderSpan(8.2,214.4,232.1,136,-250)])]);
@@ -50,8 +50,8 @@ class HobberSaddle extends MachineComponent {
         box(35,45,-160,130,115,190),box(35,100,-115,-95,95,115),
         box(35,115,100,130,185,190),
         Solids.cut(box(35,115,125,130,110,190),[boreY(7.1,124.9,130.1,70,145)])]);
-      case "GE-X-drive": Solids.union([box(125,620,210,295,210,215),box(125,620,290,295,215,250),
-        Solids.cut(box(120,125,205,295,215,285),[boreX(7.1,119.9,125.1,250,240)])]);
+      case "GE-X-drive": Solids.union([box(140,630,-45,45,140,155),box(140,620,40,45,155,190),
+        Solids.cut(box(625,630,-45,45,150,220),[boreX(7.1,624.9,630.1,0,180)])]);
       case "GE-Z-drive": Solids.union([box(165,255,-230,-210,295,862),box(55,145,-280,-275,420,862),
         Solids.cut(box(55,220,-295,-210,415,420),[Part.cylinderSpan(9.6,414.9,420.1,100,-250)]),
         box(55,220,-275,-210,857,862),box(35,95,-300,-290,420,862)]);

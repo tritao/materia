@@ -22,6 +22,7 @@ class FoundationLayout {
       if(kind=="bed"){
         cores.push(CastingFeatures.box("work-well",410,300,100,-295,0,120));
         cores.push(CastingFeatures.box("chip-drain",280,180,80,-300,0,40));
+        cores.push(CastingFeatures.box("X-drive-channel",625,110,90,187.5,0,130));
       }else cores.push(CastingFeatures.box("head-recess",240,100,502,0,60,-1));
     }
     return new ComponentValues().setNumber("width",d[0]).setNumber("depth",d[1]).setNumber("height",d[2])
@@ -39,7 +40,7 @@ class FoundationLayout {
         add("tablePlate","table seat",180,180,20,-250,0,110);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"preloaded column guide seat",width:50,depth:680,height:20,
           pose:F.fromRotationMatrix(110,side*165,200,[0.0,1,0,-1,0,0,0,0,1])});
-        out.push({id:"driveSeat",role:"X screw and scale seat",width:90,depth:680,height:20,pose:F.fromRotationMatrix(150,310,190,[0.0,1,0,-1,0,0,0,0,1])});
+        out.push({id:"driveSeat",role:"central X screw channel seat",width:100,depth:600,height:20,pose:F.fromRotationMatrix(192.5,0,120,[0.0,1,0,-1,0,0,0,0,1])});
         for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,-400,side*310,180);
       }else{
         add("basePlate","column carriage sole",380,100,20,0,-40,-10);

@@ -29,6 +29,20 @@ vertical separation. The spindle and floating outboard bracket share the vertica
 Y saddle. An open C bracket supports the rear spindle housing; there is no
 overhead roof. These compact motor and bearing dimensions and ratings require
 supplier confirmation; geometry checks do not establish a thermal duty rating.
+All twelve carriages use pinned HGH25CA (X) or HGH15CA (Z/Y) supplier CAD,
+including wraparound sides and lubrication fittings. X uses matching supplier-derived
+HGR25R rails; Z/Y retain the verified analytical HGR15R running profile. These
+portable recipes require explicit local supplier-asset preparation. The source
+CAD does not qualify load ratings or mixed-material carriage mass.
+
+The X screw runs centrally between the bed rails, at Z=180 mm, in a 110 mm wide
+recessed casting channel. Its nut carrier drops from the carriage into the channel;
+a steel deck mounts to a separate ground-after-casting steel insert. The fixed
+support and motor sit at the rear; the screw axis points towards the table.
+The screw transmission sign follows that reversed axis. The insert starts beyond
+the chip guard, with 2.5 mm nominal radial clearance. A channel cover/bellows remains
+a design provision; the exposed mechanism is an inspection model.
+
 Ground screws and linear scales serve
 all three translations; screw manufacturing grades and preload need procurement
 confirmation.
@@ -38,15 +52,15 @@ confirmation.
 | X guide-plane to hob centre | 347 mm | 121 mm |
 | Z guide-plane to hob centre | 325 mm | 161 mm |
 | Y guide-plane to hob centre | 137 mm | 70 mm |
-| X moving mass | 81.71 kg | 127.43 kg |
-| Z moving mass | 106.79 kg | 39.90 kg |
-| Y moving mass | 18.01 kg | 13.18 kg |
-| Machine mass | 351.61 kg | 343.67 kg |
+| X moving mass | 81.71 kg | 129.55 kg |
+| Z moving mass | 106.79 kg | 40.52 kg |
+| Y moving mass | 18.01 kg | 13.49 kg |
+| Machine mass | 351.61 kg | 343.76 kg |
 | Bed footprint (radial × tangential) | 650 × 750 mm | 1000 × 650 mm |
-| Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1630 × 682 mm |
-| X continuous thrust margin, same assumed demand basis | 911.15 N | 888.28 N |
-| Y continuous thrust margin, same assumed demand basis | 897.29 N | 911.97 N |
-| Z continuous thrust margin, same assumed demand basis | 859.36 N | 1548.81 N |
+| Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1640 × 650 mm |
+| X continuous thrust margin, same assumed demand basis | 911.15 N | 887.23 N |
+| Y continuous thrust margin, same assumed demand basis | 897.29 N | 911.02 N |
+| Z continuous thrust margin, same assumed demand basis | 859.36 N | 1542.40 N |
 
 The initial moving-column revision had a 125 mm Z guide offset but retained the
 old underhung head. The front-mounted head needs 36 mm more radial space: its

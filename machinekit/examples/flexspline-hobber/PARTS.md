@@ -161,3 +161,13 @@ physical contacts, connected solids and recipe/pose round trips are checked.
 See [MACHINE_DESIGN.md](MACHINE_DESIGN.md) for datums, load paths and qualification scope.
 The generic `HobberBracket` recipe is retained for saved descriptions, but is no
 longer used to assemble the machine.
+
+### Centred X transmission and supplier guide exteriors
+
+X uses a central recessed screw deck and nut carrier, rear motor/fixed bearing,
+and a separate cast-in channel-floor insert. The bed channel is a shared casting
+void, not a machined mineral-cast surface. All twelve carriage blocks select pinned
+HGH25CA (X) / HGH15CA (Y/Z) supplier exteriors. X rails use the matching HGR25R
+section; Y/Z use the verified HGR15R generator. The supplier recipes persist source
+hashes and share the existing rail/top/mount connectors. Assets are prepared by
+`linear-rail-reference/prepare.py`; CAD-derived homogeneous-steel mass is assumed.

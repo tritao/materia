@@ -20,6 +20,10 @@ class HobberDesignChecks {
       var face=F.compose(canonical,F.compose(poses.get("swivel/bearing"),F.translation(0,0,machine.swivel.bearing.parameterNumber("height"))));
       var mount=F.compose(canonical,poses.get("swivel/housing"));
       count++;if(Math.abs(face.x-centre.x-114)>1e-8||Math.abs(mount.x-centre.x-135)>1e-8||face.x>=mount.x)throw "swivel bearing must be in front of the Z saddle";
+      var screw=F.compose(canonical,poses.get("Xscrew"));
+      count++;if(Math.abs(screw.y)>1e-8||Math.abs(screw.z-180)>1e-8)throw "X screw must lie centrally in recessed bed channel";
+      var motor=F.compose(canonical,poses.get("Xmotor"));
+      count++;if(motor.x<screw.x)throw "X motor must be at rear end of central drive";
       for(m in members)if(Std.isOfType(m.component,HobberSaddle)){
         count++;if(["A-yoke","Y-saddle","X-bridge","Z-saddle"].indexOf(m.component.values().token("design"))>=0)throw "retired overhead saddle installed";
       }
@@ -36,6 +40,8 @@ class HobberDesignChecks {
         var axis=m.id.substr(5,1),railId="rail"+axis+(m.id.indexOf("Left")>=0?"Left":"Right");
         var rail:machinekit.motion.LinearRail=cast members.filter(p->p.id==railId)[0].component;
         var block:machinekit.motion.LinearRailBlock=cast m.component;
+        count++;if(!Std.isOfType(block,machinekit.motion.SupplierRailBlock))throw "hobber must use full supplier carriage geometry";
+        count++;if(axis=="X"&&!Std.isOfType(rail,machinekit.motion.HiwinHgr25Rail))throw "X must use matching supplier rail profile";
         var relative=F.compose(F.inverse(poses.get(railId)),poses.get(m.id)),travel=machine.travel.filter(t->t.id==axis)[0];
         count++;if(Math.abs(relative.x)+Math.abs(relative.y)>1e-7)throw 'block off guide datum ${m.id}';
         var lo=relative.z+travel.lower-travel.initial-block.spec.blockLength/2-rail.spec.railEndMargin;

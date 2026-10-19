@@ -2104,3 +2104,35 @@ Full travel-grid acceptance and the remaining layout gates above stay open.
   Y-offset parts; it is not a manufacturing drawing. Compact swivel procurement,
   manufactured fits/retention, modal stiffness and physical accuracy remain open.
   Frozen HB11/HB4 cuts/providers were left untouched.
+
+### Centred X drive and supplier guide geometry (2026-10-19)
+
+At the user's request the X screw and nut load path now lie between the bed
+rails, in a recessed 110 mm casting channel, with the motor and fixed support
+at the rear. A separate cast-in steel floor insert carries the screw deck; the
+moving nut carrier drops centrally from the column carriage. The chip guard
+and insert have 2.5 mm radial clearance. The screw axis and coupling sense were
+reversed together; work-frame cutting kinematics remain unchanged. Channel
+covers/bellows remain a design provision.
+
+The hobber had selected nominal carriage envelopes despite the detailed HGR15
+rail generator on main. All twelve blocks now select pinned HGH15CA/HGH25CA
+supplier CAD; X rails select a matching HGR25R supplier-derived section. Shared
+motion recipes persist source revisions and reconstruct from explicitly prepared
+local assets, with no runtime network access or nominal fallback. Supplier fit,
+bores, four cut lengths per series, revision rejection and recipe reconstruction
+checks pass. CAD exteriors do not qualify preload, ratings or mixed-material mass.
+
+Updated validation and calculated masses/thrust margins are recorded in
+MACHINE_DESIGN.md and LAYOUT_REPORT.json. Frozen HB4/HB11 providers and workers
+are unchanged. The app coarse cut retains its 6.003 s cycle, 982 windows and
+zero cutter/fixture collisions; this does not close full-reference HB12 acceptance.
+
+Acceptance: 801 mechanical/persistence assertions, 1000 parts assertions, 60
+parts-geometry assertions, 1584 range/loading checks and 5888 installation checks
+pass. Both 85-pose exact-solid grids pass at 0.001 mm³, including A ±15°, with
+no unintended intersections. Work-frame regression remains within 1e-8 mm/rad
+for poses, 1e-8 mm for cut boundaries and 1e-6 N for loads. The supplier-reference
+checks and the new-layout app coarse cut pass. Updated X/Y/Z moving masses are
+129.55/13.49/40.52 kg; calculated machine mass is 343.76 kg, with the stated
+uniform-density supplier-CAD assumption.

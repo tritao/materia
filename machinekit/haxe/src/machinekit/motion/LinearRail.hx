@@ -21,6 +21,7 @@ import materia.assembly.AssemblyFrames;
  * and bores; other profiles remain nominal. Mounting holes expose named connectors. CAD frame: the
  * rail cross-section is centred on x=0, spans y=-railHeight..0, and runs along +Z. */
 @:allow(machinekit.motion.HgRail)
+@:allow(machinekit.motion.HiwinHgr25Rail)
 class LinearRail extends MachineComponent {
 	public final spec:LinearRailProfileSpec;
 	public final length:Float;
@@ -32,7 +33,7 @@ class LinearRail extends MachineComponent {
 	public static function custom(spec:LinearRailProfileSpec, length:Float):LinearRail
 		return new LinearRail(spec, length, true);
 
-	private function new(spec:LinearRailProfileSpec, length:Float, codeOnly:Bool = false) {
+	private function new(spec:LinearRailProfileSpec, length:Float, codeOnly:Bool = false, referenceSuffix:String = "") {
 		if (!(length > 2 * spec.railEndMargin)) throw 'Linear rail length must exceed twice the end margin';
 		if (!(spec.railWidth > 0) || !(spec.railHeight > 0) || !(spec.railHolePitch > 0) || !(spec.railEndMargin > 0))
 			throw 'Linear rail profile "${spec.designation}" has invalid rail dimensions';
@@ -40,7 +41,7 @@ class LinearRail extends MachineComponent {
 		var designation = '${spec.family}-${spec.designation}-RAIL-L$lengthText';
 		var customName = '${spec.family}-${spec.designation}-RW${Dimension.format(spec.railWidth)}-RH${Dimension.format(spec.railHeight)}' +
 			'-HP${Dimension.format(spec.railHolePitch)}-EM${Dimension.format(spec.railEndMargin)}-L$lengthText';
-		super(codeOnly ? customDesignation(customName) : designation,
+		super(referenceSuffix!="" ? designation+referenceSuffix : codeOnly ? customDesignation(customName) : designation,
 			'${spec.family} ${spec.designation} profile rail, $lengthText mm long', "steel", codeOnly);
 		this.spec = spec;
 		this.length = length;

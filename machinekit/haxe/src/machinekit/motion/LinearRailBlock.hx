@@ -21,6 +21,7 @@ import materia.assembly.AssemblyFrames;
  * frame: the block is centred on z=0, with its rail-facing side at y=0. */
 @:allow(machinekit.motion.HiwinHgh15ca)
 @:allow(machinekit.motion.HgBlock)
+@:allow(machinekit.motion.SupplierRailBlock)
 class LinearRailBlock extends MachineComponent {
 	public final spec:LinearRailProfileSpec;
 
@@ -42,7 +43,7 @@ class LinearRailBlock extends MachineComponent {
 		var customName = '${spec.family}-${spec.designation}-BW${Dimension.format(spec.blockWidth)}-BH${Dimension.format(spec.blockHeight)}' +
 			'-BL${Dimension.format(spec.blockLength)}-B${Dimension.format(spec.blockHolePitchB)}' +
 			'-C${Dimension.format(spec.blockHolePitchC)}-M${spec.blockMountScrew}';
-		super(codeOnly ? customDesignation(customName+referenceSuffix) : designation,
+		super(referenceSuffix!="" ? designation+referenceSuffix : codeOnly ? customDesignation(customName) : designation,
 			'${spec.family} ${spec.designation} carriage block', "steel", codeOnly);
 		this.spec = spec;
 		addConnector("rail", Axis, Solids.axial(0, 0, 0));

@@ -26,6 +26,46 @@ class RailReferenceChecks {
    var parent=haxe.io.Path.directory(root);if(parent==root || parent=="")throw "Repository not found";root=parent;
   }
   var output=root+"/machinekit/examples/linear-rail-reference/build/",cache=output+"supplier/";
+  // Both supplier series share portable recipes, but retain revision-specific cache identities.
+  var assetFolder=Sys.getEnv("MACHINEKIT_SUPPLIER_CAD");
+  Sys.putEnv("MACHINEKIT_SUPPLIER_CAD",output+"deliberately-unavailable");
+  var registry=machinekit.component.MachineKitComponents.standard();
+  check(registry.byId("machinekit.motion.supplier-hgh-block").create()!=null,"Registry and default recipes need no supplier files");
+  check(registry.byId("machinekit.motion.supplier-hgr25-rail").create()!=null,"Rail recipe registration needs no supplier files");
+  Sys.putEnv("MACHINEKIT_SUPPLIER_CAD",assetFolder==null?cache:assetFolder);
+  for(profile in ["HGR15","HGR25"]) {
+   var supplier=new machinekit.motion.SupplierRailBlock(profile);
+   var recreated=supplier.componentType().create(supplier.values());
+   var original=supplier.geometry(), restored=recreated.geometry();
+   near(original.volume(),restored.volume(),"Supplier carriage recipe geometry round-trip");
+   check(supplier.values().token("cadSha256").length==64,"Persisted supplier revision");
+   original.close();restored.close();supplier.close();
+  }
+  var badRevision=false;
+  try {new machinekit.motion.SupplierRailBlock("HGR25",null,"wrong revision");} catch(_:Dynamic) badRevision=true;
+  check(badRevision,"Saved carriage rejects unavailable revision");
+  var rail25=new machinekit.motion.HiwinHgr25Rail(150);
+  check(rail25.designation!=LinearRail.metric("HGR25",150).designation,"Supplier rail cache identity differs from nominal");
+  var raw25=new Part(Shape.importStep(cache+"HGR25R.step")), shifted25=raw25.translated(new Vector(0,0,75));raw25.close();
+  var matched25=machinekit.motion.HiwinHgr25Rail.profile(150,[15,75,135]);
+  var missing25=shifted25.subtract(matched25),extra25=matched25.subtract(shifted25);
+  check(missing25.volume()+extra25.volume()<0.02,"HGR25 supplier profile and bores reproduced");
+  missing25.close();extra25.close();shifted25.close();matched25.close();
+  var carriage25=new machinekit.motion.SupplierRailBlock("HGR25"), exterior25=carriage25.geometry();
+  for(length in [150.0,237.0,440.0,680.0]) {
+   var guide=new machinekit.motion.HiwinHgr25Rail(length),solid=guide.geometry();
+   for(z in [45.0,length/2,length-45]) {
+    var moved=exterior25.translated(new Vector(0,0,z)),common=solid.intersect(moved);
+    check(common.volume()<0.001,"HGR25 rail clears full supplier carriage across travel");common.close();moved.close();
+   }
+   solid.close();
+  }
+  for(c in carriage25.connectors()) if(StringTools.startsWith(c.name,"mount")) {
+   var tool=Part.cylinderSpan(2.5,11,19);
+   var bore=tool.placed(new Location(new Plane(new Vector(c.frame.x,0,c.frame.z),Vector.X(),Vector.Y())));tool.close();
+   var common=exterior25.intersect(bore);check(common.volume()<0.001,"HGH25 mounting connectors align with actual holes");common.close();bore.close();
+  }
+  exterior25.close();carriage25.close();
   var railPath=cache+"HGR15R.step";
   check(HiwinHgh15ca.fileDigest(railPath)=="2897086393c72de3ca2a1af658da9e471bfbe38e234605e89dbb8497283e4351","Pinned rail STEP");
   var rejected=false;
