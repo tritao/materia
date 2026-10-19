@@ -124,8 +124,8 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("outboardBearing",new FloatingRadialBearing(),F.fromRotationMatrix(centre,-95.5,363,e0),"outboard");
     mountContacts.push({parent:"outboard",child:"outboardBearing"});mountContacts.push({parent:"spindle/arbor",child:"outboardBearing"});
     var supply=new ThreePhaseRectifier(new AcMains(ThreePhase,new AcRmsVoltage(400),50),new DcCurrent(40),6,240,120,100,15000);
-    fixAt("electricalPanel",new HobberSaddle("electrical-panel"),F.translation(-650,100,0),"bed/liftLeft");
-    fixAt("powerSupply",supply,F.translation(-650,30,20),"electricalPanel");exposePort("mains","powerSupply","mains");
+    fixAt("electricalPanel",new HobberSaddle("electrical-panel"),HobberElectricalLayout.panelPose(),"bed/liftLeft");
+    fixAt("powerSupply",supply,HobberElectricalLayout.devicePose(0,130),"electricalPanel");exposePort("mains","powerSupply","mains");
     fixAt("XdriveFrame",new HobberSaddle("GE-X-drive"),F.translation(centre,0,0),"bed/driveSeat",F.alongY((HobberXLayout.front().motorFace+HobberXLayout.front().deckStart)/2,0,140,0,0,1));
     precisionMounts.push({name:"XdriveFrame-mount",parent:"bed/driveSeat"});
     fixAt("ZdriveFrame",new HobberSaddle("GE-Z-drive"),F.translation(centre,0,0),"column/driveSeat",F.alongY(centre+HobberZLayout.SEAT_FACE_X,0,540,-1,0,0));
@@ -197,7 +197,8 @@ class FlexsplineHobber extends MachineAssembly {
   }
   function bind(id:String,joint:String,motor:String,process:Bool=false):Void {
     driverNumber++;var driver=id+"-driver";
-    fixAt(driver,new MotorDriver("GENERIC-400V-SERVO-AMP",new PhaseRmsCurrent(id=="table-drive"?tableSpec.number("peakCurrent"):20)),F.translation(-790+((driverNumber-1)%3)*140,50,200+Std.int((driverNumber-1)/3)*250),"electricalPanel");
+    fixAt(driver,new MotorDriver("GENERIC-400V-SERVO-AMP",new PhaseRmsCurrent(id=="table-drive"?tableSpec.number("peakCurrent"):20)),
+      HobberElectricalLayout.devicePose(-140+((driverNumber-1)%3)*140,300+Std.int((driverNumber-1)/3)*250),"electricalPanel");
     connectPorts(id+"-power","powerSupply","power"+driverNumber,driver,"power");
     addMotor(id,joint,motor,driver,1,null,process?{speedChannel:"hob.speed",directionChannel:"hob.direction",radiansPerSpeedUnit:2*Math.PI/60}:null);
   }

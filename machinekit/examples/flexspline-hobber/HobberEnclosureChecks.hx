@@ -6,6 +6,7 @@ import cadkit.modeling.Vector;
 
 class HobberEnclosureChecks {
   public static function main():Void {
+    HobberElectricalChecks.run(new FlexsplineHobber());
     var fitted=HobberEnclosurePreview.assembled(),assembly=fitted.assembly,shell=fitted.shell;
     if(assembly.validate().length!=0)throw "Enclosed hobber assembly does not validate";
     var model=new cadkit.modeling.AssemblyModel("mm");assembly.addTo(model,"");var state=model.initialState();

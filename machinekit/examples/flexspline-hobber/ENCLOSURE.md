@@ -42,3 +42,16 @@ Acceptance checks 48 machine/door positions, exact near-pair intersections,
 the loading reservation, removable service openings, the round port cut and
 mass, collision aperture proxy and assembly save/reopen. It is sampled clearance
 evidence; the scene does not run a production cycle.
+
+## Electrical rack mounting
+
+The separate rack is floor-standing at machine Z0, using the machine/work-frame
+transform instead of placing its base at the elevated work origin. Its upright
+is joined to the base by two triangular steel webs. The six drives are arranged
+in two rows of three with 20 mm horizontal gaps; the supply is below them.
+Device local XY mounting faces lie on the vertical plate, with their depth
+projecting outwards. Geometry checks confirm floor support, seven flush mounts,
+plate coverage and no device/device or device/stand penetration. Supplier hole
+patterns, fasteners, cable routing and electrical guarding remain design work.
+The renewed enclosure acceptance passes 48 machine/door states and 624 exact
+near-pair checks. The exported scene was reopened and visually checked.

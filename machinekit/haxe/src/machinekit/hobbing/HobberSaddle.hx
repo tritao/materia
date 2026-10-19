@@ -2,6 +2,7 @@ package machinekit.hobbing;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import machinekit.assembly.PosedParts;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 import materia.assembly.AssemblyFrames as F;
@@ -87,7 +88,15 @@ class HobberSaddle extends MachineComponent {
         [Part.revolve([{r:lip+2,z:top},{r:skirt+2,z:shoulder},{r:skirt+2,z:bottom},{r:skirt,z:bottom},{r:skirt,z:shoulder},{r:lip,z:top-2}]),Solids.cut(Solids.union([box(-245,90,-170,170,135,139),box(-245,90,-174,-170,135,164),box(-245,90,170,174,135,164)]),[box(-skirt,skirt,-skirt,skirt,134,165)])];
       case "GE-coolant": [Solids.cut(box(33,45,30,50,60,84),[boreX(2,32.9,45.1,40,72)])];
       case "GE-enclosure": [box(-270,780,-360,-356,0,950),box(-270,780,356,360,0,950),box(776,780,-360,360,0,950)];
-      case "electrical-panel": [box(-210,210,-10,0,0,850),box(-230,230,-150,50,0,20)];
+      case "electrical-panel":
+        var parts=[box(-210,210,-10,0,0,850),box(-230,230,-150,50,0,20)];
+        // Two welded triangular webs tie the upright to its floor base.
+        for(x in [-190.0,190.0]) {
+          var web=Part.prism([new Vector(0,20),new Vector(-130,20),new Vector(0,200)],-3,3);
+          var placed=PosedParts.moved(web,F.fromRotationMatrix(x,0,0,[0,0,1, 1,0,0, 0,1,0]));
+          web.close();parts.push(placed);
+        }
+        parts;
       default: throw "unknown hobber saddle design";
     };
   }

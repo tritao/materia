@@ -340,3 +340,14 @@ The 7 MiB scene and layout/check JSON files are exported under the hobber's
 revision and derived layout. The report retains 52 unresolved qualification,
 sealing and plant-interface requirements. No protective/containment acceptance
 or unattended cutting cycle is claimed.
+
+### Electrical rack correction — 2026-10-19
+
+Corrected the rack's 637 mm elevated base and the horizontal device orientation.
+The base is now at machine-floor Z0, with two welded triangular support webs;
+one supply and six drives mount upright, flush to the backplate. Added focused
+floor/contact/coverage and device-overlap acceptance to the existing enclosure
+runner. Both rack checks and the renewed 48-state enclosure acceptance pass
+(624 exact near-pair checks). The transparent-window desktop was reopened with
+the updated scene and visually verified. The initial enclosure dimensions are
+unchanged because the external rack is excluded from shell sizing.
