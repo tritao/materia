@@ -152,5 +152,6 @@ class ToolingTests {
 		check(ToolingReview.inspect(reusable).filter(d -> d.ruleId == "tooling.process" && d.status == "pending").length == 1,
 			"evidence references alone never qualify process");
 		Sys.println('ToolingTests: $assertions assertions passed');
+		PanelTests.run();
 	}
 }

@@ -122,5 +122,6 @@ class FoundationToolingTests {
 		equivalent(new machinekit.hobbing.MineralCastBed(), "hobber-bed");
 		equivalent(new machinekit.hobbing.MineralCastColumn(), "hobber-column");
 		Sys.println('FoundationToolingTests: $assertions assertions passed');
+		PanelNativeTests.run();
 	}
 }

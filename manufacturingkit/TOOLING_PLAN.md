@@ -1,6 +1,6 @@
 # Reusable panel tooling and mineral-casting molds
 
-Status: phase 1 implemented. Panel generation and physical qualification remain pending.
+Status: phases 1 and 2 implemented. Mold generation and physical qualification remain pending.
 
 ## Implementation progress
 
@@ -10,11 +10,20 @@ Status: phase 1 implemented. Panel generation and physical qualification remain 
   cover box/chamfered/flared envelopes, rotated inserts and existing hobber layouts.
   The initial contract supports mm inputs, convex additive prisms and box cuts;
   unsupported units must be converted before entering the contract.
-- [ ] Phase 2: panel geometry, joints and fit coupon.
-  In progress: phase 1 closed vocabularies converted to enum abstracts; tooling
-  codec version 2 rejects version 1. Original insert role labels remain source
-  descriptions alongside the typed role. The uncommitted panel prototype is being
-  reconciled to exact line/arc operations, CadKit drawings and swept blocking.
+- [x] Phase 2: exact panel geometry, joint pairs, generic preview and fit coupon.
+  Phase 1 closed vocabularies are enum abstracts; tooling codec version 2 rejects
+  version 1. Original insert role labels remain source descriptions alongside the
+  typed role. Each panel operation owns one exact line/arc contour and explicit
+  operation kind, side, setup, depth and tool diameter. CAD and CadKit SVG/DXF
+  drawings consume `PanelContours.operation`; ManufacturingKit emits no drawings.
+  Rebuildable panel/pin recipes are registered. Straight swept volumes, including
+  cylindrical face subdivisions at tangent generators, supply the blocking graph
+  and its assembly/removal orders. Tests cover clear endpoints with an obstructed
+  path, cyclic blocking, reversed keyed panels and open-bore clearance.
+  `machinekit/examples/panel-tooling/` generates assembled/exploded scenes,
+  STEP/SVG/DXF/recipe records and a numbered fit coupon. Reports explicitly cover
+  the panels after loose closure hardware is removed. Physical fit and loads
+  remain unqualified.
 - [ ] Phase 3: single-pocket box mold, end to end.
 - [ ] Phase 4: mill base mold review assembly.
 - [ ] Phase 5: assembly validation and fabrication package.
@@ -122,6 +131,8 @@ Proposed source locations:
 - `machinekit/examples/bench-mill/MillMoldPreview.hx`: generation entry point.
 - `manufacturingkit/tests/tooling/` and `machinekit/tests/tooling/`: focused tests.
 - `machinekit/examples/casting-tooling/`: independent pedestal reuse example.
+- `machinekit/examples/panel-tooling/`: implemented phase 2 generic joinery preview
+  and fit coupon, independent of casting and mill layouts.
 
 ManufacturingKit must not import MachineKit, CadKit, milling types or OCC handles.
 Use ProjectKit rigid frames and unit conversion where suitable. MachineKit adapts
@@ -566,6 +577,14 @@ suite in phase 5. Existing regression commands are:
 ./haxeon/scripts/haxeon run --project=manufacturingkit/tests/haxeon.json
 ./haxeon/scripts/haxeon run --project=machinekit/tests/casting/haxeon.json
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.frame-tests.json
+```
+
+Phase 2 also adds a generic preview and a focused regression for CadKit's existing
+drawing writers and their named process layers:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/panel-tooling/haxeon.json
+./haxeon/scripts/haxeon run --project=cadkit/haxe/tests/haxeon-drawing.json
 ```
 
 Run the existing bench-mill configurations sequentially because some share build

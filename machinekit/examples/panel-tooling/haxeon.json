@@ -1,0 +1,9 @@
+{
+    "version": 1,
+    "package": {"name": "machinekit-panel-tooling-example"},
+    "entry": "PanelToolingPreview",
+    "sourceRoots": ["."],
+    "dependencies": {"machinekit": {"path": "../.."}},
+    "target": "host",
+    "outputDir": "build/runner"
+}

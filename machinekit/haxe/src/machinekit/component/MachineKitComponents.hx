@@ -20,6 +20,8 @@ class MachineKitComponents {
 		registry.register(machinekit.structural.RectTubeMember.recipeType());
 		registry.register(machinekit.structural.MineralCasting.recipeType());
 		registry.register(machinekit.structural.CastInsert.recipeType());
+		registry.register(machinekit.tooling.ToolingPanel.recipeType());
+		registry.register(machinekit.tooling.ToolingPin.recipeType());
 		return registry;
 	}
 
