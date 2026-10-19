@@ -16,6 +16,7 @@ import haxeon.ui.core.WidgetId;
 import sys.io.File;
 import sys.FileSystem;
 
+@:access(haxeon.ui.core.UiContext)
 class SceneVisibilityTests {
   static var assertions=0;
   static function check(value:Bool,message:String):Void {assertions++;if(!value)throw message;}
@@ -138,6 +139,7 @@ class SceneVisibilityTests {
     generatedScene.dispose();
     generatedRoundtrip();
     uiControls();
+    scrollbarControls();
     var count=0;
     var key=new UiEvent(UiEventKind.KeyDown,new WidgetId(1),0,0,0,0,0,UiKey.Space);
     HierarchyTreeView.handleKey(key,()->count++);
@@ -153,6 +155,60 @@ class SceneVisibilityTests {
     if(predicate(root))return root;
     for(child in root.children){var found=findNode(child,predicate);if(found!=null)return found;}
     return null;
+  }
+  static function scrollbarControls():Void {
+    var fonts=haxeon.ui.FontCollection.create(),font="haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf";
+    if(!FileSystem.exists(font))font="../../"+font;fonts.add(font);
+    var records:Array<SceneObjectData> = [for(i in 0...40)
+      {id:"row-"+i,label:"Object "+i+" with a long scene label",type:"rectangle",x:0.0,y:0.0,z:0.0,
+        width:1.0,height:1.0,depth:1.0,collisionEnabled:false,dynamicBody:false,mass:1.0,
+        red:0.5,green:0.5,blue:0.5,visible:true}];
+    var scene=new EditorScene(records),model=new EditorSceneTree(scene),ui=new haxeon.ui.core.UiContext(null,fonts);
+    ui.buildContext.environment.scrollbarVisibility=haxeon.ui.widgets.scroll.ScrollbarVisibility.Always;
+    var controller=model.scrollController;
+    var style=new haxeon.ui.LayoutStyle();style.width=haxeon.ui.LayoutAxis.grow();style.height=haxeon.ui.LayoutAxis.grow();
+    var tree=new haxeon.ui.widgets.collections.TreeView("scrollbar-eyes",model,style,controller,180,null,["scene"],key->model.selectKey(key));
+    try {
+      for(width in [180,260,400]) {
+        var frame=new haxeon.ui.LayoutFrame(width,180);frame.deltaSeconds=0.25;
+        var root=ui.submit(tree,frame);
+        ui.scroll(width/2,80,0,28);root=ui.submit(tree,frame);
+        var thumb=findNode(root,node->node.semantics!=null && node.semantics.label=="Vertical scroll position");
+        if(thumb==null || thumb.parent==null)throw "Missing hierarchy scrollbar";
+        var track=thumb.parent,trackBounds=track.globalBounds();
+        var eye=findNode(root,node->{
+          var semantics=node.semantics;if(semantics==null || semantics.label==null || !StringTools.startsWith(semantics.label,"Hide Object "))return false;
+          var bounds=node.globalBounds();return bounds.y>5 && bounds.y+bounds.height<175;
+        });
+        if(eye==null)throw "Missing visible hierarchy eye";
+        var bounds=eye.globalBounds();
+        check(track.layout.style.zIndex>0,"scrollbar overlay paints above ordinary tree rows");
+        var scrollbarPath=haxeon.ui.core.HitTest.path(root,trackBounds.x+trackBounds.width/2,bounds.y+bounds.height/2);
+        check(scrollbarPath.indexOf(track)>=0,"scrollbar owns pointer input in its overlay strip");
+        check(bounds.x+bounds.width<=trackBounds.x,"visibility eye does not extend beneath the scrollbar");
+        var eyePath=haxeon.ui.core.HitTest.path(root,bounds.x+bounds.width/2,bounds.y+bounds.height/2);
+        check(eyePath[eyePath.length-1]==eye,"eye centre remains independently clickable beside scrollbar");
+        var history=scene.document.history.undoCount;
+        ui.pointerDown(bounds.x+bounds.width/2,bounds.y+bounds.height/2,0);
+        ui.pointerUp(bounds.x+bounds.width/2,bounds.y+bounds.height/2,0);
+        check(scene.document.history.undoCount==history+1,"eye click toggles visibility rather than scrolling");
+        scene.document.undo();
+        // Dismiss the eye's tooltip before starting a separate scrollbar gesture.
+        ui.pointerMove(-20,-20);root=ui.submit(tree,frame);
+        thumb=findNode(root,node->node.semantics!=null && node.semantics.label=="Vertical scroll position");
+        if(thumb==null)throw "Missing rebuilt hierarchy scrollbar";
+        var before=controller.offsetY,thumbBounds=thumb.globalBounds();
+        var x=thumbBounds.x+thumbBounds.width/2,y=thumbBounds.y+thumbBounds.height/2;
+        history=scene.document.history.undoCount;
+        ui.pointerMove(x,y);root=ui.submit(tree,frame);
+        var hitPath=haxeon.ui.core.HitTest.path(root,x,y);
+        check(hitPath[hitPath.length-1].id.equals(thumb.id),"scrollbar thumb receives its own drag press");
+        ui.pointerDown(x,y,0);ui.pointerMove(x,y+25);ui.pointerUp(x,y+25,0);
+        check(controller.offsetY>before,"scrollbar drag moves the hierarchy");
+        check(scene.document.history.undoCount==history,"scrollbar drag does not toggle visibility");
+      }
+      ui.dispose();scene.dispose();fonts.dispose();
+    }catch(error:Dynamic){ui.dispose();scene.dispose();fonts.dispose();throw error;}
   }
   static function uiControls():Void {
     var fonts=haxeon.ui.FontCollection.create(), font:Null<String> = null;

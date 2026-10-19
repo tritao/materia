@@ -1,6 +1,7 @@
 package app.editor;
 
 import haxeon.ui.LayoutStyle;
+import haxeon.ui.Insets;
 import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutAlignmentY;
 import haxeon.ui.LayoutVisualKind;
@@ -37,6 +38,8 @@ class SceneTreeRow implements View {
     tooltip.fillAnchor = true;
     tooltip.showWhen = () -> detail != null || text.truncated;
     var style = new LayoutStyle(); style.width=LayoutAxis.grow(); style.childAlignY=LayoutAlignmentY.Center; style.childGap=6;
+    // Keep the 24px eye target clear of the overlay scrollbar (12px + 2px inset).
+    style.padding=new Insets(0,0,16,0);
     var children = [new KeyedView("icon", new Icon("glyph:" + key, icon, 15, color)), new KeyedView("label", tooltip)];
     if (toggle != null) {
       var hint = (ownVisible ? "Hide " : "Show ") + label + " (Space)";
