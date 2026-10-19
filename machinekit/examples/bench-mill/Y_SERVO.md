@@ -62,3 +62,19 @@ uniform rail section covering its full length. This proves clearance continuousl
 along the extrusion without filling the carriage’s rail channel with a bounding
 box. Other structural pairs retain the conservative sweep checks. A deliberate
 1 mm seating error is also checked to ensure actual interference is detected.
+
+The front structure is sized by `MillYTravel`, shared through `MillFrameLayout.yTravel`
+with the XY stage. Defaults are 160 mm working stroke, 25 mm table-edge margin,
+200 mm saddle depth and 2 mm overtravel reserve. Rail ends are rounded outwards
+on a 10 mm grid after allowing for the paired carriages, end margins, floating
+bearing, nut bracket and screw journal. The same front envelope covers both the
+reference drive and the selected HZMotion drive. The base, inserts, bearing seat,
+screw and feet then follow the resulting rail datums.
+
+For another working stroke, pass e.g. `new MillYTravel(120)` to
+`MillFramePreview.layout(reference, travel)`. Table depth follows
+`stroke + 2 * tableEdgeMargin`; do not change joint limits separately. The compact
+160 mm version has 410 mm Y rails and an 809 mm base, down from 508 and 909 mm.
+The spindle and column retain their positions. A larger stroke with the existing
+spindle reach is rejected with a clearance error: it needs a coordinated head/reach
+change and another full motion, access and structural assessment.

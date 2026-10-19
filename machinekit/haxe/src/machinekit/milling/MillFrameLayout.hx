@@ -15,6 +15,7 @@ typedef MillFrameInterfaces = {
 }
 
 typedef MillFrameOptions = {
+	?yTravel:MillYTravel;
 	?baseWidth:Float;
 	?frontExtension:Float;
 	?footPockets:Bool;
@@ -36,6 +37,7 @@ class MillFrameLayout {
 	public static inline var COLUMN_FOOT_SHOULDER:Float = 90;
 	public static inline var COLUMN_FOOT_HEIGHT:Float = 150;
 	public static inline var COLUMN_ACCESS_TOP:Float = 80;
+	public final yTravel:MillYTravel;
 	public final yRailSpacing:Float;
 	public final yRailStart:Float;
 	public final yRailLength:Float;
@@ -66,6 +68,7 @@ class MillFrameLayout {
 	public function new(interfaces:MillFrameInterfaces, ?options:MillFrameOptions) {
 		if (interfaces == null) throw "Mill frame needs axis interfaces";
 		if (options == null) options = {};
+		yTravel = options.yTravel ?? new MillYTravel();
 		yRailSpacing = interfaces.yRailSpacing; yRailStart = interfaces.yRailStart; yRailLength = interfaces.yRailLength;
 		columnFront = interfaces.columnFront; columnHeight = interfaces.columnHeight;
 		zRailSpacing = interfaces.zRailSpacing; zRailStart = interfaces.zRailStart; zRailLength = interfaces.zRailLength;

@@ -27,11 +27,11 @@ class MillXYStageLayout {
 	public final xScrew = new BallScrew(455);
 	public final yScrew:BallScrew;
 	public final xHalfTravel:Float = 125;
-	public final yHalfTravel:Float = 80;
-	public final tableDepth:Float = 210;
+	public final yHalfTravel:Float;
+	public final tableDepth:Float;
 	public final xRailSpacing:Float = 160;
 	public final xRailLength:Float = 440;
-	public final saddleDepth:Float = 200;
+	public final saddleDepth:Float;
 	public final xBlockSpan:Float;
 	public final yBlockSpan:Float;
 	public final saddleBottom:Float;
@@ -64,6 +64,9 @@ class MillXYStageLayout {
 	public function new(frame:MillFrameLayout, centreY:Float, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null,supplierY:Bool=false) {
 		if (frame == null || !Math.isFinite(centreY)) throw "XY stage needs finite matching frame datums";
 		this.frame = frame;
+		yHalfTravel = frame.yTravel.halfTravel;
+		tableDepth = frame.yTravel.tableDepth;
+		saddleDepth = frame.yTravel.saddleDepth;
   this.supplierY=supplierY;
   var selectedY=LeadshineServo.model("ELM2H-0400LA60F");
   yMotor=supplierY?selectedY:motor;
@@ -76,6 +79,8 @@ class MillXYStageLayout {
 		block = guideBlock == null ? LinearRailBlock.metric(profile) : guideBlock;
 		xBlockSpan = (block.spec.blockLength + 4) / 2;
 		yBlockSpan = (block.spec.blockLength + 40) / 2;
+		if (saddleDepth < 2 * yBlockSpan + block.spec.blockLength + clearance)
+			throw "Y saddle is too short to support both carriage blocks";
 		saddleBottom = frame.railPlane + block.spec.blockHeight;
 		xRailPlane = saddleBottom + SADDLE_HEIGHT;
 		tableBottom = xRailPlane + block.spec.blockHeight + RISER_HEIGHT;
@@ -94,6 +99,8 @@ class MillXYStageLayout {
 		yFloatingY = frame.yRailStart + (supplierY?7:BallScrew.JOURNAL_LENGTH / 2);
 		yScrew = new BallScrew(yScrewStart - frame.yRailStart);
   yDriveScrew=supplierY?new HzMotionDrawingScrew(yScrew.totalLength):yScrew;
+		if (centreY + yHalfTravel + tableDepth / 2 + clearance > frame.columnFront - block.spec.railHeight)
+			throw "Y travel/table depth exceeds spindle reach: increase column-to-spindle clearance before increasing Y stroke";
 		var xReach = xBlockSpan + block.spec.blockLength / 2 + block.spec.railEndMargin;
 		var yReach = yBlockSpan + block.spec.blockLength / 2 + block.spec.railEndMargin;
 		var yRailRoom = Math.min(
@@ -113,6 +120,8 @@ class MillXYStageLayout {
 		if (frame.baseWidth / 2 < 245 + clearance || yMountPlane < frame.insertThickness + frame.wall ||
 			yMotorFace + yMotor.rating.bodyLength + clearance > yServiceRear || yBayWidth / 2 + frame.wall > frame.columnWidth / 2 - 1.5 * frame.wall)
 			throw "Rear Y drive bay leaves insufficient column support, floor or service space";
+		if (yOvertravel + 1e-6 < frame.yTravel.overtravel)
+			throw "Y layout cannot retain the configured overtravel reserve";
 		if (xOvertravel <= 0 || yOvertravel <= 0 ||
 			frame.yRailSpacing / 2 - frame.seatWidth / 2 < yChannelWidth / 2 + clearance ||
 			xRailSpacing / 2 - block.spec.blockWidth / 2 < 42 + clearance ||

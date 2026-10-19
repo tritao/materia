@@ -19,6 +19,38 @@ class MillFrameChecks {
 	public static function main():Void {
 		var reference = new BenchMill(false, false), layout = MillFramePreview.layout(reference);
 		var z = MillFramePreview.zLayout(reference, layout), xy = new machinekit.milling.MillXYStageLayout(layout, z.spindleY, BenchMill.RAIL);
+		// Envelope regression: shorten the front without moving the spindle or column.
+		near(layout.yRailStart, -270, "compact front rail datum");
+		near(layout.yRailLength, 410, "rails sized from stroke and support envelopes");
+		near(layout.baseDepth, 809, "base follows compact rail start");
+		near(xy.yHalfTravel * 2, layout.yTravel.stroke, "shared Y stroke");
+		check(xy.yOvertravel >= layout.yTravel.overtravel, "reserved Y overtravel survives shortening");
+		for (stroke in [120.0, 160]) {
+			var travel = new machinekit.milling.MillYTravel(stroke);
+			var sized = MillFramePreview.layout(reference, travel);
+			var stage = new machinekit.milling.MillXYStageLayout(sized, z.spindleY, BenchMill.RAIL);
+			near(stage.tableDepth, stroke + 50, "table grows with working travel");
+			near(stage.yHalfTravel * 2, stroke, "stage uses requested working travel");
+			check(stage.yOvertravel >= travel.overtravel, "configured travel retains overrun");
+			check(sized.baseDepth <= layout.baseDepth, "smaller stroke does not grow the base");
+		}
+		rejects(() -> new machinekit.milling.MillYTravel(Math.NaN), "reject nonfinite Y stroke");
+		rejects(() -> new machinekit.milling.MillYTravel(0), "reject zero Y stroke");
+		rejects(() -> MillFramePreview.layout(reference, new machinekit.milling.MillYTravel(240)),
+			"larger travel requires more spindle reach, not just longer rails");
+		// A longer-reach variant can use the same sizing rule for a larger stroke.
+		var largerTravel = new machinekit.milling.MillYTravel(240), largerCentre = z.spindleY - 80;
+		var guide = machinekit.motion.LinearRailBlock.metric(BenchMill.RAIL);
+		var largerStart = largerTravel.railStart(largerCentre, guide);
+		var largerFrame = new MillFrameLayout({yRailSpacing: layout.yRailSpacing, yRailStart: largerStart,
+			yRailLength: largerTravel.railEnd(largerCentre, guide) - largerStart,
+			columnFront: layout.columnFront, columnHeight: layout.columnHeight,
+			zRailSpacing: layout.zRailSpacing, zRailStart: layout.zRailStart, zRailLength: layout.zRailLength},
+			{yTravel: largerTravel, frontExtension: largerTravel.frontExtension});
+		var largerStage = new machinekit.milling.MillXYStageLayout(largerFrame, largerCentre, BenchMill.RAIL);
+		near(largerStage.yHalfTravel * 2, 240, "larger travel fits with deliberately increased spindle reach");
+		check(largerStage.yOvertravel >= largerTravel.overtravel, "larger travel retains overrun");
+		check(largerFrame.baseDepth > layout.baseDepth, "larger working envelope grows the structure");
 		var frame = new MillFrame(layout, z, xy);
 		frame.validate();
 		var poses = frame.solvedPoses();

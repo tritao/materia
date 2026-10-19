@@ -16,17 +16,24 @@ import materia.assembly.AssemblyFrames as F;
  * The legacy BenchMill keeps its independent, working motion/control model.
  */
 class MillFramePreview {
-	public static function layout(reference:BenchMill):MillFrameLayout {
+	public static function layout(reference:BenchMill, ?yTravel:machinekit.milling.MillYTravel):MillFrameLayout {
 		var state:Map<String, AssemblyFrame> = reference.solvedPoses();
-		var y:AssemblyFrame = state.get("railYLeft"), z:AssemblyFrame = state.get("railZLeft");
+		var z:AssemblyFrame = state.get("railZLeft");
 		var column:AssemblyFrame = state.get("column");
-		var yRail:LinearRail = cast reference.components().filter(row -> row.id == "railYLeft")[0].component;
 		var zRail:LinearRail = cast reference.components().filter(row -> row.id == "railZLeft")[0].component;
 		var rise = stageRise(reference);
-		return new MillFrameLayout({yRailSpacing: 220, yRailStart: y.y - 100, yRailLength: yRail.length + 88,
+		if (yTravel == null) yTravel = new machinekit.milling.MillYTravel();
+		var guide = machinekit.motion.LinearRailBlock.metric(BenchMill.RAIL);
+		var spindle:AssemblyFrame = state.get("spindle");
+		var centreY = spindle.y;
+		if (centreY + yTravel.halfTravel + yTravel.tableDepth / 2 + yTravel.clearance >
+			column.y - reference.column.depth / 2 - guide.spec.railHeight)
+			throw "Y travel/table depth exceeds spindle reach: increase column-to-spindle clearance before increasing Y stroke";
+		var railStart = yTravel.railStart(centreY, guide), railEnd = yTravel.railEnd(centreY, guide);
+		return new MillFrameLayout({yRailSpacing: 220, yRailStart: railStart, yRailLength: railEnd - railStart,
 			columnFront: column.y - reference.column.depth / 2, columnHeight: reference.column.height + rise + 40 + spindleStackRise(reference),
 			zRailSpacing: Math.max(180, reference.column.railSpacing),
-			zRailStart: z.z - reference.base.height + 100, zRailLength: zRail.length + rise - 60 + spindleStackRise(reference)}, {baseWidth: 520, columnFootWidth: 440, frontExtension: 40, footPockets: true});
+			zRailStart: z.z - reference.base.height + 100, zRailLength: zRail.length + rise - 60 + spindleStackRise(reference)}, {baseWidth: 520, columnFootWidth: 440, frontExtension: yTravel.frontExtension, footPockets: true, yTravel: yTravel});
 	}
 
 	public static function spindleStackRise(reference:BenchMill):Float {
