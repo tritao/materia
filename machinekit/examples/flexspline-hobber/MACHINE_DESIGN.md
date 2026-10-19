@@ -296,3 +296,20 @@ is gated until measured X reaches loading clearance after spindle stop. Blank,
 Clamped and Finished views preserve native cut stock and authored assembly state.
 Sleeve motion shows the nominal radial fit take-up without exaggeration; it
 must not be used to qualify pressure, strain, clamping distortion or support stiffness.
+
+
+### Handling display performance
+
+The cup is a cached child mesh moved by a scene transform; handling does not
+rebuild vertices, triangle filters or GPU geometry. Material-removal previews
+still replace geometry when the cut changes it. Child transforms are composed
+with the live C pose for rendering and picking, while paused views use the
+saved assembly pose. The sleeve uses one cached mesh with an illustrative
+radial affine scale that matches its outside-radius take-up; this is not a
+constant-wall-thickness strain/contact model.
+
+Realtime load/unload trajectories use active playback wall time (four seconds
+each), so slow physics does not stretch a display-only transfer. Pause freezes
+that time. Explicit deterministic steps advance handling by the fixed timestep.
+Cutting and head withdrawal retain the physical clock and 4 kHz controller;
+illustrative transfers remain excluded from the measured machining cycle.

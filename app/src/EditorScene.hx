@@ -2936,6 +2936,18 @@ class EditorScene {
     publishRuntimeNodes(updated, changes);
   }
 
+  /** Move/scale cached display geometry without replacing its mesh or authored/physics pose. */
+  public function setRuntimeGeometryPartTransform(id:String,index:Int,transform:Transform):Void {
+    var parts=runtimeParts.get(id);
+    if(parts==null||!parts.nodes.exists(index))throw 'Runtime geometry part absent: $id/$index';
+    var values=[for(i in 0...16)transform.element(i)],previous=parts.transforms.get(index),same=previous!=null;
+    if(same)for(i in 0...16)if(values[i]!=previous[i]){same=false;break;}
+    if(same)return;
+    var node=parts.nodes.get(index),transaction=scene.beginTransaction();
+    try{transaction.setTransform(node,transform);transaction.commit();}catch(error:Dynamic){transaction.dispose();throw error;}
+    parts.transforms.set(index,values);publishRuntimeNodes([node]);
+  }
+
   function releaseRuntimeParts(id:String):Void {
     var parts = runtimeParts.get(id);
     if (parts == null) return;
@@ -3224,6 +3236,7 @@ class RuntimeGeometryParts {
   public final count:Int;
   public final nodes:Map<Int, NodeId> = new Map();
   public final geometries:Map<Int, Geometry> = new Map();
+  public final transforms:Map<Int, Array<Float>> = new Map();
 
   public function new(count:Int) this.count = count;
 

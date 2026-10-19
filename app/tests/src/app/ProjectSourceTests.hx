@@ -4243,7 +4243,11 @@ class ProjectSourceTests {
       var openDeadline=Sys.time()+180;
       while(editor.openingProject()&&Sys.time()<openDeadline){editor.tick();Sys.sleep(0.005);}
       check(!editor.openingProject(),"Loading scene finishes project generation");
-      var original=editor.scene.info("project:blank").bounds();
+      function cupBounds():nativekit.scene.Bounds {
+        var nodes=editor.scene.runtimePartNodes("project:blank");
+        return nodes.length==0?editor.scene.info("project:blank").bounds():editor.scene.renderSnapshot().findNode(nodes[0]).bounds();
+      }
+      var original=cupBounds();
       editor.commands.execute("sim.play");
       var deadline=Sys.time()+60;
       while(editor.simulationBuild!=null&&Sys.time()<deadline){editor.tick();Sys.sleep(0.005);}
@@ -4252,7 +4256,7 @@ class ProjectSourceTests {
       deadline=Sys.time()+(loading?180:120);
       while(!player.completed&&player.failure==null&&Sys.time()<deadline){editor.tick();Sys.sleep(0.005);}
       player.stock.preview.wait();player.present();
-      var visible=editor.scene.info("project:blank").bounds();
+      var visible=cupBounds();
       Sys.println("HOBBER_PLAYBACK_STATE "+haxe.Json.stringify({completed:player.completed,failure:player.failure,phase:player.handling==null?"cut-only":player.handling.phase,elapsed:player.elapsed,windows:player.stock.stream.passes}));
       check(player.failure==null,"Desktop hobbing failure: "+player.failure);
       check(original.valid&&visible.valid,"Stock display has valid bounds");
@@ -4264,6 +4268,7 @@ class ProjectSourceTests {
         elapsed:player.elapsed,windows:player.stock.stream.passes,report:player.stock.report,logs:editor.logLines}));
       check(player.failure==null,"Desktop hobbing failure: "+player.failure);
       check(player.completed,"Desktop playback completes the cutting job");
+      check(player.sleeveMeshUploads==(loading?1:0),"Sleeve animation uses one cached mesh");
       check(player.stock.forces.maxTangential>0,"Desktop playback removes material");
       if(loading){
         var handling=player.handling;if(handling==null)throw "Handling timeline missing";
@@ -4278,11 +4283,15 @@ class ProjectSourceTests {
         var displacement=app.AssemblyRobot.rotate(live.rotation,local);
         check(Math.abs(live.position[0]+displacement[0])<0.0001&&Math.abs(live.position[1]+displacement[1]+0.250)<0.0001,"Front transfer stays on machine -Y after C rotates");
         editor.simulation.stop();editor.tick();player.present();
-        var paused=editor.scene.info("project:blank").bounds();
+        var paused=cupBounds();
         check(Math.abs((paused.minY+paused.maxY-original.minY-original.maxY)/2+0.250)<0.0001,"Paused cup retains the fixed front approach");
         check(handling.clamp==0&&handling.liftMm==35&&handling.frontMm==250,"Finished cup lifted after release");
         var intervals=player.stock.stock.intervalCount();
-        player.inspectCup("clamped");var clamped=editor.scene.info("project:blank").bounds();
+        var uploads=player.stock.displayMeshUpdates;
+        for(t in 0...120){handling.unload(1.5+t/48);player.present();}
+        check(player.stock.displayMeshUpdates==uploads,"Unloading transforms do not rebuild/upload stock geometry");
+        handling.unload(4);
+        player.inspectCup("clamped");var clamped=cupBounds();
         check(Math.abs(clamped.minZ-original.minZ)<1e-5&&Math.abs(clamped.maxZ-original.maxZ)<1e-5,"Clamped inspection shows complete cup at fixture");
         player.inspectCup("blank");player.inspectCup("finished");
         check(player.stock.stock.intervalCount()==intervals,"Inspection preserves actual cut stock");

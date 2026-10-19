@@ -20,8 +20,11 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   public var cutStarted(default,null)=false;
   public var headRetracted(default,null)=false;
   var handlingStart=-1.0;
+  var handlingClock=0.0;
   var unloadStart=-1.0;
   var sleeveDisplay=-1.0;
+  var sleeveInstalled=false;
+  public var sleeveMeshUploads(default,null)=0;
   final sleeveCenter:Array<Float>;
   final withdrawal:Null<motionkit.program.MotionProgram>;
   public var stock(default,null):HobbingStock;
@@ -102,14 +105,18 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     if(channel=="hob.at_speed")return Digital(Math.abs(b-job.rpm*2*Math.PI/60)<Math.max(0.01,job.rpm*2*Math.PI/60*0.001));
     return null;
   }
+  /** Display-only transfer time; paused playback never advances it. */
+  public function advanceHandling(seconds:Float):Void {
+    if(handling!=null&&!completed&&handling.inspection=="sequence"&&(!cutStarted||headRetracted))handlingClock+=seconds;
+  }
   public function feed():Void {
     if(completed||failure!=null||disposed)return;
     try{
       var now=session.simulationTime();
       if(handling!=null&&handling.inspection!="sequence")return;
       if(handling!=null&&!cutStarted){
-        if(handlingStart<0)handlingStart=now;
-        if(!handling.load(now-handlingStart))return;
+        if(handlingStart<0)handlingStart=handlingClock;
+        if(!handling.load(handlingClock-handlingStart))return;
       }
       if(!started){startTime=now;motion.run(program);started=true;cutStarted=true;}
       if(!cutCompleted){
@@ -128,9 +135,9 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
           var hc=config.handling;if(hc==null)throw "Handling configuration absent";
           var q=robot.robot.snapshot().positions;
           if(Math.abs(x-hc.retractX)>0.01||Math.abs((q.get(indices[2])+offsets[2])*1000)>0.01||Math.abs((q.get(indices[1])+offsets[1])*1000)>0.01)throw "Head has not reached loading park X/Y/Z";
-          headRetracted=true;unloadStart=now;
+          headRetracted=true;unloadStart=handlingClock;
         }
-      }else if(handling!=null)completed=handling.unload(now-unloadStart);
+      }else if(handling!=null)completed=handling.unload(handlingClock-unloadStart);
     }catch(e:Dynamic){failure=Std.string(e);motion.abort();}
   }
   public function afterSimulationStep(timestamp:Int64):Void {
@@ -175,21 +182,31 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     // The cup rotates only about C; paused inspection uses the authored scene frame.
     var local=physicalPresentation?[-front*Math.cos(c),front*Math.sin(c),0.0]:
       AssemblyRobot.rotate([-q[0],-q[1],-q[2],q[3]],[for(v in frontDirection)v*front]);
-    var geometry=stock.geometry(lift,blank,local[0],local[1]);if(geometry!=null)project.scene.setRuntimeGeometry("project:"+config.stock,geometry);
+    var stockId="project:"+config.stock,geometry=stock.geometry(blank);
+    if(geometry!=null)project.scene.setRuntimeGeometryParts(stockId,1,[0=>geometry]);
+    project.scene.setRuntimeGeometryPartTransform(stockId,0,nativekit.scene.Transform.identity().translated(local[0]/1000,local[1]/1000,lift/1000));
     if(handling!=null){
       var clamp=handling.displayedClamp();
       if(clamp!=sleeveDisplay){
         var h=config.handling;if(h==null)throw "Handling configuration absent";
-        var outer=h.outside/2+clamp*h.radialTravel,inner=h.outside/2-h.wall+clamp*h.radialTravel;
-        var sleeve=CutterGeometry.sectionGeometry([{r:inner,z:0.0},{r:outer,z:0.0},{r:outer,z:h.length},{r:inner,z:h.length},{r:inner,z:0.0}],
-          (x,y,z)->[x/1000-sleeveCenter[0],y/1000-sleeveCenter[1],z/1000-sleeveCenter[2]],(x,y,z)->[x,y,z]);
-        project.scene.setRuntimeGeometry("project:"+h.sleeve,sleeve);sleeveDisplay=clamp;
+        if(!sleeveInstalled){
+          var outer=h.outside/2,inner=outer-h.wall;
+          var sleeve=CutterGeometry.sectionGeometry([{r:inner,z:0.0},{r:outer,z:0.0},{r:outer,z:h.length},{r:inner,z:h.length},{r:inner,z:0.0}],
+            (x,y,z)->[x/1000-sleeveCenter[0],y/1000-sleeveCenter[1],z/1000-sleeveCenter[2]],(x,y,z)->[x,y,z]);
+          project.scene.setRuntimeGeometryParts("project:"+h.sleeve,1,[0=>sleeve]);sleeveInstalled=true;sleeveMeshUploads++;
+        }
+        // Illustrative outer-radius fit take-up, affine radial scaling about the bore axis.
+        // This is display-only; hydraulic strain/contact and wall thickness are not qualified.
+        var scale=1+clamp*h.radialTravel/(h.outside/2);
+        project.scene.setRuntimeGeometryPartTransform("project:"+h.sleeve,0,nativekit.scene.Transform.identity().set(0,scale).set(5,scale)
+          .translated((scale-1)*sleeveCenter[0],(scale-1)*sleeveCenter[1],0));
+        sleeveDisplay=clamp;
       }
     }
   }
   public function beforeReset():Void{if(motion.running)motion.abort();}
   public function reset():Void{stock.dispose();stock=new HobbingStock(config,centerMetres);motion=newMotion();started=false;cutStarted=false;cutCompleted=false;headRetracted=false;completed=false;failure=null;syncError=0;elapsed=0;
-    handlingStart=-1;unloadStart=-1;sleeveDisplay=-1;
+    handlingStart=-1;handlingClock=0;unloadStart=-1;sleeveDisplay=-1;
     if(handling!=null){handling.inspect("sequence");handling.load(0);}}
   public function dispose():Void{if(disposed)return;beforeReset();disposed=true;simulation.removeStepObserver(observerId);stock.dispose();}
 }

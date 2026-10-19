@@ -844,6 +844,7 @@ class ApplicationSimulation {
     var active = space;
     if (active == null) throw "Apply the pending simulation configuration first";
     if (running) throw "Stop realtime simulation before deterministic stepping";
+    if(hobbing!=null)hobbing.advanceHandling(active.session.fixedTimestep());
     feedMembers();
     presentMembers();
     active.session.step(timestampNs == null ? Int64.ofInt(0) : timestampNs);
@@ -1022,6 +1023,7 @@ class ApplicationSimulation {
     var now = Sys.time();
     var elapsed = pumpStamp < 0.0 ? 0.0 : Math.max(0.0, now - pumpStamp);
     pumpStamp = now;
+    if(hobbing!=null)hobbing.advanceHandling(elapsed);
     var due = active.session.dueTicks(haxe.Int64.fromFloat(elapsed * 1.0e9), MAX_TICKS_PER_PUMP);
     runOwnerTicks(due, present);
   }
@@ -1032,13 +1034,14 @@ class ApplicationSimulation {
    */
   public function runTicks(count:Int):Void {
     if (playbackActive) throw "Background playback owns the simulation ticks";
-    runOwnerTicks(count, true);
+    runOwnerTicks(count, true, true);
   }
 
-  function runOwnerTicks(count:Int, present:Bool):Void {
+  function runOwnerTicks(count:Int, present:Bool,deterministic:Bool=false):Void {
     var active = space;
     if (active == null || !running) return;
     for (_ in 0...count) {
+      if(deterministic&&hobbing!=null)hobbing.advanceHandling(active.session.fixedTimestep());
       feedMembers();
       active.session.stepPaced();
     }

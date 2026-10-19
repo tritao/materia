@@ -42,6 +42,16 @@ class Transform {
 		return this;
 	}
 
+	/** Compose a local transform after this parent/world transform. */
+	public function multiplied(local:Transform):Transform {
+		var result=new Transform();
+		for(column in 0...4)for(row in 0...4){var sum=0.0;
+			for(k in 0...4)sum+=element(k*4+row)*local.element(column*4+k);
+			result.set(column*4+row,sum);
+		}
+		return result;
+	}
+
 	public function element(index:Int):Float {
 		if (index < 0 || index >= 16)
 			throw "Transform matrix index must be between 0 and 15";

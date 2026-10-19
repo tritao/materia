@@ -1415,7 +1415,25 @@
       "additionalContactExclusions": false
     },
     "loadingScope": "Front approach on work -X/global -Y, X110, Y=Z=0, OD25/140 face20; complete swept jaw boxes against every neighbour at A -15/0/+15; hollow cup sampled along transfer/seating; head corridor all-A angular enclosure in LOADING_CLEARANCE.json",
-    "unchangedTableEvidence": "Table tilt and mandrel source checks reused from preceding plinth revision; cutting geometry and installed C/fixture/head datums unchanged. Current work-frame/load regression passed."
+    "unchangedTableEvidence": "Table tilt and mandrel source checks reused from preceding plinth revision; cutting geometry and installed C/fixture/head datums unchanged. Current work-frame/load regression passed.",
+    "cachedHandlingDisplay": {
+      "stockMeshUploadsAcross120UnloadUpdates": 0,
+      "sleeveMeshUploads": 1,
+      "runtimeGeometry": "cached child meshes; live parent pose composed with local display transform for rendering/picking",
+      "handlingClock": "active realtime playback wall time; deterministic stepping uses fixed dt; pause freezes handling",
+      "loadAndUnloadSecondsEach": 4,
+      "physicsControllerHz": 4000,
+      "cutAndWithdrawalClock": "physical simulation time unchanged",
+      "observedCaseWallSeconds": 58.1,
+      "previousObservedCaseWallSeconds": 79.2,
+      "timingScope": "cached artifact, other frozen reference cases running; observational, not controlled FPS benchmark",
+      "coarseWindows": 982,
+      "machiningSeconds": 6.49625000000364,
+      "fixtureContacts": 0,
+      "resetAndInspectionPassed": true,
+      "sleeveScale": "display-only radial affine scale matches outside take-up; no constant-wall strain claim",
+      "runtimeGeometryTestsPassed": true
+    }
   },
   "previousRevisionProvenance": {
     "baseCommit": "483c8052c84030c566acb20759ebedfdbdfbd999",
@@ -1446,17 +1464,17 @@
     "nativeProviders": "Existing providers reused read-only; frozen HB4/HB11 workers not rebuilt or signalled."
   },
   "provenance": {
-    "baseCommit": "b5244792e062b3e7d788ec186429134524e448cf",
+    "baseCommit": "f44c58ca3a42d5ab5b80d4a500a66b7312acf09f",
     "geometryAndChecksSourceSha256": {
-      "app/src/ApplicationSimulation.hx": "9806233a01be9ea535155d4ff6d867984137d92b6fd7a048d5df792cbdfba9de",
+      "app/src/ApplicationSimulation.hx": "2c7b4d5d1a881a60a84bfdce200f57916c532af462f255623772e65ee0db721b",
       "app/src/CutterGeometry.hx": "51e730c0f3d5f3660b60b9a1c935d40e2376cc05303392e471d099b396ad4455",
-      "app/src/HobbingCupDisplay.hx": "622a96f6ee8f54bb2657997ceb6a8729c142c6f5d87f7600d8b70a7d3f4567ab",
-      "app/src/HobbingHandling.hx": "0b396620c834c4953358082ff66902ec1cd29aef7beac7ca72c55fda917f3c0e",
-      "app/src/HobbingProgramPlayer.hx": "a8e08e0f65aabba4579282e08d0bf6c95e9671abbeff2a7b883b2dea7e43aa1c",
-      "app/src/HobbingStock.hx": "fb03b49244cfe6b9bf12b9e0eb24950a76cd1363477814d3f2682f801fe7b2f1",
+      "app/src/HobbingCupDisplay.hx": "4f432e28ea7fbe383786b6547a97ebedd4c6735fa43a9a5fac1f707bfcc4f895",
+      "app/src/HobbingHandling.hx": "24a7b64b6a8d9c488cc99195a8e8ac322396c968f7caa0d869246ef7d2f406c1",
+      "app/src/HobbingProgramPlayer.hx": "92891bd9f012dde901386b993dde39effe4a8c79224ef9ca3fd4b2406579aee3",
+      "app/src/HobbingStock.hx": "f8d22dc8167f071d40ea14933960431dcb743391b539b327cf851571a0a60128",
       "app/src/editor/CncPanel.hx": "f8a5138450360c748fa8a7d3981f08a9523f2b4d7f3c0825bbd16073d4c7ed5f",
       "app/src/editor/MachineControlPanel.hx": "576a025d663720db6396726647ed6d9f214aeec4d847ebf6ad0c1f73931e3d37",
-      "app/tests/src/app/ProjectSourceTests.hx": "e90cfdf3f626293e14df976892d3b4fe59506506365177c6dee363adfb1f799b",
+      "app/tests/src/app/ProjectSourceTests.hx": "88eb1ca63a646bc826db6793ecf2075060423edc8bde4b52a9e639cbaf767f9b",
       "app/tests/src/tests/AppTests.hx": "af6c1674ed70f65eaf529677f58c97f1fff9946a8724e5d5d8ec9e0062f4b212",
       "app/tests/src/tests/HobbingHandlingTests.hx": "03abc85824faf2cc81d11ccab263bdd53d2af9b790616ffa9a4c23d29f78da07",
       "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "1db94b96dd3216fc586148a27eb05adafc2363003813c10fa6b4196c60b6ee9e",
@@ -1491,7 +1509,11 @@
       "stockkit/haxe/stockkit/hobbing/HobbingAxes.hx": "25db0683a4929f286b725ef0c95d4435dcb903bcb7a5879283e2ee1c3162348d",
       "stockkit/haxe/stockkit/hobbing/HobbingErrorSource.hx": "78ea849d3c33abe69e00da7917238f6a16cc71bc4fdd1025b88235311aaa630b",
       "stockkit/haxe/stockkit/hobbing/HobbingMotion.hx": "4910056ed94ec924b5916a74c01935e4430b94474bc8de6dbb2dfdb2d8ddafbc",
-      "stockkit/haxe/stockkit/hobbing/HobbingPoseOffset.hx": "b0f24540cfb7e35f1d191b2eb65d0bcea53512d1c623b05409ed37436397dd96"
+      "stockkit/haxe/stockkit/hobbing/HobbingPoseOffset.hx": "b0f24540cfb7e35f1d191b2eb65d0bcea53512d1c623b05409ed37436397dd96",
+      "app/src/EditorScene.hx": "c091d88d10a71c470254a42aa2f4f1ceaeca274c56d049b9a327c8fa24b4574a",
+      "app/src/editor/ScenePresentation.hx": "487370944cfa2dec1b5317ec2e4766071cd9efb71cfcaf801d0a6a30582b775c",
+      "app/tests/src/tests/RuntimeGeometryTests.hx": "0a85d3f1dd62d817ed8d544a2a38e1d689325012435e49f103ccd95f388b97ee",
+      "scenekit/scene/bindings/haxe/nativekit/scene/Transform.hx": "86337648c46214d262ec2ec9f0fbc6430219fe6084185775549a3f979b53a8c3"
     }
   },
   "previousPlinthValidation": {

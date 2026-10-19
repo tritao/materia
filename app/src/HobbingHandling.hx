@@ -1,6 +1,7 @@
 package app;
 
-/** Deterministic, presentation-only handling timeline on the simulation clock.
+/** Presentation-only handling trajectory; realtime playback supplies wall time,
+    deterministic stepping supplies the fixed timestep.
     Not a contact/gripper solver or a hydraulic deformation calculation. */
 class HobbingHandling {
   public static inline final LIFT_MM=120.0;

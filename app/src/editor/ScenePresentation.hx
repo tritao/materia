@@ -238,6 +238,12 @@ class ScenePresentation {
             for (axis in 0...4) previous[axis + 3] = pose.rotation[axis];
           }
           poseTransforms.push(transform);
+          // Native view overrides are per-node, so cached child meshes need the
+          // live parent pose composed with their local display transform too.
+          for(node in owner.runtimePartNodes(pose.id)){
+            var child=owner.renderSnapshot().findNode(node);
+            if(child!=null){poseNodes.push(node);poseTransforms.push(transform.multiplied(child.localTransform()));}
+          }
           for (node in threads.nodesFor(pose.id)) { poseNodes.push(node); poseTransforms.push(transform); }
           // The face overlay is a child of its object with an identity transform, but a pose
           // override moves only its own node, so the overlay needs the object's pose as well.

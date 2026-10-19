@@ -2505,3 +2505,29 @@ HB6/HB9's ordinary app acceptance also passes with the shorter mechanics:
 **0.002800 arcsec** maximum sync error, zero fixture-envelope contacts and no
 inspection exception. Stock retains 969,168 bytes and 619 buffered samples.
 Neither coarse app result claims an ISO grade or closes full-reference HB12.
+
+
+### Cached handling display and realtime transfer clock (2026-10-19)
+
+Cup movement now changes a runtime child-node transform instead of rebuilding
+and uploading the combined cup/tooth mesh. Only changed cut previews or
+inspection-mode changes replace its geometry. The sleeve is uploaded once and
+uses display-only radial scaling; its outside take-up is shown, without claiming
+constant wall thickness or a hydraulic strain solution. Runtime children follow
+the live C pose in rendering/picking and retain correct paused inspection poses.
+
+Illustrative load/unload now run on active playback wall time (four seconds
+each), frozen during pause. Deterministic stepping supplies the fixed timestep.
+The cutting/withdrawal clock, 4 kHz controller and stock settings are unchanged.
+The full saved-scene playback passes with 982 windows, 6.496250 s machining and
+zero fixture-envelope contacts. A 120-update unloading check produces **zero
+stock mesh uploads**; sleeve animation uses **one cached upload**. Live/paused
+front direction, inspection preservation and reset pass. Observed cached-artifact
+case wall time falls from 79.2 s to 58.1 s with other reference jobs running;
+this is a diagnostic observation, not a controlled FPS benchmark. Frozen HB4/HB11
+binaries/providers and running cases are unchanged.
+
+Focused runtime-geometry checks also pass: transforms retain the GPU geometry,
+update bounds, skip unchanged publications, survive material mesh updates and
+compose with live parent poses for picking/rendering. Clearing/deleting runtime
+parts restores the authored geometry and leaves document/physics revisions stable.

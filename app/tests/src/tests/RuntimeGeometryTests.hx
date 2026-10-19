@@ -65,6 +65,30 @@ class RuntimeGeometryTests {
       scene.setRuntimeGeometryParts(id, 2, [1 => triangle(0.03)]);
       check(scene.runtimePartNodes(id).join(",") == parts.join(","), "an update replaces a part's geometry in place");
 
+      var cached:app.EditorScene.RuntimeGeometryParts=scene.runtimeParts.get(id);
+      var retained=cached.geometries.get(0);
+      var transform=nativekit.scene.Transform.identity().translated(0.15,0,0.04);
+      var beforeTransform=scene.visualRevision;
+      scene.setRuntimeGeometryPartTransform(id,0,transform);
+      var moved=scene.renderSnapshot().findNode(parts[0]).bounds();
+      check(moved.valid&&Math.abs(moved.minX-0.15)<1e-6&&Math.abs(moved.minZ-0.04)<1e-6,
+        "runtime part transform moves cached geometry and updates bounds");
+      check(cached.geometries.get(0)==retained&&scene.visualRevision==beforeTransform+1,
+        "runtime movement retains its mesh and publishes one visual revision");
+      scene.setRuntimeGeometryPartTransform(id,0,transform);
+      check(scene.visualRevision==beforeTransform+1,"unchanged transform does not republish");
+      scene.setRuntimeGeometryParts(id,2,[0=>triangle(0.01)]);
+      check(Math.abs(scene.renderSnapshot().findNode(parts[0]).bounds().minX-0.16)<1e-6,
+        "material update retains runtime part transform");
+
+      // Keep the unrelated rectangle from occluding the small posed triangle.
+      scene.setRuntimeGeometry(second,new GeometryData());
+      var posed=scene.configureRenderView(new nativekit.scene.SceneView(),nativekit.scene.Transform.identity(),
+        [{id:id,position:[0.5,0,0],rotation:[0.0,0,0,1]}]);
+      var hit=scene.pickHitRayWithView(posed,0.662,0.002,1,0,0,-1);
+      check(hit.id==id,"live parent pose composes with cached child display transform for picking/rendering: "+haxe.Json.stringify(hit));
+      scene.clearRuntimeGeometry(second);
+
       scene.clearRuntimeGeometry(id);
       check(scene.revision == revision && scene.environmentRevision == environmentRevision,
         "runtime part updates and restoration keep document and physics revisions stable");
