@@ -116,15 +116,21 @@ class MillFemExport {
 		return haxe.Json.parse(File.getContent(file));
 	}
 
-	/** Preserve STEP geometry but fix the writer's volatile header timestamp. */
-	static function stepText(text:String):String {
+	/** Preserve geometry while stabilizing timestamps and OCCT's Product N labels. */
+	static function stepText(text:String,memberId:String):String {
 		var end = text.indexOf("DATA;");
 		if (end < 0) throw "STEP export has no DATA section";
 		var timestamp = ~/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/g;
-		return timestamp.replace(text.substr(0, end), "1970-01-01T00:00:00") + text.substr(end);
+		var normalized=timestamp.replace(text.substr(0, end), "1970-01-01T00:00:00") + text.substr(end);
+        var product=~/PRODUCT\('Product [0-9]+','Product [0-9]+'/g;
+        var label=StringTools.replace(memberId,"'","''");
+        return product.replace(normalized,"PRODUCT('"+label+"','"+label+"'");
 	}
 
-	public static function write(assembly:MachineAssembly, frame:MillFrame, state:AssemblyState, folder:String):Dynamic {
+	public static function write(assembly:MachineAssembly, frame:MillFrame, state:AssemblyState, folder:String,?capturedProvenance:Dynamic,?conceptPath:String):Dynamic {
+        var zLayout:MillZAxisLayout=frame.zAxis;
+        var referencePath=conceptPath==null?root()+"/"+DIRECTORY+"/build/mill-frame-concept.json":conceptPath;
+        var referenceText=File.getContent(referencePath);
 		var repository = root();
 		ensure(folder);
 		var manifestPath = folder + "/manifest.json";
@@ -164,7 +170,7 @@ class MillFemExport {
 						if(solid) {
 						file = StringTools.replace(id,"/","__") + ".step";
 						part.shape.exportStep(folder + "/" + file);
-						var text = stepText(File.getContent(folder + "/" + file));
+						var text = stepText(File.getContent(folder + "/" + file),id);
 						File.saveContent(folder + "/" + file,text);
 						digest = Sha256.encode(text);
 						}
@@ -173,8 +179,9 @@ class MillFemExport {
 					if(solid)solidMass += mass.mass;
 				}
 				totalMass += mass.mass;
+                var massSource = switch(mass.source) {case Computed(_):"Computed"; case Declared:"Declared";};
 				parts.push({id:id, parentId:parents.get(id), materialId:material.id, representation:solid?"solid":"mass-only",
-					poseMm:pose, massKg:mass.mass, centreOfMassMm:centre, volumeMm3:volume,
+					poseMm:pose, massKg:mass.mass, massSource:massSource, centreOfMassMm:centre, volumeMm3:volume,
 					boundsMm:bounds, stepFile:file, stepSha256:digest});
 			}
 			for (foundation in [{id:"base",value:frame.base},{id:"column",value:frame.column}])
@@ -205,29 +212,37 @@ class MillFemExport {
 					railWidthMm:block.spec.railWidth,blockLengthMm:block.spec.blockLength});
 			}
 		materials.sort((a,b) -> Reflect.compare(a.id,b.id));
-		var result = {schemaVersion:1, status:"geometry packet; not solver-ready", geometryFrame:"world", poseApplication:"already-applied",
-			units:{length:"mm",force:"N",mass:"kg",time:"s",modulus:"Pa",density:"kg/m3"},
-			provenance:{revision:StringTools.trim(command(repository,["rev-parse","HEAD"])),
+		var identity:Dynamic=capturedProvenance;
+        if(identity==null)identity={revision:StringTools.trim(command(repository,["rev-parse","HEAD"])),
 				trackedDiffSha256:Sha256.encode(command(repository,["diff","--binary","HEAD","--","machinekit","cadkit","projectkit","haxeon"])),
 				exporterSha256:Sha256.encode(File.getContent(repository+"/"+DIRECTORY+"/MillFemExport.hx")),
-				sourceBuild:sourceBuildProvenance(repository,folder)},
+				sourceBuild:sourceBuildProvenance(repository,folder)};
+		var result = {schemaVersion:1, status:"geometry packet; not solver-ready", geometryFrame:"world", poseApplication:"already-applied",
+			units:{length:"mm",force:"N",mass:"kg",time:"s",modulus:"Pa",density:"kg/m3"},
+			provenance:identity,
 			jointsMm:{x:state.joint("xyStage/x"),y:state.joint("xyStage/y"),z:state.joint("zAxis/z")},
 			jointDirections:jointDirections(state),
 			parts:parts, materials:materials, interfaces:interfaces, supports:supports, guides:guides,
-			conceptReference:{file:"mill-frame-concept.json",sha256:Sha256.encode(File.getContent(repository+"/"+DIRECTORY+"/build/mill-frame-concept.json"))},
+            frameLayout:{wall:frame.layout.wall,roof:frame.layout.roof,baseHeight:frame.layout.baseHeight,
+                baseWidth:frame.layout.baseWidth,columnWidth:frame.layout.columnWidth,columnDepth:frame.layout.columnDepth,
+                columnHeight:frame.layout.columnHeight,columnCentreY:frame.layout.columnCentreY,railPlane:frame.layout.railPlane,
+                front:frame.layout.front,columnFront:frame.layout.columnFront,footPockets:frame.layout.footPockets,zChannelBack:zLayout.channelBack,
+                yRailSpacing:frame.layout.yRailSpacing,seatWidth:frame.layout.seatWidth,insertThickness:frame.layout.insertThickness},
+			conceptReference:{file:"mill-frame-concept.json",sha256:Sha256.encode(referenceText)},
 			datums:datums(state), totalComponentMassKg:totalMass, solidMassKg:solidMass,
 			castingMassKg:{base:frame.base.castingByWeight().kg,column:frame.column.castingByWeight().kg},
 			studyEnvelope:{cuttingForcePerAxisN:500,payloadKg:20,payloadHeightMm:50,accelerationMPerS2:1,
 				gravityMPerS2:9.80665,cuttingContactAssigned:false},
 			pending:["mesh and elastic material inputs including Poisson ratio", "guide and drive load-path stiffness", "insert bonds and column clamp contact/preload", "foot/floor restraints", "cutting contact and workpiece attachment", "mass-only component attachment and inertia for modal study"]};
 		File.saveContent(manifestPath,haxe.Json.stringify(result,null,"  ")+"\n");
-		File.saveContent(folder+"/mill-frame-concept.json",File.getContent(repository+"/"+DIRECTORY+"/build/mill-frame-concept.json"));
+		File.saveContent(folder+"/mill-frame-concept.json",referenceText);
 		return result;
 	}
 
 	public static function main():Void {
 		var mill = build(), zLayout:MillZAxisLayout = mill.frame.zAxis;
 		var name = "center", x = 0.0, y = 0.0, z = zLayout.lower / 2;
+        var verifyRepeat=false;
 		var args = Sys.args(), i = 0;
 		while (i < args.length) {
 			var flag = args[i++];
@@ -238,12 +253,33 @@ class MillFemExport {
 				case "--x": x = coordinate(value);
 				case "--y": y = coordinate(value);
 				case "--z": z = coordinate(value);
+                case "--verify-repeat":
+                    if(value!="true" && value!="false")throw "--verify-repeat requires true or false";
+                    verifyRepeat=value=="true";
 				default: throw 'Unknown FEM option $flag';
 			}
 		}
 		if (!~/^[A-Za-z0-9_-]+$/.match(name)) throw "FEM packet name must contain letters, digits, underscores or hyphens";
 		var folder = root()+"/"+DIRECTORY+"/build/fem/"+name;
-		var result = write(mill.assembly,mill.frame,state(mill.assembly,x,y,z),folder);
+		var repeatPath=folder+"/repeat-verification.json";
+        if(FileSystem.exists(repeatPath))FileSystem.deleteFile(repeatPath);
+        var pose=state(mill.assembly,x,y,z);
+        ensure(folder);
+        MillFramePreview.writeReport(mill.assembly,mill.frame,folder,false,{x:x,y:y,z:z});
+        var conceptPath=folder+"/mill-frame-concept.json";
+        var result = write(mill.assembly,mill.frame,pose,folder,null,conceptPath);
+        if(verifyRepeat) {
+            var before=File.getContent(folder+"/manifest.json");
+            File.saveContent(folder+"/repeat-first-manifest.json",before);
+            // Both exports execute the same loaded build; preserve its captured identity
+            // even if another session changes unrelated working-tree files meanwhile.
+            result=write(mill.assembly,mill.frame,pose,folder,result.provenance,conceptPath);
+            var after=File.getContent(folder+"/manifest.json");
+            if(before!=after)throw "Repeat export changed: inspect source/build provenance and geometry before qualifying the packet";
+            File.saveContent(repeatPath,haxe.Json.stringify({passed:true,manifestSha256:Sha256.encode(after),
+                sourceRevision:result.provenance.revision,method:"Two exports from the same loaded build and posed assembly; complete manifest and STEP hashes identical"},null,"  ")+"\n");
+            Sys.println("Complete manifest and STEP hash repeat verification passed");
+        }
 		var parts:Array<Dynamic> = result.parts;
 		Sys.println('FEM packet: $folder/manifest.json (${parts.length} components; no structural solution)');
 	}

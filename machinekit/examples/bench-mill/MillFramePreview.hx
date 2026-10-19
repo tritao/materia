@@ -105,6 +105,27 @@ class MillFramePreview {
 			assemblyDefinition:definition,assemblyState:model.initialState("spindle-service-review").record()}));
 	}
 
+
+    /** Same concept report schema for previews and same-build FEM reference packets. */
+    public static function writeReport(assembly:MachineAssembly,frame:MillFrame,directory:String,clearancesVerified:Bool,?extraPose:{x:Float,y:Float,z:Float}):Dynamic {
+        var l=frame.layout,z:MillZAxisLayout=frame.zAxis,xy:MillXYStageLayout=frame.xyAxis;
+		var report = {status: "mechanical XYZ concept; not qualified for manufacture", units: "mm",
+			analysisReference:MillFemReference.capture(assembly,frame,extraPose),
+			travel: [{axis:"x",travel:2*xy.xHalfTravel},{axis:"y",travel:2*xy.yHalfTravel},{axis:"z",travel:-z.lower}],
+			base: {width: l.baseWidth, depth: l.baseDepth, height: l.baseHeight, railPlane: l.railPlane},
+			column: {width: l.columnWidth, depth: l.columnDepth, height: l.columnHeight, railFaceY: l.columnFront,
+				footShoulderMm: MillFrameLayout.COLUMN_FOOT_SHOULDER,footHeightMm: MillFrameLayout.COLUMN_FOOT_HEIGHT,clampAccess:"vertical side face"},
+			xyFullStrokeStructuralClearance: clearancesVerified?"passed conservative Cartesian-product CAD swept-volume audit":"not rerun by the physical-reference writer",
+			zFullStrokeStructuralClearance: clearancesVerified?"passed conservative CAD swept-volume audit":"not rerun by the physical-reference writer",
+			xy: {tableTop: xy.tableTop, saddleHeight: MillXYStageLayout.SADDLE_HEIGHT, tableRibDepth: MillXYStageLayout.RISER_HEIGHT, xOvertravel: xy.xOvertravel, yOvertravel: xy.yOvertravel, yScrewZ: xy.yScrewZ, yMotorFace: xy.yMotorFace, yBayRoof: l.roof, yBayLocation: "lower column", yServiceRear: xy.yServiceRear},
+			z: {screwX: 0, screwY: z.screwY, guideSpacing: l.zRailSpacing, lower: z.lower, upper: 0},
+			castingMassKg: {base: frame.base.castingByWeight().kg, column: frame.column.castingByWeight().kg},
+			pending: ["BT30 study axial interfaces, release force/stroke and supplier selection", "guide/block drilling, vendor mounting patterns and installed fasteners", "insert anchorage and strength analysis",
+				"electrical brake and motor controls", "chip drainage and enclosure", "lifting and mold design", "material qualification and static/modal analysis"]};
+        sys.io.File.saveContent(directory+"/mill-frame-concept.json",haxe.Json.stringify(report,null,"  "));
+        return report;
+    }
+
 	public static function main():Void {
 		var reference = new BenchMill(false, false), l = layout(reference);
 		var z = zLayout(reference, l), xy = new MillXYStageLayout(l, z.spindleY, BenchMill.RAIL), frame = new MillFrame(l, z, xy);
@@ -121,21 +142,9 @@ class MillFramePreview {
 			Sys.println('Mill frame preview: $path');
 		}
 		writeServiceStudy(concept(reference, frame), z, directory);
-		var report = {status: "mechanical XYZ concept; not qualified for manufacture", units: "mm",
-			analysisReference:MillFemReference.capture(concept(reference,frame),frame),
-			travel: [{axis:"x",travel:2*xy.xHalfTravel},{axis:"y",travel:2*xy.yHalfTravel},{axis:"z",travel:-z.lower}],
-			base: {width: l.baseWidth, depth: l.baseDepth, height: l.baseHeight, railPlane: l.railPlane},
-			column: {width: l.columnWidth, depth: l.columnDepth, height: l.columnHeight, railFaceY: l.columnFront,
-				footShoulderMm: MillFrameLayout.COLUMN_FOOT_SHOULDER,footHeightMm: MillFrameLayout.COLUMN_FOOT_HEIGHT,clampAccess:"vertical side face"},
-			xyFullStrokeStructuralClearance: "passed conservative Cartesian-product CAD swept-volume audit",
-			zFullStrokeStructuralClearance: "passed conservative CAD swept-volume audit",
-			xy: {tableTop: xy.tableTop, saddleHeight: MillXYStageLayout.SADDLE_HEIGHT, tableRibDepth: MillXYStageLayout.RISER_HEIGHT, xOvertravel: xy.xOvertravel, yOvertravel: xy.yOvertravel, yScrewZ: xy.yScrewZ, yMotorFace: xy.yMotorFace, yBayRoof: l.roof, yBayLocation: "lower column", yServiceRear: xy.yServiceRear},
-			z: {screwX: 0, screwY: z.screwY, guideSpacing: l.zRailSpacing, lower: z.lower, upper: 0},
-			castingMassKg: {base: frame.base.castingByWeight().kg, column: frame.column.castingByWeight().kg},
-			pending: ["BT30 study axial interfaces, release force/stroke and supplier selection", "guide/block drilling, vendor mounting patterns and installed fasteners", "insert anchorage and strength analysis",
-				"electrical brake and motor controls", "chip drainage and enclosure", "lifting and mold design", "material qualification and static/modal analysis"]};
+
 		MillDesignStudy.write(concept(reference, frame), frame, directory);
-		sys.io.File.saveContent(directory + "/mill-frame-concept.json", haxe.Json.stringify(report, null, "  "));
+		writeReport(concept(reference,frame),frame,directory,true);
 		Sys.println('Mill frame concept report: $directory/mill-frame-concept.json');
 	}
 }

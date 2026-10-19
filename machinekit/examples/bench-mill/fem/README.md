@@ -2,7 +2,8 @@
 
 The current implementation exports a geometry packet, validates its physical
 datums, verifies CalculiX with analytical fixtures, and meshes the two mineral
-castings independently. It does not yet calculate assembled-machine stiffness.
+castings independently. The upper-bound assembled solve is being verified; no
+whole-machine accuracy result is qualified.
 The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN.md).
 
 ## Gate status
@@ -11,7 +12,10 @@ The implementation sequence and remaining gates are in [FEM_PLAN.md](../FEM_PLAN
   known prescribed translation/rotation, reference-node reaction correction,
   and three analytical spring/leveling cases.
   Root/submodule patch snapshots and loaded build identities are now captured.
-- Export comparison: 214 parts and three datums pass at the center pose; repeat geometry hashes pass. The corner pose also passes. Full manifest identity across a stable source/build state remains to be recorded; concurrent source changes correctly alter provenance.
+- Export gate: passed on 224 parts at center and a travel corner, including
+  same-build concept comparisons, per-part density checks, fixed-frame STEP
+  hashes across poses, and byte-identical full manifest/STEP repeat verification.
+  The Haxe datum contract passes 33 assertions and Python packet checks pass 14 tests.
 - The bonded-frame upper-bound static model, bracketed supports, energy
   decomposition and compliance budget are WIP; no stiffness result is qualified yet.
 
@@ -21,6 +25,7 @@ Run from the repository root. These Haxe configurations share their compiler
 output directory, so run them sequentially.
 
 ```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.frame.json
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fem-tests.json
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fem.json
 python3 machinekit/examples/bench-mill/fem/packet.py machinekit/examples/bench-mill/build/fem/center/manifest.json
@@ -46,7 +51,8 @@ The version-1 `manifest.json` contains:
   are already posed; applying `poseMm` again would move the solids twice.
 - Stable component IDs, material IDs, posed bounds, volumes, masses, centres of
   mass, and hashes of each STEP file. Writer timestamps in STEP headers are
-  fixed to the Unix epoch for repeatable file hashing; geometry is preserved.
+  fixed to the Unix epoch, and process-global `Product N` labels become stable
+  member IDs. These metadata changes preserve geometry and repeatable hashes.
 - Source revision, root and initialized submodule revisions, their actual tracked
   patches and hashes, and snapshots of untracked source files. Loaded haxeon,
   CadKit and OCCT binaries are hashed, with CadKit CMake/OCCT version identities.
@@ -66,8 +72,11 @@ The version-1 `manifest.json` contains:
 
 `MillFramePreview` records independent per-part physical reference data at the
 center, zero and eight corner poses in `mill-frame-concept.json`. The export
-copies that reference and checks all 214 volumes, masses, centres and bounds,
-plus tool/table/payload datums. Tolerances are recorded in the validation output.
+generates a packet-local copy through the same concept report writer, using
+the same loaded CAD build, and checks every volume, mass, centre and bound,
+plus tool/table/payload datums. Requested intermediate poses are added to the
+reference set. The physical-reference writer records that it has not rerun the
+preview clearance audits. Tolerances are recorded in the validation output.
 
 `packet.py` checks hashes, units, representations, material references, positive
 masses, normalized poses, casting volume/density consistency, total mass sums,
@@ -153,12 +162,77 @@ Jacobian determinants and mesh volume within 0.1% of CAD volume. Generated
 a geometry/toolchain pilot, not a converged structural mesh. The [Gmsh API](https://gmsh.info/doc/texinfo/)
 provides the import, mass, bounds and element-quality operations used here.
 
-## Next implementation step
+## Upper-bound static study (verification in progress)
 
-Add named interface face regions and pilot the casting/steel mesh partition.
-Then configure explicit elastic inputs, support constraints, guide/drive load
-paths and column-clamp behavior for the first upper-bound static model. Assign
-a physically consistent tool/workpiece load pair and distribute its loads to
-the interfaces. Use independent XYZ unit pairs to form the compliance matrix; gravity supplies
-reactions independently and is not subtracted in the linear model. Mesh the full load path and pass equilibrium/convergence checks before
-using any result to change the casting geometry.
+```sh
+LD_LIBRARY_PATH="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  machinekit/examples/bench-mill/build/fem/venv/bin/python machinekit/examples/bench-mill/fem/static_study.py \
+  machinekit/examples/bench-mill/build/fem/center/manifest.json \
+  --ccx "$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/bin/ccx" \
+  --sizes 40 30 --output machinekit/examples/bench-mill/build/fem/static-study
+```
+
+The driver freezes a validated copy of the packet under its output directory.
+It captures analysis source/submodule patches before solving and rejects changes
+to its Python sources or configuration during the run. CAD build identities
+come from the frozen input packet. `--resume` reuses a completed solve only when
+the regenerated input deck is byte-identical; all result gates are evaluated again.
+On this shared workstation, run large meshes through the machine-wide
+`/home/joao/dev/materia-cache/tools/heavy-run` queue with adequate memory headroom.
+An unpartitioned 20 mm solve was terminated by the host's earlyoom service when available memory
+fell below its threshold; that incomplete run is not a passed result.
+
+`frame-study.json` keys materials by `mineral-cast` and `machined-steel`, retains
+library densities and records assumed elastic overrides. Every packet part gets
+a density/volume/mass comparison. The solver separately checks each meshed part's
+density against its packet mass. Computed masses must agree; an explicitly
+declared catalogue mass is retained and its density comparison is reported.
+
+The model is explicitly an **upper bound**: casting/insert and column pad pairs
+are bonded, moving axes are rigid, and guide/drive patches use kinematic
+`*EQUATION` coupling. These equations stiffen the rail/seat regions. Physically
+rigid foot nut annuli use `*RIGID BODY`; foot rotations remain free. Other lumped
+gravity loads use `distribute_wrench`, the least-norm force allocation that
+preserves their force and moment at the represented ancestor. This static load
+allocation is not a modal mass/inertia attachment model.
+
+Two named supports are required: `soft-three-point` uses one XYZ anchor, a
+second XZ anchor, a third Z anchor and a vertically free fourth foot;
+`stiff-four-springs` uses four vertical springs and the same lateral anchors.
+The three-point triangle has two rear feet to keep the rear-heavy machine's
+self-weight reactions compressive. Four-spring leveling uses gravity reactions
+from a four-seat calibration: equivalent initial spring forces represent each
+foot's precompression, while prescribed ground DOFs stay zero. The analytical
+spring fixture checks settlement, leveling, unit response and element energy.
+
+Independent X/Y/Z unit force pairs form the relative 3x3 compliance matrix;
+gravity is a separate reaction case. Reports include all eight corners of the
+±500 N load box, principal compliances/directions, reciprocity, half-load/sign
+checks, and force/moment balance. CalculiX `ELSE` totals split strain energy
+between base casting, column casting, inserts, clamp pads and support springs.
+One base-casting stiffening solve cross-checks its X energy sensitivity.
+
+The mesher inserts conformal planes at the minimum sections' mid-depth,
+without changing material volume. These impose two quadratic layers without
+uniformly refining every long wall. Every counted convergence level must pass CAD-derived normal section probes
+through the thin floors, walls, ribs and roofs: at least two quadratic elements
+and no sampled element chord exceeding half the section thickness. The original unpartitioned 40 mm
+pilot fails this gate and does not count toward convergence. Partitioned levels
+are checked separately. Reports retain
+Gmsh warnings and final Jacobian checks. Stresses at interface/constraint edges
+and joint tractions are not qualified by these displacement checks.
+
+`compliance-budget.json` records catalogue proxies, preload classes, links and
+explicit assumptions for unselected hardware. The budget adds guides, screw/
+nut/support bearings, the X return belt reflected through its lead, clamp
+contact, spindle bearings, tool holder and the current tool to frame FEM.
+Supports already inside FEM are split by energy, without adding duplicate
+series compliance. A provisional 30% casting share target controls geometry
+screening for this pose, tool and assumed hardware. This is a conditional budget;
+selected supplier data and joint measurements remain open inputs.
+
+The remaining first-milestone gates are the two counted mesh levels, both
+support bounds, the energy cross-check and their generated budget/report.
+Later work includes the distributing-coupling assembly model, all nine poses,
+uncertainty/contact checks and modal inertia tensors. Geometry candidates stay
+deferred until the compliance budget justifies them.

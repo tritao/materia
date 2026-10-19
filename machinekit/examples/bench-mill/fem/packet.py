@@ -89,9 +89,17 @@ def validate(manifest_path):
         if required not in by_id:
             raise ValueError(f"Missing required component: {required}")
     solids = []
+    density_checks = []
     for part in parts:
         if part["materialId"] not in materials or part["massKg"] <= 0:
             raise ValueError(f"Invalid material or mass: {part['id']}")
+        if part.get("massSource") not in ("Computed","Declared"):
+            raise ValueError("Re-export packet with explicit per-part mass sources")
+        density_mass=part["volumeMm3"]*1e-9*materials[part["materialId"]]["densityKgPerM3"]
+        relative=abs(density_mass/part["massKg"]-1)
+        if part["massSource"]=="Computed" and relative>1e-7:
+            raise ValueError(f"Part volume/density/mass mismatch: {part['id']}")
+        density_checks.append({"member":part["id"],"materialId":part["materialId"],"massSource":part["massSource"],"packetMassKg":part["massKg"],"densityVolumeMassKg":density_mass,"relativeDifference":relative})
         pose = part["poseMm"]
         norm = sum(pose[k] ** 2 for k in ("qx", "qy", "qz", "qw"))
         if abs(norm - 1) > 1e-6:
@@ -142,6 +150,7 @@ def validate(manifest_path):
     comparison=compare_concept(packet,manifest_path.parent)
     validate_provenance(packet["provenance"]["sourceBuild"],manifest_path.parent)
     return {"status": "CAD packet validated; structural inputs remain unassigned",
+            "densityMassChecks":density_checks,
             "components": len(parts), "solids": len(solids), "massOnly": len(parts) - len(solids),
             "totalComponentMassKg": packet["totalComponentMassKg"],
             "manifestSha256": digest(manifest_path), "conceptComparison":comparison,

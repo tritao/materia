@@ -61,6 +61,13 @@ class FemChecks(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Duplicate"):
             self.mutated(lambda p, _: p["parts"].append(p["parts"][0]))
 
+    def test_noncasting_density_mass_check(self):
+        def change(packet, _):
+            part=next(p for p in packet["parts"] if p["materialId"]=="machined-steel" and p["massSource"]=="Computed")
+            part["volumeMm3"]*=1.1
+        with self.assertRaisesRegex(ValueError,"volume/density/mass"):
+            self.mutated(change)
+
     def test_changed_step_file(self):
         def corrupt(packet, folder):
             part = next(p for p in packet["parts"] if p["representation"] == "solid")

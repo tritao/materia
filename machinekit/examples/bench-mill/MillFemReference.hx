@@ -9,11 +9,17 @@ import materia.assembly.AssemblyFrames as F;
 
 /** Independent physical records in the concept report for checking the FEM export. */
 class MillFemReference {
-	public static function capture(assembly:MachineAssembly,frame:MillFrame):Dynamic {
+	public static function capture(assembly:MachineAssembly,frame:MillFrame,?extraPose:{x:Float,y:Float,z:Float}):Dynamic {
 		var xy:MillXYStageLayout=frame.xyAxis, z:MillZAxisLayout=frame.zAxis;
 		var poses=[{x:0.0,y:0.0,z:0.0},{x:0.0,y:0.0,z:z.lower/2}];
 		for (x in [-xy.xHalfTravel,xy.xHalfTravel]) for (y in [-xy.yHalfTravel,xy.yHalfTravel])
 			for (height in [z.lower,0.0]) poses.push({x:x,y:y,z:height});
+        if(extraPose!=null) {
+            var requested:{x:Float,y:Float,z:Float}=extraPose;
+            var duplicate=false;
+            for(pose in poses)if(Math.abs(pose.x-requested.x)<1e-6 && Math.abs(pose.y-requested.y)<1e-6 && Math.abs(pose.z-requested.z)<1e-6)duplicate=true;
+            if(!duplicate)poses.push(requested);
+        }
 		var members=assembly.components();
 		members.sort((a,b)->Reflect.compare(a.id,b.id));
 		var records:Array<Dynamic> = [];

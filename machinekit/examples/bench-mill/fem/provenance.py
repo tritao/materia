@@ -44,16 +44,22 @@ def snapshot(repository, label, output):
             "trackedDirty":bool(patch),"untrackedSources":untracked}
 
 
-def capture(repository, runtime, output):
+def capture_sources(repository, output):
     repository,output = Path(repository).resolve(),Path(output).resolve()
     diffs = output/"diffs"
     diffs.mkdir(parents=True,exist_ok=True)
     records = [snapshot(repository,"root",diffs)]
     for line in git(repository,"submodule","status","--recursive").decode().splitlines():
         if line.startswith("-"):
-            continue  # Uninitialized modules cannot supply loaded code.
+            continue
         path = line[1:].split()[1]
         records.append(snapshot(repository/path,path,diffs))
+    return {"schemaVersion":1,"root":records[0],"submodules":records[1:],"dirtySourcesCaptured":True}
+
+
+def capture(repository, runtime, output):
+    repository,output = Path(repository).resolve(),Path(output).resolve()
+    sources=capture_sources(repository,output)
     binaries = []
     paths = set(Path(p).resolve() for p in runtime)
     for name in ("haxeon/.tools/haxe/haxe","haxeon/out/haxeon-cli.hl","haxeon/out/haxeon_runtime.hdll"):
@@ -77,7 +83,7 @@ def capture(repository, runtime, output):
         builds.append(entry)
     if not any("libcadkit" in p["path"] for p in binaries) or not builds:
         raise ValueError("Missing loaded CadKit/OCCT build identity")
-    return {"schemaVersion":1,"root":records[0],"submodules":records[1:],"loadedBuildArtifacts":binaries,
+    return {**sources,"loadedBuildArtifacts":binaries,
             "cadkitBuilds":builds,"dirtySourcesCaptured":True}
 
 
