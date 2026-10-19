@@ -20,7 +20,7 @@ class MachineControlTests {
   static function slidePosition(session:ProjectDocumentSession):Float {
     var object=session.scene.object("project:slide");if(object==null)throw "Missing slide";return object.x;
   }
-  static function fixture(unit:String):ProjectDocumentSession {
+  static function fixture(unit:String,?existing:ProjectDocumentSession):ProjectDocumentSession {
     var model=new AssemblyModel(unit);
     for(id in ["base","slide","screw","head","rotor"]) {model.add(id);model.connector(id,"axis",AssemblyFrames.identity());}
     model.mateOnAxis("x","prismatic","base","axis","slide","axis",{x:1,y:0,z:0},0,
@@ -34,7 +34,7 @@ class MachineControlTests {
       {id:"project:"+id,label:id,type:"rectangle",x:0.0,y:0.0,z:0.0,width:0.01,height:0.01,depth:0.01,
         collisionEnabled:false,dynamicBody:false,mass:1.0,red:0.5,green:0.5,blue:0.5,visible:true}];
     var centers:Map<String,Array<Float>> = [];for(id in ["base","slide","screw","head","rotor"])centers.set(id,[0,0,0]);
-    var session=new ProjectDocumentSession(null,false);
+    var session=existing==null ? new ProjectDocumentSession(null,false) : existing;
     session.openGeneratedScene(data,null,null,model.definition("machine-controls"),null,centers,unit=="mm" ? 0.001 : 1.0);
     return session;
   }
@@ -95,6 +95,9 @@ class MachineControlTests {
       ui.dispose();fonts.dispose();session.dispose();
     } catch(error:Dynamic){ui.dispose();fonts.dispose();session.dispose();throw error;}
   }
+  static function angleSemantics(node:haxeon.ui.core.RenderNode):haxeon.ui.semantics.Semantics {
+    var semantics=node.semantics;if(semantics==null)throw "Missing angle semantics";return semantics;
+  }
   static function angleRouting():Void {
     near(app.editor.MachineAngleControl.deltaAngle(350,10),20,"dial wraps forward across zero");
     near(app.editor.MachineAngleControl.deltaAngle(10,350),-20,"dial wraps backward across zero");
@@ -131,8 +134,13 @@ class MachineControlTests {
       function py(a:Float):Float return cy-24*Math.cos(a*Math.PI/180);
       history=session.document.history.undoCount;
       ui.pointerDown(px(350),py(350),0);ui.pointerMove(px(10),py(10));near(value(),370,"dial crosses zero without jumping a turn");
+      near(angleSemantics(root).numericValue,10,"dial exposes wrapped orientation while coordinates keep turns");
+      near(angleSemantics(root).numericMinimum,0,"continuous dial starts at zero degrees");
+      near(angleSemantics(root).numericMaximum,360,"continuous dial exposes a full circle");
       for(a in [90.0,170.0,250.0,330.0,50.0]) {ui.submit(control(true),frame);ui.pointerMove(px(a),py(a));}
-      near(value(),770,"dial accumulates multiple turns across rebuilds");ui.pointerUp(px(50),py(50),0);
+      near(value(),770,"dial accumulates multiple turns across rebuilds");
+      root=ui.submit(control(true),frame);near(angleSemantics(root).numericValue,50,"rebuilt dial preserves wrapped orientation");
+      ui.pointerUp(px(50),py(50),0);
       check(session.document.history.undoCount==history+1,"multi-turn dial drag records one edit");
       session.document.undo();near(value(),350,"dial undo restores full accumulated angle");
       ui.submit(control(true),frame);ui.pointerDown(px(90),py(90),0);ui.pointerCancel(0,px(90),py(90));near(value(),350,"dial cancellation restores angle");
@@ -144,8 +152,67 @@ class MachineControlTests {
       MachineControlModel.set(session,id,3600000,true);ui.submit(control(false),frame);
       ui.pointerDown(x,y,0);ui.pointerMove(x+20,y);ui.pointerUp(x+20,y,0);
       near(value(),3600020,"scrubber retains large accumulated turn counts without integer overflow");
+      root=ui.submit(control(false),frame);near(angleSemantics(root).numericValue,20,"large turn counts display a single orientation");
+      MachineControlModel.set(session,id,-1,true);root=ui.submit(control(false),frame);
+      near(angleSemantics(root).numericValue,359,"negative coordinates display positive orientation");
+      ui.focusWidget(root.id);ui.key(haxeon.ui.core.UiEventKind.KeyDown,haxeon.ui.core.UiKey.Right);
+      near(value(),0,"keyboard crosses zero without adding a reverse revolution");
+      near(angleSemantics(root).numericValue,0,"keyboard wraps displayed orientation at zero");
       ui.dispose();fonts.dispose();session.dispose();
     } catch(error:Dynamic){ui.dispose();fonts.dispose();session.dispose();throw error;}
+  }
+  static function orientationEntry():Void {
+    var session=fixture("mm"),id="spindle/rotor-turn";
+    function axis():app.MachineControlModel.MachineControlAxis return MachineControlModel.axes(session).filter(a->a.id==id)[0];
+    try {
+      near(MachineControlModel.wrapDegrees(450),90,"450 degrees displays as 90");
+      near(MachineControlModel.wrapDegrees(-30),330,"negative angles wrap positively");
+      near(MachineControlModel.wrapDegrees(360),0,"a full revolution displays as zero");
+      near(MachineControlModel.wrapDegrees(-720),0,"negative whole revolutions display as zero");
+      MachineControlModel.set(session,id,350,true);
+      near(MachineControlModel.enteredPosition(axis(),10),370,"numeric entry crosses zero along the shortest rotation");
+      MachineControlModel.set(session,id,MachineControlModel.enteredPosition(axis(),10),true);
+      MachineControlModel.set(session,id,MachineControlModel.enteredPosition(axis(),450),true);
+      near(axis().value,450,"numeric entry keeps accumulated turns");
+      near(MachineControlModel.wrapDegrees(axis().value),90,"numeric entry displays normalized orientation");
+      session.document.undo();near(axis().value,370,"undo restores the continuous coordinate");
+      session.document.redo();near(axis().value,450,"redo restores the continuous coordinate");
+      var bounded=MachineControlModel.axes(session).filter(a->a.id=="tilt")[0];
+      check(!MachineControlModel.wrapsAngle(bounded),"bounded rotary joints retain authored ranges");
+      near(MachineControlModel.enteredPosition(bounded,450),450,"bounded numeric entry does not wrap past its stops");
+      refused(()->{MachineControlModel.set(session,"tilt",MachineControlModel.enteredPosition(bounded,450),true);},"bounded rotary stops still reject wrapped equivalents");
+      session.dispose();
+    }catch(error:Dynamic){session.dispose();throw error;}
+  }
+  static function orientationPanel():Void {
+    var fonts=haxeon.ui.FontCollection.create();
+    var font="haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf";
+    if(!sys.FileSystem.exists(font))font="../../"+font;
+    fonts.add(font);
+    var editor=new app.Main.ReferenceEditorApp(fonts,null,null,null,null,null,null,null,true);
+    var session=fixture("mm",editor.session),panel=new app.editor.MachineControlPanel(),frame=new haxeon.ui.LayoutFrame(360,1600);
+    try {
+      editor.documentChanged();MachineControlModel.set(session,"spindle/rotor-turn",350,true);
+      var root=editor.ui.submit(panel.build(editor),frame),field=findControl(root,"Spindle rotation (deg)");
+      if(field==null)throw "Missing spindle angle field";
+      check(angleSemantics(field).value=="350","pane shows normalized starting angle");
+      check(editor.ui.accessibilityAction(field.id.value,4,"450",0,0,0),"angle field accepts numeric input");
+      root=editor.ui.submit(panel.build(editor),frame);field=findControl(root,"Spindle rotation (deg)");
+      if(field==null)throw "Missing edited angle field";
+      editor.ui.focusWidget(field.id);editor.ui.key(haxeon.ui.core.UiEventKind.KeyDown,haxeon.ui.core.UiKey.Enter);
+      root=editor.ui.submit(panel.build(editor),frame);field=findControl(root,"Spindle rotation (deg)");
+      if(field==null)throw "Missing applied angle field";
+      check(angleSemantics(field).value=="90","Enter normalizes 450 degrees to 90 in the visible field");
+      near(MachineControlModel.axes(session).filter(a->a.id=="spindle/rotor-turn")[0].value,450,"pane keeps the nearest continuous coordinate");
+      session.document.undo();root=editor.ui.submit(panel.build(editor),frame);field=findControl(root,"Spindle rotation (deg)");
+      if(field==null)throw "Missing undo angle field";
+      check(angleSemantics(field).value=="350","undo restores the displayed orientation");
+      MachineControlModel.set(session,"spindle/rotor-turn",359.9999,true);
+      root=editor.ui.submit(panel.build(editor),frame);field=findControl(root,"Spindle rotation (deg)");
+      if(field==null)throw "Missing rounded angle field";
+      check(angleSemantics(field).value=="0","rounding at the wrap never displays 360");
+      editor.dispose();fonts.dispose();
+    }catch(error:Dynamic){editor.dispose();fonts.dispose();throw error;}
   }
   static function responsiveness(path:String):Void {
     var generated=app.ProjectSourceLoader.load(path),fonts=haxeon.ui.FontCollection.create();
@@ -277,7 +344,7 @@ class MachineControlTests {
         session.dispose();
       } catch(error:Dynamic) {session.dispose();throw error;}
     }
-    sliderRouting();angleRouting();
+    sliderRouting();angleRouting();orientationEntry();orientationPanel();
     near(MachineControlModel.parsePosition(" -1.25e2 "),-125,"numeric entry accepts scientific notation");
     for(text in ["","-","1abc","NaN","Infinity"]) refused(()->{MachineControlModel.parsePosition(text);},"invalid numeric input rejected");
     check(EditorWorkspaceLayoutTests.main()==0,"machine tab layout regression");

@@ -98,7 +98,9 @@ class MachineControlPanel {
         };
         var finish = function(commit:Bool) {finishGesture(commit);app.commands.refresh();};
 
-        var rotary=axis.unit=="deg";
+        var rotary=axis.unit=="deg",wrapped=MachineControlModel.wrapsAngle(axis);
+        // Round before wrapping so 359.9999 degrees displays as 0 rather than 360.
+        var position=number(wrapped ? MachineControlModel.wrapDegrees(Math.fround(axis.value*1000)/1000) : axis.value);
         var title=rotary ? rotaryTitle(id) : id+" · "+number(axis.value)+" "+axis.unit;
         var controls:Array<KeyedView> = [new KeyedView("label",new Text(title))];
         var minimum=axis.minimum,maximum=axis.maximum;
@@ -113,16 +115,17 @@ class MachineControlPanel {
             new KeyedView("fine",new Text("Shift for fine",null,app.appearance.theme.tokens.textSecondary,
               haxeon.ui.core.TextStyleOverride.text(11)))],stripStyle);
           controls.push(new KeyedView("angle",new Row("machine-angle:"+id,[new KeyedView("dial",dial),new KeyedView("strip",strip)],ReferenceEditorApp.actionRowStyle())));
-          if(minimum!=null && maximum!=null)controls.push(new KeyedView("range",new Text(number(minimum)+" … "+number(maximum)+"°")));
+          if(wrapped)controls.push(new KeyedView("range",new Text("0 … 360° · wraps")));
+          else if(minimum!=null && maximum!=null)controls.push(new KeyedView("range",new Text(number(minimum)+" … "+number(maximum)+"°")));
         } else if (minimum != null && maximum != null && maximum > minimum) {
           var slider=new MachineControlSlider("machine-axis-slider:"+id,id+" position ("+axis.unit+")",axis.value,minimum,maximum,
             Math.min(axis.step,(maximum-minimum)/1000),preview,begin,finish);
           slider.enabled=editable;controls.push(new KeyedView("slider",slider));
           controls.push(new KeyedView("range",new Text(number(minimum)+" … "+number(maximum)+" "+axis.unit)));
         }
-        var field=new TextField("machine-axis-value:"+id,drafts.exists(id) ? drafts.get(id) : number(axis.value),
+        var field=new TextField("machine-axis-value:"+id,drafts.exists(id) ? drafts.get(id) : position,
           value -> drafts.set(id,value));
-        field.label="Position ("+axis.unit+")";field.enabled=editable;field.style.width=LayoutAxis.grow();
+        field.label=rotary ? title+" (deg)" : "Position ("+axis.unit+")";field.enabled=editable;field.style.width=LayoutAxis.grow();
         if(!rotary) controls.push(new KeyedView("value",field));
         var buttons:Array<KeyedView> = [];
         function button(key:String,label:String,value:Float):Void {
@@ -131,7 +134,7 @@ class MachineControlPanel {
         }
         var applyPosition = function() {
           if (!editable) return;
-          try {set(MachineControlModel.parsePosition(drafts.exists(id) ? drafts.get(id) : number(axis.value)));}
+          try {set(MachineControlModel.enteredPosition(axis,MachineControlModel.parsePosition(drafts.exists(id) ? drafts.get(id) : position)));}
           catch (failure:Dynamic) {error=Std.string(failure);app.invalidateView();}
         };
         field.onSubmit = _ -> applyPosition();

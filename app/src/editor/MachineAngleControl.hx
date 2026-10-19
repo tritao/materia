@@ -48,10 +48,12 @@ class MachineAngleControl implements View {
   public function build(context:BuildContext):RenderNode return context.withScope(new Key(key),()->{
     var node=new RenderNode(context.id("angle"),LayoutVisualKind.Custom,style);
     node.focusable=enabled;node.enabled=enabled;
-    var semantics=new Semantics(AccessibilityRole.Slider,label,Std.string(value)+" degrees");
-    semantics.numericValue=value;
-    semantics.numericMinimum=minimum==null ? value-360 : minimum;
-    semantics.numericMaximum=maximum==null ? value+360 : maximum;
+    var wrapped=minimum==null && maximum==null;
+    var displayed=wrapped ? app.MachineControlModel.wrapDegrees(value) : value;
+    var semantics=new Semantics(AccessibilityRole.Slider,label,Std.string(displayed)+" degrees");
+    semantics.numericValue=displayed;
+    semantics.numericMinimum=wrapped ? 0 : minimum==null ? value-360 : minimum;
+    semantics.numericMaximum=wrapped ? 360 : maximum==null ? value+360 : maximum;
     semantics.actions=AccessibilityAction.Increment|AccessibilityAction.Decrement|AccessibilityAction.SetValue;
     if(!enabled)semantics.states|=AccessibilityState.Disabled;
     node.semantics=semantics;
@@ -63,9 +65,11 @@ class MachineAngleControl implements View {
       if(maximum!=null)next=Math.min(maximum,next);
       next=Math.fround(next*10000)/10000;
       if(next==value)return;
-      value=next;semantics.numericValue=value;semantics.value=Std.string(value)+" degrees";
-      if(minimum==null)semantics.numericMinimum=value-360;
-      if(maximum==null)semantics.numericMaximum=value+360;
+      value=next;
+      var displayed=wrapped ? app.MachineControlModel.wrapDegrees(value) : value;
+      semantics.numericValue=displayed;semantics.value=Std.string(displayed)+" degrees";
+      if(!wrapped && minimum==null)semantics.numericMinimum=value-360;
+      if(!wrapped && maximum==null)semantics.numericMaximum=value+360;
       refresh.update(value);change(value);
     };
     var point=function(event:UiEvent):{x:Float,y:Float} {
@@ -116,7 +120,10 @@ class MachineAngleControl implements View {
     node.on(UiEventKind.AccessibilityIncrement,_->emit(value+1));
     node.on(UiEventKind.AccessibilityDecrement,_->emit(value-1));
     node.on(UiEventKind.AccessibilitySetValue,event->{
-      if(event.text!=null) {try {emit(app.MachineControlModel.parsePosition(event.text));}catch(_:Dynamic){}}
+      if(event.text!=null) {try {
+        var next=app.MachineControlModel.parsePosition(event.text);
+        emit(wrapped ? value+deltaAngle(value,app.MachineControlModel.wrapDegrees(next)) : next);
+      }catch(_:Dynamic){}}
     });
     var tokens=context.theme.tokens;
     node.onPaint((canvas,bounds)->{

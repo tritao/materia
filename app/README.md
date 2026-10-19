@@ -76,7 +76,10 @@ independently of the assembly's source units. Rotary joints have a dial and an
 endless horizontal scrubber linked to numeric entry. The dial chooses the nearest
 orientation on click and accumulates turns while dragged through zero. Drag the
 scrubber horizontally to rotate by any number of turns; hold Shift on either
-control for one-tenth sensitivity. Angular travel limits still apply. Press Enter
+control for one-tenth sensitivity. Continuous rotary controls display orientation
+from 0° up to 360° (360° wraps to 0°), while joint coordinates retain accumulated
+turns. Numeric entry normalizes angles such as 450° to 90° and chooses the nearest
+equivalent orientation. Bounded rotary joints retain their authored travel limits. Press Enter
 or Apply for an exact angle, and Reset to restore the initial angle. Edits update the complete assembly and support Undo/Redo. Slider drags
 preview live and record one undo step on mouse release; cancellation restores
 the starting position without adding history. Coordinate edits reuse the compiled

@@ -40,6 +40,20 @@ class MachineControlModel {
     return result;
   }
 
+  public static function wrapsAngle(axis:MachineControlAxis):Bool
+    return axis.unit=="deg" && axis.minimum==null && axis.maximum==null;
+
+  /** Orientation is displayed in [0, 360); coordinates retain their accumulated turns. */
+  public static function wrapDegrees(value:Float):Float return ((value%360)+360)%360;
+
+  /** Numeric orientation edits choose the closest equivalent continuous coordinate. */
+  public static function enteredPosition(axis:MachineControlAxis,value:Float):Float {
+    if(!wrapsAngle(axis) || !Math.isFinite(value))return value;
+    var delta=wrapDegrees(value)-wrapDegrees(axis.value);
+    if(delta>180)delta-=360;else if(delta < -180)delta+=360;
+    return axis.value+delta;
+  }
+
   public static function parsePosition(text:String):Float {
     var clean = StringTools.trim(text);
     if (!~/^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/.match(clean))
