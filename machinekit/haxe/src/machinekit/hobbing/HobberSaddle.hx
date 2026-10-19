@@ -34,7 +34,7 @@ class HobberSaddle extends MachineComponent {
   override public function geometry(detail:ComponentDetail=Preview):Part {
     return switch values().token("design") {
       case "GE-X-carriage": Solids.union([
-        box(240,386,-185,185,260,280),box(60,386,-185,-140,260,280),box(60,386,140,185,260,280),
+        box(240,386,-210,210,260,280),box(60,386,-210,-160,260,280),box(60,386,160,210,260,280),
         Solids.cut(box(202.5,222.5,-35,35,155,280),[boreX(8.2,202.4,222.6,0,180)]),box(202.5,260,-35,35,260,280)]);
       case "GE-Z-saddle": Solids.union([
         box(135,148,-175,175,-65,170),box(135,148,-190,-175,140,232),

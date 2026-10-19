@@ -48,6 +48,29 @@ class HobberDesignChecks {
         var hi=rail.length-(relative.z+travel.upper-travel.initial+block.spec.blockLength/2)-rail.spec.railEndMargin;
         count++;if(lo<5||hi<5)throw 'guide lacks declared 5 mm overtravel ${m.id}: $lo/$hi';
       }
+      // A point contact can pass while a rail seat overhangs a well. Check its full backing volume.
+      var foundations:Array<machinekit.hobbing.MineralFoundation> = [machine.bed,machine.column];
+      for(foundation in foundations){
+        var localPoses=foundation.solvedPoses(),body=cache.posed(foundation.body,localPoses.get("casting"));
+        try {
+          for(row in foundation.insertLocations())if(row.id=="railLeft"||row.id=="railRight"){
+            var backing=foundation.kind=="bed"?row.pose.z:10.0;
+            var raw=cadkit.modeling.Part.box(row.part.parameterNumber("width"),row.part.parameterNumber("depth"),backing);
+            var slab=PosedParts.moved(raw,F.compose(localPoses.get(row.id),F.translation(0,0,-backing)));raw.close();
+            var unsupported=slab.subtract(body),missing=unsupported.volume();unsupported.close();slab.close();
+            count++;if(missing>0.001)throw 'rail insert ${foundation.kind}/${row.id} lacks full casting backing: $missing mm3';
+          }
+        }catch(e:Dynamic){body.close();throw e;}body.close();
+      }
+      // Tray drops in from above with bed guides and table fitted, before the moving column/head.
+      var tray=members.filter(m->m.id=="chipTray")[0].component;
+      for(lift in [0.0,25,50,100,200,400]){
+        var trayPose=F.compose(F.translation(0,0,lift),poses.get("chipTray"));
+        for(m in members)if(StringTools.startsWith(m.id,"bed/")||StringTools.startsWith(m.id,"railX")||StringTools.startsWith(m.id,"table/")||m.id=="XdriveFrame"||m.id=="Xfixed"||m.id=="Xfloating"||m.id=="Xscrew"){
+          var overlap=cache.overlap(tray,trayPose,m.component,poses.get(m.id));
+          count++;if(overlap>0.001)throw 'chip tray cannot be installed vertically past ${m.id} at lift $lift mm: $overlap mm3';
+        }
+      }
       var rebuilt=MachineAssembly.decode(machine.encode(),MachineKitComponents.standard()),restored=rebuilt.solvedPoses();
       count++;if(rebuilt.components().length!=members.length)throw "redesigned machine lost members in persistence";
       for(m in members){var original:materia.assembly.AssemblyRecord.AssemblyFrame=poses.get(m.id);

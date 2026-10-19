@@ -11,6 +11,28 @@ typedef InsertLocation={id:String,role:String,width:Float,depth:Float,height:Flo
 
 /** Design-specific insert layout, not a casting process model. Coordinates relative to casting body. */
 class FoundationLayout {
+  public static inline final BED_RAIL_CENTRE=185.0;
+  public static inline final BED_RAIL_SEAT_WIDTH=50.0;
+  public static inline final BED_RAIL_BEAM_WIDTH=110.0;
+
+  /** Keep full-height longitudinal load beams out of the general lightening cores. */
+  static function bedCores(cells:Array<machinekit.structural.CastingFeatures.CastingBox>):Array<machinekit.structural.CastingFeatures.CastingBox> {
+    var result:Array<machinekit.structural.CastingFeatures.CastingBox> = [];
+    for(cell in cells){
+      var spans=[{lo:cell.pose.y-cell.depth/2,hi:cell.pose.y+cell.depth/2}];
+      for(side in [-1,1]){
+        var low=side*BED_RAIL_CENTRE-BED_RAIL_BEAM_WIDTH/2,high=side*BED_RAIL_CENTRE+BED_RAIL_BEAM_WIDTH/2;
+        var remaining=[];
+        for(span in spans){
+          if(span.hi<=low||span.lo>=high)remaining.push(span);
+          else {if(span.lo<low)remaining.push({lo:span.lo,hi:low});if(span.hi>high)remaining.push({lo:high,hi:span.hi});}
+        }
+        spans=remaining;
+      }
+      for(i in 0...spans.length){var span=spans[i];result.push(CastingFeatures.box(cell.id+"-bay-"+i,cell.width,span.hi-span.lo,cell.height,cell.pose.x,(span.lo+span.hi)/2,cell.pose.z));}
+    }
+    return result;
+  }
   public static function dimensions(kind:String,legacy:Bool=false):Array<Float> return switch kind {
     case "bed": legacy?[650.0,550,120]:[1000.0,650,210]; case "column": legacy?[200.0,180,600]:[400.0,200,500];
     default: throw "Unknown hobber foundation kind";
@@ -20,6 +42,7 @@ class FoundationLayout {
     var cores=CastingFeatures.grid(d[0],d[1],d[2],kind=="bed"?30:25,20,20,25);
     if(!legacy){
       if(kind=="bed"){
+        cores=bedCores(cores);
         cores.push(CastingFeatures.box("work-well",410,300,100,-295,0,120));
         cores.push(CastingFeatures.box("chip-drain",280,180,80,-300,0,40));
         cores.push(CastingFeatures.box("X-drive-channel",625,110,90,187.5,0,130));
@@ -38,8 +61,8 @@ class FoundationLayout {
     if(!legacy){
       if(kind=="bed"){
         add("tablePlate","table seat",180,180,20,-250,0,110);
-        for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"preloaded column guide seat",width:50,depth:680,height:20,
-          pose:F.fromRotationMatrix(110,side*165,200,[0.0,1,0,-1,0,0,0,0,1])});
+        for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"preloaded column guide seat",width:BED_RAIL_SEAT_WIDTH,depth:680,height:20,
+          pose:F.fromRotationMatrix(110,side*BED_RAIL_CENTRE,200,[0.0,1,0,-1,0,0,0,0,1])});
         out.push({id:"driveSeat",role:"central X screw channel seat",width:100,depth:600,height:20,pose:F.fromRotationMatrix(192.5,0,120,[0.0,1,0,-1,0,0,0,0,1])});
         for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,-400,side*310,180);
       }else{

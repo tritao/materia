@@ -171,3 +171,10 @@ HGH25CA (X) / HGH15CA (Y/Z) supplier exteriors. X rails use the matching HGR25R
 section; Y/Z use the verified HGR15R generator. The supplier recipes persist source
 hashes and share the existing rail/top/mount connectors. Assets are prepared by
 `linear-rail-reference/prepare.py`; CAD-derived homogeneous-steel mass is assumed.
+
+Rail-seat support revision: the bed has continuous casting beams (110 mm core-free bands, at least 90 mm at the well) below the
+50 mm guide inserts, with bed guides spaced 370 mm apart and a matching wider
+carriage. The 300 mm chip-well opening is preserved for tray installation. Bed
+rail inserts have full-footprint support to the sole; column seats have at least
+10 mm backing. The exposed 10 mm steel mounting land is intentional. Fit the
+tray and align the rails before installing the moving column/head.

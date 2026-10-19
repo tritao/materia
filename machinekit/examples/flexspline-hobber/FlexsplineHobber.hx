@@ -59,13 +59,13 @@ class FlexsplineHobber extends MachineAssembly {
     travel=[{id:"X",lower:minX,upper:250,initial:cutDistance},{id:"Y",lower:-10,upper:10,initial:0},{id:"Z",lower:-10,upper:190,initial:0}];
     for(side in [-1,1]){
       var name=side<0?"Left":"Right",insert=side<0?"bed/railLeft":"bed/railRight";
-      fixAt("railX"+name,new HiwinHgr25Rail(680),AxisBuilder.orient(20,side*165,242,[0.0,0,1],[1.0,0,0]),insert,F.alongY(20,side*165,220,0,0,1));
+      fixAt("railX"+name,new HiwinHgr25Rail(680),AxisBuilder.orient(20,side*FoundationLayout.BED_RAIL_CENTRE,242,[0.0,0,1],[1.0,0,0]),insert,F.alongY(20,side*FoundationLayout.BED_RAIL_CENTRE,220,0,0,1));
       precisionMounts.push({name:"railX"+name+"-mount",parent:insert});
     }
     addComponent("Xbridge",new HobberSaddle("GE-X-carriage"));zero.set("Xbridge",F.translation(centre,0,0));
     moving("X",Prismatic,"railXLeft","Xbridge",F.translation(0,0,242),[1.0,0,0],cutDistance,minX,250);
     for(side in [-1,1])for(row in [102,300])fixAt("blockX"+(side<0?"Left":"Right")+(row==102?"":"Front"),new SupplierRailBlock("HGR25"),
-      AxisBuilder.orient(centre+row,side*165,242,[0.0,0,1],[1.0,0,0]),"Xbridge",F.alongY(centre+row,side*165,260,0,0,1));
+      AxisBuilder.orient(centre+row,side*FoundationLayout.BED_RAIL_CENTRE,242,[0.0,0,1],[1.0,0,0]),"Xbridge",F.alongY(centre+row,side*FoundationLayout.BED_RAIL_CENTRE,260,0,0,1));
     includeAt("column",column,F.fromRotationMatrix(centre+286,0,290,[0.0,-1,0,1,0,0,0,0,1]));
     fixExisting("column-mount","Xbridge","column/basePlate",F.alongY(centre+326,0,280,0,0,1));
     for(side in [-1,1]){

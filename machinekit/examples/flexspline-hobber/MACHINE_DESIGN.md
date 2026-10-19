@@ -16,6 +16,16 @@ The frame regression compares actual assembled poses, cut boundaries and loads
 with the analytic reference chain, rather than changing the cutting definition.
 
 The bed is 1000 × 650 × 210 mm, with a work well and drain below the table.
+The bed has two continuous longitudinal casting beams under the
+50 mm rail-seat inserts. Bed guides are spaced 370 mm apart (centres ±185 mm),
+and the carriage is widened to suit. Lightening cores stay outside 110 mm beam
+bands; the chip well leaves at least 90 mm beam width at the guide seats.
+Each complete bed rail-seat footprint is backed by solid casting down to the sole;
+the work well remains 300 mm wide throughout for top-down chip-tray installation.
+The steel top faces deliberately stand 10 mm above the casting for rail mounting.
+Full-footprint solid checks verify the bed load beams and at least 10 mm of backing
+behind both column rail inserts. No rail mounting face overhangs a casting cavity.
+
 Its table seat, two column rail seats, drive seat and lifting points use shared
 `machinekit.structural` casting recipes and separately listed steel inserts.
 Precision mounts land on inserts, never on mineral cast. The recessed column is
@@ -52,13 +62,13 @@ confirmation.
 | X guide-plane to hob centre | 347 mm | 121 mm |
 | Z guide-plane to hob centre | 325 mm | 161 mm |
 | Y guide-plane to hob centre | 137 mm | 70 mm |
-| X moving mass | 81.71 kg | 129.55 kg |
+| X moving mass | 81.71 kg | 130.98 kg |
 | Z moving mass | 106.79 kg | 40.52 kg |
 | Y moving mass | 18.01 kg | 13.49 kg |
-| Machine mass | 351.61 kg | 343.27 kg |
+| Machine mass | 351.61 kg | 424.21 kg |
 | Bed footprint (radial × tangential) | 650 × 750 mm | 1000 × 650 mm |
 | Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1640 × 650 mm |
-| X continuous thrust margin, same assumed demand basis | 911.15 N | 887.23 N |
+| X continuous thrust margin, same assumed demand basis | 911.15 N | 886.51 N |
 | Y continuous thrust margin, same assumed demand basis | 897.29 N | 911.02 N |
 | Z continuous thrust margin, same assumed demand basis | 859.36 N | 1542.40 N |
 
@@ -124,3 +134,24 @@ a coarse physical cut; it cannot establish reference ISO grade or HB12's full
 reference cycle-time acceptance. Frozen HB4/HB11 cuts use their original layout
 and remain separate evidence. Structural/modal analysis, spindle/mandrel sag,
 thermal behaviour and detailed manufacturing release remain open plan items.
+
+The continuous bed beams add 79.51 kg to the fixed casting, and the wider carriage
+adds 1.43 kg to X. Total calculated machine mass is now 424.21 kg (previously
+343.27 kg). X moving mass is 130.98 kg and its assumed-demand continuous thrust
+margin remains 886.51 N. Y/Z masses and margins are unchanged. Structural/modal
+qualification remains open; these are geometry and mass checks.
+
+## Foundation assembly sequence
+
+Cast the bed with the steel inserts located as child parts, then grind or replicate
+the steel mounting faces after cure; do not machine datum surfaces into mineral cast.
+Inspect the rail-seat planes and backing before fitting the guides. Lower the chip
+tray into the open well before the moving column/head are fitted; its insertion
+path is checked with the bed guides, screw supports and table present. Fit and align
+the bed rails with the column carriage removed, preserving access to every rail
+mounting bore. Align the master guide first, then indicate the second guide parallel
+before tightening. Install blocks, carriage and column afterwards; fit and align the
+column guides before adding the Z saddle and head. The central screw deck remains
+separate and accessible through its channel. Mounting threads, retention details,
+fastener selections and tightening procedures still need manufacturing drawings;
+this layout check is not structural or mould-process qualification.

@@ -2191,3 +2191,34 @@ asserts material removal and checks the runtime stock's axial bounds against the
 original blank (10 µm display-position allowance). It also checks the installed
 4 kHz timestep. The corrected desktop build was opened on the coarse cutting job.
 The preceding headless acceptance alone did not establish visible stock removal.
+
+### Continuous support for bed guide inserts (2026-10-19)
+
+Repositioned the bed guides from ±165 to ±185 mm and widened the X carriage to
+match. The 50 mm steel rail seats now sit wholly on continuous
+longitudinal casting beams with 110 mm core-free bands (at least 90 mm width at
+the chip well); lightening cores stay outside that primary load path.
+The existing 300 mm chip-well opening is preserved, allowing top-down tray
+installation. The steel mounting lands remain intentionally 10 mm proud.
+
+Full-footprint checks verify uninterrupted casting down to the sole beneath both
+bed rail seats, plus 10 mm backing behind both column seats. The chip tray's
+vertical installation path is checked with the fixed bed guides, screw supports
+and table present, before installing the moving column/head. Assembly sequence
+and rail alignment access are documented in MACHINE_DESIGN.md. No shims or
+collision exclusions were added. Recessed lifting sockets remain deferred.
+
+The final arrangement passes 914 mechanical/persistence/assembly assertions and
+85-pose changed-part solid audits for both coarse and reference configurations
+(A ±15°, 0.001 mm³ threshold). All unchanged part pairs retain their prior full
+audit evidence. Repeated identical relative poses reuse exact solid results with
+no rounding or tolerance changes. The work-frame pose/cut/force regression passes
+unchanged. Calculated machine mass is 424.21 kg; X moving mass is 130.98 kg and
+continuous thrust margin is 886.51 N under the existing assumed demand basis.
+Modal/structural and manufacturing release checks remain open.
+
+Final loading-range checks: 1804 pass. The final saved-scene/background-playback
+regression completes all 982 windows in 6.00275 simulated seconds, with zero
+cutter/fixture contacts and stock display alignment verified. Materia was refreshed
+with the final guide spacing and casting. Frozen native providers were reused
+read-only; running metrology/budget workers were not rebuilt or signalled.
