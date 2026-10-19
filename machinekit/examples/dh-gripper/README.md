@@ -28,9 +28,8 @@ The remote connector contains invalid supplier topology; its faces are tessellat
 individually into one visual object, preserving the supplied geometry without repair.
 
 The example route starts at the measured supplier jacket exit, travels straight for
-100 mm, turns 90 degrees with a true circular 55 mm centreline radius, and runs another
-80 mm toward a future wrist attachment point. Its analytic length is approximately
-266.4 mm. The circular sweep has continuous tangents; it is not a sharp polyline.
+100 mm, turns 180 degrees with a true circular 55 mm centreline radius, and returns
+40 mm toward the wrist. Its analytic length is approximately 312.8 mm. The circular sweep has continuous tangents; it is not a sharp polyline.
 The diameter follows supplier geometry. The 100 mm clearance and R50 minimum come from
 [DH's PGC drawing](https://en.dh-robotics.com/wp-content/uploads/2022/08/DH-Robotics-Servo-Electric-Gripper.pdf).
 The chosen R55 also leaves more than 50 mm at the jacket's inner surface.
@@ -43,9 +42,16 @@ The model is translated to center the rigid gripper in X/Y and rest on Z=0.
 Colors are reference styling; the current STEP reader does not retain supplier colors/names.
 Simulation masses are zero and collisions explicitly disabled for this visual reference:
 connector contacts and the supplier's surface-only housing are not commissioned collision
-bodies. Electrical interfaces, wrist bracket/strain relief, full wrist-motion
-slack and collision checks against the tending cell remain to be defined. The return leg
-and endpoint are provisional until the wrist layout is chosen.
+bodies. The dual tool adds a second split saddle on each return lead, connected to the
+existing adapter-mounted support. These support the cable just before the supplier
+connector, replacing the unsupported upward-facing ends. The connector mating faces point toward the wrist; assembly access, sockets,
+connector retention, liners and fastening details remain unverified. The existing exit saddle spans 90–100 mm from the measured jacket exit;
+the drawing's 100 mm callout reference and fixation requirements need confirmation.
+
+The return leads are rigid references attached to the tool. They do not represent a
+finished robot dress pack: mating sockets, a flexible wrist service loop, forearm
+attachment, torsion limits and full-motion checks remain to be designed. In particular,
+a valid isolated-tool check does not establish clearance from robot links or the cell.
 
 ## Jaw articulation
 
@@ -211,7 +217,9 @@ boss enters a 2.7 mm-deep pocket. The robot-side pattern matches the existing
 `RobotFlange(50)` reference, including its raised pilot. This is that model's
 interface, not a claim that every robot with a nominal ISO pattern fits it.
 
-Two supported split-clamp concepts carry the outward electrical service loops.
+Two adapter-mounted support concepts each carry an exit clamp and a return clamp.
+The R55 hairpins turn the leads back toward the wrist instead of leaving upright
+connectors unsupported. Connector bodies are not structural attachment points.
 The clamps use a nominal 6.6 mm bore around the 6.4 mm cable and a 0.2 mm split;
 liners and tightening behaviour need validation. M3 clamp and M4 support holes
 are modelled, but screws, tapped threads and final screw lengths are not a released
@@ -253,7 +261,138 @@ The two grippers have independent synchronized jaw mechanisms and expose
 `grasp-a`/`grasp-b` frames at the centres of the planned blanks. Blanks remain fixed
 in their held reference poses; there is no electrical driver or simulated grasp.
 The generated scene explicitly disables collision physics, as does the single
-supplier reference. STEP files for the adapter and four clamp/support pieces are
+supplier reference. STEP files for the adapter and six clamp/support pieces are
 exported beside the scene for review. All new adapter and support geometry is a
 prototype pending mounting access, stiffness, fatigue, tolerance, cable flex and
 full tending machine/vise-access checks.
+
+
+The optional cobot wrist socket and passive dual-output junction now have a separate
+[tool-service reference](../tool-service/README.md), including electrical contract
+checks and local mounting CAD. They are not yet installed in this dual-tool artifact.
+The previous large-return cable/support routing has confirmed interference with the
+arm at a tested pose; its isolated-tool clearance result does not make that route usable.
+
+The dual-PGC concept selects the Fairino **Expert ICACX1500GSCEXP** adapter
+(Welectron FA2-860952), with external 24 V power, through
+`DhDualGripperServices`. The dual preview exports `build/dual/service-bom.json`
+for this purchased harness; this is a service purchase list, not a complete tool BOM.
+The purchase entry remains inventory-only; the installation study below adds separate
+provisional geometry. Its mass remains
+unknown rather than using the short illustrative cable model as actual stock mass.
+The old cable returns are still a prototype and have known installed tending
+interference; selecting this adapter does not validate or replace those routes.
+DH compatibility, adapter current rating, supply/cable selection and backfeed handling
+remain open. See the [adapter reference](../tool-service/FAIRINO-ADAPTERS.md).
+
+### Expert installation layout
+
+The dual preview entry now displays the Expert installation study, built by
+`DhExpertToolPreview`. The old `DhDualToolPreview.preview()` remains the baseline
+geometry builder for comparison; its old cable/support checks do not qualify the
+replacement routing. Expert outputs live separately in `build/expert/`.
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/dh-gripper/haxeon.expert.json
+python machinekit/examples/dh-gripper/render_expert.py
+./haxeon/scripts/haxeon run --project=machinekit/examples/dh-gripper/haxeon.expert-audit.json -- --tool-only
+```
+
+`-- --cached-dual` may be used on the Expert preview command for routing-only
+iterations after generating the baseline. Omit it when source gripper geometry changes.
+The renderer uses the scene triangles and recorded assembly poses.
+
+The A DH cable's R55 return is rotated into the tool-side XY plane; B retains its
+horizontal return. Both preserve 100 mm straight exits and 40 mm return tails.
+All tall carriers, cable-loop cantilevers and screw clamp caps are removed.
+A 52 × 54 × 4 mm low saddle sits on the exposed +Y adapter edge, with a recessed
+1 mm soft pad and two reusable 10 mm strap envelopes. Two counterbored M3x10 mounting
+screws require **two new blind M3 tap drills** at tool XY (-47,44) and (-3,44),
+modeled in the adapter. Strap slots pass through the shelf. Strap material,
+closure, tension and retention remain prototype choices; these are planning
+envelopes, not a selected commercial strap. The two DH cable loops are flexible
+and unsupported along their length; preserving the drawn bend radius does not
+prove their shape or strain relief under acceleration. No tape or clamps across
+robot joints are modeled. The splitter is lowered beside the A gripper, reducing
+the support envelope instead of carrying it high on a frame.
+
+Expert branch lengths, diameters, connector envelopes and wrist plug placement
+remain estimates. Expert routes use analytic circular arcs and straight segments, with radii and
+lengths reported. R25 is a provisional planning target, not a supplier rating; the
+cable's allowed bend radius is still unknown. The right-angle
+plug's displayed location is a layout assumption on the generic cobot, not a
+FAIRINO measured mating frame. External power ends at a provisional wrist-side handoff without a qualified anchor: no cable
+across moving robot joints is claimed. The purchased harness is one line in
+`service-bom.json`; prototype saddle/strap hardware is not a procurement-ready BOM.
+The baseline dual tool payload budget excludes this new installation and must not
+be reused as a qualified payload check.
+
+`layout-report.json` records every new static service pair, including connector
+attachment contacts. `tool-cad-audit.json` checks retained gripper/tool CAD at jaw
+openings 0, 17 and 25 mm. `tending-pose-audit.json` uses saved solved configurations
+from the historical `machine-tending/build/electric-access/report.json`, recording
+its hash and individual STEP source hashes. Clear bounds above 5 mm are lower
+limits; closer pairs use exact CAD distance and solid common volume. This is a
+static saved-pose audit, not a continuous sweep or a new cell-access certificate.
+By default it audits all solved tending-top-entry poses; `-- --all-profiles` also
+includes the older side-entry comparison poses. The overmold entry points are
+layout assumptions; they are not supplier connector frames. Modeled branch
+lengths do not establish stock cable lengths or permit cutting the supplied harness.
+
+The historical diagnostic audit includes four outfeed/B configurations already
+rejected by the original access study. Exact CAD confirms forearm/service clashes
+there; they must remain rejected rather than being treated as approved tending
+poses. The access checker now tries all four headings and additional elbow seeds
+before accepting an endpoint. Fresh Expert access results go to the separate
+`electric-expert-access` directory. To audit that dataset independently:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/machine-tending/haxeon.electric-access.json -- --cached-expert
+./haxeon/scripts/haxeon run --project=machinekit/examples/dh-gripper/haxeon.expert-audit.json -- --current-access --poses-only --approved-only
+python machinekit/examples/dh-gripper/review_expert.py --current-access
+```
+
+`--cached-expert` uses the already generated Expert scene and saved gripper frame;
+omit it to rebuild the entire tool. This study screens top-entry by default;
+`--all-profiles` also includes the older side-entry comparison. The audit's
+`--tool-only` mode refreshes just retained-tool checks without rewriting robot-source
+artifacts. Current-access robot CAD is stored separately. Changes to service geometry invalidate
+older service hashes; rerun a diagnostic audit before interpreting it as current. A nonzero review exit means actual overlap, less than 0.5 mm retained-tool clearance,
+or less than 5 mm robot clearance remains in at least one audited configuration; a successful static review
+still does not certify the full cell or a continuous trajectory.
+
+`--poses-only` reuses a retained-tool audit only after verifying its scene hash.
+
+`--approved-only` checks the poses selected by source paths whose status is
+`sampled route solved and clear`. It does not convert rejected or unsolved source
+cases into passes. The review summary separately lists all unresolved required
+station/gripper cases; static review success is not full study completion.
+
+The generator trials two catalog ISO 4762 M3x10 screws against the saddle,
+including head counterbores and the neighboring splitter envelope. This checks saddle interference, not thread strength,
+preload or a procurement-ready mounting BOM. `fastenerTrials` records both checks.
+Regenerate the baseline adapter when changing these mounting holes; `--cached-dual`
+must only reuse a baseline built from the current adapter source.
+
+The simplified saddle layout passes 91 service/service checks, 406 retained-tool
+CAD checks at three jaw openings, and both M3x10 screw trials. At the simplified-saddle checkpoint, the full access
+study retained 17 of 28 station/gripper cases; 11 remained unresolved. An independent
+audit of those 17 accepted poses checks 24,752 service/robot pairs across 104
+mechanical components and passes the 5 mm static margin. The nearest reported
+robot separation is a conservative bounds lower limit of 5.51 mm. These results
+do not establish dynamic cable retention, swept clearance or full-cycle access.
+
+A subsequent focused vise study resolves all four vise approaches through staged
+routing and a 50 mm approach lift, with no tool/support geometry changes. See
+`../machine-tending/build/electric-expert-vise/report.json` and the machine-tending
+README for its command and scope. Independent endpoint review:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/dh-gripper/haxeon.expert-audit.json -- --vise-access --poses-only --approved-only
+python machinekit/examples/dh-gripper/review_expert.py --vise-access
+```
+
+This produces `vise-tending-pose-audit.json` and `vise-review-summary.json`, with
+separate `robot-source-vise/` CAD captures. It does not promote the older full-cell
+report to a full-cycle pass. The accepted route joint traces and actual final
+joint configurations are saved in the focused source report.

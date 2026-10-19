@@ -69,6 +69,8 @@ class DhDualToolPreview {
       var pocket=Part.cylinderAlongY(15.85,-2.7,0.5);
       tools.push(new Part(mount.apply(pocket.shape)));pocket.close();
     }
+    // Low Expert splitter saddle on the exposed +Y edge: blind M3 tap drills.
+    for(x in [-47.0,-3.0]) tools.push(Part.cylinderSpan(1.25,8,17,x,44));
     // Blind M4 tap drills for cable support A; opposing pin/tap holes retain a web.
     for(y in [-39.0,-29.0]) tools.push(Part.cylinderSpan(1.65,8,17,-45,y));
     // B support anchors normal to the side plate.
@@ -86,6 +88,11 @@ class DhDualToolPreview {
       : fuse([box(-52,-40,-44,-24,12,27),box(-148,-40,-44,-26,20,25),box(-148,-138,-44,8,20,25),box(-148,-138,-8,8,25,33)]);
     else result=cap ? box(88,104,138,148,60.2,68)
       : fuse([box(75,104,40,50,30,50),box(88,104,40,148,43,50),box(88,104,138,148,50,60)]);
+    if(!cap) {
+      var rear=returnSupport(side,false);
+      if(side==0) {var shifted=rear.translated(new Vector(0,0,-4));rear.close();rear=shifted;}
+      result=fuse([result,rear]);
+    }
     var tools:Array<Part> = [];
     tools.push(side==0 ? Part.cylinderAlong(3.3,new Vector(-149,0,33),Vector.X(),12)
       : Part.cylinderAlongY(3.3,137,149,96,60));
@@ -108,6 +115,32 @@ class DhDualToolPreview {
     if(side==0) {
       var raised=refined.translated(new Vector(0,0,4));refined.close();return raised;
     }
+    return refined;
+  }
+  /** Second split saddle supports the return lead immediately before its connector.
+      Both ends stay on the tool; no rigid cable is asserted across moving joints. */
+  static function returnSupport(side:Int,cap:Bool):Part {
+    // Supports are dimensioned for the shared route; fail rather than silently
+    // leaving a saddle behind if the single-gripper service route changes.
+    near(DhGripperPreview.STRAIGHT_MM,100,"Return support straight lead");
+    near(DhGripperPreview.BEND_RADIUS_MM,55,"Return support bend radius");
+    near(DhGripperPreview.RETURN_MM,40,"Return support return lead");
+    // Cable tips A (-108,0,-73), B (-14,108,60). Saddles stop 10 mm
+    // before those tips, leaving clearance for the supplier connector backshell.
+    var result=side==0
+      ? (cap ? box(-128,-118,-8,8,-72.8,-65)
+        : fuse([box(-128,-118,-44,-26,-81,25),box(-128,-118,-44,8,-81,-76),box(-128,-118,-8,8,-81,-73)]))
+      : (cap ? box(-22,-6,118,128,60.2,68)
+        : fuse([box(-22,96,118,128,43,50),box(-22,-6,118,128,50,60)]));
+    var tools:Array<Part> = [side==0 ? Part.cylinderAlong(3.3,new Vector(-129,0,-73),Vector.X(),12)
+      : Part.cylinderAlongY(3.3,117,129,-14,60)];
+    for(radial in [-6.0,6.0]) {
+      var x=side==0 ? -123.0 : -14+radial,y=side==0 ? radial : 123.0,z=side==0 ? -73.0 : 60.0;
+      tools.push(Part.cylinderSpan(cap ? 1.7 : 1.25,z-9,z+9,x,y));
+      if(cap) tools.push(Part.cylinderSpan(2.9,z+5,z+9,x,y));
+    }
+    result=cut(result,tools);var refined=result.refined();result.close();
+    if(!refined.valid() || refined.solidCount()!=1) throw "Return cable support is not one valid solid";
     return refined;
   }
   static function shapeAt(shape:Shape,frame:AssemblyFrame):Shape {
@@ -162,6 +195,8 @@ class DhDualToolPreview {
       addMetal("adapter","Prototype machined dual-wrist adapter",adapter(),[0.38,0.44,0.52]);
       for(side in 0...2) for(cap in [false,true]) addMetal('support-$side-'+(cap ? "cap" : "base"),
         'Cable ${side==0 ? "A" : "B"} '+(cap ? "split-clamp cap" : "support and lower clamp"),support(side,cap),[0.58,0.6,0.63]);
+      for(side in 0...2) addMetal('return-$side-cap','Cable return saddle cap '+side,returnSupport(side,true),[0.58,0.6,0.63]);
+      var metalCount=owned.length;
       var definition=source.assemblyDefinition;
       if(definition==null) throw "Single gripper lost its kinematic definition";
       for(side in 0...2) {
@@ -219,14 +254,14 @@ class DhDualToolPreview {
         }
         groups=[group,group];
       }
-      for(i in 0...5) for(j in i+1...5) overlap(owned[i],owned[j],'Added metal $i / $j');
+      for(i in 0...metalCount) for(j in i+1...metalCount) overlap(owned[i],owned[j],'Added metal $i / $j');
       var low=new Vector(1e30,1e30,1e30),high=new Vector(-1e30,-1e30,-1e30);
       function extend(shape:Shape):Void {
         var bounds=envelope(shape),a=bounds.low,b=bounds.high;
         low=new Vector(Math.min(low.x,a.x),Math.min(low.y,a.y),Math.min(low.z,a.z));
         high=new Vector(Math.max(high.x,b.x),Math.max(high.y,b.y),Math.max(high.z,b.z));
       }
-      for(i in 0...5) extend(owned[i]);
+      for(i in 0...metalCount) extend(owned[i]);
       var cached:Array<Array<Array<Shape>>> =[[],[]];
       Sys.println("Checking 121 dual-tool jaw combinations");
       var minimum=1e30;
@@ -247,7 +282,7 @@ class DhDualToolPreview {
           // contacts are intentional; jaws and fingers must clear the adapter.
           if((side==0 && b==0) || (side==1 && a==0)) for(i in 0...ids.length) {
             if(i==1 || (sample>0 && (i==0 || i>=6))) continue; // fixed roots checked once; cable below
-            for(metal in (i==0 ? 1 : 0)...5) {
+            for(metal in (i==0 ? 1 : 0)...metalCount) {
               var distance=separation(world[side][i],owned[metal]);
               if(distance<0.5) distance=world[side][i].distance(owned[metal]);
               if(distance<0.05) throw 'Tool $prefix${ids[i]} / metal $metal clearance $distance mm';
@@ -265,7 +300,7 @@ class DhDualToolPreview {
           var distance=separation(x,y);
           if(distance<0.5) {
             // Resolve a tight conservative envelope with the actual surface/solid distance.
-            distance=x.distance(y);if(distance<0.5) throw 'Cross-gripper clearance below 0.5 mm at samples $a/$b';
+            distance=x.distance(y);if(distance<0.5) throw 'Cross-gripper clearance below 0.5 mm at samples $a/$b: A ${world[0].indexOf(x)} / B ${world[1].indexOf(y)}';
           }
           minimum=Math.min(minimum,distance);
         }
@@ -276,7 +311,7 @@ class DhDualToolPreview {
       // is geometric clearance only; compliant liners/preload need engineering validation.
       for(side in 0...2) {
         var cable=shapeAt(groups[side][1],placements[side]);
-        for(i in 0...5) overlap(cable,owned[i],'Cable $side / support metal $i');
+        for(i in 0...metalCount) overlap(cable,owned[i],'Cable $side / support metal $i');
         cable.close();
       }
       var mass=0.0,weighted=new Vector();for(item in masses) {mass+=item.massKg;weighted=weighted.add(new Vector(item.centreMm[0],item.centreMm[1],item.centreMm[2]).scale(item.massKg));}
@@ -284,8 +319,19 @@ class DhDualToolPreview {
       var reserve=0.25;addMass("hardware-and-service-reserve",reserve,new Vector(0,0,60),"Planning allowance, not a detailed fastener/cable BOM");
       mass+=reserve;weighted=weighted.add(new Vector(0,0,60).scale(reserve));var cog=weighted.scale(1/mass);
       var moment=mass*9.81*cog.length()*0.001;
-      var report={status:"prototype reference; no reach or structural certification",jawSamples:121,
+      var serviceAdapter=machinekit.robotics.DhDualGripperServices.adapter();
+      var servicePurchases=new machinekit.assembly.MachineAssembly();
+      machinekit.robotics.DhDualGripperServices.addPurchases(servicePurchases);
+      sys.io.File.saveContent(directory+"/service-bom.json",haxe.Json.stringify(servicePurchases.billOfMaterials().lines(),null,"  "));
+      var report={selectedServiceAdapter:{manufacturerPartNumber:serviceAdapter.manufacturerPartNumber,
+          supplierPartNumber:serviceAdapter.supplierPartNumber,sourceUrl:serviceAdapter.sourceUrl,
+          externalPower:serviceAdapter.externalPower,geometryInstalled:false,pinoutVerified:serviceAdapter.pinoutVerified,
+          status:"Selected Expert purchase; external 24 V supply, DH wiring and physical installation pending"},
+        status:"prototype reference; no reach or structural certification",jawSamples:121,
         approachAngleDegrees:90,
+        cableRouting:{style:"Supported 180 degree returns toward wrist; no cable across moving joints yet",
+          bendRadiusMm:55,straightExitMm:100,returnLengthMm:40,
+          connectorStatus:"Supplier connector supported by adjacent return saddle; Expert adapter selected; mating compatibility and installed flexible harness unverified"},
         sampledEnvelopeMm:{min:[low.x,low.y,low.z],max:[high.x,high.y,high.z],size:[high.x-low.x,high.y-low.y,high.z-low.z]},minimumSampledCrossToolClearanceMm:minimum,
         loadedMassKg:mass,centreOfGravityMm:[cog.x,cog.y,cog.z],gravityMomentUpperBoundNm:moment,
         reach1300NominalPayloadKg:12.5,withinNominalMassLimit:mass<12.5,massBudget:masses,
@@ -301,5 +347,5 @@ class DhDualToolPreview {
       for(shape in owned) shape.close();envelopes=new haxe.ds.ObjectMap();return bytes;
     } catch(error:Dynamic) {for(shape in owned) shape.close();envelopes=new haxe.ds.ObjectMap();throw error;}
   }
-  public static function main():Void {preview();}
+  public static function main():Void {DhExpertToolPreview.preview();}
 }

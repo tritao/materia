@@ -14,26 +14,37 @@ class OffsetFingerGeometry {
   }
   public static function blank():Part return box(CENTRE_X-30,CENTRE_X+30,30,90,CENTRE_Z-10,CENTRE_Z+10);
   public static function contact(left:Bool):Part {
-    var x=left ? CENTRE_X-19 : CENTRE_X+13;
-    return box(x,x+6,16,50,
-      left ? CENTRE_Z-20.2 : CENTRE_Z-10,
-      left ? CENTRE_Z+10 : CENTRE_Z+20.2);
+    var b=collisionBoxes(left)[2];
+    return box(b[0],b[1],b[2],b[3],b[4],b[5]);
+  }
+  /** Construction bounds [x0,x1,y0,y1,z0,z1] before bores and the root-radius cut remove material. */
+  public static function collisionBoxes(left:Bool,variant:String="cnc-aluminium"):Array<Array<Float>> {
+    var sls=variant=="sls-pa12";
+    if(!sls && variant!="cnc-aluminium")throw "Unknown finger manufacturing variant";
+    var halfHeight=sls ? 9.0 : 7.0,extra=sls ? 4.0 : 2.0;
+    var x0=left ? 183.003081202068 : 186.003081202068;
+    var z=CENTRE_Z+(left ? -13.2 : 13.2),rootX=left ? CENTRE_X-13 : CENTRE_X+13,r=sls ? 3.0 : 2.0;
+    return [
+      [x0-extra,x0+20+extra,MOUNT_Y,20,z-halfHeight,z+halfHeight],
+      [left ? CENTRE_X-(sls ? 21 : 19) : x0-extra,left ? x0+20+extra : CENTRE_X+(sls ? 21 : 19),12,20,z-halfHeight,z+halfHeight],
+      [left ? CENTRE_X-(sls ? 21 : 19) : CENTRE_X+13,left ? CENTRE_X-13 : CENTRE_X+(sls ? 21 : 19),16,50,
+        left ? CENTRE_Z-(sls ? 22.2 : 20.2) : CENTRE_Z-10,left ? CENTRE_Z+10 : CENTRE_Z+(sls ? 22.2 : 20.2)],
+      [left ? rootX : rootX-r,left ? rootX+r : rootX,20,20+r,z-halfHeight,z+halfHeight]
+    ];
   }
   public static function make(left:Bool,variant:String="cnc-aluminium"):Part {
     var sls=variant=="sls-pa12";
     if(!sls && variant!="cnc-aluminium") throw "Unknown finger manufacturing variant";
-    var halfHeight=sls ? 9.0 : 7.0, extra=sls ? 4.0 : 2.0;
+    var halfHeight=sls ? 9.0 : 7.0;
     var x0=left ? 183.003081202068 : 186.003081202068;
     var mountZ=CENTRE_Z+(left ? -13.2 : 13.2);
-    var pad=sls ? box(left ? CENTRE_X-21 : CENTRE_X+13,left ? CENTRE_X-13 : CENTRE_X+21,
-      16,50,left ? CENTRE_Z-22.2 : CENTRE_Z-10,left ? CENTRE_Z+10 : CENTRE_Z+22.2) : contact(left);
-    var base=box(x0-extra,x0+20+extra,MOUNT_Y,20,mountZ-halfHeight,mountZ+halfHeight);
-    var bridge=box(left ? CENTRE_X-(sls ? 21 : 19) : x0-extra,left ? x0+20+extra : CENTRE_X+(sls ? 21 : 19),
-      12,20,mountZ-halfHeight,mountZ+halfHeight);
+    var bounds=collisionBoxes(left,variant);
+    function piece(i:Int):Part {var b=bounds[i];return box(b[0],b[1],b[2],b[3],b[4],b[5]);}
+    var pad=piece(2),base=piece(0),bridge=piece(1);
     var result=Part.fuseAll([base,bridge,pad]);base.close();bridge.close();pad.close();
     // Explicit R2 root in the XY section; avoids relying on a fillet across union seams.
     var rootX=left ? CENTRE_X-13 : CENTRE_X+13;
-    var square=box(left ? rootX : rootX-(sls ? 3 : 2),left ? rootX+(sls ? 3 : 2) : rootX,20,20+(sls ? 3 : 2),mountZ-halfHeight,mountZ+halfHeight);
+    var square=piece(3);
     var cutter=Part.cylinderSpan(sls ? 3 : 2,mountZ-halfHeight-1,mountZ+halfHeight+1,left ? rootX+(sls ? 3 : 2) : rootX-(sls ? 3 : 2),20+(sls ? 3 : 2));
     var root=square.subtract(cutter);square.close();cutter.close();
     var rounded=Part.fuseAll([result,root]);root.close();result.close();result=rounded;

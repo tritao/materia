@@ -20,6 +20,8 @@ class MillPanel extends MachineComponent {
 			!Math.isFinite(width + depth + height)) throw "Mill panel needs finite positive dimensions";
 		super('MILL-PANEL-${width}x${depth}x${height}-$material', "Fabricated mill panel", material);
 		this.width = width; this.depth = depth; this.height = height;
+		// Exact box geometry needs no tessellation hull or outward mesh offset.
+		addFacet(machinekit.component.CollisionHullFacet.fromBoxes([[-width/2,-depth/2,0,width/2,depth/2,height]]));
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Face, Solids.axial(0, 0, height));
 	}

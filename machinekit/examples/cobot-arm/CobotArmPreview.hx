@@ -3,6 +3,8 @@ import machinekit.robotics.CobotClass;
 import machinekit.robotics.CobotWristLink;
 import machinekit.robotics.CobotToolLink;
 import machinekit.robotics.CobotJoint;
+import machinekit.robotics.CobotArmLink;
+import machinekit.robotics.CobotLinkCover;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.PosedParts;
 import machinekit.assembly.PosedParts.PartBox;
@@ -22,7 +24,7 @@ import haxe.io.Bytes;
 
 /** Each class runs a planned free-motion loop, exercising all six joint drives. */
 class CobotArmPreview {
-	public static function arm(cls:CobotClass):Bytes {
+	public static function scene(cls:CobotClass):materia.project.SceneArtifact.SceneArtifactData {
 		var arm = new CobotArm(cls);
 		var ready = arm.ready();
 		var scene = AssemblyPreview.scene(arm, "cobot-" + arm.reference.designation.toLowerCase());
@@ -34,12 +36,45 @@ class CobotArmPreview {
 		scene.missions = [{loop: true, steps: [for (offset in excursions)
 			{kind: "moveJoints", at: {occurrence: "toolFlange", connector: "face"},
 				joints: [for (i in 0...6) {joint: 'j${i + 1}', position: ready[i] + offset[i]}]}]}];
-		return SceneArtifact.encode(scene);
+		return scene;
 	}
+	public static function arm(cls:CobotClass):Bytes return SceneArtifact.encode(scene(cls));
 	public static function reach500():Bytes return arm(Reach500);
 	public static function reach850():Bytes return arm(Reach850);
 	public static function reach900():Bytes return arm(Reach900);
 	public static function reach1300():Bytes return arm(Reach1300);
+
+	/** Reviewable scene plus posed mesh data, generated directly from the model. */
+	public static function export():Void {
+		var directory = "machinekit/examples/cobot-arm/build";
+		for (cls in [Reach500, Reach850, Reach900, Reach1300]) {
+			var selected = [for (arg in Sys.args()) if (StringTools.startsWith(arg, "--class=")) arg];
+			if (selected.length > 0 && selected.indexOf("--class=" + Std.string(cls)) < 0) continue;
+			var data:materia.project.SceneArtifact.SceneArtifactData = CobotArmPreview.scene(cls);
+			var definition:materia.assembly.AssemblyDefinition = data.assemblyDefinition;
+			var state = new AssemblyState(definition, data.assemblyState);
+			var stem = directory + "/" + Std.string(cls).toLowerCase();
+			sys.io.File.saveBytes(stem + ".scene", SceneArtifact.encode(data));
+			var meshes:Array<{id:String, material:Null<String>, vertices:Array<Float>, indices:Array<Int>}> = [];
+			for (occurrence in definition.occurrences) {
+				var id = occurrence.id;
+				if (id == "powerSupply" || StringTools.startsWith(id, "driver") || StringTools.startsWith(id, "gearbox")) continue;
+				var pose = state.worldPose(id);
+				for (part in data.parts) if (part.id == occurrence.definition) {
+					var vertices:Array<Float> = [];
+					for (i in 0...part.vertexCount) {
+						var p = AssemblyFrames.transformPoint(pose, part.vertices.getDouble(i * 24),
+							part.vertices.getDouble(i * 24 + 8), part.vertices.getDouble(i * 24 + 16));
+						vertices.push(p.x); vertices.push(p.y); vertices.push(p.z);
+					}
+					meshes.push({id:id, material:part.materialId, vertices:vertices,
+						indices:[for (i in 0...part.indexCount) part.indices.getInt32(i * 4)]});
+				}
+			}
+			sys.io.File.saveContent(stem + ".mesh.json", haxe.Json.stringify(meshes));
+			Sys.println('Exported $stem.scene and $stem.mesh.json'); Sys.stdout().flush();
+		}
+	}
 }
 
 /** Independent DH arithmetic checks the mechanically assembled flange. */
@@ -48,17 +83,27 @@ class CobotArmChecks {
 		if (!(Math.abs(a - b) <= tolerance)) throw '$label: expected $b, got $a';
 
 	public static function run():Void {
-		for (cls in [Reach500, Reach850, Reach900, Reach1300]) PosedParts.scope(parts -> checkClass(cls, parts));
+		var selected = [for (arg in Sys.args()) if (StringTools.startsWith(arg, "--class=")) arg];
+		var matched = false;
+		for (cls in [Reach500, Reach850, Reach900, Reach1300])
+			if (selected.length == 0 || selected.indexOf("--class=" + Std.string(cls)) >= 0) {
+				matched = true;
+				PosedParts.scope(parts -> checkClass(cls, parts));
+			}
+		if (!matched) throw "Unknown cobot class selection";
 	}
 
 	/** One class's DH, overlap, limit, torque and mass checks; its link geometry is built once in `parts` for all poses. */
 	static function checkClass(cls:CobotClass, parts:PosedParts):Void {
 		var arm = new CobotArm(cls);
+		Sys.println('${arm.reference.designation}: checking housing construction'); Sys.stdout().flush();
 		var model = new AssemblyModel("mm");
 		arm.addTo(model, "");
 		var definition = model.definition("cobot-arm");
 		var state = new AssemblyState(definition);
 		checkWristConstruction(arm, state, parts);
+		checkArmConstruction(arm, state, parts);
+		var rigidChecks:Map<String, Bool> = [];
 		var poses = [[0.0, 0, 0, 0, 0, 0], arm.ready(), [0.2, -1, 0.8, -0.5, -0.7, 0.3],
 			[-0.4, -0.8, 0.5, 0.6, -1.2, -0.2], [0.6, -1.4, 1.2, -0.4, -0.9, 0.1]];
 		var oppositeWrist = arm.ready();
@@ -72,13 +117,14 @@ class CobotArmChecks {
 		for (fraction in [-1.0, -0.5, 0.5, 1.0])
 			poses.push([for (i in 0...6) readyPose[i] + fraction * excursion[i]]);
 		for (q in poses) {
+			Sys.println('${arm.reference.designation}: checking pose $q'); Sys.stdout().flush();
 			for (i in 0...6) state.setJoint('j${i + 1}', q[i]);
 			var expected = dh(arm, q), actual = state.worldPose("toolFlange");
 			near(actual.x, expected.x, "DH flange X"); near(actual.y, expected.y, "DH flange Y");
 			near(actual.z, expected.z, "DH flange Z");
 			var a = AssemblyFrames.toRotationMatrix(actual), b = AssemblyFrames.toRotationMatrix(expected);
 			for (i in 0...9) near(a[i], b[i], "DH flange orientation", 1e-8);
-			checkOverlap(arm, state, parts);
+			checkOverlap(arm, state, parts, rigidChecks);
 		}
 		for (i in 0...6) {
 			var exported = [for (joint in definition.joints) if (joint.id == 'j${i + 1}') joint];
@@ -90,7 +136,7 @@ class CobotArmChecks {
 		}
 		var ready = arm.ready();
 		for (i in 0...6) state.setJoint('j${i + 1}', ready[i]);
-		checkOverlap(arm, state, parts);
+		checkOverlap(arm, state, parts, rigidChecks);
 		for (i in 0...6) state.setJoint('j${i + 1}', 0);
 		var shoulder = state.worldPose("joint2"), flange = state.worldPose("toolFlange");
 		var dx = flange.x - shoulder.x, dy = flange.y - shoulder.y, dz = flange.z - shoulder.z;
@@ -104,10 +150,10 @@ class CobotArmChecks {
 			throw '${arm.reference.designation} joint ${i + 1} needs ${Math.abs(torques[i])} N m, exceeds ${arm.modules[i].outputRatedTorque} N m rated torque';
 		var mass = arm.armMass();
 		var checkedMass = switch cls {
-			case Reach500: 15.026405673873528;
-			case Reach850: 21.47042990709948;
-			case Reach900: 36.89230654642542;
-			case Reach1300: 37.229415761171815;
+			case Reach500: 14.471688223078141;
+			case Reach850: 22.130439422601416;
+			case Reach900: 36.343211560031065;
+			case Reach1300: 36.79045128655561;
 		};
 		if (!Math.isFinite(mass) || Math.abs(mass - checkedMass) > 0.02)
 			throw '${arm.reference.designation} assembled mass $mass kg differs from its checked assumed assembly mass $checkedMass kg';
@@ -121,7 +167,7 @@ class CobotArmChecks {
 	 * regression, not a substitute for whole-elbow FEA or bearing selection.
 	 */
 	static function checkWristConstruction(arm:CobotArm, state:AssemblyState, parts:PosedParts):Void {
-		for (i in [3, 4]) {
+		for (i in [0, 3, 4]) {
 			if (!Std.isOfType(arm.links[i], CobotWristLink)) throw "Cobot wrist needs structural elbows";
 			var elbow:CobotWristLink = cast arm.links[i];
 			var local = parts.local(elbow), minimum = Math.POSITIVE_INFINITY;
@@ -143,7 +189,7 @@ class CobotArmChecks {
 			}
 			if (!(minimum > 2 * oldInertia))
 				throw '${arm.reference.designation} wrist elbow ${i + 1} section stiffness $minimum mm^4 must exceed twice the old neck $oldInertia mm^4';
-			for (pair in [["wristRotor" + (i + 1), "link" + (i + 1)], ["link" + (i + 1), "joint" + (i + 2)]]) {
+			for (pair in [[i == 0 ? "shoulderRotor" : "wristRotor" + (i + 1), "link" + (i + 1)], ["link" + (i + 1), "joint" + (i + 2)]]) {
 				checkContact(arm, state, parts, pair[0], pair[1]);
 			}
 			var rebuilt:CobotJoint = cast elbow.input.componentType().create(elbow.input.values());
@@ -169,6 +215,57 @@ class CobotArmChecks {
 		if (!rejected) throw "An undersized wrist layout must fail instead of shrinking its structural section";
 	}
 
+	static function checkArmConstruction(arm:CobotArm, state:AssemblyState, parts:PosedParts):Void {
+		for (i in [1, 2]) {
+			if (!Std.isOfType(arm.links[i], CobotArmLink)) throw "Long links need serviceable hollow housings";
+			var link:CobotArmLink = cast arm.links[i];
+			var shell = parts.local(link), envelope = link.geometry(Envelope);
+			if (!shell.valid() || shell.solidCount() != 1) { envelope.close(); throw "Arm housing must be one valid connected solid"; }
+			var escaped = shell.subtract(envelope); envelope.close();
+			var escapedVolume = escaped.volume(); escaped.close();
+			if (escapedVolume > 1e-3) throw "Arm shell escapes its collision envelope";
+			// A connected solid can still have open outer quadrants where two
+			// hollow cylinders meet. Probe the expected wall at both hub bends.
+			for (side in 0...2) {
+				var radius = side == 0 ? link.inputRadius : link.outputRadius;
+				var centre = side == 0 ? new Vector(0, 0, CobotArmLink.CAP + radius) :
+					new Vector(link.seat.x, 0, link.seat.z - CobotArmLink.CAP - radius);
+				var sign = side == 0 ? 1.0 : -1.0;
+				for (angle in [Math.PI / 6, Math.PI / 4, Math.PI / 3]) {
+					var r = radius - CobotArmLink.WALL / 2;
+					var point = centre.add(new Vector(sign * r * Math.sin(angle), 0, sign * r * Math.cos(angle)));
+					var ball = Part.sphere(0.35), gauge = ball.translated(point); ball.close();
+					var missing = gauge.subtract(shell); gauge.close();
+					var missingVolume = missing.volume(); missing.close();
+					if (missingVolume > 1e-3) throw 'Arm link ${i + 1} hub bend $side has a missing outer wall';
+				}
+			}
+			var duct = Part.cylinderAlong(CobotArmLink.PORT_RADIUS - 0.3, link.bridgeStart,
+				link.bridgeAxis, link.bridgeLength);
+			var blocked = shell.intersect(duct); duct.close();
+			var blockedVolume = blocked.volume(); blocked.close();
+			if (blockedVolume > 1e-3) throw "Arm cable duct must be continuous through the bridge";
+			for (t in [0.15, 0.85]) {
+				var p = link.bridgeStart.add(link.bridgeEnd.subtract(link.bridgeStart).scale(t));
+				var gauge = Part.cylinderAlong(CobotArmLink.PORT_RADIUS - 0.3,
+					p.add(new Vector(0, -link.inputRadius - 1, 0)), Vector.Y(), link.inputRadius + 1);
+				blocked = shell.intersect(gauge); gauge.close(); blockedVolume = blocked.volume(); blocked.close();
+				if (blockedVolume > 1e-3) throw "Cable entry port must open into the internal duct";
+			}
+			var access = link.atService(CobotArmLink.roundedPlate(link.serviceLength - 20,
+				link.serviceWidth - 20, CobotArmLink.WALL + 1, 1, -CobotArmLink.WALL - 0.5));
+			// The opening's centre can be reached from outside with the cover removed.
+			blocked = shell.intersect(access); access.close(); blockedVolume = blocked.volume(); blocked.close();
+			if (blockedVolume > 1e-3) throw "Service opening must remain clear";
+			checkContact(arm, state, parts, 'link${i + 1}', 'linkGasket${i + 1}');
+			checkContact(arm, state, parts, 'linkGasket${i + 1}', 'linkCover${i + 1}');
+			checkContact(arm, state, parts, 'armRotor${i + 1}', 'link${i + 1}');
+			checkContact(arm, state, parts, 'link${i + 1}', 'joint${i + 2}');
+			Sys.println('${arm.reference.designation} link ${i + 1}: continuous 8.4 mm duct gauge, two cable ports and removable service cover passed');
+			Sys.stdout().flush();
+		}
+	}
+
 	static function checkContact(arm:CobotArm, state:AssemblyState, parts:PosedParts, first:String, second:String):Void {
 		var a = parts.member(arm, state, "wrist", first), b = parts.member(arm, state, "wrist", second);
 		var joined = a.combine(b); a.close(); b.close();
@@ -192,9 +289,17 @@ class CobotArmChecks {
 	 * No two links share volume. Pairs are tested with a boolean only when their boxes (each link's own box carried to its
 	 * pose, see `PosedParts.box`) are not `PosedParts.apart`, and each link is moved to its pose only for such a pair.
 	 */
-	static function checkOverlap(arm:CobotArm, state:AssemblyState, parts:PosedParts):Void {
+	static function checkOverlap(arm:CobotArm, state:AssemblyState, parts:PosedParts, rigidChecks:Map<String, Bool>):Void {
 		var entries = arm.components(), boxes:Array<PartBox> = [], placed:Array<Null<Part>> = [];
+		// Fixed-connected members have identical relative geometry at every pose.
+		// Check each such pair once; pairs across moving joints are checked at every pose.
+		var fixedParents:Map<String, String> = [], roots:Array<String> = [];
+		for (joint in state.definition.joints) if (joint.type == materia.assembly.AssemblyDefinition.AssemblyJointType.Fixed &&
+			joint.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree) fixedParents.set(joint.child, joint.parent);
 		for (entry in entries) {
+			var root = entry.id;
+			while (fixedParents.exists(root)) root = fixedParents.get(root);
+			roots.push(root);
 			var local = parts.local(entry.component);
 			if (!local.valid() || local.solidCount() != 1)
 				throw '${arm.reference.designation}: ${entry.id} must be one valid solid';
@@ -211,10 +316,13 @@ class CobotArmChecks {
 		}
 		try {
 			for (i in 0...entries.length) for (j in i + 1...entries.length) {
-				if (PosedParts.apart(boxes[i], boxes[j])) continue;
+				var rigid = roots[i] == roots[j], key = i + ":" + j;
+				if (rigid && rigidChecks.exists(key)) continue;
+				if (PosedParts.apart(boxes[i], boxes[j])) { if (rigid) rigidChecks.set(key, true); continue; }
 				var common = at(i).intersect(at(j)), volume = common.volume();
 				common.close();
 				if (volume > 1e-3) throw '${arm.reference.designation}: ${entries[i].id} overlaps ${entries[j].id} by $volume mm³';
+				if (rigid) rigidChecks.set(key, true);
 			}
 		} catch (error:Dynamic) {
 			PosedParts.closeAll([for (part in placed) if (part != null) part]);
@@ -224,4 +332,6 @@ class CobotArmChecks {
 	}
 }
 
-function main():Void CobotArmChecks.run();
+function main():Void {
+	if (Sys.args().indexOf("--export") >= 0) CobotArmPreview.export(); else CobotArmChecks.run();
+}

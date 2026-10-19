@@ -9,7 +9,9 @@
     "DhGripperJaws.hx",
     "DhCustomFingers.hx",
     "ManufacturingVariantChecks.hx",
-    "DhDualToolPreview.hx"
+    "DhDualToolPreview.hx",
+    "DhExpertToolPreview.hx",
+    "DhExpertRouteAudit.hx"
   ],
   "sourceRoots": [
     "."

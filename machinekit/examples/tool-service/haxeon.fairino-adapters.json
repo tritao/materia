@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-tool-service-example"
+  },
+  "entry": "FairinoAdapterPreview",
+  "sources": [
+    "FairinoAdapterPreview.hx"
+  ],
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/fairino-adapter-run"
+}

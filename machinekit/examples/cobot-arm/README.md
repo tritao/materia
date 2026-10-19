@@ -55,8 +55,9 @@ The articulated supplier-based variant is implemented in
 [`zeroerr-arm`](../zeroerr-arm/README.md), using the pinned T modules and straight
 links. Its six joints remain passive until the hardware configuration is resolved.
 
-The four size classes retain their reference DH axes and flange transforms. Wrist
-links 4 and 5 use `CobotWristLink`: broad locating hubs joined by a hollow elbow,
+The four size classes retain their reference DH axes, motor/gearbox envelopes and
+flange transforms. The shoulder and wrist links 1, 4 and 5 use `CobotWristLink`:
+broad locating hubs joined by a hollow elbow,
 with a saddle relieved around the next module. Their section is sized from the
 module diameters, rather than shrinking a tube to fit the axial gap. An offset
 that cannot accommodate the hub, shell walls and clearance is rejected.
@@ -64,7 +65,7 @@ that cannot accommodate the hub, shell walls and clearance is rejected.
 The assumed construction uses a 2.5 mm aluminium shell, 5 mm hubs, 1.5 mm housing
 clearance, 2 mm annular locating shoulders, and six M4 screws at each interface.
 The module stators have matching pilot seats and nominal threaded-hole envelopes.
-The three rotating output flanges are separate `CobotWristRotor` members carried by
+All six rotating output flanges are separate `CobotWristRotor` members carried by
 the driven links; their holes and screws follow the joint rotation. Their annular
 skirts clear the existing gearheads. Motor and gearbox dimensions are unchanged.
 `CobotToolLink` encloses the final output in a smooth hollow taper, with a 5 mm
@@ -74,15 +75,38 @@ rejects a layout with less than 1 mm of web between them. The tool flange retain
 its reference position and orientation. The rotor recess represents bearing running clearance; rolling elements, bearing
 selection, preload, sealing and fatigue life remain engineering assumptions.
 
-The nominal elbow shell diameters and checked arm masses (including wrist
+The upper arm and forearm use `CobotArmLink`: tapered hollow bridges with 2.5 mm
+walls, flat service lands, locating pilots and six M4 screws at both module
+interfaces. End hubs reach the actual housing annuli rather than ending inside
+the next module's gearhead pocket. The upper arm has a broader section; the
+forearm retains its previous proximal radius and tapers toward the wrist to
+preserve clearance when the shortest arm folds back on itself. Motor and gearbox
+sizes, ratios and drive ratings are unchanged.
+
+Each long link has a separate 2 mm aluminium service lid, a nominal 0.25 mm NBR
+gasket, four M3 screws and internal screw bosses. Screw-access bores reach the
+module fasteners. Two 9 mm cable-entry ports open into a continuous bridge duct;
+an 8.4 mm gauge checks the duct and both entries. Connector frames identify the
+entry and exit locations. The ports do not assume a through-bore in the existing
+gearboxes. External joint loops, glands, strain relief and the tool harness are
+not yet modeled. The hollow housings assume cored/assembled shell construction;
+casting tooling, manufacturing splits, fits and gasket compression remain to be
+specified. The gasket geometry establishes assembly space, not an ingress rating.
+
+The nominal wrist-elbow shell diameters and checked arm masses (including wrist
 flanges and fasteners, excluding the tool and offboard drives) are:
 
 | Class | Shell diameter | Arm mass |
 | --- | --- | --- |
-| Reach500 | 63 mm | 15.026 kg |
-| Reach850 | 80.64 mm | 21.470 kg |
-| Reach900 | 92.4 mm | 36.892 kg |
-| Reach1300 | 92.4 mm | 37.229 kg |
+| Reach500 | 63 mm | 14.472 kg |
+| Reach850 | 80.64 mm | 22.130 kg |
+| Reach900 | 92.4 mm | 36.343 kg |
+| Reach1300 | 92.4 mm | 36.790 kg |
+
+Mass includes the shoulder/arm output flanges, service lids, gaskets and all
+modeled mounting screws. Different housing/cavity distributions mean some
+classes become lighter while another becomes heavier; these are CAD-derived
+assumed masses, not manufacturer measurements.
 
 ## Validation
 
@@ -101,6 +125,30 @@ neck. This is a section-stiffness regression, not a whole-elbow stress, deflecti
 fastener-load or fatigue analysis. Sampled poses do not certify the entire joint
 range. Existing reach/collision certificates for a cell need regeneration when
 its arm geometry changes.
+
+The long-link checks also require one valid connected solid, containment within
+the collision envelope, a continuous duct, open cable entries, an unobstructed
+service window and mounting contact at both drive interfaces and across each
+gasket/lid stack. Material probes also check the outer wall through each hub's
+90-degree rounding: overlapping hollow cylinders can form a connected solid
+while leaving that quadrant open, so both outer and inner spherical transitions
+are modeled at all four route bends. Fixed-connected member pairs are checked once per class;
+all pairs across moving joints are checked at every sampled pose. No collision
+pair is exempted merely because it is adjacent or is a fastener.
+
+Use `--class=Reach850` to run one size. Pass `--export --class=Reach850` to write
+`build/reach850.scene` and posed `build/reach850.mesh.json` for review. The scene
+includes the preview motion loop; the mesh export omits offboard drives and
+internal gearheads for a clear exterior view. Generated artifacts stay out of
+project history. The current [whole-arm comparison](build/arm-before-after.png)
+shows the old and refined models at the same pose and scale. The
+[hub-corner comparison](build/corner-before-after.png) shows the missing outer
+rounding corrected at the tube-to-joint junction.
+
+The additional hub rounding changes the tending collision envelope. Its previous
+reach certificate cannot be reused: the saved `infeed-1-2-approach` pose for
+gripper A collides with the current cell. Regenerate the certificate and run its
+independent check before using these housings in the tending cycle.
 
 ## FAIRINO and UR reference comparison
 
@@ -131,3 +179,18 @@ that tapers to the tool flange. Materia retains its current motor and gearbox
 sizes, torque assumptions and reference joint axes. In particular, the 96 mm
 Reach850 wrist module is not reduced to an 80 mm vendor casing: matching that
 external size would require an independently justified internal package.
+
+The custom cobot's optional collar socket is a provisional service module, not an
+OEM UR/FAIRINO interface. The imported commercial robots now have separate
+[source-backed wrist electrical profiles](../reference-arms/README.md#manufacturer-wrist-electrical-interfaces),
+including revision-specific pinouts and documented power limits. Their socket
+mating positions/key orientations remain explicitly unqualified.
+
+Long-link collision geometry follows the housing construction: 17 convex pieces
+per link, including cover screw bosses, with 0.03 mm tessellation and a 0.05 mm
+outward support reserve. The long oblique taper is enclosed in its own
+longitudinal frame before transforming its hull back to the link frame; a
+world-axis envelope can otherwise add tens of millimetres of false volume.
+Internal bores remain conservatively filled. The
+machine-tending arm audit independently checks coverage of the finer 0.01 mm
+surface triangles and compares previously flagged poses against exact CAD.

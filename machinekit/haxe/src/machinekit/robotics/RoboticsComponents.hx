@@ -8,6 +8,8 @@ class RoboticsComponents {
 		registry.register(GearedArmJoint.recipeType());
 		registry.register(CobotJoint.moduleRecipeType());
 		registry.register(RobotFlange.recipeType());
+		registry.register(ToolServiceModule.recipeType());
+		registry.register(FairinoDualToolAdapter.recipeType());
 		registry.register(EndEffectorPlate.recipeType());
 		registry.register(Pedestal.recipeType());
 		registry.register(FrameBar.recipeType());

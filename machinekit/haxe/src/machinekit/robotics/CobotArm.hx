@@ -29,7 +29,7 @@ class CobotArm extends MachineAssembly {
 		links = [];
 		baseFlange = new RobotFlange(63);
 		for (i in 0...6) modules.push(new CobotJoint(reference.modules[i], reference.speeds[i],
-			i == 0 ? baseFlange.pilotHeight : 0, i == 4 || i == 5, i >= 3));
+			i == 0 ? baseFlange.pilotHeight : 0, i >= 1, true));
 		toolFlange = new RobotFlange(50);
 		addComponent("baseFlange", baseFlange, AssemblyFrames.translation(0, 0, baseFlange.thickness));
 		addMemberConnector("baseFlange", "moduleSeat", Solids.axial(0, 0, 0));
@@ -39,10 +39,10 @@ class CobotArm extends MachineAssembly {
 		for (i in 0...6) {
 			var nextRadius = i < 5 ? modules[i + 1].diameter / 2 : toolFlange.flangeDiameter / 2;
 			var d = reference.d[i] - (i == 5 ? toolFlange.thickness : 0);
-			var link:MachineComponent = i == 3 || i == 4
+			var link:MachineComponent = i == 0 || i == 3 || i == 4
 				? new CobotWristLink(d, reference.alpha[i], modules[i], modules[i + 1])
 				: i == 5 ? new CobotToolLink(reference.d[i], modules[i], toolFlange)
-				: new CobotLink(reference.a[i], d, reference.alpha[i], modules[i], nextRadius);
+				: new CobotArmLink(reference.a[i], d, modules[i], modules[i + 1]);
 			links.push(link);
 			var linkId = 'link${i + 1}', jointId = 'j${i + 1}', moduleId = 'joint${i + 1}';
 			addComponent(linkId, link);
@@ -57,15 +57,28 @@ class CobotArm extends MachineAssembly {
 				addMemberConnector("toolFlange", "back", Solids.axial(0, 0, -toolFlange.thickness));
 				addMate("tool-flange", "fixed", linkId, "end", "toolFlange", "back");
 			}
-			if (i >= 3) {
-				var rotorId = 'wristRotor${i + 1}';
+			{
+				var rotorId = i == 0 ? "shoulderRotor" : i < 3 ? 'armRotor${i + 1}' : 'wristRotor${i + 1}';
 				addComponent(rotorId, new CobotWristRotor(modules[i], i == 5 ? CobotToolLink.CLOCKING : 0));
 				addMate('$rotorId-mount', "fixed", linkId, "start", rotorId, "face");
 			}
-			if (i >= 3) for (side in (i == 5 ? ["input"] : ["input", "output"])) for (bolt in 1...CobotWristMount.COUNT + 1) {
-				var id = 'wristBolt${i + 1}-${side}-$bolt';
+			for (side in (i == 5 ? ["input"] : ["input", "output"])) for (bolt in 1...CobotWristMount.COUNT + 1) {
+				var id = (i == 0 ? "shoulderBolt" : i < 3 ? 'armBolt${i + 1}' : 'wristBolt${i + 1}') + '-${side}-$bolt';
 				addComponent(id, SocketHeadCapScrew.metric("M4", CobotWristLink.HUB_DEPTH + CobotWristMount.ENGAGEMENT));
 				addMate('$id-mount', "fixed", linkId, '${side}Bolt$bolt', id, "head");
+			}
+			if (i == 1 || i == 2) {
+				var shell:CobotArmLink = cast link;
+				var coverId = 'linkCover${i + 1}', gasketId = 'linkGasket${i + 1}';
+				addComponent(coverId, new CobotLinkCover(shell.serviceLength, shell.serviceWidth));
+				addComponent(gasketId, new CobotLinkCover(shell.serviceLength, shell.serviceWidth, true));
+				addMate('$coverId-mount', "fixed", linkId, "service", coverId, "back");
+				addMate('$gasketId-mount', "fixed", linkId, "service", gasketId, "back");
+				for (bolt in 1...5) {
+					var id = '${coverId}Bolt$bolt';
+					addComponent(id, SocketHeadCapScrew.metric("M3", 8));
+					addMate('$id-mount', "fixed", coverId, 'bolt$bolt', id, "head");
+				}
 			}
 			var gearboxId = 'gearbox${i + 1}';
 			addComponent(gearboxId, modules[i].gearbox);
@@ -93,12 +106,19 @@ class CobotArm extends MachineAssembly {
 		exposeConnector("toolFace", "toolFlange", "face");
 	}
 
+	/** Add the provisional wrist socket explicitly; existing arms retain their service layout. */
+	public function installToolService(spec:ToolServiceSpec):ToolServiceModule
+		return CobotToolServices.install(this,spec);
+
 	/** The moving mechanics and base plate, excluding offboard control hardware and a tool. */
 	public function armMass():Float {
 		var mass = baseFlange.massProperties().mass + toolFlange.massProperties().mass;
 		for (module in modules) mass += module.massProperties().mass + module.gearbox.massProperties().mass;
 		for (link in links) mass += link.massProperties().mass;
-		for (entry in components()) if (StringTools.startsWith(entry.id, "wristBolt") || StringTools.startsWith(entry.id, "wristRotor"))
+		for (entry in components()) if (StringTools.startsWith(entry.id, "toolService") || StringTools.startsWith(entry.id, "wristBolt") || StringTools.startsWith(entry.id, "wristRotor") ||
+			StringTools.startsWith(entry.id, "armRotor") || StringTools.startsWith(entry.id, "armBolt") ||
+			StringTools.startsWith(entry.id, "shoulder") || StringTools.startsWith(entry.id, "linkCover") ||
+			StringTools.startsWith(entry.id, "linkGasket"))
 			mass += entry.component.massProperties().mass;
 		return mass;
 	}

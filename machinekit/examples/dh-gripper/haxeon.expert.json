@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-dh-gripper-example"
+  },
+  "entry": "DhExpertToolPreview",
+  "sources": [
+    "DhGripperPreview.hx",
+    "DhGripperJaws.hx",
+    "DhCustomFingers.hx",
+    "ManufacturingVariantChecks.hx",
+    "DhDualToolPreview.hx",
+    "DhExpertToolPreview.hx",
+    "DhExpertRouteAudit.hx"
+  ],
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/expert-run"
+}

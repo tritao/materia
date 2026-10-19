@@ -19,7 +19,7 @@ class DhGripperPreview {
   static final TAIL = new Vector(395.503081202068, EXIT.y, EXIT.z);
   public static final STRAIGHT_MM = 100.0;
   public static final BEND_RADIUS_MM = 55.0;
-  public static final RETURN_MM = 80.0;
+  public static final RETURN_MM = 40.0;
   public static final DIAMETER_MM = 6.4;
   public static function directory():String {
     var current=sys.FileSystem.fullPath(Sys.getCwd());
@@ -70,21 +70,21 @@ class DhGripperPreview {
   }
   static function ends():Array<Vector> {
     var bendStart = EXIT.add(new Vector(STRAIGHT_MM,0,0));
-    var bendEnd = bendStart.add(new Vector(BEND_RADIUS_MM,-BEND_RADIUS_MM,0));
-    return [bendStart,bendEnd,bendEnd.add(new Vector(0,-RETURN_MM,0))];
+    var bendEnd = bendStart.add(new Vector(0,-2*BEND_RADIUS_MM,0));
+    return [bendStart,bendEnd,bendEnd.add(new Vector(-RETURN_MM,0,0))];
   }
   static function cable():Part {
     if (STRAIGHT_MM < 100 || BEND_RADIUS_MM < 50 || DIAMETER_MM >= 2*BEND_RADIUS_MM)
       throw "Cable exit clearance or bend radius is below specification";
     var e = ends(), centre = e[0].add(new Vector(0,-BEND_RADIUS_MM,0));
-    var middle = centre.add(new Vector(BEND_RADIUS_MM/Math.sqrt(2), BEND_RADIUS_MM/Math.sqrt(2),0));
+    var middle = centre.add(new Vector(BEND_RADIUS_MM,0,0));
     var curves = [Curve.line(EXIT,e[0]), Curve.arc(e[0],middle,e[1]), Curve.line(e[1],e[2])];
     var path = Curve.wire(curves);
     var profile = Sketch.circle(DIAMETER_MM/2,new Plane(EXIT,Vector.Y(),Vector.X()));
     var result = profile.sweep(path);
     profile.close(); path.close(); for (curve in curves) curve.close();
     if (!result.valid() || result.solidCount()!=1) {result.close(); throw "Routed cable is not one valid solid";}
-    var length = STRAIGHT_MM+BEND_RADIUS_MM*Math.PI/2+RETURN_MM;
+    var length = STRAIGHT_MM+BEND_RADIUS_MM*Math.PI+RETURN_MM;
     var expectedVolume = Math.PI*Math.pow(DIAMETER_MM/2,2)*length;
     if (Math.abs(result.shape.volume()/expectedVolume-1)>0.001) {
       result.close(); throw "Cable sweep volume disagrees with analytic centreline length";
@@ -178,7 +178,7 @@ class DhGripperPreview {
       if (body.distance(removedCable)>0.001)
         throw "Cable partition lost its supplier attachment";
       var e=ends();
-      var placement = Location.translation(e[2]).compose(Location.rotation(Axis.Z(),-Math.PI/2))
+      var placement = Location.translation(e[2]).compose(Location.rotation(Axis.Z(),-Math.PI))
         .compose(Location.translation(TAIL.scale(-1)));
       var route = cable(); owned.push(route.shape.cloneShape()); route.close();
       var cableShape=owned[owned.length-1];
@@ -202,7 +202,7 @@ class DhGripperPreview {
       var parts:Array<SceneArtifactPart> = [];
       var shapes=[body,cableShape];
       var ids=["pgc-140-50","electrical-cable","cable-end-connector"];
-      var names=["PGC-140-50 fixed housing and cable exit","Routed electrical cable — R55 / 100 mm straight","Supplier cable-end connector"];
+      var names=["PGC-140-50 fixed housing and cable exit","Wrist-directed electrical lead — R55 return / 100 mm straight","Supplier cable-end connector"];
       var colors=[[0.48,0.50,0.53],[0.08,0.09,0.11],[0.3,0.32,0.35]];
       for(i in 0...shapes.length) {
         var displayed=shapes[i].translate(offset.native()); owned.push(displayed);
@@ -228,7 +228,7 @@ class DhGripperPreview {
           var pose=Location.translation(offset).compose(placement).plane;
           // Assembly frame is derived from the same orthonormal cable tangent placement.
           model.add(ids[i],{x:pose.origin.x,y:pose.origin.y,z:pose.origin.z,
-            qx:0,qy:0,qz:-Math.sqrt(0.5),qw:Math.sqrt(0.5)});
+            qx:0,qy:0,qz:-1,qw:0});
         }
       }
       for(i in 0...2) {

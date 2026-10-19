@@ -18,6 +18,24 @@ class DhCustomFingers {
   public static function blank():Part {
     return machinekit.robotics.OffsetFingerGeometry.blank();
   }
+  /** Audit another orientation of the same stock without changing the finger interface. */
+  public static function checkBlankOrientation(stock:Shape,expectedPatch:Float):Void {
+    for(left in [true,false]) {
+      var part=make(left);
+      for(gap in [60.0,65.0,70.0,76.0]) {
+        var finger=part.shape.translate(new Vector((left ? -1 : 1)*(gap-MIN_GAP)/2,0,0).native());
+        if(volumeOverlap(finger,stock)>0.001) throw "Reoriented stock penetrates finger";
+        if(Math.abs(finger.distance(stock)-(gap-60)/2)>0.001) throw "Reoriented stock clearance changed";
+        if(gap==60) {
+          var area=bearingArea(finger,stock,new Vector(CENTRE_X+(left ? -30 : 30),0,0),Vector.X(),left ? -1 : 1);
+          if(Math.abs(area-expectedPatch)>0.1) throw 'Reoriented stock contact $area != $expectedPatch mm2';
+          Sys.println('Reoriented stock contact: $area mm2; no penetration');
+        }
+        finger.close();
+      }
+      part.close();
+    }
+  }
   static function volumeOverlap(a:Shape,b:Shape):Float {
     var overlap=a.common(b);
     var value=overlap.subshapeCount(CadKit.ShapeKind.Solid)==0 ? 0 : overlap.volume();
