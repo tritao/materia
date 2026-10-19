@@ -4,7 +4,7 @@ import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
 /** Vallder's published SFU20/SFU25 standard ends, shared by the 5/10 mm lead variants.
- * Semantic race/lock thread, root envelope for the lock thread. Small chamfers/fillets omitted.
+ * Semantic race; root envelope for the lock thread. Small chamfers/fillets omitted.
  * Root diameter is an explicit engineering assumption. Catalogue end option, not custom machining.
  */
 class SfuDrawingScrew extends LeadScrew {
@@ -21,12 +21,12 @@ class SfuDrawingScrew extends LeadScrew {
  public final grooveDepth:Float;
  public function new(model:String="SFU2005",length:Float=500,raceRootDiameter:Float=0) {
   if(models().indexOf(model)<0)throw "Unknown drawing screw: "+model;
-  var s=SfuFamilyData.nut(model),large=s.diameter==25,end=large ? 76.0 : 60.0,floatEnd=large ? 16.0 : 13.0;
+  var s=SfuFamilyData.nut(model),ends=SfuFamilyData.ends(model),end=ends.fixedEnd,floatEnd=ends.floatingEnd;
   if(!Math.isFinite(length) || length<=end+floatEnd+s.length || length>4000)throw "SFU length must contain its standard ends and selected nut";
   super(new LeadScrewThread(Ball,s.diameter,s.pitch,1,RightHand,raceRootDiameter),length,"SFU-DRAWING-"+model+"-L"+Dimension.format(length));
-  this.model=model;fixedEnd=end;floatingEnd=floatEnd;couplingDiameter=large ? 15 : 12;couplingLength=large ? 23 : 20;
-  journalDiameter=large ? 17 : 15;journalStart=large ? 42 : 34;
-  grooveStart=length-floatEnd+(large ? 12 : 9);grooveDepth=large ? 0.4 : 0.35;
+  this.model=model;fixedEnd=end;floatingEnd=floatEnd;couplingDiameter=ends.couplingDiameter;couplingLength=ends.couplingLength;
+  journalDiameter=ends.journalDiameter;journalStart=ends.couplingLength+ends.threadReliefLength;
+  grooveStart=length-floatEnd+ends.ringSeatLength;grooveDepth=ends.grooveDepth;
   addConnector("raceStart",Mount,Solids.axial(0,0,fixedEnd));
   addConnector("fixedJournalStart",Axis,Solids.axial(0,0,journalStart));
   addConnector("floatingSeat",Axis,Solids.axial(0,0,length-floatingEnd));

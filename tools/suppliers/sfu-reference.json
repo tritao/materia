@@ -263,5 +263,39 @@
       "sha256": "15fb70c6ff2b84a365f0ab801c5ebc93cf7c18e093ef72a52a95e7f5ccf3bc87",
       "source_url": "https://vallder.com/wp-content/uploads/2017/08/products-sfu2505.png"
     }
+  ],
+  "end_profiles": [
+    {
+      "models": [
+        "SFU2005",
+        "SFU2010"
+      ],
+      "drawing": "products-sfu2005a.jpg",
+      "couplingDiameter": 12,
+      "couplingLength": 20,
+      "threadReliefLength": 12,
+      "fixedEnd": 60,
+      "journalDiameter": 15,
+      "floatingEnd": 13,
+      "ringSeatLength": 9,
+      "grooveWidth": 1.15,
+      "grooveDepth": 0.35
+    },
+    {
+      "models": [
+        "SFU2505",
+        "SFU2510"
+      ],
+      "drawing": "products-sfu2505.png",
+      "couplingDiameter": 15,
+      "couplingLength": 23,
+      "threadReliefLength": 17,
+      "fixedEnd": 76,
+      "journalDiameter": 17,
+      "floatingEnd": 16,
+      "ringSeatLength": 12,
+      "grooveWidth": 1.15,
+      "grooveDepth": 0.4
+    }
   ]
 }

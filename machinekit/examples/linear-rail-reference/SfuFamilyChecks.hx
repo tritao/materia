@@ -49,7 +49,7 @@ class SfuFamilyChecks {
    var large=StringTools.startsWith(model,"SFU25"),screw=new SfuDrawingScrew(model,500,large ? 21 : 16),p=screw.geometry();
    check(p.valid() && p.solidCount()==1,"Drawing screw solid "+model);
    check(screw.axialComplianceBetween(0,500)>0 && Math.abs(screw.axialStiffness()*screw.axialComplianceBetween(0,500)-1)<1e-9,"Piecewise shaft compliance "+model);
-   check(screw.fixedEnd==(large ? 76 : 60) && screw.journalDiameter==(large ? 17 : 15),"Drawing screw ends "+model);
+   check(screw.fixedEnd==(large ? 76 : 60) && screw.journalDiameter==(large ? 17 : 15) && screw.journalStart==(large ? 40 : 32),"Drawing screw ends "+model);
    for(prefix in ["BK","BF"]) {
     var support=new VallderScrewSupport(prefix+(large ? "17" : "15")),body=support.geometry();
     check(support.spec.bore==screw.journalDiameter,"Journal/support diameter "+model);
