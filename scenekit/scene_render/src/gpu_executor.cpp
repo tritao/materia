@@ -42,7 +42,7 @@ struct StrokeVertex {
 constexpr std::uint32_t vertex_stride = sizeof(SceneVertex);
 constexpr std::uint32_t pick_vertex_stride = sizeof(PickVertex);
 constexpr std::uint32_t stroke_vertex_stride = sizeof(StrokeVertex);
-constexpr std::uint32_t instance_stride = sizeof(float) * 20;
+constexpr std::uint32_t instance_stride = sizeof(float) * 24;
 constexpr std::uint32_t default_viewport_width = 1024;
 constexpr std::uint32_t default_viewport_height = 768;
 
@@ -57,6 +57,7 @@ struct StrokeUniformData {
 struct InstanceData {
     std::array<float, 16> transform;
     std::array<float, 4> pick_color;
+    std::array<float, 4> highlight_tint{};
 };
 
 static_assert(sizeof(InstanceData) == instance_stride);
@@ -135,6 +136,7 @@ struct DesiredBatch {
     std::vector<std::uint64_t> transform_revisions;
     std::vector<std::array<float, 16>> transforms;
     std::vector<std::uint32_t> pick_ids;
+    std::vector<std::array<float, 4>> highlight_tints;
 };
 
 std::array<float, 4> encode_pick_id(std::uint32_t id) {
@@ -361,6 +363,7 @@ DesiredBatch desired_batch(const RenderPlan &plan, const InstanceBatch &batch) {
         desired.transform_revisions.push_back(transform.revision);
         desired.transforms.push_back(transform.transform.matrix);
         desired.pick_ids.push_back(item->pickId);
+        desired.highlight_tints.push_back(item->highlight_tint);
     }
     return desired;
 }
@@ -742,6 +745,7 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool
             (result = attribute(5, "normal", "TEXCOORD")) != NKGPU_OK ||
             (result = attribute(6, "texcoord0", "TEXCOORD")) != NKGPU_OK ||
             (result = attribute(7, "color0", "TEXCOORD")) != NKGPU_OK ||
+            (result = attribute(8, "highlight_tint", "TEXCOORD")) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 1, NKGPU_SHADERSTAGE_VERTEX,
                                                  sizeof(float) * 16)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_params",
@@ -794,6 +798,8 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool
         (result = nkgpu_pipeline_attribute(pipeline_builder, 6, 0, sizeof(float) * 6,
                                            NKGPU_VERTEXFORMAT_FLOAT2)) != NKGPU_OK ||
         (result = nkgpu_pipeline_attribute(pipeline_builder, 7, 0, sizeof(float) * 8,
+                                           NKGPU_VERTEXFORMAT_FLOAT4)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_attribute(pipeline_builder, 8, 1, sizeof(float) * 20,
                                            NKGPU_VERTEXFORMAT_FLOAT4)) != NKGPU_OK ||
         (result = nkgpu_pipeline_vertex_buffer(pipeline_builder, 0, vertex_stride,
                                                NKGPU_VERTEXSTEP_PER_VERTEX, 1)) != NKGPU_OK ||
@@ -1626,7 +1632,8 @@ bool create_instance_buffer(StateT &state, const DesiredBatch &desired,
     std::vector<InstanceData> data;
     data.reserve(desired.transforms.size());
     for (std::size_t index = 0; index < desired.transforms.size(); ++index)
-        data.push_back({desired.transforms[index], encode_pick_id(desired.pick_ids[index])});
+        data.push_back({desired.transforms[index], encode_pick_id(desired.pick_ids[index]),
+                        desired.highlight_tints[index]});
     const auto byte_size = data.size() * sizeof(InstanceData);
     if (byte_size > std::numeric_limits<std::uint32_t>::max())
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
@@ -2109,10 +2116,12 @@ bool update_batch(StateT &state, const DesiredBatch &desired, std::size_t batch_
     }
     std::size_t first = have.records.size(), last = 0, changed = 0;
     for (std::size_t instance = 0; instance < desired.transform_revisions.size(); ++instance) {
-        if (desired.transform_revisions[instance] == have.transform_revisions[instance])
+        if (desired.transform_revisions[instance] == have.transform_revisions[instance] &&
+            desired.highlight_tints[instance] == have.records[instance].highlight_tint)
             continue;
         have.records[instance] = {desired.transforms[instance],
-                                  encode_pick_id(desired.pick_ids[instance])};
+                                  encode_pick_id(desired.pick_ids[instance]),
+                                  desired.highlight_tints[instance]};
         first = std::min(first, instance);
         last = instance;
         ++changed;
@@ -2331,9 +2340,10 @@ bool patch_instance_records(StateT &state, const RenderPlan &plan,
         if (instance >= batch.transform_revisions.size() || instance >= batch.instances.size())
             return false;
         const auto &transform = plan.transforms()[item.transformIndex];
-        if (transform.revision == batch.transform_revisions[instance])
+        if (transform.revision == batch.transform_revisions[instance] &&
+            item.highlight_tint == batch.records[instance].highlight_tint)
             continue;
-        batch.records[instance] = {transform.transform.matrix, encode_pick_id(item.pickId)};
+        batch.records[instance] = {transform.transform.matrix, encode_pick_id(item.pickId), item.highlight_tint};
         updates.push_back({found->second.batch, instance, transform.revision});
     }
     std::sort(updates.begin(), updates.end(), [](const auto &a, const auto &b) {

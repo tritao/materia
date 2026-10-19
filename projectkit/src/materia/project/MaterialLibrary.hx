@@ -30,7 +30,7 @@ class MaterialLibrary {
     // Nominal planning density; print-lot properties must be supplied for production validation.
     material("pa12-nylon", "PA12 nylon (nominal)", [0.68, 0.69, 0.71], 0.0, 0.85, 1000, "PA12 nylon"),
     material("plastic", "Engineering plastic", [0.28, 0.30, 0.32], 0.0, 0.55, 1200, "plastic"),
-    material("polycarbonate", "Polycarbonate", [0.58, 0.74, 0.79], 0.0, 0.2, 1200, "polycarbonate"),
+    polycarbonate(),
     material("polyurethane", "Polyurethane", [0.26, 0.34, 0.37], 0.0, 0.65, 1200, "polyurethane PU"),
     material("plywood-birch", "Birch plywood", [0.70, 0.55, 0.34], 0.0, 0.72, 680, "birch plywood"),
     toolingEPS(),
@@ -42,6 +42,13 @@ class MaterialLibrary {
     material("spring-steel", "Spring steel", [0.56, 0.58, 0.60], 0.75, 0.38, 7850, "spring steel"),
     sheetSteel(), sheetAluminium()
   ];
+
+  /** Clear viewing sheet; visual opacity does not change physical material properties. */
+  static function polycarbonate():MaterialDef {
+    var result = material("polycarbonate", "Polycarbonate", [0.58, 0.74, 0.79], 0, 0.2, 1200, "polycarbonate");
+    result.visual.alpha = 0.18;
+    return result;
+  }
 
   /** Display/BOM assumptions only; supplier lot data belongs in tooling stock records. */
   static function toolingEPS():MaterialDef {

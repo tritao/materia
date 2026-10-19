@@ -124,7 +124,7 @@ class ScenePresentation {
       transaction.setVisibility(node, false);
       transaction.setParent(node, owner.runtimeFor(id).node);
       transaction.setGeometry(node, geometry);
-      transaction.setMaterial(node, hoverMaterial);
+      transaction.setMaterial(node, owner.runtimeFor(id).material);
       transaction.setTransform(node, Transform.identity());
       transaction.commit();
       faceHoverNodes.set(id, node);
@@ -192,29 +192,28 @@ class ScenePresentation {
     for(selected in owner.objects) {
       if(!selectedKeys.exists(selected.id))continue;
       var workerVisual = owner.workerVisuals.get(selected.id);
-      if (workerVisual == null) selection.add(owner.runtimeFor(selected.id).node);
-      else for (node in workerVisual.character.model.primitiveNodes) selection.add(node);
-      threadHighlights.set(selected.id, selectionMaterial);
+      var selectedMaterial = selectionMaterial;
+      if (workerVisual == null) selection.add(owner.runtimeFor(selected.id).node, selectedMaterial);
+      else for (node in workerVisual.character.model.primitiveNodes) selection.add(node, selectedMaterial);
     }
     view.applySelection(selection, selectionMaterial);
+    var highlightMaterial = hoverMaterial;
     var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
       ? null : faceHoverNodes.get(hoveredId);
     var faceHoverShown = faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex;
     if (faceHoverShown) {
       // The face node is hidden in the scene and shown only in this presentation view.
       view.setVisibility(faceHoverNode, true);
-      view.setMaterial(faceHoverNode, hoverMaterial);
-      view.applyHover(null, hoverMaterial);
+      view.applyHover(faceHoverNode, highlightMaterial);
     } else {
       var hovered = hoveredId == null ? null : owner.object(hoveredId);
       // A worker's own node is an invisible pick proxy; highlight the character it stands for.
       var hoveredWorker = hovered == null ? null : owner.workerVisuals.get(hovered.id);
       if (hoveredWorker != null)
-        view.applyHoverNodes(hoveredWorker.character.model.primitiveNodes, hoverMaterial);
+        view.applyHoverNodes(hoveredWorker.character.model.primitiveNodes, highlightMaterial);
       else
-        view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, hoverMaterial);
+        view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, highlightMaterial);
     }
-    if (hoveredId != null && hoveredId != owner.selectedId && !faceHoverShown) threadHighlights.set(hoveredId, hoverMaterial);
     threads.show(owner, view, cosmeticThreads, threadHighlights);
     if (poses != null) {
       var poseNodes:Array<NodeId> = [];
@@ -259,6 +258,11 @@ class ScenePresentation {
       kind:String = ""):MaterialData {
     var finish = appearance == null ? Appearances.neutral() : appearance;
     var result = MaterialData.opaque(red, green, blue).setMetallic(finish.metallic).setRoughness(finish.roughness);
+    var material = materia.project.MaterialLibrary.get(finish.finish);
+    if (material != null && material.visual.alpha != null) {
+      var alpha:Float = material.visual.alpha;
+      result.setOpacity(alpha).setOpaque(alpha >= 1.0);
+    }
     if (kind == "human-worker") result.setOpacity(0.0).setOpaque(false);
     return result;
   }

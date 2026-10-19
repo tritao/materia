@@ -455,10 +455,7 @@ RenderUpdate update(RenderPlan &plan, const SceneSnapshot &snapshot, const Chang
                                    view.hover_material_overrides.size());
         for (const auto &override : view.material_overrides)
             material_overrides[override.node] = override.material;
-        for (const auto &override : view.selection_material_overrides)
-            material_overrides[override.node] = override.material;
-        for (const auto &override : view.hover_material_overrides)
-            material_overrides[override.node] = override.material;
+        // Selection and hover are independent tints, not material replacements.
 
         std::vector<std::size_t> local_items;
         std::unordered_set<std::size_t> local_item_set;
@@ -841,6 +838,30 @@ RenderUpdate update(RenderPlan &plan, const SceneSnapshot &snapshot, const Chang
         else
             plan.culled_nodes_.erase(node_id);
     }
+    std::vector<NodeId> tint_nodes;
+    if (presentation_changed || material_resources_changed || hierarchy_changed) {
+        render_internal::HighlightTints highlights(snapshot, view);
+        std::unordered_set<std::size_t> candidates;
+        const auto add_subtree = [&](NodeId node) {
+            const auto found = plan.items_by_ancestor_.find(node);
+            if (found != plan.items_by_ancestor_.end())
+                candidates.insert(found->second.begin(), found->second.end());
+        };
+        // Include retired overrides so clearing or moving a highlight restores its old subtree.
+        for (const auto node : plan.view_override_nodes_) add_subtree(node);
+        for (const auto &value : view.selection_material_overrides) add_subtree(value.node);
+        for (const auto &value : view.hover_material_overrides) add_subtree(value.node);
+        if (hierarchy_changed)
+            for (std::size_t index = 0; index < plan.items_.size(); ++index) candidates.insert(index);
+        for (const auto index : candidates) {
+            auto &item = plan.items_[index];
+            const auto tint = highlights.tint(item.node);
+            if (tint != item.highlight_tint) {
+                item.highlight_tint = tint;
+                tint_nodes.push_back(item.node);
+            }
+        }
+    }
     plan.source_revision_ = snapshot.revision();
     plan.view_signature_ = next_view_signature;
     plan.pose_signature_ = render_internal::pose_signature(view);
@@ -870,6 +891,7 @@ RenderUpdate update(RenderPlan &plan, const SceneSnapshot &snapshot, const Chang
                            result.patched_culling != 0;
     delta.resource_delta_complete = resource_changes_complete;
     delta.transforms = changes.world_transform_nodes;
+    delta.transforms.insert(delta.transforms.end(), tint_nodes.begin(), tint_nodes.end());
     delta.layout_nodes = std::move(layout_nodes);
     if (resource_changes_complete) {
         delta.geometries = resource_changes.geometries;

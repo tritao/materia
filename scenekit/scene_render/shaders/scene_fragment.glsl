@@ -27,6 +27,7 @@ in vec3 world_position;
 in vec3 vertex_normal;
 in vec2 vertex_texcoord;
 in vec4 vertex_color;
+in vec4 surface_highlight;
 uniform vec4 clip_planes[32];
 uniform vec4 clip_plane_count;
 out vec4 fragment_color;
@@ -109,6 +110,7 @@ void main() {
                           ? srgb_to_linear(texture_color.rgb) : texture_color.rgb;
     vec3 albedo = srgb_to_linear(base_color.rgb) * base_texel *
                   srgb_to_linear(vertex_color.rgb);
+    albedo = mix(albedo, srgb_to_linear(surface_highlight.rgb), surface_highlight.a);
     float metallic = clamp(material_params.x * metal_rough.b, 0.0, 1.0);
     float roughness = clamp(material_params.y * metal_rough.g, 0.045, 1.0);
     if (lighting_mode.x > 0.5) roughness = max(roughness, ao_params.w);

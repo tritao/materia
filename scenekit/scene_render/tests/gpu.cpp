@@ -35,6 +35,90 @@ bool wait_for_surface(nk_surface surface) {
     return false;
 }
 
+// Real pixel coverage: selection/hover must preserve custom alpha, then update in place.
+void highlight_alpha_regression(nkgpu_renderer renderer) {
+    auto scene = std::make_shared<Scene>();
+    const auto geometry = scene->reserve_geometry_id();
+    auto &mesh = scene->geometry_store().create(geometry);
+    mesh.edit_payload().vertices = {
+        {{{-0.8f, -0.8f, 0}}}, {{{0.8f, -0.8f, 0}}}, {{{0, 0.8f, 0}}}};
+    const auto glass = scene->reserve_material_id();
+    auto &surface = scene->material_store().create(glass);
+    surface.edit_state().base_color = {0.3f, 0.4f, 0.5f, 0.8f};
+    surface.edit_state().opacity = 0.3f;
+    surface.edit_state().alpha_mode = nkscene::AlphaMode::Blend;
+    surface.edit_state().flags = 0;
+    const auto yellow = scene->reserve_material_id();
+    scene->material_store().create(yellow).edit_state().base_color = {1, 1, 0, 1};
+    const auto blue = scene->reserve_material_id();
+    scene->material_store().create(blue).edit_state().base_color = {0, 0, 1, 1};
+    const auto group = scene->reserve_node_id(), node = scene->reserve_node_id();
+    Transaction create(scene);
+    create.add_create(group); create.add_create(node);
+    ChangeSet changes;
+    assert(scene->commit(create, changes) == NKS_OK); create.close();
+    Transaction configure(scene);
+    configure.add_geometry(node, geometry); configure.add_material(node, glass);
+    configure.add_parent(node, group);
+    assert(scene->commit(configure, changes) == NKS_OK); configure.close();
+    nkscene::SceneView view;
+    auto plan = nkscene::compile(scene->snapshot(), view);
+    nkscene::NativeKitGpuExecutor executor(renderer);
+    auto pixel = [&]() {
+        std::vector<std::uint8_t> pixels;
+        assert(executor.capture_rgba8(plan, scene->snapshot(), 64, 64,
+                   {0, 0, 0, 0}, pixels) == NKGPU_OK);
+        const auto at = (32 * 64 + 32) * 4;
+        return std::array<int, 4>{pixels[at], pixels[at+1], pixels[at+2], pixels[at+3]};
+    };
+    const auto normal = pixel();
+    assert(std::abs(normal[3] - 61) <= 2); // 0.8 base alpha * 0.3 opacity
+    view.set_selection_material_override(group, yellow);
+    auto update = nkscene::refresh(plan, scene->snapshot(), view);
+    assert(!update.plan_rebuilt && update.rebuilt_batches == 0);
+    const auto selected = pixel();
+    assert(selected[3] == normal[3] && selected != normal);
+    assert(selected[0] > selected[2]);
+    view.set_hover_material_override(node, blue);
+    nkscene::refresh(plan, scene->snapshot(), view);
+    const auto hovered = pixel();
+    assert(hovered[3] == normal[3] && hovered[2] > hovered[0]);
+    surface.edit_state().opacity = 0.6f;
+    scene->publish();
+    nkscene::refresh(plan, scene->snapshot(), view);
+    const auto edited = pixel();
+    assert(std::abs(edited[3] - 122) <= 2);
+    view.clear_hover_material_overrides(); view.clear_selection_material_overrides();
+    nkscene::refresh(plan, scene->snapshot(), view);
+    const auto cleared = pixel();
+    assert(cleared[3] == edited[3] && cleared != edited);
+    // Fully invisible and alpha-masked surfaces remain invisible when highlighted.
+    view.set_selection_material_override(group, yellow);
+    surface.edit_state().opacity = 0;
+    scene->publish(); nkscene::refresh(plan, scene->snapshot(), view);
+    assert(pixel()[3] == 0);
+    surface.edit_state().opacity = 1;
+    surface.edit_state().base_color[3] = 0.1f;
+    surface.edit_state().alpha_mode = nkscene::AlphaMode::Mask;
+    scene->publish(); nkscene::refresh(plan, scene->snapshot(), view);
+    assert(pixel()[3] == 0);
+    // Texture alpha remains in the shader's alpha equation and mask discard.
+    const auto image = scene->reserve_image_id();
+    auto &image_data = scene->image_store().create(image);
+    image_data.width = 1; image_data.height = 1;
+    image_data.format = nkscene::ImageFormat::RGBA8;
+    image_data.data = {std::byte{255}, std::byte{255}, std::byte{255}, std::byte{64}};
+    const auto texture = scene->reserve_texture_id();
+    scene->texture_store().create(texture).image = image;
+    surface.edit_state().base_color[3] = 1;
+    surface.edit_state().base_color_texture = texture;
+    scene->publish(); nkscene::refresh(plan, scene->snapshot(), view);
+    assert(pixel()[3] == 0); // texture alpha is below the mask cutoff
+    surface.edit_state().alpha_mode = nkscene::AlphaMode::Blend;
+    scene->publish(); nkscene::refresh(plan, scene->snapshot(), view);
+    assert(std::abs(pixel()[3] - 64) <= 2);
+}
+
 } // namespace
 
 int main() {
@@ -70,6 +154,8 @@ int main() {
         result = 3;
         goto cleanup;
     }
+
+    highlight_alpha_regression(renderer);
 
     {
         auto scene = std::make_shared<Scene>();

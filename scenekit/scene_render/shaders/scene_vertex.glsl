@@ -9,11 +9,13 @@ layout(location=4) in vec4 transform3;
 layout(location=5) in vec3 normal;
 layout(location=6) in vec2 texcoord0;
 layout(location=7) in vec4 color0;
+layout(location=8) in vec4 highlight_tint;
 uniform mat4 view_projection;
 out vec3 world_position;
 out vec3 vertex_normal;
 out vec2 vertex_texcoord;
 out vec4 vertex_color;
+out vec4 surface_highlight;
 
 void main() {
     mat4 transform = mat4(transform0, transform1, transform2, transform3);
@@ -24,5 +26,6 @@ void main() {
     vertex_normal = normalize(corrected * sign(dot(c0, cross(c1, c2))));
     vertex_texcoord = texcoord0;
     vertex_color = color0;
+    surface_highlight = highlight_tint;
     gl_Position = view_projection * vec4(world_position, 1.0);
 }

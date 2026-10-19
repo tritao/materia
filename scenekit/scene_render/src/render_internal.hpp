@@ -13,6 +13,17 @@ struct EffectiveState {
     std::unordered_map<NodeId, MaterialId> material;
 };
 
+/** Resolves interaction colors without scanning the override arrays for each primitive. */
+class HighlightTints {
+    const SceneSnapshot &snapshot_;
+    using Colors = std::unordered_map<NodeId, std::array<float, 4>>;
+    Colors selection_, hover_;
+    std::array<float, 4> resolve(Colors &, NodeId);
+  public:
+    HighlightTints(const SceneSnapshot &, const SceneView &);
+    std::array<float, 4> tint(NodeId);
+};
+
 void rebuild_batches(RenderPlan &plan);
 std::size_t move_item_batch(RenderPlan &plan, std::size_t item_index, GeometryId geometry,
                             MaterialId material);

@@ -177,9 +177,9 @@ struct SceneView {
     std::vector<VisibilityOverride> visibility_overrides;
     /** Base presentation material overrides. */
     std::vector<MaterialOverride> material_overrides;
-    /** Selection material layer, below hover material overrides. */
+    /** Selection RGB tint, inherited by descendants; preserves source surface and alpha. */
     std::vector<MaterialOverride> selection_material_overrides;
-    /** Hover material layer, above selection and base material overrides. */
+    /** Hover RGB tint, inherited by descendants and taking precedence over selection. */
     std::vector<MaterialOverride> hover_material_overrides;
     /** Declarative source and isolation presentation rules. */
     SceneViewFilter filter;
@@ -282,6 +282,8 @@ struct RenderItem {
     std::uint32_t pickId = 0;
     std::uint32_t transformIndex = 0;
     RenderFlags flags = RenderFlags::Opaque;
+    /** Display tint only: RGB plus an enable weight; source material alpha is unchanged. */
+    std::array<float, 4> highlight_tint{};
 };
 
 struct InstanceBatch {
