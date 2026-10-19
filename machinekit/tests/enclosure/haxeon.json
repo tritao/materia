@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-enclosure-catalogue-checks"},
+  "entry": "PanelCatalogueChecks",
+  "sourceRoots": ["src", "../../haxe/src", "../../../projectkit/src"],
+  "scopeSourceRoots": false,
+  "target": "host",
+  "outputDir": "build"
+}

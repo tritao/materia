@@ -1,0 +1,1 @@
+{"version":1,"package":{"name":"hobber-enclosure-checks"},"entry":"HobberEnclosureChecks","sourceRoots":["."],"dependencies":{"machinekit":{"path":"../.."}},"target":"host","outputDir":"build/enclosure-run"}

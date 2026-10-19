@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-enclosure-geometry-checks"},
+  "entry": "EnclosureGeometryChecks",
+  "sourceRoots": ["src", "../../examples/enclosure-kit"],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/geometry"
+}

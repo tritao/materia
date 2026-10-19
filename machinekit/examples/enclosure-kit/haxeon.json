@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-enclosure-kit-example"},
+  "entry": "EnclosureKitPreview",
+  "sourceRoots": ["."],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

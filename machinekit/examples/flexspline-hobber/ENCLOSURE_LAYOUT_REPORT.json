@@ -1,0 +1,402 @@
+{
+  "samples": 248,
+  "angularPaddingMm": 11.587067263591413,
+  "excludedElectricalRack": [
+    "electricalPanel",
+    "powerSupply",
+    "Xdrive-driver",
+    "Zdrive-driver",
+    "Ydrive-driver",
+    "table-drive-driver",
+    "swivel-drive-driver",
+    "hob-drive-driver"
+  ],
+  "input": {
+    "floorZ": 847,
+    "loading": {
+      "maxX": 95,
+      "maxY": 15,
+      "maxZ": 1115,
+      "minX": -95,
+      "minY": -536.5870672635915,
+      "minZ": 940
+    },
+    "margin": 75,
+    "openingWidth": 600,
+    "plinth": {
+      "maxX": 410.0000000000001,
+      "maxY": 640.0000000000001,
+      "maxZ": 847,
+      "minX": -410,
+      "minY": -310.0000000000001,
+      "minZ": 47
+    },
+    "swept": {
+      "maxX": 411.5870672635915,
+      "maxY": 641.5870672635915,
+      "maxZ": 1558.5870672635915,
+      "minX": -411.5870672635914,
+      "minY": -311.5870672635915,
+      "minZ": -11.587067263591413
+    }
+  },
+  "dimensionsMm": [
+    1471.5870672635915,
+    1103.174134527183,
+    786.5870672635915
+  ],
+  "doorStrokeMm": 610,
+  "servicePanels": [
+    "hobService",
+    "swivelService"
+  ],
+  "serviceOpenings": [
+    {
+      "bounds": {
+        "maxX": -476.5870672635914,
+        "maxY": 666.5870672635915,
+        "maxZ": 1583.5870672635915,
+        "minX": -886.5870672635914,
+        "minY": -336.5870672635915,
+        "minZ": 897
+      },
+      "panelId": "hobService"
+    },
+    {
+      "bounds": {
+        "maxX": 1385,
+        "maxY": 666.5870672635915,
+        "maxZ": 1583.5870672635915,
+        "minX": 975,
+        "minY": -336.5870672635915,
+        "minZ": 897
+      },
+      "panelId": "swivelService"
+    }
+  ],
+  "seams": "Continuous wet-rated sealant on tray seams; gasketed removable panels and plinth interface (unqualified)",
+  "qualificationIssues": [
+    {
+      "message": "Provide mist extraction",
+      "panelId": "enclosure",
+      "rule": "mist-extraction",
+      "zone": "process"
+    },
+    {
+      "message": "Provide a sealed floor-to-trough path",
+      "panelId": "enclosure",
+      "rule": "drainage",
+      "zone": "process"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "hobService",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "hobService",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "hobService",
+      "rule": "coolant-qualification",
+      "zone": "Splash"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "hobService",
+      "rule": "sealed-seams",
+      "zone": "Splash"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "swivelService",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "swivelService",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "swivelService",
+      "rule": "coolant-qualification",
+      "zone": "Splash"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "swivelService",
+      "rule": "sealed-seams",
+      "zone": "Splash"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "rearMistPanel",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "rearMistPanel",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "rearMistPanel",
+      "rule": "coolant-qualification",
+      "zone": "Splash"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "rearMistPanel",
+      "rule": "sealed-seams",
+      "zone": "Splash"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "roof",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "roof",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "roof",
+      "rule": "coolant-qualification",
+      "zone": "Splash"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "roof",
+      "rule": "sealed-seams",
+      "zone": "Splash"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "frontLeft",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "frontLeft",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "frontLeft",
+      "rule": "coolant-qualification",
+      "zone": "Splash"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "frontLeft",
+      "rule": "sealed-seams",
+      "zone": "Splash"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "frontRight",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "frontRight",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "frontRight",
+      "rule": "coolant-qualification",
+      "zone": "Splash"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "frontRight",
+      "rule": "sealed-seams",
+      "zone": "Splash"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "tray",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "tray",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "tray",
+      "rule": "coolant-qualification",
+      "zone": "Chute"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "tray",
+      "rule": "sealed-seams",
+      "zone": "Chute"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "trayFrontLip",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "trayFrontLip",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "trayFrontLip",
+      "rule": "coolant-qualification",
+      "zone": "Chute"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "trayFrontLip",
+      "rule": "sealed-seams",
+      "zone": "Chute"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "trayRearLip",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "trayRearLip",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "trayRearLip",
+      "rule": "coolant-qualification",
+      "zone": "Chute"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "trayRearLip",
+      "rule": "sealed-seams",
+      "zone": "Chute"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "trayLeftLip",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "trayLeftLip",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "trayLeftLip",
+      "rule": "coolant-qualification",
+      "zone": "Chute"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "trayLeftLip",
+      "rule": "sealed-seams",
+      "zone": "Chute"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "trayRightLip",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "trayRightLip",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "trayRightLip",
+      "rule": "coolant-qualification",
+      "zone": "Chute"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "trayRightLip",
+      "rule": "sealed-seams",
+      "zone": "Chute"
+    },
+    {
+      "message": "Supply a sourced construction heat limit",
+      "panelId": "door/leaf",
+      "rule": "heat-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Supply an applicable construction fire classification",
+      "panelId": "door/leaf",
+      "rule": "fire-qualification",
+      "zone": "all"
+    },
+    {
+      "message": "Polycarbonate alone does not qualify a viewing assembly",
+      "panelId": "door/leaf",
+      "rule": "window-qualification",
+      "zone": "Window"
+    },
+    {
+      "message": "Supply a construction rating/test covering demand, thickness, joints and mounting",
+      "panelId": "door/leaf",
+      "rule": "impact-qualification",
+      "zone": "Impact"
+    },
+    {
+      "message": "Supply a record for the actual coolant and construction",
+      "panelId": "door/leaf",
+      "rule": "coolant-qualification",
+      "zone": "Splash"
+    },
+    {
+      "message": "Wet seams need sealing and drip control",
+      "panelId": "door/leaf",
+      "rule": "sealed-seams",
+      "zone": "Splash"
+    }
+  ],
+  "evidence": "X/Y/Z endpoints, A one-degree grid with radius*half-step padding; B/C descendants bounded by rotation-centred spheres",
+  "assumptions": "75 mm clearance; 600 mm opening; OD140 side-jaw reservation; 100 mm mist opening; 60 C process and oil-mist rule assessment assumed. Robot, seals, retention and flow not qualified.",
+  "acceptance": {
+    "samples": 48,
+    "exactNearPairs": 648,
+    "loadingCorridorClear": true,
+    "saveReopen": true,
+    "serviceOpeningsClear": true
+  },
+  "mechanicalSourceRevision": "7fb67d507f66cf190cd6d3fa63cc67d5c9fb4526"
+}

@@ -41,8 +41,25 @@ class MaterialLibrary {
     material("bronze", "Bronze", [0.55, 0.38, 0.20], 0.70, 0.38, 8800, "bronze"),
     material("brass", "Brass", [0.69, 0.55, 0.29], 0.75, 0.34, 8500, "brass"),
     material("spring-steel", "Spring steel", [0.56, 0.58, 0.60], 0.75, 0.38, 7850, "spring steel"),
-    sheetSteel(), sheetAluminium()
+    sheetSteel(), sheetAluminium(),
+    enclosureMaterial("compact-laminate", "Compact laminate", 1400),
+    enclosureMaterial("grp", "Glass reinforced plastic", 1800),
+    enclosureMaterial("pp", "Polypropylene", 900),
+    enclosureMaterial("hdpe", "HDPE", 950),
+    enclosureMaterial("uhmw-pe", "UHMW polyethylene", 930),
+    enclosureMaterial("fr-acm", "FR aluminium composite panel", 1800),
+    enclosureMaterial("al-honeycomb", "Aluminium honeycomb panel", 200),
+    enclosureMaterial("insulated-sandwich", "Insulated sandwich panel", 100),
+    enclosureMaterial("stainless-sheet", "Stainless sheet", 7900),
+    enclosureMaterial("panel-adhesive", "Panel adhesive", 1200)
   ];
+
+  /** Planning densities only. IDs imply no chemical, fire or impact qualification. */
+  static function enclosureMaterial(id:String, name:String, density:Float):MaterialDef {
+    var result = material(id, name + " (assumed)", [0.65, 0.68, 0.70], 0, 0.6, density, name);
+    result.physical.propertiesAssumed = true;
+    return result;
+  }
 
   /** Display/BOM assumptions only; supplier lot data belongs in tooling stock records. */
   static function toolingEPS():MaterialDef {

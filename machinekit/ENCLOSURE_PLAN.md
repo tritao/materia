@@ -283,11 +283,60 @@ EN0 ── EN1 ── EN2 ── EN3 ── EN4 ── EN5 ── EN6 ── EN7
 | EN1 | planned | |
 | EN2 | planned | |
 | EN3 | planned | |
-| EN4 | planned | |
+| EN4 | in progress: fitted front-loading generator and plinth/tray interface | |
 | EN5 | planned | |
 | EN6 | planned | |
-| EN7 | planned | |
+| EN7 | in progress: current hobber geometry fitted; guard and qualification remain open | |
 | EN8 | planned | |
 | EN9 | planned | |
 | EN10 | planned | |
 | Phase D | later | |
+
+### EN4 / early EN7 hobber fit — 2026-10-19
+
+The user requested fitting the enclosure to the current hobber before the
+bench-mill port. Generic layout/cut-panel/generator code remains in branch
+`enclosure`; it was also integrated into the existing `flexspline-hobber`
+worktree for current-CAD acceptance. Existing mechanical edits were preserved;
+no merge to main or change to the open/cutting previews was required.
+
+`EnclosureLayout` sizes a front-loading shell and right-hand door parking from
+machine-frame swept bounds, a loading reservation and the plinth interface.
+`GeneratedEnclosure` produces a frame, removable side service panels, roof,
+rear mist opening and a steel tray ring with four upstands. `EnclosureCutPanel`
+has a recipe, exact CAD through-cut, net mass/centre of mass and BOM area, plus
+collision proxies preserving its aperture. Rectangular proxies are exact;
+a round port proxy reserves its circumscribed square.
+
+The hobber adapter derives X/Y/Z endpoints and swivel limits from the machine.
+It uses at most one-degree swivel spacing and radius-times-half-step padding;
+B/C descendants get conservative rotation-centred sphere bounds. The separate
+electrical rack is excluded from sizing but included in collision acceptance.
+The front loading reservation follows the existing OD140 jaw assumptions and
+extends outward through the shell; it does not author a robot path.
+
+Initial dimensions: about 1472 × 1103 × 787 mm clear shell above the plinth,
+tray datum Z847 mm, 600 mm opening and 610 mm door stroke. The 75 mm margin,
+100 mm mist opening, service outside space, OD140 jaw reservation and 60 C
+process assessment are assumed. Reported dimensions are CAD-derived.
+
+Open the new hobber `materia.enclosed.project.json`: **enclosed** shows the shell,
+**inspection** hides enclosure occurrences. Outputs and the focused acceptance
+command are documented in `examples/flexspline-hobber/ENCLOSURE.md` in that
+worktree. The normal project and its cutting preview are untouched.
+
+Acceptance covers 48 machine/door states, exact near-pair intersections,
+loading and removable service openings, port cut/mass/proxy and save/reopen.
+The report exposes qualification violations rather than treating geometry as
+protective or fluid-containment acceptance. Seals, plinth transition, retention,
+tray slope/flow, extractor hardware and guard controls remain open. EN4/EN7
+therefore remain in progress; this is the fitted geometry milestone.
+
+Final fitted acceptance passed: 248 envelope samples; 48 machine/door states;
+648 exact near-pair checks; loading reservation and both removable service
+openings clear; port CAD/net mass/aperture proxy and assembly save/reopen pass.
+The 7 MiB scene and layout/check JSON files are exported under the hobber's
+`build/enclosure/`. `ENCLOSURE_LAYOUT_REPORT.json` records the mechanical source
+revision and derived layout. The report retains 52 unresolved qualification,
+sealing and plant-interface requirements. No protective/containment acceptance
+or unattended cutting cycle is claimed.
