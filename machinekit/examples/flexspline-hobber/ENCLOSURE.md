@@ -196,3 +196,36 @@ controlled access stop, reset, boundary interruption and E-stop. Runtime contact
 qualification remains separate; controller motion is tested with contacts
 turned off, as in the preceding single-leaf fixture. See
 `ENCLOSURE_CHECKS_REPORT.json` and `ENCLOSURE_LAYOUT_REPORT.json`.
+
+## Base interface: router-cut laminate study
+
+`HobberBaseInterfaceStudy` compares the proposed seating details against the
+current casting dimensions, core openings and mounting-insert envelopes. It
+selects `compact-laminate-13` (13 mm, RouterCut) for the study. This catalogue
+construction carries assumed generic material properties; its commercial
+chemical grade, coolant/cleaner compatibility and chip-heat suitability remain
+unqualified.
+
+The starting layout retains a 25 mm-wide, 4 mm-deep moulded ledge. With an
+assumed 2 mm compressed gasket, the panel top is 11 mm above the casting top.
+The flush alternative needs a 15 mm recess. Both candidate rebates clear the
+existing mounting inserts and lightening cores. Both intersect the rear X-drive
+channel, requiring a removable sealed service bridge. The reported 21 / 10 mm
+clearances to the general-core roof datum are conservative datum comparisons,
+not remaining wall thicknesses or strength calculations.
+
+The raised inner edge requires a sealed collar/drainage transition so coolant
+cannot collect against it. Moving-machine clearance, panel supports/deflection,
+local insert bosses and clamp loads, gasket compression stops and dedicated
+frame mounting pads remain to design. The casting and current steel enclosure
+tray are unchanged by this study.
+
+Generate the checked comparison and section drawing from the worktree root:
+
+```sh
+/home/joao/dev/materia-cache/tools/heavy-run --mem 3G --need 2G --label hobber-base-interface -- env HAXEON_COMPILER_SERVER=0 ./haxeon/scripts/haxeon run --jobs=1 --project=machinekit/examples/flexspline-hobber/haxeon.base-interface.json
+```
+
+Outputs: `build/base-interface/interface.json` and `interface.svg` beneath this
+example directory. The SVG shows the casting plan, interrupted rear seal route,
+and raised/flush edge sections at the same scale.

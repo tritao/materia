@@ -3,6 +3,7 @@ package machinekit.enclosure;
 /** Initial planning constructions. Thicknesses/densities are assumed; qualification is unfilled. */
 class PanelCatalogue {
   public static function all():Array<LaminatedPanel> return [
+    new LaminatedPanel("compact-laminate-13", [{materialId:"compact-laminate", thicknessMm:13}], RouterCut, "supported and gasketed removable joints"),
     new LaminatedPanel("compact-laminate-6", [{materialId:"compact-laminate", thicknessMm:6}], RouterCut, "corner profile"),
     new LaminatedPanel("fr-acm-4", [{materialId:"fr-acm", thicknessMm:4}], VGrooveFold, "fold and sealed trim"),
     new LaminatedPanel("pp-6", [{materialId:"pp", thicknessMm:6}], HotGasWeld, "hot-gas welded seam"),
