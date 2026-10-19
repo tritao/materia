@@ -406,10 +406,28 @@ Later work includes the distributing-coupling assembly model, all nine poses,
 uncertainty/contact checks and modal inertia tensors. Geometry candidates stay
 deferred until the compliance budget justifies them.
 
-The current nine-pose run has qualified eight poses on both supports and
-resolved mesh levels. `xminus_yplus_zupper` required a 27 mm third level:
-40→30 mm changed one higher frequency by 6.42%; 30→27 mm changes at most 1.14%. Host earlyoom terminated a fine-mesh solve at
-`xminus_yminus_zupper`; it is not a numerical failure or a counted result.
+The nine-pose **modal numerical gate passes** for all 12 modes, both supports,
+positive Jacobians and resolved minimum sections on every counted level.
+Maximum last-refinement frequency change across poses is **3.59%** (limit 5%).
+Two upper corners needed 27 mm third levels: `xminus_yplus_zupper` resolves
+6.42% (40→30) to 1.14% (30→27); `xplus_yplus_zupper` resolves 17.83% to 1.41%.
+Failed comparisons and pressure-interrupted solves are retained and not counted
+as passing evidence. The nine-pose nose/test-bar static sweep is now running.
+
+Lowest frequencies span **47.431–49.678 Hz** with three-point supports and
+**41.460–44.312 Hz** with four springs. Shape tracking of the center first mode
+has MAC ≥0.993 / 0.984 and frequency changes −2.49…+2.13% / −3.52…+3.12%.
+The third, Z-drive-coupled mode spans 75.015–78.693 Hz / 75.872–78.655 Hz
+(check the linked matrix for exact values). First-three-mode MAC stays ≥0.932.
+The four-spring second mode crosses the arbitrary 0.1 column residual flag
+at some upper corners: its continuous ratio changes from 0.0827 at center to
+0.0759–0.1070, with MAC ≥0.973. Thus the first flagged frequency can change
+from ~78 Hz to ~46 Hz without a new mode appearing. Use tracked shapes and
+continuous residuals, not that flag alone. Operating-band acceptance remains
+open; no candidate is selected.
+
+Full pose comparisons, source hashes, motion/kinetic diagnostics and individual
+mode-shape links: `build/fem/nine-pose-upper-bound/modal-report.md` / `.json`.
 The runner requires 10 GiB available at startup (4 GiB need plus 6 GiB reserve).
 `resource_guard.py` additionally monitors host pressure during the full run:
 below 4.5 GiB available it terminates only large private CCX processes within
@@ -433,3 +451,5 @@ meshed frame. These are coupled modes; the casting shape proxy alone must not
 be used to call the ~78 Hz mode pure column bending. Kinetic localization does
 not locate strain energy. Diagnostics are in each completed pose's
 `modal/mass-motion.md` / `.json`, and the modal matrix report links them.
+
+Nine-pose modal aggregate JSON SHA256: `36054d2c6938de2f8ee398117022653095993d43cc4f03206c9f7ccec34c8cea`.

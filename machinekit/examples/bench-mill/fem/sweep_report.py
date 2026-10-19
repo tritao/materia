@@ -42,6 +42,7 @@ def collect_modal(directory,config_path=Path(__file__).with_name("frame-study.js
                     'frequencyRatio':best['frequencyHz']/base['frequencyHz']})
             column=[m for m in modes if m['columnBendingProxy']]
             supports[name]={'frequenciesHz':[m['frequencyHz'] for m in modes],
+                'columnBendingResidualRatios':[m['columnBendingResidualOverMaxCastingMotion'] for m in modes],
                 'lowestColumnBendingProxyHz':min((m['frequencyHz'] for m in column),default=None),
                 'centerModeMatches':matches,'massMotion':motion['supports'][name]}
         rows.append({'pose':pose.name,'jointsMm':modal['jointsMm'],'manifestSha256':modal['manifestSha256'],'supports':supports})
@@ -84,6 +85,7 @@ def modal_markdown(report):
                 group=mode['massGroups'][0]
                 lines.append(f'| [{row["pose"]}]({row["pose"]}/modal/mass-motion.md) | {name} | {mode["mode"]} | {mode["frequencyHz"]:.3f} | {group["target"]} | {100*group["kineticFraction"]:.2f}% | {100*mode["solidKineticFraction"]:.2f}% |')
     lines+=['','Kinetic localization complements the casting shape proxy; it does not locate strain energy or assign a pure column/mount mode automatically.',
+        '','The column-proxy flag uses an arbitrary residual ratio of 0.1. A low support/frame mode can cross that threshold with travel; a change in the first flagged frequency does not establish a new low column mode. Compare the same shape using MAC and the continuous residual ratios in the JSON.',
         '','Mode shape SVGs and effective masses are retained in each pose/modal report. Bonded interfaces and rigid axes raise mode frequencies. No damping or forced-response amplitudes are predicted.']
     return '\n'.join(lines)+'\n'
 
@@ -122,6 +124,7 @@ def collect(directory,config_path=Path(__file__).with_name("frame-study.json")):
                 cases[case]={'castingMachineLoopShares':shares,'machineWorstLoadBoxUm':b['machineLoopExcludingTool']['worstLoadBoxCorner']['normUm'],'worstLoadBoxUm':b['worstLoadBoxCorner']['normUm']}
             column=[m for m in modes if m['columnBendingProxy']]
             supports[name]={'frequenciesHz':[m['frequencyHz'] for m in modes],
+                'columnBendingResidualRatios':[m['columnBendingResidualOverMaxCastingMotion'] for m in modes],
                 'lowestColumnBendingProxyHz':min((m['frequencyHz'] for m in column),default=None),
                 'centerModeMatches':tracking,'staticCases':cases}
         rows.append({'pose':pose.name,'jointsMm':modal['jointsMm'],'supports':supports})
