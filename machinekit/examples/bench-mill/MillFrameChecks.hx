@@ -53,6 +53,17 @@ class MillFrameChecks {
 				near(foot.z, layout.footPockets ? 40 : 0, "foot steel plane");
 			}
 		}
+  var insertState=new cadkit.modeling.AssemblyState(frame.definition());
+  check(frame.column.insertLocations().filter(row->StringTools.startsWith(row.id,"drive")).length==0,"Z bearing regions are not extra physical inserts");
+  for(side in ["Left","Right"]){
+   var id='railZ$side',member=frame.column.components().filter(m->m.id==id)[0].component;
+   near(member.parameterNumber("depth"),layout.zRailStart+layout.zRailLength+20,"Continuous strip spans lower anchor through upper anchor");
+   for(end in ["Lower","Upper"]){
+    var seat=insertState.worldConnector('column/$id','bearing${end}Face');
+    near(seat.y,layout.columnFront,"Bearing mounting face preserved");
+    near(seat.z,layout.railPlane+(end=="Lower"?10:layout.zRailStart+layout.zRailLength+10),"Bearing anchor height preserved");
+   }
+  }
 		check(frame.components().filter(m -> StringTools.startsWith(m.id, "levelingFoot")).length == 4, "four leveling feet installed");
 		for (side in ["Left", "Right"]) for (end in ["Front", "Rear"]) {
 			var id = side + end;

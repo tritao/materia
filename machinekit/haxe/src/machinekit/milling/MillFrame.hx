@@ -108,12 +108,6 @@ class MillFrame extends MachineAssembly {
 			var channelFront = l.columnCentreY - l.columnDepth / 2 - 1;
 			columnVoids.push(CastingFeatures.box("z-drive-channel", zAxis.channelWidth, zAxis.channelBack - channelFront,
 				l.columnHeight + 2, 0, (channelFront + zAxis.channelBack) / 2 - l.columnCentreY, -1));
-			for (side in [-1, 1]) for (end in ["Lower", "Upper"]) {
-				var start = end == "Lower" ? 0.0 : l.zRailStart + l.zRailLength;
-				columnInserts.push(insert('drive$end${side < 0 ? "Left" : "Right"}', l.seatWidth, 20, l.insertThickness,
-					"Z bearing mount anchor", F.fromRotationMatrix(side * l.zRailSpacing / 2,
-						-l.columnDepth / 2 + l.insertThickness - l.seatRise, start + 10, [1,0,0, 0,0,-1, 0,1,0])));
-			}
 		}
 		if (xyAxis != null) {
 			var a = xyAxis, bayFront = a.yFixedY-a.yFixedDepth/2-a.clearance;
@@ -142,10 +136,14 @@ class MillFrame extends MachineAssembly {
 				top-start,0,(frontWeb+1)/2,start));
 		}
 
+  // One physical strip per side carries the guide and both bearing-plate anchors.
+  var stripStart=zAxis==null?l.zRailStart:0.0;
+  var stripEnd=l.zRailStart+l.zRailLength+(zAxis==null?0:20);
+  var stripCentre=(stripStart+stripEnd)/2;
 		for (side in [-1, 1]) columnInserts.push(insert(side < 0 ? "railZLeft" : "railZRight",
-			l.seatWidth, l.zRailLength, l.insertThickness, "Z guide seat",
+			l.seatWidth, stripEnd-stripStart, l.insertThickness, zAxis==null?"Z guide seat":"continuous Z guide and bearing mounting strip",
 			F.fromRotationMatrix(side * l.zRailSpacing / 2, -l.columnDepth / 2 + l.insertThickness - l.seatRise,
-				l.zRailStart + l.zRailLength / 2, [1,0,0, 0,0,-1, 0,1,0])));
+				stripCentre, [1,0,0, 0,0,-1, 0,1,0])));
 		for (sx in [-1, 1]) for (sy in [-1, 1]) columnInserts.push(insert('foot${corner(sx, sy)}',
 			footWidth, footDepth, l.insertThickness, "column sole pad",
 			down(sx * (flared ? (l.columnWidth+l.columnFootWidth)/4 : l.columnWidth/2-l.wall), sy * (l.columnDepth / 2 - l.roof), l.insertThickness)));
@@ -162,6 +160,16 @@ class MillFrame extends MachineAssembly {
 		var columnValues = body(l.columnWidth,l.columnDepth,l.columnHeight,columnVoids);
 		if (flared) columnValues.setNumber("footWidth",l.columnFootWidth).setNumber("footHeight",MillFrameLayout.COLUMN_FOOT_HEIGHT).setNumber("footShoulder",MillFrameLayout.COLUMN_FOOT_SHOULDER);
 		column = new MineralFoundation(columnValues, columnInserts, "footLeftFront");
+  for(side in ["Left","Right"]){
+   var id='railZ$side',top=Solids.axial(0,0,l.insertThickness);
+   column.addMemberConnector(id,"railSeat",F.compose(F.translation(0,l.zRailStart+l.zRailLength/2-stripCentre,0),top));
+   if(zAxis!=null)for(end in ["Lower","Upper"]){
+    var centre=end=="Lower"?10.0:l.zRailStart+l.zRailLength+10;
+    var region=F.translation(0,centre-stripCentre,0);
+    column.addMemberConnector(id,'bearing$end',region);
+    column.addMemberConnector(id,'bearing${end}Face',F.compose(region,top));
+   }
+  }
 		include("column", column, F.translation(0, l.columnCentreY, l.railPlane));
 		// Mating frames coincide; the physical finished faces oppose each other.
 		var first = columnInserts.filter(row -> row.id == "footLeftFront")[0];
@@ -178,7 +186,7 @@ class MillFrame extends MachineAssembly {
 		}
 		exposeConnector("mount", "base/casting", "mount");
 		for (id in ["railYLeft", "railYRight"]) exposeConnector(id, 'base/$id', "top");
-		for (id in ["railZLeft", "railZRight"]) exposeConnector(id, 'column/$id', "top");
+		for (id in ["railZLeft", "railZRight"]) exposeConnector(id, 'column/$id', "railSeat");
 		for (sx in [-1, 1]) for (sy in [-1, 1]) exposeConnector('foot${corner(sx, sy)}', 'base/foot${corner(sx, sy)}', "top");
 	}
 

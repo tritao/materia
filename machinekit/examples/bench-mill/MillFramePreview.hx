@@ -52,10 +52,10 @@ class MillFramePreview {
 		result.include("frame", frame); result.include("zAxis", axis);
 		var framePoses:Map<String, AssemblyFrame> = frame.solvedPoses();
 		var plate = axis.zeroPose("fixedMount");
-		result.addMemberConnector("frame/column/driveUpperLeft", "axisSeat",
-			F.compose(F.inverse(framePoses.get("column/driveUpperLeft")), plate));
+		result.addMemberConnector("frame/column/railZLeft", "axisSeat",
+			F.compose(F.inverse(framePoses.get("column/railZLeft")), plate));
 		result.addMemberConnector("zAxis/fixedMount", "frameSeat", F.identity());
-		result.addMate("z-on-column", "fixed", "frame/column/driveUpperLeft", "axisSeat", "zAxis/fixedMount", "frameSeat");
+		result.addMate("z-on-column", "fixed", "frame/column/railZLeft", "axisSeat", "zAxis/fixedMount", "frameSeat");
 		return result;
 	}
 

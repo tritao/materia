@@ -61,7 +61,7 @@ class MillZAxisIntegrity {
 			for (sweep in swept) noOverlap(out, sweep, fixed, 'full-stroke clearance to $id'); fixed.close();
 		}
 		var mounts = FoundationIntegrity.checkMounts(frame, [for (end in ["Lower", "Upper"]) for (side in ["Left", "Right"])
-			{name: 'Z $end bearing plate $side', parent: 'column/drive$end$side'}]);
+			{name: 'Z $end bearing plate $side', parent: 'column/railZ$side'}]);
 		for (item in mounts.items) out.add(item.severity, item.code, item.subject, item.message);
 		return out;
 	}

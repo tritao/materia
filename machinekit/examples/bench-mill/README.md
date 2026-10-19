@@ -404,3 +404,8 @@ this exposes drawbar and piston travel while leaving the generated CAD intact.
 The [selected Leadshine Y-drive variant](Y_SERVO.md) fits the checked HZMotion
 interfaces into this mechanical frame and stage. Open
 `materia.y-servo.project.json` for the assembled preview.
+
+Each column side now uses one continuous steel Z mounting strip for the rail
+and both bearing anchors. The `railSeat`, `bearingLowerFace` and
+`bearingUpperFace` regions retain their mounting datums on `column/railZLeft`
+and `column/railZRight`. FEM bearing loads still use only the upper 20 mm region.

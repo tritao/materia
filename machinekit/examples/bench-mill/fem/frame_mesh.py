@@ -56,6 +56,17 @@ def build_mesh(gmsh, packet, manifest, config, size, output):
                        (x + width / 2, y, z + length / 2), (x - width / 2, y, z + length / 2)]
         tools.append((2, rectangle(gmsh, corners)))
         patches.append({"name": guide["member"], "owner": owner, "kind": "guide-" + guide["axis"]})
+    # New frames use one strip per side; partition only the original 20 mm
+    # upper bearing region, rather than applying drive load over the whole strip.
+    for side in ("Left", "Right"):
+        if "frame/column/driveUpper" + side in parts:
+            continue  # Previously exported split-insert packets remain readable.
+        owner = "frame/column/railZ" + side
+        box = parts[owner]["boundsMm"]
+        x0, x1, y, z1 = box["minX"], box["maxX"], box["minY"], box["maxZ"]
+        tools.append((2, rectangle(gmsh, [(x0, y, z1 - 20), (x1, y, z1 - 20),
+                                         (x1, y, z1), (x0, y, z1)])))
+        patches.append({"name": "drive-z-" + side.lower(), "owner": owner, "kind": "drive-z"})
     for support in packet["supports"]:
         x, y, z = xyz(support["seatMm"])
         r = config["footContactRadiusMm"]
@@ -87,6 +98,8 @@ def build_mesh(gmsh, packet, manifest, config, size, output):
             ("frame/base/driveYFixed", 2, "maxZ", "drive-y", "drive-y"),
             ("frame/column/driveUpperLeft", 1, "minY", "drive-z-left", "drive-z"),
             ("frame/column/driveUpperRight", 1, "minY", "drive-z-right", "drive-z")):
+        if owner not in parts:
+            continue  # Continuous-strip drive patches were partitioned above.
         coordinate = parts[owner]["boundsMm"][side]
         faces = []
         for face in faces_by_part[owner]:
