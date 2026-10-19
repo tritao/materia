@@ -36,6 +36,16 @@ void PointConvex::reset(std::shared_ptr<std::vector<coal::Vec3s>> points) {
     computeLocalAABB();
 }
 
+World::QueryStorage World::query_storage() const {
+    QueryStorage result;
+    result.pairs = pairs_.size();
+    for (const auto &pair : pairs_) {
+        result.collisions += bool(pair.collide);
+        result.distances += bool(pair.distance);
+    }
+    return result;
+}
+
 uint32_t World::add_body(int32_t group) {
     bodies_.emplace_back();
     bodies_.back().group = group;
@@ -214,15 +224,9 @@ bool World::make_pair(uint32_t a, uint32_t b, Pair &pair) {
     pair.second = second.object.get();
     pair.field = first.height_field ? 1 : second.height_field ? 2 : 0;
     if (!supported(first, second)) return false;
-    try {
-        if (!pair.field)
-            pair.collide = std::make_unique<coal::ComputeCollision>(pair.first->collisionGeometryPtr(),
-                                                                    pair.second->collisionGeometryPtr());
-        pair.distance = std::make_unique<coal::ComputeDistance>(pair.first->collisionGeometryPtr(),
-                                                                pair.second->collisionGeometryPtr());
-    } catch (const std::invalid_argument &) {
-        return false;
-    }
+    // Eligibility is checked above, but query solvers are heavyweight. Broadphase
+    // often rejects almost every pair, so retain only the lightweight pair record
+    // until a collision or distance is actually requested.
     return true;
 }
 
@@ -350,13 +354,20 @@ World::Candidates World::candidates(double radius) {
     return result;
 }
 
+coal::ComputeDistance &World::distance_query(Pair &pair) {
+    if (!pair.distance)
+        pair.distance = std::make_unique<coal::ComputeDistance>(pair.first->collisionGeometryPtr(),
+                                                               pair.second->collisionGeometryPtr());
+    return *pair.distance;
+}
+
 bool World::collides(Pair &pair, double margin, coal::CollisionRequest &request) {
     if (pair.touch && margin == 0.0) {
         coal::DistanceRequest distance_request(false, true);
         coal::DistanceResult result;
         // A contact interface may touch. This absolute precision allowance is
         // numerical (one nanometre), not an engineering clearance or compliance.
-        return (*pair.distance)(pair.first->getTransform(), pair.second->getTransform(), distance_request, result) < -1e-9;
+        return distance_query(pair)(pair.first->getTransform(), pair.second->getTransform(), distance_request, result) < -1e-9;
     }
     // Coal's convex collision fast path can miss contact made only by its
     // swept-sphere radius. Its signed-distance query includes that radius.
@@ -368,11 +379,14 @@ bool World::collides(Pair &pair, double margin, coal::CollisionRequest &request)
     if (pair.field || inflated_convex(pair.first) || inflated_convex(pair.second)) {
         coal::DistanceRequest distance_request(false, true);
         coal::DistanceResult result;
-        return (*pair.distance)(pair.first->getTransform(), pair.second->getTransform(), distance_request, result) <=
+        return distance_query(pair)(pair.first->getTransform(), pair.second->getTransform(), distance_request, result) <=
                margin;
     }
     request.security_margin = margin;
     coal::CollisionResult result;
+    if (!pair.collide)
+        pair.collide = std::make_unique<coal::ComputeCollision>(pair.first->collisionGeometryPtr(),
+                                                               pair.second->collisionGeometryPtr());
     (*pair.collide)(pair.first->getTransform(), pair.second->getTransform(), request, result);
     return result.isCollision();
 }
@@ -384,7 +398,7 @@ void World::measure(Pair &pair, PairResult &out) {
     out.body_b = pair.body_b;
     coal::DistanceRequest request(true, true);
     coal::DistanceResult result;
-    out.distance = (*pair.distance)(pair.first->getTransform(), pair.second->getTransform(), request, result);
+    out.distance = distance_query(pair)(pair.first->getTransform(), pair.second->getTransform(), request, result);
     for (int k = 0; k < 3; ++k) {
         out.point_a[k] = result.nearest_points[0][k];
         out.point_b[k] = result.nearest_points[1][k];

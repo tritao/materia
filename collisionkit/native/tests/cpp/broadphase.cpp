@@ -51,6 +51,42 @@ const double identity[7]={0,0,0,0,0,0,1};
 }
 
 int main() {
+    // Distant objects must not retain heavyweight narrow-phase solvers. Moving
+    // a previously distant pair into range must still create and use its solver.
+    {
+        ck::World sparse(0);
+        const auto moving = sparse.add_body(0);
+        auto box = std::make_shared<coal::Box>(1,1,1);
+        const auto moving_object = sparse.add(moving,identity,box,false);
+        uint32_t first_fixed = 0;
+        for (int i=1;i<=300;++i) {
+            const double position[7]={10.0*i,0,0,0,0,0,1};
+            const auto fixed=sparse.add(-1,position,box,false);
+            if(i==1) first_fixed=fixed;
+        }
+        const double margin=0.01;
+        const ck::Margins margins{1,&margin};
+        bool found=false;ck::PairResult hit;
+        expect(sparse.violation(margins,nullptr,found,hit) && !found,"distant scene is clear");
+        auto storage=sparse.query_storage();
+        expect(storage.pairs==300 && storage.collisions==0 && storage.distances==0,
+               "broadphase-rejected pairs retain no narrow-phase solver state");
+        const double near[7]={10,0,0,0,0,0,1};
+        sparse.set_body_pose(moving,near);
+        expect(sparse.violation(margins,nullptr,found,hit) && found && hit.a==moving_object && hit.b==first_fixed,
+               "previously distant pair is queried after movement");
+        storage=sparse.query_storage();
+        expect(storage.collisions==1 && storage.distances==1,"only measured pair retains query state");
+        std::vector<ck::PairResult> all;
+        expect(sparse.distances(INFINITY,all) && all.size()==300,"unbounded distance query still measures every pair");
+        storage=sparse.query_storage();
+        expect(storage.collisions==1 && storage.distances==300,"distance queries do not allocate collision solvers");
+        sparse.set_object_rule(moving_object,first_fixed,CK_RULE_ALLOW,CK_PAIR_PROCESS_CONTACT);
+        expect(sparse.violation(margins,nullptr,found,hit) && !found,"rule mutation drops former blocker");
+        storage=sparse.query_storage();
+        expect(storage.pairs==299 && storage.collisions==0 && storage.distances==0,"rebuild releases obsolete solver state");
+    }
+
     // One authored scene, run above and below the policy threshold. Exact
     // equality includes pair ordering and every numeric result field.
     ck_test::Cell loop(100,std::numeric_limits<size_t>::max()),tree(100,ck::World::kBroadphaseThreshold);

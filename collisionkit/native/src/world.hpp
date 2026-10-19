@@ -46,6 +46,9 @@ public:
     static constexpr size_t kBroadphaseThreshold = 512;
     /** The override is internal C++ policy, also used by the same-scene test and benchmark. */
     explicit World(size_t broadphase_threshold = kBroadphaseThreshold) : broadphase_threshold_(broadphase_threshold) {}
+    /** Internal diagnostics for memory regression tests and benchmarks, not part of the C ABI. */
+    struct QueryStorage { size_t pairs = 0, collisions = 0, distances = 0; };
+    QueryStorage query_storage() const;
     uint32_t add_body(int32_t group);
     uint32_t body_count() const { return uint32_t(bodies_.size()); }
     bool has_body(int32_t body) const { return body >= -1 && body < int32_t(bodies_.size()); }
@@ -113,7 +116,7 @@ private:
         uint32_t a, b;
         int32_t body_a, body_b;
         coal::CollisionObject *first, *second;
-        /** coal's own queries; no collision query for a height-field pair, which is checked by distance. */
+        /** Lazy coal query state, retained only after a narrow-phase query. Height fields use distance alone. */
         std::unique_ptr<coal::ComputeCollision> collide;
         std::unique_ptr<coal::ComputeDistance> distance;
         /** 1 when `first` is a height field, 2 when `second` is, else 0. */
@@ -152,6 +155,8 @@ private:
     bool make_pair(uint32_t a, uint32_t b, Pair &out);
     /** True when the pair is closer than `margin` (touching counts at 0); `request` carries the margin for coal. */
     static bool collides(Pair &pair, double margin, coal::CollisionRequest &request);
+    /** Construct distance solver state only for pairs actually measured. */
+    static coal::ComputeDistance &distance_query(Pair &pair);
     /** The pair's signed distance with closest points into `out` (ids and bodies included). */
     static void measure(Pair &pair, PairResult &out);
     /** False when coal cannot compare the two objects' shapes (directly, or through height-field cells). */
