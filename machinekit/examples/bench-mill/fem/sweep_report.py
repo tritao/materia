@@ -20,6 +20,7 @@ def collect_modal(directory,config_path=Path(__file__).with_name("frame-study.js
     configuration=json.loads(config_path.read_text())
     for pose in paths:
         path=pose/'modal/report.json';modal=json.loads(path.read_text());finite(modal)
+        if modal.get('solverThreads')!=1:raise ValueError('Modal sweep requires qualified serial solver reports')
         motion_path=pose/'modal/mass-motion.json'
         motion=json.loads(motion_path.read_text()) if motion_path.exists() else None
         valid=motion is not None and motion['sourceReportSha256']==digest(path) and motion['postprocessorSha256']==digest(Path(__file__).with_name('modal_motion.py'))
@@ -84,6 +85,16 @@ def modal_markdown(report):
             for mode in support['massMotion'][:6]:
                 group=mode['massGroups'][0]
                 lines.append(f'| [{row["pose"]}]({row["pose"]}/modal/mass-motion.md) | {name} | {mode["mode"]} | {mode["frequencyHz"]:.3f} | {group["target"]} | {100*group["kineticFraction"]:.2f}% | {100*mode["solidKineticFraction"]:.2f}% |')
+    lines+=['','## Excitation frequency equality (no operating band assumed)','',
+        '| Support | Mode order | Frequency range, Hz | Rotation / one flute, rpm | Two flutes, rpm | Four flutes, rpm |',
+        '| --- | --- | --- | --- | --- | --- |']
+    for name in report['poses'][0]['supports']:
+        for i in range(3):
+            frequencies=[p['supports'][name]['frequenciesHz'][i] for p in report['poses']]
+            lo,hi=min(frequencies),max(frequencies)
+            ranges=[f'{60*lo/n:.0f}–{60*hi/n:.0f}' for n in (1,2,4)]
+            lines.append(f'| {name} | {i+1} | {lo:.3f}–{hi:.3f} | '+ ' | '.join(ranges)+' |')
+    lines+=['','These are frequency-equality speeds f = rpm × flute count / 60, not exclusion bands or predicted response. Declared spindle/motor/axis operating bands, forcing harmonics, damping and joint uncertainty remain necessary for physical acceptance. Mode order is shown for reference; use the MAC table for identity.']
     lines+=['','Kinetic localization complements the casting shape proxy; it does not locate strain energy or assign a pure column/mount mode automatically.',
         '','The column-proxy flag uses an arbitrary residual ratio of 0.1. A low support/frame mode can cross that threshold with travel; a change in the first flagged frequency does not establish a new low column mode. Compare the same shape using MAC and the continuous residual ratios in the JSON.',
         '','Mode shape SVGs and effective masses are retained in each pose/modal report. Bonded interfaces and rigid axes raise mode frequencies. No damping or forced-response amplitudes are predicted.']
@@ -99,6 +110,7 @@ def collect(directory,config_path=Path(__file__).with_name("frame-study.json")):
     configuration=json.loads(config_path.read_text())
     for pose in poses:
         modal_path=pose/'modal/report.json';modal=json.loads(modal_path.read_text());finite(modal)
+        if modal.get('solverThreads')!=1:raise ValueError('Modal sweep requires qualified serial solver reports')
         if modal['configurationSha256']!=center['configurationSha256']:raise ValueError('Modal configurations differ across poses')
         if not modal['converged']:raise ValueError('Unconverged modes: '+pose.name)
         sources[str(modal_path)]=digest(modal_path);supports={}
@@ -113,6 +125,7 @@ def collect(directory,config_path=Path(__file__).with_name("frame-study.json")):
             cases={}
             for case in ('spindle-nose','test-bar-20'):
                 path=pose/case/'report.json';static=json.loads(path.read_text());finite(static);sources[str(path)]=digest(path)
+                if static.get('solverThreads')!=1:raise ValueError('Static sweep requires qualified serial solver reports')
                 if not static['converged'] or static['manifestSha256']!=modal['manifestSha256'] or static['configurationSha256']!=modal['configurationSha256']:
                     raise ValueError('Unconverged or different CAD packet in static/modal comparison')
                 b=static['meshes'][-1]['supports'][name]['complianceBudget']

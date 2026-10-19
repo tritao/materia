@@ -14,6 +14,7 @@ from packet import digest,validate
 def reusable(path,manifest,config):
     if not path.exists():return False
     report=json.loads(path.read_text())
+    if report.get('solverThreads')!=1:return False
     if not report.get('converged') or report['manifestSha256']!=digest(manifest) or report['configurationSha256']!=digest(config):return False
     if 'budgetConfigurationSha256' in report and report['budgetConfigurationSha256']!=digest(Path(__file__).with_name('compliance-budget.json')):return False
     return all(digest(Path(__file__).with_name(name))==value for name,value in report['sourceSha256'].items())
@@ -25,7 +26,7 @@ def main():
     parser.add_argument('--ccx',required=True);parser.add_argument('--heavy-run',type=Path,default=Path('/home/joao/dev/materia-cache/tools/heavy-run'))
     parser.add_argument('--config',type=Path,default=Path(__file__).with_name('frame-study.json'))
     parser.add_argument('--sizes',nargs='+',type=float,default=[40,30]);parser.add_argument('--resume',action='store_true')
-    parser.add_argument('--threads',type=int,choices=[1,2,4],default=1)
+    parser.add_argument('--threads',type=int,choices=[1],default=1,help='Only serial execution is qualified for this CalculiX build')
     parser.add_argument('--modal-size-map',type=Path,help='Explicit per-pose modal mesh size lists; all levels retain numerical gates')
     parser.add_argument('--stage',choices=['all','modal','static'],default='all')
     args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)

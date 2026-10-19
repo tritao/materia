@@ -506,3 +506,16 @@ The byte-identical static-deck thread comparison is retained at
 with four threads versus ~3.2e-12 N with one thread. `--modal-size-map PATH`
 lets the runner explicitly request previously necessary third mesh levels per
 pose without relaxing any numerical checks.
+
+
+Only serial study execution is now qualified: the pose runner accepts one thread,
+resume rejects parallel/missing-thread reports, and both budget and travel
+aggregators require explicit `solverThreads: 1`. Standalone thread experiments
+remain available for diagnosis but cannot qualify these aggregate gates.
+Negative controls verify that a converged four-thread report cannot be reused
+or accepted for a tool budget; all **36 Python tests** pass. The serial rerun
+also changed one coarse modal frequency from 236.269 Hz to 222.280 Hz on a
+byte-identical input (SHA256 `dd462ed3a8206511d000a227a461245e1d0a1f17487d59d5fa5ab0d2c4c273e6`).
+Thus the earlier apparent third-level refinement needs are provisional too;
+serial mesh comparisons decide which levels are needed. Five serial poses
+currently pass on 40/30 mm meshes, including `xminus_yplus_zupper` at 2.41%.

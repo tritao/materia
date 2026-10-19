@@ -10,7 +10,7 @@ from packet import digest
 from tool_cases import collect
 
 class ToolCaseChecks(unittest.TestCase):
-    def check_report(self,root,mixed=False):
+    def check_report(self,root,mixed=False,threads=1):
         cases=[{'id':'test-bar-20','decisionCase':True,'holderLengthMm':0,'stickOutMm':40},
                {'id':'cutter-6-steel','decisionCase':False,'holderLengthMm':35,'stickOutMm':20}]
         inputs={'toolCases':cases,'toolHolder':{'neckLengthMm':35}}
@@ -21,7 +21,7 @@ class ToolCaseChecks(unittest.TestCase):
         manifest=root/'manifest.json';manifest.write_text(json.dumps(packet))
         for i,case in enumerate(cases):
             directory=root/case['id'];directory.mkdir()
-            report={'converged':True,'manifestSha256':('different-packet' if mixed and i else digest(manifest)),
+            report={'converged':True,'solverThreads':threads,'manifestSha256':('different-packet' if mixed and i else digest(manifest)),
                 'frozenManifestPath':str(manifest),'budgetConfigurationSha256':digest(inputs_path),'configurationSha256':digest(config_path),
                 'analysisContactMm':tool_case_packet(packet,inputs,case['id'])['datums']['toolTipMm'],
                 'meshes':[{'supports':{'soft-three-point':{'solution':{}}}}]}
@@ -43,6 +43,11 @@ class ToolCaseChecks(unittest.TestCase):
         self.assertAlmostEqual(decision['castingMachineLoopShares']['x'],.31)
         self.assertTrue(decision['geometryEligible'])
         self.assertIsNone(context['geometryEligible'])
+
+    def test_parallel_reports_cannot_qualify_budget(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError,'qualified serial'):
+                self.check_report(Path(folder),threads=4)
 
     def test_mixed_cad_packets_rejected(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -14,6 +14,7 @@ def collect(directory,inputs_path,config_path):
         path=directory/source_case/'report.json';report=json.loads(path.read_text())
         if frame_packet is None:frame_packet=report['manifestSha256']
         if frame_packet!=report['manifestSha256']:raise ValueError('Tool cases must use the same frozen CAD packet')
+        if report.get('solverThreads')!=1:raise ValueError('Tool budget requires qualified serial solver reports')
         if not report['converged']:raise ValueError('Unconverged FE case: '+source_case)
         if report['budgetConfigurationSha256']!=digest(inputs_path) or report['configurationSha256']!=digest(config_path):
             raise ValueError('Budget/config input differs from FE report')
