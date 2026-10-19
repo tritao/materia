@@ -45,7 +45,7 @@ class MillXYStageIntegrity {
 		}
 		if (id == "saddle") {
 			// Extrude the saddle section over the full Y interval.
-			var saddle = new MillCrossSaddle(axis.saddle.values().setNumber("depth", l.saddleDepth + dy).setBoolean("motorPocket", false).setBoolean("ribbed",false));
+			var saddle = new MillCrossSaddle(axis.saddle.values().setNumber("depth", l.saddleDepth + dy).setBoolean("motorPocket", false).setBoolean("ribbed",false).setBoolean("blockAccess",false));
 			var part = cache.posed(saddle, axis.zeroPose(id));
 			owned.push(part);
 			return part;

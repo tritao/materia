@@ -260,8 +260,13 @@ finished rail plane stays at 224 mm. A retained island supports the front
 bearing insert. Y rails span 220 mm, with 101.4 mm between block centers along
 Y. Four saddle mounting pads, relieved undersides, deep side openings, continuous
 X-guide chords/end webs and the central nut spine replace shallow cosmetic
-pockets. Sixteen M4 × 20 block bolts have top access wells; wrench clearance
-is checked with the X motor installed. The 508 mm Y rails end in explicit
+pockets. Four side-entry service pockets are centered on the actual Y-block bolt patterns.
+Their width and depth follow both screw rows, with rounded corners, retained
+side webs, a 12 mm mounting floor and a closed 14 mm top deck. Sixteen M4 × 16
+screws engage the blocks by 4 mm, within the HGH15CA reference's M4 × 5 thread.
+The screws remain vertical; an L-key enters from the front or rear opening,
+so top access wells are unnecessary. Both legs of a Ø5 mm wrench envelope are
+checked against the saddle and installed X motor. The 508 mm Y rails end in explicit
 front-face reliefs in the lower Z bearing plate, retaining the plate's rear
 section and anchor stations.
 

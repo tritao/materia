@@ -90,12 +90,26 @@ class MillXYStageChecks {
 			near(cache.overlap(axis.component(id), poses.get(id), axis.saddle, poses.get("saddle")), 0, 'return drive clears saddle: $id');
 		}
 		var motorBody=cache.posed(axis.component("motorX"),poses.get("motorX"));
+		var saddleBody=cache.posed(axis.saddle,poses.get("saddle"));
+		var rebuiltSaddle=cache.posed(restored.components().filter(m->m.id=="saddle")[0].component,poses.get("saddle"));
 		for (i in 0...4) for (hole in 1...5) {
 			var point=F.compose(poses.get('blockY$i'),l.block.connector('mount$hole').frame);
-			var tool=cadkit.modeling.Part.cylinderSpan(2.5,l.saddleBottom+16,l.xRailPlane+20,point.x,point.y);
-			var overlap=tool.intersect(motorBody); near(overlap.volume(),0,"Y block wrench clears installed X motor"); overlap.close(); tool.close();
+			var sy=point.y<l.centreY?-1:1;
+			var stem=cadkit.modeling.Part.cylinderSpan(2.5,l.saddleBottom+14,l.saddleBottom+MillCrossSaddle.WRENCH_HEIGHT,point.x,point.y);
+			var handle=cadkit.modeling.Part.cylinderAlong(2.5,new cadkit.modeling.Vector(point.x,point.y,l.saddleBottom+MillCrossSaddle.WRENCH_HEIGHT),
+				new cadkit.modeling.Vector(0,sy,0),l.saddleDepth/2-Math.abs(point.y-l.centreY)+40);
+			for (tool in [stem,handle]) {
+				for (body in [saddleBody,rebuiltSaddle,motorBody]) {
+					var overlap=tool.intersect(body); near(overlap.volume(),0,"Y block has side-entry Allen-key access"); overlap.close();
+				}
+				tool.close();
+			}
+			var topProbe=cadkit.modeling.Part.cylinderSpan(2.5,l.xRailPlane-10,l.xRailPlane+1,point.x,point.y);
+			var topCommon=topProbe.intersect(saddleBody); check(topCommon.volume()>1,"Y block access leaves closed top deck"); topCommon.close(); topProbe.close();
+			var bolt:AssemblyFrame=poses.get('blockYBolt$i-$hole');
+			near(bolt.z-MillCrossSaddle.BLOCK_SCREW_LENGTH,l.saddleBottom-4,"M4 screw engages 4 mm of block thread");
 		}
-		motorBody.close();
+		motorBody.close(); saddleBody.close(); rebuiltSaddle.close();
 		near(cache.overlap(axis.component("nutY"), poses.get("nutY"), axis.saddle, poses.get("saddle")), 0, "nut body and fitting clear underside saddle tunnel");
 		for (id in ["motorShaftX", "motorPulleyX", "screwPulleyX", "beltX", "motorMountX", "fixedBearingX"]) {
 			near(cache.overlap(axis.component(id), poses.get(id), axis.component("motorCoverX"), poses.get("motorCoverX")), 0, 'return hood clears $id');

@@ -9,13 +9,16 @@ import machinekit.component.ComponentRecipeSupport as P;
 
 /** Cross slide with a bottom Z datum and optional through-Y nut tunnel. */
 class MillCrossSaddle extends MachineComponent {
+	public static inline var BLOCK_SEAT:Float = 12;
+	public static inline var BLOCK_SCREW_LENGTH:Float = 16;
+	public static inline var WRENCH_HEIGHT:Float = 34;
 	static var recipe:Null<ComponentType>;
 
 	public static function parameters():Array<ComponentParameter> return [
 		P.length("width", 450),
 		P.length("depth", 174),
 		P.length("height", 80),
-		P.flag("ribbed", false), P.length("guideSpacing",220), P.length("blockSpan",50.7), P.length("blockHolePitchB",26),P.length("blockHolePitchC",26),
+		P.flag("ribbed", false), P.flag("blockAccess",false), P.length("guideSpacing",220), P.length("blockSpan",50.7), P.length("blockHolePitchB",26),P.length("blockHolePitchC",26),
 		P.length("bore", 54), P.length("boreZ", 40), P.flag("motorPocket", true), P.flag("sidePockets", false)
 	];
 
@@ -32,6 +35,10 @@ class MillCrossSaddle extends MachineComponent {
 		if (v.boolean("ribbed") && (v.number("guideSpacing")<160 || v.number("guideSpacing")>v.number("width")-80 ||
 			v.number("blockHolePitchC")<=0 || v.number("blockHolePitchC")>30 || v.number("blockHolePitchB")<=0 ||
 			v.number("blockSpan")<=v.number("blockHolePitchB")/2+17)) throw "Ribbed saddle cannot retain its guide pads and bolt wells";
+		if (v.boolean("blockAccess") && (!v.boolean("ribbed") || v.boolean("sidePockets") ||
+			v.number("blockSpan")+v.number("blockHolePitchB")/2+10>=v.number("depth")/2 ||
+			v.number("guideSpacing")/2-(v.number("blockHolePitchC")+20)/2-12<=45))
+			throw "Block access pockets need ribbed guide pads, end clearance and retained central webs";
 		super("MILL-CROSS-SADDLE", "Machined cross saddle", "cast iron", false, v);
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Face, Solids.axial(0, 0, v.number("height")));
@@ -64,6 +71,18 @@ class MillCrossSaddle extends MachineComponent {
 				tools.push(Part.box(interval[1]-interval[0], 13, h-28)
 					.translated(new Vector((interval[0]+interval[1])/2, side*(d/2-5.5), 14)));
 		if (values().boolean("ribbed")) {
+			// Side-entry service pockets are centered on the real block pattern.
+			if (values().boolean("blockAccess")) {
+				var pocketWidth=parameterNumber("blockHolePitchC")+20;
+				var inner=parameterNumber("blockSpan")-parameterNumber("blockHolePitchB")/2-10;
+				for (sx in [-1,1]) for (sy in [-1,1])
+					tools.push(accessPocket(sx*guide,pocketWidth,sy<0?-d/2-1:inner,sy<0?-inner:d/2+1,h));
+				// Separate lightening cells leave full-height webs beside each guide pad.
+				for (side in [-1,1]) for (interval in [[-w/2+40,-guide-pocketWidth/2-12],[-guide+pocketWidth/2+12,-45.0],
+					[45.0,guide-pocketWidth/2-12],[guide+pocketWidth/2+12,w/2-20]])
+					if (interval[1]>interval[0]) tools.push(Part.box(interval[1]-interval[0],d/2-28,h-28)
+						.translated(new Vector((interval[0]+interval[1])/2,side*(d/4+14),14)));
+			} else
 			// Four bottom guide pads, continuous X guide chords, transverse end
 			// webs and the central nut spine remain joined by a 14 mm sole.
 			for (side in [-1,1]) for (interval in [[-w/2+40,-guide-20],[-guide+20,-45.0],[45.0,guide-20],[guide+20,w/2-20]])
@@ -76,10 +95,21 @@ class MillCrossSaddle extends MachineComponent {
 				for (dx in [-parameterNumber("blockHolePitchC")/2,parameterNumber("blockHolePitchC")/2])
 				for (dy in [-parameterNumber("blockHolePitchB")/2,parameterNumber("blockHolePitchB")/2]) {
 				var x = sx*parameterNumber("guideSpacing")/2+dx, y = sy*parameterNumber("blockSpan")+dy;
-				tools.push(Part.cylinderSpan(2.25,-1,h+1,x,y));
-				tools.push(Part.cylinderSpan(5,12,h+1,x,y));
+				tools.push(Part.cylinderSpan(2.25,-1,values().boolean("blockAccess")?BLOCK_SEAT+1:h+1,x,y));
+				if (!values().boolean("blockAccess")) tools.push(Part.cylinderSpan(5,12,h+1,x,y));
 			}
 		}
-		return Solids.cut(Part.box(w, d, h), tools);
+		var raw=Solids.cut(Part.box(w,d,h),tools);
+		if (!values().boolean("blockAccess")) return raw;
+		try { var result=raw.refined(); raw.close(); return result; } catch(e:Dynamic) { raw.close(); throw e; }
+	}
+	/** Rounded XZ profile extruded from the side face to the inner bolt row. */
+	static function accessPocket(x:Float,width:Float,y0:Float,y1:Float,height:Float):Part {
+		var floor=BLOCK_SEAT, top=height-14, radius=4.0, depth=y1-y0;
+		var parts=[Part.box(width-2*radius,depth,top-floor).translated(new Vector(x,(y0+y1)/2,floor)),
+			Part.box(width,depth,top-floor-2*radius).translated(new Vector(x,(y0+y1)/2,floor+radius))];
+		for (sx in [-1,1]) for (z in [floor+radius,top-radius])
+			parts.push(Part.cylinderAlongY(radius,y0,y1,x+sx*(width/2-radius),z));
+		return Solids.union(parts);
 	}
 }
