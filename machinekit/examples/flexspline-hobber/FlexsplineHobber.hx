@@ -128,11 +128,11 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("powerSupply",supply,F.translation(-650,30,20),"electricalPanel");exposePort("mains","powerSupply","mains");
     fixAt("XdriveFrame",new HobberSaddle("GE-X-drive"),F.translation(centre,0,0),"bed/driveSeat",F.alongY((HobberXLayout.front().motorFace+HobberXLayout.front().deckStart)/2,0,140,0,0,1));
     precisionMounts.push({name:"XdriveFrame-mount",parent:"bed/driveSeat"});
-    fixAt("ZdriveFrame",new HobberSaddle("GE-Z-drive"),F.translation(centre+36,0,0),"column/driveSeat",F.alongY(centre+246,-210,535,0,-1,0));
+    fixAt("ZdriveFrame",new HobberSaddle("GE-Z-drive"),F.translation(centre,0,0),"column/driveSeat",F.alongY(centre+HobberZLayout.SEAT_FACE_X,0,540,-1,0,0));
     precisionMounts.push({name:"ZdriveFrame-mount",parent:"column/driveSeat"});
     fixAt("YdriveFrame",new HobberSaddle("GE-Y-drive"),F.translation(centre,0,363),"swivelPlate",F.alongY(centre+85,-105,458,-1,0,0));
     drive("X","XdriveFrame","Xbridge",[-1.0,0,0],F.translation(centre+HobberXLayout.NUT_DATUM,0,180),HobberXLayout.front().screwLength,HobberXLayout.front().nutStation);
-    drive("Z","ZdriveFrame","Zplate",[0.0,0,1],F.translation(centre+136,-250,575),400);
+    drive("Z","ZdriveFrame","Zplate",[0.0,0,-1],F.translation(centre+HobberZLayout.AXIS_X,0,363+HobberZLayout.NUT_OFFSET_Z),HobberZLayout.SHAFT_LENGTH,HobberZLayout.NUT_STATION);
     drive("Y","YdriveFrame","Yplate",[0.0,-1,0],F.translation(centre+70,0,508),250);
     fixAt("chipTray",new HobberSaddle("GE-chip-tray",new ComponentValues().setNumber("tableFaceDiameter",tableSpec.number("faceDiameter")).setNumber("tableHousingDiameter",tableSpec.number("housingDiameter")).setNumber("tableFaceHeight",FoundationLayout.TABLE_FACE).setNumber("tableSeatHeight",tableBase)),F.identity(),"bed/tablePlate");
     fixAt("coolantPort",new HobberSaddle("GE-coolant"),F.translation(centre,0,363),"Yplate",F.alongY(centre+45,40,435,1,0,0));
@@ -166,7 +166,7 @@ class FlexsplineHobber extends MachineAssembly {
   function drive(id:String,parent:String,carriage:String,d:Array<Float>,nutOrigin:AssemblyFrame,length:Float,nutStation:Float=100):Void {
     var motor=ServoMotor.model(id=="Z"?"GENERIC-HV-SERVO-750W":"GENERIC-HV-SERVO-400W"),screw=new BallScrew(length,id=="Z"?60:BallScrew.INPUT_JOURNAL_LENGTH,true),nut=new BallNut();
     var start=[nutOrigin.x-d[0]*nutStation,nutOrigin.y-d[1]*nutStation,nutOrigin.z-d[2]*nutStation];
-    var up=id=="Y"?[1.0,0,0]:Math.abs(d[2])>0.5?[0.0,1,0]:[0.0,0,1];
+    var up=id=="Z"?[-1.0,0,0]:id=="Y"?[1.0,0,0]:[0.0,0,1];
     var mp=AxisBuilder.orient(start[0]-d[0]*motor.rating.shaftLength,start[1]-d[1]*motor.rating.shaftLength,start[2]-d[2]*motor.rating.shaftLength,up,d);
     fixAt(id+"motor",motor,mp,parent,F.compose(mp,Solids.axial(0,0,0)));
     addComponent(id+"screw",screw);zero.set(id+"screw",AxisBuilder.orient(start[0],start[1],start[2],up,d));
@@ -187,7 +187,7 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt(id+"motor-shaft",motor.shaft(),mp,id+"screw");
     var scaleSeat=switch id {
       case "X": AxisBuilder.orient(start[0],46,175,[0.0,1,0],d);
-      case "Z": AxisBuilder.orient(start[0]-35,-289,start[2],[0.0,-1,0],d);
+      case "Z": AxisBuilder.orient(start[0]+45,HobberZLayout.SCALE_Y,start[2],[-1.0,0,0],d);
       case "Y": AxisBuilder.orient(nutOrigin.x-24,start[1],548,[-1.0,0,0],d);
       default: throw "missing scale mounting datum";
     };

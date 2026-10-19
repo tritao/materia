@@ -67,7 +67,7 @@ and empty verified-field lists.
 - `MineralCastBed`: 930 × 800 × 800 mm monolithic ribbed casting, with steel rail seats,
   a table plate and used drive seat as child parts. Levelling uses three side-access cast pockets with removable steel plates, not embedded foot anchors; lifting hardware is deferred.
 - `MineralCastColumn`: 400 × 200 × 500 mm ribbed casting and separate steel base,
-  rail seats, a side Z-drive seat, lifting inserts, 290 mm Z rail spacing. All precision mounts
+  rail seats, a central recessed Z-drive back seat, lifting inserts, 290 mm Z rail spacing. All precision mounts
   are insert faces, with 0.01 mm assumed position tolerance and ground-after-casting
   finish. Casting BOM rows show native-computed kg; inserts are separate items.
   Optional assumed bulk inputs are 35 GPa Young modulus, loss factor 0.02 (8x an
@@ -198,7 +198,7 @@ provide 47 mm floor clearance. Each recessed mount has a separately itemised
 through a cast side pocket. A 70 mm solid roof carries the removable plate;
 no threads or embedded foot anchors remain in the casting. The 15 kN per-foot
 target is assumed. See FOOT_MOUNTS_REPORT.json for access and reaction checks. The
-lightened column casting is 31.75 kg. The work-frame-to-machine transform also
+reinforced central-drive column casting is 43.34 kg. The work-frame-to-machine transform also
 raises the assembly 637 mm, putting the tooth band 1000 mm above the floor.
 See MACHINE_DESIGN.md and LAYOUT_REPORT.json for current mass/stiffness evidence.
 
@@ -218,3 +218,8 @@ or mounted accuracy is implied by the envelope.
 The central X-drive insert has 50 mm full-footprint casting backing, carried by
 a 60 mm channel floor/cap, twin 35 mm longitudinal webs and transverse ribs
 linking both guide beams. See DRIVE_SUPPORT_REPORT.json and its section SVGs.
+
+The centered Z drive uses a 420 mm ground SFU1605 screw, top fixed / bottom
+floating supports, a top-mounted 750 W servo, short saddle nut shelf and adjacent
+linear scale. Its 40 × 40 R3 motor-platform window clears the actual coupling.
+See Z_DRIVE_REPORT.json for travel, backing and thread-direction evidence.

@@ -16,7 +16,7 @@
   },
   "after": {
     "collisionShapes": {
-      "authoredPlusDefaultTotal": 761,
+      "authoredPlusDefaultTotal": 750,
       "parts": [
         {
           "part": "bed/casting",
@@ -144,7 +144,7 @@
         },
         {
           "part": "column/casting",
-          "hulls": 41
+          "hulls": 43
         },
         {
           "part": "column/basePlate",
@@ -180,7 +180,7 @@
         },
         {
           "part": "Zplate",
-          "hulls": 43
+          "hulls": 42
         },
         {
           "part": "blockZLeft",
@@ -316,7 +316,7 @@
         },
         {
           "part": "ZdriveFrame",
-          "hulls": 48
+          "hulls": 36
         },
         {
           "part": "YdriveFrame",
@@ -467,11 +467,11 @@
     },
     "drives": [
       {
-        "thrustMarginN": 888.0092563108531,
+        "thrustMarginN": 884.3712577649027,
         "axis": "X",
-        "movingMassKg": 127.9814873782938,
+        "movingMassKg": 135.25748447019464,
         "continuousThrustWith20PercentReserveN": 1152,
-        "designDemandN": 263.9907436891469,
+        "designDemandN": 267.6287422350973,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
@@ -485,11 +485,11 @@
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 1536.431981396759,
+        "thrustMarginN": 1534.3480628122572,
         "axis": "Z",
-        "movingMassKg": 41.09657537640654,
+        "movingMassKg": 41.29876702786476,
         "continuousThrustWith20PercentReserveN": 2159.9999999999995,
-        "designDemandN": 623.5680186032405,
+        "designDemandN": 625.6519371877423,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       }
@@ -504,11 +504,11 @@
       "Z": 161.00000000000006
     },
     "movingMassKg": {
-      "X": 127.9814873782938,
+      "X": 135.25748447019464,
       "Y": 14.028913051310433,
-      "Z": 41.09657537640654
+      "Z": 41.29876702786476
     },
-    "machineMassKg": 1125.556401073507,
+    "machineMassKg": 1132.8323981654075,
     "members": 108
   },
   "open": [
@@ -582,15 +582,15 @@
   "baseAcceptance": {
     "baseCastingKg": 835.5798839999995,
     "baseAssemblyKg": 859.2230419813541,
-    "machineKg": 1125.556401073507,
+    "machineKg": 1132.8323981654075,
     "baseToMovingMassRatio": {
-      "X": 6.528912119376705,
+      "X": 6.177697946054347,
       "Y": 59.56127042372314,
-      "Z": 20.33210495879187
+      "Z": 20.232562474231344
     },
     "column": {
-      "afterAssemblyKg": 49.96585,
-      "afterCastingKg": 31.745999999999995,
+      "afterAssemblyKg": 62.00225000000003,
+      "afterCastingKg": 43.342800000000025,
       "beforeAssemblyKg": 55.499650000000024,
       "beforeCastingKg": 37.27980000000002
     },
@@ -611,7 +611,7 @@
       "radialSpacingMm": 690,
       "removableSeat": true,
       "vibrationMounts": false,
-      "worstReactionN": 5078.423992883235
+      "worstReactionN": 5152.285712037574
     },
     "table": {
       "basis": "per-field catalog/measured/assumed data; face/flange/centering provisional; bearing construction not claimed",
@@ -983,369 +983,369 @@
     "coolantReservedLitres": 7.92,
     "beam": {
       "assumedProfileAllocationUm": 1.9000000000000001,
-      "atHalfModulusChangeBoundUm": 0.004948863233392938,
+      "atHalfModulusChangeBoundUm": 0.0061890301414424444,
       "basis": "Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; full mechanism X25..retract evaluated by exact prismatic COM translation, reference moving mass; old 210 mm bed uses its original 860 mm support span over the new X range; previous heavy-plinth/full-stroke result is retained separately; 121 mm guide Abbe height; current work-to-table-seat lever follows TABLE_SEAT; old table lever233 mm; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open.",
-      "newChangeBoundUm": 0.002474431616696469,
+      "newChangeBoundUm": 0.0030945150707212222,
       "newMinimumIyMm4": 15465726175.368881,
-      "oldChangeBoundUm": 0.13166196957844534,
+      "oldChangeBoundUm": 0.11523865621916533,
       "oldMinimumIyMm4": 262747548.55643028,
       "passed": true,
       "samples": [
         {
           "xMm": 25,
-          "movingLoadWorkXMm": 229.33962151579559,
+          "movingLoadWorkXMm": 241.1698565891031,
           "oldRelativeRadialVerticalUm": [
-            -1.208642160363676,
-            0.7415006955022614
+            -1.2337458782227286,
+            0.755145679228424
           ],
           "newRelativeRadialVerticalUm": [
-            -0.018279282969055594,
-            0.004458849778258266
+            -0.019303391963032723,
+            0.0045372531605505665
           ],
           "footReactionN": [
-            3067.1733870813814,
-            3046.950330364717,
-            4923.813963141408
+            2990.265793455378,
+            3130.139243362466,
+            4988.885800650949
           ]
         },
         {
           "xMm": 29.25,
-          "movingLoadWorkXMm": 233.58962151579559,
+          "movingLoadWorkXMm": 245.4198565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.2179147973013873,
-            0.7468389852601912
+            -1.242219683550725,
+            0.7591157951689219
           ],
           "newRelativeRadialVerticalUm": [
-            -0.018281115793017236,
-            0.004404186960450699
+            -0.019282279818774416,
+            0.004463658868494925
           ],
           "footReactionN": [
-            3063.308136337835,
-            3043.0850796211716,
-            4931.5444646285005
+            2986.180795670713,
+            3126.0542455778004,
+            4997.05579622028
           ]
         },
         {
           "xMm": 33.5,
-          "movingLoadWorkXMm": 237.8396215157957,
+          "movingLoadWorkXMm": 249.66985658910323,
           "oldRelativeRadialVerticalUm": [
-            -1.226903268670192,
-            0.751688959510412
+            -1.2504005402414646,
+            0.7625883589600487
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01827514563545134,
-            0.004344054488312958
+            -0.019252815595738177,
+            0.004384599679108812
           ],
           "footReactionN": [
-            3059.4428855942897,
-            3039.219828877626,
-            4939.274966115591
+            2982.095797886047,
+            3121.9692477931344,
+            5005.225791789612
           ]
         },
         {
           "xMm": 37.75,
-          "movingLoadWorkXMm": 242.08962151579576,
+          "movingLoadWorkXMm": 253.91985658910323,
           "oldRelativeRadialVerticalUm": [
-            -1.2356044191616562,
-            0.7560469188357142
+            -1.2582852929865163,
+            0.7655608609229402
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01826133664034732,
-            0.0042785518602035735
+            -0.0192149613994293,
+            0.004300206548910203
           ],
           "footReactionN": [
-            3055.577634850743,
-            3035.3545781340786,
-            4947.005467602684
+            2978.0108001013814,
+            3117.8842500084693,
+            5013.395787358943
           ]
         },
         {
           "xMm": 42,
-          "movingLoadWorkXMm": 246.33962151579576,
+          "movingLoadWorkXMm": 258.1698565891033,
           "oldRelativeRadialVerticalUm": [
-            -1.244015093467349,
-            0.7599095912311873
+            -1.2658707864774463,
+            0.7680312187910261
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01823965295169458,
-            0.004207787345016051
+            -0.019168679335353087,
+            0.004210619703574047
           ],
           "footReactionN": [
-            3051.7123841071984,
-            3031.489327390535,
-            4954.735969089773
+            2973.9258023167154,
+            3113.7992522238037,
+            5021.565782928274
           ]
         },
         {
           "xMm": 46.25,
-          "movingLoadWorkXMm": 250.58962151579564,
+          "movingLoadWorkXMm": 262.4198565891033,
           "oldRelativeRadialVerticalUm": [
-            -1.252132136278837,
-            0.7632741321042184
+            -1.2731538654058228,
+            0.7699977777100352
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01821005871348254,
-            0.004131877982178847
+            -0.01911393150901483,
+            0.004115988637932279
           ],
           "footReactionN": [
-            3047.847171983478,
-            3027.6240380271634,
-            4962.466470576866
+            2969.840843151875,
+            3109.714215819313,
+            5029.735778497607
           ]
         },
         {
           "xMm": 50.5,
-          "movingLoadWorkXMm": 254.83962151579559,
+          "movingLoadWorkXMm": 266.66985658910306,
           "oldRelativeRadialVerticalUm": [
-            -1.2599523922876879,
-            0.7661381242744907
+            -1.280131374463213,
+            0.7714593102379939
           ],
           "newRelativeRadialVerticalUm": [
-            -0.018172518069700615,
-            0.0040509495816553965
+            -0.01905068002591984,
+            0.004016472115973813
           ],
           "footReactionN": [
-            3043.9818889824073,
-            3023.7588195411413,
-            4970.196972063958
+            2965.7558131096853,
+            3105.6292502921715,
+            5037.905774066937
           ]
         },
         {
           "xMm": 54.75,
-          "movingLoadWorkXMm": 259.0896215157957,
+          "movingLoadWorkXMm": 270.9198565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.2674727061854705,
-            0.7684995779739876
+            -1.2868001583411852,
+            0.7724150163452265
           ],
           "newRelativeRadialVerticalUm": [
-            -0.018126995164338206,
-            0.003965136723944086
+            -0.018978886991573404,
+            0.003912238170844516
           ],
           "footReactionN": [
-            3040.116632575391,
-            3019.8935744610667,
-            4977.927473551049
+            2961.6708096615494,
+            3101.5442581709754,
+            5046.075769636268
           ]
         },
         {
           "xMm": 59,
-          "movingLoadWorkXMm": 263.3396215157957,
+          "movingLoadWorkXMm": 275.16985658910335,
           "oldRelativeRadialVerticalUm": [
-            -1.2746899226637511,
-            0.7703569308469874
+            -1.293157061731307,
+            0.7728645234143546
           ],
           "newRelativeRadialVerticalUm": [
-            -0.018073454141384733,
-            0.0038745827600782804
+            -0.018898514511480818,
+            0.0038034641048472644
           ],
           "footReactionN": [
-            3036.251407431563,
-            3016.0282981178057,
-            4985.657975038139
+            2957.585837476601,
+            3097.4592347865955,
+            5054.245765205596
           ]
         },
         {
           "xMm": 63.25,
-          "movingLoadWorkXMm": 267.5896215157957,
+          "movingLoadWorkXMm": 279.4198565891033,
           "oldRelativeRadialVerticalUm": [
-            -1.2816008864140975,
-            0.7717090479500673
+            -1.2991989293251451,
+            0.772807886240297
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01801185914482961,
-            0.003779439811626294
+            -0.018809524691147397,
+            0.003690336489441896
           ],
           "footReactionN": [
-            3032.3861924457574,
-            3012.163011616518,
-            4993.388476525232
+            2953.500875449675,
+            3093.3742012441876,
+            5062.415760774931
           ]
         },
         {
           "xMm": 67.5,
-          "movingLoadWorkXMm": 271.8396215157956,
+          "movingLoadWorkXMm": 283.6698565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.2882024421280773,
-            0.7725552217521022
+            -1.3049226058142682,
+            0.7722455870302705
           ],
           "newRelativeRadialVerticalUm": [
-            -0.017942174318662244,
-            0.0036798687706914154
+            -0.01871187963607843,
+            0.0035730511652452292
           ],
           "footReactionN": [
-            3028.5209581382414,
-            3008.297744436942,
-            5001.118978012323
+            2949.415894101039,
+            3089.2891870234916,
+            5070.585756344261
           ]
         },
         {
           "xMm": 71.75,
-          "movingLoadWorkXMm": 276.0896215157956,
+          "movingLoadWorkXMm": 287.91985658910335,
           "oldRelativeRadialVerticalUm": [
-            -1.2944914344972591,
-            0.7728951721342643
+            -1.3103249358902433,
+            0.7711785354037903
           ],
           "newRelativeRadialVerticalUm": [
-            -0.017864363806872043,
-            0.003576039299911884
+            -0.01860554145177921,
+            0.0034518132420310473
           ],
           "footReactionN": [
-            3024.6556909586675,
-            3004.432510129426,
-            5008.849479499413
+            2945.3308798803455,
+            3085.2042056748564,
+            5078.755751913591
           ]
         },
         {
           "xMm": 76,
-          "movingLoadWorkXMm": 280.33962151579544,
+          "movingLoadWorkXMm": 292.169856589103,
           "oldRelativeRadialVerticalUm": [
-            -1.3004647082132095,
-            0.7727290463900236
+            -1.315402764244638,
+            0.769608068392668
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01777839175344843,
-            0.003468129832460927
+            -0.018490472243755062,
+            0.003326837098730138
           ],
           "footReactionN": [
-            3020.790404457381,
-            3000.5672951436222,
-            5016.579980986504
+            2941.245846337938,
+            3081.119243647932,
+            5086.925747482924
           ]
         },
         {
           "xMm": 80.25,
-          "movingLoadWorkXMm": 284.5896215157955,
+          "movingLoadWorkXMm": 296.41985658910295,
           "oldRelativeRadialVerticalUm": [
-            -1.3061191079674963,
-            0.7720574192251484
+            -1.3201529355690205,
+            0.7675359504410132
           ],
           "newRelativeRadialVerticalUm": [
-            -0.0176842223023808,
-            0.0033563275720467052
+            -0.018366634117511257,
+            0.0031983463834302415
           ],
           "footReactionN": [
-            3016.9251281141183,
-            2996.702069999792,
-            5024.3104824735965
+            2937.1608229535564,
+            3077.0342714629833,
+            5095.095743052254
           ]
         },
         {
           "xMm": 84.5,
-          "movingLoadWorkXMm": 288.83962151579556,
+          "movingLoadWorkXMm": 300.669856589103,
           "oldRelativeRadialVerticalUm": [
-            -1.311451478451688,
-            0.7708812927577021
+            -1.3245722945549578,
+            0.7649643734052326
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01758181959765858,
-            0.0032408284929123644
+            -0.018233989178553102,
+            0.0030665740133760727
           ],
           "footReactionN": [
-            3013.0598830340414,
-            2992.8368135927767,
-            5032.040983960689
+            2933.0758308323607,
+            3072.9492680148473,
+            5103.265738621584
           ]
         },
         {
           "xMm": 88.75,
-          "movingLoadWorkXMm": 293.0896215157956,
+          "movingLoadWorkXMm": 304.9198565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.3164586643573508,
-            0.769202096518049
+            -1.3286576858940178,
+            0.7618959565540318
           ],
           "newRelativeRadialVerticalUm": [
-            -0.017471147783271176,
-            0.003121837339836011
+            -0.018092499532385887,
+            0.0029317621749693403
           ],
           "footReactionN": [
-            3009.194664548021,
-            2988.9715305917075,
-            5039.771485447778
+            2928.9908653052203,
+            3068.864237972658,
+            5111.435734190915
           ]
         },
         {
           "xMm": 93,
-          "movingLoadWorkXMm": 297.33962151579556,
+          "movingLoadWorkXMm": 309.1698565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.3211375103760532,
-            0.7670216874488495
+            -1.332405954277768,
+            0.7583337465684127
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01735217100320801,
-            0.0029995676281307183
+            -0.017942127284514938,
+            0.0027941623237687377
           ],
           "footReactionN": [
-            3005.3294460619995,
-            2985.1062475906374,
-            5047.50198693487
+            2924.9058997780785,
+            3064.779207930468,
+            5119.6057297602465
           ]
         },
         {
           "xMm": 97.25,
-          "movingLoadWorkXMm": 301.5896215157958,
+          "movingLoadWorkXMm": 313.4198565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.325484861199363,
-            0.7643423499050608
+            -1.3358139443977766,
+            0.7542812175416767
           ],
           "newRelativeRadialVerticalUm": [
-            -0.017224853401458465,
-            0.002874241643644498
+            -0.017782834540445526,
+            0.0026540351844899076
           ],
           "footReactionN": [
-            3001.4642009819254,
-            2981.2409911836235,
-            5055.232488421959
+            2920.8209076568824,
+            3060.6942044823318,
+            5127.775725329578
           ]
         },
         {
           "xMm": 101.5,
-          "movingLoadWorkXMm": 305.8396215157957,
+          "movingLoadWorkXMm": 317.6698565891031,
           "oldRelativeRadialVerticalUm": [
-            -1.3294975615188471,
-            0.7611667956539379
+            -1.3388785009456101,
+            0.7497422709794204
           ],
           "newRelativeRadialVerticalUm": [
-            -0.017089159122011994,
-            0.002746090442760376
+            -0.01761458340568297,
+            0.002511650751005491
           ],
           "footReactionN": [
-            2997.5989246386625,
-            2977.3757660397923,
-            5062.962989909052
+            2916.7358842725007,
+            3056.6092322973823,
+            5135.94572089891
           ]
         },
         {
           "xMm": 105.75,
-          "movingLoadWorkXMm": 310.0896215157955,
+          "movingLoadWorkXMm": 321.919856589103,
           "oldRelativeRadialVerticalUm": [
-            -1.3331724560260734,
-            0.7574981638750359
+            -1.341596468612837,
+            0.7447212357995396
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01694505230885798,
-            0.002615353852396299
+            -0.01743733598573256,
+            0.0023672882863451043
           ],
           "footReactionN": [
-            2993.733638137374,
-            2973.510551053987,
-            5070.693491396147
+            2912.6508507300937,
+            3052.524270270458,
+            5144.115716468241
           ]
         },
         {
           "xMm": 110,
-          "movingLoadWorkXMm": 314.33962151579544,
+          "movingLoadWorkXMm": 326.1698565891031,
           "oldRelativeRadialVerticalUm": [
-            -1.3365063894126095,
-            0.7533400211602046
+            -1.3439646920910246,
+            0.7392228683322263
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01679249710598585,
-            0.002482280470005188
+            -0.017251054386099588,
+            0.002221236322695323
           ],
           "footReactionN": [
-            2989.8683709578,
-            2969.6453167464715,
-            5078.423992883235
+            2908.565836509398,
+            3048.439288921822,
+            5152.285712037574
           ]
         }
       ],
@@ -1584,9 +1584,9 @@
     }
   },
   "validation": {
-    "mechanicalAssertions": 968,
+    "mechanicalAssertions": 971,
     "boughtTableAssertions": 126,
-    "sizeRangeAssertions": 1318,
+    "sizeRangeAssertions": 1362,
     "cupLoadingPathAssertions": 6666,
     "referenceFrame": {
       "threads": 1,
@@ -1597,7 +1597,7 @@
       "arcToleranceMm": 1e-08,
       "maxArcDifferenceMm": 1.3176743646820595e-13,
       "forceToleranceN": 1e-06,
-      "maxForceDifferenceN": 1.38016e-10,
+      "maxForceDifferenceN": 1.3801582099404186e-10,
       "cutCircles": 9,
       "scope": "short reference-geometry cut using measured assembly transforms; no full-reference grade claim"
     },
@@ -1677,6 +1677,25 @@
       "fixtureEnvelopeContacts": 0,
       "inspectionAndReset": "passed",
       "scope": "Coarse demonstration, not ISO grading"
+    },
+    "centralZDriveReport": "Z_DRIVE_REPORT.json",
+    "centralZDriveAssertions": 37,
+    "centralZDriveClearanceGrid": {
+      "reference": true,
+      "scope": "changed central Z drive, saddle and column against all parts; unchanged pairs retain prior audit evidence",
+      "completed": 85,
+      "members": 108,
+      "checked": 4420,
+      "thresholdMm3": 0.001,
+      "unexpected": 0,
+      "seconds": 11.163219928741455
+    },
+    "centralZAppPlayback": {
+      "cutWindows": 982,
+      "machiningSeconds": 6.49625,
+      "fixtureEnvelopeContacts": 0,
+      "inspectionAndReset": "passed",
+      "scope": "Coarse demonstration, not ISO grading"
     }
   },
   "previousRevisionProvenance": {
@@ -1708,72 +1727,19 @@
     "nativeProviders": "Existing providers reused read-only; frozen HB4/HB11 workers not rebuilt or signalled."
   },
   "provenance": {
-    "baseCommit": "94161d3e3adbb7f76ef5250515d0d47152f62137",
-    "rebasedOntoMain": "219966f2d0f051289b406bcc6427d3de3d9c42a1",
+    "baseCommit": "4427eabe3",
+    "rebasedOntoMain": "3511a01fbf4e1306357462d2e30542cf53e2ce07",
+    "scope": "Owned geometry and checks for this revision. Concurrent enclosure/BOM/material edits in the shared workspace are excluded from this commit.",
     "geometryAndChecksSourceSha256": {
-      "app/src/ApplicationSimulation.hx": "2c7b4d5d1a881a60a84bfdce200f57916c532af462f255623772e65ee0db721b",
-      "app/src/CutterGeometry.hx": "51e730c0f3d5f3660b60b9a1c935d40e2376cc05303392e471d099b396ad4455",
-      "app/src/EditorScene.hx": "f2904483ce171cb9c85c4ce3c5b051f95a9efc2bfa020bf77a8d53d0116770e4",
-      "app/src/HobbingCupDisplay.hx": "4f432e28ea7fbe383786b6547a97ebedd4c6735fa43a9a5fac1f707bfcc4f895",
-      "app/src/HobbingHandling.hx": "24a7b64b6a8d9c488cc99195a8e8ac322396c968f7caa0d869246ef7d2f406c1",
-      "app/src/HobbingProgramPlayer.hx": "92891bd9f012dde901386b993dde39effe4a8c79224ef9ca3fd4b2406579aee3",
-      "app/src/HobbingStock.hx": "f8d22dc8167f071d40ea14933960431dcb743391b539b327cf851571a0a60128",
-      "app/src/editor/CncPanel.hx": "f8a5138450360c748fa8a7d3981f08a9523f2b4d7f3c0825bbd16073d4c7ed5f",
-      "app/src/editor/MachineControlPanel.hx": "82f0e3d7760f5fc3be1e5f4e2c2f0ececd4519395d76d6251f1c46ad51689458",
-      "app/src/editor/ScenePresentation.hx": "17b388838ac85aeaf88d2d335abb81461dad5776565bf4361f54c520abb03f01",
-      "app/tests/src/app/ProjectSourceTests.hx": "d3d4e750d4abfa48aaa8b305943803e229e2c0e9a42d75891a4dbeb4b7716f8c",
-      "app/tests/src/tests/AppTests.hx": "220ed972ca600102fb072252ca45c10bebcc3b16c39acf6a1c5c77d3789bd7bc",
-      "app/tests/src/tests/HobbingHandlingTests.hx": "03abc85824faf2cc81d11ccab263bdd53d2af9b790616ffa9a4c23d29f78da07",
-      "app/tests/src/tests/RuntimeGeometryTests.hx": "0a85d3f1dd62d817ed8d544a2a38e1d689325012435e49f103ccd95f388b97ee",
-      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "230c98ccc69b04a6f5cb5e4a84bdae1d3d3e83cba4c0feaa4ae52d385dae3749",
-      "machinekit/examples/flexspline-hobber/FlexsplineHobberBaseReport.hx": "1c90967f09d1d457965420a70a9c2cd2d56a8377903d58c5671f7914f6ae62e4",
-      "machinekit/examples/flexspline-hobber/FlexsplineHobberCam.hx": "b80c1bf804bc516a7f1695bae1cfc1de7b99963b5f5c07d875890c229ab07e6b",
-      "machinekit/examples/flexspline-hobber/FlexsplineHobberErrors.hx": "c40716a4354bd6c0db031281e52e3c07819dea17e7f85f6829097211dca61656",
-      "machinekit/examples/flexspline-hobber/FlexsplineHobberLayoutReport.hx": "364e29ac6292068ecab01cde5ef83200a2d95eb4627e5f0e99e13916b1d7e963",
-      "machinekit/examples/flexspline-hobber/FlexsplineHobberLoads.hx": "df2d41e3e2279b3dcd8380be8aa5c7cafcfc4bc55124941902c1ab59d9c548c9",
-      "machinekit/examples/flexspline-hobber/FlexsplineHobberPreview.hx": "67d5c9acc595719541f4b1a067fd11a5e91a70629ca3145436464792620bbb09",
-      "machinekit/haxe/src/machinekit/component/Bom.hx": "8fbbd45d3d57243b87f8b6ac9e55b598760c2f0fddd9caab8ddbe2678e8beb38",
-      "machinekit/haxe/src/machinekit/component/ExtrusionCollision.hx": "71ca3dd52cbe7bd52ed73c41f1a9df88693e6f35dcd33a7e9c595bd781e942a7",
-      "machinekit/haxe/src/machinekit/component/IncludedInPurchase.hx": "5e6155733508886a9452d9dffeda992ebf41d09f9ebbfd6df93526c6343abd92",
-      "machinekit/haxe/src/machinekit/component/MachineKitComponents.hx": "6c6950e089b617475f9d78c067f5a173e4a4e510f91cbd9aabbb9e3dcdfcf91d",
-      "machinekit/haxe/src/machinekit/hobbing/ExpandingMandrel.hx": "ffdfc50f183eaf2c07106b867c98c29a37bf89e25ef05ab0c4c71ad75f01aec9",
-      "machinekit/haxe/src/machinekit/hobbing/FlexsplineCupBlank.hx": "a73acc3962d71d5ceff7fc342bd4a8c921726ce711e13e53ea5f3dd2b295db5f",
-      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "1b1ac1672a6b1a1c019929cdb8a8d36b60e024f0556510d63666c77c04e12b1a",
-      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "b4e8fbf026a11f87c228fcb77acf601cbe4172d6e85f91b9098ff07a27712203",
-      "machinekit/haxe/src/machinekit/hobbing/HobberXLayout.hx": "76c7553f9cbc7bd2de4603371bc68208075e67ded383a534076127332957ce0c",
-      "machinekit/haxe/src/machinekit/hobbing/HobbingComponents.hx": "0c31815eb5d7cea1532a7af4eb2825bddddbc36d09576c90a5a557ed082a8812",
-      "machinekit/haxe/src/machinekit/hobbing/MandrelSleeve.hx": "65c2a3ebb037cae0d21e09b53e423045239225c0412377edfc715d669b0b7b2f",
-      "machinekit/haxe/src/machinekit/hobbing/RotaryTable.hx": "033a502bff4563875d1c8ea2508c549f5cabc885425e1de5ff1e80fb7ccbf7a6",
-      "machinekit/haxe/src/machinekit/hobbing/TableHousing.hx": "c60b024cd0d03439ad204be01312d5baef3c3814898c1b04d94b5e2861ac5918",
-      "machinekit/haxe/src/machinekit/hobbing/TablePlaten.hx": "da2a1671a174ca17d1264b4836ca993cfac2dfd337325a57ffbf6e1022a1cd86",
-      "machinekit/haxe/src/machinekit/motion/MotionComponents.hx": "e612ed9b64c73ce526064704de20ded7da32388c78bfbde6ce76e1eea87bacaa",
-      "machinekit/haxe/src/machinekit/motion/PrecisionRotaryAxis.hx": "aac4567a6f7389f4571e4258d9aad960486824f7988822b022d33d336394748a",
-      "machinekit/haxe/src/machinekit/motion/PurchasedRotaryPart.hx": "c6ed48ed15df7841609a4ddda5c2268e5ffafa783ce76460584fe999dfb1c09c",
-      "machinekit/haxe/src/machinekit/motion/PurchasedRotaryTable.hx": "5c65e0ba2ec6c50d5df190023d1dd8b37236c7658d18afce7f2c9b52a9564dbd",
-      "machinekit/haxe/src/machinekit/motion/RotaryAxisSpec.hx": "3a2a0e92aae2f3ba07c524b867240ad4308dc48e351ab316cf0bdc9ade64c0f6",
-      "machinekit/haxe/src/machinekit/structural/CastingCells.hx": "b68983fa9d62f6d7d3a6fef78ac2a1893dc80aafe35dae12d15a0ba3cee210ed",
-      "machinekit/haxe/src/machinekit/structural/LevelingFoot.hx": "36578ac1e24e617487a62e6171c4112bf39375efac0a0f698d936372385935a3",
-      "machinekit/haxe/src/machinekit/structural/MineralCasting.hx": "7138391b28ad14298881196fb437b2dcd380cdec6b74b75bfa60907d9539c5b3",
-      "machinekit/tests/hobber/src/FlexsplineHobberBudget.hx": "d4e5ac6f79878c64cfa7ea5ab829b451e094c5a9fb1c3102ddda8ef8bb456397",
-      "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "f3f5ea94f5007ac45cfcb91069acd544681a5f2c0aff630b33c58a4693817f1a",
-      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "26f1e543a9ced8f0505ee919f8cfc9020a0da61c13cd4b3a64250f3370389b20",
-      "machinekit/tests/hobber/src/HobberGERangeChecks.hx": "b4fc587212d9ac63c2a712b5c45db9301209eb3ae744c6f1be2512b3dec82ce5",
-      "machinekit/tests/hobber/src/HobberInterferenceChecks.hx": "689f157daadb3a2e4b2e186541ee650e2da2721a1b6cb19c1524343d751b7b6a",
-      "machinekit/tests/hobber/src/HobberLoadingChecks.hx": "7a71d9e46e368722d0b10bf695c4a46f352fc672761e156cd2414df6f18871f7",
-      "machinekit/tests/hobber/src/HobberLoadingSizing.hx": "061d9f67f2008dfc1f69c0d347a4449edcdc0e63022a221353d1d2aa7c11ab1c",
-      "machinekit/tests/hobber/src/HobberPurchasedTableChecks.hx": "3e6febfaccfcdab5c7755d8938add619ff59454bb81b18d3521a5abbcf127d5f",
-      "machinekit/tests/hobber/src/HobberTableTiltChecks.hx": "fd4d58f55145f43f1bcc4e12f2ee62aa2941846735c0b5e01bd09f1fb7d64355",
-      "machinekit/tests/hobbing/src/HobberPartTests.hx": "cd1a6b59ea47fc7153ee715e89f8bd9269cdfdd7d7e499317139535532fab700",
-      "projectkit/src/materia/project/SceneArtifact.hx": "2b1ecbee0c65eb6bca1577a2d2df8fd3f7efff54ed8a7fefd727b4aa779cda90",
-      "scenekit/scene/bindings/haxe/nativekit/scene/Transform.hx": "86337648c46214d262ec2ec9f0fbc6430219fe6084185775549a3f979b53a8c3",
-      "stockkit/haxe/stockkit/hobbing/HobbingAxes.hx": "25db0683a4929f286b725ef0c95d4435dcb903bcb7a5879283e2ee1c3162348d",
-      "stockkit/haxe/stockkit/hobbing/HobbingErrorSource.hx": "78ea849d3c33abe69e00da7917238f6a16cc71bc4fdd1025b88235311aaa630b",
-      "stockkit/haxe/stockkit/hobbing/HobbingMotion.hx": "4910056ed94ec924b5916a74c01935e4430b94474bc8de6dbb2dfdb2d8ddafbc",
-      "stockkit/haxe/stockkit/hobbing/HobbingPoseOffset.hx": "b0f24540cfb7e35f1d191b2eb65d0bcea53512d1c623b05409ed37436397dd96",
-      "machinekit/haxe/src/machinekit/structural/CastingFootPocket.hx": "35eb048fe6bc66fb383df2f037f3ae7d404335c28c85c4ef6ad7c78b7e49dd35",
-      "machinekit/haxe/src/machinekit/structural/LevelingSeat.hx": "ebadd947b5603270e9234cb393d6d22b9729bfd5ef5ee1ab5b2f7a9bbeb376df",
-      "machinekit/tests/hobber/src/HobberFootChecks.hx": "6a0e417dd4ddb4fba85d5f099cf72efb9d77b916a838eeeb554023ebb475ce17",
-      "machinekit/tests/hobber/src/HobberDriveSupportChecks.hx": "ffbc86b6bccecccb69cb82f6771fb9daf49a047cdff013c9ed7c2fd7e1a1fd57"
+      "machinekit/haxe/src/machinekit/hobbing/HobberZLayout.hx": "8562d04915abc865d771c8a3ad9c542997bf8bd000d52745e9b898bff1122f4a",
+      "machinekit/haxe/src/machinekit/hobbing/HobberSaddle.hx": "fb2df116483dcbd46ae703ece6fe322d72e82ce234e5738d97fbfe970f096b1f",
+      "machinekit/haxe/src/machinekit/hobbing/FoundationLayout.hx": "006bc806f9e3d8317346c842a6f4dba84a2e689694ed4fada2b4a7856ae34d49",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobber.hx": "475b21ddf3916df4e6089dd642e3b3e83f588813733e3672be19cd0f2fa2191f",
+      "machinekit/examples/flexspline-hobber/FlexsplineHobberLayoutReport.hx": "d574ad318dc3cd3da87e16cde9cc330cfcb7e6e6a60f2b76ce2aad196269e580",
+      "machinekit/tests/hobber/src/HobberZDriveChecks.hx": "e8013c6a8dbe9dd600fcf0217196426baa042d260ef03f5a01f6c1d1178e7e54",
+      "machinekit/tests/hobber/src/HobberDesignChecks.hx": "13c4ae6eb8a868c4dc02f4ab13baabddba6b2bd7d50746c61e6f986bc82456f0",
+      "machinekit/tests/hobber/src/HobberInterferenceChecks.hx": "547e2cab18a4132610ba0e2f4a514c19bcbfd4f7cf86a11edfc46a94677b1734",
+      "machinekit/tests/hobber/src/FlexsplineHobberChecks.hx": "cda690b528a40b1951f0b6707453f0c83235453c1e97e5123e0a68aa7b5c0d2c"
     }
   },
   "previousPlinthValidation": {

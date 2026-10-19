@@ -131,7 +131,9 @@ chains, and geometric errors are not modelled anywhere. SimKit fidelity levels
   Validate both OD25/140, face20 and the complete A ±15° interval; park Y=Z=0
   and stop B before transfer. See LOADING_CLEARANCE.json for the stated gripper
   envelope and angular enclosure. No fixed 250 mm column stroke is retained.
-- Z is on the recessed column face, with 200 mm travel. A is bolted directly to
+- Z is on the recessed column face, with 200 mm travel. Its 420 mm ground screw
+  is centered between the guides, with top fixed bearing/motor, bottom floating
+  bearing and a short central nut shelf. A is bolted directly to
   the front of the vertical Z saddle, radial pivot through the hob-centre line.
   Its compact concentric bearing/motor/clamp drives a vertical swivel plate;
   Y uses twin rails on that plate’s front face, with a vertical spindle saddle.
@@ -618,7 +620,7 @@ r 30 mm. HB7 and HB11 must show this.
   from a smaller hob OD. Each must be checked against HB11's error budget; none is
   assumed to preserve accuracy for free.
 
-- Casting process model and structural/modal analysis (external FEA), first targets: base/column deflection over X travel, local X-drive floor/web stiffness under screw thrust and motor torque, and modes versus ≈ 50 Hz spindle / 600 Hz gash excitations.
+- Casting process model and structural/modal analysis (external FEA), first targets: base/column deflection over X travel, local X-drive floor/web and central Z spine/adapter stiffness under screw thrust and motor torque, and modes versus ≈ 50 Hz spindle / 600 Hz gash excitations.
 - Double-circular-arc and S-tooth flexsplines; crowning and longitudinal modification.
 - Thermal growth (spindle and table heat, bed); hob wear and shift strategy.
 - G-code: a Fanuc-style EGB dialect in CncKit (writer and reader).
@@ -2678,3 +2680,34 @@ leaving 25 mm beside access openings. Final validation: 968 assembly checks,
 (126 checks). Complete saved-scene playback passes: 982 windows, 6.49625 s
 machining, zero fixture-envelope contacts, inspection/reset passed. The final
 scene is open in Materia; frozen HB11/HB4 work was left untouched.
+
+### Centered recessed Z screw (2026-10-19)
+
+Replaced the screw at transverse Y=-250 mm and its long side arm with a centered
+SFU1605 at Y=0, 19 mm behind the guide plane, in the column recess. A 420 mm screw
+runs down from Z=730 mm with its fixed bearing/motor at the top; the loaded
+segment hangs in tension. A short nut shelf carries the saddle, and the scale
+sits beside the screw. The central ground steel back insert has a full 125 mm
+casting spine behind it. Removed the unused side seat and old side drive frame.
+The 40 × 40 R3 service window clears the full coupling envelope by 2.9 mm.
+
+The soft travel remains -10..190 mm. Geometry checks include 5 mm reserve at both
+ends: nut/race margin ≥39.5 mm, moving saddle/drive clearance ≥11 mm, correct
+right-hand thread direction and positive-Z motion. Ideal work-frame geometry
+and force regressions are unchanged within 1e-8 mm/rad and 1e-6 N tolerances.
+Local spine/adapter stiffness and holding-brake specification remain open.
+
+The reinforced column is 43.34 kg casting / 62.00 kg with inserts; X moving mass
+135.26 kg, Z 41.30 kg, machine 1132.83 kg. The X mass ratio is 6.18; continuous
+thrust margins remain positive (X 884.37 N, Z 1534.35 N on the existing assumed
+demand basis). Global assumed-stiffness beam change over X is 0.00309 µm,
+0.00619 µm at half E. Updated support reactions are in FOOT_MOUNTS_REPORT.json.
+See Z_DRIVE_REPORT.json and its dimensioned section. Frozen HB11/HB4 binaries
+were left untouched; no new measured-accuracy claim is made.
+
+Validation for the centered Z revision: 971 assembly, 37 focused Z-drive, 1362
+size-range and 102 foot checks pass. The changed-Z/column exact-solid audit
+passes all 85 poses (including A ±15°) with zero unexpected intersections. Front
+loading still needs 110 mm retract, the top alternative 145 mm. Full saved-scene
+playback passes 982 windows, inspection/reset and zero fixture-envelope contacts;
+the updated scene is open in Materia.

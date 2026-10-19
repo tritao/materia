@@ -39,6 +39,13 @@ class HobberSaddle extends MachineComponent {
     var q=machinekit.assembly.PosedParts.moved(p,machinekit.assembly.AxisBuilder.orient(0,y,z,[0.0,0,1],[1.0,0,0]));p.close();return q;
   }
   static function boreY(radius:Float,y0:Float,y1:Float,x:Float,z:Float):Part return Part.cylinderAlongY(radius,y0,y1,x,z);
+  /** Milled 40 x 40 coupling service window with R3 internal corners. */
+  static function couplingWindow(x:Float,z0:Float,z1:Float):Part {
+    var cuts=[box(x-17,x+17,-20,20,z0,z1),box(x-20,x+20,-17,17,z0,z1)];
+    for(sx in [-1,1])for(sy in [-1,1])cuts.push(Part.cylinderSpan(3,z0,z1,x+sx*17,sy*17));
+    return Solids.union(cuts);
+  }
+
   static function radialPlate(x0:Float,x1:Float,section:Array<{y:Float,z:Float}>):Part {
     var raw=Part.prism([for(p in section)new Vector(p.y,p.z)],x0,x1);
     var shaped=machinekit.assembly.PosedParts.moved(raw,F.fromRotationMatrix(0,0,0,[0.0,0,1,1,0,0,0,1,0]));raw.close();return shaped;
@@ -50,8 +57,8 @@ class HobberSaddle extends MachineComponent {
         box(240,386,-245,245,260,280),box(60,386,-245,-195,260,280),box(60,386,195,245,260,280),
         Solids.cut(box(202.5,222.5,-35,35,155,280),[boreX(8.2,202.4,222.6,0,180)]),box(202.5,260,-35,35,260,280)];
       case "GE-Z-saddle": [
-        box(135,148,-175,175,-65,170),box(135,148,-190,-175,140,257),
-        Solids.cut(box(111,148,-270,-175,239.5,257),[Part.cylinderSpan(8.2,239.4,257.1,136,-250)])];
+        box(135,148,-175,175,-65,170),
+        Solids.cut(box(148,215,-40,40,7.5,27.5),[Part.cylinderSpan(8.2,7.4,27.6,HobberZLayout.AXIS_X,0)])];
       case "GE-swivel-plate": [box(85,100,-115,115,-95,95)];
       case "GE-Y-saddle": [
         radialPlate(45,57,[{y:-130.0,z:-40.0},{y:-65.0,z:-75.0},{y:65.0,z:-75.0},{y:90.0,z:-55.0},{y:90.0,z:95.0},{y:-130.0,z:95.0}]),box(45,57,90,240,55,95),
@@ -65,9 +72,11 @@ class HobberSaddle extends MachineComponent {
         Solids.cut(box(35,115,125,130,110,190),[boreY(7.1,124.9,130.1,70,145)])];
       case "GE-X-drive": [box(HobberXLayout.front().deckStart,HobberXLayout.front().motorFace,-45,45,140,155),box(HobberXLayout.front().deckStart,HobberXLayout.front().motorFace-10,40,45,155,190),
         Solids.cut(box(HobberXLayout.front().motorFace-5,HobberXLayout.front().motorFace,-45,45,150,220),[boreX(7.1,HobberXLayout.front().motorFace-5.1,HobberXLayout.front().motorFace+0.1,0,180)])];
-      case "GE-Z-drive": [box(165,255,-230,-210,295,887),box(55,145,-280,-275,445,887),
-        Solids.cut(box(55,220,-295,-210,440,445),[Part.cylinderSpan(9.6,439.9,445.1,100,-250)]),
-        box(55,220,-275,-210,882,887),box(35,95,-300,-290,445,887)];
+      case "GE-Z-drive": [
+        box(226,241,-50,50,300,780),
+        box(205,226,-35,35,670,695),box(205,226,-35,35,312.5,332.5),
+        Solids.cut(box(125,241,-55,55,750,765),[couplingWindow(HobberZLayout.AXIS_X,749.9,765.1)]),
+        box(226,231,50,85,310,730)];
       case "GE-chip-tray":
         // Removable stationary skirt: 5 mm radial face clearance, 15 mm housing
         // clearance and 2 mm sheet. The lower skirt covers the full table height.

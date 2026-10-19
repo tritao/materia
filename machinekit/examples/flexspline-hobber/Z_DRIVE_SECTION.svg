@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="900" viewBox="0 0 1120 900"><rect width="1120" height="900" fill="white"/><g font-family="sans-serif" font-size="14">
+<text x="30" y="28" font-size="21">Central Z drive — work-frame section, mm</text>
+<text x="30" y="50">Casting: exact central cell section. Hardware: schematic envelopes. Not a shop drawing.</text>
+<rect x="418.400" y="207.500" width="14.000" height="425.000" fill="#b6bdc5" stroke="none" stroke-width="0.7"/>
+<rect x="257.400" y="207.500" width="21.000" height="425.000" fill="#b6bdc5" stroke="none" stroke-width="0.7"/>
+<rect x="229.400" y="615.500" width="28.000" height="17.000" fill="#b6bdc5" stroke="none" stroke-width="0.7"/>
+<rect x="229.400" y="207.500" width="28.000" height="17.000" fill="#b6bdc5" stroke="none" stroke-width="0.7"/>
+<rect x="278.400" y="207.500" width="140.000" height="416.500" fill="#b6bdc5" stroke="none" stroke-width="0.7"/>
+<rect x="229.400" y="224.500" width="28.000" height="391.000" fill="#8193ab" stroke="#333" stroke-width="0.7"/>
+<rect x="208.400" y="216.000" width="21.000" height="408.000" fill="#567da1" stroke="#333" stroke-width="0.7"/>
+<rect x="179.000" y="288.250" width="29.400" height="21.250" fill="#567da1" stroke="#333" stroke-width="0.7"/>
+<rect x="179.000" y="596.375" width="29.400" height="17.000" fill="#567da1" stroke="#333" stroke-width="0.7"/>
+<rect x="67.000" y="228.750" width="49.000" height="12.750" fill="#567da1" stroke="#333" stroke-width="0.7"/>
+<rect x="172.000" y="228.750" width="57.400" height="12.750" fill="#567da1" stroke="#333" stroke-width="0.7"/>
+<rect x="88.000" y="105.500" width="112.000" height="123.250" fill="#dcaa47" stroke="#333" stroke-width="0.7"/>
+<rect x="135.600" y="258.500" width="16.800" height="51.000" fill="#777" stroke="#333" stroke-width="0.7"/>
+<rect x="132.800" y="309.500" width="22.400" height="284.750" fill="#777" stroke="#333" stroke-width="0.7"/>
+<rect x="135.600" y="594.250" width="16.800" height="21.250" fill="#777" stroke="#333" stroke-width="0.7"/>
+<rect x="120.060" y="234.275" width="47.880" height="48.450" fill="#c4935d" stroke="#333" stroke-width="0.7"/>
+<rect x="130.700" y="228.750" width="26.600" height="29.750" fill="#b0b5bb" stroke="#333" stroke-width="0.7"/>
+<rect x="118.800" y="288.250" width="60.200" height="21.250" fill="#343b45" stroke="#333" stroke-width="0.7"/>
+<rect x="118.800" y="596.375" width="60.200" height="17.000" fill="#343b45" stroke="#333" stroke-width="0.7"/>
+<rect x="124.400" y="508.825" width="39.200" height="29.750" fill="#7fa077" stroke="#333" stroke-width="0.7"/>
+<rect x="110.400" y="538.575" width="67.200" height="8.500" fill="#7fa077" stroke="#333" stroke-width="0.7"/>
+<rect x="81.000" y="425.950" width="18.200" height="199.750" fill="#8cb5d9" stroke="#333" stroke-width="0.7"/>
+<rect x="99.200" y="547.075" width="33.320" height="17.000" fill="#8cb5d9" stroke="#333" stroke-width="0.7"/>
+<rect x="155.480" y="547.075" width="37.520" height="17.000" fill="#8cb5d9" stroke="#333" stroke-width="0.7"/>
+<path d="M117.4 80 V641.0" stroke="#985353" stroke-dasharray="5 4"/><text x="72.4" y="653.75" fill="#985353">guide plane 161</text>
+<path d="M144.0 80 V641.0" stroke="#ad7800" stroke-dasharray="5 4"/><text x="99.0" y="673.75" fill="#ad7800">screw axis 180</text>
+<path d="M144.0 105.5 H510" stroke="#8996a2" stroke-dasharray="3 4"/><text x="515" y="110.5">motor top 910</text>
+<path d="M144.0 228.75 H510" stroke="#8996a2" stroke-dasharray="3 4"/><text x="515" y="233.75">motor face 765</text>
+<path d="M144.0 298.875 H510" stroke="#8996a2" stroke-dasharray="3 4"/><text x="515" y="303.875">fixed 682.5</text>
+<path d="M144.0 523.7 H510" stroke="#8996a2" stroke-dasharray="3 4"/><text x="515" y="528.7">nut centre 418</text>
+<path d="M144.0 604.875 H510" stroke="#8996a2" stroke-dasharray="3 4"/><text x="515" y="609.875">floating 322.5</text>
+<path d="M144.0 615.5 H510" stroke="#8996a2" stroke-dasharray="3 4"/><text x="515" y="650">shaft bottom 310</text>
+<text x="720" y="100" font-size="18">Front view: guide/screw centres</text>
+<rect x="740.75" y="150" width="10" height="390" fill="#6b7684"/><text x="710.75" y="568">rail Y=-145</text>
+<rect x="730.75" y="440.0" width="30" height="45" fill="#8193ab" stroke="#334"/>
+<rect x="730.75" y="374.0" width="30" height="45" fill="#8193ab" stroke="#334"/>
+<rect x="929.25" y="150" width="10" height="390" fill="#6b7684"/><text x="899.25" y="568">rail Y=145</text>
+<rect x="919.25" y="440.0" width="30" height="45" fill="#8193ab" stroke="#334"/>
+<rect x="919.25" y="374.0" width="30" height="45" fill="#8193ab" stroke="#334"/>
+<path d="M840.0 140 V550" stroke="#b48224" stroke-width="7"/><text x="785.0" y="600">screw Y=0</text><path d="M677.5 140 V550" stroke="#bbb" stroke-width="3" stroke-dasharray="6 5"/><text x="650" y="650">old Y=-250</text>
+<text x="560" y="690">Z soft travel: -10..190 mm; 5 mm reserve checked</text>
+<text x="560" y="713">Screw: 420 mm; nut race margin: 39.5 mm minimum</text>
+<text x="560" y="736">Saddle / drive gap: 11 mm minimum</text>
+<text x="560" y="759">Coupling window: 40 x 40 mm, R3 corners</text>
+<text x="560" y="782">Coupling radial clearance: 2.9 mm minimum</text>
+<text x="560" y="805">Ground insert: 125 mm of casting backing</text>
+<text x="560" y="828">Guide-to-hob offsets and 1000 mm work height unchanged</text>
+<text x="560" y="851">Stiffness and holding-brake performance unqualified</text>
+<path d="M510 615.5 V640 H515" fill="none" stroke="#8996a2" stroke-dasharray="3 4"/></g></svg>

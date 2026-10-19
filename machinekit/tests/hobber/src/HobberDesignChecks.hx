@@ -22,6 +22,11 @@ class HobberDesignChecks {
       count++;if(Math.abs(face.x-centre.x-114)>1e-8||Math.abs(mount.x-centre.x-135)>1e-8||face.x>=mount.x)throw "swivel bearing must be in front of the Z saddle";
       var screw=F.compose(canonical,poses.get("Xscrew"));
       count++;if(Math.abs(screw.y)>1e-8||Math.abs(screw.z-180)>1e-8)throw "X screw must lie centrally in recessed bed channel";
+      var zScrew=F.compose(canonical,poses.get("Zscrew")),zl=F.compose(canonical,poses.get("railZLeft")),zr=F.compose(canonical,poses.get("railZRight"));
+      var zd=F.transformVector(zScrew,0,0,1);
+      count++;if(Math.abs(zScrew.y-(zl.y+zr.y)/2)>1e-8||Math.abs(zScrew.x-zl.x-19)>1e-8||Math.abs(zd.z+1)>1e-8)throw "Z screw must lie centrally behind the guide plane and point down";
+      var zFixed=F.compose(canonical,poses.get("Zfixed")),zFloating=F.compose(canonical,poses.get("Zfloating"));
+      count++;if(zFixed.z<=zFloating.z)throw "Z fixed bearing must be at the top";
       var motor=F.compose(canonical,poses.get("Xmotor"));
       count++;if(motor.x<screw.x)throw "X motor must be at rear end of central drive";
       for(m in members)if(Std.isOfType(m.component,HobberSaddle)){
@@ -82,6 +87,13 @@ class HobberDesignChecks {
             var missing=slab.subtract(body),volume=missing.volume();missing.close();slab.close();
             count++;if(volume>0.001)throw 'X drive insert lacks 50 mm full-footprint casting backing: $volume mm3';
             for(probe in HobberDriveSupportChecks.ribProbes(body)){count++;if(probe.missingMm3>0.001)throw 'Missing casting load path ${probe.label}: ${probe.missingMm3} mm3';}
+          }
+          if(foundation.kind=="column"){
+            var drive=foundation.insertLocations().filter(p->p.id=="driveSeat")[0];
+            var raw=cadkit.modeling.Part.box(drive.part.parameterNumber("width"),drive.part.parameterNumber("depth"),125);
+            var slab=PosedParts.moved(raw,F.compose(drive.pose,F.translation(0,0,-125)));raw.close();
+            var missing=slab.subtract(body),volume=missing.volume();missing.close();slab.close();
+            count++;if(volume>0.001)throw 'Central Z drive seat lacks 125 mm full casting backing: $volume mm3';
           }
           for(row in foundation.insertLocations())if(row.id=="railLeft"||row.id=="railRight"){
             var backing=foundation.kind=="bed"?row.pose.z:10.0;

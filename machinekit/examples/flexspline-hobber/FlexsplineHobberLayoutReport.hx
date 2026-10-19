@@ -23,7 +23,7 @@ class FlexsplineHobberLayoutReport {
       '<text x="30" y="50">Central mounting section; Y-offset guides, spindle and hob projected. Not a manufacturing drawing.</text>'];
     function px(x:Float):Float return 220+1.2*x;
     function py(z:Float):Float return 580-1.05*z;
-    var ids=["column/casting","Zplate","railZLeft","column/railLeft","blockZLeft","swivel/housing","swivel/bearing","swivel/motor","swivel/clamp","swivel/head","swivelPlate","railYLeft","railYRight","blockYLeft","blockYRight","Yplate","spindle/housing","hob","table/platen","mandrel"];
+    var ids=["column/casting","column/driveSeat","Zplate","railZLeft","column/railLeft","blockZLeft","swivel/housing","swivel/bearing","swivel/motor","swivel/clamp","swivel/head","swivelPlate","railYLeft","railYRight","blockYLeft","blockYRight","Yplate","spindle/housing","hob","table/platen","mandrel"];
     var row=0;
     try {
       for(id in ids){var member=machine.components().filter(m->m.id==id)[0];
@@ -33,7 +33,7 @@ class FlexsplineHobberLayoutReport {
         // Show the central load path, rather than an off-axis nut carrier's enclosing box.
         if(id=="Zplate"){x0=135;x1=148;z0=-65;z1=170;}
         if(id=="Yplate"){x0=45;x1=57;z0=-75;z1=95;}
-        if(id=="column/casting")x0=276; // Central recess: the rear wall, not its side cheeks.
+        if(id=="column/casting")x0=261; // Central recess: the rear wall, not its side cheeks.
         function rect(a:Float,c:Float,d:Float,e:Float):Void lines.push('<rect x="'+px(a)+'" y="'+py(e)+'" width="'+((c-a)*1.2)+'" height="'+((e-d)*1.05)+'" fill="'+fill+'" fill-opacity="0.55" stroke="#334455"/>');
         if(id=="swivel/housing"){
           for(side in [-1,1]){rect(130,135,side<0?-110:50,side<0?-50:110);rect(120,130,side<0?-110:90,side<0?-90:110);rect(110,120,side<0?-110:100,side<0?-100:110);}

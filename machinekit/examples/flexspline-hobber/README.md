@@ -99,3 +99,6 @@ python3 machinekit/examples/flexspline-hobber/run-plinth-budget.py \
 The runner refuses changed binary/input/settings fingerprints. Do not replace
 its frozen binary during a run. HB4 convergence and HB12 reference acceptance
 remain open; a completed numerical budget does not establish ISO certification.
+
+Z now uses a centered, recessed 420 mm ball screw between the guides, with its
+fixed bearing and motor at the top. See [Z_DRIVE_SECTION.svg](Z_DRIVE_SECTION.svg).

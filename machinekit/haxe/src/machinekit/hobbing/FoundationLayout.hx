@@ -76,7 +76,11 @@ class FoundationLayout {
         cores.push(CastingFeatures.box("chip-downcomer",80,100,TABLE_WELL_FLOOR+390,-200-centre,0,200));
         cores.push(CastingFeatures.box("rotary-union-access",40,40,TABLE_SEAT+UPPER_OFFSET+1,-centre,0,0));
         cores.push(CastingFeatures.box("cable-route",HobberXLayout.front().bedLength-200,30,40,0,300,500));
-      }else cores.push(CastingFeatures.box("head-recess",240,100,502,0,60,-1));
+      }else {
+        cores.push(CastingFeatures.box("head-recess",240,100,502,0,60,-1));
+        // Rear spine carries the central steel drive seat to the column sole.
+        cores=machinekit.structural.CastingCells.outsideBoxes(cores,[[-60.0,-100,0,60,HobberZLayout.SPINE_FRONT_COLUMN_Y,500]]);
+      }
     }
     return new ComponentValues().setNumber("width",d[0]).setNumber("depth",d[1]).setNumber("height",d[2])
       .setToken("voids",CastingFeatures.encode(cores));
@@ -100,8 +104,8 @@ class FoundationLayout {
         add("basePlate","column carriage sole",380,100,20,0,-40,-10);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"Z rail seat",width:35,depth:480,height:20,
           pose:F.fromRotationMatrix(side*145,90,245,[1.0,0,0,0,0,1,0,-1,0])});
-        out.push({id:"driveSeat",role:"Z drive support seat",width:90,depth:480,height:20,
-          pose:F.fromRotationMatrix(-190,40,245,[0.0,0,-1,-1,0,0,0,1,0])});
+        out.push({id:"driveSeat",role:"central Z drive back seat",width:100,depth:460,height:20,
+          pose:F.fromRotationMatrix(0,HobberZLayout.SEAT_COLUMN_Y,250,[-1.0,0,0,0,0,1,0,1,0])});
         for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",25,25,20,side*160,-40,490);
       }
       return out;

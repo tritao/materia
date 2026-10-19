@@ -1,0 +1,2183 @@
+{
+  "beforeCommit": "4427eabe3",
+  "before": {
+    "screwWorkFrame": [
+      136,
+      -250,
+      475
+    ],
+    "screwLengthMm": 400,
+    "nutCentreAtZeroZMm": 575,
+    "fixedBearingLocation": "bottom",
+    "layout": {
+      "collisionShapes": {
+        "authoredPlusDefaultTotal": 761,
+        "parts": [
+          {
+            "part": "bed/casting",
+            "hulls": 170
+          },
+          {
+            "part": "bed/tablePlate",
+            "hulls": 1
+          },
+          {
+            "part": "bed/railLeft",
+            "hulls": 1
+          },
+          {
+            "part": "bed/railRight",
+            "hulls": 1
+          },
+          {
+            "part": "bed/driveSeat",
+            "hulls": 1
+          },
+          {
+            "part": "bed/liftLeft",
+            "hulls": 1
+          },
+          {
+            "part": "bed/liftRight",
+            "hulls": 1
+          },
+          {
+            "part": "footSeat0",
+            "hulls": 1
+          },
+          {
+            "part": "footNut0",
+            "hulls": 1
+          },
+          {
+            "part": "footLocknut0",
+            "hulls": 1
+          },
+          {
+            "part": "foot0",
+            "hulls": 1
+          },
+          {
+            "part": "footSeat1",
+            "hulls": 1
+          },
+          {
+            "part": "footNut1",
+            "hulls": 1
+          },
+          {
+            "part": "footLocknut1",
+            "hulls": 1
+          },
+          {
+            "part": "foot1",
+            "hulls": 1
+          },
+          {
+            "part": "footSeat2",
+            "hulls": 1
+          },
+          {
+            "part": "footNut2",
+            "hulls": 1
+          },
+          {
+            "part": "footLocknut2",
+            "hulls": 1
+          },
+          {
+            "part": "foot2",
+            "hulls": 1
+          },
+          {
+            "part": "table/housing",
+            "hulls": 1
+          },
+          {
+            "part": "table/platen",
+            "hulls": 1
+          },
+          {
+            "part": "mandrel",
+            "hulls": 11
+          },
+          {
+            "part": "mandrelSleeve",
+            "hulls": 1
+          },
+          {
+            "part": "blank",
+            "hulls": 1
+          },
+          {
+            "part": "railXLeft",
+            "hulls": 1
+          },
+          {
+            "part": "railXRight",
+            "hulls": 1
+          },
+          {
+            "part": "Xbridge",
+            "hulls": 45
+          },
+          {
+            "part": "blockXLeft",
+            "hulls": 1
+          },
+          {
+            "part": "blockXLeftFront",
+            "hulls": 1
+          },
+          {
+            "part": "blockXRight",
+            "hulls": 1
+          },
+          {
+            "part": "blockXRightFront",
+            "hulls": 1
+          },
+          {
+            "part": "column/casting",
+            "hulls": 41
+          },
+          {
+            "part": "column/basePlate",
+            "hulls": 1
+          },
+          {
+            "part": "column/railLeft",
+            "hulls": 1
+          },
+          {
+            "part": "column/railRight",
+            "hulls": 1
+          },
+          {
+            "part": "column/driveSeat",
+            "hulls": 1
+          },
+          {
+            "part": "column/liftLeft",
+            "hulls": 1
+          },
+          {
+            "part": "column/liftRight",
+            "hulls": 1
+          },
+          {
+            "part": "railZLeft",
+            "hulls": 1
+          },
+          {
+            "part": "railZRight",
+            "hulls": 1
+          },
+          {
+            "part": "Zplate",
+            "hulls": 43
+          },
+          {
+            "part": "blockZLeft",
+            "hulls": 1
+          },
+          {
+            "part": "blockZLeftUpper",
+            "hulls": 1
+          },
+          {
+            "part": "blockZRight",
+            "hulls": 1
+          },
+          {
+            "part": "blockZRightUpper",
+            "hulls": 1
+          },
+          {
+            "part": "swivel/housing",
+            "hulls": 1
+          },
+          {
+            "part": "swivel/bearing",
+            "hulls": 1
+          },
+          {
+            "part": "swivel/motor",
+            "hulls": 1
+          },
+          {
+            "part": "swivel/clamp",
+            "hulls": 1
+          },
+          {
+            "part": "swivel/head",
+            "hulls": 1
+          },
+          {
+            "part": "swivelPlate",
+            "hulls": 1
+          },
+          {
+            "part": "railYLeft",
+            "hulls": 1
+          },
+          {
+            "part": "railYRight",
+            "hulls": 1
+          },
+          {
+            "part": "Yplate",
+            "hulls": 223
+          },
+          {
+            "part": "blockYLeft",
+            "hulls": 1
+          },
+          {
+            "part": "blockYLeftFront",
+            "hulls": 1
+          },
+          {
+            "part": "blockYRight",
+            "hulls": 1
+          },
+          {
+            "part": "blockYRightFront",
+            "hulls": 1
+          },
+          {
+            "part": "spindle/housing",
+            "hulls": 1
+          },
+          {
+            "part": "spindle/motor",
+            "hulls": 1
+          },
+          {
+            "part": "spindle/frontBearing",
+            "hulls": 1
+          },
+          {
+            "part": "spindle/encoder",
+            "hulls": 1
+          },
+          {
+            "part": "spindle/rearBearing",
+            "hulls": 1
+          },
+          {
+            "part": "spindle/shaft",
+            "hulls": 1
+          },
+          {
+            "part": "spindle/arbor",
+            "hulls": 1
+          },
+          {
+            "part": "spindle/drawbar",
+            "hulls": 1
+          },
+          {
+            "part": "spindle/bearingLocknut",
+            "hulls": 1
+          },
+          {
+            "part": "spindle/bearingRetainer",
+            "hulls": 1
+          },
+          {
+            "part": "hob",
+            "hulls": 1
+          },
+          {
+            "part": "outboard",
+            "hulls": 1
+          },
+          {
+            "part": "outboardBearing",
+            "hulls": 1
+          },
+          {
+            "part": "electricalPanel",
+            "hulls": 1
+          },
+          {
+            "part": "powerSupply",
+            "hulls": 1
+          },
+          {
+            "part": "XdriveFrame",
+            "hulls": 40
+          },
+          {
+            "part": "ZdriveFrame",
+            "hulls": 48
+          },
+          {
+            "part": "YdriveFrame",
+            "hulls": 41
+          },
+          {
+            "part": "Xmotor",
+            "hulls": 1
+          },
+          {
+            "part": "Xscrew",
+            "hulls": 1
+          },
+          {
+            "part": "Xnut",
+            "hulls": 1
+          },
+          {
+            "part": "Xfixed",
+            "hulls": 1
+          },
+          {
+            "part": "Xfloating",
+            "hulls": 1
+          },
+          {
+            "part": "Xcoupling",
+            "hulls": 1
+          },
+          {
+            "part": "Xmotor-shaft",
+            "hulls": 1
+          },
+          {
+            "part": "Xscale",
+            "hulls": 1
+          },
+          {
+            "part": "Xdrive-driver",
+            "hulls": 1
+          },
+          {
+            "part": "Zmotor",
+            "hulls": 1
+          },
+          {
+            "part": "Zscrew",
+            "hulls": 1
+          },
+          {
+            "part": "Znut",
+            "hulls": 1
+          },
+          {
+            "part": "Zfixed",
+            "hulls": 1
+          },
+          {
+            "part": "Zfloating",
+            "hulls": 1
+          },
+          {
+            "part": "Zcoupling",
+            "hulls": 1
+          },
+          {
+            "part": "Zmotor-shaft",
+            "hulls": 1
+          },
+          {
+            "part": "Zscale",
+            "hulls": 1
+          },
+          {
+            "part": "Zdrive-driver",
+            "hulls": 1
+          },
+          {
+            "part": "Ymotor",
+            "hulls": 1
+          },
+          {
+            "part": "Yscrew",
+            "hulls": 1
+          },
+          {
+            "part": "Ynut",
+            "hulls": 1
+          },
+          {
+            "part": "Yfixed",
+            "hulls": 1
+          },
+          {
+            "part": "Yfloating",
+            "hulls": 1
+          },
+          {
+            "part": "Ycoupling",
+            "hulls": 1
+          },
+          {
+            "part": "Ymotor-shaft",
+            "hulls": 1
+          },
+          {
+            "part": "Yscale",
+            "hulls": 1
+          },
+          {
+            "part": "Ydrive-driver",
+            "hulls": 1
+          },
+          {
+            "part": "chipTray",
+            "hulls": 1
+          },
+          {
+            "part": "coolantPort",
+            "hulls": 1
+          },
+          {
+            "part": "table-drive-driver",
+            "hulls": 1
+          },
+          {
+            "part": "swivel-drive-driver",
+            "hulls": 1
+          },
+          {
+            "part": "hob-drive-driver",
+            "hulls": 1
+          }
+        ]
+      },
+      "installedPoseEnvelopeMm": {
+        "radial": 1510,
+        "scope": "initial pose including separate electrical rack; CAD envelope bounds",
+        "tangential": 800
+      },
+      "headStackMm": {
+        "swivelBearingFrontFace": 114,
+        "swivelOutputFace": 100,
+        "verticalGuideSeparation": 120,
+        "yGuidePlane": 70,
+        "zGuidePlane": 161,
+        "zSaddleFront": 135
+      },
+      "drives": [
+        {
+          "thrustMarginN": 888.0092563108531,
+          "axis": "X",
+          "movingMassKg": 127.9814873782938,
+          "continuousThrustWith20PercentReserveN": 1152,
+          "designDemandN": 263.9907436891469,
+          "passed": true,
+          "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
+        },
+        {
+          "thrustMarginN": 909.3780888359331,
+          "axis": "Y",
+          "movingMassKg": 14.028913051310433,
+          "continuousThrustWith20PercentReserveN": 1152,
+          "designDemandN": 242.62191116406694,
+          "passed": true,
+          "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
+        },
+        {
+          "thrustMarginN": 1536.431981396759,
+          "axis": "Z",
+          "movingMassKg": 41.09657537640654,
+          "continuousThrustWith20PercentReserveN": 2159.9999999999995,
+          "designDemandN": 623.5680186032405,
+          "passed": true,
+          "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
+        }
+      ],
+      "bedFootprintRadialTangentialMm": [
+        930,
+        800
+      ],
+      "guideToHobMm": {
+        "X": 121,
+        "Y": 70.00000000000011,
+        "Z": 161.00000000000006
+      },
+      "movingMassKg": {
+        "X": 127.9814873782938,
+        "Y": 14.028913051310433,
+        "Z": 41.09657537640654
+      },
+      "machineMassKg": 1125.556401073507,
+      "members": 108
+    },
+    "coordinateBasis": "Work-frame coordinates at X mechanism zero"
+  },
+  "after": {
+    "assertions": 37,
+    "castingBackingMm": 125,
+    "columnCastingKg": 43.342800000000025,
+    "columnCells": [
+      [
+        -200,
+        -100,
+        0,
+        -190,
+        100,
+        500
+      ],
+      [
+        -190,
+        -100,
+        0,
+        190,
+        -90,
+        500
+      ],
+      [
+        -190,
+        10,
+        0,
+        -180,
+        100,
+        500
+      ],
+      [
+        -190,
+        -90,
+        10,
+        -180,
+        10,
+        500
+      ],
+      [
+        -49.99999999999999,
+        10,
+        0,
+        49.99999999999999,
+        24.99999999999997,
+        500
+      ],
+      [
+        -49.99999999999999,
+        24.99999999999997,
+        0,
+        49.99999999999999,
+        45,
+        20
+      ],
+      [
+        -49.99999999999999,
+        24.99999999999997,
+        480,
+        49.99999999999999,
+        45,
+        500
+      ],
+      [
+        -60,
+        -90,
+        10,
+        60,
+        10,
+        500
+      ],
+      [
+        49.99999999999999,
+        10,
+        0,
+        60,
+        45,
+        500
+      ],
+      [
+        190,
+        -100,
+        0,
+        200,
+        100,
+        500
+      ],
+      [
+        180,
+        10,
+        0,
+        190,
+        100,
+        500
+      ],
+      [
+        180,
+        -90,
+        10,
+        190,
+        10,
+        500
+      ],
+      [
+        60,
+        -90,
+        10,
+        180,
+        -80,
+        500
+      ],
+      [
+        60,
+        -10,
+        10,
+        180,
+        10,
+        500
+      ],
+      [
+        120,
+        80,
+        0,
+        127.5,
+        100,
+        500
+      ],
+      [
+        162.5,
+        80,
+        0,
+        180,
+        100,
+        500
+      ],
+      [
+        127.5,
+        80,
+        0,
+        162.5,
+        89.99999999999994,
+        500
+      ],
+      [
+        127.5,
+        89.99999999999994,
+        0,
+        162.5,
+        100,
+        5.000000000000028
+      ],
+      [
+        127.5,
+        89.99999999999994,
+        485,
+        162.5,
+        100,
+        500
+      ],
+      [
+        120,
+        10,
+        0,
+        180,
+        80,
+        20
+      ],
+      [
+        120,
+        10,
+        480,
+        180,
+        80,
+        500
+      ],
+      [
+        60,
+        -80,
+        10,
+        180,
+        -10,
+        20
+      ],
+      [
+        60,
+        -80,
+        480,
+        147.5,
+        -10,
+        500
+      ],
+      [
+        172.5,
+        -80,
+        480,
+        180,
+        -10,
+        500
+      ],
+      [
+        147.5,
+        -80,
+        480,
+        172.5,
+        -52.5,
+        500
+      ],
+      [
+        147.5,
+        -27.5,
+        480,
+        172.5,
+        -10,
+        500
+      ],
+      [
+        147.5,
+        -52.5,
+        480,
+        172.5,
+        -27.5,
+        490
+      ],
+      [
+        -60,
+        10,
+        0,
+        -49.99999999999999,
+        45,
+        500
+      ],
+      [
+        -180,
+        -90,
+        10,
+        -60,
+        -80,
+        500
+      ],
+      [
+        -180,
+        -10,
+        10,
+        -60,
+        10,
+        500
+      ],
+      [
+        -180,
+        80,
+        0,
+        -162.5,
+        100,
+        500
+      ],
+      [
+        -127.5,
+        80,
+        0,
+        -120,
+        100,
+        500
+      ],
+      [
+        -162.5,
+        80,
+        0,
+        -127.5,
+        89.99999999999994,
+        500
+      ],
+      [
+        -162.5,
+        89.99999999999994,
+        0,
+        -127.5,
+        100,
+        5.000000000000028
+      ],
+      [
+        -162.5,
+        89.99999999999994,
+        485,
+        -127.5,
+        100,
+        500
+      ],
+      [
+        -180,
+        10,
+        0,
+        -120,
+        80,
+        20
+      ],
+      [
+        -180,
+        10,
+        480,
+        -120,
+        80,
+        500
+      ],
+      [
+        -180,
+        -80,
+        10,
+        -60,
+        -10,
+        20
+      ],
+      [
+        -180,
+        -80,
+        480,
+        -172.5,
+        -10,
+        500
+      ],
+      [
+        -147.5,
+        -80,
+        480,
+        -60,
+        -10,
+        500
+      ],
+      [
+        -172.5,
+        -80,
+        480,
+        -147.5,
+        -52.5,
+        500
+      ],
+      [
+        -172.5,
+        -27.5,
+        480,
+        -147.5,
+        -10,
+        500
+      ],
+      [
+        -172.5,
+        -52.5,
+        480,
+        -147.5,
+        -27.5,
+        490
+      ]
+    ],
+    "couplingClearanceMm": 2.899999999999693,
+    "couplingPassageMm": 40,
+    "couplingWindowCornerRadiusMm": 3,
+    "driveInsertMissingBackingMm3": 0,
+    "fixedBearingZMm": 682.5,
+    "floatingBearingZMm": 322.5,
+    "guideSpacingMm": 290,
+    "minimumRaceMarginMm": 39.5,
+    "minimumSaddleDriveClearanceMm": 11.000000000000114,
+    "motorFaceZMm": 765,
+    "motorTopZMm": 910,
+    "nutCentreAtZeroZMm": 418,
+    "scope": "Geometry, mechanical travel and thread sign only; structural stiffness and brake performance unqualified.",
+    "screwBehindGuideMm": 19,
+    "screwLateralOffsetMm": -2.842170943040401e-14,
+    "screwLengthMm": 420,
+    "shaftBottomZMm": 310,
+    "shaftTopZMm": 730,
+    "screwRadialAtXZeroMm": 180,
+    "scaleTransverseMm": 70
+  },
+  "layout": {
+    "collisionShapes": {
+      "authoredPlusDefaultTotal": 750,
+      "parts": [
+        {
+          "part": "bed/casting",
+          "hulls": 170
+        },
+        {
+          "part": "bed/tablePlate",
+          "hulls": 1
+        },
+        {
+          "part": "bed/railLeft",
+          "hulls": 1
+        },
+        {
+          "part": "bed/railRight",
+          "hulls": 1
+        },
+        {
+          "part": "bed/driveSeat",
+          "hulls": 1
+        },
+        {
+          "part": "bed/liftLeft",
+          "hulls": 1
+        },
+        {
+          "part": "bed/liftRight",
+          "hulls": 1
+        },
+        {
+          "part": "footSeat0",
+          "hulls": 1
+        },
+        {
+          "part": "footNut0",
+          "hulls": 1
+        },
+        {
+          "part": "footLocknut0",
+          "hulls": 1
+        },
+        {
+          "part": "foot0",
+          "hulls": 1
+        },
+        {
+          "part": "footSeat1",
+          "hulls": 1
+        },
+        {
+          "part": "footNut1",
+          "hulls": 1
+        },
+        {
+          "part": "footLocknut1",
+          "hulls": 1
+        },
+        {
+          "part": "foot1",
+          "hulls": 1
+        },
+        {
+          "part": "footSeat2",
+          "hulls": 1
+        },
+        {
+          "part": "footNut2",
+          "hulls": 1
+        },
+        {
+          "part": "footLocknut2",
+          "hulls": 1
+        },
+        {
+          "part": "foot2",
+          "hulls": 1
+        },
+        {
+          "part": "table/housing",
+          "hulls": 1
+        },
+        {
+          "part": "table/platen",
+          "hulls": 1
+        },
+        {
+          "part": "mandrel",
+          "hulls": 11
+        },
+        {
+          "part": "mandrelSleeve",
+          "hulls": 1
+        },
+        {
+          "part": "blank",
+          "hulls": 1
+        },
+        {
+          "part": "railXLeft",
+          "hulls": 1
+        },
+        {
+          "part": "railXRight",
+          "hulls": 1
+        },
+        {
+          "part": "Xbridge",
+          "hulls": 45
+        },
+        {
+          "part": "blockXLeft",
+          "hulls": 1
+        },
+        {
+          "part": "blockXLeftFront",
+          "hulls": 1
+        },
+        {
+          "part": "blockXRight",
+          "hulls": 1
+        },
+        {
+          "part": "blockXRightFront",
+          "hulls": 1
+        },
+        {
+          "part": "column/casting",
+          "hulls": 43
+        },
+        {
+          "part": "column/basePlate",
+          "hulls": 1
+        },
+        {
+          "part": "column/railLeft",
+          "hulls": 1
+        },
+        {
+          "part": "column/railRight",
+          "hulls": 1
+        },
+        {
+          "part": "column/driveSeat",
+          "hulls": 1
+        },
+        {
+          "part": "column/liftLeft",
+          "hulls": 1
+        },
+        {
+          "part": "column/liftRight",
+          "hulls": 1
+        },
+        {
+          "part": "railZLeft",
+          "hulls": 1
+        },
+        {
+          "part": "railZRight",
+          "hulls": 1
+        },
+        {
+          "part": "Zplate",
+          "hulls": 42
+        },
+        {
+          "part": "blockZLeft",
+          "hulls": 1
+        },
+        {
+          "part": "blockZLeftUpper",
+          "hulls": 1
+        },
+        {
+          "part": "blockZRight",
+          "hulls": 1
+        },
+        {
+          "part": "blockZRightUpper",
+          "hulls": 1
+        },
+        {
+          "part": "swivel/housing",
+          "hulls": 1
+        },
+        {
+          "part": "swivel/bearing",
+          "hulls": 1
+        },
+        {
+          "part": "swivel/motor",
+          "hulls": 1
+        },
+        {
+          "part": "swivel/clamp",
+          "hulls": 1
+        },
+        {
+          "part": "swivel/head",
+          "hulls": 1
+        },
+        {
+          "part": "swivelPlate",
+          "hulls": 1
+        },
+        {
+          "part": "railYLeft",
+          "hulls": 1
+        },
+        {
+          "part": "railYRight",
+          "hulls": 1
+        },
+        {
+          "part": "Yplate",
+          "hulls": 223
+        },
+        {
+          "part": "blockYLeft",
+          "hulls": 1
+        },
+        {
+          "part": "blockYLeftFront",
+          "hulls": 1
+        },
+        {
+          "part": "blockYRight",
+          "hulls": 1
+        },
+        {
+          "part": "blockYRightFront",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/housing",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/motor",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/frontBearing",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/encoder",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/rearBearing",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/shaft",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/arbor",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/drawbar",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/bearingLocknut",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/bearingRetainer",
+          "hulls": 1
+        },
+        {
+          "part": "hob",
+          "hulls": 1
+        },
+        {
+          "part": "outboard",
+          "hulls": 1
+        },
+        {
+          "part": "outboardBearing",
+          "hulls": 1
+        },
+        {
+          "part": "electricalPanel",
+          "hulls": 1
+        },
+        {
+          "part": "powerSupply",
+          "hulls": 1
+        },
+        {
+          "part": "XdriveFrame",
+          "hulls": 40
+        },
+        {
+          "part": "ZdriveFrame",
+          "hulls": 36
+        },
+        {
+          "part": "YdriveFrame",
+          "hulls": 41
+        },
+        {
+          "part": "Xmotor",
+          "hulls": 1
+        },
+        {
+          "part": "Xscrew",
+          "hulls": 1
+        },
+        {
+          "part": "Xnut",
+          "hulls": 1
+        },
+        {
+          "part": "Xfixed",
+          "hulls": 1
+        },
+        {
+          "part": "Xfloating",
+          "hulls": 1
+        },
+        {
+          "part": "Xcoupling",
+          "hulls": 1
+        },
+        {
+          "part": "Xmotor-shaft",
+          "hulls": 1
+        },
+        {
+          "part": "Xscale",
+          "hulls": 1
+        },
+        {
+          "part": "Xdrive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "Zmotor",
+          "hulls": 1
+        },
+        {
+          "part": "Zscrew",
+          "hulls": 1
+        },
+        {
+          "part": "Znut",
+          "hulls": 1
+        },
+        {
+          "part": "Zfixed",
+          "hulls": 1
+        },
+        {
+          "part": "Zfloating",
+          "hulls": 1
+        },
+        {
+          "part": "Zcoupling",
+          "hulls": 1
+        },
+        {
+          "part": "Zmotor-shaft",
+          "hulls": 1
+        },
+        {
+          "part": "Zscale",
+          "hulls": 1
+        },
+        {
+          "part": "Zdrive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "Ymotor",
+          "hulls": 1
+        },
+        {
+          "part": "Yscrew",
+          "hulls": 1
+        },
+        {
+          "part": "Ynut",
+          "hulls": 1
+        },
+        {
+          "part": "Yfixed",
+          "hulls": 1
+        },
+        {
+          "part": "Yfloating",
+          "hulls": 1
+        },
+        {
+          "part": "Ycoupling",
+          "hulls": 1
+        },
+        {
+          "part": "Ymotor-shaft",
+          "hulls": 1
+        },
+        {
+          "part": "Yscale",
+          "hulls": 1
+        },
+        {
+          "part": "Ydrive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "chipTray",
+          "hulls": 1
+        },
+        {
+          "part": "coolantPort",
+          "hulls": 1
+        },
+        {
+          "part": "table-drive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "swivel-drive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "hob-drive-driver",
+          "hulls": 1
+        }
+      ]
+    },
+    "installedPoseEnvelopeMm": {
+      "radial": 1510,
+      "scope": "initial pose including separate electrical rack; CAD envelope bounds",
+      "tangential": 800
+    },
+    "headStackMm": {
+      "swivelBearingFrontFace": 114,
+      "swivelOutputFace": 100,
+      "verticalGuideSeparation": 120,
+      "yGuidePlane": 70,
+      "zGuidePlane": 161,
+      "zSaddleFront": 135
+    },
+    "drives": [
+      {
+        "thrustMarginN": 884.3712577649027,
+        "axis": "X",
+        "movingMassKg": 135.25748447019464,
+        "continuousThrustWith20PercentReserveN": 1152,
+        "designDemandN": 267.6287422350973,
+        "passed": true,
+        "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
+      },
+      {
+        "thrustMarginN": 909.3780888359331,
+        "axis": "Y",
+        "movingMassKg": 14.028913051310433,
+        "continuousThrustWith20PercentReserveN": 1152,
+        "designDemandN": 242.62191116406694,
+        "passed": true,
+        "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
+      },
+      {
+        "thrustMarginN": 1534.3480628122572,
+        "axis": "Z",
+        "movingMassKg": 41.29876702786476,
+        "continuousThrustWith20PercentReserveN": 2159.9999999999995,
+        "designDemandN": 625.6519371877423,
+        "passed": true,
+        "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
+      }
+    ],
+    "bedFootprintRadialTangentialMm": [
+      930,
+      800
+    ],
+    "guideToHobMm": {
+      "X": 121,
+      "Y": 70.00000000000011,
+      "Z": 161.00000000000006
+    },
+    "movingMassKg": {
+      "X": 135.25748447019464,
+      "Y": 14.028913051310433,
+      "Z": 41.29876702786476
+    },
+    "machineMassKg": 1132.8323981654075,
+    "members": 108
+  },
+  "baseAcceptance": {
+    "baseCastingKg": 835.5798839999995,
+    "baseAssemblyKg": 859.2230419813541,
+    "machineKg": 1132.8323981654075,
+    "baseToMovingMassRatio": {
+      "X": 6.177697946054347,
+      "Y": 59.56127042372314,
+      "Z": 20.232562474231344
+    },
+    "column": {
+      "afterAssemblyKg": 62.00225000000003,
+      "afterCastingKg": 43.342800000000025,
+      "beforeAssemblyKg": 55.499650000000024,
+      "beforeCastingKg": 37.27980000000002
+    },
+    "dimensionsMm": [
+      930,
+      800,
+      800
+    ],
+    "workingHeightMm": 1000,
+    "feet": {
+      "assumedTargetPerFootN": 15000,
+      "count": 3,
+      "floorClearanceMm": 47,
+      "frontTangentialSpacingMm": 660,
+      "heightMm": 47,
+      "overallFootEnvelopeMm": 232,
+      "pocketRoofAboveCastingBottomMm": 160,
+      "radialSpacingMm": 690,
+      "removableSeat": true,
+      "vibrationMounts": false,
+      "worstReactionN": 5152.285712037574
+    },
+    "table": {
+      "basis": "per-field catalog/measured/assumed data; face/flange/centering provisional; bearing construction not claimed",
+      "faceDiameterMm": 200,
+      "fieldValues": [
+        {
+          "basis": "Catalog",
+          "name": "faceDiameter",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "mm",
+          "value": 200
+        },
+        {
+          "basis": "Catalog",
+          "name": "height",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "mm",
+          "value": 210
+        },
+        {
+          "basis": "Catalog",
+          "name": "bore",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "mm",
+          "value": 40
+        },
+        {
+          "basis": "Catalog",
+          "name": "mass",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "kg",
+          "value": 52
+        },
+        {
+          "basis": "Catalog",
+          "name": "continuousTorque",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "N m",
+          "value": 54.9
+        },
+        {
+          "basis": "Catalog",
+          "name": "peakTorque",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "N m",
+          "value": 223
+        },
+        {
+          "basis": "Catalog",
+          "name": "continuousCurrent",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "A rms",
+          "value": 3.43
+        },
+        {
+          "basis": "Catalog",
+          "name": "peakCurrent",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "A rms",
+          "value": 17.9
+        },
+        {
+          "basis": "Catalog",
+          "name": "ratedSpeed",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "rad/s",
+          "value": 20.943951023931955
+        },
+        {
+          "basis": "Catalog",
+          "name": "maxSpeed",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "rad/s",
+          "value": 24.504422698000386
+        },
+        {
+          "basis": "Catalog",
+          "name": "loadCapacity",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "kg",
+          "value": 50
+        },
+        {
+          "basis": "Catalog",
+          "name": "absoluteAccuracy",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate. Published positioning accuracy; not NRRO or interpolation error.",
+          "unit": "rad",
+          "value": 2.42406840554768e-05
+        },
+        {
+          "basis": "Catalog",
+          "name": "repeatability",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "rad",
+          "value": 9.69627362219072e-06
+        },
+        {
+          "basis": "Catalog",
+          "name": "clampPressure",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "Pa",
+          "value": 600000
+        },
+        {
+          "basis": "Catalog",
+          "name": "driverAcLow",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "V rms",
+          "value": 220
+        },
+        {
+          "basis": "Catalog",
+          "name": "driverAcHigh",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "V rms",
+          "value": 380
+        },
+        {
+          "basis": "Catalog",
+          "name": "ingressRating",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "IP code",
+          "value": 67
+        },
+        {
+          "basis": "Catalog",
+          "name": "naturalCooling",
+          "reason": "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.",
+          "unit": "boolean",
+          "value": 1
+        },
+        {
+          "basis": "Assumed",
+          "name": "housingDiameter",
+          "reason": "Conservative clearance envelope; only the face diameter is published. Vendor outline required.",
+          "unit": "mm",
+          "value": 260
+        },
+        {
+          "basis": "Assumed",
+          "name": "barrelDiameter",
+          "reason": "Provisional cylindrical housing under the face; outline drawing required.",
+          "unit": "mm",
+          "value": 200
+        },
+        {
+          "basis": "Assumed",
+          "name": "flangeThickness",
+          "reason": "Provisional accessible flange outside the barrel; vendor drawing required.",
+          "unit": "mm",
+          "value": 15
+        },
+        {
+          "basis": "Assumed",
+          "name": "faceThickness",
+          "reason": "Envelope split for kinematic presentation, not an internal construction drawing.",
+          "unit": "mm",
+          "value": 20
+        },
+        {
+          "basis": "Assumed",
+          "name": "rotatingMass",
+          "reason": "Unpublished rotor/platen mass allocation within the catalog 52 kg total.",
+          "unit": "kg",
+          "value": 8
+        },
+        {
+          "basis": "Assumed",
+          "name": "rotorInertia",
+          "reason": "8 kg rotating allocation at an effective 71 mm radius; bench identification required.",
+          "unit": "kg m2",
+          "value": 0.04
+        },
+        {
+          "basis": "Assumed",
+          "name": "radialRunout",
+          "reason": "Purchase target, unpublished; not inferred from positioning accuracy.",
+          "unit": "mm TIR",
+          "value": 0.002
+        },
+        {
+          "basis": "Assumed",
+          "name": "axialRunout",
+          "reason": "Purchase target, unpublished; retain earlier HB11 2 um TIR screen.",
+          "unit": "mm TIR",
+          "value": 0.002
+        },
+        {
+          "basis": "Assumed",
+          "name": "radialNrro",
+          "reason": "Unpublished target; non-repeatable sequence modeled explicitly, no vendor qualification.",
+          "unit": "mm peak",
+          "value": 0.0003
+        },
+        {
+          "basis": "Assumed",
+          "name": "axialNrro",
+          "reason": "Unpublished target; non-repeatable sequence modeled explicitly.",
+          "unit": "mm peak",
+          "value": 0.0003
+        },
+        {
+          "basis": "Assumed",
+          "name": "interpolationError",
+          "reason": "Unpublished half-arcsecond target; assumed 4096-fold harmonic.",
+          "unit": "rad peak",
+          "value": 2.42406840554768e-06
+        },
+        {
+          "basis": "Assumed",
+          "name": "encoderCounts",
+          "reason": "23-bit absolute target; encoder interface and actual resolution require confirmation.",
+          "unit": "counts/revolution",
+          "value": 8388608
+        },
+        {
+          "basis": "Assumed",
+          "name": "coggingTorque",
+          "reason": "Low-speed disturbance allowance; 48th harmonic, bench measurement required.",
+          "unit": "N m peak",
+          "value": 0.1
+        },
+        {
+          "basis": "Assumed",
+          "name": "speedRipple",
+          "reason": "0.1 percent once-per-turn ripple at 10-20 rpm; measurement required.",
+          "unit": "fraction peak",
+          "value": 0.001
+        },
+        {
+          "basis": "Assumed",
+          "name": "sealDrag",
+          "reason": "IP67 does not establish seal type; conservative contact-seal allowance.",
+          "unit": "N m mean",
+          "value": 0.5
+        },
+        {
+          "basis": "Assumed",
+          "name": "sealDragRipple",
+          "reason": "20 percent drag variation, twice per turn; not measured.",
+          "unit": "N m peak",
+          "value": 0.1
+        },
+        {
+          "basis": "Assumed",
+          "name": "servoTorsionalStiffness",
+          "reason": "Quasistatic closed-loop disturbance rejection used only by explicit seal/cogging error sources.",
+          "unit": "N m/rad",
+          "value": 200000
+        },
+        {
+          "basis": "Assumed",
+          "name": "momentStiffness",
+          "reason": "Retain former HB11 moment-stiffness screen; purchased bearing type is not claimed.",
+          "unit": "N m/rad",
+          "value": 1000000
+        },
+        {
+          "basis": "Assumed",
+          "name": "radialStiffness",
+          "reason": "Unpublished bearing/housing target; conservative static compliance screen.",
+          "unit": "N/mm",
+          "value": 100000
+        },
+        {
+          "basis": "Assumed",
+          "name": "axialStiffness",
+          "reason": "Unpublished bearing/housing target; axial load envelope must be stated separately.",
+          "unit": "N/mm",
+          "value": 100000
+        },
+        {
+          "basis": "Assumed",
+          "name": "pivotBelowFace",
+          "reason": "Unpublished bearing centre, 60 mm below table face; sensitivity required.",
+          "unit": "mm",
+          "value": 60
+        },
+        {
+          "basis": "Assumed",
+          "name": "torqueConstant",
+          "reason": "Continuous torque/current quotient only; peak quotient differs, not a measured motor constant.",
+          "unit": "N m/A rms",
+          "value": 16.005830903790088
+        },
+        {
+          "basis": "Assumed",
+          "name": "backEmfConstant",
+          "reason": "Power-consistent sinusoidal motor convention derived from assumed Kt.",
+          "unit": "V/(rad/s)",
+          "value": 9.240970780906839
+        },
+        {
+          "basis": "Assumed",
+          "name": "phaseResistance",
+          "reason": "Unpublished winding resistance, retained simulation reference.",
+          "unit": "ohm",
+          "value": 0.3
+        },
+        {
+          "basis": "Assumed",
+          "name": "clampHoldingTorque",
+          "reason": "Procurement target above peak motor torque; air pressure alone does not establish holding torque.",
+          "unit": "N m",
+          "value": 300
+        },
+        {
+          "basis": "Assumed",
+          "name": "thermalExpansion",
+          "reason": "Effective steel-rich axial expansion; housing/material stack unknown, HB14 thermal model input.",
+          "unit": "1/K",
+          "value": 1.2e-05
+        },
+        {
+          "basis": "Assumed",
+          "name": "heatAt15Rpm",
+          "reason": "Lumped low-speed winding/iron/drive heat allowance; seal power is separate; duty measurement required.",
+          "unit": "W",
+          "value": 10
+        },
+        {
+          "basis": "Assumed",
+          "name": "thermalResistance",
+          "reason": "Natural-cooling lumped thermal estimate, requires duty/temperature measurement.",
+          "unit": "K/W",
+          "value": 0.2
+        },
+        {
+          "basis": "Assumed",
+          "name": "thermalCapacity",
+          "reason": "52 kg x 450 J/kg/K effective heat capacity, mixed materials unconfirmed.",
+          "unit": "J/K",
+          "value": 23400
+        },
+        {
+          "basis": "Assumed",
+          "name": "facePcd",
+          "reason": "Provisional six M8 holes on this PCD, clocked 30 degrees; vendor drawing required.",
+          "unit": "mm",
+          "value": 160
+        },
+        {
+          "basis": "Assumed",
+          "name": "centeringDiameter",
+          "reason": "Provisional 3 mm-deep female face pilot with matching mandrel spigot; vendor drawing required.",
+          "unit": "mm",
+          "value": 100
+        },
+        {
+          "basis": "Assumed",
+          "name": "flangePcd",
+          "reason": "Provisional six M10 flange holes, 30 degree clocking, 15 mm flange; vendor drawing required.",
+          "unit": "mm",
+          "value": 230
+        },
+        {
+          "basis": "Assumed",
+          "name": "driverAcTolerance",
+          "reason": "380 VAC +/-10 percent includes site's 400 VAC; actual driver approval required.",
+          "unit": "fraction",
+          "value": 0.1
+        }
+      ],
+      "form": "purchased",
+      "heightMm": 210,
+      "seatWorkZMm": 18,
+      "throughBoreMm": 40
+    },
+    "coolantReservedLitres": 7.92,
+    "beam": {
+      "assumedProfileAllocationUm": 1.9000000000000001,
+      "atHalfModulusChangeBoundUm": 0.0061890301414424444,
+      "basis": "Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; full mechanism X25..retract evaluated by exact prismatic COM translation, reference moving mass; old 210 mm bed uses its original 860 mm support span over the new X range; previous heavy-plinth/full-stroke result is retained separately; 121 mm guide Abbe height; current work-to-table-seat lever follows TABLE_SEAT; old table lever233 mm; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open.",
+      "newChangeBoundUm": 0.0030945150707212222,
+      "newMinimumIyMm4": 15465726175.368881,
+      "oldChangeBoundUm": 0.11523865621916533,
+      "oldMinimumIyMm4": 262747548.55643028,
+      "passed": true,
+      "samples": [
+        {
+          "xMm": 25,
+          "movingLoadWorkXMm": 241.1698565891031,
+          "oldRelativeRadialVerticalUm": [
+            -1.2337458782227286,
+            0.755145679228424
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.019303391963032723,
+            0.0045372531605505665
+          ],
+          "footReactionN": [
+            2990.265793455378,
+            3130.139243362466,
+            4988.885800650949
+          ]
+        },
+        {
+          "xMm": 29.25,
+          "movingLoadWorkXMm": 245.4198565891032,
+          "oldRelativeRadialVerticalUm": [
+            -1.242219683550725,
+            0.7591157951689219
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.019282279818774416,
+            0.004463658868494925
+          ],
+          "footReactionN": [
+            2986.180795670713,
+            3126.0542455778004,
+            4997.05579622028
+          ]
+        },
+        {
+          "xMm": 33.5,
+          "movingLoadWorkXMm": 249.66985658910323,
+          "oldRelativeRadialVerticalUm": [
+            -1.2504005402414646,
+            0.7625883589600487
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.019252815595738177,
+            0.004384599679108812
+          ],
+          "footReactionN": [
+            2982.095797886047,
+            3121.9692477931344,
+            5005.225791789612
+          ]
+        },
+        {
+          "xMm": 37.75,
+          "movingLoadWorkXMm": 253.91985658910323,
+          "oldRelativeRadialVerticalUm": [
+            -1.2582852929865163,
+            0.7655608609229402
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.0192149613994293,
+            0.004300206548910203
+          ],
+          "footReactionN": [
+            2978.0108001013814,
+            3117.8842500084693,
+            5013.395787358943
+          ]
+        },
+        {
+          "xMm": 42,
+          "movingLoadWorkXMm": 258.1698565891033,
+          "oldRelativeRadialVerticalUm": [
+            -1.2658707864774463,
+            0.7680312187910261
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.019168679335353087,
+            0.004210619703574047
+          ],
+          "footReactionN": [
+            2973.9258023167154,
+            3113.7992522238037,
+            5021.565782928274
+          ]
+        },
+        {
+          "xMm": 46.25,
+          "movingLoadWorkXMm": 262.4198565891033,
+          "oldRelativeRadialVerticalUm": [
+            -1.2731538654058228,
+            0.7699977777100352
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.01911393150901483,
+            0.004115988637932279
+          ],
+          "footReactionN": [
+            2969.840843151875,
+            3109.714215819313,
+            5029.735778497607
+          ]
+        },
+        {
+          "xMm": 50.5,
+          "movingLoadWorkXMm": 266.66985658910306,
+          "oldRelativeRadialVerticalUm": [
+            -1.280131374463213,
+            0.7714593102379939
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.01905068002591984,
+            0.004016472115973813
+          ],
+          "footReactionN": [
+            2965.7558131096853,
+            3105.6292502921715,
+            5037.905774066937
+          ]
+        },
+        {
+          "xMm": 54.75,
+          "movingLoadWorkXMm": 270.9198565891032,
+          "oldRelativeRadialVerticalUm": [
+            -1.2868001583411852,
+            0.7724150163452265
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.018978886991573404,
+            0.003912238170844516
+          ],
+          "footReactionN": [
+            2961.6708096615494,
+            3101.5442581709754,
+            5046.075769636268
+          ]
+        },
+        {
+          "xMm": 59,
+          "movingLoadWorkXMm": 275.16985658910335,
+          "oldRelativeRadialVerticalUm": [
+            -1.293157061731307,
+            0.7728645234143546
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.018898514511480818,
+            0.0038034641048472644
+          ],
+          "footReactionN": [
+            2957.585837476601,
+            3097.4592347865955,
+            5054.245765205596
+          ]
+        },
+        {
+          "xMm": 63.25,
+          "movingLoadWorkXMm": 279.4198565891033,
+          "oldRelativeRadialVerticalUm": [
+            -1.2991989293251451,
+            0.772807886240297
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.018809524691147397,
+            0.003690336489441896
+          ],
+          "footReactionN": [
+            2953.500875449675,
+            3093.3742012441876,
+            5062.415760774931
+          ]
+        },
+        {
+          "xMm": 67.5,
+          "movingLoadWorkXMm": 283.6698565891032,
+          "oldRelativeRadialVerticalUm": [
+            -1.3049226058142682,
+            0.7722455870302705
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.01871187963607843,
+            0.0035730511652452292
+          ],
+          "footReactionN": [
+            2949.415894101039,
+            3089.2891870234916,
+            5070.585756344261
+          ]
+        },
+        {
+          "xMm": 71.75,
+          "movingLoadWorkXMm": 287.91985658910335,
+          "oldRelativeRadialVerticalUm": [
+            -1.3103249358902433,
+            0.7711785354037903
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.01860554145177921,
+            0.0034518132420310473
+          ],
+          "footReactionN": [
+            2945.3308798803455,
+            3085.2042056748564,
+            5078.755751913591
+          ]
+        },
+        {
+          "xMm": 76,
+          "movingLoadWorkXMm": 292.169856589103,
+          "oldRelativeRadialVerticalUm": [
+            -1.315402764244638,
+            0.769608068392668
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.018490472243755062,
+            0.003326837098730138
+          ],
+          "footReactionN": [
+            2941.245846337938,
+            3081.119243647932,
+            5086.925747482924
+          ]
+        },
+        {
+          "xMm": 80.25,
+          "movingLoadWorkXMm": 296.41985658910295,
+          "oldRelativeRadialVerticalUm": [
+            -1.3201529355690205,
+            0.7675359504410132
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.018366634117511257,
+            0.0031983463834302415
+          ],
+          "footReactionN": [
+            2937.1608229535564,
+            3077.0342714629833,
+            5095.095743052254
+          ]
+        },
+        {
+          "xMm": 84.5,
+          "movingLoadWorkXMm": 300.669856589103,
+          "oldRelativeRadialVerticalUm": [
+            -1.3245722945549578,
+            0.7649643734052326
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.018233989178553102,
+            0.0030665740133760727
+          ],
+          "footReactionN": [
+            2933.0758308323607,
+            3072.9492680148473,
+            5103.265738621584
+          ]
+        },
+        {
+          "xMm": 88.75,
+          "movingLoadWorkXMm": 304.9198565891032,
+          "oldRelativeRadialVerticalUm": [
+            -1.3286576858940178,
+            0.7618959565540318
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.018092499532385887,
+            0.0029317621749693403
+          ],
+          "footReactionN": [
+            2928.9908653052203,
+            3068.864237972658,
+            5111.435734190915
+          ]
+        },
+        {
+          "xMm": 93,
+          "movingLoadWorkXMm": 309.1698565891032,
+          "oldRelativeRadialVerticalUm": [
+            -1.332405954277768,
+            0.7583337465684127
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.017942127284514938,
+            0.0027941623237687377
+          ],
+          "footReactionN": [
+            2924.9058997780785,
+            3064.779207930468,
+            5119.6057297602465
+          ]
+        },
+        {
+          "xMm": 97.25,
+          "movingLoadWorkXMm": 313.4198565891032,
+          "oldRelativeRadialVerticalUm": [
+            -1.3358139443977766,
+            0.7542812175416767
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.017782834540445526,
+            0.0026540351844899076
+          ],
+          "footReactionN": [
+            2920.8209076568824,
+            3060.6942044823318,
+            5127.775725329578
+          ]
+        },
+        {
+          "xMm": 101.5,
+          "movingLoadWorkXMm": 317.6698565891031,
+          "oldRelativeRadialVerticalUm": [
+            -1.3388785009456101,
+            0.7497422709794204
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.01761458340568297,
+            0.002511650751005491
+          ],
+          "footReactionN": [
+            2916.7358842725007,
+            3056.6092322973823,
+            5135.94572089891
+          ]
+        },
+        {
+          "xMm": 105.75,
+          "movingLoadWorkXMm": 321.919856589103,
+          "oldRelativeRadialVerticalUm": [
+            -1.341596468612837,
+            0.7447212357995396
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.01743733598573256,
+            0.0023672882863451043
+          ],
+          "footReactionN": [
+            2912.6508507300937,
+            3052.524270270458,
+            5144.115716468241
+          ]
+        },
+        {
+          "xMm": 110,
+          "movingLoadWorkXMm": 326.1698565891031,
+          "oldRelativeRadialVerticalUm": [
+            -1.3439646920910246,
+            0.7392228683322263
+          ],
+          "newRelativeRadialVerticalUm": [
+            -0.017251054386099588,
+            0.002221236322695323
+          ],
+          "footReactionN": [
+            2908.565836509398,
+            3048.439288921822,
+            5152.285712037574
+          ]
+        }
+      ],
+      "spanMm": 690,
+      "youngsNPerMm2": 35000
+    }
+  },
+  "clearanceAudit": {
+    "reference": true,
+    "scope": "changed central Z drive, saddle and column against all parts; unchanged pairs retain prior audit evidence",
+    "completed": 85,
+    "members": 108,
+    "checked": 4420,
+    "thresholdMm3": 0.001,
+    "unexpected": 0,
+    "seconds": 11.163219928741455
+  },
+  "basis": "Nominal CAD and declared material density; motor, stiffness and mechanical interfaces remain assumed. This is not machining-accuracy qualification.",
+  "validation": {
+    "assemblyAssertions": 971,
+    "rangeAssertions": 1362,
+    "centralZAssertions": 37,
+    "footAssertions": 102,
+    "clearancePoses": 85,
+    "unexpectedIntersections": 0,
+    "loadingRetractsMm": {
+      "front": 110,
+      "topAlternative": 145
+    },
+    "appPlayback": {
+      "cutWindows": 982,
+      "machiningSeconds": 6.49625,
+      "fixtureEnvelopeContacts": 0,
+      "inspectionAndReset": "passed",
+      "scope": "Coarse demonstration, not ISO grading"
+    }
+  }
+}

@@ -67,15 +67,15 @@ confirmation.
 | X guide-plane to hob centre | 347 mm | 121 mm |
 | Z guide-plane to hob centre | 325 mm | 161 mm |
 | Y guide-plane to hob centre | 137 mm | 70 mm |
-| X moving mass | 81.71 kg | 127.98 kg |
-| Z moving mass | 106.79 kg | 41.10 kg |
+| X moving mass | 81.71 kg | 135.26 kg |
+| Z moving mass | 106.79 kg | 41.30 kg |
 | Y moving mass | 18.01 kg | 14.03 kg |
-| Machine mass | 351.61 kg | 1125.56 kg |
+| Machine mass | 351.61 kg | 1132.83 kg |
 | Bed footprint (radial × tangential) | 650 × 750 mm | 930 × 800 mm |
 | Installed-pose envelope, including separate rack | 1225.63 × 750 mm | 1510 × 800 mm |
-| X continuous thrust margin, same assumed demand basis | 911.15 N | 888.01 N |
+| X continuous thrust margin, same assumed demand basis | 911.15 N | 884.37 N |
 | Y continuous thrust margin, same assumed demand basis | 897.29 N | 909.38 N |
-| Z continuous thrust margin, same assumed demand basis | 859.36 N | 1536.43 N |
+| Z continuous thrust margin, same assumed demand basis | 859.36 N | 1534.35 N |
 
 The initial moving-column revision had a 125 mm Z guide offset but retained the
 old underhung head. The front-mounted head needs 36 mm more radial space: its
@@ -150,10 +150,12 @@ thermal behaviour and detailed manufacturing release remain open plan items.
 ## Heavy plinth acceptance (HB-D11)
 
 The casting is 835.58 kg; the base assembly is 859.22 kg and the complete machine
-is 1125.56 kg. The casting-to-moving-mass ratios are 6.53:1 (X), 59.56:1 (Y)
-and 20.33:1 (Z), meeting the assumed ≥5:1 X target. Column casting mass falls
-from 37.28 to 31.75 kg; its insert-equipped assembly falls from 55.50 to 49.97 kg.
-X moves 127.98 kg including the complete column/head. The three support points
+is 1132.83 kg. The casting-to-moving-mass ratios are 6.18:1 (X), 59.56:1 (Y)
+and 20.23:1 (Z), meeting the assumed ≥5:1 X target. The central Z-drive spine raises column casting mass from the preceding
+31.75 kg to 43.34 kg; its insert-equipped assembly becomes 62.00 kg (previously
+49.97 kg). The pre-lightening reference was 37.28 / 55.50 kg. This reinforcement
+retains the base-to-X mass-ratio target while providing a direct drive load path.
+X moves 135.26 kg including the complete column/head. The three support points
 span 690 mm radially and 660 mm across the front. Positive reactions are checked
 through X travel against an assumed 15 kN target per foot; no vibration pads
 are fitted. Floor, pad and screw compliance remain unqualified.
@@ -176,8 +178,8 @@ lowering the plate 20 mm and sliding it out sideways; supports are never removed
 under machine weight. Floor clearance, support centres and the 1000 mm tooth-band
 height are unchanged. Nominal foot/stem envelope height is now 232 mm.
 
-Maximum static reaction is 5.08 kN across 21 X positions; mean roof bearing stress
-is about 0.449 MPa assuming full plate contact outside the stem passage. Full-area
+Maximum static reaction is 5.15 kN across 21 X positions; mean roof bearing stress
+is about 0.455 MPa assuming full plate contact outside the stem passage. Full-area
 contact needs a replicated/bedded roof bearing face, using a removable released
 master; no machining of the mineral casting is specified. Bedding, roof bending,
 creep, thread strength, lateral restraint, floor compliance and dynamic tipping
@@ -243,7 +245,7 @@ basis. Bench measurements at 15 rpm are needed before qualification.
 `base-report` uses a simply supported beam, minimum net section and E=35 GPa
 (assumed). Across the new full mechanism X25..110 range, the old bed retains
 its original 860 mm support span and changes by 0.132 µm; the shortened plinth
-uses its 690 mm span and changes by 0.00247 µm (0.00495 µm at half modulus).
+uses its 690 mm span and changes by 0.00309 µm (0.00619 µm at half modulus).
 The previous 1100 mm plinth changed by 0.00628 µm across X45.2..250; that
 historical result is retained separately, not compared as equal travel.
 The new bound is below the explicitly allocated 1.9 µm profile share.
@@ -406,9 +408,9 @@ webs. The motor body is flange-mounted, so its overhang behind the flange is
 intentional; its flange/frame now has a continuous casting load path.
 
 The updated casting is 835.58 kg, within the assumed 600–900 kg range; the whole
-machine is 1125.56 kg. X's casting-to-moving-mass ratio is 6.53. Local drive-floor
+machine is 1132.83 kg. X's casting-to-moving-mass ratio is 6.18. Local drive-floor
 bending, screw thrust, motor torque and structural/modal adequacy still need FEA.
-The simplified global beam bound remains 0.00247 µm over X travel and does not
+The simplified global beam bound remains 0.00309 µm over X travel and does not
 qualify this local load path.
 
 See the dimensioned transverse [section below the motor](DRIVE_SUPPORT_SECTION.svg),
@@ -417,3 +419,35 @@ and [exact-volume evidence](DRIVE_SUPPORT_REPORT.json). Normal assembly checks n
 verify both the backing slab and supporting ribs. Collision boxes are compacted
 by exact repartition, preserving every cavity and the CAD volume; no geometry or
 metrology tolerance is relaxed.
+
+
+## Centered recessed Z drive
+
+The former Z screw at transverse Y=-250 mm and its high side nut arm are removed.
+The ground SFU1605 screw now lies at Y=0 between the Z guides at Y=±145 mm,
+19 mm behind their radial plane (screw X=180 mm, guides X=161 mm). Head frames,
+guide-to-hob offsets and Z=-10..190 mm travel stay unchanged.
+
+The 420 mm screw points down from work Z=730 to 310 mm. Its fixed bearing is
+at the top (682.5 mm), floating bearing below (322.5 mm), and 750 W motor above
+the column (mount face Z=765 mm, body top Z=910 mm). The head hangs below the
+fixed bearing, loading that screw segment in tension. The normal positive-Z
+command still raises the head; an actual-pose/right-hand-thread regression
+verifies the transmission sign.
+
+A short 20 mm-thick nut shelf on the Z saddle replaces the long side arm. The
+bearing pads and motor platform connect to a vertical backplate, bolted to one
+central ground steel casting insert. A retained rear casting spine provides
+125 mm of full backing behind that insert, continuous to the column sole. The
+linear scale sits beside the screw, at Y=70 mm. The motor platform has a milled
+40 × 40 mm R3 coupling service window, with 2.9 mm minimum coupling clearance.
+Motor mounting/centering and nut fastener details remain assumed pending the
+selected hardware drawings; this is a layout, not a manufacturing release.
+
+Checks cover 5 mm of reserve beyond both soft stops: minimum nut/race margin
+39.5 mm and minimum moving saddle/drive clearance 11 mm. The reinforced column
+adds mass, included in the updated X/Z moving masses and thrust margins above.
+The work height remains 1000 mm. Local spine/adapter stiffness and a Z holding
+brake specification remain open; the simulation models powered holding.
+
+See [Z_DRIVE_SECTION.svg](Z_DRIVE_SECTION.svg) and [Z_DRIVE_REPORT.json](Z_DRIVE_REPORT.json).

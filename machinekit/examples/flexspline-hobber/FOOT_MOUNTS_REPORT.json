@@ -3,15 +3,15 @@
   "base": {
     "baseCastingKg": 835.5798839999995,
     "baseAssemblyKg": 859.2230419813541,
-    "machineKg": 1125.556401073507,
+    "machineKg": 1132.8323981654075,
     "baseToMovingMassRatio": {
-      "X": 6.528912119376705,
+      "X": 6.177697946054347,
       "Y": 59.56127042372314,
-      "Z": 20.33210495879187
+      "Z": 20.232562474231344
     },
     "column": {
-      "afterAssemblyKg": 49.96585,
-      "afterCastingKg": 31.745999999999995,
+      "afterAssemblyKg": 62.00225000000003,
+      "afterCastingKg": 43.342800000000025,
       "beforeAssemblyKg": 55.499650000000024,
       "beforeCastingKg": 37.27980000000002
     },
@@ -32,7 +32,7 @@
       "radialSpacingMm": 690,
       "removableSeat": true,
       "vibrationMounts": false,
-      "worstReactionN": 5078.423992883235
+      "worstReactionN": 5152.285712037574
     },
     "table": {
       "basis": "per-field catalog/measured/assumed data; face/flange/centering provisional; bearing construction not claimed",
@@ -404,369 +404,369 @@
     "coolantReservedLitres": 7.92,
     "beam": {
       "assumedProfileAllocationUm": 1.9000000000000001,
-      "atHalfModulusChangeBoundUm": 0.004948863233392938,
+      "atHalfModulusChangeBoundUm": 0.0061890301414424444,
       "basis": "Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; full mechanism X25..retract evaluated by exact prismatic COM translation, reference moving mass; old 210 mm bed uses its original 860 mm support span over the new X range; previous heavy-plinth/full-stroke result is retained separately; 121 mm guide Abbe height; current work-to-table-seat lever follows TABLE_SEAT; old table lever233 mm; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open.",
-      "newChangeBoundUm": 0.002474431616696469,
+      "newChangeBoundUm": 0.0030945150707212222,
       "newMinimumIyMm4": 15465726175.368881,
-      "oldChangeBoundUm": 0.13166196957844534,
+      "oldChangeBoundUm": 0.11523865621916533,
       "oldMinimumIyMm4": 262747548.55643028,
       "passed": true,
       "samples": [
         {
           "xMm": 25,
-          "movingLoadWorkXMm": 229.33962151579559,
+          "movingLoadWorkXMm": 241.1698565891031,
           "oldRelativeRadialVerticalUm": [
-            -1.208642160363676,
-            0.7415006955022614
+            -1.2337458782227286,
+            0.755145679228424
           ],
           "newRelativeRadialVerticalUm": [
-            -0.018279282969055594,
-            0.004458849778258266
+            -0.019303391963032723,
+            0.0045372531605505665
           ],
           "footReactionN": [
-            3067.1733870813814,
-            3046.950330364717,
-            4923.813963141408
+            2990.265793455378,
+            3130.139243362466,
+            4988.885800650949
           ]
         },
         {
           "xMm": 29.25,
-          "movingLoadWorkXMm": 233.58962151579559,
+          "movingLoadWorkXMm": 245.4198565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.2179147973013873,
-            0.7468389852601912
+            -1.242219683550725,
+            0.7591157951689219
           ],
           "newRelativeRadialVerticalUm": [
-            -0.018281115793017236,
-            0.004404186960450699
+            -0.019282279818774416,
+            0.004463658868494925
           ],
           "footReactionN": [
-            3063.308136337835,
-            3043.0850796211716,
-            4931.5444646285005
+            2986.180795670713,
+            3126.0542455778004,
+            4997.05579622028
           ]
         },
         {
           "xMm": 33.5,
-          "movingLoadWorkXMm": 237.8396215157957,
+          "movingLoadWorkXMm": 249.66985658910323,
           "oldRelativeRadialVerticalUm": [
-            -1.226903268670192,
-            0.751688959510412
+            -1.2504005402414646,
+            0.7625883589600487
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01827514563545134,
-            0.004344054488312958
+            -0.019252815595738177,
+            0.004384599679108812
           ],
           "footReactionN": [
-            3059.4428855942897,
-            3039.219828877626,
-            4939.274966115591
+            2982.095797886047,
+            3121.9692477931344,
+            5005.225791789612
           ]
         },
         {
           "xMm": 37.75,
-          "movingLoadWorkXMm": 242.08962151579576,
+          "movingLoadWorkXMm": 253.91985658910323,
           "oldRelativeRadialVerticalUm": [
-            -1.2356044191616562,
-            0.7560469188357142
+            -1.2582852929865163,
+            0.7655608609229402
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01826133664034732,
-            0.0042785518602035735
+            -0.0192149613994293,
+            0.004300206548910203
           ],
           "footReactionN": [
-            3055.577634850743,
-            3035.3545781340786,
-            4947.005467602684
+            2978.0108001013814,
+            3117.8842500084693,
+            5013.395787358943
           ]
         },
         {
           "xMm": 42,
-          "movingLoadWorkXMm": 246.33962151579576,
+          "movingLoadWorkXMm": 258.1698565891033,
           "oldRelativeRadialVerticalUm": [
-            -1.244015093467349,
-            0.7599095912311873
+            -1.2658707864774463,
+            0.7680312187910261
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01823965295169458,
-            0.004207787345016051
+            -0.019168679335353087,
+            0.004210619703574047
           ],
           "footReactionN": [
-            3051.7123841071984,
-            3031.489327390535,
-            4954.735969089773
+            2973.9258023167154,
+            3113.7992522238037,
+            5021.565782928274
           ]
         },
         {
           "xMm": 46.25,
-          "movingLoadWorkXMm": 250.58962151579564,
+          "movingLoadWorkXMm": 262.4198565891033,
           "oldRelativeRadialVerticalUm": [
-            -1.252132136278837,
-            0.7632741321042184
+            -1.2731538654058228,
+            0.7699977777100352
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01821005871348254,
-            0.004131877982178847
+            -0.01911393150901483,
+            0.004115988637932279
           ],
           "footReactionN": [
-            3047.847171983478,
-            3027.6240380271634,
-            4962.466470576866
+            2969.840843151875,
+            3109.714215819313,
+            5029.735778497607
           ]
         },
         {
           "xMm": 50.5,
-          "movingLoadWorkXMm": 254.83962151579559,
+          "movingLoadWorkXMm": 266.66985658910306,
           "oldRelativeRadialVerticalUm": [
-            -1.2599523922876879,
-            0.7661381242744907
+            -1.280131374463213,
+            0.7714593102379939
           ],
           "newRelativeRadialVerticalUm": [
-            -0.018172518069700615,
-            0.0040509495816553965
+            -0.01905068002591984,
+            0.004016472115973813
           ],
           "footReactionN": [
-            3043.9818889824073,
-            3023.7588195411413,
-            4970.196972063958
+            2965.7558131096853,
+            3105.6292502921715,
+            5037.905774066937
           ]
         },
         {
           "xMm": 54.75,
-          "movingLoadWorkXMm": 259.0896215157957,
+          "movingLoadWorkXMm": 270.9198565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.2674727061854705,
-            0.7684995779739876
+            -1.2868001583411852,
+            0.7724150163452265
           ],
           "newRelativeRadialVerticalUm": [
-            -0.018126995164338206,
-            0.003965136723944086
+            -0.018978886991573404,
+            0.003912238170844516
           ],
           "footReactionN": [
-            3040.116632575391,
-            3019.8935744610667,
-            4977.927473551049
+            2961.6708096615494,
+            3101.5442581709754,
+            5046.075769636268
           ]
         },
         {
           "xMm": 59,
-          "movingLoadWorkXMm": 263.3396215157957,
+          "movingLoadWorkXMm": 275.16985658910335,
           "oldRelativeRadialVerticalUm": [
-            -1.2746899226637511,
-            0.7703569308469874
+            -1.293157061731307,
+            0.7728645234143546
           ],
           "newRelativeRadialVerticalUm": [
-            -0.018073454141384733,
-            0.0038745827600782804
+            -0.018898514511480818,
+            0.0038034641048472644
           ],
           "footReactionN": [
-            3036.251407431563,
-            3016.0282981178057,
-            4985.657975038139
+            2957.585837476601,
+            3097.4592347865955,
+            5054.245765205596
           ]
         },
         {
           "xMm": 63.25,
-          "movingLoadWorkXMm": 267.5896215157957,
+          "movingLoadWorkXMm": 279.4198565891033,
           "oldRelativeRadialVerticalUm": [
-            -1.2816008864140975,
-            0.7717090479500673
+            -1.2991989293251451,
+            0.772807886240297
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01801185914482961,
-            0.003779439811626294
+            -0.018809524691147397,
+            0.003690336489441896
           ],
           "footReactionN": [
-            3032.3861924457574,
-            3012.163011616518,
-            4993.388476525232
+            2953.500875449675,
+            3093.3742012441876,
+            5062.415760774931
           ]
         },
         {
           "xMm": 67.5,
-          "movingLoadWorkXMm": 271.8396215157956,
+          "movingLoadWorkXMm": 283.6698565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.2882024421280773,
-            0.7725552217521022
+            -1.3049226058142682,
+            0.7722455870302705
           ],
           "newRelativeRadialVerticalUm": [
-            -0.017942174318662244,
-            0.0036798687706914154
+            -0.01871187963607843,
+            0.0035730511652452292
           ],
           "footReactionN": [
-            3028.5209581382414,
-            3008.297744436942,
-            5001.118978012323
+            2949.415894101039,
+            3089.2891870234916,
+            5070.585756344261
           ]
         },
         {
           "xMm": 71.75,
-          "movingLoadWorkXMm": 276.0896215157956,
+          "movingLoadWorkXMm": 287.91985658910335,
           "oldRelativeRadialVerticalUm": [
-            -1.2944914344972591,
-            0.7728951721342643
+            -1.3103249358902433,
+            0.7711785354037903
           ],
           "newRelativeRadialVerticalUm": [
-            -0.017864363806872043,
-            0.003576039299911884
+            -0.01860554145177921,
+            0.0034518132420310473
           ],
           "footReactionN": [
-            3024.6556909586675,
-            3004.432510129426,
-            5008.849479499413
+            2945.3308798803455,
+            3085.2042056748564,
+            5078.755751913591
           ]
         },
         {
           "xMm": 76,
-          "movingLoadWorkXMm": 280.33962151579544,
+          "movingLoadWorkXMm": 292.169856589103,
           "oldRelativeRadialVerticalUm": [
-            -1.3004647082132095,
-            0.7727290463900236
+            -1.315402764244638,
+            0.769608068392668
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01777839175344843,
-            0.003468129832460927
+            -0.018490472243755062,
+            0.003326837098730138
           ],
           "footReactionN": [
-            3020.790404457381,
-            3000.5672951436222,
-            5016.579980986504
+            2941.245846337938,
+            3081.119243647932,
+            5086.925747482924
           ]
         },
         {
           "xMm": 80.25,
-          "movingLoadWorkXMm": 284.5896215157955,
+          "movingLoadWorkXMm": 296.41985658910295,
           "oldRelativeRadialVerticalUm": [
-            -1.3061191079674963,
-            0.7720574192251484
+            -1.3201529355690205,
+            0.7675359504410132
           ],
           "newRelativeRadialVerticalUm": [
-            -0.0176842223023808,
-            0.0033563275720467052
+            -0.018366634117511257,
+            0.0031983463834302415
           ],
           "footReactionN": [
-            3016.9251281141183,
-            2996.702069999792,
-            5024.3104824735965
+            2937.1608229535564,
+            3077.0342714629833,
+            5095.095743052254
           ]
         },
         {
           "xMm": 84.5,
-          "movingLoadWorkXMm": 288.83962151579556,
+          "movingLoadWorkXMm": 300.669856589103,
           "oldRelativeRadialVerticalUm": [
-            -1.311451478451688,
-            0.7708812927577021
+            -1.3245722945549578,
+            0.7649643734052326
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01758181959765858,
-            0.0032408284929123644
+            -0.018233989178553102,
+            0.0030665740133760727
           ],
           "footReactionN": [
-            3013.0598830340414,
-            2992.8368135927767,
-            5032.040983960689
+            2933.0758308323607,
+            3072.9492680148473,
+            5103.265738621584
           ]
         },
         {
           "xMm": 88.75,
-          "movingLoadWorkXMm": 293.0896215157956,
+          "movingLoadWorkXMm": 304.9198565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.3164586643573508,
-            0.769202096518049
+            -1.3286576858940178,
+            0.7618959565540318
           ],
           "newRelativeRadialVerticalUm": [
-            -0.017471147783271176,
-            0.003121837339836011
+            -0.018092499532385887,
+            0.0029317621749693403
           ],
           "footReactionN": [
-            3009.194664548021,
-            2988.9715305917075,
-            5039.771485447778
+            2928.9908653052203,
+            3068.864237972658,
+            5111.435734190915
           ]
         },
         {
           "xMm": 93,
-          "movingLoadWorkXMm": 297.33962151579556,
+          "movingLoadWorkXMm": 309.1698565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.3211375103760532,
-            0.7670216874488495
+            -1.332405954277768,
+            0.7583337465684127
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01735217100320801,
-            0.0029995676281307183
+            -0.017942127284514938,
+            0.0027941623237687377
           ],
           "footReactionN": [
-            3005.3294460619995,
-            2985.1062475906374,
-            5047.50198693487
+            2924.9058997780785,
+            3064.779207930468,
+            5119.6057297602465
           ]
         },
         {
           "xMm": 97.25,
-          "movingLoadWorkXMm": 301.5896215157958,
+          "movingLoadWorkXMm": 313.4198565891032,
           "oldRelativeRadialVerticalUm": [
-            -1.325484861199363,
-            0.7643423499050608
+            -1.3358139443977766,
+            0.7542812175416767
           ],
           "newRelativeRadialVerticalUm": [
-            -0.017224853401458465,
-            0.002874241643644498
+            -0.017782834540445526,
+            0.0026540351844899076
           ],
           "footReactionN": [
-            3001.4642009819254,
-            2981.2409911836235,
-            5055.232488421959
+            2920.8209076568824,
+            3060.6942044823318,
+            5127.775725329578
           ]
         },
         {
           "xMm": 101.5,
-          "movingLoadWorkXMm": 305.8396215157957,
+          "movingLoadWorkXMm": 317.6698565891031,
           "oldRelativeRadialVerticalUm": [
-            -1.3294975615188471,
-            0.7611667956539379
+            -1.3388785009456101,
+            0.7497422709794204
           ],
           "newRelativeRadialVerticalUm": [
-            -0.017089159122011994,
-            0.002746090442760376
+            -0.01761458340568297,
+            0.002511650751005491
           ],
           "footReactionN": [
-            2997.5989246386625,
-            2977.3757660397923,
-            5062.962989909052
+            2916.7358842725007,
+            3056.6092322973823,
+            5135.94572089891
           ]
         },
         {
           "xMm": 105.75,
-          "movingLoadWorkXMm": 310.0896215157955,
+          "movingLoadWorkXMm": 321.919856589103,
           "oldRelativeRadialVerticalUm": [
-            -1.3331724560260734,
-            0.7574981638750359
+            -1.341596468612837,
+            0.7447212357995396
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01694505230885798,
-            0.002615353852396299
+            -0.01743733598573256,
+            0.0023672882863451043
           ],
           "footReactionN": [
-            2993.733638137374,
-            2973.510551053987,
-            5070.693491396147
+            2912.6508507300937,
+            3052.524270270458,
+            5144.115716468241
           ]
         },
         {
           "xMm": 110,
-          "movingLoadWorkXMm": 314.33962151579544,
+          "movingLoadWorkXMm": 326.1698565891031,
           "oldRelativeRadialVerticalUm": [
-            -1.3365063894126095,
-            0.7533400211602046
+            -1.3439646920910246,
+            0.7392228683322263
           ],
           "newRelativeRadialVerticalUm": [
-            -0.01679249710598585,
-            0.002482280470005188
+            -0.017251054386099588,
+            0.002221236322695323
           ],
           "footReactionN": [
-            2989.8683709578,
-            2969.6453167464715,
-            5078.423992883235
+            2908.565836509398,
+            3048.439288921822,
+            5152.285712037574
           ]
         }
       ],
@@ -776,7 +776,7 @@
   },
   "basis": "Static gravity reaction at 21 X positions; nominal full plate contact assumed. Bearing stress is a preliminary average, not a roof bending, creep, fatigue, thread or dynamic stability qualification.",
   "footCount": 3,
-  "meanRoofBearingStressMPa": 0.4487826080667404,
+  "meanRoofBearingStressMPa": 0.45530980134655125,
   "plateMm": [
     110,
     110,
@@ -786,10 +786,9 @@
   "pocketRoofMm": 160,
   "replacement": "Unload and lift base before withdrawing foot stem, lowering plate and extracting through side opening; never remove a loaded support.",
   "roofThicknessMm": 70,
-  "seconds": 5.948015928268433,
+  "seconds": 7.312182188034058,
   "stemClearanceMm": 28,
   "thread": "M24x3 nominal, semantic threads",
-  "worstFootReactionN": 5078.423992883235,
-  "geometrySource": "CastingFootPocket / LevelingSeat / LevelingFoot; final X-drive support and 190 mm foot bosses included",
-  "millReference": "machinekit.milling.MillFrame access-pocket/stem-passage pattern; mill retains its own cast-in seats."
+  "worstFootReactionN": 5152.285712037574,
+  "geometrySource": "Final centered Z layout; casting, plate and foot geometry unchanged, updated moving mass/CG."
 }
