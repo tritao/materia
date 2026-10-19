@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Focused SR1 gate, using an existing native build. Invoke through heavy-run.
+set -euo pipefail
+materia_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+cadkit_build="${CADKIT_BUILD_ROOT:-$materia_root/app/build/host/native/cadkit}"
+if [[ ! -f "$cadkit_build/libcadkit-core.so" ]]; then
+    echo "missing existing CadKit library in $cadkit_build; set CADKIT_BUILD_ROOT" >&2
+    exit 1
+fi
+output="$materia_root/machinekit/tests/build/host/sheet-router-parts.hl"
+export HAXEON_COMPILER_SERVER=0
+"$materia_root/haxeon/scripts/haxeon" build --compiler-only \
+    --project "$materia_root/machinekit/tests/haxeon.sheet-router-parts.json" --output "$output"
+export LD_LIBRARY_PATH="$cadkit_build:$materia_root/app/build/host/native/collisionkit-native:$materia_root/haxeon/out:$materia_root/haxeon/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$materia_root/haxeon/.tools/hashlink/hl" "$output"

@@ -5,6 +5,10 @@ import machinekit.component.ComponentRegistry;
 /** The transmission package's component recipes. */
 class TransmissionComponents {
 	public static function register(registry:ComponentRegistry):Void {
+		registry.register(HelicalRack.recipeType());
+		registry.register(HelicalPinion.recipeType());
+		registry.register(PreloadedPinionMount.recipeType());
+
 		registry.register(Sprocket.chainRecipeType());
 		registry.register(Sprocket.genericRecipeType());
 		registry.register(SpurGear.recipeType());

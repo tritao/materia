@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-sheet-router-parts-tests"},
+  "entry": "SheetRouterPartsTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": ".."}},
+  "target": "host",
+  "outputDir": "build"
+}

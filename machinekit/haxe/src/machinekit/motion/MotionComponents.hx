@@ -5,6 +5,10 @@ import machinekit.component.ComponentRegistry;
 /** The motion package's component recipes. */
 class MotionComponents {
 	public static function register(registry:ComponentRegistry):Void {
+		registry.register(PlanetaryReducer.recipeType());
+		registry.register(CableChain.recipeType());
+		registry.register(BrakeServo.recipeType());
+
 		registry.register(LinearBearing.recipeType());
 		registry.register(PillowBlock.recipeType());
 		registry.register(LinearRail.recipeType());

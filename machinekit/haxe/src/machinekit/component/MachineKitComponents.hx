@@ -17,6 +17,12 @@ class MachineKitComponents {
 		machinekit.printing.PrintingComponents.register(registry);
 		machinekit.assembly.AssemblyComponents.register(registry);
 		machinekit.control.ControlComponents.register(registry);
+		machinekit.routing.RoutingComponents.register(registry);
+		registry.register(machinekit.power.Vfd.recipeType());
+		registry.register(machinekit.power.BrakeResistor.recipeType());
+		registry.register(machinekit.power.Contactor.recipeType());
+		registry.register(machinekit.power.CircuitBreaker.recipeType());
+		registry.register(machinekit.structural.LevellingFoot.recipeType());
 		registry.register(machinekit.structural.RectTubeMember.recipeType());
 		registry.register(machinekit.structural.ProfileMember.tslotRecipeType());
 		registry.register(machinekit.structural.ProfileMember.drawingRecipeType());

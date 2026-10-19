@@ -912,7 +912,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | Step | State | Commits |
 |---|---|---|
 | SR0 | started: reference survey recorded; gate blocked by disk headroom and toolchain setup; workshop facts pending | see SR0 notes |
-| SR1 | planned | |
+| SR1 | done: 25 assumed part recipes, HGR20/25 rows; focused gate 292 assertions | this commit |
 | SR2 | planned | |
 | SR3 | planned | |
 | SR4 | planned | |
@@ -1005,3 +1005,78 @@ separate `sheet-router` worktree is removed; its branch retains commits
 `build/sheet-router-sr0/` in the main checkout. Earlier setup and disk notes
 above describe the removed worktree; recheck the current main toolchain and
 available disk before the next gate. Unrelated main-checkout edits are preserved.
+
+
+### SR1 — catalogue parts
+
+The reference parts use `AssumedCatalogComponent`: saved, validated inputs,
+explicit `ValueBasis.Assumed`, nominal geometry, named connectors and recipe/BOM
+identity. Bought-part dimensions, ratings and material densities remain reference
+assumptions until SR19 checks a supplier drawing or measurement. New identifiers
+are generic; no supplier name is encoded in a new recipe.
+
+- Motion: HGR20 and HGR25 rail/block rows with unverified metadata; planetary
+  reducers (output torque, backlash in arcmin, torsional stiffness in N m/rad,
+  axial/radial limits and input inertia); 400/750 W high-voltage servos with a
+  spring-applied brake capability; cable-chain fill, bend radius, constant-length
+  centreline, travel envelope and posed hollow link envelope.
+- Transmission: separate normal-module `HelicalRack` and `HelicalPinion` recipes,
+  opposite mating hands, pressure/helix-angle checks, transverse and overlap
+  contact ratios, signed axial thrust, assumed mesh stiffness/backlash/efficiency;
+  a hinged spring-preloaded pinion mount with force from moment balance and a
+  bounded spring stroke. Existing straight rack/spur recipes keep their API.
+- Routing: ISO30 ATC spindle and ER32 holder/collet, open-entry forks, linear
+  tool rack and reference cover cylinder, setter trigger frame, dust-shoe lift
+  cylinder and brush/hose envelope, grooved zoned vacuum table and separate
+  isolation valves, bleeder spoilboard and side-channel blower. The release,
+  cover and lift cylinders and zone valves are separate BOM components for SR3
+  assembly. Layout envelopes do not replace fabrication drawings.
+- Power/control: VFD with STO terminals, braking resistor, contactor, breaker,
+  dual-channel delayed safety-relay contact interfaces, two-NC emergency stop,
+  and cabinet shell/DIN rows. `ControlCabinet.forParts` counts required I/O from
+  the supplied physical owners: spindle owns clamp I/O, VFD owns drive/speed I/O,
+  and each vacuum isolation valve owns its output. Hardwired safety contacts are
+  separate ports, not software safety functions. Wiring/architecture stays SR17.
+- Structure/materials: load-rated levelling foot; nominal MDF material for the
+  bleeder board. Permeability is stored in mm² and converted to m² for the later
+  vacuum model.
+
+The default helical angle is derived as `acos(3*pi/10)`, so a 20-tooth, normal
+module 1.5 pinion advances 100 mm/revolution. Pinion flanks are sampled involutes;
+ruled loft sections approximate their helices. The rack is skew-lofted and trimmed
+at whole transverse pitches for square-ended joints. Geometry and force relations
+follow the normal/transverse conventions in the manufacturer's
+[KHK gear dimension reference](https://khkgears.net/gear-knowledge/gear-technical-reference/calculation-gear-dimensions/)
+and [helical gear technical notes](https://khkgears.net/pdf/helical-tech.pdf).
+These references establish formulas/conventions, not the proposed parts' ratings.
+
+Focused gate (reuses native libraries, does not create another native build):
+
+```sh
+/home/joao/dev/materia-cache/tools/heavy-run --mem 8G --need 2G --label sr1-parts -- \
+  machinekit/scripts/test-sheet-router-parts
+```
+
+The script defaults to `app/build/host/native/cadkit`; `CADKIT_BUILD_ROOT` can
+select another existing CadKit library directory. It compiles only Haxe bytecode
+into the existing MachineKit test tree before running it. Logs for this session
+are under `build/sheet-router-sr0/sr1-*.log`. This is the SR1 focused gate, not a
+claim that the unfinished SR0 full application baseline has passed.
+
+
+SR1 closing evidence: `machinekit/scripts/test-sheet-router-parts` passed **292
+assertions** through heavy-run (8 GiB cap, 2 GiB requirement), exit 0; log
+`build/sheet-router-sr0/sr1-close.log`. The 25 recipes have valid positive-volume
+solids, stable direct-constructor/recipe identities, BOM rebuilds, connector frames
+and saved-assembly decode. Checks include both rail sizes, a 100 mm/revolution
+helical reference, thrust direction, contact ratio, preload and reducer units,
+chain fill and constant length over travel, valid posed chain solids at both
+limits, setter/fork frames, ER32 collet/holder geometric fit, cylinder release
+capacity, six vacuum zones with separate valves, and derived cabinet I/O
+(23 inputs, 12 outputs, one analog output for the tested parts).
+
+The straight-rack ratio and original rail selections are also checked. No full
+MachineKit/application baseline, SR2 servo-axis integration, safety architecture
+validation or hardware acceptance is claimed by this focused result. No native
+library was rebuilt. Root free space was 3.5 GiB at closing; future builds must
+recheck headroom.

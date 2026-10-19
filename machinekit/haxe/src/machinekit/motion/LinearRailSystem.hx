@@ -37,6 +37,17 @@ class LinearRailSystem {
 			blockHolePitchB: 26, blockHolePitchC: 26, blockMountScrew: "M4x10", railHolePitch: 60, railEndMargin: 20,
 			railMountScrew: "M4x16", staticLoadCapacity: 10000
 		}, {
+			// SR1 reference envelopes and capacities, all unverified assumptions.
+			designation: "HGR20", family: "GENERIC-HG",
+			railWidth: 20, railHeight: 17.5, blockWidth: 44, blockHeight: 30, blockLength: 77.5,
+			blockHolePitchB: 32, blockHolePitchC: 36, blockMountScrew: "M5x12", railHolePitch: 60, railEndMargin: 20,
+			railMountScrew: "M5x20", staticLoadCapacity: 27000
+		}, {
+			designation: "HGR25", family: "GENERIC-HG",
+			railWidth: 23, railHeight: 22, blockWidth: 48, blockHeight: 40, blockLength: 84,
+			blockHolePitchB: 35, blockHolePitchC: 35, blockMountScrew: "M6x16", railHolePitch: 60, railEndMargin: 20,
+			railMountScrew: "M6x25", staticLoadCapacity: 36000
+		}, {
 			// The long carriage of the MGN12 rail: same rail, a longer block for stiffness. Assumed envelope;
 			// static capacity scaled from the assumed MGN12C value by the H/C block ratio (about 1.5).
 			designation: "MGN12H", family: "HIWIN",
@@ -55,7 +66,7 @@ class LinearRailSystem {
 	/** HIWIN MGN/MGW linear guideway dimensions used by the MGN12C profile row. */
 	public static function catalog():Catalog<LinearRailProfileSpec> {
 		if (table == null)
-			table = new Catalog("linear rail profile", spec -> spec.designation, rows(), spec -> spec.designation == "HGR15" || spec.designation == "MGN12H" || spec.designation == "MGN9C" ? ({
+			table = new Catalog("linear rail profile", spec -> spec.designation, rows(), spec -> (spec.designation == "HGR15" || spec.designation == "HGR20" || spec.designation == "HGR25") || spec.designation == "MGN12H" || spec.designation == "MGN9C" ? ({
 				source: spec.designation == "HGR15" ? "Assumed HGR15/HGH15CA reference envelope and 10 kN static block capacity; not vendor verified"
 					: "Assumed " + spec.designation + " reference envelope and static block capacity; not vendor verified",
 				standard: null, standardEdition: null, dimensionKind: Nominal, conformance: GenericApproximation,
