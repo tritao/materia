@@ -6862,7 +6862,7 @@ class ProjectSourceTests {
     if (reopenedDefinition == null || reopenedState == null) throw "the reopened project has no assembly";
     check([for (joint in reopenedDefinition.joints) if (joint.id == jointId) joint].length == 1, "the joint survives a save and reopen");
     var coordinate = [for (value in reopenedState.jointCoordinates) if (value.joint == jointId) value.value];
-    check(coordinate.length == 1 && Math.abs(coordinate[0] - 0.5) < 1e-9, 'and so does its coordinate: $coordinate');
+    check(coordinate.length == 1 && Math.abs(coordinate[0]) < 1e-9, 'saved joint keeps its initial coordinate rather than the travel preview: $coordinate');
 
     check(session.document.undo() && session.document.undo(), "the turn and the conversion undo");
     check(session.assemblyMates.mates.length == 2 && session.assemblyMates.joints.length == 0, "undo brings the mates back");

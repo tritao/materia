@@ -312,6 +312,68 @@ class MachineControlTests {
       editor.dispose();fonts.dispose();Sys.println('Spindle view: $checks checks passed');
     }catch(error:Dynamic){editor.dispose();fonts.dispose();throw error;}
   }
+  static function posePersistenceChecks():Void {
+    var document=new haxeon.ui.editing.EditorDocument("persistence"),value=0;
+    function operation(persistent:Bool,from:Int,to:Int):haxeon.ui.editing.EditOperation
+      return new haxeon.ui.editing.EditOperation("Change",()->value=to,()->value=from,null,null,null,256,persistent);
+    document.apply(operation(false,0,1));check(!document.isDirty,"session edits preserve clean savepoint");
+    document.undo();check(!document.isDirty && value==0,"session undo remains clean");
+    document.redo();check(!document.isDirty && value==1,"session redo remains clean");
+    document.apply(operation(true,1,2));check(document.isDirty,"design edit requires save");
+    document.apply(operation(false,2,3));document.undo();check(document.isDirty,"session undo cannot hide a design edit");
+    document.undo();check(!document.isDirty,"undo design edit returns to saved content through session history");
+    document.redo();document.redo();document.markSaved();
+    document.undo();check(!document.isDirty,"undo session step across a savepoint remains clean");
+    document.undo();check(document.isDirty,"undo saved design content requires save");
+    document.apply(operation(true,1,4));check(document.isDirty,"branched design history cannot collide with saved token");
+    document.markSaved();
+    var transaction=document.begin("Session transaction");transaction.apply(operation(false,4,5));transaction.commit();
+    check(!document.isDirty,"session-only transaction remains clean");
+    transaction=document.begin("Mixed transaction");transaction.apply(operation(false,5,6));transaction.apply(operation(true,6,7));transaction.commit();
+    check(document.isDirty,"mixed transaction affects persistence");document.undo();check(!document.isDirty,"mixed transaction undo restores savepoint");
+    document.markSaved();
+    var count=document.history.undoCount;
+    transaction=document.begin("Travel drag","travel");transaction.apply(operation(false,5,6));transaction.commit();
+    transaction=document.begin("Travel drag","travel");transaction.apply(operation(false,6,7));transaction.commit();
+    check(document.history.undoCount==count+1 && !document.isDirty,"coalesced session transactions remain clean");
+    document.undo();check(value==5 && !document.isDirty,"coalesced session undo restores its start");
+    var session=fixture("mm");
+    try {
+      session.document.markSaved();MachineControlModel.set(session,"x",25,true);
+      check(!session.isDirty(),"travel does not trigger close prompt");
+      var closed=false;
+      var controller=new app.SceneDocumentController(session,function(_,_,_){throw "Unexpected path dialog";},function(){});
+      controller.requestClose(()->closed=true);
+      check(closed && !controller.needsConfirmation(),"native close workflow skips confirmation after travel only");
+      var initial=session.initialAssemblyState;
+      check(initial!=null,"initial assembly pose retained");
+      near(session.initialJointCoordinate("x",-1),0,"preview leaves initial pose unchanged");
+      var gesture=session.beginAssemblyJointEdit("x");gesture.update(50);gesture.commit();
+      check(!session.isDirty(),"slider gesture remains session-only");
+      session.document.undo();check(!session.isDirty(),"slider undo remains clean");
+      session.document.redo();check(!session.isDirty(),"slider redo remains clean");
+      check(session.saveCurrentPoseAsInitial(),"explicit initial pose change applies");
+      check(session.isDirty(),"explicit initial pose requires saving");
+      closed=false;controller.requestClose(()->closed=true);
+      check(!closed && controller.needsConfirmation(),"native close workflow protects an authored initial pose");
+      controller.resolve("cancel");
+      near(MachineControlModel.axes(session).filter(a->a.id=="x")[0].initial,50,"Initial button uses authored pose");
+      session.document.markSaved();MachineControlModel.set(session,"x",75,true);
+      check(!session.isDirty(),"travel after saving initial pose remains clean");
+      // Ordinary saves serialize the initial pose, not the live preview.
+      session.projectReference=sys.FileSystem.fullPath("haxeon.json");
+      session.projectBaseline=session.scene.recordsForSave();
+      var saved=session.projectSaveData("/tmp/materia-pose-persistence.materia");
+      var definition=session.projectAssemblyDefinition;if(definition==null)throw "Missing fixture definition";
+      var encoded=saved.record.assemblyState;if(encoded==null)throw "Missing saved initial pose";
+      var restored=materia.assembly.AssemblyDefinitionCodec.decodeState(definition,encoded);
+      for(joint in restored.jointCoordinates)if(joint.joint=="x")near(joint.value,50,"ordinary save excludes live preview");
+      session.document.undo();check(!session.isDirty(),"undo travel after save stays clean");
+      session.document.undo();check(session.isDirty(),"undo saved initial pose is a persistent edit");
+      near(session.initialJointCoordinate("x",-1),0,"undo initial pose restores previous authoring state");
+      session.dispose();
+    }catch(error:Dynamic){session.dispose();throw error;}
+  }
   public static function main():Int {
     var args=Sys.args();if(args.length==2 && args[0]=="--responsiveness"){responsiveness(args[1]);return 0;}
     if(args.length==2 && args[0]=="--spindle-view"){spindleView(args[1]);return 0;}
@@ -344,6 +406,7 @@ class MachineControlTests {
         session.dispose();
       } catch(error:Dynamic) {session.dispose();throw error;}
     }
+    posePersistenceChecks();
     sliderRouting();angleRouting();orientationEntry();orientationPanel();
     near(MachineControlModel.parsePosition(" -1.25e2 "),-125,"numeric entry accepts scientific notation");
     for(text in ["","-","1abc","NaN","Infinity"]) refused(()->{MachineControlModel.parsePosition(text);},"invalid numeric input rejected");

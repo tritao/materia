@@ -74,6 +74,9 @@ class ProjectDocumentSession {
   public var projectReference(default,null):Null<String> = null;
   /** Selected entrypoint in the source project's job list, when it defines one. */
   public var projectJob(default,null):Null<String> = null;
+  var initialAssemblyState:Null<AssemblyStateRecord> = null;
+  /** Source definition bound to the runtime; compiled models own a separate snapshot. */
+  var assemblyRuntimeDefinition:Null<AssemblyDefinition> = null;
   public var initialView(default,null):Null<materia.project.SceneArtifact.SceneArtifactView> = null;
   public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
@@ -449,10 +452,12 @@ class ProjectDocumentSession {
     assemblyDependentJoints.clear();
     projectAssemblyDefinition = definition;
     assemblyRuntime = state;
+    assemblyRuntimeDefinition = definition;
     assemblyLocalCentersByDefinition = centers;
     assemblyMetresPerUnit = metresPerUnit;
     if (definition == null || state == null) {
       projectAssemblyState = null;
+      initialAssemblyState = null;
       return;
     }
     // Without a saved choice, the joints the definition's driven inputs leave dependent; a saved list overrides.
@@ -461,6 +466,7 @@ class ProjectDocumentSession {
     for (id in dependencies) assemblyDependentJoints.set(id, true);
     for (occurrence in definition.occurrences) assemblyOccurrenceIds.set("project:" + occurrence.id, true);
     projectAssemblyState = state.record();
+    initialAssemblyState = state.record();
     if (assemblyMates.mates.length > 0 && assemblyMateProblem == null) layMates(state);
   }
 
@@ -531,15 +537,21 @@ class ProjectDocumentSession {
     var afterState:AssemblyStateRecord = {schemaVersion: before.schemaVersion, definition: before.definition,
       jointCoordinates: coordinates, rootPoses: [for (root in before.rootPoses) if (root.occurrence != occurrence.id) root]};
     AssemblyDefinitionCodec.validateState(afterDefinition, afterState);
-    var overlayBefore = assemblyMates, definitionBefore = definition;
+    var overlayBefore = assemblyMates, definitionBefore = definition, initialBefore = initialAssemblyState;
+    var authoredBefore = initialBefore == null ? before : initialBefore;
+    var initialCoordinates = [for(coordinate in authoredBefore.jointCoordinates) {joint:coordinate.joint,value:coordinate.value}];
+    initialCoordinates.push({joint:jointId,value:0.0});
+    var initialAfter:AssemblyStateRecord = {schemaVersion:before.schemaVersion,definition:before.definition,
+      jointCoordinates:initialCoordinates,rootPoses:[for(root in authoredBefore.rootPoses) if(root.occurrence!=occurrence.id) root]};
     document.apply(new EditOperation("Make the mates of " + occurrence.id + " a joint",
-      function() setAssemblyStructure(after, afterDefinition, afterState),
-      function() setAssemblyStructure(overlayBefore, definitionBefore, before)));
+      function() setAssemblyStructure(after, afterDefinition, afterState, initialAfter),
+      function() setAssemblyStructure(overlayBefore, definitionBefore, before, initialBefore)));
     return jointId;
   }
 
   /** Installs an overlay whose joints changed the assembly's structure, with a state of the new definition. */
-  function setAssemblyStructure(overlay:ProjectAssemblyMates, definition:AssemblyDefinition, state:AssemblyStateRecord):Void {
+  function setAssemblyStructure(overlay:ProjectAssemblyMates, definition:AssemblyDefinition, state:AssemblyStateRecord, initial:Null<AssemblyStateRecord>):Void {
+    initialAssemblyState = initial;
     assemblyMates = overlay;
     assemblyMateProblem = null;
     projectAssemblyDefinition = definition;
@@ -647,11 +659,13 @@ class ProjectDocumentSession {
     var after = overlay.withMate(mate), generated = generatedAssemblyDefinition;
     if (generated == null) throw "This project has no assembly to mate";
     var solved = after.solve(generated, state.record());
-    var before = assemblyMates, beforeResult = assemblyMateResult, beforeState = state.record();
+    var before = assemblyMates, beforeResult = assemblyMateResult, beforeState = state.record(), initialBefore = initialAssemblyState;
     var afterState = solved.result.converged ? solved.state : beforeState;
+    var initialSolved = after.solve(generated,initialBefore == null ? beforeState : initialBefore);
+    var initialAfter = initialSolved.result.converged ? initialSolved.state : initialBefore;
     document.apply(new EditOperation("Add " + kind + " mate",
-      function() setMates(after, solved.result, afterState),
-      function() setMates(before, beforeResult, beforeState)));
+      function() {setMates(after, solved.result, afterState);initialAssemblyState=initialAfter;},
+      function() {setMates(before, beforeResult, beforeState);initialAssemblyState=initialBefore;}));
     return mate.id;
   }
 
@@ -787,7 +801,23 @@ class ProjectDocumentSession {
     if (sameAssemblyState(before, after)) return false;
     return document.apply(new EditOperation("Set joint " + jointId,
       function() applyAssemblyStateRecord(after),
-      function() applyAssemblyStateRecord(before)));
+      function() applyAssemblyStateRecord(before),null,null,null,256,false));
+  }
+
+  /** Persist the displayed pose only through this explicit, undoable design edit. */
+  public function saveCurrentPoseAsInitial():Bool {
+    var runtime=assemblyRuntime;
+    if(runtime==null)throw "This project has no assembly pose";
+    var before=initialAssemblyState,after=runtime.record();
+    if(before!=null && sameAssemblyState(before,after))return false;
+    return document.apply(new EditOperation("Save current pose as initial",
+      function() initialAssemblyState=after,function() initialAssemblyState=before));
+  }
+
+  public function initialJointCoordinate(id:String,fallback:Float):Float {
+    var state=initialAssemblyState;
+    if(state!=null)for(joint in state.jointCoordinates)if(joint.joint==id)return joint.value;
+    return fallback;
   }
 
   public function beginAssemblyJointEdit(jointId:String):ProjectJointEdit {
@@ -890,7 +920,7 @@ class ProjectDocumentSession {
     applyAssemblyStateRecord(after);
     document.record(new EditOperation(label,
       function() applyAssemblyStateRecord(after),
-      function() applyAssemblyStateRecord(before)));
+      function() applyAssemblyStateRecord(before),null,null,null,256,false));
     return true;
   }
 
@@ -917,7 +947,7 @@ class ProjectDocumentSession {
     if (definition == null) throw "Assembly definition is unavailable";
     // Coordinate edits keep topology unchanged; configurations own their mutable state.
     var runtime = assemblyRuntime;
-    var candidate = runtime == null ? new AssemblyState(definition, stateRecord) :
+    var candidate = runtime == null || assemblyRuntimeDefinition != definition ? new AssemblyState(definition, stateRecord) :
       AssemblyState.fromModel(runtime.model, stateRecord);
     candidate.setJoint(jointId, value);
     return evaluateAssemblyConfigurationState(candidate, assemblyDependentJointIds());
@@ -953,7 +983,7 @@ class ProjectDocumentSession {
       throw "Assembly placement data is unavailable";
     // Coordinate edits keep topology unchanged; configurations own their mutable state.
     var runtime = assemblyRuntime;
-    var candidate = runtime == null ? new AssemblyState(definition, stateRecord) :
+    var candidate = runtime == null || assemblyRuntimeDefinition != definition ? new AssemblyState(definition, stateRecord) :
       AssemblyState.fromModel(runtime.model, stateRecord);
     var transforms:Array<{id:String, x:Float, y:Float, z:Float, rotation:Array<Float>}> = [];
     for (occurrence in definition.occurrences) {
@@ -969,6 +999,7 @@ class ProjectDocumentSession {
     var nextRecord = candidate.record();
     scene.setAssemblyOccurrenceTransforms(transforms);
     assemblyRuntime = candidate;
+    assemblyRuntimeDefinition = definition;
     projectAssemblyState = nextRecord;
     assemblyRevision++;
   }
@@ -1063,6 +1094,8 @@ class ProjectDocumentSession {
     staleProjectRecord = null;
     projectAssemblyDefinition = null;
     projectAssemblyState = null;
+    initialAssemblyState = null;
+    assemblyRuntimeDefinition = null;
     projectPhysical = null;
     customMaterials = [];
     robotMotions = [];
@@ -1188,7 +1221,7 @@ class ProjectDocumentSession {
       for (instance in stale.instances) if (!sources.exists(instance.sourceId)) instances.push(instance);
     }
     var savedAssemblyState = projectAssemblyDefinition == null || assemblyRuntime == null ? null
-      : AssemblyDefinitionCodec.encodeState(projectAssemblyDefinition, assemblyRuntime.record());
+      : AssemblyDefinitionCodec.encodeState(projectAssemblyDefinition, initialAssemblyState == null ? assemblyRuntime.record() : initialAssemblyState);
     var record:ProjectSceneRecord = {version: 1, reference: relativeReference(destination, reference),
       overrides: overrides, removed: removed, instances: instances,
       assemblyState: savedAssemblyState,

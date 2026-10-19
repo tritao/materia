@@ -34,7 +34,7 @@ class MachineControlModel {
       result.push({id:joint.id,value:(value == null ? joint.defaultValue : value)*factor,
         minimum:joint.limits.lower == null ? null : joint.limits.lower*factor,
         maximum:joint.limits.upper == null ? null : joint.limits.upper*factor,
-        initial:joint.defaultValue*factor,unit:linear ? "mm" : "deg",step:linear ? 0.1 : 1.0,factor:factor,
+        initial:session.initialJointCoordinate(joint.id,joint.defaultValue)*factor,unit:linear ? "mm" : "deg",step:linear ? 0.1 : 1.0,factor:factor,
         follows:coupled.exists(joint.id) ? coupled.get(joint.id) : session.assemblyJointIsDependent(joint.id) ? "closure" : null});
     }
     return result;

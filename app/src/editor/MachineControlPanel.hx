@@ -69,8 +69,15 @@ class MachineControlPanel {
     }
     if (axes.length == 0) rows.push(new KeyedView("empty",new Text("Open a machine assembly with movable joints to test its travel.")));
     else {
-      rows.push(new KeyedView("hint",new Text(editable ? "Move axes to check travel. Changes support Undo." :
+      rows.push(new KeyedView("hint",new Text(editable ? "Move axes to check travel. Undoable previews do not require saving." :
         app.simulation.isActive() ? "Stop simulation to edit these design positions." : "The project currently controls this machine.")));
+      if(editable) {
+        var savePose=new Button("Save current pose as initial",null,()->{
+          try {commitGesture();app.session.saveCurrentPoseAsInitial();error=null;app.documentChanged();}
+          catch(failure:Dynamic){error=Std.string(failure);app.invalidateView();}
+        },"machine-save-initial-pose");
+        rows.push(new KeyedView("save-initial-pose",savePose));
+      }
       var linked = 0;
       for (axis in axes) {
         if (axis.follows != null) {linked++;continue;}
