@@ -24,17 +24,17 @@ class MillSpindleHead extends MachineAssembly {
 		addComponent("spindle",new Bt30Cartridge(),gauge);
 		rotating("rotor",new MillPowerDrawbarPart(new ComponentValues().setToken("role","rotor")),gauge,"spindle","rotor-turn");
 		for (role in ["springs","pullStud","holder","reactionFrame","cylinder"])
-			fixed(role,new MillPowerDrawbarPart(new ComponentValues().setToken("role",role)),gauge,
+			fixed(role,new MillPowerDrawbarPart(new ComponentValues().setToken("role",role).setBoolean("compactCylinder",true)),gauge,
 				(role=="reactionFrame" || role=="cylinder")?"spindle":"rotor");
 		moving("drawbar",new MillPowerDrawbarPart(new ComponentValues().setToken("role","drawbar")),gauge,"rotor",4.5);
 		fixed("gripper",new MillPowerDrawbarPart(new ComponentValues().setToken("role","gripper")),gauge,"drawbar");
-		moving("pistonRod",new MillPowerDrawbarPart(new ComponentValues().setToken("role","pistonRod")),gauge,"cylinder",6.5);
-		fixed("piston",new MillPowerDrawbarPart(new ComponentValues().setToken("role","piston")),gauge,"pistonRod");
+		moving("pistonRod",new MillPowerDrawbarPart(new ComponentValues().setToken("role","pistonRod").setBoolean("compactCylinder",true)),gauge,"cylinder",MillDrawbarLayout.RELEASE_STROKE);
+		fixed("piston",new MillPowerDrawbarPart(new ComponentValues().setToken("role","piston").setBoolean("compactCylinder",true)),gauge,"pistonRod");
 		for (i in 0...6) { var a=i*Math.PI/3;
 			fixed('collarBolt$i',SocketHeadCapScrew.metric("M6",30),F.fromRotationMatrix(53.5*Math.cos(a),l.spindleY+53.5*Math.sin(a),gauge.z+40,[1,0,0, 0,-1,0, 0,0,-1]),"spindle");
 		}
 		for (p in [[-37.5,0.0],[37.5,0.0],[0.0,-37.5],[0.0,37.5]]) fixed('reactionBolt${p[0]}-${p[1]}',SocketHeadCapScrew.metric("M5",12),F.translation(p[0],l.spindleY+p[1],gauge.z+244.6),"reactionFrame");
-		for (x in [-50.0,50.0]) for (y in [-50.0,50.0]) fixed('cylinderBolt$x-$y',SocketHeadCapScrew.metric("M8",16),F.fromRotationMatrix(x,l.spindleY+y,gauge.z+322,[1,0,0, 0,-1,0, 0,0,-1]),"reactionFrame");
+		for (x in [-MillDrawbarLayout.MOUNT_X,MillDrawbarLayout.MOUNT_X]) for (y in [-MillDrawbarLayout.MOUNT_Y,MillDrawbarLayout.MOUNT_Y]) fixed('cylinderBolt$x-$y',SocketHeadCapScrew.metric("M6",16),F.fromRotationMatrix(x,l.spindleY+y,gauge.z+MillDrawbarLayout.BRIDGE_BOTTOM,[1,0,0, 0,-1,0, 0,0,-1]),"reactionFrame");
 		var motor = new Bt30SpindleMotor();
 		var face = gauge.z+282, mountBottom = l.headBottom+l.headHeight;
 		fixed("motorCarrier",new MillSpindleMotorMount(new ComponentValues().setNumber("height",face-12-mountBottom).setBoolean("centered",true)),F.translation(0,l.spindleY,mountBottom),"spindle");

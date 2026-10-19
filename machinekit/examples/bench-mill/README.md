@@ -95,8 +95,15 @@ withdrawal envelope checks motor removal after removing the guard, belt, pulley 
 motor fasteners. Belt selection and cable connectors still need supplier qualification.
 
 The four-post release frame bears on the stationary cartridge rear housing.
-It carries an assumed double-acting cylinder with a 100 mm bore envelope,
-120 mm square end caps and 100 mm overall length. The two inspection joints
+It carries an assumed compact double-acting cylinder with an 80 mm bore,
+100 mm square end caps and 46 mm overall height. Its bridge is 20 mm lower;
+the complete release package ends 74 mm lower than the previous tall cylinder.
+A matched piston and continuous rod retain a 10 mm study stroke, while the
+release inspection uses 6.5 mm. The smaller mounting pattern uses four M6 bolts.
+At an assumed 6 bar at the cylinder, theoretical push force is 3016 N; an explicit
+20% allowance leaves 2413 N against the DAIYA reference's 2000 N unclamping force.
+This provisional comparison does not qualify the actuator: minimum delivered
+pressure, actual friction, required stroke and supplier interfaces remain inputs. The two inspection joints
 are `spindle/drawbar-release` (4.5 mm) and `spindle/pistonRod-release` (6.5 mm,
 including a 2 mm retracted gap). These are packaging assumptions, **not** a
 matched supplier stroke/force specification. The spring stack does not deform

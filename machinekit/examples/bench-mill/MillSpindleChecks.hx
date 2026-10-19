@@ -21,6 +21,29 @@ class MillSpindleChecks {
 		check(true,"motor withdraws upward 50 mm at nominal tension after drive disassembly");
 		var zero:Map<String,AssemblyFrame> =assembly.solvedPoses();
 		var motorPose:AssemblyFrame=zero.get("spindle/motor");
+		var cylinderMember=assembly.components().filter(m->m.id=="spindle/cylinder")[0];
+		var compact=cylinderMember.component.geometry(), cb=PosedParts.boxOf(compact);
+		near(cb.maxX-cb.minX,MillDrawbarLayout.WIDTH,"compact cylinder width");
+		near(cb.maxZ-cb.minZ,MillDrawbarLayout.HEIGHT,"compact cylinder height");
+		var legacy=new MillPowerDrawbarPart(new machinekit.component.ComponentValues().setToken("role","cylinder")).geometry();
+		near(PosedParts.boxOf(legacy).maxZ,430,"legacy cylinder recipe keeps original envelope"); legacy.close();
+		for (role in ["piston","pistonRod"]) {
+			var part=new MillPowerDrawbarPart(new machinekit.component.ComponentValues().setToken("role",role).setBoolean("compactCylinder",true)).geometry();
+			for (stroke in [MillDrawbarLayout.RELEASE_STROKE,MillDrawbarLayout.STUDY_STROKE]) {
+				var shifted=part.translated(new cadkit.modeling.Vector(0,0,-stroke)), common=compact.intersect(shifted);
+				near(common.volume(),0,'compact $role clears cylinder at $stroke mm stroke'); common.close(); shifted.close();
+			}
+			part.close();
+		}
+		var capProbe=cadkit.modeling.Part.cylinderSpan(5,cb.maxZ-6,cb.maxZ-2), capCommon=compact.intersect(capProbe);
+		check(capCommon.volume()>1,"upper pressure cap is closed above piston"); capCommon.close(); capProbe.close(); compact.close();
+		near(MillDrawbarLayout.theoreticalPushForce(6),Math.PI*1600*0.6,"80 mm piston force at 6 bar");
+		check(MillDrawbarLayout.theoreticalPushForce(MillDrawbarLayout.PRESSURE_BAR)*MillDrawbarLayout.FORCE_ALLOWANCE>
+			MillDrawbarLayout.REFERENCE_RELEASE_FORCE,"provisional derated force exceeds reference unclamping force");
+		check(MillDrawbarLayout.PISTON_BOTTOM-MillDrawbarLayout.STUDY_STROKE>MillDrawbarLayout.CYLINDER_BOTTOM+MillDrawbarLayout.CAP,
+			"piston retains lower-cap clearance through full study stroke");
+		check(MillDrawbarLayout.PISTON_BOTTOM+MillDrawbarLayout.PISTON_THICKNESS<MillDrawbarLayout.CYLINDER_BOTTOM+MillDrawbarLayout.HEIGHT-MillDrawbarLayout.CAP,
+			"retracted piston clears upper cap");
 		near(motorPose.x,0,"spindle motor lies on machine centerline");
 		near(motorPose.y-l.spindleY,MillSpindleMotorLayout.CENTRES,"motor sits behind release assembly");
 		for (candidate in [assembly,MachineAssembly.decode(assembly.encode(),MachineKitComponents.standard())]) {
@@ -35,6 +58,18 @@ class MillSpindleChecks {
 			near(state.worldPose("spindle/pistonRod").z,rod-6.5,"rod takes up gap then releases");
 			near(state.worldPose("spindle/drawbar").z+285,state.worldPose("spindle/pistonRod").z+287,"release rod contacts drawbar after gap take-up");
 			near(state.worldPose("spindle/gripper").z,drawbar-4.5,"gripper follows drawbar release");
+			var motionCache=new PosedParts();
+			for (movingId in ["spindle/piston","spindle/pistonRod"]) {
+				var movingMember=candidate.components().filter(m->m.id==movingId)[0];
+				var movingPart=motionCache.posed(movingMember.component,state.worldPose(movingId));
+				for (fixedId in ["spindle/cylinder","spindle/reactionFrame","spindle/rotor"]) {
+					var fixedMember=candidate.components().filter(m->m.id==fixedId)[0];
+					var fixedPart=motionCache.posed(fixedMember.component,state.worldPose(fixedId));
+					var common=movingPart.intersect(fixedPart); near(common.volume(),0,'release stroke clears $movingId/$fixedId'); common.close(); fixedPart.close();
+				}
+				movingPart.close();
+			}
+			motionCache.close();
 			var zeroTool=state.worldPose("spindle/tool").z;
 			state.setJoint("zAxis/z",l.lower); state.forwardKinematics();
 			near(state.worldPose("spindle/tool").z,zeroTool+l.lower,"complete spindle follows Z");
@@ -46,7 +81,7 @@ class MillSpindleChecks {
 		}
 		var cache=new PosedParts(), poses:Map<String,AssemblyFrame> =assembly.solvedPoses();
 		for (pair in [["zAxis/head","spindle/motorCarrier"],["spindle/motorCarrier","spindle/motor"],
-			["spindle/tensionScrew","spindle/motor"],
+			["spindle/tensionScrew","spindle/motor"],["spindle/piston","spindle/pistonRod"],
 			["zAxis/head","spindle/spindle"],["spindle/spindle","spindle/reactionFrame"],["spindle/reactionFrame","spindle/cylinder"],["spindle/beltGuard","spindle/motorCarrier"]]) {
 			var members=assembly.components(), a=members.filter(m->m.id==pair[0])[0],b=members.filter(m->m.id==pair[1])[0];
 			var first=cache.posed(a.component,poses.get(a.id)),second=cache.posed(b.component,poses.get(b.id));
@@ -59,6 +94,10 @@ class MillSpindleChecks {
 				var tool=cadkit.modeling.Part.cylinderSpan(3,l.headBottom+l.headHeight+13,l.headBottom+l.headHeight+110,x,l.spindleY+y);
 				var common=carrier.intersect(tool); near(common.volume(),0,"carrier anchor has vertical Allen-key access"); common.close(); tool.close();
 			}
+		for (member in assembly.components()) if (StringTools.startsWith(member.id,"spindle/cylinderBolt")) {
+			var bolt=cache.posed(member.component,poses.get(member.id));
+			check(bolt.distance(carrier)>=3,"compact cylinder bolt clears motor carrier by at least 3 mm"); bolt.close();
+		}
 		carrier.close(); cache.close();
 		for (m in assembly.components()) if (StringTools.startsWith(m.id,"spindle/")) {
 			var p=m.component.geometry(); check(p.valid(), 'valid spindle solid ${m.id}');

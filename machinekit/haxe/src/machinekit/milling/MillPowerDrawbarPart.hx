@@ -10,7 +10,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 class MillPowerDrawbarPart extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 	static final roles = ["drawbar","springs","gripper","pullStud","holder","reactionFrame","cylinder","pistonRod","rotor","piston"];
-	public static function parameters():Array<ComponentParameter> return [P.text("role","drawbar")];
+	public static function parameters():Array<ComponentParameter> return [P.text("role","drawbar"),P.flag("compactCylinder",false)];
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.milling.power-drawbar-study-part",parameters(),v -> new MillPowerDrawbarPart(v));
 		return recipe;
@@ -25,7 +25,11 @@ class MillPowerDrawbarPart extends MachineComponent {
 	override public function componentType():Null<ComponentType> return recipeType();
 	override public function hasGeometry():Bool return true;
 	static function ring(r:Float,b:Float,lo:Float,hi:Float):Part return Solids.cut(Part.cylinderSpan(r,lo,hi),[Part.cylinderSpan(b,lo-1,hi+1)]);
-	override public function geometry(detail:ComponentDetail = Preview):Part return switch(values().token("role")) {
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var role=values().token("role");
+		if (values().boolean("compactCylinder") && ["reactionFrame","cylinder","piston","pistonRod"].indexOf(role)>=0)
+			return compactGeometry(role);
+		return switch(role) {
 		case "drawbar": Solids.union([Part.cylinderSpan(5,62,285),Part.cylinderSpan(11,222,227),Part.cylinderSpan(7,68,71)]);
 		case "springs":
 			var rows = []; for (i in 0...16) rows.push(ring(12.5,5.5,181+i*2.6,183+i*2.6)); Solids.union(rows);
@@ -58,5 +62,36 @@ class MillPowerDrawbarPart extends MachineComponent {
 			var tube=Solids.cut(blank,[taper,Part.cylinderSpan(13,43,243)]);
 			Solids.union([tube,ring(25,5.5,178,181),ring(25,5.5,238,242),ring(10,5.5,242,275)]);
 		default: throw "Unknown drawbar role";
-	};
+		};
+	}
+	function compactGeometry(role:String):Part {
+		var b=MillDrawbarLayout.CYLINDER_BOTTOM, top=b+MillDrawbarLayout.HEIGHT;
+		var bridge=MillDrawbarLayout.BRIDGE_BOTTOM, piston=MillDrawbarLayout.PISTON_BOTTOM;
+		var raw=switch(role) {
+			case "reactionFrame":
+				var rows=[ring(70,22,242,250),Part.box(140,100,MillDrawbarLayout.BRIDGE_THICKNESS).translated(new Vector(0,0,bridge))];
+				for (x in [-60.0,60.0]) for (y in [-35.0,35.0]) rows.push(Part.cylinderSpan(6,249,bridge+1,x,y));
+				var cuts=[Part.cylinderSpan(12,bridge-1,b+1)];
+				for (x in [-MillDrawbarLayout.MOUNT_X,MillDrawbarLayout.MOUNT_X])
+					for (y in [-MillDrawbarLayout.MOUNT_Y,MillDrawbarLayout.MOUNT_Y]) cuts.push(Part.cylinderSpan(3.3,bridge-1,b+1,x,y));
+				for (p in [[-37.5,0.0],[37.5,0.0],[0.0,-37.5],[0.0,37.5]]) {
+					cuts.push(Part.cylinderSpan(2.75,241,251,p[0],p[1])); cuts.push(Part.cylinderSpan(5,244.6,251,p[0],p[1]));
+				}
+				Solids.cut(Solids.union(rows),cuts);
+			case "cylinder":
+				var rows=[Part.box(MillDrawbarLayout.WIDTH,MillDrawbarLayout.WIDTH,MillDrawbarLayout.CAP).translated(new Vector(0,0,b)),
+					Part.box(MillDrawbarLayout.WIDTH,MillDrawbarLayout.WIDTH,MillDrawbarLayout.CAP).translated(new Vector(0,0,top-MillDrawbarLayout.CAP)),
+					ring(MillDrawbarLayout.BORE/2+5,MillDrawbarLayout.BORE/2,b+MillDrawbarLayout.CAP,top-MillDrawbarLayout.CAP)];
+				for (x in [-34.0,34.0]) for (y in [-34.0,34.0]) rows.push(Part.cylinderSpan(3,b+MillDrawbarLayout.CAP-1,top-MillDrawbarLayout.CAP+1,x,y));
+				var cuts=[Part.cylinderSpan(10.5,b-1,b+MillDrawbarLayout.CAP+1)];
+				for (x in [-MillDrawbarLayout.MOUNT_X,MillDrawbarLayout.MOUNT_X])
+					for (y in [-MillDrawbarLayout.MOUNT_Y,MillDrawbarLayout.MOUNT_Y]) cuts.push(Part.cylinderSpan(2.5,b-1,b+MillDrawbarLayout.CAP+1,x,y));
+				for (z in [b+11,top-11]) cuts.push(Part.cylinderAlongY(3,-46,-39,0,z));
+				Solids.cut(Solids.union(rows),cuts);
+			case "piston": ring(MillDrawbarLayout.BORE/2-0.5,10,piston,piston+MillDrawbarLayout.PISTON_THICKNESS);
+			case "pistonRod": Part.cylinderSpan(10,MillDrawbarLayout.ROD_TIP,piston+MillDrawbarLayout.PISTON_THICKNESS);
+			default: throw "Unknown compact release role";
+		};
+		try { var result=raw.refined(); raw.close(); return result; } catch(e:Dynamic) { raw.close(); throw e; }
+	}
 }
