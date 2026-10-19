@@ -493,3 +493,16 @@ to one thread. Static cases also run in fresh processes at solver time zero;
 raw case DAT/deck/log hashes are recorded, with case-time relabeling only in
 an explicitly derived concatenated DAT. The known coupled-seat solver fixture
 passes that path; all **34 Python tests** pass. No gate tolerance is relaxed.
+
+
+Serial center modal numerical gate passes on both meshes/supports; maximum
+frequency-order refinement change remains 2.55%. Coarse frequencies and fine
+three-point frequencies match the archived four-thread results exactly; the
+fine four-spring maximum difference is 0.0031%. The full serial matrix remains
+in progress. Center serial report: `build/fem/nine-pose-serial/center/modal/report.json`,
+SHA256 `980b58cd4f3a541b6cf1ff4263a97799aadce97e6dbe1aa0233238ebcd4fd08c`.
+The byte-identical static-deck thread comparison is retained at
+`build/fem/static-thread-qualification/comparison.json`: force resultant ~0.0113 N
+with four threads versus ~3.2e-12 N with one thread. `--modal-size-map PATH`
+lets the runner explicitly request previously necessary third mesh levels per
+pose without relaxing any numerical checks.

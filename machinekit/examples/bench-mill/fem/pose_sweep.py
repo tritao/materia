@@ -26,10 +26,13 @@ def main():
     parser.add_argument('--config',type=Path,default=Path(__file__).with_name('frame-study.json'))
     parser.add_argument('--sizes',nargs='+',type=float,default=[40,30]);parser.add_argument('--resume',action='store_true')
     parser.add_argument('--threads',type=int,choices=[1,2,4],default=1)
+    parser.add_argument('--modal-size-map',type=Path,help='Explicit per-pose modal mesh size lists; all levels retain numerical gates')
     parser.add_argument('--stage',choices=['all','modal','static'],default='all')
     args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
     entries=json.loads((args.packets/'poses.json').read_text())
     if len(entries)!=9 or entries[0]['id']!='center':raise ValueError('Expected center plus eight corners')
+    size_map=json.loads(args.modal_size_map.read_text()) if args.modal_size_map else {}
+    if any(k not in {e['id'] for e in entries} for k in size_map):raise ValueError('Unknown pose in modal size map')
     records=[];fixed=None
     for entry in entries:
         manifest=args.packets/entry['id']/'manifest.json';validate(manifest)
@@ -39,15 +42,15 @@ def main():
         if fixed is None:fixed=hashes
         if hashes!=fixed:raise ValueError('Fixed-frame geometry changed across pose packets')
         records.append((entry,manifest))
-    def study(script,manifest,output,extra):
+    def study(script,manifest,output,extra,sizes=None):
         if args.resume and reusable(output/'report.json',manifest,args.config):return
         command=[str(args.heavy_run),'--slots','4','--mem','6G','--need','4G','--margin','6G','--label','mill-pose-study','--',sys.executable,
             str(Path(__file__).with_name(script)),str(manifest),'--ccx',args.ccx,'--config',str(args.config),'--output',str(output),
-            '--threads',str(args.threads),'--sizes',*[str(v) for v in args.sizes],*extra]
+            '--threads',str(args.threads),'--sizes',*[str(v) for v in (sizes or args.sizes)],*extra]
         print('Starting '+str(output),flush=True)
         subprocess.run(command,check=True)
     if args.stage in ('all','modal'):
-        for entry,manifest in records:study('modal_study.py',manifest,args.output/entry['id']/'modal',['--resume'])
+        for entry,manifest in records:study('modal_study.py',manifest,args.output/entry['id']/'modal',['--resume'],size_map.get(entry['id']))
     if args.stage in ('all','static'):
         for entry,manifest in records:
             for case in ('spindle-nose','test-bar-20'):
