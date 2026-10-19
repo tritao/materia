@@ -238,6 +238,9 @@ class ScenePresentation {
             for (axis in 0...4) previous[axis + 3] = pose.rotation[axis];
           }
           poseTransforms.push(transform);
+          // SceneView poses replace individual drawable world transforms; child nodes
+          // do not inherit that override. Runtime meshes use the owner's centred frame.
+          for (node in owner.runtimePartNodes(pose.id)) { poseNodes.push(node); poseTransforms.push(transform); }
           for (node in threads.nodesFor(pose.id)) { poseNodes.push(node); poseTransforms.push(transform); }
           // The face overlay is a child of its object with an identity transform, but a pose
           // override moves only its own node, so the overlay needs the object's pose as well.
