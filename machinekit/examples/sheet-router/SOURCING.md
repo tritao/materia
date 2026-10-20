@@ -256,3 +256,21 @@ compliance and frame flexibility now lead the static budget. Both drive branches
 pass the eccentric supplier-based screen, including 935.77 N maximum preload-flank
 demand against the conditional 3000 N mounting-derated rack rating. See
 [fem/README.md](fem/README.md) for convergence, classification limits and next work.
+
+## Populated ATC selection (2026-10-20)
+
+Use eight nominal ISO30/ER32 tools at 220 mm rack pitch with top-loading U forks.
+The 110/150 mm layouts collide with the Z ram/offset screw when tools are parked.
+The rack case is 1760 mm long over the existing 880 mm plinth; pocket centres
+X=30..1570 remain reachable. The rack datum is Y=workY+280 mm. The setter moves ahead of the case
+to Y=workY+60 mm (240 mm extra-travel margin), leaving the widened rack case
+unobstructed and keeping XY transfers in the front approach lane. The cover is centred on the rack
+rather than 20 mm forward of it, clearing the Z rails at the rear cutting edge. A 1780 x 300 x 3 mm steel cover has 30 mm upward
+returns. See [ATC sizing and release conditions](atc/cylinder-sizing.json).
+The 25 x 600 mm cylinder needs a separate guided slide: actual guides, mounts,
+cushions, flow controls and their filled-rack sweep remain procurement/release
+gates. The guide/adaptor mass allowance is 3 kg. The fixed Y-chain bracket arm
+is below the Y preload swept envelope; its outboard post still supports the
+same chain end. Independent stopped sensing and local pressure/clamp feedback
+must be selected before hardware acceptance. Nominal simulation delays are not
+hardware stopping-time ratings.

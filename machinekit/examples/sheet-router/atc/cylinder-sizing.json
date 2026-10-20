@@ -1,0 +1,91 @@
+{
+  "status": "PASS for assumed axial duty; guided-slide and purchased flow/cushion hardware remain release requirements",
+  "units": {
+    "length": "mm",
+    "pressure": "Pa",
+    "force": "N",
+    "mass": "kg",
+    "flow": "normal litres/minute at 1 bar absolute"
+  },
+  "coverCylinder": {
+    "family": "ISO6432",
+    "boreMm": 25,
+    "rodMm": 10,
+    "strokeMm": 600,
+    "ratedSpeedMmPerS": 200,
+    "pressurePa": 600000,
+    "extensionForceN": 294.52431127404316,
+    "retractionForceN": 247.40042147019625
+  },
+  "movingMass": {
+    "coverKg": 15.090839999999998,
+    "bracketKg": 0.7535999999999999,
+    "rodKg": 0.3791705983342031,
+    "guideAdapterAllowanceKg": 3,
+    "totalKg": 19.2236105983342
+  },
+  "axialDuty": {
+    "frictionCoefficient": 0.2,
+    "sealAllowanceN": 30,
+    "accelerationMPerS2": 2,
+    "requiredForceN": 106.15106537149921,
+    "minimumForceFactor": 2.330644733563093,
+    "requiredFactor": 2,
+    "passes": true
+  },
+  "coverAir": {
+    "extensionNormalLPerMin": 41.233403578366044,
+    "retractionNormalLPerMin": 34.63605900582747,
+    "requiredValveBranchNormalLPerMin": 50,
+    "assumedOneWayTravelS": 3,
+    "commissionedRampTravelEstimateS": 3.1
+  },
+  "drawbar": {
+    "boreMm": 80,
+    "strokeMm": 6,
+    "pressurePa": 600000,
+    "nominalReleaseForceN": 3015.9289474462016,
+    "assumedClampSpringForceN": 2200,
+    "minimumFeedbackDelayS": 0.15,
+    "normalLitresPerRelease": 0.2111150263212341,
+    "minimumIdealFlowForDelayNormalLPerMin": 84.44601052849364
+  },
+  "guideRequirement": {
+    "separateGuidedSlide": true,
+    "pairVerticalCapacityAtLeastN": 500,
+    "pairMomentCapacityAtLeastNm": 75,
+    "weightWithFactor2N": 377.0384417483082,
+    "centreOfMassOffsetAllowanceMm": 150,
+    "guideHardwareModelled": false,
+    "requiredBeforeHardwareRelease": "Catalogue guide capacity, support/bracket detail and filled-rack clearance sweep; cylinder rod carries axial force only"
+  },
+  "assumptions": [
+    "Horizontal cover on a separate guide; friction and seals are assumed, not measured",
+    "Confirm purchased 25x600 cylinder stroke/speed/cushion rating and manifold flow at the installed pressure",
+    "Independent VFD-zero-speed AND spindle-stopped signals plus local 600 kPa pressure feedback gate release; valve is normally closed/energise-to-release",
+    "0.5 s spindle stop and 0.15 s drawbar confirmations are simulation delays, not hardware stopping-time claims"
+  ],
+  "coverPan": {
+    "widthMm": 1780,
+    "depthMm": 300,
+    "webMm": 3,
+    "upwardReturnMm": 30,
+    "steelE_MPa": 210000,
+    "sectionInertiaMm4": 55012.5,
+    "simplySupportedSelfWeightDeflectionMm": 0.9407022888238001,
+    "note": "Upward edge returns preserve the flat underside clearance; bend radius/development and guide hardware need shop qualification"
+  },
+  "rackSupport": {
+    "caseLengthMm": 1760,
+    "plinthLengthMm": 880,
+    "maximumPocketOverhangMm": 330,
+    "caseEndOverhangMm": 440,
+    "caseWidthMm": 140,
+    "caseHeightMm": 80,
+    "wallMm": 4,
+    "outerPocketDesignMassKg": 3,
+    "sectionInertiaMm4": 1867605.3333333333,
+    "maximumSupportEdgeMomentNmm": 25583.161734592,
+    "bendingStressMPa": 0.5479350755318468
+  }
+}

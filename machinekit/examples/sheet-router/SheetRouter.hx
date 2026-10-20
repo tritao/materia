@@ -82,10 +82,12 @@ class SheetRouter extends Gantry {
             connectPorts('vacuumRightBranch$row',"vacuumHeader",'out${4-row}','zoneValve${row*2+2}',"inlet");
         }
         // Forks open towards -Y, so their approach remains inside the extra Y travel.
-        rack=new ToolRack(new ComponentValues().setNumber("forkHeight",160).setNumber("coverStroke",600));
-        rackPose=F.translation(chosen.workX/2,gaugeZero.y+chosen.workY+260,boardTop-20);
+        rack=new ToolRack(new ComponentValues().setNumber("pitch",220).setNumber("forkHeight",160).setNumber("coverStroke",600));
+        rackPose=F.translation(chosen.workX/2,gaugeZero.y+chosen.workY+280,boardTop-20);
         attach("toolRack",rack,rackPose,"base");
-        attach("rackSupport",new GantryPlate("rack support",rack.parameterCount("pockets")*rack.n("pitch"),180,rackPose.z-bedBottom),
+        // Retain the 880 mm plinth. The closed rack case supports the outer
+        // pockets' 330 mm overhang; do not widen the solid plinth.
+        attach("rackSupport",new GantryPlate("rack support",880,180,rackPose.z-bedBottom),
             F.translation(rackPose.x,rackPose.y,bedBottom),"base");
         for(i in 0...rack.parameterCount("pockets")) {
             var pocket=F.compose(rackPose,rack.pocketFrame(i));
@@ -94,8 +96,8 @@ class SheetRouter extends Gantry {
             attach('forkRiser${i+1}',new GantryPlate("fork riser",80,12,pose.z-rackPose.z-rack.n("height")),
                 F.translation(pose.x,rackPose.y-rack.n("depth")/2+6,rackPose.z+rack.n("height")),"toolRack");
         }
-        attach("setterPad",new GantryPlate("setter pedestal",100,100,boardTop-bedBottom),F.translation(100,rackPose.y,bedBottom),"base");
-        attach("setter",new ToolLengthSetter(),F.translation(100,rackPose.y,boardTop),"setterPad");
+        attach("setterPad",new GantryPlate("setter pedestal",100,100,boardTop-bedBottom),F.translation(100,rackPose.y-220,bedBottom),"base");
+        attach("setter",new ToolLengthSetter(),F.translation(100,rackPose.y-220,boardTop),"setterPad");
         exposeConnector("setterTrigger","setter","trigger");
         attach("airSupply",new AirSupply(),F.translation(right+300,front,100),"base");
         attach("airManifold",new PneumaticManifold(2),F.translation(right+300,front,230),"base");
@@ -104,8 +106,8 @@ class SheetRouter extends Gantry {
         var shoeZero=F.compose(gaugeZero,F.translation(0,0,40));
         lift("shoeLift","shoe",shoe,shoeZero,"spindle",shoe.liftCylinder(),shoe.n("liftStroke"),0);
         var coverZ=Math.max(rackPose.z+rack.n("forkHeight")+60,zeroPose("frameBack").z+spec.frameSection().height/2+5);
-        var cover=new GantryPlate("rack cover",rack.parameterCount("pockets")*rack.n("pitch")+20,300,8);
-        lift("rackCoverLift","rackCover",cover,F.translation(rackPose.x,rackPose.y-20+rack.n("coverStroke"),coverZ),
+        var cover=new SheetRouterAtcCover(rack.parameterCount("pockets")*rack.n("pitch")+20);
+        lift("rackCoverLift","rackCover",cover,F.translation(rackPose.x,rackPose.y+rack.n("coverStroke"),coverZ),
             "toolRack",rack.coverCylinder(),rack.n("coverStroke"),0);
         var cabinetPose=F.translation(right+600,front+600,0);
         attach("vfd",new machinekit.power.Vfd(),F.compose(cabinetPose,F.translation(-180,0,200)),"base");
@@ -169,10 +171,11 @@ class SheetRouter extends Gantry {
                     box(end.x-20,end.y-30,beam.z+112,end.x+20,end.y,end.z-15.5),
                     box(end.x-25,end.y-10,end.z-17.5,end.x+25,end.y,end.z+17.5)
                 ],end,[box(end.x-20,end.y-11,end.z-12.5,end.x+20,end.y+1,end.z+12.5)]);
-                var post=frame.x-350;
+                var post=frame.x-400;
                 support("chainYFixedBracket","frameLeft",[
-                    box(post-20,fixed.y-20,frame.z+38,frame.x-50,fixed.y+20,frame.z+50),
-                    box(post-20,fixed.y-20,frame.z+50,post+20,fixed.y+20,fixed.z-15.5),
+                    // Keep the mounting arm below the Y preload unit swept envelope.
+                    box(post-20,fixed.y-20,frame.z-12,frame.x-50,fixed.y+20,frame.z),
+                    box(post-20,fixed.y-20,frame.z,post+20,fixed.y+20,fixed.z-15.5),
                     box(post-20,fixed.y-20,fixed.z-27.5,fixed.x+25,fixed.y+20,fixed.z-15.5)
                 ],fixed);
             } else {

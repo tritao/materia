@@ -361,14 +361,14 @@ machined.**
   occupancy is machine state, persisted on the machine and in the simulation. Returning a tool to
   an occupied pocket is refused.
 - The change is a **machine sequence**, the same in the simulation and on the machine (SR7):
-  1. check spindle stopped (the VFD's zero-speed relay) and raise the dust shoe;
+  1. check independent VFD zero-speed and spindle-stopped feedback, air pressure and axis lease; raise the dust shoe;
   2. open the rack cover;
-  3. move along the fork opening into the current tool's pocket;
+  3. move above the current pocket and lower vertically into its top-loading fork;
   4. release, confirm unclamped, and lift Z clear;
   5. move over the new pocket, descend, and clamp with purge off;
   6. confirm clamped and tool present;
-  7. slide out along the fork, close the cover, lower the shoe;
-  8. apply the length.
+  7. lift vertically clear of the fork, measure at the setter, park and close the cover; keep the shoe raised until the cutting approach;
+  8. persist ownership and measured length, apply H in SI, then acknowledge the matching change request.
 - Every step has a timeout and a named fault: tool lost, pocket not empty, clamp not confirmed,
   cover not open.
 - **Rejected:**
@@ -887,6 +887,26 @@ open; do not release fabrication files by replacing them with simulated sign-off
 ### Phase B: machine behaviour in simulation
 
 **SR7. The ATC sequence and tool table (SR-D5).**
+
+Native implementation and evidence: [ATC packet](atc/README.md). The populated
+rack requires 220 mm pitch and vertical docking; the fixed Y-chain arm is lowered
+below the preload unit swept envelope and its post moved outboard of the motor.
+The rack moves 20 mm rearward; the cover moves another 20 mm relative
+to the rack to preserve rear-edge cutting clearance. Cross-pocket moves fully
+retract Z and retreat to the front approach lane before changing X, because
+the screw stays fixed to the carriage. The setter is also on that lane, outside
+the widened rack case. The 55 mm lift is only local taper clearance. The sequence runs against existing
+assembly joints with all eight physical tools. Fresh confirmations, ownership,
+axis-lease/motion tokens, setter-edge latching, persisted inventory and CNC H
+rehydration are tested. Robot transaction runtime bindings are not shared.
+Native T1 -> T3 -> T1 passes on both beds, with 48.56–50.23 s simulated changes
+and <0.43% timing error. The fixed-mass update (+30.72 kg, no moving-mass change)
+passes the focused governing-pose SR-D3 and weld recheck; see the packet hashes.
+The native runner is implemented here; app dispatch and physical RKD6 bindings
+remain SR16 work. Do not mark the in-app acceptance or hardware release complete
+from the native runner. The cover guide/support hardware and purchased cylinder
+flow/cushions remain explicit release requirements.
+
 - A `ToolChangeSequence` in MotionKit answers `cnc.tool_change.N`:
   - pocket approach frames come from the assembly;
   - each step waits on its sensor with a timeout and names its fault;
@@ -1153,7 +1173,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR5 | complete: 36-case raised-datum/extra-leg rerun and new-mode motion check pass; structure frozen | see FEM diagnosis |
 | SR6-C | planned: measured modes/damping and shaper tuning before cutting acceptance | SR13/SR16 gate |
 | SR6 | reaction qualification passes 132/132 weld groups per bed at 100 million reversals; geometry/service checks pass and metrology method is documented; fabrication release blocked on the named WPS, material/relief, epoxy and whole-unit machining acceptances | [fabrication packet](fabrication/README.md) |
-| SR7 | planned | |
+| SR7 | native checks pass: 42 policy assertions, 83 static poses/bed, four complete exchanges and focused SR-D3 recheck; app/SR16 dispatch and purchased hardware acceptance remain gated | [ATC packet](atc/README.md) |
 | SR8 | planned | |
 | SR9 | planned | |
 | SR10 | planned | |

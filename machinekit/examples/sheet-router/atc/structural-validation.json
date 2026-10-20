@@ -1,0 +1,251 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "fixedFixtureClearance": [
+        {
+          "a": "setter",
+          "b": "toolRack",
+          "separatingAxisGapMm": 130.0
+        },
+        {
+          "a": "setter",
+          "b": "fork1",
+          "separatingAxisGapMm": 68.0
+        },
+        {
+          "a": "setter",
+          "b": "fork2",
+          "separatingAxisGapMm": 90
+        },
+        {
+          "a": "setter",
+          "b": "fork3",
+          "separatingAxisGapMm": 310
+        },
+        {
+          "a": "setter",
+          "b": "fork4",
+          "separatingAxisGapMm": 530
+        },
+        {
+          "a": "setter",
+          "b": "fork5",
+          "separatingAxisGapMm": 750
+        },
+        {
+          "a": "setter",
+          "b": "fork6",
+          "separatingAxisGapMm": 970
+        },
+        {
+          "a": "setter",
+          "b": "fork7",
+          "separatingAxisGapMm": 1190
+        },
+        {
+          "a": "setter",
+          "b": "fork8",
+          "separatingAxisGapMm": 1410
+        },
+        {
+          "a": "setterPad",
+          "b": "toolRack",
+          "separatingAxisGapMm": 100.0
+        },
+        {
+          "a": "setterPad",
+          "b": "fork1",
+          "separatingAxisGapMm": 128.0
+        },
+        {
+          "a": "setterPad",
+          "b": "fork2",
+          "separatingAxisGapMm": 128.0
+        },
+        {
+          "a": "setterPad",
+          "b": "fork3",
+          "separatingAxisGapMm": 280
+        },
+        {
+          "a": "setterPad",
+          "b": "fork4",
+          "separatingAxisGapMm": 500
+        },
+        {
+          "a": "setterPad",
+          "b": "fork5",
+          "separatingAxisGapMm": 720
+        },
+        {
+          "a": "setterPad",
+          "b": "fork6",
+          "separatingAxisGapMm": 940
+        },
+        {
+          "a": "setterPad",
+          "b": "fork7",
+          "separatingAxisGapMm": 1160
+        },
+        {
+          "a": "setterPad",
+          "b": "fork8",
+          "separatingAxisGapMm": 1380
+        }
+      ],
+      "workY": 2600,
+      "pose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "fixedMassDeltaKg": 30.71975992148191,
+      "movingMassDeltaKg": 0,
+      "firstModeHz": 27.41603,
+      "stiffnessNPerUm": [
+        2.240097510070687,
+        2.1993511352290165
+      ],
+      "maximumContourDeviationMm": 0.012746867016929444,
+      "maximumResidualMm": 0.013006263571332572,
+      "maximumWeldRangeMPa": 9.047851266012668,
+      "maximumDesignStressMPa": 44.0116676746225,
+      "pass": true,
+      "jointLayoutSha256": "3de893b99bcefdd948c3f3e520fee77d70dfd25b9d3802919db52cc3f96489d8",
+      "solverDeckSha256": "c6e05afcad00931e87647c9e1d19bf58e813469b95b13f58867143fc3894c110",
+      "massExportSha256": "576597bca5056d3c482d5e87c06cd427fc380b38e8f781a6dc717a59dbccd754",
+      "manifestSha256": "c4b0c4d674788a41ebfe5fa6febede29992aa9b34f316150b18c7c43dfffd0ec"
+    },
+    {
+      "fixedFixtureClearance": [
+        {
+          "a": "setter",
+          "b": "toolRack",
+          "separatingAxisGapMm": 130.0
+        },
+        {
+          "a": "setter",
+          "b": "fork1",
+          "separatingAxisGapMm": 68.0
+        },
+        {
+          "a": "setter",
+          "b": "fork2",
+          "separatingAxisGapMm": 90
+        },
+        {
+          "a": "setter",
+          "b": "fork3",
+          "separatingAxisGapMm": 310
+        },
+        {
+          "a": "setter",
+          "b": "fork4",
+          "separatingAxisGapMm": 530
+        },
+        {
+          "a": "setter",
+          "b": "fork5",
+          "separatingAxisGapMm": 750
+        },
+        {
+          "a": "setter",
+          "b": "fork6",
+          "separatingAxisGapMm": 970
+        },
+        {
+          "a": "setter",
+          "b": "fork7",
+          "separatingAxisGapMm": 1190
+        },
+        {
+          "a": "setter",
+          "b": "fork8",
+          "separatingAxisGapMm": 1410
+        },
+        {
+          "a": "setterPad",
+          "b": "toolRack",
+          "separatingAxisGapMm": 100.0
+        },
+        {
+          "a": "setterPad",
+          "b": "fork1",
+          "separatingAxisGapMm": 128.0
+        },
+        {
+          "a": "setterPad",
+          "b": "fork2",
+          "separatingAxisGapMm": 128.0
+        },
+        {
+          "a": "setterPad",
+          "b": "fork3",
+          "separatingAxisGapMm": 280
+        },
+        {
+          "a": "setterPad",
+          "b": "fork4",
+          "separatingAxisGapMm": 500
+        },
+        {
+          "a": "setterPad",
+          "b": "fork5",
+          "separatingAxisGapMm": 720
+        },
+        {
+          "a": "setterPad",
+          "b": "fork6",
+          "separatingAxisGapMm": 940
+        },
+        {
+          "a": "setterPad",
+          "b": "fork7",
+          "separatingAxisGapMm": 1160
+        },
+        {
+          "a": "setterPad",
+          "b": "fork8",
+          "separatingAxisGapMm": 1380
+        }
+      ],
+      "workY": 3150,
+      "pose": {
+        "x": 800,
+        "y": 3150,
+        "z": 200
+      },
+      "fixedMassDeltaKg": 30.719759921482364,
+      "movingMassDeltaKg": 0,
+      "firstModeHz": 26.97893,
+      "stiffnessNPerUm": [
+        2.2539867051749773,
+        2.1993307861914815
+      ],
+      "maximumContourDeviationMm": 0.02011093918653728,
+      "maximumResidualMm": 0.012795780420199866,
+      "maximumWeldRangeMPa": 9.067649618610178,
+      "maximumDesignStressMPa": 44.60454892027145,
+      "pass": true,
+      "jointLayoutSha256": "a0b93780f42a6cea42466c1236c164ced787d4460b67910c58bffbca280371e1",
+      "solverDeckSha256": "74473af3a2341cb3d66d98e7b073a92ac3ba7b98c589019834eab9b2e73ff1c8",
+      "massExportSha256": "59fdf5b993d66f234eaa2ab55a139204fe7f27439ddc1d5829714097685dcdd8",
+      "manifestSha256": "eb1a8771a39b174fec586b53c021fcb56f3169d546f8378df4a10dd1eb5565de"
+    }
+  ],
+  "scope": "Focused anchored-floor joint-model recheck at the two previously governing dynamic poses; 50 mm mesh, 40 modes; 0.5/1% damping, 250 us time step. Unchanged structural geometry and moving cutting mass; fixed ATC masses/positions updated.",
+  "baselineCommit": "4869f1f49",
+  "baselineArchive": "build/sheet-router-evidence/sr6-qualified.tar.gz",
+  "baselineArchiveSha256": "e5e741330b35b35b1dffde7dc9eef04de28b776d036fc7ec10bf2c03b20c07bf",
+  "sourceSha256": {
+    "machinekit/examples/sheet-router/SheetRouter.hx": "7c8eb8a1bd84ea3ce290f756db9598f2527011408f19356973189e1727a5e282",
+    "machinekit/examples/sheet-router/SheetRouterSpec.hx": "e9bd8a9ea938fc77e67469086a3689412777b749ef6d6454901bb324bb578ca3",
+    "machinekit/examples/sheet-router/SheetRouterAtcMass.hx": "8d61b26161861ee5cfcc61fd4b1df4c610c458d1f2a521358fcd76203995c35c",
+    "machinekit/examples/sheet-router/SheetRouterAtcCover.hx": "c19f8498924806d130d386981d3bfe7c1b016e975b6ffc750d175e5dc714cfcb",
+    "machinekit/examples/sheet-router/atc/structural_check.py": "12ddd13177326f4fe085b17d039dfa7ff97e16ea5612f175bd679f62358225c3",
+    "machinekit/haxe/src/machinekit/gantry/Gantry.hx": "1c0991a9ac84582f6e424f9f02180982846e17129512269bab28244917ba429f",
+    "machinekit/haxe/src/machinekit/gantry/GantryParts.hx": "0bd2c0b0d500051867cb6433ffbc2b32d1972068cf7f8d8f7751865f46b0f8b2",
+    "machinekit/haxe/src/machinekit/gantry/GantrySpec.hx": "73cb4810b95e1bd42647b746dcf47176e78bbb55af76df24b0a00998fb7ed452"
+  }
+}

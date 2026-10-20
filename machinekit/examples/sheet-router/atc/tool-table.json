@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "loaded": 0,
+  "pocketOwner": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "recoveryRequired": false,
+  "target": 0,
+  "tools": [
+    {
+      "number": 1,
+      "pocket": 1,
+      "diameterMm": 12,
+      "nominalGaugeTipMm": 120,
+      "measuredGaugeTipMm": null,
+      "description": "Reference roughing tool",
+      "holderId": "nominal-ISO30-ER32",
+      "cutterId": "nominal-T1-12mm",
+      "lifeCount": 0
+    },
+    {
+      "number": 2,
+      "pocket": 2,
+      "diameterMm": 6,
+      "nominalGaugeTipMm": 120,
+      "measuredGaugeTipMm": null,
+      "description": "Reference drill",
+      "holderId": "nominal-ISO30-ER32",
+      "cutterId": "nominal-T2-6mm",
+      "lifeCount": 0
+    },
+    {
+      "number": 3,
+      "pocket": 3,
+      "diameterMm": 6,
+      "nominalGaugeTipMm": 120,
+      "measuredGaugeTipMm": null,
+      "description": "Reference finishing tool",
+      "holderId": "nominal-ISO30-ER32",
+      "cutterId": "nominal-T3-6mm",
+      "lifeCount": 0
+    },
+    {
+      "number": 4,
+      "pocket": 4,
+      "diameterMm": 3,
+      "nominalGaugeTipMm": 120,
+      "measuredGaugeTipMm": null,
+      "description": "Reference small end mill",
+      "holderId": "nominal-ISO30-ER32",
+      "cutterId": "nominal-T4-3mm",
+      "lifeCount": 0
+    },
+    {
+      "number": 5,
+      "pocket": 5,
+      "diameterMm": 5,
+      "nominalGaugeTipMm": 120,
+      "measuredGaugeTipMm": null,
+      "description": "Reference boring tool",
+      "holderId": "nominal-ISO30-ER32",
+      "cutterId": "nominal-T5-5mm",
+      "lifeCount": 0
+    },
+    {
+      "number": 6,
+      "pocket": 6,
+      "diameterMm": 8,
+      "nominalGaugeTipMm": 120,
+      "measuredGaugeTipMm": null,
+      "description": "Reference profiling tool",
+      "holderId": "nominal-ISO30-ER32",
+      "cutterId": "nominal-T6-8mm",
+      "lifeCount": 0
+    },
+    {
+      "number": 7,
+      "pocket": 7,
+      "diameterMm": 10,
+      "nominalGaugeTipMm": 120,
+      "measuredGaugeTipMm": null,
+      "description": "Reference pocketing tool",
+      "holderId": "nominal-ISO30-ER32",
+      "cutterId": "nominal-T7-10mm",
+      "lifeCount": 0
+    },
+    {
+      "number": 8,
+      "pocket": 8,
+      "diameterMm": 6,
+      "nominalGaugeTipMm": 120,
+      "measuredGaugeTipMm": null,
+      "description": "Reference spare tool",
+      "holderId": "nominal-ISO30-ER32",
+      "cutterId": "nominal-T8-6mm",
+      "lifeCount": 0
+    }
+  ]
+}
