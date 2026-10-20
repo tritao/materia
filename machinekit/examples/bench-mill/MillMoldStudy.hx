@@ -103,6 +103,8 @@ class MillMoldStudy {
 				text.push("Panels: " + e.panels + " (" + e.uniquePanels + " unique); rigid formers: " + e.formers + "; EPS cores: " + e.epsCores
 					+ "; production blank sheets: " + e.sheetCount + "; logical hardware stacks: " + e.logicalHardwareStacks + ".");
 			}
+			text.push("Castability: minimum opposing-face span " + r.castability.minimumOpposingFaceSpanMm + " mm; " + r.castability.proposals.length
+				+ " review suggestions (not applied).");
 			for (v in r.validation)
 				if (v.status != ToolingCheckStatus.Pass)
 					text.push("- `" + v.rule + "` (" + v.status + "): " + v.message);

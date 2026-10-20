@@ -4,7 +4,7 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
 import materia.tooling.process.CastingProcessSpec;
 
-/** Strict independent v1 format. Reconstructs typed records after validation. */
+/** Strict independent v2 format. Reconstructs typed records after validation. */
 class ProcessSpecCodec {
 	static function object(v:Dynamic, keys:Array<String>):Void {
 		if (v == null || !Reflect.isObject(v) || Std.isOfType(v, Array) || Std.isOfType(v, String))
@@ -95,6 +95,7 @@ class ProcessSpecCodec {
 			"temperatureMarginC",
 			"pourRateMm3PerSecond",
 			"maximumAirEscapeWidthMm",
+			"castability",
 			"cure",
 			"sections",
 			"solver"
@@ -104,6 +105,19 @@ class ProcessSpecCodec {
 		var fingerprint = text(v.recipeFingerprint);
 		if (!~/^[a-f0-9]{64}$/.match(fingerprint))
 			throw "Invalid process recipe fingerprint";
+		var limits = v.castability;
+		object(limits, [
+			"maximumAggregateSizeMm",
+			"minimumPassageAggregateRatio",
+			"maximumSectionThicknessMm",
+			"evidence"
+		]);
+		var castability:CastabilityLimits = {
+			maximumAggregateSizeMm: optional(limits.maximumAggregateSizeMm, 1e-9, 1e6),
+			minimumPassageAggregateRatio: optional(limits.minimumPassageAggregateRatio, 1, 1e6),
+			maximumSectionThicknessMm: optional(limits.maximumSectionThicknessMm, 1e-9, 1e6),
+			evidence: texts(limits.evidence)
+		};
 		var c = v.cure;
 		object(c, [
 			"reference",
@@ -180,6 +194,7 @@ class ProcessSpecCodec {
 			temperatureMarginC: optional(v.temperatureMarginC, 0, 2000),
 			pourRateMm3PerSecond: optional(v.pourRateMm3PerSecond, 1e-12, 1e15),
 			maximumAirEscapeWidthMm: optional(v.maximumAirEscapeWidthMm, 1e-9, 1e6),
+			castability: castability,
 			cure: {
 				reference: text(c.reference),
 				resinMassFraction: optional(c.resinMassFraction, 0, 1),
@@ -196,7 +211,7 @@ class ProcessSpecCodec {
 	}
 
 	public static function encode(v:CastingProcessSpec):String {
-		var text = ToolingCodec.canonical({format: "materia.casting-process", version: 1, spec: snapshot(v)}) + "\n";
+		var text = ToolingCodec.canonical({format: "materia.casting-process", version: 2, spec: snapshot(v)}) + "\n";
 		if (haxe.io.Bytes.ofString(text).length > 2097152)
 			throw "Casting process size limit";
 		return text;
@@ -214,7 +229,7 @@ class ProcessSpecCodec {
 			throw error;
 		}
 		object(v, ["format", "version", "spec"]);
-		if (v.format != "materia.casting-process" || v.version != 1)
+		if (v.format != "materia.casting-process" || v.version != 2)
 			throw "Unsupported casting process format/version";
 		return snapshot(v.spec);
 	}

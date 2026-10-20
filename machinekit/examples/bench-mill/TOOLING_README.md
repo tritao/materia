@@ -198,7 +198,7 @@ manifest and fabrication Diagnostics alongside the existing design requests.
 
 The process analysis now includes extracted opposing-face planar spans, the
 orientation comparison and checked-order playback described below. Complex
-junction thickness, design-rule/proposal and column studies remain outstanding.
+junction thickness, broader design rules, accepted source edits and column studies remain outstanding.
 The mold is still a review package.
 
 
@@ -253,3 +253,27 @@ Alternative candidates reuse material properties but require their own boundary
 assignments; the comparison does not silently rotate heat sinks or convection.
 Records-only exports contain no sequence scenes and leave every candidate's CAD
 assessment pending.
+
+
+## Castability feedback
+
+`castability-analysis.json` and `castability-review.md` contain source-owned
+findings and suggested actions. The same screening results are included in each
+orientation candidate. The report retains existing fill topology/ceiling and
+planner draft checks, adds aggregate-based passage and section-size screens,
+and keeps EPS breakout trials explicitly pending. Nothing changes the casting.
+
+The strict process input is now version 2 (version 1 is rejected). Its required
+`castability` object declares `maximumAggregateSizeMm`,
+`minimumPassageAggregateRatio`, `maximumSectionThicknessMm` and `evidence`.
+The mill leaves these limits null until the actual mix/process is selected.
+Supply them in the existing `--process-spec` input, preserving the recipe
+fingerprint. Declared limits are screening assumptions, not physical qualification.
+
+Suggestions identify source IDs and the blocking rule. Where supported they give
+measured/target dimensions, an axis and a representative region, or a candidate
+vent point, all in mold coordinates (mm). A design reviewer must map a proposed
+face separation to actual source parameters and replan a new source revision.
+Vents need a continuous route and sealing plan; no penetration is added by the
+report. Junction inscribed thickness remains unsupported, and cure, structural,
+release and handling evidence remain independent requirements.

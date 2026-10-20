@@ -59,6 +59,12 @@ class ProcessTests {
 			temperatureMarginC: 5,
 			pourRateMm3PerSecond: null,
 			maximumAirEscapeWidthMm: null,
+			castability: {
+				maximumAggregateSizeMm: null,
+				minimumPassageAggregateRatio: null,
+				maximumSectionThicknessMm: null,
+				evidence: []
+			},
 			cure: {
 				reference: "test-only resin",
 				resinMassFraction: 0.1,
@@ -197,7 +203,7 @@ class ProcessTests {
 		var s = spec(), encoded = ProcessSpecCodec.encode(s);
 		check(ProcessSpecCodec.encode(ProcessSpecCodec.decode(encoded)) == encoded, "strict process roundtrip");
 		var raw:Dynamic = haxe.Json.parse(encoded);
-		raw.version = 2;
+		raw.version = 1;
 		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported casting process");
 		raw = haxe.Json.parse(encoded);
 		Reflect.setField(raw.spec, "typo", 1);
@@ -306,6 +312,7 @@ class ProcessTests {
 		check(!integrated.fabrication.ready, "analysis cannot clear existing mold blockers");
 		s.recipeFingerprint = haxe.crypto.Sha256.encode("stale");
 		rejects(() -> CastingProcessAnalysis.analyze(p, s, 9.80665), "Stale process recipe");
+		CastabilityTests.run(p, spec());
 		OrientationSectionTests.run(p, spec());
 		Sys.println('ProcessTests: $assertions assertions passed');
 	}

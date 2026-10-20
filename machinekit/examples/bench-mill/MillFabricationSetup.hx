@@ -40,6 +40,12 @@ class MillFabricationSetup {
 			temperatureMarginC: null,
 			pourRateMm3PerSecond: null,
 			maximumAirEscapeWidthMm: null,
+			castability: {
+				maximumAggregateSizeMm: null,
+				minimumPassageAggregateRatio: null,
+				maximumSectionThicknessMm: null,
+				evidence: []
+			},
 			cure: {
 				reference: recipe.resinSpec,
 				resinMassFraction: null,

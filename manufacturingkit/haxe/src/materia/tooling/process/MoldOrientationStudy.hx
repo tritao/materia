@@ -63,6 +63,7 @@ typedef MoldOrientationResult = {
 	var fill:FillReport;
 	var cure:CureReport;
 	var sections:OrthogonalSections.OrthogonalSectionReport;
+	var castability:CastabilityAnalysis.CastabilityReport;
 	var handling:HandlingPlan;
 	var effort:Null<MoldEffortMetrics>;
 	var changeRequests:Array<DesignChangeRequest>;
@@ -233,6 +234,7 @@ class MoldOrientationStudy {
 				fill: fill,
 				cure: cure,
 				sections: sections,
+				castability: CastabilityAnalysis.analyze(d, spec, fill, sections, fingerprint, processFingerprint),
 				handling: CastHandling.plan(d, candidate.options, envelope),
 				effort: null,
 				changeRequests: [],
@@ -250,6 +252,7 @@ class MoldOrientationStudy {
 				result.planningSucceeded = true;
 				result.planFingerprint = CastingMoldCodec.fingerprint(plan);
 				result.changeRequests = plan.changeRequests.copy();
+				result.castability = CastabilityAnalysis.analyze(d, spec, fill, sections, fingerprint, processFingerprint, plan.validation);
 				var fabricated:Null<FabricationPlan> = null;
 				try
 					fabricated = ToolingFabrication.plan(plan, fabrication)
@@ -280,6 +283,9 @@ class MoldOrientationStudy {
 							"Candidate CAD/swept-graph assessment failed: " + Std.string(error), [result.planFingerprint]));
 				}
 			}
+			for (check in result.castability.validation)
+				if (result.validation.filter(v -> v.rule == check.rule).length == 0)
+					result.validation.push(check);
 			result.validation.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 			results.push(result);
 		}
@@ -287,7 +293,7 @@ class MoldOrientationStudy {
 		var best = results[0],
 			preferred = best.planningSucceeded && best.geometryChecked && count(best, ToolingCheckStatus.Fail) == 0 ? best.id : null;
 		return {
-			version: 1,
+			version: 2,
 			sourceFingerprint: source,
 			rankingRule: "planned, CAD-checked, failures, unsupported, source requests, pending, candidate ID",
 			rankedCandidates: results,

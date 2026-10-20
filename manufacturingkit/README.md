@@ -297,7 +297,7 @@ dependency. Coupon fabrication and physical evidence collection require a shop.
 
 `materia.tooling.process.CastingProcessAnalysis.analyze(plan, spec, gravity)`
 extends the real mold validation with `FillReport` and `CureReport`. The strict
-`ProcessSpecCodec` version 1 is independent of existing source/mold/fabrication
+`ProcessSpecCodec` version 2 is independent of existing source/mold/fabrication
 encodings; its required recipe fingerprint rejects stale process inputs. Actual
 material values, evidence, temperatures, pour rate, ceiling escape-width limit,
 thermal boundaries and slab definitions are declared or explicitly unknown.
@@ -350,5 +350,30 @@ hardware stacks and handling mass/flip. Unknown geometry stays unchecked; failed
 planning never receives invented fabrication metrics. The mill example supplies
 three orientations and static checked-order playback scenes.
 
-Broader design rules/proposals, complex junction/3D thermal coverage and column
-orientation/design-study integration are still outstanding in phase 6.
+`CastabilityAnalysis` adds recipe-bound section screening and typed review
+suggestions to the same process report and orientation candidates. Version 2 of
+`CastingProcessSpec` requires `castability`: nullable maximum aggregate size,
+minimum passage/aggregate ratio, maximum section thickness and evidence. Version
+1 is rejected; no thresholds or process properties are silently supplied.
+
+The minimum passage screen compares complete opposing-face spans against the
+aggregate size times the declared ratio. It is a conservative geometry screen,
+not a prediction of mix transport. A widening suggestion names the source faces,
+axis, measured/target separation and a representative material strip in mold mm.
+The maximum-section screen uses exact inscribed thickness only for rectangular
+solids. Complex junctions request supported geometry/thermal coverage; long-axis
+chords are never substituted for junction thickness. A declared section limit
+is an assumption for screening and cannot replace the independent cure gate.
+
+Trapped-air and broad-ceiling findings reuse the exact fill results. Suggested
+vents identify candidate points, not generated tooling penetrations; routing,
+sealing and any required casting revision still need explicit design. Former
+release suggestions retain the real planner's draft validations. EPS breakout
+remains pending until physical access/release trials exist. Suggestions have
+stable IDs, source IDs, an actual blocking rule and a typed action/owner. They
+are separate from accepted `DesignChangeRequest`s and never edit the source or
+clear readiness. The JSON and human-readable review join the hashed mill package.
+
+Remaining phase 6 work includes broader radius/cover/access rules, accepted
+source-parameter proposals and replan demonstrations, complex junction/3D thermal
+coverage, and column orientation/design-study integration.

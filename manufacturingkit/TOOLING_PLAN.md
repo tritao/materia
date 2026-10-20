@@ -136,7 +136,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   Source/reconstructed CAD symmetric difference is zero.
 - [ ] Phase 6: design-stage moldability feedback and casting process analysis.
   Process-analysis foundation implemented: independent strict `CastingProcessSpec`
-  version 1 binds resin/thermal/fill inputs to the exact recipe fingerprint.
+  version 2 binds resin/thermal/fill/screening inputs to the exact recipe fingerprint.
   `FillAnalysis` computes exact orthogonal event-plane connectivity, limiting
   trapped volumes, source-owned ceilings and candidate vent points, ideal
   level/volume/mass/head/time curves and per-core submerged uplift. It uses the
@@ -173,9 +173,19 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   orders and expands grouped fixtures/hardware explicitly. It retains the cured
   casting at withdrawal clearance and shows the service-orientation endpoint;
   pending loose fixings, release and lift/flip qualifications are not cleared.
-  Remaining phase 6 work: complex junction/3D thermal coverage, fast castability
-  rules and concrete source proposals, and column orientation/design-study
-  integration. No phase 6 completion or physical release is claimed.
+  Castability screening now reuses exact fill/ceiling and planner draft records,
+  with typed source-owned review proposals, aggregate-based minimum passage and
+  rectangular-solid maximum section checks. Recipe-bound process spec version 2
+  requires explicit nullable screening limits/evidence and rejects version 1.
+  Widening proposals carry measured/target separations, axes and representative
+  regions; vent proposals retain exact ceiling points and require routing/sealing.
+  Complex junctions request supported thickness/thermal coverage, and EPS breakout
+  stays pending physical access/release trials. The source is never edited and
+  suggestions cannot clear checks. Each orientation includes the same screening;
+  `castability-analysis.json` and `castability-review.md` join the hashed fabrication package.
+  Remaining phase 6 work: broader radius/insert-cover/access rules, accepted
+  source-parameter proposals with replan demonstrations, complex junction/3D
+  thermal coverage, and column orientation/design-study integration. No phase 6 completion or physical release is claimed.
   Process-foundation validation: 492 pure tooling assertions (276 process), 361 native tooling
   assertions (22 independent process/CAD) and 151 full-mill assertions pass.
   Two full generations have byte-identical manifests and all 654 artifact hashes,
@@ -196,6 +206,13 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   visual-only scenes retain pending release/flip states and do not substitute
   viewer collision boxes for the exact saved review. Actual final readiness is
   false: 23 passing, 147 pending and one unsupported junction-thickness rule.
+  Castability screening validation: 571 pure tooling assertions (47 castability),
+  28 independent native process/CAD and 239 full-mill assertions pass. The full
+  package has 23 passing, 155 pending and one unsupported check; the 9 mm minimum
+  opposing-face span cannot be approved against an undeclared aggregate size.
+  The feedback contains 23 review actions: six EPS breakout trials, thirteen
+  rigid-former release reviews, three process-limit declarations and junction
+  analysis. No source change, automatic vent or physical release is claimed.
 - [ ] Phase 7: mill column and independent pedestal example.
 - [ ] Phase 8: physical calibration and release.
 

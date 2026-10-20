@@ -58,6 +58,16 @@ typedef CureSolverSettings = {
 	var maximumIterations:Int;
 }
 
+/** Recipe-bound screening assumptions, not qualified process capacities.
+ * Null limits leave the corresponding rule pending. Evidence records provenance.
+ */
+typedef CastabilityLimits = {
+	var maximumAggregateSizeMm:Null<Float>;
+	var minimumPassageAggregateRatio:Null<Float>;
+	var maximumSectionThicknessMm:Null<Float>;
+	var evidence:Array<String>;
+}
+
 /** Versioned analysis inputs, bound to an exact recipe. Kept separate from the
  * existing source/mold and fabrication formats; never silently upgrades them.
  */
@@ -70,6 +80,7 @@ typedef CastingProcessSpec = {
 	var temperatureMarginC:Null<Float>;
 	var pourRateMm3PerSecond:Null<Float>;
 	var maximumAirEscapeWidthMm:Null<Float>;
+	var castability:CastabilityLimits;
 	var cure:ResinCureSpec;
 	var sections:Array<CureSection>;
 	var solver:CureSolverSettings;

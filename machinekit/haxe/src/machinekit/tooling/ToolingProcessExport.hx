@@ -32,6 +32,27 @@ class ToolingProcessExport {
 		sys.io.File.saveContent(dir + "/casting-process-spec.json", materia.tooling.process.ProcessSpecCodec.encode(report.spec));
 		sys.io.File.saveContent(dir + "/fill-analysis.json", ToolingCodec.canonical(report.fill) + "\n");
 		sys.io.File.saveContent(dir + "/cure-analysis.json", ToolingCodec.canonical(report.cure) + "\n");
+		sys.io.File.saveContent(dir + "/castability-analysis.json", ToolingCodec.canonical(report.castability) + "\n");
+		var text = [
+			"# Casting design feedback",
+			"",
+			"Review suggestions only. Source geometry is unchanged; cure, CAD and physical release checks remain independent.",
+			"",
+			"All dimensions/points are in mold coordinates (mm).",
+			""
+		];
+		for (v in report.castability.validation)
+			text.push("- `" + v.rule + "` (" + v.status + ") [" + v.affectedIds.join(", ") + "]: " + v.message);
+		text.push("\n## Suggested actions\n");
+		for (proposal in report.castability.proposals) {
+			text.push("- `" + proposal.id + "` — " + proposal.action + " (" + proposal.owner + "), sources: " + proposal.sourceIds.join(", ")
+				+ "; blocking rule: `" + proposal.rule + "`. " + proposal.instruction);
+			if (proposal.measuredMm != null || proposal.targetMm != null)
+				text.push("  Measured: " + proposal.measuredMm + " mm; target: " + proposal.targetMm + " mm; axis: " + proposal.axis + ".");
+			if (proposal.point != null)
+				text.push("  Candidate point: " + ToolingCodec.canonical(proposal.point) + ".");
+		}
+		sys.io.File.saveContent(dir + "/castability-review.md", text.join("\n") + "\n");
 		sys.io.File.saveContent(dir + "/section-geometry.json", ToolingCodec.canonical(report.sections) + "\n");
 		sys.io.File.saveContent(dir + "/process-diagnostics.json", ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items) + "\n");
 		return checks;

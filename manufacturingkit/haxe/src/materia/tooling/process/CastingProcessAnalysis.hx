@@ -17,6 +17,7 @@ typedef CastingProcessReport = {
 	var fill:FillReport;
 	var cure:CureReport;
 	var sections:OrthogonalSections.OrthogonalSectionReport;
+	var castability:CastabilityAnalysis.CastabilityReport;
 	var validation:Array<materia.tooling.ToolingValidation>;
 	var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
 }
@@ -63,16 +64,21 @@ class CastingProcessAnalysis {
 			&& v.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass)
 			.length > 0)
 			sectionChecks = sectionChecks.filter(v -> v.rule != "process.sections.junction-thickness");
-		var validation = p.validation.concat(fill.validation).concat(cure.validation).concat(sectionChecks);
+		var castability = CastabilityAnalysis.analyze(p.document, spec, fill, sections, sourceFingerprint, fingerprint, p.validation);
+		var validation = p.validation.concat(cure.validation).concat(sectionChecks);
+		for (check in castability.validation)
+			if (validation.filter(v -> v.rule == check.rule).length == 0)
+				validation.push(check);
 		validation.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		return {
-			version: 1,
+			version: 2,
 			sourceFingerprint: sourceFingerprint,
 			processFingerprint: fingerprint,
 			spec: spec,
 			fill: fill,
 			cure: cure,
 			sections: sections,
+			castability: castability,
 			validation: validation,
 			fabrication: materia.tooling.ToolingValidation.ToolingReadiness.evaluate(validation)
 		};
