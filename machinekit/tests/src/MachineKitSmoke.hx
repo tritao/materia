@@ -2602,6 +2602,7 @@ class MachineKitSmoke {
 			{name: "ScrewdrivingEquipmentTests.run", run: ScrewdrivingEquipmentTests.run, weight: 1.5},
 			{name: "AxisBuilderChecks.run", run: () -> AxisBuilderChecks.run(), weight: 1.0},
 			{name: "AssemblyIntegrityTests.run", run: () -> AssemblyIntegrityTests.run(), weight: 1.0},
+			{name: "SheetRouterChecks.run", run: () -> SheetRouterChecks.run(), weight: 4.0},
 			{name: "GantryChecks.run", run: () -> GantryChecks.run(), weight: 1.0},
 			{name: "RotaryHeadCheck.run", run: () -> RotaryHeadCheck.run(), weight: 1.0},
 			{name: "LinearTrackCheck.run", run: () -> LinearTrackCheck.run(), weight: 1.0},

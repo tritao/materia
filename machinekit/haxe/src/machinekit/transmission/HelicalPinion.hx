@@ -49,7 +49,10 @@ class HelicalPinion extends AssumedCatalogComponent {
     if(detail==Envelope) return Solids.named(Part.cylinder(pitchDiameter()/2+n("normalModule"),n("faceWidth")),"pinion-envelope");
     var sections:Array<cadkit.modeling.Curve> = [];
     try {
-      var outline = profile();
+      // A single tooth has a unique root edge. Lofting the complete periodic
+      // outline lets OCCT re-index equivalent wire starts and alter the helix.
+      var full = profile(), perTooth=Std.int(full.length/parameterCount("teeth"));
+      var outline=full.slice(0,perTooth);
       var count = 5;
       for (i in 0...count) {
         var z = n("faceWidth") * i /(count - 1), a = handSign() * 2 * z * Math.tan(n("helixAngle")) / pitchDiameter();
@@ -62,10 +65,19 @@ class HelicalPinion extends AssumedCatalogComponent {
           true
         ));
       }
-      var body = Part.loft(sections, true);
+      var tooth = Part.loft(sections, true);
       for (section in sections) section.close();
       sections = [];
-      body = Solids.named(body, "helical-teeth");
+      var body=Solids.building([tooth],owned->{
+        var pieces:Array<Part> = [Solids.named(Part.cylinder(rootDiameter()/2,n("faceWidth")),"pinion-core")];owned.push(pieces[0]);
+        for(i in 0...parameterCount("teeth")) {
+          var angle=2*Math.PI*i/parameterCount("teeth");
+          var placed=tooth.placed(new cadkit.modeling.Location(new cadkit.modeling.Plane(new Vector(0,0,0),
+            new Vector(Math.cos(angle),Math.sin(angle),0),new Vector(0,0,1))));
+          placed=Solids.named(placed,"tooth-"+i);pieces.push(placed);owned.push(placed);
+        }
+        return Solids.union(pieces);
+      });
       return n("bore") == 0 ? body : Solids.cut(
         body,
         [Solids.named(

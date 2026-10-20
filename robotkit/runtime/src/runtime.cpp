@@ -129,7 +129,14 @@ int32_t RobotRuntime::update_brake_interlocks(uint64_t owner_ns, internal::Brake
     for (uint32_t i = 0; i < blueprint_.brake_count; ++i) {
         const auto &binding = blueprint_.brakes[i];
         if (servo_enabled && !brake_powered_[i]) {
-            commanded_position_[binding.joint] = sample.position[binding.joint];
+            // A coupled command is one affine state. Rebasing only the braked
+            // shaft destroys its plan anchor when the load has settled through
+            // compliance. The release hold below already uses observed positions.
+            bool coupled = false;
+            for (uint32_t term = 0; term < blueprint_.coupling_count; ++term)
+                coupled = coupled || blueprint_.couplings[term].leader == binding.joint ||
+                    blueprint_.couplings[term].follower == binding.joint;
+            if (!coupled) commanded_position_[binding.joint] = sample.position[binding.joint];
             brake_powered_[i] = true;
         } else if (!servo_enabled) {
             brake_powered_[i] = false;
@@ -2351,7 +2358,10 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         latch_fault();
         return result;
     }
-    if (output.kind == RK_COMMAND_JOINT_TARGETS)
+    // Observed brake-release holds are temporary endpoint commands, not new
+    // trajectory anchors. In particular, a loaded spring may have non-nominal
+    // measured coordinates while its commanded coupling remains consistent.
+    if (output.kind == RK_COMMAND_JOINT_TARGETS && brakes_motion_ready_)
         for (uint32_t index = 0; index < output.target_count; ++index) {
             const auto &target = output.targets[index];
             if (target.mode != RK_TARGET_POSITION && target.mode != RK_TARGET_SERVO)

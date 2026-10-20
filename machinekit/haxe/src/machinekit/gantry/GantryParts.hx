@@ -194,3 +194,19 @@ class GantryMotorSupport extends GantryBoredBracket {
 		mountedMotor = motor; this.shaftFace = shaftFace;
 	}
 }
+
+/** Side tab and front bridge around a column wider than its Z carriage. */
+class GantrySwitchTrigger extends MachineComponent {
+    final width:Float;final depth:Float;final height:Float;
+    final bridgeWidth:Float;final bridgeDepth:Float;final bridgeX:Float;final bridgeY:Float;
+    public function new(width:Float,depth:Float,height:Float,bridgeWidth:Float,bridgeDepth:Float,bridgeX:Float,bridgeY:Float) {
+        super("GANTRY-STEPPED-TRIGGER-"+[width,depth,height,bridgeWidth,bridgeDepth,bridgeX,bridgeY].join("-"),"Gantry stepped Z switch trigger","steel",true);
+        this.width=width;this.depth=depth;this.height=height;this.bridgeWidth=bridgeWidth;this.bridgeDepth=bridgeDepth;this.bridgeX=bridgeX;this.bridgeY=bridgeY;
+        for(value in [width,depth,height,bridgeWidth,bridgeDepth])if(value<=0||!Math.isFinite(value))throw "Invalid stepped switch trigger";
+    }
+    override public function hasGeometry():Bool return true;
+    override public function geometry(detail:ComponentDetail=Preview):Part {
+        var blank=Part.box(bridgeWidth,bridgeDepth,height),bridge=blank.translated(new Vector(bridgeX,bridgeY,0));blank.close();
+        return Solids.union([Part.box(width,depth,height),bridge]);
+    }
+}

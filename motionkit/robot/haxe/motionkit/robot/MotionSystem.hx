@@ -154,7 +154,7 @@ class MotionSystem {
           physical.overtravel, axis.jointOffset(0) + axis.jointScale(0) * axis.homePosition,
           fixedTimestepSeconds, new HomingDynamics(physical.maxAcceleration,
             physical.maxAcceleration / fixedTimestepSeconds, response, fixedTimestepSeconds),
-          homes.length > 1 && racking > 0 ? racking : null));
+          homes.length > 1 && racking > 0 ? racking : null,blueprint.homingCaptureSpeedLimits.get(axis.id)));
       }
     }
     for (contact in blueprint.runtime.switches) if (contact.role == "home") {

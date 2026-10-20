@@ -13,6 +13,7 @@ import machinekit.gantry.GantryParts.GantryBeltClamp;
 import machinekit.gantry.GantryParts.GantryNutMount;
 import machinekit.gantry.GantryParts.GantryMotorSupport;
 import machinekit.gantry.GantryParts.GantryBoredBracket;
+import machinekit.gantry.GantryParts.GantrySwitchTrigger;
 import machinekit.component.MachineComponent;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
@@ -61,10 +62,12 @@ class Gantry extends AxisBuilder {
 		var frame = spec.frameSection();
 		var beam = spec.frameSection(true);
 		var guide = LinearRailBlock.metric(spec.railProfile).spec;
+        var guideY=spec.railProfileY==spec.railProfile?guide:LinearRailBlock.metric(spec.railProfileY).spec;
+        if(spec.yBlockSpacing>0&&spec.yBlockSpacing<guideY.blockLength+3)throw "Y guide blocks need physical separation";
 		var flange = new RobotFlange(50);
 		// The flange's rear rim must clear the column's projecting rail by 3 mm.
 		var toolReach = Math.max(spec.toolReach, Math.max(flange.flangeDiameter / 2, headRadius) + 3 - (guide.blockHeight - guide.railHeight + 4));
-		railMargin = Math.max(Math.max(80, Math.max(frame.size / 2 + 66, 89)), guide.railEndMargin + guide.blockLength / 2 + 20);
+		railMargin = Math.max(Math.max(Math.max(80, Math.max(frame.size / 2 + 66, 89)), guide.railEndMargin + guide.blockLength / 2 + 20), guideY.railEndMargin + guideY.blockLength / 2 + spec.yBlockSpacing / 2 + 20);
 		var guideOvertravel = railMargin - guide.railEndMargin - guide.blockLength / 2;
 		var zDriveX = 40 + Math.max((AxisMotor.of(spec.motorPart("z")).face + 12) / 2, 30) + 12 + 3;
 		var sideRoom = Math.max(Math.max(railMargin, headRadius + frame.size / 2 + 3), zDriveX + Math.max((AxisMotor.of(spec.motorPart("z")).face + 12) / 2, 30) + frame.size / 2 + 3);
@@ -95,25 +98,33 @@ class Gantry extends AxisBuilder {
 					AxisBuilder.orient(x, end == 0 ? front : back, 0, [0.0, 1, 0], up), "frameFront");
 			}
 		}
-		var railYTop = frameZ + frame.height / 2 + guide.railHeight;
+		var railYTop = frameZ + frame.height / 2 + spec.railPadHeight + guideY.railHeight;
 		for (side in [-1, 1]) {
 			var name = side < 0 ? "Left" : "Right", x = side < 0 ? left : right;
-			attach('railY$name', LinearRail.metric(spec.railProfile, spec.travelY + 2 * railMargin),
+			if(spec.railPadHeight>0) {
+                var pad=new GantryPlate("rail pad",frame.size,spec.travelY+2*railMargin,spec.railPadHeight);pad.setMaterial("steel");
+                attach('railPadY$name',pad,AssemblyFrames.translation(x,spec.travelY/2,frameZ+frame.height/2),'frame$name');
+            }
+            attach('railY$name', LinearRail.metric(spec.railProfileY, spec.travelY + 2 * railMargin),
 				AxisBuilder.orient(x, -railMargin, railYTop, up, alongY), 'frame$name');
 		}
 		// One translational leader; the opposite guide is rigidly held by the beam.
-		slide(axes[1], "railYLeft", "blockYLeft", LinearRailBlock.metric(spec.railProfile),
-			AxisBuilder.orient(left, 0, railYTop, up, alongY), {x: 0.0, y: 1.0, z: 0.0});
-		var feetZ = railYTop + guide.blockHeight - guide.railHeight;
-		attach("beamFootLeft", new GantryPlate("beam foot", spec.driveFootprint("y",60), spec.driveFootprint("y",60), 12),
+		slide(axes[1], "railYLeft", "blockYLeft", LinearRailBlock.metric(spec.railProfileY),
+			AxisBuilder.orient(left, spec.yBlockSpacing==0?0:-spec.yBlockSpacing/2, railYTop, up, alongY), {x: 0.0, y: 1.0, z: 0.0},
+            spec.yBlockSpacing==0?null:[AxisBuilder.orient(left,spec.yBlockSpacing/2,railYTop,up,alongY)]);
+		var feetZ = railYTop + guideY.blockHeight - guideY.railHeight;
+        var footDepth=spec.yBlockSpacing==0?spec.driveFootprint("y",60):Math.max(spec.driveFootprint("y",60),spec.yBlockSpacing+guideY.blockLength);
+		attach("beamFootLeft", new GantryPlate("beam foot", spec.driveFootprint("y",60), footDepth, 12),
 			AssemblyFrames.translation(left, 0, feetZ), "blockYLeft");
 		var beamZ = feetZ + 12 + beam.height / 2;
 		attach("beam", beam.member(right - left + 2 * endAllowance),
 			AxisBuilder.orient(left - endAllowance, 0, beamZ, up, alongX), "beamFootLeft");
-		attach("beamFootRight", new GantryPlate("beam foot", spec.driveFootprint("y",60), spec.driveFootprint("y",60), 12),
+		attach("beamFootRight", new GantryPlate("beam foot", spec.driveFootprint("y",60), footDepth, 12),
 			AssemblyFrames.translation(right, 0, feetZ), "beam");
-		attach("blockYRight", LinearRailBlock.metric(spec.railProfile),
-			AxisBuilder.orient(right, 0, railYTop, up, alongY), "beamFootRight");
+		attach("blockYRight", LinearRailBlock.metric(spec.railProfileY),
+			AxisBuilder.orient(right, spec.yBlockSpacing==0?0:-spec.yBlockSpacing/2, railYTop, up, alongY), "beamFootRight");
+        if(spec.yBlockSpacing>0)for(side in ["Left","Right"])attach('blockY${side}Rear',LinearRailBlock.metric(spec.railProfileY),
+            AxisBuilder.orient(side=="Left"?left:right,spec.yBlockSpacing/2,railYTop,up,alongY),'beamFoot$side');
 		var railXTop = beamZ + beam.height / 2 + guide.railHeight;
 		attach("railX", LinearRail.metric(spec.railProfile, spec.travelX + 2 * railMargin),
 			AxisBuilder.orient(-railMargin, 0, railXTop, up, alongX), "beam");
@@ -198,7 +209,8 @@ class Gantry extends AxisBuilder {
         for(axis in ["y","x"]) {
             var travel=axis=="y"?spec.travelY:spec.travelX,carrier=axis=="y"?"beam":"xCarriage",fixed=axis=="y"?"frameLeft":"beam";
             var start=zeroPose(carrier),r=spec.cableChain.n("bendRadius"),direction=axisDirection(axis);
-            var origin=[start.x+direction[0]*travel/2,start.y+direction[1]*travel/2,start.z-2*r];
+            var offset=axis=="x"?spec.cableChainOffsetX:spec.cableChainOffsetY;
+            var origin=[start.x+offset.x+direction[0]*travel/2,start.y+offset.y+direction[1]*travel/2,start.z+offset.z-2*r];
             var pose=AxisBuilder.orient(origin[0],origin[1],origin[2],direction,[0.0,0,1]);
             var member="cableChain"+axis.toUpperCase(),values=spec.cableChain.values().setNumber("travel",travel);
             var chain=new machinekit.motion.CableChain(values);
@@ -231,13 +243,23 @@ class Gantry extends AxisBuilder {
 		var point = [for (i in 0...3) (bounds.min[i] + bounds.max[i]) / 2];
 		point[outboardAxis] = (sign < 0 ? bounds.min[outboardAxis] : bounds.max[outboardAxis]) + sign * 18;
 		var dimensions = [10.0, 10.0, 6.0];
+        var customTrigger:Null<MachineComponent> = null;
 		dimensions[outboardAxis] = 40;
 		for (i in 0...3) if (Math.abs(direction[i]) > 0.5)
 			dimensions[i] = bounds.max[i] - bounds.min[i] + 6;
+        if(suffix=="X" && switch spec.motorZ {case Stepper(_):false; case _:true;}) {
+            // Keep the sensor's descending leg ahead of a wide Z motor.
+            var motor=mountBounds(component("motorZ"),zeroPose("motorZ"));
+            if(motor.min[1]<bounds.min[1]) {
+                point[1]=Math.min(point[1],motor.min[1]-18);
+                dimensions[1]=2*(bounds.min[1]-point[1]+3);
+            }
+        }
 		if (StringTools.startsWith(suffix, "Y")) {
 			point[outboardAxis] = (sign < 0 ? bounds.min[outboardAxis] : bounds.max[outboardAxis]) + sign * 7;
 			dimensions[outboardAxis] = 20;
 			point[2] = bounds.min[2] + 2;
+            if(bounds.max[0]-bounds.min[0]>70)point[outboardAxis]=(sign<0?bounds.max[outboardAxis]:bounds.min[outboardAxis])-sign*7;
 		}
 		// Z workpieces rise in front of the column. Keep the fixed switches
 		// alongside it; the outboard trigger stays clear of the rear beam.
@@ -256,9 +278,16 @@ class Gantry extends AxisBuilder {
 			// 3 mm short of the beam and its feet, throughout the Z stroke.
 			point[1] = Math.min(column.max[1] - 10, (rearLimit + bounds.max[1] - 6) / 2);
 			dimensions[1] = 2 * (point[1] - bounds.max[1] + 3);
+            if(column.min[0]<bounds.min[0]-3) {
+                point[0]=column.min[0]-13;dimensions[0]=20;
+                var bridgeWidth=bounds.min[0]+3-(point[0]-dimensions[0]/2);
+                var bridgeDepth=column.min[1]-bounds.max[1];
+                customTrigger=new GantrySwitchTrigger(dimensions[0],dimensions[1],dimensions[2],bridgeWidth,bridgeDepth,
+                    (bridgeWidth-dimensions[0])/2,(bounds.max[1]-3+column.min[1]-3)/2-point[1]);
+            }
 		}
 
-		var target = new GantryPlate("switch trigger", dimensions[0], dimensions[1], dimensions[2]);
+		var target:MachineComponent = customTrigger==null?new GantryPlate("switch trigger", dimensions[0], dimensions[1], dimensions[2]):customTrigger;
 		target.setMaterial("steel");
 		var trigger = "switchTrigger" + suffix;
 		attach(trigger, target, AssemblyFrames.translation(point[0], point[1], point[2] - dimensions[2] / 2), moving);

@@ -34,6 +34,14 @@ class HomingTests {
       "Search speed accounts for latency, acceleration and jerk before the end stop");
     check(axis.capturedApproachSpeed > axis.latchSpeed,
       "Captured edges permit a faster approach than sampled positions");
+    var capped = new HomingAxis("z",0,[contact],1.0,2.0,0.0,0.5,0.01,0.0,0.02,null,null,0.0001);
+    check(capped.capturedApproachSpeed==0.0001 && capped.seekSpeed==axis.seekSpeed && capped.positionTolerance==axis.positionTolerance,
+      "Commissioned capture cap slows only the final pass and retains physical precision");
+    for(limit in [0.0,-1.0,Math.NaN,Math.POSITIVE_INFINITY]) {
+      var rejected=false;
+      try new HomingAxis("z",0,[contact],1.0,2.0,0.0,0.5,0.01,0.0,0.02,null,null,limit) catch(_:Dynamic)rejected=true;
+      check(rejected,"Invalid homing capture caps are rejected");
+    }
     var slow = new motionkit.robot.HomingDynamics(2.0, 20.0, 0.1, 0.02);
     check(slow.speedForRoom(0.001, 1.0) < axis.dynamics.speedForRoom(0.001, 1.0),
       "A longer response and tighter jerk limit reduce safe switch approach speed");

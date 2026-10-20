@@ -79,7 +79,7 @@ class ExampleBrowser {
   public static function categoryOf(id:String):String return switch id {
     case "robot-welder", "robot-welder-seam", "robot-welder-post", "robot-welder-weave", "robot-welder-multipass",
       "mobile-robot-welder", "mobile-welding-mission", "gantry-welder", "track-welder": "Welding";
-    case "mill", "bench-mill", "enclosed-bench-mill", "cnc-router", "press-brake": "Machining";
+    case "mill", "bench-mill", "enclosed-bench-mill", "cnc-router", "sheet-router", "press-brake": "Machining";
     case "printer": "3D printing";
     case "motor-shaft-bearings", "cad-modeling": "CAD & design";
     case "two-robot", "worker-rack-to-table", "worker-gallery": "People & simulation";

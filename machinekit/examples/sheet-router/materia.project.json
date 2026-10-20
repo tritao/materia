@@ -1,0 +1,28 @@
+{
+  "format": "materia.project",
+  "version": 1,
+  "name": "Full-sheet CNC router",
+  "defaultEntrypoint": "router",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
+  "entrypoints": {
+    "router": {
+      "kind": "cad-preview",
+      "module": "SheetRouterPreview",
+      "function": "router",
+      "cache": {
+        "inputs": []
+      }
+    },
+    "long-router": {
+      "kind": "cad-preview",
+      "module": "SheetRouterPreview",
+      "function": "longRouter",
+      "cache": {
+        "inputs": []
+      }
+    }
+  }
+}

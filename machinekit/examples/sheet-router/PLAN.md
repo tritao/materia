@@ -914,7 +914,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR0 | started: reference survey recorded; gate blocked by disk headroom and toolchain setup; workshop facts pending | see SR0 notes |
 | SR1 | done: 25 assumed part recipes, HGR20/25 rows; focused gate 292 assertions | this commit |
 | SR2 | done: shared servo/reducer/steel builders; 59 focused assertions, existing gantry/router checks, 292 catalogue assertions | this commit |
-| SR3 | planned | |
+| SR3 | complete: both beds, project load/hold/homing and focused regressions pass | see SR3 notes |
 | SR4 | planned | |
 | SR5 | planned | |
 | SR6 | planned | |
@@ -1133,3 +1133,129 @@ SR2 closing evidence: existing `GantryChecks` and `CncRouterChecks` passed (exit
 and the SR1 catalogue gate passed all **292 assertions** again (exit 0). Both ran
 through heavy-run against the final SR2 sources and existing native libraries.
 Root free space at closing was 3.6 GiB.
+
+## SR3 — full-sheet reference assembly
+
+`SheetRouterSpec` keeps a 1600 mm X work area and a parameterised Y work length
+(2600 or 3150 mm in the checks). The rear rack zone adds 300 mm, giving 2900 or
+3450 mm Y travel; Z travel remains 250 mm. This replaces the preliminary
+approximately 2800 mm Y estimate. The 300 mm zone keeps a fork's approach beyond
+an entire full-length sheet rather than cutting across its last edge.
+
+The assembly extends the shared Gantry with a welded lower base, six levelling
+feet and nominal M20 leg caps, table crossmembers, a rack crossmember, a vacuum
+bed and 25 mm spoilboard. Y uses HGR25 rails, two blocks per side at 140 mm
+spacing and separate 12 mm steel replication pads; X/Z use HGR20. The steel beam
+is RHS 200 x 100 x 6.3. The 400 W X, dual 750 W Y and braked 400 W Z selections
+use the SR2 motor/reducer capabilities. Z has the 16 x 5 ball screw and its fixed
+bearing. Stock profiles, purchased dimensions, thread envelopes and loads remain
+assumptions; this assembly is not fabrication approval.
+
+A saddle with the flange's actual mounting cutout carries the ISO30 spindle,
+release cylinder, ER32 holder/collet and a 120 mm gauge-to-tip tool envelope.
+The eight fork centres are X = 415 through 1185 mm at 110 mm pitch. Pickup is at
+Y = work length + 140 mm, Z = 222 mm; the open-fork approach starts at Y = work
+length + 40 mm. The forks sit ahead of the rack base on risers. The setter has
+its own pedestal. The shoe and rearward-retracting cover have separate cylinder,
+rod, bracket and valve members, a shared air manifold, and assumed 0.25 mm reed
+windows. Their initial states are shoe raised and cover open. The hose neck is
+offset so the raised shoe clears the spindle body. The cover uses a 600 mm rearward
+storage stroke to clear the Z screw over the rear work edge.
+
+The vacuum bed has six separately listed valves and a common header/blower.
+The cabinet's process I/O counts come from the actual assumed catalogue owners;
+VFD, braking resistor, breaker, contactor, safety relay and emergency-stop parts
+are in the BOM. The VFD drives the spindle port and its resistor is connected.
+Unfinished service/safety connections are exposed explicitly. SR17 still owns
+the complete electrical architecture, axis I/O allocation, wiring and safety
+validation; presence of these parts does not implement a safety circuit.
+
+The project manifest has standard and 3150 mm preview entrypoints and a separate
+Start-page machining family. `SheetRouterChecks` is registered in MachineKit
+smoke; its focused gate can be run without another native build:
+
+```sh
+/home/joao/dev/materia-cache/tools/heavy-run --mem 10G --need 2G --label sr3-router -- \
+  machinekit/scripts/test-sheet-router --clearance
+```
+
+`--layout-only` runs the FK/reach and chain-shape checks before expensive scene
+export. The full check validates a physical robot model, BOM and mass for both
+bed lengths. Collision samples cover work-area corners, mid-travel poses, and
+each fork's entry, midpoint and seated poses. The rear rack contains fixtures:
+arbitrary low-Z moves through that zone are not a permitted cutting envelope.
+SR6 owns the tool-change motion interlocks; a full unrestricted XYZ box is not
+claimed clear of its own rack.
+
+Full-length helical rack geometry is made from repeated, square-ended whole-pitch
+pieces (at most 80 teeth per B-rep wire), retaining tooth phase and material
+volume. A focused check compares 80- and 81-tooth volumes. The sheet-router scene
+limits automatic geometric mating descriptors to parts with at most 256 faces;
+all meshes, mass/inertia and explicit mounting/axis connectors are still exported.
+This avoids measuring thousands of groove/tooth faces during project loading.
+Other examples retain the default unlimited descriptor export. Optional
+`MACHINEKIT_PREVIEW_TRACE=1` reports the component being exported.
+
+X/Y chain routing has endpoint and posed-solid checks over the complete declared
+travel, including the rack zone. The published scene carries the initial chain
+shape; interactive flexible-chain rendering is still a presentation limitation.
+The pose helpers retain the moving end and constant-radius routing for later
+runtime visual updates. Full cutting/ATC programs and sheet stock simulation
+belong to the following steps.
+
+
+SR3 also corrects the helical pinion solid: lofting the complete periodic outline
+allowed OCCT to change tooth correspondence between sections. Lofting one tooth
+and repeating that solid retains the intended helix. Eleven positions over one
+rack pitch have zero intersecting volume (`sr3-mesh2.log`). Clearance checks pose
+the chain geometry at each sampled axis coordinate and reuse only congruent
+relative-pose checks; rack mesh reuse also requires matching tooth/pitch phase.
+Chain supports have apertures at the moving end and clear the full return bend.
+
+The loaded braked Z exposed a native startup bug: temporary measured brake-release
+holds overwrote the affine commanded coupling state. The runtime now preserves
+coupled command anchors while still sending measured holds to the endpoint.
+The new compliant-coupling brake regression fails against the original library
+and passes with the fix. Existing scalar brake, runtime validation and full runtime
+unit checks also pass. Only the existing runtime object/library was rebuilt;
+no new native build tree was created. The Haxe planner and strict native coupling
+validation are unchanged. Native test logs are `sr3-brake-baseline.log`,
+`sr3-native-brake2.log`, `sr3-native-tests.log` and `sr3-runtime-unit.log` under
+`build/sheet-router-sr0/`. The unoptimised runtime test executable needs a 64 MiB
+stack because its large fixture locals exceed the default stack with helper calls.
+
+
+The final two-bed CAD/physical gate passed **426 assertions**, including 59
+interference samples per length (27 work poses and 32 fork-path poses). Both
+physical models validate. Assumed assembly mass is **1694.879 kg** at Y=2600 and
+**1847.572 kg** at Y=3150; each BOM has **103 lines**. See
+`build/sheet-router-sr0/sr3-clearance6.log` (exit 0). Cutting paths and open-cover,
+raised-shoe fork paths are sampled; arbitrary low moves through rear fixtures
+and closed-cover/tool-change motion are not declared collision-free.
+
+
+SR3 adds an optional `MotionSystemBlueprint.homingCaptureSpeedLimits` policy.
+Timestamped capture avoids sampling uncertainty but does not remove compliant
+load deflection during a fast squaring pass. The router app check authors a
+conservative Y final-pass cap of 0.05 mm/s; seek speed, switch repeatability,
+home datum, and return tolerance stay unchanged. The cap is a simulation
+commissioning assumption pending SR4 dynamics and hardware commissioning.
+`HomingTests` checks cap isolation and invalid values; the focused suite passes
+(`sr3-homing-policy.log`). The existing desktop-router RKD6 device-homing case
+also passes with default policy (`sr3-old-home.log`).
+
+Closing catalogue regression: **292 assertions** pass in
+`sr3-regression-final.log`. Closing shared-builder regression: **59 assertions**
+pass, including all five exact legacy signatures, in `sr3-axes-final.log`.
+The X sensor extension is confined to servo Z selections; stepper examples retain
+their previous geometry. `StartPageTests` passes in `sr3-start-page.log`.
+
+
+Closing app evidence: `ProjectSourceTests` case `sheet-router` passes source
+project load, physical model validation, loaded MuJoCo pose hold, affine brake
+command anchors and complete Z/X/Y homing with all three leaders referenced
+(`build/sheet-router-sr0/sr3-app7.log`, exit 0). Final Y capture uses the declared
+0.05 mm/s cap and the existing 20 micrometre return tolerance; no tolerance was
+relaxed. Root free space is approximately 2.0 GiB. SR3 is complete under these
+reference assumptions; SR4 drive sizing/compliance is next. The full SR0 baseline,
+hardware dimensions/ratings and electrical/safety acceptance remain open.

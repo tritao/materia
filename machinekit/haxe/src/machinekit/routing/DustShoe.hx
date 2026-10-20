@@ -16,17 +16,19 @@ class DustShoe extends AssumedCatalogComponent {
     P.length("height", 30),
     P.length("brushLength", 60),
     P.length("hoseDiameter", 100),
+    P.length("hoseOffset", 130),
     P.length("liftStroke", 120),
     P.length("liftBore", 25)
   ];
   public function new(?v:ComponentValues) {
     super("dust-shoe", "lifting dust shoe", "aluminium 6061", inputs(), v);
-    positive(["diameter", "spindleClearance", "height", "brushLength", "hoseDiameter", "liftStroke", "liftBore"]);
+    positive(["diameter", "spindleClearance", "height", "brushLength", "hoseDiameter", "hoseOffset", "liftStroke", "liftBore"]);
     require(n("hoseDiameter") > 6, "hose wall consumes bore");
     require(n("spindleClearance") < n("diameter"), "spindle opening exceeds shoe");
     addConnector("mount", Mount, Solids.axial(0, 0, n("height")));
-    addConnector("hose", Mount, Solids.axial(n("diameter") / 2, 0, n("height") + 40));
+    addConnector("hose", Mount, Solids.axial(n("hoseOffset"), 0, n("height") + 40));
     addConnector("lift", Axis, Solids.axial(0, 0, n("height")));
+    require(n("hoseOffset")-n("hoseDiameter")/2>=n("spindleClearance")/2+3 && n("hoseOffset")<n("diameter")/2+n("hoseDiameter")/2, "hose must clear spindle and overlap shoe ring");
     liftCylinder();
     addPort({name: "lift_air", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true}
     );
@@ -61,7 +63,7 @@ class DustShoe extends AssumedCatalogComponent {
           n("hoseDiameter") / 2,
           n("height") / 2,
           n("height") + 40,
-          n("diameter") / 2
+          n("hoseOffset")
         ),
         "hose-neck"
       ),
@@ -70,7 +72,7 @@ class DustShoe extends AssumedCatalogComponent {
           n("hoseDiameter") / 2 - 3,
           n("height") / 2 - 1,
           n("height") + 41,
-          n("diameter") / 2
+          n("hoseOffset")
         ),
         "hose-bore"
       )]

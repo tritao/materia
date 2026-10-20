@@ -43,6 +43,22 @@ class HelicalRack extends AssumedCatalogComponent {
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part {
+    // Bound OCCT wire validation cost at full-sheet lengths. Whole-pitch pieces
+    // meet on square faces with identical tooth phase; their volumes do not overlap.
+    var total=parameterCount("teeth");
+    if(total>80)return Solids.building([],parts->{
+      var prototype=new HelicalRack(values().setInteger("teeth",80)).geometry(detail);parts.push(prototype);
+      var copies:Array<Part> =[];
+      var offset=0;
+      while(offset<total) {
+        var count=Std.int(Math.min(80,total-offset));
+        var piece=count==80?prototype:new HelicalRack(values().setInteger("teeth",count)).geometry(detail);
+        if(piece!=prototype)parts.push(piece);
+        var placed=piece.translated(new Vector(0,0,offset*Math.PI*transverseModule()));parts.push(placed);copies.push(placed);
+        offset+=count;
+      }
+      return new Part(cadkit.Shape.compound([for(part in copies)part.shape]));
+    });
     // Skew a transverse rack profile, then trim ends square for whole-pitch joints.
     var p = Math.PI * transverseModule(), add = n("normalModule"),
       ded = 1.25 * add, bottom = -ded - n("barHeight"), slope = Math.tan(transversePressureAngle());

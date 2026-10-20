@@ -24,6 +24,9 @@ enum GantryStructure {
     Steel(frame:machinekit.structural.RectTube,beam:machinekit.structural.RectTube);
 }
 typedef GantryOptions = {
+    @:optional var railProfileY:String;
+    @:optional var yBlockSpacing:Null<Float>;
+    @:optional var railPadHeight:Null<Float>;
     @:optional var motor:GantryMotor;
     @:optional var motorX:GantryMotor;
     @:optional var motorY:GantryMotor;
@@ -35,6 +38,8 @@ typedef GantryOptions = {
     @:optional var preload:machinekit.transmission.PreloadedPinionMount;
     @:optional var structure:GantryStructure;
     @:optional var cableChain:machinekit.motion.CableChain;
+    @:optional var cableChainOffsetX:materia.assembly.AssemblyDefinition.AssemblyVector;
+    @:optional var cableChainOffsetY:materia.assembly.AssemblyDefinition.AssemblyVector;
     @:optional var supplyCurrent:Null<machinekit.power.DcCurrent>;
 }
 
@@ -56,6 +61,9 @@ class GantrySpec {
 	public final dualY:Bool;
 	public final railProfile:String;
 	public final motorFrame:Int;
+    public final railProfileY:String;
+    public final yBlockSpacing:Float;
+    public final railPadHeight:Float;
     public final motor:GantryMotor;
     public final motorX:GantryMotor;
     public final motorY:GantryMotor;
@@ -67,6 +75,8 @@ class GantrySpec {
     public final preload:Null<machinekit.transmission.PreloadedPinionMount>;
     public final structure:GantryStructure;
     public final cableChain:Null<machinekit.motion.CableChain>;
+    public final cableChainOffsetX:materia.assembly.AssemblyDefinition.AssemblyVector;
+    public final cableChainOffsetY:materia.assembly.AssemblyDefinition.AssemblyVector;
     public final supplyCurrent:Null<machinekit.power.DcCurrent>;
 	public final frameProfile:String;
 	public final beamProfile:String;
@@ -101,6 +111,10 @@ class GantrySpec {
 		if (!Math.isFinite(sideExtension) || sideExtension < 0) throw "Gantry side extension must be finite and non-negative";
 		if (!Math.isFinite(frameLift) || frameLift < 0) throw "Gantry frame lift must be finite and non-negative";
         var selected:GantryOptions=options==null?{motor:null}:options;
+        railProfileY=selected.railProfileY==null?railProfile:selected.railProfileY;
+        yBlockSpacing=selected.yBlockSpacing==null?0:selected.yBlockSpacing;
+        railPadHeight=selected.railPadHeight==null?0:selected.railPadHeight;
+        if(!Math.isFinite(yBlockSpacing)||yBlockSpacing<0||!Math.isFinite(railPadHeight)||railPadHeight<0)throw "Invalid Y guide mounting dimensions";
         motor=selected.motor==null?Stepper(motorFrame):selected.motor;
         motorX=selected.motorX==null?motor:selected.motorX;
         motorY=selected.motorY==null?motor:selected.motorY;
@@ -109,6 +123,10 @@ class GantrySpec {
         reducerY=selected.reducerY==null?reducer:selected.reducerY;reducerZ=selected.reducerZ;preload=selected.preload;
         structure=selected.structure==null?Aluminium:selected.structure;
         cableChain=selected.cableChain;supplyCurrent=selected.supplyCurrent;
+        cableChainOffsetX=selected.cableChainOffsetX==null?{x:0.0,y:0.0,z:0.0}:selected.cableChainOffsetX;
+        cableChainOffsetY=selected.cableChainOffsetY==null?{x:0.0,y:0.0,z:0.0}:selected.cableChainOffsetY;
+        for(offset in [cableChainOffsetX,cableChainOffsetY])for(value in [offset.x,offset.y,offset.z])
+            if(!Math.isFinite(value))throw "Cable-chain mounting offsets must be finite";
         if(supplyVoltage==null && (!isStepper(motorX)||!isStepper(motorY)||!isStepper(motorZ)))throw "Servo gantries need an explicit DC bus voltage";
 		this.travelX = travelX; this.travelY = travelY; this.travelZ = travelZ;
 		this.driveX = driveX == null ? Belt(TimingBeltProfile.GT2, 20, 9) : driveX;
@@ -129,7 +147,7 @@ class GantrySpec {
         for(axis in ["x","y","z"])validateReduction(axis);
 		assumedFields = ["travelX", "travelY", "travelZ", "driveX", "driveY", "driveZ", "dualY",
 			"railProfile", "motorFrame", "frameProfile", "beamProfile", "tableMounted", "head",
-			"racking", "supplyVoltage", "microsteps", "frontExtension", "sideExtension", "frameLift", "toolReach", "motor", "motorX", "motorY", "motorZ", "reducer", "reducerX", "reducerY", "reducerZ", "preload", "structure", "cableChain", "supplyCurrent"];
+			"racking", "supplyVoltage", "microsteps", "frontExtension", "sideExtension", "frameLift", "toolReach", "railProfileY", "yBlockSpacing", "railPadHeight", "motor", "motorX", "motorY", "motorZ", "reducer", "reducerX", "reducerY", "reducerZ", "preload", "structure", "cableChain", "cableChainOffsetX", "cableChainOffsetY", "supplyCurrent"];
 	}
     function validateReduction(axis:String):Void {
         if(reducerFor(axis)==null)return;

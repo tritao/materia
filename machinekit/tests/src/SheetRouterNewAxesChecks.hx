@@ -34,7 +34,7 @@ class SheetRouterNewAxesChecks {
         check(Std.isOfType(gantry.component('frameFront'),RectTubeMember),'steel frame uses steel tube members');
         check(gantry.component('beam').materialSpec()=='steel','steel beam material');
         check(gantry.component('motorZ').motorBrakeSpec()!=null,'Z brake remains a typed physical capability');
-        var scene=machinekit.assembly.AssemblyPreview.scene(gantry,'sr2-servo-gantry');
+        var scene=machinekit.assembly.AssemblyPreview.scene(gantry,'sr2-servo-gantry',256);
         var definition=scene.assemblyDefinition;
         if(definition==null)throw 'No compiled assembly';
         var motors=definition.actuators,couplings=definition.couplings;

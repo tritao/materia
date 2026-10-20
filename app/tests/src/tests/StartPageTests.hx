@@ -55,7 +55,8 @@ class StartPageTests {
     check(browser.filtered(all).length == 0, "search and category compose");
     browser.search("");
     var machining = browser.filtered(all);
-    check(machining.length == 4, "mill, bench mills, router and press brake form separate machining families");
+    check(machining.length == 5, "mill, bench mills, desktop router, sheet router and press brake form separate machining families");
+    check([for (family in machining) if (family.id == "sheet-router") family].length == 1, "sheet router is directly accessible");
     var mills = [for (family in machining) if (family.id == "bench-mills") family];
     check(mills.length == 1 && mills[0].examples.length == 2 &&
       mills[0].examples[0].id == "bench-mill" && mills[0].examples[1].id == "enclosed-bench-mill",
