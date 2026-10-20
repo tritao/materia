@@ -1,0 +1,396 @@
+{
+ "kit": "haxeon-editor",
+ "packages": [
+  {
+   "name": "haxeon.editor",
+   "types": [
+    {
+     "name": "CodepointOffset",
+     "kind": "abstract",
+     "file": "haxeon/packages/editor/src/haxeon/editor/CodepointOffset.hx",
+     "underlying": "Int",
+     "doc": "An offset between Unicode scalar values in a NativeKit document.\n\nThis is the coordinate system used by Skribidi and the editor transaction\nprotocol. It is deliberately distinct from UTF-8 bytes and UTF-16 units."
+    },
+    {
+     "name": "GraphemePosition",
+     "kind": "abstract",
+     "file": "haxeon/packages/editor/src/haxeon/editor/GraphemePosition.hx",
+     "underlying": "Int",
+     "doc": "A code-point offset that has been aligned to a user-perceived grapheme\nboundary. Grapheme positions use document coordinates, not cluster ordinals."
+    },
+    {
+     "name": "TextDocument",
+     "kind": "class",
+     "file": "haxeon/packages/editor/src/haxeon/editor/TextDocument.hx",
+     "doc": "Editable UTF-8 text with code-point, UTF-16, and paragraph indexes per segment.",
+     "fields": [
+      {
+       "name": "revision",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Incremented after each non-no-op replacement."
+      },
+      {
+       "name": "codepointCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "utf8ByteLength",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "utf16Length",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "text",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(value:String):Void"
+      },
+      {
+       "name": "replace",
+       "kind": "method",
+       "signature": "(start:Int, end:Int, replacement:String):Bool"
+      },
+      {
+       "name": "sliceCodepoints",
+       "kind": "method",
+       "signature": "(start:Int, end:Int):String"
+      },
+      {
+       "name": "utf8OffsetForCodepoint",
+       "kind": "method",
+       "signature": "(position:Int):Int"
+      },
+      {
+       "name": "utf16OffsetForCodepoint",
+       "kind": "method",
+       "signature": "(position:Int):Int"
+      },
+      {
+       "name": "codepointOffsetForUtf8",
+       "kind": "method",
+       "signature": "(position:Int):Int"
+      },
+      {
+       "name": "codepointOffsetForUtf16",
+       "kind": "method",
+       "signature": "(position:Int):Int"
+      },
+      {
+       "name": "paragraphCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "paragraphIndexAtOffset",
+       "kind": "method",
+       "signature": "(position:Int):Int"
+      },
+      {
+       "name": "paragraphRangeAtIndex",
+       "kind": "method",
+       "signature": "(number:Int):TextRange"
+      }
+     ]
+    },
+    {
+     "name": "TextOffsetMap",
+     "kind": "class",
+     "file": "haxeon/packages/editor/src/haxeon/editor/TextOffsetMap.hx",
+     "doc": "Cached coordinate conversions for one bounded UTF-8 segment. All conversion\nmethods use the coordinate name in their API so a\nbyte offset cannot be accidentally passed as a UTF-16 or code-point offset.\n\nThe generated grapheme boundaries cover the common Unicode rules needed by\neditor movement (combining marks, emoji modifiers, ZWJ sequences, regional\nindicator flags, Hangul, and Indic viramas). A shaping backend may replace\nthem with its authoritative boundaries using setGraphemeBoundaries().",
+     "fields": [
+      {
+       "name": "text",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "codepointCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "utf8ByteLength",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "utf16Length",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(value:String, ?boundaries:Array<Int>):Void"
+      },
+      {
+       "name": "countCodepoints",
+       "kind": "method",
+       "signature": "(value:String):Int",
+       "static": true,
+       "doc": "Counts Unicode scalar values without retaining a second mapping cache."
+      },
+      {
+       "name": "utf8OffsetForCodepoint",
+       "kind": "method",
+       "signature": "(position:CodepointOffset):Utf8Offset"
+      },
+      {
+       "name": "codepointOffsetForUtf8",
+       "kind": "method",
+       "signature": "(offset:Utf8Offset):CodepointOffset"
+      },
+      {
+       "name": "utf16OffsetForCodepoint",
+       "kind": "method",
+       "signature": "(position:CodepointOffset):Utf16Offset"
+      },
+      {
+       "name": "codepointOffsetForUtf16",
+       "kind": "method",
+       "signature": "(offset:Utf16Offset):CodepointOffset"
+      },
+      {
+       "name": "graphemePositionAt",
+       "kind": "method",
+       "signature": "(position:CodepointOffset):GraphemePosition",
+       "doc": "Returns the nearest boundary, preferring the preceding one on a tie."
+      },
+      {
+       "name": "codepointOffsetForGrapheme",
+       "kind": "method",
+       "signature": "(position:GraphemePosition):CodepointOffset"
+      },
+      {
+       "name": "isGraphemeBoundary",
+       "kind": "method",
+       "signature": "(position:CodepointOffset):Bool"
+      },
+      {
+       "name": "previousGraphemeBoundary",
+       "kind": "method",
+       "signature": "(position:CodepointOffset):GraphemePosition",
+       "doc": "Returns the preceding boundary, or the document start."
+      },
+      {
+       "name": "nextGraphemeBoundary",
+       "kind": "method",
+       "signature": "(position:CodepointOffset):GraphemePosition",
+       "doc": "Returns the following boundary, or the document end."
+      },
+      {
+       "name": "graphemeBoundariesForRange",
+       "kind": "method",
+       "signature": "(start:CodepointOffset, end:CodepointOffset):Array<Int>",
+       "doc": "Returns global grapheme boundaries within a code-point range as\nsubrange-local offsets. Both range edges are included so paragraph\nviews remain valid when a grapheme crosses a paragraph boundary."
+      },
+      {
+       "name": "sliceCodepoints",
+       "kind": "method",
+       "signature": "(start:CodepointOffset, end:CodepointOffset):String"
+      },
+      {
+       "name": "replaceCodepoints",
+       "kind": "method",
+       "signature": "(start:CodepointOffset, end:CodepointOffset, ?replacement:String):String"
+      },
+      {
+       "name": "replaceCodepointsIncremental",
+       "kind": "method",
+       "signature": "(start:CodepointOffset, end:CodepointOffset, ?replacement:String, ?nextValue:String):String",
+       "doc": "Applies a code-point replacement while retaining unaffected conversion\ntables. Only the edited paragraph/grapheme neighborhood is rescanned;\nsuffix offsets are shifted in place."
+      },
+      {
+       "name": "paragraphRangeAt",
+       "kind": "method",
+       "signature": "(position:CodepointOffset):TextRange",
+       "doc": "Returns the paragraph containing a code-point position."
+      },
+      {
+       "name": "paragraphCount",
+       "kind": "method",
+       "signature": "():Int",
+       "doc": "Returns the number of paragraph records, including empty paragraphs."
+      },
+      {
+       "name": "paragraphIndexAtOffset",
+       "kind": "method",
+       "signature": "(position:CodepointOffset):Int",
+       "doc": "Returns the paragraph number containing a code-point offset."
+      },
+      {
+       "name": "paragraphRangeAtIndex",
+       "kind": "method",
+       "signature": "(index:Int):TextRange",
+       "doc": "Returns a paragraph range by its stable document-order number."
+      },
+      {
+       "name": "setGraphemeBoundaries",
+       "kind": "method",
+       "signature": "(boundaries:Array<Int>):Void",
+       "doc": "Replaces generated grapheme boundaries with shaping-engine boundaries.\nValues are code-point offsets and must be sorted, unique, and inclusive of\nboth zero and codepointCount."
+      },
+      {
+       "name": "replaceGraphemeBoundariesForRange",
+       "kind": "method",
+       "signature": "(start:CodepointOffset, end:CodepointOffset, boundaries:Array<Int>):Void",
+       "doc": "Replaces authoritative shaping boundaries for one document subrange."
+      },
+      {
+       "name": "graphemeBoundaryCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "graphemeCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "graphemeBoundaryAt",
+       "kind": "method",
+       "signature": "(boundaryNumber:Int):GraphemePosition"
+      }
+     ]
+    },
+    {
+     "name": "TextRange",
+     "kind": "class",
+     "file": "haxeon/packages/editor/src/haxeon/editor/TextRange.hx",
+     "doc": "A half-open Unicode code-point range in an editor document.",
+     "fields": [
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":CodepointOffset",
+       "final": true
+      },
+      {
+       "name": "end",
+       "kind": "var",
+       "signature": ":CodepointOffset",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(start:CodepointOffset, end:CodepointOffset):Void"
+      }
+     ]
+    },
+    {
+     "name": "Utf16Offset",
+     "kind": "abstract",
+     "file": "haxeon/packages/editor/src/haxeon/editor/Utf16Offset.hx",
+     "underlying": "Int",
+     "doc": "An offset measured in UTF-16 code units, at a valid scalar boundary."
+    },
+    {
+     "name": "Utf8Offset",
+     "kind": "abstract",
+     "file": "haxeon/packages/editor/src/haxeon/editor/Utf8Offset.hx",
+     "underlying": "Int",
+     "doc": "An offset measured in UTF-8 bytes, always at a validated code-point boundary."
+    },
+    {
+     "name": "ViewportLook",
+     "kind": "class",
+     "file": "haxeon/packages/editor/src/haxeon/editor/ViewportLook.hx",
+     "doc": "The neutral look of a 3D editor viewport, shared so that editors read the same: a light background\ngradient, a workplane grid, and a three-light studio rig that turns with the camera, with presets.\n\nColors are linear RGB triples and light directions are camera-space vectors, so this has no UI or\nrenderer dependency; each editor wraps them in its own color type and camera.",
+     "fields": [
+      {
+       "name": "Studio",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Soft",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Contrast",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "PresetNames",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "static": true,
+       "final": true,
+       "doc": "Preset names, indexed by preset, for settings and menus."
+      },
+      {
+       "name": "SampleCount",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Default multisample count for the scene image."
+      },
+      {
+       "name": "GridStep",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true,
+       "doc": "Default workplane grid spacing, in metres."
+      },
+      {
+       "name": "backgroundTop",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "static": true
+      },
+      {
+       "name": "backgroundBottom",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "static": true
+      },
+      {
+       "name": "lightDirections",
+       "kind": "method",
+       "signature": "():Array<Array<Float>>",
+       "static": true,
+       "doc": "Directions from each of the three lights into the scene, in camera space (x right, y up, z toward\nthe viewer). Shaders take the direction toward the light, so callers pass the negated vector."
+      },
+      {
+       "name": "intensities",
+       "kind": "method",
+       "signature": "(preset:Int):Array<Float>",
+       "static": true,
+       "doc": "Key, fill and rim intensities, in the order of `lightDirections`."
+      },
+      {
+       "name": "sky",
+       "kind": "method",
+       "signature": "(preset:Int):Array<Float>",
+       "static": true,
+       "doc": "Ambient light from above."
+      },
+      {
+       "name": "ground",
+       "kind": "method",
+       "signature": "(preset:Int):Array<Float>",
+       "static": true,
+       "doc": "Ambient light from below."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,47 @@
+{
+ "kit": "animkit",
+ "packages": [
+  {
+   "name": "animkit.scene",
+   "types": [
+    {
+     "name": "SkinnedModel",
+     "kind": "class",
+     "file": "animkit/haxe/animkit/scene/SkinnedModel.hx",
+     "doc": "Presents an animation instance in a SceneKit scene: one root node with a\nchild node per primitive. Skinning runs on the CPU, so update() republishes\neach primitive's deformed positions and normals after the instance is\nevaluated. Place the model by transforming root. The instance's asset must\nstill be live during construction, which reads its indices, UVs, and images.",
+     "fields": [
+      {
+       "name": "root",
+       "kind": "var",
+       "signature": ":NodeId",
+       "final": true
+      },
+      {
+       "name": "primitiveNodes",
+       "kind": "var",
+       "signature": ":Array<NodeId>",
+       "final": true
+      },
+      {
+       "name": "instance",
+       "kind": "var",
+       "signature": ":AnimationInstance",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(scene:Scene, instance:AnimationInstance, ?parent:NodeId, ?name:String):Void"
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Publishes the instance's current deformed geometry. Call after evaluating it."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

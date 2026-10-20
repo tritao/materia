@@ -143,7 +143,7 @@ To plan motion, the assembly is compiled into a **robot model**: one link per
 rigid body, one robot joint per movable assembly joint, couplings rescaled into SI.
 Joint zero is rebased to the authored starting pose. Two compilers feed one
 kinematics core (KinematicsKit): CadKit's assembly kinematics for the editor's
-posing, and the simulation bridge for the robot model.
+posing, and RobotKit's for the robot model that the simulation bridge builds.
 
 Speed and acceleration limits are **derived, not authored**
 (`RobotModel.coupledLimits`). For each axis, Materia walks the couplings from

@@ -1,0 +1,49 @@
+{
+ "kit": "trajectorykit",
+ "packages": [
+  {
+   "name": "(top level)",
+   "types": [
+    {
+     "name": "TrajectoryKit",
+     "kind": "class",
+     "file": "trajectorykit/haxe/TrajectoryKit.hx",
+     "doc": "Shared native polynomial evaluation, validation and immutable execution plans."
+    }
+   ]
+  },
+  {
+   "name": "trajectorykit.validation",
+   "types": [
+    {
+     "name": "ValidationGuarantee",
+     "kind": "enum",
+     "file": "trajectorykit/haxe/trajectorykit/validation/ValidationGuarantee.hx",
+     "doc": "What one validation check establishes for a particular plan.",
+     "fields": [
+      {
+       "name": "Proven",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Sampled",
+       "kind": "case",
+       "signature": "(resolutionNs:Int64)"
+      },
+      {
+       "name": "Unchecked",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Failed",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

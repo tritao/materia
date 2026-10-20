@@ -1,0 +1,1222 @@
+{
+ "kit": "simkit",
+ "packages": [
+  {
+   "name": "nativekit.sim",
+   "types": [
+    {
+     "name": "Body",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/Body.hx",
+     "doc": "Owns one body handle. The body remains bound to its scene node.",
+     "fields": [
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nksim_body"
+      },
+      {
+       "name": "state",
+       "kind": "method",
+       "signature": "():BodyState"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "BodyState",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/BodyState.hx",
+     "doc": "Immutable copy of one simulated body's state.",
+     "fields": [
+      {
+       "name": "body",
+       "kind": "var",
+       "signature": ":nksim_body",
+       "final": true
+      },
+      {
+       "name": "node",
+       "kind": "var",
+       "signature": ":nkscene_node_id",
+       "final": true
+      },
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":SimPose",
+       "final": true
+      },
+      {
+       "name": "linearVelocityX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "linearVelocityY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "linearVelocityZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "angularVelocityX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "angularVelocityY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "angularVelocityZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "sleeping",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      }
+     ]
+    },
+    {
+     "name": "Joint",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/Joint.hx",
+     "doc": "Owns one simulation joint handle.",
+     "fields": [
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nksim_joint"
+      },
+      {
+       "name": "state",
+       "kind": "method",
+       "signature": "():JointState"
+      },
+      {
+       "name": "setTargetPosition",
+       "kind": "method",
+       "signature": "(target:Float, ?maxForce:Float):Void",
+       "doc": "Stages a position command for the next world step."
+      },
+      {
+       "name": "setTargetVelocity",
+       "kind": "method",
+       "signature": "(target:Float, ?maxForce:Float):Void",
+       "doc": "Stages a velocity command for the next world step."
+      },
+      {
+       "name": "setTargetEffort",
+       "kind": "method",
+       "signature": "(target:Float, ?maxForce:Float):Void",
+       "doc": "Stages an effort command for the next world step."
+      },
+      {
+       "name": "configureBrake",
+       "kind": "method",
+       "signature": "(holdingEffort:Float, releaseDelay:Float, applicationDelay:Float):Void",
+       "doc": "Configures passive spring-applied friction and physical contact delays, in SI units."
+      },
+      {
+       "name": "setBrakeRelease",
+       "kind": "method",
+       "signature": "(energized:Bool):Void",
+       "doc": "Writes the digital release coil; physical contact changes after its configured delay."
+      },
+      {
+       "name": "brakeReleased",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Reads the physical released contact, independently of the coil command."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "JointState",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/JointState.hx",
+     "doc": "Immutable copy of one simulated joint's state.",
+     "fields": [
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":nksim_joint",
+       "final": true
+      },
+      {
+       "name": "position",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "velocity",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "effort",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "brakeConfigured",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "brakeReleased",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      }
+     ]
+    },
+    {
+     "name": "JointTargetMode",
+     "kind": "abstract",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/JointTargetMode.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Position",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Velocity",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Effort",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Flow",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "JointType",
+     "kind": "abstract",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/JointType.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Fixed",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Revolute",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Prismatic",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "MotionType",
+     "kind": "abstract",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/MotionType.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Static",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Kinematic",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Dynamic",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "MujocoSimWorld",
+     "kind": "class",
+     "file": "simkit/sim_mujoco/bindings/haxe/nativekit/sim/MujocoSimWorld.hx",
+     "doc": "Creates the engine-neutral simulation façade with the MuJoCo backend."
+    },
+    {
+     "name": "SceneChanges",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SceneChanges.hx",
+     "doc": "The single scene transaction committed by one simulation step.",
+     "fields": [
+      {
+       "name": "revision",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nkscene_change_set"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "Shape",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/Shape.hx",
+     "doc": "Owns one simulation collision shape resource.",
+     "fields": [
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nksim_shape"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "ShapeType",
+     "kind": "abstract",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/ShapeType.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Box",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Sphere",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Capsule",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Plane",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Convex",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Compound",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Cylinder",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SimActor",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimActor.hx",
+     "doc": "A group of kinematic parts a session moves along a timed trajectory. They\npush dynamic bodies in their way and nothing pushes them back.",
+     "fields": [
+      {
+       "name": "handle",
+       "kind": "var",
+       "signature": ":nksim_actor",
+       "final": true
+      },
+      {
+       "name": "partCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "pushKeyframe",
+       "kind": "method",
+       "signature": "(time:Float, poses:Array<SimPose>):Void",
+       "doc": "Every part's pose at simulation time `time`. Ticks interpolate between\nkeyframes and hold the last one; a keyframe at or before an existing\none replaces it and every later one."
+      },
+      {
+       "name": "partBody",
+       "kind": "method",
+       "signature": "(index:Int):nksim_body",
+       "doc": "The session body for a capsule or other actor part."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Removes the actor while stopped."
+      }
+     ]
+    },
+    {
+     "name": "SimContact",
+     "kind": "typedef",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimContact.hx",
+     "fields": [
+      {
+       "name": "bodyA",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "bodyB",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "distance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "active",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "wrenchValid",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "force",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      }
+     ],
+     "doc": "One measured world contact, including object/object and robot/object pairs. SI units."
+    },
+    {
+     "name": "SimContactFilter",
+     "kind": "abstract",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimContactFilter.hx",
+     "underlying": "Int",
+     "doc": "Selects how a shape participates in simulation contacts.",
+     "fields": [
+      {
+       "name": "Layers",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Contacts follow the body's collision layer and mask."
+      },
+      {
+       "name": "PairsOnly",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Contacts occur only through explicitly declared body pairs."
+      },
+      {
+       "name": "PairsAndEnvironment",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Contacts use explicit pairs and include every environment body."
+      }
+     ]
+    },
+    {
+     "name": "SimContactSurface",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimContactSurface.hx",
+     "doc": "Contact response for an environment shape. Lengths are seconds and friction is dimensionless.",
+     "fields": [
+      {
+       "name": "friction",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "frictionDimensions",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "contactTimeConstant",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "contactDampingRatio",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "contactFilter",
+       "kind": "var",
+       "signature": ":SimContactFilter",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?friction:Array<Float>, ?frictionDimensions:Int, ?contactTimeConstant:Float, ?contactDampingRatio:Float, ?contactFilter:SimContactFilter):Void"
+      },
+      {
+       "name": "writeNative",
+       "kind": "method",
+       "signature": "(target:nksim_surface):Void"
+      }
+     ]
+    },
+    {
+     "name": "SimFixedJoint",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimFixedJoint.hx",
+     "doc": "A removable rigid connection between two objects, owned by their session.",
+     "fields": [
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Remove the connection while stopped, before removing either object."
+      }
+     ]
+    },
+    {
+     "name": "SimFrame",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimFrame.hx",
+     "doc": "Immutable view of a session's bodies and clock after one tick.",
+     "fields": [
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nksim_frame"
+      },
+      {
+       "name": "stepIndex",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "simulationTime",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "objectPose",
+       "kind": "method",
+       "signature": "(object:SimObject):SimPose"
+      },
+      {
+       "name": "actorPose",
+       "kind": "method",
+       "signature": "(actor:SimActor, part:Int):SimPose"
+      },
+      {
+       "name": "bodyState",
+       "kind": "method",
+       "signature": "(body:nksim_body):BodyState"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "SimInertialProperties",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimInertialProperties.hx",
+     "doc": "Local centre in metres and centroidal row-major inertia in kg m²."
+    },
+    {
+     "name": "SimObject",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimObject.hx",
+     "doc": "One environment body owned by a session.",
+     "fields": [
+      {
+       "name": "handle",
+       "kind": "var",
+       "signature": ":nksim_object",
+       "final": true
+      },
+      {
+       "name": "motion",
+       "kind": "var",
+       "signature": ":MotionType",
+       "final": true
+      },
+      {
+       "name": "shape",
+       "kind": "var",
+       "signature": ":SimShape",
+       "final": true,
+       "doc": "The collision shape the object was created with."
+      },
+      {
+       "name": "drive",
+       "kind": "method",
+       "signature": "(pose:SimPose):Void",
+       "doc": "Moves a kinematic object for the next tick, while stopped or running."
+      },
+      {
+       "name": "teleport",
+       "kind": "method",
+       "signature": "(pose:SimPose):Void",
+       "doc": "Moves the object at rest while stopped; the pose becomes its reset pose."
+      },
+      {
+       "name": "setPoseForNextTick",
+       "kind": "method",
+       "signature": "(pose:SimPose):Void",
+       "doc": "Places a free dynamic object on the next physics tick and clears its velocity."
+      },
+      {
+       "name": "overlapsVolume",
+       "kind": "method",
+       "signature": "(pose:SimPose, halfExtents:Array<Float>):Bool",
+       "doc": "Whether this free dynamic body intersects an oriented volume."
+      },
+      {
+       "name": "setMass",
+       "kind": "method",
+       "signature": "(mass:Float):Void",
+       "doc": "Changes this dynamic body's inertial mass without teleporting it."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Removes the object while stopped."
+      }
+     ]
+    },
+    {
+     "name": "SimPose",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimPose.hx",
+     "doc": "A rigid pose: position in metres and a unit x, y, z, w quaternion.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qx",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qy",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qz",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qw",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float, ?qx:Float, ?qy:Float, ?qz:Float, ?qw:Float):Void"
+      },
+      {
+       "name": "toNative",
+       "kind": "method",
+       "signature": "():nksim_pose"
+      },
+      {
+       "name": "writeNative",
+       "kind": "method",
+       "signature": "(value:nksim_pose):nksim_pose",
+       "doc": "Writes the pose into an existing native value, so a caller that sends poses every tick can reuse one."
+      },
+      {
+       "name": "fromNative",
+       "kind": "method",
+       "signature": "(value:nksim_pose):SimPose",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SimSession",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimSession.hx",
+     "doc": "One shared simulated space around a borrowed world and scene: the fixed\nclock, stepping, realtime ticking, and the objects and actors every\nparticipant shares. Dispose it before the world and scene.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(scene:Scene, world:nksim_world):Void"
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nksim_session"
+      },
+      {
+       "name": "step",
+       "kind": "method",
+       "signature": "(?ownerTimeNs:haxe.Int64):Float",
+       "doc": "Advances exactly one fixed tick and returns the new simulation time."
+      },
+      {
+       "name": "dueTicks",
+       "kind": "method",
+       "signature": "(elapsedNs:haxe.Int64, maxTicks:Int):Int",
+       "doc": "Owner-paced realtime: adds `elapsedNs` of wall time and returns how many\nfixed ticks are due, at most `maxTicks` (the excess is dropped, so a slow\nowner slows simulation time). Run each with `stepPaced`, acting on the\nsession between them."
+      },
+      {
+       "name": "stepPaced",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Like `step`, but participants see a realtime tick on the native monotonic clock."
+      },
+      {
+       "name": "addStepObserver",
+       "kind": "method",
+       "signature": "(callback:() -> Void):Int",
+       "doc": "Runs after each successful explicit step, once the shared contacts are available."
+      },
+      {
+       "name": "removeStepObserver",
+       "kind": "method",
+       "signature": "(id:Int):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "stop",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "reset",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "addResetObserver",
+       "kind": "method",
+       "signature": "(callback:() -> Void):Int",
+       "doc": "Runs after a successful reset. Clock owners invalidate the preceding observation epoch."
+      },
+      {
+       "name": "removeResetObserver",
+       "kind": "method",
+       "signature": "(id:Int):Void"
+      },
+      {
+       "name": "isRunning",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "isSealed",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "stepIndex",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "simulationTime",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "fixedTimestep",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "beginTopologyUpdate",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Batch topology changes after stop(), preserving the shared clock and other participants."
+      },
+      {
+       "name": "endTopologyUpdate",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "createObject",
+       "kind": "method",
+       "signature": "(motion:MotionType, shape:SimShape, pose:SimPose, ?mass:Float, ?restContactGroup:haxe.Int64, ?surface:SimContactSurface, ?inertial:SimInertialProperties):SimObject"
+      },
+      {
+       "name": "createFixedJoint",
+       "kind": "method",
+       "signature": "(parent:SimObject, child:SimObject):SimFixedJoint",
+       "doc": "Rigidly connect objects using their creation frames; the parent retains its motion."
+      },
+      {
+       "name": "createMeasuredFixedJoint",
+       "kind": "method",
+       "signature": "(parent:SimObject, child:SimObject):SimFixedJoint",
+       "doc": "Fasten at the current measured pose while stopped, retaining physical mass and motion.\nThe session removes this runtime connection on reset."
+      },
+      {
+       "name": "excludeContactPair",
+       "kind": "method",
+       "signature": "(first:nksim_body, second:nksim_body):Void",
+       "doc": "Excludes contacts between two simulation bodies before this session's first tick."
+      },
+      {
+       "name": "excludeObjectContactPair",
+       "kind": "method",
+       "signature": "(body:nksim_body, object:SimObject):Void",
+       "doc": "Excludes a robot body from a session-owned object without exposing the object's body handle."
+      },
+      {
+       "name": "holdObject",
+       "kind": "method",
+       "signature": "(object:SimObject, carrier:nksim_body, ?offset:SimPose):Void",
+       "doc": "Drive a dynamic object from a carrier body's frame on every tick."
+      },
+      {
+       "name": "releaseObject",
+       "kind": "method",
+       "signature": "(object:SimObject):Void"
+      },
+      {
+       "name": "objectPose",
+       "kind": "method",
+       "signature": "(object:SimObject):SimPose",
+       "doc": "Read this object's measured world pose, including while stopped."
+      },
+      {
+       "name": "bodyPose",
+       "kind": "method",
+       "signature": "(body:nksim_body):SimPose",
+       "doc": "Read a carrier's measured world pose from this shared world."
+      },
+      {
+       "name": "holdObjectFromObject",
+       "kind": "method",
+       "signature": "(object:SimObject, carrier:SimObject, offset:SimPose):Void",
+       "doc": "Hold one session object from another's measured frame without exposing a body handle."
+      },
+      {
+       "name": "holdObjectOnObject",
+       "kind": "method",
+       "signature": "(object:SimObject, carrier:SimObject, offset:SimPose):Void",
+       "doc": "Retains a dynamic part relative to an explicitly identified environment object."
+      },
+      {
+       "name": "objectBody",
+       "kind": "method",
+       "signature": "(object:SimObject):nksim_body",
+       "doc": "The physics body of this session's explicitly identified environment object."
+      },
+      {
+       "name": "objectCarrier",
+       "kind": "method",
+       "signature": "(object:SimObject):nksim_body",
+       "doc": "Zero means the object is free."
+      },
+      {
+       "name": "createActor",
+       "kind": "method",
+       "signature": "(shapes:Array<SimShape>, poses:Array<SimPose>):SimActor",
+       "doc": "Adds a group of kinematic parts, each starting at its pose."
+      },
+      {
+       "name": "raycast",
+       "kind": "method",
+       "signature": "(origin:SimPose, dirX:Float, dirY:Float, dirZ:Float, maxDistance:Float):Float",
+       "doc": "Distance along a unit direction to the nearest object or actor, up to maxDistance."
+      },
+      {
+       "name": "capture",
+       "kind": "method",
+       "signature": "():SimFrame",
+       "doc": "Captures a consistent view of every body after the latest tick."
+      },
+      {
+       "name": "contacts",
+       "kind": "method",
+       "signature": "():Array<SimContact>",
+       "doc": "Capture all world contacts, including workpiece/fixture pairs outside a robot's links."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SimShape",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimShape.hx",
+     "doc": "A collision shape for session objects; actors currently use primitives.",
+     "fields": [
+      {
+       "name": "type",
+       "kind": "var",
+       "signature": ":ShapeType",
+       "final": true
+      },
+      {
+       "name": "box",
+       "kind": "method",
+       "signature": "(halfX:Float, halfY:Float, halfZ:Float):SimShape",
+       "static": true
+      },
+      {
+       "name": "sphere",
+       "kind": "method",
+       "signature": "(radius:Float):SimShape",
+       "static": true
+      },
+      {
+       "name": "cylinder",
+       "kind": "method",
+       "signature": "(radius:Float, height:Float):SimShape",
+       "static": true,
+       "doc": "A solid cylinder along local +Z, of full height `height`."
+      },
+      {
+       "name": "plane",
+       "kind": "method",
+       "signature": "():SimShape",
+       "static": true,
+       "doc": "An infinite plane through the object's origin facing its local +Z, such\nas a ground plane; only static objects may be planes."
+      },
+      {
+       "name": "capsule",
+       "kind": "method",
+       "signature": "(radius:Float, length:Float):SimShape",
+       "static": true,
+       "doc": "A capsule along local +Z; length is between its hemisphere centres."
+      },
+      {
+       "name": "convex",
+       "kind": "method",
+       "signature": "(vertices:Array<Float>):SimShape",
+       "static": true,
+       "doc": "Hull coordinates are XYZ triples in metres, in the object's local frame."
+      },
+      {
+       "name": "convexVertices",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "compoundConvex",
+       "kind": "method",
+       "signature": "(pieces:Array<Array<Float>>):SimShape",
+       "static": true,
+       "doc": "One body made of separate hulls; holes and concave gaps remain empty."
+      },
+      {
+       "name": "convexPieceCounts",
+       "kind": "method",
+       "signature": "():Array<Int>"
+      },
+      {
+       "name": "boundingRadius",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Radius of the smallest sphere about the shape's origin that encloses it (infinite for a plane)."
+      },
+      {
+       "name": "boundingHalfExtents",
+       "kind": "method",
+       "signature": "():Null<{x:Float, y:Float, z:Float}>",
+       "doc": "Half extents of a local box enclosing this finite primitive; null for an infinite plane."
+      },
+      {
+       "name": "toNative",
+       "kind": "method",
+       "signature": "():nksim_shape_desc"
+      }
+     ]
+    },
+    {
+     "name": "SimSnapshot",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimSnapshot.hx",
+     "doc": "Immutable simulation state captured after a fixed tick.",
+     "fields": [
+      {
+       "name": "bodyCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "bodyAt",
+       "kind": "method",
+       "signature": "(index:Int):BodyState"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SimWorld",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimWorld.hx",
+     "doc": "Thin typed Haxeon façade over an explicitly stepped simulation world."
+    },
+    {
+     "name": "SimWorldOptions",
+     "kind": "typedef",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/SimWorldOptions.hx",
+     "fields": [
+      {
+       "name": "timestep",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "physicsSubsteps",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "gravity",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "optional": true
+      },
+      {
+       "name": "integrator",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "frictionCone",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "solverIterations",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "lineSearchIterations",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "frictionImpedanceRatio",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "noslipIterations",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "arenaMemoryBytes",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "solverTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      }
+     ],
+     "doc": "How a simulation world steps; unset fields keep the defaults."
+    },
+    {
+     "name": "StepResult",
+     "kind": "class",
+     "file": "simkit/sim_core/bindings/haxe/nativekit/sim/StepResult.hx",
+     "doc": "Result of one deterministic fixed-timestep simulation tick.",
+     "fields": [
+      {
+       "name": "stepIndex",
+       "kind": "var",
+       "signature": ":haxe.Int64",
+       "final": true
+      },
+      {
+       "name": "simulationTime",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "physicsSubsteps",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "sceneChanges",
+       "kind": "var",
+       "signature": ":SceneChanges",
+       "final": true
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

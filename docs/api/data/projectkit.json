@@ -1,0 +1,6523 @@
+{
+ "kit": "projectkit",
+ "packages": [
+  {
+   "name": "materia.assembly",
+   "types": [
+    {
+     "name": "AssemblyActuator",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "maxEffort",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxRate",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "rotorInertia",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "fullStepsPerRevolution",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "drive",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "optional": true
+      },
+      {
+       "name": "torqueSpeed",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "optional": true
+      },
+      {
+       "name": "holdingTorque",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "ratedTorque",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "peakTorque",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "ratedSpeed",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "maxSpeed",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "encoderCounts",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "servoStiffness",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "servoDamping",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "encoder",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "optional": true
+      },
+      {
+       "name": "gearRatio",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "gearEfficiency",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "assumed",
+       "kind": "var",
+       "signature": ":Null<ReadOnlyArray<String>>",
+       "optional": true
+      },
+      {
+       "name": "microsteps",
+       "kind": "var",
+       "signature": ":Null<Int>",
+       "optional": true
+      },
+      {
+       "name": "maxStepRate",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "assumptions",
+       "kind": "var",
+       "signature": ":Null<ReadOnlyArray<QuantityAssumption>>",
+       "optional": true
+      },
+      {
+       "name": "positionLoopRate",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "pneumatic",
+       "kind": "var",
+       "signature": ":Null<AssemblyPneumaticDrive>",
+       "optional": true
+      },
+      {
+       "name": "processVelocity",
+       "kind": "var",
+       "signature": ":Null<AssemblyProcessVelocityDrive>",
+       "optional": true
+      },
+      {
+       "name": "brake",
+       "kind": "var",
+       "signature": ":Null<AssemblyMotorBrake>",
+       "optional": true
+      },
+      {
+       "name": "hydraulic",
+       "kind": "var",
+       "signature": ":Null<AssemblyHydraulicDrive>",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "AssemblyBodies",
+     "kind": "class",
+     "file": "projectkit/src/materia/assembly/AssemblyBodies.hx",
+     "doc": "Groups an assembly's occurrences into rigid bodies, for hierarchy views and simulation links.",
+     "fields": [
+      {
+       "name": "of",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition):Array<AssemblyBody>",
+       "static": true,
+       "doc": "Bodies in the order their first occurrence appears; only tree joints connect occurrences."
+      }
+     ]
+    },
+    {
+     "name": "AssemblyBody",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyBodies.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "occurrences",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "parent",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "jointType",
+       "kind": "var",
+       "signature": ":Null<AssemblyJointType>"
+      }
+     ],
+     "doc": "A rigid body of an assembly: the occurrences that fixed joints hold together. Moving joints\n(revolute, continuous, prismatic) separate bodies, so a body is what actually moves as one piece."
+    },
+    {
+     "name": "AssemblyCodec",
+     "kind": "class",
+     "file": "projectkit/src/materia/assembly/AssemblyCodec.hx",
+     "doc": "Validation shared by assembly frames and identifiers.",
+     "fields": [
+      {
+       "name": "validateFrame",
+       "kind": "method",
+       "signature": "(frame:AssemblyFrame):Void",
+       "static": true
+      },
+      {
+       "name": "containsNul",
+       "kind": "method",
+       "signature": "(value:String):Bool",
+       "static": true,
+       "doc": "Whether text holds a NUL character. Checked by code: a `\"\\x00\"` literal cannot be a HashLink string\nconstant (and compiled to the text \"x00\" before haxeon decoded `\\x` escapes)."
+      }
+     ]
+    },
+    {
+     "name": "AssemblyComplianceCoordinate",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "alias": "AssemblyElasticTerm"
+    },
+    {
+     "name": "AssemblyComplianceSpring",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "compliance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "coordinates",
+       "kind": "var",
+       "signature": ":Array<AssemblyComplianceCoordinate>"
+      }
+     ],
+     "doc": "Series compliance of one parallel spring, in source-coordinate units per effort."
+    },
+    {
+     "name": "AssemblyComponentDefinition",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "connectors",
+       "kind": "var",
+       "signature": ":Array<AssemblyConnector>"
+      },
+      {
+       "name": "robotFlangeConnector",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "collisionHulls",
+       "kind": "var",
+       "signature": ":Array<Array<Float>>",
+       "optional": true
+      }
+     ],
+     "doc": "Connectors belong to a reusable component definition, not an occurrence."
+    },
+    {
+     "name": "AssemblyComponentOccurrence",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "definition",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "initialPose",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      },
+      {
+       "name": "assembly",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "grounded",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
+       "name": "includePath",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "visible",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      }
+     ],
+     "doc": "An occurrence references shared component data and has a local initial pose."
+    },
+    {
+     "name": "AssemblyConnector",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyRecord.hx",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "frame",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      },
+      {
+       "name": "reference",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "AssemblyDefinition",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "schemaVersion",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "lengthUnit",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "definitions",
+       "kind": "var",
+       "signature": ":Array<AssemblyComponentDefinition>"
+      },
+      {
+       "name": "occurrences",
+       "kind": "var",
+       "signature": ":Array<AssemblyComponentOccurrence>"
+      },
+      {
+       "name": "joints",
+       "kind": "var",
+       "signature": ":Array<KinematicJoint>"
+      },
+      {
+       "name": "couplings",
+       "kind": "var",
+       "signature": ":Array<AssemblyJointCoupling>",
+       "optional": true
+      },
+      {
+       "name": "assemblies",
+       "kind": "var",
+       "signature": ":Array<AssemblySubdefinition>",
+       "optional": true
+      },
+      {
+       "name": "exposedConnectors",
+       "kind": "var",
+       "signature": ":Array<AssemblyExposedConnector>",
+       "optional": true
+      },
+      {
+       "name": "mates",
+       "kind": "var",
+       "signature": ":Array<AssemblyMate>",
+       "optional": true
+      },
+      {
+       "name": "actuators",
+       "kind": "var",
+       "signature": ":Array<AssemblyActuator>",
+       "optional": true
+      },
+      {
+       "name": "encoders",
+       "kind": "var",
+       "signature": ":Array<AssemblyEncoder>",
+       "optional": true
+      },
+      {
+       "name": "elasticNetworks",
+       "kind": "var",
+       "signature": ":Array<AssemblyElasticNetwork>",
+       "optional": true
+      },
+      {
+       "name": "sensors",
+       "kind": "var",
+       "signature": ":Array<AssemblySensor>",
+       "optional": true
+      },
+      {
+       "name": "switches",
+       "kind": "var",
+       "signature": ":Array<AssemblySwitch>",
+       "optional": true
+      }
+     ],
+     "doc": "Versioned assembly design data. `assemblies` is a reusable definition table;\nan occurrence with `assembly` set names a table entry and exposes only its\ndeclared connectors. Flattening prefixes nested occurrence and joint IDs\nwith their occurrence path. Runtime coordinates live in AssemblyStateRecord."
+    },
+    {
+     "name": "AssemblyDefinitionCodec",
+     "kind": "class",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinitionCodec.hx",
+     "doc": "Versioned transport and validation for reusable assembly definitions and states.",
+     "fields": [
+      {
+       "name": "VERSION",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "validateStop",
+       "kind": "method",
+       "signature": "(stop:AssemblyJointStop, joint:String):Void",
+       "static": true
+      },
+      {
+       "name": "encode",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition):String",
+       "static": true
+      },
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(text:String):AssemblyDefinition",
+       "static": true
+      },
+      {
+       "name": "encodeState",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, state:AssemblyStateRecord):String",
+       "static": true
+      },
+      {
+       "name": "decodeState",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, text:String):AssemblyStateRecord",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "AssemblyDefinitionFlattener",
+     "kind": "class",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinitionFlattener.hx",
+     "doc": "Expands reusable assembly occurrences into the flat mechanical solver schema.",
+     "fields": [
+      {
+       "name": "flattenState",
+       "kind": "method",
+       "signature": "(source:AssemblyDefinition, state:AssemblyStateRecord):AssemblyStateRecord",
+       "static": true,
+       "doc": "Maps a saved subassembly root pose to the roots of its flattened members."
+      },
+      {
+       "name": "flattenView",
+       "kind": "method",
+       "signature": "(source:AssemblyDefinition):AssemblyDefinition",
+       "static": true,
+       "doc": "A read-only flat view. Already-flat definitions are borrowed; nested definitions are expanded.\nCall flatten instead when the result will be edited independently of the source."
+      },
+      {
+       "name": "flatten",
+       "kind": "method",
+       "signature": "(source:AssemblyDefinition):AssemblyDefinition",
+       "static": true
+      },
+      {
+       "name": "copyActuator",
+       "kind": "method",
+       "signature": "(actuator:AssemblyActuator, id:String, joint:String, prefix:String):AssemblyActuator",
+       "static": true,
+       "doc": "A copy of `actuator` under a new id, on a new joint, with every drive field."
+      },
+      {
+       "name": "copyEncoder",
+       "kind": "method",
+       "signature": "(encoder:AssemblyEncoder, id:String, joint:String):AssemblyEncoder",
+       "static": true,
+       "doc": "A copy of `encoder` under a new id, on a new joint."
+      },
+      {
+       "name": "copySensor",
+       "kind": "method",
+       "signature": "(sensor:AssemblySensor, id:String, prefix:String):AssemblySensor",
+       "static": true,
+       "doc": "A copy of `sensor` under the supplied scope prefix."
+      },
+      {
+       "name": "copySwitch",
+       "kind": "method",
+       "signature": "(contact:materia.assembly.AssemblyDefinition.AssemblySwitch, map:(String) -> String):materia.assembly.AssemblyDefinition.AssemblySwitch",
+       "static": true,
+       "doc": "Copy physical switch references into a containing namespace."
+      },
+      {
+       "name": "copyComplianceLaw",
+       "kind": "method",
+       "signature": "(law:Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>, map:(String) -> String):Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>",
+       "static": true,
+       "doc": "Copy every compliance coordinate into its containing joint namespace."
+      },
+      {
+       "name": "copyElasticNetwork",
+       "kind": "method",
+       "signature": "(network:materia.assembly.AssemblyDefinition.AssemblyElasticNetwork, map:(String) -> String):materia.assembly.AssemblyDefinition.AssemblyElasticNetwork",
+       "static": true,
+       "doc": "Keep every coordinate and motion-source reference in a network's namespace."
+      }
+     ]
+    },
+    {
+     "name": "AssemblyElasticClearance",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "allowance",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "One physical elastic network replaces the scalar springs of its listed motion couplings."
+    },
+    {
+     "name": "AssemblyElasticNetwork",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "couplings",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "spans",
+       "kind": "var",
+       "signature": ":Array<AssemblyElasticSpan>"
+      },
+      {
+       "name": "assumptions",
+       "kind": "var",
+       "signature": ":Array<QuantityAssumption>",
+       "optional": true
+      },
+      {
+       "name": "clearances",
+       "kind": "var",
+       "signature": ":Array<AssemblyElasticClearance>",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "AssemblyElasticSpan",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "stiffness",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "terms",
+       "kind": "var",
+       "signature": ":Array<AssemblyElasticTerm>"
+      }
+     ]
+    },
+    {
+     "name": "AssemblyElasticTerm",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "coefficient",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "A derived elastic span; displacement coefficients use assembly length per joint unit."
+    },
+    {
+     "name": "AssemblyEncoder",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "counts",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "index",
+       "kind": "var",
+       "signature": ":Null<Bool>",
+       "optional": true
+      }
+     ],
+     "doc": "An encoder on a joint: it reads the joint's travel in counts. Which joint it sits on says what it\nsees. On a motor's own joint it is motor-side and sees the rotor (lost steps, a servo's following\nerror, but not backlash or belt stretch); on a joint the load moves through a drive it is load-side\nand sees where the load is."
+    },
+    {
+     "name": "AssemblyExposedConnector",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "connector",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ],
+     "doc": "A connector exported from a member of an assembly definition."
+    },
+    {
+     "name": "AssemblyFrame",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyRecord.hx",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "qx",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "qy",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "qz",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "qw",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Rigid frame in the artifact's length unit; quaternion order is x, y, z, w."
+    },
+    {
+     "name": "AssemblyFrames",
+     "kind": "class",
+     "file": "projectkit/src/materia/assembly/AssemblyFrames.hx",
+     "doc": "Rigid-frame arithmetic shared by CAD generators and project consumers.",
+     "fields": [
+      {
+       "name": "ROTATION_TOLERANCE",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true,
+       "doc": "How far a rotation matrix may be from orthonormal (the largest entry of RᵀR − I) and still be taken as a\nrotation: the rounding of entries written to six decimal places. Computed matrices are within 1e-15."
+      },
+      {
+       "name": "identity",
+       "kind": "method",
+       "signature": "():AssemblyFrame",
+       "static": true
+      },
+      {
+       "name": "translation",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):AssemblyFrame",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "AssemblyHydraulicDrive",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "bore",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "rod",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "stroke",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "approachSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "workingSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "returnSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "changePoint",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pressurePa",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "channelA",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "channelB",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "extendSign",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Hydraulic dimensions are assembly length units, phase speeds length units/s and pressure Pa.\nBoth valve coils off, or both on, select a closed centre; one coil requests extension or return."
+    },
+    {
+     "name": "AssemblyJointCoordinate",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "value",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "AssemblyJointCoupling",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "ratio",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "offset",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "efficiency",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "stiffness",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "backlash",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "drag",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "assumed",
+       "kind": "var",
+       "signature": ":Null<ReadOnlyArray<String>>",
+       "optional": true
+      },
+      {
+       "name": "assumptions",
+       "kind": "var",
+       "signature": ":Null<ReadOnlyArray<QuantityAssumption>>",
+       "optional": true
+      },
+      {
+       "name": "dampingRatio",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "stiffnessLaw",
+       "kind": "var",
+       "signature": ":Null<Array<AssemblyComplianceSpring>>",
+       "optional": true
+      },
+      {
+       "name": "calibration",
+       "kind": "var",
+       "signature": ":Null<materia.assembly.BeltCalibration>",
+       "optional": true
+      }
+     ],
+     "doc": "Target coordinate = source coordinate × ratio + offset. A target with several couplings is the sum of\ntheir terms: target = Σ (ratioᵢ × sourceᵢ + offsetᵢ), as a CoreXY motor follows both axes. Each coupling\nis one term, with its own efficiency, stiffness, backlash and drag. Every (source, target) pair is\nunique and the terms never form a cycle."
+    },
+    {
+     "name": "AssemblyJointLimits",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "lower",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "upper",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "velocity",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "effort",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "overtravel",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "acceleration",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "rackingTolerance",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "assumptions",
+       "kind": "var",
+       "signature": ":Null<ReadOnlyArray<QuantityAssumption>>",
+       "optional": true
+      }
+     ],
+     "doc": "Missing limits are unbounded. Velocity and effort are optional metadata."
+    },
+    {
+     "name": "AssemblyJointRole",
+     "kind": "abstract",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "Tree",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Closure",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "AssemblyJointStop",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyJointStop.hx",
+     "fields": [
+      {
+       "name": "timeConstantSec",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "dampingRatio",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "A mechanical end stop expressed as a contact response."
+    },
+    {
+     "name": "AssemblyJointType",
+     "kind": "abstract",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "Fixed",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Revolute",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Continuous",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Prismatic",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Spherical",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Closures only: a shared point."
+      },
+      {
+       "name": "Cylindrical",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Closures only: a shared axis line, free to slide and turn along it."
+      },
+      {
+       "name": "Planar",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Closures only: the child connector's origin on the parent's plane (normal = axis), normals parallel."
+      }
+     ]
+    },
+    {
+     "name": "AssemblyMate",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":AssemblyMateKind"
+      },
+      {
+       "name": "first",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "firstConnector",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "second",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "secondConnector",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "axis",
+       "kind": "var",
+       "signature": ":AssemblyVector"
+      },
+      {
+       "name": "value",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      }
+     ],
+     "doc": "A placement relation between two occurrence connectors (see `AssemblyMateKind`)."
+    },
+    {
+     "name": "AssemblyMateKind",
+     "kind": "abstract",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "underlying": "String",
+     "doc": "How a mate places its second connector frame B against its first, A, with\na = A's axis and b = B's axis (the mate's `axis`, in each connector frame)\nand d = B's origin − A's origin. Mates position parts; joints move them.",
+     "fields": [
+      {
+       "name": "Coincident",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "B's origin on A's origin."
+      },
+      {
+       "name": "Coaxial",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "B's origin on A's axis line, axes parallel."
+      },
+      {
+       "name": "Planar",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "B's origin on A's plane (normal a), offset by `value` along a; normals parallel."
+      },
+      {
+       "name": "Parallel",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Axes parallel (either direction)."
+      },
+      {
+       "name": "Perpendicular",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Axes perpendicular."
+      },
+      {
+       "name": "Distance",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Origins `value` apart (length unit, positive; zero is `Coincident`)."
+      },
+      {
+       "name": "Angle",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "`value` radians between the axes, in [0, π] (0 and π hold the axes aligned or opposed)."
+      },
+      {
+       "name": "Lock",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "B's frame on A's frame."
+      }
+     ]
+    },
+    {
+     "name": "AssemblyMotorBrake",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "releaseChannel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "releasedSensor",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "holdingEffort",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "releaseDelay",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "applicationDelay",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "releaseTimeoutMs",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "feedbackMaxAgeMs",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ],
+     "doc": "A motor driving a joint directly: its usable torque (N m) or force (N), its usable speed in the\njoint's units per second, and the inertia of its rotor (kg m²), which turns with the joint."
+    },
+    {
+     "name": "AssemblyPneumaticDrive",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "bore",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "rod",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "stroke",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "ratedSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pressurePa",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "channelA",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "channelB",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "optional": true
+      },
+      {
+       "name": "normallyToA",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "extendSign",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Cylinder dimensions and speed use the assembly length unit; gauge pressure is Pa."
+    },
+    {
+     "name": "AssemblyProcessVelocityDrive",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "speedChannel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "directionChannel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "radiansPerSpeedUnit",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "A CNC speed setpoint in RPM and a signed direction signal drive a continuous joint."
+    },
+    {
+     "name": "AssemblyRootPose",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      }
+     ]
+    },
+    {
+     "name": "AssemblySensor",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "optional": true
+      },
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "optional": true
+      },
+      {
+       "name": "connector",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "optional": true
+      },
+      {
+       "name": "windowLower",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "windowUpper",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "hysteresis",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "range",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "zoneBoxes",
+       "kind": "var",
+       "signature": ":Null<Array<Float>>",
+       "optional": true
+      }
+     ],
+     "doc": "A native discrete sensor mounted to a joint coordinate or a connector face. A `robot_zone`\nreports a robot body in any of its `zoneBoxes`: six numbers per box, its centre and half\nextents in millimetres, in the connector's frame."
+    },
+    {
+     "name": "AssemblyStateRecord",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "schemaVersion",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "definition",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "jointCoordinates",
+       "kind": "var",
+       "signature": ":Array<AssemblyJointCoordinate>"
+      },
+      {
+       "name": "rootPoses",
+       "kind": "var",
+       "signature": ":Array<AssemblyRootPose>"
+      }
+     ],
+     "doc": "A saved configuration, separate from the persistent assembly definition."
+    },
+    {
+     "name": "AssemblySubdefinition",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "definitions",
+       "kind": "var",
+       "signature": ":Array<AssemblyComponentDefinition>"
+      },
+      {
+       "name": "occurrences",
+       "kind": "var",
+       "signature": ":Array<AssemblyComponentOccurrence>"
+      },
+      {
+       "name": "joints",
+       "kind": "var",
+       "signature": ":Array<KinematicJoint>"
+      },
+      {
+       "name": "couplings",
+       "kind": "var",
+       "signature": ":Array<AssemblyJointCoupling>",
+       "optional": true
+      },
+      {
+       "name": "exposedConnectors",
+       "kind": "var",
+       "signature": ":Array<AssemblyExposedConnector>",
+       "optional": true
+      },
+      {
+       "name": "mates",
+       "kind": "var",
+       "signature": ":Array<AssemblyMate>",
+       "optional": true
+      },
+      {
+       "name": "actuators",
+       "kind": "var",
+       "signature": ":Array<AssemblyActuator>",
+       "optional": true
+      },
+      {
+       "name": "encoders",
+       "kind": "var",
+       "signature": ":Array<AssemblyEncoder>",
+       "optional": true
+      },
+      {
+       "name": "elasticNetworks",
+       "kind": "var",
+       "signature": ":Array<AssemblyElasticNetwork>",
+       "optional": true
+      },
+      {
+       "name": "sensors",
+       "kind": "var",
+       "signature": ":Array<AssemblySensor>",
+       "optional": true
+      },
+      {
+       "name": "switches",
+       "kind": "var",
+       "signature": ":Array<AssemblySwitch>",
+       "optional": true
+      }
+     ],
+     "doc": "Reusable nested assembly. Occurrences may reference another entry in the root table."
+    },
+    {
+     "name": "AssemblySwitch",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "part",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "connector",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "trigger",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "triggerConnector",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "role",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "side",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "trip",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "hysteresis",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "repeatability",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "seed",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "driveJoint",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "homeAfter",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "optional": true
+      }
+     ],
+     "doc": "Geometry-derived switch event on a prismatic joint, in assembly coordinate units."
+    },
+    {
+     "name": "AssemblyVector",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "BeltCalibration",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/BeltCalibration.hx",
+     "fields": [
+      {
+       "name": "rigidityPerWidth",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "dampingRatio",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "axis",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":Array<BeltCalibrationPosition>"
+      },
+      {
+       "name": "frequencyHz",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "massKg",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spectrumSource",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "decaySource",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "fitError",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "method",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "decayStart",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "decayEnd",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Effective cord rigidity inferred from a measured single mode, not a belt manufacturer's material test.\nPose values are physical RobotKit joint coordinates in SI, at acquisition. Sources include content hashes."
+    },
+    {
+     "name": "BeltCalibrationPosition",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/BeltCalibration.hx",
+     "alias": "materia.assembly.AssemblyDefinition.AssemblyJointCoordinate"
+    },
+    {
+     "name": "BeltCalibrationSet",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/BeltCalibration.hx",
+     "fields": [
+      {
+       "name": "schemaVersion",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "assemblyHash",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "modelHash",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "belts",
+       "kind": "var",
+       "signature": ":Array<CalibratedBelt>"
+      }
+     ],
+     "doc": "Portable measurement overlay for a source-generated assembly whose parts need not have rebuild recipes."
+    },
+    {
+     "name": "BeltCalibrations",
+     "kind": "class",
+     "file": "projectkit/src/materia/assembly/BeltCalibration.hx",
+     "fields": [
+      {
+       "name": "METHOD",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(value:BeltCalibration):Void",
+       "static": true
+      },
+      {
+       "name": "copy",
+       "kind": "method",
+       "signature": "(value:BeltCalibration, map:(String) -> String):BeltCalibration",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CalibratedBelt",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/BeltCalibration.hx",
+     "fields": [
+      {
+       "name": "belt",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "calibration",
+       "kind": "var",
+       "signature": ":BeltCalibration"
+      }
+     ]
+    },
+    {
+     "name": "ComplianceCoordinate",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/PositionStiffness.hx",
+     "fields": [
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "coefficient",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "A parallel sum of springs whose series compliances vary affinely with physical joint coordinates.\nA belt span is L(q)/EA; a supported screw is L(q)/EA + 1/K_nut + 1/K_bearing.\nCoordinates and compliance use the caller's units, in the coupling's stated coordinate. No samples or callbacks cross the ABI."
+    },
+    {
+     "name": "ComplianceSpring",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/PositionStiffness.hx",
+     "fields": [
+      {
+       "name": "compliance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "coordinates",
+       "kind": "var",
+       "signature": ":Array<ComplianceCoordinate>"
+      }
+     ]
+    },
+    {
+     "name": "KinematicJoint",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "type",
+       "kind": "var",
+       "signature": ":AssemblyJointType"
+      },
+      {
+       "name": "role",
+       "kind": "var",
+       "signature": ":AssemblyJointRole"
+      },
+      {
+       "name": "parent",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "parentConnector",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "child",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "childConnector",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "axis",
+       "kind": "var",
+       "signature": ":AssemblyVector"
+      },
+      {
+       "name": "limits",
+       "kind": "var",
+       "signature": ":AssemblyJointLimits"
+      },
+      {
+       "name": "defaultValue",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "closureTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "driven",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
+       "name": "includePath",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "passive",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
+       "name": "stop",
+       "kind": "var",
+       "signature": ":AssemblyJointStop",
+       "optional": true
+      }
+     ],
+     "doc": "A persistent kinematic edge or closure. The axis is unit length in the parent connector frame."
+    },
+    {
+     "name": "PositionStiffness",
+     "kind": "class",
+     "file": "projectkit/src/materia/assembly/PositionStiffness.hx",
+     "fields": [
+      {
+       "name": "springs",
+       "kind": "var",
+       "signature": ":Array<ComplianceSpring>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(springs:Array<ComplianceSpring>):Void"
+      },
+      {
+       "name": "at",
+       "kind": "method",
+       "signature": "(position:(String) -> Float):Float"
+      },
+      {
+       "name": "range",
+       "kind": "method",
+       "signature": "(bounds:(String) -> {lower:Float, upper:Float}):{minimum:Float, maximum:Float}",
+       "doc": "Tight certified bounds on a finite travel box. Reciprocal positive affine forms are convex.\nMaxima are at vertices. Coordinate minimisation supplies a point; its supporting hyperplane supplies a lower bound,\nso even early termination never turns a sampled minimum into a claimed worst-case stiffness."
+      },
+      {
+       "name": "scaled",
+       "kind": "method",
+       "signature": "(complianceScale:Float, coordinateScale:(String) -> Float, origin:(String) -> Float):PositionStiffness"
+      }
+     ]
+    },
+    {
+     "name": "QuantityAssumption",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyDefinition.hx",
+     "fields": [
+      {
+       "name": "quantity",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ],
+     "doc": "An engineering assumption attached to the quantity that uses it."
+    },
+    {
+     "name": "ResonanceMeasurement",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/BeltCalibration.hx",
+     "fields": [
+      {
+       "name": "axis",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "frequencyHz",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "dampingRatio",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "fitError",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spectrumSource",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "decaySource",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "decayStart",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "decayEnd",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Results of a validated capture, before model-dependent mass/geometry inference."
+    }
+   ]
+  },
+  {
+   "name": "materia.drawing",
+   "types": [
+    {
+     "name": "DrawingBounds",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/drawing/DrawingProjection.hx",
+     "fields": [
+      {
+       "name": "minX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "minY",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxY",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "DrawingCallout",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/drawing/DrawingProjection.hx",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "leaderX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "leaderY",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "text",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "faceName",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ]
+    },
+    {
+     "name": "DrawingLine",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/drawing/DrawingProjection.hx",
+     "fields": [
+      {
+       "name": "x1",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y1",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "x2",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y2",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "style",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "faceName",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      }
+     ],
+     "doc": "Projected drawing primitives are in millimetres, with +Y upward."
+    },
+    {
+     "name": "DrawingProjection",
+     "kind": "class",
+     "file": "projectkit/src/materia/drawing/DrawingProjection.hx",
+     "doc": "Builds vector orthographic views from the portable CAD mesh and its named thread packets.",
+     "fields": [
+      {
+       "name": "project",
+       "kind": "method",
+       "signature": "(part:SceneArtifactPart, metresPerUnit:Float, view:DrawingViewSpec):ProjectedDrawingView",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "DrawingSectionSpec",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/drawing/DrawingProjection.hx",
+     "fields": [
+      {
+       "name": "origin",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "normal",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "keepPositive",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ],
+     "doc": "A section keeps the selected half-space of the source part."
+    },
+    {
+     "name": "DrawingSvgExporter",
+     "kind": "class",
+     "file": "projectkit/src/materia/drawing/DrawingSvgExporter.hx",
+     "doc": "Physical-size SVG export for an already projected engineering drawing view.",
+     "fields": [
+      {
+       "name": "svg",
+       "kind": "method",
+       "signature": "(drawing:ProjectedDrawingView, ?widthMm:Float, ?heightMm:Float):String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "DrawingViewSpec",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/drawing/DrawingProjection.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "direction",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "up",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "showHiddenLines",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
+       "name": "section",
+       "kind": "var",
+       "signature": ":DrawingSectionSpec",
+       "optional": true
+      }
+     ],
+     "doc": "Orthographic view inputs use the part's model units; direction points toward the viewer."
+    },
+    {
+     "name": "ProjectedDrawingView",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/drawing/DrawingProjection.hx",
+     "fields": [
+      {
+       "name": "partId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "viewId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "lengthUnit",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "lines",
+       "kind": "var",
+       "signature": ":Array<DrawingLine>"
+      },
+      {
+       "name": "callouts",
+       "kind": "var",
+       "signature": ":Array<DrawingCallout>"
+      },
+      {
+       "name": "bounds",
+       "kind": "var",
+       "signature": ":DrawingBounds"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "materia.project",
+   "types": [
+    {
+     "name": "Appearance",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/Appearance.hx",
+     "fields": [
+      {
+       "name": "finish",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "metallic",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "roughness",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Portable surface finish. Physical/BOM material is a separate property."
+    },
+    {
+     "name": "Appearances",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/Appearance.hx",
+     "fields": [
+      {
+       "name": "same",
+       "kind": "method",
+       "signature": "(?a:Appearance, ?b:Appearance):Bool",
+       "static": true
+      },
+      {
+       "name": "presets",
+       "kind": "method",
+       "signature": "():Array<Appearance>",
+       "static": true
+      },
+      {
+       "name": "preset",
+       "kind": "method",
+       "signature": "(id:String):Null<Appearance>",
+       "static": true
+      },
+      {
+       "name": "neutral",
+       "kind": "method",
+       "signature": "():Appearance",
+       "static": true
+      },
+      {
+       "name": "painted",
+       "kind": "method",
+       "signature": "():Appearance",
+       "static": true
+      },
+      {
+       "name": "machinedSteel",
+       "kind": "method",
+       "signature": "():Appearance",
+       "static": true
+      },
+      {
+       "name": "blackOxide",
+       "kind": "method",
+       "signature": "():Appearance",
+       "static": true
+      },
+      {
+       "name": "bearingSteel",
+       "kind": "method",
+       "signature": "():Appearance",
+       "static": true
+      },
+      {
+       "name": "aluminium",
+       "kind": "method",
+       "signature": "():Appearance",
+       "static": true
+      },
+      {
+       "name": "rubber",
+       "kind": "method",
+       "signature": "():Appearance",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "MaterialDef",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/MaterialDef.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "visual",
+       "kind": "var",
+       "signature": ":MaterialVisual"
+      },
+      {
+       "name": "physical",
+       "kind": "var",
+       "signature": ":MaterialPhysical"
+      },
+      {
+       "name": "mechanical",
+       "kind": "var",
+       "signature": ":Null<MaterialMechanical>",
+       "optional": true
+      },
+      {
+       "name": "sheet",
+       "kind": "var",
+       "signature": ":Null<MaterialSheet>",
+       "optional": true
+      }
+     ],
+     "doc": "Visual and bulk properties; density is kg/m3, mechanical properties are MPa."
+    },
+    {
+     "name": "MaterialKFactorRow",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/MaterialDef.hx",
+     "fields": [
+      {
+       "name": "ratio",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "k",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "ANSI K factor at one nonnegative inner-radius/thickness ratio."
+    },
+    {
+     "name": "MaterialLibrary",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/MaterialLibrary.hx",
+     "doc": "Built-in material definitions shared by generators, the BOM, and the editor.",
+     "fields": [
+      {
+       "name": "all",
+       "kind": "method",
+       "signature": "():Array<MaterialDef>",
+       "static": true
+      },
+      {
+       "name": "sheetMaterials",
+       "kind": "method",
+       "signature": "():Array<MaterialDef>",
+       "static": true
+      },
+      {
+       "name": "get",
+       "kind": "method",
+       "signature": "(id:String):Null<MaterialDef>",
+       "static": true
+      },
+      {
+       "name": "require",
+       "kind": "method",
+       "signature": "(id:String):MaterialDef",
+       "static": true
+      },
+      {
+       "name": "specs",
+       "kind": "method",
+       "signature": "():Array<String>",
+       "static": true
+      },
+      {
+       "name": "validateCustom",
+       "kind": "method",
+       "signature": "(items:Array<MaterialDef>):Void",
+       "static": true
+      },
+      {
+       "name": "validateSheetProperties",
+       "kind": "method",
+       "signature": "(item:MaterialDef):Void",
+       "static": true,
+       "doc": "Validate optional structural and development data without assigning defaults."
+      },
+      {
+       "name": "fromSpec",
+       "kind": "method",
+       "signature": "(?spec:String):String",
+       "static": true
+      },
+      {
+       "name": "appearance",
+       "kind": "method",
+       "signature": "(id:String):Appearance",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "MaterialMechanical",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/MaterialDef.hx",
+     "fields": [
+      {
+       "name": "uts",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "yield",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "youngs",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Strengths and elastic modulus in MPa. Optional for nonstructural materials."
+    },
+    {
+     "name": "MaterialPhysical",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/MaterialDef.hx",
+     "fields": [
+      {
+       "name": "density",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spec",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "youngsModulusPa",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "dampingLossFactor",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "thermalExpansionPerK",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "thermalConductivityWPerMK",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      },
+      {
+       "name": "propertiesAssumed",
+       "kind": "var",
+       "signature": ":Null<Bool>",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "MaterialSheet",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/MaterialDef.hx",
+     "fields": [
+      {
+       "name": "kFactorTable",
+       "kind": "var",
+       "signature": ":Array<MaterialKFactorRow>"
+      },
+      {
+       "name": "defaultRadiusRatio",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "minRadiusRatio",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "grain",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ],
+     "doc": "Sheet development defaults; grain indicates that the authored rolling direction matters."
+    },
+    {
+     "name": "MaterialVisual",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/MaterialDef.hx",
+     "fields": [
+      {
+       "name": "baseColor",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "metallic",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "roughness",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "emissive",
+       "kind": "var",
+       "signature": ":Null<Array<Float>>",
+       "optional": true
+      },
+      {
+       "name": "alpha",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "MeshMassData",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/MeshMassProperties.hx",
+     "fields": [
+      {
+       "name": "volume",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "centerOfMass",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "inertia",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      }
+     ]
+    },
+    {
+     "name": "MeshMassProperties",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/MeshMassProperties.hx",
+     "doc": "Integrates a closed, consistently wound triangle mesh as signed tetrahedra.",
+     "fields": [
+      {
+       "name": "compute",
+       "kind": "method",
+       "signature": "(vertices:Bytes, indices:Bytes):MeshMassData",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifact",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "doc": "Versioned, producer-independent scene geometry exchange format.",
+     "fields": [
+      {
+       "name": "VERSION",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "MAX_BYTES",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactArmConfiguration",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "shoulder",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "elbow",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "wrist",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "turns",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "optional": true
+      }
+     ],
+     "doc": "Generic geometric labels, with optional physical arm turn counts."
+    },
+    {
+     "name": "SceneArtifactAxisProgram",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "axes",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "waypoints",
+       "kind": "var",
+       "signature": ":Array<Array<Float>>"
+      },
+      {
+       "name": "loop",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "positionTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      }
+     ],
+     "doc": "Metre-valued independent-axis waypoints, run as exact-stop moves."
+    },
+    {
+     "name": "SceneArtifactBeltVisual",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "pitch",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "thickness",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "driverJoint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "driverWrap",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "driverSign",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "wraps",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactBeltWrap>"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactBeltWrap",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "connector",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "radius",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "side",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactCellController",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "joints",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "sensors",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "channels",
+       "kind": "var",
+       "signature": ":Array<String>"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactCellSignal",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "from",
+       "kind": "var",
+       "signature": ":SceneArtifactSignalPort"
+      },
+      {
+       "name": "to",
+       "kind": "var",
+       "signature": ":SceneArtifactSignalPort"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactController",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "stepTickHz",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ],
+     "doc": "The controller generates at most `stepTickHz` step edges a second per channel. Driver\nmicrostepping and input-rate limits belong to the machine's actuators; binding combines them."
+    },
+    {
+     "name": "SceneArtifactData",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "lengthUnit",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "metresPerUnit",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "parts",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactPart>"
+      },
+      {
+       "name": "assemblyDefinition",
+       "kind": "var",
+       "signature": ":AssemblyDefinition",
+       "optional": true
+      },
+      {
+       "name": "assemblyState",
+       "kind": "var",
+       "signature": ":AssemblyStateRecord",
+       "optional": true
+      },
+      {
+       "name": "recipeDocument",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "recipeDiagnostics",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "optional": true
+      },
+      {
+       "name": "machining",
+       "kind": "var",
+       "signature": ":SceneArtifactMachining",
+       "optional": true
+      },
+      {
+       "name": "mobileBase",
+       "kind": "var",
+       "signature": ":SceneArtifactMobileBase",
+       "optional": true
+      },
+      {
+       "name": "missions",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactMission>",
+       "optional": true
+      },
+      {
+       "name": "robotTools",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactRobotTool>",
+       "optional": true
+      },
+      {
+       "name": "robotSensors",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactRobotSensor>",
+       "optional": true
+      },
+      {
+       "name": "machineMotion",
+       "kind": "var",
+       "signature": ":SceneArtifactMachineMotion",
+       "optional": true
+      },
+      {
+       "name": "controllers",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactCellController>",
+       "optional": true
+      },
+      {
+       "name": "signals",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactCellSignal>",
+       "optional": true
+      },
+      {
+       "name": "project",
+       "kind": "var",
+       "signature": ":SceneArtifactProject",
+       "optional": true
+      },
+      {
+       "name": "printing",
+       "kind": "var",
+       "signature": ":SceneArtifactPrinting",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactDigitalEvent",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "timeSec",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "channel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "value",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactDigitalProgram",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "durationSec",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "events",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactDigitalEvent>"
+      },
+      {
+       "name": "loop",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactEnclosureGuard",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "doorJoint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "closedSensor",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "openSensor",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "spindleJoints",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "axisJoints",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "stroke",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "setupSpeedLimit",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "timeoutSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "lockTravelSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "linearStandstillTolerance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "rotaryStandstillTolerance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "standstillConfirmationSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "enclosureParts",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "optional": true
+      }
+     ],
+     "doc": "Runtime guard policy; door travel and linear speeds are SI, angles radians."
+    },
+    {
+     "name": "SceneArtifactFaceRange",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "faceIndex",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "firstIndex",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "indexCount",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactFloorPose",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "yaw",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "A pose on the floor: x and y in metres and the heading `yaw` in radians about +Z."
+    },
+    {
+     "name": "SceneArtifactGripper",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "padMembers",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "envelopeMembers",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "minimumPartWidthMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "nominalPartWidthMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumPartWidthMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "fingerLengthMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "fingerPadFrictionCoefficient",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Assumed physical limits used to choose and orient a grasp from the blank's planar faces."
+    },
+    {
+     "name": "SceneArtifactHeater",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "sensor",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "slot",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "mount",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "fan",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "feedsExtruder",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "r0Ohm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "t0Celsius",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "beta",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pullupOhm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "vRef",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "kp",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "ki",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "kd",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxDuty",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxTemperature",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "bandCelsius",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pidRangeCelsius",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "gainWindowSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "gainMinCelsius",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "hysteresisCelsius",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "hysteresisWindowSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "heatCapacity",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "power",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "loss",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "fanLoss",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "ambient",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "One heater of a print job; see SceneArtifactPrinting."
+    },
+    {
+     "name": "SceneArtifactHobbing",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "module",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "teeth",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pressureAngle",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "starts",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "gashes",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "outside",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "wall",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "radialStep",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "axialStep",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "tolerance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "feed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cuttingSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "axes",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "stock",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "controllerHz",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cupLength",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "cupEndThickness",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "handling",
+       "kind": "var",
+       "signature": ":SceneArtifactHobbingHandling",
+       "optional": true
+      },
+      {
+       "name": "scenario",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      }
+     ],
+     "doc": "Gear/hob lengths in mm, angles radians, process speed m/min."
+    },
+    {
+     "name": "SceneArtifactHobbingHandling",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "sleeve",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "outside",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "wall",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "radialTravel",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "retractX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "frontApproachMm",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "liftMm",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      }
+     ],
+     "doc": "Authored handling illustration, millimetres; not a deformation/contact model."
+    },
+    {
+     "name": "SceneArtifactHullContact",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "surface",
+       "kind": "var",
+       "signature": ":SceneContactSurface"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactInspectionCamera",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "anchor",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "offset",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "span",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "yaw",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pitch",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "hiddenPrefixes",
+       "kind": "var",
+       "signature": ":Array<String>"
+      }
+     ],
+     "doc": "Inspection target is a world-aligned offset from the displayed anchor centre, in metres.\nOrientation is steady in world space, so a rotating part never spins the camera."
+    },
+    {
+     "name": "SceneArtifactJointTarget",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "position",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Absolute mechanical joint position, in radians or metres."
+    },
+    {
+     "name": "SceneArtifactMachineMotion",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "belts",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactBeltVisual>"
+      },
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":SceneArtifactAxisProgram",
+       "optional": true
+      },
+      {
+       "name": "virtualDevice",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
+       "name": "contacts",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactHullContact>",
+       "optional": true
+      },
+      {
+       "name": "digitalProgram",
+       "kind": "var",
+       "signature": ":SceneArtifactDigitalProgram",
+       "optional": true
+      },
+      {
+       "name": "pressBrake",
+       "kind": "var",
+       "signature": ":SceneArtifactPressBrake",
+       "optional": true
+      },
+      {
+       "name": "hobbing",
+       "kind": "var",
+       "signature": ":SceneArtifactHobbing",
+       "optional": true
+      },
+      {
+       "name": "enclosureGuard",
+       "kind": "var",
+       "signature": ":SceneArtifactEnclosureGuard",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactMachining",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "setupJoints",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactMachiningSetupJoint>",
+       "optional": true
+      },
+      {
+       "name": "kinematicPreview",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
+       "name": "mission",
+       "kind": "var",
+       "signature": ":SceneArtifactMachiningMission",
+       "optional": true
+      },
+      {
+       "name": "powerUpOffsets",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactPowerUpOffset>",
+       "optional": true
+      },
+      {
+       "name": "powerUpSideOffsets",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactPowerUpSideOffset>",
+       "optional": true
+      },
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "programFile",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "programSha256",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "workOffsets",
+       "kind": "var",
+       "signature": ":Array<{number:Int, offset:Array<Float>}>",
+       "optional": true
+      },
+      {
+       "name": "stockSpacing",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "targets",
+       "kind": "var",
+       "signature": ":Array<{id:String, part:String, stock:String, position:Array<Float>, angle:Float}>",
+       "optional": true
+      },
+      {
+       "name": "axes",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "spindle",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "channelScope",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "workOffset",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "tools",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactTool>"
+      },
+      {
+       "name": "stocks",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "sacrificial",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "optional": true
+      },
+      {
+       "name": "toolPart",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "loadedTool",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "loop",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
+       "name": "controller",
+       "kind": "var",
+       "signature": ":SceneArtifactController",
+       "optional": true
+      },
+      {
+       "name": "controllerId",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      }
+     ],
+     "doc": "A machining job the generator made for its own machine, with everything needed to run it (since\nversion 20). Lengths are metres, whatever the scene's unit.\n\nThe machine's `axes` are three prismatic joints whose positions are machine X, Y and Z, and machine\ncoordinates name where the spindle's gauge line is: the origin of the `spindle` occurrence, whose\n+Z runs up the spindle axis. `workOffset` is G54 in machine coordinates. Each tool in `tools` hangs\n`length` below the gauge line and has the shape `profile` (a toolpath cutter profile's `encode`),\nso the program's G43 H numbers are the tool numbers. `stocks` are the occurrences the tool may cut and\n`sacrificial` those it may run into without harm, such as a spoilboard under through holes.\n`toolPart` is the occurrence that shows the tool in the spindle, whose shape changes with the tool,\nand `loadedTool` the number of the tool in the spindle when the job starts.\n`target` names a part of the artifact that no occurrence uses: the finished part, in the stock's\nframe, to compare the machined stock with. A looping job starts again when the program ends.\n`controller` is the controller the machine's steppers are nominally wired to: the machine's own\nlimits are the motors' and drives', and the controller's step rate caps them further."
+    },
+    {
+     "name": "SceneArtifactMachiningMission",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ],
+     "doc": "A named, single-program machining mission, executed by the CNC player."
+    },
+    {
+     "name": "SceneArtifactMachiningSetupJoint",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "position",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "tolerance",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Geometric setup condition, in metres for translation and radians for rotation."
+    },
+    {
+     "name": "SceneArtifactMission",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "screwFeeders",
+       "kind": "var",
+       "signature": ":Array<materia.project.SceneScrewFeeder>",
+       "optional": true
+      },
+      {
+       "name": "blowFeeds",
+       "kind": "var",
+       "signature": ":Array<materia.project.SceneBlowFeed>",
+       "optional": true
+      },
+      {
+       "name": "screwEngagement",
+       "kind": "var",
+       "signature": ":SceneArtifactScrewEngagement",
+       "optional": true
+      },
+      {
+       "name": "toolChanger",
+       "kind": "var",
+       "signature": ":SceneArtifactToolChanger",
+       "optional": true
+      },
+      {
+       "name": "screwEntrySearch",
+       "kind": "var",
+       "signature": ":SceneArtifactScrewEntrySearch",
+       "optional": true
+      },
+      {
+       "name": "steps",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactMissionStep>"
+      },
+      {
+       "name": "loop",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
+       "name": "powerUpOffsets",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactPowerUpOffset>",
+       "optional": true
+      },
+      {
+       "name": "powerUpSideOffsets",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactPowerUpSideOffset>",
+       "optional": true
+      },
+      {
+       "name": "controllerId",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactMissionSignal",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "value",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ],
+     "doc": "One digital output command owned by a cell controller."
+    },
+    {
+     "name": "SceneArtifactMissionStep",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "configuration",
+       "kind": "var",
+       "signature": ":SceneArtifactArmConfiguration",
+       "optional": true
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":SceneArtifactFloorPose",
+       "optional": true
+      },
+      {
+       "name": "at",
+       "kind": "var",
+       "signature": ":SceneArtifactPlace",
+       "optional": true
+      },
+      {
+       "name": "yaw",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "toolYaw",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "weld",
+       "kind": "var",
+       "signature": ":SceneArtifactWeld",
+       "optional": true
+      },
+      {
+       "name": "screw",
+       "kind": "var",
+       "signature": ":SceneScrewInvocation.ScrewInvocation",
+       "optional": true
+      },
+      {
+       "name": "joints",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactJointTarget>",
+       "optional": true
+      },
+      {
+       "name": "contactWork",
+       "kind": "var",
+       "signature": ":SceneContactRegistration.SceneContactWork",
+       "optional": true
+      },
+      {
+       "name": "signal",
+       "kind": "var",
+       "signature": ":SceneArtifactMissionSignal",
+       "optional": true
+      },
+      {
+       "name": "waitFor",
+       "kind": "var",
+       "signature": ":SceneArtifactMissionWait",
+       "optional": true
+      },
+      {
+       "name": "poses",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactMissionWaypoint>",
+       "optional": true
+      },
+      {
+       "name": "timeoutSeconds",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "approachDistance",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "tool",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "targetToolId",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      }
+     ],
+     "doc": "One step of a mission.\n- `goTo`: drive the mobile base to `pose`, in the assembly frame on the floor.\n- `pick`: take hold of the occurrence `at.occurrence` with the tool, meeting it at its connector\n`at.connector`, wherever the part is when the step starts.\n- `place`: set what the tool holds down with its base on the connector `at.connector` of\n`at.occurrence`, and let go.\n- `moveJoints`: move the chain ending at `at` to absolute joint coordinates in radians or metres.\n- `signal`: set one digital output on the mission's controller.\n- `waitFor`: wait for one digital input on the mission's controller until its simulation-time timeout.\n- `moveVia`: move the chain ending at `at` through exact-stop joint or robot-root-frame pose waypoints.\n- `weld`: weld the seam `weld` describes with the robot's torch.\n- `screw`: pick and drive the named CAD fastening with the robot's screwdriver.\n- `findWork`: measure the named work frame from contact probes on saved nominal CAD faces.\n- `changeTool`: dock the current tool and select the named physical tool after measured lock feedback.\n- `stow`: return the welding arm to its CAD ready posture using its measured joints and live cell clearance."
+    },
+    {
+     "name": "SceneArtifactMissionWait",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "value",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "timeout",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "retryStep",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      }
+     ],
+     "doc": "A controller input condition with a simulation-time deadline."
+    },
+    {
+     "name": "SceneArtifactMissionWaypoint",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "joints",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactJointTarget>",
+       "optional": true
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":SceneArtifactTorchPose",
+       "optional": true
+      }
+     ],
+     "doc": "A waypoint is exactly one of a joint target or a robot-root-frame Cartesian pose."
+    },
+    {
+     "name": "SceneArtifactMobileBase",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "leftWheel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "rightWheel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "wheelRadius",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "trackWidth",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxLinearSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxAngularSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxLinearAcceleration",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxAngularAcceleration",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "footprintLength",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "footprintWidth",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "robot",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "origin",
+       "kind": "var",
+       "signature": ":SceneArtifactFloorPose",
+       "optional": true
+      },
+      {
+       "name": "energy",
+       "kind": "var",
+       "signature": ":SceneArtifactMobileEnergy",
+       "optional": true
+      }
+     ],
+     "doc": "The assembly is a differential-drive robot that rolls on the floor. Its root body\nis the chassis, driven over the floor plane in the assembly frame: +X forward, +Z up, the origin on\nthe floor between the wheels' contacts. `leftWheel` and `rightWheel` are its wheel joints (+Y side\nfirst), each turning about its own axle; the simulation reads each one's rolling direction from\nits axis. Lengths are metres, speeds m/s and rad/s, accelerations m/s² and rad/s², whatever the\nscene's unit. `footprintLength`/`footprintWidth` are the chassis outline, centred on the origin.\n\nA robot that works in a scene of its own names its occurrence subtree as `robot` (an include id:\nits occurrences are `robot/...`) and stands at `origin` (x, y and heading on the floor, in the\nassembly frame); everything outside the subtree is its world, held where it stands. Without\n`robot` the whole assembly is the robot, standing at the assembly origin."
+    },
+    {
+     "name": "SceneArtifactMobileEnergy",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "initialChargeFraction",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "batteryOccurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "nominalVolts",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "capacityWh",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "fullVoltage",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "emptyVoltage",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cutoffVoltage",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "internalResistanceOhms",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxDischargeCurrentA",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxChargePowerW",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "chargeEfficiency",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "inverterContinuousWatts",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "inverterEfficiency",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "armSupplyEfficiency",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "driveSupplyEfficiency",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "computerSupplyEfficiency",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "armDriveEfficiency",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "driveMotorEfficiency",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "driveGearEfficiency",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "computerLoadWatts",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "chargerOccurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "chargerPowerWatts",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "dockPose",
+       "kind": "var",
+       "signature": ":SceneArtifactFloorPose"
+      },
+      {
+       "name": "dockPositionToleranceMeters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "dockHeadingToleranceRadians",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactPart",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "red",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "green",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "blue",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "appearance",
+       "kind": "var",
+       "signature": ":Appearance",
+       "optional": true
+      },
+      {
+       "name": "materialId",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "materialDensity",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "materialSpec",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "volume",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "centerOfMass",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "optional": true
+      },
+      {
+       "name": "inertia",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "optional": true
+      },
+      {
+       "name": "physicalMassKg",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "physicalMassDeclared",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
+       "name": "physicalInertiaKgM2",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "optional": true
+      },
+      {
+       "name": "vertexCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "indexCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "vertices",
+       "kind": "var",
+       "signature": ":Bytes"
+      },
+      {
+       "name": "normals",
+       "kind": "var",
+       "signature": ":Bytes"
+      },
+      {
+       "name": "indices",
+       "kind": "var",
+       "signature": ":Bytes"
+      },
+      {
+       "name": "edgeSegments",
+       "kind": "var",
+       "signature": ":Bytes",
+       "optional": true
+      },
+      {
+       "name": "edgeIds",
+       "kind": "var",
+       "signature": ":Bytes",
+       "optional": true
+      },
+      {
+       "name": "faceRanges",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactFaceRange>"
+      },
+      {
+       "name": "faceDescriptors",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "threads",
+       "kind": "var",
+       "signature": ":Array<ThreadRenderData>",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactPlace",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "connector",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ],
+     "doc": "A connector of an occurrence in the assembly."
+    },
+    {
+     "name": "SceneArtifactPowerUpOffset",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "offset",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Physical initial displacement in SI units from the saved pose of a home-monitored joint."
+    },
+    {
+     "name": "SceneArtifactPowerUpSideOffset",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "homeSwitch",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "offset",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Startup racking in axis SI units, identified by the physical side home switch."
+    },
+    {
+     "name": "SceneArtifactPressBrake",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "controllerId",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "ramJoint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "depthAxis",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "gaugeX",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "gaugeR",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "topSwitch",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "fingerSwitches",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "steps",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactPressBrakeStep>"
+      },
+      {
+       "name": "positionToleranceMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "requestTimeoutSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "releaseTravelMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "releaseClosingForceN",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Runtime bindings are authored semantic ids; geometry supplies each program step."
+    },
+    {
+     "name": "SceneArtifactPressBrakeStep",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "gaugeXmm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "gaugeRmm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "clampTravelMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "depthTravelMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "withdrawalMm",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Press travel and gauge setup use millimetres; axis planning converts to SI once."
+    },
+    {
+     "name": "SceneArtifactPrinting",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "axes",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "extruder",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "filamentDiameter",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "gearRadius",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxFlow",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pressureAdvance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pressureAdvanceWindow",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "meltLag",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "rampLength",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "heaters",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactHeater>"
+      },
+      {
+       "name": "controller",
+       "kind": "var",
+       "signature": ":SceneArtifactController"
+      },
+      {
+       "name": "minExtrusionTemperature",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "deposit",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "shaping",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactShaper>",
+       "optional": true
+      }
+     ],
+     "doc": "A print job the generator made for its own printer. Lengths are metres, whatever the scene's unit.\n\n`source` is the program as the printer's G-code (Klipper flavour: relative extrusion, `M104`/`M109`/`M140`/`M190`,\n`M106`/`M107`), in machine coordinates: the positions of the three `axes`, prismatic joints whose values are\nmachine X, Y and Z (the bed's Z grows as the bed goes down, so the nozzle rises relative to it). The machine starts\nwhere the assembly's initial pose puts it, referenced: a leading `G28` is not run, because the virtual device has\nno switch inputs for a CoreXY yet. The `extruder` is the joint of the filament drive gear: it turns\n`1 / gearRadius` radians per metre of filament, and the hotend melts at most `maxFlow` cubic metres a second.\n`pressureAdvance` seconds (0 is off) is how far the extruder runs ahead of the flow it feeds, averaged over\n`pressureAdvanceWindow` seconds; `rampLength` is how far along the path its rate ramps. `meltLag` seconds is how long\nthe melt takes to follow the filament: what flows out of the nozzle is the feed through a lag of that time, which\npressure advance (of the same time) cancels. `controller` is the\ncontroller the steppers are wired to, as in a machining job.\n\nEach heater (the hotend, the bed) is run by the controller: the host sets its target on the analog channel\n`target`, the board's PID and watchdog do the rest, and its report is the `tool_heater` sensor `sensor`, in the\nboard's slot `slot`, mounted on the occurrence `mount`. The numbers are the controller's tuning and the part's\nassumed thermal plant. A heater's `fan` is the analog channel (duty 0 to 1) of the part fan that blows on it;\n`feedsExtruder` says that pushing filament while it is below `minExtrusionTemperature` is a fault. `deposit`, when\ngiven, is the occurrence that shows what is printed: the simulation lays the material on it as geometry of its own,\nin the frame of the occurrence, whose origin is the machine's zero (the bed's front left corner at its surface),\nand it rides the bed. `shaping`, when given, names the axes whose motion is input-shaped and with what: the shaper\n(`zv`, `mzv` or `ei`) cancels the vibration of a mode at `frequency` hertz and `damping` ratio, and the other joints\nare delayed to stay in step (see `InputShaper`)."
+    },
+    {
+     "name": "SceneArtifactProgram",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/SceneArtifactProgram.hx",
+     "doc": "Program dependencies stay outside the bounded geometry metadata section.",
+     "fields": [
+      {
+       "name": "MAX_BYTES",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(job:SceneArtifactMachining):Void",
+       "static": true
+      },
+      {
+       "name": "digest",
+       "kind": "method",
+       "signature": "(bytes:Bytes):String",
+       "static": true
+      },
+      {
+       "name": "resolve",
+       "kind": "method",
+       "signature": "(job:SceneArtifactMachining, ?read:(String) -> Bytes):String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactProject",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "inspectionCameras",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactInspectionCamera>",
+       "optional": true
+      },
+      {
+       "name": "initialView",
+       "kind": "var",
+       "signature": ":SceneArtifactView",
+       "optional": true
+      },
+      {
+       "name": "variant",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "job",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "dynamicParts",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "motions",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactProjectMotion>"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactProjectMotion",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "loop",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "keys",
+       "kind": "var",
+       "signature": ":Array<{time:Float, position:Float}>"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactRobotSensor",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "mount",
+       "kind": "var",
+       "signature": ":SceneArtifactPlace"
+      },
+      {
+       "name": "rayCount",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "maxRange",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "updateRate",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      }
+     ],
+     "doc": "A sensor on the assembly's robot, as its part declares it. A `lidar` scans the\nhorizontal plane of the connector `mount.connector` of the occurrence `mount.occurrence`, `rayCount`\nrays round the full circle from the connector's +X axis, seeing out to `maxRange` metres and scanning\n`updateRate` times a second. A `force_torque` sensor reports XYZ newtons and XYZ newton-metres at its\nnamed frame. `id` names it in the robot's observations."
+    },
+    {
+     "name": "SceneArtifactRobotTool",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "controller",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "members",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "contact",
+       "kind": "var",
+       "signature": ":SceneArtifactPlace"
+      },
+      {
+       "name": "channel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "sensor",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "gripper",
+       "kind": "var",
+       "signature": ":SceneArtifactGripper",
+       "optional": true
+      },
+      {
+       "name": "torch",
+       "kind": "var",
+       "signature": ":SceneArtifactTorch",
+       "optional": true
+      },
+      {
+       "name": "screwdriver",
+       "kind": "var",
+       "signature": ":SceneArtifactScrewdriver",
+       "optional": true
+      }
+     ],
+     "doc": "A tool on the assembly's robot and how it is worked, as its parts' declared\ncapabilities say: a `suction` tool seals on what touches the occurrence `contact.occurrence` at its\nconnector `contact.connector` while the digital process channel `channel` is on, and reports the\nvacuum it pulls on the sensor `sensor` when it has one. A `gripper` has physical jaws, closes on\nthe same kind of digital channel, and uses its native joint switch `sensor` as grasp feedback.\n\nA `torch` tool is a MIG/MAG welding torch: `contact` is the connector at its wire tip (the tool point),\n`channel` is the digital channel that lights its arc, `sensor` is its `tool_weld` sensor, and `torch`\ndescribes the welder behind it. A `screwdriver` carries its bit, capacities and named tool joints;\nits process sensor and tightening observer are supplied by the driving process. Tool data requires\nthe current scene schema; older versions are rejected."
+    },
+    {
+     "name": "SceneArtifactScrewEngagement",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "mode",
+       "kind": "var",
+       "signature": ":SceneArtifactScrewEngagementMode"
+      },
+      {
+       "name": "maximumAxialForceN",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "threadStiffnessNPerM",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      }
+     ],
+     "doc": "Mission-level thread-reaction selection, independent of hole-search sensing."
+    },
+    {
+     "name": "SceneArtifactScrewEngagementMode",
+     "kind": "abstract",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "underlying": "String",
+     "doc": "Selects whether thread reaction comes from the qualified process model or a physical coupled screw joint.",
+     "fields": [
+      {
+       "name": "ProcessModel",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "PhysicalThread",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactScrewEntrySearch",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "sensor",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "maximumAgeSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "contactForceN",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "contactThresholdN",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "confirmationSamples",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "virtualMass",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "damping",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "maximumLinearSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumAngularSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumStepSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "approachSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumForceN",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumTorqueNm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumTravelMeters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumTravelRadians",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumRunSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "regionHalfUMeters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "regionHalfVMeters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spiralRadiusMeters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spiralPitchMeters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spiralSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spiralTrackingGainPerSecond",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spiralTrackingToleranceMeters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "entryAdvanceMeters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "stallSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Commissioning of a force-guided screw entry (`ScrewEntryController`). Axes are the fastening's: u and v span the\nhole plane and n advances into the hole; `virtualMass` and `damping` give u, v, n and the rotations about them.\nLengths are metres, speeds m/s, forces N."
+    },
+    {
+     "name": "SceneArtifactScrewdriver",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "bit",
+       "kind": "var",
+       "signature": ":SceneArtifactScrewdriverBit"
+      },
+      {
+       "name": "bitMember",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "directionChannel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "programChannel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "vacuumChannel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "feedJoint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "spindleJoint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "strokeEncoder",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "maxTorque",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "strokeMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "springRate",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Tool capacity in Nm and rad/s, travel in mm, spring rate in N/mm. Joint names identify real tool motion."
+    },
+    {
+     "name": "SceneArtifactScrewdriverBit",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "size",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ],
+     "doc": "Nominal bit identity, portable without a dependency on MachineKit."
+    },
+    {
+     "name": "SceneArtifactShaper",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "axis",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "frequency",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "damping",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "One axis's input shaper in a print job; see SceneArtifactPrinting."
+    },
+    {
+     "name": "SceneArtifactSignalPort",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "controller",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "port",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactTool",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "number",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "profile",
+       "kind": "var",
+       "signature": ":Array<Array<Float>>"
+      }
+     ],
+     "doc": "One tool of a machining job's tool table; see SceneArtifactMachining."
+    },
+    {
+     "name": "SceneArtifactToolChanger",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "master",
+       "kind": "var",
+       "signature": ":SceneArtifactPlace"
+      },
+      {
+       "name": "lockOutput",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "lockedInput",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "identityInputs",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "initialToolId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "maximumObservationAgeSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "tools",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactToolChangerTool>"
+      }
+     ],
+     "doc": "Commissioned changer I/O and the CAD interfaces of every interchangeable tool."
+    },
+    {
+     "name": "SceneArtifactToolChangerTool",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "channel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "connector",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "dock",
+       "kind": "var",
+       "signature": ":SceneArtifactPlace"
+      },
+      {
+       "name": "identityCode",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ],
+     "doc": "One interchangeable physical end effector and its CAD docking interface."
+    },
+    {
+     "name": "SceneArtifactTorch",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "wireSpeedChannel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "voltageChannel",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "groundedWork",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "maxCurrentA",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "efficiency",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "wireDiameterMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "stickoutMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxWireSpeedMPerMin",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "depositionEfficiency",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "The welder a `torch` robot tool runs on. `wireSpeedChannel` (metres per minute) and `voltageChannel` (volts)\nare its analogue setpoints. The weld circuit closes through the occurrences in `groundedWork` (the work\nclamp's member and what is welded to it); the arc strikes only against them. `maxCurrentA` is the supply's\nrating, `efficiency` the fraction of the mains power it delivers to the arc, `wireDiameterMm` the wire's\ndiameter and `stickoutMm` the wire's extension past the contact tip. `maxWireSpeedMPerMin` is the feeder's top\nwire speed and `depositionEfficiency` the fraction of the melted wire that reaches the weld; the weld steps' recipes\nwere made for this wire, and the simulated weld deposits with the same figure."
+    },
+    {
+     "name": "SceneArtifactTorchPose",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "position",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "rotation",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      }
+     ],
+     "doc": "A pose in the assembly frame: position in metres and an xyzw rotation."
+    },
+    {
+     "name": "SceneArtifactView",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "yaw",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pitch",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "SceneArtifactWeld",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "frame",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "metal",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "path",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactWeldSegment>"
+      },
+      {
+       "name": "legSize",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "passes",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactWeldPass>"
+      }
+     ],
+     "doc": "A weld to run and how. What is welded is a result of the CAD, never authored: `path` is the seams as the CAD\nfound them, run one after the other as one weld (a straight seam is a path of one segment, the four sides of a\ntube a path of four), and the rest is what the generator derived from them, so a player needs no CAD to weld\nthem. Lengths are metres, whatever the scene's unit.\n- `path` is the segments in order, each starting where the one before ends. The torch strikes the arc at the\nstart of the first, keeps it up along the whole path and ends it at the end of the last. Where one segment's\ntorch angles differ from the next one's, as at the corner of a tube, the torch turns from one to the other\nas it passes the joint. All passes share this CAD path and together deposit the requested leg.\n- `frame` is the occurrence the path is relative to, the workpiece's reference member: every pose and normal in the\npath is in that occurrence's own frame (metres, with its normals turned with it). A player finds the occurrence where it\nstands when the step starts and places the path by it, so the weld follows a workpiece that is not where it was\ndesigned. Without a `frame` the path is in the assembly as designed (the form welds took before it existed).\n- `metal` is the occurrence that carries the weld metal: the part the bead is shown on as the welder lays it.\n- `legSize` is the leg the weldment asks for.\n- `passes` give ordered processes, face offsets, weaving and cooling over that path. The generator derives\ntheir deposited areas from the target leg; the measured final leg is checked against that target."
+    },
+    {
+     "name": "SceneArtifactWeldFace",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "member",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "face",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ],
+     "doc": "Physical CAD identity is separate from a seam's display name."
+    },
+    {
+     "name": "SceneArtifactWeldPass",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "offset",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "process",
+       "kind": "var",
+       "signature": ":SceneArtifactWeldProcess"
+      },
+      {
+       "name": "weave",
+       "kind": "var",
+       "signature": ":SceneArtifactWeldWeave",
+       "optional": true
+      },
+      {
+       "name": "interpassDwell",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Ordered passes over the CAD path. Offsets are metres along its two outward face normals."
+    },
+    {
+     "name": "SceneArtifactWeldProcess",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "wireSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "voltage",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "travelSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "approach",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "startDwell",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "craterDwell",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "burnback",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "How a seam is welded: the wire speed (metres per minute) and voltage (volts) of the arc, the travel\nspeed along the seam (metres per second), and the sequence around it. The torch approaches from `approach`\nmetres out along the wire, strikes the arc at the start and holds until it is established, dwells\n`startDwell` seconds, travels the seam, dwells `craterDwell` seconds at its end to fill the crater, stops the\nwire, lets the arc burn back for `burnback` seconds, and retracts."
+    },
+    {
+     "name": "SceneArtifactWeldSegment",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "seam",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "faces",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactWeldFace>"
+      },
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":SceneArtifactTorchPose"
+      },
+      {
+       "name": "stop",
+       "kind": "var",
+       "signature": ":SceneArtifactTorchPose"
+      },
+      {
+       "name": "normals",
+       "kind": "var",
+       "signature": ":Array<Array<Float>>"
+      }
+     ],
+     "doc": "One primitive of a weld path, the piece of a seam the CAD found. `kind` says what shape it is: only a `line` so far,\nstraight from `start` to `stop` with the torch holding its orientation; an `arc` for a curved seam would add its\ncentre and sweep, and be another kind.\n- `seam` is its name as the CAD found it (`member:face|member:face`, the two faces the weld metal fills against,\neach in the geometry of the occurrence `member`).\n- `faces` carry the two CAD member/face identities; consumers never parse `seam`.\n- `joint` is how the members meet; only a `fillet` is deposited so far.\n- `start` and `stop` are the poses of the wire tip at the two ends: +Z along the wire out of the torch, +X along\nthe direction of travel as far as it is square to the wire. They carry the work and travel angles.\n- `normals` are the two faces' outward unit normals, which say where the weld metal sits (the fillet\nfills the corner they leave open)."
+    },
+    {
+     "name": "SceneArtifactWeldWeave",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "pattern",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "amplitude",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cyclesPerMetre",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "edgeDwell",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Frequency is spatial, so timing changes never change the authored weave."
+    },
+    {
+     "name": "SceneBlowFeed",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneBlowFeed.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "receiver",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "socketConnector",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "receiptSensor",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "inventory",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "bufferCapacity",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "trackDelay",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "deliveryDelay",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "deliveryTimeout",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "airPulse",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "airPressureBar",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "tube",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "externalTubeLengthMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "minimumBendRadiusMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "receivingAngularSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "receivingFeedSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "One commissioned tube/receiver path; seconds, bar and millimetres are explicit."
+    },
+    {
+     "name": "SceneBlowFeeds",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/SceneBlowFeed.hx",
+     "fields": [
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(value:Dynamic):Array<SceneBlowFeed>",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(paths:Array<SceneBlowFeed>, mission:SceneArtifactMission, scene:SceneArtifactData):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SceneContactFace",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneContactRegistration.hx",
+     "fields": [
+      {
+       "name": "member",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "face",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "normal",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "centre",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "chords",
+       "kind": "var",
+       "signature": ":Array<Array<Array<Float>>>"
+      }
+     ],
+     "doc": "Nominal polygonal CAD patches, including fixtures; lengths are metres in the named work frame."
+    },
+    {
+     "name": "SceneContactFilter",
+     "kind": "enum",
+     "file": "projectkit/src/materia/project/SceneContactFilter.hx",
+     "doc": "Which contacts an authored assembly hull participates in.",
+     "fields": [
+      {
+       "name": "Layers",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "PairsOnly",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "PairsAndEnvironment",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "SceneContactRegistration",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/SceneContactRegistration.hx",
+     "doc": "Strict saved-data boundary; execution and uncertainty policies belong to ProcessKit.",
+     "fields": [
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(raw:Dynamic):SceneContactWork",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(work:SceneContactWork, occurrences:Array<String>):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SceneContactSurface",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneContactSurface.hx",
+     "fields": [
+      {
+       "name": "friction",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "frictionDimensions",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "contactTimeConstant",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "contactDampingRatio",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "filter",
+       "kind": "var",
+       "signature": ":SceneContactFilter"
+      }
+     ],
+     "doc": "Explicit simulation contact settings; zero numerical fields keep backend defaults."
+    },
+    {
+     "name": "SceneContactWork",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneContactRegistration.hx",
+     "fields": [
+      {
+       "name": "frame",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "nominal",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      },
+      {
+       "name": "translation",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "rotation",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "measurementError",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "calibratedError",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "contactOffset",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "faces",
+       "kind": "var",
+       "signature": ":Array<SceneContactFace>"
+      }
+     ],
+     "doc": "Contact registration after parking. Nominal is assembly_T_work; uncertainty rotates about the chassis origin."
+    },
+    {
+     "name": "SceneScrew",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneScrewDefinition.hx",
+     "fields": [
+      {
+       "name": "fastening",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "screw",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "frame",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "threadFace",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "presenter",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "presentSensor",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "socket",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      },
+      {
+       "name": "pickup",
+       "kind": "var",
+       "signature": ":AssemblyFrame",
+       "optional": true
+      },
+      {
+       "name": "entry",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      },
+      {
+       "name": "seat",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      },
+      {
+       "name": "hole",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      },
+      {
+       "name": "leadMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "hand",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "slot",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":TighteningSettings"
+      },
+      {
+       "name": "simulation",
+       "kind": "var",
+       "signature": ":ScrewSimulationSettings"
+      },
+      {
+       "name": "approach",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "recovery",
+       "kind": "var",
+       "signature": ":ScrewRecovery",
+       "optional": true
+      },
+      {
+       "name": "delivery",
+       "kind": "var",
+       "signature": ":ScrewDeliveryMode"
+      },
+      {
+       "name": "clamped",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ],
+     "doc": "A freshly derived CAD fastening. All frames use metres; named occurrences own their live poses."
+    },
+    {
+     "name": "SceneScrewDefinition",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/SceneScrewDefinition.hx",
+     "doc": "Strict saved-data boundary, shared with the live process program. No CAD or process dependency.",
+     "fields": [
+      {
+       "name": "validateProgram",
+       "kind": "method",
+       "signature": "(settings:TighteningSettings):Void",
+       "static": true
+      },
+      {
+       "name": "copyProgram",
+       "kind": "method",
+       "signature": "(settings:TighteningSettings):TighteningSettings",
+       "static": true
+      },
+      {
+       "name": "runDownMm",
+       "kind": "method",
+       "signature": "(screw:SceneScrew):Float",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(screw:SceneScrew, occurrences:Array<String>):Void",
+       "static": true
+      },
+      {
+       "name": "replacement",
+       "kind": "method",
+       "signature": "(job:SceneScrew):SceneScrew",
+       "static": true,
+       "doc": "A replacement changes only supply identity and pickup; the qualified connection has one owner."
+      },
+      {
+       "name": "validateScene",
+       "kind": "method",
+       "signature": "(screw:SceneScrew, flat:AssemblyDefinition, data:SceneArtifactData):Void",
+       "static": true,
+       "doc": "Validate identity against the actual named thread packet, never another equal bore."
+      },
+      {
+       "name": "validateWireIntegers",
+       "kind": "method",
+       "signature": "(raw:Dynamic, job:SceneScrew):Void",
+       "static": true
+      },
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(source:String):SceneScrew",
+       "static": true,
+       "doc": "Current wire representation only; older scene versions are rejected by SceneArtifact."
+      }
+     ]
+    },
+    {
+     "name": "SceneScrewFeeder",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneScrewFeeder.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "presenter",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "presentSensor",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "inventory",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "deposit",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      },
+      {
+       "name": "bufferCapacity",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "trackDelay",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "deliveryDelay",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "deliveryTimeout",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "One commissioned simulated material path; poses are metres in the named nest frame."
+    },
+    {
+     "name": "SceneScrewFeeders",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/SceneScrewFeeder.hx",
+     "doc": "Strict current-format material paths, with physical sensor and identified-body ownership.",
+     "fields": [
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(value:Dynamic):Array<SceneScrewFeeder>",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(feeders:Array<SceneScrewFeeder>, mission:SceneArtifactMission, scene:SceneArtifactData):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SceneScrewInvocation",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/SceneScrewInvocation.hx",
+     "doc": "Resolve stage identity without duplicating geometry, qualification or replacement supply.",
+     "fields": [
+      {
+       "name": "job",
+       "kind": "method",
+       "signature": "(?value:ScrewInvocation, steps:Array<SceneArtifactMissionStep>):Null<SceneScrew>",
+       "static": true
+      },
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(source:String):ScrewInvocation",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(steps:Array<SceneArtifactMissionStep>):Void",
+       "static": true,
+       "doc": "All snug passes precede final; every connection and physical supply has exactly one owner."
+      }
+     ]
+    },
+    {
+     "name": "SceneWireJson",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/SceneWireJson.hx",
+     "doc": "Preserve JSON numbers before haxeon's integer-token parser can truncate them to Int32.",
+     "fields": [
+      {
+       "name": "preserveNumbers",
+       "kind": "method",
+       "signature": "(source:String):String",
+       "static": true
+      },
+      {
+       "name": "integer",
+       "kind": "method",
+       "signature": "(raw:Dynamic):Void",
+       "static": true,
+       "doc": "Integer values cannot use the reader's annotated-string map-key conversion."
+      },
+      {
+       "name": "integerFields",
+       "kind": "method",
+       "signature": "(raw:Dynamic, canonical:Dynamic, names:Array<String>):Void",
+       "static": true,
+       "doc": "Field IDs come from the current generated codec rather than a second authored schema."
+      },
+      {
+       "name": "enumArguments",
+       "kind": "method",
+       "signature": "(raw:Dynamic, canonical:Dynamic):Array<Dynamic>",
+       "static": true,
+       "doc": "Current enum arguments are the CAD job, the numeric snug slot or the named final reference."
+      }
+     ]
+    },
+    {
+     "name": "ScrewDeliveryMode",
+     "kind": "enum",
+     "file": "projectkit/src/materia/project/SceneScrewDefinition.hx",
+     "doc": "Explicit acquisition arrangement; a tool receiver never supplies a remote pickup pose.",
+     "fields": [
+      {
+       "name": "Presented",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "BlowFeed",
+       "kind": "case",
+       "signature": "(feeder:String)"
+      }
+     ]
+    },
+    {
+     "name": "ScrewEntrySearchBounds",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/ScrewEntrySearchBounds.hx",
+     "doc": "What a force-guided screw entry's travel and run bounds must cover. Lengths are metres, speeds m/s.",
+     "fields": [
+      {
+       "name": "requiredTravelMeters",
+       "kind": "method",
+       "signature": "(approachMeters:Float, advanceMeters:Float, halfUMeters:Float, halfVMeters:Float, maximumLinearStepMeters:Float):Float",
+       "static": true,
+       "doc": "Largest TCP displacement from the approach pose: the CAD approach plus the entry advance, the registered region, one servo step."
+      },
+      {
+       "name": "spiralLengthMeters",
+       "kind": "method",
+       "signature": "(radius:Float, pitch:Float):Float",
+       "static": true,
+       "doc": "Path length of an Archimedean spiral from its centre out to `radius`, turns `pitch` apart."
+      },
+      {
+       "name": "minimumRunSeconds",
+       "kind": "method",
+       "signature": "(approachMeters:Float, advanceMeters:Float, approachSpeed:Float, spiralRadius:Float, spiralPitch:Float, spiralSpeed:Float):Float",
+       "static": true,
+       "doc": "The guarded descent over the approach and the entry advance, plus one complete spiral at its path speed."
+      }
+     ]
+    },
+    {
+     "name": "ScrewInvocation",
+     "kind": "enum",
+     "file": "projectkit/src/materia/project/SceneScrewInvocation.hx",
+     "doc": "A connection is qualified once; its final pass refers to the preceding snug job.",
+     "fields": [
+      {
+       "name": "Single",
+       "kind": "case",
+       "signature": "(job:SceneScrew)"
+      },
+      {
+       "name": "Snug",
+       "kind": "case",
+       "signature": "(job:SceneScrew, slot:Int)"
+      },
+      {
+       "name": "Final",
+       "kind": "case",
+       "signature": "(fastening:String)"
+      },
+      {
+       "name": "Required",
+       "kind": "case",
+       "signature": "(job:SceneScrew)",
+       "doc": "Single pass whose exhausted NOK stops the controller program before downstream handling."
+      }
+     ]
+    },
+    {
+     "name": "ScrewRecovery",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneScrewDefinition.hx",
+     "fields": [
+      {
+       "name": "replacement",
+       "kind": "var",
+       "signature": ":ScrewSupply"
+      },
+      {
+       "name": "rejectMember",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "reject",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      }
+     ],
+     "doc": "Reject pose follows its declared fixture, and a replacement is never another guessed nearby body."
+    },
+    {
+     "name": "ScrewSimulationSettings",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneScrewDefinition.hx",
+     "fields": [
+      {
+       "name": "leadInMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumAxisAngle",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "prevailingTorque",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "stiffnessNmPerRad",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "stripTorque",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Qualified simulation response, independent of the published torque table."
+    },
+    {
+     "name": "ScrewSupply",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneScrewDefinition.hx",
+     "fields": [
+      {
+       "name": "screw",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "presenter",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "presentSensor",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "pickup",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      }
+     ],
+     "doc": "A physically distinct supply for one replacement attempt; lengths use scene metres."
+    },
+    {
+     "name": "ThreadHand",
+     "kind": "enum",
+     "file": "projectkit/src/materia/project/ThreadSpecData.hx",
+     "doc": "Hand of a thread, independent of the face's orientation.",
+     "fields": [
+      {
+       "name": "RightHand",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "LeftHand",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "ThreadProfile",
+     "kind": "enum",
+     "file": "projectkit/src/materia/project/ThreadSpecData.hx",
+     "doc": "Nominal thread profile; ball races use rounded cosmetic grooves.",
+     "fields": [
+      {
+       "name": "Metric",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Trapezoidal",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Acme",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Ball",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "ThreadRenderData",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/ThreadRenderData.hx",
+     "fields": [
+      {
+       "name": "faceName",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "faceIndex",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "spec",
+       "kind": "var",
+       "signature": ":ThreadSpecData"
+      },
+      {
+       "name": "origin",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "xDirection",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "direction",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "ringAtStart",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "ringAtEnd",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ],
+     "doc": "Derived face interval for renderers without a B-rep. Frame and length use the part's unit; spec uses millimetres."
+    },
+    {
+     "name": "ThreadRenderDataValues",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/ThreadRenderData.hx",
+     "doc": "Portable display packets are validated before an editor allocates resources.",
+     "fields": [
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(thread:ThreadRenderData):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ThreadSpecData",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/ThreadSpecData.hx",
+     "fields": [
+      {
+       "name": "designation",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "majorDiameter",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pitch",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "starts",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "hand",
+       "kind": "var",
+       "signature": ":ThreadHand"
+      },
+      {
+       "name": "internal",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "toleranceClass",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "profile",
+       "kind": "var",
+       "signature": ":ThreadProfile"
+      }
+     ],
+     "doc": "Current saved nominal dimensions; face intervals are rebuilt from their feature."
+    },
+    {
+     "name": "ThreadSpecDataValues",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/ThreadSpecData.hx",
+     "doc": "One validation policy for CAD values and portable saved data.",
+     "fields": [
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(data:ThreadSpecData):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "TighteningSettings",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneScrewDefinition.hx",
+     "fields": [
+      {
+       "name": "runDownSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "finalSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "targetTorque",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "minimumAngle",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumAngle",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "runDownTorqueLimit",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "finalTorqueLimit",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumRunDownAngle",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "minimumStroke",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maximumStroke",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Explicit joint qualification: rad/s, radians from snug, Nm and mm."
+    }
+   ]
+  },
+  {
+   "name": "materia.units",
+   "types": [
+    {
+     "name": "LengthUnit",
+     "kind": "class",
+     "file": "projectkit/src/materia/units/LengthUnit.hx",
+     "doc": "Supported model coordinate units and their SI scale.",
+     "fields": [
+      {
+       "name": "metresPerUnit",
+       "kind": "method",
+       "signature": "(unit:String):Float",
+       "static": true
+      },
+      {
+       "name": "fromScale",
+       "kind": "method",
+       "signature": "(scale:Float):String",
+       "static": true
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

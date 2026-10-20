@@ -1,0 +1,1314 @@
+{
+ "kit": "cnckit",
+ "packages": [
+  {
+   "name": "cnckit",
+   "types": [
+    {
+     "name": "CncCompensationResult",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/CncCompensator.hx",
+     "fields": [
+      {
+       "name": "ops",
+       "kind": "var",
+       "signature": ":Array<ToolpathOp>",
+       "final": true
+      },
+      {
+       "name": "diagnostics",
+       "kind": "var",
+       "signature": ":Array<CncDiagnostic>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(ops:Array<ToolpathOp>, diagnostics:Array<CncDiagnostic>):Void"
+      }
+     ]
+    },
+    {
+     "name": "CncCompensator",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/CncCompensator.hx",
+     "doc": "Bounded line/arc cutter-radius offsets with explicit entry and exit moves.",
+     "fields": [
+      {
+       "name": "resolve",
+       "kind": "method",
+       "signature": "(ops:Array<CncInterpOp>):CncCompensationResult",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CncCompileResult",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/CncCompileResult.hx",
+     "doc": "G-code compilation result independent of motion execution.",
+     "fields": [
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":ToolpathProgram",
+       "final": true
+      },
+      {
+       "name": "diagnostics",
+       "kind": "var",
+       "signature": ":Array<CncDiagnostic>",
+       "final": true
+      },
+      {
+       "name": "homes",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true,
+       "doc": "Did the program ask to home (`G28`)? Homing is the player's job, so it is not an operation."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(program:ToolpathProgram, diagnostics:Array<CncDiagnostic>, ?homes:Bool):Void"
+      }
+     ]
+    },
+    {
+     "name": "CncCompiler",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/CncCompiler.hx",
+     "doc": "Parses and interprets G-code into the shared toolpath format.",
+     "fields": [
+      {
+       "name": "compileDetailed",
+       "kind": "method",
+       "signature": "(source:String, controller:CncController, ?start:Point3, ?travel:TravelEnvelope):CncCompileResult",
+       "static": true,
+       "doc": "Returns diagnostics and the surviving toolpath operations."
+      }
+     ]
+    },
+    {
+     "name": "CncController",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/CncController.hx",
+     "doc": "Controller-specific G54–G59, G28/G30, and H/D number mapping."
+    },
+    {
+     "name": "CncDiagnostic",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/CncDiagnostic.hx",
+     "doc": "Stable code and source location for parser, interpreter, and lowering errors.",
+     "fields": [
+      {
+       "name": "severity",
+       "kind": "var",
+       "signature": ":CncSeverity",
+       "final": true
+      },
+      {
+       "name": "code",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "span",
+       "kind": "var",
+       "signature": ":Provenance",
+       "final": true
+      },
+      {
+       "name": "message",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(severity:CncSeverity, code:String, span:Provenance, message:String):Void"
+      },
+      {
+       "name": "toString",
+       "kind": "method",
+       "signature": "():String"
+      }
+     ]
+    },
+    {
+     "name": "CncDialect",
+     "kind": "enum",
+     "file": "cnckit/haxe/cnckit/CncDialect.hx",
+     "doc": "Ordering and interpretation of commands within one G-code block.",
+     "fields": [
+      {
+       "name": "LinuxCnc",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Printer",
+       "kind": "case",
+       "signature": "",
+       "doc": "The Marlin, Klipper and RepRap family: extruder words, heater and fan M-codes, comments as markers."
+      }
+     ]
+    },
+    {
+     "name": "CncSeverity",
+     "kind": "enum",
+     "file": "cnckit/haxe/cnckit/CncDiagnostic.hx",
+     "fields": [
+      {
+       "name": "Error",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Warning",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "CncWriter",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/CncWriter.hx",
+     "doc": "LinuxCNC post for shared toolpath operations, in millimetres.",
+     "fields": [
+      {
+       "name": "write",
+       "kind": "method",
+       "signature": "(program:ToolpathProgram, controller:CncController, ?travel:TravelEnvelope):String",
+       "static": true
+      },
+      {
+       "name": "xyz",
+       "kind": "method",
+       "signature": "(point:Point3):String",
+       "static": true
+      },
+      {
+       "name": "millimetres",
+       "kind": "method",
+       "signature": "(metres:Float):String",
+       "static": true
+      },
+      {
+       "name": "number",
+       "kind": "method",
+       "signature": "(value:Float):String",
+       "static": true,
+       "doc": "Six decimal places in millimetres avoid exponent syntax in G-code."
+      }
+     ]
+    },
+    {
+     "name": "PrinterSettings",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/PrinterSettings.hx",
+     "doc": "What a printer controller knows that a G-code file does not say: the filament, which turns an `E`\ndistance into the cross-section laid along the path, and the firmware's own retract. Lengths are in\nmetres and speeds in metres per second.",
+     "fields": [
+      {
+       "name": "filamentDiameter",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Filament diameter; 1.75 mm is the usual size."
+      },
+      {
+       "name": "retractLength",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The firmware retract `G10` pulls back and `G11` pushes forward again."
+      },
+      {
+       "name": "retractSpeed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "unretractExtraLength",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Extra filament `G11` pushes, which `G10` did not pull."
+      },
+      {
+       "name": "unretractSpeed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "ratioTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Change of the extrusion-per-distance ratio, relative to the bead in force, that starts a new\n`Deposit`. Slicers round `E` to a few decimals, so exact comparison would restart it constantly."
+      },
+      {
+       "name": "pathTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Corner rounding allowed to deposited moves; the file says nothing of it, a slicer or the user does."
+      },
+      {
+       "name": "defaultLayerHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Layer height assumed before a file says one."
+      },
+      {
+       "name": "arcs",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true,
+       "doc": "May the controller draw `G2`/`G3` arcs? Otherwise the writer draws them as short lines."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?filamentDiameter:Float, ?retractLength:Float, ?retractSpeed:Float, ?unretractExtraLength:Float, ?unretractSpeed:Float, ?ratioTolerance:Float, ?pathTolerance:Float, ?defaultLayerHeight:Float, ?arcs:Bool):Void"
+      },
+      {
+       "name": "filamentArea",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Cross-section of the filament, in m^2."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "cnckit.controller",
+   "types": [
+    {
+     "name": "RobotInterface",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/controller/RobotInterface.hx",
+     "doc": "Pure, one-cycle PLC state machine for a robot-tended CNC enclosure and vise.",
+     "fields": [
+      {
+       "name": "DEFAULT_REQUEST_TIMEOUT_SECONDS",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true,
+       "doc": "Internal PLC timeout; the robot mission waits one extra signal round trip before its own deadline."
+      },
+      {
+       "name": "requestTimeoutSeconds",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?requestTimeoutSeconds:Float):Void"
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "(input:RobotInterfaceInput, dt:Float):RobotInterfaceOutputs",
+       "doc": "Consume one 10 ms controller image and return the complete output image."
+      }
+     ]
+    },
+    {
+     "name": "RobotInterfaceAlarm",
+     "kind": "abstract",
+     "file": "cnckit/haxe/cnckit/controller/RobotInterfaceAlarm.hx",
+     "underlying": "Int",
+     "doc": "Stable alarm codes published by a machine's robot interface.",
+     "fields": [
+      {
+       "name": "None",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "ConflictingRequests",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "DoorOpenInterlock",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "DoorCloseInterlock",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "ClampInterlock",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "UnclampInterlock",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "CycleInterlock",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "DoorOpenTimeout",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "DoorCloseTimeout",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "ClampTimeout",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "UnclampTimeout",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "DoorOpenedDuringCycle",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "ToolChangeRequired",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "RobotInZone",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "The machine's robot zone was entered while the door closed or the machine cut."
+      }
+     ]
+    },
+    {
+     "name": "RobotInterfaceChannels",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/controller/RobotInterfaceChannels.hx",
+     "doc": "Stable machine-cell signal names shared by the CNC and robot controllers.",
+     "fields": [
+      {
+       "name": "REQUEST_DOOR_OPEN",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "REQUEST_DOOR_CLOSE",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "REQUEST_CLAMP",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "REQUEST_UNCLAMP",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "CYCLE_START",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "FAULT_RESET",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "CNC_READY",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "DOOR_OPEN",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "DOOR_CLOSED",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "CLAMPED",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "UNCLAMPED",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "PART_PRESENT",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "IN_CYCLE",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "CYCLE_COMPLETE",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "ALARM",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "alarmCodeBits",
+       "kind": "method",
+       "signature": "():Array<String>",
+       "static": true,
+       "doc": "Four discrete outputs carry the current RobotInterfaceAlarm value to the cell PLC."
+      },
+      {
+       "name": "alarmCodeChannel",
+       "kind": "method",
+       "signature": "(scope:String):String",
+       "static": true
+      },
+      {
+       "name": "robotRequests",
+       "kind": "method",
+       "signature": "():Array<String>",
+       "static": true
+      },
+      {
+       "name": "cncOutputs",
+       "kind": "method",
+       "signature": "():Array<String>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "RobotInterfaceInput",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/controller/RobotInterfaceInput.hx",
+     "doc": "One sampled PLC input image. Times are seconds from the controller cycle.",
+     "fields": [
+      {
+       "name": "requestDoorOpen",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "requestDoorClose",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "requestClamp",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "requestUnclamp",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "cycleStart",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "clear",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "faultReset",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "doorOpen",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "doorClosed",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "clamped",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "unclamped",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "partPresent",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "spindleStopped",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "axesAtLoad",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "cycleComplete",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "toolChangeRequired",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(requestDoorOpen:Bool, requestDoorClose:Bool, requestClamp:Bool, requestUnclamp:Bool, cycleStart:Bool, clear:Bool, faultReset:Bool, doorOpen:Bool, doorClosed:Bool, clamped:Bool, unclamped:Bool, partPresent:Bool, spindleStopped:Bool, axesAtLoad:Bool, cycleComplete:Bool, toolChangeRequired:Bool):Void"
+      }
+     ]
+    },
+    {
+     "name": "RobotInterfaceOutputs",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/controller/RobotInterfaceOutputs.hx",
+     "doc": "One complete output image after a RobotInterface update.",
+     "fields": [
+      {
+       "name": "ready",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "doorOpen",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "doorClosed",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "clamped",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "unclamped",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "partPresent",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "inCycle",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "cycleComplete",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "alarm",
+       "kind": "var",
+       "signature": ":RobotInterfaceAlarm",
+       "final": true
+      },
+      {
+       "name": "doorCoilA",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "doorCoilB",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "viseCoilA",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "viseCoilB",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "startCycle",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "holdCycle",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(ready:Bool, doorOpen:Bool, doorClosed:Bool, clamped:Bool, unclamped:Bool, partPresent:Bool, inCycle:Bool, cycleComplete:Bool, alarm:RobotInterfaceAlarm, doorCoilA:Bool, doorCoilB:Bool, viseCoilA:Bool, viseCoilB:Bool, startCycle:Bool, holdCycle:Bool):Void"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "cnckit.interp",
+   "types": [
+    {
+     "name": "CncInterpOp",
+     "kind": "enum",
+     "file": "cnckit/haxe/cnckit/interp/CncInterpOp.hx",
+     "doc": "Interpreter-only markers resolved before a shared toolpath is returned.",
+     "fields": [
+      {
+       "name": "Path",
+       "kind": "case",
+       "signature": "(op:ToolpathOp)"
+      },
+      {
+       "name": "CutterCompStart",
+       "kind": "case",
+       "signature": "(side:Int, radius:Float, plane:ArcPlane, provenance:Provenance)"
+      },
+      {
+       "name": "CutterCompEnd",
+       "kind": "case",
+       "signature": "(provenance:Provenance)"
+      }
+     ]
+    },
+    {
+     "name": "CncInterpreter",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/interp/CncInterpreter.hx",
+     "doc": "Interprets LinuxCNC blocks into plain metre geometry and ordered CNC ops.",
+     "fields": [
+      {
+       "name": "controller",
+       "kind": "var",
+       "signature": ":CncController",
+       "final": true
+      },
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true
+      },
+      {
+       "name": "state",
+       "kind": "var",
+       "signature": ":CncState"
+      },
+      {
+       "name": "ops",
+       "kind": "var",
+       "signature": ":Array<CncInterpOp>"
+      },
+      {
+       "name": "diagnostics",
+       "kind": "var",
+       "signature": ":Array<CncDiagnostic>"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(controller:CncController, start:Point3):Void"
+      },
+      {
+       "name": "interpret",
+       "kind": "method",
+       "signature": "(blocks:Array<CncBlock>):Array<CncInterpOp>"
+      },
+      {
+       "name": "radiusCenter",
+       "kind": "method",
+       "signature": "(start:Point3, end:Point3, radius:Float, mode:Int, plane:Int, line:Int, column:Int):Point3",
+       "static": true
+      },
+      {
+       "name": "arcSweep",
+       "kind": "method",
+       "signature": "(start:Point3, end:Point3, center:Point3, mode:Int, plane:Int):Float",
+       "static": true
+      },
+      {
+       "name": "centerFromOffsets",
+       "kind": "method",
+       "signature": "(start:Point3, plane:Int, first:Float, second:Float):Point3",
+       "static": true
+      },
+      {
+       "name": "coordinates",
+       "kind": "method",
+       "signature": "(point:Point3, plane:Int):Array<Float>",
+       "static": true
+      },
+      {
+       "name": "fromCoordinates",
+       "kind": "method",
+       "signature": "(u:Float, v:Float, axial:Float, plane:Int):Point3",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CncState",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/interp/CncState.hx",
+     "doc": "Modal state. A block is committed only after its interpretation succeeds.",
+     "fields": [
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true
+      },
+      {
+       "name": "metric",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "absolute",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "wcs",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "toolLength",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "feedCommand",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spindleSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spindleDirection",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "coolantMist",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "coolantFlood",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "selectedTool",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "activeTool",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "cutterSide",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "motionMode",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "plane",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "cycleCode",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "cycleDepth",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cycleR",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cycleQ",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cycleP",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cycleInitialZ",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cycleSpan",
+       "kind": "var",
+       "signature": ":Null<Provenance>"
+      },
+      {
+       "name": "retractToInitial",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "blendTolerance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "position",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "ended",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(start:Point3):Void"
+      },
+      {
+       "name": "copy",
+       "kind": "method",
+       "signature": "():CncState"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "cnckit.parse",
+   "types": [
+    {
+     "name": "CncBlock",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/parse/CncBlock.hx",
+     "doc": "One source line after comments have been removed.",
+     "fields": [
+      {
+       "name": "words",
+       "kind": "var",
+       "signature": ":Array<CncWord>",
+       "final": true
+      },
+      {
+       "name": "span",
+       "kind": "var",
+       "signature": ":Provenance",
+       "final": true
+      },
+      {
+       "name": "comments",
+       "kind": "var",
+       "signature": ":Array<CncComment>",
+       "final": true,
+       "doc": "Comments of the line; kept only by the printer dialect."
+      },
+      {
+       "name": "command",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "final": true,
+       "doc": "A Klipper-style extended command such as `EXCLUDE_OBJECT_START`, upper-cased; null for a lettered block."
+      },
+      {
+       "name": "arguments",
+       "kind": "var",
+       "signature": ":Map<String, String>",
+       "final": true,
+       "doc": "The `KEY=value` arguments of an extended command, keys upper-cased, values unquoted."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(words:Array<CncWord>, span:Provenance, ?comments:Array<CncComment>, ?command:String, ?arguments:Map<String, String>):Void"
+      }
+     ]
+    },
+    {
+     "name": "CncComment",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/parse/CncComment.hx",
+     "doc": "A comment kept as data (printer dialect): slicers use them as layer and feature markers.",
+     "fields": [
+      {
+       "name": "text",
+       "kind": "var",
+       "signature": ":String",
+       "final": true,
+       "doc": "The text after `;` (or inside parentheses), trimmed."
+      },
+      {
+       "name": "span",
+       "kind": "var",
+       "signature": ":Provenance",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(text:String, span:Provenance):Void"
+      }
+     ]
+    },
+    {
+     "name": "CncLexer",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/parse/CncLexer.hx",
+     "doc": "Numeric words and both LinuxCNC comment forms, with line recovery. The printer dialect keeps\ncomments as data, reads string words (`A\"name\"`), takes the rest of an M117/M118 line as a\nmessage, ignores line numbers and checksums, and reads Klipper extended commands.",
+     "fields": [
+      {
+       "name": "parse",
+       "kind": "method",
+       "signature": "(source:String, ?dialect:CncDialect):CncParseResult",
+       "static": true
+      },
+      {
+       "name": "lexLine",
+       "kind": "method",
+       "signature": "(line:String, lineNumber:Int):CncBlock",
+       "static": true
+      },
+      {
+       "name": "lexPrinterLine",
+       "kind": "method",
+       "signature": "(line:String, lineNumber:Int):CncBlock",
+       "static": true,
+       "doc": "A printer line: words, then comments and extended commands as data."
+      }
+     ]
+    },
+    {
+     "name": "CncParseResult",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/parse/CncParseResult.hx",
+     "fields": [
+      {
+       "name": "blocks",
+       "kind": "var",
+       "signature": ":Array<CncBlock>",
+       "final": true
+      },
+      {
+       "name": "diagnostics",
+       "kind": "var",
+       "signature": ":Array<CncDiagnostic>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(blocks:Array<CncBlock>, diagnostics:Array<CncDiagnostic>):Void"
+      }
+     ]
+    },
+    {
+     "name": "CncWord",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/parse/CncWord.hx",
+     "doc": "Numeric G-code word, retaining its original spelling location.",
+     "fields": [
+      {
+       "name": "letter",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "value",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "span",
+       "kind": "var",
+       "signature": ":Provenance",
+       "final": true
+      },
+      {
+       "name": "text",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "final": true,
+       "doc": "The quoted text of a string word such as Marlin's `A\"name\"`; null for a numeric word."
+      },
+      {
+       "name": "column",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(letter:String, value:Float, span:Provenance, ?text:String):Void"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "cnckit.printer",
+   "types": [
+    {
+     "name": "PendingMarker",
+     "kind": "enum",
+     "file": "cnckit/haxe/cnckit/printer/PrinterInterpreter.hx",
+     "fields": [
+      {
+       "name": "PendingLayer",
+       "kind": "case",
+       "signature": "(index:Int, span:Provenance)"
+      },
+      {
+       "name": "PendingFeature",
+       "kind": "case",
+       "signature": "(kind:PrintFeature, span:Provenance)"
+      }
+     ]
+    },
+    {
+     "name": "PrinterFlavour",
+     "kind": "enum",
+     "file": "cnckit/haxe/cnckit/printer/PrinterFlavour.hx",
+     "doc": "The firmware dialect `PrinterWriter` writes. They differ only in object markers and non-standard heaters and fans.",
+     "fields": [
+      {
+       "name": "Klipper",
+       "kind": "case",
+       "signature": "",
+       "doc": "Klipper: `EXCLUDE_OBJECT_*` markers, `SET_HEATER_TEMPERATURE` and `SET_FAN_SPEED` for generic parts."
+      },
+      {
+       "name": "Marlin",
+       "kind": "case",
+       "signature": "",
+       "doc": "Marlin: `M486` object markers; only the hotend, bed, chamber and numbered fans exist."
+      }
+     ]
+    },
+    {
+     "name": "PrinterInterpreter",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/printer/PrinterInterpreter.hx",
+     "doc": "Interprets Marlin, Klipper and RepRap G-code into the shared toolpath format.\n\n`E` is filament, not a coordinate: a move that pushes filament lays a bead whose cross-section is\nthe filament pushed times its area over the distance moved, and the program says that (`Deposit`),\nnot how far the extruder turned. A new `Deposit` starts when that ratio changes by more than the\ncontroller's tolerance, so the deposited volume is right to that tolerance. Overrides `M220` and\n`M221` are folded into the moves they scale, as the firmware does. Slicers' comments are read as\nlayer, feature and object markers.",
+     "fields": [
+      {
+       "name": "controller",
+       "kind": "var",
+       "signature": ":CncController",
+       "final": true
+      },
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true
+      },
+      {
+       "name": "ops",
+       "kind": "var",
+       "signature": ":Array<ToolpathOp>"
+      },
+      {
+       "name": "diagnostics",
+       "kind": "var",
+       "signature": ":Array<CncDiagnostic>"
+      },
+      {
+       "name": "homes",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Did the program ask to home?"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(controller:CncController, start:Point3):Void"
+      },
+      {
+       "name": "interpret",
+       "kind": "method",
+       "signature": "(blocks:Array<CncBlock>):Array<ToolpathOp>"
+      },
+      {
+       "name": "feature",
+       "kind": "method",
+       "signature": "(label:String):PrintFeature",
+       "static": true,
+       "doc": "The label slicers give a feature, as the shared vocabulary."
+      }
+     ]
+    },
+    {
+     "name": "PrinterWriter",
+     "kind": "class",
+     "file": "cnckit/haxe/cnckit/printer/PrinterWriter.hx",
+     "doc": "The printer post: writes a program's printing operations as Marlin or Klipper G-code, in\nmillimetres with relative extrusion (`M83`). Each bead's `E` is its cross-section times the\ndistance over the filament's area, so reading the file back (`CncCompiler` with a printer\ncontroller) recovers the deposited volume. Layers and features are written as the slicers'\ncomments, so other tools and this reader see the same markers.",
+     "fields": [
+      {
+       "name": "write",
+       "kind": "method",
+       "signature": "(program:ToolpathProgram, controller:CncController, ?flavour:PrinterFlavour, ?home:Bool):String",
+       "static": true,
+       "doc": "`home` writes a leading `G28`: the printer homes before the program."
+      },
+      {
+       "name": "featureLabel",
+       "kind": "method",
+       "signature": "(kind:PrintFeature):String",
+       "static": true,
+       "doc": "The label slicers use, which `PrinterInterpreter.feature` reads back."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

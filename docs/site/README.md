@@ -63,3 +63,18 @@ computed by `docs/figures` with the real kits, never by hand:
 # recompute it after a kit change, then review the diff
 DOCS_FIGURES_WRITE=1 ./haxeon/scripts/haxeon workspace test --workspace materia.workspace.json --only docs-figures --no-test-cache
 ```
+
+## API reference
+
+`/reference/` is generated from the kits' source. `docs/api/generate.py` walks the editor's package
+graph, parses each kit with Haxeon's own parser (`docs/api/src/ApiXml.hx`, run on the pinned Haxe;
+declarations and doc comments only, no compile) and writes one JSON file per kit to `docs/api/data/`.
+`scripts/reference.mjs` renders those files into a page per package, and links `Type` and
+`Type.member` code spans on concept and tutorial pages to their entries when the name is unique.
+
+The data is committed, so the site builds without Haxe. Regenerate it after changing a kit's public
+API; CI runs `docs/api/generate.py --check` and fails when it is stale:
+
+```sh
+docs/api/generate.py
+```

@@ -1,0 +1,446 @@
+{
+ "kit": "visionkit",
+ "packages": [
+  {
+   "name": "visionkit",
+   "types": [
+    {
+     "name": "CameraCalibration",
+     "kind": "class",
+     "file": "visionkit/haxe/visionkit/CameraCalibration.hx",
+     "doc": "Deployment calibration data, independent of RobotKit.",
+     "fields": [
+      {
+       "name": "VERSION",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "model",
+       "kind": "var",
+       "signature": ":CameraModel",
+       "final": true
+      },
+      {
+       "name": "rmsReprojectionError",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "calibrationTime",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "boardDescription",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(model:CameraModel, rmsReprojectionError:Float, calibrationTime:String, boardDescription:String, source:String):Void"
+      },
+      {
+       "name": "toJson",
+       "kind": "method",
+       "signature": "():String"
+      },
+      {
+       "name": "fromJson",
+       "kind": "method",
+       "signature": "(text:String):CameraCalibration",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CameraModel",
+     "kind": "class",
+     "file": "visionkit/haxe/visionkit/CameraModel.hx",
+     "doc": "Materia camera convention: +X forward, +Y left, +Z up.",
+     "fields": [
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "fx",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "fy",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "cx",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "cy",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "distortionModel",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "k1",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "k2",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "p1",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "p2",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "k3",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(width:Int, height:Int, fx:Float, fy:Float, cx:Float, cy:Float, ?distortionModel:Int, ?k1:Float, ?k2:Float, ?p1:Float, ?p2:Float, ?k3:Float):Void"
+      },
+      {
+       "name": "native",
+       "kind": "method",
+       "signature": "():vk_camera_model"
+      },
+      {
+       "name": "fromNative",
+       "kind": "method",
+       "signature": "(n:vk_camera_model):CameraModel",
+       "static": true
+      },
+      {
+       "name": "project",
+       "kind": "method",
+       "signature": "(points:Array<{x:Float, y:Float, z:Float}>):Array<{x:Float, y:Float}>",
+       "doc": "Projects metre points in the Materia camera frame into pixels."
+      },
+      {
+       "name": "unproject",
+       "kind": "method",
+       "signature": "(pixels:Array<{x:Float, y:Float}>):Array<{x:Float, y:Float, z:Float}>",
+       "doc": "Returns unit rays in the Materia camera frame."
+      },
+      {
+       "name": "solvePnP",
+       "kind": "method",
+       "signature": "(objectPoints:Array<{x:Float, y:Float, z:Float}>, pixels:Array<{x:Float, y:Float}>, ?ippeSquare:Bool):PoseEstimate",
+       "doc": "Object points are metres in the object's Materia frame."
+      }
+     ]
+    },
+    {
+     "name": "ImageView",
+     "kind": "class",
+     "file": "visionkit/haxe/visionkit/ImageView.hx",
+     "doc": "Caller-owned image bytes with explicit row stride.",
+     "fields": [
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "strideBytes",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "pixelFormat",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "bytes",
+       "kind": "var",
+       "signature": ":Bytes",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(width:Int, height:Int, strideBytes:Int, pixelFormat:Int, bytes:Bytes):Void"
+      },
+      {
+       "name": "native",
+       "kind": "method",
+       "signature": "():vk_image_view"
+      }
+     ]
+    },
+    {
+     "name": "MarkerDetector",
+     "kind": "class",
+     "file": "visionkit/haxe/visionkit/MarkerDetector.hx",
+     "doc": "Synchronous ArUco or AprilTag detector. Call dispose after use.",
+     "fields": [
+      {
+       "name": "ARUCO_4X4_50",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "ARUCO_5X5_100",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "APRILTAG_36H11",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(dictionary:Int, ?minPerimeterRate:Float, ?refineCorners:Bool):Void"
+      },
+      {
+       "name": "detect",
+       "kind": "method",
+       "signature": "(image:ImageView, model:CameraModel, markerSizeMetres:Float, ?capacity:Int):Array<MarkerObservation>"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "MarkerObservation",
+     "kind": "class",
+     "file": "visionkit/haxe/visionkit/MarkerObservation.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "corners",
+       "kind": "var",
+       "signature": ":Array<{x:Float, y:Float}>",
+       "final": true
+      },
+      {
+       "name": "camera_T_marker",
+       "kind": "var",
+       "signature": ":Pose3",
+       "final": true
+      },
+      {
+       "name": "rmsReprojectionError",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "confidence",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:Int, corners:Array<{x:Float, y:Float}>, pose:Pose3, rmsReprojectionError:Float, confidence:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "Pose3",
+     "kind": "class",
+     "file": "visionkit/haxe/visionkit/Pose3.hx",
+     "doc": "B's pose in A, with metres and x,y,z,w quaternion order.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qx",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qy",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qz",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qw",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float, qx:Float, qy:Float, qz:Float, qw:Float):Void"
+      },
+      {
+       "name": "fromNative",
+       "kind": "method",
+       "signature": "(n:vk_pose3):Pose3",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "PoseEstimate",
+     "kind": "class",
+     "file": "visionkit/haxe/visionkit/PoseEstimate.hx",
+     "fields": [
+      {
+       "name": "camera_T_object",
+       "kind": "var",
+       "signature": ":Pose3",
+       "final": true
+      },
+      {
+       "name": "reprojectionErrors",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(pose:Pose3, errors:Array<Float>):Void"
+      }
+     ]
+    },
+    {
+     "name": "UndistortMap",
+     "kind": "class",
+     "file": "visionkit/haxe/visionkit/UndistortMap.hx",
+     "doc": "Reusable native remap. Dispose it after use.",
+     "fields": [
+      {
+       "name": "rectified",
+       "kind": "var",
+       "signature": ":CameraModel",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(model:CameraModel, ?cropValid:Bool):Void"
+      },
+      {
+       "name": "remap",
+       "kind": "method",
+       "signature": "(src:ImageView, dst:ImageView):Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "VisionKit",
+     "kind": "class",
+     "file": "visionkit/haxe/visionkit/VisionKit.hx",
+     "fields": [
+      {
+       "name": "version",
+       "kind": "method",
+       "signature": "():Int",
+       "static": true
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

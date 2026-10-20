@@ -1,0 +1,917 @@
+{
+ "kit": "haxeon-animation",
+ "packages": [
+  {
+   "name": "haxeon.animation",
+   "types": [
+    {
+     "name": "AnimationAsset",
+     "kind": "class",
+     "file": "haxeon/packages/animation/src/haxeon/animation/AnimationAsset.hx",
+     "doc": "An imported glTF asset: skeleton, meshes, materials, decoded images, and\nanimation clips. Outputs are in model space (+Z up, +X forward, metres).\nEvery node of the glTF scene is a joint, so names match the source nodes.",
+     "fields": [
+      {
+       "name": "jointNames",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "jointParents",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Parent joint per joint, or -1 for roots; parents precede children."
+      },
+      {
+       "name": "clipNames",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "clipDurations",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "primitives",
+       "kind": "var",
+       "signature": ":Array<AssetPrimitive>",
+       "final": true
+      },
+      {
+       "name": "materials",
+       "kind": "var",
+       "signature": ":Array<AssetMaterial>",
+       "final": true
+      },
+      {
+       "name": "imageCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "warnings",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true,
+       "doc": "Non-fatal import diagnostics, such as unsupported features that were skipped."
+      },
+      {
+       "name": "load",
+       "kind": "method",
+       "signature": "(path:String):AnimationAsset",
+       "static": true,
+       "doc": "Loads a .gltf or .glb file; relative buffers and images resolve beside it."
+      },
+      {
+       "name": "fromBytes",
+       "kind": "method",
+       "signature": "(data:Bytes):AnimationAsset",
+       "static": true,
+       "doc": "Loads a GLB, or a .gltf whose buffers and images are embedded data URIs."
+      },
+      {
+       "name": "jointIndex",
+       "kind": "method",
+       "signature": "(name:String):Int",
+       "doc": "Returns the joint with this glTF node name, or -1."
+      },
+      {
+       "name": "clipIndex",
+       "kind": "method",
+       "signature": "(name:String):Int",
+       "doc": "Returns the clip with this exact name, or else the clip whose action name\nmatches ignoring case, or -1. Blender exports clips as \"Armature|Action\",\nso \"walk\" finds \"CharacterArmature|Walk\"."
+      },
+      {
+       "name": "readIndices",
+       "kind": "method",
+       "signature": "(primitive:Int):Bytes",
+       "doc": "Packed uint32 triangle indices."
+      },
+      {
+       "name": "readTexcoords",
+       "kind": "method",
+       "signature": "(primitive:Int):Null<Bytes>",
+       "doc": "Packed float32 UV pairs with glTF's top-left origin, or null when absent."
+      },
+      {
+       "name": "readBindPositions",
+       "kind": "method",
+       "signature": "(primitive:Int):Bytes",
+       "doc": "Float32 xyz positions in source bind space."
+      },
+      {
+       "name": "readBindNormals",
+       "kind": "method",
+       "signature": "(primitive:Int):Bytes",
+       "doc": "Float32 xyz normals in source bind space."
+      },
+      {
+       "name": "readJointIndices",
+       "kind": "method",
+       "signature": "(primitive:Int):Bytes",
+       "doc": "Uint16x4 palette indices per vertex; empty for rigid primitives."
+      },
+      {
+       "name": "readJointWeights",
+       "kind": "method",
+       "signature": "(primitive:Int):Bytes",
+       "doc": "Float32x4 weights per vertex; empty for rigid primitives."
+      },
+      {
+       "name": "readSkinJoints",
+       "kind": "method",
+       "signature": "(primitive:Int):Bytes",
+       "doc": "Int32 skeleton joints in palette order; owning joint for rigid primitives."
+      },
+      {
+       "name": "readInverseBindMatrices",
+       "kind": "method",
+       "signature": "(primitive:Int):Bytes",
+       "doc": "Column-major float32 4x4 inverse binds in palette order."
+      },
+      {
+       "name": "imageWidth",
+       "kind": "method",
+       "signature": "(image:Int):Int"
+      },
+      {
+       "name": "imageHeight",
+       "kind": "method",
+       "signature": "(image:Int):Int"
+      },
+      {
+       "name": "readImage",
+       "kind": "method",
+       "signature": "(image:Int):Bytes",
+       "doc": "Decoded RGBA8 pixels, top row first."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Releases the asset; instances created from it stay valid."
+      }
+     ]
+    },
+    {
+     "name": "AnimationInstance",
+     "kind": "class",
+     "file": "haxeon/packages/animation/src/haxeon/animation/AnimationInstance.hx",
+     "doc": "One posed copy of an asset. Set up to four blend layers, evaluate, then read\nthe CPU-skinned vertex streams and joint matrices in model space.",
+     "fields": [
+      {
+       "name": "MAX_LAYERS",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "MAX_IK_CHAINS",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "asset",
+       "kind": "var",
+       "signature": ":AnimationAsset",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(asset:AnimationAsset):Void",
+       "doc": "Creates an instance at the rest pose, already evaluated."
+      },
+      {
+       "name": "setLayer",
+       "kind": "method",
+       "signature": "(layer:Int, clip:Int, time:Float, weight:Float, ?loop:Bool):Void",
+       "doc": "Sets one blend layer. A layer contributes when clip is valid and weight is\npositive; weights are normalized across layers. Time is in seconds and\nwraps when loop is set, otherwise it clamps to the clip."
+      },
+      {
+       "name": "setIk",
+       "kind": "method",
+       "signature": "(chain:Int, start:Int, mid:Int, end:Int, target:Array<Float>, pole:Array<Float>, ?weight:Float, ?soften:Float, ?keepEnd:Float):Void",
+       "doc": "Sets one of MAX_IK_CHAINS two-bone chains solved after the layers blend:\nend reaches target and mid points along pole, both [x, y, z] in scene\nspace (pole is a direction; a zero pole bends the limb the way the animation\ndoes, which never flips as the target moves). Weight 0 disables the chain."
+      },
+      {
+       "name": "setJointRotation",
+       "kind": "method",
+       "signature": "(joint:Int, rotation:Array<Float>, ?weight:Float, ?source:Int):Void",
+       "doc": "Turns a joint by rotation ([x, y, z, w], about its own local axes) on top of its animated pose and\nbefore inverse kinematics, so its children turn with it: fingers curl, a spine leans. Weight blends\nfrom no turn (0, which removes it) to all of it (1). `source` names who asks: turns of different\nsources on one joint compose, lowest source first, and never overwrite each other. The turn stays\nuntil it is removed."
+      },
+      {
+       "name": "clearJointRotation",
+       "kind": "method",
+       "signature": "(joint:Int, ?source:Int):Void",
+       "doc": "Removes one source's turn from a joint."
+      },
+      {
+       "name": "setJointRotations",
+       "kind": "method",
+       "signature": "(source:Int, joints:Array<Int>, rotations:Array<Array<Float>>, weights:Array<Float>):Void",
+       "doc": "Replaces every turn of one source in a single call: joint i is turned by rotations[i] ([x, y, z, w])\nat weights[i]. Turns of other sources stay. Nothing changes if any entry is invalid."
+      },
+      {
+       "name": "clearJointRotations",
+       "kind": "method",
+       "signature": "(source:Int):Void",
+       "doc": "Removes every turn of one source."
+      },
+      {
+       "name": "clearIk",
+       "kind": "method",
+       "signature": "(chain:Int):Void",
+       "doc": "Disables one inverse kinematics chain."
+      },
+      {
+       "name": "clearLayers",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Clears every layer, returning the instance to the rest pose on evaluate."
+      },
+      {
+       "name": "evaluatePose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Evaluates the pose and joint matrices only, without skinning; see ak_instance_evaluate_pose."
+      },
+      {
+       "name": "evaluate",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Samples, blends, and skins the current layers."
+      },
+      {
+       "name": "readPositions",
+       "kind": "method",
+       "signature": "(primitive:Int):Bytes",
+       "doc": "Deformed float32 xyz positions of one primitive."
+      },
+      {
+       "name": "readNormals",
+       "kind": "method",
+       "signature": "(primitive:Int):Bytes",
+       "doc": "Deformed unit float32 xyz normals of one primitive."
+      },
+      {
+       "name": "readJointMatrices",
+       "kind": "method",
+       "signature": "():Bytes",
+       "doc": "One column-major float32 4x4 model matrix per joint, 64 bytes each."
+      },
+      {
+       "name": "readSkinMatrices",
+       "kind": "method",
+       "signature": "(primitive:Int):Bytes",
+       "doc": "Float32 column-major 4x4 matrices mapping bind vertices to model space, in palette order."
+      },
+      {
+       "name": "bounds",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "Deformed bounds as [minX, minY, minZ, maxX, maxY, maxZ]."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "AssetMaterial",
+     "kind": "typedef",
+     "file": "haxeon/packages/animation/src/haxeon/animation/AnimationAsset.hx",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "baseColor",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "metallic",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "roughness",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "emissive",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "alphaMode",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "alphaCutoff",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "doubleSided",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "baseColorImage",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ],
+     "doc": "glTF metallic-roughness material values AnimKit imports."
+    },
+    {
+     "name": "AssetPrimitive",
+     "kind": "typedef",
+     "file": "haxeon/packages/animation/src/haxeon/animation/AnimationAsset.hx",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "vertexCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "indexCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "material",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "skinned",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "hasTexcoords",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "joint",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ],
+     "doc": "One drawable mesh primitive of an imported asset."
+    },
+    {
+     "name": "ClipPlayer",
+     "kind": "class",
+     "file": "haxeon/packages/animation/src/haxeon/animation/ClipPlayer.hx",
+     "doc": "Plays one clip at a time on an instance and crossfades between clips.\nThe outgoing clips keep advancing while their weights fade to zero. One overlay clip may be mixed over\nall of that at a weight the caller sets, to hold a pose such as a crouch at any depth between the two.",
+     "fields": [
+      {
+       "name": "instance",
+       "kind": "var",
+       "signature": ":AnimationInstance",
+       "final": true
+      },
+      {
+       "name": "speed",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Playback rate multiplier applied to both clips."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(instance:AnimationInstance):Void"
+      },
+      {
+       "name": "currentClip",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "fadeWeight",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far the current clip has faded in, 0 to 1; one when nothing is fading."
+      },
+      {
+       "name": "fading",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether a crossfade between clips is still running."
+      },
+      {
+       "name": "currentTime",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "playNamed",
+       "kind": "method",
+       "signature": "(name:String, ?fadeSeconds:Float, ?loop:Bool):Bool",
+       "doc": "Starts a clip by name; returns false when the asset has no such clip."
+      },
+      {
+       "name": "play",
+       "kind": "method",
+       "signature": "(index:Int, ?fadeSeconds:Float, ?loop:Bool, ?startSeconds:Float):Void",
+       "doc": "Starts a clip from its beginning, fading from the current one. Replaying the current clip is a no-op."
+      },
+      {
+       "name": "restart",
+       "kind": "method",
+       "signature": "(index:Int, ?loop:Bool):Void",
+       "doc": "Starts a clip from its beginning with no fade, even when it is already the\ncurrent clip, dropping any crossfade in progress and returning the rate to\nnormal. This puts the player back as if the clip had just been started."
+      },
+      {
+       "name": "setOverlay",
+       "kind": "method",
+       "signature": "(index:Int, weight:Float, ?hold:Float):Void",
+       "doc": "Mixes a clip over everything else at `weight` (0 none, 1 only the overlay), looping on its own clock. A\nnegative clip, or a weight of zero, takes it out of the mix; the clock keeps running, so putting the same\nclip back picks up where it would be rather than from its start. With `hold` the overlay does not run but\nstays at that time in the clip, which poses the body part way through a one-way clip. Takes effect from the\nnext advance."
+      },
+      {
+       "name": "overlayAmount",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void",
+       "doc": "Advances playback, updates the instance layers, and evaluates the pose."
+      },
+      {
+       "name": "pose",
+       "kind": "method",
+       "signature": "(?seconds:Float):Void",
+       "doc": "Like `advance`, but evaluates the pose only: joint matrices are current and the deformed geometry is not\ntouched. For measuring what a pose would be (planning a reach) without paying to skin it."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "haxeon.animation.rig",
+   "types": [
+    {
+     "name": "HumanBone",
+     "kind": "abstract",
+     "file": "haxeon/packages/animation/src/haxeon/animation/rig/HumanBone.hx",
+     "underlying": "String",
+     "doc": "the standard humanoid bones. The finger bones name the knuckle at the\nbase of each finger's first segment. Asset rigs map onto these names once at\nimport, so everything above AnimKit is independent of any asset's naming.\nThe names describe anatomy only; an asset's own hierarchy may differ.",
+     "fields": [
+      {
+       "name": "Pelvis",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Spine",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Spine2",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Chest",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Neck",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Head",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ShoulderL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "UpperArmL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ForearmL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "HandL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "IndexL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "MiddleL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "PinkyL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ShoulderR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "UpperArmR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ForearmR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "HandR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "IndexR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "MiddleR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "PinkyR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ThighL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ShinL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "FootL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ToeL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ToeTipL",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Tip of the left foot, where the toes end."
+      },
+      {
+       "name": "ThighR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ShinR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "FootR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ToeR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ToeTipR",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HumanBones",
+     "kind": "class",
+     "file": "haxeon/packages/animation/src/haxeon/animation/rig/HumanBones.hx",
+     "fields": [
+      {
+       "name": "REQUIRED",
+       "kind": "var",
+       "signature": ":Array<HumanBone>",
+       "static": true,
+       "final": true,
+       "doc": "Bones every humanoid rig must provide."
+      },
+      {
+       "name": "OPTIONAL",
+       "kind": "var",
+       "signature": ":Array<HumanBone>",
+       "static": true,
+       "final": true,
+       "doc": "Bones used when present: spine segments, shoulders, toes, toe tips, and knuckles for hand frames."
+      },
+      {
+       "name": "all",
+       "kind": "method",
+       "signature": "():Array<HumanBone>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HumanPose",
+     "kind": "class",
+     "file": "haxeon/packages/animation/src/haxeon/animation/rig/HumanPose.hx",
+     "doc": "Standard-bone view of an animation instance's joint matrices, in the\nmodel's space (+Z up, +X forward, metres).\n\nHands expose a rig-independent frame: the origin is the palm centre, +X\npoints along the fingers, +Y towards the thumb side, and +Z completes a\nright-handed frame, so it leaves the two hands through opposite faces. It is\nderived from the rest pose knuckles, so grip offsets authored once work on\nevery rig. Other bones use their own joint frame with scale removed.",
+     "fields": [
+      {
+       "name": "rig",
+       "kind": "var",
+       "signature": ":HumanoidRig",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(rig:HumanoidRig, restMatrices:Bytes):Void",
+       "doc": "restMatrices must be the instance's joint matrices at its rest pose."
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "(jointMatrices:Bytes):Void",
+       "doc": "Replaces the pose with an instance's current joint matrices."
+      },
+      {
+       "name": "bonePosition",
+       "kind": "method",
+       "signature": "(bone:HumanBone):Null<Array<Float>>",
+       "doc": "Model-space position of a bone, or null when the rig lacks it."
+      },
+      {
+       "name": "boneFrame",
+       "kind": "method",
+       "signature": "(bone:HumanBone):Null<Array<Float>>",
+       "doc": "Rigid model-space frame of a bone, or null when the rig lacks it."
+      }
+     ]
+    },
+    {
+     "name": "HumanoidRig",
+     "kind": "class",
+     "file": "haxeon/packages/animation/src/haxeon/animation/rig/HumanoidRig.hx",
+     "doc": "An asset's joints resolved onto the standard humanoid bones.",
+     "fields": [
+      {
+       "name": "mapping",
+       "kind": "var",
+       "signature": ":RigMapping",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(asset:AnimationAsset, mapping:RigMapping):Void",
+       "doc": "Resolves mapping against asset; throws when a required bone is missing."
+      },
+      {
+       "name": "detect",
+       "kind": "method",
+       "signature": "(asset:AnimationAsset):HumanoidRig",
+       "static": true,
+       "doc": "Uses the first preset that provides every required bone."
+      },
+      {
+       "name": "joint",
+       "kind": "method",
+       "signature": "(bone:HumanBone):Int",
+       "doc": "The asset joint for a standard bone, or -1 when the rig lacks it."
+      },
+      {
+       "name": "has",
+       "kind": "method",
+       "signature": "(bone:HumanBone):Bool"
+      }
+     ]
+    },
+    {
+     "name": "Mat4",
+     "kind": "class",
+     "file": "haxeon/packages/animation/src/haxeon/animation/rig/Mat4.hx",
+     "doc": "Column-major 4x4 matrix helpers over Array<Float>, using column vectors.",
+     "fields": [
+      {
+       "name": "identity",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "static": true
+      },
+      {
+       "name": "translation",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):Array<Float>",
+       "static": true
+      },
+      {
+       "name": "frame",
+       "kind": "method",
+       "signature": "(origin:Array<Float>, x:Array<Float>, y:Array<Float>):Array<Float>",
+       "static": true,
+       "doc": "A rigid frame from an origin and unit x and y axes; z completes a right-handed basis."
+      },
+      {
+       "name": "multiply",
+       "kind": "method",
+       "signature": "(a:Array<Float>, b:Array<Float>):Array<Float>",
+       "static": true
+      },
+      {
+       "name": "rigidInverse",
+       "kind": "method",
+       "signature": "(m:Array<Float>):Array<Float>",
+       "static": true,
+       "doc": "Inverse of a rigid transform (orthonormal rotation plus translation)."
+      },
+      {
+       "name": "orthonormalized",
+       "kind": "method",
+       "signature": "(m:Array<Float>):Array<Float>",
+       "static": true,
+       "doc": "Removes scale and shear, keeping the x axis direction and translation.\nExporters often bake unit scale (such as Mixamo's 0.01) into bones, which\nrigid attachments must not inherit."
+      },
+      {
+       "name": "position",
+       "kind": "method",
+       "signature": "(m:Array<Float>):Array<Float>",
+       "static": true
+      },
+      {
+       "name": "dot",
+       "kind": "method",
+       "signature": "(a:Array<Float>, b:Array<Float>):Float",
+       "static": true
+      },
+      {
+       "name": "cross",
+       "kind": "method",
+       "signature": "(a:Array<Float>, b:Array<Float>):Array<Float>",
+       "static": true
+      },
+      {
+       "name": "subtract",
+       "kind": "method",
+       "signature": "(a:Array<Float>, b:Array<Float>):Array<Float>",
+       "static": true
+      },
+      {
+       "name": "normalize",
+       "kind": "method",
+       "signature": "(v:Array<Float>):Array<Float>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "RigMapping",
+     "kind": "class",
+     "file": "haxeon/packages/animation/src/haxeon/animation/rig/RigMapping.hx",
+     "doc": "Names of an asset rig's joints for each standard bone. Joint names are\ncompared after dropping any namespace prefix ending in ':', so Mixamo's\n\"mixamorig:Hips\" and \"mixamorig1:Hips\" both match \"Hips\". A bone may list\nalternatives, used in order, for variants within one rig family.",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, joints:Map<String, String>):Void"
+      },
+      {
+       "name": "jointNames",
+       "kind": "method",
+       "signature": "(bone:HumanBone):Array<String>",
+       "doc": "The asset joint names that may provide a standard bone, preferred first."
+      },
+      {
+       "name": "alternative",
+       "kind": "method",
+       "signature": "(bone:HumanBone, joint:String):RigMapping",
+       "doc": "Adds a fallback joint name for a bone, tried after the ones already given."
+      },
+      {
+       "name": "quaternius",
+       "kind": "method",
+       "signature": "():RigMapping",
+       "static": true,
+       "doc": "Quaternius characters, including the Ultimate Modular and Universal Animation rigs."
+      },
+      {
+       "name": "universal",
+       "kind": "method",
+       "signature": "():RigMapping",
+       "static": true,
+       "doc": "Quaternius's Universal Animation Library character, whose joints are Blender \"DEF-\" deformation bones."
+      },
+      {
+       "name": "mixamo",
+       "kind": "method",
+       "signature": "():RigMapping",
+       "static": true,
+       "doc": "Mixamo exports, with or without the \"mixamorig:\" namespace."
+      },
+      {
+       "name": "presets",
+       "kind": "method",
+       "signature": "():Array<RigMapping>",
+       "static": true
+      },
+      {
+       "name": "localName",
+       "kind": "method",
+       "signature": "(joint:String):String",
+       "static": true,
+       "doc": "Drops a namespace prefix such as \"mixamorig:\"."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

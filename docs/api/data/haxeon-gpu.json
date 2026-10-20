@@ -1,0 +1,1875 @@
+{
+ "kit": "haxeon-gpu",
+ "packages": [
+  {
+   "name": "haxeon.gpu",
+   "types": [
+    {
+     "name": "AttachmentAction",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/AttachmentAction.hx",
+     "doc": "Clear and store behavior for one render-pass attachment.",
+     "fields": [
+      {
+       "name": "loadAction",
+       "kind": "var",
+       "signature": ":LoadAction"
+      },
+      {
+       "name": "storeAction",
+       "kind": "var",
+       "signature": ":StoreAction"
+      },
+      {
+       "name": "clearRed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "clearGreen",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "clearBlue",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "clearAlpha",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "clearDepth",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "clearStencil",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?loadAction:LoadAction, ?storeAction:StoreAction):Void"
+      }
+     ]
+    },
+    {
+     "name": "Batch",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Batch.hx",
+     "doc": "Reusable sealed submission batch owned by one renderer.",
+     "fields": [
+      {
+       "name": "begin",
+       "kind": "method",
+       "signature": "(renderer:Renderer):Batch",
+       "static": true
+      },
+      {
+       "name": "windowPass",
+       "kind": "method",
+       "signature": "(width:Int, height:Int, ?clear:Bool):Batch",
+       "doc": "Appends a window-surface pass to this batch."
+      },
+      {
+       "name": "computePass",
+       "kind": "method",
+       "signature": "():Batch",
+       "doc": "Appends a compute pass to this batch."
+      },
+      {
+       "name": "renderPass",
+       "kind": "method",
+       "signature": "(desc:RenderPassDesc):Batch",
+       "doc": "Appends a general attachment-based render pass to this batch."
+      },
+      {
+       "name": "copyPass",
+       "kind": "method",
+       "signature": "():Batch",
+       "doc": "Appends a copy/transfer pass to this batch."
+      },
+      {
+       "name": "commands",
+       "kind": "method",
+       "signature": "(commands:CommandBuffer):Batch",
+       "doc": "Appends a packed command buffer to the most recent pass."
+      },
+      {
+       "name": "seal",
+       "kind": "method",
+       "signature": "():Batch",
+       "doc": "Freezes this batch; repeated sealing is safe."
+      },
+      {
+       "name": "submit",
+       "kind": "method",
+       "signature": "(?frame:SurfaceFrame):Void",
+       "doc": "Replays a sealed batch against the renderer's current surface frame."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "BatchPassKind",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Window",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Compute",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Copy",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Render",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "Buffer",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Buffer.hx",
+     "doc": "Renderer-owned GPU buffer; its handle cannot be used after disposal.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(renderer:Renderer, desc:BufferDesc):Buffer",
+       "static": true,
+       "doc": "Creates a buffer from the current generic buffer descriptor."
+      },
+      {
+       "name": "fromBytes",
+       "kind": "method",
+       "signature": "(renderer:Renderer, data:Bytes):Buffer",
+       "static": true
+      },
+      {
+       "name": "vertexFloats",
+       "kind": "method",
+       "signature": "(renderer:Renderer, values:Array<Float>):Buffer",
+       "static": true
+      },
+      {
+       "name": "indices16",
+       "kind": "method",
+       "signature": "(renderer:Renderer, values:Array<Int>):Buffer",
+       "static": true
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nkgpu_buffer"
+      },
+      {
+       "name": "applyVertex",
+       "kind": "method",
+       "signature": "(slot:Int, ?offset:Int):Void"
+      },
+      {
+       "name": "applyIndex",
+       "kind": "method",
+       "signature": "(?offset:Int):Void"
+      },
+      {
+       "name": "applyStorage",
+       "kind": "method",
+       "signature": "(slot:Int):Void",
+       "doc": "Binds this buffer as a storage resource in the active pass."
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "(offset:Int, data:Bytes):Void",
+       "doc": "Updates an arbitrary byte range of a dynamic buffer."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "BufferDesc",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/BufferDesc.hx",
+     "doc": "Portable descriptor for a NativeKit GPU buffer.",
+     "fields": [
+      {
+       "name": "size",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "usage",
+       "kind": "var",
+       "signature": ":BufferUsage"
+      },
+      {
+       "name": "dynamicUpdate",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "stream",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(size:Int, usage:BufferUsage):Void"
+      }
+     ]
+    },
+    {
+     "name": "BufferUsage",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "doc": "Stable Haxe names for the integer enums in the GPU adapter ABI.",
+     "fields": [
+      {
+       "name": "Vertex",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Index",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Storage",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Uniform",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Transfer",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ColorAttachment",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/RenderPassDesc.hx",
+     "doc": "One color attachment and its optional MSAA resolve image.",
+     "fields": [
+      {
+       "name": "image",
+       "kind": "var",
+       "signature": ":Image",
+       "final": true
+      },
+      {
+       "name": "resolveImage",
+       "kind": "var",
+       "signature": ":Null<Image>"
+      },
+      {
+       "name": "action",
+       "kind": "var",
+       "signature": ":AttachmentAction"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(image:Image, action:AttachmentAction, ?resolveImage:Null<Image>):Void"
+      }
+     ]
+    },
+    {
+     "name": "CommandBuffer",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/CommandBuffer.hx",
+     "fields": [
+      {
+       "name": "reset",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "data",
+       "kind": "method",
+       "signature": "():Bytes"
+      },
+      {
+       "name": "size",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "applyPipeline",
+       "kind": "method",
+       "signature": "(pipeline:Pipeline):Void"
+      },
+      {
+       "name": "applyVertexBuffer",
+       "kind": "method",
+       "signature": "(slot:Int, buffer:Buffer, offset:Int):Void"
+      },
+      {
+       "name": "applyIndexBuffer",
+       "kind": "method",
+       "signature": "(buffer:Buffer, offset:Int):Void"
+      },
+      {
+       "name": "applyImage",
+       "kind": "method",
+       "signature": "(slot:Int, image:Image):Void"
+      },
+      {
+       "name": "applySampler",
+       "kind": "method",
+       "signature": "(slot:Int, sampler:Sampler):Void"
+      },
+      {
+       "name": "applyStorageBuffer",
+       "kind": "method",
+       "signature": "(slot:Int, buffer:Buffer):Void"
+      },
+      {
+       "name": "applyStorageImage",
+       "kind": "method",
+       "signature": "(slot:Int, image:Image):Void"
+      },
+      {
+       "name": "applyUniforms",
+       "kind": "method",
+       "signature": "(slot:Int, data:Bytes):Void"
+      },
+      {
+       "name": "applyUniform2f",
+       "kind": "method",
+       "signature": "(slot:Int, x:Float, y:Float):Void"
+      },
+      {
+       "name": "draw",
+       "kind": "method",
+       "signature": "(baseElement:Int, elementCount:Int, instanceCount:Int):Void"
+      },
+      {
+       "name": "scissor",
+       "kind": "method",
+       "signature": "(enabled:Bool, ?x:Int, ?y:Int, ?width:Int, ?height:Int):Void"
+      },
+      {
+       "name": "viewport",
+       "kind": "method",
+       "signature": "(x:Int, y:Int, width:Int, height:Int):Void"
+      },
+      {
+       "name": "dispatch",
+       "kind": "method",
+       "signature": "(x:Int, ?y:Int, ?z:Int):Void"
+      },
+      {
+       "name": "copyBuffer",
+       "kind": "method",
+       "signature": "(source:Buffer, destination:Buffer, size:Int, ?sourceOffset:Int, ?destinationOffset:Int):Void"
+      },
+      {
+       "name": "copyImage",
+       "kind": "method",
+       "signature": "(source:Image, destination:Image, width:Int, height:Int, ?sourceX:Int, ?sourceY:Int, ?destinationX:Int, ?destinationY:Int, ?sourceMip:Int, ?sourceLayer:Int, ?destinationMip:Int, ?destinationLayer:Int):Void"
+      },
+      {
+       "name": "copyBufferToImage",
+       "kind": "method",
+       "signature": "(source:Buffer, destination:Image, width:Int, height:Int, ?rowPitch:Int, ?bufferOffset:Int, ?x:Int, ?y:Int, ?mipLevel:Int, ?layer:Int):Void"
+      },
+      {
+       "name": "copyImageToBuffer",
+       "kind": "method",
+       "signature": "(source:Image, destination:Buffer, width:Int, height:Int, ?rowPitch:Int, ?bufferOffset:Int, ?x:Int, ?y:Int, ?mipLevel:Int, ?layer:Int):Void"
+      },
+      {
+       "name": "finish",
+       "kind": "method",
+       "signature": "():Bytes"
+      }
+     ]
+    },
+    {
+     "name": "Features",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Features.hx",
+     "doc": "Optional GPU capabilities exposed by one renderer.",
+     "fields": [
+      {
+       "name": "mrtCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "maxSamples",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "storageBuffer",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "storageImage",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "compute",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "instancing",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "bufferCopy",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "imageCopy",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "imageReadback",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "bufferReadback",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "timestamps",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      }
+     ]
+    },
+    {
+     "name": "Filter",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Nearest",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Linear",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "GpuResult",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/GpuResult.hx",
+     "doc": "Centralizes raw GPU-adapter result handling for the typed Haxe facade.",
+     "fields": [
+      {
+       "name": "check",
+       "kind": "method",
+       "signature": "(status:Int, operation:String):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "Image",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Image.hx",
+     "doc": "Renderer-owned RGBA8 sampled image.",
+     "fields": [
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(renderer:Renderer, desc:ImageDesc):Image",
+       "static": true,
+       "doc": "Creates an image from the current generic image descriptor."
+      },
+      {
+       "name": "fromRgba8",
+       "kind": "method",
+       "signature": "(renderer:Renderer, width:Int, height:Int, pixels:Bytes):Image",
+       "static": true,
+       "doc": "Copies tightly packed row-major RGBA8 pixels into a new GPU image."
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nkgpu_image"
+      },
+      {
+       "name": "apply",
+       "kind": "method",
+       "signature": "(slot:Int):Void"
+      },
+      {
+       "name": "applyStorage",
+       "kind": "method",
+       "signature": "(slot:Int):Void",
+       "doc": "Binds this image as a storage resource in the active pass."
+      },
+      {
+       "name": "graphicsImage",
+       "kind": "method",
+       "signature": "():GraphicsImageRef",
+       "doc": "Exports this sampled image as a retained cross-module graphics image."
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "(x:Int, y:Int, width:Int, height:Int, pixels:Bytes, rowPitch:Int):Void",
+       "doc": "Updates a tightly packed image rectangle."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "ImageDesc",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/ImageDesc.hx",
+     "doc": "Portable descriptor for a NativeKit GPU image.",
+     "fields": [
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "format",
+       "kind": "var",
+       "signature": ":ImageFormat"
+      },
+      {
+       "name": "usage",
+       "kind": "var",
+       "signature": ":ImageUsage"
+      },
+      {
+       "name": "mipCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "sampleCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "layerCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "rowPitch",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "dynamicUpdate",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "type",
+       "kind": "var",
+       "signature": ":ImageType"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(width:Int, height:Int, ?format:ImageFormat, ?usage:ImageUsage):Void"
+      }
+     ]
+    },
+    {
+     "name": "ImageFormat",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "R8",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Rgba8",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Rg8",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Bgra8",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "R16f",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Rg16f",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Rgba16f",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "R32f",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Rgba32f",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "R32Uint",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Depth16",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Depth24Stencil8",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Depth32f",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ImageFormatSupport",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/ImageFormatSupport.hx",
+     "doc": "Portable operations supported by one image format on a renderer.",
+     "fields": [
+      {
+       "name": "sampled",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "filter",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "renderTarget",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "blend",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "multisample",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "depthStencil",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "storage",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      }
+     ]
+    },
+    {
+     "name": "ImageType",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Auto",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "TwoD",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Array",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Cube",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "CubeArray",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ImageUsage",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Sampled",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "RenderTarget",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "DepthStencil",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Storage",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "IndexType",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "None",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "UInt16",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "UInt32",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "Limits",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Limits.hx",
+     "doc": "Portable resource and binding limits exposed by one renderer.",
+     "fields": [
+      {
+       "name": "maxTextureSize",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "maxArrayLayers",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "maxVertexAttributes",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "maxColorAttachments",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "maxTextureBindings",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "maxStorageBufferBindings",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "maxStorageImageBindings",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "maxCubeSize",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      }
+     ]
+    },
+    {
+     "name": "LoadAction",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Load",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Clear",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Discard",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "Pipeline",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Pipeline.hx",
+     "doc": "Renderer-owned pipeline resource.",
+     "fields": [
+      {
+       "name": "begin",
+       "kind": "method",
+       "signature": "(renderer:Renderer, shader:Shader, stride:Int):PipelineBuilder",
+       "static": true
+      },
+      {
+       "name": "beginCompute",
+       "kind": "method",
+       "signature": "(renderer:Renderer, shader:Shader):PipelineBuilder",
+       "static": true,
+       "doc": "Begins a compute-only pipeline builder."
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nkgpu_pipeline"
+      },
+      {
+       "name": "apply",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "PipelineBuilder",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Pipeline.hx",
+     "doc": "Configures one vertex/index layout before creating an immutable pipeline.",
+     "fields": [
+      {
+       "name": "attribute",
+       "kind": "method",
+       "signature": "(location:Int, bufferIndex:Int, offset:Int, format:VertexFormat):PipelineBuilder"
+      },
+      {
+       "name": "depthStencil",
+       "kind": "method",
+       "signature": "(enabled:Bool):PipelineBuilder"
+      },
+      {
+       "name": "compute",
+       "kind": "method",
+       "signature": "():PipelineBuilder",
+       "doc": "Marks this pipeline builder as compute-only."
+      },
+      {
+       "name": "indexType",
+       "kind": "method",
+       "signature": "(type:IndexType):PipelineBuilder"
+      },
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "():Pipeline"
+      }
+     ]
+    },
+    {
+     "name": "Readback",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Readback.hx",
+     "doc": "Owns one asynchronous image or buffer readback request.",
+     "fields": [
+      {
+       "name": "begin",
+       "kind": "method",
+       "signature": "(image:Image, x:Int, y:Int, width:Int, height:Int, ?mipLevel:Int, ?layer:Int):Readback",
+       "static": true,
+       "doc": "Starts a tightly packed readback of an image rectangle."
+      },
+      {
+       "name": "beginBuffer",
+       "kind": "method",
+       "signature": "(buffer:Buffer, offset:Int, size:Int):Readback",
+       "static": true,
+       "doc": "Starts a tightly packed readback of an arbitrary buffer range."
+      },
+      {
+       "name": "query",
+       "kind": "method",
+       "signature": "():ReadbackInfo"
+      },
+      {
+       "name": "read",
+       "kind": "method",
+       "signature": "(data:Bytes):Int"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "ReadbackInfo",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Readback.hx",
+     "doc": "Snapshot of an asynchronous readback's state and packed result layout.",
+     "fields": [
+      {
+       "name": "state",
+       "kind": "var",
+       "signature": ":ReadbackState",
+       "final": true
+      },
+      {
+       "name": "size",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "rowPitch",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      }
+     ]
+    },
+    {
+     "name": "ReadbackState",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Pending",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Ready",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Failed",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "RenderPassDesc",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/RenderPassDesc.hx",
+     "doc": "Portable render-pass attachment description.",
+     "fields": [
+      {
+       "name": "colors",
+       "kind": "var",
+       "signature": ":Array<ColorAttachment>"
+      },
+      {
+       "name": "depthStencil",
+       "kind": "var",
+       "signature": ":Null<Image>"
+      },
+      {
+       "name": "depthStencilAction",
+       "kind": "var",
+       "signature": ":AttachmentAction"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "color",
+       "kind": "method",
+       "signature": "(image:Image, action:AttachmentAction, ?resolveImage:Null<Image>):RenderPassDesc"
+      },
+      {
+       "name": "depth",
+       "kind": "method",
+       "signature": "(image:Image, ?action:AttachmentAction):RenderPassDesc"
+      }
+     ]
+    },
+    {
+     "name": "Renderer",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Renderer.hx",
+     "doc": "Owns one renderer and all resources created through it.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(surface:Surface):Renderer",
+       "static": true
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nkgpu_renderer"
+      },
+      {
+       "name": "features",
+       "kind": "method",
+       "signature": "():Features",
+       "doc": "Returns optional backend capabilities through the portable GPU envelope."
+      },
+      {
+       "name": "limits",
+       "kind": "method",
+       "signature": "():Limits",
+       "doc": "Returns portable resource and binding limits for this renderer."
+      },
+      {
+       "name": "imageFormatSupport",
+       "kind": "method",
+       "signature": "(format:ImageFormat):ImageFormatSupport",
+       "doc": "Returns the portable operations supported by one image format."
+      },
+      {
+       "name": "beginFrame",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "endFrame",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "beginPassFrame",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Begins a frame that will contain explicit render, compute, or copy passes."
+      },
+      {
+       "name": "beginRenderPass",
+       "kind": "method",
+       "signature": "(desc:RenderPassDesc):Void",
+       "doc": "Begins a generic render pass inside an explicit pass frame."
+      },
+      {
+       "name": "beginComputePass",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Begins a compute pass inside an explicit pass frame."
+      },
+      {
+       "name": "beginCopyPass",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Begins a transfer pass inside an explicit pass frame."
+      },
+      {
+       "name": "endPass",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Ends the active generic render, compute, or copy pass."
+      },
+      {
+       "name": "dispatch",
+       "kind": "method",
+       "signature": "(x:Int, ?y:Int, ?z:Int):Void",
+       "doc": "Dispatches compute workgroups in the active compute pass."
+      },
+      {
+       "name": "copyBuffer",
+       "kind": "method",
+       "signature": "(source:Buffer, destination:Buffer, size:Int, ?sourceOffset:Int, ?destinationOffset:Int):Void",
+       "doc": "Copies a byte range between buffers in the active copy pass."
+      },
+      {
+       "name": "copyImage",
+       "kind": "method",
+       "signature": "(source:Image, destination:Image, width:Int, height:Int, ?sourceX:Int, ?sourceY:Int, ?destinationX:Int, ?destinationY:Int):Void",
+       "doc": "Copies a 2D image region in the active copy pass."
+      },
+      {
+       "name": "bufferToImage",
+       "kind": "method",
+       "signature": "(source:Buffer, destination:Image, width:Int, height:Int, ?rowPitch:Int, ?bufferOffset:Int, ?x:Int, ?y:Int, ?mipLevel:Int, ?layer:Int):Void",
+       "doc": "Uploads a buffer rectangle into an image in the active copy pass."
+      },
+      {
+       "name": "imageToBuffer",
+       "kind": "method",
+       "signature": "(source:Image, destination:Buffer, width:Int, height:Int, ?rowPitch:Int, ?bufferOffset:Int, ?x:Int, ?y:Int, ?mipLevel:Int, ?layer:Int):Void",
+       "doc": "Downloads an image rectangle into a buffer in top-to-bottom row order."
+      },
+      {
+       "name": "viewport",
+       "kind": "method",
+       "signature": "(x:Int, y:Int, width:Int, height:Int):Void",
+       "doc": "Applies a framebuffer-pixel viewport to the active render pass."
+      },
+      {
+       "name": "scissor",
+       "kind": "method",
+       "signature": "(enabled:Bool, ?x:Int, ?y:Int, ?width:Int, ?height:Int):Void",
+       "doc": "Applies or disables a framebuffer-pixel scissor rectangle."
+      },
+      {
+       "name": "submit",
+       "kind": "method",
+       "signature": "(commands:CommandBuffer):Void"
+      },
+      {
+       "name": "commandBuffer",
+       "kind": "method",
+       "signature": "(capacity:Int):CommandBuffer"
+      },
+      {
+       "name": "batch",
+       "kind": "method",
+       "signature": "():Batch"
+      },
+      {
+       "name": "uniforms",
+       "kind": "method",
+       "signature": "(size:Int):Uniforms"
+      },
+      {
+       "name": "draw",
+       "kind": "method",
+       "signature": "(baseElement:Int, elementCount:Int, ?instanceCount:Int):Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "Sampler",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Sampler.hx",
+     "doc": "Renderer-owned texture sampler with typed filter and wrap modes.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(renderer:Renderer, ?minFilter:Filter, ?magFilter:Filter, ?wrapU:Wrap, ?wrapV:Wrap):Sampler",
+       "static": true
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nkgpu_sampler"
+      },
+      {
+       "name": "apply",
+       "kind": "method",
+       "signature": "(slot:Int):Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "Shader",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Shader.hx",
+     "doc": "Renderer-owned shader resource.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(renderer:Renderer, language:ShaderLanguage, vertexSource:String, fragmentSource:String):Shader",
+       "static": true
+      },
+      {
+       "name": "begin",
+       "kind": "method",
+       "signature": "(renderer:Renderer, language:ShaderLanguage, vertexSource:String, fragmentSource:String):ShaderBuilder",
+       "static": true
+      },
+      {
+       "name": "beginCompute",
+       "kind": "method",
+       "signature": "(renderer:Renderer, language:ShaderLanguage, computeSource:String):ShaderBuilder",
+       "static": true,
+       "doc": "Begins a compute-only shader builder."
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nkgpu_shader"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "ShaderBuilder",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Shader.hx",
+     "doc": "Configures shader bindings before creating the immutable shader resource.",
+     "fields": [
+      {
+       "name": "uniformBlock",
+       "kind": "method",
+       "signature": "(slot:Int, stage:ShaderStage, size:Int):ShaderBuilder"
+      },
+      {
+       "name": "attribute",
+       "kind": "method",
+       "signature": "(location:Int, glslName:String, hlslSemantic:String, ?semanticIndex:Int):ShaderBuilder"
+      },
+      {
+       "name": "uniform",
+       "kind": "method",
+       "signature": "(slot:Int, memberIndex:Int, name:String, type:UniformType, ?arrayCount:Int):ShaderBuilder"
+      },
+      {
+       "name": "texture",
+       "kind": "method",
+       "signature": "(viewSlot:Int, samplerSlot:Int, stage:ShaderStage, name:String):ShaderBuilder"
+      },
+      {
+       "name": "textureType",
+       "kind": "method",
+       "signature": "(viewSlot:Int, samplerSlot:Int, stage:ShaderStage, imageType:ImageType, name:String):ShaderBuilder",
+       "doc": "Describes a filtering texture binding with an explicit image shape."
+      },
+      {
+       "name": "storageBuffer",
+       "kind": "method",
+       "signature": "(viewSlot:Int, ?stage:ShaderStage, ?readonly:Bool):ShaderBuilder",
+       "doc": "Describes a storage-buffer resource for a compute or graphics stage."
+      },
+      {
+       "name": "storageImage",
+       "kind": "method",
+       "signature": "(viewSlot:Int, format:ImageFormat, ?writeonly:Bool):ShaderBuilder",
+       "doc": "Describes a compute storage-image resource and its access format."
+      },
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "():Shader"
+      }
+     ]
+    },
+    {
+     "name": "ShaderLanguage",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Glsl",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Hlsl5",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Msl",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ShaderStage",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Vertex",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Fragment",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Compute",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "StoreAction",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Store",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Discard",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "Surface",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Surface.hx",
+     "doc": "Owns a GPU-adapter surface associated with a NativeKit window.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(window:NativeKitWindow, width:Int, height:Int):Surface",
+       "static": true
+      },
+      {
+       "name": "createForApi",
+       "kind": "method",
+       "signature": "(window:NativeKitWindow, api:GraphicsApi, width:Int, height:Int):Surface",
+       "static": true
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():SurfaceHandle"
+      },
+      {
+       "name": "acquireFrame",
+       "kind": "method",
+       "signature": "():haxeon.gpu.SurfaceFrame",
+       "doc": "Acquires an immutable surface frame for explicit batch submission."
+      },
+      {
+       "name": "createRenderer",
+       "kind": "method",
+       "signature": "():Renderer"
+      },
+      {
+       "name": "resize",
+       "kind": "method",
+       "signature": "(width:Int, height:Int):Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SurfaceFrame",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/SurfaceFrame.hx",
+     "doc": "Immutable surface target acquired for a deferred render submission.\n\nAcquire on the platform executor, submit the batch on the render executor,\nthen present or cancel this frame on the platform executor.",
+     "fields": [
+      {
+       "name": "present",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Presents the submitted frame and releases its platform transaction."
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Cancels the frame and releases its platform transaction."
+      },
+      {
+       "name": "isFinished",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "Timestamp",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Timestamp.hx",
+     "doc": "Owns one asynchronous GPU timestamp interval.",
+     "fields": [
+      {
+       "name": "begin",
+       "kind": "method",
+       "signature": "(renderer:Renderer):Timestamp",
+       "static": true,
+       "doc": "Begins timing work in the active render or compute pass."
+      },
+      {
+       "name": "beginNamed",
+       "kind": "method",
+       "signature": "(renderer:Renderer, label:String):Timestamp",
+       "static": true,
+       "doc": "Begins a named timing scope in the active render or compute pass."
+      },
+      {
+       "name": "end",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "query",
+       "kind": "method",
+       "signature": "():TimestampInfo"
+      },
+      {
+       "name": "label",
+       "kind": "method",
+       "signature": "():String",
+       "doc": "Returns the copied scope label, or an empty string for an unnamed scope."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "TimestampInfo",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Timestamp.hx",
+     "doc": "Snapshot of a timestamp query's state and elapsed GPU time.",
+     "fields": [
+      {
+       "name": "state",
+       "kind": "var",
+       "signature": ":TimestampState",
+       "final": true
+      },
+      {
+       "name": "nanoseconds",
+       "kind": "var",
+       "signature": ":haxe.Int64",
+       "final": true
+      }
+     ]
+    },
+    {
+     "name": "TimestampState",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Pending",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Ready",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Failed",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "UniformType",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Float",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Float2",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Float3",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Float4",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Int",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Int2",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Int3",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Int4",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Mat4",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "Uniforms",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Uniforms.hx",
+     "doc": "One consumed uniform block staged for the current renderer frame.",
+     "fields": [
+      {
+       "name": "writeFloat",
+       "kind": "method",
+       "signature": "(offset:Int, number:Float):Uniforms"
+      },
+      {
+       "name": "apply",
+       "kind": "method",
+       "signature": "(slot:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "VertexFormat",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Float",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Float2",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Float3",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Float4",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "Wrap",
+     "kind": "abstract",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/Enums.hx",
+     "underlying": "Int",
+     "fields": [
+      {
+       "name": "Repeat",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "ClampToEdge",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

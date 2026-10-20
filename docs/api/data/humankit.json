@@ -1,0 +1,3607 @@
+{
+ "kit": "humankit",
+ "packages": [
+  {
+   "name": "humankit",
+   "types": [
+    {
+     "name": "CapsulePlacement",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/CapsulePlacement.hx",
+     "doc": "Where one proxy capsule is: its centre and a rotation taking +Z to its axis (x, y, z, w).",
+     "fields": [
+      {
+       "name": "center",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "rotation",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(center:Array<Float>, rotation:Array<Float>):Void"
+      }
+     ]
+    },
+    {
+     "name": "FootHold",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/FootHold.hx",
+     "doc": "While the idle pose shows (standing, and the fade into and out of a walk), the feet are held where they stand:\nthe idle pose keeps its feet still relative to the body, so a body that starts to move drags them, and one that\nlowers or rises slides them. Each foot is reached for at the spot it had when the hold began, with a hold that\ncomes in and goes out smoothly; in a steady walk the gait already keeps a planted foot still. Only a character whose\nlegs are IK chains can hold its feet.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(body:HumanBody):Void"
+      },
+      {
+       "name": "amount",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How firmly the feet are held where they stand, 0 (free) to 1 (held)."
+      },
+      {
+       "name": "reset",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Lets go of both feet at once."
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float, kneeling:Bool):Void",
+       "doc": "Eases the hold toward what the pose asks for and reaches each held foot to its anchor. `kneeling` turns it off."
+      }
+     ]
+    },
+    {
+     "name": "HumanAttachment",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanCharacter.hx",
+     "doc": "A rigid object carried by a bone, such as a tool in a hand.",
+     "fields": [
+      {
+       "name": "bone",
+       "kind": "var",
+       "signature": ":HumanBone",
+       "final": true
+      },
+      {
+       "name": "node",
+       "kind": "var",
+       "signature": ":NodeId",
+       "final": true,
+       "doc": "Node that follows the bone; the prop hangs beneath it."
+      },
+      {
+       "name": "offset",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "doc": "Transform of the prop in the bone's frame."
+      },
+      {
+       "name": "instance",
+       "kind": "var",
+       "signature": ":AnimationInstance",
+       "final": true
+      },
+      {
+       "name": "model",
+       "kind": "var",
+       "signature": ":SkinnedModel",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(bone:HumanBone, node:NodeId, offset:Array<Float>, instance:AnimationInstance, model:SkinnedModel):Void"
+      }
+     ]
+    },
+    {
+     "name": "HumanBody",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanBody.hx",
+     "doc": "Animation and locomotion state shared by every action in a worker's job.\n\nThe body is what actions talk to: where it stands, which limbs reach or carry, how the hands\ngrip, how far the upper body leans. Each limb keeps its own small state machine\n(`LimbControl`); the body steps them, solves wrist goals against the animated pose, and turns\nthe tuning in `HumanPosture` into the pose. See BODY.md for how the layers fit together.",
+     "fields": [
+      {
+       "name": "character",
+       "kind": "var",
+       "signature": ":HumanCharacter",
+       "final": true
+      },
+      {
+       "name": "walker",
+       "kind": "var",
+       "signature": ":HumanWalker",
+       "final": true
+      },
+      {
+       "name": "description",
+       "kind": "var",
+       "signature": ":HumanDescription",
+       "final": true
+      },
+      {
+       "name": "posture",
+       "kind": "var",
+       "signature": ":HumanPosture",
+       "final": true
+      },
+      {
+       "name": "palmReach",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "How far the point a hand holds with (between the wrist and the knuckles) is beyond its wrist, in metres. The\narm has to bring the wrist this much less far than the point it is reaching for."
+      },
+      {
+       "name": "grip",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "True between a completed pick and its matching place."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(character:HumanCharacter, ?walker:HumanWalker, ?posture:HumanPosture):Void"
+      },
+      {
+       "name": "standingBone",
+       "kind": "method",
+       "signature": "(bone:HumanBone):Null<Array<Float>>",
+       "doc": "Where a bone stands when the body is upright and at rest, in model space, for planning where to\nstand: the animated pose bobs with the gait, so reading it at the instant a plan is made would let\na reach near the limit be possible in one phase of a stride and not another."
+      },
+      {
+       "name": "graspDepth",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, object:HumanTargetBox):Float",
+       "doc": "How far an object reaches from the palm, straight out along the palm's normal, for the hand that\nis about to close on it: the fingers must curl down that far. `object` is the object's box."
+      },
+      {
+       "name": "setGrasp",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, depth:Float):Void",
+       "doc": "Closes a hand's fingers around an object that reaches `depth` metres from the palm, and keeps them so while it holds it."
+      },
+      {
+       "name": "grasp",
+       "kind": "method",
+       "signature": "(hand:HumanLimb):Null<Array<Float>>",
+       "doc": "The curl each finger closes to around what a hand holds (THUMB to PINKY), or null when it holds nothing shaped."
+      },
+      {
+       "name": "fingerDepth",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, finger:Int):Float",
+       "doc": "How far a fingertip is from the palm along the palm's normal, in metres: positive on the palm's\nside, where an object is held. Zero for a hand without that finger."
+      },
+      {
+       "name": "setLean",
+       "kind": "method",
+       "signature": "(angle:Float):Void",
+       "doc": "Where the torso is asked to lean; it eases there. Zero stands upright."
+      },
+      {
+       "name": "canCrouch",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the character can crouch: its asset has a crouch clip to lower the body with."
+      },
+      {
+       "name": "setCrouch",
+       "kind": "method",
+       "signature": "(amount:Float):Void",
+       "doc": "Where the body is asked to crouch (0 stands, 1 is the clip's full crouch); it eases there."
+      },
+      {
+       "name": "crouchAmount",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far the body is into its crouch now."
+      },
+      {
+       "name": "setArmsDown",
+       "kind": "method",
+       "signature": "(down:Bool):Void",
+       "doc": "Holds the arms that are not reaching or carrying down at the sides instead of letting the gait swing them,\nso walking up to a surface does not sweep a hand across what lies on it. Eases in and out like the hang a\nlean asks for. Pick and Place let go of it once their hand has the part."
+      },
+      {
+       "name": "leanReached",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the body has finished easing to the lean it was asked for."
+      },
+      {
+       "name": "setHinge",
+       "kind": "method",
+       "signature": "(angle:Float):Void",
+       "doc": "Where the body is asked to bend at the hips, on top of its lean; it eases there. Zero stands straight."
+      },
+      {
+       "name": "crouchReached",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the body has finished easing to the crouch it was asked for."
+      },
+      {
+       "name": "canKneel",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the character can kneel: its asset has a kneeling clip to lower the body onto a knee with."
+      },
+      {
+       "name": "setKneel",
+       "kind": "method",
+       "signature": "(amount:Float):Void",
+       "doc": "Where the body is asked to kneel (0 stands, 1 the lowest the kneeling clip goes); it eases there. A kneel and a crouch are\ndifferent ways down, so a body kneels only from standing: ask for a crouch of nothing first."
+      },
+      {
+       "name": "kneelAmount",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far the body is into its kneel now."
+      },
+      {
+       "name": "kneelReached",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "downReached",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the body has finished easing to the crouch and the kneel it was asked for."
+      },
+      {
+       "name": "downAmount",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far down, in either way, the body is now: 0 standing."
+      },
+      {
+       "name": "crouchShift",
+       "kind": "method",
+       "signature": "(bone:HumanBone, amount:Float):Array<Float>",
+       "doc": "How far a bone sits from where it stands upright when the body crouches `amount`, in model space.\nMeasured on the skeleton at the current animation time, with no lean; the pose is left as it was."
+      },
+      {
+       "name": "kneelShift",
+       "kind": "method",
+       "signature": "(bone:HumanBone, amount:Float):Array<Float>",
+       "doc": "The same for a kneel: how far a bone sits from standing when the body kneels `amount`."
+      },
+      {
+       "name": "leanFor",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, shift:Float, ?crouch:Float, ?kneel:Float, ?belly:HumanBone):{angle:Float, shift:Float, drop:Float, belly:Float}",
+       "doc": "The lean that carries a hand's shoulder `shift` metres further forward, and the shift it can\ndeliver (less than asked when that would pass the posture's maximum lean). Measured by leaning\nthe skeleton a test amount, so it holds for any rig; the pose is left as it was. `crouch` is the\ndepth the body is planned to be at, since a crouched torso carries the shoulder differently."
+      },
+      {
+       "name": "hingeFor",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, shift:Float, crouch:Float, kneel:Float, lean:Float, ?belly:HumanBone):{angle:Float, shift:Float, drop:Float, belly:Float}",
+       "doc": "The same for bending at the hips, on top of a lean already planned (`lean`): the hinge that carries the shoulder `shift`\nmetres further forward than that lean does, and the shift and drop it delivers, up to the posture's maximum hinge."
+      },
+      {
+       "name": "rootTransform",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "toModel",
+       "kind": "method",
+       "signature": "(worldPoint:Array<Float>):Array<Float>"
+      },
+      {
+       "name": "toWorld",
+       "kind": "method",
+       "signature": "(modelPoint:Array<Float>):Array<Float>"
+      },
+      {
+       "name": "setReachWorld",
+       "kind": "method",
+       "signature": "(limb:HumanLimb, target:Array<Float>, weight:Float, ?pole:Array<Float>):Void"
+      },
+      {
+       "name": "setReachModel",
+       "kind": "method",
+       "signature": "(limb:HumanLimb, target:Array<Float>, weight:Float, ?pole:Array<Float>):Void",
+       "doc": "Legacy model-space reach target used by HumanReachTask."
+      },
+      {
+       "name": "setReachShoulder",
+       "kind": "method",
+       "signature": "(limb:HumanLimb, offset:Array<Float>, weight:Float, ?pole:Array<Float>):Void",
+       "doc": "Reaches for a point given as an offset from the limb's shoulder (model-space axes), so the target moves with the\nshoulder: the arm keeps its shape as the body leans, straightens, and walks. A caller whose offset should turn\nwith the torso turns it itself, by the change in `torsoPitch`."
+      },
+      {
+       "name": "shoulderPosition",
+       "kind": "method",
+       "signature": "(limb:HumanLimb):Array<Float>",
+       "doc": "Where a limb's shoulder is, in model space."
+      },
+      {
+       "name": "chestPosition",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "Where the chest is, in model space (the pelvis on a rig without one)."
+      },
+      {
+       "name": "reachTargetModel",
+       "kind": "method",
+       "signature": "(control:LimbControl):Array<Float>",
+       "doc": "A limb's reach target in model space, whichever frame it was given in."
+      },
+      {
+       "name": "footHold",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How firmly the feet are held where they stand, 0 (free) to 1 (held)."
+      },
+      {
+       "name": "torsoPitch",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far the upper body is pitched forward now, in radians: the lean and the hip hinge together."
+      },
+      {
+       "name": "reachWeight",
+       "kind": "method",
+       "signature": "(limb:HumanLimb):Float"
+      },
+      {
+       "name": "setHeldPoint",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, ?provider:() -> Array<Float>):Void",
+       "doc": "Predicted world position of the object reference point held by a hand."
+      },
+      {
+       "name": "heldPoint",
+       "kind": "method",
+       "signature": "(hand:HumanLimb):Null<Array<Float>>"
+      },
+      {
+       "name": "gripPoint",
+       "kind": "method",
+       "signature": "(hand:HumanLimb):Array<Float>",
+       "doc": "World position of a hand's palm centre, midway between the wrist and the\nmiddle-finger knuckle (the wrist itself on a rig without fingers). Pick\nbrings this point to its grasp point."
+      },
+      {
+       "name": "reachFailure",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, goal:Array<Float>):Null<String>",
+       "doc": "Why a wrist goal is beyond 95% of the arm's length from its shoulder, or null."
+      },
+      {
+       "name": "solveReach",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, target:Array<Float>, point:() -> Array<Float>, guess:Array<Float>, cap:Float):{goal:Array<Float>, error:Float, failure:Null<String>}",
+       "doc": "Finds the wrist goal that brings point() onto target with the arm at full\nIK weight, re-evaluating the pose at the current animation time between\nattempts, so nothing accumulates across frames. Each attempt steps the\nbest goal so far by the remaining miss; a step that does not improve on it\nis halved instead of taken, so the returned error never exceeds the\nguess's and repeated solves cannot oscillate. guess is the first wrist\ngoal; the goal never moves more than cap metres from it. Leaves the arm\nreaching for the returned goal. failure is set only when the guess itself\nis out of reach; steps beyond reach are treated as overshoots."
+      },
+      {
+       "name": "travelToAnimation",
+       "kind": "method",
+       "signature": "(limb:HumanLimb):Float",
+       "doc": "How far a limb's wrist would travel, in metres, if its reach were let go now: the distance from where\nthe IK holds it to where its animation puts it. The pose is left as it was."
+      },
+      {
+       "name": "wristWorld",
+       "kind": "method",
+       "signature": "(limb:HumanLimb):Array<Float>",
+       "doc": "Where a hand's wrist is in the world now."
+      },
+      {
+       "name": "blendSeconds",
+       "kind": "method",
+       "signature": "(distance:Float, minimum:Float):Float",
+       "doc": "How long a reach takes to blend in from the animation or out to it, given how far the wrist has to go: at\nleast `minimum`, and longer when the distance would otherwise push the wrist past the posture's blend speed.\nEasing peaks at half as much again as the average speed, hence the factor."
+      },
+      {
+       "name": "reachPole",
+       "kind": "method",
+       "signature": "(limb:HumanLimb):Null<Array<Float>>"
+      },
+      {
+       "name": "reachTargetWorld",
+       "kind": "method",
+       "signature": "(limb:HumanLimb):Null<Array<Float>>"
+      },
+      {
+       "name": "clearReach",
+       "kind": "method",
+       "signature": "(limb:HumanLimb):Void"
+      },
+      {
+       "name": "setCarry",
+       "kind": "method",
+       "signature": "(hands:Array<HumanLimb>):Void"
+      },
+      {
+       "name": "isCarrying",
+       "kind": "method",
+       "signature": "(limb:HumanLimb):Bool"
+      },
+      {
+       "name": "carryTargetModel",
+       "kind": "method",
+       "signature": "(limb:HumanLimb):Array<Float>",
+       "doc": "Current carry target in model space, tied to the animated chest."
+      },
+      {
+       "name": "standingTwist",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far the idle pose's shoulders are twisted from square to the way the body faces, in radians (positive: the left shoulder\nfurther back). A body that faces a table with its shoulders square needs its root turned by the opposite."
+      },
+      {
+       "name": "bodyTurn",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far the body is turned in model space from standing at rest (a turn clip turns it so), in radians."
+      },
+      {
+       "name": "setGrip",
+       "kind": "method",
+       "signature": "(held:Bool):Void"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "reset",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, heading:Float):Void",
+       "doc": "Returns the body to rest at a floor pose as if newly constructed: no route,\nno reach, nothing carried or held, and the idle pose evaluated."
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void",
+       "doc": "Advances gait once, then reapplies current world targets over that pose."
+      },
+      {
+       "name": "evaluate",
+       "kind": "method",
+       "signature": "(?present:Bool):Void",
+       "doc": "Re-evaluates reaches at the current animation time for in-frame IK solving. Nothing here is skinned or shown\n(`HumanCharacter.publish` does that). With `present` off the pose is a measurement, for the attempts of a solve\nof which only the last is to be kept."
+      }
+     ]
+    },
+    {
+     "name": "HumanBodyProxy",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanBodyProxy.hx",
+     "doc": "A person's collision stand-in: fifteen capsules between standard bones\n(head, abdomen, chest, and three segments per limb), sized from a\nHumanDescription and placed from a HumanPose every frame. Simulations use it\nwhere the skinned mesh would be too costly to collide with.",
+     "fields": [
+      {
+       "name": "capsules",
+       "kind": "var",
+       "signature": ":Array<HumanCapsule>",
+       "final": true
+      },
+      {
+       "name": "description",
+       "kind": "var",
+       "signature": ":HumanDescription",
+       "final": true
+      },
+      {
+       "name": "standard",
+       "kind": "method",
+       "signature": "(rest:HumanPose, description:HumanDescription):HumanBodyProxy",
+       "static": true,
+       "doc": "The standard proxy for a rig, measured at its rest pose. Radii are\nproportions of stature; capsule lengths follow the rig's bones, scaled\nby description.scale like the character's visual root."
+      },
+      {
+       "name": "place",
+       "kind": "method",
+       "signature": "(pose:HumanPose, ?root:Array<Float>):Array<CapsulePlacement>",
+       "doc": "Every capsule's placement for a pose, through a root transform (column-major 4x4)."
+      },
+      {
+       "name": "rotationFromZ",
+       "kind": "method",
+       "signature": "(direction:Array<Float>):Array<Float>",
+       "static": true,
+       "doc": "The rotation (x, y, z, w) taking +Z onto a unit direction by the shortest arc."
+      }
+     ]
+    },
+    {
+     "name": "HumanBodyView",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanBodyView.hx",
+     "doc": "Draws a human's collision capsules or skeleton beneath its root node, for\nchecking a body proxy against the mesh. Bones are rigid, so every part keeps\none geometry and only its node moves; update() places them from a pose in\nthe character's model space.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(scene:Scene, parent:NodeId, proxy:HumanBodyProxy, rest:HumanPose):Void",
+       "doc": "Builds hidden capsule and skeleton nodes beneath parent (the character root)."
+      },
+      {
+       "name": "show",
+       "kind": "method",
+       "signature": "(mode:HumanDisplay):Void",
+       "doc": "Shows the capsules, the skeleton, or neither (the mesh alone)."
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "(pose:HumanPose):Void",
+       "doc": "Places every part from a pose in model space."
+      },
+      {
+       "name": "nodes",
+       "kind": "method",
+       "signature": "():Array<NodeId>"
+      }
+     ]
+    },
+    {
+     "name": "HumanCapsule",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanCapsule.hx",
+     "doc": "One capsule of a body proxy. It runs from its `from` bone towards its `to`\nbone, continued past `to` by `extension` times that span (a head beyond its\njoint, fingers beyond the knuckles) or stopped `trim` metres short of it (a\nshin that leaves the ankle to the foot). The capsule's hemisphere centres sit\nat the two ends, so it covers `radius` beyond each.",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "from",
+       "kind": "var",
+       "signature": ":HumanBone",
+       "final": true
+      },
+      {
+       "name": "to",
+       "kind": "var",
+       "signature": ":HumanBone",
+       "final": true
+      },
+      {
+       "name": "extension",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "trim",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "radius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Distance between the hemisphere centres, fixed at the rest pose."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, from:HumanBone, to:HumanBone, extension:Float, trim:Float, radius:Float, length:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "HumanCarryPosture",
+     "kind": "abstract",
+     "file": "humankit/haxe/humankit/HumanCarryPosture.hx",
+     "underlying": "Int",
+     "doc": "Hands held near the chest while the legs keep their walking gait.",
+     "fields": [
+      {
+       "name": "None",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "LeftHand",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "RightHand",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "BothHands",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HumanCharacter",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanCharacter.hx",
+     "doc": "An animated humanoid in a SceneKit scene: the skinned mesh, its standard\nskeleton pose, and rigid attachments that follow bones. Place it by\ntransforming root; advance() plays the current clip and moves everything.",
+     "fields": [
+      {
+       "name": "asset",
+       "kind": "var",
+       "signature": ":AnimationAsset",
+       "final": true
+      },
+      {
+       "name": "instance",
+       "kind": "var",
+       "signature": ":AnimationInstance",
+       "final": true
+      },
+      {
+       "name": "player",
+       "kind": "var",
+       "signature": ":ClipPlayer",
+       "final": true
+      },
+      {
+       "name": "rig",
+       "kind": "var",
+       "signature": ":HumanoidRig",
+       "final": true
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":HumanPose",
+       "final": true
+      },
+      {
+       "name": "model",
+       "kind": "var",
+       "signature": ":SkinnedModel",
+       "final": true
+      },
+      {
+       "name": "attachments",
+       "kind": "var",
+       "signature": ":Array<HumanAttachment>",
+       "final": true
+      },
+      {
+       "name": "root",
+       "kind": "var",
+       "signature": ":NodeId"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(scene:Scene, asset:AnimationAsset, ?rig:HumanoidRig, ?parent:NodeId, ?name:String):Void",
+       "doc": "Presents asset in scene; the rig is detected from its joint names unless given."
+      },
+      {
+       "name": "height",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Model height at the rest pose, in metres."
+      },
+      {
+       "name": "attach",
+       "kind": "method",
+       "signature": "(prop:AnimationAsset, bone:HumanBone, ?offset:Array<Float>, ?name:String):HumanAttachment",
+       "doc": "Attaches a rigid prop to a bone. The prop is placed at offset in the\nbone's frame (see HumanPose for the hand frame). The prop's asset must\nstay live until this call returns."
+      },
+      {
+       "name": "reach",
+       "kind": "method",
+       "signature": "(limb:HumanLimb, target:Array<Float>, ?weight:Float, ?pole:Array<Float>):Void",
+       "doc": "Reaches a limb's wrist or ankle for target ([x, y, z] in model space)\non top of the animation, from the next advance on. The elbow or knee\npoints along pole, a model-space direction: by default an elbow bends the\nway the animation bends it, which stays continuous wherever the hand goes,\nand knees point forward. weight blends from the animation (0) to the\nfull reach (1). Throws when the rig's limb is not one chain, as with\nQuaternius legs, whose feet hang off the body as IK controls."
+      },
+      {
+       "name": "setHandCurl",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, curl:Float):Void",
+       "doc": "Curls a hand's fingers, from open (0) to a fist (1), on top of the animation. A rig without finger\njoints ignores it. Takes effect from the next advance."
+      },
+      {
+       "name": "setSpineLean",
+       "kind": "method",
+       "signature": "(angle:Float):Void",
+       "doc": "Leans the upper body forward by angle radians (0 upright), on top of the animation, by pitching\nthe spine's upper joints together. Takes effect from the next advance."
+      },
+      {
+       "name": "spineLean",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "setSpineHinge",
+       "kind": "method",
+       "signature": "(angle:Float):Void",
+       "doc": "Bends the body forward at the hips by angle radians (0 upright), on top of the animation and of any lean: the whole trunk\npitches about the lowest spine joint, so the shoulders travel far forward and down, as when someone bends over a table to\nreach across it. A rig without that joint ignores it. Takes effect from the next advance."
+      },
+      {
+       "name": "spineHinge",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "legsAreChains",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the legs are IK chains (thigh, shin and foot one below the other), so a foot can be held where it is.\nThe bundled worker's feet hang off the body as controls instead, and cannot."
+      },
+      {
+       "name": "canCrouch",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the asset has a crouch clip to lower the body with."
+      },
+      {
+       "name": "setCrouch",
+       "kind": "method",
+       "signature": "(amount:Float):Void",
+       "doc": "Lowers the body toward a crouch, by mixing the asset's crouching clip over the animation: 0 stands, 1 is\nthe clip's full crouch. The legs and pelvis come from the clip, so the feet stay near the floor (they are not\npinned: one may lift a few centimetres at full depth). Throws when the asset has no crouch clip. A crouch takes the\nplace of a kneel, as a kneel does of a crouch. Takes effect from the next advance, and is meant for a worker standing still."
+      },
+      {
+       "name": "crouch",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "canKneel",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the asset has a kneeling clip to lower the body further with than a crouch can."
+      },
+      {
+       "name": "setKneel",
+       "kind": "method",
+       "signature": "(amount:Float):Void",
+       "doc": "Lowers the body onto a knee, with the arm reaching down, by holding the going-down part of the asset's kneeling clip\nat the point where the pelvis is that fraction of the way down: 0 stands, 1 is the lowest the clip goes. It takes the\nplace of a crouch (the two are different ways down, not stages of one), so asking for a kneel stands the crouch back up\nand the other way round. Throws when the asset has no kneeling clip."
+      },
+      {
+       "name": "kneel",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "setDown",
+       "kind": "method",
+       "signature": "(crouchAmount:Float, kneelAmount:Float):Void",
+       "doc": "Sets how far down the body is in both ways at once (a kneel, if any, wins); for measuring and putting back."
+      },
+      {
+       "name": "setHandCurls",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, curls:Array<Float>):Void",
+       "doc": "Curls each finger of a hand on its own: values are indexed HumanHand.THUMB to PINKY, each 0 open to\n1 a fist. A rig without finger joints ignores it."
+      },
+      {
+       "name": "handCurls",
+       "kind": "method",
+       "signature": "(hand:HumanLimb):Array<Float>",
+       "doc": "How curled each finger of a hand is (THUMB to PINKY), or all zero for a rig without them."
+      },
+      {
+       "name": "fingertip",
+       "kind": "method",
+       "signature": "(hand:HumanLimb, finger:Int):Null<Array<Float>>",
+       "doc": "The model-space position of a finger's tip on a hand (HumanHand.THUMB to PINKY), or null when it has none."
+      },
+      {
+       "name": "handCurl",
+       "kind": "method",
+       "signature": "(hand:HumanLimb):Float",
+       "doc": "How curled a hand's fingers are, or 0 for a rig without them."
+      },
+      {
+       "name": "release",
+       "kind": "method",
+       "signature": "(limb:HumanLimb):Void",
+       "doc": "Returns a limb to its animation."
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void",
+       "doc": "Advances the current clip and applies every turn and reach, so `pose` describes the body now. The scene is not\ntouched: a simulation advances many times for each frame it draws, and skinning and uploading a mesh nobody sees\nis the largest cost of doing it. Whoever draws the character calls `publish` once per frame."
+      },
+      {
+       "name": "publish",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Skins the mesh to the state the character is in now and moves it and its attachments in the scene. The state\nis the one the latest `advance` left (a measurement puts back what it changes), so a probe between an advance\nand a publish cannot reach the screen."
+      },
+      {
+       "name": "probe",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Evaluates the pose as it would be now, at the current animation time and with every turn and reach applied, and\nmakes `pose` current, without skinning the model or moving attachments. For measuring (what would the shoulder\ndo under a lean, where would the hand be if released): nothing a measurement poses reaches the scene, and\nthe next `advance` evaluates the pose again as usual."
+      },
+      {
+       "name": "changedNodes",
+       "kind": "method",
+       "signature": "():Array<NodeId>",
+       "doc": "Nodes whose geometry or world transform changed in the last advance."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "HumanCrouch",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanCrouch.hx",
+     "doc": "A one-way clip of going down into a crouch, measured so that any depth between standing and crouched can be posed\nfrom it: how far the pelvis has dropped at each moment of the clip, as a fraction of its whole drop. Holding the\nclip at the time where the drop is a given fraction gives an authored pose at that depth, in place of a blend of\nstanding and crouching poses.",
+     "fields": [
+      {
+       "name": "clip",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "timeFor",
+       "kind": "method",
+       "signature": "(depth:Float):Float",
+       "doc": "The time in the clip at which the body is `depth` of the way down (0 standing, 1 crouched)."
+      },
+      {
+       "name": "measure",
+       "kind": "method",
+       "signature": "(asset:AnimationAsset, rig:HumanoidRig, clip:Int, ?toLowest:Bool):Null<HumanCrouch>",
+       "static": true,
+       "doc": "Measures a clip of going down. With `toLowest` the clip is taken only as far as the pelvis gets lowest, which is\nfor a clip that goes down, does something, and comes back up: its descent is the going-down part."
+      }
+     ]
+    },
+    {
+     "name": "HumanDescription",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanDescription.hx",
+     "doc": "A person's body measurements in metres. Measured from a rig's rest pose by\ndefault; scaledTo() describes the same body at another stature, and\n`scale` is then the uniform scale to apply to the character's visual root.\nSide-dependent lengths are the mean of both sides.",
+     "fields": [
+      {
+       "name": "stature",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Floor to crown."
+      },
+      {
+       "name": "shoulderWidth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Between the upper arm joints."
+      },
+      {
+       "name": "hipWidth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Between the thigh joints."
+      },
+      {
+       "name": "torso",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Pelvis joint to neck joint."
+      },
+      {
+       "name": "upperArm",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "forearm",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "thigh",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "shin",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "scale",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Uniform scale from the measured rig to this description."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(stature:Float, shoulderWidth:Float, hipWidth:Float, torso:Float, upperArm:Float, forearm:Float, thigh:Float, shin:Float, ?scale:Float):Void"
+      },
+      {
+       "name": "measure",
+       "kind": "method",
+       "signature": "(rest:HumanPose, stature:Float):HumanDescription",
+       "static": true,
+       "doc": "Measures a rest pose; stature is the model's rest height (floor to crown)."
+      },
+      {
+       "name": "scaledTo",
+       "kind": "method",
+       "signature": "(targetStature:Float):HumanDescription",
+       "doc": "The same body proportions at another stature."
+      }
+     ]
+    },
+    {
+     "name": "HumanDisplay",
+     "kind": "abstract",
+     "file": "humankit/haxe/humankit/HumanDisplay.hx",
+     "underlying": "Int",
+     "doc": "How a human is drawn: the skinned mesh, the collision capsules, or the skeleton.",
+     "fields": [
+      {
+       "name": "Mesh",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Capsules",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Skeleton",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HumanDisplays",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanDisplays.hx",
+     "fields": [
+      {
+       "name": "parse",
+       "kind": "method",
+       "signature": "(name:String):HumanDisplay",
+       "static": true,
+       "doc": "Parses \"mesh\", \"capsules\", or \"skeleton\"."
+      }
+     ]
+    },
+    {
+     "name": "HumanGait",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanGait.hx",
+     "doc": "The natural ground speed of a looping locomotion clip. While a foot is\nplanted it slides backwards past the pelvis at exactly the speed the body\ntravels, so playing the clip at `speed / naturalSpeed` keeps planted feet\nstill on the floor. Clips are expected in place, facing +X.",
+     "fields": [
+      {
+       "name": "clip",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "naturalSpeed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Metres per second at playback rate 1."
+      },
+      {
+       "name": "startTime",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Seconds into the clip where a walk from standing should begin: the moment in the cycle when the feet are nearest\nwhere they stand at idle, one foot planted under the body and the other passing it. Starting there, the fade from idle\ndrags the feet a few centimetres; starting at the top of the cycle drags them across a stride."
+      },
+      {
+       "name": "measure",
+       "kind": "method",
+       "signature": "(asset:AnimationAsset, rig:HumanoidRig, clip:Int, ?backward:Bool, ?idleClip:Int, ?holdsFeet:Bool):HumanGait",
+       "static": true,
+       "doc": "Measures a clip of asset on rig by sampling one cycle. With `idleClip`, also finds the moment in the cycle\nthat best matches the feet at idle (see `startTime`); without it a walk starts at the top of the cycle."
+      }
+     ]
+    },
+    {
+     "name": "HumanGrip",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanGrip.hx",
+     "doc": "Prop offsets for HumanCharacter.attach, expressed in the standard hand frame (see HumanPose).",
+     "fields": [
+      {
+       "name": "handle",
+       "kind": "method",
+       "signature": "(gripPoint:Float, ?palmDepth:Float):Array<Float>",
+       "static": true,
+       "doc": "A closed-fist grip on a handle. The prop's +X axis runs through the fist\nalong the hand's thumb side (+Y), held gripPoint metres along the prop from\nits origin, and palmDepth metres from the palm centre towards the fingers."
+      }
+     ]
+    },
+    {
+     "name": "HumanHand",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanHand.hx",
+     "doc": "One hand's fingers, each curled between open (0) and a fist (1). A finger is each child of the\nwrist and the single-child chain below it, found from the skeleton so any humanoid rig works. Every\njoint of a finger turns about one of its own local axes: negative X on the Quaternius and Mixamo\nrigs, which brings the fingertip toward the palm on both hands, and for any other rig the axis that\ndoes, found by turning the knuckle each way in the rest pose and keeping the turn that closes the\nfinger most. The turns ride on the animation, so fingers keep whatever their clip did and only add\nthe curl.",
+     "fields": [
+      {
+       "name": "THUMB",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "The fingers, in the order curls are given."
+      },
+      {
+       "name": "INDEX",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "MIDDLE",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "RING",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "PINKY",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "FINGERS",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "curl",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How curled the hand is now on average, or -1 before the first curl."
+      },
+      {
+       "name": "find",
+       "kind": "method",
+       "signature": "(asset:AnimationAsset, rig:HumanoidRig, instance:AnimationInstance, wrist:HumanBone, source:Int, ?pose:HumanPose):Null<HumanHand>",
+       "static": true,
+       "doc": "The fingers below a rig's wrist bone, or null when the skeleton has none."
+      },
+      {
+       "name": "has",
+       "kind": "method",
+       "signature": "(kind:Int):Bool",
+       "doc": "Whether the hand has this finger."
+      },
+      {
+       "name": "curlOf",
+       "kind": "method",
+       "signature": "(kind:Int):Float",
+       "doc": "How curled a finger is now, or 0 before the first curl."
+      },
+      {
+       "name": "tipPosition",
+       "kind": "method",
+       "signature": "(kind:Int):Null<Array<Float>>",
+       "doc": "The model-space position of a finger's last joint, or null when the hand lacks the finger."
+      },
+      {
+       "name": "setCurl",
+       "kind": "method",
+       "signature": "(value:Float):Void",
+       "doc": "Curls every finger alike, 0 open to 1 a fist."
+      },
+      {
+       "name": "setCurls",
+       "kind": "method",
+       "signature": "(values:Array<Float>):Void",
+       "doc": "Curls each finger on its own: values are indexed THUMB to PINKY, each 0 open to 1 a fist. Fingers\nthe hand lacks are ignored."
+      }
+     ]
+    },
+    {
+     "name": "HumanLimb",
+     "kind": "abstract",
+     "file": "humankit/haxe/humankit/HumanLimb.hx",
+     "underlying": "Int",
+     "doc": "A limb inverse kinematics can pose: each arm ends at its wrist, each leg at its ankle.",
+     "fields": [
+      {
+       "name": "ArmL",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "ArmR",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "LegL",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "LegR",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HumanPosture",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanPosture.hx",
+     "doc": "Every tuning number behind how a worker holds and moves its body, in one place. The values are in\nmetres and radians, tuned on the bundled worker rig (`REFERENCE_STATURE` tall); a body built without a\nposture scales the lengths to its own stature (`forStature`), and one built with a modified copy carries\nitself as that copy says. Nothing here is a fact about a rig's bones, which HumanKit reads from\nthe skeleton or measures instead.",
+     "fields": [
+      {
+       "name": "REFERENCE_STATURE",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "doc": "The height of the bundled worker rig the lengths below were tuned on, as its bounds measure it, in metres."
+      },
+      {
+       "name": "comfort",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The fraction of arm length (shoulder to wrist) a standing reach uses; the palm adds no reliable length."
+      },
+      {
+       "name": "reachLimit",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Beyond this fraction of the arm's length a wrist goal is out of reach."
+      },
+      {
+       "name": "stretch",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How much of the arm's length a worker will stretch to keep clear of a surface's edge, once the lean is\nspent: more than the comfortable reach, and short of the limit the solver refuses at."
+      },
+      {
+       "name": "reachSlack",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Reach held back from the stretch when a stance is planned, in metres: the shoulder is measured at one moment\nand the grasp point is not exactly the planned one, so a stance planned to the stretch would sometimes be a\nlittle past what the arm can reach."
+      },
+      {
+       "name": "handSpread",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "With two hands on one object, how far each hand's grasp point sits to its own side of the object's centre, in metres."
+      },
+      {
+       "name": "carryOffset",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "doc": "Where a carried wrist sits relative to the chest bone, in model space (the left hand; the right mirrors Y)."
+      },
+      {
+       "name": "carryEaseSeconds",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Seconds a hand takes to settle into the carry pose from wherever it was."
+      },
+      {
+       "name": "relaxedCurl",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The curl of a resting hand, of one reaching for something, and of one holding it."
+      },
+      {
+       "name": "openCurl",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "gripCurl",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "curlRate",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How fast the fingers open and close, in full curls per second."
+      },
+      {
+       "name": "pinchBelow",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "A held object thinner than this (across the palm, in metres) is pinched: thumb and index close on it and\nthe other fingers stay relaxed. The thumb closes this share of the fingers' curl."
+      },
+      {
+       "name": "thumbShare",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "graspSteps",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "How many curl steps are measured to find the curl that brings a fingertip to a held object's far side."
+      },
+      {
+       "name": "maxLean",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The furthest the upper body leans into a reach, in radians, and how fast it leans."
+      },
+      {
+       "name": "maxHinge",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The furthest the body bends forward at the hips, on top of the lean, in radians; used when the lean is not enough to reach across."
+      },
+      {
+       "name": "hingeWithCrouch",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Whether a hip hinge may combine with a crouch or a kneel, for a top too deep to reach across from a crouch."
+      },
+      {
+       "name": "hingeDiscomfort",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "What a stance's hip hinge costs in the planner's comparison of stances, per radian: a hinge is the last resort, after a deeper crouch."
+      },
+      {
+       "name": "reachMargin",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How near the arm's limit a reach may end before the planner counts it a stretch, in metres, and what a stretch costs in the comparison of stances."
+      },
+      {
+       "name": "tightDiscomfort",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "leanRate",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "hangSeconds",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How long an arm that is not reaching or carrying takes to settle into hanging (and back) while the body leans, and where it hangs under the shoulder."
+      },
+      {
+       "name": "hangDrop",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "hangForward",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "hangOutward",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "bellyFront",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How far the front of the belly sits ahead of the abdomen bone, and the gap left to a surface edge."
+      },
+      {
+       "name": "edgeGap",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "bellyHalfHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How far below the abdomen bone the belly reaches: a belly higher than a surface's top by this much overhangs it without touching it."
+      },
+      {
+       "name": "bellyOverhangMargin",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How much higher than that the planner wants the belly before it lets it overhang: leaning lowers the belly a little, and the rule switches a whole edge on or off."
+      },
+      {
+       "name": "blendSpeed",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How fast, in metres per second, a wrist is allowed to go at the peak of the easing as a reach blends in from\nthe animation or out to it, working from the straight-line distance it has to cover. The wrist follows an arc\nand the IK blend is not linear in position, so its real peak is about twice this."
+      },
+      {
+       "name": "lockFeet",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Whether a planted foot is held where it is in the world, on a character whose legs are IK chains."
+      },
+      {
+       "name": "lockFrom",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The share of the pose that is the idle one above which the feet are held, and the span over which the hold comes in."
+      },
+      {
+       "name": "lockSpan",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "lockSeconds",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Seconds the hold takes to come in and go out."
+      },
+      {
+       "name": "lockReach",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How far a held foot may be from where the pose wants it, in metres, before the hold lets go."
+      },
+      {
+       "name": "crouchRate",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How fast the body lowers into a crouch and rises out of it, in full crouches per second."
+      },
+      {
+       "name": "legRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The radius of a leg, and how far above and below a surface's slab a leg still counts as meeting it (for a kneel)."
+      },
+      {
+       "name": "slabMargin",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "kneelRate",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The same for a kneel, which swings an arm down with the body and is taken slower."
+      },
+      {
+       "name": "crouchLevels",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "How many depths between standing and the full crouch the planner tries, counting both."
+      },
+      {
+       "name": "comfortLean",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The lean a worker will put up with before it bends its knees instead, in radians."
+      },
+      {
+       "name": "withdraw",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How far the wrists pull back toward the body, and how far they lift."
+      },
+      {
+       "name": "lift",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "minAhead",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The least a withdrawn wrist stays ahead of the chest."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "standard",
+       "kind": "method",
+       "signature": "():HumanPosture",
+       "static": true,
+       "doc": "The tuning the bundled worker rig was set up with."
+      },
+      {
+       "name": "forStature",
+       "kind": "method",
+       "signature": "(stature:Float):HumanPosture",
+       "static": true,
+       "doc": "The tuning for a body of `stature` metres: every length, and the speed the wrist may go at, grows with\nthe body. Angles, fractions of the arm's length, curls and times do not depend on size and are kept.\n`edgeGap` is also kept: it is the clearance left to a surface, which is not a matter of the worker's size."
+      }
+     ]
+    },
+    {
+     "name": "HumanTargetBox",
+     "kind": "typedef",
+     "file": "humankit/haxe/humankit/HumanTargetBox.hx",
+     "fields": [
+      {
+       "name": "center",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "halfExtents",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "yaw",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "World-space oriented box, with yaw around the vertical Z axis."
+    },
+    {
+     "name": "HumanTurn",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanTurn.hx",
+     "doc": "A turn-in-place clip, measured: how far the body has turned by the end of the clip and how long that takes.\nSuch a clip turns the body in its own space and does not move the root, so it ends in the pose of the idle\nclip turned by that angle. Playing it and then turning the root by the same angle while switching to idle is\nseamless, and the feet step through the turn instead of sliding. The turn is read from the line between the\nshoulders, which a clip that turns the body turns with it.",
+     "fields": [
+      {
+       "name": "clip",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "angle",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Radians turned, positive to the left (counter-clockwise from above)."
+      },
+      {
+       "name": "seconds",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Seconds of the clip until the turn is done; the rest of it only holds the pose."
+      },
+      {
+       "name": "measure",
+       "kind": "method",
+       "signature": "(asset:AnimationAsset, rig:HumanoidRig, clip:Int):Null<HumanTurn>",
+       "static": true,
+       "doc": "Measures a clip, or null when it does not turn the body by roughly a right angle."
+      }
+     ]
+    },
+    {
+     "name": "HumanWalker",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/HumanWalker.hx",
+     "doc": "Walks a HumanCharacter along a route of floor points. The walk clip plays at\nthe rate that matches the body's speed to the clip's gait, so planted feet\nstay on the floor. The body speeds up over the crossfade from idle, slows\ndown to stop at the end of the route, and turns towards the route at a\nbounded rate. rootTransform() is where\nto place the character; it faces +X like every AnimKit character.",
+     "fields": [
+      {
+       "name": "character",
+       "kind": "var",
+       "signature": ":HumanCharacter",
+       "final": true
+      },
+      {
+       "name": "gait",
+       "kind": "var",
+       "signature": ":HumanGait",
+       "final": true
+      },
+      {
+       "name": "carryGait",
+       "kind": "var",
+       "signature": ":Null<HumanGait>",
+       "final": true,
+       "doc": "The gait of a walk that carries something, when the character has a clip for it; see setCarrying."
+      },
+      {
+       "name": "backGait",
+       "kind": "var",
+       "signature": ":Null<HumanGait>",
+       "final": true,
+       "doc": "The gait of walking backwards, when the character has a clip for it; a retreat uses it."
+      },
+      {
+       "name": "turnLeft",
+       "kind": "var",
+       "signature": ":Null<HumanTurn>",
+       "final": true,
+       "doc": "The turn-in-place clips, to the left and to the right, when the character has them; see face."
+      },
+      {
+       "name": "turnRight",
+       "kind": "var",
+       "signature": ":Null<HumanTurn>",
+       "final": true
+      },
+      {
+       "name": "turnRate",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Fastest turn, in radians per second."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(character:HumanCharacter, ?walkClip:String, ?idleClip:String):Void",
+       "doc": "Measures the walk clip's gait and starts the character idling at the origin."
+      },
+      {
+       "name": "follow",
+       "kind": "method",
+       "signature": "(route:Array<Array<Float>>, metresPerSecond:Float, ?loop:Bool):Void",
+       "doc": "Walks along points ([x, y] on the floor, metres) at speed, starting at\nthe first point facing the second. A looping route returns to its start."
+      },
+      {
+       "name": "setCarrying",
+       "kind": "method",
+       "signature": "(value:Bool):Void",
+       "doc": "Whether the next walk is one that carries something: a character with a carrying walk clip uses it, with\nthe shoulders and stance of a worker holding a load. It applies from the next route, not the one under way."
+      },
+      {
+       "name": "continueAlong",
+       "kind": "method",
+       "signature": "(route:Array<Array<Float>>, metresPerSecond:Float):Void",
+       "doc": "Walks along route from where the character stands (the route's first\npoint), keeping its heading and turning onto the route at turnRate rather\nthan snapping to it, so what it carries does not swing."
+      },
+      {
+       "name": "retreatAlong",
+       "kind": "method",
+       "signature": "(route:Array<Array<Float>>, metresPerSecond:Float):Void",
+       "doc": "Moves along a retreat route without turning toward it."
+      },
+      {
+       "name": "place",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, heading:Float):Void",
+       "doc": "Sets the starting floor pose before a job begins."
+      },
+      {
+       "name": "restart",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, heading:Float):Void",
+       "doc": "Returns to rest at a floor pose as if newly constructed: no route, no turn\npending, and the idle clip playing from its start."
+      },
+      {
+       "name": "face",
+       "kind": "method",
+       "signature": "(angle:Float):Void",
+       "doc": "Turns in place at turnRate, including after a route has ended."
+      },
+      {
+       "name": "isTurning",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "turningByClip",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether a turn clip is turning the body in model space right now (the root takes the turn up when it ends)."
+      },
+      {
+       "name": "stanceShare",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How much of the pose showing is the idle one, whose feet are on the floor: 1 standing, 0 in a steady walk, and\nin between while the walk fades in or out. A planted foot is held in the world while this is high."
+      },
+      {
+       "name": "settled",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the character stands still with its walk faded out: not walking, not turning, not mid-crossfade."
+      },
+      {
+       "name": "stop",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Stops where the character stands and idles."
+      },
+      {
+       "name": "isWalking",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "distance",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Distance walked along the current route, in metres."
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void",
+       "doc": "Moves along the route and advances the animation by seconds."
+      },
+      {
+       "name": "rootTransform",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "The character root: standing at the walker's position, turned to its heading."
+      }
+     ]
+    },
+    {
+     "name": "LimbControl",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/LimbControl.hx",
+     "doc": "One limb of a body: what it was asked to do, and what its IK holds now. The owner sets the asked\nmode (reach, carry, or release); `apply` then reconciles the character with it, releasing IK only\nwhen the character still holds something the limb no longer wants. `applied` is the single record of\nwhat the character holds, so there is no flag that can go stale.",
+     "fields": [
+      {
+       "name": "limb",
+       "kind": "var",
+       "signature": ":HumanLimb",
+       "final": true
+      },
+      {
+       "name": "mode",
+       "kind": "var",
+       "signature": ":LimbMode"
+      },
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "doc": "The reach target, and the frame it is given in."
+      },
+      {
+       "name": "space",
+       "kind": "var",
+       "signature": ":ReachSpace"
+      },
+      {
+       "name": "weight",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pole",
+       "kind": "var",
+       "signature": ":Null<Array<Float>>"
+      },
+      {
+       "name": "curls",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "The curl of each of this hand's fingers now (HumanHand.THUMB to PINKY); they move toward what the limb's state asks for."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(limb:HumanLimb, curl:Float):Void"
+      },
+      {
+       "name": "isArm",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "reach",
+       "kind": "method",
+       "signature": "(target:Array<Float>, space:ReachSpace, weight:Float, ?pole:Array<Float>):Void"
+      },
+      {
+       "name": "carry",
+       "kind": "method",
+       "signature": "(?from:Array<Float>):Void",
+       "doc": "Takes up the carry pose, easing in from `from`, the wrist's position now, when there is one."
+      },
+      {
+       "name": "release",
+       "kind": "method",
+       "signature": "(character:HumanCharacter):Void",
+       "doc": "Goes back to the animation, releasing the character's IK on the spot."
+      },
+      {
+       "name": "dropIk",
+       "kind": "method",
+       "signature": "(character:HumanCharacter):Void",
+       "doc": "Releases the character's IK for this limb without changing what the limb is asked to do."
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float, carryEaseSeconds:Float, hangWanted:Bool, hangSeconds:Float):Void"
+      },
+      {
+       "name": "apply",
+       "kind": "method",
+       "signature": "(body:HumanBody):Bool",
+       "doc": "Brings the character's IK for this limb in line with what it is asked to do; returns whether the\npose changed."
+      }
+     ]
+    },
+    {
+     "name": "LimbMode",
+     "kind": "abstract",
+     "file": "humankit/haxe/humankit/LimbMode.hx",
+     "underlying": "Int",
+     "doc": "What a limb is being asked to do; Hang is never asked for, it is what a free arm does while the body leans.",
+     "fields": [
+      {
+       "name": "Free",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Follows its animation."
+      },
+      {
+       "name": "Reach",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Reaches for a point."
+      },
+      {
+       "name": "Carry",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Holds the carry pose at the chest."
+      },
+      {
+       "name": "Hang",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "An arm not otherwise in use, held hanging under its shoulder."
+      }
+     ]
+    },
+    {
+     "name": "PostureState",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/PostureState.hx",
+     "doc": "How far a body is leaned, bent at the hips, crouched and kneeling, and what it has been asked for. Each is a goal\nthe body eases toward at the rate `HumanPosture` sets, written to the character as it goes. A body that cannot\ncrouch or kneel (its asset has no clip for it) ignores the ask.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(character:HumanCharacter, posture:HumanPosture):Void"
+      },
+      {
+       "name": "setLean",
+       "kind": "method",
+       "signature": "(angle:Float):Void",
+       "doc": "Where the torso is asked to lean; it eases there. Zero stands upright."
+      },
+      {
+       "name": "setHinge",
+       "kind": "method",
+       "signature": "(angle:Float):Void",
+       "doc": "Where the body is asked to bend at the hips, on top of its lean; it eases there. Zero stands straight."
+      },
+      {
+       "name": "setCrouch",
+       "kind": "method",
+       "signature": "(amount:Float):Void",
+       "doc": "Where the body is asked to crouch (0 stands, 1 is the clip's full crouch); it eases there."
+      },
+      {
+       "name": "setKneel",
+       "kind": "method",
+       "signature": "(amount:Float):Void",
+       "doc": "Where the body is asked to kneel (0 stands, 1 the lowest the kneeling clip goes); it eases there. A kneel and a crouch are\ndifferent ways down, so a body kneels only from standing: ask for a crouch of nothing first."
+      },
+      {
+       "name": "crouchAmount",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far the body is into its crouch now."
+      },
+      {
+       "name": "kneelAmount",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far the body is into its kneel now."
+      },
+      {
+       "name": "downAmount",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far down, in either way, the body is now: 0 standing."
+      },
+      {
+       "name": "leanReached",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the body has finished easing to the lean and the hinge it was asked for."
+      },
+      {
+       "name": "crouchReached",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "kneelReached",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "downReached",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the body has finished easing to the crouch and the kneel it was asked for."
+      },
+      {
+       "name": "isBent",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the body is, or is on its way to being, leaned, bent or down: the cue for holding a free arm hanging."
+      },
+      {
+       "name": "isKneeling",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the body is on a knee or asked to be: a foot cannot be held where it stood then."
+      },
+      {
+       "name": "torsoPitch",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far the upper body is pitched forward now, in radians: the lean and the hip hinge together."
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void",
+       "doc": "Eases each toward its goal over `seconds` and writes the result to the character."
+      },
+      {
+       "name": "reset",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Stands the body upright at once, with nothing asked for."
+      }
+     ]
+    },
+    {
+     "name": "ReachSpace",
+     "kind": "abstract",
+     "file": "humankit/haxe/humankit/ReachSpace.hx",
+     "underlying": "Int",
+     "doc": "The frame a limb's reach target is given in.",
+     "fields": [
+      {
+       "name": "World",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "The world: the target stays put while the body moves."
+      },
+      {
+       "name": "Model",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "The body's root frame: the target moves with the worker's feet but not with its torso."
+      },
+      {
+       "name": "Shoulder",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Relative to the limb's shoulder, in the model's axes: the target moves with the shoulder, so the arm keeps its shape as the body walks."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "humankit.action",
+   "types": [
+    {
+     "name": "ApproachFor",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/ApproachFor.hx",
+     "extends": [
+      "HumanActionBase"
+     ],
+     "doc": "Walks to where the limb's shoulder has a comfortable reach to a point and\nfaces so the point lies straight ahead of that shoulder, before a reach.\nThe stand-off accounts for the height between shoulder and point: a low\npoint is approached closer than one at shoulder height.\n\nGiven the surface the point lies on, the worker also stands far enough back\nthat the belly stays clear of its near edge, and leans the upper body\nforward over it to keep the shoulder where the reach is comfortable.",
+     "fields": [
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "limb",
+       "kind": "var",
+       "signature": ":HumanLimb",
+       "final": true
+      },
+      {
+       "name": "speed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "bothHands",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "shortfall",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How far short of the surface's edge the belly ends, in metres, once the lean and the stretch are spent:\nzero when the stance clears it. A surface too deep for the arm to reach over (a crouch does not help: it\nlowers the shoulder, not carries it over the edge), or a body that cannot crouch at a low one, leaves this above\nzero; the job still runs, with the belly over the edge by about this much."
+      },
+      {
+       "name": "crouch",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How deep a crouch the worker takes at the stand (0 upright, 1 the clip's full crouch), once it has arrived."
+      },
+      {
+       "name": "kneel",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How deep a kneel the worker takes instead of a crouch, for a point too low for one (0 when it does not kneel)."
+      },
+      {
+       "name": "lean",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How far the upper body leans over the surface at the stand, in radians, once the worker has arrived."
+      },
+      {
+       "name": "hinge",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "How far it bends at the hips on top of that, for a surface too deep to reach across by leaning alone."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(target:Array<Float>, limb:HumanLimb, ?speed:Float, ?bothHands:Bool, ?targetProvider:() -> Array<Float>, ?support:HumanTargetBox):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      },
+      {
+       "name": "isDone",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "Carry",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/Carry.hx",
+     "extends": [
+      "HumanActionBase"
+     ],
+     "doc": "Establishes a persistent carry posture for subsequent walking actions.",
+     "fields": [
+      {
+       "name": "posture",
+       "kind": "var",
+       "signature": ":HumanCarryPosture",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(posture:HumanCarryPosture):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      }
+     ]
+    },
+    {
+     "name": "HumanAction",
+     "kind": "interface",
+     "file": "humankit/haxe/humankit/action/HumanAction.hx",
+     "doc": "One step of a worker job. Targets supplied by actions are world-space.",
+     "fields": [
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      },
+      {
+       "name": "isDone",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "failure",
+       "kind": "method",
+       "signature": "():Null<String>"
+      }
+     ]
+    },
+    {
+     "name": "HumanActionBase",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/HumanActionBase.hx",
+     "implements": [
+      "HumanAction"
+     ],
+     "doc": "Common completion and failure state for concrete actions.",
+     "fields": [
+      {
+       "name": "worker",
+       "kind": "var",
+       "signature": ":HumanBody"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      },
+      {
+       "name": "isDone",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "failure",
+       "kind": "method",
+       "signature": "():Null<String>"
+      }
+     ]
+    },
+    {
+     "name": "HumanReachPhase",
+     "kind": "abstract",
+     "file": "humankit/haxe/humankit/action/HumanReachTask.hx",
+     "underlying": "Int",
+     "doc": "Phase of a HumanReachTask's walk-then-reach sequence.",
+     "fields": [
+      {
+       "name": "Approaching",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "RampingIn",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Holding",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "RampingOut",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Finished",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HumanReachTask",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/HumanReachTask.hx",
+     "doc": "Legacy walk, reach, wait, and release convenience task.",
+     "fields": [
+      {
+       "name": "walker",
+       "kind": "var",
+       "signature": ":HumanWalker",
+       "final": true
+      },
+      {
+       "name": "limb",
+       "kind": "var",
+       "signature": ":HumanLimb",
+       "final": true
+      },
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "rampSeconds",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "holdSeconds",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "phase",
+       "kind": "var",
+       "signature": ":HumanReachPhase"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(walker:HumanWalker, route:Array<Array<Float>>, metresPerSecond:Float, limb:HumanLimb, target:Array<Float>, ?rampSeconds:Float, ?holdSeconds:Float, ?pole:Array<Float>, ?clip:String, ?fadeSeconds:Float):Void",
+       "doc": "The legacy target remains in model space. The composed job's walk uses\nfloor-world points; its reach uses Reach.inModelSpace."
+      },
+      {
+       "name": "isDone",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "Pick",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/Pick.hx",
+     "extends": [
+      "HumanActionBase"
+     ],
+     "doc": "Reaches the palms to a grasp point, closes the hands there, then establishes\na carry pose. target is where the palm centre (HumanBody.gripPoint) goes;\nthe hands only close if they got within 2 cm of it.",
+     "fields": [
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "hands",
+       "kind": "var",
+       "signature": ":Array<HumanLimb>",
+       "final": true
+      },
+      {
+       "name": "ramp",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "object",
+       "kind": "var",
+       "signature": ":Null<HumanTargetBox>",
+       "final": true,
+       "doc": "The box of the object being picked up, so the fingers close to its size; null for the plain grip."
+      },
+      {
+       "name": "grip",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Becomes true for one full-weight tick at the grasp point."
+      },
+      {
+       "name": "pickError",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Largest palm distance from its grasp point when the hands closed, in metres."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(target:Array<Float>, hands:Array<HumanLimb>, ?ramp:Float, ?object:HumanTargetBox):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "Place",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/Place.hx",
+     "extends": [
+      "HumanActionBase"
+     ],
+     "doc": "Places what the hands hold at target, then opens and withdraws the hands.\nWith a held-point provider (HumanBody.setHeldPoint, set by the simulation\nlayer while a hand holds an object), target is where the object's reference\npoint goes and the wrists are solved to put it there; without one, target is\nwhere the palms go. The object keeps the orientation it was carried with.",
+     "fields": [
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "hands",
+       "kind": "var",
+       "signature": ":Array<HumanLimb>",
+       "final": true
+      },
+      {
+       "name": "ramp",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "grip",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "False once the part should be released by the simulation layer."
+      },
+      {
+       "name": "atTarget",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "True after the hands have reached the placing point."
+      },
+      {
+       "name": "placementError",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Distance from the placed point to target when the hands opened, in metres."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(target:Array<Float>, hands:Array<HumanLimb>, ?ramp:Float):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "PlayClip",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/PlayClip.hx",
+     "extends": [
+      "HumanActionBase"
+     ],
+     "doc": "Crossfades to a named clip and plays it for a fixed duration.",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "seconds",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "fade",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, seconds:Float, ?fade:Float):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "Press",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/Press.hx",
+     "extends": [
+      "HumanActionBase"
+     ],
+     "doc": "Reaches a button, holds contact briefly, and releases the arm.",
+     "fields": [
+      {
+       "name": "point",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "limb",
+       "kind": "var",
+       "signature": ":HumanLimb",
+       "final": true
+      },
+      {
+       "name": "ramp",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "hold",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(point:Array<Float>, ?limb:HumanLimb, ?ramp:Float, ?hold:Float, ?pointProvider:() -> Array<Float>):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "Reach",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/Reach.hx",
+     "extends": [
+      "HumanActionBase"
+     ],
+     "doc": "Ramps one limb's IK toward a world point.",
+     "fields": [
+      {
+       "name": "limb",
+       "kind": "var",
+       "signature": ":HumanLimb",
+       "final": true
+      },
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "ramp",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(limb:HumanLimb, target:Array<Float>, ?ramp:Float, ?modelSpace:Bool, ?pole:Array<Float>):Void"
+      },
+      {
+       "name": "inModelSpace",
+       "kind": "method",
+       "signature": "(limb:HumanLimb, target:Array<Float>, ramp:Float, ?pole:Array<Float>):Reach",
+       "static": true,
+       "doc": "Keeps HumanReachTask's historical model-space target semantics."
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "ReleaseLimb",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/ReleaseLimb.hx",
+     "extends": [
+      "HumanActionBase"
+     ],
+     "doc": "Ramps an active IK limb back onto its animation.",
+     "fields": [
+      {
+       "name": "limb",
+       "kind": "var",
+       "signature": ":HumanLimb",
+       "final": true
+      },
+      {
+       "name": "ramp",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The shortest the release takes; it lasts longer when the hand has far to go, to keep its speed down."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(limb:HumanLimb, ?ramp:Float):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "Stance",
+     "kind": "typedef",
+     "file": "humankit/haxe/humankit/action/Stance.hx",
+     "fields": [
+      {
+       "name": "failure",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "crouch",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "kneel",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "lean",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "hinge",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "standDistance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "shortfall",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "ux",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "uy",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "lateral",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "comfortable",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "tight",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ],
+     "doc": "Where a worker stands and how it holds its body to reach a point: what StancePlanner weighs between."
+    },
+    {
+     "name": "StancePlanner",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/StancePlanner.hx",
+     "doc": "Chooses where a worker stands, how it faces and how it holds its body (crouched or kneeling, leaned, bent at the hips) to\nreach a point with one arm or two, optionally over a surface it has to keep its belly and knees clear of.\n\nStanding is tried first. A worker crouches only for a point lower than the arm comfortably reaches below the shoulder:\ncrouching brings the shoulder down, not forward over a surface, so it does nothing for a point at table height. For a\nlower one, ever deeper crouches are tried and the first that is easy is taken; failing that, the least hard of those\ntried. A point lower than a crouch reaches is taken from a knee instead, if that is clearly the easier stance. How hard\na stance is has one measure (`discomfort`), so every comparison below uses the same one.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(worker:HumanBody, target:Array<Float>, limb:HumanLimb, bothHands:Bool, ?support:HumanTargetBox):Void"
+      },
+      {
+       "name": "plan",
+       "kind": "method",
+       "signature": "():Stance",
+       "doc": "The stance to take, or one whose `failure` says why there is none."
+      }
+     ]
+    },
+    {
+     "name": "Wait",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/Wait.hx",
+     "extends": [
+      "HumanActionBase"
+     ],
+     "doc": "Keeps the current animation and IK pose for a fixed duration.",
+     "fields": [
+      {
+       "name": "seconds",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "WalkTo",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/action/WalkTo.hx",
+     "extends": [
+      "HumanActionBase"
+     ],
+     "doc": "Walks to one floor point, or along an explicit sequence of floor points.",
+     "fields": [
+      {
+       "name": "speed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "deferred",
+       "kind": "method",
+       "signature": "(pointProvider:() -> Array<Float>, speed:Float, ?preserveFacing:Bool):WalkTo",
+       "static": true,
+       "doc": "Resolve a destination from the worker's pose when this action starts."
+      },
+      {
+       "name": "along",
+       "kind": "method",
+       "signature": "(path:Array<Array<Float>>, speed:Float, ?destination:() -> Array<Float>):WalkTo",
+       "static": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?point:Array<Float>, speed:Float, ?path:Array<Array<Float>>, ?pointProvider:() -> Array<Float>, ?preserveFacing:Bool):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      },
+      {
+       "name": "isDone",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "humankit.facility",
+   "types": [
+    {
+     "name": "FacilityFetchJob",
+     "kind": "class",
+     "file": "humankit/facility/haxe/humankit/facility/FacilityFetchJob.hx",
+     "doc": "A fetch plan resolved into one HumanJob when its delivery is named.",
+     "fields": [
+      {
+       "name": "targets",
+       "kind": "var",
+       "signature": ":FacilityTargets",
+       "final": true
+      },
+      {
+       "name": "rackId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "slotId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(targets:FacilityTargets, rackId:String, slotId:String):Void"
+      },
+      {
+       "name": "deliver",
+       "kind": "method",
+       "signature": "(stationId:String, ?placePoint:Array<Float>, ?rackSurface:HumanTargetBox, ?stationSurface:HumanTargetBox, ?part:HumanTargetBox):HumanJob",
+       "doc": "The job: fetch the part from its slot, walk the lane, set it down at `placePoint`. The worker leans\nover the rack's and the station's tops and closes its fingers to the part's size when the facility\ndescribes them (a rack's and station's `surface`, a slot's `itemHalfExtents`); a caller may pass\n`rackSurface`, `stationSurface`, or `part` to override or supply what the facility does not. With\nneither, the worker stands where its shoulder reaches the point and grips plainly.\n\nWithout a `placePoint` the part is set down at the middle of the station's surface, resting on it: the point\nis the surface's top plus half the part's height, so the facility must describe both."
+      }
+     ]
+    },
+    {
+     "name": "FacilityJobs",
+     "kind": "class",
+     "file": "humankit/facility/haxe/humankit/facility/FacilityJobs.hx",
+     "doc": "Creates lane-following worker jobs from named facility targets.",
+     "fields": [
+      {
+       "name": "fetch",
+       "kind": "method",
+       "signature": "(facility:Facility, rackId:String, slotId:String):FacilityFetchJob",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "FacilityTargets",
+     "kind": "class",
+     "file": "humankit/facility/haxe/humankit/facility/FacilityTargets.hx",
+     "doc": "Resolves facility IDs into positions in their shared facility frame.",
+     "fields": [
+      {
+       "name": "facility",
+       "kind": "var",
+       "signature": ":Facility",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(facility:Facility):Void"
+      },
+      {
+       "name": "stationStandPose",
+       "kind": "method",
+       "signature": "(stationId:String):Pose2"
+      },
+      {
+       "name": "rackSlotPoint",
+       "kind": "method",
+       "signature": "(rackId:String, slotId:String):Array<Float>"
+      },
+      {
+       "name": "surfaceBox",
+       "kind": "method",
+       "signature": "(stationId:String):Null<HumanTargetBox>",
+       "doc": "The top of a rack or station as a box in the facility frame, or null when the facility describes none."
+      },
+      {
+       "name": "slotItemBox",
+       "kind": "method",
+       "signature": "(rackId:String, slotId:String):Null<HumanTargetBox>",
+       "doc": "The box of the item a rack slot holds, in the facility frame, or null when the facility does not say."
+      },
+      {
+       "name": "route",
+       "kind": "method",
+       "signature": "(fromStationId:String, toStationId:String):FacilityRoute"
+      }
+     ]
+    },
+    {
+     "name": "FacilityWalk",
+     "kind": "class",
+     "file": "humankit/facility/haxe/humankit/facility/FacilityWalk.hx",
+     "doc": "Bridges AutomationKit's facility routing to HumanWalker. HumanKit itself\ndoes not depend on RobotKit or AutomationKit; this small package is the\none place that knows about both, so a person can walk a FacilityRoute (or\nany robotkit Path) planned above it.",
+     "fields": [
+      {
+       "name": "routeFromPath",
+       "kind": "method",
+       "signature": "(path:Path):Array<Array<Float>>",
+       "static": true,
+       "doc": "Floor points ([x, y], metres) along path's waypoints in order, for\nHumanWalker.follow. Consecutive waypoints closer than a millimetre are\ncollapsed, so a route never carries a zero-length final segment that\nwould leave the walker's ending heading undefined."
+      },
+      {
+       "name": "routeFromFacilityRoute",
+       "kind": "method",
+       "signature": "(route:FacilityRoute):Array<Array<Float>>",
+       "static": true,
+       "doc": "Floor points along a facility route's path, from its origin to its destination station."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "humankit.job",
+   "types": [
+    {
+     "name": "HumanJob",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/job/HumanJob.hx",
+     "doc": "Ordered actions for one body. A failed action stops the job.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?worker:HumanBody):Void"
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(action:HumanAction):HumanJob"
+      },
+      {
+       "name": "bind",
+       "kind": "method",
+       "signature": "(worker:HumanBody):Void",
+       "doc": "Binds an unstarted job to a simulated body."
+      },
+      {
+       "name": "currentIndex",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "orderedActions",
+       "kind": "method",
+       "signature": "():Array<HumanAction>",
+       "doc": "Read-only copy of the ordered actions, for physics bindings."
+      },
+      {
+       "name": "currentAction",
+       "kind": "method",
+       "signature": "():Null<HumanAction>"
+      },
+      {
+       "name": "isDone",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "failure",
+       "kind": "method",
+       "signature": "():Null<String>"
+      },
+      {
+       "name": "abort",
+       "kind": "method",
+       "signature": "(reason:String):Void",
+       "doc": "Stops the job with a failure found outside its actions, such as by a simulation layer."
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(seconds:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "HumanJobBuildResult",
+     "kind": "typedef",
+     "file": "humankit/haxe/humankit/job/HumanJobBuildResult.hx",
+     "fields": [
+      {
+       "name": "job",
+       "kind": "var",
+       "signature": ":HumanJob"
+      },
+      {
+       "name": "holds",
+       "kind": "var",
+       "signature": ":Array<HumanJobHold>"
+      },
+      {
+       "name": "actionSteps",
+       "kind": "var",
+       "signature": ":Array<Int>"
+      }
+     ]
+    },
+    {
+     "name": "HumanJobBuilder",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/job/HumanJobBuilder.hx",
+     "doc": "Resolves a portable job spec into world-space HumanKit actions.",
+     "fields": [
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(spec:HumanJobSpec, targets:HumanJobTargets, body:HumanBody):HumanJobBuildResult",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HumanJobHold",
+     "kind": "typedef",
+     "file": "humankit/haxe/humankit/job/HumanJobHold.hx",
+     "fields": [
+      {
+       "name": "action",
+       "kind": "var",
+       "signature": ":HumanAction"
+      },
+      {
+       "name": "objectId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "grasp",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "hand",
+       "kind": "var",
+       "signature": ":HumanLimb"
+      }
+     ]
+    },
+    {
+     "name": "HumanJobSpec",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/job/HumanJobSpec.hx",
+     "doc": "Strict, versioned description of an editor-authored human job.",
+     "fields": [
+      {
+       "name": "version",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "loop",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "steps",
+       "kind": "var",
+       "signature": ":Array<HumanJobStep>",
+       "final": true
+      },
+      {
+       "name": "parse",
+       "kind": "method",
+       "signature": "(json:String):HumanJobSpec",
+       "static": true
+      },
+      {
+       "name": "toJson",
+       "kind": "method",
+       "signature": "():String"
+      },
+      {
+       "name": "check",
+       "kind": "method",
+       "signature": "(spec:HumanJobSpec, targets:HumanJobTargets, body:HumanBody):Array<String>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HumanJobStep",
+     "kind": "typedef",
+     "file": "humankit/haxe/humankit/job/HumanJobSpec.hx",
+     "fields": [
+      {
+       "name": "action",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":HumanJobTarget",
+       "optional": true
+      },
+      {
+       "name": "via",
+       "kind": "var",
+       "signature": ":Array<Array<Float>>",
+       "optional": true
+      },
+      {
+       "name": "object",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "from",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "onto",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "offset",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "optional": true
+      },
+      {
+       "name": "retreat",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "hand",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "seconds",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "clip",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      }
+     ],
+     "doc": "Typed canonical step. Action-specific requirements are enforced by parse."
+    },
+    {
+     "name": "HumanJobTarget",
+     "kind": "typedef",
+     "file": "humankit/haxe/humankit/job/HumanJobSpec.hx",
+     "fields": [
+      {
+       "name": "object",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "point",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "optional": true
+      },
+      {
+       "name": "anchor",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      }
+     ],
+     "doc": "Validated target in a canonical job step."
+    },
+    {
+     "name": "HumanJobTargets",
+     "kind": "interface",
+     "file": "humankit/haxe/humankit/job/HumanJobTargets.hx",
+     "fields": [
+      {
+       "name": "box",
+       "kind": "method",
+       "signature": "(objectId:String):Null<HumanTargetBox>"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "humankit.quality",
+   "types": [
+    {
+     "name": "ArmQuality",
+     "kind": "typedef",
+     "file": "humankit/haxe/humankit/quality/MotionQuality.hx",
+     "fields": [
+      {
+       "name": "planeTurnRate",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "elbowAboveShoulder",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "minElbowAngle",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxHandSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxHandAcceleration",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "handAheadOfChest",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "planeTurnAt",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "handSpeedAt",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "handAccelerationAt",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "minElbowAt",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ],
+     "doc": "What a run of poses did to one arm, in model space (+Z up, +X forward)."
+    },
+    {
+     "name": "MotionQuality",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/quality/MotionQuality.hx",
+     "doc": "Measures how natural a motion is from its poses, one sample per tick: arms that flip, fold up to\nthe shoulder, bend too sharply, whip, or are dragged behind the torso. A motion's tests can\nhold these to limits, and a regression then shows up as a number.",
+     "fields": [
+      {
+       "name": "LEFT",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "RIGHT",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "samples",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "arm",
+       "kind": "method",
+       "signature": "(side:Int):ArmQuality"
+      },
+      {
+       "name": "sample",
+       "kind": "method",
+       "signature": "(pose:HumanPose, seconds:Float):Void",
+       "doc": "Adds the pose reached `seconds` after the previous sample (any value the first time)."
+      },
+      {
+       "name": "breakContinuity",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Forgets the previous sample, so a jump the caller caused (a reset) is not counted as motion."
+      }
+     ]
+    },
+    {
+     "name": "Naturalness",
+     "kind": "class",
+     "file": "humankit/haxe/humankit/quality/Naturalness.hx",
+     "doc": "What a run of poses looks like from the floor up, sampled once per tick: whether planted feet slide, whether the\ncentre of mass stays over the feet while both are down, and how jerky the pelvis and wrists are.\n`MotionQuality` judges the arms; this judges the body. Neither says a motion is natural, only that a regression\nshowed up as a number.\n\nA foot is planted from when it is low (within `PLANTED_HEIGHT` of where it first stood) and slow (under\n`PLANTED_SPEED`) for `PLANTED_SAMPLES` samples running, until it lifts or speeds up (a swing foot skimming the\nfloor is fast, so is not taken for planted). Its slide is how far it moves from where it was planted while it stays\nso. The centre of mass is a weighted mean of a few bones, and the support polygon is the hull of both feet from\nheel to toe; the margin is how far inside it the mass projects (negative outside), kept only while both feet are planted.",
+     "fields": [
+      {
+       "name": "PLANTED_HEIGHT",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "PLANTED_SPEED",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "doc": "Slower than this a low foot is planted; faster than `UNPLANTED_SPEED` it has left the floor."
+      },
+      {
+       "name": "UNPLANTED_SPEED",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "maxSlide",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The furthest a foot moved from where it was planted while it stayed planted, in metres."
+      },
+      {
+       "name": "maxSlideAt",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "The sample at which that furthest slide was reached, and the one at which that foot was planted."
+      },
+      {
+       "name": "maxSlideFrom",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "slideTotal",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The slide of every plant added up, in metres, and the seconds a foot was planted."
+      },
+      {
+       "name": "plantedSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "minSupportMargin",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Least margin of the centre of mass inside the feet's support, in metres, while both were planted; infinite if never."
+      },
+      {
+       "name": "floorPenetration",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Lowest a foot went below where it first stood, in metres (positive: it went into the floor)."
+      },
+      {
+       "name": "maxPelvisJerk",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Largest jerk of the pelvis and of either wrist, in metres per second cubed."
+      },
+      {
+       "name": "maxWristJerk",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxFootTilt",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The most a planted foot tilted from the way it first stood (ankle to toe, pitched up or down), in degrees."
+      },
+      {
+       "name": "maxFootJerk",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Largest jerk of either ankle: a foot held in the world and let go again must not pop."
+      },
+      {
+       "name": "samples",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "standOnTheFloorOf",
+       "kind": "method",
+       "signature": "(other:Naturalness):Void",
+       "doc": "Takes the floor under each foot from another run's: a foot's floor height is taken from its first sample, which is only\nright when the run begins with both feet down. A run that begins mid-stride says so by taking it from one that stood."
+      },
+      {
+       "name": "sample",
+       "kind": "method",
+       "signature": "(body:HumanBody, seconds:Float):Void"
+      },
+      {
+       "name": "summary",
+       "kind": "method",
+       "signature": "():String",
+       "doc": "One line for a report."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "humankit.sim",
+   "types": [
+    {
+     "name": "HumanActor",
+     "kind": "class",
+     "file": "humankit/sim/haxe/humankit/sim/HumanActor.hx",
+     "doc": "A person taking part in a SimKit session: the body proxy's capsules as one\nkinematic actor. The person pushes whatever they walk into and nothing\npushes them back. Poses are keyframes in simulation time: a writer pushes\none per tick, for the tick about to complete.",
+     "fields": [
+      {
+       "name": "actor",
+       "kind": "var",
+       "signature": ":SimActor",
+       "final": true
+      },
+      {
+       "name": "proxy",
+       "kind": "var",
+       "signature": ":HumanBodyProxy",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(session:SimSession, proxy:HumanBodyProxy, pose:HumanPose, root:Array<Float>):Void",
+       "doc": "Joins a stopped session with the body at a pose, through a root transform."
+      },
+      {
+       "name": "pushPose",
+       "kind": "method",
+       "signature": "(time:Float, pose:HumanPose, root:Array<Float>):Void",
+       "doc": "Where the body is at simulation time `time`."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "HumanWorker",
+     "kind": "class",
+     "file": "humankit/sim/haxe/humankit/sim/HumanWorker.hx",
+     "doc": "A job-driven animated worker and its physical capsule actor.",
+     "fields": [
+      {
+       "name": "session",
+       "kind": "var",
+       "signature": ":SimSession",
+       "final": true
+      },
+      {
+       "name": "body",
+       "kind": "var",
+       "signature": ":HumanBody",
+       "final": true
+      },
+      {
+       "name": "actor",
+       "kind": "var",
+       "signature": ":HumanActor",
+       "final": true
+      },
+      {
+       "name": "zones",
+       "kind": "var",
+       "signature": ":Array<HumanZone>",
+       "final": true
+      },
+      {
+       "name": "onTick",
+       "kind": "var",
+       "signature": ":Null<(HumanWorker, HumanWorkerSignals) -> Void>"
+      },
+      {
+       "name": "maxHoldDistance",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Farthest an object's origin may be from the hand's grip point when a hold starts, in metres."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(session:SimSession, character:HumanCharacter, proxy:HumanBodyProxy, startPose:SimPose):Void"
+      },
+      {
+       "name": "bindPick",
+       "kind": "method",
+       "signature": "(action:Pick, object:SimObject, graspPoint:Array<Float>, ?hand:HumanLimb):Void",
+       "doc": "Associates a Pick with a dynamic object and its world grasp point."
+      },
+      {
+       "name": "bindBothPick",
+       "kind": "method",
+       "signature": "(action:Pick, object:SimObject, graspPoint:Array<Float>):Void"
+      },
+      {
+       "name": "bindPlace",
+       "kind": "method",
+       "signature": "(action:Place, object:SimObject, graspPoint:Array<Float>, ?hand:HumanLimb):Void",
+       "doc": "Associates a Place with the object to release at its world target."
+      },
+      {
+       "name": "bindBothPlace",
+       "kind": "method",
+       "signature": "(action:Place, object:SimObject, graspPoint:Array<Float>):Void"
+      },
+      {
+       "name": "pickError",
+       "kind": "method",
+       "signature": "():Null<Float>"
+      },
+      {
+       "name": "placementError",
+       "kind": "method",
+       "signature": "():Null<Float>"
+      },
+      {
+       "name": "run",
+       "kind": "method",
+       "signature": "(job:HumanJob):Void"
+      },
+      {
+       "name": "runSpec",
+       "kind": "method",
+       "signature": "(spec:HumanJobSpec, targets:HumanJobTargets, objectsById:Map<String, SimObject>):Void",
+       "doc": "Resolves a document job and binds its dynamic parts to the session."
+      },
+      {
+       "name": "reset",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Returns the worker to where its session starts. The session's own reset has\nalready put its objects, actors and stabilisers back; this restores what\nlives beside the session: the body at its start pose with nothing reaching,\ncarried or held, every hold and pin forgotten, and a document job started\nagain from its first step. A job given to run() cannot be rewound, so that\nworker stands idle at its start pose."
+      },
+      {
+       "name": "currentJobDone",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "currentJobFailure",
+       "kind": "method",
+       "signature": "():Null<String>"
+      },
+      {
+       "name": "approachShortfall",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "The most any approach in the current job fell short of standing clear of its surface, in metres: above\nzero where the reach needs a crouch the body does not do. See `ApproachFor.shortfall`."
+      },
+      {
+       "name": "currentActionLabel",
+       "kind": "method",
+       "signature": "():String",
+       "doc": "What the job is doing now, in a word, for reports: the running action's kind, or \"idle\"."
+      },
+      {
+       "name": "currentStep",
+       "kind": "method",
+       "signature": "():Null<Int>",
+       "doc": "Zero-based document step currently running, or null for an empty or finished job."
+      },
+      {
+       "name": "addZone",
+       "kind": "method",
+       "signature": "(zone:HumanZone):Void"
+      },
+      {
+       "name": "addRobotLink",
+       "kind": "method",
+       "signature": "(id:String, link:nksim_body, radius:Float):Void",
+       "doc": "A robot link's collision bound is approximated by a sphere around its body origin."
+      },
+      {
+       "name": "addRobotLinkPose",
+       "kind": "method",
+       "signature": "(id:String, pose:() -> SimPose, radius:Float):Void",
+       "doc": "Samples a robot runtime link's collision center after each physics tick."
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Call once before every tick of the session, however the session is driven\n(`SimSession.stepPaced` from the owner's loop, or `step`). The job and the\nactor pose run one tick ahead: the pose for the tick about to complete, and\nthe pin, hold and release events that belong to it, land before it runs."
+      },
+      {
+       "name": "handBody",
+       "kind": "method",
+       "signature": "(hand:HumanLimb):nksim_body",
+       "doc": "The session body of a hand's collision capsule, which carries what that hand holds."
+      },
+      {
+       "name": "readSignals",
+       "kind": "method",
+       "signature": "():Null<HumanWorkerSignals>",
+       "doc": "What the body is touching or near as of the last tick: the zones it stands in and its distance to each tracked\nlink. Reading captures the physics world, so a display asks when it draws; `onTick` is for a reader that wants\nevery tick."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "HumanWorkerSignals",
+     "kind": "class",
+     "file": "humankit/sim/haxe/humankit/sim/HumanWorkerSignals.hx",
+     "doc": "Safety sample from one completed simulation tick. Distances are metres.",
+     "fields": [
+      {
+       "name": "time",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "zones",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "separation",
+       "kind": "var",
+       "signature": ":Map<String, Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(time:Float, zones:Array<String>, separation:Map<String, Float>):Void"
+      }
+     ]
+    },
+    {
+     "name": "HumanZone",
+     "kind": "class",
+     "file": "humankit/sim/haxe/humankit/sim/HumanZone.hx",
+     "doc": "A floor polygon in session world metres.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "polygon",
+       "kind": "var",
+       "signature": ":Array<Array<Float>>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, polygon:Array<Array<Float>>):Void"
+      },
+      {
+       "name": "contains",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Bool"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

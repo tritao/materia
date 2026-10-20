@@ -1,0 +1,2497 @@
+{
+ "kit": "stockkit",
+ "packages": [
+  {
+   "name": "stockkit",
+   "types": [
+    {
+     "name": "CutMotion",
+     "kind": "enum",
+     "file": "stockkit/haxe/stockkit/CutMotion.hx",
+     "doc": "How the tool moves during one cut, in the workpiece frame.",
+     "fields": [
+      {
+       "name": "Path",
+       "kind": "case",
+       "signature": "(geometry:PathGeometry)",
+       "doc": "The tool tip follows `geometry` with the tool axis along +Z throughout."
+      }
+     ]
+    },
+    {
+     "name": "CutMove",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/CutMove.hx",
+     "doc": "One tool motion through the stock, with where it came from.",
+     "fields": [
+      {
+       "name": "tool",
+       "kind": "var",
+       "signature": ":Tool",
+       "final": true
+      },
+      {
+       "name": "motion",
+       "kind": "var",
+       "signature": ":CutMotion",
+       "final": true
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":MoveKind",
+       "final": true
+      },
+      {
+       "name": "rapid",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Rapid moves should not touch stock; cutting them is a diagnostic."
+      },
+      {
+       "name": "opIndex",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true,
+       "doc": "Index of the source operation in the program's op list."
+      },
+      {
+       "name": "provenance",
+       "kind": "var",
+       "signature": ":Provenance",
+       "final": true
+      },
+      {
+       "name": "operationId",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "final": true
+      },
+      {
+       "name": "featureRef",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "final": true
+      },
+      {
+       "name": "toolId",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(tool:Tool, motion:CutMotion, kind:MoveKind, opIndex:Int, provenance:Provenance):Void"
+      }
+     ]
+    },
+    {
+     "name": "CutMoves",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/CutMoves.hx",
+     "doc": "Builds stock moves from a controller-independent toolpath.",
+     "fields": [
+      {
+       "name": "fromProgram",
+       "kind": "method",
+       "signature": "(program:ToolpathProgram, ?workOrigin:Point3):Array<CutMove>",
+       "static": true,
+       "doc": "Tool-tip moves in the workpiece frame: each programmed point is placed by\nits setup's work origin, the active G43 length and the loaded tool's own\nlength (see `ToolpathFrame`), less the optional stock origin. Moves made\nbefore any tool change are skipped: there is no tool in the spindle to\nsimulate."
+      }
+     ]
+    },
+    {
+     "name": "CutReport",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/CutReport.hx",
+     "doc": "What one `Stock.cut` call did, move by move.",
+     "fields": [
+      {
+       "name": "moves",
+       "kind": "var",
+       "signature": ":Array<MoveOutcome>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(moves:Array<MoveOutcome>):Void"
+      },
+      {
+       "name": "removed",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "Volume each move removed, in the order given."
+      },
+      {
+       "name": "removedVolume",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "rapidContacts",
+       "kind": "method",
+       "signature": "(?tolerance:Float):Array<MoveOutcome>",
+       "doc": "Rapid moves that removed more than `tolerance` of material (cubic metres)."
+      },
+      {
+       "name": "collisions",
+       "kind": "method",
+       "signature": "(?tolerance:Float):Array<MoveOutcome>",
+       "doc": "Moves whose shank or holder overlapped more than `tolerance` of stock (cubic metres)."
+      },
+      {
+       "name": "byOperation",
+       "kind": "method",
+       "signature": "():Array<OperationTotals>",
+       "doc": "Totals per source operation, in order of first appearance."
+      }
+     ]
+    },
+    {
+     "name": "MoveOutcome",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/MoveOutcome.hx",
+     "doc": "What one move did to the stock, in cubic metres: the material its flutes\nremoved, and the stock left after that cut which its shank and holder\noverlapped. Contact is measured after the move's own cut, so a climbing\nmove whose shank meets material its flutes remove later is not reported.",
+     "fields": [
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true,
+       "doc": "Index of the move in the stock's history."
+      },
+      {
+       "name": "move",
+       "kind": "var",
+       "signature": ":CutMove",
+       "final": true
+      },
+      {
+       "name": "removed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "shankContact",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "holderContact",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(source:Int, move:CutMove, removed:Float, shankContact:Float, holderContact:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "OperationTotals",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/OperationTotals.hx",
+     "doc": "Removal and contact summed over the moves of one source operation.",
+     "fields": [
+      {
+       "name": "opIndex",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "operationId",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "final": true
+      },
+      {
+       "name": "toolId",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "moves",
+       "kind": "var",
+       "signature": ":Dynamic"
+      },
+      {
+       "name": "removed",
+       "kind": "var",
+       "signature": ":Dynamic"
+      },
+      {
+       "name": "shankContact",
+       "kind": "var",
+       "signature": ":Dynamic"
+      },
+      {
+       "name": "holderContact",
+       "kind": "var",
+       "signature": ":Dynamic"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(move:CutMove):Void"
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(outcome:MoveOutcome):Void"
+      }
+     ]
+    },
+    {
+     "name": "RingComparison",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/RingComparison.hx",
+     "doc": "Per-circle angular errors (radians), axial-major, radial index fastest.\nArc lengths and cell-volume estimates use mm and cubic mm. This is geometric\nleftover/gouge, not an ISO gear grade; HB4 supplies metrology evaluation.",
+     "fields": [
+      {
+       "name": "grid",
+       "kind": "var",
+       "signature": ":RingGrid",
+       "final": true
+      },
+      {
+       "name": "leftover",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "gouge",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(grid:RingGrid, leftover:Array<Float>, gouge:Array<Float>):Void"
+      },
+      {
+       "name": "leftoverVolume",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "gougeVolume",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "leftoverArc",
+       "kind": "method",
+       "signature": "(radialIndex:Int, axialIndex:Int):Float"
+      },
+      {
+       "name": "gougeArc",
+       "kind": "method",
+       "signature": "(radialIndex:Int, axialIndex:Int):Float"
+      }
+     ]
+    },
+    {
+     "name": "RingCut",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/RingCut.hx",
+     "doc": "Remove one counterclockwise angular span on a radial circle and consecutive Z cells.\nstart wraps; sweep is in [0,2*pi]. Gash/pass identifiers must be non-negative.",
+     "fields": [
+      {
+       "name": "radialIndex",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "axialFirst",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "axialCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "sweep",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "gash",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "pass",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(radialIndex:Int, axialFirst:Int, axialCount:Int, start:Float, sweep:Float, gash:Int, pass:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "RingGearTarget",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/RingGearTarget.hx",
+     "doc": "Samples an ideal, undeformed spur gear on an existing ring lattice.\nOnly angular crossings are solved; there is no angular tessellation error.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(grid:RingGrid, spec:GearSpec):RingStock",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "RingGrid",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/RingGrid.hx",
+     "doc": "Cell-centred circumferential grid. Millimetres; angles about +Z from +X.\nBounds are exact; cell sizes divide the bounds and never exceed requested spacing.",
+     "fields": [
+      {
+       "name": "radiusMin",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "radiusMax",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "zMin",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "zMax",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "radialCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "axialCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "radialStep",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "axialStep",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(radiusMin:Float, radiusMax:Float, zMin:Float, zMax:Float, radialSpacing:Float, axialSpacing:Float):Void"
+      },
+      {
+       "name": "radius",
+       "kind": "method",
+       "signature": "(index:Int):Float"
+      },
+      {
+       "name": "z",
+       "kind": "method",
+       "signature": "(index:Int):Float"
+      },
+      {
+       "name": "sectorVolume",
+       "kind": "method",
+       "signature": "(radialIndex:Int):Float",
+       "doc": "Volume of a one-radian sector of a cell, in cubic mm."
+      }
+     ]
+    },
+    {
+     "name": "RingInterval",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/RingInterval.hx",
+     "doc": "Sorted material arc [lo,hi] in [0,2*pi]. Artificial seam boundaries are not surfaces.\nEach real exposed endpoint retains its gash and pass; -1 means original stock.",
+     "fields": [
+      {
+       "name": "lo",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "hi",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "loGash",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "loPass",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "hiGash",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "hiPass",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(lo:Float, hi:Float, loGash:Int, loPass:Int, hiGash:Int, hiPass:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "RingPreviewWorker",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/RingPreviewWorker.hx",
+     "doc": "Single-flight, bounded snapshot preview. Worker owns its contour stock and only transfers buffers.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(source:RingStock):Void"
+      },
+      {
+       "name": "refresh",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "take",
+       "kind": "method",
+       "signature": "():Null<StockMesh>"
+      },
+      {
+       "name": "wait",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "RingSnapshot",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/RingSnapshot.hx",
+     "doc": "Immutable copy-on-write radial layers. Survives destruction of the original stock.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(owner:Ownedsk_ring_snapshot_handle):Void"
+      },
+      {
+       "name": "borrow",
+       "kind": "method",
+       "signature": "():sk_ring_snapshot_handle"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "RingStock",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/RingStock.hx",
+     "implements": [
+      "gearkit.GearRings"
+     ],
+     "doc": "Circumferential stock for gear cutting. Millimetres, radians; unlike Cartesian Stock's metres.\nExact angular interval endpoints at cell-centred (r,z) samples. No angle raster.",
+     "fields": [
+      {
+       "name": "grid",
+       "kind": "var",
+       "signature": ":RingGrid",
+       "final": true
+      },
+      {
+       "name": "annulus",
+       "kind": "method",
+       "signature": "(grid:RingGrid):RingStock",
+       "static": true
+      },
+      {
+       "name": "fromGearBlank",
+       "kind": "method",
+       "signature": "(spec:GearSpec, wallThickness:Float, ?radialSpacing:Float, ?axialSpacing:Float):RingStock",
+       "static": true,
+       "doc": "Cylindrical tooth band plus a continuous wall. wallThickness is measured BELOW\nthe external tooth roots (outside internal roots), not from the blank's tip circle."
+      },
+      {
+       "name": "radii",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "axialPositions",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "boundaries",
+       "kind": "method",
+       "signature": "(radial:Int, axial:Int):Array<Float>"
+      },
+      {
+       "name": "setThreads",
+       "kind": "method",
+       "signature": "(threads:Int):Void"
+      },
+      {
+       "name": "circle",
+       "kind": "method",
+       "signature": "(radialIndex:Int, axialIndex:Int):Array<RingInterval>"
+      },
+      {
+       "name": "cutRegion",
+       "kind": "method",
+       "signature": "(cuts:Array<RingCut>):Void",
+       "doc": "Entire batch is validated before native mutation; array order determines overlapping sources."
+      },
+      {
+       "name": "cutSlab",
+       "kind": "method",
+       "signature": "(normalAngle:Float, offsetMin:Float, offsetMax:Float, gash:Int, pass:Int):Void",
+       "doc": "Exact analytic intersection with a transverse planar slab, through the full Z range."
+      },
+      {
+       "name": "snapshot",
+       "kind": "method",
+       "signature": "():RingSnapshot"
+      },
+      {
+       "name": "restore",
+       "kind": "method",
+       "signature": "(snapshot:RingSnapshot):Void"
+      },
+      {
+       "name": "bytes",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "intervalCount",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "compareStock",
+       "kind": "method",
+       "signature": "(target:RingStock):RingComparison"
+      },
+      {
+       "name": "compare",
+       "kind": "method",
+       "signature": "(target:GearSpec):RingComparison",
+       "doc": "Geometric comparison against the complete GearKit tooth, root and tip fillets included."
+      },
+      {
+       "name": "contour",
+       "kind": "method",
+       "signature": "(?maxAngle:Float):StockMesh",
+       "doc": "Boundary of the piecewise-cell solid. Angular chords only affect display.\nStreams use mm; convert to metres when passing to the existing app scene."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "Stock",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/Stock.hx",
+     "doc": "In-process stock on a `StockLattice`, held by StockKit core: a grid of rays\nalong Z, and along X and Y too when the lattice is tri-dexel. Each ray keeps\nsorted material intervals whose ends record the outward normal and the move\nthat made them. Every cut updates every grid; volumes, per-move removal and\ncontact, tiles and previews use the Z grid.\n\nOnly the cutting zone of each tool removes material; its shank and holder\nare swept too, and their overlap with the stock is reported per move. Moves\ncut in order; every cut move is kept in `history` and its index there is\nthe source recorded on the surfaces it made.",
+     "fields": [
+      {
+       "name": "ORIGINAL",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true,
+       "doc": "Source of surfaces no move has touched."
+      },
+      {
+       "name": "lattice",
+       "kind": "var",
+       "signature": ":StockLattice",
+       "final": true
+      },
+      {
+       "name": "grid",
+       "kind": "var",
+       "signature": ":StockGrid",
+       "final": true,
+       "doc": "The Z grid."
+      },
+      {
+       "name": "history",
+       "kind": "var",
+       "signature": ":Array<CutMove>",
+       "final": true
+      },
+      {
+       "name": "empty",
+       "kind": "method",
+       "signature": "(lattice:StockLattice):Stock",
+       "static": true,
+       "doc": "Stock with no material, to build up with `add`."
+      },
+      {
+       "name": "box",
+       "kind": "method",
+       "signature": "(lattice:StockLattice, minX:Float, minY:Float, minZ:Float, maxX:Float, maxY:Float, maxZ:Float):Stock",
+       "static": true,
+       "doc": "A solid box; rays on its sides count as inside."
+      },
+      {
+       "name": "fromTriangles",
+       "kind": "method",
+       "signature": "(lattice:StockLattice, positions:Array<Float>, indices:Array<Int>):Stock",
+       "static": true,
+       "doc": "Stock from a closed triangle mesh with outward, counter-clockwise faces:\n`positions` holds xyz triples and `indices` vertex triples. A ray through\na shared edge or vertex is counted exactly once."
+      },
+      {
+       "name": "fromMesh",
+       "kind": "method",
+       "signature": "(lattice:StockLattice, mesh:cadkit.Mesh):Stock",
+       "static": true,
+       "doc": "Stock from a CadKit tessellation (vertex and index buffers in native layout)."
+      },
+      {
+       "name": "setThreads",
+       "kind": "method",
+       "signature": "(threads:Int):Void",
+       "doc": "Threads the core cuts with: 0 (the default) means one per hardware\nthread. The result is bit-identical for any count."
+      },
+      {
+       "name": "cut",
+       "kind": "method",
+       "signature": "(moves:Array<CutMove>):CutReport",
+       "doc": "Removes the material each move's flutes sweep, in order, and measures\nthe stock each move's shank and holder overlap after its cut."
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(moves:Array<CutMove>):Array<Float>",
+       "doc": "Adds the material each move's cutting zone sweeps, in order: the stock becomes its union with it, from empty\nstock if need be. The surfaces a move makes face out of what it swept and record its index in `history` as\ntheir source. Returns the volume each move added (cubic metres, measured on the Z grid). A bead of filament is\nsuch a move: the tool is the bead's cross-section revolved about the nozzle's axis."
+      },
+      {
+       "name": "compare",
+       "kind": "method",
+       "signature": "(target:Stock, ?axis:StockAxis):StockComparison",
+       "doc": "Compares this stock with `target` ray by ray along `axis` (Z by default);\n`target` must use the same lattice, for example\n`Stock.fromMesh(stock.lattice, part.shape.tessellate(...))`."
+      },
+      {
+       "name": "compareAll",
+       "kind": "method",
+       "signature": "(target:Stock):Array<StockComparison>",
+       "doc": "The stock compared with `target` along every grid of its lattice, X, Y\nthen Z (only Z unless tri-dexel). Walls gouged sideways show on the X\nand Y grids; each grid estimates the same volumes on its own."
+      },
+      {
+       "name": "snapshot",
+       "kind": "method",
+       "signature": "(?withHistory:Bool):StockSnapshot",
+       "doc": "Captures the stock and, unless `withHistory` is false, its history; see\n`StockSnapshot`. The history costs a copy as long as it, so leave it out\nwhere the moves are not needed, as for colouring by deviation."
+      },
+      {
+       "name": "restore",
+       "kind": "method",
+       "signature": "(snapshot:StockSnapshot):Void",
+       "doc": "Returns the stock and its history to `snapshot`, which must share its lattice."
+      },
+      {
+       "name": "tilesX",
+       "kind": "method",
+       "signature": "():Int",
+       "doc": "Z-grid tiles across (x) and down (y); tile (tx, ty) holds rays from (tx, ty) times the tile size."
+      },
+      {
+       "name": "tilesY",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "tileRevisions",
+       "kind": "method",
+       "signature": "():Array<haxe.Int64>",
+       "doc": "Each Z-grid tile's revision, row by row; it changes whenever the tile's rays change."
+      },
+      {
+       "name": "mesh",
+       "kind": "method",
+       "signature": "(tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, merge:Bool, bottoms:Bool, ?palette:Array<Int>, ?original:Int, ?rayColors:Array<Int>):StockMesh",
+       "doc": "A column mesh of `tilesWide` by `tilesHigh` Z tiles from tile (tileX,\ntileY): each Z ray drawn as a square column spacing wide with exact\ndepths. With `merge`, equal faces along rows are joined (not with\n`rayColors`); `bottoms` closes the columns. Colours come from `rayColors`\n(one 0xRRGGBBAA per ray of the Z grid) if given, else from `palette`\nindexed by source with `original` for untouched stock."
+      },
+      {
+       "name": "contour",
+       "kind": "method",
+       "signature": "(tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, ?coloring:StockColoring, ?palette:Array<Int>):StockMesh",
+       "doc": "A closed surface over `tilesWide` by `tilesHigh` Z tiles from tile (tileX,\ntileY), dual-contoured from all three grids: walls and floors at the\nrays' exact crossings with their normals and sources, sharp edges and\ncorners kept, features thinner than a spacing possibly lost. Needs a\ntri-dexel lattice. `BySource` colours each surface by its move (pass\n`palette`, one colour per history entry, to reuse one already built);\n`ByDeviation` colours each surface by the gouge or leftover its own ray\nfinds there against the target, so walls cut too deep show as well as\nfloors. Without `coloring` the mesh is white."
+      },
+      {
+       "name": "ray",
+       "kind": "method",
+       "signature": "(i:Int, j:Int, ?axis:StockAxis):Array<StockInterval>",
+       "doc": "The intervals along ray (i, j) of the grid along `axis` (Z by default), in increasing order."
+      },
+      {
+       "name": "rays",
+       "kind": "method",
+       "signature": "(i0:Int, j0:Int, ni:Int, nj:Int, ?axis:StockAxis):Array<Array<StockInterval>>",
+       "doc": "Intervals of every ray in a block of the grid along `axis` (Z by default), i fastest."
+      },
+      {
+       "name": "volume",
+       "kind": "method",
+       "signature": "(?axis:StockAxis):Float",
+       "doc": "Material volume as the grid along `axis` (Z by default) measures it: interval lengths times spacing squared."
+      },
+      {
+       "name": "intervalCount",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Intervals over every grid."
+      },
+      {
+       "name": "raysTested",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Rays whose sweep the core evaluated over every cut so far."
+      },
+      {
+       "name": "bytes",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Bytes the core holds for this stock."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "sweep",
+       "kind": "method",
+       "signature": "(tool:Tool, geometry:PathGeometry, axis:StockAxis, u:Float, v:Float):Array<StockInterval>",
+       "static": true,
+       "doc": "The material one move of `tool` would sweep along the ray through (u, v)\non `axis` (see `StockAxis`), for checking the core against references.\nUses the tool's cutting zone, as `cut` does."
+      }
+     ]
+    },
+    {
+     "name": "StockAxis",
+     "kind": "enum",
+     "file": "stockkit/haxe/stockkit/StockAxis.hx",
+     "doc": "The direction a ray runs along: Z rays pass through (x, y), X rays through\n(y, z) and Y rays through (x, z).",
+     "fields": [
+      {
+       "name": "X",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Y",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Z",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "StockColoring",
+     "kind": "enum",
+     "file": "stockkit/haxe/stockkit/StockColoring.hx",
+     "doc": "How a stock preview colours its surfaces. Colours are 0xRRGGBBAA.",
+     "fields": [
+      {
+       "name": "BySource",
+       "kind": "case",
+       "signature": "(color:(CutMove) -> Int, original:Int)",
+       "doc": "Surfaces take the colour of the move that made them; untouched stock takes `original`."
+      },
+      {
+       "name": "ByDeviation",
+       "kind": "case",
+       "signature": "(target:Stock, tolerance:Float, onTarget:Int, leftover:Int, gouge:Int)",
+       "doc": "Against a target stock on the same lattice: gouges deeper than\n`tolerance` in `gouge`, leftover thicker than `tolerance` in `leftover`,\nthe rest in `onTarget`. Contoured meshes judge each surface by its own\nray (walls by X and Y rays, floors by Z rays); column meshes judge each\nZ ray as a whole."
+      }
+     ]
+    },
+    {
+     "name": "StockComparison",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockComparison.hx",
+     "doc": "Stock compared with a target part ray by ray along one grid's rays.\nLeftover is stock outside the target and gouge is target missing from the\nstock, as lengths along each ray; volumes multiply by the ray spacing\nsquared. Z rays see floors and ceilings; X and Y rays see walls, so a wall\ngouged sideways shows on them.",
+     "fields": [
+      {
+       "name": "grid",
+       "kind": "var",
+       "signature": ":StockGrid",
+       "final": true
+      },
+      {
+       "name": "leftover",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "Per ray, i fastest."
+      },
+      {
+       "name": "gouge",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "largestLeftover",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "largestGouge",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "gougeSource",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Source (history index) of the move that cut the largest gouge on each ray, or -1."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(grid:StockGrid, leftover:Array<Float>, gouge:Array<Float>, largestLeftover:Array<Float>, largestGouge:Array<Float>, gougeSource:Array<Int>):Void"
+      },
+      {
+       "name": "leftoverVolume",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "gougeVolume",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "deepestGouge",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Deepest single gouge along any ray."
+      },
+      {
+       "name": "thickestLeftover",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Thickest single stretch of leftover along any ray."
+      },
+      {
+       "name": "gougingMoves",
+       "kind": "method",
+       "signature": "(tolerance:Float):Array<Int>",
+       "doc": "Sources of moves whose gouges exceed `tolerance` somewhere, each once, in increasing order."
+      }
+     ]
+    },
+    {
+     "name": "StockComponent",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockComponents.hx",
+     "doc": "One material component on the dexel lattice. Areas/volumes are sampled,\njust as Stock.volume is; supportArea is material crossing supportPlaneZ.",
+     "fields": [
+      {
+       "name": "seedRay",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "seedZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "supportArea",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "volume",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "min",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "max",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "intervalSamples",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "supportByRegion",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(seedRay:Int, seedZ:Float, supportArea:Float, volume:Float, min:Array<Float>, max:Array<Float>, samples:Int, regions:Array<Float>):Void"
+      }
+     ]
+    },
+    {
+     "name": "StockComponents",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockComponents.hx",
+     "doc": "Four-neighbour XY connectivity, joining only intervals with positive Z\noverlap. A thin onion skin connects a part; stacked layers and diagonal-only\ncontact do not. Streams two rows instead of materialising a sheet's rays.",
+     "fields": [
+      {
+       "name": "measure",
+       "kind": "method",
+       "signature": "(stock:Stock, ?supportPlaneZ:Float, ?tolerance:Float, ?regionCount:Int, ?regionAt:Null<(Float, Float) -> Int>):Array<StockComponent>",
+       "static": true,
+       "doc": "Call at a completed cut checkpoint; the stock must not change mid-scan."
+      },
+      {
+       "name": "fromRows",
+       "kind": "method",
+       "signature": "(grid:StockGrid, readRow:(Int) -> Array<Array<StockInterval>>, ?supportPlaneZ:Float, ?tolerance:Float, ?regionCount:Int, ?regionAt:Null<(Float, Float) -> Int>):Array<StockComponent>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "StockGrid",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockGrid.hx",
+     "doc": "The rays of a `StockLattice` along one axis: ray (i, j) passes through\n(u, v) = (originU + i * spacing, originV + j * spacing), where u and v are\nthe other two axes in order: (x, y) for Z rays, (y, z) for X rays and\n(x, z) for Y rays. Units are metres.",
+     "fields": [
+      {
+       "name": "axis",
+       "kind": "var",
+       "signature": ":StockAxis",
+       "final": true
+      },
+      {
+       "name": "originU",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "originV",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "spacing",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "countU",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "countV",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(axis:StockAxis, originU:Float, originV:Float, spacing:Float, countU:Int, countV:Int):Void"
+      },
+      {
+       "name": "u",
+       "kind": "method",
+       "signature": "(i:Int):Float"
+      },
+      {
+       "name": "v",
+       "kind": "method",
+       "signature": "(j:Int):Float"
+      },
+      {
+       "name": "rayCount",
+       "kind": "method",
+       "signature": "():Int"
+      }
+     ]
+    },
+    {
+     "name": "StockInterval",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockInterval.hx",
+     "doc": "Material along a ray between heights `lo` and `hi`. Each end keeps the\noutward normal of the material there and the source of the move that made\nit: an index into the stock's move history, or `Stock.ORIGINAL` for\nsurfaces no move has touched.",
+     "fields": [
+      {
+       "name": "lo",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "hi",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "loSource",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "hiSource",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "loNormal",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "hiNormal",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(lo:Float, hi:Float, loSource:Int, hiSource:Int, loNormal:Array<Float>, hiNormal:Array<Float>):Void"
+      }
+     ]
+    },
+    {
+     "name": "StockLattice",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockLattice.hx",
+     "doc": "A lattice of nodes (originX + i * spacing, originY + j * spacing, originZ +\nk * spacing) and a grid of rays through them along each of its axes:\nZ rays through (x_i, y_j), X rays through (y_j, z_k) and Y rays through\n(x_i, z_k). The Z grid is always present; `triDexel` adds X and Y, which\nevery cut then updates too. Units are metres.",
+     "fields": [
+      {
+       "name": "originX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "originY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "originZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "spacing",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "countX",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "countY",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "countZ",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "triDexel",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(originX:Float, originY:Float, originZ:Float, spacing:Float, countX:Int, countY:Int, countZ:Int, ?triDexel:Bool):Void"
+      },
+      {
+       "name": "covering",
+       "kind": "method",
+       "signature": "(minX:Float, minY:Float, minZ:Float, maxX:Float, maxY:Float, maxZ:Float, spacing:Float, ?triDexel:Bool):StockLattice",
+       "static": true,
+       "doc": "Nodes at the centres of `spacing` cells covering the box with one cell\nto spare on every side, so no ray lies in a face of the box and the\nstock's outside is always sampled."
+      },
+      {
+       "name": "has",
+       "kind": "method",
+       "signature": "(axis:StockAxis):Bool"
+      },
+      {
+       "name": "grid",
+       "kind": "method",
+       "signature": "(axis:StockAxis):StockGrid",
+       "doc": "The rays along `axis`."
+      },
+      {
+       "name": "x",
+       "kind": "method",
+       "signature": "(i:Int):Float"
+      },
+      {
+       "name": "y",
+       "kind": "method",
+       "signature": "(j:Int):Float"
+      },
+      {
+       "name": "z",
+       "kind": "method",
+       "signature": "(k:Int):Float"
+      }
+     ]
+    },
+    {
+     "name": "StockMesh",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockMesh.hx",
+     "doc": "A display mesh of part of a stock, as byte streams ready for a renderer:\nfloat xyz positions and normals per vertex, uint32 triangle indices, RGBA8\ncolours per vertex, and the source move of each triangle for picking: a\ncolumn mesh (`Stock.mesh`) or a contoured surface (`Stock.contour`).",
+     "fields": [
+      {
+       "name": "vertexCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "triangleCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "positions",
+       "kind": "var",
+       "signature": ":Bytes",
+       "final": true
+      },
+      {
+       "name": "normals",
+       "kind": "var",
+       "signature": ":Bytes",
+       "final": true
+      },
+      {
+       "name": "indices",
+       "kind": "var",
+       "signature": ":Bytes",
+       "final": true
+      },
+      {
+       "name": "colors",
+       "kind": "var",
+       "signature": ":Bytes",
+       "final": true
+      },
+      {
+       "name": "triangleSources",
+       "kind": "var",
+       "signature": ":Bytes",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(vertexCount:Int, triangleCount:Int, positions:Bytes, normals:Bytes, indices:Bytes, colors:Bytes, triangleSources:Bytes):Void"
+      },
+      {
+       "name": "sourceAt",
+       "kind": "method",
+       "signature": "(triangle:Int):Int",
+       "doc": "The source (history index) of the move that made `triangle`'s surface, or `Stock.ORIGINAL`."
+      }
+     ]
+    },
+    {
+     "name": "StockPreview",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockPreview.hx",
+     "doc": "Keeps display meshes of a stock in chunks of tiles and rebuilds only the\nchunks whose tiles changed since the last `update`: contoured surfaces for\na tri-dexel stock, else columns. A chunk also depends on the tiles just\npast its +x and +y edges, whose rays it reads. Headless: hand the meshes to\na renderer.",
+     "fields": [
+      {
+       "name": "stock",
+       "kind": "var",
+       "signature": ":Stock",
+       "final": true
+      },
+      {
+       "name": "chunkTiles",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true,
+       "doc": "Tiles per chunk side."
+      },
+      {
+       "name": "chunksX",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "chunksY",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "coloring",
+       "kind": "var",
+       "signature": ":StockColoring"
+      },
+      {
+       "name": "meshes",
+       "kind": "var",
+       "signature": ":Array<Null<StockMesh>>",
+       "final": true,
+       "doc": "Current mesh of each chunk, row by row; null until the first update."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(stock:Stock, coloring:StockColoring, ?chunkTiles:Int):Void"
+      },
+      {
+       "name": "setColoring",
+       "kind": "method",
+       "signature": "(coloring:StockColoring):Void"
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "():Array<Int>",
+       "doc": "Rebuilds changed chunks and returns their indices (chunk (cx, cy) is cy * chunksX + cx)."
+      },
+      {
+       "name": "pick",
+       "kind": "method",
+       "signature": "(chunk:Int, triangle:Int):Null<CutMove>",
+       "doc": "The move that made the surface under a picked triangle of chunk `chunk`,\nor null for untouched stock: the link from a click on the preview to the\noperation and source line (`move.opIndex`, `move.provenance`)."
+      }
+     ]
+    },
+    {
+     "name": "StockPreviewUpdate",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockPreviewWorker.hx",
+     "doc": "The chunks one refresh rebuilt: chunk `chunks[k]` now has mesh `meshes[k]`.",
+     "fields": [
+      {
+       "name": "chunks",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "meshes",
+       "kind": "var",
+       "signature": ":Array<StockMesh>",
+       "final": true
+      },
+      {
+       "name": "chunksX",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "chunksY",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(chunks:Array<Int>, meshes:Array<StockMesh>, chunksX:Int, chunksY:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "StockPreviewWorker",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockPreviewWorker.hx",
+     "doc": "A `StockPreview` contoured on a worker thread, so cutting never waits for\nmeshing. `refresh` hands the worker a snapshot of `source`, which costs a\npointer per tile since tiles are shared until the next cut changes them;\nthe worker restores it into a stock of its own, contours the chunks that\nchanged and posts their meshes, which `take` returns on the caller's\nthread. Only the caller's thread touches `source`.",
+     "fields": [
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":Stock",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(source:Stock, coloring:StockColoring, ?chunkTiles:Int):Void"
+      },
+      {
+       "name": "refresh",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Starts a refresh of what `source` is now, unless one is under way; returns whether it started."
+      },
+      {
+       "name": "take",
+       "kind": "method",
+       "signature": "():Array<StockPreviewUpdate>",
+       "doc": "The refreshes finished since the last call, oldest first; throws the worker's failure."
+      },
+      {
+       "name": "wait",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Waits for the refresh under way, if any."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Stops the worker and releases its stock. Returns once it has stopped."
+      }
+     ]
+    },
+    {
+     "name": "StockSnapshot",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockSnapshot.hx",
+     "doc": "A stock as it was, sharing tiles with it until either side changes them.\nRestoring it also restores the move history it had.",
+     "fields": [
+      {
+       "name": "lattice",
+       "kind": "var",
+       "signature": ":StockLattice",
+       "final": true
+      },
+      {
+       "name": "history",
+       "kind": "var",
+       "signature": ":Array<CutMove>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(lattice:StockLattice, history:Array<CutMove>, owner:Ownedsk_snapshot_handle):Void",
+       "doc": "Made by `Stock.snapshot`."
+      },
+      {
+       "name": "borrow",
+       "kind": "method",
+       "signature": "():sk_snapshot_handle"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "StockTimeline",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/StockTimeline.hx",
+     "doc": "Scrubs through a program: the stock after any number of its moves. Cuts\nthe whole program once, keeping a snapshot every `interval` moves; seeking\nrestores the nearest snapshot at or before the position and cuts forward.",
+     "fields": [
+      {
+       "name": "stock",
+       "kind": "var",
+       "signature": ":Stock",
+       "final": true
+      },
+      {
+       "name": "moves",
+       "kind": "var",
+       "signature": ":Array<CutMove>",
+       "final": true
+      },
+      {
+       "name": "interval",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "position",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Moves cut into the stock so far."
+      },
+      {
+       "name": "outcomes",
+       "kind": "var",
+       "signature": ":Array<MoveOutcome>",
+       "final": true,
+       "doc": "What each move did when the whole program was first cut, in program order."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(stock:Stock, moves:Array<CutMove>, ?interval:Int):Void",
+       "doc": "`stock` must be fresh (no history); it ends at the program's end."
+      },
+      {
+       "name": "seek",
+       "kind": "method",
+       "signature": "(target:Int):Void",
+       "doc": "Shows the stock after the first `target` moves."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "stockkit.hobbing",
+   "types": [
+    {
+     "name": "FaceEndpointStock",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/FaceEndpointStock.hx",
+     "implements": [
+      "GearRings"
+     ],
+     "doc": "Adds physically cut Z=0 and Z=faceWidth circles to an existing inspection.\nInterior coordinates are unchanged. These planes are sampling domains, not\nextra material or an extrapolation of unseen face ends.",
+     "fields": [
+      {
+       "name": "stocks",
+       "kind": "var",
+       "signature": ":Array<RingStock>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(base:GearRings, baseStocks:Array<RingStock>, grid:RingGrid, faceWidth:Float):Void"
+      },
+      {
+       "name": "radii",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "axialPositions",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "boundaries",
+       "kind": "method",
+       "signature": "(r:Int, z:Int):Array<Float>"
+      }
+     ]
+    },
+    {
+     "name": "GashPass",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/GashPass.hx",
+     "doc": "An exact master-phase crossing and its engagement window (seconds).\nA window may straddle many controller ticks. center may lie outside the\nrequested run when an already engaged edge crosses a run boundary.",
+     "fields": [
+      {
+       "name": "gash",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "pass",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "center",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "end",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(gash:Int, pass:Int, start:Float, center:Float, end:Float):Void"
+      },
+      {
+       "name": "constantSpeed",
+       "kind": "method",
+       "signature": "(gashes:Int, rpm:Float, duration:Float, halfAngle:Float):Array<GashPass>",
+       "static": true,
+       "doc": "Constant-speed events come from integer phase indices, never tick accumulation."
+      },
+      {
+       "name": "fromMotion",
+       "kind": "method",
+       "signature": "(motion:HobbingMotion, gashes:Int, halfAngle:Float):Array<GashPass>",
+       "static": true,
+       "doc": "Exact phase crossings under piecewise-linear master interpolation."
+      }
+     ]
+    },
+    {
+     "name": "HobbingAxes",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingAxes.hx",
+     "doc": "mm/radians. X is the work/hob centre distance, Y shift along the hob axis,\nZ the hob head height. A is signed tilt from -Y towards +Z. B and C are\nright-hand, unwrapped spindle and table angles.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "a",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "b",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "c",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "offset",
+       "kind": "var",
+       "signature": ":Null<HobbingPoseOffset>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float, a:Float, b:Float, c:Float, ?offset:HobbingPoseOffset):Void"
+      },
+      {
+       "name": "poseValues",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "Hob +X faces the work centre; hob +Z points along the tilted -Y axis.\nThe final inverse C rotation expresses the cut in the workpiece frame."
+      },
+      {
+       "name": "nativePose",
+       "kind": "method",
+       "signature": "(values:Array<Float>):sk_rake_pose",
+       "static": true,
+       "doc": "Materialize only accepted samples; midpoint error checks stay in Haxe."
+      },
+      {
+       "name": "pose",
+       "kind": "method",
+       "signature": "():sk_rake_pose"
+      }
+     ]
+    },
+    {
+     "name": "HobbingErrorJob",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingErrorJob.hx",
+     "doc": "Repeats physical rake subtraction and HB4 inspection from a fresh blank for\nevery budget run. at() may be ideal motion or recorded HB7 actual observations;\nmeasured sync must not be injected a second time. No target-boundary shortcuts.",
+     "fields": [
+      {
+       "name": "sources",
+       "kind": "var",
+       "signature": ":Array<HobbingErrorSource>",
+       "final": true
+      },
+      {
+       "name": "threads",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(spec:GearSpec, hob:HobDesign, at:(Float) -> HobbingAxes, passes:Array<GashPass>, sources:Array<HobbingErrorSource>, wall:Float, radialStep:Float, axialStep:Float, firstTooth:Int, lastTooth:Int, tolerance:Float, ?inspection:GearInspection, ?motionKnots:Array<Float>, ?threads:Int, ?inspectionCross:Bool, ?faceEndpoints:Bool, ?stockGrid:RingGrid):Void"
+      },
+      {
+       "name": "run",
+       "kind": "method",
+       "signature": "(enabled:Array<String>):GearMeasurement"
+      },
+      {
+       "name": "budget",
+       "kind": "method",
+       "signature": "(?relativeTolerance:Float, ?absoluteTolerance:Float):ErrorBudget"
+      }
+     ]
+    },
+    {
+     "name": "HobbingErrorSource",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingErrorSource.hx",
+     "doc": "Identified error with provenance. Perturbs tool/work motion before cutting,\nnever metrology values after the fact. Dimensions mm/rad/s; phases explicit.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "part",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "basis",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "apply",
+       "kind": "var",
+       "signature": ":(Float, HobbingAxes) -> HobbingAxes",
+       "final": true
+      },
+      {
+       "name": "warp",
+       "kind": "var",
+       "signature": ":Null<(Point3) -> Point3>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, part:String, basis:String, apply:(Float, HobbingAxes) -> HobbingAxes, ?warp:(Point3) -> Point3):Void"
+      },
+      {
+       "name": "workEccentricity",
+       "kind": "method",
+       "signature": "(id:String, part:String, e:Float, ?phase:Float):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "tableAxial",
+       "kind": "method",
+       "signature": "(part:String, tir:Float):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "tableTilt",
+       "kind": "method",
+       "signature": "(part:String, stiffness:Float, pivotDepth:Float, forceHeight:Float, radialForce:(Float) -> Float):HobbingErrorSource",
+       "static": true,
+       "doc": "Load-induced tilt, separate from axial TIR. Force is machine-radial N;\nbearing pivot depth/force height mm, moment stiffness Nm/rad."
+      },
+      {
+       "name": "hobRadial",
+       "kind": "method",
+       "signature": "(part:String, tir:Float):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "hobAxial",
+       "kind": "method",
+       "signature": "(part:String, tir:Float):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "encoder",
+       "kind": "method",
+       "signature": "(part:String, e:Float, radius:Float):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "graduation",
+       "kind": "method",
+       "signature": "(part:String, peak:Float, order:Int):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "measuredSync",
+       "kind": "method",
+       "signature": "(part:String, error:(Float) -> Float, basis:String):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "latency",
+       "kind": "method",
+       "signature": "(part:String, delay:Float, ratio:Float, master:(Float) -> Float, velocity:(Float) -> Float, predict:Bool):HobbingErrorSource",
+       "static": true,
+       "doc": "Diagnostic latency model. A runtime study should instead supply the measured\nC error in apply(), avoiding double counting encoder/servo errors already present."
+      },
+      {
+       "name": "profile",
+       "kind": "method",
+       "signature": "(part:String, peak:Float, pitch:Float):HobbingErrorSource",
+       "static": true,
+       "doc": "Assumed radial form waveform on a zero-rake hob's planar rake regions.\nDoes not claim a measured profile map or arbitrary-rake planarity."
+      },
+      {
+       "name": "wall",
+       "kind": "method",
+       "signature": "(part:String, stiffness:Float, radialForce:(Float) -> Float):HobbingErrorSource",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HobbingForceHistory",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingForceHistory.hx",
+     "doc": "Opt-in per-gash history, separate from the bounded online force observer.\nReconstructs the same overlapping rectangular window-mean radial loads.\nThis is not instantaneous tooth force. Times seconds, forces N.",
+     "fields": [
+      {
+       "name": "samples",
+       "kind": "var",
+       "signature": ":Array<HobbingForceSample>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(sample:HobbingForceSample):Void"
+      },
+      {
+       "name": "radialAt",
+       "kind": "method",
+       "signature": "(time:Float):Float",
+       "doc": "Right-continuous radial window load for a later wall-source sweep."
+      },
+      {
+       "name": "statistics",
+       "kind": "method",
+       "signature": "(start:Float, end:Float):Dynamic"
+      },
+      {
+       "name": "writeCsv",
+       "kind": "method",
+       "signature": "(path:String):Void"
+      }
+     ]
+    },
+    {
+     "name": "HobbingForceSample",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingForceSample.hx",
+     "doc": "One gash's window-AVERAGE loads, not an instantaneous tooth peak.\nmm³/mm²/mm inputs; N, Nm, W, J outputs. Table torque is a magnitude bound\n(resultant force at work radius), not a signed force-vector prediction."
+    },
+    {
+     "name": "HobbingForces",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingForces.hx",
+     "doc": "Optional per-pass observer. A COW previous stock plus native interval comparison\ngives removed volume, without copying circle intervals into the managed heap.\nCall after EVERY pass in cutting order; unrelated stock edits invalidate attribution.\nSummary storage is bounded. Pass means are rectangular loads over their windows;\nmaxima sum overlapping windows at each start. These are NOT tooth-force peaks.",
+     "fields": [
+      {
+       "name": "material",
+       "kind": "var",
+       "signature": ":KienzleMaterial",
+       "final": true
+      },
+      {
+       "name": "edgeWidth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "workRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "pressureAngle",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "passes",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "volume",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "energy",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxTangential",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxRadial",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxHobTorque",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxTableTorqueBound",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxPower",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "last",
+       "kind": "var",
+       "signature": ":Null<HobbingForceSample>"
+      },
+      {
+       "name": "maxGashTangential",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "peakActiveWindows",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(stock:RingStock, workRadius:Float, pressureAngle:Float, edgeWidth:Float, ?material:KienzleMaterial):Void",
+       "doc": "edgeWidth is an explicitly assumed effective engaged cutting-edge width, mm;\ninterval volume alone cannot identify chip width and thickness separately."
+      },
+      {
+       "name": "afterPass",
+       "kind": "method",
+       "signature": "(pass:GashPass, start:HobbingAxes, end:HobbingAxes, hobRadius:Float):HobbingForceSample"
+      },
+      {
+       "name": "retainedBytes",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "HobbingKeyframe",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingKeyframe.hx",
+     "doc": "Controller sample. Rotary positions are unwrapped radians.",
+     "fields": [
+      {
+       "name": "time",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "axes",
+       "kind": "var",
+       "signature": ":HobbingAxes",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(time:Float, axes:HobbingAxes):Void"
+      }
+     ]
+    },
+    {
+     "name": "HobbingMotion",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingMotion.hx",
+     "doc": "Linear interpolation of measured/controller axis samples, without coupling C\nrigidly to B. Gash events can therefore use measured master phase while C keeps\nits independent actual following error.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(frames:Array<HobbingKeyframe>):Void"
+      },
+      {
+       "name": "samples",
+       "kind": "method",
+       "signature": "():Array<HobbingKeyframe>"
+      },
+      {
+       "name": "times",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "at",
+       "kind": "method",
+       "signature": "(time:Float):HobbingAxes"
+      },
+      {
+       "name": "timeAtMaster",
+       "kind": "method",
+       "signature": "(phase:Float):Float",
+       "doc": "Monotone measured master; extrapolation only locates the centres of partial\nengagement windows outside the run, never poses outside sampled time."
+      }
+     ]
+    },
+    {
+     "name": "HobbingPoseOffset",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingPoseOffset.hx",
+     "doc": "Rigid translations in mm and work-table tilts in radians. Work offsets rotate with C; tool offsets\nrotate with B. Separate frames prevent radial hob error becoming an X-only wobble.",
+     "fields": [
+      {
+       "name": "workX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "workY",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "workZ",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "toolX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "toolY",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "toolZ",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "workTiltX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "workTiltY",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "workPivotZ",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "copy",
+       "kind": "method",
+       "signature": "():HobbingPoseOffset"
+      }
+     ]
+    },
+    {
+     "name": "HobbingReport",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingReport.hx",
+     "doc": "Numerical convergence is observed on the sampled circles, not a machine accuracy grade.",
+     "fields": [
+      {
+       "name": "passes",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "poses",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "refinement",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "maxArcChange",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(passes:Int, poses:Int, refinement:Int, maxArcChange:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "HobbingStream",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingStream.hx",
+     "doc": "Bounded measured-motion window. Finishes each complete gash window exactly once,\nretaining the bracketing controller samples until all overlapping windows are cut.",
+     "fields": [
+      {
+       "name": "stock",
+       "kind": "var",
+       "signature": ":RingStock",
+       "final": true
+      },
+      {
+       "name": "sweep",
+       "kind": "var",
+       "signature": ":HobbingSweep",
+       "final": true
+      },
+      {
+       "name": "halfAngle",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "passes",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "poses",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "peakFrames",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "lastTime",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "onPass",
+       "kind": "var",
+       "signature": ":Null<(GashPass, HobbingAxes, HobbingAxes) -> Void>"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(stock:RingStock, sweep:HobbingSweep, halfAngle:Float):Void"
+      },
+      {
+       "name": "push",
+       "kind": "method",
+       "signature": "(time:Float, axes:HobbingAxes):Void"
+      },
+      {
+       "name": "finish",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "HobbingSweep",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/HobbingSweep.hx",
+     "doc": "Sweeps the actual planar rake regions through sampled rigid poses. A native\nconvex-prism sweep supplies circle intervals; no target GearSpec or quality\nformula is passed to the cutter. The sampler must resolve motion between its\ntime knots; maxTimeStep also caps sampling of nonlinear/perturbed trajectories.",
+     "fields": [
+      {
+       "name": "hob",
+       "kind": "var",
+       "signature": ":HobDesign",
+       "final": true
+      },
+      {
+       "name": "tolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(hob:HobDesign, firstTooth:Int, lastTooth:Int, ?tolerance:Float, ?warp:(Point3) -> Point3):Void"
+      },
+      {
+       "name": "cut",
+       "kind": "method",
+       "signature": "(stock:RingStock, axesAt:(Float) -> HobbingAxes, passes:Array<GashPass>, ?maxRefinements:Int, ?maxTimeStep:Float, ?motionKnots:Array<Float>):HobbingReport",
+       "doc": "Transactional job. Refine the whole swept path until per-circle angular\nsymmetric differences, expressed as arc lengths, meet tolerance. On failure\nthe incoming stock is restored. Sources identify the exact scheduled pass."
+      },
+      {
+       "name": "cutMany",
+       "kind": "method",
+       "signature": "(stocks:Array<RingStock>, axesAt:(Float) -> HobbingAxes, passes:Array<GashPass>, ?maxRefinements:Int, ?maxTimeStep:Float, ?progress:(Dynamic) -> Void):HobbingReport",
+       "doc": "Converged inspection domains: retain every sampled circle, share poses,\nand require the same arc-change bound on every domain at each refinement."
+      },
+      {
+       "name": "cutPass",
+       "kind": "method",
+       "signature": "(stock:RingStock, axesAt:(Float) -> HobbingAxes, pass:GashPass, pathTolerance:Float, ?maxTimeStep:Float, ?motionKnots:Array<Float>):Int",
+       "doc": "One resolution, useful for convergence studies. Sampling still evaluates\ntrue motion, including the exact pass-centre time between control ticks."
+      },
+      {
+       "name": "cutPassMany",
+       "kind": "method",
+       "signature": "(stocks:Array<RingStock>, axesAt:(Float) -> HobbingAxes, pass:GashPass, pathTolerance:Float, ?maxTimeStep:Float, ?motionKnots:Array<Float>):Int",
+       "doc": "Identical poses for independent sampled stock domains."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "IdealHobbingJob",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/IdealHobbingJob.hx",
+     "doc": "External spur-gear driver, no machine/runtime coupling or error sources.\nReference rack module/pressure angle must match; positive feed advances +Z.",
+     "fields": [
+      {
+       "name": "spec",
+       "kind": "var",
+       "signature": ":GearSpec",
+       "final": true
+      },
+      {
+       "name": "hob",
+       "kind": "var",
+       "signature": ":HobDesign",
+       "final": true
+      },
+      {
+       "name": "rpm",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "duration",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "workTurns",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "feed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "zStart",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "shift",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "centerDistance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "tablePhase",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(spec:GearSpec, hob:HobDesign, ?rpm:Float, ?workTurns:Float, ?feed:Float, ?zStart:Float, ?shift:Float):Void"
+      },
+      {
+       "name": "axesAt",
+       "kind": "method",
+       "signature": "(time:Float):HobbingAxes"
+      },
+      {
+       "name": "schedule",
+       "kind": "method",
+       "signature": "(grid:RingGrid):Array<GashPass>"
+      }
+     ]
+    },
+    {
+     "name": "InspectionRingStock",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/InspectionRingStock.hx",
+     "implements": [
+      "GearRings"
+     ],
+     "doc": "Physical rake stock only at the circles read by GearMeasurement: all radial\nsamples at profile/pitch Z, all axial samples bracketing measurement radius.\nCircle subtraction is independent; no uncut circle or target boundary is\nsupplied to inspection. Every retained coordinate must be bit-identical to\nthe dense grid. Unsupported coordinates fail rather than fabricate coverage.\nNot a volume, load, mesh or force-feedback stock representation.",
+     "fields": [
+      {
+       "name": "grid",
+       "kind": "var",
+       "signature": ":RingGrid",
+       "final": true
+      },
+      {
+       "name": "stocks",
+       "kind": "var",
+       "signature": ":Array<RingStock>",
+       "final": true
+      },
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(grid:RingGrid, cfg:GearInspection):Null<InspectionRingStock>",
+       "static": true
+      },
+      {
+       "name": "radii",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "axialPositions",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "contains",
+       "kind": "method",
+       "signature": "(r:Int, z:Int):Bool"
+      },
+      {
+       "name": "circle",
+       "kind": "method",
+       "signature": "(r:Int, z:Int):Array<RingInterval>"
+      },
+      {
+       "name": "boundaries",
+       "kind": "method",
+       "signature": "(r:Int, z:Int):Array<Float>"
+      },
+      {
+       "name": "assertOverlap",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "InspectionSlice",
+     "kind": "typedef",
+     "file": "stockkit/haxe/stockkit/hobbing/InspectionRingStock.hx",
+     "fields": [
+      {
+       "name": "first",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "last",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "low",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "high",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "KienzleMaterial",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/KienzleMaterial.hx",
+     "doc": "Empirical coefficients, NOT a hardness/material database. kc11 is N/mm² at\nh=1 mm, mc dimensionless. No rake, speed, wear or ploughing correction."
+    },
+    {
+     "name": "RingCompliance",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/RingCompliance.hx",
+     "doc": "Quasistatic in-plane n=2 thin-ring model. mm, N, Young's modulus N/mm².\nw=d*cos(2 theta), U=9*pi*E*I*d²/(2R³), I=width*wall³/12.\nMandrel support is a separately stated generalized stiffness in parallel.\nHigher modes, local tooth bending, contact lift-off and dynamics are omitted."
+    }
+   ]
+  }
+ ]
+}

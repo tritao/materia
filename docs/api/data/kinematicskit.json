@@ -1,0 +1,1554 @@
+{
+ "kit": "kinematicskit",
+ "packages": [
+  {
+   "name": "kinematicskit",
+   "types": [
+    {
+     "name": "AvoidancePair",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/AvoidancePair.hx",
+     "doc": "Two bodies within the influence distance of each other (COLLISION.md\nCL-D4, CL5), as a collision world reports them: the closest points on each\n(world frame), the unit normal from `a` toward `b`, the signed distance,\nand the pair's safety margin `ds` and influence distance `di`. A side that\nis not a body of the solved model (the environment, another robot) is -1:\nit does not move with the solve.",
+     "fields": [
+      {
+       "name": "bodyA",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "bodyB",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "pointA",
+       "kind": "var",
+       "signature": ":Vector3",
+       "final": true
+      },
+      {
+       "name": "pointB",
+       "kind": "var",
+       "signature": ":Vector3",
+       "final": true
+      },
+      {
+       "name": "normal",
+       "kind": "var",
+       "signature": ":Vector3",
+       "final": true
+      },
+      {
+       "name": "distance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "safety",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "influence",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(bodyA:Int, bodyB:Int, pointA:Vector3, pointB:Vector3, normal:Vector3, distance:Float, safety:Float, influence:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "AvoidanceRows",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/AvoidanceRows.hx",
+     "doc": "Velocity-damper rows for collision avoidance (COLLISION.md CL5, Lane D's\nD4). The distance of a pair changes at n·(J_b − J_a)·q̇, where n is the\nnormal from `a` toward `b` and J the point Jacobians at the closest\npoints. Over one step Δ of period `dt`, each pair within its influence\ndistance gives the row\n\nn·(J_b − J_a)·Δ ≥ −ξ·(d − ds)/(di − ds)·dt\n\nwith `ξ` a speed: far from the safety margin the pair may close at up to\nξ, at the margin not at all, and inside it the row demands separation. A\nside outside the solved model has a zero Jacobian. Columns are the\nproblem's layout DOFs; a moving root's columns get no row entries."
+    },
+    {
+     "name": "BodyPair",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/BodyPair.hx",
+     "doc": "Two bodies of a model, the lower index first, and how they are related.",
+     "fields": [
+      {
+       "name": "a",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "b",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "relation",
+       "kind": "var",
+       "signature": ":BodyPairRelation",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, relation:BodyPairRelation):Void"
+      }
+     ]
+    },
+    {
+     "name": "BodyPairRelation",
+     "kind": "abstract",
+     "file": "kinematicskit/haxe/kinematicskit/BodyPairRelation.hx",
+     "underlying": "Int",
+     "doc": "Why two bodies of one model need no collision check (COLLISION.md CL-D3).",
+     "fields": [
+      {
+       "name": "Rigid",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "They never move relative to each other: joined only through fixed joints."
+      },
+      {
+       "name": "Adjacent",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "One movable joint apart, through fixed joints on either side."
+      },
+      {
+       "name": "Closure",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Joined by a closure (KK-D4): the two sides meet by design."
+      }
+     ]
+    },
+    {
+     "name": "ClearanceMotionBounds",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/ClearanceMotionBounds.hx",
+     "doc": "Triangle-inequality motion bounds on compiled link geometry, including\naffine multi-source followers and joints outside the planning group.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(model:KinematicModel, dofs:Array<Int>, state:KinematicState, error:Array<Float>, flangeFrame:Int, tcpOffset:Transform, ?workFrame:Int):Void"
+      },
+      {
+       "name": "point",
+       "kind": "method",
+       "signature": "(link:Int, radius:Float):Float",
+       "doc": "Every point within radius of this link origin moves by at most this much."
+      },
+      {
+       "name": "tcp",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Includes translation of the moving work frame and rotation of its axes."
+      }
+     ]
+    },
+    {
+     "name": "ClearanceMotionEnvelope",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/ClearanceMotionEnvelope.hx",
+     "doc": "Fixed reach coefficients over a finite joint box. The box must include\nthe entire geometry and lowering neighborhood. All affine follower terms\ncontribute; joints outside the group keep their compiled held values.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(model:KinematicModel, dofs:Array<Int>, state:KinematicState, lower:Array<Float>, upper:Array<Float>, bodies:Array<Int>, corners:Array<Array<Float>>, flangeFrame:Int, tcpOffset:Transform, ?workFrame:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "ClosureKind",
+     "kind": "abstract",
+     "file": "kinematicskit/haxe/kinematicskit/ClosureKind.hx",
+     "underlying": "Int",
+     "doc": "What a loop-closure constraint holds between its two frames: the whole\npose (Fixed), a shared point and axis (Revolute), a shared axis line\nwith free sliding along it (Prismatic), a shared point only (Spherical),\na shared axis line with free sliding and turning (Cylindrical), or B's\norigin on A's plane with parallel normals (Planar; the axis is A's normal).\nPrismatic is Cylindrical plus a row holding the twist about the axis.\nPlanar's B origin sits `value` along A's normal. Parallel, Perpendicular,\nDistance and Angle exist for assembly mates.",
+     "fields": [
+      {
+       "name": "Fixed",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Revolute",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Prismatic",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Spherical",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Cylindrical",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Planar",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Parallel",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Axes parallel (either direction): the two axis rows."
+      },
+      {
+       "name": "Perpendicular",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Axes perpendicular: a·b = 0."
+      },
+      {
+       "name": "Distance",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Origins `value` apart: |pB − pA| = value."
+      },
+      {
+       "name": "Angle",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "`value` radians between the axes: a·b = cos(value)."
+      }
+     ]
+    },
+    {
+     "name": "ClosureTask",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/ClosureTask.hx",
+     "implements": [
+      "KinematicTask"
+     ],
+     "doc": "Holds one of the model's loop closures. Rows (each divided by its\ntolerance, so a residual of 1 is \"exactly at tolerance\"):\n- Fixed: `pB − pA` (3) and the rotation vector of `A⁻¹B` in A (3);\n- Revolute: `pB − pA` (3) and B's axis in the plane perpendicular to A's (2);\n- Prismatic: `pB − pA` across A's axis (2), the axis rows (2) and the twist about the axis (1);\n- Cylindrical: the Prismatic rows without the twist (4);\n- Spherical: `pB − pA` (3);\n- Planar: `pB − pA` along A's axis, the plane normal, minus the offset value (1), and the axis rows (2);\n- Parallel: the axis rows (2); Perpendicular: a·b (1);\n- Angle: acos(a·b) − value (1), in radians; at 0 or π, where one row cannot hold two axes together (the\nangle is not differentiable there), the axis rows with the sign the angle asks for (2);\n- Distance: |pB − pA| − value (1; the value must be positive, since the direction is undefined at 0).\nAxis rows accept anti-parallel axes, except for an aligned Angle. The residual definitions match\nCadKit's `AssemblyLoopSolver`; Jacobians are analytic (exact for the\nposition and fixed-rotation rows, first order in the transverse and axis\nrows, exact at closure).",
+     "fields": [
+      {
+       "name": "closure",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      }
+     ]
+    },
+    {
+     "name": "DampedLeastSquares",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/DampedLeastSquares.hx",
+     "doc": "Fixed-damping least squares: each iteration takes the full step\n`(JᵀJ + λ²I) Δq = Jᵀe` over the active DOFs, then clamps them into their\nlimits. This is RobotKit's original IK iteration: it stops as soon as the\nhard tasks are met (reporting the iteration index). After `maxIterations`\nsteps it checks the final state too, reporting `Converged` if the last\nstep landed inside the tolerances (the original iteration reported\n`IterationLimit` there). With a reused `workspace` it allocates nothing\nper iteration.\n\n`maxStep` (unlimited by default, which is the original iteration) caps\neach step: if any DOF would move more than `maxStep` (radians, or\n`maxStep · translationScale` for a prismatic DOF), the whole step is\nscaled down, keeping its direction. Targets far outside the reachable set\notherwise produce linearised steps of several radians."
+    },
+    {
+     "name": "DofDampingTask",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/DofDampingTask.hx",
+     "implements": [
+      "KinematicTask"
+     ],
+     "doc": "A soft cost on moving DOFs: one row `weights[dof] · Δq` per weighted DOF,\nwith zero target. Unlike a `PostureTask` it pulls towards nothing, so a\nsolve still meets its hard tasks exactly; it only makes weighted DOFs\ntake a smaller share of each step. A robot's external axes (a rail, a\npositioner) use it to move only for what the arm cannot do alone.\nThe joint-space analogue of `RootDampingTask`."
+    },
+    {
+     "name": "FlatTransform",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/FlatTransform.hx",
+     "doc": "Rigid-transform arithmetic on flat arrays, seven floats per transform\n(x, y, z, qx, qy, qz, qw), so hot loops allocate nothing. Same formulas\nas `Transform`."
+    },
+    {
+     "name": "FrameOrientation",
+     "kind": "enum",
+     "file": "kinematicskit/haxe/kinematicskit/FrameOrientation.hx",
+     "doc": "Which part of a target orientation a `FrameTask` holds.",
+     "fields": [
+      {
+       "name": "Full",
+       "kind": "case",
+       "signature": "",
+       "doc": "The whole orientation (three rows)."
+      },
+      {
+       "name": "Axis",
+       "kind": "case",
+       "signature": "(x:Float, y:Float, z:Float)",
+       "doc": "Only the direction of one local axis (two rows); rotation about it is free."
+      },
+      {
+       "name": "Free",
+       "kind": "case",
+       "signature": "",
+       "doc": "None (no rows)."
+      }
+     ]
+    },
+    {
+     "name": "FrameTask",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/FrameTask.hx",
+     "implements": [
+      "KinematicTask"
+     ],
+     "doc": "Moves a point frame rigidly attached to a body (`body · offset`) to a\nworld target.\n\nPosition: with all three axes selected, three rows along world X/Y/Z; with\na subset (`AXIS_X | AXIS_Y | AXIS_Z`), one row per selected axis of the\n*target* frame, so e.g. `AXIS_Z` alone only fixes depth along the target's Z.\n\nOrientation (`FrameOrientation`): `Full` uses the rotation vector of\n`target · current⁻¹` in world coordinates with the angular Jacobian rows\n(first order, exact at convergence; the exact log-map derivative was\nmeasured and rejected, see KINEMATICS.md K-log \"orientation Jacobian\");\n`Axis(u)` aligns the frame's local axis `u` with the target's, leaving\nrotation about it free.\n\nWith `relativeTo(reference, offset)` the target is expressed in a frame\non another body (e.g. a workpiece on a positioner): the task holds the\nframe at that pose relative to the reference, both bodies free to move.\nIts rows are then J_body − J_reference, the reference's taken at the\ntarget point (exact for position), so the solver may move either side.\n\nPosition and orientation errors stay separate (straight-line position\nerror, per-part masks and tolerances). A different error formulation\n(e.g. mink's SE(3) logarithm) belongs in its own task type, not a mode."
+    },
+    {
+     "name": "FrameVelocityTask",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/FrameVelocityTask.hx",
+     "implements": [
+      "KinematicTask"
+     ],
+     "doc": "Moves a point frame rigidly attached to a body (`body · offset`) at a\ntwist for one step: the residual is `(v, ω)·dt` and the rows are the\nframe point's Jacobian, so a differential solve (`DifferentialIk`) returns\nthe joint velocities that produce that twist. With `relativeTo`, the twist\nis relative to another body's frame (a workpiece on a positioner) and\nexpressed in it; otherwise it is in the world frame.\n\nA step goal, not a pose goal: it is never \"satisfied\", so use it in\ndifferential solves, not iterative IK.",
+     "fields": [
+      {
+       "name": "weight",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "JacobianLayout",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/JacobianLayout.hx",
+     "doc": "The columns of a solve: one per active DOF, then one block per moving root\n(`RootMotion`: 3 columns for `Planar` — vx, vy, ωz — or 6 for `Floating` —\nv then ω), all in world coordinates, the twist taken about the root's\norigin. Tasks write Jacobian rows `width` wide; DOFs outside the layout get\nno column, so an assembly with hundreds of joints solving a three-DOF\nlinkage works with three columns."
+    },
+    {
+     "name": "JointKind",
+     "kind": "abstract",
+     "file": "kinematicskit/haxe/kinematicskit/JointKind.hx",
+     "underlying": "Int",
+     "doc": "How a compiled joint moves its child: not at all, about its axis, or along it.",
+     "fields": [
+      {
+       "name": "Fixed",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Revolute",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Prismatic",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "KinematicBodyPairs",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/KinematicBodyPairs.hx",
+     "doc": "The body pairs of a model that a collision world should not check, with\ntheir reasons (COLLISION.md CL-D1, CL-D3): rigid, adjacent and closure\npairs. They follow from the model's structure alone; the caller turns\nthem into its collision world's rules. Overlap at a reference\nconfiguration is the world's to find, since it needs the geometry.",
+     "fields": [
+      {
+       "name": "of",
+       "kind": "method",
+       "signature": "(model:KinematicModel):Array<BodyPair>",
+       "static": true,
+       "doc": "Every related pair of `model`'s bodies, once each, in body order; a pair takes its first reason of rigid, adjacent, closure."
+      },
+      {
+       "name": "rigidGroups",
+       "kind": "method",
+       "signature": "(model:KinematicModel):Array<Int>",
+       "static": true,
+       "doc": "Per body: the top body of the group it is rigidly fixed to (through fixed joints)."
+      }
+     ]
+    },
+    {
+     "name": "KinematicModel",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/KinematicModel.hx",
+     "doc": "An immutable compiled kinematic forest. Bodies are joined by tree joints;\ncoupled joints share their source's degree of freedom (DOF); frames are\nfixed offsets on bodies; closures are extra equality constraints that\nforward kinematics never walks. Build one with `KinematicModelBuilder`.\n\nTransforms are stored flat, seven floats each (x, y, z, qx, qy, qz, qw).\nThe arrays are shared with snapshots and solvers and must not be modified.",
+     "fields": [
+      {
+       "name": "COMBINED",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "doc": "`jointSource` of a joint that sums several DOF terms."
+      },
+      {
+       "name": "bodyIds",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "bodyParentJoint",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Incoming tree joint per body, or -1 for a root."
+      },
+      {
+       "name": "bodyRootPoses",
+       "kind": "var",
+       "signature": ":Array<Transform>",
+       "final": true
+      },
+      {
+       "name": "bodyOrder",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Bodies with every parent before its children."
+      },
+      {
+       "name": "bodyChain",
+       "kind": "var",
+       "signature": ":Array<Array<Int>>",
+       "final": true,
+       "doc": "Movable joints from each body's root to the body, root first."
+      },
+      {
+       "name": "bodyRoot",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "The root body each body hangs from (itself for a root)."
+      },
+      {
+       "name": "jointIds",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "jointKind",
+       "kind": "var",
+       "signature": ":Array<JointKind>",
+       "final": true
+      },
+      {
+       "name": "jointParent",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "jointChild",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "jointParentTJoint",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "jointJointTChild",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "jointAxis",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "Unit motion axis per joint in the joint frame, three floats each."
+      },
+      {
+       "name": "jointOrder",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Joints with every parent joint before its children."
+      },
+      {
+       "name": "jointValueOrder",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Joints with every coupling source before its targets."
+      },
+      {
+       "name": "jointDof",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "The DOF that drives each movable joint (directly or through couplings); -1 when fixed."
+      },
+      {
+       "name": "jointSource",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Coupling source joint, or -1 when the joint is fixed or drives its own DOF, or `COMBINED` when it\nsums several couplings' terms (a CoreXY motor). Then `jointDof` and `jointScale` hold only its\nfirst term: use the terms below."
+      },
+      {
+       "name": "jointRatio",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "jointOffset",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "jointScale",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "d(joint value) / d(DOF value): 1 for a driving joint, the ratio product for a coupled one."
+      },
+      {
+       "name": "jointTermStart",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Every movable joint's value as an affine map of the DOF values: the terms (DOF and scale) of joint\n`j` are `jointTermStart[j]` up to `jointTermStart[j + 1]`, plus `jointConstant[j]`. A driving joint\nhas one term of scale 1; a fixed joint none."
+      },
+      {
+       "name": "jointTermDof",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "jointTermScale",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "jointConstant",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "jointLower",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "jointUpper",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "jointDefault",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "dofJoint",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "The driving joint of each DOF, in authored joint order."
+      },
+      {
+       "name": "dofLower",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "DOF ranges after intersecting coupled joints' limits; infinite when unbounded."
+      },
+      {
+       "name": "dofUpper",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "frameIds",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "frameBody",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "frameOffset",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "closureIds",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "closureKind",
+       "kind": "var",
+       "signature": ":Array<ClosureKind>",
+       "final": true
+      },
+      {
+       "name": "closureFrameA",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "closureFrameB",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "closureAxis",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "closureTolerance",
+       "kind": "var",
+       "signature": ":Array<Null<Float>>",
+       "final": true
+      },
+      {
+       "name": "closureValue",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "bodyCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "jointCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "dofCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "frameCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "closureCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "bodyIndex",
+       "kind": "method",
+       "signature": "(id:String):Int",
+       "doc": "Compiled index of a body, joint, frame or closure ID; -1 when absent."
+      },
+      {
+       "name": "jointIndex",
+       "kind": "method",
+       "signature": "(id:String):Int"
+      },
+      {
+       "name": "frameIndex",
+       "kind": "method",
+       "signature": "(id:String):Int"
+      },
+      {
+       "name": "closureIndex",
+       "kind": "method",
+       "signature": "(id:String):Int"
+      },
+      {
+       "name": "dofIndex",
+       "kind": "method",
+       "signature": "(jointId:String):Int",
+       "doc": "The DOF a joint ID drives directly; -1 when the joint is fixed, coupled, or absent."
+      },
+      {
+       "name": "dofId",
+       "kind": "method",
+       "signature": "(dof:Int):String"
+      },
+      {
+       "name": "dofIsAngular",
+       "kind": "method",
+       "signature": "(dof:Int):Bool",
+       "doc": "True when the DOF is revolute (its value is an angle)."
+      },
+      {
+       "name": "frameTransform",
+       "kind": "method",
+       "signature": "(frame:Int):Transform"
+      }
+     ]
+    },
+    {
+     "name": "KinematicModelBuilder",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/KinematicModelBuilder.hx",
+     "doc": "Collects bodies, joints, couplings, frames and closures, then compiles\nthem into an immutable `KinematicModel`. Indices returned by the `add*`\nmethods are the compiled indices.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "addBody",
+       "kind": "method",
+       "signature": "(id:String):Int"
+      },
+      {
+       "name": "setRootPose",
+       "kind": "method",
+       "signature": "(body:Int, pose:Transform):Void",
+       "doc": "The pose a root body takes when the state does not override it (identity by default)."
+      }
+     ]
+    },
+    {
+     "name": "KinematicModelParts",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/KinematicModelParts.hx",
+     "doc": "The arrays `KinematicModelBuilder` compiles, handed to `KinematicModel` in one piece."
+    },
+    {
+     "name": "KinematicProblem",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/KinematicProblem.hx",
+     "doc": "Tasks to meet, the DOFs a solver may move (all by default; the others stay\nat the seed), and the DOF limits (the model's by default). Solvers read a\nproblem and never modify it.",
+     "fields": [
+      {
+       "name": "model",
+       "kind": "var",
+       "signature": ":KinematicModel",
+       "final": true
+      },
+      {
+       "name": "tasks",
+       "kind": "var",
+       "signature": ":Array<KinematicTask>",
+       "final": true
+      },
+      {
+       "name": "lower",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "upper",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(model:KinematicModel):Void"
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(task:KinematicTask):KinematicProblem"
+      },
+      {
+       "name": "setActiveDofs",
+       "kind": "method",
+       "signature": "(dofs:Array<Int>):KinematicProblem",
+       "doc": "Restricts the solve to these DOFs, in this order (the order solvers use for their columns). It may be empty\nwhen only moving roots (see `setRootMotion`) are to be solved."
+      },
+      {
+       "name": "setRootMotion",
+       "kind": "method",
+       "signature": "(body:Int, mode:RootMotion):KinematicProblem",
+       "doc": "Lets the solve move a root body (`RootMotion.Planar` for a wheeled base,\n`Floating` for a free one; `Fixed` to stop). Its pose changes in the\nsolved state; its columns follow the active DOFs'. Add a\n`RootDampingTask` to prefer joint motion over root motion."
+      },
+      {
+       "name": "setActiveJoints",
+       "kind": "method",
+       "signature": "(jointIds:Array<String>):KinematicProblem",
+       "doc": "`setActiveDofs` by joint ID; each must be a joint that drives its own DOF (not fixed, not coupled)."
+      },
+      {
+       "name": "layout",
+       "kind": "method",
+       "signature": "():JacobianLayout",
+       "doc": "The Jacobian columns of a solve: one per active DOF, in active order."
+      },
+      {
+       "name": "activeDofs",
+       "kind": "method",
+       "signature": "():Array<Int>"
+      },
+      {
+       "name": "setLimits",
+       "kind": "method",
+       "signature": "(dof:Int, lowerBound:Float, upperBound:Float):KinematicProblem",
+       "doc": "Overrides one DOF's range; infinite bounds mean unlimited."
+      },
+      {
+       "name": "rowCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "evaluate",
+       "kind": "method",
+       "signature": "(state:KinematicState, snapshot:KinematicSnapshot, residual:Array<Float>, jacobian:Array<Float>):Void",
+       "doc": "Evaluates `snapshot` at `state`, then every task into `residual` and the\nrow-major `jacobian` (`layout().width` columns)."
+      },
+      {
+       "name": "satisfied",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether every hard task met its tolerances at the last `evaluate`."
+      },
+      {
+       "name": "hardRows",
+       "kind": "method",
+       "signature": "():Array<Int>",
+       "doc": "Rows belonging to hard tasks, in order."
+      },
+      {
+       "name": "clamp",
+       "kind": "method",
+       "signature": "(q:Array<Float>):Void",
+       "doc": "Clamps the active DOFs of `q` into their limits."
+      },
+      {
+       "name": "limitHits",
+       "kind": "method",
+       "signature": "(q:Array<Float>):Array<Int>"
+      }
+     ]
+    },
+    {
+     "name": "KinematicSnapshot",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/KinematicSnapshot.hx",
+     "doc": "World poses of every body and frame, and every movable joint's world\norigin and axis, for one `KinematicState`. `evaluate` reuses its arrays,\nso one snapshot serves any number of states without allocating. Repeated\nevaluations reuse the result when DOF values and immutable root poses match.",
+     "fields": [
+      {
+       "name": "model",
+       "kind": "var",
+       "signature": ":KinematicModel",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(model:KinematicModel):Void"
+      },
+      {
+       "name": "of",
+       "kind": "method",
+       "signature": "(state:KinematicState):KinematicSnapshot",
+       "static": true,
+       "doc": "Convenience: a new snapshot evaluated at `state`."
+      },
+      {
+       "name": "evaluate",
+       "kind": "method",
+       "signature": "(state:KinematicState):Void"
+      },
+      {
+       "name": "jointValue",
+       "kind": "method",
+       "signature": "(joint:Int):Float"
+      },
+      {
+       "name": "bodyPose",
+       "kind": "method",
+       "signature": "(body:Int):Transform"
+      },
+      {
+       "name": "framePose",
+       "kind": "method",
+       "signature": "(frame:Int):Transform"
+      },
+      {
+       "name": "bodyPoseInto",
+       "kind": "method",
+       "signature": "(body:Int, out:Array<Float>, offset:Int):Void",
+       "doc": "Writes a body's world pose (seven floats) into `out` at `offset`."
+      }
+     ]
+    },
+    {
+     "name": "KinematicSolution",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/KinematicSolution.hx",
+     "doc": "What a solver returns; the problem and seed are never modified.",
+     "fields": [
+      {
+       "name": "status",
+       "kind": "var",
+       "signature": ":KinematicStatus",
+       "final": true
+      },
+      {
+       "name": "state",
+       "kind": "var",
+       "signature": ":KinematicState",
+       "final": true
+      },
+      {
+       "name": "iterations",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "residualNorm",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Norm of all weighted residual rows at `state`."
+      },
+      {
+       "name": "tasks",
+       "kind": "var",
+       "signature": ":Array<TaskResult>",
+       "final": true
+      },
+      {
+       "name": "rank",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true,
+       "doc": "Rank of the hard-task Jacobian over the active DOFs at `state`."
+      }
+     ]
+    },
+    {
+     "name": "KinematicState",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/KinematicState.hx",
+     "doc": "DOF values (in `KinematicModel.dofJoint` order) plus optional root-pose overrides.",
+     "fields": [
+      {
+       "name": "model",
+       "kind": "var",
+       "signature": ":KinematicModel",
+       "final": true
+      },
+      {
+       "name": "q",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(model:KinematicModel, ?q:Array<Float>):Void",
+       "doc": "Starts every DOF at its driving joint's default value and every root at its model pose."
+      },
+      {
+       "name": "setRootPose",
+       "kind": "method",
+       "signature": "(body:Int, pose:Transform):Void"
+      },
+      {
+       "name": "rootPose",
+       "kind": "method",
+       "signature": "(body:Int):Transform",
+       "doc": "The root's pose in this state: its override, or the model's pose."
+      },
+      {
+       "name": "copy",
+       "kind": "method",
+       "signature": "():KinematicState"
+      }
+     ]
+    },
+    {
+     "name": "KinematicStatus",
+     "kind": "abstract",
+     "file": "kinematicskit/haxe/kinematicskit/KinematicStatus.hx",
+     "underlying": "String",
+     "doc": "Why a solver stopped.",
+     "fields": [
+      {
+       "name": "Converged",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Every hard task met its tolerances."
+      },
+      {
+       "name": "LimitBlocked",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Joint limits stopped further progress before the tolerances were met."
+      },
+      {
+       "name": "Conflicting",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "The residual stopped decreasing at a locally stationary configuration (tasks conflict or are unreachable there)."
+      },
+      {
+       "name": "IterationLimit",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "The iteration budget ran out while progress was still possible."
+      },
+      {
+       "name": "NumericalFailure",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "A linear system could not be solved."
+      }
+     ]
+    },
+    {
+     "name": "KinematicTask",
+     "kind": "interface",
+     "file": "kinematicskit/haxe/kinematicskit/KinematicTask.hx",
+     "doc": "One term of a `KinematicProblem`. A task contributes `rowCount()` rows:\nresiduals `e = desired − current` and the Jacobian rows `∂current/∂q`\nover all model DOFs, both already multiplied by the task's weights.\nHard tasks decide convergence; soft tasks (posture, preferences) only\nshape the solution.",
+     "fields": [
+      {
+       "name": "label",
+       "kind": "method",
+       "signature": "():String"
+      },
+      {
+       "name": "rowCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "isSoft",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "evaluate",
+       "kind": "method",
+       "signature": "(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout, residual:Array<Float>, jacobian:Array<Float>, row:Int):Void",
+       "doc": "Writes rows `row .. row + rowCount()` of `residual` and of the row-major\n`jacobian` (`layout.width` columns) for the evaluated `snapshot` of\n`state`, and records the errors reported below."
+      },
+      {
+       "name": "positionError",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Unweighted translational error at the last `evaluate`, in model length units."
+      },
+      {
+       "name": "orientationError",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Unweighted angular error at the last `evaluate`, in radians."
+      },
+      {
+       "name": "satisfied",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the last `evaluate` met the task's tolerances (always true for a soft task)."
+      }
+     ]
+    },
+    {
+     "name": "LevenbergMarquardt",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/LevenbergMarquardt.hx",
+     "doc": "Levenberg-Marquardt with trial steps: solve\n`(JᵀJ + μ·diag(max(JᵀJ, 1e-12))) Δ = Jᵀe` over the active DOFs, limit the\nlargest component to 1, clamp into the limits, and keep the step only if\nthe residual norm drops (then μ ← 0.3μ; otherwise roll back and μ ← 10μ).\nPrismatic DOFs are solved in units of `translationScale` so a step of 1\nmeans \"one characteristic length\". This is CadKit's closure-solver\nalgorithm, with analytic instead of finite-difference Jacobians.\n\nStops `LimitBlocked` when an active DOF ends on a limit with the descent\ndirection pushing it further out,\n`Conflicting` when the gradient vanishes (relative to ‖J‖‖e‖, so the\ntest does not depend on units or tolerances; see `STATIONARY_RATIO`) or no step of any size lowers\nthe residual (the damping reached its 1e16 ceiling) without meeting the\ntolerances, and `IterationLimit` otherwise. (CadKit reported an exhausted\ndamping as nonconvergent.)",
+     "fields": [
+      {
+       "name": "STATIONARY_RATIO",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true,
+       "doc": "A stop is stationary when ‖Jᵀe‖ <= this × ‖J‖‖e‖ (plus a tiny absolute floor). A large-residual problem,\nsuch as an unclosable loop, approaches its least-squares point only linearly, so an absolute test let it run\nout of iterations there: an unclosable four-bar ends at ≈ 1e-6 while unfinished solves sit at 0.1–1."
+      }
+     ]
+    },
+    {
+     "name": "LinearAlgebra",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/LinearAlgebra.hx",
+     "doc": "Dense helpers on row-major flat matrices, sized for kinematics (tens of\nrows and columns). Summation order is fixed and documented because\nmigrated solvers must reproduce their previous answers."
+    },
+    {
+     "name": "LookAtTask",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/LookAtTask.hx",
+     "implements": [
+      "KinematicTask"
+     ],
+     "doc": "Points a local axis of a frame (`body · offset`) at a world point, e.g. a\ncamera's optical axis at a part. Two rows: the axis components across the\nline of sight. Rotation about the line of sight and the frame's position\nare free. The error is the angle between the axis and the line of sight."
+    },
+    {
+     "name": "MotionReach",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/MotionReach.hx",
+     "doc": "A configuration-independent motion bound for a model's bodies\n(COLLISION.md CL-D5, CL7): over any motion in which DOF k travels at most\n`travel[k]`, no point of body b within `radius` of its frame moves further\nthan Σ_k (distance[b][k] + angular[b][k]·radius)·travel[k].\n\nFor a revolute joint j between the root and b, the point's distance from\nj's axis is at most the sum of the offsets from j to b (every joint on the\nway, fixed or movable, with a prismatic joint's largest travel) plus the\npoint's radius about b's frame, whatever the configuration; a prismatic\njoint moves it at most its own travel. Coupled joints weigh each DOF by\nthe absolute scale of its term."
+    },
+    {
+     "name": "PostureTask",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/PostureTask.hx",
+     "implements": [
+      "KinematicTask"
+     ],
+     "doc": "A soft preference for DOF values near `targets` (one row per DOF,\n`weight · (target − q)`). It never blocks convergence; use it to resolve\nredundancy (preferred posture) or to stay near a seed.",
+     "fields": [
+      {
+       "name": "weight",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "PrioritizedSolver",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/PrioritizedSolver.hx",
+     "doc": "Hard tasks exactly, soft tasks as well as they allow (KINEMATICS.md\nKK-D16). Each iteration takes the step Δ that\n\nminimizes  ½‖J_soft·Δ − e_soft‖² + ½λ²‖Δ‖²\nsubject to J_hard·Δ = e_hard   and   lower − q ≤ Δ ≤ upper − q\n\nover the active columns: an equality-constrained least-squares step,\nsolved through its KKT system (regularized by ε on the constraint block,\nso rank-deficient hard rows, e.g. at a singularity, still solve). Limits\nform an active set: DOFs whose step would leave their range are pinned at\nit and the rest re-solved. Unlike `DampedLeastSquares`, soft tasks do not\npull the hard ones off: a posture preference shapes the configuration\nwhile the tool target is met exactly. Pure Haxe, so it runs wherever the\nkit does.\n\nStops `Converged` once the hard tasks are met and the step has settled\n(below `stepTolerance`), or met at the iteration limit; otherwise\n`IterationLimit`. `maxStep` caps each step as in `DampedLeastSquares`."
+    },
+    {
+     "name": "RootDampingTask",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/RootDampingTask.hx",
+     "implements": [
+      "KinematicTask"
+     ],
+     "doc": "A soft cost on moving a root (see `KinematicProblem.setRootMotion`): rows\n`weight · v` and `angularWeight · ω` with zero target. It makes a solve\nprefer joint motion and move the base only for what the joints cannot\nreach, e.g. a mobile manipulator driving only when its arm runs out.\nContributes nothing when the root does not move in the solve.",
+     "fields": [
+      {
+       "name": "linearWeight",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "angularWeight",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "RootMotion",
+     "kind": "abstract",
+     "file": "kinematicskit/haxe/kinematicskit/RootMotion.hx",
+     "underlying": "Int",
+     "doc": "How a solve may move a root body of the model (see `KinematicProblem.setRootMotion`).",
+     "fields": [
+      {
+       "name": "Fixed",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "The root stays where the state puts it."
+      },
+      {
+       "name": "Planar",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "x, y and yaw about world Z: a wheeled mobile base. Three columns (vx, vy, ωz)."
+      },
+      {
+       "name": "Floating",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "A free rigid pose: a floating or legged base. Six columns (v, ω), world frame."
+      }
+     ]
+    },
+    {
+     "name": "Rotations",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/Rotations.hx",
+     "doc": "Rotation helpers on raw quaternion components (x, y, z, w), writing into caller arrays."
+    },
+    {
+     "name": "SolverSupport",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/SolverSupport.hx",
+     "doc": "Shared bookkeeping for the solver policies."
+    },
+    {
+     "name": "SolverWorkspace",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/SolverWorkspace.hx",
+     "doc": "Buffers a solver needs, sized for one problem shape and reused across\nsolves (e.g. one per frame while an editor gizmo is dragged). Growing is\nthe only allocation; a solve with an already-fitting workspace allocates\nnothing per iteration.",
+     "fields": [
+      {
+       "name": "snapshot",
+       "kind": "var",
+       "signature": ":Null<KinematicSnapshot>"
+      },
+      {
+       "name": "residual",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "jacobian",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "scaled",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "normal",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "rhs",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "delta",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "accepted",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "scales",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "step",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "roots",
+       "kind": "var",
+       "signature": ":Array<Transform>",
+       "final": true,
+       "doc": "Saved poses of the problem's moving roots (see `SolverSupport.saveRoots`)."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "prepare",
+       "kind": "method",
+       "signature": "(problem:KinematicProblem):Void"
+      }
+     ]
+    },
+    {
+     "name": "StepLimits",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/StepLimits.hx",
+     "doc": "Bounds on one differential step Δ over a period `dt` (one per layout\ncolumn: the active DOFs, then any moving roots), for servoing and other\nper-tick solves (KINEMATICS.md KK-D17).\n\n- Configuration: a DOF covers at most `limitGain` (in (0, 1]) of its\nremaining distance to a stop per step; one already outside its range may\nonly move back.\n- Velocity: |Δ| ≤ v·dt with `velocity` per column (unlimited without).\n- Acceleration, with `previousVelocity`: the velocity changes by at most\na·dt per step (`acceleration` per DOF; absent, 0 or positive infinity = unlimited), and a DOF never\napproaches a stop faster than it can brake: one step of travel plus a\nfull brake fits in the distance left, |v|·dt + v²/(2a) ≤ distance. Where\nthe two conflict (a DOF already too fast near a stop), the position and\nbraking bounds win.\n- `ramped`: the velocity ramps linearly from the previous one to the new\none over the step (a streamed plan chunk) instead of switching at once,\nso a DOF travels (before + v)·dt/2, and a ramp that turns back within\nthe step keeps its turning point inside the range.\n\nShould velocity and position bounds exclude each other, the position side\nwins."
+    },
+    {
+     "name": "SwivelTask",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/SwivelTask.hx",
+     "implements": [
+      "KinematicTask"
+     ],
+     "doc": "The swivel (elbow) angle of an arm with a shoulder, an elbow and a wrist\npoint: how far the elbow is turned about the shoulder-wrist line, measured\nfrom the plane that contains that line and a world `reference` direction\n(world Z by default), positive by the right-hand rule about\nshoulder -> wrist. On a 7-axis arm with a 6D tool target this is the one\nredundant motion, so one row picks the arm's configuration exactly.\n\nThe residual is exact (the wrapped angle difference). The Jacobian row is\nψ's gradient with respect to the three points (central differences of the\nclosed-form angle, accurate to about 1e-8) times their point Jacobians, so\nno extra forward kinematics runs. Degenerate when the elbow lies on the\nshoulder-wrist line or that line is parallel to `reference`."
+    },
+    {
+     "name": "TaskResult",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/TaskResult.hx",
+     "doc": "One task's errors in a `KinematicSolution`.",
+     "fields": [
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "satisfied",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "soft",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "positionError",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "orientationError",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(task:KinematicTask):Void"
+      }
+     ]
+    },
+    {
+     "name": "Transform",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/Transform.hx",
+     "doc": "A rigid transform: translation plus a unit quaternion (x, y, z, w), in the\nmodel's length unit. `a.compose(b)` is `a · b`, i.e. `b` expressed in\n`a`'s frame. The formulas match `robotkit.spatial.Transform3` and\n`materia.assembly.AssemblyFrames`, so compiled models reproduce both."
+    },
+    {
+     "name": "UnicycleEnvelope",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/UnicycleEnvelope.hx",
+     "doc": "Wheel-derived bound |v| + |omega| b/2 <= groundSpeed, preserving commanded curvature.",
+     "fields": [
+      {
+       "name": "groundSpeed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "trackWidth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(groundSpeed:Float, trackWidth:Float):Void"
+      },
+      {
+       "name": "pathSpeed",
+       "kind": "method",
+       "signature": "(curvature:Float):Float"
+      },
+      {
+       "name": "constrain",
+       "kind": "method",
+       "signature": "(linear:Float, angular:Float):{linear:Float, angular:Float}"
+      }
+     ]
+    },
+    {
+     "name": "Vector3",
+     "kind": "class",
+     "file": "kinematicskit/haxe/kinematicskit/Vector3.hx",
+     "doc": "A 3D point or direction in the model's length unit.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):Void"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "kinematicskit.native",
+   "types": [
+    {
+     "name": "DifferentialIk",
+     "kind": "class",
+     "file": "kinematicskit/native/haxe/kinematicskit/native/DifferentialIk.hx",
+     "doc": "Differential IK in the shape of mink: each step evaluates the problem's\ntasks at `state` (residuals `e`, Jacobians `J`, already weighted), then\nsolves for the joint displacement Δ over one period `dt`:\n\nminimize ½‖J·Δ − gain·e‖² + ½λ²‖Δ‖²   subject to `limits` (`StepLimits`)\n\nand returns Δ / dt. `gain` in (0, 1] closes that fraction of the task error\nper step (1 = all of it; a `FrameVelocityTask` asks for a twist, so 1).\nWithout `limits`, only the configuration limits bound the step. The limits\nhold exactly, so integrating the returned velocities never leaves the\nrange. Should the QP fail, the damped least-squares step clamped into the\nsame bounds is returned, flagged `fallback`.\n\nWith `avoidance` pairs (COLLISION.md CL5), each pair within its influence\ndistance adds the velocity-damper row of `AvoidanceRows` at speed `xi`.\nWhen rows and limits admit no step, the rows are relaxed (heavily\npenalized slack) and the step lists the pairs relaxed; should the QP fail\nwith rows, the step is zero rather than an unchecked damped step."
+    },
+    {
+     "name": "DifferentialStep",
+     "kind": "class",
+     "file": "kinematicskit/native/haxe/kinematicskit/native/DifferentialIk.hx",
+     "doc": "One differential step: a velocity per layout column (the active DOFs, then\nany moving root's twist, world frame), and why the QP stopped. Integrate\nroots with `SolverSupport.applyStep(problem, state, velocity, dt)`."
+    },
+    {
+     "name": "NativeKinematics",
+     "kind": "class",
+     "file": "kinematicskit/native/haxe/kinematicskit/native/NativeKinematics.hx",
+     "doc": "A `KinematicModel` uploaded to the native core (packed once, see\n`kinematicskit.h`). Owns the native handle; call `dispose` when done.",
+     "fields": [
+      {
+       "name": "model",
+       "kind": "var",
+       "signature": ":KinematicModel",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(model:KinematicModel):Void"
+      },
+      {
+       "name": "forward",
+       "kind": "method",
+       "signature": "(q:Array<Float>, ?rootPoses:Array<Float>):Array<Float>",
+       "doc": "World poses of every body, seven floats each, for DOF values `q` (and optional root poses, seven per body)."
+      },
+      {
+       "name": "pointJacobian",
+       "kind": "method",
+       "signature": "(q:Array<Float>, body:Int, point:Array<Float>, columns:Array<Int>):Array<Float>",
+       "doc": "6 x `columns.length` Jacobian (row-major) of a world point on `body`, over the listed DOFs."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "packInts",
+       "kind": "method",
+       "signature": "(model:KinematicModel):Array<Int>",
+       "static": true,
+       "doc": "The integer half of the packed model (format 2)."
+      },
+      {
+       "name": "packReals",
+       "kind": "method",
+       "signature": "(model:KinematicModel):Array<Float>",
+       "static": true,
+       "doc": "The floating-point half of the packed model (format 2)."
+      }
+     ]
+    },
+    {
+     "name": "NativeQpStep",
+     "kind": "class",
+     "file": "kinematicskit/native/haxe/kinematicskit/native/NativeQpStep.hx",
+     "doc": "The native bounded damped least-squares step (ProxQP, dense):\nminimize ½‖J·Δ − e‖² + ½λ²‖Δ‖² subject to lower ≤ Δ ≤ upper. Keep one per\nproblem width and reuse it; every solve warm-starts from the previous one."
+    },
+    {
+     "name": "QpStepResult",
+     "kind": "class",
+     "file": "kinematicskit/native/haxe/kinematicskit/native/NativeQpStep.hx",
+     "doc": "Outcome of one `NativeQpStep.solve`.",
+     "fields": [
+      {
+       "name": "step",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "The step, one entry per variable (the solver's last iterate when it did not solve)."
+      },
+      {
+       "name": "status",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true,
+       "doc": "`KinematicsKitNativeConstants.KK_QP_*`."
+      },
+      {
+       "name": "iterations",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "relaxed",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Rows (of `solveRows`) whose relaxation was needed; empty when the rows held as given."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(step:Array<Float>, status:Int, iterations:Int, ?relaxed:Array<Int>):Void"
+      },
+      {
+       "name": "solved",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

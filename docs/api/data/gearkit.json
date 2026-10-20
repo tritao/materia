@@ -1,0 +1,914 @@
+{
+ "kit": "gearkit",
+ "packages": [
+  {
+   "name": "gearkit",
+   "types": [
+    {
+     "name": "BudgetContribution",
+     "kind": "typedef",
+     "file": "gearkit/haxe/gearkit/ErrorBudget.hx",
+     "fields": [
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":BudgetSource"
+      },
+      {
+       "name": "measurement",
+       "kind": "var",
+       "signature": ":GearMeasurement"
+      },
+      {
+       "name": "delta",
+       "kind": "var",
+       "signature": ":Map<String, Float>"
+      }
+     ]
+    },
+    {
+     "name": "BudgetSource",
+     "kind": "typedef",
+     "file": "gearkit/haxe/gearkit/ErrorBudget.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "part",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "basis",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ]
+    },
+    {
+     "name": "ConjugateRack",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/ConjugateRack.hx",
+     "doc": "Numerically generated conjugate rack in its unshifted normal plane.\nX is the right gear-flank coordinate; Y is height above the gear pitch datum.\nThe cutter tooth is centred at X=pitch/2, so its half-width is pitch/2-X.\nSamples retain the recovered rounded cutter tip as well as the active flank.",
+     "fields": [
+      {
+       "name": "module",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "pressureAngle",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "hasRootFold",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true,
+       "doc": "A folded conjugate root cannot be used as a single-valued hob cutter region."
+      },
+      {
+       "name": "of",
+       "kind": "method",
+       "signature": "(profile:ToothProfile, ?samples:Int):ConjugateRack",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ErrorBudget",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/ErrorBudget.hx",
+     "doc": "Runs the SAME supplied job with no errors, each source, and all sources.\nSigned metric deltas are diagnostic, not additive independent random variances.\nSuperposition is checked on measured traces, not sums of peak-to-peak metrics.",
+     "fields": [
+      {
+       "name": "baseline",
+       "kind": "var",
+       "signature": ":GearMeasurement",
+       "final": true
+      },
+      {
+       "name": "combined",
+       "kind": "var",
+       "signature": ":GearMeasurement",
+       "final": true
+      },
+      {
+       "name": "contributions",
+       "kind": "var",
+       "signature": ":Array<BudgetContribution>",
+       "final": true
+      },
+      {
+       "name": "dominant",
+       "kind": "var",
+       "signature": ":Map<String, String>",
+       "final": true
+      },
+      {
+       "name": "interaction",
+       "kind": "var",
+       "signature": ":Map<String, Float>",
+       "final": true
+      },
+      {
+       "name": "warnings",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "additive",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "relativeTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "absoluteTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(sources:Array<BudgetSource>, run:(Array<String>) -> GearMeasurement, ?relativeTolerance:Float, ?absoluteTolerance:Float):Void"
+      },
+      {
+       "name": "report",
+       "kind": "method",
+       "signature": "():String"
+      }
+     ]
+    },
+    {
+     "name": "GearEvaluationRange",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/GearEvaluationRange.hx",
+     "doc": "Explicit geometric evaluation window. This does not imply ISO evaluation rules.",
+     "fields": [
+      {
+       "name": "radiusMin",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "radiusMax",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "axialMin",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "axialMax",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(radiusMin:Float, radiusMax:Float, axialMin:Float, axialMax:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "GearInspection",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/GearInspection.hx",
+     "doc": "Designer supplies the active profile control radius; a mating gear is needed to infer it.\nDefaults for tip form, 95% roll evaluation and end exclusions follow ISO 1328-1:2013.\nGaussian cutoff lengths are mm; zero selects unfiltered diagnostic measurement.",
+     "fields": [
+      {
+       "name": "spec",
+       "kind": "var",
+       "signature": ":GearSpec",
+       "final": true
+      },
+      {
+       "name": "controlRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "tipFormRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "measurementRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "pitchZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "profileZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "rollStart",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "rollEnd",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "rollTip",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "axialStart",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "axialEnd",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "profileCutoff",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "helixCutoff",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(s:GearSpec, controlRadius:Float, ?measurementRadius:Float, ?pitchZ:Float, ?profileZ:Float, ?tipFormRadius:Float, ?profileCutoff:Float, ?helixCutoff:Float):Void"
+      },
+      {
+       "name": "roll",
+       "kind": "method",
+       "signature": "(r:Float, rb:Float):Float",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "GearMeasurement",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/GearMeasurement.hx",
+     "doc": "Numerical spur-gear inspection. No datum recentering: eccentricity remains measurable.\nBoth flanks of every tooth are inspected; missing coverage cannot earn a grade.\nAll deviations/traces in micrometres, circular tooth thickness in mm.",
+     "fields": [
+      {
+       "name": "values",
+       "kind": "var",
+       "signature": ":Map<String, Float>",
+       "final": true
+      },
+      {
+       "name": "grades",
+       "kind": "var",
+       "signature": ":Map<String, Null<Int>>",
+       "final": true
+      },
+      {
+       "name": "profiles",
+       "kind": "var",
+       "signature": ":Array<GearTrace>",
+       "final": true
+      },
+      {
+       "name": "helices",
+       "kind": "var",
+       "signature": ":Array<GearTrace>",
+       "final": true
+      },
+      {
+       "name": "pitch",
+       "kind": "var",
+       "signature": ":Array<Array<Float>>",
+       "final": true
+      },
+      {
+       "name": "cumulativePitch",
+       "kind": "var",
+       "signature": ":Array<Array<Float>>",
+       "final": true
+      },
+      {
+       "name": "radialMeasurements",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "thickness",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "ballCentres",
+       "kind": "var",
+       "signature": ":Array<Point2>",
+       "final": true,
+       "doc": "Annex E.5 reconstructed ball centres and opposing-ball dimensions, mm.\nExternal: over balls. Internal: between the inward ball surfaces."
+      },
+      {
+       "name": "dimensionsOverBalls",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "ballDiameter",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "warnings",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "extrapolation",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "inspection",
+       "kind": "var",
+       "signature": ":GearInspection",
+       "final": true
+      },
+      {
+       "name": "overallGrade",
+       "kind": "var",
+       "signature": ":Null<Int>"
+      },
+      {
+       "name": "isoClass",
+       "kind": "var",
+       "signature": ":Null<Int>",
+       "doc": "Only set for complete, sufficiently sampled, in-scope filtered numerical inspections."
+      },
+      {
+       "name": "profileSourcePoints",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "helixSourcePoints",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "fromRings",
+       "kind": "method",
+       "signature": "(rings:GearRings, s:GearSpec, ?inspection:GearInspection):GearMeasurement",
+       "static": true
+      },
+      {
+       "name": "value",
+       "kind": "method",
+       "signature": "(key:String):Float"
+      }
+     ]
+    },
+    {
+     "name": "GearRings",
+     "kind": "interface",
+     "file": "gearkit/haxe/gearkit/GearRings.hx",
+     "doc": "Read-only metrology boundary, mm/radians. Keeps GearKit independent of StockKit.\nBoundaries are paired material interval endpoints, sorted in [0,2pi].",
+     "fields": [
+      {
+       "name": "radii",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "axialPositions",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "boundaries",
+       "kind": "method",
+       "signature": "(radial:Int, axial:Int):Array<Float>"
+      }
+     ]
+    },
+    {
+     "name": "GearSpec",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/GearSpec.hx",
+     "doc": "Full-depth normal-system spur gear. Lengths in mm, angles in radians.\nPositive shift thickens external teeth and thins internal teeth.\nFillet defaults are design assumptions, not catalogue/standard claims.",
+     "fields": [
+      {
+       "name": "module",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "teeth",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "faceWidth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "pressureAngle",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "internal",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "profileShift",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "cutterTipRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "tipFilletRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "evaluation",
+       "kind": "var",
+       "signature": ":Null<GearEvaluationRange>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(module:Float, teeth:Int, faceWidth:Float, pressureAngle:Float, ?internal:Bool, ?profileShift:Float, ?cutterTipRadius:Float, ?tipFilletRadius:Float, ?evaluation:GearEvaluationRange):Void"
+      },
+      {
+       "name": "sign",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "pitchDiameter",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "pitchRadius",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "baseRadius",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "tipRadius",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "rootRadius",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "pitchToothThickness",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "evaluationRange",
+       "kind": "method",
+       "signature": "():GearEvaluationRange",
+       "doc": "Default is the entire unrounded flank and face; HB4 supplies standard-specific windows."
+      }
+     ]
+    },
+    {
+     "name": "GearTrace",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/GearTrace.hx",
+     "doc": "Uniformly spaced roll/axial abscissa in mm; material-positive deviations in micrometres.\nGaussian endpoints use linear residual extension; raw values always retained.",
+     "fields": [
+      {
+       "name": "tooth",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "flank",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "raw",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "filtered",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "cutoff",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "total",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "form",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "slope",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "gradient",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "intercept",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(tooth:Int, flank:Int, x:Array<Float>, y:Array<Float>, cutoff:Float, start:Float, end:Float, slopeLength:Float):Void"
+      },
+      {
+       "name": "gaussian",
+       "kind": "method",
+       "signature": "(x:Array<Float>, y:Array<Float>, cutoff:Float):Array<Float>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HobDesign",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/HobDesign.hx",
+     "doc": "Right-hand hob from a numerically conjugated normal rack. The outside diameter\nincludes the recovered cutter-tip height. Rake faces are planes parallel to Z;\npositive rake tilts the face at the outside circle. The generating cutter has no\nimplicit sharpening allowance; backing relief is a separate explicit section.",
+     "fields": [
+      {
+       "name": "rack",
+       "kind": "var",
+       "signature": ":ConjugateRack",
+       "final": true
+      },
+      {
+       "name": "starts",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "outsideDiameter",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "gashes",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "rake",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "pitchDiameter",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "leadAngle",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "axialPitch",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "lead",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "rootHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(rack:ConjugateRack, starts:Int, outsideDiameter:Float, gashes:Int, ?rake:Float, ?rootHeight:Float):Void"
+      },
+      {
+       "name": "rakeFaceRegion",
+       "kind": "method",
+       "signature": "(gash:Int, ?thread:Int, ?turn:Int):Array<Point3>",
+       "doc": "One closed rake-face tooth region. thread=0..starts-1, turn is any axial turn\nof that thread. Consecutive thread starts are one axial pitch apart."
+      },
+      {
+       "name": "relievedFaceRegion",
+       "kind": "method",
+       "signature": "(gash:Int, thread:Int, turn:Int, behind:Float, tipRelief:Float):Array<Point3>",
+       "doc": "Section behind the cutting face. Zero retreat/relief is exactly the rake cutter.\nRadial relief tapers linearly to zero at the root; the rake-plane offset is\nretained at each rotated section, including nonzero rake. This is an explicit\nbacking-surface design assumption, not a supplier grinding specification."
+      }
+     ]
+    },
+    {
+     "name": "Iso1328",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/Iso1328.hx",
+     "doc": "ISO 1328-1:2013, 5.2/5.3 and Annex E. Inputs mm, tolerances micrometres.\nOutside scope these numbers are engineering extrapolations, never ISO classes.\nSource and qualification requirements: gearkit/METROLOGY.md.",
+     "fields": [
+      {
+       "name": "parameters",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "outsideScope",
+       "kind": "method",
+       "signature": "(s:GearSpec):Array<String>",
+       "static": true
+      },
+      {
+       "name": "tolerance",
+       "kind": "method",
+       "signature": "(s:GearSpec, parameter:String, grade:Int, ?rounded:Bool):Float",
+       "static": true
+      },
+      {
+       "name": "grade",
+       "kind": "method",
+       "signature": "(s:GearSpec, parameter:String, micrometres:Float):Null<Int>",
+       "static": true,
+       "doc": "null means worse than class 11; never clamp a failing measurement."
+      }
+     ]
+    },
+    {
+     "name": "Point2",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/Point2.hx",
+     "doc": "Immutable transverse-plane point/vector, in millimetres.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Void"
+      },
+      {
+       "name": "radius",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "rotated",
+       "kind": "method",
+       "signature": "(angle:Float):Point2"
+      },
+      {
+       "name": "scaled",
+       "kind": "method",
+       "signature": "(scale:Float):Point2"
+      },
+      {
+       "name": "distance",
+       "kind": "method",
+       "signature": "(other:Point2):Float"
+      }
+     ]
+    },
+    {
+     "name": "Point3",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/Point3.hx",
+     "doc": "Immutable hob-local point in mm; spindle axis is +Z.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "ToothProfile",
+     "kind": "class",
+     "file": "gearkit/haxe/gearkit/ToothProfile.hx",
+     "doc": "One tooth centred on +Y, right flank at positive X. External/internal involutes\nand the signed rolling envelope of a rounded rack cutter at the root.\nInternal roots are a formal rack-limit construction, not a pinion-shaper model.\nUndercut, pointed and overlapping teeth are rejected rather than silently trimmed.",
+     "fields": [
+      {
+       "name": "spec",
+       "kind": "var",
+       "signature": ":GearSpec",
+       "final": true
+      },
+      {
+       "name": "rootJoinRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "tipJoinRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(spec:GearSpec):Void"
+      },
+      {
+       "name": "involute",
+       "kind": "method",
+       "signature": "(angle:Float):Float",
+       "static": true
+      },
+      {
+       "name": "flankAtRadius",
+       "kind": "method",
+       "signature": "(radius:Float):Point2",
+       "doc": "Exact active involute. Radius outside the unrounded flank is rejected."
+      },
+      {
+       "name": "flank",
+       "kind": "method",
+       "signature": "(t:Float):Point2"
+      },
+      {
+       "name": "flankDerivative",
+       "kind": "method",
+       "signature": "(t:Float):Point2",
+       "doc": "Derivative w.r.t. radius, oriented towards increasing radius for either gear kind."
+      },
+      {
+       "name": "rootFillet",
+       "kind": "method",
+       "signature": "(t:Float):Point2",
+       "doc": "t=0: involute join; t=1: root circle, both tangent. This is not a circular blend."
+      },
+      {
+       "name": "rootDerivative",
+       "kind": "method",
+       "signature": "(t:Float):Point2"
+      },
+      {
+       "name": "tipFillet",
+       "kind": "method",
+       "signature": "(t:Float):Point2",
+       "doc": "Circular tip rounding from flank join to the tip-circle land."
+      },
+      {
+       "name": "tipDerivative",
+       "kind": "method",
+       "signature": "(t:Float):Point2"
+      },
+      {
+       "name": "evaluationRange",
+       "kind": "method",
+       "signature": "():GearEvaluationRange"
+      },
+      {
+       "name": "outline",
+       "kind": "method",
+       "signature": "(?samples:Int):Array<Point2>",
+       "doc": "Closed polygon of one pitch, including root and tip lands. Mirror for the left flank."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

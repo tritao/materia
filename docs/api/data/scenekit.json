@@ -1,0 +1,3045 @@
+{
+ "kit": "scenekit",
+ "packages": [
+  {
+   "name": "nativekit.scene",
+   "types": [
+    {
+     "name": "Bounds",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Bounds.hx",
+     "doc": "Read-only axis-aligned bounds captured by a scene snapshot.",
+     "fields": [
+      {
+       "name": "valid",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "minX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "minY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "minZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      }
+     ]
+    },
+    {
+     "name": "Camera",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Camera.hx",
+     "doc": "Owns one scene camera asset.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "method",
+       "signature": "():nkscene_camera_id"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "CameraData",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/CameraData.hx",
+     "doc": "Value builder for a perspective or orthographic scene camera.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "setPerspective",
+       "kind": "method",
+       "signature": "(fovY:Float, nearPlane:Float, farPlane:Float, ?aspectRatio:Float):CameraData"
+      },
+      {
+       "name": "setOrthographic",
+       "kind": "method",
+       "signature": "(height:Float, nearPlane:Float, farPlane:Float, ?aspectRatio:Float):CameraData"
+      }
+     ]
+    },
+    {
+     "name": "ChangeSet",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/ChangeSet.hx",
+     "doc": "Immutable transaction result describing the changed scene domains.",
+     "fields": [
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nkscene_change_set"
+      },
+      {
+       "name": "revision",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "Geometry",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Geometry.hx",
+     "doc": "Owns one geometry resource ID in a Scene.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "method",
+       "signature": "():nkscene_geometry_id"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "GeometryData",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/GeometryData.hx",
+     "doc": "Owns the backing arrays used to describe one geometry resource.",
+     "fields": [
+      {
+       "name": "EDGE_SUBELEMENT_TAG",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "box",
+       "kind": "method",
+       "signature": "(width:Float, height:Float, depth:Float):GeometryData",
+       "static": true,
+       "doc": "Describes a box primitive; native SceneKit generates its faces, normals, and edges."
+      },
+      {
+       "name": "addVertex",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):Int"
+      },
+      {
+       "name": "addTriangle",
+       "kind": "method",
+       "signature": "(first:Int, second:Int, third:Int):GeometryData"
+      },
+      {
+       "name": "setPrimitiveType",
+       "kind": "method",
+       "signature": "(primitiveType:Int):GeometryData"
+      },
+      {
+       "name": "addStream",
+       "kind": "method",
+       "signature": "(semantic:Int, format:Int, data:Bytes, count:Int, ?stride:Int):GeometryData",
+       "doc": "Adds one tightly packed or explicitly strided vertex attribute stream."
+      },
+      {
+       "name": "setBounds",
+       "kind": "method",
+       "signature": "(minX:Float, minY:Float, minZ:Float, maxX:Float, maxY:Float, maxZ:Float):GeometryData"
+      },
+      {
+       "name": "addSubelement",
+       "kind": "method",
+       "signature": "(firstPrimitive:Int, primitiveCount:Int, subelement:Int):GeometryData"
+      },
+      {
+       "name": "addStrokeSegment",
+       "kind": "method",
+       "signature": "(startX:Float, startY:Float, startZ:Float, endX:Float, endY:Float, endZ:Float, ?edgeIndex:Int):GeometryData",
+       "doc": "Adds one object-space centerline segment for the analytic GPU stroke pass."
+      },
+      {
+       "name": "clearStrokeSegments",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Replace display strokes without changing triangle topology or face IDs."
+      },
+      {
+       "name": "vertexCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "triangleCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "stream",
+       "kind": "method",
+       "signature": "(semantic:Int):Null<GeometryStream>",
+       "doc": "Read a stream without copying it, for overlays on the same tessellation."
+      },
+      {
+       "name": "indexAt",
+       "kind": "method",
+       "signature": "(index:Int):Int"
+      },
+      {
+       "name": "subelementGeometry",
+       "kind": "method",
+       "signature": "(subelement:Int):Null<GeometryData>",
+       "doc": "Builds a renderable geometry containing only one subelement's triangles.\nThis is used for face overlays while retaining the source vertex streams."
+      },
+      {
+       "name": "setIndexBuffer",
+       "kind": "method",
+       "signature": "(data:Bytes, count:Int):GeometryData",
+       "doc": "Supplies a tightly packed uint32 index stream without per-index Haxe allocations."
+      }
+     ]
+    },
+    {
+     "name": "GeometryStream",
+     "kind": "typedef",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/GeometryData.hx",
+     "fields": [
+      {
+       "name": "bytes",
+       "kind": "var",
+       "signature": ":Bytes"
+      },
+      {
+       "name": "format",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "count",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "stride",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ],
+     "doc": "Borrowed vertex stream; callers must keep its bytes immutable."
+    },
+    {
+     "name": "Image",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Image.hx",
+     "doc": "Owns one scene image asset.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "method",
+       "signature": "():nkscene_image_id"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "ImageData",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/ImageData.hx",
+     "doc": "Value builder for one scene-owned image asset.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(width:Int, height:Int, ?format:Int):Void"
+      },
+      {
+       "name": "setMipCount",
+       "kind": "method",
+       "signature": "(count:Int):ImageData"
+      },
+      {
+       "name": "setPixels",
+       "kind": "method",
+       "signature": "(data:Bytes):ImageData"
+      }
+     ]
+    },
+    {
+     "name": "Light",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Light.hx",
+     "doc": "Owns one scene light asset.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "method",
+       "signature": "():nkscene_light_id"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "LightData",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/LightData.hx",
+     "doc": "Value builder for a directional, point, or spot scene light.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "setType",
+       "kind": "method",
+       "signature": "(type:Int):LightData"
+      },
+      {
+       "name": "setColor",
+       "kind": "method",
+       "signature": "(red:Float, green:Float, blue:Float):LightData"
+      },
+      {
+       "name": "setIntensity",
+       "kind": "method",
+       "signature": "(intensity:Float):LightData"
+      },
+      {
+       "name": "setRange",
+       "kind": "method",
+       "signature": "(range:Float):LightData"
+      },
+      {
+       "name": "setCone",
+       "kind": "method",
+       "signature": "(innerAngle:Float, outerAngle:Float):LightData"
+      }
+     ]
+    },
+    {
+     "name": "Material",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Material.hx",
+     "doc": "Owns one material resource ID in a Scene.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "method",
+       "signature": "():nkscene_material_id"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "MaterialData",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/MaterialData.hx",
+     "doc": "Fluent value builder for one material resource.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "opaque",
+       "kind": "method",
+       "signature": "(red:Float, green:Float, blue:Float, ?alpha:Float):MaterialData",
+       "static": true
+      },
+      {
+       "name": "setBaseColor",
+       "kind": "method",
+       "signature": "(red:Float, green:Float, blue:Float, ?alpha:Float):MaterialData"
+      },
+      {
+       "name": "setOpacity",
+       "kind": "method",
+       "signature": "(opacity:Float):MaterialData"
+      },
+      {
+       "name": "setMetallic",
+       "kind": "method",
+       "signature": "(value:Float):MaterialData"
+      },
+      {
+       "name": "setRoughness",
+       "kind": "method",
+       "signature": "(value:Float):MaterialData"
+      },
+      {
+       "name": "setEmissive",
+       "kind": "method",
+       "signature": "(red:Float, green:Float, blue:Float):MaterialData"
+      },
+      {
+       "name": "setAlphaCutoff",
+       "kind": "method",
+       "signature": "(value:Float):MaterialData"
+      },
+      {
+       "name": "setAlphaMode",
+       "kind": "method",
+       "signature": "(value:Int):MaterialData"
+      },
+      {
+       "name": "setBaseColorTexture",
+       "kind": "method",
+       "signature": "(?texture:Texture, ?sampler:Null<Sampler>):MaterialData"
+      },
+      {
+       "name": "setMetallicRoughnessTexture",
+       "kind": "method",
+       "signature": "(?texture:Texture):MaterialData"
+      },
+      {
+       "name": "setNormalTexture",
+       "kind": "method",
+       "signature": "(?texture:Texture):MaterialData"
+      },
+      {
+       "name": "setEmissiveTexture",
+       "kind": "method",
+       "signature": "(?texture:Texture):MaterialData"
+      },
+      {
+       "name": "setOcclusionTexture",
+       "kind": "method",
+       "signature": "(?texture:Texture):MaterialData"
+      },
+      {
+       "name": "setOpaque",
+       "kind": "method",
+       "signature": "(opaque:Bool):MaterialData"
+      },
+      {
+       "name": "setDoubleSided",
+       "kind": "method",
+       "signature": "(doubleSided:Bool):MaterialData"
+      }
+     ]
+    },
+    {
+     "name": "NodeId",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/NodeId.hx",
+     "doc": "Stable identity for one positioned item in a scene hierarchy.",
+     "fields": [
+      {
+       "name": "stableValue",
+       "kind": "method",
+       "signature": "():haxe.Int64",
+       "doc": "Returns the stable 64-bit node value for logging or maps."
+      },
+      {
+       "name": "equals",
+       "kind": "method",
+       "signature": "(other:NodeId):Bool"
+      }
+     ]
+    },
+    {
+     "name": "PerspectiveCamera",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/PerspectiveCamera.hx",
+     "doc": "Testable orbit camera state shared by perspective input and rendering.",
+     "fields": [
+      {
+       "name": "FOV_Y",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true
+      },
+      {
+       "name": "targetX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "targetY",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "targetZ",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "yaw",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pitch",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "distance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "clipNear",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "clipFar",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "revision",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "reset",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "fitClipRange",
+       "kind": "method",
+       "signature": "(bounds:Array<Array<Float>>):Void",
+       "doc": "Fits the depth range to visible world-space axis-aligned bounds."
+      },
+      {
+       "name": "orbit",
+       "kind": "method",
+       "signature": "(deltaX:Float, deltaY:Float):Void"
+      },
+      {
+       "name": "orbitAround",
+       "kind": "method",
+       "signature": "(deltaX:Float, deltaY:Float, x:Float, y:Float, z:Float):Void",
+       "doc": "Rotate around a world point without recentering it or changing the zoom.\nRotating both the eye and view target preserves the pivot's screen position."
+      },
+      {
+       "name": "look",
+       "kind": "method",
+       "signature": "(deltaX:Float, deltaY:Float):Void",
+       "doc": "Mouse-look turns around the eye rather than orbiting the target."
+      },
+      {
+       "name": "fly",
+       "kind": "method",
+       "signature": "(forward:Float, right:Float, up:Float, amount:Float):Void",
+       "doc": "Translate in view-forward/right and world-up directions, with normalized diagonal speed."
+      },
+      {
+       "name": "setTarget",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float, nextDistance:Float):Void",
+       "doc": "Explicit metric focus, including small-part inspection below the navigation zoom floor."
+      },
+      {
+       "name": "setAngle",
+       "kind": "method",
+       "signature": "(nextYaw:Float, nextPitch:Float):Void",
+       "doc": "Set a standard camera angle without changing the current focus or zoom."
+      },
+      {
+       "name": "angleLabel",
+       "kind": "method",
+       "signature": "():String"
+      },
+      {
+       "name": "pan",
+       "kind": "method",
+       "signature": "(deltaX:Float, deltaY:Float, viewportHeight:Float):Void"
+      },
+      {
+       "name": "zoom",
+       "kind": "method",
+       "signature": "(deltaY:Float):Void"
+      },
+      {
+       "name": "zoomAt",
+       "kind": "method",
+       "signature": "(deltaY:Float, x:Float, y:Float, z:Float):Void",
+       "doc": "Zoom around a world anchor, keeping its projected position fixed."
+      },
+      {
+       "name": "cursorAnchor",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, width:Float, height:Float):Array<Float>",
+       "doc": "Cursor anchor on the plane through the orbit target, parallel to the screen."
+      },
+      {
+       "name": "frame",
+       "kind": "method",
+       "signature": "(centerX:Float, centerY:Float, centerZ:Float, width:Float, height:Float, depth:Float, aspect:Float):Void"
+      },
+      {
+       "name": "viewProjection",
+       "kind": "method",
+       "signature": "(aspect:Float, ?nearOverride:Float, ?farOverride:Float, ?fovYOverride:Float):Transform"
+      },
+      {
+       "name": "studioDirection",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):Array<Float>",
+       "doc": "Rotate a camera-space direction toward a light into world coordinates."
+      },
+      {
+       "name": "screenRay",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, width:Float, height:Float):PerspectiveRay",
+       "doc": "Builds a world-space camera ray through a viewport pixel."
+      },
+      {
+       "name": "project",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float, width:Float, height:Float):Null<PerspectiveScreenPoint>"
+      },
+      {
+       "name": "projectWithMatrix",
+       "kind": "method",
+       "signature": "(matrix:Transform, x:Float, y:Float, z:Float, width:Float, height:Float):Null<PerspectiveScreenPoint>",
+       "doc": "Projects a point using the same immutable matrix as the other points in this paint."
+      },
+      {
+       "name": "projectSegment",
+       "kind": "method",
+       "signature": "(x0:Float, y0:Float, z0:Float, x1:Float, y1:Float, z1:Float, width:Float, height:Float):Null<Array<PerspectiveScreenPoint>>",
+       "doc": "Projects the visible part of a world-space line after clipping it to the camera frustum."
+      },
+      {
+       "name": "projectSegmentWithMatrix",
+       "kind": "method",
+       "signature": "(matrix:Transform, x0:Float, y0:Float, z0:Float, x1:Float, y1:Float, z1:Float, width:Float, height:Float):Null<Array<PerspectiveScreenPoint>>",
+       "doc": "Uses one frame's projection for multiple lines in the same viewport."
+      },
+      {
+       "name": "intersectPlaneZ",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, width:Float, height:Float, planeZ:Float):Null<PerspectivePlanePoint>"
+      },
+      {
+       "name": "eyePosition",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "viewDirection",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      }
+     ]
+    },
+    {
+     "name": "PerspectivePlanePoint",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/PerspectiveCamera.hx",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "PerspectiveRay",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/PerspectiveCamera.hx",
+     "fields": [
+      {
+       "name": "originX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "originY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "originZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "directionX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "directionY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "directionZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(originX:Float, originY:Float, originZ:Float, directionX:Float, directionY:Float, directionZ:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "PerspectiveScreenPoint",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/PerspectiveCamera.hx",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "depth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, depth:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "PickPollResult",
+     "kind": "enum",
+     "file": "scenekit/scene_render/bindings/haxe/nativekit/scene/PickPollResult.hx",
+     "doc": "Result of polling an asynchronous GPU pick request.",
+     "fields": [
+      {
+       "name": "Pending",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Ready",
+       "kind": "case",
+       "signature": "(result:PickResult)"
+      },
+      {
+       "name": "Stale",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Failed",
+       "kind": "case",
+       "signature": "(error:NativeKitGpu.GpuStatus)"
+      }
+     ]
+    },
+    {
+     "name": "PickRequest",
+     "kind": "class",
+     "file": "scenekit/scene_render/bindings/haxe/nativekit/scene/PickRequest.hx",
+     "doc": "Owns one asynchronous GPU ID-pass readback.",
+     "fields": [
+      {
+       "name": "poll",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot):PickPollResult",
+       "doc": "Polls without blocking. The request is valid until disposed."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "PickResult",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/PickResult.hx",
+     "doc": "Typed Haxe result for one renderer picking query.",
+     "fields": [
+      {
+       "name": "node",
+       "kind": "method",
+       "signature": "():NodeId",
+       "doc": "Picked scene node."
+      },
+      {
+       "name": "sourceValue",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "subelement",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "worldX",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "worldY",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "worldZ",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "depth",
+       "kind": "method",
+       "signature": "():Float"
+      }
+     ]
+    },
+    {
+     "name": "Sampler",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Sampler.hx",
+     "doc": "Owns one scene sampler asset.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "method",
+       "signature": "():nkscene_sampler_id"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SamplerData",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/SamplerData.hx",
+     "doc": "Value builder for scene sampler state.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "setFilters",
+       "kind": "method",
+       "signature": "(minFilter:Int, magFilter:Int):SamplerData"
+      },
+      {
+       "name": "setWrap",
+       "kind": "method",
+       "signature": "(wrapU:Int, wrapV:Int, ?wrapW:Int):SamplerData"
+      },
+      {
+       "name": "setMaxAnisotropy",
+       "kind": "method",
+       "signature": "(value:Float):SamplerData"
+      }
+     ]
+    },
+    {
+     "name": "Scene",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Scene.hx",
+     "doc": "Owns one mutable NativeKit scene and its explicitly created resources.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "():Scene",
+       "static": true
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nkscene_scene"
+      },
+      {
+       "name": "beginTransaction",
+       "kind": "method",
+       "signature": "():Transaction"
+      },
+      {
+       "name": "snapshot",
+       "kind": "method",
+       "signature": "():SceneSnapshot"
+      },
+      {
+       "name": "createGeometry",
+       "kind": "method",
+       "signature": "():Geometry"
+      },
+      {
+       "name": "createGeometryBatch",
+       "kind": "method",
+       "signature": "(data:Array<GeometryData>):Array<Geometry>",
+       "doc": "Creates geometry resources from one batch and publishes them together."
+      },
+      {
+       "name": "createMaterial",
+       "kind": "method",
+       "signature": "():Material"
+      },
+      {
+       "name": "createMaterialBatch",
+       "kind": "method",
+       "signature": "(data:Array<MaterialData>):Array<Material>",
+       "doc": "Creates material resources from one batch and publishes them together."
+      },
+      {
+       "name": "createImage",
+       "kind": "method",
+       "signature": "():SceneImage"
+      },
+      {
+       "name": "createTexture",
+       "kind": "method",
+       "signature": "():Texture"
+      },
+      {
+       "name": "createSampler",
+       "kind": "method",
+       "signature": "():Sampler"
+      },
+      {
+       "name": "createCamera",
+       "kind": "method",
+       "signature": "():Camera"
+      },
+      {
+       "name": "createLight",
+       "kind": "method",
+       "signature": "():Light"
+      },
+      {
+       "name": "setGeometryData",
+       "kind": "method",
+       "signature": "(geometry:Geometry, data:GeometryData):Void"
+      },
+      {
+       "name": "setMaterialData",
+       "kind": "method",
+       "signature": "(material:Material, data:MaterialData):Void"
+      },
+      {
+       "name": "setImageData",
+       "kind": "method",
+       "signature": "(image:SceneImage, data:ImageData):Void"
+      },
+      {
+       "name": "setTextureData",
+       "kind": "method",
+       "signature": "(texture:Texture, data:TextureData):Void"
+      },
+      {
+       "name": "setSamplerData",
+       "kind": "method",
+       "signature": "(sampler:Sampler, data:SamplerData):Void"
+      },
+      {
+       "name": "setCameraData",
+       "kind": "method",
+       "signature": "(camera:Camera, data:CameraData):Void"
+      },
+      {
+       "name": "setLightData",
+       "kind": "method",
+       "signature": "(light:Light, data:LightData):Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Disposes child resources before releasing the scene handle."
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SceneFrame",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/SceneFrame.hx",
+     "doc": "Owns the immutable snapshot and optional change set for one renderable\nscene frame.\n\nA frame keeps both native values alive until the render boundary has\nconsumed them. The change set may be null for an initial or explicitly\nrefreshed frame.",
+     "fields": [
+      {
+       "name": "snapshot",
+       "kind": "method",
+       "signature": "(scene:Scene):SceneFrame",
+       "static": true,
+       "doc": "Creates a frame from the scene's current published state."
+      },
+      {
+       "name": "sceneSnapshot",
+       "kind": "method",
+       "signature": "():SceneSnapshot",
+       "doc": "Returns the immutable scene state retained by this frame."
+      },
+      {
+       "name": "changeSet",
+       "kind": "method",
+       "signature": "():Null<ChangeSet>",
+       "doc": "Returns the commit delta, or null when this frame has no delta."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Releases the change set and snapshot in dependency-safe order."
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SceneNode",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/SceneNode.hx",
+     "doc": "Immutable node state captured by a scene snapshot.",
+     "fields": [
+      {
+       "name": "node",
+       "kind": "method",
+       "signature": "():NodeId"
+      },
+      {
+       "name": "parent",
+       "kind": "method",
+       "signature": "():Null<NodeId>"
+      },
+      {
+       "name": "sourceValue",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "geometryValue",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "materialValue",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "cameraValue",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "lightValue",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "visible",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "localTransform",
+       "kind": "method",
+       "signature": "():Transform"
+      },
+      {
+       "name": "worldTransform",
+       "kind": "method",
+       "signature": "():Transform"
+      },
+      {
+       "name": "worldTransformRevision",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "bounds",
+       "kind": "method",
+       "signature": "():Bounds"
+      }
+     ]
+    },
+    {
+     "name": "SceneRenderer",
+     "kind": "class",
+     "file": "scenekit/scene_render/bindings/haxe/nativekit/scene/SceneRenderer.hx",
+     "doc": "Keeps render-plan and NativeKit GPU synchronization behind one explicit\nrender boundary. Scene snapshots and change sets are owned by the caller.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(renderer:nkgpu_renderer):SceneRenderer",
+       "static": true,
+       "doc": "Creates an executor for a live renderer handle. Keep its owner alive."
+      },
+      {
+       "name": "createHeadless",
+       "kind": "method",
+       "signature": "():SceneRenderer",
+       "static": true,
+       "doc": "Creates the headless resource/command executor used by tests and tools."
+      },
+      {
+       "name": "createBorrowedId",
+       "kind": "method",
+       "signature": "(rendererId:Int):SceneRenderer",
+       "static": true,
+       "doc": "Creates an executor around a caller-owned opaque renderer ID."
+      },
+      {
+       "name": "render",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot, view:SceneView, ?changes:Null<ChangeSet>):nkscene_render_execution_stats",
+       "doc": "Compiles, refreshes, or incrementally updates the plan, then executes it."
+      },
+      {
+       "name": "captureRgba8",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot, view:SceneView, width:Int, height:Int, ?clearRed:Float, ?clearGreen:Float, ?clearBlue:Float, ?clearAlpha:Float):Bytes",
+       "doc": "Renders through the GPU into tightly packed RGBA8 pixels."
+      },
+      {
+       "name": "setSampleCount",
+       "kind": "method",
+       "signature": "(requested:Int):Int",
+       "doc": "Sets how many samples rendered images use and returns the count that will be used.\nOne means no multisampling, which is the default. The request is clamped to what the\nGPU can render and resolve and rounded down to a power of two. Picking is never\nmultisampled, and the image returned by renderImage() is always single-sample: the\nmultisampled result is resolved into it."
+      },
+      {
+       "name": "maxSampleCount",
+       "kind": "method",
+       "signature": "():Int",
+       "doc": "The largest sample count this GPU can render and resolve for rendered images."
+      },
+      {
+       "name": "renderImage",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot, view:SceneView, width:Int, height:Int, ?clearRed:Float, ?clearGreen:Float, ?clearBlue:Float, ?clearAlpha:Float, ?changes:Null<ChangeSet>):GraphicsImageRef",
+       "doc": "Renders directly into a retained, backend-neutral GPU image."
+      },
+      {
+       "name": "renderFrame",
+       "kind": "method",
+       "signature": "(frame:SceneFrame, view:SceneView):nkscene_render_execution_stats",
+       "doc": "Renders one owned frame, including its optional incremental change set."
+      },
+      {
+       "name": "lastUpdate",
+       "kind": "method",
+       "signature": "():Null<nkscene_render_update>",
+       "doc": "Returns the last plan update metrics, or null before the first update."
+      },
+      {
+       "name": "hasPlan",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Reports whether this renderer has compiled a render plan yet."
+      },
+      {
+       "name": "pickPixel",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot, width:Int, height:Int, x:Int, y:Int):PickResult",
+       "doc": "Performs a GPU ID pass and resolves one pixel to scene ownership."
+      },
+      {
+       "name": "pickPixelAsync",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot, width:Int, height:Int, x:Int, y:Int):PickRequest",
+       "doc": "Starts a non-blocking GPU ID pass and pixel readback."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SceneSession",
+     "kind": "class",
+     "file": "scenekit/scene_render/bindings/haxe/nativekit/scene/SceneSession.hx",
+     "doc": "Thin Haxeon owner for the NativeKit scene/render frame loop.\n\nThe session owns the mutable scene, render boundary, and reusable view.\nIndividual SceneFrame values remain caller-owned so an application can\nretain immutable frames for asynchronous work.",
+     "fields": [
+      {
+       "name": "createHeadless",
+       "kind": "method",
+       "signature": "():SceneSession",
+       "static": true,
+       "doc": "Creates a session using the headless resource and command executor."
+      },
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(renderer:Renderer):SceneSession",
+       "static": true,
+       "doc": "Creates a session attached to an externally owned GPU renderer."
+      },
+      {
+       "name": "scene",
+       "kind": "method",
+       "signature": "():Scene"
+      },
+      {
+       "name": "renderer",
+       "kind": "method",
+       "signature": "():SceneRenderer"
+      },
+      {
+       "name": "view",
+       "kind": "method",
+       "signature": "():SceneView",
+       "doc": "Returns the reusable view applied to subsequent render calls."
+      },
+      {
+       "name": "beginTransaction",
+       "kind": "method",
+       "signature": "():Transaction"
+      },
+      {
+       "name": "snapshotFrame",
+       "kind": "method",
+       "signature": "():SceneFrame",
+       "doc": "Captures the current published scene without a change set."
+      },
+      {
+       "name": "commit",
+       "kind": "method",
+       "signature": "(transaction:Transaction):SceneFrame",
+       "doc": "Commits a transaction and captures its corresponding render frame."
+      },
+      {
+       "name": "render",
+       "kind": "method",
+       "signature": "(frame:SceneFrame):nkscene_render_execution_stats",
+       "doc": "Executes the current render plan against one immutable frame."
+      },
+      {
+       "name": "pickPixel",
+       "kind": "method",
+       "signature": "(frame:SceneFrame, width:Int, height:Int, x:Int, y:Int):PickResult",
+       "doc": "Performs a synchronous pixel pick against one immutable frame."
+      },
+      {
+       "name": "pickPixelAsync",
+       "kind": "method",
+       "signature": "(frame:SceneFrame, width:Int, height:Int, x:Int, y:Int):PickRequest",
+       "doc": "Starts an asynchronous pixel pick against one immutable frame."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SceneSnapshot",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/SceneSnapshot.hx",
+     "doc": "Immutable read-only scene state captured at one scene revision.",
+     "fields": [
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():nkscene_snapshot"
+      },
+      {
+       "name": "revision",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "nodeCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "nodeAt",
+       "kind": "method",
+       "signature": "(index:Int):SceneNode"
+      },
+      {
+       "name": "nodes",
+       "kind": "method",
+       "signature": "():Array<SceneNode>",
+       "doc": "Returns all published scene nodes."
+      },
+      {
+       "name": "findNode",
+       "kind": "method",
+       "signature": "(node:NodeId):Null<SceneNode>"
+      },
+      {
+       "name": "childrenOf",
+       "kind": "method",
+       "signature": "(parent:NodeId):Array<NodeId>"
+      },
+      {
+       "name": "nodesForSource",
+       "kind": "method",
+       "signature": "(source:haxe.Int64):Array<NodeId>",
+       "doc": "Returns nodes associated with one source entity."
+      },
+      {
+       "name": "nodesForGeometry",
+       "kind": "method",
+       "signature": "(geometry:Geometry):Array<NodeId>",
+       "doc": "Returns nodes associated with one geometry resource."
+      },
+      {
+       "name": "nodesForMaterial",
+       "kind": "method",
+       "signature": "(material:Material):Array<NodeId>",
+       "doc": "Returns nodes associated with one material resource."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SceneView",
+     "kind": "class",
+     "file": "scenekit/scene_render/bindings/haxe/nativekit/scene/SceneView.hx",
+     "doc": "Immutable-at-render-boundary view configuration with typed overrides.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "setRoot",
+       "kind": "method",
+       "signature": "(root:NodeId):SceneView"
+      },
+      {
+       "name": "clearRoot",
+       "kind": "method",
+       "signature": "():SceneView"
+      },
+      {
+       "name": "setIncludeInvisible",
+       "kind": "method",
+       "signature": "(include:Bool):SceneView"
+      },
+      {
+       "name": "setViewProjection",
+       "kind": "method",
+       "signature": "(transform:Transform):SceneView",
+       "doc": "Enables bounds culling and applies a column-major world-to-clip matrix."
+      },
+      {
+       "name": "clearViewProjection",
+       "kind": "method",
+       "signature": "():SceneView",
+       "doc": "Disables bounds culling and restores the default identity projection."
+      },
+      {
+       "name": "setCameraViewPose",
+       "kind": "method",
+       "signature": "(position:Array<Float>, viewDirection:Array<Float>, ?orthographic:Bool):SceneView",
+       "doc": "Supplies the exact eye and view direction for an explicit projection."
+      },
+      {
+       "name": "setWorkplaneGrid",
+       "kind": "method",
+       "signature": "(eye:Array<Float>, forward:Array<Float>, right:Array<Float>, up:Array<Float>, spacing:Float, cameraDistance:Float):SceneView",
+       "doc": "Renders an infinite z=0 grid behind scene geometry for editor views.\nForward, right, and up are world-space ray basis vectors; right/up include\nthe camera's field-of-view scale for clip-space coordinates in [-1, 1]."
+      },
+      {
+       "name": "setStudioLighting",
+       "kind": "method",
+       "signature": "(directions:Array<Float>, sky:Array<Float>, ground:Array<Float>, ?colors:Array<Float>):SceneView",
+       "doc": "Sets three world-space directions, intensities, and optional RGB light colors."
+      },
+      {
+       "name": "setStudioDetail",
+       "kind": "method",
+       "signature": "(radius:Float, ?strength:Float, ?bias:Float, ?roughnessFloor:Float):SceneView",
+       "doc": "Display-only depth AO and highlight broadening. Radius uses scene world units; zero strength disables AO."
+      },
+      {
+       "name": "setCameraNode",
+       "kind": "method",
+       "signature": "(node:NodeId):SceneView",
+       "doc": "Selects a scene camera node when no explicit matrix is set."
+      },
+      {
+       "name": "clearCameraNode",
+       "kind": "method",
+       "signature": "():SceneView"
+      },
+      {
+       "name": "addClipPlane",
+       "kind": "method",
+       "signature": "(normalX:Float, normalY:Float, normalZ:Float, distance:Float, ?enabled:Bool):SceneView",
+       "doc": "Adds a conservative node-level section plane. Kept side is normal * p + distance >= 0."
+      },
+      {
+       "name": "clearClipPlanes",
+       "kind": "method",
+       "signature": "():SceneView"
+      },
+      {
+       "name": "setVisibility",
+       "kind": "method",
+       "signature": "(node:NodeId, visible:Bool):SceneView"
+      },
+      {
+       "name": "setNodeVisibility",
+       "kind": "method",
+       "signature": "(node:NodeId, visible:Bool):SceneView"
+      },
+      {
+       "name": "setMaterial",
+       "kind": "method",
+       "signature": "(node:NodeId, material:Material):SceneView"
+      },
+      {
+       "name": "setNodeMaterial",
+       "kind": "method",
+       "signature": "(node:NodeId, material:Material):SceneView"
+      },
+      {
+       "name": "setPose",
+       "kind": "method",
+       "signature": "(node:NodeId, transform:Transform):SceneView",
+       "doc": "Adds or replaces a runtime world-space pose without changing the scene snapshot."
+      },
+      {
+       "name": "replacePoses",
+       "kind": "method",
+       "signature": "(nodes:Array<NodeId>, transforms:Array<Transform>):SceneView",
+       "doc": "Replaces all world-space poses with one native publication."
+      },
+      {
+       "name": "clearPoses",
+       "kind": "method",
+       "signature": "():SceneView"
+      },
+      {
+       "name": "setDiagnosticTint",
+       "kind": "method",
+       "signature": "(node:NodeId, material:Material):SceneView",
+       "doc": "Tints a diagnostic subtree without replacing its material; selection and hover win."
+      },
+      {
+       "name": "clearDiagnosticTints",
+       "kind": "method",
+       "signature": "():SceneView"
+      },
+      {
+       "name": "diagnosticTintValues",
+       "kind": "method",
+       "signature": "():Array<nkscene_render_material_override>"
+      },
+      {
+       "name": "setSourceVisibility",
+       "kind": "method",
+       "signature": "(source:haxe.Int64, visible:Bool):SceneView",
+       "doc": "Adds or replaces a source-level visibility rule."
+      },
+      {
+       "name": "setSourceMaterial",
+       "kind": "method",
+       "signature": "(source:haxe.Int64, material:Material):SceneView",
+       "doc": "Adds or replaces a source-level base material rule."
+      },
+      {
+       "name": "setIsolatedSource",
+       "kind": "method",
+       "signature": "(source:haxe.Int64, isolated:Bool):SceneView",
+       "doc": "Adds or removes a source from the declarative isolation set."
+      },
+      {
+       "name": "setIsolatedNode",
+       "kind": "method",
+       "signature": "(node:NodeId, isolated:Bool):SceneView",
+       "doc": "Adds or removes an explicit node from the isolation set."
+      },
+      {
+       "name": "clearIsolation",
+       "kind": "method",
+       "signature": "():SceneView",
+       "doc": "Clears source and explicit node isolation while preserving rules."
+      },
+      {
+       "name": "clearSourceFilter",
+       "kind": "method",
+       "signature": "():SceneView"
+      },
+      {
+       "name": "clearSelectionOverrides",
+       "kind": "method",
+       "signature": "():SceneView"
+      },
+      {
+       "name": "clearHoverOverrides",
+       "kind": "method",
+       "signature": "():SceneView"
+      },
+      {
+       "name": "clearOverrides",
+       "kind": "method",
+       "signature": "():SceneView"
+      },
+      {
+       "name": "applyVisibilityFilter",
+       "kind": "method",
+       "signature": "(filter:VisibilityFilter):SceneView"
+      },
+      {
+       "name": "applyPolicy",
+       "kind": "method",
+       "signature": "(policy:SceneViewPolicy):SceneView",
+       "doc": "Applies reusable base visibility and material presentation rules."
+      },
+      {
+       "name": "applySelection",
+       "kind": "method",
+       "signature": "(selection:SelectionSet, highlight:Material):SceneView",
+       "doc": "Tints selected subtrees with highlight RGB while retaining each surface material."
+      },
+      {
+       "name": "applyHover",
+       "kind": "method",
+       "signature": "(?node:NodeId, highlight:Material):SceneView",
+       "doc": "Tints a hovered subtree; preserves source alpha and takes precedence over selection."
+      },
+      {
+       "name": "applyHoverNodes",
+       "kind": "method",
+       "signature": "(nodes:Array<NodeId>, highlight:Material):SceneView",
+       "doc": "Replaces the hover layer with every node of one object that is drawn as several."
+      },
+      {
+       "name": "visibilityOverrideValues",
+       "kind": "method",
+       "signature": "():Array<nkscene_render_visibility_override>"
+      },
+      {
+       "name": "materialOverrideValues",
+       "kind": "method",
+       "signature": "():Array<nkscene_render_material_override>"
+      },
+      {
+       "name": "selectionOverrideValues",
+       "kind": "method",
+       "signature": "():Array<nkscene_render_material_override>"
+      },
+      {
+       "name": "hoverOverrideValues",
+       "kind": "method",
+       "signature": "():Array<nkscene_render_material_override>"
+      },
+      {
+       "name": "poseOverrideCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "visibilityOverrideCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "materialOverrideCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "selectionOverrideCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "hoverOverrideCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "isolatedSourceCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "isolatedNodeCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "sourceVisibilityOverrideCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "sourceMaterialOverrideCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "clipPlaneCount",
+       "kind": "method",
+       "signature": "():Int"
+      }
+     ]
+    },
+    {
+     "name": "SceneViewFilter",
+     "kind": "class",
+     "file": "scenekit/scene_render/bindings/haxe/nativekit/scene/SceneViewFilter.hx",
+     "doc": "Native scene-view presentation filter.\n\nSourceEntityFilter remains available as a compatibility subclass for code\nwritten before this value had its SceneView-oriented name.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "setSourceVisibility",
+       "kind": "method",
+       "signature": "(source:haxe.Int64, visible:Bool):SceneViewFilter"
+      },
+      {
+       "name": "hideSource",
+       "kind": "method",
+       "signature": "(source:haxe.Int64):SceneViewFilter"
+      },
+      {
+       "name": "showSource",
+       "kind": "method",
+       "signature": "(source:haxe.Int64):SceneViewFilter"
+      },
+      {
+       "name": "setSourceMaterial",
+       "kind": "method",
+       "signature": "(source:haxe.Int64, material:Material):SceneViewFilter"
+      },
+      {
+       "name": "isolateSource",
+       "kind": "method",
+       "signature": "(source:haxe.Int64):SceneViewFilter",
+       "doc": "Replaces the isolation set with one source."
+      },
+      {
+       "name": "isolateSources",
+       "kind": "method",
+       "signature": "(sources:Array<haxe.Int64>):SceneViewFilter",
+       "doc": "Replaces the isolation set with the supplied sources."
+      },
+      {
+       "name": "clearIsolation",
+       "kind": "method",
+       "signature": "():SceneViewFilter"
+      },
+      {
+       "name": "clear",
+       "kind": "method",
+       "signature": "():SceneViewFilter"
+      },
+      {
+       "name": "visibilityRuleCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "materialRuleCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "isolationRuleCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "applyTo",
+       "kind": "method",
+       "signature": "(view:SceneView):SceneView",
+       "doc": "Applies the source rules directly to a reusable view."
+      },
+      {
+       "name": "apply",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot, policy:SceneViewPolicy):SceneViewPolicy",
+       "doc": "Applies declarative source rules to a view policy."
+      }
+     ]
+    },
+    {
+     "name": "SceneViewPolicy",
+     "kind": "class",
+     "file": "scenekit/scene_render/bindings/haxe/nativekit/scene/SceneViewPolicy.hx",
+     "doc": "Reusable base presentation rules for a SceneView.\n\nPolicies are composable: apply them in order and a later rule for the same\nnode replaces an earlier rule in the same layer. ScenePresentation applies\nselection and hover from SceneInteraction into SceneView's transient layers.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "setVisibility",
+       "kind": "method",
+       "signature": "(node:NodeId, visible:Bool):SceneViewPolicy"
+      },
+      {
+       "name": "hide",
+       "kind": "method",
+       "signature": "(node:NodeId):SceneViewPolicy"
+      },
+      {
+       "name": "show",
+       "kind": "method",
+       "signature": "(node:NodeId):SceneViewPolicy"
+      },
+      {
+       "name": "hideSubtree",
+       "kind": "method",
+       "signature": "(node:NodeId):SceneViewPolicy",
+       "doc": "Visibility follows the node hierarchy, so this affects descendants."
+      },
+      {
+       "name": "showSubtree",
+       "kind": "method",
+       "signature": "(node:NodeId):SceneViewPolicy",
+       "doc": "Restores this subtree unless another ancestor policy keeps it hidden."
+      },
+      {
+       "name": "setMaterial",
+       "kind": "method",
+       "signature": "(node:NodeId, material:Material):SceneViewPolicy"
+      },
+      {
+       "name": "setSourceVisibility",
+       "kind": "method",
+       "signature": "(source:haxe.Int64, visible:Bool):SceneViewPolicy",
+       "doc": "Adds or replaces a source-level visibility rule."
+      },
+      {
+       "name": "setSourceMaterial",
+       "kind": "method",
+       "signature": "(source:haxe.Int64, material:Material):SceneViewPolicy",
+       "doc": "Adds or replaces a source-level base material rule."
+      },
+      {
+       "name": "isolateSource",
+       "kind": "method",
+       "signature": "(source:haxe.Int64):SceneViewPolicy",
+       "doc": "Replaces the source isolation set with one source."
+      },
+      {
+       "name": "isolateSources",
+       "kind": "method",
+       "signature": "(sources:Array<haxe.Int64>):SceneViewPolicy",
+       "doc": "Replaces the source isolation set with the supplied sources."
+      },
+      {
+       "name": "clearIsolation",
+       "kind": "method",
+       "signature": "():SceneViewPolicy"
+      },
+      {
+       "name": "clear",
+       "kind": "method",
+       "signature": "():SceneViewPolicy"
+      },
+      {
+       "name": "visibilityCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "materialCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "isolationRuleCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "sourceVisibilityRuleCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "sourceMaterialRuleCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "applySourceFilter",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot, filter:SceneViewFilter):SceneViewPolicy"
+      },
+      {
+       "name": "apply",
+       "kind": "method",
+       "signature": "(view:SceneView):SceneView",
+       "doc": "Applies this policy without disturbing other view layers."
+      }
+     ]
+    },
+    {
+     "name": "SelectionSet",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/SelectionSet.hx",
+     "doc": "Reusable set of subtrees to tint without replacing their surface materials.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(node:NodeId, ?material:Material):SelectionSet"
+      },
+      {
+       "name": "remove",
+       "kind": "method",
+       "signature": "(node:NodeId):SelectionSet"
+      },
+      {
+       "name": "clear",
+       "kind": "method",
+       "signature": "():SelectionSet"
+      },
+      {
+       "name": "contains",
+       "kind": "method",
+       "signature": "(node:NodeId):Bool"
+      },
+      {
+       "name": "count",
+       "kind": "method",
+       "signature": "():Int"
+      }
+     ]
+    },
+    {
+     "name": "SourceEntityFilter",
+     "kind": "class",
+     "file": "scenekit/scene_render/bindings/haxe/nativekit/scene/SourceEntityFilter.hx",
+     "extends": [
+      "SceneViewFilter"
+     ],
+     "doc": "Compatibility name for source-entity presentation rules.\n\nNew code can use SceneViewFilter; this subclass keeps existing Haxeon call\nsites source-compatible while sharing the same implementation.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "SpatialIndex",
+     "kind": "class",
+     "file": "scenekit/scene_render/bindings/haxe/nativekit/scene/SpatialIndex.hx",
+     "doc": "Read-only spatial queries and CPU ray picking for one scene snapshot.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot, ?view:SceneView):SpatialIndex",
+       "static": true
+      },
+      {
+       "name": "sourceRevision",
+       "kind": "method",
+       "signature": "():haxe.Int64"
+      },
+      {
+       "name": "updateNode",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot, node:NodeId):Bool",
+       "doc": "Refit this index after a transform-only update to one existing node."
+      },
+      {
+       "name": "updateNodes",
+       "kind": "method",
+       "signature": "(snapshot:SceneSnapshot, nodes:Array<NodeId>):Bool",
+       "doc": "Refits all changed bounds, or advances a metadata-only snapshot with an empty array."
+      },
+      {
+       "name": "queryBounds",
+       "kind": "method",
+       "signature": "(minX:Float, minY:Float, minZ:Float, maxX:Float, maxY:Float, maxZ:Float):Array<NodeId>",
+       "doc": "Returns nodes whose snapshot bounds overlap the supplied box."
+      },
+      {
+       "name": "queryRay",
+       "kind": "method",
+       "signature": "(originX:Float, originY:Float, originZ:Float, directionX:Float, directionY:Float, directionZ:Float):Array<NodeId>",
+       "doc": "Returns nodes whose snapshot bounds intersect the supplied ray."
+      },
+      {
+       "name": "pickRay",
+       "kind": "method",
+       "signature": "(originX:Float, originY:Float, originZ:Float, directionX:Float, directionY:Float, directionZ:Float):PickResult",
+       "doc": "Returns the nearest visible triangle hit, including source and subelement identity."
+      },
+      {
+       "name": "pickRayWithView",
+       "kind": "method",
+       "signature": "(view:SceneView, originX:Float, originY:Float, originZ:Float, directionX:Float, directionY:Float, directionZ:Float):PickResult",
+       "doc": "Picks the presented view using this retained scene index and its current pose overrides."
+      },
+      {
+       "name": "pickRayWithViewEdges",
+       "kind": "method",
+       "signature": "(view:SceneView, originX:Float, originY:Float, originZ:Float, directionX:Float, directionY:Float, directionZ:Float, angularTolerance:Float):PickResult"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "Texture",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Texture.hx",
+     "doc": "Owns one scene texture asset.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "method",
+       "signature": "():nkscene_texture_id"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "TextureData",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/TextureData.hx",
+     "doc": "Value builder connecting a scene texture to an image asset.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(image:SceneImage):Void"
+      }
+     ]
+    },
+    {
+     "name": "Transaction",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Transaction.hx",
+     "doc": "Records scene mutations until commit or cancellation.",
+     "fields": [
+      {
+       "name": "createNode",
+       "kind": "method",
+       "signature": "():NodeId"
+      },
+      {
+       "name": "destroyNode",
+       "kind": "method",
+       "signature": "(node:NodeId):Void"
+      },
+      {
+       "name": "setParent",
+       "kind": "method",
+       "signature": "(node:NodeId, ?parent:NodeId):Void"
+      },
+      {
+       "name": "setTransform",
+       "kind": "method",
+       "signature": "(node:NodeId, transform:Transform):Void"
+      },
+      {
+       "name": "setTransforms",
+       "kind": "method",
+       "signature": "(updates:Array<TransformUpdate>):Void"
+      },
+      {
+       "name": "setName",
+       "kind": "method",
+       "signature": "(node:NodeId, name:String):Void"
+      },
+      {
+       "name": "setEntityName",
+       "kind": "method",
+       "signature": "(entity:haxe.Int64, name:String):Void"
+      },
+      {
+       "name": "setGeometry",
+       "kind": "method",
+       "signature": "(node:NodeId, geometry:Geometry):Void"
+      },
+      {
+       "name": "setMaterial",
+       "kind": "method",
+       "signature": "(node:NodeId, material:Material):Void"
+      },
+      {
+       "name": "setCamera",
+       "kind": "method",
+       "signature": "(node:NodeId, ?camera:Camera):Void"
+      },
+      {
+       "name": "setLight",
+       "kind": "method",
+       "signature": "(node:NodeId, ?light:Light):Void"
+      },
+      {
+       "name": "setVisibility",
+       "kind": "method",
+       "signature": "(node:NodeId, visible:Bool):Void"
+      },
+      {
+       "name": "setSourceEntity",
+       "kind": "method",
+       "signature": "(node:NodeId, source:haxe.Int64):Void",
+       "doc": "Associates an node with a source entity; zero clears the association."
+      },
+      {
+       "name": "commit",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "commitWithChanges",
+       "kind": "method",
+       "signature": "():ChangeSet"
+      },
+      {
+       "name": "commitFrame",
+       "kind": "method",
+       "signature": "():SceneFrame",
+       "doc": "Commits this transaction and retains its snapshot/delta as one frame."
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isClosed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "Transform",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/Transform.hx",
+     "doc": "Small value builder for column-major scene transforms.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "identity",
+       "kind": "method",
+       "signature": "():Transform",
+       "static": true
+      },
+      {
+       "name": "set",
+       "kind": "method",
+       "signature": "(index:Int, element:Float):Transform"
+      },
+      {
+       "name": "identityInPlace",
+       "kind": "method",
+       "signature": "():Transform"
+      },
+      {
+       "name": "translated",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):Transform"
+      },
+      {
+       "name": "multiplied",
+       "kind": "method",
+       "signature": "(local:Transform):Transform",
+       "doc": "Compose a local transform after this parent/world transform."
+      },
+      {
+       "name": "element",
+       "kind": "method",
+       "signature": "(index:Int):Float"
+      }
+     ]
+    },
+    {
+     "name": "TransformUpdate",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/TransformUpdate.hx",
+     "doc": "One node transform in a bulk transaction update.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(node:NodeId, transform:Transform):Void"
+      }
+     ]
+    },
+    {
+     "name": "VisibilityFilter",
+     "kind": "class",
+     "file": "scenekit/scene/bindings/haxe/nativekit/scene/VisibilityFilter.hx",
+     "doc": "Reusable per-node visibility policy for a SceneView.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "set",
+       "kind": "method",
+       "signature": "(node:NodeId, visible:Bool):VisibilityFilter"
+      },
+      {
+       "name": "show",
+       "kind": "method",
+       "signature": "(node:NodeId):VisibilityFilter"
+      },
+      {
+       "name": "hide",
+       "kind": "method",
+       "signature": "(node:NodeId):VisibilityFilter"
+      },
+      {
+       "name": "clear",
+       "kind": "method",
+       "signature": "():VisibilityFilter"
+      },
+      {
+       "name": "count",
+       "kind": "method",
+       "signature": "():Int"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "nativekit.scene.gizmo",
+   "types": [
+    {
+     "name": "GizmoBasis",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/GizmoBasis.hx",
+     "doc": "Immutable right-handed orthonormal movement axes; scale never changes handle size or snap units.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:GizmoVec3, y:GizmoVec3, z:GizmoVec3):Void"
+      },
+      {
+       "name": "world",
+       "kind": "method",
+       "signature": "():GizmoBasis",
+       "static": true
+      },
+      {
+       "name": "fromQuaternion",
+       "kind": "method",
+       "signature": "(qx:Float, qy:Float, qz:Float, qw:Float):GizmoBasis",
+       "static": true,
+       "doc": "Rotation only, from a finite nonzero quaternion. Normalize without inheriting object/parent scale."
+      },
+      {
+       "name": "axis",
+       "kind": "method",
+       "signature": "(handle:TranslationHandle):GizmoVec3"
+      },
+      {
+       "name": "planeAxes",
+       "kind": "method",
+       "signature": "(handle:TranslationHandle):Array<GizmoVec3>"
+      }
+     ]
+    },
+    {
+     "name": "GizmoCamera",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/GizmoCamera.hx",
+     "doc": "Frozen perspective pose, suitable for capture from PerspectiveCamera's public eye/target/FOV.",
+     "fields": [
+      {
+       "name": "eye",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "forward",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "right",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "up",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "near",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "far",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(eye:GizmoVec3, target:GizmoVec3, worldUp:GizmoVec3, width:Float, height:Float, ?fovDegrees:Float, ?near:Float, ?far:Float):Void"
+      },
+      {
+       "name": "depth",
+       "kind": "method",
+       "signature": "(point:GizmoVec3):Float"
+      },
+      {
+       "name": "worldLength",
+       "kind": "method",
+       "signature": "(point:GizmoVec3, pixels:Float):Float"
+      },
+      {
+       "name": "project",
+       "kind": "method",
+       "signature": "(point:GizmoVec3):Null<GizmoPoint>"
+      },
+      {
+       "name": "contains",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Bool"
+      },
+      {
+       "name": "rayDirection",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):GizmoVec3"
+      }
+     ]
+    },
+    {
+     "name": "GizmoPoint",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/GizmoPoint.hx",
+     "doc": "Logical viewport pixels and positive eye-space depth.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "depth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, depth:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "GizmoShapeHit",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/GizmoShapeHit.hx",
+     "doc": "Shared capsule/convex-pad hit geometry in logical pixels.",
+     "fields": [
+      {
+       "name": "distance",
+       "kind": "method",
+       "signature": "(vertices:Array<GizmoPoint>, x:Float, y:Float):Null<Float>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "GizmoVec3",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/GizmoVec3.hx",
+     "doc": "Immutable Float64 geometry, independent of scene entities and rendering.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):Void"
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(b:GizmoVec3):GizmoVec3"
+      },
+      {
+       "name": "subtract",
+       "kind": "method",
+       "signature": "(b:GizmoVec3):GizmoVec3"
+      },
+      {
+       "name": "scaled",
+       "kind": "method",
+       "signature": "(s:Float):GizmoVec3"
+      },
+      {
+       "name": "dot",
+       "kind": "method",
+       "signature": "(b:GizmoVec3):Float"
+      },
+      {
+       "name": "cross",
+       "kind": "method",
+       "signature": "(b:GizmoVec3):GizmoVec3"
+      },
+      {
+       "name": "normalized",
+       "kind": "method",
+       "signature": "():GizmoVec3"
+      }
+     ]
+    },
+    {
+     "name": "RotationDrag",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/RotationDrag.hx",
+     "doc": "Signed angle about a frozen World axis, unwrapped across the atan2 boundary.",
+     "fields": [
+      {
+       "name": "handle",
+       "kind": "var",
+       "signature": ":TranslationHandle",
+       "final": true
+      },
+      {
+       "name": "axis",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "lastDegrees",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "closed",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Null<Float>"
+      },
+      {
+       "name": "finish",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "RotationGizmo",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/RotationGizmo.hx",
+     "doc": "Frozen axis rings. Perspective logical pixels; no scene, source or UI ownership.",
+     "fields": [
+      {
+       "name": "camera",
+       "kind": "var",
+       "signature": ":GizmoCamera",
+       "final": true
+      },
+      {
+       "name": "pivot",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "basis",
+       "kind": "var",
+       "signature": ":GizmoBasis",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(camera:GizmoCamera, pivot:GizmoVec3, ?pixels:Float, ?basis:Null<GizmoBasis>):Void"
+      },
+      {
+       "name": "shapes",
+       "kind": "method",
+       "signature": "():Array<RotationShape>"
+      },
+      {
+       "name": "pick",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Null<TranslationHandle>"
+      },
+      {
+       "name": "begin",
+       "kind": "method",
+       "signature": "(handle:TranslationHandle, x:Float, y:Float, ?snapDegrees:Float):RotationDrag"
+      }
+     ]
+    },
+    {
+     "name": "RotationShape",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/RotationShape.hx",
+     "doc": "Owned projected ring polyline used identically by drawing and picking.",
+     "fields": [
+      {
+       "name": "handle",
+       "kind": "var",
+       "signature": ":TranslationHandle",
+       "final": true
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(handle:TranslationHandle, points:Array<GizmoPoint>):Void"
+      },
+      {
+       "name": "points",
+       "kind": "method",
+       "signature": "():Array<GizmoPoint>"
+      },
+      {
+       "name": "distance",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Float"
+      }
+     ]
+    },
+    {
+     "name": "ScaleDrag",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/ScaleDrag.hx",
+     "doc": "Absolute dimensionless factor from pointer-down; invalid/zero/negative factors retain the last proposal.",
+     "fields": [
+      {
+       "name": "handle",
+       "kind": "var",
+       "signature": ":ScaleHandle",
+       "final": true
+      },
+      {
+       "name": "lastFactor",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "closed",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Null<Float>"
+      },
+      {
+       "name": "factors",
+       "kind": "method",
+       "signature": "(factor:Float):Array<Float>"
+      },
+      {
+       "name": "finish",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "ScaleGizmo",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/ScaleGizmo.hx",
+     "doc": "Positive local-axis and uniform scale factors, using frozen screen geometry.",
+     "fields": [
+      {
+       "name": "camera",
+       "kind": "var",
+       "signature": ":GizmoCamera",
+       "final": true
+      },
+      {
+       "name": "pivot",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "basis",
+       "kind": "var",
+       "signature": ":GizmoBasis",
+       "final": true
+      },
+      {
+       "name": "pixels",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(camera:GizmoCamera, pivot:GizmoVec3, basis:GizmoBasis, ?pixels:Float):Void"
+      },
+      {
+       "name": "shapes",
+       "kind": "method",
+       "signature": "():Array<ScaleShape>"
+      },
+      {
+       "name": "pick",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Null<ScaleHandle>"
+      },
+      {
+       "name": "begin",
+       "kind": "method",
+       "signature": "(handle:ScaleHandle, x:Float, y:Float, ?snapFactor:Float):ScaleDrag"
+      },
+      {
+       "name": "label",
+       "kind": "method",
+       "signature": "(handle:ScaleHandle):String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ScaleHandle",
+     "kind": "enum",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/ScaleHandle.hx",
+     "doc": "Local axis factors or uniform scaling about the selected pivot.",
+     "fields": [
+      {
+       "name": "ScaleX",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "ScaleY",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "ScaleZ",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Uniform",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "ScaleShape",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/ScaleShape.hx",
+     "doc": "Owned axis shaft or center pad; drawing and picking use the same points.",
+     "fields": [
+      {
+       "name": "handle",
+       "kind": "var",
+       "signature": ":ScaleHandle",
+       "final": true
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(handle:ScaleHandle, points:Array<GizmoPoint>):Void"
+      },
+      {
+       "name": "points",
+       "kind": "method",
+       "signature": "():Array<GizmoPoint>"
+      },
+      {
+       "name": "distance",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Null<Float>"
+      }
+     ]
+    },
+    {
+     "name": "TranslationDrag",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/TranslationDrag.hx",
+     "doc": "Frozen constraint producing absolute World displacement from pointer-down.",
+     "fields": [
+      {
+       "name": "handle",
+       "kind": "var",
+       "signature": ":TranslationHandle",
+       "final": true
+      },
+      {
+       "name": "lastDelta",
+       "kind": "var",
+       "signature": ":GizmoVec3"
+      },
+      {
+       "name": "closed",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Null<GizmoVec3>"
+      },
+      {
+       "name": "finish",
+       "kind": "method",
+       "signature": "():GizmoVec3"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "TranslationGizmo",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/TranslationGizmo.hx",
+     "doc": "Immutable translation layout and synchronous handle picker. No scene or UI ownership.",
+     "fields": [
+      {
+       "name": "camera",
+       "kind": "var",
+       "signature": ":GizmoCamera",
+       "final": true
+      },
+      {
+       "name": "basis",
+       "kind": "var",
+       "signature": ":GizmoBasis",
+       "final": true
+      },
+      {
+       "name": "pivot",
+       "kind": "var",
+       "signature": ":GizmoVec3",
+       "final": true
+      },
+      {
+       "name": "worldSize",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "hitRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(camera:GizmoCamera, pivot:GizmoVec3, ?pixels:Float, ?hitRadius:Float, ?basis:Null<GizmoBasis>):Void"
+      },
+      {
+       "name": "shapes",
+       "kind": "method",
+       "signature": "():Array<TranslationShape>"
+      },
+      {
+       "name": "translatedShapes",
+       "kind": "method",
+       "signature": "(delta:GizmoVec3):Array<TranslationShape>",
+       "doc": "Follow a proposal while retaining pointer-down size, visible handles and camera."
+      },
+      {
+       "name": "pick",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Null<TranslationHandle>"
+      },
+      {
+       "name": "begin",
+       "kind": "method",
+       "signature": "(handle:TranslationHandle, x:Float, y:Float, ?snap:Float):TranslationDrag"
+      },
+      {
+       "name": "axis",
+       "kind": "method",
+       "signature": "(handle:TranslationHandle):GizmoVec3",
+       "static": true
+      },
+      {
+       "name": "planeAxes",
+       "kind": "method",
+       "signature": "(handle:TranslationHandle):Array<GizmoVec3>",
+       "static": true
+      },
+      {
+       "name": "label",
+       "kind": "method",
+       "signature": "(handle:TranslationHandle):String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "TranslationHandle",
+     "kind": "enum",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/TranslationHandle.hx",
+     "fields": [
+      {
+       "name": "AxisX",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "AxisY",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "AxisZ",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "PlaneXY",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "PlaneXZ",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "PlaneYZ",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "TranslationShape",
+     "kind": "class",
+     "file": "scenekit/scene_interaction/haxe/src/nativekit/scene/gizmo/TranslationShape.hx",
+     "doc": "Two points draw an axis; four draw a plane pad. Picking uses these same primitives.",
+     "fields": [
+      {
+       "name": "handle",
+       "kind": "var",
+       "signature": ":TranslationHandle",
+       "final": true
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(handle:TranslationHandle, label:String, vertices:Array<GizmoPoint>):Void"
+      },
+      {
+       "name": "points",
+       "kind": "method",
+       "signature": "():Array<GizmoPoint>"
+      },
+      {
+       "name": "depth",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "distance",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Null<Float>"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

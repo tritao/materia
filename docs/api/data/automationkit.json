@@ -1,0 +1,1341 @@
+{
+ "kit": "automationkit",
+ "packages": [
+  {
+   "name": "materia.automation.facility",
+   "types": [
+    {
+     "name": "Charger",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/Charger.hx",
+     "extends": [
+      "Station"
+     ],
+     "doc": "Station with a known charging interface and rated power.",
+     "fields": [
+      {
+       "name": "connector",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "maximumPowerKilowatts",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, name:String, zoneId:String, frameId:String, pose:Pose2, connector:String, maximumPowerKilowatts:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "Facility",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/Facility.hx",
+     "doc": "Facility topology kept above RobotWorld and RobotKit's live robot model.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, name:String):Void"
+      },
+      {
+       "name": "addZone",
+       "kind": "method",
+       "signature": "(zone:Zone):Void"
+      },
+      {
+       "name": "addStation",
+       "kind": "method",
+       "signature": "(station:Station):Void"
+      },
+      {
+       "name": "addRack",
+       "kind": "method",
+       "signature": "(rack:Rack):Void"
+      },
+      {
+       "name": "addCharger",
+       "kind": "method",
+       "signature": "(charger:Charger):Void"
+      },
+      {
+       "name": "addLane",
+       "kind": "method",
+       "signature": "(lane:Lane):Void"
+      },
+      {
+       "name": "addIntersection",
+       "kind": "method",
+       "signature": "(intersection:Intersection):Void"
+      },
+      {
+       "name": "zone",
+       "kind": "method",
+       "signature": "(id:String):Null<Zone>"
+      },
+      {
+       "name": "station",
+       "kind": "method",
+       "signature": "(id:String):Null<Station>"
+      },
+      {
+       "name": "lane",
+       "kind": "method",
+       "signature": "(id:String):Null<Lane>"
+      },
+      {
+       "name": "intersection",
+       "kind": "method",
+       "signature": "(id:String):Null<Intersection>"
+      },
+      {
+       "name": "rack",
+       "kind": "method",
+       "signature": "(id:String):Null<Rack>"
+      },
+      {
+       "name": "charger",
+       "kind": "method",
+       "signature": "(id:String):Null<Charger>"
+      },
+      {
+       "name": "zones",
+       "kind": "method",
+       "signature": "():Array<Zone>"
+      },
+      {
+       "name": "stations",
+       "kind": "method",
+       "signature": "():Array<Station>"
+      },
+      {
+       "name": "lanes",
+       "kind": "method",
+       "signature": "():Array<Lane>"
+      },
+      {
+       "name": "intersections",
+       "kind": "method",
+       "signature": "():Array<Intersection>"
+      }
+     ]
+    },
+    {
+     "name": "FacilityRoute",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/FacilityRoute.hx",
+     "doc": "Shortest-time lane sequence and composed path through one facility frame.",
+     "fields": [
+      {
+       "name": "facilityId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "fromStationId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "toStationId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "path",
+       "kind": "var",
+       "signature": ":Path",
+       "final": true
+      },
+      {
+       "name": "maximumSpeedMetersPerSecond",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(facilityId:String, fromStationId:String, toStationId:String, legs:Array<FacilityRouteLeg>, path:Path, speedLimits:Array<PathSpeedLimit>, maximumSpeedMetersPerSecond:Float):Void"
+      },
+      {
+       "name": "legs",
+       "kind": "method",
+       "signature": "():Array<FacilityRouteLeg>"
+      },
+      {
+       "name": "speedLimits",
+       "kind": "method",
+       "signature": "():Array<PathSpeedLimit>"
+      }
+     ]
+    },
+    {
+     "name": "FacilityRouteLeg",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/FacilityRouteLeg.hx",
+     "doc": "One directed traversal of a facility lane.",
+     "fields": [
+      {
+       "name": "lane",
+       "kind": "var",
+       "signature": ":Lane",
+       "final": true
+      },
+      {
+       "name": "fromStationId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "toStationId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "reversed",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(lane:Lane, fromStationId:String, toStationId:String, reversed:Bool):Void"
+      }
+     ]
+    },
+    {
+     "name": "FacilityRouter",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/FacilityRouter.hx",
+     "doc": "Plans the minimum-travel-time lane route between named facility stations.",
+     "fields": [
+      {
+       "name": "facility",
+       "kind": "var",
+       "signature": ":Facility",
+       "final": true
+      },
+      {
+       "name": "endpointToleranceMeters",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(facility:Facility, ?endpointToleranceMeters:Float):Void"
+      },
+      {
+       "name": "route",
+       "kind": "method",
+       "signature": "(fromStationId:String, toStationId:String, ?unavailableLaneIds:Array<String>, ?laneSpeedLimits:Map<String, Float>):FacilityRoute",
+       "doc": "Returns the least-time route, respecting lane speeds and one-way direction."
+      }
+     ]
+    },
+    {
+     "name": "Intersection",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/Intersection.hx",
+     "doc": "Shared conflict region whose configured lanes require exclusive passage.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "zoneId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "frameId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, name:String, zoneId:String, frameId:String, laneIds:Array<String>):Void"
+      },
+      {
+       "name": "lanes",
+       "kind": "method",
+       "signature": "():Array<String>"
+      }
+     ]
+    },
+    {
+     "name": "Lane",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/Lane.hx",
+     "doc": "Directed travel corridor connecting two facility stations.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "fromStationId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "toStationId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "centerline",
+       "kind": "var",
+       "signature": ":Path",
+       "final": true
+      },
+      {
+       "name": "widthMeters",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maximumSpeedMetersPerSecond",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "bidirectional",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, fromStationId:String, toStationId:String, centerline:Path, widthMeters:Float, maximumSpeedMetersPerSecond:Float, ?bidirectional:Bool):Void"
+      }
+     ]
+    },
+    {
+     "name": "Rack",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/Rack.hx",
+     "extends": [
+      "Station"
+     ],
+     "doc": "Storage station with identified three-dimensional slots.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, name:String, zoneId:String, frameId:String, pose:Pose2, slots:Array<RackSlot>, ?surface:Surface):Void",
+       "doc": "The rack's pose is the rack itself; its optional surface is the top its slots sit on, usually centred on it."
+      },
+      {
+       "name": "slots",
+       "kind": "method",
+       "signature": "():Array<String>",
+       "doc": "Slot IDs retained for existing facility callers."
+      },
+      {
+       "name": "hasSlot",
+       "kind": "method",
+       "signature": "(slotId:String):Bool"
+      },
+      {
+       "name": "slot",
+       "kind": "method",
+       "signature": "(slotId:String):Null<RackSlot>"
+      },
+      {
+       "name": "slotPose",
+       "kind": "method",
+       "signature": "(slotId:String):RackSlotPose",
+       "doc": "Slot pose in the rack's facility frame, including rack yaw."
+      }
+     ]
+    },
+    {
+     "name": "RackSlot",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/RackSlot.hx",
+     "doc": "Identified slot with a pose relative to its rack, and optionally the size of what it holds.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":RackSlotPose",
+       "final": true
+      },
+      {
+       "name": "itemHalfExtents",
+       "kind": "var",
+       "signature": ":Null<Array<Float>>",
+       "final": true,
+       "doc": "Half the extents (x, y, z) of the item kept here, or null when the facility does not say."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, pose:RackSlotPose, ?itemHalfExtents:Array<Float>):Void"
+      }
+     ]
+    },
+    {
+     "name": "RackSlotPose",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/RackSlotPose.hx",
+     "doc": "Rack slot pose in a named facility frame, metres and yaw radians.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "yaw",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float, ?yaw:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "Station",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/Station.hx",
+     "doc": "A named operational location in a zone. A station's pose is where a person stands to work at it; the\noptional surface is the top they work over, placed relative to that pose.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "zoneId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "frameId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":Pose2",
+       "final": true
+      },
+      {
+       "name": "surface",
+       "kind": "var",
+       "signature": ":Null<Surface>",
+       "final": true,
+       "doc": "The work top at this station, or null when the facility does not describe one."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, name:String, zoneId:String, frameId:String, pose:Pose2, ?surface:Surface):Void"
+      }
+     ]
+    },
+    {
+     "name": "Surface",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/Surface.hx",
+     "doc": "The flat, rectangular top of a rack or table: what a person reaches over and must stand clear of.\nIts position is relative to the pose of whatever owns it. A rack's pose is the rack itself, so its\ntop is usually centred on it; a station's pose is where a person stands, so its table sits ahead of\nthat pose. Metres and radians.",
+     "fields": [
+      {
+       "name": "halfWidth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Half the top's extent along its own x axis, and along its y axis."
+      },
+      {
+       "name": "halfDepth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "top",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Height of the top above the floor."
+      },
+      {
+       "name": "offsetX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The top's centre and turn in its owner's frame."
+      },
+      {
+       "name": "offsetY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "yaw",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(halfWidth:Float, halfDepth:Float, top:Float, ?offsetX:Float, ?offsetY:Float, ?yaw:Float):Void"
+      },
+      {
+       "name": "centerIn",
+       "kind": "method",
+       "signature": "(owner:Pose2):{x:Float, y:Float, yaw:Float}",
+       "doc": "The top's centre in the owner's frame, given the owner's pose there, with its turn including the owner's."
+      }
+     ]
+    },
+    {
+     "name": "Zone",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/facility/Zone.hx",
+     "doc": "Named planar work area with a boundary expressed in a facility frame.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "frameId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "boundary",
+       "kind": "var",
+       "signature": ":Footprint",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, name:String, frameId:String, boundary:Footprint):Void"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "materia.automation.fleet",
+   "types": [
+    {
+     "name": "Dispatcher",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/fleet/Dispatcher.hx",
+     "doc": "Deterministic first-available assignment policy for a single fleet.",
+     "fields": [
+      {
+       "name": "fleet",
+       "kind": "var",
+       "signature": ":Fleet",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(fleet:Fleet):Void"
+      },
+      {
+       "name": "dispatch",
+       "kind": "method",
+       "signature": "(mission:Mission):Null<FleetAssignment>",
+       "doc": "Returns null when no ready, unassigned fleet robot is available."
+      },
+      {
+       "name": "releaseCompleted",
+       "kind": "method",
+       "signature": "(mission:Mission):Void"
+      }
+     ]
+    },
+    {
+     "name": "Fleet",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/fleet/Fleet.hx",
+     "doc": "Fleet roster and mission reservations composed over a live RobotWorld.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "world",
+       "kind": "var",
+       "signature": ":RobotWorld",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, world:RobotWorld):Void"
+      },
+      {
+       "name": "addRobot",
+       "kind": "method",
+       "signature": "(robotId:String):Void"
+      },
+      {
+       "name": "removeRobot",
+       "kind": "method",
+       "signature": "(robotId:String):Void"
+      },
+      {
+       "name": "containsRobot",
+       "kind": "method",
+       "signature": "(robotId:String):Bool"
+      },
+      {
+       "name": "robotIds",
+       "kind": "method",
+       "signature": "():Array<String>"
+      },
+      {
+       "name": "availableRobotIds",
+       "kind": "method",
+       "signature": "():Array<String>"
+      },
+      {
+       "name": "assignmentForRobot",
+       "kind": "method",
+       "signature": "(robotId:String):Null<FleetAssignment>"
+      },
+      {
+       "name": "assignmentForMission",
+       "kind": "method",
+       "signature": "(missionId:String):Null<FleetAssignment>"
+      },
+      {
+       "name": "assign",
+       "kind": "method",
+       "signature": "(robotId:String, mission:Mission):FleetAssignment"
+      },
+      {
+       "name": "release",
+       "kind": "method",
+       "signature": "(missionId:String):Void"
+      }
+     ]
+    },
+    {
+     "name": "FleetAssignment",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/fleet/FleetAssignment.hx",
+     "doc": "One mission reservation on one RobotWorld member.",
+     "fields": [
+      {
+       "name": "robotId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "mission",
+       "kind": "var",
+       "signature": ":Mission",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(robotId:String, mission:Mission):Void"
+      }
+     ]
+    },
+    {
+     "name": "TrafficManager",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/fleet/TrafficManager.hx",
+     "doc": "Priority reservations for facility lanes and route intersections.",
+     "fields": [
+      {
+       "name": "facility",
+       "kind": "var",
+       "signature": ":Facility",
+       "final": true
+      },
+      {
+       "name": "fleet",
+       "kind": "var",
+       "signature": ":Fleet",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(facility:Facility, fleet:Fleet):Void"
+      },
+      {
+       "name": "reserve",
+       "kind": "method",
+       "signature": "(laneId:String, robotId:String, ?priority:Int):Bool",
+       "doc": "Returns false when the lane is blocked, owned, or ahead of this request in the priority queue."
+      },
+      {
+       "name": "reserveIntersection",
+       "kind": "method",
+       "signature": "(stationId:String, robotId:String, ?priority:Int):Bool",
+       "doc": "Reserves a station's intersection resource using the same priority queue as lanes."
+      },
+      {
+       "name": "reserveRoute",
+       "kind": "method",
+       "signature": "(route:FacilityRoute, robotId:String, ?priority:Int):Bool",
+       "doc": "Atomically reserves every lane and intermediate intersection in a route.\nNo resource is held while waiting, so route-level requests cannot deadlock."
+      },
+      {
+       "name": "owner",
+       "kind": "method",
+       "signature": "(laneId:String):Null<String>"
+      },
+      {
+       "name": "intersectionOwner",
+       "kind": "method",
+       "signature": "(stationId:String):Null<String>"
+      },
+      {
+       "name": "conflictRegionOwner",
+       "kind": "method",
+       "signature": "(id:String):Null<String>"
+      },
+      {
+       "name": "laneBlockReason",
+       "kind": "method",
+       "signature": "(laneId:String):Null<String>"
+      },
+      {
+       "name": "setSpeedZone",
+       "kind": "method",
+       "signature": "(zone:TrafficSpeedZone):Void"
+      },
+      {
+       "name": "clearSpeedZone",
+       "kind": "method",
+       "signature": "(zoneId:String):Bool"
+      },
+      {
+       "name": "speedZone",
+       "kind": "method",
+       "signature": "(zoneId:String):Null<TrafficSpeedZone>"
+      },
+      {
+       "name": "speedZones",
+       "kind": "method",
+       "signature": "():Array<TrafficSpeedZone>"
+      },
+      {
+       "name": "route",
+       "kind": "method",
+       "signature": "(fromStationId:String, toStationId:String, ?robotId:String):FacilityRoute",
+       "doc": "Plans around closures and other robots' reservations with current speed caps."
+      },
+      {
+       "name": "blockLane",
+       "kind": "method",
+       "signature": "(laneId:String, reason:String):Void",
+       "doc": "Prevents new reservations; the current owner may still release the lane."
+      },
+      {
+       "name": "unblockLane",
+       "kind": "method",
+       "signature": "(laneId:String):Bool"
+      },
+      {
+       "name": "release",
+       "kind": "method",
+       "signature": "(laneId:String, robotId:String):Bool",
+       "doc": "Releases a single lane; route bundles must use releaseRoute to stay atomic."
+      },
+      {
+       "name": "releaseIntersection",
+       "kind": "method",
+       "signature": "(stationId:String, robotId:String):Bool"
+      },
+      {
+       "name": "releaseRoute",
+       "kind": "method",
+       "signature": "(route:FacilityRoute, robotId:String):Bool",
+       "doc": "Releases a held route bundle, or removes this robot's pending request for\nthat exact route. The return value is true only when a held bundle released."
+      },
+      {
+       "name": "releaseRobot",
+       "kind": "method",
+       "signature": "(robotId:String):Void"
+      },
+      {
+       "name": "reservedLanes",
+       "kind": "method",
+       "signature": "(robotId:String):Array<String>"
+      },
+      {
+       "name": "reservedIntersections",
+       "kind": "method",
+       "signature": "(robotId:String):Array<String>"
+      },
+      {
+       "name": "waitingRobots",
+       "kind": "method",
+       "signature": "(resourceKey:String):Array<String>"
+      },
+      {
+       "name": "waitingForLane",
+       "kind": "method",
+       "signature": "(laneId:String):Array<String>"
+      },
+      {
+       "name": "waitingForIntersection",
+       "kind": "method",
+       "signature": "(stationId:String):Array<String>"
+      }
+     ]
+    },
+    {
+     "name": "TrafficSpeedZone",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/fleet/TrafficSpeedZone.hx",
+     "doc": "Temporary speed cap applied to the configured facility lanes.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "maximumSpeedMetersPerSecond",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, laneIds:Array<String>, maximumSpeedMetersPerSecond:Float):Void"
+      },
+      {
+       "name": "lanes",
+       "kind": "method",
+       "signature": "():Array<String>"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "materia.automation.mission",
+   "types": [
+    {
+     "name": "Mission",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/mission/Mission.hx",
+     "doc": "Ordered facility-level task sequence with an explicit terminal lifecycle.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "status",
+       "kind": "var",
+       "signature": ":MissionStatus"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, name:String, tasks:Array<Task>):Void"
+      },
+      {
+       "name": "tasks",
+       "kind": "method",
+       "signature": "():Array<Task>"
+      },
+      {
+       "name": "currentTask",
+       "kind": "method",
+       "signature": "():Null<Task>"
+      },
+      {
+       "name": "completedTaskCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "completeCurrentTask",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "fail",
+       "kind": "method",
+       "signature": "(message:String):Void"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isTerminal",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "MissionExecutionStatus",
+     "kind": "enum",
+     "file": "automationkit/haxe/materia/automation/mission/MissionExecutionStatus.hx",
+     "doc": "Runtime result of advancing a mission through RobotKit skills.",
+     "fields": [
+      {
+       "name": "Idle",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Running",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Succeeded",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Failed",
+       "kind": "case",
+       "signature": "(message:String)"
+      },
+      {
+       "name": "Cancelled",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "MissionExecutor",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/mission/MissionExecutor.hx",
+     "doc": "Advances one assigned mission by composing its ordered tasks from RobotKit skills.",
+     "fields": [
+      {
+       "name": "fleet",
+       "kind": "var",
+       "signature": ":Fleet",
+       "final": true
+      },
+      {
+       "name": "assignment",
+       "kind": "var",
+       "signature": ":FleetAssignment",
+       "final": true
+      },
+      {
+       "name": "facility",
+       "kind": "var",
+       "signature": ":Facility",
+       "final": true
+      },
+      {
+       "name": "skillFactory",
+       "kind": "var",
+       "signature": ":TaskSkillFactory",
+       "final": true
+      },
+      {
+       "name": "trafficManager",
+       "kind": "var",
+       "signature": ":Null<TrafficManager>",
+       "final": true
+      },
+      {
+       "name": "trafficPriority",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "status",
+       "kind": "var",
+       "signature": ":MissionExecutionStatus"
+      },
+      {
+       "name": "currentSkill",
+       "kind": "var",
+       "signature": ":Null<Skill>"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(fleet:Fleet, assignment:FleetAssignment, facility:Facility, skillFactory:TaskSkillFactory, ?trafficManager:TrafficManager, ?trafficPriority:Int):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "update",
+       "kind": "method",
+       "signature": "(durationSeconds:Float):MissionExecutionStatus",
+       "doc": "Advances the current skill with the latest snapshot from its assigned robot."
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "MissionStatus",
+     "kind": "enum",
+     "file": "automationkit/haxe/materia/automation/mission/MissionStatus.hx",
+     "fields": [
+      {
+       "name": "Pending",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Running",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Succeeded",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Failed",
+       "kind": "case",
+       "signature": "(message:String)"
+      },
+      {
+       "name": "Cancelled",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "TaskSkillFactory",
+     "kind": "interface",
+     "file": "automationkit/haxe/materia/automation/mission/TaskSkillFactory.hx",
+     "doc": "Explicit application adapter from facility task data to configured RobotKit skills.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(task:Task, robot:Robot, facility:Facility):Skill"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "materia.automation.task",
+   "types": [
+    {
+     "name": "Charge",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/task/Charge.hx",
+     "extends": [
+      "Task"
+     ],
+     "doc": "Charge a robot at a named charger to a minimum state of charge.",
+     "fields": [
+      {
+       "name": "chargerId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "targetChargeFraction",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, chargerId:String, targetChargeFraction:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "Pick",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/task/Pick.hx",
+     "extends": [
+      "Task"
+     ],
+     "doc": "Retrieve a payload from one addressed rack slot.",
+     "fields": [
+      {
+       "name": "rackId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "slotId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "payload",
+       "kind": "var",
+       "signature": ":Payload",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, rackId:String, slotId:String, payload:Payload):Void"
+      }
+     ]
+    },
+    {
+     "name": "Place",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/task/Place.hx",
+     "extends": [
+      "Task"
+     ],
+     "doc": "Place a payload into one addressed rack slot.",
+     "fields": [
+      {
+       "name": "rackId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "slotId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "payload",
+       "kind": "var",
+       "signature": ":Payload",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, rackId:String, slotId:String, payload:Payload):Void"
+      }
+     ]
+    },
+    {
+     "name": "Task",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/task/Task.hx",
+     "doc": "Immutable identity and kind shared by declarative facility tasks.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":TaskKind",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, kind:TaskKind):Void"
+      }
+     ]
+    },
+    {
+     "name": "TaskKind",
+     "kind": "abstract",
+     "file": "automationkit/haxe/materia/automation/task/TaskKind.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "Transport",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Pick",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Place",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Charge",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "Transport",
+     "kind": "class",
+     "file": "automationkit/haxe/materia/automation/task/Transport.hx",
+     "extends": [
+      "Task"
+     ],
+     "doc": "Move a known payload from one facility station to another.",
+     "fields": [
+      {
+       "name": "pickupStationId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "destinationStationId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "payload",
+       "kind": "var",
+       "signature": ":Payload",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, pickupStationId:String, destinationStationId:String, payload:Payload):Void"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

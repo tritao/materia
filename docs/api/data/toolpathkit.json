@@ -1,0 +1,2262 @@
+{
+ "kit": "toolpathkit",
+ "packages": [
+  {
+   "name": "toolpathkit",
+   "types": [
+    {
+     "name": "ToolpathKit",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/ToolpathKit.hx",
+     "doc": "Dependency-free toolpath format and geometry."
+    }
+   ]
+  },
+  {
+   "name": "toolpathkit.motion",
+   "types": [
+    {
+     "name": "ClearanceStock",
+     "kind": "typedef",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/RapidClearance.hx",
+     "fields": [
+      {
+       "name": "minimum",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "maximum",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      }
+     ],
+     "doc": "A fixed stock envelope in machine coordinates, metres."
+    },
+    {
+     "name": "GearBinding",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/GearBinding.hx",
+     "doc": "Resolve names and encoder counts from the model. Controller timing is deliberately explicit:\nthe driver position loop is a ceiling, not evidence of the owner's actual scheduling frequency.",
+     "fields": [
+      {
+       "name": "install",
+       "kind": "method",
+       "signature": "(binding:MachineBinding, model:RobotModel, controllerHz:Float, encoderDelayNs:Map<String, Int>, followers:Array<String>):Array<ProcessChannelDeclaration>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "GearEncoderTiming",
+     "kind": "typedef",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/MachineBinding.hx",
+     "fields": [
+      {
+       "name": "latencyNs",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "quantum",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "loopHz",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Extra encoder delay excludes delay already carried in the observation timestamp."
+    },
+    {
+     "name": "MachineBinding",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/MachineBinding.hx",
+     "doc": "Machine axes and execution limits, independent of a G-code controller.",
+     "fields": [
+      {
+       "name": "auxiliaryJoints",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "doc": "Process spindle joint used to resolve per-work-revolution feeds."
+      },
+      {
+       "name": "spindleJointId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "gearFollowers",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "gearJointIds",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "gearEncoders",
+       "kind": "var",
+       "signature": ":Map<String, GearEncoderTiming>"
+      },
+      {
+       "name": "channels",
+       "kind": "var",
+       "signature": ":ToolpathChannels",
+       "final": true
+      },
+      {
+       "name": "frameId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "xAxisId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "yAxisId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "zAxisId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "rapidSpeed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "positionTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "orientationTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxBlendTurnAngleRadians",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "travel",
+       "kind": "var",
+       "signature": ":Null<TravelEnvelope>"
+      },
+      {
+       "name": "cornerAcceleration",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The acceleration the machine gives in the XY plane, metres per second squared: what bounds the speed of a rounded\ncorner (`CornerBlender.minimumRadius`). Zero until the motion binding sets it from the axes' limits."
+      },
+      {
+       "name": "rapidsAtFeed",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Whether `Rapid`, `Link` and `Retract` moves run at their own feed (bounded by `rapidSpeed`) and round\ntheir corners within their tolerance, as a printer's travels do, instead of at `rapidSpeed` with\nexact stops, as a mill's rapids do."
+      },
+      {
+       "name": "printer",
+       "kind": "var",
+       "signature": ":Null<PrinterBinding>",
+       "doc": "The extruder and heaters, when the machine prints."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(frameId:String, xAxisId:String, yAxisId:String, zAxisId:String, rapidSpeed:Float, channels:ToolpathChannels, ?positionTolerance:Float, ?orientationTolerance:Float, ?maxBlendTurnAngleRadians:Float):Void"
+      },
+      {
+       "name": "setTravel",
+       "kind": "method",
+       "signature": "(?value:TravelEnvelope):Void"
+      },
+      {
+       "name": "setCornerAcceleration",
+       "kind": "method",
+       "signature": "(value:Float):Void"
+      },
+      {
+       "name": "setRapidsAtFeed",
+       "kind": "method",
+       "signature": "(value:Bool):Void"
+      },
+      {
+       "name": "setPrinter",
+       "kind": "method",
+       "signature": "(?value:PrinterBinding):Void"
+      }
+     ]
+    },
+    {
+     "name": "MachiningContinuation",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/MachiningContinuation.hx",
+     "doc": "A program that resumes machining partway along op `opIndex` of the\noriginal, from `startDistance` along it: some approach ops, that op's\nremainder at `resumeOp`, then the original's later ops.",
+     "fields": [
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":MotionProgram",
+       "final": true
+      },
+      {
+       "name": "opIndex",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "startDistance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "resumeOp",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(program:MotionProgram, opIndex:Int, startDistance:Float, resumeOp:Int):Void"
+      },
+      {
+       "name": "originalAt",
+       "kind": "method",
+       "signature": "(op:Int, distance:Float):{op:Int, distance:Float}",
+       "doc": "The original op and distance along it for `op` and `distance` of this program; op -1 while approaching."
+      }
+     ]
+    },
+    {
+     "name": "MachiningRecipe",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/MachiningRecipe.hx",
+     "doc": "Restart settings for machining, independent of dispensing rates.",
+     "fields": [
+      {
+       "name": "approachFeed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "restartBackoff",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "clearanceZ",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "final": true,
+       "doc": "Height in the motion frame that clears the work and its fixtures. With\nit, a restart retracts there, moves across and descends to the restart\npoint; without it, it moves straight there."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(approachFeed:Float, ?restartBackoff:Float, ?clearanceZ:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "MachiningRun",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/MachiningRun.hx",
+     "doc": "Runs a machining program and prepares a safe mid-path continuation.",
+     "fields": [
+      {
+       "name": "channels",
+       "kind": "var",
+       "signature": ":ToolpathChannels",
+       "final": true
+      },
+      {
+       "name": "recipe",
+       "kind": "var",
+       "signature": ":MachiningRecipe",
+       "final": true
+      },
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":MotionProgram",
+       "final": true
+      },
+      {
+       "name": "motion",
+       "kind": "var",
+       "signature": ":ManipulatorMotion",
+       "final": true
+      },
+      {
+       "name": "spindleFaulted",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(recipe:MachiningRecipe, program:MotionProgram, motion:ManipulatorMotion, channels:ToolpathChannels):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "feedHold",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "prepareRestart",
+       "kind": "method",
+       "signature": "(opIndex:Int, distance:Float):MachiningContinuation",
+       "doc": "Aborts a held execution and returns the program to submit once idle."
+      },
+      {
+       "name": "continuationFrom",
+       "kind": "method",
+       "signature": "(opIndex:Int, distance:Float):MachiningContinuation",
+       "doc": "The program that resumes machining at `distance` along path op\n`opIndex`, from where the machine stands: it loads the tool the program\nhad loaded there, restores the spindle and coolant, approaches (over\nthe recipe's clearance, when it has one) and carries on."
+      },
+      {
+       "name": "resumePrepared",
+       "kind": "method",
+       "signature": "(continuation:MachiningContinuation):Void"
+      },
+      {
+       "name": "spindleFault",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Requests a controlled stop; call safeShutdown after the stop completes."
+      },
+      {
+       "name": "safeShutdown",
+       "kind": "method",
+       "signature": "():MotionProgram"
+      }
+     ]
+    },
+    {
+     "name": "PrinterBinding",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/PrinterBinding.hx",
+     "doc": "What lowering needs to know of a printer beyond its axes: the extruder joint and how it turns per metre of\nfilament, the hotend's melt-rate limit, and how the heaters and fans are reached. A bead of cross-section `area`\nlaid along a path takes `area / filamentArea` of filament per metre, and the extruder's gear turns\n`1 / gearRadius` radians per metre of filament.",
+     "fields": [
+      {
+       "name": "extruderJoint",
+       "kind": "var",
+       "signature": ":String",
+       "final": true,
+       "doc": "The robot-model joint of the filament drive gear."
+      },
+      {
+       "name": "filamentDiameter",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "gearRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The effective radius at which the drive gear grips the filament, metres."
+      },
+      {
+       "name": "maxFlow",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The hotend's greatest volumetric flow, m^3/s: a bead is laid no faster than this melts."
+      },
+      {
+       "name": "rampLength",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "How far along the path the extruder's rate ramps between runs of bead, metres."
+      },
+      {
+       "name": "pressureAdvance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Pressure advance: the extruder runs `pressureAdvance` seconds ahead of the flow it feeds, seconds (0 is off)."
+      },
+      {
+       "name": "pressureAdvanceWindow",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The window over which the extruder's velocity is averaged for the advance, seconds: it keeps the advance within the drive's limits."
+      },
+      {
+       "name": "shapers",
+       "kind": "var",
+       "signature": ":Map<String, InputShaper>",
+       "final": true,
+       "doc": "Input shapers by axis id (the axes of the machine binding): those axes' motion is shaped, everything else is delayed to match."
+      },
+      {
+       "name": "extruderIndex",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "The extruder joint's index in the machine, set by the `ToolpathMotionBinding` that finds it."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(extruderJoint:String, filamentDiameter:Float, gearRadius:Float, maxFlow:Float, ?rampLength:Float, ?pressureAdvance:Float, ?pressureAdvanceWindow:Float):Void"
+      },
+      {
+       "name": "filamentArea",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "radiansPerMetre",
+       "kind": "method",
+       "signature": "(area:Float):Float",
+       "doc": "Radians of the extruder gear per metre of path laying a bead of `area`."
+      },
+      {
+       "name": "radians",
+       "kind": "method",
+       "signature": "(length:Float):Float",
+       "doc": "Radians of the extruder gear for `length` metres of filament."
+      },
+      {
+       "name": "bind",
+       "kind": "method",
+       "signature": "(index:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "PrintingMotionBinding",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/PrintingMotionBinding.hx",
+     "doc": "One scene-job adapter for application execution and planning benchmarks.\nLogical XYZ positions are machine metres; explicit joint offsets account for\nthe assembly's initial placement. Optional overrides describe benchmark variants.",
+     "fields": [
+      {
+       "name": "blueprint",
+       "kind": "var",
+       "signature": ":MotionSystemBlueprint",
+       "final": true
+      },
+      {
+       "name": "machine",
+       "kind": "var",
+       "signature": ":MachineBinding",
+       "final": true
+      },
+      {
+       "name": "printer",
+       "kind": "var",
+       "signature": ":PrinterBinding",
+       "final": true
+      },
+      {
+       "name": "binding",
+       "kind": "var",
+       "signature": ":ToolpathMotionBinding",
+       "final": true
+      },
+      {
+       "name": "initialPositions",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "gcodeController",
+       "kind": "method",
+       "signature": "():cnckit.CncController",
+       "doc": "Fresh parser/writer state using the same filament as physical motion lowering."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(job:SceneArtifactPrinting, context:PrintingMotionContext, ?pressureAdvanceOverride:Float, ?applyShaping:Bool):Void"
+      }
+     ]
+    },
+    {
+     "name": "PrintingMotionContext",
+     "kind": "typedef",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/PrintingMotionBinding.hx",
+     "fields": [
+      {
+       "name": "definition",
+       "kind": "var",
+       "signature": ":AssemblyDefinition"
+      },
+      {
+       "name": "initialPositions",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "metresPerUnit",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "model",
+       "kind": "var",
+       "signature": ":RobotModel"
+      },
+      {
+       "name": "runtime",
+       "kind": "var",
+       "signature": ":RobotRuntimeBlueprint"
+      },
+      {
+       "name": "fixedTimestepSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "channels",
+       "kind": "var",
+       "signature": ":ToolpathChannels"
+      },
+      {
+       "name": "steady",
+       "kind": "var",
+       "signature": ":SteadyLoads"
+      }
+     ],
+     "doc": "Assembly placement and execution context; initial positions are in authored assembly units."
+    },
+    {
+     "name": "RapidClearance",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/RapidClearance.hx",
+     "doc": "Reserves drive displacement around stock. Portions without this clearance are explicit exact-stop feed approaches.\nRaw stock boxes are conservative: an already machined pocket is still treated as occupied. No geometry is displaced.",
+     "fields": [
+      {
+       "name": "apply",
+       "kind": "method",
+       "signature": "(program:ToolpathProgram, stocks:Array<ClearanceStock>, displacement:Array<Float>, ?initialTool:Int):ToolpathProgram",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ToolpathChannels",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathChannels.hx",
+     "doc": "Controller channels scoped to one machine. A standalone machine uses an empty scope.",
+     "fields": [
+      {
+       "name": "spindleDirection",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "spindleSpeed",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "spindleAtSpeed",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "coolantMist",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "coolantFlood",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "operatorResume",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "toolChangePrefix",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "heaterPrefix",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "fanPrefix",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(scope:String, ?spindleName:String):Void"
+      },
+      {
+       "name": "toolChange",
+       "kind": "method",
+       "signature": "(number:Int):String"
+      },
+      {
+       "name": "heaterTarget",
+       "kind": "method",
+       "signature": "(heater:String):String",
+       "doc": "The analog channel a heater's target is set on, in degrees Celsius."
+      },
+      {
+       "name": "heaterAtTemperature",
+       "kind": "method",
+       "signature": "(heater:String):String",
+       "doc": "The digital input that says a heater is within its band of a target above zero."
+      },
+      {
+       "name": "fan",
+       "kind": "method",
+       "signature": "(name:String):String",
+       "doc": "The analog channel a fan's duty (0 to 1) is set on."
+      }
+     ]
+    },
+    {
+     "name": "ToolpathDiagnostic",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathDiagnostic.hx",
+     "doc": "A lowering warning tied to its authored operation.",
+     "fields": [
+      {
+       "name": "code",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "provenance",
+       "kind": "var",
+       "signature": ":Provenance",
+       "final": true
+      },
+      {
+       "name": "message",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(code:String, provenance:Provenance, message:String):Void"
+      }
+     ]
+    },
+    {
+     "name": "ToolpathLowering",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathLowering.hx",
+     "doc": "Converts plain CNC operations to MotionKit paths, barriers, and source map.",
+     "fields": [
+      {
+       "name": "machine",
+       "kind": "var",
+       "signature": ":MachineBinding",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(machine:MachineBinding):Void"
+      },
+      {
+       "name": "lower",
+       "kind": "method",
+       "signature": "(ops:Array<ToolpathOp>):ToolpathLoweringResult"
+      }
+     ]
+    },
+    {
+     "name": "ToolpathLoweringResult",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathLoweringResult.hx",
+     "fields": [
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":Null<MotionProgram>",
+       "final": true
+      },
+      {
+       "name": "sourceMap",
+       "kind": "var",
+       "signature": ":ToolpathSourceMap",
+       "final": true
+      },
+      {
+       "name": "diagnostics",
+       "kind": "var",
+       "signature": ":Array<ToolpathDiagnostic>",
+       "final": true
+      },
+      {
+       "name": "stops",
+       "kind": "var",
+       "signature": ":Map<String, Int>",
+       "final": true,
+       "doc": "How many corners between moves the path stops at, by reason; tangent-continuous and rounded corners are not among them."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?program:MotionProgram, sourceMap:ToolpathSourceMap, diagnostics:Array<ToolpathDiagnostic>, ?stops:Map<String, Int>):Void"
+      }
+     ]
+    },
+    {
+     "name": "ToolpathMotion",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathMotion.hx",
+     "doc": "Entry point for executing authored toolpaths on a bound machine. Moves are\nlowered at the machine's controlled point: work origin plus G43 length.",
+     "fields": [
+      {
+       "name": "lower",
+       "kind": "method",
+       "signature": "(program:ToolpathProgram, binding:MachineBinding):ToolpathLoweringResult",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ToolpathMotionBinding",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathMotionBinding.hx",
+     "doc": "Binds pure CncKit programs to the physical joints of a direct XYZ machine.",
+     "fields": [
+      {
+       "name": "machine",
+       "kind": "var",
+       "signature": ":MachineBinding",
+       "final": true
+      },
+      {
+       "name": "blueprint",
+       "kind": "var",
+       "signature": ":MotionSystemBlueprint",
+       "final": true
+      },
+      {
+       "name": "solver",
+       "kind": "var",
+       "signature": ":AxisKinematics",
+       "final": true
+      },
+      {
+       "name": "compiler",
+       "kind": "var",
+       "signature": ":ProgramCompiler",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(machine:MachineBinding, blueprint:MotionSystemBlueprint, ?modelRevision:Int64, ?calibrationRevision:Int64, ?heldJoints:Array<String>):Void",
+       "doc": "`heldJoints` are joints the XYZ axes do not move and this binding does not plan (a printer's extruder\nand the motor that turns it): they hold their position."
+      },
+      {
+       "name": "compile",
+       "kind": "method",
+       "signature": "(program:ToolpathProgram, initialJoints:Array<Float>, firstPlanId:Int64):CompiledProgram"
+      }
+     ]
+    },
+    {
+     "name": "ToolpathPosePrimitive",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathPosePrimitive.hx",
+     "implements": [
+      "PosePrimitive",
+      "motionkit.path.PosePositionBound"
+     ],
+     "doc": "Keeps exact line, arc, helix, or fillet geometry for ProgramCompiler.",
+     "fields": [
+      {
+       "name": "geometry",
+       "kind": "var",
+       "signature": ":PathPrimitive",
+       "final": true
+      },
+      {
+       "name": "feed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "positionTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "orientationTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "positionErrorBound",
+       "kind": "method",
+       "signature": "(control:Array<Array<Float>>, from:Float, to:Float):Float"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(geometry:PathPrimitive, feed:Float, positionTolerance:Float, orientationTolerance:Float):Void"
+      },
+      {
+       "name": "length",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "startWaypoint",
+       "kind": "method",
+       "signature": "():PoseWaypoint"
+      },
+      {
+       "name": "endWaypoint",
+       "kind": "method",
+       "signature": "():PoseWaypoint"
+      },
+      {
+       "name": "speedLimit",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "orientationPolicy",
+       "kind": "method",
+       "signature": "():OrientationPolicy"
+      },
+      {
+       "name": "derivativesAt",
+       "kind": "method",
+       "signature": "(distance:Float):PoseDerivatives"
+      },
+      {
+       "name": "waypointAt",
+       "kind": "method",
+       "signature": "(distance:Float):PoseWaypoint"
+      }
+     ]
+    },
+    {
+     "name": "ToolpathSourceMap",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathSourceMap.hx",
+     "doc": "Maps MotionOp indices and path distance in metres to source locations.",
+     "fields": [
+      {
+       "name": "entries",
+       "kind": "var",
+       "signature": ":Array<ToolpathSourceMapEntry>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(opIndex:Int, startDistance:Float, endDistance:Float, provenance:Provenance):Void"
+      },
+      {
+       "name": "entriesFor",
+       "kind": "method",
+       "signature": "(provenance:Provenance):Array<ToolpathSourceMapEntry>"
+      },
+      {
+       "name": "provenanceAt",
+       "kind": "method",
+       "signature": "(opIndex:Int, distance:Float):Null<Provenance>"
+      }
+     ]
+    },
+    {
+     "name": "ToolpathSourceMapEntry",
+     "kind": "class",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathSourceMap.hx",
+     "fields": [
+      {
+       "name": "opIndex",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "startDistance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "endDistance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "provenance",
+       "kind": "var",
+       "signature": ":Provenance",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(opIndex:Int, startDistance:Float, endDistance:Float, provenance:Provenance):Void"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "toolpathkit.path",
+   "types": [
+    {
+     "name": "ArcFitting",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/path/ArcFitting.hx",
+     "doc": "Replaces runs of short cutting lines that lie on one circle with arcs, so a\ncircle that CAM polygonized reaches the machine as G2/G3 again. A run\nbecomes an arc only if the arc stays within `tolerance` of the lines both\nways: every vertex lies on the circle and no chord strays from it by more,\nso a genuine polygon is never rounded.",
+     "fields": [
+      {
+       "name": "fit",
+       "kind": "method",
+       "signature": "(ops:Array<ToolpathOp>, tolerance:Float):Array<ToolpathOp>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ArcPlane",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/path/ArcPlane.hx",
+     "doc": "Arc planes in G-code coordinate order.",
+     "fields": [
+      {
+       "name": "XY",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "XZ",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "YZ",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "BeadSection",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/path/BeadSection.hx",
+     "doc": "Rounded bead geometry shared by slicing, G-code and motion lowering.\nLengths are metres and areas m^2. These arithmetic helpers expect validated\npositive inputs; a stadium's overall width is at least its height. Input\nvalidation stays at each caller's settings/program boundary.",
+     "fields": [
+      {
+       "name": "area",
+       "kind": "method",
+       "signature": "(width:Float, height:Float):Float",
+       "static": true,
+       "doc": "Rectangle with semicircular sides, width measured edge to edge."
+      },
+      {
+       "name": "width",
+       "kind": "method",
+       "signature": "(area:Float, height:Float):Float",
+       "static": true
+      },
+      {
+       "name": "spacing",
+       "kind": "method",
+       "signature": "(width:Float, height:Float):Float",
+       "static": true,
+       "doc": "Neighbouring beads at this spacing fill a layer of the given height."
+      },
+      {
+       "name": "heightForArea",
+       "kind": "method",
+       "signature": "(area:Float, nominalHeight:Float):Float",
+       "static": true,
+       "doc": "Reduce the nominal layer height when the supplied area only admits a circular bead."
+      },
+      {
+       "name": "filamentArea",
+       "kind": "method",
+       "signature": "(diameter:Float):Float",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "GearTerm",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/path/GearTerm.hx",
+     "doc": "A master joint by stable machine name, rather than a mechanical transmission.",
+     "fields": [
+      {
+       "name": "master",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "ratio",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(master:String, ratio:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "GeometryOffset",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/path/GeometryOffset.hx",
+     "doc": "Translates paths and offsets planar closed contours without CAM dependencies.",
+     "fields": [
+      {
+       "name": "translate",
+       "kind": "method",
+       "signature": "(geometry:PathGeometry, offset:Array<Float>):PathGeometry",
+       "static": true
+      },
+      {
+       "name": "profile",
+       "kind": "method",
+       "signature": "(vertices:Array<Point3>, radius:Float, depth:Float, outside:Bool):Array<PathGeometry>",
+       "static": true,
+       "doc": "Round corners that open toward the cutter and trim the other joins."
+      },
+      {
+       "name": "validateProfile",
+       "kind": "method",
+       "signature": "(vertices:Array<Point3>, path:Array<PathGeometry>, radius:Float, expectedInside:Bool):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "GeometryTools",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/path/GeometryTools.hx",
+     "doc": "Preview queries that do not require MotionKit.",
+     "fields": [
+      {
+       "name": "length",
+       "kind": "method",
+       "signature": "(geometry:PathGeometry):Float",
+       "static": true
+      },
+      {
+       "name": "pointAt",
+       "kind": "method",
+       "signature": "(geometry:PathGeometry, distance:Float):Point3",
+       "static": true
+      },
+      {
+       "name": "tangentAt",
+       "kind": "method",
+       "signature": "(geometry:PathGeometry, distance:Float):Point3",
+       "static": true,
+       "doc": "Unit tangent in the direction of travel at a distance along a path."
+      }
+     ]
+    },
+    {
+     "name": "LayerVolume",
+     "kind": "typedef",
+     "file": "toolpathkit/haxe/toolpathkit/path/ToolpathProgram.hx",
+     "fields": [
+      {
+       "name": "index",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "volume",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Material laid on one layer, in m^3."
+    },
+    {
+     "name": "MoveKind",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/path/MoveKind.hx",
+     "doc": "Intended role of a move along the path.",
+     "fields": [
+      {
+       "name": "Rapid",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Cut",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Plunge",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Ramp",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Link",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Retract",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "ObjectVolume",
+     "kind": "typedef",
+     "file": "toolpathkit/haxe/toolpathkit/path/ToolpathProgram.hx",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "volume",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Material laid for one printed object, in m^3."
+    },
+    {
+     "name": "PathGeometry",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/path/PathGeometry.hx",
+     "doc": "Authored toolpath primitive. All coordinates and lengths are metres.",
+     "fields": [
+      {
+       "name": "Line",
+       "kind": "case",
+       "signature": "(start:Point3, end:Point3)"
+      },
+      {
+       "name": "Arc",
+       "kind": "case",
+       "signature": "(center:Point3, radius:Float, startAngle:Float, sweepAngle:Float)"
+      },
+      {
+       "name": "Circular",
+       "kind": "case",
+       "signature": "(center:Point3, radius:Float, startAngle:Float, sweepAngle:Float, plane:ArcPlane, axialRise:Float)"
+      }
+     ]
+    },
+    {
+     "name": "Point3",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/path/Point3.hx",
+     "doc": "Cartesian point in machine metres, independent of MotionKit.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):Void"
+      },
+      {
+       "name": "distanceTo",
+       "kind": "method",
+       "signature": "(other:Point3):Float"
+      }
+     ]
+    },
+    {
+     "name": "PrintFeature",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/path/PrintFeature.hx",
+     "doc": "What the moves that follow a `Feature` marker are for, as slicers label them.",
+     "fields": [
+      {
+       "name": "ExternalPerimeter",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Perimeter",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Infill",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "SolidInfill",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "TopSolidInfill",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Skirt",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Travel",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Other",
+       "kind": "case",
+       "signature": "(name:String)",
+       "doc": "Any other label; `name` is the slicer's own text."
+      }
+     ]
+    },
+    {
+     "name": "PrinterOps",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/path/PrinterOps.hx",
+     "doc": "Queries over the printing operations of `ToolpathOp`.",
+     "fields": [
+      {
+       "name": "isPrinter",
+       "kind": "method",
+       "signature": "(op:ToolpathOp):Bool",
+       "static": true,
+       "doc": "Does this operation exist only for printing?"
+      },
+      {
+       "name": "provenance",
+       "kind": "method",
+       "signature": "(op:ToolpathOp):Provenance",
+       "static": true,
+       "doc": "The source of a printing operation."
+      },
+      {
+       "name": "first",
+       "kind": "method",
+       "signature": "(ops:Array<ToolpathOp>):Null<ToolpathOp>",
+       "static": true,
+       "doc": "The first printing operation of `ops`, or null."
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(op:ToolpathOp, index:Int):Void",
+       "static": true,
+       "doc": "Throws if a printing operation is malformed. `index` names it in the message."
+      },
+      {
+       "name": "coldExtrusion",
+       "kind": "method",
+       "signature": "(ops:Array<ToolpathOp>, minimumCelsius:Float, ?heater:String):Array<{provenance:Provenance, message:String}>",
+       "static": true,
+       "doc": "Where a program lays a bead or pushes filament before `heater` has been waited up to `minimumCelsius`, the\nmaterial's minimum extrusion temperature: a `Heat` that waits for at least that, with no later `Heat` below it,\nis what makes extruding safe. The device faults a cold extrusion too; this finds it before the print starts.\nEach finding is the source of the offending operation and says what it did."
+      }
+     ]
+    },
+    {
+     "name": "Provenance",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/path/Provenance.hx",
+     "doc": "Origin of a path operation. G-code locations are one-based.",
+     "fields": [
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":ProvenanceKind",
+       "final": true
+      },
+      {
+       "name": "line",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "column",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "operationIndex",
+       "kind": "var",
+       "signature": ":Null<Int>",
+       "final": true
+      },
+      {
+       "name": "operationId",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "final": true
+      },
+      {
+       "name": "featureRef",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(line:Int, column:Int, length:Int, ?kind:ProvenanceKind, ?operationIndex:Null<Int>, ?operationId:Null<String>, ?featureRef:Null<String>):Void"
+      },
+      {
+       "name": "cam",
+       "kind": "method",
+       "signature": "(operationIndex:Int, ?featureRef:String):Provenance",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ProvenanceKind",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/path/Provenance.hx",
+     "fields": [
+      {
+       "name": "GCode",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Cam",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "SpindleDirection",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/path/SpindleDirection.hx",
+     "fields": [
+      {
+       "name": "Off",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Clockwise",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "CounterClockwise",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "ToolpathFrame",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/path/ToolpathFrame.hx",
+     "doc": "The coordinate state in effect at each operation of a program.\n\n`Move` geometry holds programmed points: work coordinates of the active\nsetup, as G-code writes them. The machine's controlled point (the spindle\ngauge line) is the programmed point plus the setup's work origin plus the\nactive G43 length in Z. The physical tool tip is that controlled point\nless the loaded tool's own length, so a wrong H number shows up as a\nshifted tip rather than being silently trusted.\n\nCall `advance` with each operation in order, before using its geometry.",
+     "fields": [
+      {
+       "name": "setup",
+       "kind": "var",
+       "signature": ":Setup"
+      },
+      {
+       "name": "toolNumber",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "The tool number in the spindle; -1 before the first tool change."
+      },
+      {
+       "name": "toolLength",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The active G43 length; zero after G49 or before any G43."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(tools:ToolLibrary, setups:Array<Setup>):Void"
+      },
+      {
+       "name": "of",
+       "kind": "method",
+       "signature": "(program:ToolpathProgram):ToolpathFrame",
+       "static": true
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(op:ToolpathOp):Void"
+      },
+      {
+       "name": "toMachine",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "Translation from a programmed point to the machine's controlled point."
+      },
+      {
+       "name": "tool",
+       "kind": "method",
+       "signature": "():Null<Tool>",
+       "doc": "The tool in the spindle, resolved in the program's library."
+      },
+      {
+       "name": "tipShift",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Z translation from a programmed point to the physical tool tip."
+      },
+      {
+       "name": "toTip",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "Translation from a programmed point to the tool tip in work coordinates."
+      }
+     ]
+    },
+    {
+     "name": "ToolpathOp",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/path/ToolpathOp.hx",
+     "doc": "Controller-independent CNC operations in LinuxCNC block order.",
+     "fields": [
+      {
+       "name": "SetSetup",
+       "kind": "case",
+       "signature": "(id:String, provenance:Provenance)",
+       "doc": "Selects a work-coordinate setup. IDs have no controller-specific meaning."
+      },
+      {
+       "name": "Move",
+       "kind": "case",
+       "signature": "(kind:MoveKind, geometry:PathGeometry, feed:Float, tolerance:Float, provenance:Provenance)",
+       "doc": "Programmed points in the active setup's work coordinates, as G-code\nwrites them: with G43 active they name the tool tip, and the machine's\ncontrolled point is the active length above. `ToolpathFrame` maps them."
+      },
+      {
+       "name": "MachineMove",
+       "kind": "case",
+       "signature": "(kind:MoveKind, geometry:PathGeometry, feed:Float, tolerance:Float, provenance:Provenance)",
+       "doc": "A move of the controlled point in absolute machine coordinates."
+      },
+      {
+       "name": "PositionJoint",
+       "kind": "case",
+       "signature": "(joint:String, position:Float, provenance:Provenance)",
+       "doc": "Absolute auxiliary joint position, SI units; independent planned coordinate when geared."
+      },
+      {
+       "name": "WaitSignal",
+       "kind": "case",
+       "signature": "(channel:String, expected:Bool, timeoutSeconds:Float, provenance:Provenance)",
+       "doc": "Digital barrier; the machine binding supplies the measured signal."
+      },
+      {
+       "name": "FeedPerRevolution",
+       "kind": "case",
+       "signature": "(master:String, axis:String, distance:Float, provenance:Provenance)",
+       "doc": "Modal axial feed in metres/work revolution on Cut lines; distance=0 restores explicit feeds."
+      },
+      {
+       "name": "ElectronicGear",
+       "kind": "case",
+       "signature": "(follower:String, terms:Array<GearTerm>, provenance:Provenance)"
+      },
+      {
+       "name": "ReleaseGear",
+       "kind": "case",
+       "signature": "(follower:String, provenance:Provenance)"
+      },
+      {
+       "name": "Dwell",
+       "kind": "case",
+       "signature": "(seconds:Float, span:Provenance)"
+      },
+      {
+       "name": "Spindle",
+       "kind": "case",
+       "signature": "(direction:SpindleDirection, rpm:Float, provenance:Provenance)"
+      },
+      {
+       "name": "Coolant",
+       "kind": "case",
+       "signature": "(mist:Bool, flood:Bool, provenance:Provenance)"
+      },
+      {
+       "name": "ToolChange",
+       "kind": "case",
+       "signature": "(number:Int, span:Provenance)"
+      },
+      {
+       "name": "ToolLengthOffset",
+       "kind": "case",
+       "signature": "(number:Int, length:Float, span:Provenance)",
+       "doc": "G43 Hn sets tool length offset `number` (G49 is number 0). Later `Move`\npoints are programmed at the tip, `length` below the controlled point."
+      },
+      {
+       "name": "OptionalStop",
+       "kind": "case",
+       "signature": "(span:Provenance)"
+      },
+      {
+       "name": "ProgramStop",
+       "kind": "case",
+       "signature": "(span:Provenance)"
+      },
+      {
+       "name": "End",
+       "kind": "case",
+       "signature": "(span:Provenance)"
+      },
+      {
+       "name": "Deposit",
+       "kind": "case",
+       "signature": "(area:Float, width:Float, height:Float, provenance:Provenance)",
+       "doc": "Modal: every following `Cut` move lays a bead of this cross-section until the next `Deposit` or\n`DepositOff`. `area` is in m², and `width` by `height` is the bead's footprint, which its\nrounded cross-section cannot exceed. `Rapid`, `Link` and `Retract` moves never deposit."
+      },
+      {
+       "name": "DepositOff",
+       "kind": "case",
+       "signature": "(provenance:Provenance)",
+       "doc": "Ends deposition: following `Cut` moves lay nothing."
+      },
+      {
+       "name": "FilamentMove",
+       "kind": "case",
+       "signature": "(length:Float, speed:Float, provenance:Provenance)",
+       "doc": "An extruder-only move, in metres of filament at `speed` metres of filament per second.\nPositive primes, negative retracts. It is how retraction, unretraction and purge are written."
+      },
+      {
+       "name": "Heat",
+       "kind": "case",
+       "signature": "(heater:String, celsius:Float, wait:Bool, provenance:Provenance)",
+       "doc": "Sets a heater, such as `hotend` or `bed`, to `celsius`; with `wait`, later moves wait until it is there."
+      },
+      {
+       "name": "Fan",
+       "kind": "case",
+       "signature": "(fan:String, duty:Float, provenance:Provenance)",
+       "doc": "Sets a fan to a duty from 0 to 1."
+      },
+      {
+       "name": "Layer",
+       "kind": "case",
+       "signature": "(index:Int, z:Float, provenance:Provenance)",
+       "doc": "Marker: the layer `index` (from 0) printed at height `z`. Lowering ignores it."
+      },
+      {
+       "name": "Feature",
+       "kind": "case",
+       "signature": "(kind:PrintFeature, provenance:Provenance)",
+       "doc": "Marker: the moves up to the next marker are of this kind. Lowering ignores it."
+      },
+      {
+       "name": "PrintObject",
+       "kind": "case",
+       "signature": "(name:String, start:Bool, provenance:Provenance)",
+       "doc": "Marker: the part named `name` starts (or, with `start` false, ends). Lowering ignores it."
+      }
+     ]
+    },
+    {
+     "name": "ToolpathProgram",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/path/ToolpathProgram.hx",
+     "doc": "Controller-independent operations and the tools referenced by changes.",
+     "fields": [
+      {
+       "name": "ops",
+       "kind": "var",
+       "signature": ":Array<ToolpathOp>",
+       "final": true
+      },
+      {
+       "name": "tools",
+       "kind": "var",
+       "signature": ":ToolLibrary",
+       "final": true
+      },
+      {
+       "name": "setups",
+       "kind": "var",
+       "signature": ":Array<Setup>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(ops:Array<ToolpathOp>, tools:ToolLibrary, setups:Array<Setup>):Void"
+      },
+      {
+       "name": "depositedVolume",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "The volume, in m^3, of the beads the program lays: each `Cut` move's length times the bead\narea of the `Deposit` in force."
+      },
+      {
+       "name": "layerVolumes",
+       "kind": "method",
+       "signature": "():Array<LayerVolume>",
+       "doc": "Deposited volume per layer, in the order the layers first appear. Beads before any `Layer` marker are layer -1."
+      },
+      {
+       "name": "objectVolumes",
+       "kind": "method",
+       "signature": "():Array<ObjectVolume>",
+       "doc": "Deposited volume per `PrintObject`, in the order the objects first appear. Beads outside any object are not listed."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "toolpathkit.setup",
+   "types": [
+    {
+     "name": "Fixture",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/setup/Fixture.hx",
+     "doc": "A rectangular clamp or other forbidden volume in work coordinates, metres.",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "minX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "minY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "minZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, minX:Float, maxX:Float, minY:Float, maxY:Float, minZ:Float, maxZ:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "Setup",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/setup/Setup.hx",
+     "doc": "Stock, clearance and clamp checks in the same work coordinates as CAM IR.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "workOrigin",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true,
+       "doc": "Translation from work coordinates to machine coordinates, in metres."
+      },
+      {
+       "name": "stock",
+       "kind": "var",
+       "signature": ":Null<SetupStock>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, workOrigin:Point3, ?stock:SetupStock):Void"
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(ops:Array<ToolpathOp>, tools:ToolLibrary):Void",
+       "doc": "Rejects a program before export. The cutter clearance column and finite\nshank/holder bands are swept at the physical tip, after the active G43 length."
+      }
+     ]
+    },
+    {
+     "name": "SetupStock",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/setup/SetupStock.hx",
+     "doc": "Optional stock and clamp geometry for validating a placed setup.",
+     "fields": [
+      {
+       "name": "minX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "minY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "top",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "bottom",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "safeZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "fixtures",
+       "kind": "var",
+       "signature": ":Array<Fixture>",
+       "final": true
+      },
+      {
+       "name": "spoilboardPlane",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Top plane of the sacrificial spoilboard, coincident with the stock bottom."
+      },
+      {
+       "name": "breakthroughAllowance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(minX:Float, maxX:Float, minY:Float, maxY:Float, top:Float, bottom:Float, safeZ:Float, ?fixtures:Array<Fixture>, ?spoilboardPlane:Float, ?breakthroughAllowance:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "TravelEnvelope",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/setup/TravelEnvelope.hx",
+     "doc": "Checks the controlled point in machine space: setup origin plus G43 length.",
+     "fields": [
+      {
+       "name": "lower",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true
+      },
+      {
+       "name": "upper",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(lower:Point3, upper:Point3):Void"
+      },
+      {
+       "name": "check",
+       "kind": "method",
+       "signature": "(program:ToolpathProgram):Array<TravelViolation>"
+      }
+     ]
+    },
+    {
+     "name": "TravelViolation",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/setup/TravelEnvelope.hx",
+     "doc": "One toolpath point outside the configured machine travel bounds.",
+     "fields": [
+      {
+       "name": "axis",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "value",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "lower",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "upper",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "provenance",
+       "kind": "var",
+       "signature": ":Provenance",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(axis:Int, value:Float, lower:Float, upper:Float, provenance:Provenance):Void"
+      },
+      {
+       "name": "message",
+       "kind": "method",
+       "signature": "():String"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "toolpathkit.tool",
+   "types": [
+    {
+     "name": "CutterProfile",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/tool/CutterProfile.hx",
+     "doc": "A rotating tool as a surface of revolution about its axis. Segments run\nfrom the tip (r = 0, z = 0) upwards and are continuous; the solid is closed\nby the axis and by a flat top at the last segment's height. Heights never\ndecrease along the profile, so horizontal steps (a flat bottom, a shank or\nholder shoulder) are allowed but overhangs are not. Units are metres.",
+     "fields": [
+      {
+       "name": "segments",
+       "kind": "var",
+       "signature": ":Array<CutterSegment>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(segments:Array<CutterSegment>):Void"
+      },
+      {
+       "name": "flat",
+       "kind": "method",
+       "signature": "(diameter:Float, fluteLength:Float):CutterProfile",
+       "static": true,
+       "doc": "Flat end mill; the flutes run `fluteLength` up from the tip."
+      },
+      {
+       "name": "ball",
+       "kind": "method",
+       "signature": "(diameter:Float, fluteLength:Float):CutterProfile",
+       "static": true,
+       "doc": "Ball end mill: a hemispherical tip of the cutter's radius."
+      },
+      {
+       "name": "bullNose",
+       "kind": "method",
+       "signature": "(diameter:Float, cornerRadius:Float, fluteLength:Float):CutterProfile",
+       "static": true,
+       "doc": "Bull-nose (corner radius) end mill."
+      },
+      {
+       "name": "vee",
+       "kind": "method",
+       "signature": "(diameter:Float, includedAngle:Float, fluteLength:Float):CutterProfile",
+       "static": true,
+       "doc": "V-bit with a sharp tip; `includedAngle` is the full cone angle in radians."
+      },
+      {
+       "name": "taperedBall",
+       "kind": "method",
+       "signature": "(tipDiameter:Float, taperAngle:Float, diameter:Float, fluteLength:Float):CutterProfile",
+       "static": true,
+       "doc": "Tapered ball mill: a ball tip of `tipDiameter` blending tangentially into a\ncone of `taperAngle` (half-angle from the axis) up to `diameter`."
+      },
+      {
+       "name": "withShank",
+       "kind": "method",
+       "signature": "(diameter:Float, length:Float):CutterProfile",
+       "doc": "Appends a cylindrical non-cutting section, with a shoulder if the radius changes."
+      },
+      {
+       "name": "withHolder",
+       "kind": "method",
+       "signature": "(diameter:Float, length:Float):CutterProfile"
+      },
+      {
+       "name": "height",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "topRadius",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "cuttingDiameter",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Widest diameter of the cutting zone."
+      },
+      {
+       "name": "fluteLength",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Height of the top of the cutting zone."
+      },
+      {
+       "name": "below",
+       "kind": "method",
+       "signature": "(height:Float):CutterProfile",
+       "doc": "The part of the tool up to `height` above its tip, closed by a flat top\nthere: the tool as seen by stock whose surface is `height` above the tip."
+      },
+      {
+       "name": "halfSectionArea",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Area between the axis and the profile: half the tool's cross-section."
+      },
+      {
+       "name": "volume",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Volume of the solid tool."
+      },
+      {
+       "name": "isRadiallyMonotonic",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Radius never shrinks going up, so the tool's silhouette narrows only towards the tip."
+      },
+      {
+       "name": "startOf",
+       "kind": "method",
+       "signature": "(segment:CutterSegment):{r:Float, z:Float}",
+       "static": true
+      },
+      {
+       "name": "endOf",
+       "kind": "method",
+       "signature": "(segment:CutterSegment):{r:Float, z:Float}",
+       "static": true
+      },
+      {
+       "name": "zoneOf",
+       "kind": "method",
+       "signature": "(segment:CutterSegment):CutterZone",
+       "static": true
+      },
+      {
+       "name": "encode",
+       "kind": "method",
+       "signature": "():Array<Array<Float>>",
+       "doc": "The profile as plain numbers, for JSON: one row per segment, `[0, zone,\nr0, z0, r1, z1]` for a line and `[1, zone, centerR, centerZ, r0, z0, r1,\nz1]` for an arc, with zone 0 cutting, 1 shank and 2 holder."
+      },
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(rows:Array<Array<Float>>):CutterProfile",
+       "static": true,
+       "doc": "The profile `encode` wrote; rejects rows it could not have written."
+      }
+     ]
+    },
+    {
+     "name": "CutterSegment",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/tool/CutterSegment.hx",
+     "doc": "One piece of a tool half-profile. `r` is the distance from the tool axis and\n`z` the height above the tip, both in metres.",
+     "fields": [
+      {
+       "name": "Line",
+       "kind": "case",
+       "signature": "(r0:Float, z0:Float, r1:Float, z1:Float, zone:CutterZone)"
+      },
+      {
+       "name": "Arc",
+       "kind": "case",
+       "signature": "(centerR:Float, centerZ:Float, r0:Float, z0:Float, r1:Float, z1:Float, zone:CutterZone)",
+       "doc": "The minor circular arc from (r0, z0) to (r1, z1) about (centerR, centerZ)."
+      }
+     ]
+    },
+    {
+     "name": "CutterZone",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/tool/CutterZone.hx",
+     "doc": "What happens when this part of a tool meets stock.",
+     "fields": [
+      {
+       "name": "Cutting",
+       "kind": "case",
+       "signature": "",
+       "doc": "Flutes: overlap with stock removes material."
+      },
+      {
+       "name": "Shank",
+       "kind": "case",
+       "signature": "",
+       "doc": "Overlap with stock is a shank collision."
+      },
+      {
+       "name": "Holder",
+       "kind": "case",
+       "signature": "",
+       "doc": "Overlap with stock is a holder collision."
+      }
+     ]
+    },
+    {
+     "name": "Tool",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/tool/Tool.hx",
+     "doc": "Declared cutter dimensions in metres, with an optional exact shape.",
+     "fields": [
+      {
+       "name": "DEFAULT_FLUTE_LENGTH",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true,
+       "doc": "Flute length assumed for a tool with neither a shape nor a length."
+      },
+      {
+       "name": "number",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "diameter",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "fluteLength",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "final": true,
+       "doc": "Declared reach in metres; unknown values never qualify panel CAM."
+      },
+      {
+       "name": "stickOut",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "final": true
+      },
+      {
+       "name": "nominalDiameter",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "cutter",
+       "kind": "var",
+       "signature": ":Null<CutterProfile>",
+       "final": true,
+       "doc": "The tool's shape; null when only its diameter is known."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(number:Int, length:Float, diameter:Float, ?cutter:CutterProfile, ?fluteLength:Float, ?stickOut:Float, ?nominalDiameter:Float):Void"
+      },
+      {
+       "name": "shaped",
+       "kind": "method",
+       "signature": "(number:Int, length:Float, cutter:CutterProfile):Tool",
+       "static": true,
+       "doc": "A tool whose diameter comes from its shape."
+      },
+      {
+       "name": "profile",
+       "kind": "method",
+       "signature": "():CutterProfile",
+       "doc": "The shape to simulate. Without an explicit shape this is a flat end mill\nof the declared diameter whose flutes run the whole tool length (or\n`DEFAULT_FLUTE_LENGTH` when no length is known), so it removes material\nbut never reports shank or holder collisions."
+      },
+      {
+       "name": "withLength",
+       "kind": "method",
+       "signature": "(length:Float):Tool",
+       "doc": "The same tool with a different stored length."
+      }
+     ]
+    },
+    {
+     "name": "ToolLibrary",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/tool/ToolLibrary.hx",
+     "doc": "Tools referenced by controller-independent tool changes.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "set",
+       "kind": "method",
+       "signature": "(tool:Tool):Void"
+      },
+      {
+       "name": "tool",
+       "kind": "method",
+       "signature": "(number:Int):Tool"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

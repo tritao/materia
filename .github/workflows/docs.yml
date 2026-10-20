@@ -2,9 +2,9 @@ name: docs
 
 on:
   push:
-    paths: ["docs/**", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "**/*.hx", ".github/workflows/docs.yml"]
   pull_request:
-    paths: ["docs/**", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "**/*.hx", ".github/workflows/docs.yml"]
 
 jobs:
   build:
@@ -14,6 +14,15 @@ jobs:
         working-directory: docs/site
     steps:
       - uses: actions/checkout@v4
+      # The API reference is parsed with Haxeon's own parser (docs/api/src/ApiXml.hx).
+      - run: git submodule update --init --depth 1 haxeon
+        working-directory: .
+      - uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.7
+      # Fails when docs/api/data no longer matches the kits' public API.
+      - run: HAXE=haxe python3 docs/api/generate.py --check
+        working-directory: .
       - uses: actions/setup-node@v4
         with:
           node-version: 22

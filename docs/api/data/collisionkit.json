@@ -1,0 +1,1503 @@
+{
+ "kit": "collisionkit",
+ "packages": [
+  {
+   "name": "collisionkit",
+   "types": [
+    {
+     "name": "CollisionBounds",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/CollisionBounds.hx",
+     "doc": "Axis-aligned bounds after a shape pose, with a conservative radius about its origin.",
+     "fields": [
+      {
+       "name": "centre",
+       "kind": "var",
+       "signature": ":{x:Float, y:Float, z:Float}",
+       "final": true
+      },
+      {
+       "name": "halfExtents",
+       "kind": "var",
+       "signature": ":{x:Float, y:Float, z:Float}",
+       "final": true
+      },
+      {
+       "name": "radius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "corners",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "Eight conservative corners, using the same bounds as placement and motion queries."
+      },
+      {
+       "name": "of",
+       "kind": "method",
+       "signature": "(geometry:CollisionGeometry, pose:CollisionPose, ?inflation:Float):CollisionBounds",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CollisionBuild",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/CollisionBuild.hx",
+     "doc": "A `CollisionDescription` built into a world: the world's id of every\ndescribed body and object, how many pairs overlapped at their\narticulation's reference, and the layout errors: pairs colliding at the\nreference between an articulation and anything outside it (CL-D3).",
+     "fields": [
+      {
+       "name": "world",
+       "kind": "var",
+       "signature": ":CollisionWorld",
+       "final": true
+      },
+      {
+       "name": "description",
+       "kind": "var",
+       "signature": ":CollisionDescription",
+       "final": true,
+       "doc": "Live geometry and policy after transfers; the original build input remains reusable."
+      },
+      {
+       "name": "bodies",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "objects",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "overlapsAtReference",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "layoutErrors",
+       "kind": "var",
+       "signature": ":Array<CollisionPair>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(world:CollisionWorld, bodies:Array<Int>, objects:Array<Int>, overlapsAtReference:Int, layoutErrors:Array<CollisionPair>, description:CollisionDescription):Void"
+      },
+      {
+       "name": "transferBody",
+       "kind": "method",
+       "signature": "(body:Int, current:CollisionPose, target:CollisionPose, fixed:Bool, ?contacts:Array<Int>, ?releasedPolicy:CollisionDescription):Void",
+       "doc": "Change a carried body's frame without moving its shapes in the world.\nGeometry, inflation and object ids remain unchanged. This is the same\noperation for a grasp, a placement, and a transfer between carriers."
+      },
+      {
+       "name": "restoreBodyRule",
+       "kind": "method",
+       "signature": "(first:Int, second:Int):Void",
+       "doc": "Restore an authored rule after a temporary process window."
+      },
+      {
+       "name": "openContactWindow",
+       "kind": "method",
+       "signature": "(first:Int, second:Int, ?margin:Float):Void",
+       "doc": "A temporary contact window overrides object rules as well as body rules."
+      },
+      {
+       "name": "closeContactWindow",
+       "kind": "method",
+       "signature": "(first:Int, second:Int):Void",
+       "doc": "Restore the live description's policy after a contact window closes."
+      },
+      {
+       "name": "openObjectWindow",
+       "kind": "method",
+       "signature": "(first:Array<Int>, second:Array<Int>, ?margin:Float):Void",
+       "doc": "A window between two sets of described objects: contact allowed (no margin) or the margin between them."
+      },
+      {
+       "name": "closeObjectWindow",
+       "kind": "method",
+       "signature": "(first:Array<Int>, second:Array<Int>):Void",
+       "doc": "Restore the described rules and margins between two sets of objects."
+      },
+      {
+       "name": "objectOf",
+       "kind": "method",
+       "signature": "(worldObject:Int):Int",
+       "doc": "The described object a world object came from, or -1."
+      },
+      {
+       "name": "bodyOf",
+       "kind": "method",
+       "signature": "(worldBody:Int):Int",
+       "doc": "The described body a world body came from, or -1 (the world)."
+      }
+     ]
+    },
+    {
+     "name": "CollisionDescription",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/CollisionDescription.hx",
+     "doc": "A cell's collision description (COLLISION.md CL3): bodies with their\ngroups and poses, shapes on them, rules with their reasons, the\narticulations and their reference configurations, and the assumptions the\ngeometry makes (CL-D8). Geometry sources (RobotKit, CadKit through\ncadbridge, terrain) add to it; `build` turns it into a `CollisionWorld`.\nIt is plain data, so the same description can feed other consumers (the\nsimulation, CL3b).",
+     "fields": [
+      {
+       "name": "margins",
+       "kind": "var",
+       "signature": ":CollisionMargins",
+       "doc": "Air and process margins belong to the same description as its pair rules."
+      },
+      {
+       "name": "contactMargins",
+       "kind": "var",
+       "signature": ":CollisionMargins"
+      },
+      {
+       "name": "defaultMargin",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "bodies",
+       "kind": "var",
+       "signature": ":Array<DescribedBody>",
+       "final": true
+      },
+      {
+       "name": "objects",
+       "kind": "var",
+       "signature": ":Array<DescribedObject>",
+       "final": true
+      },
+      {
+       "name": "bodyRules",
+       "kind": "var",
+       "signature": ":Array<DescribedRule>",
+       "final": true
+      },
+      {
+       "name": "objectRules",
+       "kind": "var",
+       "signature": ":Array<DescribedRule>",
+       "final": true
+      },
+      {
+       "name": "articulations",
+       "kind": "var",
+       "signature": ":Array<DescribedArticulation>",
+       "final": true
+      },
+      {
+       "name": "assumptions",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true,
+       "doc": "What the geometry approximates or ignores, once each, in the order noted."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?margin:Float):Void"
+      },
+      {
+       "name": "append",
+       "kind": "method",
+       "signature": "(other:CollisionDescription):Void",
+       "doc": "Appends another scene, remapping its body/object references and rules."
+      },
+      {
+       "name": "copy",
+       "kind": "method",
+       "signature": "():CollisionDescription"
+      },
+      {
+       "name": "addBody",
+       "kind": "method",
+       "signature": "(name:String, group:Int, fixed:Bool, ?pose:CollisionPose):Int",
+       "doc": "Adds a body; `pose` is where it starts (an articulation's bodies start at its reference)."
+      },
+      {
+       "name": "addObject",
+       "kind": "method",
+       "signature": "(name:String, body:Int, offset:CollisionPose, geometry:CollisionGeometry, ?inflation:Float, ?source:String, ?member:String, ?tool:Bool):Int",
+       "doc": "Adds a shape on `body` (-1: the world) at `offset`; `source` says what it approximates."
+      },
+      {
+       "name": "addFixed",
+       "kind": "method",
+       "signature": "(name:String, pose:CollisionPose, geometry:CollisionGeometry, group:Int, ?inflation:Float, ?source:String):Int",
+       "doc": "Adds a fixed body at `pose` with one shape on it; returns the object."
+      },
+      {
+       "name": "setBodyRule",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void"
+      },
+      {
+       "name": "setObjectRule",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void"
+      },
+      {
+       "name": "bodyRule",
+       "kind": "method",
+       "signature": "(a:Int, b:Int):Null<DescribedRule>"
+      },
+      {
+       "name": "objectRule",
+       "kind": "method",
+       "signature": "(a:Int, b:Int):Null<DescribedRule>"
+      },
+      {
+       "name": "restoreBodyPolicy",
+       "kind": "method",
+       "signature": "(body:Int, authored:CollisionDescription):Void",
+       "doc": "Release restores authored seat/contact policy instead of a carried part's exclusions."
+      },
+      {
+       "name": "setHeldContacts",
+       "kind": "method",
+       "signature": "(body:Int, contacts:Array<Int>, ?contactRule:CollisionPairRule, ?contactReason:CollisionPairStatus, ?margin:Float):Void",
+       "doc": "Carried stock checks every outside shape except its explicitly named contact surfaces."
+      },
+      {
+       "name": "setObjectMargins",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, ?air:Float, ?contact:Float):Void",
+       "doc": "Exact object-pair margins do not alter any other object in the same margin class."
+      },
+      {
+       "name": "applyObjectMargins",
+       "kind": "method",
+       "signature": "(world:CollisionWorld, ids:Array<Int>, a:Int, b:Int):Void",
+       "doc": "Restore only this described pair's sparse margins, without rewriting the class table."
+      },
+      {
+       "name": "marginBetweenObjects",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, ?contact:Bool):Float"
+      },
+      {
+       "name": "setGroupMargins",
+       "kind": "method",
+       "signature": "(g:Int, h:Int, ?air:Float, ?contact:Float):Void",
+       "doc": "Margin classes are explicit groups, shared by as many objects as belong to that class."
+      },
+      {
+       "name": "groupCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "addArticulation",
+       "kind": "method",
+       "signature": "(name:String, bodies:Array<Int>, reference:String):Int",
+       "doc": "Declares an articulation: its bodies, posed at the named reference configuration."
+      },
+      {
+       "name": "bodyRadius",
+       "kind": "method",
+       "signature": "(body:Int):Float",
+       "doc": "The radius of a body's objects about its frame: no point of them is\nfarther from the body's origin (inflation included). Motion bounds use\nit (CL-D5). Height fields and half-spaces have no finite radius."
+      },
+      {
+       "name": "note",
+       "kind": "method",
+       "signature": "(text:String):Void",
+       "doc": "Records an assumption once."
+      },
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(world:CollisionWorld):CollisionBuild",
+       "doc": "Adds everything to `world`, poses each body where the description has\nit, marks each articulation's overlaps at its reference, and reports as\nlayout errors the pairs colliding there between an articulation's body\nand anything outside it. The world is left posed at the references."
+      }
+     ]
+    },
+    {
+     "name": "CollisionDistance",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/CollisionDistance.hx",
+     "doc": "A pair's closest approach in world coordinates: the objects and their\nbodies (-1: the world), the signed distance (negative when penetrating),\nthe closest point on each object (x, y, z), and the unit normal from `a`\ntoward `b`.",
+     "fields": [
+      {
+       "name": "a",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "b",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "bodyA",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "bodyB",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "distance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "pointA",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "pointB",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "normal",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, bodyA:Int, bodyB:Int, distance:Float, pointA:Array<Float>, pointB:Array<Float>, normal:Array<Float>):Void"
+      }
+     ]
+    },
+    {
+     "name": "CollisionGeometry",
+     "kind": "enum",
+     "file": "collisionkit/haxe/collisionkit/CollisionGeometry.hx",
+     "doc": "A collision shape, in its body's frame after the offset it is added with\n(COLLISION.md CL-D1). Lengths are in the caller's unit; axial shapes run\nalong local z. Primitives and convex sets can be inflated\n(`CollisionWorld.setInflation`); meshes are surfaces (CL-D8).",
+     "fields": [
+      {
+       "name": "Box",
+       "kind": "case",
+       "signature": "(halfX:Float, halfY:Float, halfZ:Float)"
+      },
+      {
+       "name": "Sphere",
+       "kind": "case",
+       "signature": "(radius:Float)"
+      },
+      {
+       "name": "Capsule",
+       "kind": "case",
+       "signature": "(radius:Float, halfLength:Float)",
+       "doc": "A segment of length 2·halfLength along z, swept by a sphere."
+      },
+      {
+       "name": "Cylinder",
+       "kind": "case",
+       "signature": "(radius:Float, halfLength:Float)"
+      },
+      {
+       "name": "HalfSpace",
+       "kind": "case",
+       "signature": "(nx:Float, ny:Float, nz:Float, offset:Float)",
+       "doc": "The solid side of a plane: n·p ≤ offset."
+      },
+      {
+       "name": "Convex",
+       "kind": "case",
+       "signature": "(points:Array<Float>)",
+       "doc": "The convex hull of points (x, y, z each; four or more, not coplanar). Pass the hull's vertices."
+      },
+      {
+       "name": "Mesh",
+       "kind": "case",
+       "signature": "(vertices:Array<Float>, indices:Array<Int>)",
+       "doc": "A triangle mesh: vertices x, y, z each, three indices per triangle."
+      },
+      {
+       "name": "HeightField",
+       "kind": "case",
+       "signature": "(xSize:Float, ySize:Float, heights:Array<Float>, rows:Int, minHeight:Float)",
+       "doc": "A grid of `rows` x (heights.length / rows) heights, row-major, centred on\nthe offset over xSize by ySize; columns run along +x, rows along -y. A\nsolid down to `minHeight`; no height may be below it (CL-D6)."
+      }
+     ]
+    },
+    {
+     "name": "CollisionMarginClass",
+     "kind": "abstract",
+     "file": "collisionkit/haxe/collisionkit/CollisionMarginClass.hx",
+     "underlying": "Int",
+     "doc": "Cell margin classes; exact process-interface margins are sparse object-pair overrides.",
+     "fields": [
+      {
+       "name": "Air",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Installed",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Tool",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Work",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Held",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CollisionMargins",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/CollisionMargins.hx",
+     "doc": "The clearance required between bodies, per pair of body groups (CL-D4's\npair classes: a robot's links, its tool, held parts, the environment).\nGroups are numbered from 0; every pair starts at `initial`.",
+     "fields": [
+      {
+       "name": "groups",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "contact",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "ceiling",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "final": true,
+       "doc": "Optional upper bound also applies to sparse object-pair margins."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(groups:Int, initial:Float, ?contact:Bool, ?ceiling:Float):Void"
+      },
+      {
+       "name": "uniform",
+       "kind": "method",
+       "signature": "(margin:Float):CollisionMargins",
+       "static": true,
+       "doc": "One margin for every pair."
+      },
+      {
+       "name": "set",
+       "kind": "method",
+       "signature": "(g:Int, h:Int, margin:Float):CollisionMargins"
+      },
+      {
+       "name": "between",
+       "kind": "method",
+       "signature": "(g:Int, h:Int):Float"
+      },
+      {
+       "name": "flat",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "The square table, row-major (as `collisionkit.h` reads it)."
+      }
+     ]
+    },
+    {
+     "name": "CollisionPair",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/CollisionPair.hx",
+     "doc": "Two collision objects, the lower id first, with the bodies they are on (-1: the world).",
+     "fields": [
+      {
+       "name": "a",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "b",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "bodyA",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "bodyB",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, bodyA:Int, bodyB:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "CollisionPairRule",
+     "kind": "abstract",
+     "file": "collisionkit/haxe/collisionkit/CollisionPairRule.hx",
+     "underlying": "Int",
+     "doc": "A declared rule for a pair of bodies or of objects.",
+     "fields": [
+      {
+       "name": "Default",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "No declared rule: the pair's status follows the defaults."
+      },
+      {
+       "name": "Allow",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Not checked, for a reason (`CollisionPairStatus`)."
+      },
+      {
+       "name": "Check",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Checked even where the defaults would not check it."
+      },
+      {
+       "name": "Touch",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Checked; at zero margin, touching is permitted but penetration beyond numerical precision is not."
+      }
+     ]
+    },
+    {
+     "name": "CollisionPairStatus",
+     "kind": "abstract",
+     "file": "collisionkit/haxe/collisionkit/CollisionPairStatus.hx",
+     "underlying": "Int",
+     "doc": "Whether a pair of collision objects is checked, and why not\n(COLLISION.md CL-D3). An allow rule records one of the reasons here.",
+     "fields": [
+      {
+       "name": "Checked",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Static",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Both bodies are static (fixed in this cell; the world is)."
+      },
+      {
+       "name": "Rigid",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "They never move relative to each other: one body, or bodies joined only through fixed joints."
+      },
+      {
+       "name": "Adjacent",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Their bodies are one movable joint apart."
+      },
+      {
+       "name": "OverlapsAtReference",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "They overlapped at their articulation's reference configuration (`CollisionWorld.allowOverlapping`)."
+      },
+      {
+       "name": "Allowed",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Allowed by a declared rule."
+      },
+      {
+       "name": "Unsupported",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Would be checked, but the shapes cannot be compared: queries fail until it is allowed or removed."
+      },
+      {
+       "name": "Closure",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Joined by a closure of the caller's model."
+      },
+      {
+       "name": "ProcessContact",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Process contact (a torch on its seam), allowed per window (CL-D9)."
+      },
+      {
+       "name": "DeclaredContact",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Meant to touch: RobotKit's contact pairs (CL-D10)."
+      }
+     ]
+    },
+    {
+     "name": "CollisionPose",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/CollisionPose.hx",
+     "doc": "A rigid transform: a translation and a unit quaternion (x, y, z, w), in\nthe world's frame for a body, in its body's frame for an object's offset.\nCallers convert their own transforms (a kit snapshot's body poses,\nRobotKit's `Transform3`) to it.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qx",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qy",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qz",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "qw",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float, qx:Float, qy:Float, qz:Float, qw:Float):Void"
+      },
+      {
+       "name": "identity",
+       "kind": "method",
+       "signature": "():CollisionPose",
+       "static": true
+      },
+      {
+       "name": "translation",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):CollisionPose",
+       "static": true
+      },
+      {
+       "name": "writeTo",
+       "kind": "method",
+       "signature": "(out:Array<Float>):Void",
+       "doc": "Appends the seven numbers to `out`."
+      }
+     ]
+    },
+    {
+     "name": "CollisionViolation",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/CollisionViolation.hx",
+     "doc": "A checked pair closer than its query required (or, from `closest`, the\nclosest pair): the objects, their bodies (-1: the world), the signed\ndistance, and the clearance required (the group margin plus both bodies'\ninflation). `set` is the index of the pose set it was found in, for\nbatched queries (0 otherwise).",
+     "fields": [
+      {
+       "name": "a",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "b",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "bodyA",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "bodyB",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "distance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "required",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "set",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, bodyA:Int, bodyB:Int, distance:Float, required:Float, set:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "CollisionWorld",
+     "kind": "interface",
+     "file": "collisionkit/haxe/collisionkit/CollisionWorld.hx",
+     "doc": "Collision objects attached to bodies the caller registers and poses\n(COLLISION.md CL-D1, CL-D2). The world knows bodies, not models: one\nworld holds a whole cell (several robots and mechanisms, each the\ncaller's own model, and the environment). Body -1 is the world itself.\nBodies are numbered from 0 in the order they are added; object ids are\nnever reused.\n\nOnly `Checked` pairs are queried (`CollisionPairStatus` says why others\nare not). A checked pair whose shapes cannot be compared makes queries\nthrow: a check is never silently skipped.\n\n`collisionkit.native.NativeCollisionWorld` (collisionkit-native, on coal)\nimplements it. Without a backend nothing does: callers report collision\nas unchecked, never as passed.",
+     "fields": [
+      {
+       "name": "addBody",
+       "kind": "method",
+       "signature": "(group:Int):Int",
+       "doc": "Adds a body in `group` (CL-D4's pair classes, from 0), at the identity and not static; returns its number."
+      },
+      {
+       "name": "bodyCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "setBodyGroup",
+       "kind": "method",
+       "signature": "(body:Int, group:Int):Void"
+      },
+      {
+       "name": "setBodyStatic",
+       "kind": "method",
+       "signature": "(body:Int, fixed:Bool):Void",
+       "doc": "A static body is fixed in this cell: pairs between static bodies are never checked."
+      },
+      {
+       "name": "setBodyPose",
+       "kind": "method",
+       "signature": "(body:Int, pose:CollisionPose):Void"
+      },
+      {
+       "name": "setBodyPoses",
+       "kind": "method",
+       "signature": "(first:Int, poses:Array<Float>):Void",
+       "doc": "Poses bodies `first`, `first + 1`, ... from seven numbers each (x, y, z, qx, qy, qz, qw)."
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(body:Int, offset:CollisionPose, geometry:CollisionGeometry):Int",
+       "doc": "Adds a shape on `body` (-1: the world) at `offset` in the body's frame; returns its id."
+      },
+      {
+       "name": "setInflation",
+       "kind": "method",
+       "signature": "(object:Int, radius:Float):Void",
+       "doc": "Inflates a primitive or convex object by `radius`: every distance to it shrinks by that much."
+      },
+      {
+       "name": "setHeights",
+       "kind": "method",
+       "signature": "(object:Int, heights:Array<Float>):Void",
+       "doc": "Replaces a height field's heights (the same grid, none below its minimum), e.g. after digging."
+      },
+      {
+       "name": "attach",
+       "kind": "method",
+       "signature": "(object:Int, body:Int, offset:CollisionPose):Void",
+       "doc": "Moves an object onto `body` (-1: the world) at `offset`: a grasped or placed part. It follows the new body's rules."
+      },
+      {
+       "name": "remove",
+       "kind": "method",
+       "signature": "(object:Int):Void"
+      },
+      {
+       "name": "setBodyRule",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void",
+       "doc": "A rule for every object pair between two bodies; `reason` is what an allow rule records."
+      },
+      {
+       "name": "setObjectRule",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void",
+       "doc": "A rule for one object pair (process contact); it overrides body rules."
+      },
+      {
+       "name": "setObjectMargins",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, ?air:Float, ?contact:Float):Void",
+       "doc": "Sparse object-pair margins override group classes; null restores the class margin."
+      },
+      {
+       "name": "pairStatus",
+       "kind": "method",
+       "signature": "(a:Int, b:Int):CollisionPairStatus"
+      },
+      {
+       "name": "allowOverlapping",
+       "kind": "method",
+       "signature": "(bodies:Array<Int>):Int",
+       "doc": "Over `bodies` (one articulation, posed at its reference configuration),\nmarks the object pairs colliding now as `OverlapsAtReference`, replacing\nearlier marks among them. Pairs reaching outside the set stay checked:\nan overlap with the environment is a layout error. Returns how many."
+      },
+      {
+       "name": "colliding",
+       "kind": "method",
+       "signature": "(margin:Float):Array<CollisionPair>",
+       "doc": "Checked pairs closer than `margin` (0: touching or penetrating), in id order.\nExplicit Touch rules permit zero-margin contact, but still reject penetration beyond numerical precision."
+      },
+      {
+       "name": "distances",
+       "kind": "method",
+       "signature": "(queryDistance:Float):Array<CollisionDistance>",
+       "doc": "Checked pairs closer than `queryDistance`, closest first."
+      },
+      {
+       "name": "pairDistances",
+       "kind": "method",
+       "signature": "(pairs:Array<CollisionPair>):Array<CollisionDistance>",
+       "doc": "The distances of chosen pairs, whatever their status, each as given (`a` first)."
+      },
+      {
+       "name": "violation",
+       "kind": "method",
+       "signature": "(margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation>",
+       "doc": "The first checked pair, in id order, closer than its group margin plus\nboth bodies' motion bounds in `inflation` (one per body; null for none), or null.\nShapes on one body have no relative motion and retain only their group margin.\nGeometric object inflation still applies."
+      },
+      {
+       "name": "closest",
+       "kind": "method",
+       "signature": "(margins:CollisionMargins):Null<CollisionViolation>",
+       "doc": "The closest checked pair, clear or not, with its group margin as `required`; null when none is checked."
+      },
+      {
+       "name": "firstViolation",
+       "kind": "method",
+       "signature": "(poses:Array<Float>, margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation>",
+       "doc": "Batched violations: `poses` holds sets of every body's pose (seven\nnumbers per body), `inflation` one number per body per set (or null).\nThe first set with a violation reports it, with `set` its index; null\nwhen every set is clear. The world is left posed at the last set checked."
+      },
+      {
+       "name": "violations",
+       "kind": "method",
+       "signature": "(poses:Array<Float>, margins:CollisionMargins, ?inflation:Array<Float>):Array<Bool>",
+       "doc": "As `firstViolation`, but for every set: true where the set has a violation (a planner's edge checks, CL-D7)."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "ConvexDecomposer",
+     "kind": "interface",
+     "file": "collisionkit/haxe/collisionkit/ConvexDecomposer.hx",
+     "doc": "Splits a closed triangle mesh into convex pieces whose union, inflated by\nthe decomposition's `inflation`, encloses it (CL-D11).\n`collisionkit.native.NativeConvexDecomposer` implements it with V-HACD 4.",
+     "fields": [
+      {
+       "name": "decompose",
+       "kind": "method",
+       "signature": "(vertices:Array<Float>, indices:Array<Int>, maxPieces:Int, sampleSpacing:Float):ConvexDecomposition",
+       "doc": "`vertices` x, y, z each, `indices` three per triangle; at most\n`maxPieces` pieces; `sampleSpacing` 0 picks 0.5 % of the bounding\ndiagonal."
+      }
+     ]
+    },
+    {
+     "name": "ConvexDecomposition",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/ConvexDecomposition.hx",
+     "doc": "A mesh split into convex pieces (CL-D11): each piece's vertices (x, y, z\neach), and the inflation after which their union encloses the mesh:\n`measured` (the farthest a sample of the mesh lies outside every piece)\nplus `spacing` (no point of the mesh is farther than that from a sample).",
+     "fields": [
+      {
+       "name": "pieces",
+       "kind": "var",
+       "signature": ":Array<Array<Float>>",
+       "final": true
+      },
+      {
+       "name": "measured",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "spacing",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "inflation",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(pieces:Array<Array<Float>>, measured:Float, spacing:Float, inflation:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "DescribedArticulation",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/DescribedArticulation.hx",
+     "doc": "One articulation of a `CollisionDescription` (a robot, a CAD mechanism):\nits bodies, and the reference configuration they are posed at when the\ndescription is built (CL-D3: overlap at reference applies among them).",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "bodies",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "reference",
+       "kind": "var",
+       "signature": ":String",
+       "final": true,
+       "doc": "What the reference configuration is (\"home\", \"zero\", or the caller's name)."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, bodies:Array<Int>, reference:String):Void"
+      }
+     ]
+    },
+    {
+     "name": "DescribedBody",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/DescribedBody.hx",
+     "doc": "A body of a `CollisionDescription`: its name, pair-class group (CL-D4), whether it is fixed in the cell, and its pose.",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "group",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "fixed",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":CollisionPose"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, group:Int, fixed:Bool, pose:CollisionPose):Void"
+      }
+     ]
+    },
+    {
+     "name": "DescribedObject",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/DescribedObject.hx",
+     "doc": "A shape of a `CollisionDescription` on a body (-1: the world), at an\noffset in the body's frame, with its inflation and what it approximates\n(`source`, e.g. \"primitive\", \"hull\", \"enclosing hull\", \"surface mesh\",\n\"decomposed piece\"), for the report's assumptions (CL-D8).",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "member",
+       "kind": "var",
+       "signature": ":String",
+       "final": true,
+       "doc": "Physical source member shared by all of its convex pieces; never inferred from the display name."
+      },
+      {
+       "name": "tool",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true,
+       "doc": "Tool identity is independent of margin classes and carrier ownership."
+      },
+      {
+       "name": "body",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "offset",
+       "kind": "var",
+       "signature": ":CollisionPose",
+       "final": true
+      },
+      {
+       "name": "geometry",
+       "kind": "var",
+       "signature": ":CollisionGeometry",
+       "final": true
+      },
+      {
+       "name": "inflation",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, body:Int, offset:CollisionPose, geometry:CollisionGeometry, inflation:Float, source:String, ?member:String, ?tool:Bool):Void"
+      }
+     ]
+    },
+    {
+     "name": "DescribedRule",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/DescribedRule.hx",
+     "doc": "A declared rule between two bodies (-1: the world) or two objects of a `CollisionDescription`, with its reason.",
+     "fields": [
+      {
+       "name": "a",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "b",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "rule",
+       "kind": "var",
+       "signature": ":CollisionPairRule",
+       "final": true
+      },
+      {
+       "name": "reason",
+       "kind": "var",
+       "signature": ":CollisionPairStatus",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "collisionkit.kinematics",
+   "types": [
+    {
+     "name": "ModelBodies",
+     "kind": "class",
+     "file": "collisionkit/haxe/collisionkit/kinematics/ModelBodies.hx",
+     "doc": "A `KinematicModel`'s bodies in a `CollisionDescription` (CL-D1, CL-D3):\none described body per model body, the kit's rigid, adjacent and closure\npairs as rules, posed at a reference configuration and declared as one\narticulation. Extra bodies can follow a model body rigidly (a tool in its\nown group); they take that body's rules. `place` poses them all from a\nsnapshot of the model.",
+     "fields": [
+      {
+       "name": "model",
+       "kind": "var",
+       "signature": ":KinematicModel",
+       "final": true
+      },
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "bodies",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Described body of each model body."
+      },
+      {
+       "name": "followers",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Described bodies that follow a model body, and the model body each follows."
+      },
+      {
+       "name": "followed",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true
+      },
+      {
+       "name": "reference",
+       "kind": "var",
+       "signature": ":KinematicState",
+       "final": true
+      },
+      {
+       "name": "referenceName",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "bind",
+       "kind": "method",
+       "signature": "(description:CollisionDescription, model:KinematicModel, reference:KinematicState):ModelBodies",
+       "static": true,
+       "doc": "Bind authored link-named bodies without replacing their geometry. The\nmodel's rigid, adjacent and closure pairs become rules, as in\n`describe`, and a second body on one link follows it, as in `follow`.\nA rule the description already authors for a pair is kept."
+      },
+      {
+       "name": "describe",
+       "kind": "method",
+       "signature": "(description:CollisionDescription, model:KinematicModel, name:String, group:Int, reference:KinematicState, referenceName:String, fixedRoots:Bool):ModelBodies",
+       "static": true,
+       "doc": "Adds `model`'s bodies to `description` in `group`, named\n`name/bodyId`, posed at `reference` (called `referenceName`). With\n`fixedRoots`, bodies rigid to a root of the model are fixed in the cell\n(a robot bolted down); otherwise only the model's structure decides."
+      },
+      {
+       "name": "follow",
+       "kind": "method",
+       "signature": "(body:Int, followerName:String, group:Int):Int",
+       "doc": "Adds a body in `group` that moves rigidly with model body `body` (a tool\non its flange link): it is rigid with that body and takes its rules."
+      },
+      {
+       "name": "carry",
+       "kind": "method",
+       "signature": "(body:Int, followerName:String, group:Int):Int",
+       "doc": "Carried stock follows the pose without inheriting structural contact exemptions."
+      },
+      {
+       "name": "declare",
+       "kind": "method",
+       "signature": "():Int",
+       "doc": "Declares the bodies (and followers) as one articulation at the reference; call once all followers exist."
+      },
+      {
+       "name": "all",
+       "kind": "method",
+       "signature": "():Array<Int>",
+       "doc": "Every described body of this model, followers last."
+      },
+      {
+       "name": "copyForDescription",
+       "kind": "method",
+       "signature": "(live:CollisionDescription):ModelBodies",
+       "doc": "An independently mutable mapping for a world's live copy of the description."
+      },
+      {
+       "name": "carrier",
+       "kind": "method",
+       "signature": "(body:Int):Int",
+       "doc": "Model body followed by a described body, or -1 for independent geometry."
+      },
+      {
+       "name": "transfer",
+       "kind": "method",
+       "signature": "(build:CollisionBuild, body:Int, current:CollisionPose, target:CollisionPose, fixed:Bool, carrier:Int, contacts:Array<Int>, ?releasedPolicy:CollisionDescription):Void",
+       "doc": "Transfer collision geometry and its mechanical follower together."
+      },
+      {
+       "name": "state",
+       "kind": "method",
+       "signature": "(q:Array<Float>):KinematicState",
+       "doc": "A state of the model at DOF values `q`, with the root poses of the reference (where the model sits in the cell)."
+      },
+      {
+       "name": "stateInto",
+       "kind": "method",
+       "signature": "(q:Array<Float>, state:KinematicState):KinematicState",
+       "doc": "Update caller-owned scratch, including the reference's current root poses."
+      },
+      {
+       "name": "place",
+       "kind": "method",
+       "signature": "(build:CollisionBuild, state:KinematicState):Void",
+       "doc": "Poses the built world's bodies of this model for `state` (its root poses included: see `state`)."
+      },
+      {
+       "name": "poses",
+       "kind": "method",
+       "signature": "(state:KinematicState):Array<Float>",
+       "doc": "Every body's pose for `state` (seven numbers each, in `all()` order): a pose set for batched checks."
+      },
+      {
+       "name": "posesInto",
+       "kind": "method",
+       "signature": "(state:KinematicState, out:Array<Float>):Void",
+       "doc": "Write a batch pose set into caller-owned storage without allocating another array."
+      },
+      {
+       "name": "avoidancePairs",
+       "kind": "method",
+       "signature": "(build:CollisionBuild, found:Array<CollisionDistance>, safety:Float, influence:Float):Array<AvoidancePair>",
+       "doc": "Avoidance pairs for this model (COLLISION.md CL5) from a built world's\ndistances: each pair with a body of this model, as model bodies (a side\noutside it, or a follower such as the tool, maps to its model body or\n-1), with the pair's safety margin and influence distance."
+      },
+      {
+       "name": "pose",
+       "kind": "method",
+       "signature": "(t:Transform):CollisionPose",
+       "static": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "collisionkit.native",
+   "types": [
+    {
+     "name": "NativeCollisionWorld",
+     "kind": "class",
+     "file": "collisionkit/native/haxe/collisionkit/native/NativeCollisionWorld.hx",
+     "implements": [
+      "CollisionWorld"
+     ],
+     "doc": "A `CollisionWorld` on coal, through collisionkit's C ABI (`ck_*`, see\n`collisionkit.h`). Owns the native handle; call `dispose` when done.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "addBody",
+       "kind": "method",
+       "signature": "(group:Int):Int"
+      },
+      {
+       "name": "bodyCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "setBodyGroup",
+       "kind": "method",
+       "signature": "(body:Int, group:Int):Void"
+      },
+      {
+       "name": "setBodyStatic",
+       "kind": "method",
+       "signature": "(body:Int, fixed:Bool):Void"
+      },
+      {
+       "name": "setBodyPose",
+       "kind": "method",
+       "signature": "(body:Int, pose:CollisionPose):Void"
+      },
+      {
+       "name": "setBodyPoses",
+       "kind": "method",
+       "signature": "(first:Int, poses:Array<Float>):Void"
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(body:Int, offset:CollisionPose, geometry:CollisionGeometry):Int"
+      },
+      {
+       "name": "setInflation",
+       "kind": "method",
+       "signature": "(object:Int, radius:Float):Void"
+      },
+      {
+       "name": "setHeights",
+       "kind": "method",
+       "signature": "(object:Int, heights:Array<Float>):Void"
+      },
+      {
+       "name": "attach",
+       "kind": "method",
+       "signature": "(object:Int, body:Int, offset:CollisionPose):Void"
+      },
+      {
+       "name": "remove",
+       "kind": "method",
+       "signature": "(object:Int):Void"
+      },
+      {
+       "name": "setBodyRule",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void"
+      },
+      {
+       "name": "setObjectRule",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void"
+      },
+      {
+       "name": "setObjectMargins",
+       "kind": "method",
+       "signature": "(a:Int, b:Int, ?air:Float, ?contact:Float):Void"
+      },
+      {
+       "name": "pairStatus",
+       "kind": "method",
+       "signature": "(a:Int, b:Int):CollisionPairStatus"
+      },
+      {
+       "name": "allowOverlapping",
+       "kind": "method",
+       "signature": "(bodies:Array<Int>):Int"
+      },
+      {
+       "name": "colliding",
+       "kind": "method",
+       "signature": "(margin:Float):Array<CollisionPair>"
+      },
+      {
+       "name": "distances",
+       "kind": "method",
+       "signature": "(queryDistance:Float):Array<CollisionDistance>"
+      },
+      {
+       "name": "pairDistances",
+       "kind": "method",
+       "signature": "(pairs:Array<CollisionPair>):Array<CollisionDistance>"
+      },
+      {
+       "name": "violation",
+       "kind": "method",
+       "signature": "(margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation>"
+      },
+      {
+       "name": "closest",
+       "kind": "method",
+       "signature": "(margins:CollisionMargins):Null<CollisionViolation>"
+      },
+      {
+       "name": "firstViolation",
+       "kind": "method",
+       "signature": "(poses:Array<Float>, margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation>"
+      },
+      {
+       "name": "violations",
+       "kind": "method",
+       "signature": "(poses:Array<Float>, margins:CollisionMargins, ?inflation:Array<Float>):Array<Bool>"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "NativeConvexDecomposer",
+     "kind": "class",
+     "file": "collisionkit/native/haxe/collisionkit/native/NativeConvexDecomposer.hx",
+     "implements": [
+      "ConvexDecomposer"
+     ],
+     "doc": "V-HACD 4 through collisionkit's C ABI (`ck_decompose`), with the enclosure measured natively (CL-D11).",
+     "fields": [
+      {
+       "name": "resolution",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true,
+       "doc": "V-HACD's voxel resolution."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?resolution:Int):Void"
+      },
+      {
+       "name": "decompose",
+       "kind": "method",
+       "signature": "(vertices:Array<Float>, indices:Array<Int>, maxPieces:Int, sampleSpacing:Float):ConvexDecomposition"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

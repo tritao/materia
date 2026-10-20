@@ -1,0 +1,591 @@
+{
+ "kit": "bimkit",
+ "packages": [
+  {
+   "name": "bimkit",
+   "types": [
+    {
+     "name": "BimCodec",
+     "kind": "class",
+     "file": "bimkit/haxe/src/bimkit/BimCodec.hx",
+     "doc": "BIM documents share CadKit's current document schema.",
+     "fields": [
+      {
+       "name": "FORMAT",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "VERSION",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "encode",
+       "kind": "method",
+       "signature": "(model:BimDocument):String",
+       "static": true
+      },
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(text:String):BimDocument",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "BimDocument",
+     "kind": "class",
+     "file": "bimkit/haxe/src/bimkit/BimDocument.hx",
+     "doc": "BIM roles and hosting relationships layered over an ordinary CadKit document.",
+     "fields": [
+      {
+       "name": "cad",
+       "kind": "var",
+       "signature": ":Document",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?cad:Document):Void"
+      },
+      {
+       "name": "createWindowDefinition",
+       "kind": "method",
+       "signature": "(name:String, width:Float, height:Float, frameThickness:Float, depth:Float):Definition"
+      },
+      {
+       "name": "createDoorDefinition",
+       "kind": "method",
+       "signature": "(name:String, width:Float, height:Float, depth:Float):Definition"
+      },
+      {
+       "name": "exportIfc",
+       "kind": "method",
+       "signature": "(?timestamp:String):String",
+       "doc": "Export the supported BIM subset as an IFC4 STEP file."
+      },
+      {
+       "name": "saveIfc",
+       "kind": "method",
+       "signature": "(path:String, ?timestamp:String):Void"
+      },
+      {
+       "name": "createWindow",
+       "kind": "method",
+       "signature": "(name:String, definition:Definition):InstanceElement"
+      },
+      {
+       "name": "createDoor",
+       "kind": "method",
+       "signature": "(name:String, definition:Definition):InstanceElement"
+      },
+      {
+       "name": "createProject",
+       "kind": "method",
+       "signature": "(name:String):Element",
+       "doc": "Create a BIM project as a generic persistent CadKit object."
+      },
+      {
+       "name": "createSite",
+       "kind": "method",
+       "signature": "(name:String, projectId:ElementId):Element"
+      },
+      {
+       "name": "createBuilding",
+       "kind": "method",
+       "signature": "(name:String, siteId:ElementId):Element"
+      },
+      {
+       "name": "createStorey",
+       "kind": "method",
+       "signature": "(name:String, buildingId:ElementId, ?baseLevel:ElementReference, ?topLevel:ElementReference):Element"
+      },
+      {
+       "name": "createSpace",
+       "kind": "method",
+       "signature": "(name:String, storeyId:ElementId):Element"
+      },
+      {
+       "name": "createSlab",
+       "kind": "method",
+       "signature": "(name:String, width:Float, depth:Float, thickness:Float):Element"
+      },
+      {
+       "name": "removeSpatialContainer",
+       "kind": "method",
+       "signature": "(elementId:ElementId):Void",
+       "doc": "Remove an empty spatial container and detach its one incoming aggregate edge."
+      },
+      {
+       "name": "removeSpace",
+       "kind": "method",
+       "signature": "(elementId:ElementId):Void"
+      },
+      {
+       "name": "addToStorey",
+       "kind": "method",
+       "signature": "(storeyId:ElementId, elementId:ElementId):Relationship",
+       "doc": "Add an existing BIM object directly to a Storey's spatial contents."
+      },
+      {
+       "name": "removeFromStorey",
+       "kind": "method",
+       "signature": "(storeyId:ElementId, elementId:ElementId):Void"
+      },
+      {
+       "name": "aggregate",
+       "kind": "method",
+       "signature": "(parentId:ElementId, childId:ElementId):Relationship",
+       "doc": "Add an existing child to the spatial aggregate hierarchy."
+      },
+      {
+       "name": "setStoreyLevels",
+       "kind": "method",
+       "signature": "(storeyId:ElementId, ?baseLevel:ElementReference, ?topLevel:ElementReference):Void"
+      },
+      {
+       "name": "storeyBaseLevel",
+       "kind": "method",
+       "signature": "(storeyId:ElementId):Null<ElementReference>"
+      },
+      {
+       "name": "storeyTopLevel",
+       "kind": "method",
+       "signature": "(storeyId:ElementId):Null<ElementReference>"
+      },
+      {
+       "name": "aggregateChildren",
+       "kind": "method",
+       "signature": "(parentId:ElementId):Array<Element>"
+      },
+      {
+       "name": "containedElements",
+       "kind": "method",
+       "signature": "(storeyId:ElementId):Array<Element>"
+      },
+      {
+       "name": "createWall",
+       "kind": "method",
+       "signature": "(name:String, length:Float, thickness:Float, height:Float):Element"
+      },
+      {
+       "name": "createLevelWall",
+       "kind": "method",
+       "signature": "(name:String, length:Float, thickness:Float, base:ElementReference, top:ElementReference, ?baseOffset:Float, ?topOffset:Float):Element"
+      },
+      {
+       "name": "installWall",
+       "kind": "method",
+       "signature": "(elementId:ElementId, uncutOutput:Feature):Void"
+      },
+      {
+       "name": "wallRole",
+       "kind": "method",
+       "signature": "(id:ElementId):WallRole"
+      },
+      {
+       "name": "allWallRoles",
+       "kind": "method",
+       "signature": "():Array<WallRole>"
+      },
+      {
+       "name": "relationship",
+       "kind": "method",
+       "signature": "(openingId:ElementId):HostRelationship"
+      },
+      {
+       "name": "openingsForWall",
+       "kind": "method",
+       "signature": "(wallId:ElementId):Array<HostRelationship>"
+      },
+      {
+       "name": "allRelationships",
+       "kind": "method",
+       "signature": "():Array<HostRelationship>"
+      },
+      {
+       "name": "hostOpening",
+       "kind": "method",
+       "signature": "(opening:InstanceElement, wallId:ElementId, along:Float, sill:Float):Void"
+      },
+      {
+       "name": "rehostOpening",
+       "kind": "method",
+       "signature": "(openingId:ElementId, wallId:ElementId, along:Float, sill:Float):Void"
+      },
+      {
+       "name": "moveOpening",
+       "kind": "method",
+       "signature": "(openingId:ElementId, along:Float, sill:Float):Void"
+      },
+      {
+       "name": "resizeWall",
+       "kind": "method",
+       "signature": "(wallId:ElementId, length:Float, thickness:Float, ?height:Float):Void",
+       "doc": "Resize a wall and synchronize the opening tools' through-wall depth atomically."
+      },
+      {
+       "name": "unhostOpening",
+       "kind": "method",
+       "signature": "(openingId:ElementId):Void"
+      },
+      {
+       "name": "removeOpening",
+       "kind": "method",
+       "signature": "(openingId:ElementId):Void",
+       "doc": "Remove an opening and its host relation in one undoable edit."
+      },
+      {
+       "name": "removeWall",
+       "kind": "method",
+       "signature": "(wallId:ElementId):Void",
+       "doc": "A wall with openings must be emptied explicitly before deletion."
+      },
+      {
+       "name": "installRelationship",
+       "kind": "method",
+       "signature": "(value:HostRelationship):Void"
+      },
+      {
+       "name": "undo",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "redo",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "close",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "BimDoorDefinition",
+     "kind": "class",
+     "file": "bimkit/haxe/src/bimkit/BimDoorDefinition.hx",
+     "doc": "Factory for an authored reusable door type with a panel body and hosted opening tool.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(document:Document, name:String, width:Float, height:Float, depth:Float):Definition",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "BimError",
+     "kind": "class",
+     "file": "bimkit/haxe/src/bimkit/BimError.hx",
+     "fields": [
+      {
+       "name": "message",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(message:String):Void"
+      },
+      {
+       "name": "toString",
+       "kind": "method",
+       "signature": "():String"
+      }
+     ]
+    },
+    {
+     "name": "BimSchema",
+     "kind": "class",
+     "file": "bimkit/haxe/src/bimkit/BimSchema.hx",
+     "doc": "Stable names for the BIM domain vocabulary stored in generic CadKit data.",
+     "fields": [
+      {
+       "name": "ElementClass",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "DefinitionClass",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "HostOutput",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "GlobalId",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Project",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Site",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Building",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Storey",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Space",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Wall",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Window",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Door",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Slab",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "WindowType",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "DoorType",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Aggregates",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Contains",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Hosts",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "BaseLevel",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "TopLevel",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "BimWindowDefinition",
+     "kind": "class",
+     "file": "bimkit/haxe/src/bimkit/BimWindowDefinition.hx",
+     "doc": "Factory for an authored reusable window type built from a CadKit feature subgraph.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(document:Document, name:String, width:Float, height:Float, frameThickness:Float, depth:Float):Definition",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HostRelationship",
+     "kind": "class",
+     "file": "bimkit/haxe/src/bimkit/HostRelationship.hx",
+     "doc": "Authoritative authored coordinates for one opening on one wall baseline.",
+     "fields": [
+      {
+       "name": "openingId",
+       "kind": "var",
+       "signature": ":ElementId",
+       "final": true
+      },
+      {
+       "name": "wallId",
+       "kind": "var",
+       "signature": ":ElementId",
+       "final": true
+      },
+      {
+       "name": "along",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "sill",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "outputName",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "unhostPlacement",
+       "kind": "var",
+       "signature": ":Placement",
+       "final": true
+      },
+      {
+       "name": "unhostParent",
+       "kind": "var",
+       "signature": ":Null<ElementReference>",
+       "final": true
+      },
+      {
+       "name": "unhostDepth",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(openingId:ElementId, wallId:ElementId, along:Float, sill:Float, ?outputName:String, ?unhostPlacement:Placement, ?unhostParent:ElementReference, ?unhostDepth:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "IfcExporter",
+     "kind": "class",
+     "file": "bimkit/haxe/src/bimkit/IfcExporter.hx",
+     "doc": "IFC4 STEP export for the BIM object, type, spatial, containment, and hosting subset.",
+     "fields": [
+      {
+       "name": "encode",
+       "kind": "method",
+       "signature": "(document:Document, ?timestamp:String):String",
+       "static": true
+      },
+      {
+       "name": "save",
+       "kind": "method",
+       "signature": "(document:Document, path:String, ?timestamp:String):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "WallRole",
+     "kind": "class",
+     "file": "bimkit/haxe/src/bimkit/WallRole.hx",
+     "doc": "BIM metadata for a straight vertical wall; geometry stays in CadKit.",
+     "fields": [
+      {
+       "name": "elementId",
+       "kind": "var",
+       "signature": ":ElementId",
+       "final": true
+      },
+      {
+       "name": "uncutOutput",
+       "kind": "var",
+       "signature": ":Feature",
+       "final": true
+      },
+      {
+       "name": "body",
+       "kind": "var",
+       "signature": ":Null<BoxFeature>",
+       "final": true
+      },
+      {
+       "name": "levelBody",
+       "kind": "var",
+       "signature": ":Null<LevelBoxFeature>",
+       "final": true
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "thickness",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(elementId:ElementId, uncutOutput:Feature):Void"
+      },
+      {
+       "name": "baseElevation",
+       "kind": "method",
+       "signature": "():Float"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

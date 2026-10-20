@@ -39,6 +39,7 @@ export default defineConfig({
 					items: [{ label: "Your first machine: a gantry picker", slug: "tutorials/gantry-picker" }],
 				},
 				{ label: "Concepts", items: [{ label: "Overview", slug: "concepts" }, ...conceptGroups()] },
+				{ label: "API reference", link: "/reference/" },
 				{
 					label: "Project",
 					items: [

@@ -1,0 +1,1322 @@
+{
+ "kit": "camkit",
+ "packages": [
+  {
+   "name": "camkit",
+   "types": [
+    {
+     "name": "CamContour",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamContour.hx",
+     "doc": "One simple closed XY boundary, in machine metres.",
+     "fields": [
+      {
+       "name": "exactBoundary",
+       "kind": "var",
+       "signature": ":Null<Array<cadkit.sheetmetal.Segment>>",
+       "doc": "Optional exact CAD boundary in metres. Vertices remain the declared chordal representation."
+      },
+      {
+       "name": "chordTolerance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "vertices",
+       "kind": "var",
+       "signature": ":Array<Point3>",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "signedArea",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(vertices:Array<Point3>, ?validated:Bool):Void",
+       "doc": "`validated` skips the self-intersection check, which costs the square of the vertex count: for\ncontours that come from a valid B-rep face, where a boundary cannot cross itself."
+      },
+      {
+       "name": "fromSketch",
+       "kind": "method",
+       "signature": "(authored:ConstrainedSketch, solved:SolvedSketch):CamContour",
+       "static": true,
+       "doc": "Builds a single profile from solved cadkit lines, arcs, or one circle."
+      },
+      {
+       "name": "fromEdges",
+       "kind": "method",
+       "signature": "(edges:Array<Edge>, ?unit:String, ?chordToleranceMetres:Float):CamContour",
+       "static": true,
+       "doc": "CAD edge positions are sampled adaptively to the requested chord tolerance."
+      },
+      {
+       "name": "fromFace",
+       "kind": "method",
+       "signature": "(face:Face, ?unit:String, ?chordToleranceMetres:Float):CamContour",
+       "static": true
+      },
+      {
+       "name": "fromFaceBoundaries",
+       "kind": "method",
+       "signature": "(face:Face, ?unit:String, ?chordToleranceMetres:Float):Array<CamContour>",
+       "static": true,
+       "doc": "Returns the outer face contour first, followed by its inner boundaries."
+      },
+      {
+       "name": "inset",
+       "kind": "method",
+       "signature": "(distance:Float):CamContour",
+       "doc": "Positive inset moves toward the polygon interior; negative moves outward."
+      }
+     ]
+    },
+    {
+     "name": "CamCutDirection",
+     "kind": "abstract",
+     "file": "camkit/haxe/camkit/CamCutDirection.hx",
+     "underlying": "String",
+     "doc": "Relative to a clockwise spindle. Outside climb is CW; inside climb is CCW.",
+     "fields": [
+      {
+       "name": "Climb",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Conventional",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CamExactBoundary",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamExactBoundary.hx",
+     "doc": "Exact compensation belongs to CamKit. Native geometry uses mm for its tolerance.\nThe final centreline is sampled to the declared chord tolerance, in metres.",
+     "fields": [
+      {
+       "name": "reliefCenters",
+       "kind": "method",
+       "signature": "(contour:CamContour, radius:Float, outside:Bool):Array<Point3>",
+       "static": true,
+       "doc": "Matched-radius relief centres may be isolated points discarded by regular offsets.\nSupply separate vertical entries within the SAME operation/provenance, after\nproving that the complete cutter disc fits the source's removable region."
+      },
+      {
+       "name": "offset",
+       "kind": "method",
+       "signature": "(contour:CamContour, radius:Float, depth:Float, outside:Bool):Array<PathGeometry>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CamJob",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamJob.hx",
+     "doc": "2.5D toolpath producer. All inputs here are metres and metres/second.",
+     "fields": [
+      {
+       "name": "safeZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "spindleRpm",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "blendTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "How far a cutting move may round the corner into the next one (G64 P),\nin metres; zero stops exactly at every corner. Plunges and ramps always\nstop exactly."
+      },
+      {
+       "name": "arcTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "How far an arc may stray from the cutting lines it replaces, in metres:\na circle that the contours polygonized is cut as G2/G3 again (see\n`ArcFitting`). Zero keeps every line."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(safeZ:Float, spindleRpm:Float, ?initial:Point3, ?blendTolerance:Float, ?arcTolerance:Float, ?spindleSpinUpSeconds:Float, ?initialRetract:Bool, ?cutDirection:CamCutDirection, ?approachClearance:Float):Void",
+       "doc": "`safeZ` is the lowest height for rapid traverses over the work. `initial`\nis where the spindle starts, before any tool length applies; it must be\nclear of the work, since the first tool is loaded there."
+      },
+      {
+       "name": "profile",
+       "kind": "method",
+       "signature": "(contour:CamContour, tool:Tool, depth:Float, feed:Float, ?side:String, ?stepDown:Float, ?plungeFeed:Null<Float>, ?featureRef:String, ?startDepth:Float):CamJob",
+       "doc": "Offset closed profile; `outside` and `inside` use the cutter radius."
+      },
+      {
+       "name": "profileFace",
+       "kind": "method",
+       "signature": "(face:Face, tool:Tool, depth:Float, feed:Float, ?stepDown:Float, ?unit:String, ?chordToleranceMetres:Float, ?plungeFeed:Null<Float>):CamJob",
+       "doc": "Profile a planar CAD face, completing each hole before releasing its outer edge."
+      },
+      {
+       "name": "pocket",
+       "kind": "method",
+       "signature": "(contour:CamContour, tool:Tool, depth:Float, feed:Float, stepOver:Float, ?stepDown:Float, ?plungeFeed:Null<Float>, ?featureRef:String):CamJob",
+       "doc": "Clear a pocket with a separate plunge feed and ramps where spans allow."
+      },
+      {
+       "name": "pocketFace",
+       "kind": "method",
+       "signature": "(face:Face, tool:Tool, depth:Float, feed:Float, stepOver:Float, ?stepDown:Float, ?unit:String, ?chordToleranceMetres:Float, ?plungeFeed:Null<Float>):CamJob",
+       "doc": "Clear a face around its internal islands, then finish every boundary."
+      },
+      {
+       "name": "drill",
+       "kind": "method",
+       "signature": "(holes:Array<Point3>, tool:Tool, depth:Float, retractZ:Float, feed:Float, ?featureRef:String, ?peckDepth:Float):CamJob",
+       "doc": "Expand hole centres into safe rapid, feed, and retract moves."
+      },
+      {
+       "name": "finish",
+       "kind": "method",
+       "signature": "(?setup:Setup):ToolpathProgram"
+      }
+     ]
+    },
+    {
+     "name": "CamPocketPass",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamPocketPlanner.hx",
+     "fields": [
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "left",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "right",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "CamPocketPlanner",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamPocketPlanner.hx",
+     "doc": "Horizontal cutter-centre passes inside a face eroded by a disk.",
+     "fields": [
+      {
+       "name": "plan",
+       "kind": "method",
+       "signature": "(contour:CamContour, radius:Float, stepOver:Float, ?islands:Array<CamContour>):Array<CamPocketPass>",
+       "static": true
+      },
+      {
+       "name": "fill",
+       "kind": "method",
+       "signature": "(contour:CamContour, spacing:Float, ?islands:Array<CamContour>):Array<CamPocketPass>",
+       "static": true,
+       "doc": "Horizontal passes across a face, one on every line `y = k * spacing` of a lattice through the origin\nthat crosses it: the face's own interior, with no cutter eroding the edges. Because the lattice does\nnot depend on the face, passes of neighbouring layers line up. The islands are holes."
+      },
+      {
+       "name": "canLink",
+       "kind": "method",
+       "signature": "(contour:CamContour, islands:Array<CamContour>, radius:Float, a:Point3, b:Point3):Bool",
+       "static": true,
+       "doc": "Exact segment/edge clearance proof for a local link above a cleared layer."
+      }
+     ]
+    },
+    {
+     "name": "CamSheetProfiles",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamSheetProfiles.hx",
+     "doc": "Rectangular MachineKit sheet blanks as CNC profile inputs.",
+     "fields": [
+      {
+       "name": "fromPlan",
+       "kind": "method",
+       "signature": "(plan:SheetCutPlan, placementId:String, ?surfaceZMetres:Float):CamContour",
+       "static": true
+      },
+      {
+       "name": "placement",
+       "kind": "method",
+       "signature": "(value:SheetPartPlacement, unit:String, ?surfaceZMetres:Float):CamContour",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CamToolingPanels",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamToolingPanels.hx",
+     "doc": "Finished panel contours -> one CamJob operation per record. Compensation stays in CamJob.",
+     "fields": [
+      {
+       "name": "contour",
+       "kind": "method",
+       "signature": "(op:PanelOperation, tolerance:Float, ?mirrorX:Bool, ?minX:Float, ?minY:Float, ?widthMm:Float, ?margin:Float):CamContour",
+       "static": true
+      },
+      {
+       "name": "openRebate",
+       "kind": "method",
+       "signature": "(op:PanelOperation, outline:Array<PanelSegment>, radiusMm:Float):PanelOperation",
+       "static": true,
+       "doc": "Extend only outside the finished panel; neutral operation geometry is untouched."
+      },
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(input:PanelPlan, settings:PanelCamSettings):Array<PanelCamSetup>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "HobbingEngagement",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/HobbingEngagement.hx",
+     "doc": "Exact continuous cylindrical-envelope bounds for two skew cutter/blank cylinders.\nLengths in mm. Cutter tooth/gash gaps can only reduce this envelope.\nRequires the finite hob to cover the returned axial half-span at the selected shift.",
+     "fields": [
+      {
+       "name": "overrun",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "axialHalfSpan",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(blankRadius:Float, hobRadius:Float, centreDistance:Float, tilt:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "HobbingJob",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/HobbingJob.hx",
+     "doc": "External spur-gear CAM for a right-hand hob. No machine solids, native CAD or stock subtraction.\nGear/hob geometry is mm; exported machine-axis coordinates and feeds are metres and m/s.\nThe setup is the logical X/Y/Z hobber axes, not a tool-tip Cartesian frame.",
+     "fields": [
+      {
+       "name": "spec",
+       "kind": "var",
+       "signature": ":GearSpec",
+       "final": true
+      },
+      {
+       "name": "hob",
+       "kind": "var",
+       "signature": ":HobDesign",
+       "final": true
+      },
+      {
+       "name": "usableHobLength",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "rpm",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "tableRpm",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "axialFeed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "fullDepth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "safeX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "passes",
+       "kind": "var",
+       "signature": ":Array<HobbingPass>",
+       "final": true
+      },
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":ToolpathProgram",
+       "final": true
+      },
+      {
+       "name": "cuttingSeconds",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Nominal cutting-feed time, including geometric overrun and axial clearance on each pass.\nPositioning, acceleration, spindle ramps and measured barriers are additional."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(spec:GearSpec, hob:HobDesign, usableHobLength:Float, ?settings:HobbingSettings, ?limits:HobbingLimits):Void"
+      },
+      {
+       "name": "crownAt",
+       "kind": "method",
+       "signature": "(z:Float):Float",
+       "doc": "Programmed centre-thickness crown (mm), clamped to zero outside the blank face."
+      }
+     ]
+    },
+    {
+     "name": "HobbingLimits",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/HobbingLimits.hx",
+     "doc": "Installed logical-axis travel in mm/radians plus speed limits. Supplied by the machine adapter.",
+     "fields": [
+      {
+       "name": "lower",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true
+      },
+      {
+       "name": "upper",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true
+      },
+      {
+       "name": "minTilt",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxTilt",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxHobRpm",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "maxTableRpm",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(lower:Point3, upper:Point3, minTilt:Float, maxTilt:Float, maxHobRpm:Float, maxTableRpm:Float):Void"
+      },
+      {
+       "name": "check",
+       "kind": "method",
+       "signature": "(job:HobbingJob):Void"
+      }
+     ]
+    },
+    {
+     "name": "HobbingPass",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/HobbingPass.hx",
+     "doc": "Planned cutting pass, mm/radians/seconds. Excludes positioning and spindle settling.",
+     "fields": [
+      {
+       "name": "depth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "shift",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "centreDistance",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "engagement",
+       "kind": "var",
+       "signature": ":HobbingEngagement",
+       "final": true
+      },
+      {
+       "name": "zStart",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "zEnd",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "revolutions",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "seconds",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "tablePhase",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(depth:Float, shift:Float, centreDistance:Float, engagement:HobbingEngagement, zStart:Float, zEnd:Float, revolutions:Float, seconds:Float, tablePhase:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "HobbingSettings",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/HobbingSettings.hx",
+     "doc": "Hobbing inputs use GearKit's mm, radians, rpm and m/min; ToolpathKit output uses SI.",
+     "fields": [
+      {
+       "name": "cuttingSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "feedPerRevolution",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "climb",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "depths",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "doc": "Incremental radial depths in mm, strictly increasing; empty chooses one full-depth pass."
+      },
+      {
+       "name": "shifts",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "doc": "One static hob-axis shift per pass; empty chooses zero. Shifting happens retracted."
+      },
+      {
+       "name": "blankOuterRadius",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "faceBottom",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "clearance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "crown",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Middle-face outward X bump; zero at both face ends, parabolic inside, zero outside."
+      },
+      {
+       "name": "crownChordTolerance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "rapidFeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "infeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "signalTimeout",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "xAxis",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "yAxis",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "zAxis",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "tiltJoint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "hobJoint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "tableJoint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "readySignal",
+       "kind": "var",
+       "signature": ":String",
+       "doc": "Startup witness: hob encoder datum B=0, released EGB, and machine ready to accept this job."
+      },
+      {
+       "name": "stoppedSignal",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "copy",
+       "kind": "method",
+       "signature": "():HobbingSettings"
+      }
+     ]
+    },
+    {
+     "name": "PanelCamSettings",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamToolingPanels.hx",
+     "fields": [
+      {
+       "name": "chordTolerance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "arcTolerance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "blendTolerance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cutDirection",
+       "kind": "var",
+       "signature": ":CamCutDirection"
+      },
+      {
+       "name": "spindleSpinUpSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "nominalDiameters",
+       "kind": "var",
+       "signature": ":Array<{number:Int, diameter:Float}>"
+      },
+      {
+       "name": "diameterMatchTolerance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "toolMeasurementReference",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "singleToolPrograms",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "spoilboardPlane",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "breakthroughAllowance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "onionSkinDepth",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "vacuumHold",
+       "kind": "var",
+       "signature": ":Null<{reference:String, areaMm2:Float, holdingForceN:Float, cuttingForceN:Float, safetyFactor:Float}>"
+      },
+      {
+       "name": "approachClearance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "drillPeckRatio",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "drillPeckDepth",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "travelSpace",
+       "kind": "var",
+       "signature": ":PanelTravelSpace"
+      },
+      {
+       "name": "workOriginReference",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "safeZ",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spindleRpm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "feed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "plungeFeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "stepDown",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "stepOverFraction",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "blankMargin",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "tools",
+       "kind": "var",
+       "signature": ":Array<Tool>"
+      },
+      {
+       "name": "fixtures",
+       "kind": "var",
+       "signature": ":Array<Fixture>"
+      },
+      {
+       "name": "travel",
+       "kind": "var",
+       "signature": ":TravelEnvelope"
+      },
+      {
+       "name": "workOrigin",
+       "kind": "var",
+       "signature": ":Point3"
+      },
+      {
+       "name": "workholdingReference",
+       "kind": "var",
+       "signature": ":Null<String>"
+      }
+     ],
+     "doc": "Explicit shop choices, in metres and metres/second. No inferred cutting feeds."
+    },
+    {
+     "name": "PanelCamSetup",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamToolingPanels.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "side",
+       "kind": "var",
+       "signature": ":MachiningSide"
+      },
+      {
+       "name": "sourceSetupId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "operationIds",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":ToolpathProgram"
+      },
+      {
+       "name": "readinessPending",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "setup",
+       "kind": "var",
+       "signature": ":Setup"
+      },
+      {
+       "name": "reflectedX",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "sourceMinX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "sourceMinY",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "widthMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "heightMm",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "PanelToolOrder",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/PanelToolOrder.hx",
+     "doc": "Breadth-first tool-block scheduling. Saturating a tool's ready operations\ncannot worsen a precedence-only schedule; every level is exactly one load.",
+     "fields": [
+      {
+       "name": "order",
+       "kind": "method",
+       "signature": "(operations:Array<PanelOperation>, number:(PanelOperation) -> Int):Array<PanelOperation>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "PanelTravelSpace",
+     "kind": "abstract",
+     "file": "camkit/haxe/camkit/CamToolingPanels.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "MachineCoordinates",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "WorkCoordinates",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "camkit.additive",
+   "types": [
+    {
+     "name": "Group",
+     "kind": "enum",
+     "file": "camkit/haxe/camkit/additive/Slicer.hx",
+     "fields": [
+      {
+       "name": "PerimeterLoops",
+       "kind": "case",
+       "signature": "(k:Int)"
+      },
+      {
+       "name": "SolidFill",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "SparseFill",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "PrinterProfile",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/additive/PrinterProfile.hx",
+     "doc": "The machine the slicer writes for: where the bed is and the start and end sequences. Positions are\nmachine metres. A model is centred on `bedCenterX/Y` and sits on the bed at z = 0.",
+     "fields": [
+      {
+       "name": "bedCenterX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "bedCenterY",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "purgeStart",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true,
+       "doc": "The purge line along the front of the bed, printed before the first layer."
+      },
+      {
+       "name": "purgeEnd",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true
+      },
+      {
+       "name": "purgeHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Height and width of the purge bead."
+      },
+      {
+       "name": "purgeWidth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "purgeSpeed",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "purgePrimeLength",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Stationary filament prime before the purge bead, metres; zero disables it."
+      },
+      {
+       "name": "home",
+       "kind": "var",
+       "signature": ":Point3",
+       "final": true,
+       "doc": "Where homing leaves the nozzle, and where it goes when the print is done (after lifting `parkLift`)."
+      },
+      {
+       "name": "parkLift",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(bedCenterX:Float, bedCenterY:Float, purgeStart:Point3, purgeEnd:Point3, ?purgeHeight:Float, ?purgeWidth:Float, ?purgeSpeed:Float, ?home:Point3, ?parkLift:Float, ?purgePrimeLength:Float):Void"
+      },
+      {
+       "name": "bed220",
+       "kind": "method",
+       "signature": "():PrinterProfile",
+       "static": true,
+       "doc": "A 220 x 220 mm bed with the purge line 5 mm from its front edge."
+      }
+     ]
+    },
+    {
+     "name": "SliceReport",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/additive/Slicer.hx",
+     "doc": "What a slice came to, for reports and tests. Lengths in metres, volumes in m^3.",
+     "fields": [
+      {
+       "name": "layers",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "moves",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "retractions",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "extrudedLength",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "travelLength",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "seconds",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Seconds the slice took."
+      },
+      {
+       "name": "depositedVolume",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "SliceResult",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/additive/Slicer.hx",
+     "fields": [
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":ToolpathProgram",
+       "final": true
+      },
+      {
+       "name": "report",
+       "kind": "var",
+       "signature": ":SliceReport",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(program:ToolpathProgram, report:SliceReport):Void"
+      }
+     ]
+    },
+    {
+     "name": "Slicer",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/additive/Slicer.hx",
+     "doc": "Slices a part into a toolpath program, from the B-rep: each layer is a planar section of the solid,\nperimeters are offsets of it, top and bottom skins are what the layers above and below do not cover,\nand infill is scanlines across the rest. Boundaries stay exact lines and arcs, so a circle is an arc.\n\nThe part is placed on the bed at z = 0, centred on the profile's bed centre. Geometry is in the\npart's millimetres; the program is in metres.",
+     "fields": [
+      {
+       "name": "slice",
+       "kind": "method",
+       "signature": "(part:Part, settings:SlicerSettings, ?profile:PrinterProfile, ?objectName:String):SliceResult",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SlicerSettings",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/additive/SlicerSettings.hx",
+     "doc": "What the slicer is told, in metres and metres per second. The defaults are an ordinary 0.4 mm nozzle\nat 0.2 mm layers; every value is checked, so a bad one fails before anything is sliced.",
+     "fields": [
+      {
+       "name": "nozzleDiameter",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "layerHeight",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "firstLayerHeight",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "lineWidth",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Width of a bead, centre to edge to edge; a quarter wider than the nozzle fills its corners."
+      },
+      {
+       "name": "perimeters",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "topLayers",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "bottomLayers",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "infillDensity",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Fraction of the sparse infill region filled: 0 to 1. At 1 every layer is solid."
+      },
+      {
+       "name": "infillAngles",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "doc": "Rectilinear infill alternates between these angles (radians, from +x) layer by layer."
+      },
+      {
+       "name": "externalPerimeterSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "perimeterSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "infillSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "solidInfillSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "topSolidInfillSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "skirtSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "firstLayerSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "travelSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "retractLength",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Retraction: pull back this much filament, at this speed, before a travel longer than `retractMinTravel` that leaves the part."
+      },
+      {
+       "name": "retractSpeed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "retractMinTravel",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "zHop",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Lift the nozzle this much during retracted travels; off by default."
+      },
+      {
+       "name": "hotendTemperature",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "bedTemperature",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "fanDuty",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Part-cooling fan duty from this layer on (layer indices count from 0); the first layers print without it."
+      },
+      {
+       "name": "fanFromLayer",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "skirtLoops",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "skirtDistance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pathTolerance",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Corner rounding allowed to deposited moves."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "beadSpacing",
+       "kind": "method",
+       "signature": "(height:Float):Float",
+       "doc": "The distance between neighbouring beads that fills a layer exactly: a rounded bead of this width and height holds `height * spacing`."
+      },
+      {
+       "name": "beadArea",
+       "kind": "method",
+       "signature": "(height:Float):Float",
+       "doc": "Cross-section of a bead `height` tall: a rectangle with semicircular sides, `lineWidth` wide over all."
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "TestParts",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/additive/TestParts.hx",
+     "doc": "Parts to print for testing, built in code so tests need no files. Millimetres, standing on z = 0 and\ncentred on the origin; the caller closes them.",
+     "fields": [
+      {
+       "name": "calibrationCube",
+       "kind": "method",
+       "signature": "(?height:Float):Part",
+       "static": true,
+       "doc": "A 20 mm square block `height` millimetres tall (a cube at the default 20) with a 6 mm hole through it along z, off\ncentre by (2, -1): for dimensional checks."
+      },
+      {
+       "name": "testTower",
+       "kind": "method",
+       "signature": "():Part",
+       "static": true,
+       "doc": "20 x 20 x 12 mm: a block with a 45 degree chamfer round its top edges, a round boss on it, and a\nhole through both with a counterbore in the boss. It has arcs, an island, and sloped and flat skins."
+      },
+      {
+       "name": "smallTab",
+       "kind": "method",
+       "signature": "():Part",
+       "static": true,
+       "doc": "10 x 10 x 1.2 mm, six layers at 0.2 mm: the fast test."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

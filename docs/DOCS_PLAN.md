@@ -128,8 +128,13 @@ place.
   workspace member (`docs-figures`), shares the workspace's native builds, and
   fails as a test when a committed figure is stale. The first figure (paths vs.
   trajectories) is live on its concept page.
-- D7 under way. Drafted beyond D2: the overview (*Materia in one page*),
-  Toolpaths, Machine components, Transmissions, Mechanical truth, Stock and
-  material removal, Manufacturing outputs, Diagnostics, The robot runtime,
-  Simulation worlds, Facilities and fleets, and the gantry-picker tutorial.
-  Every diagram is laid out to read at the column's width.
+- D7 concepts done: no stubs left in `concepts/`; every page is a draft
+  checked against the code, with its inconsistencies under Open questions.
+  Every diagram is laid out to read at the column's width. The editor user
+  manual is next.
+- D5 done: `docs/api/generate.py` parses every kit the editor uses with
+  Haxeon's parser into `docs/api/data/` (27 kits, about 3,700 public types);
+  the site renders a page per package under `/reference/` and links type names
+  on concept pages to it. The API reference comes from source declarations,
+  not the typed program, so a type is shown as the source writes it. CI fails
+  when the data is stale.
