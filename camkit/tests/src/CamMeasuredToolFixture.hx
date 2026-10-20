@@ -99,7 +99,7 @@ class CamMeasuredToolFixture {
       "the machine drives the gauge line one tool length above each tip");
 
     var imported = machine.compileDetailed(
-      machine.export(program, CamTestSetup.standard()));
+      machine.export(program, CamTestSetup.standard()), new Point3(0.002,0.002,0.05));
     check(imported.diagnostics.length == 0 &&
       imported.program.ops.length == program.ops.length,
       'measured-tool G-code round trip keeps operation order: ${imported.diagnostics}');

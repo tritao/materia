@@ -73,7 +73,8 @@ class CncWriter {
       case Move(Rapid, geometry, _, _, _), Move(Link, geometry, _, _, _),
           Move(Retract, geometry, _, _, _):
         switch geometry {
-          case Line(_, end): lines.push('G0 ${xyz(end)}');
+          case Line(start, end):
+            lines.push(Math.abs(start.x-end.x)<1e-12 && Math.abs(start.y-end.y)<1e-12 ? 'G0 Z${millimetres(end.z)}' : 'G0 ${xyz(end)}');
           case _: throw "CNC rapid export needs a line";
         }
       case Move(_, geometry, speed, blend, _):

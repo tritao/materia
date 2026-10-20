@@ -34,6 +34,25 @@ class CamToolingPanelTests {
 	static function settings():PanelCamSettings
 		return {
 			chordTolerance: 0.00002,
+			arcTolerance: 0.00002,
+			blendTolerance: 0.00002,
+			cutDirection: Climb,
+			spindleSpinUpSeconds: 2,
+			diameterMatchTolerance: 0.00005,
+			toolMeasurementReference: "test measured tools",
+			singleToolPrograms: false,
+			spoilboardPlane: -0.012,
+			breakthroughAllowance: 0.001,
+			vacuumHoldReference: null,
+			travelSpace: MachineCoordinates,
+			workOriginReference: "test machine datum",
+			nominalDiameters: [
+				{
+					number: 1,
+					diameter: 0.002
+				},
+				{number: 2, diameter: 0.004}
+			],
 			safeZ: 0.01,
 			spindleRpm: 12000,
 			feed: 0.01,
@@ -41,7 +60,7 @@ class CamToolingPanelTests {
 			stepDown: 0.004,
 			stepOverFraction: 0.4,
 			blankMargin: 0.01,
-			tools: [new Tool(1, 0, 0.002), new Tool(2, 0, 0.004)],
+			tools: [new Tool(1, 0.05, 0.002), new Tool(2, 0.06, 0.004)],
 			fixtures: [],
 			travel: new TravelEnvelope(new Point3(-0.1, -0.1, -0.1), new Point3(1, 1, 0.1)),
 			workOrigin: new Point3(0, 0, 0),
@@ -67,14 +86,15 @@ class CamToolingPanelTests {
 		p.operations.push(drill);
 		p.operations.push(PanelJoints.operation("inside", InsideProfile, PanelContours.circle(50, 60, 5), 12, 2, PositiveZ, true));
 		p.operations.push(PanelJoints.operation("back-pocket", Pocket, PanelContours.circle(70, 35, 8), 2, 2, NegativeZ, false));
-		p.operations.push(PanelJoints.operation("edge-rebate", Rebate, PanelContours.roundedRectangle(0, 5, 10, 15, 2), 2, 2, PositiveZ, false));
+		p.operations.push(PanelJoints.operation("edge-rebate", Rebate, PanelContours.rectangle(0, 0, 100, 5), 2, 2, PositiveZ, false));
 		p.labelX = 80;
 		p.labelY = 65;
 		return p;
 	}
 
 	public static function run():Int {
-		var p = panel(), s = settings(), setups = CamToolingPanels.build(p, s);
+		var p = panel(), s = settings();
+		var setups = CamToolingPanels.build(p, s);
 		check(setups.length == 2 && setups[0].reflectedX && !setups[1].reflectedX, "underside setup precedes releasing outside profile");
 		var ids = [for (setup in setups) for (id in setup.operationIds) id];
 		check(ids.length == p.operations.length, "one CAM call per operation, no omitted kind");
@@ -101,7 +121,7 @@ class CamToolingPanelTests {
 		var mirror = CamToolingPanels.contour(circle, s.chordTolerance, true, 0, 0, 100, 0.01);
 		check(Math.abs(mirror.vertices[0].x - (0.1 - c.vertices[0].x + 0.01)) < 1e-12, "negative-face XY reflection and blank margin");
 		check(c.signedArea * mirror.signedArea < 0, "reflection preserves orientation explicitly");
-		var code = CncWriter.write(setups[1].program, new CncController(), s.travel);
+		var code = CncWriter.write(setups[1].program, new CncController(cnckit.CncDialect.LinuxCnc, setups[1].program.tools), s.travel);
 		var relieved = PanelJoints.blank("matched-relief", 100, 80, p.stock, 2, 2);
 		relieved.operations.push(PanelJoints.operation("relieved", InsideProfile, PanelContours.relievedRectangle(30, 20, 30, 14, 1), 12, 2, PositiveZ, true,
 			2));
@@ -135,8 +155,167 @@ class CamToolingPanelTests {
 				"inside offset applies actual cutter radius exactly once");
 		}
 		check(code.indexOf("G21") >= 0 && code.indexOf("G54") >= 0, "LinuxCNC uses mm and explicit setup");
+		var lines = code.split("\n");
+		var firstRapid = lines.filter(line -> StringTools.startsWith(line, "G0 "))[0];
+		check(firstRapid == "G0 Z10", "first physical move is Z-only to safe height");
+		var changes = 0;
+		for (index in 0...lines.length) {
+			if (StringTools.endsWith(lines[index], " M6")) {
+				changes++;
+				check(StringTools.startsWith(lines[index + 1], "G43 H"), "every measured tool change immediately applies H offset");
+			}
+			if (StringTools.endsWith(lines[index], " M3"))
+				check(lines[index + 1] == "G4 P2", "spindle starts have declared spin-up dwell");
+		}
+		check(changes == 3, "tool grouping preserves access and outside-last with three necessary tool loads");
+		check(code.indexOf("G64 P0.02") >= 0 && code.indexOf("G49\nM2") >= 0, "blended machining and length cancellation are explicit");
+		for (index in 0...c.vertices.length) {
+			check(Math.abs(mirror.vertices[index].x - (0.1 - c.vertices[index].x + 0.01)) < 1e-12
+				&& Math.abs(mirror.vertices[index].y - c.vertices[index].y - 0.01) < 1e-12,
+				"full contour reflection includes vertex "
+				+ index);
+		}
+		function area(program:toolpathkit.path.ToolpathProgram, feature:String):Float {
+			var sum = 0.0;
+			for (op in program.ops)
+				switch (op) {
+					case Move(Cut, g, _, _, span) if (span.featureRef == feature):
+						var a = GeometryTools.pointAt(g, 0);
+						for (j in 1...17) {
+							var length = GeometryTools.length(g);
+							var b = GeometryTools.pointAt(g, j == 16 ? length : length * j / 16);
+							sum += a.x * b.y - b.x * a.y;
+							a = b;
+						}
+					case _:
+				}
+			return sum;
+		}
+		check(area(setups[1].program, p.operations[0].id) < 0 && area(setups[1].program, "inside") > 0,
+			"climb outside is clockwise and climb inside counterclockwise");
+		var conventional = settings();
+		conventional.cutDirection = Conventional;
+		var conventionalPrograms = CamToolingPanels.build(p, conventional);
+		check(area(conventionalPrograms[1].program, p.operations[0].id) > 0 && area(conventionalPrograms[1].program, "inside") < 0,
+			"conventional cutting reverses both material sides");
+		var extended = CamToolingPanels.openRebate(p.operations.filter(op -> op.id == "edge-rebate")[0], PanelContours.outside(p), 1);
+		check(materia.tooling.panel.PanelGeometry.bounds(extended.contour).x == -1,
+			"square rebate's open side extends one cutter radius outside finished outline");
+		for (op in setups[1].program.ops)
+			switch (op) {
+				case Move(Cut, g, _, _, span) if (span.featureRef == p.operations[0].id):
+					for (fraction in [0.0, 0.5, 1.0]) {
+						var q = GeometryTools.pointAt(g, GeometryTools.length(g) * fraction);
+						var dx = Math.max(0, Math.max(0.01 - q.x, q.x - 0.11)),
+							dy = Math.max(0, Math.max(0.01 - q.y, q.y - 0.09));
+						check(Math.abs(Math.sqrt(dx * dx + dy * dy) - 0.001) < s.arcTolerance * 2, "outside profile compensates actual cutter radius once");
+					}
+				case _:
+			}
+		for (corner in [
+			new Point3(0.01, 0.01, 0),
+			new Point3(0.11, 0.01, 0),
+			new Point3(0.01, 0.015, 0),
+			new Point3(0.11, 0.015, 0)
+		]) {
+			var closest = Math.POSITIVE_INFINITY;
+			for (op in setups[1].program.ops)
+				switch (op) {
+					case Move(Cut, g, _, _, span) if (span.featureRef == "edge-rebate"):
+						var length = GeometryTools.length(g),
+							a = GeometryTools.pointAt(g, 0);
+						if (a.z > -0.002 + 1e-9)
+							continue;
+						for (j in 1...33) {
+							var b = GeometryTools.pointAt(g, j == 32 ? length : length * j / 32), dx = b.x - a.x, dy = b.y - a.y;
+							var square = dx * dx + dy * dy,
+								t = square == 0 ? 0 : Math.max(0, Math.min(1, ((corner.x - a.x) * dx + (corner.y - a.y) * dy) / square));
+							closest = Math.min(closest, Math.sqrt(Math.pow(corner.x - a.x - t * dx, 2) + Math.pow(corner.y - a.y - t * dy, 2)));
+							a = b;
+						}
+					case _:
+				}
+			check(closest <= 0.001 + s.arcTolerance, "square rebate cutter sweep reaches the original outline corner without a lip");
+		}
+		var measured = settings();
+		measured.tools = [new Tool(1, 0.05, 0.00196), new Tool(2, 0.06, 0.004)];
+		var measuredBlank = PanelJoints.blank("measured-diameter", 100, 80, p.stock, 2, 2);
+		var measuredProgram = CamToolingPanels.build(measuredBlank, measured)[0].program,
+			left = Math.POSITIVE_INFINITY;
+		for (op in measuredProgram.ops)
+			switch (op) {
+				case Move(Cut, g, _, _, _):
+					left = Math.min(left, GeometryTools.pointAt(g, 0).x);
+				case _:
+			}
+		check(Math.abs(left - (0.01 - 0.00196 / 2)) < 1e-8, "actual measured diameter supplies compensation while nominal diameter selects the tool");
+		measured.tools = [new Tool(1, 0.05, 0.0022), new Tool(2, 0.06, 0.004)];
+		rejects(() -> CamToolingPanels.build(measuredBlank, measured), "matching tolerance");
+		var machineTravel = settings();
+		machineTravel.workOrigin = new Point3(1, 0, 0);
+		rejects(() -> CamToolingPanels.build(p, machineTravel), "travel");
+		var outsideRelief = PanelJoints.blank("outside-relief", 100, 80, p.stock, 2, 2);
+		outsideRelief.operations[0].contour = PanelContours.relievedPolygon([
+			{x: 0, y: 0},
+			{x: 100, y: 0},
+			{x: 100, y: 80},
+			{x: 60, y: 80},
+			{x: 60, y: 60},
+			{x: 40, y: 60},
+			{x: 40, y: 80},
+			{x: 0, y: 80}
+		], 1);
+		outsideRelief.labelX = 20;
+		outsideRelief.labelY = 60;
+		var reliefProgram = CamToolingPanels.build(outsideRelief, s)[0].program;
+		for (edge in outsideRelief.operations[0].contour)
+			if (edge.center != null && edge.sweep < 0) {
+				var center = edge.center, found = false;
+				for (op in reliefProgram.ops)
+					switch (op) {
+						case Move(Plunge, g, _, _, span):
+							var q = GeometryTools.pointAt(g, GeometryTools.length(g));
+							if (Math.abs(q.x - center.x * 0.001 - 0.01) + Math.abs(q.y - center.y * 0.001 - 0.01) < 1e-10)
+								found = true;
+						case _:
+					}
+				check(found, "outside concave relief retains its verified cutter-centre entry");
+			}
+		var negative = setups[1].program.ops.copy();
+		for (index in 0...negative.length)
+			switch (negative[index]) {
+				case Move(Cut, _, feed, tolerance, span):
+					negative[index] = Move(Cut, Line(new Point3(0.02, 0.02, -0.014), new Point3(0.03, 0.02, -0.014)), feed, tolerance, span);
+					break;
+				case _:
+			}
+		rejects(() -> setups[1].setup.validate(negative, setups[1].program.tools), "below stock bottom/spoilboard allowance");
+		var unknown = settings();
+		unknown.tools = [new Tool(1, 0, 0.002), new Tool(2, 0, 0.004)];
+		rejects(() -> CamToolingPanels.build(p, unknown), "multi-tool programs require measured");
+		unknown.singleToolPrograms = true;
+		for (batch in CamToolingPanels.build(p, unknown)) {
+			var ids = new Map<Int, Bool>();
+			for (op in batch.program.ops)
+				switch (op) {
+					case ToolChange(number, _):
+						ids.set(number, true);
+					case _:
+				}
+			check([for (id in ids.keys()) id].length == 1 && batch.readinessPending.length > 0,
+				"unmeasured tools are only exported as pending single-tool programs");
+		}
+		var qualified = settings();
+		qualified.fixtures = [new Fixture("declared-vacuum-base", 0.5, 0.51, 0.5, 0.51, -0.02, 0.005)];
+		qualified.vacuumHoldReference = "fixture-only vacuum test";
+		check(CamToolingPanels.build(p, qualified).filter(batch -> batch.readinessPending.length > 0).length == 0,
+			"declared machine coordinates, measured tools, fixtures and vacuum satisfy CAM declaration checks");
+		qualified.travelSpace = WorkCoordinates;
+		check(CamToolingPanels.build(p, qualified).filter(batch -> batch.readinessPending.length == 0).length == 0,
+			"work-coordinate travel never receives a passing CAM qualification");
 		var repeated = CamToolingPanels.build(p, s);
-		check(CncWriter.write(repeated[1].program, new CncController(), s.travel) == code, "repeated CAM generation stable");
+		check(CncWriter.write(repeated[1].program, new CncController(cnckit.CncDialect.LinuxCnc, repeated[1].program.tools), s.travel) == code,
+			"repeated CAM generation stable");
 		for (kind in [InsideProfile, Pocket]) {
 			var point = PanelJoints.blank("point-centreline", 100, 80, p.stock, 2, 2);
 			point.operations.push(PanelJoints.operation("point-hole", kind, PanelContours.circle(25, 35, 1), kind == Pocket ? 3 : 12, 2, PositiveZ,
@@ -147,7 +326,7 @@ class CamToolingPanelTests {
 					case Move(Plunge, geometry, _, _, span):
 						if (span.featureRef == "point-hole") {
 							var end = GeometryTools.pointAt(geometry, GeometryTools.length(geometry));
-							if (Math.abs(end.x - 0.035) + Math.abs(end.y - 0.045) + Math.abs(end.z + (kind == Pocket ? 0.003 : 0.012)) < 1e-10)
+							if (Math.abs(end.x - 0.035) + Math.abs(end.y - 0.045) + Math.abs(end.z + (kind == Pocket ? 0.003 : 0.013)) < 1e-10)
 								found = true;
 						}
 					case _:
@@ -165,7 +344,7 @@ class CamToolingPanelTests {
 		rejects(() -> CamToolingPanels.build(p, s), "numbers must be unique");
 		s = settings();
 		s.tools = [new Tool(3, 0, 0.003), new Tool(2, 0, 0.004)];
-		rejects(() -> CamToolingPanels.build(p, s), "exactly one tool");
+		rejects(() -> CamToolingPanels.build(p, s), "matching tolerance");
 		s = settings();
 		s.fixtures = [new Fixture("blocked-pocket", 0.02, 0.05, 0.03, 0.06, -0.012, 0.005)];
 		rejects(() -> CamToolingPanels.build(p, s), "fixture");

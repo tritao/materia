@@ -302,3 +302,26 @@ specifying the actual left/right thermal conditions. Unknown/stale references,
 wrong dimensions or repeated span assignments fail. Even complete slab volume
 coverage leaves nonrectangular junction modelling pending. Review exports may
 contain failures; no suggestion changes the source casting or releases fabrication.
+
+
+## Manufacturing review corrections
+
+**Not fabrication-ready.** No coupon trial has been recorded. The panel CAM route
+now declares nominal versus measured cutter diameters and matching tolerance,
+measured tool lengths, G43 after measured tool changes and G49 at program end.
+Unknown lengths are allowed only in single-tool review programs. Operations group
+by tool while preserving access prerequisites and outside-last. Run split files
+in `cam-programs.json` order, including earlier faces and access cuts.
+
+Programs begin with a Z-only safe retract and use a declared spindle spin-up dwell,
+arc fitting, blending tolerance and climb/conventional direction. Through cuts
+include the declared breakthrough allowance into a stock-bottom spoilboard plane.
+Square rebates extend their open contour sides outside the finished outline in
+CAM; the neutral profile and CAD remain finished geometry.
+
+This route requires a declared vacuum-hold qualification for the final outside
+profile. It does not generate tabs or an onion skin. Missing vacuum evidence,
+fixture geometry, measured lengths or a qualified machine-coordinate work origin
+keeps the per-panel CAM check pending. The mill's zero-length study tools are split
+into pending single-tool files; they are not qualified machine programs. Shop
+feeds, machine travel, setup and the physical coupon trial remain required.

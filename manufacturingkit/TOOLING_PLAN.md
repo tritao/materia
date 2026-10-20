@@ -240,6 +240,27 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
 
+## Manufacturing review follow-up
+
+- [x] Review 1–9, panel CAM: measured-length multi-tool programs (G43/G49),
+  dependency-preserving grouping, explicit single-tool review fallback, declared
+  spoilboard/breakthrough, qualified-vacuum retention route, Z-only start, spindle
+  dwell, open-side square-rebate extension, arc/blend tolerance, cut direction,
+  nominal/measured diameter matching and machine-coordinate qualification gates.
+  Panel tests include outside/relief compensation, full contour mirror, square
+  rebate cutter coverage, tool offset sequencing, direction and CAM-depth rejection.
+  The 276 panel assertions and 12,457 existing CamKit assertions pass. The records export yields 44 review programs, with five ordered bed files;
+  all 19 per-panel CAM records stay pending under the study setup. The mill
+  remains not fabrication-ready: tools/fixtures/vacuum and a recorded coupon trial
+  are not qualified. Tabs/onion skins are not claimed by the vacuum route.
+- [ ] Review 10–13: rigid-tooling loads, explicit panel-model gaps, manifest
+  readiness integrity and unknown hardware reporting.
+- [ ] Review 14–21: handling, shared bridges, finishing stock, former overlap/
+  release, typed source insert roles/links and neutral datum/resin validation.
+- [ ] Review 22–30: actual fill openings, single cure authority, thermal model
+  corrections, EPS compatibility, shared orientation analysis/ranking, actual CAD
+  comparison, trapped-volume/head curves and stronger process fixtures.
+
 ## Objective and first deliverable
 
 Generate an inexpensive, self-locating mold kit from a machine's casting definition:

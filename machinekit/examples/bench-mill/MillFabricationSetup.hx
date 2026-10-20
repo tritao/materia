@@ -67,6 +67,7 @@ class MillFabricationSetup {
 		};
 
 	public static function cam(panels:Array<PanelPlan>):PanelCamSettings {
+		if (panels.length == 0) throw "Panel machining requires panels";
 		var diameters:Array<Float> = [];
 		for (p in panels)
 			for (op in p.operations)
@@ -75,6 +76,24 @@ class MillFabricationSetup {
 		diameters.sort((a, b) -> Reflect.compare(a, b));
 		return {
 			chordTolerance: 0.00002,
+			arcTolerance: 0.00002,
+			blendTolerance: 0.00002,
+			cutDirection: Climb,
+			spindleSpinUpSeconds: 2,
+			diameterMatchTolerance: 0.00005,
+			toolMeasurementReference: null,
+			singleToolPrograms: true,
+			spoilboardPlane: -panels[0].stock.measuredThickness * 0.001,
+			breakthroughAllowance: 0.001,
+			vacuumHoldReference: null,
+			travelSpace: MachineCoordinates,
+			workOriginReference: null,
+			nominalDiameters: [
+				for (i in 0...diameters.length) {
+					number: i + 1,
+					diameter: diameters[i] * 0.001
+				}
+			],
 			safeZ: 0.012,
 			spindleRpm: 12000,
 			feed: 0.01,

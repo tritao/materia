@@ -61,8 +61,8 @@ class Setup {
     var length = GeometryTools.length(geometry);
     var start = GeometryTools.pointAt(geometry, 0.0);
     var end = GeometryTools.pointAt(geometry, length);
-    if (cutting && Math.min(start.z, end.z) < stock.bottom - 1e-9)
-      fail(span, 'cut goes below stock bottom ${stock.bottom}');
+    if (cutting && Math.min(start.z, end.z) < stock.bottom - stock.breakthroughAllowance - 1e-9)
+      fail(span, 'cut goes below stock bottom/spoilboard allowance ${stock.bottom - stock.breakthroughAllowance}');
     if (!cutting && (Math.abs(start.x - end.x) > 1e-9 ||
         Math.abs(start.y - end.y) > 1e-9) &&
         Math.min(start.z, end.z) < stock.safeZ - 1e-9)
@@ -78,7 +78,7 @@ class Setup {
     var previous = start;
     for (index in 1...(segments + 1)) {
       var current = GeometryTools.pointAt(geometry,
-        length * index / segments);
+        index == segments ? length : length * index / segments);
       var margin = switch geometry {
         case Line(_, _): 0.0;
         case Arc(_, arcRadius, _, sweep), Circular(_, arcRadius, _, sweep, _, _):

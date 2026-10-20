@@ -79,8 +79,11 @@ class CamSafeTravelFixture {
     machine.toolLibrary.set(profileTool); machine.toolLibrary.set(drillTool);
     check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "mixed tool job lowers through MotionKit");
-    var imported = machine.compileDetailed(
-      machine.export(program, CamTestSetup.standard()));
+    var source = machine.export(program, CamTestSetup.standard());
+    check(source.split("\n").filter(line -> StringTools.startsWith(line,"G0 "))[0] == "G0 Z5",
+      "nonzero initial XY is retained by a Z-only first retract");
+    var imported = machine.compileDetailed(source,
+      new Point3(0.002, 0.002, -0.001));
     check(imported.diagnostics.length == 0 &&
       imported.program.ops.length == program.ops.length,
       "mixed tool G-code round trip keeps operation order");

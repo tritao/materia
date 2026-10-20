@@ -36,6 +36,9 @@ class CamJob {
   /** The G43 length in effect; moves are programmed at the tool tip. */
   var activeLength:Float = 0.0;
   var operationNumber:Int = 0;
+  final spindleSpinUpSeconds:Float;
+  final initialRetract:Bool;
+  final cutDirection:Null<CamCutDirection>;
   var ops:Array<ToolpathOp> = [];
   var tools:Array<Tool> = [];
 
@@ -45,7 +48,7 @@ class CamJob {
     clear of the work, since the first tool is loaded there.
   **/
   public function new(safeZ:Float, spindleRpm:Float, ?initial:Point3,
-      blendTolerance:Float = 0.0, arcTolerance:Float = 0.0) {
+      blendTolerance:Float = 0.0, arcTolerance:Float = 0.0, spindleSpinUpSeconds:Float = 0.0, initialRetract:Bool = false, ?cutDirection:CamCutDirection) {
     if (!Math.isFinite(safeZ) || !Math.isFinite(spindleRpm) ||
         spindleRpm <= 0.0)
       throw "CAM needs finite safe Z and positive spindle RPM";
@@ -54,6 +57,10 @@ class CamJob {
     this.blendTolerance = blendTolerance;
     if (!Math.isFinite(arcTolerance) || arcTolerance < 0.0)
       throw "CAM arc tolerance must be finite and not negative";
+    if (!Math.isFinite(spindleSpinUpSeconds) || spindleSpinUpSeconds < 0) throw "Invalid spindle spin-up dwell";
+    this.spindleSpinUpSeconds = spindleSpinUpSeconds;
+    this.initialRetract = initialRetract;
+    this.cutDirection = cutDirection;
     this.arcTolerance = arcTolerance;
     this.safeZ = safeZ;
     this.spindleRpm = spindleRpm;
@@ -234,6 +241,10 @@ class CamJob {
 
   function cutPocketRing(contour:CamContour, level:Float, prior:Float,
       surface:Float, feed:Float, plungeFeed:Float, span:Provenance):Void {
+    if (cutDirection != null && ((contour.signedArea > 0) != (cutDirection == CamCutDirection.Climb))) {
+      var reversed = contour.vertices.copy(); reversed.reverse();
+      contour = new CamContour(reversed);
+    }
     var first = contour.vertices[0], next = contour.vertices[1];
     var start = new Point3(first.x, first.y, level);
     enterPocket(start, new Point3(next.x, next.y, level), prior,
@@ -333,6 +344,7 @@ class CamJob {
     var result = ArcFitting.fit(ops, arcTolerance);
     var endSpan = Provenance.cam(operationNumber + 1);
     result.push(ToolpathOp.Spindle(Off, 0.0, endSpan));
+    if (initialRetract || activeLength > 0) result.push(ToolpathOp.ToolLengthOffset(0, 0.0, endSpan));
     result.push(ToolpathOp.End(endSpan));
     var library = new ToolLibrary();
     for (tool in tools) library.set(tool);
@@ -366,10 +378,34 @@ class CamJob {
     rapid(new Point3(first.x, first.y, safeZ), span);
   }
 
-  static function offsetPath(contour:CamContour, radius:Float,
-      depth:Float, outside:Bool):Array<PathGeometry>
-    return contour.exactBoundary == null ? GeometryOffset.profile(contour.vertices, radius, depth, outside)
+  function offsetPath(contour:CamContour, radius:Float,
+      depth:Float, outside:Bool):Array<PathGeometry> {
+    var path = contour.exactBoundary == null ? GeometryOffset.profile(contour.vertices, radius, depth, outside)
       : CamExactBoundary.offset(contour, radius, depth, outside);
+    return orientPath(path, outside);
+  }
+
+  function orientPath(path:Array<PathGeometry>, outside:Bool):Array<PathGeometry> {
+    if (cutDirection == null || path.length == 0) return path;
+    var area = 0.0;
+    for (g in path) {
+      var previous = GeometryTools.pointAt(g, 0);
+      for (i in 1...17) {
+        var next = GeometryTools.pointAt(g, GeometryTools.length(g) * i / 16);
+        area += previous.x * next.y - next.x * previous.y;
+        previous = next;
+      }
+    }
+    var ccw = (cutDirection == CamCutDirection.Climb) != outside;
+    if ((area > 0) == ccw) return path;
+    var result:Array<PathGeometry> = [];
+    for (index in 0...path.length) switch path[path.length - index - 1] {
+      case Line(a,b): result.push(Line(b,a));
+      case Arc(center,radius,start,sweep): result.push(Arc(center,radius,start+sweep,-sweep));
+      case _: throw "CAM ring direction needs planar line/arc geometry";
+    }
+    return result;
+  }
 
   function cutReliefs(centers:Array<Point3>, depth:Float, feed:Float,
       span:Provenance):Void {
@@ -442,8 +478,16 @@ class CamJob {
         current = new Point3(current.x, current.y,
           current.z + activeLength - tool.length);
         activeLength = tool.length;
+      } else if (selectedTool < 0 && initialRetract) {
+        ops.push(ToolpathOp.ToolLengthOffset(0, 0.0, span));
+      }
+      if (selectedTool < 0 && initialRetract) {
+        var target = new Point3(current.x, current.y, safeZ);
+        ops.push(ToolpathOp.Move(MoveKind.Retract, PathGeometry.Line(current, target), 0.0, 0.0, span));
+        current = target;
       }
       ops.push(ToolpathOp.Spindle(Clockwise, spindleRpm, span));
+      if (spindleSpinUpSeconds > 0) ops.push(ToolpathOp.Dwell(spindleSpinUpSeconds, span));
       selectedTool = tool.number;
     }
   }

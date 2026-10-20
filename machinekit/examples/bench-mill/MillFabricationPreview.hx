@@ -87,6 +87,19 @@ class MillFabricationPreview {
 			speedUnit: "m/s",
 			studyOnly: true,
 			chordTolerance: settings.chordTolerance,
+			arcTolerance: settings.arcTolerance,
+			blendTolerance: settings.blendTolerance,
+			cutDirection: settings.cutDirection,
+			spindleSpinUpSeconds: settings.spindleSpinUpSeconds,
+			nominalDiameters: settings.nominalDiameters,
+			diameterMatchTolerance: settings.diameterMatchTolerance,
+			toolMeasurementReference: settings.toolMeasurementReference,
+			singleToolPrograms: settings.singleToolPrograms,
+			spoilboardPlane: settings.spoilboardPlane,
+			breakthroughAllowance: settings.breakthroughAllowance,
+			vacuumHoldReference: settings.vacuumHoldReference,
+			travelSpace: settings.travelSpace,
+			workOriginReference: settings.workOriginReference,
 			safeZ: settings.safeZ,
 			spindleRpm: settings.spindleRpm,
 			feed: settings.feed,
@@ -111,9 +124,11 @@ class MillFabricationPreview {
 		for (panel in panels) {
 			try {
 				var setups = CamToolingPanels.build(panel, settings);
+				var pending = [for (setup in setups) for (reason in setup.readinessPending) reason];
 				for (setup in setups) {
 					var name = setup.id + ".ngc",
-						code = CncWriter.write(setup.program, new CncController(), settings.travel);
+						code = CncWriter.write(setup.program, new CncController(cnckit.CncDialect.LinuxCnc, setup.program.tools),
+							settings.travelSpace == MachineCoordinates ? settings.travel : null);
 					sys.io.File.saveContent(dir + "/" + name, "(REVIEW ONLY - unqualified study cutting data and workholding)\n" + code);
 					programs.push({
 						panelId: panel.id,
@@ -121,6 +136,7 @@ class MillFabricationPreview {
 						operationIds: setup.operationIds,
 						side: setup.side,
 						sourceSetupId: setup.sourceSetupId,
+						readinessPending: setup.readinessPending,
 						reflectedX: setup.reflectedX,
 						sourceMinX: setup.sourceMinX,
 						sourceMinY: setup.sourceMinY,
@@ -138,8 +154,9 @@ class MillFabricationPreview {
 						]
 					});
 				}
-				checks.push(ToolingLoads.check("fabrication.cam." + panel.id, [panel.id], ToolingCheckStatus.Pass,
-					"Panel operations mapped one-to-one and checked against declared stock, fixtures and travel before LinuxCNC export.",
+				checks.push(ToolingLoads.check("fabrication.cam." + panel.id, [panel.id],
+					pending.length == 0 ? ToolingCheckStatus.Pass : ToolingCheckStatus.Pending,
+					(pending.length == 0 ? "Panel operations checked in machine coordinates with measured tools, fixtures and retention." : pending.join("; ")),
 					[f.sourceFingerprint]));
 			} catch (e:Dynamic) {
 				checks.push(ToolingLoads.check("fabrication.cam." + panel.id, [panel.id], ToolingCheckStatus.Fail, "CAM export rejected: " + Std.string(e),
@@ -151,7 +168,7 @@ class MillFabricationPreview {
 			settings.workholdingReference == null ? [] : [settings.workholdingReference]));
 		data(dir, "cam-programs.json", programs);
 		sys.io.File.saveContent(dir + "/machining-instructions.md",
-			"# Panel machining review\n\nPrograms are LinuxCNC review outputs in mm. Settings originate in metres and m/s. Do not substitute relief cutters without regenerating the plan.\n\nEach program uses G54 with Z0 at the face being machined. XY starts at the raw blank lower left; the finished bounding profile is offset by the declared blank margin. Negative-Z setups reflect X about the finished profile midline: flip about local Y and re-establish the origin. Operation order clears named access pockets first and releases the outside profile last, after other faces. CAM checks supplied stock, fixtures and travel; an empty fixture list does not qualify workholding.\n\nRetain the part for the final contour with a qualified fixture/spoilboard or tabs specified by a revised operation plan. Through cuts stop at the declared stock bottom; no undeclared breakthrough allowance is applied. Fit-coupon programs and locator-coupon programs use the same settings. Resolve every blocking fabrication-validation.json record before fabrication release.\n");
+			"# Panel machining review\n\nPrograms are LinuxCNC review outputs in mm. Settings originate in metres and m/s. Do not substitute relief cutters without regenerating the plan.\n\nEach program uses G54 with Z0 at the face being machined. XY starts at the raw blank lower left; the finished bounding profile is offset by the declared blank margin. Negative-Z setups reflect X about the finished profile midline: flip about local Y and re-establish the origin. Operation order clears named access pockets first and releases the outside profile last, after other faces. CAM checks supplied stock, fixtures and travel; an empty fixture list does not qualify workholding.\n\nRetain the part for the final contour with a qualified fixture/spoilboard or tabs specified by a revised operation plan. Through cuts include the declared breakthrough allowance into the declared spoilboard. Execute split single-tool programs in the cam-programs.json order, preserving access pockets and outside-last. Final outside cuts require the declared vacuum-hold qualification; no tabs are generated by this route. Fit-coupon programs and locator-coupon programs use the same settings. Resolve every blocking fabrication-validation.json record before fabrication release.\n");
 		checks = checks.concat(machinekit.tooling.ToolingProcessExport.write(p, process, f.spec.gravityMps2, dir, geometricReview));
 		MillMoldStudy.write(MillMoldStudy.study(frame, geometricReview, !recordsOnly, process), dir);
 		ToolingPackageManifest.write(dir, f, checks);
@@ -178,6 +195,6 @@ class MillFabricationPreview {
 			+ destination
 			+ "; "
 			+ programs.length
-			+ " checked programs; readiness remains separately reported in manifest.json");
+			+ " review programs; readiness remains separately reported in manifest.json");
 	}
 }
