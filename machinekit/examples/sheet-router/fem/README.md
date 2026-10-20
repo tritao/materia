@@ -1,5 +1,69 @@
 # SR5 structural screen
 
+## Approved SR-D3 rerun and structural freeze (2026-10-20)
+
+**Pass; freeze the overall structure at `71f330894` plus `c71e0d17d`.** The
+user-approved decision (`663a51bb8`, evidence `1ba79b551`) replaces the 40 Hz gate
+with static X/Y ≥2 N/µm and motion-induced contour/rapid residual ≤0.05 mm.
+Use jerk-limited contour timing, with per-move ZVD as fallback. Required
+[MotionKit OM-R1](../../../../motionkit/plans/ONLINE_MOTION.md) implements that
+execution policy; SR13/SR16 and measured-mode commissioning remain open.
+No deep side girders or local plate/block/rail changes were adopted.
+
+Full anchored rerun: **36 solves**, both beds, nine poses per bed, full Z200,
+100/50 mm meshes, eight supports per bed at 50,000 N/mm XYZ. Maximum mesh
+changes are 1.194% static, 1.848% for all twenty envelope modes, and 1.845% for
+the extended forty modes. Reciprocity, load balance and energy checks pass.
+The full native assembly/clearance sweep passes **426 assertions**; guide
+coverage, the 149 mm ram gap, 367.75 mm tool lever and front sheet sweep pass.
+
+| Bed mm | Worst X / Y N/µm | Lowest global / gantry Hz | Dynamic governing X/Y/Z mm |
+|---|---:|---:|---|
+| 2600 | 2.165 / 2.051 | 27.001 / 27.434 | 800 / 0 / 200 |
+| 3150 | 2.109 / 2.044 | 24.239 / 26.986 | 800 / 3150 / 200 |
+
+The short-bed governing gantry mode is predominantly X motion; the long-bed
+mode is predominantly Y motion/gantry roll. Frequencies, participation and
+strain-energy shares are retained in `sr-d3-results.json`; full body motion is
+in the solve reports. The extra pair adds 22.18/22.34 kg fixed CAD mass,
+respectively, versus the earlier gross-stock estimate of 25.4 kg; moving mass
+remains 196.533/196.650 kg. The original middle pair stays in place.
+
+Dynamic checks use all forty modes at each bed's newly governing pose. The
+shaper is tuned from those results, not the former 26.05352 Hz constant.
+The following maxima include nominal and half-step results, 0.5/1/2/5% damping,
+and ±10/15% frequency variations. Limits are 3 m/s², configured default jerk
+20 m/s³, 20 m/min contour and 40 m/min rapid.
+
+| Bed mm | Jerk-limited contour / residual mm | With ZVD contour / residual mm | ZVD delay/move |
+|---|---:|---:|---:|
+| 2600 | 0.01418 / 0.01232 | 0.000873 / 0.000131 | 36.45 ms |
+| 3150 | 0.01926 / 0.01206 | 0.001508 / 0.000112 | 37.06 ms |
+
+The native TOPPRA acceleration-step policy is retained as a comparison, not
+accepted as the required execution policy. A six-edge contour adds 218.7/222.3 ms
+with per-move ZVD. The coarse long-bed basis contains five modes above the 50%
+gantry-energy classification threshold, the fine basis six; all forty modes are
+retained and checked by index, so a classification threshold does not discard
+participating frame modes or become an acceptance gate.
+
+**This is a reduced-model structural freeze, not cutting or shop release.**
+Damping remains unmeasured at 1%; servo, backlash, cutting-force and cutter/spindle
+compliance dynamics are excluded. SR6-C tap/impact or sine-sweep measurements at
+the governing poses must replace modeled frequencies/damping, tune the shaper,
+and repeat the 0.05 mm checks. The initial [SR6 fabrication packet](../fabrication/README.md)
+starts frame layout, weld/jig planning, stock lists and alignment; real tube
+end/cope preparation and weld-seam detailing remain open.
+
+Durable condensed evidence: [`sr-d3-results.json`](sr-d3-results.json). Full
+hashed packets, all 36 solves, forty-mode runs and dynamic traces live under
+`build/sheet-router-freeze/`; `packets/acceptance.json` records the combined
+assessment. Run `study.py`, `report.py`, `extended_modes.py`, then
+`dynamic_error.py --work-y 2600` and `--work-y 3150` with the same packet/extended
+paths, and finally `acceptance.py --packets … --dynamic …`. Analytical SDOF and
+ZV/ZVD cancellation/DC fixtures pass. Native libraries and OCCT were reused.
+
+
 ## Raised Z / table / rack datum: separate clearance revision
 
 The subsequent CAD revision raises the whole fixed-Z-block/moving-rail pattern
@@ -22,7 +86,7 @@ This is a clearance revision, not a new 40 Hz qualification. Its four midpoint
 | 3150 /0 /1575 | 2.340 /2.402 | 23.764 /27.489 |
 | 3150 /800 /1575 | 2.367 /2.023 | 23.764 /25.867 |
 
-The full new pose/mesh envelope remains pending. **SR-D3 is unchanged.** The
+The full new pose/mesh envelope remains pending. **This predates the approved motion-error SR-D3 decision below.** The
 motion-error, shaping and architecture calculations below use the preceding
 f47ed13f4 geometry; they are not silently relabelled as validation of the raised
 datum. Native packets and checks are in `build/sheet-router-system/cad`,
@@ -35,11 +99,11 @@ was changed; the required router assembly, sizing and export checks above pass.
 
 ## Motion-error requirement and architecture screen (2026-10-20)
 
-**SR-D3 is unchanged:** the ≥40 Hz gantry rule remains a hard target pending a user decision. The proposed alternative below is an engineering motion-error allocation, not approval to build or a total part-tolerance claim. No local plate/block/rail iteration was adopted.
+**SR-D3 decision, 2026-10-20:** the user replaced the ≥40 Hz gate with static X/Y ≥2 N/µm and ≤0.05 mm motion-induced contour error and rapid residual, using jerk-limited contour timing and per-move ZVD fallback. Modal frequencies are reported. Required MotionKit OM-R1 and measured-mode commissioning gate cutting acceptance. The proposed alternative below is an engineering motion-error allocation, not approval to build or a total part-tolerance claim. No local plate/block/rail iteration was adopted.
 
 ### Proposed dynamic-error allocation and actual planner limits
 
-Use ≤ 0.05 mm tool/workpiece geometric contour deviation during finishing, and ≤ 0.05 mm residual displacement after rapid-to-cut handover, as proposed in the review. The 0.05 mm value comes from that suggested engineering allocation, not an industry-wide wood/plastics tolerance. Confirm it against actual product drawings and finishing loads before replacing SR-D3. Servo tracking, backlash, cutter/spindle compliance and cutting-force dynamics are excluded. The 300 N structural load alone gives about 0.140 mm static Y deflection; a 50 N finishing load gives 0.0234 mm. The assumed drive backlash is about 0.054 mm. Thus these motion-only results do **not** establish0.05 mm finished-part accuracy.
+Use ≤ 0.05 mm tool/workpiece geometric contour deviation during finishing, and ≤ 0.05 mm residual displacement after rapid-to-cut handover, as proposed in the review. The 0.05 mm value comes from that suggested engineering allocation, not an industry-wide wood/plastics tolerance. It is now the approved motion allocation; product drawings and finishing loads still govern total part tolerance. Servo tracking, backlash, cutter/spindle compliance and cutting-force dynamics are excluded. The 300 N structural load alone gives about 0.140 mm static Y deflection; a 50 N finishing load gives 0.0234 mm. The assumed drive backlash is about 0.054 mm. Thus these motion-only results do **not** establish0.05 mm finished-part accuracy.
 
 Planner caps are3 m/s²,20 m/min contour and 40 m/min rapid. `PlanningLimits.hx` supplies an assumed default jerk of 20 m/s³. Actual CNC FollowPath timing uses TOPPRA without a certified jerk bound; its acceleration phases have steps. Native Ruckig is therefore reported separately as the jerk-limited execution alternative, not silently substituted for today’s contour timing. `planner_sample.cpp` calls the prebuilt MotionKit libraries directly. Their reserves give39.2 m/min initial rapid and 19.960 m/min final cut in the TOPPRA transition; Ruckig reaches40/20. No OCCT/native library was rebuilt.
 

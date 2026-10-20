@@ -76,7 +76,7 @@ def distance_to_path(x,y,points):
 
 
 def run_response(basis,equilibrium,profiles,kind,scale,zeta,dt,count=40,detune=0.,continuous=False,trace=False):
-    tuning=26.05352;pulses=shaper(kind,tuning,.01);tail=pulses[-1][0]
+    tuning=basis[0].get("shaperTuningHz",26.05352);pulses=shaper(kind,tuning,.01);tail=pulses[-1][0]
     points=[(0.,0.),(.3,0.),(.3,.18),(.18,.18),(.18,.10),(0.,.10),(0.,0.)]
     times=[0.]
     for p in profiles:times.append(times[-1]+p['duration']+tail)
@@ -123,17 +123,19 @@ def run_response(basis,equilibrium,profiles,kind,scale,zeta,dt,count=40,detune=0
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--packets',required=True,type=Path);p.add_argument('--extended',required=True,type=Path);p.add_argument('--sampler',required=True,type=Path);p.add_argument('--output',required=True,type=Path);args=p.parse_args();args.output.mkdir(parents=True,exist_ok=True)
-    packet=json.loads((args.packets/'y3150/manifest.json').read_text());packet['modeCount']=40;packet['floorSupport']='anchored';pose=packet['poses'][4]
-    extended=json.loads((args.extended/'extended-modes.json').read_text());static=next(r for r in extended['rows'] if r['workY']==3150)['results'][1]
-    dat=args.extended/'y3150-h50/frame.dat';basis,equilibrium=modal_basis(packet,pose,dat.read_text(),static)
+    p=argparse.ArgumentParser();p.add_argument('--work-y',type=int,choices=(2600,3150),default=3150);p.add_argument('--packets',required=True,type=Path);p.add_argument('--extended',required=True,type=Path);p.add_argument('--sampler',required=True,type=Path);p.add_argument('--output',required=True,type=Path);args=p.parse_args();args.output.mkdir(parents=True,exist_ok=True)
+    packet=json.loads((args.packets/f'y{args.work_y}/manifest.json').read_text());packet['modeCount']=40;packet['floorSupport']='anchored';pose=None
+    extended=json.loads((args.extended/'extended-modes.json').read_text());static=next(r for r in extended['rows'] if r['workY']==args.work_y)['results'][1]
+    pose=static['pose'];tuning=next(m['frequencyHz'] for m in static['modalParticipation'] if m['gantryFraction']>=.5)
+    dat=args.extended/f'y{args.work_y}-h50/frame.dat';basis,equilibrium=modal_basis(packet,pose,dat.read_text(),static)
+    for row in basis:row['shaperTuningHz']=tuning
     cases=[];dt=.0005
     lengths=[.3,.18,.12,.08,.18,.10]
     for backend in ('toppra','ruckig'):
         contour=[profile(args.sampler,backend,length,20/60,0,0,dt) for length in lengths]
         rapid_test=profile(args.sampler,backend,.5,40/60,0,0,dt);actual_rapid=max(r[2] for r in rapid_test['rows']);actual_cut=max(r[2] for r in contour[0]['rows'])
         rapid=[profile(args.sampler,backend,.3,40/60,actual_rapid,actual_cut,dt)];actual_rapid=rapid[0]['v0'];actual_cut=rapid[0]['v1']
-        for kind,scale in [('none',1.),('ZV',1.),('ZVD',1.),('none',40/26.05352)]:
+        for kind,scale in [('none',1.),('ZV',1.),('ZVD',1.),('none',40/tuning)]:
             row=dict(backend=backend,actualRapidMPerMin=actual_rapid*60,actualCutMPerMin=actual_cut*60,structure=('current' if scale==1 else 'uniform stiffness scaled to first gantry 40 Hz'),shaper=kind)
             row['contour']=run_response(basis,equilibrium,contour,kind,scale,.01,dt,trace=True)
             row['rapidToCut']=run_response(basis,equilibrium,rapid,kind,scale,.01,dt,trace=True)
@@ -144,8 +146,8 @@ def main():
             cases.append(row);print(backend,row['structure'],kind,row['contour']['peakContourErrorMm'],row['contour']['peakElasticFollowingMm'],row['rapidToCut']['residualPeakAfterTransitionMm'],flush=True)
     files=[Path(__file__),dat,args.sampler,Path('motionkit/robot/haxe/motionkit/robot/PlanningLimits.hx'),Path('motionkit/robot/haxe/motionkit/robot/ProgramCompiler.hx')]
     identity={str(f):hashlib.sha256(f.read_bytes()).hexdigest() for f in files}
-    result=dict(status='Conditional open-loop elastic motion-error screen; SR-D3 unchanged',budgetMm=.05,budgetSource='Review-proposed engineering allocation for motion-induced finishing contour deviation, not a universal wood/plastics tolerance or total part accuracy claim',
-        assumptions=['Damping 1% unmeasured; 0.5/2/5% and ±10% frequency sensitivities included','Perfect rigid command following; no servo-loop, backlash, cutting force or tool compliance dynamics','Native TOPPRA contours have acceleration steps and no certified jerk bound; native Ruckig comparison uses PlanningLimits default 20 m/s³','Exact-stop L-shaped 300x180 mm nested-panel perimeter with 180x80 notch; each shaped edge drains before the next edge','300 mm Y rapid transition from 40 to 20 m/min; residual measured for 0.5 s after shaper tail','Hypothetical 40 Hz case scales all stiffness by (40/26.05352)^2, unchanged mass and mode shapes; residual flexibility scaled consistently'],
+    result=dict(status='Open-loop elastic check of approved SR-D3 motion allocation; commissioning and OM-R1 execution required',governingPose=pose,shaperTuningHz=tuning,budgetMm=.05,budgetSource='Review-proposed engineering allocation for motion-induced finishing contour deviation, not a universal wood/plastics tolerance or total part accuracy claim',
+        assumptions=['Damping 1% unmeasured; 0.5/2/5% and ±10% frequency sensitivities included','Perfect rigid command following; no servo-loop, backlash, cutting force or tool compliance dynamics','Native TOPPRA contours have acceleration steps and no certified jerk bound; native Ruckig comparison uses PlanningLimits default 20 m/s³','Exact-stop L-shaped 300x180 mm nested-panel perimeter with 180x80 notch; each shaped edge drains before the next edge','300 mm Y rapid transition from 40 to 20 m/min; residual measured for 0.5 s after shaper tail','Hypothetical 40 Hz case scales all stiffness by (40/tuned first gantry frequency)^2, unchanged mass and mode shapes; residual flexibility scaled consistently'],
         modalBasis=basis,staticAccelerationResponseMmPerMPerS2=equilibrium,cases=cases,identity=identity)
     (args.output/'dynamic-error.json').write_text(json.dumps(result,indent=2)+'\n')
 

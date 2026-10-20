@@ -223,7 +223,7 @@ def make_model(packet,pose,h):
         p=support['pointMm'];q=nearest(p);model.rigid(p,q,'frame');root=model.root('foot'+str(i),p,'frame')
         anchored=packet.get('floorSupport','anchored')=='anchored'
         lateral=packet['interfaces'].get('footLateralNPerMm',50000)
-        model.spring(root,None,[lateral if anchored or i==0 else 0,lateral if anchored or i in (0,3) else 0,packet['interfaces']['footVerticalNPerMm'],0,0,0],'feet')
+        model.spring(root,None,[lateral if anchored or i==0 else 0,lateral if anchored or i in (0,len(packet['supports'])//2) else 0,packet['interfaces']['footVerticalNPerMm'],0,0,0],'feet')
     dy=pose['y']-packet['workY']/2;dx=pose['x']-800
     beam=next(b for b in beams if b['id']=='beam');a=add(beam['startMm'],(0,dy,0));b=add(beam['endMm'],(0,dy,0))
     model.beam(a,b,section(beam),beam['sectionX'],(beam['youngsMPa'],beam['densityKgPerMm3']),'gantry','gantry')

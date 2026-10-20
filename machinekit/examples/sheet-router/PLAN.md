@@ -297,7 +297,7 @@ machined.**
   ZVD input shaping as fallback. Modal frequencies are reported, not acceptance gates.
 - Evidence: `1ba79b551`; the 0.05 mm motion allocation is user-approved, not a
   finished-part tolerance. Required planner dependency:
-  [ONLINE_MOTION.md OM-R1](../../../motionkit/plans/ONLINE_MOTION.md#om-r1-research-jerk-on-paths)
+  [ONLINE_MOTION.md OM-R1](../../../motionkit/plans/ONLINE_MOTION.md)
   (`bb44eaf04`): jerk-limited path timing and optional ZV/ZVD stage.
 - Before cutting acceptance, SR6-C measures built-frame and gantry modes and
   damping at governing poses; measured values replace the assumed 1% damping
@@ -544,9 +544,10 @@ only as sources in docs. Standards (ISO30 / ISO 7388, ER collets, EN 60204-1, IS
 | Servos | Y 2 × 750 W, X 750 W, Z 750 W + brake | revised SR4; catalogue-class assumptions |
 | Pulse resolution | 5000 pulses/rev: Y 4 µm / 167 kHz; X 2.667 µm / 250 kHz at 40 m/min | derived; board rate qualification pending |
 | Z screw | Ø16 × 10 mm, 13 mm assumed race root, 390 mm fixed/free shaft | revised SR4 selection at 10 m/min |
-| Beam | RHS 200 × 100 × 6.3 steel retained as baseline | anchored screen static pass; new motion-error qualification required |
-| Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | f47ed full screen passes; raised-datum spot Y minimum 2.023; full new envelope pending |
-| First gantry mode | Reported; no frequency gate | f47ed full gantry min 26.054 Hz; raised-datum spot 25.867 Hz; motion-error qualification governs |
+| Beam | RHS 200 × 100 × 6.3 steel retained as baseline | frozen after full revised SR-D3 model pass; OM-R1 and commissioning required |
+| Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | full raised-datum + extra-leg run: worst X 2.109, Y 2.044; both beds pass |
+| Motion-induced error | ≤ 0.05 mm contour and rapid residual | full new-mode worst tested 0.01926/0.01232 mm; OM-R1 and measured-mode commissioning required |
+| First gantry mode | Reported; no frequency gate | short/long global 27.001/24.239 Hz; gantry 27.434/26.986 Hz; reported |
 | Spindle | ISO30 ATC, ≈ 6 kW S1, 18–24k rpm, 400 V 3~, air-cooled | assumed |
 | VFD | 7.5 kW 400 V with braking resistor and STO | assumed |
 | Tool rack | 8 forks, pneumatic cover, rear rack zone | assumed |
@@ -651,6 +652,7 @@ and the vacuum pump, and records the cost.
   load cases. The mill keeps working through the same exporter.
 - Run Gmsh + CalculiX on the gantry (beam, side plates, X carriage, Z) and the frame. Load cases:
   cutting load at the tool tip in X, Y and Z at the corners and mid-span, and gantry acceleration.
+- Acceptance uses revised SR-D3: static X/Y ≥ 2 N/µm and both motion-error limits ≤ 0.05 mm; report modal frequency without a frequency gate. Re-check with measured modes in SR6-C.
 - Outputs: tool-tip compliance and its budget per element, the first modes, support reactions and
   frame twist under its own weight on the feet.
 - Decide the beam material and section, the side-plate thickness and whether the frame tubes are
@@ -659,7 +661,7 @@ and the vacuum pump, and records the cost.
   checks (beam bending against the formula, within a stated tolerance); targets met or the step
   names what limits them.
 
-**SR5 result (2026-10-20): screening complete; current structure rejected.**
+**Initial SR5 result (2026-10-20): original single-block structure rejected (historical).**
 The shared assembly exporter reproduces all 220 mill component records and 36 STEP bodies
 byte-for-byte, excluding changed source/build provenance. The router study runs both bed lengths
 at nine full-Z poses each, with X/Y/Z cutting, gravity, X/Y acceleration and six modes. See
@@ -719,7 +721,7 @@ close-coupled trial to clear moving rail/plate ends past the tool-rack forks.
 The settled candidate passes 426 assembly/clearance assertions and all 36 structural
 solves pass force, energy, reciprocity, support-compression and mesh checks. Nevertheless,
 worst X/Y stiffness is only 1.005 / 0.480 N/µm; the lowest classified gantry-dominant
-mode is 27.249 Hz, with global frame modes down to 5.177 Hz. SR-D3 remains unmet.
+mode is 27.249 Hz, with global frame modes down to 5.177 Hz. The former frequency gate remained unmet; the approved motion-error requirement supersedes it below.
 Z plate/rail compliance leads the worst Y case (about 56%); frame compliance leads X.
 The X plate contributes about 13% of worst Y compliance. Investigate the Z load path
 and frame supports/bracing next; no closed X box is selected and no fabrication files
@@ -758,7 +760,7 @@ loading access; the following modal iteration targets the frame/beam/Y-drive
 load path, not extra Z mass. None of these results grants fabrication release.
 
 **Dynamic requirement approved (2026-10-20, evidence `1ba79b551`).** SR-D3 now
-is ≤ 0.05 mm motion-induced contour deviation and rapid-to-cut residual, from the
+requires ≤ 0.05 mm motion-induced contour deviation and rapid-to-cut residual, from the
 review's engineering allocation, not an industry tolerance. Native TOPPRA timing
 has acceleration steps and no certified jerk bound; default PlanningLimits jerk
 20 m/s³ only applies when a jerk-limited backend is used. At the governing pose,
@@ -810,9 +812,22 @@ front mouth on both beds, and the full assembly sweep passes 426 assertions.
 Moving Y mass is 196.650 kg on the long bed; the 82 sizing/planner assertions and
 guide travel/coverage gates pass. Four midpoint structural spot checks give
 2.023 N/µm minimum Y, with long-bed centre global/gantry modes 23.764/25.867 Hz.
-They do not replace a full new 18-pose/two-mesh envelope under revised SR-D3, and
-fabrication remains gated. The dynamic-error/architecture tables above analyse
+These historical spot checks were superseded by the full extra-leg rerun below;
+shop release still requires SR6 fabrication detailing. The dynamic-error/architecture tables above analyse
 the preceding f47ed13f4 geometry, not this clearance revision.
+
+**Structural freeze (2026-10-20): revised SR-D3 model passes.** Freeze the raised
+Z/table/rack geometry plus Y1575 extra leg pair (`71f330894`, `c71e0d17d`), with
+original middle pair retained and no deep side girders. All 36 two-bed/nine-pose/
+two-mesh full-Z solves pass convergence and numerical checks. Short-bed worst
+X/Y is 2.165/2.051 N/µm; long-bed 2.109/2.044. Lowest global/gantry modes are
+27.001/27.434 Hz and 24.239/26.986 Hz respectively, reported without a gate.
+New-mode jerk-limited motion worst tested contour/residual is 0.01418/0.01232 mm
+short and 0.01926/0.01206 mm long, including damping/frequency variation; ZVD
+fallback is below 0.00151/0.000131 mm for 36.45/37.06 ms per move. Full assembly
+clearance passes 426 assertions. See [rerun evidence](fem/sr-d3-results.json).
+This freezes overall layout/sections for SR6; supplier assumptions, actual
+OM-R1 execution, measured-mode commissioning and cutting acceptance remain open.
 
 **SR6-C. Structural commissioning before cutting acceptance (SR-D3).**
 - Tap/impact or sine-sweep the built frame and gantry at the governing poses.
@@ -823,6 +838,7 @@ the preceding f47ed13f4 geometry, not this clearance revision.
   shaper settings and repeatability. This gates SR13 cutting acceptance and SR16 release.
 
 **SR6. Frame, fabrication drawings and alignment procedures (SR-D2, SR-D11).**
+- Freeze the raised-datum structure plus Y1575 leg pair only after the full two-bed/two-mesh/all-pose static rerun and new-mode motion-error check pass. Keep deep side girders out.
 - Weldment: tube layout, weld seams and sequence, jig layout (frame points as jig stops), cut
   list.
 - Plate DXFs and hole tables for the side plates, Z plate, bearing plates and motor plates,
@@ -1071,6 +1087,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
   parts for SR15 (Nucleo, one servo and drive, logic analyser) are the first purchase.
 - SR4 and SR5 decide the beam, reducers and Z screw. Nothing structural is ordered before they
   are done.
+- Required OM-R1 supplies jerk-limited path timing and optional shaping before SR13/SR16 close; SR6-C measured modes/damping gate cutting acceptance.
 - SR16 freezes RKD6. Coordinate with any other session changing the protocol before closing it.
 - Long-lead items (spindle, servos, racks, rails) are ordered after SR19 on checked datasheets.
 
@@ -1101,8 +1118,9 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR2 | done: shared servo/reducer/steel builders; 59 focused assertions, existing gantry/router checks, 292 catalogue assertions | this commit |
 | SR3 | complete: both beds, project load/hold/homing and focused regressions pass | see SR3 notes |
 | SR4 | revised two-bed drive/rack/screw screen complete; 82 sizing/planner assertions pass | see guide-first revision |
-| SR5 | anchored two-bed/two-mesh rerun complete; static passes; revised motion-error gate approved; raised-datum plus extra-leg rerun pending | see FEM diagnosis |
-| SR6 | raised Z/table/rack datum and front-loading sweep pass; full service access and new structural envelope remain open; fabrication gated | see raised-datum revision |
+| SR5 | complete: 36-case raised-datum/extra-leg rerun and new-mode motion check pass; structure frozen | see FEM diagnosis |
+| SR6-C | planned: measured modes/damping and shaper tuning before cutting acceptance | SR13/SR16 gate |
+| SR6 | structure frozen; initial weldment/cut/jig/alignment packet started; tube-end/cope and seam detailing, shop release and service access remain open | see raised-datum revision |
 | SR7 | planned | |
 | SR8 | planned | |
 | SR9 | planned | |

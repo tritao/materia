@@ -4,6 +4,24 @@ This selects sourcing requirements for the next prototype. Generic catalogue-cla
 CAD envelopes are not supplier drawings or evidence that arbitrary bought parts
 have these ratings.
 
+## Approved structure and motion decision (2026-10-20)
+
+Retain the raised Z/table/rack geometry (`71f330894`) and add the anchored leg
+pair at machine Y=1575 (`c71e0d17d`), in addition to the original middle pair.
+The gross architecture screen estimated +25.4 kg fixed; actual union CAD adds
+22.18 kg on the short bed and 22.34 kg on the long bed. Moving mass is unchanged.
+Do not add the deep 300×200 side girders or change plates, guide size or spacing.
+
+The user replaced the 40 Hz gate with static X/Y ≥2 N/µm plus ≤0.05 mm
+motion-induced contour error and rapid residual. Evidence: `1ba79b551`.
+Required MotionKit OM-R1 supplies jerk-limited path timing and optional ZV/ZVD;
+per-move ZVD is the router fallback. SR6-C commissioning must measure modes and
+damping, tune the shaper and re-check the motion budget before cutting acceptance.
+The full raised-datum plus leg-pair rerun passes the revised model requirement;
+freeze the overall structure for SR6. See PLAN SR-D3, `fem/sr-d3-results.json`,
+and the current rerun record in `fem/README.md`. Shop joint preparation and
+seam detailing remain open in `fabrication/README.md`.
+
 ## Guides
 
 Use two front-face X rails, 150 mm apart vertically, with two blocks per rail

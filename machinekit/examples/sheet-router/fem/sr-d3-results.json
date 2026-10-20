@@ -1,0 +1,308 @@
+{
+  "status": "Structure frozen at raised datum plus Y1575 leg pair; reduced-model SR-D3 passes",
+  "date": "2026-10-20",
+  "decisionCommit": "663a51bb8",
+  "geometryCommits": [
+    "71f330894",
+    "c71e0d17d"
+  ],
+  "precedingMotionEvidence": "1ba79b551",
+  "requirement": {
+    "staticXYNPerUm": 2,
+    "contourMm": 0.05,
+    "rapidResidualMm": 0.05,
+    "frequencyGate": false,
+    "planner": "jerk-limited, ZVD fallback",
+    "limits": {
+      "accelerationMPerS2": 3,
+      "jerkMPerS3": 20,
+      "contourMPerMin": 20,
+      "rapidMPerMin": 40
+    }
+  },
+  "fullSolves": 36,
+  "bedsMm": [
+    2600,
+    3150
+  ],
+  "meshMm": [
+    100,
+    50
+  ],
+  "posesPerBed": 9,
+  "allAtZMm": 200,
+  "supportsPerBed": 8,
+  "anchoredSupportTranslationNPerMmXYZ": [
+    50000,
+    50000,
+    50000
+  ],
+  "maxStaticMeshChange": 0.0119362484419685,
+  "maxTwentyModeMeshChange": 0.018475558477188736,
+  "maxFortyModeMeshChange": 0.018444814802141885,
+  "rows": [
+    {
+      "workY": 2600,
+      "minimumXYStiffnessNPerUm": [
+        2.1649476659020825,
+        2.0505136253318823
+      ],
+      "staticPass": true,
+      "governingDynamicPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "shaperTuningHz": 27.4344,
+      "policies": [
+        {
+          "policy": "jerk-limited none",
+          "contourMm": 0.01418075088720119,
+          "residualMm": 0.012321088202257295,
+          "addedTimePerMoveMs": 0.0,
+          "passes": true
+        },
+        {
+          "policy": "jerk-limited ZVD",
+          "contourMm": 0.0008727293682213125,
+          "residualMm": 0.0001306169541296387,
+          "addedTimePerMoveMs": 36.45241024955211,
+          "passes": true
+        }
+      ],
+      "modelPass": true,
+      "lowestGlobalMode": {
+        "mode": 1,
+        "frequencyHz": 27.00053,
+        "dominantDirection": "X",
+        "gantryFraction": 0.33375678138262693,
+        "directionalKineticFractionsXYZ": [
+          0.9831190161502744,
+          0.009027249367574916,
+          0.007853734482151261
+        ],
+        "relativeToolToBed": 0.9748011614014199,
+        "strainEnergyFractions": {
+          "floor supports": 0.16660704482658006,
+          "legs/frame tubes": 0.4672681202983189,
+          "braces": 0.30006190831831886,
+          "Y rails/blocks": 0.006118155853567052,
+          "Y drive": 0.002454125725001924,
+          "gantry feet/welds": 0.0013866200669172264,
+          "beam": 0.008478422309789799,
+          "X carriage/guides": 0.04329501432099417,
+          "Z ram/guides": 0.0013801859680238149,
+          "table mounts": 0.0028009883410514036,
+          "artificial rigid offsets": 0.00014941397143674253
+        },
+        "pose": {
+          "x": 0,
+          "y": 1300,
+          "z": 200
+        }
+      },
+      "lowestGantryDominantMode": {
+        "mode": 1,
+        "frequencyHz": 27.4344,
+        "dominantDirection": "X",
+        "gantryFraction": 0.5023317842840618,
+        "directionalKineticFractionsXYZ": [
+          0.7967067246387921,
+          0.1964832725901238,
+          0.0068100027710834374
+        ],
+        "relativeToolToBed": 1.3686154040500085,
+        "strainEnergyFractions": {
+          "floor supports": 0.1455779515421985,
+          "legs/frame tubes": 0.3969687434787064,
+          "braces": 0.22923040062822067,
+          "Y rails/blocks": 0.03014632227052848,
+          "Y drive": 0.06303223596457222,
+          "gantry feet/welds": 0.008195327310464675,
+          "beam": 0.08011764791669897,
+          "X carriage/guides": 0.0434257711832822,
+          "Z ram/guides": 0.0016480956191587896,
+          "table mounts": 0.0015711510333543998,
+          "artificial rigid offsets": 8.63530528147097e-05
+        },
+        "pose": {
+          "x": 800,
+          "y": 0,
+          "z": 200
+        }
+      },
+      "staticGoverningPoses": [
+        {
+          "axis": "X",
+          "pose": {
+            "x": 1600,
+            "y": 0,
+            "z": 200
+          }
+        },
+        {
+          "axis": "Y",
+          "pose": {
+            "x": 800,
+            "y": 1300,
+            "z": 200
+          }
+        }
+      ]
+    },
+    {
+      "workY": 3150,
+      "minimumXYStiffnessNPerUm": [
+        2.1093870688251553,
+        2.0444434515415524
+      ],
+      "staticPass": true,
+      "governingDynamicPose": {
+        "x": 800,
+        "y": 3150,
+        "z": 200
+      },
+      "shaperTuningHz": 26.98592,
+      "policies": [
+        {
+          "policy": "jerk-limited none",
+          "contourMm": 0.01926229588253281,
+          "residualMm": 0.01205531545492759,
+          "addedTimePerMoveMs": 0.0,
+          "passes": true
+        },
+        {
+          "policy": "jerk-limited ZVD",
+          "contourMm": 0.001508185079102109,
+          "residualMm": 0.0001120085028521016,
+          "addedTimePerMoveMs": 37.058214200231546,
+          "passes": true
+        }
+      ],
+      "modelPass": true,
+      "lowestGlobalMode": {
+        "mode": 1,
+        "frequencyHz": 24.2392,
+        "dominantDirection": "X",
+        "gantryFraction": 0.2846513537963587,
+        "directionalKineticFractionsXYZ": [
+          0.9909053858237704,
+          0.0025287365063531636,
+          0.006565877669875858
+        ],
+        "relativeToolToBed": 0.7894193503425537,
+        "strainEnergyFractions": {
+          "floor supports": 0.15916265272396032,
+          "legs/frame tubes": 0.47833468598546,
+          "braces": 0.32183715139271785,
+          "Y rails/blocks": 0.003964586624013594,
+          "Y drive": 0.0003734967738919476,
+          "gantry feet/welds": 0.0008685661949785119,
+          "beam": 0.0041368592182269015,
+          "X carriage/guides": 0.02783914652537754,
+          "Z ram/guides": 0.0009003068531253872,
+          "table mounts": 0.0023717866297833334,
+          "artificial rigid offsets": 0.00021076107846467793
+        },
+        "pose": {
+          "x": 1600,
+          "y": 1575,
+          "z": 200
+        }
+      },
+      "lowestGantryDominantMode": {
+        "mode": 2,
+        "frequencyHz": 26.98592,
+        "dominantDirection": "Y",
+        "gantryFraction": 0.9754355578754368,
+        "directionalKineticFractionsXYZ": [
+          0.007818629281314785,
+          0.9514468796585319,
+          0.0407344910601536
+        ],
+        "relativeToolToBed": 2.0503837564848624,
+        "strainEnergyFractions": {
+          "floor supports": 0.028372353151487076,
+          "legs/frame tubes": 0.1484138830918947,
+          "braces": 0.014094881496281457,
+          "Y rails/blocks": 0.11318250469269896,
+          "Y drive": 0.30080831161180444,
+          "gantry feet/welds": 0.03407640439869692,
+          "beam": 0.3547060103740334,
+          "X carriage/guides": 0.004435398680418774,
+          "Z ram/guides": 0.0018158477792729602,
+          "table mounts": 7.868297311867824e-05,
+          "artificial rigid offsets": 1.572175029269822e-05
+        },
+        "pose": {
+          "x": 800,
+          "y": 3150,
+          "z": 200
+        }
+      },
+      "staticGoverningPoses": [
+        {
+          "axis": "X",
+          "pose": {
+            "x": 1600,
+            "y": 0,
+            "z": 200
+          }
+        },
+        {
+          "axis": "Y",
+          "pose": {
+            "x": 800,
+            "y": 1575,
+            "z": 200
+          }
+        }
+      ]
+    }
+  ],
+  "modelAssumptions": [
+    "1% damping unmeasured; 0.5/2/5% and \u00b110/15% frequency sensitivities tested",
+    "40-mode tool-minus-bed response; native jerk-limited exact-stop L contour and rapid-to-cut transition",
+    "Reported motion errors conservatively include all tested damping/frequency cases and half-step checks",
+    "Supplier interfaces, frame anchor stiffness and local fabrication stress remain qualification assumptions"
+  ],
+  "cuttingAcceptance": false,
+  "remaining": [
+    "Required OM-R1 certified jerk-limited path execution and optional ZVD stage",
+    "SR6-C impact/sine-sweep modes and damping, shaper retuning and measured-value motion-error recheck",
+    "Fabrication, supplier interfaces, alignment, servo tracking and cutting qualification"
+  ],
+  "sourceIdentity": {
+    "modalDiagnosticsSha256": "1bb03d226040ad4142267c3acb77866b9d46f3832f8b55cf01c494be49181a23",
+    "frontGuideSha256": "5dac4f765e6ae209e5729eb4521c36b4d45d924ac2bb2086b594da5e832a9134",
+    "packetSha256": {
+      "2600": "7a4f39972281619345230afbd4d5953c30e050e17f97558225825a984b4b4ddb",
+      "3150": "cbeb500670153060e85dd7841fdbd507a9a909da34b3a9c6add9bf8700efd7fc"
+    },
+    "studySha256": "39edb6c47fd47276e626473cab0dc88119aca4399b10da402e1309c13f99ad1f",
+    "floorSupport": "anchored",
+    "footLateralNPerMm": 50000,
+    "footVerticalNPerMm": 50000,
+    "gmshVersion": "4.12.2",
+    "ccxSha256": "6adaabf5bf0382fc2bfd692b984320ed375dba777f7dc8297562f818043faa1b",
+    "resultsSha256": "dd46e41e9a233821f393615a960f76dccb9d7df60288ea038abde5a60428fd88",
+    "reportSha256": "ca58ce9e7b65f2676313dc8865f35de92c23c78a318aa64ee78abda837e33220"
+  },
+  "dynamicEvidenceSha256": {
+    "build/sheet-router-freeze/packets/summary.json": "c7a23abcdba7f7b54743ffdff47834f636e5a4bf6a2e3ca819f30a8cfa669f6d",
+    "/home/joao/dev/materia/machinekit/examples/sheet-router/fem/acceptance.py": "31c373d8c2a395a892392e0102ce365f9c49fa9eca125b862aebd66ea0f57233",
+    "build/sheet-router-freeze/dynamic/y2600/dynamic-error.json": "8e21ac1135d62205ba56cb3c45c78f9245171edfd1ce02035aeeae906c0e37a2",
+    "build/sheet-router-freeze/dynamic/y3150/dynamic-error.json": "c8334678d80a24bedbb6d483bb4454af49446fbc4108de90237a77dcf8b3d5bc"
+  },
+  "artifactRoot": "build/sheet-router-freeze",
+  "artifactFiles": [
+    "packets/results.json",
+    "packets/summary.json",
+    "packets/acceptance.json",
+    "extended/extended-modes.json",
+    "dynamic/y2600/dynamic-error.json",
+    "dynamic/y3150/dynamic-error.json",
+    "clearance.log",
+    "layout.log"
+  ]
+}
