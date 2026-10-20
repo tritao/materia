@@ -10,7 +10,7 @@ import machinekit.assembly.HzMotionCatalog.HzMotionSpec;
 import materia.assembly.AssemblyFrames as F;
 
 /** Purchased-component interfaces from pinned drawings. Existing drawing recipes
- * stay parametric; the separate supplier recipe enables only reviewed BF supports.
+ * stay parametric; the separate supplier recipe enables reviewed motor housings and BF supports.
  * Detailed CAD does not establish installed clip state or mechanical qualification.
  */
 class HzMotionComponent extends MachineComponent {
@@ -40,11 +40,12 @@ class HzMotionComponent extends MachineComponent {
   if(bearingGrade!="unspecified"&&(spec.family=="A"||(spec.family=="BF"||spec.family=="EF")||spec.kind=="adapter"))throw "Part has no selectable fixed-end bearing grade";
   if(geometrySource!="drawing"&&geometrySource!="supplier-step")throw "Unknown HZMotion geometry source";
   if(geometrySource=="supplier-step") {
-   HzMotionCatalog.cadAsset(model);
+   var asset=HzMotionCatalog.cadAsset(model);
+   if(asset.interfaces!=null){spec.width=asset.interfaces.width;spec.baseHoles=asset.interfaces.baseHoles;}
    if(model=="M60D-BK12-C"&&spec.drawingRevision!=HzMotionCatalog.revision())throw "BK12 STEP requires corrected v2 mounting datums";
   }
   if(clipState!="as-supplied"&&clipState!="installed-envelope")throw "Unknown retaining clip state";
-  if(clipState=="installed-envelope"&&(model!="BF12"||geometrySource!="supplier-step"))throw "Installed clip model requires supplier BF12";
+  if(clipState=="installed-envelope"&&(["BF12","BF15"].indexOf(model)<0||geometrySource!="supplier-step"))throw "Installed clip model requires reviewed supplier BF support";
   this.clipState=clipState;
   this.geometrySource=geometrySource;
   this.bearingGrade=bearingGrade;
@@ -110,11 +111,11 @@ class HzMotionComponent extends MachineComponent {
      raw.close();imported.close();
      if(clipState=="installed-envelope") {
       try {
-       if(result.solidCount()!=3)throw "Pinned BF12 solid layout changed";
+       if(result.solidCount()!=3)throw "Pinned BF support solid layout changed";
        var pieces:Array<Part> = [];
        for(i in 0...2)pieces.push(new Part(result.shape.subshape(CadKit.ShapeKind.Solid,i)));
-       var ring=machinekit.standard.RetainingRing.forShaft(10).geometry();
-       pieces.push(ring.translated(new Vector(0,25,14)));ring.close();
+       var ring=machinekit.standard.RetainingRing.forShaft(spec.shaftBore).geometry();
+       pieces.push(ring.translated(new Vector(0,spec.shaftHeight,spec.model=="BF12"?14:14.5)));ring.close();
        var installed=Solids.union(pieces);result.close();return installed;
       }catch(e:Dynamic){result.close();throw e;}
      }

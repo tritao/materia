@@ -102,9 +102,64 @@
         ]
       },
       "interfaceReview": {
-        "status": "not-enabled",
+        "status": "verified-reference",
         "notes": [
-          "Previous base-height and face-offset claims were based on chamfered bore limits and are withdrawn. Planar-face audit matches nominal shaft heights and face datums. Other interfaces have not yet been enabled."
+          "Raw planar motor face Z=109 and base Y=-28; pilot radius35 from Z103 to108.5.",
+          "STEP body width88 versus drawing86. Base holes normalized X=+/-29 at Z42, +/-27 at Z87 and102; drawing rear rows +/-29. STEP recipe uses measured interfaces; drawing recipe unchanged.",
+          "Bearing bore radius7.5 at raw Z7.6..24.4; bearing centre normalized Z93. Motor M6 thread depth remains unqualified."
+        ]
+      },
+      "normalization": {
+        "translationMm": [
+          0,
+          28,
+          109
+        ],
+        "rotation": [
+          -1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          -1
+        ]
+      },
+      "interfaces": {
+        "width": 88,
+        "baseHoles": [
+          {
+            "x": -29,
+            "z": 42,
+            "diameter": 6.6
+          },
+          {
+            "x": 29,
+            "z": 42,
+            "diameter": 6.6
+          },
+          {
+            "x": -27,
+            "z": 87,
+            "diameter": 6.6
+          },
+          {
+            "x": 27,
+            "z": 87,
+            "diameter": 6.6
+          },
+          {
+            "x": -27,
+            "z": 102,
+            "diameter": 6.6
+          },
+          {
+            "x": 27,
+            "z": 102,
+            "diameter": 6.6
+          }
         ]
       }
     },

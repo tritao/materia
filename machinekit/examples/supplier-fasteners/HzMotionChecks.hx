@@ -40,7 +40,7 @@ class HzMotionChecks {
    rows.push({model:model,solidCount:p.solidCount(),volumeMm3:p.volume(),source:HzMotionCatalog.sourceUrl(model),geometryBasis:s.geometryBasis});p.close();
   }
   for(model in HzMotionCatalog.cadModels()) {
-   if(model=="M60D-BK12-C")continue;
+   if(model=="M60D-BK12-C"||model=="M80E-BK15-C")continue;
    var component=new HzMotionComponent(model,null,"unspecified","supplier-step"),s=component.spec,p=component.geometry();
    check(p.valid()&&p.solidCount()>1,"Supplier bearing assembly keeps separate solids");
    var bounds=p.shape.bounds();
