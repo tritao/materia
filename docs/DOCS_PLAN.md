@@ -113,8 +113,10 @@ place.
 ## Status
 
 - D2 started. The concept skeleton, *The life of a machine* (draft) and the
-  glossary are in `docs/concepts/` (71f9d100e). *Conventions* is drafted and
-  answers the four open questions from *The life of a machine*.
+  glossary are in `docs/concepts/` (71f9d100e). All six D2 pages are drafted:
+  Life of a machine, Conventions, Execution plans, Fidelity levels, Assemblies
+  and mates, Controller boundary. Each records its open questions; review moves
+  them to `status: reviewed`.
 - Open-core licensing accepted: Apache-2.0, CC BY 4.0 for docs, DCO
   ([OPEN_CORE.md](OPEN_CORE.md)).
 - D1 done except hosting: the Starlight site in `docs/site/` builds every page
