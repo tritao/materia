@@ -1,7 +1,7 @@
 package materia.tooling.export;
 
 import materia.tooling.casting.CastingMoldPlan;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.ToolingDiagnostic.ToolingSeverity;
@@ -112,7 +112,7 @@ class ToolingLoads {
 		var coreVolumes = new Map<String, Float>(),
 			coreForces = new Map<String, Float>();
 		for (c in cores) {
-			var volume = BoxVolumes.volume(BoxVolumes.subtract([c.cavity], occupied));
+			var volume = BoxAlgebra.volume(BoxAlgebra.subtract([c.cavity], occupied));
 			occupied.push(c.cavity);
 			coreVolumes.set(c.id, volume);
 			coreForces.set(c.id,
@@ -225,14 +225,14 @@ class ToolingLoads {
 		for (member in rigid) {
 			var clipped:Array<materia.tooling.casting.MoldPlan.MoldBox> = [];
 			for (box in materia.tooling.casting.MoldVolumeBounds.pieces(member)) {
-				var wet = BoxVolumes.intersection(box, p.envelope);
+				var wet = BoxAlgebra.intersection(box, p.envelope);
 				if (wet != null) {
 					wet.height = Math.min(wet.height, p.document.setup.fillHeightMm - wet.z);
 					if (wet.height > 1e-7)
 						clipped.push(wet);
 				}
 			}
-			var volume = BoxVolumes.volume(clipped),
+			var volume = BoxAlgebra.volume(clipped),
 				zmin = p.document.setup.fillHeightMm;
 			for (box in clipped)
 				zmin = Math.min(zmin, box.z);
@@ -248,7 +248,7 @@ class ToolingLoads {
 							height: 1
 						}
 				];
-				return BoxVolumes.volume(BoxVolumes.subtract(footprints, []));
+				return BoxAlgebra.volume(BoxAlgebra.subtract(footprints, []));
 			}
 			var pressure = (p.document.recipe.mixDensityKgM3 * s.gravityMps2 * Math.max(0, p.document.setup.fillHeightMm - zmin) * 0.001
 				+ extra) * s.loadFactor;

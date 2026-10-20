@@ -4,7 +4,7 @@ import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.casting.CastingMoldOptionsCodec;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingLoads;
 import materia.tooling.process.CastingLevelOne;

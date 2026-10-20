@@ -4,10 +4,10 @@ import materia.tooling.ToolingDocument;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.casting.BoxMoldPlanner;
 import materia.tooling.casting.CastingMoldPlanner;
-import materia.tooling.casting.CastingToolingInput.CastingFeatureKind;
+import materia.casting.CastingFeature.CastingFeatureKind;
 import materia.tooling.casting.CastingSetup.CoreStrategy;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.process.CastabilityAnalysis;
@@ -37,11 +37,11 @@ class CastingLevelOne {
 		var checks:Array<ToolingValidation> = [],
 			proposals:Array<CastabilityProposal> = [];
 		var metrics:CastingDesignMetrics = {
-			minimumCornerRadiusMm: d.input.features.filter(f -> f.kind == Void).length > 0 ? 0 : null,
+			minimumCornerRadiusMm: d.input.features.filter(f -> f.kind != InsertRecess).length > 0 ? 0 : null,
 			minimumInsertEdgeMm: null,
 			minimumEmbeddedDepthMm: null,
 			minimumFixingAccessLandMm: null,
-			liftingPointCount: d.input.inserts.filter(i -> i.role == materia.tooling.ToolingEnums.InsertRole.LiftingMount).length,
+			liftingPointCount: d.input.inserts.filter(i -> i.role == materia.casting.InsertSpec.InsertRole.LiftingMount).length,
 			checkedRemovalDirections: 0,
 			blockedRemovalDirections: 0
 		};
@@ -78,7 +78,7 @@ class CastingLevelOne {
 			return {validation: checks, proposals: proposals, metrics: metrics};
 		}
 		for (feature in d.input.features)
-			if (feature.kind == Void)
+			if (feature.kind != InsertRecess)
 				finding("process.level1.corner-radius." + feature.id, feature.id, 0, limits.minimumCornerRadiusMm,
 					"Source box cuts have zero corner radius; declare the minimum and revise source geometry if a fillet is required.", null,
 					limits.minimumCornerRadiusMm);
@@ -86,14 +86,14 @@ class CastingLevelOne {
 			var box = BoxMoldPlanner.box(insert.width, insert.depth, insert.height, F.compose(d.setup.sourceToMold, insert.pose));
 			var edge = Math.min(Math.min(box.x - envelope.x, envelope.x + envelope.width - box.x - box.width),
 				Math.min(box.y - envelope.y, envelope.y + envelope.depth - box.y - box.depth));
-			var wet = BoxVolumes.intersection(box, envelope);
+			var wet = BoxAlgebra.intersection(box, envelope);
 			var embed = wet == null ? 0 : wet.width * wet.depth * wet.height / (insert.width * insert.depth);
 			metrics.minimumInsertEdgeMm = metrics.minimumInsertEdgeMm == null ? edge : Math.min(metrics.minimumInsertEdgeMm, edge);
 			metrics.minimumEmbeddedDepthMm = metrics.minimumEmbeddedDepthMm == null ? embed : Math.min(metrics.minimumEmbeddedDepthMm, embed);
 			var proposed:Null<Float> = limits.minimumInsertEdgeMm == null ? null : insert.width - 2 * Math.max(0, limits.minimumInsertEdgeMm - edge);
 			// Only propose a width change when it actually improves the limiting edge.
 			if (proposed != null) {
-				if (proposed <= insert.boreDiameter + 2 * d.recipe.minimumLigament)
+				if (proposed <= materia.casting.InsertHoleGeometry.diameter(insert.holes) + 2 * d.recipe.minimumLigament)
 					proposed = null;
 				else {
 					var smaller = BoxMoldPlanner.box(proposed, insert.depth, insert.height, F.compose(d.setup.sourceToMold, insert.pose));
@@ -116,11 +116,11 @@ class CastingLevelOne {
 				"input.inserts."
 				+ insert.id
 				+ ".height", null);
-			if (insert.boreDiameter > 0) {
-				var land = (Math.min(insert.width, insert.depth) - insert.boreDiameter) / 2;
+			if (materia.casting.InsertHoleGeometry.diameter(insert.holes) > 0) {
+				var land = (Math.min(insert.width, insert.depth) - materia.casting.InsertHoleGeometry.diameter(insert.holes)) / 2;
 				metrics.minimumFixingAccessLandMm = metrics.minimumFixingAccessLandMm == null ? land : Math.min(metrics.minimumFixingAccessLandMm, land);
 				finding("process.level1.fixing-access."
-					+ insert.id, insert.id, (Math.min(insert.width, insert.depth) - insert.boreDiameter) / 2,
+					+ insert.id, insert.id, (Math.min(insert.width, insert.depth) - materia.casting.InsertHoleGeometry.diameter(insert.holes)) / 2,
 					limits.minimumFixingAccessMm,
 					"Declared bore-to-edge access land compared with recipe minimum; tool/fixture accessibility remains a separate check.",
 					"input.inserts."
@@ -130,10 +130,10 @@ class CastingLevelOne {
 				checks.push(FillAnalysis.check("process.level1.fixing-access." + insert.id, [insert.id], Pending,
 					"No source bore specifies fixing access; qualify an external attachment or revise the source interface.", []));
 		}
-		var liftCount = d.input.inserts.filter(i -> i.role == materia.tooling.ToolingEnums.InsertRole.LiftingMount).length;
+		var liftCount = d.input.inserts.filter(i -> i.role == materia.casting.InsertSpec.InsertRole.LiftingMount).length;
 		finding("process.level1.lifting-points", d.input.id, liftCount, limits.minimumLiftingPoints == null ? null : 1.0 * limits.minimumLiftingPoints,
 			"Typed lifting-point count versus recipe requirement; load capacity, CoM and a qualified cradle remain separate evidence.", null, null);
-		var resin = BoxVolumes.subtract([envelope], [for (feature in d.input.features) CastingMoldPlanner.featureBox(d, feature)]);
+		var resin = BoxAlgebra.subtract([envelope], [for (feature in d.input.features) CastingMoldPlanner.featureBox(d, feature)]);
 		for (strategy in d.setup.features) {
 			var rule = "process.level1.removal-direction." + strategy.featureId;
 			if (strategy.strategy != ReusableFormer || strategy.withdrawal == null || limits.removalClearanceMm == null) {
@@ -171,7 +171,7 @@ class CastingLevelOne {
 				depth: box.depth + Math.abs(direction.y * distance),
 				height: box.height + Math.abs(direction.z * distance)
 			};
-			var blocked = resin.filter(piece -> BoxVolumes.intersection(piece, sweep) != null).length > 0;
+			var blocked = resin.filter(piece -> BoxAlgebra.intersection(piece, sweep) != null).length > 0;
 			metrics.checkedRemovalDirections++;
 			if (blocked)
 				metrics.blockedRemovalDirections++;
@@ -199,8 +199,10 @@ class CastingLevelOne {
 		var insert = inserts[0];
 		insert.width = proposedValue;
 		for (feature in d.input.features)
-			if (feature.insertId == insert.id)
-				feature.width = insert.width;
+			if (feature.owner == insert.id) {
+				feature.geometry.width = insert.width;
+                feature.openings=materia.casting.CastingCavities.reachedOpenings(d.input.envelope,feature.geometry);
+            }
 		d.input.revision++;
 		d.setup.revision++;
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);

@@ -1,3 +1,4 @@
+import materia.casting.BoxAlgebra;
 import machinekit.milling.MillFrame;
 import machinekit.tooling.CastingMoldCad;
 import machinekit.tooling.ToolingVolume;
@@ -50,7 +51,7 @@ class MillMoldChecks {
 			for (feature in p.document.input.features)
 				{id: feature.id, box: CastingMoldPlanner.featureBox(p.document, feature)}
 		];
-		var resin = materia.tooling.casting.BoxVolumes.subtract([p.envelope], [for (boundary in boundaries) boundary.box]);
+		var resin = materia.casting.BoxAlgebra.subtract([p.envelope], [for (boundary in boundaries) boundary.box]);
 		var report = materia.tooling.process.JunctionThickness.analyze(p.document.input.id, CastingMoldCodec.fingerprint(p), resin, boundaries);
 		check(report.converged, "actual mill junction diameter reaches its declared numerical tolerance");
 		var owned:Array<cadkit.modeling.Part> = [];
@@ -94,7 +95,7 @@ class MillMoldChecks {
 				"CAD review owns its " + name + " evidence");
 		var design = machinekit.structural.FoundationIntegrity.castingReview(frame.base, p.document);
 		check(design.validation.length > 0
-			&& design.metrics.liftingPointCount == p.document.input.inserts.filter(i -> i.role == materia.tooling.ToolingEnums.InsertRole.LiftingMount).length,
+			&& design.metrics.liftingPointCount == p.document.input.inserts.filter(i -> i.role == materia.casting.InsertSpec.InsertRole.LiftingMount).length,
 			"source-level design metrics map into foundation integrity");
 		check(report.symmetricDifferenceMm3 < 1e-3 && !report.fabrication.ready, "review geometry passes without fabricating readiness");
 		check(report.assemblyGroups.length == 2 && report.permanentGroups.length == 2, "two shared row fixtures");
@@ -173,12 +174,12 @@ class MillMoldChecks {
 		check(assessment.geometry == null && assessment.diagnostics.hasErrors() && !partial.fabrication.ready,
 			"unsupported feature reports through shared Diagnostics without CAD fabrication claims");
 		for (i in p.document.input.inserts)
-			if (i.boreDiameter > 0) {
+			if (materia.casting.InsertHoleGeometry.diameter(i.holes) > 0) {
 				var steel = CastingMoldCad.steel(p, i.id),
 					mask = p.fixtures.filter(f -> f.insertId == i.id)[0].boreMask;
 				if (mask == null)
 					throw "Missing source bore mask";
-				var local = cadkit.modeling.Part.cylinderSpan(i.boreDiameter / 2, 0, i.height),
+				var local = cadkit.modeling.Part.cylinderSpan(materia.casting.InsertHoleGeometry.diameter(i.holes) / 2, 0, i.height),
 					world = PosedParts.moved(local, mask.pose);
 				local.close();
 				var overlap = steel.intersect(world);

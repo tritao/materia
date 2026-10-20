@@ -4,10 +4,10 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.component.ComponentValues;
 import machinekit.structural.CastInsert;
-import machinekit.structural.CastingFeatures;
+import materia.casting.CastingPatterns;
 import machinekit.structural.MineralFoundation.CastInsertPlacement;
 
-typedef InsertLocation = {id:String, role:materia.tooling.ToolingEnums.InsertRole, label:String, width:Float, depth:Float, height:Float, pose:AssemblyFrame};
+typedef InsertLocation = {id:String, role:materia.casting.InsertSpec.InsertRole, label:String, width:Float, depth:Float, height:Float, pose:AssemblyFrame};
 
 /** Design-specific insert layout, not a casting process model. Coordinates relative to casting body. */
 class FoundationLayout {
@@ -23,7 +23,7 @@ class FoundationLayout {
 		return new ComponentValues().setNumber("width", d[0])
 			.setNumber("depth", d[1])
 			.setNumber("height", d[2])
-			.setToken("voids", CastingFeatures.encode(CastingFeatures.grid(d[0], d[1], d[2], kind == "bed" ? 30 : 25, 20, 20, 25)));
+			.setToken("features", CastingPatterns.encode(CastingPatterns.grid(d[0], d[1], d[2], kind == "bed" ? 30 : 25, 20, 20, 25)));
 	}
 
 	public static function placements(kind:String):Array<CastInsertPlacement>
@@ -32,7 +32,7 @@ class FoundationLayout {
 	public static function inserts(kind:String):Array<InsertLocation> {
 		dimensions(kind);
 		var out:Array<InsertLocation> = [];
-		function add(id:String, role:materia.tooling.ToolingEnums.InsertRole, label:String, w:Float, d:Float, h:Float, x:Float, y:Float, z:Float):Void
+		function add(id:String, role:materia.casting.InsertSpec.InsertRole, label:String, w:Float, d:Float, h:Float, x:Float, y:Float, z:Float):Void
 			out.push({
 				id: id,
 				role: role,

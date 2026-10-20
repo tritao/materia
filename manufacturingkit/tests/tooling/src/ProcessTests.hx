@@ -1,3 +1,4 @@
+import materia.casting.BoxAlgebra;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.ProcessSpecCodec;
 import materia.tooling.process.FillAnalysis;
@@ -117,7 +118,7 @@ class ProcessTests {
 	}
 
 	/** Independent dense-height reference: explicit face graph, no event-plane
-	 * solver or BoxVolumes.groups. Its first sampled trapped volume approaches
+	 * solver or BoxAlgebra.groups. Its first sampled trapped volume approaches
 	 * the analytic right-hand limit as the height step shrinks.
 	 */
 	static function sampledTraps(region:Array<MoldBox>, step:Float):Float {

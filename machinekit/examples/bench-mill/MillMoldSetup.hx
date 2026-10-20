@@ -35,7 +35,7 @@ class MillMoldSetup {
 				fillHeightMm: height,
 				freeboardMm: 0,
 				sourceToMold: F.fromRotationMatrix(0, 0, height, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
-				features: [for (f in input.features) if (f.kind == "void") strategy(f.id)]
+				features: [for (f in input.features) if (f.kind != "insert-recess") strategy(f.id)]
 			},
 			recipe: {
 				id: "mill-base-panel-eps-review",

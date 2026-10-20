@@ -6,14 +6,7 @@ import materia.tooling.panel.PanelAssemblyPlan.PanelAssemblyRecord;
 import materia.tooling.panel.PanelAssemblyPlan.PanelPlacement;
 import materia.tooling.casting.CoreSupport.CoreSupportOptions;
 
-typedef MoldBox = {
-	var x:Float;
-	var y:Float;
-	var z:Float;
-	var width:Float;
-	var depth:Float;
-	var height:Float;
-}
+typedef MoldBox = materia.casting.Box3;
 
 enum abstract PenetrationClass(String) to String {
 	var OutsideCasting = "outside-casting";

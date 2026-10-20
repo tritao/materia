@@ -1,6 +1,6 @@
 package materia.tooling.process;
 
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
@@ -133,10 +133,10 @@ class OrthogonalSections {
 			if (b.width <= EPS || b.depth <= EPS || b.height <= EPS)
 				throw "Invalid section box";
 		}
-		var boxes = BoxVolumes.subtract(canonical, []),
+		var boxes = BoxAlgebra.subtract(canonical, []),
 			result:Array<PlanarSectionSpan> = [],
 			coverage:Array<{axis:SectionAxis, volumeMm3:Float}> = [];
-		var volume = BoxVolumes.volume(boxes),
+		var volume = BoxAlgebra.volume(boxes),
 			axes:Array<SectionAxis> = [X, Y, Z];
 		for (axis in 0...3) {
 			var u = (axis + 1) % 3,

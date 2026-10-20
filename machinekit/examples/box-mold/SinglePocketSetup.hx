@@ -1,7 +1,7 @@
 import machinekit.component.ComponentValues;
 import machinekit.structural.MineralFoundation;
 import machinekit.structural.CastInsert;
-import machinekit.structural.CastingFeatures;
+import materia.casting.CastingPatterns;
 import machinekit.tooling.FoundationToolingAdapter;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingDocument;
@@ -14,7 +14,7 @@ class SinglePocketSetup {
 		return new MineralFoundation(new ComponentValues().setNumber("width", 240)
 			.setNumber("depth", 180)
 			.setNumber("height", 100)
-			.setToken("voids", CastingFeatures.encode([CastingFeatures.box("pocket", 100, 80, 61, 0, 0, bedCore ? 40 : -1)])),
+			.setToken("features", CastingPatterns.encode([CastingPatterns.box("pocket",materia.casting.CastingFeature.CastingFeatureKind.Lightening,[CastingPatterns.face(bedCore?"body.z-max":"body.z-min")], 100, 80, 61, 0, 0, bedCore ? 40 : -1)])),
 			[
 				{
 					id: "seat",
@@ -22,7 +22,7 @@ class SinglePocketSetup {
 						.setNumber("width", 40)
 						.setNumber("depth", 35)
 						.setNumber("height", 15)
-						.setNumber("boreDiameter", 5)),
+						.setToken("holes",machinekit.structural.InsertHoles.through(5))),
 					pose: F.translation(80, 0, 85)
 				}
 			]);

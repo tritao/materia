@@ -3,7 +3,7 @@ package machinekit.structural;
 import cadkit.modeling.Part;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
-import materia.tooling.ToolingEnums.InsertRole;
+import materia.casting.InsertSpec.InsertRole;
 
 /** Cast-in steel design envelope; local +Z is the finished mounting-plane normal. */
 class CastInsert extends MachineComponent {
@@ -11,19 +11,14 @@ class CastInsert extends MachineComponent {
 
 	public static function parameters():Array<ComponentParameter>
 		return [
-			P.length("boreDiameter", 0),
+			P.text("holes", '{"version":1,"holes":[]}'),
 			P.length("width", 35),
 			P.length("depth", 400),
 			P.length("height", 20),
 			P.length("positionTolerance", 0.01),
-			P.requiredChoice("role", materia.tooling.ToolingEnums.InsertRoles.tokens()),
+			P.requiredChoice("role", materia.casting.InsertSpec.InsertRoles.tokens()),
 			P.text("label", "rail seat"),
-			P.choice("finish", [
-				"ground after casting",
-				"machined after casting",
-				"replicated after casting",
-				"as cast"
-			], "ground after casting")
+			P.choice("finish", ["ground-after-casting","machined-after-casting","replicated-after-casting","as-cast"], "ground-after-casting")
 		];
 
 	public static function recipeType():ComponentType {
@@ -38,13 +33,12 @@ class CastInsert extends MachineComponent {
 		for (name in ["width", "depth", "height", "positionTolerance"])
 			if (v.number(name) <= 0)
 				throw "Insert dimensions and tolerance must be positive";
-		if (v.number("boreDiameter") >= Math.min(v.number("width"), v.number("depth")))
-			throw "Insert bore consumes its seat";
 		if (StringTools.trim(v.token("label")).length == 0)
 			throw "Insert needs a label";
 		if (v.get("material") != null && v.token("material") != "steel")
 			throw "Cast insert requires steel";
 		super("CAST-IN-INSERT", "Cast-in steel " + v.token("label") + ", " + v.token("finish"), "steel", false, v);
+		addFacet(InsertHoles.facet(InsertHoles.records(v.token("holes"),v.number("height")),v.number("width"),v.number("depth"),v.number("height")));
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Mount, Solids.axial(0, 0, parameterNumber("height")));
 	}
@@ -57,9 +51,8 @@ class CastInsert extends MachineComponent {
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Solids.named(Part.box(parameterNumber("width"), parameterNumber("depth"), parameterNumber("height")), "insert");
-		return parameterNumber("boreDiameter") == 0 ? body : Solids.cut(body, [
-			Part.cylinderSpan(parameterNumber("boreDiameter") / 2, -1, parameterNumber("height") + 1)
-		]);
+		var tools=machinekit.design.DesignInterfaces.of(this).drillingTools();
+		return tools.length==0?body:Solids.cut(body,tools);
 	}
 
 	override public function setMaterial(spec:String):Void {

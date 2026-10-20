@@ -4,7 +4,7 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CastingMoldCodec;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.FillAnalysis;
 import materia.tooling.process.CureAnalysis;
@@ -60,7 +60,7 @@ class CastingProcessAnalysis {
 			for (f in features)
 				{id: f.id, box: CastingMoldPlanner.featureBox(p.document, f)}
 		];
-		var resin = BoxVolumes.subtract([p.envelope], [for (b in boundaries) b.box]);
+		var resin = BoxAlgebra.subtract([p.envelope], [for (b in boundaries) b.box]);
 		var projection = FillTooling.project(p);
 		var panels:Array<FillPanel> = [
 			for (member in p.panels.members.concat(p.supportPanels)) {

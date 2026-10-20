@@ -4,8 +4,11 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentValues;
 import machinekit.component.Solids;
 import machinekit.structural.CastInsert;
-import machinekit.structural.CastingFeatures;
-import machinekit.structural.CastingFeatures.CastingBox;
+import materia.casting.CastingPatterns;
+import materia.casting.CastingEnvelope;
+import machinekit.structural.CastingFeaturePatterns;
+import machinekit.structural.InsertHoles;
+import materia.casting.CastingFeature;
 import machinekit.structural.MineralFoundation;
 import machinekit.structural.MineralFoundation.CastInsertPlacement;
 import materia.assembly.AssemblyFrames as F;
@@ -31,7 +34,8 @@ class MillFrame extends MachineAssembly {
 		if (xyAxis != null && xyAxis.frame != layout)
 			throw "Frame and XY datums must share one layout";
 		this.xyAxis = xyAxis;
-		var l = layout, baseVoids:Array<CastingBox> = [], baseInserts:Array<CastInsertPlacement> = [];
+		var l = layout, details=l.casting, baseEnvelope=CastingEnvelope.build(l.baseWidth,l.baseDepth,l.baseHeight),
+            columnEnvelope=CastingEnvelope.build(l.columnWidth,l.columnDepth,l.columnHeight,0,l.columnFootWidth>l.columnWidth?l.columnFootWidth:0,l.columnFootWidth>l.columnWidth?MillFrameLayout.COLUMN_FOOT_HEIGHT:0,l.columnFootWidth>l.columnWidth?MillFrameLayout.COLUMN_FOOT_SHOULDER:0),baseVoids:Array<CastingFeature> = [], baseInserts:Array<CastInsertPlacement> = [];
 		var beamOuter = (l.yRailSpacing + l.seatWidth) / 2;
 		var outerWidth = l.baseWidth / 2 - l.wall - beamOuter;
 		var channels = [
@@ -47,34 +51,33 @@ class MillFrame extends MachineAssembly {
 		for (i in 0...channels.length)
 			for (row in 0...2) {
 				var channel = channels[i];
-				baseVoids.push(CastingFeatures.box('underside-$i-$row', channel.width, pocketLength, l.baseHeight
-					- l.roof
-					+ 1, channel.x,
+				baseVoids.push(CastingFeaturePatterns.box(baseEnvelope,'underside-$i-$row',Lightening, channel.width, pocketLength, l.baseHeight
+					- l.roof, channel.x,
 					pocketFront
 					+ pocketLength / 2
 					+ row * (pocketLength + l.wall)
-					- l.baseCentreY, -1));
+					- l.baseCentreY, 0));
 			}
 		if (xyAxis != null)
 			for (side in [-1, 1]) {
-				var shoulderOuter = (l.yRailSpacing + l.seatWidth) / 2 + 12;
+				var shoulderOuter = (l.yRailSpacing + l.seatWidth) / 2 + details.shoulderClearance;
 				var width = l.baseWidth / 2 - shoulderOuter;
-				baseVoids.push(CastingFeatures.box('guide-shoulder-outside-$side', width, l.yRailLength, 21, side * (shoulderOuter + width / 2),
+				baseVoids.push(CastingFeaturePatterns.box(baseEnvelope,'guide-shoulder-outside-$side',InterfaceRecess, width, l.yRailLength, details.shoulderDepth, side * (shoulderOuter + width / 2),
 					l.yRailStart
 					+ l.yRailLength / 2
 					- l.baseCentreY, l.baseHeight
-					- 20));
+					- details.shoulderDepth));
 			}
 		if (xyAxis != null) {
-			var start = xyAxis.yFloatingY + xyAxis.yFloatingDepth / 2 + 12,
+			var start = xyAxis.yFloatingY + xyAxis.yFloatingDepth / 2 + details.shoulderClearance,
 				end = l.yRailStart + l.yRailLength;
-			baseVoids.push(CastingFeatures.box("between-y-shoulders", l.yRailSpacing
+			baseVoids.push(CastingFeaturePatterns.box(baseEnvelope,"between-y-shoulders",InterfaceRecess, l.yRailSpacing
 				- l.seatWidth
-				- 24, end
-				- start, 21, 0,
+				- 2 * details.shoulderClearance, end
+				- start, details.shoulderDepth, 0,
 				(start + end) / 2
 				- l.baseCentreY, l.baseHeight
-				- 20));
+				- details.shoulderDepth));
 		}
 		for (side in [-1, 1])
 			baseInserts.push(insert(side < 0 ? "railYLeft" : "railYRight", l.seatWidth, l.yRailLength, l.insertThickness, GuideSeat, "Y guide seat",
@@ -90,16 +93,14 @@ class MillFrame extends MachineAssembly {
 			var a = xyAxis;
 			var bayFront = a.yFixedY - a.yFixedDepth / 2 - a.clearance;
 			// Only shallow bearing/motor-foot recesses remain in the base.
-			baseVoids.push(CastingFeatures.box("rear-y-drive-seat", a.yBayWidth, a.yServiceRear
-				+ 1
+			baseVoids.push(CastingFeaturePatterns.box(baseEnvelope,"rear-y-drive-seat",InterfaceRecess, a.yBayWidth, a.yServiceRear
+				+ details.rearBayDesignClearance
 				- bayFront, l.baseHeight
-				+ 1
 				- a.yMountPlane, 0,
-				(bayFront + a.yServiceRear + 1) / 2
+				(bayFront + a.yServiceRear + details.rearBayDesignClearance) / 2
 				- l.baseCentreY, a.yMountPlane));
-			baseVoids.push(CastingFeatures.box("front-y-bearing-seat", 106, a.yFloatingDepth
+			baseVoids.push(CastingFeaturePatterns.box(baseEnvelope,"front-y-bearing-seat",InterfaceRecess, details.frontBearingSeatWidth, a.yFloatingDepth
 				+ 2 * a.clearance, l.baseHeight
-				+ 1
 				- a.yMountPlane, 0,
 				a.yFloatingY
 				- l.baseCentreY, a.yMountPlane));
@@ -118,22 +119,22 @@ class MillFrame extends MachineAssembly {
 					part: new CastInsert(new ComponentValues().setNumber("width", footWidth)
 						.setNumber("depth", footDepth)
 						.setNumber("height", l.insertThickness)
-						.setNumber("boreDiameter", flared ? 10.2 : 0)
+						.setToken("holes", flared ? InsertHoles.tappedThrough(details.columnAnchorThread) : InsertHoles.through(0))
 						.setToken("role", "column-mount")
-						.setToken("label", "column mounting anchor — nominal M12 tap drill")),
+						.setToken("label", "column mounting anchor")),
 					pose: F.translation(x, y - l.baseCentreY, l.railPlane - l.insertThickness)
 				});
 				if (l.footPockets) {
 					var fx = sx * (l.baseWidth / 2 - l.wall),
 						fy = (sy < 0 ? l.front + 80 : l.rear - 80) - l.baseCentreY;
-					baseVoids.push(CastingFeatures.box('foot-access-$id', 2 * l.wall + 2, 90, 100, fx, fy, 40));
-					baseVoids.push(CastingFeatures.box('foot-stem-$id', 20, 20, 42, fx, fy, -1));
+					baseVoids.push(CastingFeaturePatterns.box(baseEnvelope,'foot-access-$id',ServiceOpening, 2 * l.wall + 2, 90, 100, fx, fy, 40));
+					baseVoids.push(CastingFeaturePatterns.box(baseEnvelope,'foot-stem-$id',Clearance, 20, 20, 42, fx, fy, -1));
 					baseInserts.push({
 						id: 'foot$id',
 						part: new CastInsert(new ComponentValues().setNumber("width", l.wall)
 							.setNumber("depth", l.wall)
 							.setNumber("height", l.insertThickness)
-							.setNumber("boreDiameter", 18)
+							.setToken("holes", InsertHoles.through(details.levelingClearanceDiameter))
 							.setToken("role", "leveling-seat")
 							.setToken("label", "leveling screw seat")),
 						pose: F.translation(fx, fy, 40 - l.insertThickness)
@@ -152,37 +153,35 @@ class MillFrame extends MachineAssembly {
 					addMate('leveling-foot-$id', "fixed", 'base/foot$id', "top", 'levelingFoot$id', "mount");
 				}
 
-		var columnVoids:Array<CastingBox> = [],
+		var columnVoids:Array<CastingFeature> = [],
 			columnInserts:Array<CastInsertPlacement> = [];
 		var frontWeb = zAxis == null ? l.roof : Math.max(l.roof, zAxis.channelBack + l.wall - (l.columnCentreY - l.columnDepth / 2));
 		if (zAxis != null) {
-			var channelFront = l.columnCentreY - l.columnDepth / 2 - 1;
-			columnVoids.push(CastingFeatures.box("z-drive-channel", zAxis.channelWidth, zAxis.channelBack
-				- channelFront, l.columnHeight
-				+ 2, 0,
+			var channelFront = l.columnCentreY - l.columnDepth / 2;
+			columnVoids.push(CastingFeaturePatterns.box(columnEnvelope,"z-drive-channel",ServiceOpening, zAxis.channelWidth, zAxis.channelBack
+				- channelFront, l.columnHeight, 0,
 				(channelFront + zAxis.channelBack) / 2
-				- l.columnCentreY, -1));
+				- l.columnCentreY, 0));
 		}
 		if (xyAxis != null) {
 			var a = xyAxis, bayFront = a.yFixedY - a.yFixedDepth / 2 - a.clearance;
 			if (a.supplierY) {
 				// The shorter selected motor moves the bracket rearward. Keep a real
 				// shaft passage through the web separating the Z channel and rear bay.
-				var tunnelFront = l.columnFront - 1, tunnelBack = bayFront + 1;
-				columnVoids.push(CastingFeatures.box("selected-y-shaft-passage", 22, tunnelBack
+				var tunnelFront = l.columnFront, tunnelBack = bayFront;
+				columnVoids.push(CastingFeaturePatterns.box(columnEnvelope,"selected-y-shaft-passage",ServiceOpening, 22, tunnelBack
 					- tunnelFront, 22, 0,
 					(tunnelFront + tunnelBack) / 2
 					- l.columnCentreY, a.yScrewZ
 					- l.railPlane
 					- 11));
 			}
-			columnVoids.push(CastingFeatures.box("rear-y-motor-bay", a.yBayWidth, a.yServiceRear
-				+ 1
+			columnVoids.push(CastingFeaturePatterns.box(columnEnvelope,"rear-y-motor-bay",ServiceOpening, a.yBayWidth, a.yServiceRear
+				+ details.rearBayDesignClearance
 				- bayFront, a.yBayTop
-				- l.railPlane
-				+ 1, 0,
-				(bayFront + a.yServiceRear + 1) / 2
-				- l.columnCentreY, -1));
+				- l.railPlane, 0,
+				(bayFront + a.yServiceRear + details.rearBayDesignClearance) / 2
+				- l.columnCentreY, 0));
 			for (sx in [-1, 1])
 				for (z in [a.yHatchLowerZ, a.yHatchUpperZ])
 					columnInserts.push({
@@ -190,7 +189,7 @@ class MillFrame extends MachineAssembly {
 						part: new CastInsert(new ComponentValues().setNumber("width", 20)
 							.setNumber("depth", 20)
 							.setNumber("height", 10)
-							.setNumber("boreDiameter", 3.3)
+							.setToken("holes", InsertHoles.tappedThrough(details.hatchAnchorThread))
 							.setToken("role", "hatch-mount")
 							.setToken("label", "rear motor hatch anchor")),
 						pose: F.fromRotationMatrix(sx * 75, a.yServiceRear - 8 - l.columnCentreY, z - l.railPlane, [1, 0, 0, 0, 0, 1, 0, -1, 0])
@@ -204,8 +203,8 @@ class MillFrame extends MachineAssembly {
 				top = start + chamberHeight;
 			if (row == 0 && xyAxis != null)
 				start = Math.max(start, xyAxis.yBayTop - l.railPlane + l.roof);
-			columnVoids.push(CastingFeatures.box('rear-chamber-$row', l.columnWidth - 2 * l.wall, l.columnDepth - frontWeb + 1, top - start, 0,
-				(frontWeb + 1) / 2, start));
+			columnVoids.push(CastingFeaturePatterns.box(columnEnvelope,'rear-chamber-$row',Lightening, l.columnWidth - 2 * l.wall, l.columnDepth - frontWeb, top - start, 0,
+				frontWeb / 2, start));
 		}
 
 		// One physical strip per side carries the guide and both bearing-plate anchors.
@@ -227,8 +226,8 @@ class MillFrame extends MachineAssembly {
 				if (StringTools.startsWith(row.id, "foot")) {
 					var side = row.pose.x < 0 ? -1 : 1,
 						inner = Math.abs(row.pose.x) - 20,
-						outer = l.columnFootWidth / 2 + 1;
-					columnVoids.push(CastingFeatures.box('bolt-access-${row.id}', outer - inner, 46, MillFrameLayout.COLUMN_ACCESS_TOP - l.insertThickness,
+						outer = l.columnFootWidth / 2;
+					columnVoids.push(CastingFeaturePatterns.box(columnEnvelope,'bolt-access-${row.id}',ServiceOpening, outer - inner, 46, MillFrameLayout.COLUMN_ACCESS_TOP - l.insertThickness,
 						side * (inner + outer) / 2, row.pose.y, l.insertThickness));
 				}
 		if (flared) {
@@ -240,7 +239,7 @@ class MillFrame extends MachineAssembly {
 						part: new CastInsert(new ComponentValues().setNumber("width", footWidth)
 							.setNumber("depth", footDepth)
 							.setNumber("height", l.insertThickness)
-							.setNumber("boreDiameter", 13)
+							.setToken("holes", InsertHoles.through(machinekit.standard.SocketHeadCapScrew.metric(details.columnAnchorThread,35).spec.clearanceFine))
 							.setToken("role", "column-mount")
 							.setToken("label", "column sole clamping pad"))
 					} : row
@@ -296,7 +295,7 @@ class MillFrame extends MachineAssembly {
 	static function down(x:Float, y:Float, z:Float):materia.assembly.AssemblyRecord.AssemblyFrame
 		return F.fromRotationMatrix(x, y, z, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
 
-	static function insert(id:String, width:Float, depth:Float, thickness:Float, role:materia.tooling.ToolingEnums.InsertRole, label:String,
+	static function insert(id:String, width:Float, depth:Float, thickness:Float, role:materia.casting.InsertSpec.InsertRole, label:String,
 			pose:materia.assembly.AssemblyRecord.AssemblyFrame):CastInsertPlacement
 		return {
 			id: id,
@@ -308,9 +307,9 @@ class MillFrame extends MachineAssembly {
 			pose: pose
 		};
 
-	static function body(width:Float, depth:Float, height:Float, voids:Array<CastingBox>):ComponentValues
+	static function body(width:Float, depth:Float, height:Float, voids:Array<CastingFeature>):ComponentValues
 		return new ComponentValues().setNumber("width", width)
 			.setNumber("depth", depth)
 			.setNumber("height", height)
-			.setToken("voids", CastingFeatures.encode(voids));
+			.setToken("features", CastingPatterns.encode(voids));
 }

@@ -8,7 +8,7 @@ import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.casting.CastHandling;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.export.FabricationSpec;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingFabrication.FabricationPlan;
@@ -153,8 +153,8 @@ class MoldOrientationStudy {
 		for (placement in layout)
 			sheets = Std.int(Math.max(sheets, placement.sheet));
 		for (c in p.cores)
-			eps += BoxVolumes.volume(c.foamLayers);
-		var mix = BoxVolumes.subtract([p.envelope], [
+			eps += BoxAlgebra.volume(c.foamLayers);
+		var mix = BoxAlgebra.subtract([p.envelope], [
 			for (c in p.document.input.features)
 				CastingMoldPlanner.featureBox(p.document, c)
 		]);
@@ -168,7 +168,7 @@ class MoldOrientationStudy {
 			sacrificialEPSVolumeMm3: eps,
 			logicalHardwareStacks: p.hardware.length,
 			castingMassKg: p.handling.castingMassKg,
-			mixMassKg: BoxVolumes.volume(mix) * p.document.recipe.mixDensityKgM3 * 1e-9,
+			mixMassKg: BoxAlgebra.volume(mix) * p.document.recipe.mixDensityKgM3 * 1e-9,
 			openChangeRequests: p.changeRequests.length,
 			requiresFlip: p.handling.requiresFlip
 		};

@@ -99,7 +99,7 @@ class CastingMoldCad {
 			.setNumber("width", i.width)
 			.setNumber("depth", i.depth)
 			.setNumber("height", i.height)
-			.setNumber("boreDiameter", i.boreDiameter));
+			.setToken("holes", machinekit.structural.InsertHoles.fromNeutral(i.holes)));
 		var local = component.geometry();
 		try {
 			var out = PosedParts.moved(local, F.compose(p.document.setup.sourceToMold, i.pose));
@@ -240,7 +240,7 @@ class CastingMoldCad {
 			var part = new CastInsert(new ComponentValues().setNumber("width", i.width)
 				.setNumber("depth", i.depth)
 				.setNumber("height", i.height)
-				.setNumber("boreDiameter", i.boreDiameter)
+				.setToken("holes", machinekit.structural.InsertHoles.fromNeutral(i.holes))
 				.setNumber("positionTolerance", i.positionTolerance)
 				.setToken("role", i.role)
 				.setToken("label", i.label));

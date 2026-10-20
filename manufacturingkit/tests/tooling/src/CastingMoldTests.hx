@@ -4,7 +4,7 @@ import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.casting.CastingMoldOptionsCodec;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.casting.MoldVolumeCodec;
 
 class CastingMoldTests {
@@ -94,7 +94,7 @@ class CastingMoldTests {
 		narrowBridge.recipe.hardware.minimumBridgeWidth = 1000;
 		rejects(() -> CastingMoldPlanner.plan(narrowBridge, options(narrowBridge)), "undersized bridge row rejected");
 		var intersecting = CastingMoldCodec.decode(s);
-		var resinPieces = BoxVolumes.subtract([p.envelope], [
+		var resinPieces = BoxAlgebra.subtract([p.envelope], [
 			for (f in p.document.input.features)
 				CastingMoldPlanner.featureBox(p.document, f)
 		]);
@@ -113,9 +113,9 @@ class CastingMoldTests {
 		for (i in d.input.inserts)
 			negative.push(materia.tooling.casting.BoxMoldPlanner.box(i.width, i.depth, i.height,
 				materia.assembly.AssemblyFrames.compose(d.setup.sourceToMold, i.pose)));
-		var source = BoxVolumes.subtract([p.envelope], cuts),
-			reconstructed = BoxVolumes.subtract([p.cavity], negative);
-		check(BoxVolumes.volume(BoxVolumes.subtract(source, reconstructed)) + BoxVolumes.volume(BoxVolumes.subtract(reconstructed, source)) < 1e-5,
+		var source = BoxAlgebra.subtract([p.envelope], cuts),
+			reconstructed = BoxAlgebra.subtract([p.cavity], negative);
+		check(BoxAlgebra.volume(BoxAlgebra.subtract(source, reconstructed)) + BoxAlgebra.volume(BoxAlgebra.subtract(reconstructed, source)) < 1e-5,
 			"orthogonal source/reconstruction symmetric difference");
 		check(p.changeRequests.filter(c -> c.kind == "lifting-points").length == 1, "unqualified flip requests lifting points");
 		check(p.changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 1, "replication requires source allowance decision");
@@ -168,8 +168,8 @@ class CastingMoldTests {
 			depth: 4.0,
 			height: 10.0
 		};
-		check(Math.abs(BoxVolumes.volume(BoxVolumes.subtract([a], [b])) - 840) < 1e-8, "through-hole box subtraction");
-		check(BoxVolumes.groups(BoxVolumes.subtract([a], [
+		check(Math.abs(BoxAlgebra.volume(BoxAlgebra.subtract([a], [b])) - 840) < 1e-8, "through-hole box subtraction");
+		check(BoxAlgebra.groups(BoxAlgebra.subtract([a], [
 			{
 				x: 4,
 				y: -1,
@@ -193,8 +193,8 @@ class CastingMoldTests {
 		var overlap = ToolingCodec.snapshot(d);
 		overlap.input.inserts[0].pose.x = 30;
 		overlap.input.inserts[0].pose.z = 40;
-		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].pose.x = 30;
-		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].pose.z = 40;
+		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].geometry.pose.x = 30;
+		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].geometry.pose.z = 40;
 		overlap.setup.sourceFingerprint = ToolingCodec.inputFingerprint(overlap.input);
 		rejects(() -> CastingMoldPlanner.plan(overlap, options(overlap)), "EPS/insert overlap cannot silently allocate away either body");
 		var rotated = ToolingCodec.snapshot(d);
@@ -210,10 +210,10 @@ class CastingMoldTests {
 		for (i in rotated.input.inserts)
 			rotatedNegative.push(materia.tooling.casting.BoxMoldPlanner.box(i.width, i.depth, i.height,
 				materia.assembly.AssemblyFrames.compose(rotated.setup.sourceToMold, i.pose)));
-		var rotatedSource = BoxVolumes.subtract([rotatedPlan.envelope], [for (f in rotated.input.features) CastingMoldPlanner.featureBox(rotated, f)]),
-			rotatedRebuilt = BoxVolumes.subtract([rotatedPlan.cavity], rotatedNegative);
-		check(BoxVolumes.volume(BoxVolumes.subtract(rotatedSource, rotatedRebuilt))
-			+ BoxVolumes.volume(BoxVolumes.subtract(rotatedRebuilt, rotatedSource)) < 1e-5,
+		var rotatedSource = BoxAlgebra.subtract([rotatedPlan.envelope], [for (f in rotated.input.features) CastingMoldPlanner.featureBox(rotated, f)]),
+			rotatedRebuilt = BoxAlgebra.subtract([rotatedPlan.cavity], rotatedNegative);
+		check(BoxAlgebra.volume(BoxAlgebra.subtract(rotatedSource, rotatedRebuilt))
+			+ BoxAlgebra.volume(BoxAlgebra.subtract(rotatedRebuilt, rotatedSource)) < 1e-5,
 			"changed setup orientation preserves exact source reconstruction");
 		check(CastingMoldCodec.fingerprint(rotatedPlan) != CastingMoldCodec.fingerprint(CastingMoldPlanner.plan(d, options(d))),
 			"setup orientation regenerates tooling");
@@ -275,15 +275,7 @@ class CastingMoldTests {
 		});
 		rejects(() -> MoldVolumeCodec.encode(volume), "overlapping mold box pieces rejected");
 		var assigned = ToolingCodec.snapshot(rigid);
-		assigned.input.features.push({
-			id: "overlap-detail",
-			kind: materia.tooling.casting.CastingToolingInput.CastingFeatureKind.Void,
-			insertId: null,
-			width: 40,
-			depth: 40,
-			height: 30,
-			pose: materia.assembly.AssemblyFrames.translation(0, 0, 20)
-		});
+		assigned.input.features.push({id:"overlap-detail",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:40,depth:40,height:30,pose:materia.assembly.AssemblyFrames.translation(0, 0, 20)},openings:[],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:["width","depth","height"],derivedFrom:null});
 		assigned.setup.features.push({
 			featureId: "overlap-detail",
 			strategy: materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
@@ -305,7 +297,7 @@ class CastingMoldTests {
 		machining.precision[0].allowance = 1;
 		rejects(() -> CastingMoldPlanner.plan(d, machining), "unimplemented finishing stock is rejected");
 		var finishing = ToolingCodec.snapshot(d);
-		finishing.input.inserts[0].finish = materia.tooling.ToolingEnums.InsertFinish.ReplicatedAfterCasting;
+		finishing.input.inserts[0].finish = materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting;
 		finishing.setup.sourceFingerprint = ToolingCodec.inputFingerprint(finishing.input);
 		check(CastingMoldPlanner.plan(finishing, options(finishing)).changeRequests.filter(c -> StringTools.startsWith(c.id, "finish-")).length == 0,
 			"replication route matches a replicated source finish");

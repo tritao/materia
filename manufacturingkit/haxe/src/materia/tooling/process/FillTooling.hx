@@ -1,7 +1,7 @@
 package materia.tooling.process;
 
 import materia.tooling.casting.CastingMoldPlan;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.casting.BoxMoldPlanner;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.panel.PanelContours;
@@ -27,7 +27,7 @@ class FillTooling {
 				depth: box.depth,
 				height: p.envelope.height
 			};
-			var clip = BoxVolumes.intersection(footprint, p.envelope);
+			var clip = BoxAlgebra.intersection(footprint, p.envelope);
 			if (clip == null)
 				return false;
 			clip.z = 0;
@@ -75,7 +75,7 @@ class FillTooling {
 					var pose = op.side == materia.tooling.ToolingEnums.MachiningSide.PositiveZ ? F.compose(member.pose,
 						F.translation(0, 0, thickness - op.depth)) : member.pose;
 					if (orthogonal(op.contour))
-						material = BoxVolumes.subtract(material, prism(op.contour, op.depth, pose));
+						material = BoxAlgebra.subtract(material, prism(op.contour, op.depth, pose));
 					else {
 						var cutBounds = PanelGeometry.bounds(op.contour);
 						var cut = BoxMoldPlanner.box(cutBounds.width, cutBounds.height, op.depth,
@@ -94,7 +94,7 @@ class FillTooling {
 			var material = volume.pieces.copy();
 			for (cut in volume.cuts) {
 				if (orthogonal(cut.operation.contour))
-					material = BoxVolumes.subtract(material, prism(cut.operation.contour, cut.operation.depth, cut.pose));
+					material = BoxAlgebra.subtract(material, prism(cut.operation.contour, cut.operation.depth, cut.pose));
 				else {
 					var bounds = PanelGeometry.bounds(cut.operation.contour);
 					var before = blockers.length;
@@ -109,7 +109,7 @@ class FillTooling {
 				add(box);
 			for (profile in volume.profiles) {
 				if (orthogonal(profile.contour))
-					for (box in BoxVolumes.subtract(prism(profile.contour, profile.depth, profile.pose), profile.subtract))
+					for (box in BoxAlgebra.subtract(prism(profile.contour, profile.depth, profile.pose), profile.subtract))
 						add(box);
 				else {
 					var bounds = PanelGeometry.bounds(profile.contour);
@@ -128,6 +128,6 @@ class FillTooling {
 			if (unique.indexOf(id) < 0)
 				unique.push(id);
 		unique.sort(Reflect.compare);
-		return {blockers: BoxVolumes.subtract(blockers, []), unsupportedIds: unique};
+		return {blockers: BoxAlgebra.subtract(blockers, []), unsupportedIds: unique};
 	}
 }

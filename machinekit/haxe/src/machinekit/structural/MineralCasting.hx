@@ -5,76 +5,66 @@ import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
-import machinekit.structural.CastingFeatures.CastingBox;
+import materia.casting.CastingFeature;
+import materia.casting.CastingPrism;
+import materia.casting.CastingPatterns;
+import materia.casting.CastingEnvelope;
+import materia.casting.CastingCavities;
+import materia.casting.BoxAlgebra;
 
-/** A mineral casting design body. Layouts supply cores and recesses; no process adequacy implied. */
+/** Source design cuts and openings; finished cavities have one neutral derivation. */
 class MineralCasting extends MachineComponent {
-	final voids:Array<CastingBox>;
-	static var recipe:Null<ComponentType>;
-
-	public static function parameters():Array<ComponentParameter> return [
-		P.length("width", 650), P.length("depth", 550), P.length("height", 120),
-		P.length("footWidth", 0), P.length("footHeight", 0), P.length("footShoulder", 0),
-		P.length("cornerChamfer", 0), P.text("voids", "[]")];
-
-	public static function recipeType():ComponentType {
-		if (recipe == null) recipe = new ComponentType("machinekit.structural.mineral-casting", parameters(),
-			v -> new MineralCasting(v), false, false, null, false);
-		return recipe;
-	}
-
-	public function new(?overrides:ComponentValues) {
-		var v = P.resolve(parameters(), overrides);
-		var cuts = CastingFeatures.decode(v.token("voids"));
-		v.setToken("voids", CastingFeatures.encode(cuts));
-		if (v.get("material") != null && v.token("material") != "mineral cast") throw "Casting requires mineral cast";
-		for (name in ["width", "depth", "height"]) if (v.number(name) <= 0) throw "Casting dimensions must be positive";
-		if (2 * v.number("cornerChamfer") >= Math.min(v.number("width"), v.number("depth")))
-			throw "Casting chamfer consumes the body";
-		if (!Math.isFinite(v.number("footWidth")+v.number("footHeight")+v.number("footShoulder")) ||
-			(v.number("footWidth")==0 && (v.number("footHeight")!=0 || v.number("footShoulder")!=0))) throw "Incomplete casting foot";
-		if (v.number("footWidth") != 0 && (v.number("footWidth") <= v.number("width") ||
-			v.number("footShoulder") <= 0 || v.number("footHeight") <= v.number("footShoulder") ||
-			v.number("footHeight") >= v.number("height"))) throw "Casting foot needs a wider sole and a tapered shoulder";
-		super("MINERAL-CASTING", "Mineral casting (purchase by casting mass, kg)", "mineral cast", false, v);
-		voids = cuts;
-		addConnector("mount", Mount, Solids.axial(0, 0, 0));
-		addConnector("top", Mount, Solids.axial(0, 0, parameterNumber("height")));
-	}
-
-	override public function componentType():Null<ComponentType> return recipeType();
-	override public function hasGeometry():Bool return true;
-	override public function setMaterial(spec:String):Void {
-		if (spec != "mineral cast") throw "Casting requires mineral cast";
-		super.setMaterial(spec);
-	}
-
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var x = parameterNumber("width") / 2, y = parameterNumber("depth") / 2;
-		var h = parameterNumber("height"), c = parameterNumber("cornerChamfer");
-		var body = Solids.named(c == 0 ? Part.box(2*x, 2*y, h) : Part.prism([
-			new Vector(-x+c,-y), new Vector(x-c,-y), new Vector(x,-y+c), new Vector(x,y-c),
-			new Vector(x-c,y), new Vector(-x+c,y), new Vector(-x,y-c), new Vector(-x,-y+c)], 0, h), "casting");
-		if (parameterNumber("footWidth") > 0) {
-			var f = parameterNumber("footWidth")/2, top = parameterNumber("footHeight"), shoulder = parameterNumber("footShoulder");
-			var profile = Part.prism([new Vector(-f,0),new Vector(f,0),new Vector(f,shoulder),
-				new Vector(x,top),new Vector(-x,top),new Vector(-f,shoulder)],0,2*y);
-			var foot = PosedParts.moved(profile, materia.assembly.AssemblyFrames.fromRotationMatrix(0,y,0,[1,0,0, 0,0,-1, 0,1,0]));
-			profile.close();
-			body = Solids.union([body,foot]);
-		}
-		return Solids.building([body], parts -> {
-			for (feature in voids) {
-				var tool = Part.box(feature.width, feature.depth, feature.height);
-				try {
-					parts.push(Solids.named(PosedParts.moved(tool, feature.pose), feature.id));
-					tool.close();
-				} catch (error:Dynamic) { tool.close(); throw error; }
-			}
-			return Solids.cut(parts[0], parts.slice(1));
-		});
-	}
-
-	public function castingByWeight():{material:String, kg:Float}
-		return {material: materialSpec(), kg: massProperties().mass};
+    final features:Array<CastingFeature>;
+    static var recipe:Null<ComponentType>;
+    public static function parameters():Array<ComponentParameter> return [
+        P.length("width",650),P.length("depth",550),P.length("height",120),
+        P.length("footWidth",0),P.length("footHeight",0),P.length("footShoulder",0),P.length("cornerChamfer",0),
+        P.text("features",'{"version":1,"features":[]}')];
+    public static function recipeType():ComponentType {
+        if(recipe==null)recipe=new ComponentType("machinekit.structural.mineral-casting",parameters(),v->new MineralCasting(v),false,false,null,false);
+        return recipe;
+    }
+    public function new(?overrides:ComponentValues) {
+        var v=P.resolve(parameters(),overrides),cuts=CastingPatterns.decode(v.token("features"));
+        v.setToken("features",CastingPatterns.encode(cuts));
+        for(name in ["width","depth","height"])if(v.number(name)<=0)throw "Casting dimensions must be positive";
+        if(v.get("material")!=null&&v.token("material")!="mineral cast")throw "Casting requires mineral cast";
+        if(v.number("cornerChamfer")<0||2*v.number("cornerChamfer")>=Math.min(v.number("width"),v.number("depth")))throw "Casting chamfer consumes body";
+        if(v.number("footWidth")==0&&(v.number("footHeight")!=0||v.number("footShoulder")!=0))throw "Incomplete casting foot";
+        if(v.number("footWidth")!=0&&(v.number("footWidth")<=v.number("width")||v.number("footShoulder")<=0||v.number("footHeight")<=v.number("footShoulder")||v.number("footHeight")>=v.number("height")))throw "Invalid flared casting foot";
+        super("MINERAL-CASTING","Mineral casting (purchase by casting mass, kg)","mineral cast",false,v);
+        features=cuts;
+        var cavities=finishedCavities();
+        if(parameterNumber("cornerChamfer")==0&&parameterNumber("footWidth")==0) {
+            var material=BoxAlgebra.material(castingEnvelope(),features);
+            addFacet(CollisionHullFacet.fromBoxes([for(b in BoxAlgebra.compact(material))BoxAlgebra.limits(b)]));
+        }
+        addConnector("mount",Mount,Solids.axial(0,0,0));addConnector("top",Mount,Solids.axial(0,0,v.number("height")));
+    }
+    override public function componentType():Null<ComponentType> return recipeType();
+    override public function hasGeometry():Bool return true;
+    override public function setMaterial(spec:String):Void {if(spec!="mineral cast")throw "Casting requires mineral cast";super.setMaterial(spec);}
+    static function prism(p:CastingPrism):Part {
+        var local=Part.prism([for(v in p.profile)new Vector(v.x,v.y)],0,p.height);
+        try {var placed=PosedParts.moved(local,p.pose);local.close();return placed;}catch(e:Dynamic){local.close();throw e;}
+    }
+    override public function geometry(detail:ComponentDetail=Preview):Part {
+        var parts:Array<Part> = [];
+        try {
+            for(p in castingEnvelope())parts.push(prism(p));
+            var body=Solids.union(parts);parts=[];
+            return Solids.building([body],owned->{
+                for(c in finishedCavities())for(p in c.pieces)owned.push(Solids.named(prism(p),c.featureId));
+                return Solids.cut(owned[0],owned.slice(1));
+            });
+        } catch(e:Dynamic){for(p in parts)p.close();throw e;}
+    }
+    public function castingFeatures():Array<CastingFeature> return materia.casting.CastingFeatureCodec.snapshot(features);
+    public function castingEnvelope():Array<CastingPrism>
+        return CastingEnvelope.build(parameterNumber("width"),parameterNumber("depth"),parameterNumber("height"),parameterNumber("cornerChamfer"),parameterNumber("footWidth"),parameterNumber("footHeight"),parameterNumber("footShoulder"));
+    public function finishedCavities():Array<materia.casting.CastingCavities.FinishedCastingCavity> return CastingCavities.derive(castingEnvelope(),features);
+    public function minimumSectionIy(x0:Float,x1:Float):Float {
+        return BoxAlgebra.minimumIy(BoxAlgebra.material(castingEnvelope(),features),x0,x1);
+    }
+    public function castingByWeight():{material:String,kg:Float} return {material:materialSpec(),kg:massProperties().mass};
 }

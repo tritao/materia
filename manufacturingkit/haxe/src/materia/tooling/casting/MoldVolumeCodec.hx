@@ -1,4 +1,5 @@
 package materia.tooling.casting;
+import materia.casting.BoxAlgebra;
 
 import materia.tooling.ToolingCodec;
 import materia.tooling.panel.PanelCodec;
@@ -114,7 +115,7 @@ class MoldVolumeCodec {
 			profiles:Array<MoldVolumeProfile> = [];
 		for (i in 0...pieces.length)
 			for (j in i + 1...pieces.length)
-				if (BoxVolumes.intersection(pieces[i], pieces[j]) != null)
+				if (BoxAlgebra.intersection(pieces[i], pieces[j]) != null)
 					throw "Mold volume pieces overlap";
 		pieces.sort((a, b) -> {
 			for (key in ["x", "y", "z", "width", "depth", "height"]) {

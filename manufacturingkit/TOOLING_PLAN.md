@@ -239,6 +239,24 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   owners, insert holes from `DesignInterfaces`, design-owned interface
   requirements, datums, lifting inserts and foundation joints, then drafted,
   radiused and profiled features. Precedes the column.
+  Compilation recovery checkpoint (step 1 remains in progress): source features,
+  insert roles/finishes and hole patterns now use neutral `materia.casting` records;
+  old JSON boxes and boreDiameter recipes are rejected. Tooling schema 6 and
+  box/casting-mold schema 5 have no prior-format path. The shared box algebra is
+  used by fill, collision and section screening; planar cut/body intersection is
+  centralized and non-box cavities are rejected by feature ID by box consumers.
+  The adapter copies source facts and `DesignInterfaces` holes. The old hobber
+  receives only required type/import and recipe-key changes.
+  The remaining step-1 rules, core-fragment grouping, hole-pattern fixture
+  expansion and unified levelling-foot family are not claimed complete; steps 2
+  and 3 remain pending. Current fixtures still declare explicit setup strategies.
+  Validation: 1,712 neutral tooling/process assertions, 17 independent foundation
+  record/algebra assertions, 49 casting assertions and 375 native tooling
+  assertions pass. Full mill review passes 248 assertions and both package modes
+  pass manifest tamper checks (40 programs, 837 full-package artifacts). Frozen
+  pre-migration mill CAD and the sloped-foot cut/body intersection pass four
+  independent native assertions. Readiness remains false: 14 Pass, 250 Pending, 15 Unsupported;
+  no physical coupon trial is recorded.
 - [ ] Phase 8: mill column and independent pedestal example.
 - [ ] Phase 9: physical calibration and release.
 

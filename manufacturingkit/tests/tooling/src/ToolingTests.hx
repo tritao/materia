@@ -4,13 +4,13 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingEnums.ToolingLengthUnit;
 import materia.tooling.ToolingEnums.CoatedFace;
 import materia.tooling.ToolingEnums.StockDirection;
-import materia.tooling.ToolingEnums.InsertRole;
-import materia.tooling.ToolingEnums.InsertFinish;
+import materia.casting.InsertSpec.InsertRole;
+import materia.casting.InsertSpec.InsertFinish;
 import materia.tooling.ToolingDocument;
 import materia.tooling.ToolingRecipe;
 import materia.tooling.ToolingReview;
 import materia.tooling.casting.CastingToolingInput;
-import materia.tooling.casting.CastingToolingInput.CastingFeatureKind;
+import materia.casting.CastingFeature.CastingFeatureKind;
 import materia.tooling.casting.CastingSetup.CoreStrategy;
 
 /** Pure records/codec tests: this target has no CAD or MachineKit dependency. */
@@ -66,24 +66,8 @@ class ToolingTests {
 				}
 			],
 			features: [
-				{
-					id: "pocket",
-					kind: Void,
-					insertId: null,
-					width: 100,
-					depth: 80,
-					height: 61,
-					pose: F.translation(0, 0, -1)
-				},
-				{
-					id: "insert-seat",
-					kind: InsertRecess,
-					insertId: "seat",
-					width: 40,
-					depth: 30,
-					height: 20,
-					pose: F.translation(80, 0, 90)
-				}
+				{id:"pocket",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:100,depth:80,height:61,pose:F.translation(0, 0, -1)},openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:["width","depth","height"],derivedFrom:null},
+				{id:"insert-seat",kind:InsertRecess,owner:"seat",geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:40,depth:30,height:20,pose:F.translation(80, 0, 90)},openings:[materia.casting.CastingPatterns.face("body.z-max"),materia.casting.CastingPatterns.face("body.x-max")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:["width","depth","height"],derivedFrom:null}
 			],
 			inserts: [
 				{
@@ -91,7 +75,7 @@ class ToolingTests {
 					width: 40,
 					depth: 30,
 					height: 20,
-					boreDiameter: 8,
+					holes: materia.casting.InsertHoleGeometry.through(8,20),
 					pose: F.translation(80, 0, 90),
 					role: InsertRole.GuideSeat,
 					label: "rail seat",
@@ -205,11 +189,11 @@ class ToolingTests {
 		check(ToolingCodec.encode(decoded) == encoded, "canonical roundtrip");
 		check(decoded.input.features[0].id == "insert-seat", "features canonicalized by ID");
 		check(original.input.features[0].id == "pocket", "canonicalization does not reorder caller arrays");
-		check(decoded.input.inserts[0].boreDiameter == 8 && decoded.input.inserts[0].positionTolerance == 0.01,
+		check(materia.casting.InsertHoleGeometry.diameter(decoded.input.inserts[0].holes) == 8 && decoded.input.inserts[0].positionTolerance == 0.01,
 			"insert manufacturing interfaces survive roundtrip");
 		var top = F.transformPoint(decoded.setup.sourceToMold, 0, 0, 100);
 		check(Math.abs(top.z) < 1e-9, "setup maps rail-side source top to bed");
-		check(decoded.input.features[1].pose.z == -1 && decoded.input.features[1].height == 61,
+		check(decoded.input.features[1].geometry.pose.z == -1 && decoded.input.features[1].geometry.height == 61,
 			"design-cut extensions preserved, not misrepresented as clipped cavity sizes");
 		decoded.input.envelope[0].profile[0].x = -999;
 		decoded.input.inserts[0].pose.x = -999;
@@ -225,12 +209,12 @@ class ToolingTests {
 		var before = ToolingCodec.recipeFingerprint(ordered.recipe);
 		ordered.recipe.panel.measuredThickness = 17.6;
 		check(ToolingCodec.recipeFingerprint(ordered.recipe) != before, "measured stock changes recipe fingerprint");
-		ordered.input.features[1].height += 1;
+		ordered.input.features[1].geometry.height += 1;
 		rejects(() -> ToolingCodec.encode(ordered), "Stale tooling setup");
 		ordered.setup.sourceFingerprint = ToolingCodec.inputFingerprint(ordered.input);
 		check(ToolingCodec.encode(ordered).length > 0, "explicitly rebind setup to updated source");
 		var antipodal = fixture();
-		antipodal.input.features[1].pose.qw = -1;
+		antipodal.input.features[1].geometry.pose.qw = -1;
 		antipodal.setup.sourceFingerprint = ToolingCodec.inputFingerprint(antipodal.input);
 		check(ToolingCodec.encode(antipodal).length > 0, "antipodal quaternions describe the same insert pose");
 
@@ -274,28 +258,28 @@ class ToolingTests {
 		}, "convex and CCW");
 		corrupt(r -> {
 			items(r.document.input.features).push(items(r.document.input.features)[0]);
-		}, "Duplicate tooling features");
+		}, "Duplicate casting feature");
 		corrupt(r -> {
-			items(r.document.input.features)[0].insertId = "missing";
+			items(r.document.input.features)[0].owner = "missing";
 		}, "Invalid insert reference");
 		corrupt(r -> {
-			items(r.document.input.features)[0].pose.x += 1;
+			items(r.document.input.features)[0].geometry.pose.x += 1;
 		}, "does not match insert");
 		corrupt(r -> {
-			items(r.document.input.features)[0].pose.qx = Math.sin(0.00005);
-			items(r.document.input.features)[0].pose.qw = Math.cos(0.00005);
+			items(r.document.input.features)[0].geometry.pose.qx = Math.sin(0.00005);
+			items(r.document.input.features)[0].geometry.pose.qw = Math.cos(0.00005);
 		}, "does not match insert");
 		corrupt(r -> {
 			items(r.document.input.features)[1].kind = "hole";
-		}, "Unsupported casting feature kind");
+		}, "Unknown casting feature kind");
 		corrupt(r -> {
-			items(r.document.input.features)[1].insertId = "seat";
-		}, "cannot reference an insert");
+			items(r.document.input.features)[1].owner = 17;
+		}, "Invalid casting text");
 		corrupt(r -> {
 			items(r.document.input.features).splice(0, 1);
 		}, "Missing recess");
 		corrupt(r -> {
-			items(r.document.input.inserts)[0].boreDiameter = 40;
+			items(items(r.document.input.inserts)[0].holes)[0].diameter = 40;
 		}, "bore consumes");
 		corrupt(r -> {
 			items(r.document.input.inserts)[0].role = "unrecognized";

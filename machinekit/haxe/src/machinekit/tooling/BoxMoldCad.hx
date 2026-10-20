@@ -68,11 +68,10 @@ class BoxMoldCad {
 			var body = Solids.union(items);
 			items.resize(0);
 			items.push(body);
-			for (f in p.document.input.features) {
-				var local = Part.box(f.width, f.depth, f.height),
-					world = PosedParts.moved(local, F.compose(p.document.setup.sourceToMold, f.pose));
+			for(c in materia.casting.CastingCavities.derive(p.document.input.envelope,p.document.input.features))for(piece in c.pieces) {
+				var local=Part.prism([for(v in piece.profile)new Vector(v.x,v.y)],0,piece.height);
+				try items.push(PosedParts.moved(local,F.compose(p.document.setup.sourceToMold,piece.pose))) catch(e:Dynamic){local.close();throw e;}
 				local.close();
-				items.push(world);
 			}
 			return Solids.cut(items[0], items.slice(1));
 		});
@@ -83,7 +82,7 @@ class BoxMoldCad {
 		return new CastInsert(new ComponentValues().setNumber("width", i.width)
 			.setNumber("depth", i.depth)
 			.setNumber("height", i.height)
-			.setNumber("boreDiameter", i.boreDiameter)
+			.setToken("holes", machinekit.structural.InsertHoles.fromNeutral(i.holes))
 			.setNumber("positionTolerance", i.positionTolerance)
 			.setToken("role", i.role)
 			.setToken("label", i.label));

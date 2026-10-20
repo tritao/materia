@@ -1,4 +1,5 @@
 package materia.tooling.casting;
+import materia.casting.BoxAlgebra;
 
 import materia.tooling.casting.CastingMoldPlan.MoldVolume;
 import materia.tooling.casting.MoldPlan.MoldBox;
@@ -11,7 +12,7 @@ import materia.assembly.AssemblyFrames as F;
  */
 class MoldVolumeBounds {
 	public static function pieces(volume:MoldVolume):Array<MoldBox> {
-		var boxes = [for (box in volume.pieces) BoxVolumes.copy(box)];
+		var boxes = [for (box in volume.pieces) BoxAlgebra.copy(box)];
 		for (profile in volume.profiles) {
 			var bounds = PanelGeometry.bounds(profile.contour);
 			var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
@@ -35,6 +36,6 @@ class MoldVolumeBounds {
 				height: high[2] - low[2]
 			});
 		}
-		return BoxVolumes.subtract(boxes, []);
+		return BoxAlgebra.subtract(boxes, []);
 	}
 }

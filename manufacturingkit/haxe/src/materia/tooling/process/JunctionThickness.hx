@@ -2,7 +2,7 @@ package materia.tooling.process;
 
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.process.FillAnalysis.FillBoundary;
 import materia.tooling.process.OrthogonalSections.SectionAxis;
@@ -71,7 +71,7 @@ class JunctionThickness {
 								depth: size(c, v),
 								height: 1
 							});
-					for (f in BoxVolumes.subtract([footprint], cover)) {
+					for (f in BoxAlgebra.subtract([footprint], cover)) {
 						// Split by owner footprints so no face receives an adjacent feature's ID.
 						var pieces = [{box: f, ids: new Array<String>()}];
 						for (owner in owners) {
@@ -88,9 +88,9 @@ class JunctionThickness {
 							};
 							var next = [];
 							for (piece in pieces) {
-								for (rest in BoxVolumes.difference(piece.box, mask))
+								for (rest in BoxAlgebra.difference(piece.box, mask))
 									next.push({box: rest, ids: piece.ids.copy()});
-								var hit = BoxVolumes.intersection(piece.box, mask);
+								var hit = BoxAlgebra.intersection(piece.box, mask);
 								if (hit != null) {
 									var ids = piece.ids.copy();
 									if (ids.indexOf(owner.id) < 0)
@@ -233,13 +233,13 @@ class JunctionThickness {
 			if (b.width <= EPS || b.depth <= EPS || b.height <= EPS)
 				throw "Invalid junction box";
 		}
-		var ordered = [for (b in region) BoxVolumes.copy(b)];
+		var ordered = [for (b in region) BoxAlgebra.copy(b)];
 		ordered.sort((a, b) -> Reflect.compare(ToolingCodec.canonical(a), ToolingCodec.canonical(b)));
 		var sortedOwners = owners.copy();
 		sortedOwners.sort((a, b) -> Reflect.compare(a.id, b.id));
 		for (o in sortedOwners)
 			ToolingIds.validate(o.id);
-		var boxes = BoxVolumes.subtract(ordered, []),
+		var boxes = BoxAlgebra.subtract(ordered, []),
 			faces = heatFaces == null ? boundary(sourceId, boxes, sortedOwners) : heatFaces;
 		if (faces.length == 0)
 			throw "Thermal thickness needs at least one heat-removing face";
@@ -288,8 +288,8 @@ class JunctionThickness {
 			for (a in 1...3)
 				if (size(current.box, a) > size(current.box, axis))
 					axis = a;
-			var a = BoxVolumes.copy(current.box),
-				b = BoxVolumes.copy(current.box);
+			var a = BoxAlgebra.copy(current.box),
+				b = BoxAlgebra.copy(current.box);
 			if (axis == 0) {
 				a.width /= 2;
 				b.x += a.width;

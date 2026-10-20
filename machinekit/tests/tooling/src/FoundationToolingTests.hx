@@ -4,7 +4,7 @@ import machinekit.assembly.PosedParts;
 import machinekit.component.ComponentValues;
 import machinekit.component.Solids;
 import machinekit.structural.CastInsert;
-import machinekit.structural.CastingFeatures;
+import materia.casting.CastingPatterns;
 import machinekit.structural.MineralFoundation;
 import machinekit.structural.MineralFoundation.CastInsertPlacement;
 import machinekit.tooling.FoundationToolingAdapter;
@@ -13,8 +13,8 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingEnums.ToolingLengthUnit;
 import materia.tooling.ToolingEnums.CoatedFace;
 import materia.tooling.ToolingEnums.StockDirection;
-import materia.tooling.ToolingEnums.InsertRole;
-import materia.tooling.ToolingEnums.InsertFinish;
+import materia.casting.InsertSpec.InsertRole;
+import materia.casting.InsertSpec.InsertFinish;
 import materia.tooling.ToolingDocument;
 import materia.tooling.casting.CastingToolingInput;
 import materia.tooling.casting.CastingSetup.CoreStrategy;
@@ -46,14 +46,9 @@ class FoundationToolingTests {
 		}
 		var body = Solids.union(envelope);
 		return Solids.building([body], parts -> {
-			for (f in input.features) {
-				var local = Part.box(f.width, f.depth, f.height);
-				try
-					parts.push(PosedParts.moved(local, f.pose))
-				catch (e:Dynamic) {
-					local.close();
-					throw e;
-				}
+			for (c in materia.casting.CastingCavities.derive(input.envelope,input.features))for(p in c.pieces) {
+				var local=Part.prism([for(v in p.profile)new Vector(v.x,v.y)],0,p.height);
+				try parts.push(PosedParts.moved(local,p.pose)) catch(e:Dynamic){local.close();throw e;}
 				local.close();
 			}
 			return Solids.cut(parts[0], parts.slice(1));
@@ -74,7 +69,7 @@ class FoundationToolingTests {
 				sourceToMold: F.identity(),
 				features: [
 					for (f in input.features)
-						if (f.kind == "void") {
+						if (f.kind != "insert-recess") {
 							featureId: f.id,
 							strategy: SacrificialEPS,
 							draftDegrees: 0,
@@ -193,19 +188,26 @@ class FoundationToolingTests {
 		return input;
 	}
 
+    static function declareFixtureOpenings(values:ComponentValues):ComponentValues {
+        values=machinekit.component.ComponentRecipeSupport.resolve(machinekit.structural.MineralCasting.parameters(),values);
+        var envelope=materia.casting.CastingEnvelope.build(values.number("width"),values.number("depth"),values.number("height"),values.number("cornerChamfer"),values.number("footWidth"),values.number("footHeight"),values.number("footShoulder"));
+        var features=CastingPatterns.decode(values.token("features"));
+        for(feature in features)feature.openings=materia.casting.CastingCavities.reachedOpenings(envelope,feature.geometry);
+        return values.copy().setToken("features",CastingPatterns.encode(features));
+    }
 	public static function main():Void {
 		var values = new ComponentValues().setNumber("width", 240)
 			.setNumber("depth", 200)
 			.setNumber("height", 180)
-			.setToken("voids", CastingFeatures.encode([
-				CastingFeatures.box("underside", 100, 80, 61, 0, 0, -1),
-				CastingFeatures.box("side-opening", 30, 60, 40, -110, 0, 90)
+			.setToken("features", CastingPatterns.encode([
+				CastingPatterns.box("underside",materia.casting.CastingFeature.CastingFeatureKind.Lightening,[CastingPatterns.face("body.z-min")], 100, 80, 61, 0, 0, -1),
+				CastingPatterns.box("side-opening",materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,[CastingPatterns.face("body.x-min")], 30, 60, 40, -110, 0, 90)
 			]));
 		var seat = new CastInsert(new ComponentValues().setToken("role", "generic-mount")
 			.setNumber("width", 40)
 			.setNumber("depth", 30)
 			.setNumber("height", 20)
-			.setNumber("boreDiameter", 8));
+			.setToken("holes",machinekit.structural.InsertHoles.through(8)));
 		var placements:Array<CastInsertPlacement> = [
 			{id: "topSeat", part: seat, pose: F.translation(80, 0, 170)},
 			{
@@ -217,14 +219,14 @@ class FoundationToolingTests {
 		var foundation = new MineralFoundation(values, placements);
 		var input = equivalent(foundation, "box-foundation");
 		check(input.features.length == 4, "ordinary voids and insert recesses all retained");
-		check(input.features.filter(f -> f.id == "underside")[0].pose.z == -1, "external cut extension retained");
+		check(input.features.filter(f -> f.id == "underside")[0].geometry.pose.z == -1, "external cut extension retained");
 		var side = input.inserts.filter(i -> i.id == "sideSeat")[0];
-		check(side.boreDiameter == 8 && side.positionTolerance == 0.01, "bore and precision tolerance retained");
+		check(materia.casting.InsertHoleGeometry.diameter(side.holes) == 8 && side.positionTolerance == 0.01, "bore and precision tolerance retained");
 		var normal = F.transformVector(side.pose, 0, 0, 1);
 		near(normal.y, -1, "side insert mounting normal retained");
 		var before = ToolingCodec.inputFingerprint(input);
 		input.envelope[0].profile[0].x = -999;
-		input.features[0].pose.x = -999;
+		input.features[0].geometry.pose.x = -999;
 		input.inserts[0].pose.z = -999;
 		input.inserts[0].width = 999;
 		check(ToolingCodec.inputFingerprint(FoundationToolingAdapter.snapshot(foundation, "box-foundation", 1)) == before,
@@ -235,19 +237,19 @@ class FoundationToolingTests {
 
 		var chamfered = values.copy();
 		chamfered.setNumber("cornerChamfer", 12);
-		var chamferedInput = equivalent(new MineralFoundation(chamfered, placements), "chamfered-foundation");
+		var chamferedInput = equivalent(new MineralFoundation(declareFixtureOpenings(chamfered), placements), "chamfered-foundation");
 		check(chamferedInput.envelope[0].profile.length == 8, "chamfer represented by actual profile");
 		var flared = values.copy();
 		flared.setNumber("footWidth", 320).setNumber("footHeight", 100).setNumber("footShoulder", 50);
-		var flaredInput = equivalent(new MineralFoundation(flared, placements), "flared-foundation");
+		var flaredInput = equivalent(new MineralFoundation(declareFixtureOpenings(flared), placements), "flared-foundation");
 		check(flaredInput.envelope.length == 2 && flaredInput.envelope[1].id == "foot", "flared foot is an additive oriented prism");
-		equivalent(new MineralFoundation(flared.setNumber("cornerChamfer", 12), placements), "flared-chamfered-foundation");
+		equivalent(new MineralFoundation(declareFixtureOpenings(flared.setNumber("cornerChamfer", 12)), placements), "flared-chamfered-foundation");
 
 		// Existing independent machine family exercises the same adapter unchanged.
 		var hobber = FoundationToolingAdapter.snapshot(new machinekit.hobbing.MineralCastBed(), "typed-hobber", 1);
-		check(hobber.inserts.filter(i -> i.id == "tablePlate")[0].role == materia.tooling.ToolingEnums.InsertRole.TableMount,
+		check(hobber.inserts.filter(i -> i.id == "tablePlate")[0].role == materia.casting.InsertSpec.InsertRole.TableMount,
 			"hobber table plate role explicit");
-		check(hobber.inserts.filter(i -> i.id == "columnPlate")[0].role == materia.tooling.ToolingEnums.InsertRole.ColumnMount,
+		check(hobber.inserts.filter(i -> i.id == "columnPlate")[0].role == materia.casting.InsertSpec.InsertRole.ColumnMount,
 			"hobber column plate role explicit");
 		var missingRole = false;
 		try
@@ -265,10 +267,10 @@ class FoundationToolingTests {
 		check(rejectedRole, "unknown source roles fail at the typed source parameter");
 		equivalent(new machinekit.hobbing.MineralCastBed(), "hobber-bed");
 		equivalent(new machinekit.hobbing.MineralCastColumn(), "hobber-column");
-		var finished = new CastInsert(new ComponentValues().setToken("role", "generic-mount").setToken("finish", "replicated after casting"));
+		var finished = new CastInsert(new ComponentValues().setToken("role", "generic-mount").setToken("finish", "replicated-after-casting"));
 		var finishFoundation = new MineralFoundation(values, [{id: "finished", part: finished, pose: F.identity()}]);
 		check(FoundationToolingAdapter.snapshot(finishFoundation, "finish-contract", 1)
-			.inserts[0].finish == materia.tooling.ToolingEnums.InsertFinish.ReplicatedAfterCasting,
+			.inserts[0].finish == materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting,
 			"typed source finishing route survives adapter");
 		Sys.println('FoundationToolingTests: $assertions assertions passed');
 		PanelNativeTests.run();

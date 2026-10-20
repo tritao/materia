@@ -5,7 +5,7 @@ import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.ToolingDiagnostic.ToolingSeverity;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.casting.MoldPlan.MoldBox;
 
 typedef FillBoundary = {var id:String; var box:MoldBox;}
@@ -68,7 +68,7 @@ class FillAnalysis {
 		};
 
 	static function sorted(boxes:Array<MoldBox>):Array<MoldBox> {
-		var out = [for (b in boxes) BoxVolumes.copy(b)];
+		var out = [for (b in boxes) BoxAlgebra.copy(b)];
 		out.sort((a, b) -> Reflect.compare(ToolingCodec.canonical(a), ToolingCodec.canonical(b)));
 		return out;
 	}
@@ -77,7 +77,7 @@ class FillAnalysis {
 		var out:Array<MoldBox> = [];
 		for (b in boxes)
 			if (b.z + b.height > h + EPS) {
-				var c = BoxVolumes.copy(b);
+				var c = BoxAlgebra.copy(b);
 				c.z = Math.max(h, b.z);
 				c.height = b.z + b.height - c.z;
 				out.push(c);
@@ -142,7 +142,7 @@ class FillAnalysis {
 						depth: c.depth,
 						height: 1
 					});
-			for (face in BoxVolumes.subtract([footprint], cover)) {
+			for (face in BoxAlgebra.subtract([footprint], cover)) {
 				face.z = z;
 				face.height = 0;
 				faces.push({box: face, sourceIds: owners(face, boundaries, sourceId)});
@@ -194,7 +194,7 @@ class FillAnalysis {
 			if (b.width <= EPS || b.depth <= EPS || b.height <= EPS || b.z + b.height > fillHeightMm + EPS)
 				throw "Invalid fill box or insufficient fill height";
 		}
-		var boxes = sorted(BoxVolumes.subtract(sorted(region), []));
+		var boxes = sorted(BoxAlgebra.subtract(sorted(region), []));
 		var footprint:Array<MoldBox> = [
 			for (box in boxes)
 				if (box.z + box.height >= fillHeightMm - EPS) {
@@ -206,8 +206,8 @@ class FillAnalysis {
 					height: 1.0
 				}
 		];
-		var open = BoxVolumes.subtract(footprint, fillObstructions == null ? [] : fillObstructions);
-		var openArea = BoxVolumes.volume(open);
+		var open = BoxAlgebra.subtract(footprint, fillObstructions == null ? [] : fillObstructions);
+		var openArea = BoxAlgebra.volume(open);
 		if (openArea <= EPS)
 			throw "Fill face has zero open area";
 		var heights:Array<Float> = [fillHeightMm];
@@ -219,7 +219,7 @@ class FillAnalysis {
 		var pockets:Array<AirPocket> = [], prior:Array<Array<MoldBox>> = [];
 		for (h in critical) {
 			var air = above(boxes, h);
-			for (component in BoxVolumes.groups(air)) {
+			for (component in BoxAlgebra.groups(air)) {
 				var vented = false;
 				for (box in component)
 					if (box.z + box.height >= fillHeightMm - EPS)
@@ -233,7 +233,7 @@ class FillAnalysis {
 				for (old in prior)
 					for (a in component)
 						for (b in old)
-							if (BoxVolumes.intersection(a, b) != null)
+							if (BoxAlgebra.intersection(a, b) != null)
 								known = true;
 				if (known)
 					continue;
@@ -254,7 +254,7 @@ class FillAnalysis {
 				pockets.push({
 					id: ToolingIds.derive("air-", hash, ""),
 					sealedAtMm: h,
-					volumeMm3: BoxVolumes.volume(component),
+					volumeMm3: BoxAlgebra.volume(component),
 					boxes: sorted(component),
 					ceilingFaces: faces,
 					sourceIds: ids,
@@ -295,13 +295,13 @@ class FillAnalysis {
 				var faces = broad.filter(f -> Math.abs(f.box.z - z) <= EPS);
 				var footprints:Array<MoldBox> = [
 					for (face in faces) {
-						var b = BoxVolumes.copy(face.box);
+						var b = BoxAlgebra.copy(face.box);
 						b.z = 0;
 						b.height = 1;
 						b;
 					}
 				];
-				for (group in BoxVolumes.groups(footprints)) {
+				for (group in BoxAlgebra.groups(footprints)) {
 					var minX = group[0].x, minY = group[0].y, maxX = minX, maxY = minY;
 					for (b in group) {
 						minX = Math.min(minX, b.x);
@@ -348,7 +348,7 @@ class FillAnalysis {
 				throw "Duplicate fill core ID";
 			seen.set(c.id, true);
 		}
-		var trapped = BoxVolumes.subtract([for (group in prior) for (box in group) box], []);
+		var trapped = BoxAlgebra.subtract([for (group in prior) for (box in group) box], []);
 		var panelRecords = panels == null ? [] : panels.copy();
 		panelRecords.sort((a, b) -> Reflect.compare(a.id, b.id));
 		var levels:Array<FillLevel> = [];
@@ -370,7 +370,7 @@ class FillAnalysis {
 					],
 					cores: [
 						for (c in cores) {
-							var displacement = submerged(BoxVolumes.subtract(sorted(c.boxes), []), h);
+							var displacement = submerged(BoxAlgebra.subtract(sorted(c.boxes), []), h);
 							{id: c.id, submergedVolumeMm3: displacement, grossUpliftN: displacement * densityKgM3 * gravityMps2 * 1e-9};
 						}
 					]
@@ -381,8 +381,8 @@ class FillAnalysis {
 			processFingerprint: processFingerprint,
 			model: "exact-orthogonal-flat-free-surface",
 			criticalHeightsMm: critical,
-			totalMixVolumeMm3: BoxVolumes.volume(boxes) - BoxVolumes.volume(trapped),
-			geometricResinVolumeMm3: BoxVolumes.volume(boxes),
+			totalMixVolumeMm3: BoxAlgebra.volume(boxes) - BoxAlgebra.volume(trapped),
+			geometricResinVolumeMm3: BoxAlgebra.volume(boxes),
 			openFillAreaMm2: openArea,
 			openFillFootprints: sorted(open),
 			levels: levels,

@@ -134,7 +134,7 @@ class RecipeContractTests {
 	static function fixtureValues(type:machinekit.component.ComponentType):ComponentValues {
 		var values = type.defaults();
 		if (type.id == machinekit.structural.CastInsert.recipeType().id)
-			values.setToken("role", materia.tooling.ToolingEnums.InsertRole.GenericMount);
+			values.setToken("role", materia.casting.InsertSpec.InsertRole.GenericMount);
 		return values;
 	}
 

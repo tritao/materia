@@ -2,7 +2,7 @@ package materia.tooling.process;
 
 import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.OrthogonalSections;
@@ -100,7 +100,7 @@ class ThermalCoverage {
 			if (status == Pass)
 				for (span in matched)
 					for (strip in span.strips)
-						if (covered.filter(previous -> BoxVolumes.intersection(previous, strip) != null).length > 0) {
+						if (covered.filter(previous -> BoxAlgebra.intersection(previous, strip) != null).length > 0) {
 							status = Fail;
 							message = "Slab volume is covered twice, including assignments across different axes.";
 						}
@@ -124,8 +124,8 @@ class ThermalCoverage {
 			for (span in sections.spans)
 				if (span.axis == X) for (strip in span.strips) strip
 		];
-		var missing = BoxVolumes.subtract(region, covered),
-			uncovered = BoxVolumes.volume(missing);
+		var missing = BoxAlgebra.subtract(region, covered),
+			uncovered = BoxAlgebra.volume(missing);
 		var failed = bindings.filter(b -> b.status == Fail).length > 0;
 		var complete = uncovered <= Math.max(1e-6, sections.mixVolumeMm3 * 1e-10) && bindings.filter(b -> b.status != Pass).length == 0;
 		checks.push(FillAnalysis.check("process.cure.geometric-coverage", [sourceId], failed ? Fail : complete ? Pass : Pending,

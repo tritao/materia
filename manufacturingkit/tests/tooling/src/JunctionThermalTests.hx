@@ -4,7 +4,7 @@ import materia.tooling.process.ThermalCoverage;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.ProcessSpecCodec;
 import materia.tooling.casting.MoldPlan.MoldBox;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.ToolingCodec;
 
 class JunctionThermalTests {
@@ -66,7 +66,7 @@ class JunctionThermalTests {
 		bounded(JunctionThickness.analyze("body", "source", l, [], settings), 8 - 4 * Math.sqrt(2));
 		var disconnected = JunctionThickness.analyze("body", "source", [b(0, 0, 0, 2, 2, 2), b(10, 0, 0, 6, 6, 6)], [], settings);
 		bounded(disconnected, 6);
-		var cavity = BoxVolumes.subtract([b(-5, -5, -5, 10, 10, 10)], [b(-1, -1, -1, 2, 2, 2)]);
+		var cavity = BoxAlgebra.subtract([b(-5, -5, -5, 10, 10, 10)], [b(-1, -1, -1, 2, 2, 2)]);
 		var withHole = JunctionThickness.analyze("body", "source", cavity, [{id: "hole", box: b(-1, -1, -1, 2, 2, 2)}], settings);
 		check(withHole.upperDiameterMm < 10, "internal cavity limits inscribed diameter");
 		check(withHole.faces.filter(f -> f.sourceIds.indexOf("hole") >= 0).length == 6, "internal cavity has six owned exposed faces");
@@ -119,7 +119,7 @@ class JunctionThermalTests {
 		var partial = ThermalCoverage.analyze("body", split, partialSpec, "p");
 		near(partial.coveredVolumeMm3, 60000, 1e-7, "one source-owned half-slab covers half the block");
 		near(partial.uncoveredVolumeMm3, 60000, 1e-7, "remaining half is explicitly uncovered");
-		near(BoxVolumes.volume(partial.uncoveredRegions), partial.uncoveredVolumeMm3, 1e-7, "uncovered-region geometry matches coverage accounting");
+		near(BoxAlgebra.volume(partial.uncoveredRegions), partial.uncoveredVolumeMm3, 1e-7, "uncovered-region geometry matches coverage accounting");
 		spec.sections[0].spanIds = [];
 		check(state(ThermalCoverage.analyze("body", sections, spec, "p"), "process.cure.geometric-coverage") == "pending",
 			"source IDs alone cannot establish coverage");

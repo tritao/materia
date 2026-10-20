@@ -321,7 +321,7 @@ class ToolingFabricationExport {
 				Std.string(i.width),
 				Std.string(i.depth),
 				Std.string(i.height),
-				Std.string(i.boreDiameter),
+				Std.string(materia.casting.InsertHoleGeometry.diameter(i.holes)),
 				"1",
 				"per-casting"
 			]);

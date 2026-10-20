@@ -3,7 +3,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 import machinekit.structural.MineralCasting;
 import machinekit.structural.MineralFoundation;
 import machinekit.structural.CastInsert;
-import machinekit.structural.CastingFeatures;
+import materia.casting.CastingPatterns;
 import machinekit.structural.FoundationIntegrity;
 import machinekit.structural.MineralFoundation.CastInsertPlacement;
 import machinekit.assembly.MachineAssembly;
@@ -56,11 +56,11 @@ class CastingTests {
 			"constructor and recipe use the same resolver");
 		rejects(() -> type.resolve(new ComponentValues().setNumber("typo", 1)), "unknown recipe input");
 
-		var core = CastingFeatures.box("core", 120, 100, 60, 0, 0, 20);
+		var core = CastingPatterns.box("core",materia.casting.CastingFeature.CastingFeatureKind.Lightening,[], 120, 100, 60, 0, 0, 20);
 		var v = new ComponentValues().setNumber("width", 200)
 			.setNumber("depth", 180)
 			.setNumber("height", 100)
-			.setToken("voids", CastingFeatures.encode([core]));
+			.setToken("features", CastingPatterns.encode([core]));
 		var casting = new MineralCasting(v), shape = casting.geometry();
 		near(shape.volume(), 200 * 180 * 100 - 120 * 100 * 60, 1e-5, "core removes only its own volume");
 		near(casting.castingByWeight().kg, shape.volume() * 1e-9 * 2400, 1e-9, "casting mass uses shared density");
@@ -88,10 +88,10 @@ class CastingTests {
 		rejects(() -> new MineralCasting(new ComponentValues().setToken("material", "steel")), "casting material lock");
 		rejects(() -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setNumber("positionTolerance", 0)), "insert tolerance positive");
 		rejects(() -> new MineralCasting(new ComponentValues().setNumber("cornerChamfer", 400)), "oversized chamfer");
-		rejects(() -> CastingFeatures.decode('[{"id":"missing-dimensions"}]'), "malformed feature");
-		rejects(() -> CastingFeatures.encode([core, core]), "duplicate feature ids");
-		rejects(() -> CastingFeatures.grid(100, 100, 100, 60, 20, 20, 25), "impossible core dimensions");
-		var cores = CastingFeatures.grid(650, 550, 120, 30, 20, 20, 25);
+		rejects(() -> CastingPatterns.decode('[{"id":"missing-dimensions"}]'), "malformed feature");
+		rejects(() -> CastingPatterns.encode([core, core]), "duplicate feature ids");
+		rejects(() -> CastingPatterns.grid(100, 100, 100, 60, 20, 20, 25), "impossible core dimensions");
+		var cores = CastingPatterns.grid(650, 550, 120, 30, 20, 20, 25);
 		check(cores.length == 4, "cross-ribbed layout has four cores");
 
 		var insert = new CastInsert(new ComponentValues().setNumber("width", 40)
@@ -148,12 +148,12 @@ class CastingTests {
 			.setNumber("width", 40)
 			.setNumber("depth", 40)
 			.setNumber("height", 20)
-			.setNumber("boreDiameter", 18));
+			.setToken("holes",machinekit.structural.InsertHoles.through(18)));
 		var boredShape = bored.geometry();
 		check(boredShape.valid() && boredShape.solidCount() == 1, "bored foot seat remains one solid");
 		near(boredShape.volume(), 40 * 40 * 20 - Math.PI * 9 * 9 * 20, 1e-6, "foot bore removes steel volume");
 		boredShape.close();
-		rejects(() -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setNumber("boreDiameter", 40)),
+		rejects(() -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setToken("holes",machinekit.structural.InsertHoles.through(40))),
 			"reject insert bore consuming seat");
 		Sys.println('CastingTests: $assertions assertions passed');
 		if (Sys.args().indexOf("--recipes") >= 0) {

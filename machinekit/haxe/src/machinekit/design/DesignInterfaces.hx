@@ -17,6 +17,7 @@ typedef BlindThreadInterface = {
 typedef CounterboreInterface = {var radius:Float; var depth:Float; var bearingDepth:Float;}
 typedef HoleInterface = {
 	var id:String; var frame:AssemblyFrame; var radius:Float; var depth:Float;
+	@:optional var through:Bool;
 	var minWall:Float; var minClearance:Float;
 	var thread:Null<BlindThreadInterface>; var counterbore:Null<CounterboreInterface>;
 	var approach:Null<{radius:Float,length:Float}>;
@@ -48,8 +49,8 @@ class DesignInterfaces implements ComponentFacet {
 			if(h.counterbore!=null) { var c=h.counterbore; positive(c.bearingDepth);positive(c.radius);positive(c.depth); if(c.radius<=h.radius || c.depth<=0 || c.depth>=h.depth) throw "Invalid counterbore"; }
 			if(h.thread!=null) {
 				var t=h.thread;
-				for(v in [t.tapDrill,t.usableDepth,t.cylindricalDepth,t.point,t.stock,t.minEngagement,t.minTipGap,t.minBack]) positive(v);
-				if(t.spec==null || !t.spec.internal || t.tapDrill<=0 || t.tapDrill>=t.spec.majorDiameter || Math.abs(h.depth-t.cylindricalDepth-t.point)>1e-6) throw "Inconsistent blind drilling depth";
+				for(v in [t.tapDrill,t.usableDepth,t.cylindricalDepth,t.stock,t.minEngagement,t.minTipGap,t.minBack]) positive(v);
+				if(!Math.isFinite(t.point)||t.point<0||t.spec==null || !t.spec.internal || t.tapDrill<=0 || t.tapDrill>=t.spec.majorDiameter || Math.abs(h.depth-t.cylindricalDepth-t.point)>1e-6) throw "Inconsistent blind drilling depth";
 			}
 			if(h.approach!=null) {positive(h.approach.radius);positive(h.approach.length);}
 		}
