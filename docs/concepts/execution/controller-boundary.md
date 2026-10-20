@@ -70,6 +70,23 @@ which configuration are in use:
 A controller is therefore never driven with a configuration meant for another
 machine.
 
+```mermaid
+sequenceDiagram
+  participant H as Host (runtime)
+  participant D as Device (controller)
+  H->>D: Session begin: expected controller id, full configuration
+  D->>H: Session ack: own id, capacities, configuration digest
+  Note over H: Refuses on a different id, wire revision,<br/>step tick or digest, or a slow link
+  H->>D: Time sync (round trips)
+  D->>H: Time sync replies
+  loop While moving
+    H->>D: Queue begin, segments
+    H->>D: Commit through t
+    D->>H: Queue status, state (positions, step counts, inputs)
+  end
+  Note over D: Without a frame from the host before the<br/>link-loss timeout, the device stops
+```
+
 ### Stopping
 
 - **Hold** slows the path rate within each actuator's acceleration budget, so
@@ -83,6 +100,20 @@ machine.
 - The device runs a **link-loss watchdog**: no frame from the host within the
   configured timeout while moving (or while an output that needs the link is
   active) stops the machine.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Moving: committed segments
+  state Moving {
+    [*] --> Running
+    Running --> Held: hold
+    Held --> Running: resume
+  }
+  Moving --> Stopped: stop, abort
+  Moving --> Faulted: e-stop, link loss, underflow, fault
+  Stopped --> [*]: new session
+  Faulted --> [*]: new session
+```
 
 ## In Materia
 

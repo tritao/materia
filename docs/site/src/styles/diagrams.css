@@ -26,3 +26,35 @@ pre.mermaid svg .messageLine1 {
 	stroke: var(--sl-color-gray-3) !important;
 }
 pre.mermaid svg marker path { fill: var(--sl-color-gray-3) !important; stroke: none !important; }
+
+/* Sequence diagrams. */
+pre.mermaid svg rect.actor,
+pre.mermaid svg .labelBox {
+	fill: var(--sl-color-gray-6) !important;
+	stroke: var(--sl-color-accent) !important;
+}
+pre.mermaid svg .note {
+	fill: var(--sl-color-gray-5) !important;
+	stroke: var(--sl-color-gray-4) !important;
+}
+pre.mermaid svg text.actor,
+pre.mermaid svg text.actor tspan,
+pre.mermaid svg .messageText,
+pre.mermaid svg .noteText,
+pre.mermaid svg .noteText tspan,
+pre.mermaid svg .labelText,
+pre.mermaid svg .loopText,
+pre.mermaid svg .loopText tspan {
+	fill: var(--sl-color-white) !important;
+	stroke: none !important;
+}
+pre.mermaid svg .actor-line,
+pre.mermaid svg .loopLine { stroke: var(--sl-color-gray-4) !important; }
+pre.mermaid svg #arrowhead path,
+pre.mermaid svg .arrowheadPath { fill: var(--sl-color-gray-3) !important; stroke: var(--sl-color-gray-3) !important; }
+
+/* State diagrams. */
+pre.mermaid svg .transition { stroke: var(--sl-color-gray-3) !important; }
+pre.mermaid svg .state-start,
+pre.mermaid svg .state-end,
+pre.mermaid svg circle.state-start { fill: var(--sl-color-white) !important; stroke: var(--sl-color-white) !important; }
