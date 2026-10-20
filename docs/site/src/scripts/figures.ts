@@ -10,6 +10,22 @@ const renderers: Record<string, Renderer> = {
 };
 
 /**
+ * `<a class="open-in-materia" data-example="ID" hidden>` links open that example in the hosted web editor. They stay
+ * hidden until the site is built with PUBLIC_MATERIA_EDITOR_URL, so the docs never link to an editor that is not
+ * deployed.
+ */
+export function linkEditorExamples(): void {
+	const editor = import.meta.env.PUBLIC_MATERIA_EDITOR_URL;
+	if (!editor) return;
+	for (const link of document.querySelectorAll<HTMLAnchorElement>("a.open-in-materia[data-example]")) {
+		const url = new URL(editor);
+		url.searchParams.set("example", link.dataset.example!);
+		link.href = url.toString();
+		link.hidden = false;
+	}
+}
+
+/**
  * Mermaid records a diagram's natural width only as an inline `max-width`. Copy it to `--natural-width`, which
  * diagrams.css uses on narrow screens to show the diagram at its natural size and scroll it sideways.
  */

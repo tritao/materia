@@ -3,7 +3,7 @@
 // docs/ stays the source of truth and reads well on GitHub; this step adapts it for Starlight:
 // README.md becomes the section index, the leading H1 is dropped (Starlight renders the title),
 // relative links to other docs pages become site routes, links to the rest of the repository
-// become GitHub links, and stub/draft pages get a banner.
+// become GitHub links, and stub/draft pages get a banner. Quoted code snippets are checked against their files.
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, posix } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,11 +58,25 @@ function rewriteLinks(body, source) {
 		.join("\n");
 }
 
+/**
+ * A code block preceded by `<!-- snippet: PATH#Lfirst-Llast -->` must equal those lines of that repository file,
+ * so code shown in the docs cannot drift from the code it quotes.
+ */
+function checkSnippets(body, source) {
+	const pattern = /<!-- snippet: ([^#\s]+)#L(\d+)-L(\d+) -->\n```[^\n]*\n([\s\S]*?)```/g;
+	for (const [, path, first, last, quoted] of body.matchAll(pattern)) {
+		const lines = readFileSync(join(repo, path), "utf8").split("\n").slice(Number(first) - 1, Number(last));
+		if (quoted !== lines.join("\n") + "\n")
+			throw new Error(`${relative(docs, source)}: the snippet from ${path}#L${first}-L${last} no longer matches the file`);
+	}
+}
+
 rmSync(out, { recursive: true, force: true });
 let count = 0;
 for (const file of markdownFiles(docs)) {
 	const path = relative(docs, file);
 	let { front, body } = splitFrontMatter(readFileSync(file, "utf8"));
+	checkSnippets(body, file);
 	const heading = /^\s*# (.+)\n/.exec(body);
 	if (heading) body = body.slice(heading.index + heading[0].length);
 	const lines = front ? front.split("\n") : [];

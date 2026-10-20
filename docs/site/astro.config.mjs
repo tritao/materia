@@ -34,6 +34,10 @@ export default defineConfig({
 			plugins: [starlightLinksValidator()],
 			components: { MarkdownContent: "./src/components/MarkdownContent.astro" },
 			sidebar: [
+				{
+					label: "Tutorials",
+					items: [{ label: "Your first machine: a gantry picker", slug: "tutorials/gantry-picker" }],
+				},
 				{ label: "Concepts", items: [{ label: "Overview", slug: "concepts" }, ...conceptGroups()] },
 				{
 					label: "Project",
