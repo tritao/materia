@@ -1603,6 +1603,27 @@ hobber conversion commits and before fixing sockets:
   and `BoxMoldPlanner`. Bore masks for tapped holes are threaded plugs or set
   screws of the hole's thread, as standard hardware, not smooth pins at tap-drill
   diameter that leave the thread roots open.
+  - Review implementation is preserved, **uncommitted**, in the detached
+    `casting-hole-protection` worktree (base `419128ce7`); the shared checkout
+    retains the tested hobber conversion `cddaad861`. The candidate uses shared
+    fixing selection/depth budgets, threaded end plugs, explicit release order,
+    a locator baseline clear of the fixing bore, and mold codecs **7**.
+    Candidate neutral assertions: Tooling **64**, Panel **52**, BoxPlanner **41**,
+    Fabrication **46**, ReviewContract **30**, JunctionThermal **36**, Castability
+    **58**, OrientationSection **43**, Process **1,313**, CastingMold **59**
+    (**1,742** total); native FoundationTooling **62**, PanelNative **132**,
+    BoxMold **157**, ProcessNative **34** (**385** total). These are candidate
+    results, not a completed review stage: the mill fixing assertion correctly
+    fails because its M12 holes are **20 mm** deep, while the current **12 mm**
+    engagement + **1.75 mm** gap + **8 mm** stock plug require **21.75 mm**.
+    A made-to-length **6 mm** threaded plug would fit the current budget without
+    changing the frozen casting; the alternative is a design change. User input
+    is pending on that route and on the steel-grade / fixture-screw-class basis
+    for sourced policy limits. No limit or test was weakened. Protection-package
+    regeneration and this review commit remain blocked on those decisions;
+    fixing sockets have not started. After isolation, main compiles and again
+    passes **381** native and **248** mill assertions. Threaded counterbores carry an explicit
+    Unsupported rule until their separate sealing cap is specified.
 - [ ] Hole policy 3–4: each `ThreadedHolePolicy` constant names its source (for
   example VDI 2230 engagement for the material pairing, ISO 273 clearance), and the
   radial wall is checked against that source rather than 0.5D. Engagement and tip
