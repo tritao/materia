@@ -40,7 +40,7 @@ coordinates and root placements separately from the definition. Scene artifact
 version 29 can carry both payloads; geometry part IDs identify component
 definitions so repeated occurrences can share one geometry payload.
 
-Assembly schema version 10 includes a reusable `assemblies` table. An occurrence selects a
+Assembly schema version 11 includes a reusable `assemblies` table. An occurrence selects a
 subassembly by setting `assembly` and `definition` to its table ID. Each entry
 can expose connectors from its members, including connectors passed through a
 deeper subassembly. `AssemblyDefinitionFlattener` prefixes nested IDs with the

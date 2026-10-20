@@ -59,11 +59,13 @@ scale³. Downstream of that seam, nothing knows the assembly was in millimetres.
 
 ### Joints and connectors
 
-- **Mated connector frames coincide.** A mate places the child so that its
-  named connector lands exactly on the parent's.
+- **Joined connector frames coincide.** A joint places the child so that its
+  named connector lands exactly on the parent's, then moves it by the joint's
+  coordinate.
 - **A joint acts along a unit axis expressed in the parent connector frame.**
-  The default axis is the connector's **+Y**. A mate can name a different axis
-  (`addMateOnAxis` in MachineKit, `mateOnAxis` in CadKit).
+  The default axis is the connector's **+Y**. A joint can name a different axis
+  (`addMateOnAxis` in MachineKit, `mateOnAxis` in CadKit; despite their names,
+  these create joints, see [Assemblies and mates](../modelling/assemblies-and-mates.md)).
 - **MachineKit component frames put the component's own axis along +Z** (a
   rail's length, a motor's shaft), and their connectors' +Y points along that
   +Z, so default joints act along the component's axis.
@@ -125,7 +127,7 @@ them.
 | Frames, transforms, units, quaternions | `robotkit/ARCHITECTURE.md` (Frames and units) |
 | Length unit of a scene | `SceneArtifact.metresPerUnit` (`projectkit`) |
 | mm → SI conversion | `AssemblySimulationBridge.toRobotModel` (`robotkit/cadbridge`) |
-| Joint axis, mate placement | `AssemblyModel.mate` / `mateOnAxis` (CadKit), `MachineAssembly.addMate` / `addMateOnAxis` (MachineKit) |
+| Joint axis and placement | `AssemblyModel.mate` / `mateOnAxis` (CadKit), `MachineAssembly.addMate` / `addMateOnAxis` (MachineKit) |
 | World-aligned axis connectors | `AxisBuilder.connect` and `AxisBuilder.slide` (MachineKit) |
 | Couplings | `AssemblyJointCoupling` (projectkit), `JointCoupling` (RobotKit) |
 | Transmissions | `SimpleTransmission` (RobotKit) |

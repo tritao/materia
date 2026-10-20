@@ -69,14 +69,14 @@ by-product of the model, not a separate list to keep in sync.
 **Concepts:** [Machine components](../modelling/machine-components.md),
 [Frames and transforms](../foundations/frames.md)
 
-## 3. Assembly: mates, joints and transmissions
+## 3. Assembly: joints and transmissions
 
-Components become a machine by **mating** their connectors. `GantryPicker`
+Components become a machine by **joining** their connectors. `GantryPicker`
 extends `Gantry`, which builds on `AxisBuilder` and `MachineAssembly`:
 
-- **Fixed mates** bolt things together: posts to frame, rail blocks to plates,
+- **Fixed joints** bolt things together: posts to frame, rail blocks to plates,
   the tool to the flange.
-- **Sliding mates** make the three axes. Each is a prismatic joint along a world
+- **Sliding (prismatic) joints** make the three axes. Each is a prismatic joint along a world
   axis with travel limits (1500 × 1000 × 500 mm here), overtravel, and for the
   dual Y axis a racking tolerance. The Z axis slides along −Z, so a positive Z
   coordinate moves the tool down.
@@ -95,8 +95,10 @@ extends `Gantry`, which builds on `AxisBuilder` and `MachineAssembly`:
 This is [mechanical truth](../modelling/mechanical-truth.md): the model follows
 the real mechanism closely enough that limits can be derived from it (step 5).
 
-The finished `MachineAssembly` flattens into a CadKit assembly model: mates,
-couplings, switches and actuators.
+The finished `MachineAssembly` flattens into a CadKit assembly model: joints,
+couplings, switches and actuators. (MachineKit's builder calls joint creation
+`addMate`; in the data model, *mates* are placement constraints and *joints*
+are degrees of freedom. See [Assemblies and mates](../modelling/assemblies-and-mates.md).)
 
 **Concepts:** [Assemblies and mates](../modelling/assemblies-and-mates.md),
 [Transmissions](../modelling/transmissions.md)
@@ -122,10 +124,10 @@ conversion happens once, when the assembly is compiled into a robot model.
 [Conventions](../foundations/conventions.md),
 [The editor and projects](../platform/editor-and-projects.md)
 
-## 5. Kinematics and limits: from mates to a robot
+## 5. Kinematics and limits: from joints to a robot
 
 To plan motion, the assembly is compiled into a **robot model**: one link per
-rigid body, one joint per sliding or rotating mate, couplings rescaled into SI.
+rigid body, one robot joint per movable assembly joint, couplings rescaled into SI.
 Joint zero is rebased to the authored starting pose. Two compilers feed one
 kinematics core (KinematicsKit): CadKit's assembly kinematics for the editor's
 posing, and the simulation bridge for the robot model.
