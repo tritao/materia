@@ -104,7 +104,7 @@ EPS/adhesive/release/cure evidence, insert anchorage, replication/grout allowanc
 compaction, closure/brace/bridge loads and qualified lifting/flip provisions.
 The review always reports fabrication readiness as false; a correct geometric
 mold is not a structural or process qualification. Phase 5 adds the fabrication
-review and load/access checks below; phase 8 supplies physical evidence.
+review and load/access checks below; phase 9 supplies physical evidence.
 
 
 ## Fabrication review package (phase 5)

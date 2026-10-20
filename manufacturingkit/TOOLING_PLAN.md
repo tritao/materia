@@ -235,8 +235,12 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   assertions pass. The 819-artifact package has 24 passing and 157 pending checks,
   with no failed/unsupported records; junction thermal modelling and the missing
   material/physical evidence remain pending, so fabrication readiness is false.
-- [ ] Phase 7: mill column and independent pedestal example.
-- [ ] Phase 8: physical calibration and release.
+- [ ] Phase 7: foundation design model: typed casting features with openings and
+  owners, insert holes from `DesignInterfaces`, design-owned interface
+  requirements, datums, lifting inserts and foundation joints, then drafted,
+  radiused and profiled features. Precedes the column.
+- [ ] Phase 8: mill column and independent pedestal example.
+- [ ] Phase 9: physical calibration and release.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
 
@@ -415,7 +419,7 @@ compatibility path for the old encoding.
 | `ToolingRecipe` | ID/revision, panel/core stock, joint policy, process limits, fit allowances, seal/liner thickness, hardware choices, resin cure spec, mix properties |
 | `PanelStockSpec` | Material reference, nominal and measured thickness, variation, coated face, stock dimensions, permitted rotations/direction |
 | `CoreStockSpec` | EPS grade reference, available block sizes, density, declared compression/temperature limits, layer adhesive, evidence references |
-| `CastingToolingInput` | Source ID/revision/hash, supported envelope, named void features, insert geometry/poses, precision datums |
+| `CastingToolingInput` | Source ID/revision/hash, supported envelope, typed `materia.casting` features, inserts with holes and interface requirements, datum scheme, foundation joints (phase 7) |
 | `CastingSetup` | Source-to-mold transform, gravity/fill direction, open face, parting choices, feature overrides, support and finishing datums, compaction, fill height, pour rate and pour points, initial/ambient temperature |
 | `CompactionSpec` | Method (vibration table, external vibrators, internal poker, none), mold-bed interface, declared frequency/amplitude/duration or pending, evidence |
 | `InsertAnchorage` | Insert reference, anchorage kind (studs, undercut, bonded keys), geometry, declared pull-out/shear capacity or pending, evidence |
@@ -463,14 +467,126 @@ envelope parameters. Existing casting recipes must reconstruct unchanged.
 The planning input must describe how the casting envelope is built, including
 the flared foot when present. A bounding box alone is insufficient. Support
 explicit box and extruded-profile envelopes first; reject unsupported shapes.
-Clip design-cut tools to the casting envelope: existing cuts deliberately extend
-beyond casting faces, and those extensions are not literal finished cavity sizes.
+Until phase 7, clip design-cut tools to the casting envelope: existing cuts
+deliberately extend beyond casting faces, and those extensions are not literal
+finished cavity sizes. Phase 7 makes features finished geometry with declared
+openings and deletes this clipping.
 
 Store plan/setup records in a versioned tooling JSON format separate from sheet
 inventory. Validate codec input, bounded record counts and referential integrity.
 Use deterministic serialization and source/recipe fingerprints. Geometry or
 recipe changes invalidate generated reports and physical qualification tied to
 the previous version. Do not serialize native CAD resources.
+
+## Foundation design model
+
+The mold pipeline is sound, but the casting description it starts from is too
+thin, and several tooling workarounds come from that: a feature-ID strategy table
+in the mill setup, clipping of deliberately oversize design cuts, hardware written
+into insert labels, precision requirements held in mold options, and box-only
+geometry that blocks drafted formers, corner-radius rules and non-orthogonal fill
+analysis. Phase 7 replaces the source model before the column and pedestal are
+built on it. Each step is one schema change with no compatibility path: casting
+recipes, tooling inputs, codecs and fingerprints move together, and generated
+packages are regenerated.
+
+### Ownership
+
+- `materia.casting`, a new ManufacturingKit package with no CadKit or MachineKit
+  imports, holds the neutral casting design records and closed vocabularies that
+  the design and the tooling share: feature kinds, openings, feature geometry,
+  insert role and finish, interface requirements, datums and foundation joints.
+  `InsertRole` and `InsertFinish` move here from `materia.tooling.ToolingEnums`.
+- `machinekit.structural` (`MineralCasting`, `MineralFoundation`, `CastInsert`)
+  stores these records as recipe parameters and realizes them as CAD. It defines
+  no second feature type.
+- `machinekit.design.DesignInterfaces` stays the hole and datum model for steel
+  inserts; it uses CadKit thread specifications, so it remains in MachineKit.
+- `FoundationToolingAdapter` becomes a copy: neutral records, plus hole interfaces
+  converted to neutral hole records, fingerprinted. It infers nothing.
+
+### Typed casting features
+
+`CastingFeature` replaces `CastingFeatures.CastingBox`, which is an ID, size and
+pose stored in a JSON text parameter.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | Stable source ID |
+| `kind` | `Lightening`, `ServiceOpening`, `InterfaceRecess`, `InsertRecess` or `Clearance` |
+| `geometry` | Box, or straight prism from a closed line/arc profile; the finished cavity, exactly inside the body |
+| `openings` | Body faces, or other feature IDs, the feature opens through; empty means enclosed |
+| `draft`, `cornerRadius` | Wall draft along a declared withdrawal axis and internal corner radius; zero is explicit |
+| `owner` | The interface or insert the feature serves, or null |
+| `adjustable` | Dimensions the design allows proposals to change (lightening cores yes, interface recesses no) |
+
+- Feature geometry is the finished cavity. CAD realization extends its cutting
+  tools past declared openings internally for robust booleans; nothing outside
+  CAD sees the overshoot. A declared opening must lie on a body face or a named
+  feature, and a cut that breaks out where no opening is declared is an error.
+- `MineralFoundation` generates insert recesses from its inserts with
+  `kind = InsertRecess` and the insert as `owner`; recess links derive from that.
+- Default mold strategies follow from kind and openings through recipe rules
+  (for example, a lightening pocket open to the fill face becomes an EPS core and
+  an interface recess a rigid former). A setup overrides a strategy by naming the
+  feature ID. Unknown kinds fail. The mill's ID-keyed strategy table is deleted.
+- Castability proposals change only `adjustable` dimensions; other features get
+  change requests.
+
+### Feature geometry beyond boxes
+
+- Draft and corner radius are realized in CAD, in the planner (formers get drafted
+  walls; EPS cores ignore draft unless declared), in drawings and in CAM, where a
+  corner radius below the router radius fails with the feature ID.
+- Prism features from line/arc profiles cover chamfered and stepped recesses.
+  Other shapes stay unsupported.
+- Box algebra remains the exact fast path for features that are axis-aligned boxes
+  in the setup. Other regions use CadKit booleans at the same critical levels, as
+  the fill analysis originally specified. `OrthogonalSections` and
+  `JunctionThickness` report non-box regions as unsupported until they gain an
+  exact method. Drafted rigid formers become supported, and their release request
+  clears through draft rather than only through EPS or a source change.
+
+### Steel inserts
+
+- Insert holes come from a `DesignInterfaces` facet on `CastInsert`: patterns of
+  `HoleInterface` with thread via `ThreadSpec`, tap drill, blind or through and
+  counterbore. They replace `boreDiameter` and hardware text in labels such as
+  "nominal M12 tap drill". Bore masks, plugs, insert-sealed penetrations and
+  fixture fixings come from these holes.
+- Anchorage (headed studs, undercuts, bonded keys) is insert geometry and feeds
+  `InsertAnchorage`; its capacity stays pending evidence.
+- `finish` becomes typed tokens; `label` is display text only.
+
+### Interface requirements
+
+Precision intent belongs to the design. Each precision insert or foundation
+interface carries an `InterfaceRequirement`: route (as cast, machined, ground,
+replicated), allowance (machining stock or replication/grout gap), flatness and
+parallelism, datum reference and position tolerance. The casting geometry
+includes the allowance. The mold options' `PrecisionInterface` keeps only process
+choices: master reference, release, hole protection and evidence. A route that
+the geometry cannot achieve is a design change request.
+
+### Foundation-level declarations
+
+- **Datum scheme:** primary, secondary and tertiary datum faces or features for
+  replication, machining and fixtures. Masters and datum fixtures reference them.
+- **Lifting and handling:** `LiftingMount` inserts placed by the design. Handling
+  checks use them, and the lifting-point castability rule proposes positions from
+  casting mass and centre of mass.
+- **Foundation joints:** the base–column interface becomes an explicit joint
+  between two foundations, with grout or replication gap, jacking screws, anchor
+  pattern and cure-before-torque. It replaces the standing change request.
+
+### Layout parameters
+
+`MillFrame` and the hobber's `FoundationLayout` build features from named layout
+parameters instead of inline numbers (shoulder clearance 12, recess depth 21, foot
+access 90 × 100 at 40, stem 20 × 20 × 42, seat width 106, bores 10.2 and 18). Tap
+drills derive from thread specifications. Shared feature patterns (open underside
+pocket grids, foot access with stem, recesses beside guide seats) live in one
+builder that both machines use.
 
 ## Generation pipeline
 
@@ -599,7 +715,7 @@ Record per seat:
 
 Grouted joints record the gap, jacking/squaring method, bolt sleeves and cure
 before torque. Replication masters, dams and plugs are tooling items in the
-fabrication package. Phase 8 coupons cover replication thickness, flatness
+fabrication package. Phase 9 coupons cover replication thickness, flatness
 transfer and bond to the steel seat.
 
 ## Validation and readiness
@@ -779,7 +895,7 @@ them into the `Diagnostics` used by `FoundationIntegrity.check`, keyed by source
 feature IDs so a later editor can highlight them; this release adds no app UI.
 `MillDesignStudy` writes the metrics alongside its existing outputs.
 
-Recipe limits start as declared assumptions. When phase 8 evidence revises a
+Recipe limits start as declared assumptions. When phase 9 evidence revises a
 recipe (aggregate size, achievable insert tolerance, minimum ligament, cure peak
 by section), the design rules use the revised values; feedback reports which
 recipe revision and evidence each threshold came from.
@@ -821,7 +937,7 @@ solid in mold coordinates, already checked against the source.
 
 The flat free surface is an idealisation: a vibrated paste traps at least these
 pockets, and may trap more under broad flat ceilings. The air-escape-width rule
-covers that case, and phase 8 compares predicted pockets with demolded voids.
+covers that case, and phase 9 compares predicted pockets with demolded voids.
 
 ### Cure temperature
 
@@ -971,18 +1087,48 @@ and the analytical inert-slab series with no reaction; missing kinetics yields
 pending, never pass. The base and column orientation comparison includes trapped
 air and cure margin.
 
-### 7. Column and independent structure
+### 7. Foundation design model
+
+Implement `materia.casting` and the source model described under foundation
+design model, in three steps:
+
+1. **Records.** Typed features with openings, finished extents, owners and
+   adjustable dimensions; shared vocabulary moved; insert holes through
+   `DesignInterfaces`; typed finish; named mill and hobber layout parameters and
+   the shared feature builder; the adapter reduced to a copy. Geometry stays
+   box-only.
+2. **Requirements.** Interface requirements with the allowance in the casting
+   geometry, the datum scheme, lifting inserts and the base–column joint.
+3. **Geometry.** Draft, corner radius and prism features through CAD, planner,
+   drawings, CAM and the phase 6 analyses.
+
+Acceptance: after step 1 the mill base, column and hobber foundations rebuild with
+zero symmetric difference against their previous CAD. `MillMoldSetup` has no
+feature-ID strategy table, and an override names its feature explicitly. No code
+outside CAD realization clips or extends design cuts; an opening that is not on a
+body face, or an undeclared breakout, is rejected. Every penetration record traces
+to a `HoleInterface`, and no insert label carries hardware data. A replicated
+seat's allowance appears in the casting geometry and clears its allowance request,
+while master and release stay pending evidence. The lifting-point and column-joint
+requests clear when the design declares them and return when removed. A drafted
+former fixture passes release and clears its release request; a prism feature with
+a corner radius below the router radius fails with its ID. Fill analysis agrees
+with CAD booleans on a sloped-ceiling fixture, and box-feature results are
+unchanged. Castability proposals change only adjustable dimensions.
+
+### 8. Column and independent structure
 
 Add the column setup, stepped/flared envelope support, intersecting channels and
-side-removal details. Add a small mineral-cast pedestal example with different
-dimensions, insert layout and opening direction using the shared planner.
+side-removal details on the phase 7 model. Add a small mineral-cast pedestal
+example with different dimensions, insert layout and opening direction using the
+shared planner.
 
 Acceptance: both selected mill foundations generate complete review packages;
 the pedestal uses shared records/joints/planner with configuration only. Changing
 stock thickness, casting size, opening direction and core strategy requires no
 mill-specific conditionals in the libraries. Existing frame geometry is unchanged.
 
-### 8. Physical calibration and release
+### 9. Physical calibration and release
 
 Fabricate a joint coupon and a representative small mold with EPS core, steel
 insert, covering, seam and restraint, using the phase 3 box where practical.
