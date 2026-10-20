@@ -1569,3 +1569,47 @@ after the hobber merge, most likely in the hobber bed/column equivalence checks.
   ID stability under unrelated edits and change under geometry edits; reject old
   feature and tooling document versions.
 
+## Follow-up review: 864370774 (stage 1)
+
+Stage 1 holds: declared openings, unique face IDs, one envelope, no
+`insertBoreDiameter` or `diameter()`, typed finishes, recipe strategy rules,
+`derivedFrom` core units and source-thread fixture fixings. Fix these after the
+hobber conversion commits and before fixing sockets:
+
+- [ ] Hole protection 1–2: a through-tapped fixing hole (the mill's M12 column
+  anchors) gets no plug and the screw fills only `minEngagement`, so resin enters
+  the rest of the thread from behind and locks the screw. Every through hole is
+  closed at its far end by a plug or cap with its own depth budget, and the fixing
+  screw stops short of it; one fixing-selection function serves `DatumFixtures`
+  and `BoxMoldPlanner`. Bore masks for tapped holes are threaded plugs or set
+  screws of the hole's thread, as standard hardware, not smooth pins at tap-drill
+  diameter that leave the thread roots open.
+- [ ] Hole policy 3–4: each `ThreadedHolePolicy` constant names its source (for
+  example VDI 2230 engagement for the material pairing, ISO 273 clearance), and the
+  radial wall is checked against that source rather than 0.5D. Engagement and tip
+  gap exist only on threaded holes; unthreaded holes carry none. The clearance
+  diameter is carried on the hole record from the standard
+  (`ThreadedHoleChoice.clearanceDiameter`); fixtures and the box planner use it
+  instead of rebuilding it from `minClearance`. Policy IDs are named constants.
+- [ ] Source sentinels 5–7: no diameter-0 "no holes" sentinel (`InsertHoles`,
+  `InsertHoleGeometry`, `MillFrame` `through(0, …)`); pass an empty list. Move the
+  `InsertHoleGeometry.through` test helper and its test policy ID out of neutral
+  code. Thread sizes are typed thread specs, not "M12"/"M4" strings; no dummy
+  `metric(size, 35)`; bolt lengths derive from the clamped stack plus engagement.
+  `footStemTop` derives from contact, not the old +1. Role tokens use
+  `InsertRole`; MillPedestal feature numbers become named details. String lists
+  in `CastingStrategies` and `CastingFeatureCodec` come from the enum values.
+- [ ] Strategy rules 8–9: withdrawal ties fail or require an explicit override,
+  never an alphabetical face ID; rule priorities live in the recipe, not as
+  library defaults copied from the mill.
+- [ ] Unsupported reporting 10–11: `CastingCavities.derive` accepts draft and
+  corner-radius intent instead of throwing at decode; box-only consumers report
+  such features Unsupported by feature ID, so the planner and castability branches
+  for draft and radius are reachable. The collision-hull Unsupported result
+  reaches the design diagnostics (component or assembly checks), and a chamfered
+  or flared body's residue names features, not the envelope prism.
+- [ ] Tests 12–14: run the sloped-foot cavity through the real fill, section and
+  planner consumers, not three wrappers of one check; `MillMoldChecks` asserts the
+  mill's inserts get source-thread fixings (and the through-hole plugs above);
+  fixture tests declare openings rather than filling them from `reachedOpenings`.
+
