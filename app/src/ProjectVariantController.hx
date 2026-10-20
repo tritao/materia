@@ -35,6 +35,16 @@ class ProjectVariantController {
     this.changed=changed;this.installed=installed;this.blocked=blocked;
   }
   public function isLoading():Bool return loading!=null;
+  public function loadingStatus():Null<ProjectLoadingStatus> {
+    var task=loading;if(task==null)return null;
+    return {title:"Opening "+loadingLabel,phase:task.control.currentPhase(),
+      elapsedSeconds:Std.int(task.elapsedSeconds()),cancelling:task.control.isCancelled()};
+  }
+  public function requestCancel():Void {
+    var task=loading;if(task==null)return;
+    task.control.phase("Cancelling");task.control.cancel();changed();
+  }
+  public function dismissFailure():Void {failure=null;changed();}
   function sync():Void {
     if(generation==session.generation)return;
     generation=session.generation;variants=[];failure=null;

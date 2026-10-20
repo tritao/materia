@@ -77,6 +77,7 @@ class ProjectVariantsTests {
   editor.projectVariants.select("large");
   check(editor.projectVariants.isLoading()&&editor.session.document==original&&editor.session.projectVariant=="small","preparation preserves installed scene and selection");
   var pending=editor.projectVariants.snapshot();
+  check(find(editor.submit(frame),"Opening large"),"variant loading is visible in shared editor chrome without its chooser");
   check(!pending.switchAllowed&&StringTools.startsWith(pending.status,"Opening large · "),"pending selection reports target and locks chooser");
   var loadingUi=editor.ui.submit(editor.viewportWithControls(new Text("Scene"),800),frame);
   check(find(loadingUi,"Loading project selection")&&find(loadingUi,"Cancel"),"chooser shows live progress and cancellation while preparing");
@@ -103,6 +104,14 @@ class ProjectVariantsTests {
   var artifactPath=dir+"/large.mtrg";File.saveBytes(artifactPath,artifact);
   check(ProjectSourceLoader.load(artifactPath,null,null,"large").projectVariant=="large","artifact reload retains variant");
   rejects(()->ProjectSourceLoader.load(artifactPath,null,null,"small"),"prebuilt artifact cannot switch source geometry");
+  var installed=editor.session.document;
+  editor.projectVariants.select("small");editor.projectVariants.requestCancel();
+  var cancelling=editor.projectVariants.loadingStatus();
+  check(cancelling!=null&&cancelling.cancelling&&editor.projectVariants.isLoading(),"variant cancel remains visibly pending until completion");
+  deadline=Sys.time()+180;
+  while(editor.projectVariants.isLoading()&&Sys.time()<deadline){editor.tick();Sys.sleep(0.01);}
+  check(!editor.projectVariants.isLoading()&&editor.projectVariants.snapshot().error==null&&
+    editor.session.document==installed&&editor.session.projectVariant=="large","cancelled variant preserves the installed scene without an error");
   editor.dispose();fonts.dispose();
  }
 }

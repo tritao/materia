@@ -664,10 +664,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   // The worker-thread build behind startLoading, when the example is a project.
   var startJob:Null<ExampleLoadJob> = null;
   var startFailure:Null<String> = null;
+  var projectFeedbackKey = "";
   var reportedMissionFailure:Null<String> = null;
   final startExamples = new app.editor.ExampleBrowser();
-  // The Start page was opened only to show a launch project's progress, so it closes once that opens.
-  var closeStartAfterOpen:Bool = false;
   var lastRecordedPath:Null<String> = null;
   // Each mode keeps the layout it was left in; the mode set itself is never persisted.
   final modeSnapshots:Map<String, DockWorkspaceSnapshot> = new Map();
@@ -1069,12 +1068,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
             ExampleCatalog.finish(this, queued, job.take());
             job.control.phase("Rendering the first project frame");
             projectFrameControl = job.control;
-            if (closeStartAfterOpen) workspace.close("start");
           } catch (failure:Dynamic) {
             startFailure = "Could not open " + queued.title + ": " + Std.string(failure);
             log(startFailure);
           }
-          closeStartAfterOpen = false;
           invalidateView();
         }
       } else if (startLoadDelay > 0) {
@@ -1090,6 +1087,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         invalidateView();
       }
     }
+    var feedback=projectLoadingRevisionKey();
+    if(feedback!=projectFeedbackKey){projectFeedbackKey=feedback;invalidateView();}
     if (simulationStop == null && simulation.isActive() && simulation.isRunning()) {
       simulation.pump();
       if (hostContext != null) hostContext.requestFrame();
@@ -1205,17 +1204,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /**
-   * Queues a project as if it had been chosen on the Start page, and shows that page so the build's
-   * progress and Cancel button are visible while it runs. The build runs on a worker thread, so the
-   * caller returns at once and the window keeps painting; `tick()` opens the result.
+   * Queues a project without changing workspace tabs. Shared editor chrome owns loading feedback;
+   * the worker keeps the window responsive and tick() installs the result.
    */
   public function openProjectInBackground(path:String):Void {
+    startFailure = null;
     projectOpenStartedAt = Sys.time();
     projectFrameControl = null;
     startLoading = ExampleCatalog.launchEntry(path);
     startLoadDelay = 3;
-    closeStartAfterOpen = workspace.get("start") != null && !workspace.isOpen("start");
-    showStartPage();
+    invalidateView();
   }
 
   /** CPU render completion; this measures frame submission, not monitor scan-out. */
@@ -1251,10 +1249,34 @@ class ReferenceEditorApp implements DesktopUiApplication {
   /** Stops a project build that is running for the Start page. */
   function cancelExampleLoad():Void {
     var job = startJob;
-    if (job == null) return;
+    if (job == null) {startLoading=null;invalidateView();return;}
     job.control.phase("Cancelling");
     job.control.cancel();
     invalidateView();
+  }
+
+  function projectLoadingStatus():Null<app.ProjectLoadingStatus> {
+    var entry=startLoading;
+    if(entry==null)return projectVariants.loadingStatus();
+    var job=startJob;
+    return {title:"Opening "+entry.title,phase:job==null?"Starting":job.control.currentPhase(),
+      elapsedSeconds:job==null?0:Std.int(job.elapsedSeconds()),cancelling:job!=null&&job.control.isCancelled()};
+  }
+
+  function projectLoadingFailure():Null<String> return startFailure??projectVariants.snapshot().error;
+
+  function projectLoadingRevisionKey():String {
+    var status=projectLoadingStatus();
+    return status==null?"idle:"+projectLoadingFailure():
+      status.title+":"+status.phase+":"+status.elapsedSeconds+":"+status.cancelling;
+  }
+
+  function cancelProjectLoading():Void {
+    if(startLoading!=null)cancelExampleLoad();else projectVariants.requestCancel();
+  }
+
+  function dismissProjectLoadingFailure():Void {
+    startFailure=null;projectVariants.dismissFailure();invalidateView();
   }
 
   function requestOpenPath(path:String):Void {
@@ -1526,6 +1548,24 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   // The mode strip is tinted while a simulation is active, so the non-editing state is obvious.
   function contextBar(compact:Bool):View {
+    var loading=projectLoadingStatus(),failure=projectLoadingFailure();
+    if(loading!=null||failure!=null) {
+      var items:Array<KeyedView> = [];
+      var text:String;
+      if(loading!=null) {
+        items.push(new KeyedView("spinner",new haxeon.ui.widgets.controls.Spinner("project-loading-spinner",loading.title)));
+        text=(viewportWidth>=700?shortenLabel(loading.title,viewportWidth>=1000?30:20)+" · ":"")+
+          shortenLabel(loading.phase,viewportWidth>=1000?40:viewportWidth>=700?24:20)+" · "+loading.elapsedSeconds+" s";
+      }else text=shortenLabel(failure,Std.int(Math.max(16,Math.min(100,(viewportWidth-130)/7))));
+      items.push(new KeyedView("status",new Text(text,null,loading==null?appearance.theme.tokens.danger:appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0))));
+      items.push(new KeyedView("space",new Spacer("project-loading-space",LayoutAxis.grow(),LayoutAxis.fixed(1))));
+      var action=new Button(loading==null?"Dismiss":loading.cancelling?"Cancelling…":"Cancel",null,
+        loading==null?dismissProjectLoadingFailure:cancelProjectLoading,loading==null?"project-loading-dismiss":"project-loading-cancel");
+      action.enabled=loading==null||!loading.cancelling;action.variant=ButtonVariant.Secondary;
+      items.push(new KeyedView("action",action));
+      return new Row("editor-project-loading",items,toolbarRowStyle(CONTEXT_BAR_HEIGHT,appearance.toolbar));
+    }
     var items:Array<KeyedView> = [
       new KeyedView("modes", modeSwitcher(compact)),
       new KeyedView("space", new Spacer("context-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
@@ -1650,7 +1690,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return "document=" + session.label() + ":commands=" + commands.revision + ":state=" + topBarCommandState() +
       ":active=" + simulation.isActive() + ":running=" + simulation.isRunning() +
       ":failed=" + (mission != null && mission.failure != null) + ":chip=" + simulationStateLabel() +
-      ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible;
+      ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible+":project-load="+projectLoadingRevisionKey();
   }
 
   function statusBarRevisionKey():String {
@@ -1707,6 +1747,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function statusSelectionLabel():String {
+    var loading=projectLoadingStatus();
+    if(loading!=null)return loading.title+" · "+loading.phase;
+    if(projectLoadingFailure()!=null)return "Project could not be opened";
     var selected = scene.object(scene.selectedId);
     var left = simulation.error != null ? "Simulation error: " + simulation.error :
       selected == null ? "Ready" : selected.label + " selected";
@@ -2229,6 +2272,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function documentChanged():Void {
+    startFailure=null;
     if (preferences != null && session.path != null && session.path != lastRecordedPath) {
       lastRecordedPath = session.path;
       preferences.addRecent(session.path);
