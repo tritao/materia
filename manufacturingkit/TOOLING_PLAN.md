@@ -611,6 +611,20 @@ pose stored in a JSON text parameter.
   fingerprint. No placeholder or unknown limit enters `DesignInterfaces`. Hand-set
   limits on existing parts (`MillYNutMount`, `MillCrossSaddle`) move to the policy
   when those parts are next touched.
+- A tapped hole is through only when its far end opens into a declared opening
+  or feature, where its closure stays accessible. A through hole whose exit would
+  be buried in casting material is a design error: the hole is declared blind,
+  with its back wall from the policy, so no plug is lost in the casting and no
+  resin path into the thread exists. If the blind hole does not fit the insert
+  thickness, the insert gets thicker (a design change request), never a shorter
+  engagement or a made-to-length plug.
+- Policy basis: default insert steel is C45 (EN 1.0503) bright or ground flat
+  bar, with the grade a typed insert material carrying its tensile strength;
+  service and fixture screws are ISO 4762 property class 8.8. Engagement for that
+  pairing comes from VDI 2230 Part 1, clearance diameters from ISO 273 (medium),
+  each recorded with its reference. Back wall, radial wall and tip gap are named
+  in-house rules with their reasoning stated, not presented as standards. Fixture
+  screws use the same limits as service screws.
 - Anchorage is insert geometry and feeds `InsertAnchorage`; its capacity stays
   pending evidence until a pull-out coupon is recorded. The default kind is
   **bolted anchors**: blind tapped holes in the insert's back face, from
@@ -1595,6 +1609,12 @@ Stage 1 holds: declared openings, unique face IDs, one envelope, no
 `derivedFrom` core units and source-thread fixture fixings. Fix these after the
 hobber conversion commits and before fixing sockets:
 
+- Decision on the 87c3f7c3c blocker: the mill's through-tapped M12 column-joint
+  anchors (base) and M4 hatch anchors (column) exit into casting material, so they
+  become blind tapped holes under the policy (see Steel inserts); end plugs remain
+  only for through holes that open into declared features. No 6 mm made-to-length
+  plug. If a blind hole does not fit, the anchor insert thickens, and the mill is
+  refrozen in a separate commit stating the design change.
 - [ ] Hole protection 1–2: a through-tapped fixing hole (the mill's M12 column
   anchors) gets no plug and the screw fills only `minEngagement`, so resin enters
   the rest of the thread from behind and locks the screw. Every through hole is
