@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-sheet-router-vacuum-checks"
+  },
+  "entry": "SheetRouterVacuumChecks",
+  "sourceRoots": [
+    ".",
+    "../../tests/src",
+    "../press-brake",
+    "..",
+    "../robot-arm",
+    "../cnc-router",
+    "../mobile-base",
+    "../robot-welder",
+    "../corexy",
+    "../printer",
+    "../bench-mill",
+    "../cobot-arm",
+    "../machine-tending",
+    "../../tests/mobile-welder/src",
+    "../gantry-picker",
+    "../track-arm",
+    "../overhead-arm",
+    "../robot-screwdriver",
+    "../gantry-welder"
+  ],
+  "dependencies": {
+    "collisionkit-native": {
+      "path": "../../../collisionkit/native"
+    },
+    "motionkit-robot": {
+      "path": "../../../motionkit/robot"
+    },
+    "processkit": {
+      "path": "../../../processkit"
+    },
+    "machinekit-process": {
+      "path": "../../process"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "manufacturingkit": {
+      "path": "../../../manufacturingkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../.."
+    },
+    "machinekit-robot": {
+      "path": "../../robot"
+    },
+    "machinekit-picking-station-example": {
+      "path": "../picking-station"
+    },
+    "robotkit": {
+      "path": "../../../robotkit"
+    },
+    "cadbridge": {
+      "path": "../../../robotkit/cadbridge"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    },
+    "toolpathkit-motion": {
+      "path": "../../../toolpathkit/motion"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    },
+    "stockkit": {
+      "path": "../../../stockkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/sheet-router-work/sr7"
+}

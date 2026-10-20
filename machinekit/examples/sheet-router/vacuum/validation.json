@@ -1,0 +1,1663 @@
+{
+  "status": "PASS",
+  "assertions": 30,
+  "reports": [
+    {
+      "newSpoilThicknessMm": 25,
+      "minimumServiceThicknessMm": 18,
+      "wornSpoilboard": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": true,
+            "lateralCapacityN": 948.6083365587515,
+            "margin": 1.5810138942645857,
+            "normalForceN": 1897.216673117503,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.15616,
+            "supportByZoneM2": [
+              0.15616,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "boundsMaxM": [
+              0.1,
+              0.1,
+              0.018
+            ],
+            "boundsMinM": [
+              0.05,
+              0.05,
+              0
+            ],
+            "component": 1,
+            "independent": true,
+            "lateralCapacityN": 15.186480797879604,
+            "margin": 0.025310801329799338,
+            "normalForceN": 30.372961595759207,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.0025,
+            "supportByZoneM2": [
+              0.0025,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.8950720164604024e-06,
+          2.1399176954732512e-06,
+          2.1399176954732512e-06,
+          2.1399176954732512e-06,
+          2.1399176954732512e-06,
+          2.1399176954732512e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.15866,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0.22333333333333463,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 16366.157563427534,
+          "headerPressurePa": 15934.108167434457,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 103.60610923886956,
+          "zoneFlowM3PerHour": [
+            103.60610923886956,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            15186.480797879602,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0.0013400000000000079,
+        "warnings": [
+          {
+            "code": "freed_part_slipping",
+            "component": 1,
+            "line": 43
+          }
+        ]
+      },
+      "tabbed": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": false,
+            "lateralCapacityN": 1083.4561021149016,
+            "margin": 1.8057601701915027,
+            "normalForceN": 2166.912204229803,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.158736,
+            "supportByZoneM2": [
+              0.158736,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.393079345391804e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.158736,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0.2106666666666692,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 17868.62943427303,
+          "headerPressurePa": 17573.86765240384,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 85.57644678872369,
+          "zoneFlowM3PerHour": [
+            85.57644678872369,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            17063.8056602614,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": true,
+        "throughKerfAreaM2": 0.0012640000000000151,
+        "warnings": []
+      },
+      "workY": 2600,
+      "initial": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": false,
+            "lateralCapacityN": 1092.3958746132803,
+            "margin": 1.8206597910221338,
+            "normalForceN": 2184.7917492265606,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.16,
+            "supportByZoneM2": [
+              0.16,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.3919035314383145e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.16,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 17872.61089561154,
+          "headerPressurePa": 17578.178154288136,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 85.52866925266149,
+          "zoneFlowM3PerHour": [
+            85.52866925266149,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            17068.685540832503,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 0,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0,
+        "warnings": []
+      },
+      "allZonesOpen": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": false,
+            "lateralCapacityN": 399.7480186937321,
+            "margin": 0.6662466978228868,
+            "normalForceN": 799.4960373874642,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.16,
+            "supportByZoneM2": [
+              0.16,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.3919035314383145e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.16,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 7991.078951304831,
+          "headerPressurePa": 6314.288873649155,
+          "open": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "totalFlowM3PerHour": 204.10705258434209,
+          "zoneFlowM3PerHour": [
+            31.298100688421716,
+            34.56179037918407,
+            34.56179037918407,
+            34.56179037918407,
+            34.56179037918407,
+            34.56179037918407
+          ],
+          "zonePressurePa": [
+            6246.062792089563,
+            6231.092015477897,
+            6231.092015477897,
+            6231.092015477897,
+            6231.092015477897,
+            6231.092015477897
+          ]
+        },
+        "programLine": 0,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0,
+        "warnings": [
+          {
+            "code": "stock_hold_insufficient",
+            "component": 0,
+            "line": 0
+          }
+        ]
+      },
+      "through": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": true,
+            "lateralCapacityN": 1065.855234061041,
+            "margin": 1.776425390101735,
+            "normalForceN": 2131.710468122082,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.15616,
+            "supportByZoneM2": [
+              0.15616,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "boundsMaxM": [
+              0.1,
+              0.1,
+              0.018
+            ],
+            "boundsMinM": [
+              0.05,
+              0.05,
+              0
+            ],
+            "component": 1,
+            "independent": true,
+            "lateralCapacityN": 17.063512328077632,
+            "margin": 0.02843918721346272,
+            "normalForceN": 34.127024656155264,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.0025,
+            "supportByZoneM2": [
+              0.0025,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.3931500430662225e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.15866,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0.22333333333333463,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 17868.39011958329,
+          "headerPressurePa": 17573.608554137485,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 85.57931856500053,
+          "zoneFlowM3PerHour": [
+            85.57931856500053,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            17063.51232807763,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0.0013400000000000079,
+        "warnings": [
+          {
+            "code": "freed_part_slipping",
+            "component": 1,
+            "line": 43
+          }
+        ]
+      },
+      "onion": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": false,
+            "lateralCapacityN": 1092.0802934169672,
+            "margin": 1.820133822361612,
+            "normalForceN": 2184.1605868339343,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.16,
+            "supportByZoneM2": [
+              0.16,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.3930916552666576e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.16,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0,
+        "minimumSupportThicknessMm": 0.5,
+        "point": {
+          "blowerPressurePa": 17868.587764185904,
+          "headerPressurePa": 17573.822537597385,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 85.57694682976911,
+          "zoneFlowM3PerHour": [
+            85.57694682976911,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            17063.75458464011,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": true,
+        "throughKerfAreaM2": 0,
+        "warnings": []
+      },
+      "lowFriction": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": true,
+            "lateralCapacityN": 532.9276170305205,
+            "margin": 0.8882126950508675,
+            "normalForceN": 2131.710468122082,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.15616,
+            "supportByZoneM2": [
+              0.15616,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "boundsMaxM": [
+              0.1,
+              0.1,
+              0.018
+            ],
+            "boundsMinM": [
+              0.05,
+              0.05,
+              0
+            ],
+            "component": 1,
+            "independent": true,
+            "lateralCapacityN": 8.531756164038816,
+            "margin": 0.01421959360673136,
+            "normalForceN": 34.127024656155264,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.0025,
+            "supportByZoneM2": [
+              0.0025,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.3931500430662225e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06,
+          1.5407407407407406e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.15866,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 17868.39011958329,
+          "headerPressurePa": 17573.608554137485,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 85.57931856500053,
+          "zoneFlowM3PerHour": [
+            85.57931856500053,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            17063.51232807763,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0,
+        "warnings": [
+          {
+            "code": "freed_part_slipping",
+            "component": 0,
+            "line": 43
+          },
+          {
+            "code": "freed_part_slipping",
+            "component": 1,
+            "line": 43
+          }
+        ]
+      },
+      "higherPermeability": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": true,
+            "lateralCapacityN": 808.8600655469309,
+            "margin": 1.3481001092448848,
+            "normalForceN": 1617.7201310938617,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.15616,
+            "supportByZoneM2": [
+              0.15616,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "boundsMaxM": [
+              0.1,
+              0.1,
+              0.018
+            ],
+            "boundsMinM": [
+              0.05,
+              0.05,
+              0
+            ],
+            "component": 1,
+            "independent": true,
+            "lateralCapacityN": 12.949219799355326,
+            "margin": 0.021582032998925544,
+            "normalForceN": 25.898439598710652,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.0025,
+            "supportByZoneM2": [
+              0.0025,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          2.665324104432726e-06,
+          3.081481481481481e-06,
+          3.081481481481481e-06,
+          3.081481481481481e-06,
+          3.081481481481481e-06,
+          3.081481481481481e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.15866,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 14645.839700554225,
+          "headerPressurePa": 14024.46304471889,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 124.24992359334931,
+          "zoneFlowM3PerHour": [
+            124.24992359334931,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            12949.219799355324,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0,
+        "warnings": [
+          {
+            "code": "freed_part_slipping",
+            "component": 1,
+            "line": 43
+          }
+        ]
+      }
+    },
+    {
+      "newSpoilThicknessMm": 25,
+      "minimumServiceThicknessMm": 18,
+      "wornSpoilboard": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": true,
+            "lateralCapacityN": 861.5242125850464,
+            "margin": 1.435873687641744,
+            "normalForceN": 1723.0484251700927,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.15616,
+            "supportByZoneM2": [
+              0.15616,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "boundsMaxM": [
+              0.1,
+              0.1,
+              0.018
+            ],
+            "boundsMinM": [
+              0.05,
+              0.05,
+              0
+            ],
+            "component": 1,
+            "independent": true,
+            "lateralCapacityN": 13.7923317844686,
+            "margin": 0.022987219640780997,
+            "normalForceN": 27.5846635689372,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.0025,
+            "supportByZoneM2": [
+              0.0025,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          2.347746913579744e-06,
+          2.5925925925925925e-06,
+          2.5925925925925925e-06,
+          2.5925925925925925e-06,
+          2.5925925925925925e-06,
+          2.5925925925925925e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.15866,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0.22333333333333463,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 15285.728686583812,
+          "headerPressurePa": 14738.781210478253,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 116.57125576099422,
+          "zoneFlowM3PerHour": [
+            116.57125576099422,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            13792.331784468597,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0.0013400000000000079,
+        "warnings": [
+          {
+            "code": "freed_part_slipping",
+            "component": 1,
+            "line": 43
+          }
+        ]
+      },
+      "tabbed": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": false,
+            "lateralCapacityN": 1003.2595090064087,
+            "margin": 1.6720991816773478,
+            "normalForceN": 2006.5190180128175,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.158736,
+            "supportByZoneM2": [
+              0.158736,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.7190052713177296e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.158736,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0.2106666666666692,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 16851.52524719509,
+          "headerPressurePa": 16466.687367308914,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 97.78169703365894,
+          "zoneFlowM3PerHour": [
+            97.78169703365894,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            15800.755799037535,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": true,
+        "throughKerfAreaM2": 0.0012640000000000151,
+        "warnings": []
+      },
+      "workY": 3150,
+      "initial": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": false,
+            "lateralCapacityN": 1011.5205966440444,
+            "margin": 1.6858676610734074,
+            "normalForceN": 2023.0411932880888,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.16,
+            "supportByZoneM2": [
+              0.16,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.7178294573642404e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.16,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 16854.906823535355,
+          "headerPressurePa": 16470.388288969683,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 97.74111811757577,
+          "zoneFlowM3PerHour": [
+            97.74111811757577,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            15805.009322563194,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 0,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0,
+        "warnings": []
+      },
+      "allZonesOpen": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": false,
+            "lateralCapacityN": 343.14389199650236,
+            "margin": 0.5719064866608373,
+            "normalForceN": 686.2877839930047,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.16,
+            "supportByZoneM2": [
+              0.16,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.7178294573642404e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.16,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 7261.847543149339,
+          "headerPressurePa": 5438.195693697393,
+          "open": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "totalFlowM3PerHour": 212.8578294822079,
+          "zoneFlowM3PerHour": [
+            33.15727607547404,
+            35.94011068134677,
+            35.94011068134677,
+            35.94011068134677,
+            35.94011068134677,
+            35.94011068134677
+          ],
+          "zonePressurePa": [
+            5361.623312445348,
+            5348.230756152795,
+            5348.230756152795,
+            5348.230756152795,
+            5348.230756152795,
+            5348.230756152795
+          ]
+        },
+        "programLine": 0,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0,
+        "warnings": [
+          {
+            "code": "stock_hold_insufficient",
+            "component": 0,
+            "line": 0
+          }
+        ]
+      },
+      "through": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": true,
+            "lateralCapacityN": 986.9624391944199,
+            "margin": 1.6449373986573663,
+            "normalForceN": 1973.9248783888397,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.15616,
+            "supportByZoneM2": [
+              0.15616,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "boundsMaxM": [
+              0.1,
+              0.1,
+              0.018
+            ],
+            "boundsMinM": [
+              0.05,
+              0.05,
+              0
+            ],
+            "component": 1,
+            "independent": true,
+            "lateralCapacityN": 15.800500115177062,
+            "margin": 0.02633416685862844,
+            "normalForceN": 31.601000230354124,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.0025,
+            "supportByZoneM2": [
+              0.0025,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.7190759689921484e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.15866,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0.22333333333333463,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 16851.321986182433,
+          "headerPressurePa": 16466.46490674906,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 97.7841361658108,
+          "zoneFlowM3PerHour": [
+            97.7841361658108,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            15800.500115177061,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0.0013400000000000079,
+        "warnings": [
+          {
+            "code": "freed_part_slipping",
+            "component": 1,
+            "line": 43
+          }
+        ]
+      },
+      "onion": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": false,
+            "lateralCapacityN": 1011.2455218458272,
+            "margin": 1.6854092030763785,
+            "normalForceN": 2022.4910436916543,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.16,
+            "supportByZoneM2": [
+              0.16,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.7190175811925834e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.16,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0,
+        "minimumSupportThicknessMm": 0.5,
+        "point": {
+          "blowerPressurePa": 16851.48985489729,
+          "headerPressurePa": 16466.64863197408,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 97.78212174123257,
+          "zoneFlowM3PerHour": [
+            97.78212174123257,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            15800.71127884105,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": true,
+        "throughKerfAreaM2": 0,
+        "warnings": []
+      },
+      "lowFriction": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": true,
+            "lateralCapacityN": 493.48121959720993,
+            "margin": 0.8224686993286832,
+            "normalForceN": 1973.9248783888397,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.15616,
+            "supportByZoneM2": [
+              0.15616,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "boundsMaxM": [
+              0.1,
+              0.1,
+              0.018
+            ],
+            "boundsMinM": [
+              0.05,
+              0.05,
+              0
+            ],
+            "component": 1,
+            "independent": true,
+            "lateralCapacityN": 7.900250057588531,
+            "margin": 0.01316708342931422,
+            "normalForceN": 31.601000230354124,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.0025,
+            "supportByZoneM2": [
+              0.0025,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          1.7190759689921484e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06,
+          1.8666666666666664e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.15866,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 16851.321986182433,
+          "headerPressurePa": 16466.46490674906,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 97.7841361658108,
+          "zoneFlowM3PerHour": [
+            97.7841361658108,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            15800.500115177061,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0,
+        "warnings": [
+          {
+            "code": "freed_part_slipping",
+            "component": 0,
+            "line": 43
+          },
+          {
+            "code": "freed_part_slipping",
+            "component": 1,
+            "line": 43
+          }
+        ]
+      },
+      "higherPermeability": {
+        "components": [
+          {
+            "boundsMaxM": [
+              0.4,
+              0.4,
+              0.018
+            ],
+            "boundsMinM": [
+              0,
+              0,
+              0
+            ],
+            "component": 0,
+            "independent": true,
+            "lateralCapacityN": 717.8871441419237,
+            "margin": 1.1964785735698729,
+            "normalForceN": 1435.7742882838475,
+            "passes": true,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.15616,
+            "supportByZoneM2": [
+              0.15616,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "boundsMaxM": [
+              0.1,
+              0.1,
+              0.018
+            ],
+            "boundsMinM": [
+              0.05,
+              0.05,
+              0
+            ],
+            "component": 1,
+            "independent": true,
+            "lateralCapacityN": 11.492814167231106,
+            "margin": 0.019154690278718512,
+            "normalForceN": 22.985628334462213,
+            "passes": false,
+            "requiredLateralN": 600,
+            "supportAreaM2": 0.0025,
+            "supportByZoneM2": [
+              0.0025,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "conductanceByZoneM3PerSPa": [
+          3.317175956284578e-06,
+          3.733333333333333e-06,
+          3.733333333333333e-06,
+          3.733333333333333e-06,
+          3.733333333333333e-06,
+          3.733333333333333e-06
+        ],
+        "coveredAreaByZoneM2": [
+          0.15866,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "equivalentThroughKerfLengthM": 0,
+        "minimumSupportThicknessMm": 18,
+        "point": {
+          "blowerPressurePa": 13562.893952324263,
+          "headerPressurePa": 12804.739899513399,
+          "open": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "totalFlowM3PerHour": 137.24527257210883,
+          "zoneFlowM3PerHour": [
+            137.24527257210883,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "zonePressurePa": [
+            11492.814167231105,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "programLine": 43,
+        "retainedWebNeedsForceQualification": false,
+        "throughKerfAreaM2": 0,
+        "warnings": [
+          {
+            "code": "freed_part_slipping",
+            "component": 1,
+            "line": 43
+          }
+        ]
+      }
+    }
+  ],
+  "coreAssertions": 16,
+  "basis": {
+    "cuttingAllowanceN": 300,
+    "safetyFactor": 2,
+    "friction": 0.5,
+    "effectiveAreaFactor": 0.8,
+    "spoilboardThicknessSource": "CAD recipe, 25 mm new; 18 mm hydraulic sensitivity only",
+    "spoilboardPermeabilityM2": 1e-12,
+    "sheetPermeabilityM2": 1e-12,
+    "freeFlowM3PerHour": 300,
+    "shutoffPa": 25000,
+    "curve": "assumed linear, not a purchased pump rating",
+    "physicalOvercutAndSurfacedDatumQualified": false
+  },
+  "sourceSha256": {
+    "machinekit/examples/sheet-router/SheetRouterVacuum.hx": "668e4f062fa698b203b63c5f8898ae3bfb8055b459bd5d77e0a0483d2ee3b748",
+    "machinekit/examples/sheet-router/SheetRouterVacuumChecks.hx": "b72075a7d83fca034a327635ed50c47448f3eaa327e7040e3677f46efe26c059",
+    "stockkit/haxe/stockkit/StockComponents.hx": "5ee4aba1fdcf5893b85c914167d37998442c5f03c1bf190de2e405fc33e40764",
+    "stockkit/tests/components/src/StockComponentsChecks.hx": "c85e5357ab54d7ffedbea6163f430e399d0e2175fe3ba27c101b1b73f5a01b6b",
+    "machinekit/haxe/src/machinekit/routing/Spoilboard.hx": "4037659f60cf2c350cea0c3a79458483f0f05b479344682259653c0b00b63893",
+    "machinekit/haxe/src/machinekit/routing/VacuumBlower.hx": "d67d93a604ab2017eaaa4e5b25c424dfd285fa52ed64a04dcaafa62d13f286db",
+    "machinekit/haxe/src/machinekit/routing/VacuumTable.hx": "4679e308a370f995ab9d0d947218fd9c1aeebee77bd6bf7223e67cbac683b7f7",
+    "machinekit/examples/sheet-router/SheetRouter.hx": "7c8eb8a1bd84ea3ce290f756db9598f2527011408f19356973189e1727a5e282",
+    "machinekit/examples/sheet-router/SheetRouterSpec.hx": "e9bd8a9ea938fc77e67469086a3689412777b749ef6d6454901bb324bb578ca3"
+  }
+}

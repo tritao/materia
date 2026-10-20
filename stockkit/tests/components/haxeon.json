@@ -1,0 +1,9 @@
+{
+  "version":1,
+  "package":{"name":"stock-components-tests"},
+  "entry":"StockComponentsChecks",
+  "sourceRoots":["src"],
+  "dependencies":{"stockkit":{"path":"../.."}},
+  "target":"host",
+  "outputDir":"../../../build/sheet-router-work/sr8/core"
+}

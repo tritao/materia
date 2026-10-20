@@ -274,3 +274,24 @@ is below the Y preload swept envelope; its outboard post still supports the
 same chain end. Independent stopped sensing and local pressure/clamp feedback
 must be selected before hardware acceptance. Nominal simulation delays are not
 hardware stopping-time ratings.
+
+## Vacuum planning basis (SR8, 2026-10-20)
+
+Keep six zones (2 x 3), independent 50 mm valves, the service-access routing and
+nominal 75 mm trunk. The model reads the CAD spoilboard thickness (25 mm) and
+permeability (1e-6 mm² = 1e-12 m²); 18 mm is a hydraulic sensitivity only.
+The recipe's 300 m³/h / 25 kPa / 5.5 kW blower remains assumed. A linear curve,
+Darcy leakage, declared hose/filter losses, friction 0.5, effective area 0.8 and
+factor of two are planning inputs, not supplier ratings or measured hold.
+
+At the new-board baseline the 50 mm freed part has 17.06/15.80 N lateral hold
+on the two beds against 600 N required. The 18 mm sensitivity reduces that to
+15.19/13.79 N. Retain small parts with onion skin/tabs or a separately qualified
+fixture; their connection strength and actual final-pass force belong to SR13.
+Measure the installed pressure/flow and material friction before cutting
+acceptance. See [the native report and zoning](vacuum/README.md).
+
+Do not treat hydraulic board-thickness sensitivity as approval to skim the
+machine datum: the 120 mm reference tool only reaches the new board plane at
+full Z. Actual tool/holder gauge lengths, sacrificial overcut and surfaced-board
+reach remain open for SR13; the structure stays frozen while these are resolved.

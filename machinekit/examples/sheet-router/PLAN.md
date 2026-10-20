@@ -924,6 +924,24 @@ flow/cushions remain explicit release requirements.
   - change time from the axis limits within 10 % of the run.
 
 **SR8. Vacuum hold-down and freed parts (SR-D6).**
+
+[Vacuum packet](vacuum/README.md): core StockKit component detection and the
+six-zone hydraulic/holding screen pass 16 core and 30 router assertions.
+Native through-cuts free the 50 mm part and report slipping at line 43; 0.5 mm
+onion skin and a full-height tab retain connectivity but remain flagged for web
+strength qualification. Zone closure, friction and permeability sensitivities
+are checked. Defaults follow the 25 mm CAD spoilboard; 18 mm is a separate
+hydraulic sensitivity. The blower curve and material/friction parameters remain
+assumptions to replace with measured values. SR11 consumes the checkpoint report;
+SR13 supplies actual last-pass forces and tab/skin strength.
+
+Cutting reach is still an acceptance gate: the present 120 mm reference tool
+reaches the new board plane at full Z, with no declared sacrificial overcut or
+surfacing reserve. Resolve actual holder/tool gauge lengths and the resurfaced
+work datum in SR13. The StockKit through-cut fixture proves separation and
+holding detection, not below-board axis reach. This records an open requirement
+without changing the frozen frame.
+
 - Vacuum table with zones, a pressure model with bleed through open kerf length, and zone
   selection from the sheet size.
 - StockKit gains connected-component detection on the sheet stock (pieces no longer joined to
@@ -1174,7 +1192,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR6-C | planned: measured modes/damping and shaper tuning before cutting acceptance | SR13/SR16 gate |
 | SR6 | reaction qualification passes 132/132 weld groups per bed at 100 million reversals; geometry/service checks pass and metrology method is documented; fabrication release blocked on the named WPS, material/relief, epoxy and whole-unit machining acceptances | [fabrication packet](fabrication/README.md) |
 | SR7 | native checks pass: 42 policy assertions, 83 static poses/bed, four complete exchanges and focused SR-D3 recheck; app/SR16 dispatch and purchased hardware acceptance remain gated | [ATC packet](atc/README.md) |
-| SR8 | planned | |
+| SR8 | planning screen passes: 16 core + 30 router assertions; measured vacuum/friction, actual forces/web strength and physical overcut datum remain cutting-acceptance gates | [vacuum packet](vacuum/README.md) |
 | SR9 | planned | |
 | SR10 | planned | |
 | SR11 | planned | |
