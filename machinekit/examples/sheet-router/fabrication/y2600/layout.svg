@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1130" viewBox="0 0 1400 1130">
+<rect width="1400" height="1130" fill="white"/>
+<style>text{font:14px sans-serif;fill:#17202a}.note{font-size:12px}</style>
+<text x="30" y="28">SR6 Y2600 — frame centreline layout / jig locations (mm), draft</text>
+<text x="30" y="50" class="note">Not a weld-detail or cutting drawing. See CSV dimensions, seam findings and fabrication procedure.</text>
+<text x="40" y="85">TOP X/Y</text>
+<path d="M65.00,663.43 L65.00,141.57" stroke="#1d596b" stroke-width="3" fill="none"><title>lower0: RECT-100x100x6, stock 3971.25 mm</title></path>
+<path d="M65.00,663.43 L65.00,663.43" stroke="#1d596b" stroke-width="3" fill="none"><title>post00: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M65.00,402.50 L65.00,402.50" stroke="#1d596b" stroke-width="3" fill="none"><title>post01: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M65.00,141.57 L65.00,141.57" stroke="#1d596b" stroke-width="3" fill="none"><title>post02: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M65.00,344.86 L65.00,344.86" stroke="#1d596b" stroke-width="3" fill="none"><title>post03: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M387.02,663.43 L387.02,141.57" stroke="#1d596b" stroke-width="3" fill="none"><title>lower1: RECT-100x100x6, stock 3971.25 mm</title></path>
+<path d="M387.02,663.43 L387.02,663.43" stroke="#1d596b" stroke-width="3" fill="none"><title>post10: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M387.02,402.50 L387.02,402.50" stroke="#1d596b" stroke-width="3" fill="none"><title>post11: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M387.02,141.57 L387.02,141.57" stroke="#1d596b" stroke-width="3" fill="none"><title>post12: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M387.02,344.86 L387.02,344.86" stroke="#1d596b" stroke-width="3" fill="none"><title>post13: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M65.00,584.75 L387.02,584.75" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross0: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M65.00,527.80 L387.02,527.80" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross1: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M65.00,470.86 L387.02,470.86" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross2: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M65.00,413.92 L387.02,413.92" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross3: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M65.00,356.97 L387.02,356.97" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross4: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M65.00,300.03 L387.02,300.03" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross5: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M65.00,243.08 L387.02,243.08" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross6: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M65.00,208.92 L387.02,208.92" stroke="#1d596b" stroke-width="3" fill="none"><title>rackCross: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M65.00,663.43 L65.00,141.57" stroke="#1d596b" stroke-width="3" fill="none"><title>tableSide0: RECT-100x80x4, stock 3971.25 mm</title></path>
+<path d="M387.02,663.43 L387.02,141.57" stroke="#1d596b" stroke-width="3" fill="none"><title>tableSide1: RECT-100x80x4, stock 3971.25 mm</title></path>
+<path d="M65.00,663.43 L65.00,402.50" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace00a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M65.00,402.50 L65.00,663.43" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace00b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M65.00,402.50 L65.00,141.57" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace01a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M65.00,141.57 L65.00,402.50" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace01b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M387.02,663.43 L387.02,402.50" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace10a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M387.02,402.50 L387.02,663.43" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace10b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M387.02,402.50 L387.02,141.57" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace11a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M387.02,141.57 L387.02,402.50" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace11b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M65.00,663.43 L387.02,663.43" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace0a: RECT-80x80x4, stock 2463.22 mm</title></path>
+<path d="M387.02,663.43 L65.00,663.43" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace0b: RECT-80x80x4, stock 2463.22 mm</title></path>
+<path d="M65.00,141.57 L387.02,141.57" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace1a: RECT-80x80x4, stock 2505.06 mm</title></path>
+<path d="M387.02,141.57 L65.00,141.57" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace1b: RECT-80x80x4, stock 2505.06 mm</title></path>
+<path d="M65.00,663.43 L387.02,402.50" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace0a: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M387.02,663.43 L65.00,402.50" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace0b: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M65.00,402.50 L387.02,141.57" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace1a: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M387.02,402.50 L65.00,141.57" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace1b: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M71.57,663.43 L380.45,663.43" stroke="#1d596b" stroke-width="3" fill="none"><title>frameFront: RECT-100x100x6, stock 2350.50 mm</title></path>
+<path d="M71.57,141.57 L380.45,141.57" stroke="#1d596b" stroke-width="3" fill="none"><title>frameBack: RECT-100x100x6, stock 2350.50 mm</title></path>
+<path d="M65.00,670.00 L65.00,135.00" stroke="#1d596b" stroke-width="3" fill="none"><title>frameLeft: RECT-100x100x6, stock 4071.25 mm</title></path>
+<path d="M387.02,670.00 L387.02,135.00" stroke="#1d596b" stroke-width="3" fill="none"><title>frameRight: RECT-100x100x6, stock 4071.25 mm</title></path>
+<circle cx="65.00" cy="663.43" r="5" fill="#b83d35"/><text x="73.00" y="657.43" class="note">foot00</text>
+<circle cx="65.00" cy="402.50" r="5" fill="#b83d35"/><text x="73.00" y="396.50" class="note">foot01</text>
+<circle cx="65.00" cy="141.57" r="5" fill="#b83d35"/><text x="73.00" y="135.57" class="note">foot02</text>
+<circle cx="65.00" cy="344.86" r="5" fill="#b83d35"/><text x="73.00" y="338.86" class="note">foot03</text>
+<circle cx="387.02" cy="663.43" r="5" fill="#b83d35"/><text x="395.02" y="657.43" class="note">foot10</text>
+<circle cx="387.02" cy="402.50" r="5" fill="#b83d35"/><text x="395.02" y="396.50" class="note">foot11</text>
+<circle cx="387.02" cy="141.57" r="5" fill="#b83d35"/><text x="395.02" y="135.57" class="note">foot12</text>
+<circle cx="387.02" cy="344.86" r="5" fill="#b83d35"/><text x="395.02" y="338.86" class="note">foot13</text>
+<text x="730" y="85">SIDE Y/Z</text>
+<path d="M761.88,489.00 L1308.12,489.00" stroke="#1d596b" stroke-width="3" fill="none"><title>lower0: RECT-100x100x6, stock 3971.25 mm</title></path>
+<path d="M761.88,500.00 L761.88,417.47" stroke="#1d596b" stroke-width="3" fill="none"><title>post00: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M1035.00,500.00 L1035.00,417.47" stroke="#1d596b" stroke-width="3" fill="none"><title>post01: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M1308.12,500.00 L1308.12,417.47" stroke="#1d596b" stroke-width="3" fill="none"><title>post02: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M1095.33,500.00 L1095.33,417.47" stroke="#1d596b" stroke-width="3" fill="none"><title>post03: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M761.88,489.00 L1308.12,489.00" stroke="#1d596b" stroke-width="3" fill="none"><title>lower1: RECT-100x100x6, stock 3971.25 mm</title></path>
+<path d="M761.88,500.00 L761.88,417.47" stroke="#1d596b" stroke-width="3" fill="none"><title>post10: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M1035.00,500.00 L1035.00,417.47" stroke="#1d596b" stroke-width="3" fill="none"><title>post11: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M1308.12,500.00 L1308.12,417.47" stroke="#1d596b" stroke-width="3" fill="none"><title>post12: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M1095.33,500.00 L1095.33,417.47" stroke="#1d596b" stroke-width="3" fill="none"><title>post13: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M844.24,445.08 L844.24,445.08" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross0: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M903.84,445.08 L903.84,445.08" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross1: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M963.45,445.08 L963.45,445.08" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross2: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M1023.05,445.08 L1023.05,445.08" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross3: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M1082.66,445.08 L1082.66,445.08" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross4: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M1142.26,445.08 L1142.26,445.08" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross5: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M1201.87,445.08 L1201.87,445.08" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross6: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M1237.63,445.08 L1237.63,445.08" stroke="#1d596b" stroke-width="3" fill="none"><title>rackCross: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M761.88,445.08 L1308.12,445.08" stroke="#1d596b" stroke-width="3" fill="none"><title>tableSide0: RECT-100x80x4, stock 3971.25 mm</title></path>
+<path d="M761.88,445.08 L1308.12,445.08" stroke="#1d596b" stroke-width="3" fill="none"><title>tableSide1: RECT-100x80x4, stock 3971.25 mm</title></path>
+<path d="M761.88,489.00 L1035.00,417.47" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace00a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M1035.00,489.00 L761.88,417.47" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace00b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M1035.00,489.00 L1308.12,417.47" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace01a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M1308.12,489.00 L1035.00,417.47" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace01b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M761.88,489.00 L1035.00,417.47" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace10a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M1035.00,489.00 L761.88,417.47" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace10b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M1035.00,489.00 L1308.12,417.47" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace11a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M1308.12,489.00 L1035.00,417.47" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace11b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M761.88,489.00 L761.88,454.61" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace0a: RECT-80x80x4, stock 2463.22 mm</title></path>
+<path d="M761.88,489.00 L761.88,454.61" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace0b: RECT-80x80x4, stock 2463.22 mm</title></path>
+<path d="M1308.12,489.00 L1308.12,417.47" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace1a: RECT-80x80x4, stock 2505.06 mm</title></path>
+<path d="M1308.12,489.00 L1308.12,417.47" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace1b: RECT-80x80x4, stock 2505.06 mm</title></path>
+<path d="M761.88,489.00 L1035.00,489.00" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace0a: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M761.88,489.00 L1035.00,489.00" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace0b: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M1035.00,489.00 L1308.12,489.00" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace1a: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M1035.00,489.00 L1308.12,489.00" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace1b: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M761.88,410.59 L761.88,410.59" stroke="#1d596b" stroke-width="3" fill="none"><title>frameFront: RECT-100x100x6, stock 2350.50 mm</title></path>
+<path d="M1308.12,410.59 L1308.12,410.59" stroke="#1d596b" stroke-width="3" fill="none"><title>frameBack: RECT-100x100x6, stock 2350.50 mm</title></path>
+<path d="M755.00,410.59 L1315.00,410.59" stroke="#1d596b" stroke-width="3" fill="none"><title>frameLeft: RECT-100x100x6, stock 4071.25 mm</title></path>
+<path d="M755.00,410.59 L1315.00,410.59" stroke="#1d596b" stroke-width="3" fill="none"><title>frameRight: RECT-100x100x6, stock 4071.25 mm</title></path>
+<text x="730" y="625">END X/Z (front and rear projected)</text>
+<path d="M755.00,981.72 L755.00,981.72" stroke="#1d596b" stroke-width="3" fill="none"><title>lower0: RECT-100x100x6, stock 3971.25 mm</title></path>
+<path d="M755.00,1000.00 L755.00,862.89" stroke="#1d596b" stroke-width="3" fill="none"><title>post00: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M755.00,1000.00 L755.00,862.89" stroke="#1d596b" stroke-width="3" fill="none"><title>post01: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M755.00,1000.00 L755.00,862.89" stroke="#1d596b" stroke-width="3" fill="none"><title>post02: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M755.00,1000.00 L755.00,862.89" stroke="#1d596b" stroke-width="3" fill="none"><title>post03: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M1315.00,981.72 L1315.00,981.72" stroke="#1d596b" stroke-width="3" fill="none"><title>lower1: RECT-100x100x6, stock 3971.25 mm</title></path>
+<path d="M1315.00,1000.00 L1315.00,862.89" stroke="#1d596b" stroke-width="3" fill="none"><title>post10: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M1315.00,1000.00 L1315.00,862.89" stroke="#1d596b" stroke-width="3" fill="none"><title>post11: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M1315.00,1000.00 L1315.00,862.89" stroke="#1d596b" stroke-width="3" fill="none"><title>post12: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M1315.00,1000.00 L1315.00,862.89" stroke="#1d596b" stroke-width="3" fill="none"><title>post13: RECT-100x100x6, stock 600.00 mm</title></path>
+<path d="M755.00,908.76 L1315.00,908.76" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross0: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M755.00,908.76 L1315.00,908.76" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross1: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M755.00,908.76 L1315.00,908.76" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross2: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M755.00,908.76 L1315.00,908.76" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross3: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M755.00,908.76 L1315.00,908.76" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross4: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M755.00,908.76 L1315.00,908.76" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross5: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M755.00,908.76 L1315.00,908.76" stroke="#1d596b" stroke-width="3" fill="none"><title>tableCross6: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M755.00,908.76 L1315.00,908.76" stroke="#1d596b" stroke-width="3" fill="none"><title>rackCross: RECT-100x80x4, stock 2450.50 mm</title></path>
+<path d="M755.00,908.76 L755.00,908.76" stroke="#1d596b" stroke-width="3" fill="none"><title>tableSide0: RECT-100x80x4, stock 3971.25 mm</title></path>
+<path d="M1315.00,908.76 L1315.00,908.76" stroke="#1d596b" stroke-width="3" fill="none"><title>tableSide1: RECT-100x80x4, stock 3971.25 mm</title></path>
+<path d="M755.00,981.72 L755.00,862.89" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace00a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M755.00,981.72 L755.00,862.89" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace00b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M755.00,981.72 L755.00,862.89" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace01a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M755.00,981.72 L755.00,862.89" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace01b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M1315.00,981.72 L1315.00,862.89" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace10a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M1315.00,981.72 L1315.00,862.89" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace10b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M1315.00,981.72 L1315.00,862.89" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace11a: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M1315.00,981.72 L1315.00,862.89" stroke="#8899a6" stroke-width="3" fill="none"><title>sideBrace11b: RECT-80x80x4, stock 2052.59 mm</title></path>
+<path d="M755.00,981.72 L1315.00,924.59" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace0a: RECT-80x80x4, stock 2463.22 mm</title></path>
+<path d="M1315.00,981.72 L755.00,924.59" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace0b: RECT-80x80x4, stock 2463.22 mm</title></path>
+<path d="M755.00,981.72 L1315.00,862.89" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace1a: RECT-80x80x4, stock 2505.06 mm</title></path>
+<path d="M1315.00,981.72 L755.00,862.89" stroke="#8899a6" stroke-width="3" fill="none"><title>endBrace1b: RECT-80x80x4, stock 2505.06 mm</title></path>
+<path d="M755.00,981.72 L1315.00,981.72" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace0a: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M1315.00,981.72 L755.00,981.72" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace0b: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M755.00,981.72 L1315.00,981.72" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace1a: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M1315.00,981.72 L755.00,981.72" stroke="#8899a6" stroke-width="3" fill="none"><title>planBrace1b: RECT-80x80x4, stock 3153.99 mm</title></path>
+<path d="M766.43,851.46 L1303.57,851.46" stroke="#1d596b" stroke-width="3" fill="none"><title>frameFront: RECT-100x100x6, stock 2350.50 mm</title></path>
+<path d="M766.43,851.46 L1303.57,851.46" stroke="#1d596b" stroke-width="3" fill="none"><title>frameBack: RECT-100x100x6, stock 2350.50 mm</title></path>
+<path d="M755.00,851.46 L755.00,851.46" stroke="#1d596b" stroke-width="3" fill="none"><title>frameLeft: RECT-100x100x6, stock 4071.25 mm</title></path>
+<path d="M1315.00,851.46 L1315.00,851.46" stroke="#1d596b" stroke-width="3" fill="none"><title>frameRight: RECT-100x100x6, stock 4071.25 mm</title></path>
+</svg>

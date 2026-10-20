@@ -95,6 +95,7 @@ class SheetRouterFemExport {
         File.saveContent(path,haxe.Json.stringify(result,null,"  ")+"\n");return result;
     }
     public static function main():Void {
+        if(Sys.args().indexOf("--fabrication")>=0) {SheetRouterFabrication.main();return;}
         var root=Sys.getEnv("SHEET_ROUTER_FEM_OUTPUT");if(root==null)root="build/sheet-router-sr6";
         if(!FileSystem.exists(root))FileSystem.createDirectory(root);
         for(length in [2600.0,3150.0]) {

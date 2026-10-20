@@ -1,0 +1,1558 @@
+{
+  "cutList": [
+    {
+      "description": "Rectangular tube 100x100x6",
+      "designation": "RECT-100x100x6",
+      "quantity": 10,
+      "totalLength": 13842.5
+    },
+    {
+      "description": "Rectangular tube 100x80x4",
+      "designation": "RECT-100x80x4",
+      "quantity": 10,
+      "totalLength": 28646.5
+    },
+    {
+      "description": "Rectangular tube 80x80x4",
+      "designation": "RECT-80x80x4",
+      "quantity": 16,
+      "totalLength": 41829.7455794757
+    }
+  ],
+  "declaredWelds": [
+    {
+      "a": "lower0",
+      "b": "post00",
+      "legSize": 6
+    },
+    {
+      "a": "lower0",
+      "b": "post01",
+      "legSize": 6
+    },
+    {
+      "a": "lower0",
+      "b": "post02",
+      "legSize": 6
+    },
+    {
+      "a": "lower0",
+      "b": "post03",
+      "legSize": 6
+    },
+    {
+      "a": "lower1",
+      "b": "post10",
+      "legSize": 6
+    },
+    {
+      "a": "lower1",
+      "b": "post11",
+      "legSize": 6
+    },
+    {
+      "a": "lower1",
+      "b": "post12",
+      "legSize": 6
+    },
+    {
+      "a": "lower1",
+      "b": "post13",
+      "legSize": 6
+    },
+    {
+      "a": "tableSide0",
+      "b": "tableCross0",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "tableCross0",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "tableCross1",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "tableCross1",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "tableCross2",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "tableCross2",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "tableCross3",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "tableCross3",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "tableCross4",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "tableCross4",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "tableCross5",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "tableCross5",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "tableCross6",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "tableCross6",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "rackCross",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "post00",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "post01",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "post02",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide0",
+      "b": "post03",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "rackCross",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "post10",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "post11",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "post12",
+      "legSize": 5
+    },
+    {
+      "a": "tableSide1",
+      "b": "post13",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace00a",
+      "b": "sideBrace00b",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace00a",
+      "b": "lower0",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace00a",
+      "b": "post00",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace00a",
+      "b": "post01",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace00b",
+      "b": "lower0",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace00b",
+      "b": "post00",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace00b",
+      "b": "post01",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace01a",
+      "b": "sideBrace01b",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace01a",
+      "b": "lower0",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace01a",
+      "b": "post01",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace01a",
+      "b": "post02",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace01b",
+      "b": "lower0",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace01b",
+      "b": "post01",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace01b",
+      "b": "post02",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace10a",
+      "b": "sideBrace10b",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace10a",
+      "b": "lower1",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace10a",
+      "b": "post10",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace10a",
+      "b": "post11",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace10b",
+      "b": "lower1",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace10b",
+      "b": "post10",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace10b",
+      "b": "post11",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace11a",
+      "b": "sideBrace11b",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace11a",
+      "b": "lower1",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace11a",
+      "b": "post11",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace11a",
+      "b": "post12",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace11b",
+      "b": "lower1",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace11b",
+      "b": "post11",
+      "legSize": 5
+    },
+    {
+      "a": "sideBrace11b",
+      "b": "post12",
+      "legSize": 5
+    },
+    {
+      "a": "endBrace0a",
+      "b": "endBrace0b",
+      "legSize": 5
+    },
+    {
+      "a": "endBrace0a",
+      "b": "post00",
+      "legSize": 5
+    },
+    {
+      "a": "endBrace0a",
+      "b": "post10",
+      "legSize": 5
+    },
+    {
+      "a": "endBrace0b",
+      "b": "post00",
+      "legSize": 5
+    },
+    {
+      "a": "endBrace0b",
+      "b": "post10",
+      "legSize": 5
+    },
+    {
+      "a": "endBrace1a",
+      "b": "endBrace1b",
+      "legSize": 5
+    },
+    {
+      "a": "endBrace1a",
+      "b": "post02",
+      "legSize": 5
+    },
+    {
+      "a": "endBrace1a",
+      "b": "post12",
+      "legSize": 5
+    },
+    {
+      "a": "endBrace1b",
+      "b": "post02",
+      "legSize": 5
+    },
+    {
+      "a": "endBrace1b",
+      "b": "post12",
+      "legSize": 5
+    },
+    {
+      "a": "planBrace0a",
+      "b": "planBrace0b",
+      "legSize": 5
+    },
+    {
+      "a": "planBrace0a",
+      "b": "lower0",
+      "legSize": 5
+    },
+    {
+      "a": "planBrace0a",
+      "b": "lower1",
+      "legSize": 5
+    },
+    {
+      "a": "planBrace0b",
+      "b": "lower0",
+      "legSize": 5
+    },
+    {
+      "a": "planBrace0b",
+      "b": "lower1",
+      "legSize": 5
+    },
+    {
+      "a": "planBrace1a",
+      "b": "planBrace1b",
+      "legSize": 5
+    },
+    {
+      "a": "planBrace1a",
+      "b": "lower0",
+      "legSize": 5
+    },
+    {
+      "a": "planBrace1a",
+      "b": "lower1",
+      "legSize": 5
+    },
+    {
+      "a": "planBrace1b",
+      "b": "lower0",
+      "legSize": 5
+    },
+    {
+      "a": "planBrace1b",
+      "b": "lower1",
+      "legSize": 5
+    }
+  ],
+  "jigFootDatumsMm": [
+    {
+      "id": "foot00",
+      "x": -425.25,
+      "y": -849.25,
+      "z": 0
+    },
+    {
+      "id": "foot01",
+      "x": -425.25,
+      "y": 1411.375,
+      "z": 0
+    },
+    {
+      "id": "foot02",
+      "x": -425.25,
+      "y": 3672,
+      "z": 0
+    },
+    {
+      "id": "foot03",
+      "x": -425.25,
+      "y": 1575,
+      "z": 0
+    },
+    {
+      "id": "foot10",
+      "x": 2025.25,
+      "y": -849.25,
+      "z": 0
+    },
+    {
+      "id": "foot11",
+      "x": 2025.25,
+      "y": 1411.375,
+      "z": 0
+    },
+    {
+      "id": "foot12",
+      "x": 2025.25,
+      "y": 3672,
+      "z": 0
+    },
+    {
+      "id": "foot13",
+      "x": 2025.25,
+      "y": 1575,
+      "z": 0
+    }
+  ],
+  "members": [
+    {
+      "centrelineLengthMm": 4521.25,
+      "endMm": [
+        -425.25,
+        3672,
+        180
+      ],
+      "id": "lower0",
+      "profile": "RECT-100x100x6",
+      "startMm": [
+        -425.25,
+        -849.25,
+        180
+      ],
+      "stockLengthMm": 4521.25
+    },
+    {
+      "centrelineLengthMm": 600,
+      "endMm": [
+        -425.25,
+        -849.25,
+        700
+      ],
+      "id": "post00",
+      "profile": "RECT-100x100x6",
+      "startMm": [
+        -425.25,
+        -849.25,
+        100
+      ],
+      "stockLengthMm": 600
+    },
+    {
+      "centrelineLengthMm": 600,
+      "endMm": [
+        -425.25,
+        1411.375,
+        700
+      ],
+      "id": "post01",
+      "profile": "RECT-100x100x6",
+      "startMm": [
+        -425.25,
+        1411.375,
+        100
+      ],
+      "stockLengthMm": 600
+    },
+    {
+      "centrelineLengthMm": 600,
+      "endMm": [
+        -425.25,
+        3672,
+        700
+      ],
+      "id": "post02",
+      "profile": "RECT-100x100x6",
+      "startMm": [
+        -425.25,
+        3672,
+        100
+      ],
+      "stockLengthMm": 600
+    },
+    {
+      "centrelineLengthMm": 600,
+      "endMm": [
+        -425.25,
+        1575,
+        700
+      ],
+      "id": "post03",
+      "profile": "RECT-100x100x6",
+      "startMm": [
+        -425.25,
+        1575,
+        100
+      ],
+      "stockLengthMm": 600
+    },
+    {
+      "centrelineLengthMm": 4521.25,
+      "endMm": [
+        2025.25,
+        3672,
+        180
+      ],
+      "id": "lower1",
+      "profile": "RECT-100x100x6",
+      "startMm": [
+        2025.25,
+        -849.25,
+        180
+      ],
+      "stockLengthMm": 4521.25
+    },
+    {
+      "centrelineLengthMm": 600,
+      "endMm": [
+        2025.25,
+        -849.25,
+        700
+      ],
+      "id": "post10",
+      "profile": "RECT-100x100x6",
+      "startMm": [
+        2025.25,
+        -849.25,
+        100
+      ],
+      "stockLengthMm": 600
+    },
+    {
+      "centrelineLengthMm": 600,
+      "endMm": [
+        2025.25,
+        1411.375,
+        700
+      ],
+      "id": "post11",
+      "profile": "RECT-100x100x6",
+      "startMm": [
+        2025.25,
+        1411.375,
+        100
+      ],
+      "stockLengthMm": 600
+    },
+    {
+      "centrelineLengthMm": 600,
+      "endMm": [
+        2025.25,
+        3672,
+        700
+      ],
+      "id": "post12",
+      "profile": "RECT-100x100x6",
+      "startMm": [
+        2025.25,
+        3672,
+        100
+      ],
+      "stockLengthMm": 600
+    },
+    {
+      "centrelineLengthMm": 600,
+      "endMm": [
+        2025.25,
+        1575,
+        700
+      ],
+      "id": "post13",
+      "profile": "RECT-100x100x6",
+      "startMm": [
+        2025.25,
+        1575,
+        100
+      ],
+      "stockLengthMm": 600
+    },
+    {
+      "centrelineLengthMm": 2450.5,
+      "endMm": [
+        2025.25,
+        -250.5,
+        499.25
+      ],
+      "id": "tableCross0",
+      "profile": "RECT-100x80x4",
+      "startMm": [
+        -425.25,
+        -250.5,
+        499.25
+      ],
+      "stockLengthMm": 2450.5
+    },
+    {
+      "centrelineLengthMm": 2450.5,
+      "endMm": [
+        2025.25,
+        274.5,
+        499.25
+      ],
+      "id": "tableCross1",
+      "profile": "RECT-100x80x4",
+      "startMm": [
+        -425.25,
+        274.5,
+        499.25
+      ],
+      "stockLengthMm": 2450.5
+    },
+    {
+      "centrelineLengthMm": 2450.5,
+      "endMm": [
+        2025.25,
+        799.5,
+        499.25
+      ],
+      "id": "tableCross2",
+      "profile": "RECT-100x80x4",
+      "startMm": [
+        -425.25,
+        799.5,
+        499.25
+      ],
+      "stockLengthMm": 2450.5
+    },
+    {
+      "centrelineLengthMm": 2450.5,
+      "endMm": [
+        2025.25,
+        1324.5,
+        499.25
+      ],
+      "id": "tableCross3",
+      "profile": "RECT-100x80x4",
+      "startMm": [
+        -425.25,
+        1324.5,
+        499.25
+      ],
+      "stockLengthMm": 2450.5
+    },
+    {
+      "centrelineLengthMm": 2450.5,
+      "endMm": [
+        2025.25,
+        1849.5,
+        499.25
+      ],
+      "id": "tableCross4",
+      "profile": "RECT-100x80x4",
+      "startMm": [
+        -425.25,
+        1849.5,
+        499.25
+      ],
+      "stockLengthMm": 2450.5
+    },
+    {
+      "centrelineLengthMm": 2450.5,
+      "endMm": [
+        2025.25,
+        2374.5,
+        499.25
+      ],
+      "id": "tableCross5",
+      "profile": "RECT-100x80x4",
+      "startMm": [
+        -425.25,
+        2374.5,
+        499.25
+      ],
+      "stockLengthMm": 2450.5
+    },
+    {
+      "centrelineLengthMm": 2450.5,
+      "endMm": [
+        2025.25,
+        2899.5,
+        499.25
+      ],
+      "id": "tableCross6",
+      "profile": "RECT-100x80x4",
+      "startMm": [
+        -425.25,
+        2899.5,
+        499.25
+      ],
+      "stockLengthMm": 2450.5
+    },
+    {
+      "centrelineLengthMm": 2450.5,
+      "endMm": [
+        2025.25,
+        3159.5,
+        499.25
+      ],
+      "id": "rackCross",
+      "profile": "RECT-100x80x4",
+      "startMm": [
+        -425.25,
+        3159.5,
+        499.25
+      ],
+      "stockLengthMm": 2450.5
+    },
+    {
+      "centrelineLengthMm": 4521.25,
+      "endMm": [
+        -425.25,
+        3672,
+        499.25
+      ],
+      "id": "tableSide0",
+      "profile": "RECT-100x80x4",
+      "startMm": [
+        -425.25,
+        -849.25,
+        499.25
+      ],
+      "stockLengthMm": 4521.25
+    },
+    {
+      "centrelineLengthMm": 4521.25,
+      "endMm": [
+        2025.25,
+        3672,
+        499.25
+      ],
+      "id": "tableSide1",
+      "profile": "RECT-100x80x4",
+      "startMm": [
+        2025.25,
+        -849.25,
+        499.25
+      ],
+      "stockLengthMm": 4521.25
+    },
+    {
+      "centrelineLengthMm": 2319.6606197081933,
+      "endMm": [
+        -425.25,
+        1411.375,
+        700
+      ],
+      "id": "sideBrace00a",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        -425.25,
+        -849.25,
+        180
+      ],
+      "stockLengthMm": 2319.6606197081933
+    },
+    {
+      "centrelineLengthMm": 2319.6606197081933,
+      "endMm": [
+        -425.25,
+        -849.25,
+        700
+      ],
+      "id": "sideBrace00b",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        -425.25,
+        1411.375,
+        180
+      ],
+      "stockLengthMm": 2319.6606197081933
+    },
+    {
+      "centrelineLengthMm": 2319.6606197081933,
+      "endMm": [
+        -425.25,
+        3672,
+        700
+      ],
+      "id": "sideBrace01a",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        -425.25,
+        1411.375,
+        180
+      ],
+      "stockLengthMm": 2319.6606197081933
+    },
+    {
+      "centrelineLengthMm": 2319.6606197081933,
+      "endMm": [
+        -425.25,
+        1411.375,
+        700
+      ],
+      "id": "sideBrace01b",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        -425.25,
+        3672,
+        180
+      ],
+      "stockLengthMm": 2319.6606197081933
+    },
+    {
+      "centrelineLengthMm": 2319.6606197081933,
+      "endMm": [
+        2025.25,
+        1411.375,
+        700
+      ],
+      "id": "sideBrace10a",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        2025.25,
+        -849.25,
+        180
+      ],
+      "stockLengthMm": 2319.6606197081933
+    },
+    {
+      "centrelineLengthMm": 2319.6606197081933,
+      "endMm": [
+        2025.25,
+        -849.25,
+        700
+      ],
+      "id": "sideBrace10b",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        2025.25,
+        1411.375,
+        180
+      ],
+      "stockLengthMm": 2319.6606197081933
+    },
+    {
+      "centrelineLengthMm": 2319.6606197081933,
+      "endMm": [
+        2025.25,
+        3672,
+        700
+      ],
+      "id": "sideBrace11a",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        2025.25,
+        1411.375,
+        180
+      ],
+      "stockLengthMm": 2319.6606197081933
+    },
+    {
+      "centrelineLengthMm": 2319.6606197081933,
+      "endMm": [
+        2025.25,
+        1411.375,
+        700
+      ],
+      "id": "sideBrace11b",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        2025.25,
+        3672,
+        180
+      ],
+      "stockLengthMm": 2319.6606197081933
+    },
+    {
+      "centrelineLengthMm": 2463.219488799161,
+      "endMm": [
+        2025.25,
+        -849.25,
+        430
+      ],
+      "id": "endBrace0a",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        -425.25,
+        -849.25,
+        180
+      ],
+      "stockLengthMm": 2463.219488799161
+    },
+    {
+      "centrelineLengthMm": 2463.219488799161,
+      "endMm": [
+        -425.25,
+        -849.25,
+        430
+      ],
+      "id": "endBrace0b",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        2025.25,
+        -849.25,
+        180
+      ],
+      "stockLengthMm": 2463.219488799161
+    },
+    {
+      "centrelineLengthMm": 2505.0649193184595,
+      "endMm": [
+        2025.25,
+        3672,
+        700
+      ],
+      "id": "endBrace1a",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        -425.25,
+        3672,
+        180
+      ],
+      "stockLengthMm": 2505.0649193184595
+    },
+    {
+      "centrelineLengthMm": 2505.0649193184595,
+      "endMm": [
+        -425.25,
+        3672,
+        700
+      ],
+      "id": "endBrace1b",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        2025.25,
+        3672,
+        180
+      ],
+      "stockLengthMm": 2505.0649193184595
+    },
+    {
+      "centrelineLengthMm": 3333.9729513937273,
+      "endMm": [
+        2025.25,
+        1411.375,
+        180
+      ],
+      "id": "planBrace0a",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        -425.25,
+        -849.25,
+        180
+      ],
+      "stockLengthMm": 3333.9729513937273
+    },
+    {
+      "centrelineLengthMm": 3333.9729513937273,
+      "endMm": [
+        -425.25,
+        1411.375,
+        180
+      ],
+      "id": "planBrace0b",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        2025.25,
+        -849.25,
+        180
+      ],
+      "stockLengthMm": 3333.9729513937273
+    },
+    {
+      "centrelineLengthMm": 3333.9729513937273,
+      "endMm": [
+        2025.25,
+        3672,
+        180
+      ],
+      "id": "planBrace1a",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        -425.25,
+        1411.375,
+        180
+      ],
+      "stockLengthMm": 3333.9729513937273
+    },
+    {
+      "centrelineLengthMm": 3333.9729513937273,
+      "endMm": [
+        -425.25,
+        3672,
+        180
+      ],
+      "id": "planBrace1b",
+      "profile": "RECT-80x80x4",
+      "startMm": [
+        2025.25,
+        1411.375,
+        180
+      ],
+      "stockLengthMm": 3333.9729513937273
+    }
+  ],
+  "railPadDatumsMm": [
+    {
+      "qw": 1,
+      "qx": 0,
+      "qy": 0,
+      "qz": 0,
+      "x": -425.25,
+      "y": 1725,
+      "z": 800
+    },
+    {
+      "qw": 1,
+      "qx": 0,
+      "qy": 0,
+      "qz": 0,
+      "x": 2025.25,
+      "y": 1725,
+      "z": 800
+    }
+  ],
+  "seamDiagnostics": [
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between lower0 and post00: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "lower0|post00"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between lower0 and post01: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "lower0|post01"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between lower0 and post02: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "lower0|post02"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between lower0 and post03: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "lower0|post03"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between lower1 and post10: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "lower1|post10"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between lower1 and post11: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "lower1|post11"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between lower1 and post12: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "lower1|post12"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between lower1 and post13: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "lower1|post13"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and tableCross0: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|tableCross0"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and tableCross0: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|tableCross0"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and tableCross1: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|tableCross1"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and tableCross1: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|tableCross1"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and tableCross2: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|tableCross2"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and tableCross2: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|tableCross2"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and tableCross3: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|tableCross3"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and tableCross3: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|tableCross3"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and tableCross4: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|tableCross4"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and tableCross4: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|tableCross4"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and tableCross5: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|tableCross5"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and tableCross5: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|tableCross5"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and tableCross6: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|tableCross6"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and tableCross6: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|tableCross6"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and rackCross: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|rackCross"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and post00: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|post00"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and post01: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|post01"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and post02: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|post02"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide0 and post03: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide0|post03"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and rackCross: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|rackCross"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and post10: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|post10"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and post11: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|post11"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and post12: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|post12"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between tableSide1 and post13: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "tableSide1|post13"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace00a and sideBrace00b: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace00a|sideBrace00b"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace00a and lower0: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace00a|lower0"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace00a and post00: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace00a|post00"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace00a and post01: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace00a|post01"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace00b and lower0: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace00b|lower0"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace00b and post00: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace00b|post00"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace00b and post01: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace00b|post01"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace01a and sideBrace01b: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace01a|sideBrace01b"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace01a and lower0: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace01a|lower0"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace01a and post01: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace01a|post01"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace01a and post02: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace01a|post02"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace01b and lower0: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace01b|lower0"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace01b and post01: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace01b|post01"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace01b and post02: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace01b|post02"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace10a and sideBrace10b: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace10a|sideBrace10b"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace10a and lower1: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace10a|lower1"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace10a and post10: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace10a|post10"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace10a and post11: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace10a|post11"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace10b and lower1: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace10b|lower1"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace10b and post10: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace10b|post10"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace10b and post11: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace10b|post11"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace11a and sideBrace11b: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace11a|sideBrace11b"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace11a and lower1: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace11a|lower1"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace11a and post11: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace11a|post11"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace11a and post12: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace11a|post12"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace11b and lower1: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace11b|lower1"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace11b and post11: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace11b|post11"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between sideBrace11b and post12: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "sideBrace11b|post12"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between endBrace0a and endBrace0b: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "endBrace0a|endBrace0b"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between endBrace0a and post00: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "endBrace0a|post00"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between endBrace0a and post10: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "endBrace0a|post10"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between endBrace0b and post00: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "endBrace0b|post00"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between endBrace0b and post10: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "endBrace0b|post10"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between endBrace1a and endBrace1b: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "endBrace1a|endBrace1b"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between endBrace1a and post02: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "endBrace1a|post02"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between endBrace1a and post12: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "endBrace1a|post12"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between endBrace1b and post02: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "endBrace1b|post02"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between endBrace1b and post12: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "endBrace1b|post12"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between planBrace0a and planBrace0b: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "planBrace0a|planBrace0b"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between planBrace0a and lower0: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "planBrace0a|lower0"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between planBrace0a and lower1: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "planBrace0a|lower1"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between planBrace0b and lower0: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "planBrace0b|lower0"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between planBrace0b and lower1: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "planBrace0b|lower1"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between planBrace1a and planBrace1b: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "planBrace1a|planBrace1b"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between planBrace1a and lower0: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "planBrace1a|lower0"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between planBrace1a and lower1: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "planBrace1a|lower1"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between planBrace1b and lower0: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "planBrace1b|lower0"
+    },
+    {
+      "code": "weld.no-seam",
+      "message": "No seam between planBrace1b and lower1: they do not meet in a corner a weld can fill",
+      "severity": "error",
+      "subject": "planBrace1b|lower1"
+    }
+  ],
+  "seams": [],
+  "source": "SheetRouter buildBase; unchanged raised-datum structure plus Y1575 legs",
+  "status": "SR6 draft; seam candidates require access, fit-up and WPS review",
+  "workY": 3150
+}
