@@ -110,10 +110,22 @@ class EnclosureRuntimeTests {
       check(has(tree,"Open door")&&has(tree,"Close door")&&has(tree,"Start cut")&&has(tree,"Reset guard"),"Operator panel contains door and cutting actions");
       editor.session.openGeneratedProject(loaded,"door-design-preview");
       check(editor.session.inspectionCameras.length==3,"Project installation retains camera presets");
+      editor.switchMode(app.EditorMode.Design);editor.resetWorkspace();
       editor.openInspectionCamera();
-      check(editor.workspace.isOpen("inspection-camera")&&editor.workspace.isOpen("perspective"),"Inspection camera docks beside the main viewport");
+      check(!editor.workspace.isOpen("inspection-camera"),"Inspection camera cannot open in Design mode");
+      editor.requestInspectionCamera();
+      check(!editor.workspace.isOpen("inspection-camera"),"Launch camera request waits for Simulate mode");
+      @:privateAccess editor.modeSnapshots.remove(app.EditorMode.Simulate.id);
+      editor.switchMode(app.EditorMode.Simulate);
+      check(editor.workspace.isOpen("inspection-camera")&&editor.workspace.isOpen("perspective"),"Entering Simulate honours a deferred inspection request");
+      check(belowPanel(editor.workspace.root,"sensors","inspection-camera")&&belowPanel(editor.workspace.root,"cnc","inspection-camera"),"Inspection defaults below the Sensors/CNC tab group in Simulate");
       var layout=editor.workspace.snapshotJson();editor.workspace.close("inspection-camera");
       check(editor.workspace.restoreJson(layout)&&editor.workspace.isOpen("inspection-camera"),"Inspection pane placement survives workspace roundtrip");
+      editor.switchMode(app.EditorMode.Design);
+      check(!editor.workspace.isOpen("inspection-camera"),"Returning to Design hides the inspection pane");
+      editor.switchMode(app.EditorMode.Simulate);
+      check(editor.workspace.isOpen("inspection-camera")&&belowPanel(editor.workspace.root,"sensors","inspection-camera"),"Returning to Simulate restores the inspection dock");
+      editor.switchMode(app.EditorMode.Design);
       var cameraHost=new haxeon.ui.host.UiHostContext(fonts,new haxeon.platform.NativeKitEvents(),function(){},function(){});
       var closeup=new app.EditorPerspectiveViewport("inspection-test",editor.session.scene,cameraHost),preset=editor.session.inspectionCameras[0];
       closeup.setInspectionCamera(preset);
@@ -136,6 +148,43 @@ class EnclosureRuntimeTests {
       var distance=camera.distance;closeup.setInspectionCamera(preset,0.5);
       @:privateAccess closeup.updateInspectionCamera();
       check(camera.distance==distance,"Optical zoom keeps the camera outside the cutter instead of moving it into the geometry");
+      var wheelRoot=editor.ui.submit(closeup,new haxeon.ui.LayoutFrame(400,300));
+      var imageNode=find(wheelRoot,"Scene perspective GPU view");if(imageNode==null)throw "Missing inspection image";
+      var lens=0.5;closeup.onInspectionZoom=value->{lens=value;};
+      function wheel(delta:Float):haxeon.ui.core.UiEvent {
+        var event=new haxeon.ui.core.UiEvent(haxeon.ui.core.UiEventKind.Scroll,imageNode.id,200,150,0,delta);
+        @:privateAccess imageNode.invokePhase(event,"bubble");return event;
+      }
+      var scroll=wheel(-120);
+      check(lens<0.5&&scroll.defaultPrevented&&scroll.propagationStopped,"Inspection wheel zooms in and consumes the routed event");
+      wheel(120);check(Math.abs(lens-0.5)<1e-9,"Opposite wheel movement restores optical zoom");
+      wheel(1000000);check(lens==8,"Wheel zoom out respects the button limit");
+      scroll=wheel(1000000);check(scroll.defaultPrevented&&scroll.propagationStopped,"Wheel is consumed even at the zoom limit");
+      wheel(-1000000);check(lens==0.2,"Wheel zoom in respects the button limit");
+      @:privateAccess closeup.updateInspectionCamera();
+      check(camera.distance==distance&&camera.yaw==angle[0]&&camera.pitch==angle[1],"Wheel zoom preserves camera position and orientation");
+      function pointer(kind:String,x:Float,y:Float,modifiers:Int=0,button:Int=2):haxeon.ui.core.UiEvent {
+        var event=new haxeon.ui.core.UiEvent(kind,imageNode.id,x,y,0,0,button,0,modifiers);
+        @:privateAccess imageNode.invokePhase(event,"bubble");return event;
+      }
+      var oldYaw=camera.yaw;
+      pointer(haxeon.ui.core.UiEventKind.PointerDown,200,150);pointer(haxeon.ui.core.UiEventKind.PointerMove,240,170);pointer(haxeon.ui.core.UiEventKind.PointerUp,240,170);
+      check(camera.yaw!=oldYaw,"Inspection uses regular viewport orbit navigation");
+      var orbited=camera.yaw;closeup.setInspectionCamera(preset,0.2);
+      @:privateAccess closeup.updateInspectionCamera();
+      check(camera.yaw==orbited,"Rebuilding the inspection pane preserves a user orbit");
+      var beforePan=[camera.targetX,camera.targetY,camera.targetZ];
+      pointer(haxeon.ui.core.UiEventKind.PointerDown,200,150,haxeon.ui.core.UiModifier.Shift);pointer(haxeon.ui.core.UiEventKind.PointerMove,240,170,haxeon.ui.core.UiModifier.Shift);pointer(haxeon.ui.core.UiEventKind.PointerUp,240,170,haxeon.ui.core.UiModifier.Shift);
+      check(camera.targetX!=beforePan[0]||camera.targetY!=beforePan[1]||camera.targetZ!=beforePan[2],"Inspection uses regular viewport pan navigation");
+      var panned=[camera.targetX,camera.targetY,camera.targetZ];
+      closeup.setSimulationState(true,[{id:sceneId,position:[0.25,0.2,1.02],rotation:[0,0,0,1]}],4);
+      @:privateAccess closeup.updateInspectionCamera();
+      check(Math.abs(camera.targetX-panned[0]-0.1)<1e-9&&camera.yaw==orbited,"Live target motion preserves the user's pan and orbit");
+      var selection=editor.session.scene.selectedId;
+      pointer(haxeon.ui.core.UiEventKind.PointerDown,200,150,0,0);pointer(haxeon.ui.core.UiEventKind.PointerMove,240,170,0,0);pointer(haxeon.ui.core.UiEventKind.PointerUp,240,170,0,0);
+      check(selection==editor.session.scene.selectedId&&beforeHistory==editor.session.document.history.undoCount,"Inspection navigation cannot select or edit the scene");
+      closeup.resetInspectionCamera();@:privateAccess closeup.updateInspectionCamera();
+      check(camera.yaw==preset.yaw&&camera.pitch==preset.pitch&&Math.abs(camera.targetX-0.25-preset.offset[0])<1e-9,"Reset restores preset framing at the current target position");
       closeup.dispose();
       var machinePanel=new app.editor.MachineControlPanel(),frame=new haxeon.ui.LayoutFrame(900,1600);
       tree=editor.ui.submit(machinePanel.build(editor),frame);
@@ -193,6 +242,13 @@ class EnclosureRuntimeTests {
     shapes[3].shape.geometry=collisionkit.CollisionGeometry.Sphere(1);
     rejected=false;try{robotkit.runtime.SimulationCollisionPacking.pack(shapes,pairs,3,1);}catch(_:Dynamic){rejected=true;}
     check(rejected,"Paired or primitive shapes cannot spill into hull storage");
+  }
+  static function belowPanel(node:haxeon.ui.docking.DockNode,upper:String,lower:String):Bool {
+    return switch(node) {
+      case Split(axis,_,first,second):
+        (axis==haxeon.ui.docking.DockSplitAxis.Vertical&&haxeon.ui.docking.DockNodeTools.contains(first,upper)&&haxeon.ui.docking.DockNodeTools.contains(second,lower))||belowPanel(first,upper,lower)||belowPanel(second,upper,lower);
+      default:false;
+    };
   }
   static function find(n:haxeon.ui.core.RenderNode,label:String):Null<haxeon.ui.core.RenderNode> {
     if(n.semantics!=null&&n.semantics.label==label)return n;

@@ -76,14 +76,39 @@ class EditorPerspectiveViewport implements View {
   final camera:PerspectiveCamera = new PerspectiveCamera();
   var inspection:Null<materia.project.SceneArtifact.SceneArtifactInspectionCamera>;
   var inspectionZoom:Float=1;
+  var inspectionTarget:Null<Array<Float>>;
+  public var onInspectionZoom:Null<Float->Void> = null;
   /** A camera-only view: no selection edits, independent visibility, steady world orientation. */
   public function setInspectionCamera(preset:materia.project.SceneArtifact.SceneArtifactInspectionCamera,zoom:Float=1):Void {
     var previous=inspection;
     if(previous==null||previous.id!=preset.id||previous.anchor!=preset.anchor||previous.yaw!=preset.yaw||previous.pitch!=preset.pitch)
-      camera.setAngle(preset.yaw,preset.pitch);
+      {camera.setAngle(preset.yaw,preset.pitch);inspectionTarget=null;}
     if(previous==null||previous.id!=preset.id||previous.anchor!=preset.anchor||previous.span!=preset.span||
       previous.offset.join(",")!=preset.offset.join(",")||previous.hiddenPrefixes.join(",")!=preset.hiddenPrefixes.join(",")||inspectionZoom!=zoom)lightingRevision++;
     inspection=preset;inspectionZoom=zoom;
+  }
+  public function resetInspectionCamera():Void {
+    var preset=inspection;if(preset==null)return;
+    camera.setAngle(preset.yaw,preset.pitch);inspectionTarget=null;orbitPivot=null;
+    host.requestFrame();
+  }
+  function inspectionLensScale():Float {
+    if(inspection==null)return 1;
+    var fov=Math.max(5,Math.min(110,PerspectiveCamera.FOV_Y*inspectionZoom));
+    return Math.tan(fov*Math.PI/360)/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360);
+  }
+  /** Lens zoom is a policy of the shared navigation handler for an inspection view. */
+  function inspectionScroll(event:UiEvent):Void {
+    var preset=inspection;
+    if(preset!=null&&Math.isFinite(event.deltaY)&&event.deltaY!=0) {
+      var next=Math.max(0.2,Math.min(8,inspectionZoom*Math.pow(2,event.deltaY*0.002)));
+      if(next!=inspectionZoom) {
+        setInspectionCamera(preset,next);
+        if(onInspectionZoom!=null)onInspectionZoom(next);
+        host.requestFrame();
+      }
+    }
+    event.preventDefault();event.stopPropagation();
   }
   function inspectionHidden(id:String):Bool {
     var preset=inspection;if(preset==null)return false;
@@ -105,7 +130,14 @@ class EditorPerspectiveViewport implements View {
     var pose=simulationActive?simulationPoseById.get(item.id):null;
     var point=app.editor.InspectionCameraModel.target(preset,pose==null?[item.x,item.y,item.z]:pose.position);
     var distance=preset.span*0.5/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360)*1.15*Math.max(1,1/aspect());
-    camera.setTarget(point[0],point[1],point[2],Math.max(0.0001,distance));
+    var previous=inspectionTarget;
+    if(previous==null)camera.setTarget(point[0],point[1],point[2],Math.max(0.0001,distance));
+    else {
+      var dx=point[0]-previous[0],dy=point[1]-previous[1],dz=point[2]-previous[2];
+      camera.setTarget(camera.targetX+dx,camera.targetY+dy,camera.targetZ+dz,camera.distance);
+      if(orbitPivot!=null){orbitPivot[0]+=dx;orbitPivot[1]+=dy;orbitPivot[2]+=dz;}
+    }
+    inspectionTarget=point;
   }
   var navigationPointer:Null<Int> = null;
   var navigationMode:Int = 0;
@@ -222,7 +254,7 @@ class EditorPerspectiveViewport implements View {
         ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" +
         renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep +
         ":collisions:" + collisionRevision);
-      if(inspection==null)installNavigation(node);
+      installNavigation(node);
       return node;
     });
   }
@@ -527,7 +559,7 @@ class EditorPerspectiveViewport implements View {
     }
   }
   public function setMissionOverlay(overlay:Null<MissionOverlay>):Void missionOverlay.set(overlay);
-  public function editingEnabled():Bool return !simulationActive;
+  public function editingEnabled():Bool return inspection==null&&!simulationActive;
 
   public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null || assemblyDrag != null ||
     matePick != null || sketchPointDragging;
@@ -667,6 +699,7 @@ class EditorPerspectiveViewport implements View {
   public function hoveredFace():Int return hoveredFaceIndex;
 
   function updateHover(localX:Float, localY:Float):Void {
+    if(inspection!=null)return;
     fitCameraClipRange();
     var ray = camera.screenRay(localX, localY, viewportWidth,
       viewportHeight);
@@ -1092,6 +1125,7 @@ class EditorPerspectiveViewport implements View {
   function aspect():Float return viewportWidth / viewportHeight;
 
   function chooseOrbitPivot(localX:Float, localY:Float):Void {
+    if(inspection!=null){orbitPivot=[camera.targetX,camera.targetY,camera.targetZ];return;}
     fitCameraClipRange();
     var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
     var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
@@ -1107,6 +1141,7 @@ class EditorPerspectiveViewport implements View {
     node.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (navigationPointer != null) return;
       if (event.button == 1) {
+        if(inspection!=null){event.preventDefault();event.stopPropagation();return;}
         clearFlyKeys();
         flyFast = (event.modifiers & UiModifier.Shift) != 0;
         navigationPointer = event.pointerId;
@@ -1128,6 +1163,7 @@ class EditorPerspectiveViewport implements View {
         event.capturePointer(); event.preventDefault(); event.stopPropagation();
         return;
       }
+      if(inspection!=null){event.preventDefault();event.stopPropagation();return;}
       updateHover(event.localX, event.localY);
       if (event.button == 0 && matePick != null) {
         pickMateFace(hoveredObjectId, hoveredFaceIndex);
@@ -1195,7 +1231,7 @@ class EditorPerspectiveViewport implements View {
         flyFast = (event.modifiers & UiModifier.Shift) != 0;
         camera.look(deltaX, deltaY);
       }
-      else if (navigationMode == 2) camera.pan(deltaX, deltaY, viewportHeight);
+      else if (navigationMode == 2) camera.pan(deltaX*inspectionLensScale(), deltaY*inspectionLensScale(), viewportHeight);
       else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY,
         viewportWidth, viewportHeight);
       else if (navigationMode == 5 && assemblyDrag != null) updateAssemblyDrag(event.localX, event.localY);
@@ -1263,6 +1299,7 @@ class EditorPerspectiveViewport implements View {
     node.on(UiEventKind.PointerUp, finish);
     node.on(UiEventKind.PointerCancel, finish);
     node.on(UiEventKind.Scroll, function(event:UiEvent) {
+      if(inspection!=null){if(navigationPointer==null)inspectionScroll(event);else{event.preventDefault();event.stopPropagation();}return;}
       if (navigationPointer != null) { event.preventDefault(); event.stopPropagation(); return; }
       var ray = camera.screenRay(event.localX, event.localY, viewportWidth, viewportHeight);
       var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),

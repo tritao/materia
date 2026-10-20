@@ -24,7 +24,7 @@ class InspectionCameraPanel {
 
   public function new() {}
   public function showDocked():Void overlay=false;
-  public function presentationKey():String return overlay+":"+generation+":"+selected+":"+zoom;
+  public function presentationKey():String return overlay+":"+generation+":"+selected+":"+zoom+":"+(viewport==null?"":viewport.presentationKey());
   public function dispose():Void {if(viewport!=null)viewport.dispose();viewport=null;}
   public function build(app:ReferenceEditorApp,inOverlay:Bool=false):View {
     if(generation!=app.session.generation) {dispose();generation=app.session.generation;selected=0;zoom=1;}
@@ -53,7 +53,7 @@ class InspectionCameraPanel {
     function action(id:String,label:String,fn:Void->Void):Void tools.push(new KeyedView(id,new Button(label,null,fn,"inspection-"+id)));
     action("zoom-in","Zoom +",()->{zoom=Math.max(0.2,zoom/1.4);app.invalidateView();});
     action("zoom-out","Zoom -",()->{zoom=Math.min(8,zoom*1.4);app.invalidateView();});
-    action("reset","Reset",()->{zoom=1;app.invalidateView();});
+    action("reset","Reset",()->{zoom=1;if(viewport!=null)viewport.resetInspectionCamera();app.invalidateView();});
     action("presentation",inOverlay?"Dock":"Picture in picture",()->{overlay=!inOverlay;
       if(overlay){app.workspace.close("inspection-camera");app.workspace.activate("perspective");app.invalidateView();}
       else app.openInspectionCamera();});
@@ -63,12 +63,13 @@ class InspectionCameraPanel {
     if(anchor==null) {rows.push(new KeyedView("missing",new Text("Camera target is unavailable in this scene.")));return new Column("inspection-missing",rows,style);}
     if(app.hostContext==null) {rows.push(new KeyedView("desktop",new Text("Inspection rendering requires the desktop GPU host.")));return new Column("inspection-desktop",rows,style);}
     if(viewport==null) {viewport=new EditorPerspectiveViewport("inspection-camera-view",app.scene,app.hostContext);viewport.setPlacementOptions(false,0,false);viewport.setSimulationOverlays(false);viewport.setCosmeticThreads(false);}
+    viewport.onInspectionZoom=next->{zoom=next;app.invalidateView();};
     viewport.setSampleCount(app.antialiasing);viewport.setLightingPreset(app.lightingPreset);
     var frame=app.framePresentation;
     viewport.setSimulationState(app.simulation.isActive(),frame==null?[]:frame.environment,frame==null?0:frame.revision);
     viewport.setInspectionCamera(preset,zoom);
     rows.push(new KeyedView("camera",new SizedBox("inspection-image",viewport,LayoutAxis.grow(),LayoutAxis.grow())));
-    rows.push(new KeyedView("caption",new Text("Steady view · follows position · visibility applies only to this camera")));
+    rows.push(new KeyedView("caption",new Text("Orbit / pan / wheel zoom · follows position · camera-only visibility")));
     return new Column("inspection-camera",rows,style);
   }
 }

@@ -270,7 +270,8 @@ Published-status acceptance: 15 contract assertions and 10,514 native/UI
 assertions pass, including immediate transport publications, preserved old
 snapshots, reset freshness and the open-design-pose transition.
 
-The 3D toolbar's **Camera** button opens a dockable inspection pane. The enclosed
+In Simulate mode, the 3D toolbar's **Camera** button opens an inspection pane
+below the Sensors/CNC tabs; Design hides it. The enclosed
 and cutting scenes provide **Tool contact**, **Workpiece** and **Loading** presets.
 Tool contact is a camera-only cutaway hiding the surrounding head and support.
 The first two follow the cup without spinning with it; Loading frames the

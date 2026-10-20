@@ -742,15 +742,22 @@ for hosting, bundle reuse and checks.
 
 ## Inspection camera
 
-The 3D toolbar's **Camera** button opens an independent inspection view beside
-3D. Drag its tab into another dock group, including the bottom panes; the
-workspace remembers its placement. **Picture in picture** moves that same view
+In Simulate mode, the 3D toolbar's **Camera** button opens an independent
+inspection view below the right-hand Sensors/CNC tabs. The camera pane and
+button are hidden in Design; returning to Simulate restores its layout.
+Drag its tab into another dock group; the workspace remembers its placement
+for the Simulate session. **Picture in picture** moves that same view
 into the main viewport, and **Dock** returns it to a pane. `--inspection-camera`
-opens the pane at launch.
+requests the pane when Simulate mode is entered (with `--simulate`, at launch).
 
 Scene-authored presets choose a target, framing and camera-local hidden parts.
 The camera follows target translation while keeping its orientation steady when
-the part rotates. Zoom changes the lens rather than moving into the geometry.
+the part rotates. Use the mouse wheel over the inspection image or the zoom
+buttons. Orbit and pan use the regular 3D viewport gestures; Reset restores the
+preset at the target’s current position. Navigation stays independent of the
+main view and cannot select or edit parts. Zoom changes the lens rather than
+moving into the geometry; wheel
+events stay within the inspection view, including at its zoom limits.
 Both views show the same live simulation and stock; inspecting does not change
 selection, document visibility or history. Scenes without presets can inspect
 the selected part.
