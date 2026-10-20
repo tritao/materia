@@ -14,7 +14,7 @@ stops), `app` (MissionPlayer force search, jog), `machinekit` (example acceptanc
 |---|---|
 | Timing a given path (print, toolpath, seam, certified transfer), including feed hold, starvation and stops on that path | TOPP-RA fork + TR3 windows |
 | Free motion to changing targets: jog, teleop, force-search approach, visual or seam-tracking corrections, stopping free motion from any state | Ruckig |
-| Jerk on long paths | Neither yet (OM-R1) |
+| Jerk on long paths | OM-R1 (required since 2026-10-20) |
 
 - **Stops on a path stay on the path.** Feed hold, stream starvation and stop requests during a process path
   brake along that path with TOPP-RA's controllable sets and TR3's safe-stop windows. Ruckig never takes a
@@ -69,6 +69,21 @@ width, seam tolerance, cutter allowance), recertification against the original l
 time and drive jerk versus no smoothing. TOTG is not a candidate: TOPP-RA covers it and keeps exact geometry,
 general constraints and streaming. Adopt only with continuous certification and measured benefit at the drives;
 otherwise record the result.
+
+**OM-R1 is now required (2026-10-20), driven by the sheet router.** The router's motion-error screen
+(`machinekit/examples/sheet-router/fem/README.md`, commit 1ba79b551) shows the tool error comes from
+TOPP-RA's acceleration steps, not from structural frequency. On the 26 Hz gantry, TOPP-RA contours give
+0.073 mm contour / 0.085 mm rapid-to-cut residual. A 40 Hz structure still gives 0.084 / 0.037 mm.
+Jerk-limited motion gives 0.011 / 0.008 mm. Deliver:
+- Jerk-limited path timing for process paths (CNC contours first), keeping exact geometry, or certified
+  post-smoothing with the deviation bound above.
+- An optional per-axis input shaper (ZV/ZVD) stage in the same certification and lowering chain, tuned from
+  measured modes. ZVD on TOPP-RA gives 0.026 / 0.004 mm for 38 ms per move and holds under ±15% frequency
+  error; ZV does not.
+
+Acceptance: the router's governing-pose contour and transition cases at ≤ 0.05 mm motion error with the
+added cycle time reported, plus no regression on the printer corner, Paint and weld seam cases. The router's
+SR13/SR16 control steps depend on this.
 
 **Order.** OM0 -> OM1 -> OM2 -> OM3 -> OM4 -> OM5; OM-R1 independent. Starts after 3d-printing lands;
 independent of `simkit/plans/FIDELITY.md` and the pellet printer, so it may run in parallel with them.
