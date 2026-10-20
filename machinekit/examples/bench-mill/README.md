@@ -22,9 +22,11 @@ or **Compact VMC**. Stop simulation before switching. Opening a generated `.mtrg
 Small and Compact VMC include **Machine bearing block**, a named CNC mission. Play
 runs the shared bearing-block program once; the Mission panel follows its actual
 CNC execution state and the CNC panel provides feed hold, resume and program
-inspection. Stock, toe clamps, work offset and effective tool length are derived
-from each configuration's table and BT30 spindle. The Compact VMC setup adds a
-riser where needed to reach the blank.
+inspection. Both configurations use a shared ZPP AR155-I pneumatic vise and manual TS96-155
+zero-point plate, with supplier STEP geometry and a tapped table adapter. Jaw
+motion is geometric; air ports are exposed for a future verified pneumatic binding. Stock seating, work offset
+and effective tool length derive from the table, vise and BT30 spindle. See
+[WORKHOLDING.md](WORKHOLDING.md) for dimensions, source and reconstruction limits.
 Open **`materia.bench.project.json`** for the independent **Bench mill** project,
 with **Open bench mill** and **Enclosed cell** configurations. The enclosed cell
 adds its pneumatic vise and door. Its bearing-block program is also a named,
@@ -460,3 +462,14 @@ The [Compact VMC capacity study](CAPACITY_STUDY.md) derives a
 `materia.capacity.project.json` for its movable packaging preview. It has its own
 build outputs and does not replace the smaller mill. Drives, structural stiffness
 and finished-machine capacity still require qualification at the larger size.
+
+Both VMC configurations now use catalog Leadshine motors for every installed drive.
+See [MOTOR_MOUNTS.md](MOTOR_MOUNTS.md) for the selected models, supplier/custom
+mount split and the Compact variant’s still-unfitted XY drives. The spindle selection
+is 1.5 kW with a 3:1 speed-increasing belt, replacing the assumed 2.2 kW envelope.
+
+The Small and Compact VMC Z drives share an HZMotion M80E-BK15-C integrated
+motor/bearing housing and BF15 support, with an SFU2005 screw. A flat T adapter
+fits the housing between the guide rails, replacing the separate stand/bearing
+stack. See `MOTOR_MOUNTS.md` for the STEP/drawing discrepancies and outstanding
+brake, fastener and load qualifications.

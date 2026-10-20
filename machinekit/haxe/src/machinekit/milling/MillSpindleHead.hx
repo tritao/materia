@@ -40,7 +40,8 @@ class MillSpindleHead extends MachineAssembly {
 		var centres=(drive==null?MillSpindleMotorLayout.CENTRES:drive.centres())+adjustment;
 		if(drive==null) fixed("motorCarrier",new MillSpindleMotorMount(new ComponentValues().setNumber("height",face-12-mountBottom).setBoolean("centered",true)),F.translation(0,l.spindleY,mountBottom),"spindle");
 		else fixed("motorCarrier",drive,gauge,"spindle");
-		var motorPose = F.fromRotationMatrix(0,l.spindleY+centres,face,[-1,0,0, 0,1,0, 0,0,-1]);
+		// Route catalog power/feedback connectors sideways, clear of the Z screw stack.
+		var motorPose = F.fromRotationMatrix(0,l.spindleY+centres,face,drive==null?[-1,0,0, 0,1,0, 0,0,-1]:[0,1,0, 1,0,0, 0,0,-1]);
 		fixed("motor",motor,motorPose,"motorCarrier");
 		rotating("motorShaft",motor.shaft(),motorPose,"motor","motor-turn",motor.rating.maxSpeed);
 		var pulley = drive==null ? new TimingPulley(HTD5M,40,20,18) : drive.spindlePulley();
@@ -53,7 +54,7 @@ class MillSpindleHead extends MachineAssembly {
 		fixed("beltGuard",guard,gauge,"motorCarrier");
 		var guardX=drive==null?MillSpindleMotorLayout.GUARD_BOLT_X:drive.guardBoltX();
 		for (x in [-guardX,guardX]) fixed('guardBolt$x',SocketHeadCapScrew.metric("M4",10),
-			F.fromRotationMatrix(x,l.spindleY+MillSpindleMotorLayout.GUARD_BOLT_Y,face-14,[1,0,0, 0,-1,0, 0,0,-1]),"beltGuard");
+			F.fromRotationMatrix(x,l.spindleY+(drive==null?MillSpindleMotorLayout.GUARD_BOLT_Y:drive.guardBoltY()),face-14,[1,0,0, 0,-1,0, 0,0,-1]),"beltGuard");
 		fixed("belt",TimingBelt.twoPulley(HTD5M,drive==null?40:drive.spindleTeeth(),drive==null?40:drive.motorTeeth(),centres,15,5000),
 			F.fromRotationMatrix(0,l.spindleY,gauge.z+252.5,[0,-1,0, 1,0,0, 0,0,1]),"spindle");
 		for (x in [-MillSpindleMotorLayout.FOOT_BOLT_X,MillSpindleMotorLayout.FOOT_BOLT_X])

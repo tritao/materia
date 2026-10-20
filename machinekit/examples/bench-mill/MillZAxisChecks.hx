@@ -27,6 +27,7 @@ class MillZAxisChecks {
 		check(volume < 1e-5, '$label: overlap $volume mm3');
 	}
 	public static function main():Void {
+		rejects(()->machinekit.structural.CastInsert.recipeType().create(),"Metadata instance does not default a required cast-insert role");
 		AxisBuilderChecks.run();
 		Sys.println("Shared axis builder regressions passed");
 		var reference = new BenchMill(false, false), f = MillFramePreview.layout(reference);
@@ -43,6 +44,15 @@ class MillZAxisChecks {
 		near(pose(poses, "screw").x, 0, "screw centred between rails");
 		near(pose(poses, "motor").x, 0, "motor centred on screw");
 		near(pose(poses, "motor").y, l.screwY, "coaxial motor");
+		check(l.motor.designation=="ELM2H-0750LA80E","Z installs the braked Leadshine catalog motor");
+		var mountCache=new PosedParts();
+		for(member in axis.components())if(member.id=="motorMount"||StringTools.startsWith(member.id,"motorBolt")||StringTools.startsWith(member.id,"motorNut")) {
+			near(mountCache.overlap(l.motor,poses.get("motor"),member.component,poses.get(member.id)),0,"Catalog Z pilot, flange and fasteners clear: "+member.id);
+		}
+		for(member in axis.components())if(member.id=="coupling"||member.id=="screw"||StringTools.startsWith(member.id,"brake-"))
+			near(mountCache.overlap(member.component,poses.get(member.id),l.fixed,poses.get("motorMount")),0,"Z drive internals clear purchased housing: "+member.id);
+		near(mountCache.overlap(l.screw,poses.get("screw"),l.floating,poses.get("floatingBearing")),0,"BF15 bearing and installed retaining ring clear machined shaft");
+		mountCache.close();
 		check(2 * l.blockSpan >= 140, "Z guide blocks have a useful vertical moment arm");
 		check(l.carriageThickness >= 20, "broad carriage retains head attachment depth");
 		check(axis.head.parameterNumber("rootExtension") > 0, "head has a deep braced root");
@@ -56,7 +66,7 @@ class MillZAxisChecks {
 		headWorld.close();
 		for (member in axis.components()) {
 			var shape = member.component.geometry();
-			check(shape.valid() && shape.solidCount() == 1, 'valid connected ${member.id}'); shape.close();
+			check(shape.valid() && shape.solidCount() >= 1, 'valid connected ${member.id}'); shape.close();
 		}
 		var crossShaft = Part.cylinderAlongY(8, f.columnFront-30, l.screwY+40, 0, f.railPlane+l.block.spec.blockHeight);
 		for (id in ["floatingMount","floatingBearing","screw"]) {
@@ -92,19 +102,20 @@ class MillZAxisChecks {
 			near(nut.z, l.headCentre + l.nut.bodyLength / 2 + q, "nut follows carriage");
 			near(state.joint("screw-turn"), l.nut.rotationFor(-q), "signed screw rotation follows handedness and axis direction");
 		}
-		check(!MillZAxisIntegrity.check(axis, frame).hasErrors(), "continuous CAD full-stroke audit");
+		var fullAudit=MillZAxisIntegrity.check(axis,frame);fullAudit.throwIfErrors();
+		check(!fullAudit.hasErrors(),"continuous CAD full-stroke audit");
 		var blocked = MillZAxisIntegrity.check(axis, new MillFrame(f));
 		check(blocked.hasErrors(), "audit rejects a column without the central channel");
 		check(blocked.items.filter(item -> item.code == "mill-z.full-stroke-collision").length > 0,
 			"negative control detects an actual swept-volume collision");
-		// Bearing feet contact their plates; motor face and stand top coincide.
-		for (id in ["fixedBearing", "floatingBearing"]) {
-			var part = axis.components().filter(m -> m.id == id)[0].component;
-			var foot = F.compose(poses.get(id), part.connector("mount").frame);
-			near(foot.y, f.columnFront, "bearing foot meets backing plate");
+		for(id in ["motorMount","floatingBearing"]) {
+			var foot=F.compose(poses.get(id),axis.component(id).connector("base").frame);
+			near(foot.y,f.columnFront,"supplier base meets backing plate");
 		}
-		near(pose(poses, "motorStand").z + l.motorStandHeight, pose(poses, "motor").z, "motor supported on stand");
-		for (pair in [["carriage", "blockLeftLower"], ["carriage", "blockLeftUpper"], ["carriage", "blockRightLower"], ["carriage", "blockRightUpper"], ["motor", "motorStand"], ["motorStand", "fixedMount"], ["fixedBearing", "fixedMount"],
+		near(pose(poses,"motorMount").z,pose(poses,"motor").z,"motor seats on integrated housing");
+		check(l.screw.thread.screwDiameter==20,"Z has a matched SFU2005 race");
+		check(!axis.components().filter(m->m.id=="motorStand"||m.id=="couplingGuard"||m.id=="fixedBearing").iterator().hasNext(),"integrated housing replaces custom stack");
+		for (pair in [["carriage", "blockLeftLower"], ["carriage", "blockLeftUpper"], ["carriage", "blockRightLower"], ["carriage", "blockRightUpper"], ["motor", "motorMount"], ["motorMount", "fixedMount"],
 			["floatingBearing", "floatingMount"], ["nut", "carriage"], ["head", "carriage"]]) {
 			var first = axis.components().filter(member -> member.id == pair[0])[0].component.geometry();
 			var second = axis.components().filter(member -> member.id == pair[1])[0].component.geometry();

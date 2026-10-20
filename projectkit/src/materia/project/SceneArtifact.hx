@@ -691,6 +691,13 @@ typedef SceneArtifactMachiningMission = {
   var label:String;
 }
 
+/** Geometric setup condition, in metres for translation and radians for rotation. */
+typedef SceneArtifactMachiningSetupJoint = {
+  var joint:String;
+  var position:Float;
+  var tolerance:Float;
+}
+
 /**
  * A machining job the generator made for its own machine, with everything needed to run it (since
  * version 20). Lengths are metres, whatever the scene's unit.
@@ -709,6 +716,7 @@ typedef SceneArtifactMachiningMission = {
  * limits are the motors' and drives', and the controller's step rate caps them further.
  */
 typedef SceneArtifactMachining = {
+  @:optional var setupJoints:Array<SceneArtifactMachiningSetupJoint>;
 	/** Explicit ideal-motion preview: travel checks apply, motor-load qualification does not. */
 	@:optional var kinematicPreview:Bool;
 	@:optional var mission:SceneArtifactMachiningMission;
@@ -2942,6 +2950,15 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 		var occurrences = new Map<String, Bool>(), joints = new Map<String, Bool>();
 		for (occurrence in definition.occurrences) occurrences.set(occurrence.id, true);
 		for (joint in definition.joints) joints.set(joint.id, true);
+    var setupIds=new Map<String,Bool>();
+    if(machining.setupJoints!=null)for(condition in machining.setupJoints) {
+      if(!joints.exists(condition.joint)||setupIds.exists(condition.joint)||
+        !finite(condition.position)||!finite(condition.tolerance)||condition.tolerance<=0)
+        fail("has an invalid setup joint condition");
+      setupIds.set(condition.joint,true);
+      if(machining.axes!=null&&machining.axes.indexOf(condition.joint)>=0)
+        fail("setup condition cannot constrain a machining axis");
+    }
 		if (machining.axes == null || machining.axes.length != 3) fail("needs three axes");
 		for (index in 0...3) {
 			var axis = machining.axes[index];
@@ -3008,6 +3025,10 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 			workOffset: [for (value in list(Reflect.field(decoded, "workOffset"))) number(value)],
 			tools: tools,
 			stocks: [for (stock in list(Reflect.field(decoded, "stocks"))) text(stock)]};
+    var setupJoints:Dynamic=Reflect.field(decoded,"setupJoints");
+    if(setupJoints!=null)machining.setupJoints=[for(condition in list(setupJoints)) {
+      joint:text(Reflect.field(condition,"joint")),position:number(Reflect.field(condition,"position")),
+      tolerance:number(Reflect.field(condition,"tolerance"))}];
     var kinematicPreview:Dynamic=Reflect.field(decoded,"kinematicPreview");
     if(kinematicPreview!=null)machining.kinematicPreview=Std.isOfType(kinematicPreview,Bool)?(kinematicPreview:Bool):fail();
     var mission:Dynamic=Reflect.field(decoded,"mission");

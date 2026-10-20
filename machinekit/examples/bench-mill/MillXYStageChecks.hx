@@ -4,6 +4,7 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.PosedParts;
 import machinekit.component.MachineKitComponents;
 import machinekit.milling.*;
+import machinekit.motion.BallScrew;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyFrames as F;
 
@@ -90,7 +91,7 @@ class MillXYStageChecks {
 				near(table.z, l.tableBottom, "table stays level");
 				near(saddle.x, 0, "saddle independent of X");
 				near(saddle.y, l.centreY - y, "saddle follows Y");
-				near(motorX.x, -195, "X motor independent of X");
+				near(motorX.x, MillXYStageLayout.X_MOTOR_FACE, "X motor independent of X");
 				near(motorX.y, l.centreY - y, "X drive rides saddle");
 				near(motorY.y, l.yMotorFace, "Y motor remains fixed");
 				near(state.joint("motorX-turn"), -state.joint("screwX-turn"), "opposed motor axis follows return belt");
@@ -122,6 +123,10 @@ class MillXYStageChecks {
 			near(cache.overlap(axis.component(id), poses.get(id), axis.saddle, poses.get("saddle")), 0, 'return drive clears saddle: $id');
 		}
 		var motorBody=cache.posed(axis.component("motorX"),poses.get("motorX"));
+		check(l.motor.designation=="ELM2H-0400LA60F","X uses the actual Leadshine catalog motor");
+		near(cache.overlap(axis.component("motorX"),poses.get("motorX"),axis.component("motorMountX"),poses.get("motorMountX")),0,"X pilot recess clears catalog motor");
+		check(MillXYStageLayout.X_BELT_PLANE+15<=MillXYStageLayout.X_MOTOR_FACE-l.motor.spec.pilotHeight,"Pulley clears motor pilot");
+		check(MillXYStageLayout.X_BELT_PLANE+15-l.xScrewStart>=BallScrew.JOURNAL_DIAMETER*0.75,"X screw engages at least 0.75 journal diameters of pulley bore");
 		var saddleBody=cache.posed(axis.saddle,poses.get("saddle"));
 		var rebuiltSaddle=cache.posed(restored.components().filter(m->m.id=="saddle")[0].component,poses.get("saddle"));
 		for (i in 0...4) for (hole in 1...5) {
@@ -148,7 +153,8 @@ class MillXYStageChecks {
 		var nutBody=cache.posed(axis.component("nutY"),poses.get("nutY"));
 		var nutSaddle=cache.posed(axis.saddle,poses.get("saddle"));
 		var legacyAdapter=cache.posed(new MillYNutMount(new machinekit.component.ComponentValues().setBoolean("reinforced",true)),poses.get("nutBracketY"));
-		var legacySaddle=axis.saddle.values().setBoolean("nutServiceAccess",false);
+		// Isolate the old grease-bore defect from the current motor-pocket redesign.
+		var legacySaddle=axis.saddle.values().setBoolean("nutServiceAccess",false).setBoolean("motorPocket",false);
 		var oldHost=new MillCrossSaddle(legacySaddle).geometry();
 		var ring=machinekit.component.Solids.cut(cadkit.modeling.Part.cylinderSpan(8,36,76,0,-l.saddleDepth/2+5),
 			[cadkit.modeling.Part.cylinderSpan(5,35,77,0,-l.saddleDepth/2+5)]);

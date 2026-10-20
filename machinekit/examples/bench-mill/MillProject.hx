@@ -37,11 +37,12 @@ class MillProject {
   for(row in assembly.components()) {
    var geometry=row.component.geometry(),mass:MassProperties;
    if(Std.isOfType(row.component,HgBlock)||Std.isOfType(row.component,HiwinHgh15ca)||
-    (Std.isOfType(row.component,HzMotionComponent)&&StringTools.endsWith(row.id,"floatingBearingY"))) {
+    (Std.isOfType(row.component,HzMotionComponent)&&cast(row.component,HzMotionComponent).spec.massKg==null)) {
     var props=geometry.massProperties();
     mass=new MassProperties(props.volume*1e-9*7850,props.centerOfMass,machinekit.component.MassProperties.MassSource.Computed(Preview));
    } else mass=row.component.massProperties();
-   parts.push(AssemblyPreview.part(row.id,row.component.description,geometry,row.component.materialId,null,mass));
+   var label=Std.isOfType(row.component,LeadshineServo)?row.component.designation+" — "+row.component.description:row.component.description;
+   parts.push(AssemblyPreview.part(row.id,label,geometry,row.component.materialId,null,mass));
   }
   var definition=model.definition(id);
   AssemblyPreview.preserveOwnership(definition,assembly.definition());

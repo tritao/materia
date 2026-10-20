@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "retrieved": "2026-10-20",
+  "supplier": "ZPPCNC / Xiefeng",
+  "source": "https://zppcncvise.com/pages/service",
+  "assets": [
+    {
+      "model": "CV10075",
+      "url": "https://zppcncvise.com/cdn/shop/files/CV10075.7z?v=1916191081395608670",
+      "archive": "CV10075.7z",
+      "archive_sha256": "1f90b04d888c9b14c3fc10cc24b44744287698b4e3b395ccbc23cba5048762a7",
+      "step": "CV10075.stp",
+      "step_sha256": "428d798c0adbfd7ef933fd467260bd764e7daa8ea7d16e29c494d1fa8f33cae2"
+    },
+    {
+      "model": "CV15075",
+      "url": "https://zppcncvise.com/cdn/shop/files/CV15075.7z?v=2504625302841233577",
+      "archive": "CV15075.7z",
+      "archive_sha256": "373f9202769a7f0f124275bb73d9dd5066d71934ae5f2273a31d53db2fd22245",
+      "step": "CV15075.stp",
+      "step_sha256": "b782addb56e6a6ef7ba42cc0b92b436095a9446adee44c76b5f46b7c3030ce6a"
+    },
+    {
+      "model": "TS52-108",
+      "url": "https://zppcncvise.com/cdn/shop/files/TS52-108.7z?v=12434949882690188448",
+      "archive": "TS52-108.7z",
+      "archive_sha256": "b1065a331e61bd2b364df22967fe4a042bd4744fe85f68abdd112c4cb708e1b9",
+      "step": "TS52-108.stp",
+      "step_sha256": "7a1b4c016ef48c9a031434050236be9584657259652eddd20f07fd5530876f76"
+    },
+    {
+      "model": "ps16f",
+      "url": "https://zppcncvise.com/cdn/shop/files/ps16f.7z?v=6403635972264750533",
+      "archive": "ps16f.7z",
+      "archive_sha256": "5cd5569839ff1dbd220bf96d1a85faf0df128238f1980104fc6d5b5ca616f9ef",
+      "step": "ps16f.stp",
+      "step_sha256": "7fdc724d4de71ff3437a6a49cd03e7bd3c14928151a2579cf8561de955a4a7e9"
+    },
+    {
+      "model": "AR155_I",
+      "url": "https://zppcncvise.com/cdn/shop/files/AR155_I_d8ca3eb5-ce11-48fe-9252-f27e30a6ee70.7z?v=16019675113487199103",
+      "archive": "AR155_I_d8ca3eb5-ce11-48fe-9252-f27e30a6ee70.7z",
+      "archive_sha256": "5a7fb80ebdaf791bf1e200ab9dd417da1d57a69bb1b8133a643ec04ee69fb6ec",
+      "step": "AR155_I.stp",
+      "step_sha256": "69bf1c9add67720c3ad1b2c744bc6be97f38cefabe2518e4c475645055c96e84"
+    },
+    {
+      "model": "TS96-155",
+      "url": "https://zppcncvise.com/cdn/shop/files/TS96-155.7z?v=7253309134737610730",
+      "archive": "TS96-155.7z",
+      "archive_sha256": "617befb093f880e5fc431f98c3c6facb6ffe68e59b001bad5b5b5dec55d90c1a",
+      "step": "TS96-155.stp",
+      "step_sha256": "2af3087bdd43a449d84976074027fef8f3661ba2bbd59a27003dc5b0028ef1ec"
+    },
+    {
+      "model": "ps20f",
+      "url": "https://zppcncvise.com/cdn/shop/files/ps20f.7z?v=13740660569221255219",
+      "archive": "ps20f.7z",
+      "archive_sha256": "508feb88866500e67c655382d834f3b152bdcbc767d351c2f456b8fcc692c96f",
+      "step": "ps20f.stp",
+      "step_sha256": "0220bb52a9811a081a0768ae03d8bb52ae783ea03130ff9f20264c3352b66b75"
+    }
+  ],
+  "catalogs": [
+    {
+      "file": "catalog-0.pdf",
+      "url": "https://cdn.shopify.com/s/files/1/0654/3933/4443/files/ZPPCNC_Zero_Point_Clamping_2026.pdf?v=1777457397",
+      "sha256": "acc4c17efcda668d823ee276a1e838c827b912ef2230c9b871e5dd9f85c71275"
+    },
+    {
+      "file": "catalog-1.pdf",
+      "url": "https://cdn.shopify.com/s/files/1/0654/3933/4443/files/ZPPCNC__catalong_2025.pdf?v=1777443847",
+      "sha256": "a28d76fe81bec0d7d6c13a8229d1157aef82d34a6bfa8013a7c8f16b91c4ff9b"
+    }
+  ],
+  "review": {
+    "installed_vise": "CV15075",
+    "plate": "TS52-108",
+    "pull_stud": "ps16f",
+    "vise_raw_gap_mm": 59,
+    "canonical_rotation": [
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "vise_bottom_translation_mm": 23.3172156163821,
+    "plate_mount_pitch_mm": 82,
+    "pull_stud_pitch_mm": 52,
+    "plate_mount_seat_mm": 12,
+    "stud_top_above_vise_base_mm": 5.08,
+    "stock_parallel_height_mm": 12
+  },
+  "pneumatic_review": {
+    "vise": "AR155_I",
+    "plate": "TS96-155",
+    "pull_stud": "ps20f",
+    "vise_rotation": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      -1,
+      0,
+      1,
+      0
+    ],
+    "raw_tooth_gap_mm": 59.5,
+    "stock_seat_mm": 126,
+    "plate_mount_pitch_mm": 128,
+    "plate_mount_seat_mm": 16,
+    "pull_stud_pitch_mm": 96,
+    "stud_collar_mm": 5.08,
+    "release_clearance_per_jaw_mm": 2,
+    "release_clearance_status": "packaging preview assumption, not a published pneumatic stroke",
+    "air_pressure_bar": [
+      6,
+      7
+    ],
+    "published_force_kN": [
+      8,
+      10
+    ],
+    "dynamic_actuation_status": "not inferred from unknown bore, flow and stroke"
+  }
+}

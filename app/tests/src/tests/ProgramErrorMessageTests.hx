@@ -3,6 +3,8 @@ import app.ProgramErrorMessage;
 class ProgramErrorMessageTests {
   static function check(value:Bool, message:String):Void { if (!value) throw message; }
   public static function main():Void {
+    var setup=ProgramErrorMessage.fromFailure("Workholding setup changed: joint opening");
+    check(setup.title=="Check the workholding setup"&&setup.recovery.indexOf("blank")>=0,"vise setup failures explain how to recover");
     var failure = "Motion program op 4: path.timing.stream.step failed with MotionKit error -6";
     var timing = ProgramErrorMessage.fromFailure(failure);
     check(timing.title == "Could not plan the next move", "timing failure has an operator explanation");

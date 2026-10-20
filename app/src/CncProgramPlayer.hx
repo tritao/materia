@@ -70,6 +70,7 @@ typedef CncJobStock = {
 }
 
 typedef CncJob = {
+  @:optional var setupJoints:Array<materia.project.SceneArtifact.SceneArtifactMachiningSetupJoint>;
 	@:optional var kinematicPreview:Bool;
 	@:optional var mission:materia.project.SceneArtifact.SceneArtifactMachiningMission;
 	@:optional var powerUpSideOffsets:Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>;
@@ -133,6 +134,25 @@ class CncProgramPlayer extends ToolpathPlayer {
 
 	final project:ProjectDocumentSession;
 	final job:CncJob;
+  final setupCoordinates:Map<String,{index:Int,initial:Float}> = [];
+
+  override public function feed():Void {
+    if(failure!=null)return;
+    if(job.setupJoints!=null) {
+      var positions=robot.robot.snapshot().positions;
+      for(condition in job.setupJoints) {
+        var coordinate=setupCoordinates.get(condition.joint);
+        var actual=coordinate==null?Math.NaN:coordinate.initial+positions.get(coordinate.index);
+        if(!Math.isFinite(actual)||Math.abs(actual-condition.position)>condition.tolerance) {
+          motion.abort();
+          fail('Workholding setup changed: joint "${condition.joint}" must be ${condition.position} within ${condition.tolerance}; observed $actual');
+          return;
+        }
+      }
+    }
+    super.feed();
+  }
+
 	final simulation:Simulation;
 	final assemblyParts:SimulationAssemblyParts;
 	var kindBySource = new haxe.ds.ObjectMap<Provenance, MoveKind>();
@@ -223,6 +243,16 @@ class CncProgramPlayer extends ToolpathPlayer {
 		robotInterface = interfaceManaged ? new RobotInterface() : null;
 		interfaceAlarmCodeChannel = interfaceManaged ? RobotInterfaceChannels.alarmCodeChannel(job.channelScope) : null;
 		var placement = new AssemblyState(definition, state);
+    // Robot coordinates start at the placed pose; setup conditions use absolute assembly SI coordinates.
+    if(job.setupJoints!=null)for(condition in job.setupJoints) {
+      var matches=[for(joint in definition.joints)if(joint.id==condition.joint)joint];
+      var index=-1;
+      for(i in 0...robot.model.joints.length)if(Std.string(robot.model.joints[i].id)==condition.joint)index=i;
+      if(matches.length!=1||index<0)throw 'Missing CNC setup joint "${condition.joint}"';
+      var factor=Std.string(matches[0].type)=="prismatic"?metresPerUnit:1.0;
+      setupCoordinates.set(condition.joint,{index:index,initial:placement.joint(condition.joint)*factor});
+    }
+
 		var steady = checkOptions.steady;
 		// Apply the controller pulse ceiling to stepper planning.
 		var machineModel = robot.model;

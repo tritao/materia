@@ -1,3 +1,21 @@
+Current VMC update: the installed Small X/Y motors are now Leadshine
+ELM2H-0400LA60F; both Z axes use ELM2H-0750LA80E. The spindle is now
+ELM2L-1500LA100FT-H MS1AE with a 3:1 speed increase. The sizing script has
+been rerun with the selected axis motors and current default spindle. Its
+reference Y arrangement still uses the custom direct-drive cage rather than
+Small's HZMotion installation; this remains a preliminary comparison, not
+qualification of the full installed drive. Compact X/Y remain unfitted and
+Compact Z is screened independently. Both Z drives now use HZMotion M80E-BK15-C
+and BF15 supports with SFU2005 screws. Their torque and 10,000 mm/min rapid screens
+pass: Small Z ~51.10 kg / 39.7% RMS utilization with reserve / 4,587 rpm screw
+limit; Compact Z ~119.60 kg / 70.8% / 2,847 rpm. Required screw speed is 2,000 rpm.
+Required frictionless brake holding torque with reserve is ~0.50 / 1.17 N·m.
+The motor has an internal brake, but holding capacity and delay are unverified;
+the former assumed external 4 N·m brake is removed because it hits the HZ housing.
+The tables below are historical generic-motor snapshots; generated JSON contains
+current results. Bearing stiffness/preload, fasteners and power-loss safety remain
+unqualified; no generic BK stiffness is assigned to the purchased HZ unit.
+
 # Mechanical mill motor sizing
 
 The installed generic 400 W X/Y and 750 W Z motors pass the preliminary

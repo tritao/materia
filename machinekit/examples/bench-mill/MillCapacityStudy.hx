@@ -202,7 +202,7 @@ class MillCapacityStudy {
   MillSpindleIntegrity.checkMotorRemoval(a).throwIfErrors();
   check(true,"Shared full spindle payload and motor removal clearances");
   var previewBytes=scene(a),decoded=SceneArtifact.decode(previewBytes);
-  for(id in ["carriage","head","screw","nut","motor","fixedBearing","floatingBearing","coupling","brake-shell-0"])
+  for(id in ["carriage","head","screw","nut","motor","motorMount","floatingBearing","coupling"])
    check(decoded.parts.filter(part -> part.id=="zAxis/"+id).length==1,"Preview retains shared Z member: "+id);
   for(id in ["motor","belt","drawbar","pistonRod","cylinder","reactionFrame","holder"])
    check(decoded.parts.filter(part -> part.id=="spindle/"+id).length==1,"Preview retains complete spindle: "+id);

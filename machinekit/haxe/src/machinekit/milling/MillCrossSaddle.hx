@@ -71,12 +71,15 @@ class MillCrossSaddle extends MachineComponent {
 		if (parameterNumber("bore") > 0) tools.push(Part.cylinderAlongY(parameterNumber("bore") / 2, -d / 2 - 1, d / 2 + 1, 0, parameterNumber("boreZ")));
 		for (x in [-35.0, 35.0]) for (z in [-20.0, 20.0]) tools.push(Part.cylinderAlongY(2.5, d / 2 - 16, d / 2 + 1, x, h / 2 + z));
 		if (values().boolean("motorPocket")) {
+			// Square Leadshine flange/body and front-facing connector envelope.
+			tools.push(Part.box(102,66,66).translated(new Vector(-170,0,7)));
+			tools.push(Part.box(102,20,24).translated(new Vector(-170,-38,28)));
 			var bore = Part.cylinderSpan(33, -226, -64);
 			tools.push(PosedParts.moved(bore, F.fromRotationMatrix(0, 0, 40, [0,0,1, 1,0,0, 0,1,0]))); bore.close();
-			tools.push(Part.box(12, 84, 82).translated(new Vector(-201, 0, -1)));
+			tools.push(Part.box(12, 86, 82).translated(new Vector(MillXYStageLayout.X_MOTOR_FACE-6, 0, -1)));
 			tools.push(Part.box(17, 40, 42).translated(new Vector(-218.5, 0, 40)));
 			for (y in [-32.0, 32.0]) for (z in [10.0, 70.0]) {
-				var hole = Part.cylinderSpan(2.5, -196, -182);
+				var hole = Part.cylinderSpan(2.5, MillXYStageLayout.X_MOTOR_FACE-1, MillXYStageLayout.X_MOTOR_FACE+13);
 				tools.push(PosedParts.moved(hole, F.fromRotationMatrix(0, y, z, [0,0,1, 1,0,0, 0,1,0]))); hole.close();
 			}
 		}

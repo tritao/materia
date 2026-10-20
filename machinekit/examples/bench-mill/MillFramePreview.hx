@@ -88,7 +88,8 @@ class MillFramePreview {
 	/** Complete shared spindle payload for both machine configurations. */
 	public static function attachSpindle(reference:BenchMill,result:MachineAssembly,spindleLayout:MillZAxisLayout,
 		?motorAdjustment:Float,?drive:machinekit.milling.MillSpindleDrivePart):Void {
-		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout,motorAdjustment,drive);
+		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout,motorAdjustment,
+			drive==null?machinekit.milling.MillSpindleDrivePart.installed(spindleLayout.headHeight):drive);
 		var spindleOrigin = spindleParts.gauge;
 		var tool = new machinekit.milling.FlatEndMill(new machinekit.component.ComponentValues().setNumber("diameter",reference.tool.diameter)
 			.setNumber("fluteLength",reference.tool.fluteLength).setNumber("stickout",reference.tool.stickout));

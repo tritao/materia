@@ -12,6 +12,9 @@ class ProgramErrorMessage {
 
   public static function fromFailure(reason:String):ProgramErrorMessage {
     var text = reason.toLowerCase();
+    if (text.indexOf("workholding setup") >= 0)
+      return new ProgramErrorMessage("Check the workholding setup",
+        "Seat the blank, close the vise to the blank width, then reset the program.");
     if (text.indexOf("path.timing") >= 0 || text.indexOf("timing requires an adjustment") >= 0)
       return new ProgramErrorMessage("Could not plan the next move",
         "Set speed to 100%, reset the program, then press Play. If it stops again, open technical details.");

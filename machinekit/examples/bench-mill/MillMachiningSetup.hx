@@ -27,19 +27,24 @@ class MillMachiningSetup {
   var definition=model.definition("setup-datums");
   var z:materia.assembly.AssemblyDefinition.KinematicJoint=[for(j in definition.joints)if(j.id==axes[2])j][0];
   var lower=z.limits.lower;if(lower==null)throw "Machining setup needs a bounded Z axis";
-  // At the lower stop, the tip can reach the blank bottom. Raise the blank only when required.
-  var riserHeight=Math.max(0,gauge.z+lower-toolLength-tableTop);
-  var stockBottom=tableTop+riserHeight;
-  function attach(id:String,c:machinekit.component.MachineComponent,pose:materia.assembly.AssemblyRecord.AssemblyFrame):Void {
-   assembly.addComponent(id,c,pose);
-   assembly.addMemberConnector(table,"to-"+id,F.compose(F.inverse(poses.get(table)),pose));
-   assembly.addMemberConnector(id,"seat",F.identity());
-   assembly.addMate("mount-"+id,"fixed",table,"to-"+id,id,"seat");
-  }
-  if(riserHeight>0.001)attach("machining-riser",new MillPanel(120,120,riserHeight,"cast iron"),F.translation(gauge.x,gauge.y,tableTop));
-  attach("machining-stock",new MillPanel(block.width,block.depth,block.height,"aluminium 6061"),F.translation(gauge.x,gauge.y,stockBottom));
-  for(side in [-1,1])attach(side<0?"machining-clampLeft":"machining-clampRight",new ToeClamp(block.height),
-   F.fromRotationMatrix(gauge.x+side*(block.width/2-8),gauge.y+block.depth/2,stockBottom,[0,-1,0,1,0,0,0,0,1]));
+  var vise=new ZppWorkholding(block.depth,block.width);
+  var minimumBottom=gauge.z+lower-toolLength;
+  if(tableTop+vise.seat.z<minimumBottom-1e-6)
+   throw "Vise stock seat is below the tool's reachable Z range; select a qualified mounting adapter";
+  var tablePart:machinekit.component.MachineComponent=[for(row in assembly.components())if(row.id==table)row.component][0];
+  if(tablePart.parameterNumber("width")<204 || tablePart.parameterNumber("depth")<194)
+   throw "Table cannot support the 200 x 190 mm workholding adapter";
+  var origin=F.translation(gauge.x,gauge.y,tableTop);
+  assembly.include("workholding",vise,origin);
+  assembly.addMemberConnector(table,"viseMount",F.compose(F.inverse(poses.get(table)),origin));
+  assembly.addMemberConnector("workholding/body","tableSeat",F.identity());
+  assembly.addMate("vise-on-table","fixed",table,"viseMount","workholding/body","tableSeat");
+  var stockPose=F.translation(gauge.x,gauge.y,tableTop+vise.seat.z);
+  assembly.addComponent("machining-stock",new MillPanel(block.width,block.depth,block.height,"aluminium 6061"),stockPose);
+  assembly.addMemberConnector("workholding/body","blankSeat",F.compose(F.inverse(origin),stockPose));
+  assembly.addMemberConnector("machining-stock","seat",F.identity());
+  assembly.addMate("blank-on-parallels","fixed","workholding/body","blankSeat","machining-stock","seat");
+
  }
 
  public function scene(id:String,notes:Array<String>):haxe.io.Bytes {
@@ -55,8 +60,9 @@ class MillMachiningSetup {
   var offset=[stock.x-block.width/2-gauge.x,stock.y-block.depth/2-gauge.y,stock.z+block.height-gauge.z];
   var fixtures:Array<Fixture> = [];
   var inverse=F.inverse(F.translation(stock.x-block.width/2,stock.y-block.depth/2,stock.z+block.height));
-  for(id in ["machining-clampLeft","machining-clampRight"]) {
-   var component:machinekit.component.MachineComponent=[for(row in assembly.components())if(row.id==id)row.component][0];
+  for(row in assembly.components())if(StringTools.startsWith(row.id,"workholding/")) {
+   var id=row.id;
+   var component=row.component;
    var geometry=component.geometry(),bounds=geometry.shape.bounds();
    var lo=bounds.get_min(),hi=bounds.get_max(),pose=F.compose(inverse,state.worldPose(id));
    var low=[Math.POSITIVE_INFINITY,Math.POSITIVE_INFINITY,Math.POSITIVE_INFINITY],high=[Math.NEGATIVE_INFINITY,Math.NEGATIVE_INFINITY,Math.NEGATIVE_INFINITY];
@@ -75,9 +81,10 @@ class MillMachiningSetup {
   var target=block.geometry();
   var program=BearingBlockJob.generate({tools:[tool],fixtures:fixtures,workOffset:offset,start:[0,0,0]},block,target);
   data.parts.push(AssemblyPreview.part("machining-target","Finished bearing block",target,block.materialId,0.002));target.close();
-  data.machining={kinematicPreview:true,mission:MISSION,program:program,axes:axes,spindle:"spindle/spindle",channelScope:"spindle",
+  data.machining={setupJoints:[{joint:"workholding/half-opening",position:block.width/2000,tolerance:0.00005}],kinematicPreview:true,mission:MISSION,program:program,axes:axes,spindle:"spindle/spindle",channelScope:"spindle",
    workOffset:[for(v in offset)v/1000],tools:[{number:1,length:tool.length,profile:tool.profile().encode()}],
    stocks:["machining-stock"],toolPart:"spindle/tool",loadedTool:1,target:"machining-target",loop:false};
+  data.recipeDiagnostics.push("Workholding uses ZPP AR155-I pneumatic-vise, manual TS96-155 plate and TS96 pull-stud STEP geometry. The hard-jaw setup is preset for a 60 mm blank. Air ports are exposed; jaw-release travel is a 2 mm-per-jaw packaging assumption. Valve, pressure, force and pressure-loss behavior are not simulated.");
   data.recipeDiagnostics.push("Bearing-block mission uses kinematic preview limits: 20 mm/s and 100 mm/s². Drive performance and cutting loads are not qualified.");
   return SceneArtifact.encode(data);
  }

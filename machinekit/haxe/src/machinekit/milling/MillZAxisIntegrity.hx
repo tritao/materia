@@ -28,12 +28,12 @@ class MillZAxisIntegrity {
 		var poses:Map<String, AssemblyFrame> = axis.solvedPoses();
 		// Swept boxes enclose every moving structural part throughout the
 		// complete stroke. No discrete sampling is used for the CAD clearance proof.
-		var lower = l.lower-margin, travel = -l.lower+2*margin, face = l.headCentre - l.nut.bodyLength / 2 - l.nut.flangeThickness;
+		var lower = l.lower-margin, travel = -l.lower+2*margin, face = l.headCentre + l.nut.bodyLength / 2 - l.nut.flangeOffset - l.nut.flangeThickness;
 		var shelfDepth = l.screwY - l.carriageBack + l.bracketWidth / 2;
 		var swept = [
 			box(owned, l.carriageWidth, l.carriageThickness, l.carriageHeight + travel, 0, l.carriageBack - l.carriageThickness / 2, l.headCentre - l.carriageHeight / 2 + lower),
 			box(owned, l.bracketWidth, shelfDepth, l.nutPlateThickness + MillZCarriage.GUSSET_HEIGHT + travel, 0, l.carriageBack + shelfDepth / 2, face - l.nutPlateThickness - MillZCarriage.GUSSET_HEIGHT + lower),
-			box(owned, l.nut.flangeDiameter, l.nut.flangeDiameter, l.nut.bodyLength + l.nut.flangeThickness + travel, 0, l.screwY, face + lower),
+			box(owned, l.nut.flangeDiameter, l.nut.flangeDiameter, l.nut.overallLength + travel, 0, l.screwY, l.headCentre + l.nut.bodyLength/2 - l.nut.overallLength + lower),
 			headSweep(axis, owned, margin)];
 		for (side in [-1, 1]) for (span in [-l.blockSpan, l.blockSpan]) swept.push(
 			box(owned, l.block.spec.blockWidth, l.block.spec.blockHeight - l.block.spec.railHeight, l.block.spec.blockLength + travel,
@@ -55,7 +55,7 @@ class MillZAxisIntegrity {
 				out.error("mill-z.channel-clearance", member.id, "Central nut shelf does not retain its specified casting clearance over full travel");
 			fixed.close();
 		}
-		for (id in ["fixedMount", "floatingMount", "fixedBearing", "floatingBearing", "motorStand", "couplingGuard", "motor", "railLeft", "railRight"]) {
+		for (id in ["fixedMount", "floatingMount", "motorMount", "floatingBearing", "motor", "railLeft", "railRight"]) {
 			var part = axis.components().filter(m -> m.id == id)[0].component.geometry();
 			owned.push(part);
 			var fixed = PosedParts.moved(part, poses.get(id)); owned.push(fixed); part.close();

@@ -52,12 +52,12 @@ class MillXYStage extends MillGuidedXYStage {
 			attach('bearingBolt$a$end$side', SocketHeadCapScrew.metric("M5", 55), F.translation(centre.x, centre.y, centre.z), '${end}Bearing$a');
 		}
 		for (side in [-1, 1]) for (height in [10, 70]) attach('motorPlateBoltX$side$height', SocketHeadCapScrew.metric("M6", 25),
-			orient(-207, l.centreY + side * 32, l.saddleBottom + height, [0,0,1], [-1,0,0]), "motorMountX");
+			orient(MillXYStageLayout.X_MOTOR_FACE-12, l.centreY + side * 32, l.saddleBottom + height, [0,0,1], [-1,0,0]), "motorMountX");
 		attach("motorCoverY", new MillDriveHatch(new ComponentValues().setNumber("lowerZ", l.yHatchLowerZ).setNumber("upperZ", l.yHatchUpperZ)), F.translation(0, l.yServiceRear + 2, 0), "fixedPedestalY");
 		for (side in [-1, 1]) for (row in [{name:"Lower",z:l.yHatchLowerZ},{name:"Upper",z:l.yHatchUpperZ}]) attach('rearCoverBoltY$side${row.name}' , SocketHeadCapScrew.metric("M4", 10),
 			orient(side * 75, l.yServiceRear + 4, row.z, [0,0,1], [0,1,0]), "motorCoverY");
-		attach("motorCoverX", new MillMotorCover(new ComponentValues().setNumber("width", 84).setNumber("depth", 38).setNumber("height", 142)),
-			F.fromRotationMatrix(-226, l.centreY, l.saddleBottom, [0,1,0, -1,0,0, 0,0,1]), "motorMountX");
+		attach("motorCoverX", new MillMotorCover(new ComponentValues().setNumber("width", 90).setNumber("depth", 38).setNumber("height", 142)),
+			F.fromRotationMatrix(MillXYStageLayout.X_BELT_PLANE-1, l.centreY, l.saddleBottom, [0,1,0, -1,0,0, 0,0,1]), "motorMountX");
 		exposeConnector("mount", "fixedPedestalY", "mount");
 		MillYNutDesignChecks.declare(this);
 	}
@@ -106,20 +106,27 @@ class MillXYStage extends MillGuidedXYStage {
 				F.fromRotationMatrix(x, l.centreY, l.xRailPlane, [0,-1,0, 1,0,0, 0,0,1]), "saddle");
 			attach('${end}BearingX', bearing, orient(x, l.centreY, l.xScrewZ, [0,0,1], [1,0,0]), '${end}PedestalX');
 		}
-		attach("motorMountX", new MillBeltMotorPlate(), F.fromRotationMatrix(-201, l.centreY, l.saddleBottom,
+		attach("motorMountX", new MillBeltMotorPlate(), F.fromRotationMatrix(MillXYStageLayout.X_MOTOR_FACE-6, l.centreY, l.saddleBottom,
 			[0,-1,0, 1,0,0, 0,0,1]), "saddle");
-		var motor = orient(-195, l.centreY, l.xMotorZ, [0,0,1], [-1,0,0]);
+		var motor = orient(MillXYStageLayout.X_MOTOR_FACE, l.centreY, l.xMotorZ, [0,-1,0], [-1,0,0]);
 		attach("motorX", l.motor, motor, "motorMountX");
+		var mounting=l.motor.mounting();if(mounting==null)throw "X motor needs mounting data";
+		for(p in mounting.holes) {
+			attach('motorBoltX${p.x}-${p.y}',SocketHeadCapScrew.metric("M5",25),
+			 orient(MillXYStageLayout.X_MOTOR_FACE-12,l.centreY+p.x,l.xMotorZ+p.y,[0,0,1],[-1,0,0]),"motorMountX");
+			attach('motorNutX${p.x}-${p.y}',machinekit.standard.HexNut.metric("M5"),
+			 orient(MillXYStageLayout.X_MOTOR_FACE+mounting.flangeThickness,l.centreY+p.x,l.xMotorZ+p.y,[0,0,1],[1,0,0]),"motorX");
+		}
 		hang("screwX", l.xScrew, shaft, "fixedBearingX");
 		attach("screwRetainerX", l.xScrew.retainer(), F.compose(shaft, F.translation(0, 0, machinekit.motion.BallScrewRetainer.STATION)), "screwX");
 		addMateOnAxis("screwX-turn", "continuous", "fixedBearingX", "to-screwX", "screwX", "attach-screwX", {x:1,y:0,z:0});
 		var screwPulley = new TimingPulley(HTD5M, 20, 12, 15), motorPulley = new TimingPulley(HTD5M, 20, 14, 15);
-		attach("screwPulleyX", screwPulley, orient(-225, l.centreY, l.xScrewZ, [0,0,1], [1,0,0]), "screwX");
-		hang("motorPulleyX", motorPulley, orient(-225, l.centreY, l.xMotorZ, [0,0,1], [1,0,0]), "motorX");
+		attach("screwPulleyX", screwPulley, orient(MillXYStageLayout.X_BELT_PLANE, l.centreY, l.xScrewZ, [0,0,1], [1,0,0]), "screwX");
+		hang("motorPulleyX", motorPulley, orient(MillXYStageLayout.X_BELT_PLANE, l.centreY, l.xMotorZ, [0,0,1], [1,0,0]), "motorX");
 		addMateOnAxis("motorX-turn", "continuous", "motorX", "to-motorPulleyX", "motorPulleyX", "attach-motorPulleyX", {x:-1,y:0,z:0});
 		attach("motorShaftX", l.motor.shaft(), motor, "motorPulleyX");
 		var belt = TimingBelt.twoPulley(HTD5M, 20, 20, l.xScrewZ-l.xMotorZ, 15, 5000);
-		attach("beltX", belt, F.fromRotationMatrix(-225, l.centreY, l.xMotorZ, [0,0,1, 0,-1,0, 1,0,0]), "saddle");
+		attach("beltX", belt, F.fromRotationMatrix(MillXYStageLayout.X_BELT_PLANE, l.centreY, l.xMotorZ, [0,0,1, 0,-1,0, 1,0,0]), "saddle");
 		addBeltPath({belt:"beltX", wraps:[{instanceId:"motorPulleyX", connectorName:"front"}, {instanceId:"screwPulleyX", connectorName:"front"}]});
 		addTransmission("x-return-belt", "screwX-turn", "motorX-turn", Transmission.BeltReduction("beltX", "screwPulleyX", "motorPulleyX"), Same);
 	}

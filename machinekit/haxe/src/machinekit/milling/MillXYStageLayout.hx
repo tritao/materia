@@ -7,6 +7,8 @@ import machinekit.motion.*;
  * Dimensions and motor patterns are design assumptions, not released vendor drawings.
  */
 class MillXYStageLayout {
+	public static inline var X_MOTOR_FACE:Float = -216;
+ public static inline var X_BELT_PLANE:Float = -234;
 	public static inline var SADDLE_HEIGHT:Float = 80;
 	public static inline var RISER_HEIGHT:Float = 48;
 	public static inline var TABLE_HEIGHT:Float = 40;
@@ -22,7 +24,7 @@ class MillXYStageLayout {
 	public final nut = new BallNut();
 	public final fixed = ScrewSupportUnit.bk12();
 	public final floating = ScrewSupportUnit.bf12();
-	public final motor = ServoMotor.model("GENERIC-SERVO-400W");
+	public final motor = LeadshineServo.model("ELM2H-0400LA60F");
 	public final coupling = new ShaftCoupling(14, 12, null, 28);
 	public final xScrew = new BallScrew(455);
 	public final yScrew:BallScrew;
@@ -88,12 +90,13 @@ class MillXYStageLayout {
 		// Put the screw at the saddle underside, between the guides.
 		yScrewZ = saddleBottom;
 		yMountPlane = yScrewZ - 40;
-		yBayTop = yScrewZ + (supplierY?selectedY.spec.connectorHeight:33) + clearance;
+		yBayTop = yScrewZ + selectedY.spec.connectorHeight + clearance;
 		yHatchLowerZ = frame.railPlane + 10; yHatchUpperZ = yBayTop + 10;
 		xMotorZ = saddleBottom + SADDLE_HEIGHT / 2;
 		xScrewZ = xRailPlane + 40;
 		yServiceRear = frame.columnCentreY + frame.columnDepth / 2;
-		yMotorFace = yServiceRear - yMotor.rating.bodyLength - clearance;
+		// The older fabricated cage retains its 130 mm service bay and bearing datums.
+		yMotorFace = yServiceRear - (supplierY?yMotor.rating.bodyLength:Math.max(130,yMotor.rating.bodyLength)) - clearance;
 		yScrewStart = yMotorFace - (supplierY?34:yMotor.rating.shaftLength);
 		yFixedY = supplierY?yMotorFace-41.5:yScrewStart - BallScrew.INPUT_JOURNAL_LENGTH + fixed.length / 2;
 		yFloatingY = frame.yRailStart + (supplierY?7:BallScrew.JOURNAL_LENGTH / 2);

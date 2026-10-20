@@ -45,12 +45,13 @@ class MillSpindleChecks {
 		check(MillDrawbarLayout.PISTON_BOTTOM+MillDrawbarLayout.PISTON_THICKNESS<MillDrawbarLayout.CYLINDER_BOTTOM+MillDrawbarLayout.HEIGHT-MillDrawbarLayout.CAP,
 			"retracted piston clears upper cap");
 		near(motorPose.x,0,"spindle motor lies on machine centerline");
-		near(motorPose.y-l.spindleY,MillSpindleMotorLayout.CENTRES,"motor sits behind release assembly");
+		var installedDrive=MillSpindleDrivePart.installed(l.headHeight);
+		near(motorPose.y-l.spindleY,installedDrive.centres(),"selected motor sits behind release assembly");
 		for (candidate in [assembly,MachineAssembly.decode(assembly.encode(),MachineKitComponents.standard())]) {
 			var model=new AssemblyModel("mm"); candidate.addTo(model,"");
 			var state=new AssemblyState(model.definition("bt30-package"));
 			state.setJoint("spindle/rotor-turn",1.25); state.forwardKinematics();
-			near(state.joint("spindle/motor-turn"),1.25,"motor and spindle follow 1:1 belt after recipe rebuild");
+			near(state.joint("spindle/motor-turn"),1.25/installedDrive.speedRatio(),"motor follows selected belt ratio after recipe rebuild");
 			state.setJoint("spindle/rotor-turn",0); state.forwardKinematics();
 			var rod=state.worldPose("spindle/pistonRod").z, drawbar=state.worldPose("spindle/drawbar").z;
 			state.setJoint("spindle/drawbar-release",4.5); state.setJoint("spindle/pistonRod-release",6.5); state.forwardKinematics();
@@ -81,7 +82,7 @@ class MillSpindleChecks {
 		}
 		var cache=new PosedParts(), poses:Map<String,AssemblyFrame> =assembly.solvedPoses();
 		for (pair in [["zAxis/head","spindle/motorCarrier"],["spindle/motorCarrier","spindle/motor"],
-			["spindle/tensionScrew","spindle/motor"],["spindle/piston","spindle/pistonRod"],
+			["spindle/piston","spindle/pistonRod"],
 			["zAxis/head","spindle/spindle"],["spindle/spindle","spindle/reactionFrame"],["spindle/reactionFrame","spindle/cylinder"],["spindle/beltGuard","spindle/motorCarrier"]]) {
 			var members=assembly.components(), a=members.filter(m->m.id==pair[0])[0],b=members.filter(m->m.id==pair[1])[0];
 			var first=cache.posed(a.component,poses.get(a.id)),second=cache.posed(b.component,poses.get(b.id));

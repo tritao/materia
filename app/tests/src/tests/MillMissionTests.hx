@@ -109,12 +109,26 @@ class MillMissionTests {
    check(simulation.rebuild(session.sensors,session.scene,session),id+" simulation builds: "+simulation.error);
    Sys.println(id+" simulation ready");Sys.stdout().flush();
    var player=simulation.cncPlayer();if(player==null)throw "Missing CNC player";
+   var conditions=job.setupJoints;
+   check(conditions!=null&&conditions.length==1,id+" retains vise setup condition");
+   var expected=conditions[0].position;
+   conditions[0].position=expected+0.01;
+   simulation.step();
+   check(player.failure!=null&&player.failure.indexOf("Workholding setup changed")>=0,id+" rejects an unclamped setup");
+   conditions[0].position=expected;
+   check(simulation.reset(),id+" recovers after restoring workholding");
+   for(i in 0...20)simulation.step();
+   conditions[0].position=expected+0.01;
+   simulation.step();
+   check(player.failure!=null&&player.failure.indexOf("Workholding setup changed")>=0,id+" detects setup changes during execution");
+   conditions[0].position=expected;
+   check(simulation.reset(),id+" resets after setup change during execution");
    for(i in 0...20)simulation.step();
    player.hold();
    var heldSteps=0;
    while(!player.held()&&player.failure==null&&heldSteps<2000){simulation.step();heldSteps++;}
    simulation.start();
-   check(player.held()&&controller.snapshot().machiningStatus=="Held",id+" mission follows actual feed hold");
+   check(player.held()&&controller.snapshot().machiningStatus=="Held",id+" mission follows actual feed hold: "+player.failure+" / held="+player.held()+" / "+controller.snapshot().machiningStatus);
    simulation.stop();player.resume();
    check(controller.snapshot().machiningStatus=="Paused",id+" mission follows transport pause");
    Sys.println(id+" hold and pause checks passed; executing the cut");Sys.stdout().flush();
