@@ -855,6 +855,16 @@ closed by the insert's mounting face: record them as insert-sealed penetrations
 with the sealing face, seal material and the thread protection that keeps resin
 out. Plug any threaded hole not used for fixing.
 
+The fixing screw runs from under the bed through clearance holes in the bed and
+the datum block or post into the insert's steel thread, so one screw clamps
+insert, datum and bed together and the pins locate the datum on the bed. Fixture
+screws never thread into panel stock, and the tooling needs no nuts, threaded
+plates or wood inserts. The fixing hole carries its screw instead of a bore mask.
+A fixing hole is a source hole on the insert (a mounting hole facing the bed, or
+a dedicated fixture hole declared through `InsertHoles` and the hole policy).
+Tooling never invents one: an insert with no usable hole gets a design change
+request, and its fixture stays blocked until the design declares the hole.
+
 **Finishing route.** Each precision interface declares how it reaches its final
 plane: `machined` (proud finishing stock, as before), `replicated`, or
 `as-cast`. The bench mill's first build uses `replicated` for rail and
