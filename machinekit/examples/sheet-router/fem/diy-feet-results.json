@@ -1,0 +1,251 @@
+{
+  "status": "Screened assumed joints fail SR-D3 static Y; retain welded feet",
+  "assumptions": {
+    "lumpedTranslationNPerMm": 1000000.0,
+    "lumpedRotationNmmPerRad": 1000000000.0,
+    "machinedFaceQuadrantNormalNPerMm": 1500000.0,
+    "machinedFaceQuadrantShearNPerMm": 200000.0
+  },
+  "rows": [
+    {
+      "model": "feet",
+      "workY": 2600,
+      "pose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "case": "modal",
+      "weldedXY": [
+        2.196605972857199,
+        2.200568538961078
+      ],
+      "boltedXY": [
+        2.137262427946276,
+        1.7342447913348265
+      ],
+      "weldedGantryHz": 27.4344,
+      "boltedGantryHz": 24.70146
+    },
+    {
+      "model": "feet",
+      "workY": 2600,
+      "pose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "case": "staticY",
+      "weldedXY": [
+        2.398414053503949,
+        2.0505136253318823
+      ],
+      "boltedXY": [
+        2.3278397969478113,
+        1.6340554302714365
+      ],
+      "weldedGantryHz": 27.83539,
+      "boltedGantryHz": 24.90823
+    },
+    {
+      "model": "feet",
+      "workY": 2600,
+      "pose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "case": "staticX",
+      "weldedXY": [
+        2.1649476659020825,
+        2.6414885426121253
+      ],
+      "boltedXY": [
+        2.0867952135578847,
+        2.0715938497952786
+      ],
+      "weldedGantryHz": 30.05376,
+      "boltedGantryHz": 26.78022
+    },
+    {
+      "model": "feet",
+      "workY": 3150,
+      "pose": {
+        "x": 800,
+        "y": 3150,
+        "z": 200
+      },
+      "case": "modal",
+      "weldedXY": [
+        2.218596279934669,
+        2.2023557163602447
+      ],
+      "boltedXY": [
+        2.1545961057700707,
+        1.7325669648086055
+      ],
+      "weldedGantryHz": 26.98592,
+      "boltedGantryHz": 24.37168
+    },
+    {
+      "model": "feet",
+      "workY": 3150,
+      "pose": {
+        "x": 800,
+        "y": 1575,
+        "z": 200
+      },
+      "case": "staticY",
+      "weldedXY": [
+        2.388307286971528,
+        2.0444434515415524
+      ],
+      "boltedXY": [
+        2.3181500352911293,
+        1.6320579511659556
+      ],
+      "weldedGantryHz": 27.31,
+      "boltedGantryHz": 24.71334
+    },
+    {
+      "model": "feet",
+      "workY": 3150,
+      "pose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "case": "staticX",
+      "weldedXY": [
+        2.1093870688251553,
+        2.6352206165283274
+      ],
+      "boltedXY": [
+        2.031626346294614,
+        2.068799756444342
+      ],
+      "weldedGantryHz": 29.69819,
+      "boltedGantryHz": 27.16716
+    },
+    {
+      "model": "machined-feet",
+      "workY": 2600,
+      "pose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "case": "modal",
+      "weldedXY": [
+        2.196605972857199,
+        2.200568538961078
+      ],
+      "boltedXY": [
+        2.1893274284117257,
+        2.0490106438949853
+      ],
+      "weldedGantryHz": 27.4344,
+      "boltedGantryHz": 25.7444
+    },
+    {
+      "model": "machined-feet",
+      "workY": 2600,
+      "pose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "case": "staticY",
+      "weldedXY": [
+        2.398414053503949,
+        2.0505136253318823
+      ],
+      "boltedXY": [
+        2.389740157259719,
+        1.9129283781920614
+      ],
+      "weldedGantryHz": 27.83539,
+      "boltedGantryHz": 25.99407
+    },
+    {
+      "model": "machined-feet",
+      "workY": 2600,
+      "pose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "case": "staticX",
+      "weldedXY": [
+        2.1649476659020825,
+        2.6414885426121253
+      ],
+      "boltedXY": [
+        2.144684671252828,
+        2.5273501429025695
+      ],
+      "weldedGantryHz": 30.05376,
+      "boltedGantryHz": 28.47945
+    },
+    {
+      "model": "machined-feet",
+      "workY": 3150,
+      "pose": {
+        "x": 800,
+        "y": 3150,
+        "z": 200
+      },
+      "case": "modal",
+      "weldedXY": [
+        2.218596279934669,
+        2.2023557163602447
+      ],
+      "boltedXY": [
+        2.2086201812536546,
+        2.048746095434217
+      ],
+      "weldedGantryHz": 26.98592,
+      "boltedGantryHz": 25.39503
+    },
+    {
+      "model": "machined-feet",
+      "workY": 3150,
+      "pose": {
+        "x": 800,
+        "y": 1575,
+        "z": 200
+      },
+      "case": "staticY",
+      "weldedXY": [
+        2.388307286971528,
+        2.0444434515415524
+      ],
+      "boltedXY": [
+        2.379580552763713,
+        1.909459033350774
+      ],
+      "weldedGantryHz": 27.31,
+      "boltedGantryHz": 25.71798
+    },
+    {
+      "model": "machined-feet",
+      "workY": 3150,
+      "pose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "case": "staticX",
+      "weldedXY": [
+        2.1093870688251553,
+        2.6352206165283274
+      ],
+      "boltedXY": [
+        2.0877363548074532,
+        2.52285816720964
+      ],
+      "weldedGantryHz": 29.69819,
+      "boltedGantryHz": 28.16873
+    }
+  ]
+}

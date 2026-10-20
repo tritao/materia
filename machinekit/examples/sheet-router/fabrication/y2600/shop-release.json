@@ -1,0 +1,24 @@
+{
+  "status": "GATED \u2014 engineering/shop qualification incomplete",
+  "released": false,
+  "digitalChecks": {
+    "preparedSeams": true,
+    "serviceAccess": true,
+    "weldStrengthScreen": false,
+    "diyProcedure": true
+  },
+  "pending": [
+    "Actual joint-load allocation and WPS/access review; resolve every failed strength-screen group",
+    "Steel identification and heat-treater cycle/payload confirmation, or approved VSR procedure",
+    "Selected machine epoxy TDS approves 2\u20136 mm layer/contact pressure and cure; witness-pour qualification",
+    "Shop confirms supported beam length/travel and indexed datum-transfer tolerances",
+    "Shop-release review signed against the exact prepared STEP/seam/service packet hashes"
+  ],
+  "buildWitnesses": [
+    "Thermal/VSR before-after-rest dimensional records",
+    "Epoxy thickness/cure and rail-seat survey",
+    "Rail parallelism/diagonals/dual-Y homing records",
+    "SR6-C measured modes/damping and motion-error recheck"
+  ],
+  "sourceSha256": "12f73ba059cc8a0000fa738460e7b2ac2b4ff24a56fe2ea90f69cbe2add3a394"
+}

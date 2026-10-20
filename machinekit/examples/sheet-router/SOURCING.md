@@ -1,3 +1,4 @@
+<!-- The DIY route decision below supersedes older whole-base machining assumptions. -->
 # Guide-first redesign: catalogue basis
 
 This selects sourcing requirements for the next prototype. Generic catalogue-class
@@ -19,8 +20,24 @@ per-move ZVD is the router fallback. SR6-C commissioning must measure modes and
 damping, tune the shaper and re-check the motion budget before cutting acceptance.
 The full raised-datum plus leg-pair rerun passes the revised model requirement;
 freeze the overall structure for SR6. See PLAN SR-D3, `fem/sr-d3-results.json`,
-and the current rerun record in `fem/README.md`. Shop joint preparation and
-seam detailing remain open in `fabrication/README.md`.
+and the current rerun record in `fem/README.md`. Prepared seam graphs now pass geometry checks; weld-load/WPS qualification and
+shop release remain open in `fabrication/README.md`.
+
+## DIY fabrication route (user-approved 2026-10-20)
+
+No full-base machining centre. Use low-distortion 5 mm stitch welding after full
+jig tacking; commercial thermal relief (quoted bare-frame envelope/mass) preferred,
+VSR fallback with measured before/after/rest evidence. Epoxy-levelled rail seats
+are baseline, adjustable jack-screw/shim mounts the alternative. The 12 mm seat
+envelope is preserved with 8 mm nominal steel plus 2–6 mm pour (4 mm nominal).
+Resin application approval and measured flatness/straightness are release gates.
+Dual-Y squareness comes from measured diagonals and rail/pad adjustment.
+
+Welded feet remain: the machined bolted/dowelled contact screen gives 1.909 N/µm
+long-bed worst Y versus 2.044 welded, failing SR-D3 despite the DIY advantages.
+Use an ordinary shop for the separate 2550.5 mm beam/feet, checking bed/travel and
+indexed datum transfer. Full method and numerical tolerances:
+[fabrication/DIY_ROUTE.md](fabrication/DIY_ROUTE.md).
 
 ## Guides
 
@@ -96,16 +113,16 @@ clearance remains 268 mm; no tested architecture variant was adopted.
 Front end-brace upper joints are lowered from Z700 to Z430; the complete 1600 mm
 width × 40 mm sheet mouth passes a native swept-volume check. Both beds pass the
 full 426-assertion assembly sweep, guide coverage and 82 sizing/planner assertions.
-The four midpoint structural spot checks retain ≥ 2 N/µm, but the full new pose/mesh
-envelope remains pending and the 40 Hz target still fails. Moving Y mass is now
-196.65 kg on the long bed. Motion-error tables in the FEM report describe the
-preceding geometry and must not be treated as fresh validation of this revision.
+The historical four midpoint spot checks retained ≥2 N/µm. The subsequent full
+raised-datum/extra-leg pose/mesh rerun and new-mode dynamic checks pass the
+revised SR-D3 requirement; see the current freeze evidence above. Moving Y mass
+is 196.65 kg on the long bed.
 
 ## Motion-error and architecture decisions
 
-Keep SR-D3's 40 Hz rule until the user decides whether the proposed 0.05 mm
-motion-error allocation plus shaping replaces it. The allocation comes from the
-review, not a universal wood/plastics tolerance. The actual CNC path backend does
+The user replaced SR-D3's 40 Hz rule with the 0.05 mm contour/residual
+motion-error allocation, jerk-limited timing and ZVD fallback. This allocation
+comes from the review; it is not a universal wood/plastics tolerance. The actual CNC path backend does
 not certify the shared 20 m/s³ jerk default. Native jerk-limited motion or per-move
 ZVD is promising in the frozen-pose modal screen; neither has been installed or
 qualified on the machine. Static cutting deflection, assumed 0.054 mm backlash,
@@ -122,32 +139,27 @@ and assembly have passed; structural and fabrication gates remain.
 
 ## Fabrication and access decisions after the braced-frame screen
 
-The installation baseline is anchored to a structural slab at all six support
+The installation baseline is anchored to a structural slab at all eight support
 stations, using separate anchor brackets/base plates, steel levelling/packing and
 grouted bearing seats. Do not rely on a rubber levelling pad to transmit anchor
 shear. The structural screen assumes 50,000 N/mm in X, Y and Z at each station,
 with no rotational clamp; these are provisional foundation stiffnesses requiring
 anchor/slab qualification. Free-standing levelling feet are a sensitivity with
-50,000 N/mm vertical at all six, and minimal 3-2-1 lateral springs of the same
+50,000 N/mm vertical at all eight, and minimal 3-2-1 lateral springs of the same
 stiffness (X at foot 0; Y at feet 0 and 3). This assumes friction without slip;
 it does not establish sliding or overturning safety.
 
-The sixteen-brace layout is a structural candidate, not an accepted service layout.
-The previous front end X braces crossed the 554.25 mm sheet-loading plane.
-Their upper joints are now lowered to 430 mm, below the revised 539.25 mm plenum
-underside, with lower-plan triangulation and side/rear braces retained. The front
-loading sweep passes; a full new frame-modal envelope remains a qualification gate.
-Keep the front approach free across the full 1600 mm sheet width. Do not make a
-load-carrying brace removable during operation.
+The sixteen-brace layout retains the lowered Z430 front endpoints and the
+full-width sheet-loading mouth. The raised-datum full rerun has passed. No
+load-carrying brace is removable during operation.
 
-Service the plenum from above with the spoilboard removed; zone valves must be
-removable through side service openings. Put the vacuum header, pump and isolation
-valves outside the right frame, with fixed hoses clamped along the longitudinal
-members and routed around brace joints, not through the lower X crossings. Reserve
-side openings for valve/tool removal and hose bend radii. Y cable chain stays
-outside the left rail; X chain remains above/behind the beam. Existing assembly
-clearance establishes chain envelopes, not flexible hose bend/service access.
-The next CAD pass must route actual hoses and demonstrate each valve removal path.
+Service the plenum from above with the spoilboard removed. The lower vacuum
+ports shift 120 mm in Y to clear crossmembers. Six valves sit on external floor
+stands, with the middle row shifted 300 mm in Y to avoid the extra posts. The
+headers, pump, rear crossover and fourteen explicitly routed hoses are detailed
+in the fabrication packet. Validate valve-withdrawal and top-inspection paths
+against the actual purchased components. Y chain stays outside the left rail;
+X chain stays above/behind the beam. No hose crosses the front loading mouth.
 
 Select bolted and dowelled aluminium Z ribs, with machined channels and bolted
 closing strips, rather than welding a 6082-T6 assembly. The current two closed
@@ -158,12 +170,17 @@ assembled rail face and guide datums after fabrication. Do not apply parent T6
 strength to a welded heat-affected zone: loss is process dependent, as shown by
 [this 6082-T6 welding study](https://doi.org/10.1007/s00170-025-15395-0).
 
-Weld the steel beam feet before stress relief. Machine the Y-carriage mounting
-faces and both X-rail seats in one fixture/setup after stress relief, using a
-common datum scheme with the beam. Dual-Y squaring must follow those machined
-datums, with final rail alignment and servo homing only trimming residual error.
-Specify the stress-relief cycle with the weldment/material supplier; qualify local
-tube-wall and weld stresses separately from the beam screen.
+Retain welded steel beam feet after both screened bolted/dowelled candidates
+failed the static Y requirement. Stress-relieve the separate beam/feet weldment,
+then machine its Y-carriage and X-rail faces at an ordinary shop using confirmed
+travel or indexed setups with measured datum transfer. Do not machine the full
+base: epoxy-levelled rail seats or adjustable pads establish its datum. Dual-Y
+parallelism and squaring follow measured diagonals and pad/rail adjustment;
+servo homing reproduces the measured square. See the DIY procedure for tolerances,
+relief evidence and the fail-closed release checklist.
+
+The following lever discussion records the earlier coupled redesign, now
+implemented and validated by the raised-datum/extra-leg freeze above.
 
 Recover the 60 mm spindle drop through a fork/riser redesign, not by accepting a
 428 mm beam-centre-to-tool-tip lever permanently. Rack height alone cannot change
@@ -196,7 +213,7 @@ braces. Built-up aluminium joints, heat treatment and subsequent rail-seat
 machining need manufacturing qualification. The router compiles against HEAD in an isolated detached worktree and both
 beds export fresh FEM CAD packets. Assembly/clearance passes 426 assertions,
 sizing/planner passes 82, and guide geometry/travel checks pass. The full
-anchored structural rerun passes static X/Y targets but still fails 40 Hz. Mode shapes,
+earlier anchored rerun passed static X/Y but failed the former 40 Hz criterion. Mode shapes,
 energy shares, sensitivities and the corrected-baseline evidence are in
 [fem/README.md](fem/README.md); the results below describe the previous candidate.
 

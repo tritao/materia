@@ -46,7 +46,7 @@ class SheetRouter extends Gantry {
         exposeConnector("toolTip","longestTool","tip");
         boardTop=gaugeZero.z-chosen.travelZ-chosen.longestTool;
         workOrigin=F.translation(0,gaugeZero.y,boardTop);
-        table=new VacuumTable(new ComponentValues().setNumber("width",chosen.workX).setNumber("length",chosen.workY));
+        table=new SheetRouterServiceTable(new ComponentValues().setNumber("width",chosen.workX).setNumber("length",chosen.workY));
         var board=new Spoilboard(new ComponentValues().setNumber("width",chosen.workX).setNumber("length",chosen.workY));
         var bedBottom=boardTop-board.n("thickness")-table.n("height");
         var left=zeroPose("frameLeft").x,right=zeroPose("frameRight").x;
@@ -64,13 +64,23 @@ class SheetRouter extends Gantry {
         attach("spoilboard",board,F.translation(chosen.workX/2,gaugeZero.y+chosen.workY/2,boardTop-board.n("thickness")),"vacuumTable");
         for(i in 0...table.zoneCount()) {
             var valve=table.zoneValve(i),zone=F.compose(zeroPose("vacuumTable"),table.zoneFrame(i));
-            attach('zoneValve${i+1}',valve,F.translation(zone.x,zone.y,bedBottom-valve.n("length")),"base");
+            var row=Std.int(i/2),serviceY=zone.y+SheetRouterServiceTable.portOffsetY+(row==1?300:0);
+            attach('zoneValve${i+1}',valve,F.translation(i%2==0?left-300:right+300,serviceY,bedBottom-valve.n("length")),"base");
             connectPorts('zone${i+1}', 'zoneValve${i+1}',"outlet","vacuumTable",'zone${i+1}');
         }
+        for(side in 0...2) {
+            var ys=[for(row in 0...3)zeroPose('zoneValve${row*2+side+1}').y],x=side==0?left-230:right+230;
+            attach(side==0?"vacuumServiceStandLeft":"vacuumServiceStandRight",new SheetValveServiceStand(x,ys),F.identity(),"base");
+        }
         attach("vacuumBlower",new VacuumBlower(),F.translation(right+300,(front+back)/2,0),"base");
-        attach("vacuumHeader",new SheetVacuumHeader(),F.translation(right+300,(front+back)/2+600,100),"base");
+        attach("vacuumHeader",new SheetVacuumHeader(4),F.translation(right+400,(front+back)/2+600,100),"base");
+        attach("leftVacuumHeader",new SheetVacuumHeader(3),F.translation(left-500,(front+back)/2+600,100),"base");
         connectPorts("vacuumFeed","vacuumBlower","vacuum","vacuumHeader","input");
-        for(i in 1...7)connectPorts('vacuumBranch$i',"vacuumHeader",'out$i','zoneValve$i',"inlet");
+        connectPorts("vacuumLeftTrunk","vacuumHeader","out1","leftVacuumHeader","input");
+        for(row in 0...3) {
+            connectPorts('vacuumLeftBranch$row',"leftVacuumHeader",'out${row+1}','zoneValve${row*2+1}',"inlet");
+            connectPorts('vacuumRightBranch$row',"vacuumHeader",'out${4-row}','zoneValve${row*2+2}',"inlet");
+        }
         // Forks open towards -Y, so their approach remains inside the extra Y travel.
         rack=new ToolRack(new ComponentValues().setNumber("forkHeight",160).setNumber("coverStroke",600));
         rackPose=F.translation(chosen.workX/2,gaugeZero.y+chosen.workY+260,boardTop-20);
@@ -297,13 +307,23 @@ class SheetSpindleSaddle extends MachineComponent {
 
 /** Assumed common vacuum header; zone isolation stays in the six separate valves. */
 class SheetVacuumHeader extends MachineComponent {
-    public function new() {
-        super("SHEET-VACUUM-HEADER-6","Six-zone vacuum distribution header","aluminium 6061",true);
-        addPort({name:"input",kind:Vacuum,role:Consumer,iface:Thread("G2"),required:true});
-        for(i in 1...7) {addPort({name:'out$i',kind:Vacuum,role:Supply,iface:Thread("G2"),required:true});addBridge("input",'out$i');}
+    public final outletXs:Array<Float>;
+    public function new(branches:Int=6) {
+        super('SHEET-VACUUM-HEADER-$branches','$branches-branch vacuum distribution header',"aluminium 6061",true);
+        outletXs=branches==4?[-200.0,-100.0,50.0,200.0]:[for(i in 0...branches)-200.0+400.0*i/(branches-1)];
+        addConnector("input",Mount,F.translation(250,0,50));
+        addPort({name:"input",kind:Vacuum,role:Consumer,iface:Thread("G2"),required:true,connector:"input"});
+        for(i in 1...branches+1) {
+            addConnector('out$i',Mount,F.translation(outletXs[i-1],0,100));
+            addPort({name:'out$i',kind:Vacuum,role:Supply,iface:Thread("G2"),required:true,connector:'out$i'});addBridge("input",'out$i');
+        }
     }
     override public function hasGeometry():Bool return true;
-    override public function geometry(detail:ComponentDetail=Preview):Part return Solids.cut(Part.box(500,100,100),[Part.cylinderAlong(30,new Vector(-251,0,50),new Vector(1,0,0),502)]);
+    override public function geometry(detail:ComponentDetail=Preview):Part {
+        var tools=[Part.cylinderAlong(30,new Vector(-235,0,50),new Vector(1,0,0),486)];
+        for(x in outletXs)tools.push(Part.cylinderSpan(25,50,101,x,0));
+        return Solids.cut(Part.box(500,100,100),tools);
+    }
 }
 
 /** Nominal M20 threaded leg cap: bore is the semantic thread's major-diameter envelope. */

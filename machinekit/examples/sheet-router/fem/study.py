@@ -249,6 +249,16 @@ def make_model(packet,pose,h):
                 model.rigid(attachment,at,'gantry');model.rigid(add(fp,(0,offset,0)),at,'foot'+side)
                 upper=model.root('weldBeam'+side+label,at,'gantry');lower=model.root('weldFoot'+side+label,at,'foot'+side)
                 model.spring(upper,lower,[1e10*g.get('weldSpringFactor',1)]*3+[1e13*g.get('weldSpringFactor',1)]*3,'welds')
+        elif g.get('beamFootMachinedContactNPerMm'):
+            # Four real bearing quadrants; two locating dowels carry transverse shear.
+            # Preloaded contact must remain closed; this linear screen does not prove it.
+            normal=g['beamFootMachinedContactNPerMm'];shear=g.get('beamFootDowelShearNPerMm',200000)
+            for ix in (-1,1):
+                for iy in (-1,1):
+                    at=add(fp,(ix*23,iy*46,plate['thicknessMm']/2));label=side+str(ix)+str(iy)
+                    model.rigid(attachment,at,'gantry');model.rigid(add(fp,(0,iy*46,0)),at,'foot'+side)
+                    upper=model.root('contactBeam'+label,at,'gantry');lower=model.root('contactFoot'+label,at,'foot'+side)
+                    model.spring(upper,lower,[shear,shear,normal,0,0,0],'bolts')
         else:model.spring(r1,r2,[g['boltTranslationNPerMm']]*3+[bolt]*3,'bolts')
     if packet.get('guideLayout'):
         for side in ['Left','Right']:

@@ -1,5 +1,22 @@
 # SR5 structural screen
 
+## Evidence retention (2026-10-20)
+
+All cited historical runs are compressed under `build/sheet-router-evidence/`.
+`archive-index.json` maps each original directory to its archive. Loose binaries,
+packets and solver output were removed after archive validation; no tracked files
+were deleted. Paths below use an on-demand extraction directory. For example:
+
+```sh
+mkdir -p build/sheet-router-evidence/unpacked
+tar -xzf build/sheet-router-evidence/freeze.tar.gz -C build/sheet-router-evidence/unpacked
+```
+
+Extract only the needed archive and remove its loose copy when finished. Old
+embedded source/hash path names identify the original run, and remain unchanged.
+New SR6 and later checks use `build/sheet-router-work/` as disposable working space.
+
+
 ## Approved SR-D3 rerun and structural freeze (2026-10-20)
 
 **Pass; freeze the overall structure at `71f330894` plus `c71e0d17d`.** The
@@ -52,12 +69,13 @@ Damping remains unmeasured at 1%; servo, backlash, cutting-force and cutter/spin
 compliance dynamics are excluded. SR6-C tap/impact or sine-sweep measurements at
 the governing poses must replace modeled frequencies/damping, tune the shaper,
 and repeat the 0.05 mm checks. The initial [SR6 fabrication packet](../fabrication/README.md)
-starts frame layout, weld/jig planning, stock lists and alignment; real tube
-end/cope preparation and weld-seam detailing remain open.
+now contains real tube-end/cope preparation and connected seam graphs on both
+beds, plus the DIY relief/rail-seat/alignment route. Its preliminary weld-load
+screen has unresolved groups; this is still a gated draft, not shop release.
 
 Durable condensed evidence: [`sr-d3-results.json`](sr-d3-results.json). Full
 hashed packets, all 36 solves, forty-mode runs and dynamic traces live under
-`build/sheet-router-freeze/`; `packets/acceptance.json` records the combined
+`build/sheet-router-evidence/unpacked/sheet-router-freeze/`; `packets/acceptance.json` records the combined
 assessment. Run `study.py`, `report.py`, `extended_modes.py`, then
 `dynamic_error.py --work-y 2600` and `--work-y 3150` with the same packet/extended
 paths, and finally `acceptance.py --packets … --dynamic …`. Analytical SDOF and
@@ -89,7 +107,7 @@ This is a clearance revision, not a new 40 Hz qualification. Its four midpoint
 The full new pose/mesh envelope remains pending. **This predates the approved motion-error SR-D3 decision below.** The
 motion-error, shaping and architecture calculations below use the preceding
 f47ed13f4 geometry; they are not silently relabelled as validation of the raised
-datum. Native packets and checks are in `build/sheet-router-system/cad`,
+datum. Native packets and checks are in `build/sheet-router-evidence/unpacked/sheet-router-system/cad`,
 `cad-spot`, `layout.log`, `clearance.log` and `sizing.log`.
 
 The optional legacy desktop-router fingerprint check fails identically on clean
@@ -178,7 +196,7 @@ Coarse/fine changes in **frequency deltas** are below0.0042 Hz; all variants ret
 
 **Recommendation:** validate a jerk-limited contour execution policy and/or per-move ZVD against measured modes and finishing requirements before redesigning the entire machine for a frequency proxy. Retain SR-D3 until the user chooses. Continue the independent clearance work: raise the complete Z-guide/ram datum 60 mm together with the table/rack, recover the tool lever to 367.75 mm while keeping149 mm clearance, and lower the front braces out of the sheet-loading path. This requires a taller X plate, not merely moving the spindle relative to its plate. No architecture variant above was selected.
 
-Artifacts remain on root under `build/sheet-router-system/`: native planner sampler, `dynamic/dynamic-error.json`, `dynamic/responses.{svg,png}`, `architecture/architecture.json`, paired coarse results and source/provenance hashes. Independent SDOF step and ZV/ZVD cancellation/DC-gain fixtures pass.
+Artifacts remain on root under `build/sheet-router-evidence/unpacked/sheet-router-system/`: native planner sampler, `dynamic/dynamic-error.json`, `dynamic/responses.{svg,png}`, `architecture/architecture.json`, paired coarse results and source/provenance hashes. Independent SDOF step and ZV/ZVD cancellation/DC-gain fixtures pass.
 
 ## Anchored modal diagnosis (2026-10-20)
 
@@ -326,7 +344,7 @@ HGR30 uses [HIWIN HGH25CA/HGH30CA](https://www.hiwin.com/wp-content/uploads/Line
 
 Fixed base braces are not part of moving Y mass. The beam mass also increases slightly because thicker feet change the generated span. Part-level inertia and material mass are changed in each sensitivity, not just a modal denominator.
 
-Artifacts: `build/sheet-router-modal/anchored/{results,summary}.json`, `extended/extended-modes.json`, `sensitivities/sensitivities.json`, and `diagnosis.json`. The full-run solve-time sources, packet hashes and solver hash remain with the results. Extended/sensitivity runs record their source hashes separately. No fabrication release.
+Artifacts: `build/sheet-router-evidence/unpacked/sheet-router-modal/anchored/{results,summary}.json`, `extended/extended-modes.json`, `sensitivities/sensitivities.json`, and `diagnosis.json`. The full-run solve-time sources, packet hashes and solver hash remain with the results. Extended/sensitivity runs record their source hashes separately. No fabrication release.
 
 
 ### Reproduce the anchored review
@@ -334,23 +352,23 @@ Artifacts: `build/sheet-router-modal/anchored/{results,summary}.json`, `extended
 Use the existing mill FEM virtualenv and prebuilt CalculiX. Keep all outputs on
 root; DATA1 is only read for the earlier moving-mass comparison. The packets used
 here are the exact f47ed13f4 exports copied from
-`build/sheet-router-stiffness/validated/y{2600,3150}` into `anchored/`.
+`build/sheet-router-evidence/unpacked/sheet-router-stiffness/validated/y{2600,3150}` into `anchored/`.
 
 ```bash
 export LD_LIBRARY_PATH="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 router_python=machinekit/examples/bench-mill/build/fem/venv/bin/python
 router_ccx=machinekit/examples/bench-mill/build/fem/tools/calculix/usr/bin/ccx
-router_packets=build/sheet-router-modal/anchored
+router_packets=build/sheet-router-evidence/unpacked/sheet-router-modal/anchored
 /home/joao/dev/materia-cache/tools/heavy-run --mem 6G --need 1G --label router-modal-full \
   "$router_python" machinekit/examples/sheet-router/fem/study.py --packets "$router_packets" --ccx "$router_ccx" --floor anchored
 "$router_python" machinekit/examples/sheet-router/fem/report.py "$router_packets"
 /home/joao/dev/materia-cache/tools/heavy-run --mem 5G --need 1G --label router-modal-sensitivity \
-  "$router_python" machinekit/examples/sheet-router/fem/sensitivity.py --packets "$router_packets" --ccx "$router_ccx" --output build/sheet-router-modal/sensitivities
+  "$router_python" machinekit/examples/sheet-router/fem/sensitivity.py --packets "$router_packets" --ccx "$router_ccx" --output build/sheet-router-evidence/unpacked/sheet-router-modal/sensitivities
 /home/joao/dev/materia-cache/tools/heavy-run --mem 5G --need 1G --label router-extended-modes \
-  "$router_python" machinekit/examples/sheet-router/fem/extended_modes.py --packets "$router_packets" --ccx "$router_ccx" --output build/sheet-router-modal/extended
+  "$router_python" machinekit/examples/sheet-router/fem/extended_modes.py --packets "$router_packets" --ccx "$router_ccx" --output build/sheet-router-evidence/unpacked/sheet-router-modal/extended
 "$router_python" machinekit/examples/sheet-router/fem/diagnose.py --packets "$router_packets" \
-  --extended build/sheet-router-modal/extended/extended-modes.json \
-  --sensitivities build/sheet-router-modal/sensitivities/sensitivities.json \
+  --extended build/sheet-router-evidence/unpacked/sheet-router-modal/extended/extended-modes.json \
+  --sensitivities build/sheet-router-evidence/unpacked/sheet-router-modal/sensitivities/sensitivities.json \
   --baseline /media/joao/DATA1/materia-router-sr6/final
 ```
 
@@ -390,7 +408,7 @@ gantry-dominant mode is only 23.688 Hz. This is a single-mesh diagnostic, not
 acceptance evidence. It predates the final motor-support clearance
 fix. Mixed frame/gantry modes remain relevant regardless of classification.
 
-Working evidence is under `build/sheet-router-stiffness`: `baseline/` contains
+Working evidence is under `build/sheet-router-evidence/unpacked/sheet-router-stiffness`: `baseline/` contains
 the corrected comparison, `cad/` the earlier revised CAD, and `cad-screen/` its
 critical-pose screen. Fresh final CAD packets are in `validated/`, exported from an isolated detached
 worktree based on HEAD with only the router patch. Both beds export 171 components
@@ -403,7 +421,7 @@ SR4 sizing/planner gate passes 82 assertions. Shared exporter fixtures pass
 33 mill plus seven router assertions, native beam/spring/crossing fixtures pass,
 and all 37 mill Python regressions pass. Both beds pass the complete assembly
 and clearance sweep: 426 assertions, including travel extremes and tool-rack
-approaches. Logs are retained in `build/sheet-router-stiffness/isolated-validation/`.
+approaches. Logs are retained in `build/sheet-router-evidence/unpacked/sheet-router-stiffness/isolated-validation/`.
 
 The revised long-bed moving Y mass is 193.77 kg. The ideal drive-only estimate is
 47.23 Hz, falling to 36.78 Hz with half hinge stiffness, or 45.03 Hz with 10% extra
@@ -421,7 +439,7 @@ The new candidate uses two X rails/four blocks, moving Z rails/four fixed blocks
 two-level spindle saddle. It retains the original steel beam and nominal rack size.
 Z is 1610, 200 mm travel and 10 m/min; X and braked Z are 750 W.
 
-New exports default to `build/sheet-router-sr6`. Set `SHEET_ROUTER_FEM_OUTPUT`
+New exports default to `build/sheet-router-evidence/unpacked/sheet-router-sr6`. Set `SHEET_ROUTER_FEM_OUTPUT`
 to place packets on another volume; pass that same path to `study.py`, `report.py`
 and the eccentric-load checker. `SHEET_ROUTER_FEM_BINARY`, `SHEET_ROUTER_BINARY`
 and `SHEET_ROUTER_SIZING_BINARY` relocate compiler outputs independently.
@@ -526,9 +544,9 @@ fem_ccx="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/bin/cc
 export LD_LIBRARY_PATH="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 "$heavy_run" --mem 10G --need 1G --label sr6-export -- machinekit/scripts/test-sheet-router-fem
-"$fem_python" machinekit/examples/sheet-router/fem/verify.py --ccx "$fem_ccx" --output build/sheet-router-sr6/verification
-"$heavy_run" --mem 10G --need 1G --label sr6-study -- "$fem_python" machinekit/examples/sheet-router/fem/study.py --packets build/sheet-router-sr6 --ccx "$fem_ccx"
-"$fem_python" machinekit/examples/sheet-router/fem/report.py build/sheet-router-sr6
+"$fem_python" machinekit/examples/sheet-router/fem/verify.py --ccx "$fem_ccx" --output build/sheet-router-evidence/unpacked/sheet-router-sr6/verification
+"$heavy_run" --mem 10G --need 1G --label sr6-study -- "$fem_python" machinekit/examples/sheet-router/fem/study.py --packets build/sheet-router-evidence/unpacked/sheet-router-sr6 --ccx "$fem_ccx"
+"$fem_python" machinekit/examples/sheet-router/fem/report.py build/sheet-router-evidence/unpacked/sheet-router-sr6
 "$heavy_run" --mem 10G --need 1G --label sr6-eccentric -- machinekit/scripts/test-sheet-router-fem --y-loads
 ```
 
@@ -650,7 +668,26 @@ compression is about 75 N within this assumed foundation model. The Haxe gate
 passes seven shared-exporter/frame-data checks and 33 existing mill datum checks;
 the existing mill Python suite passes 37 tests.
 
-Generated evidence is under `build/sheet-router-sr5/`: `summary.json`,
+Generated evidence is under `build/sheet-router-evidence/unpacked/sheet-router-sr5/`: `summary.json`,
 `results.json`, `verification/verification.json`, `y-loads.json`, and
 `eccentric-drives.json`. Packet, solver executable, study source and report hashes
 are recorded. Generated files are intentionally outside project history.
+
+
+## SR6 DIY foot-joint comparison
+
+The frozen welded candidate is unchanged. Two assumed bolted/dowelled joints
+were solved on both beds at the static-X, static-Y and modal governing poses
+(h=50 mm, anchored baseline). The four-quadrant machined-face contact candidate
+uses 1.5 MN/mm normal and 0.2 MN/mm transverse stiffness per quadrant, with no
+local rotational spring. It gives long-bed governing Y **1.909 N/µm** versus
+**2.044** welded, and modal-pose gantry **25.395 Hz** versus **26.986**. The
+original lumped bolted spring is softer still. Retain welded feet; these assumed
+spring values do not qualify a physical preloaded/dowelled joint. Hardware mass
+was held unchanged in this interface-only screen.
+
+All twelve comparisons: [diy-feet-results.json](diy-feet-results.json). Full decks
+and results: `build/sheet-router-evidence/sr6-diy.tar.gz`, extracted under
+`build/sheet-router-evidence/unpacked/sr6-diy/`. The same archive retains prepared
+frame STEP files and native service checks; their local weld qualification is
+separate from the frozen beam-centreline model.

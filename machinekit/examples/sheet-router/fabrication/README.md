@@ -1,121 +1,104 @@
-# SR6 frame fabrication and alignment — initial shop packet
+# SR6 prepared frame and DIY fabrication packet
 
-This packet starts SR6 for the raised Z/table/rack datum and the fourth leg pair
-at Y=1575. It does not add deep side girders. Structural freeze status and the
-full rerun evidence are recorded in `../fem/README.md`. These are fabrication
-planning documents; joint preparation, weld access, shop tolerances, the welding
-procedure and anchor selection must be detailed before drawings are released.
+**Draft, not released for fabrication.** The frozen frame layout and sections are
+retained, including sixteen braces and the Y1575 extra leg pair. The governing
+fabrication and alignment procedure is [DIY_ROUTE.md](DIY_ROUTE.md). No large
+machine tool is required for the complete base.
 
-## Layout, cut list and weld seams
+## Prepared geometry and seams
 
-`SheetRouterFabrication.hx` reads the actual `SheetRouter.base`: member endpoints,
-section designations, `FrameAssembly.cutLength()` and grouped cut list; every
-authored weld pair and leg size; geometry-derived seam candidates and diagnostics;
-eight foot datums and both Y rail-pad datums. Run the existing FEM entry with
-`--export-only --fabrication` and `SHEET_ROUTER_FABRICATION_OUTPUT` pointing under
-root `build/`. The JSON output is the dimensional authority for this draft.
+`SheetRouterFramePreparation.hx` partitions the forty actual fixed-frame tube
+blanks into continuous stringers and coped/intersection-trimmed members. It
+exports each resulting solid to STEP, checks for overlapping/disconnected pieces,
+and extracts seams from the prepared B-rep contacts. Both beds have 68 pieces:
 
-The per-bed CSV and SVG here combine that output with the frozen FEM manifest's four upper-frame tubes (40 fixed-frame stock members total). Coordinates are mm
-in machine XYZ; SVGs are centreline projections, not weld-detail drawings. Stock
-lengths are the current CAD square/mitre definitions, with no kerf, end allowance
-or tube-intersection cope added. The twelve upper-frame corner/post tie-ins are listed separately for joint
-detailing; they are not present in the base weld declarations. Resolve every overlapping tube intersection into
-an end/cope detail before issuing the cut list to the saw. Check available stock
-lengths and add labelled machining/trim allowances rather than changing datums.
+| Bed Y | Joined contacts | Native seam segments | Geometry findings |
+| --- | ---: | ---: | ---: |
+| 2600 | 172 | 944 | 0 |
+| 3150 | 170 | 904 | 0 |
 
-The joint schedule carries the authored 5 or 6 mm fillet legs. Geometry-derived
-seams are candidates, not an automatic instruction to weld every accessible edge.
-Review seam findings, tube wall thickness, access and start/stop positions; define
-weld extents, returns and inspection in the shop WPS. Do not silently treat an
-unresolved seam as welded. Rail-pad and beam-foot weld distortion is a machining
-allowance issue as well as an alignment issue.
+These replace the initial square-ended packet's eighty unresolved weld
+annotations and zero seams. Native edge counts are not weld instructions.
+`weld-stitches.csv` selects nominal 5 mm legs and starts with 40 mm opposed
+stitches, increasing extent only where the preliminary capacity screen requires
+it. Flush Butt edges are excluded rather than assigned imaginary fillets.
 
-The first native extraction has **36 base stock members and 80 weld declarations
-per bed, but zero valid seam edges and 80 `weld.no-seam` findings**. The current
-intersecting stock envelopes need real end/cope preparation before the seam finder
-can identify shop weld paths. This is the first open SR6 detailing item, retained
-in each `native.json`; the empty seam-candidate CSV is not an approved weld plan.
-Structural freeze fixes the overall layout/sections, not these unfinished joint
-preparations or a fabrication release.
+**Weld qualification remains open.** The conservative screen uses 5 kN force and
+arbitrary-direction family moments of 0.1 kNm (brace), 0.25 kNm (table/rack) and
+0.75 kNm (post/frame), with an assumed 80 MPa throat-stress limit. These are
+engineering screening allocations, not extracted joint loads or a qualified
+WPS. 38 short-bed and 36 long-bed short/collinear seam groups do not pass this
+allocation, even at their full available length. `weld-detail.json` identifies every failed group and retains
+null stress where an arbitrary moment is unresisted. Resolve with verified
+joint-load directions and/or a detailed connection before shop release; do not
+increase bead size or silently waive a failed group.
 
-Regenerate the views with:
+The prepared steel mass is approximately 1022.3 kg (short) and 1095.6 kg (long),
+using 7850 kg/m³. Removing intersecting interior metal reduces the original
+fixed-frame union mass by approximately 69.1/73.2 kg. The frozen beam-centreline
+model does not represent this local connection preparation or certify its weld
+stiffness. The prior full structural rerun remains evidence for the frozen
+layout, not a strength qualification of these draft connections.
+
+## DIY fabrication and metrology
+
+Follow the full sequence in [DIY_ROUTE.md](DIY_ROUTE.md): full tack in jig,
+balanced short stitches, thermal relief (VSR fallback), rest and repeat survey,
+epoxy-levelled or adjustable rail seats, rails, measured squaring, then SR6-C.
+The procedure includes furnace envelope/payload, 2–6 mm proposed epoxy layers,
+steel rail-bolt threads, alignment instruments and tolerances. Resin application
+approval and witness qualification remain required. The beam/feet go separately
+to an ordinary shop; its actual travel and indexed datum transfer must be agreed.
+
+Two bolted/dowelled foot models were checked at both beds' modal and static-X/Y
+governing poses. The improved machined-face candidate still gives only
+1.909 N/µm worst long-bed Y, below 2 N/µm; its first gantry mode is 25.395 Hz
+versus 26.986 Hz welded. Retain welded feet. This finding applies to these
+assumed joints; it does not rule out every possible bolted connection.
+
+## Service access
+
+The service table keeps its original plenum envelope, plugs the original lower
+ports and moves each lower port 120 mm in Y to clear the supporting tubes.
+Six valves are outside the side frame on removable floor stands. The middle
+valves shift 300 mm in Y to avoid the extra post pair. The packet records six
+suction routes, six feed routes, a rear crossover and the pump feed. Routes use
+60/90 mm outside envelopes, R75/R100 bends and 5 mm clearance allowance.
+
+Native checks test routes and 450 mm valve-withdrawal envelopes against the
+frame, brackets, service equipment and sampled moving gantry/chain geometry on
+both beds (185 checks each after the final stand revision). Six top inspection-lance paths give plenum access after removing the
+spoilboard, avoiding a requirement to crawl through the braces. These sampled
+clearances do not certify a purchased hose's actual bend radius or installation
+clamps. The front sheet-loading mouth remains part of the assembly sweep.
+
+## Reproduction and release
+
+Run the FEM executable with `--export-only --fabrication`; the default output is
+`build/sheet-router-work/sr6/native`. Then:
 
 ```sh
 python3 machinekit/examples/sheet-router/fabrication/render.py \
-  --native build/sheet-router-freeze/fabrication \
-  --packets build/sheet-router-freeze/packets \
+  --native build/sheet-router-work/sr6/native \
+  --packets build/sheet-router-work/sr6/model/packets \
+  --output machinekit/examples/sheet-router/fabrication
+python3 machinekit/examples/sheet-router/fabrication/detail.py \
+  --native build/sheet-router-work/sr6/native \
   --output machinekit/examples/sheet-router/fabrication
 ```
 
-## Jig layout and weld sequence
+Per-bed STEP geometry is retained as build evidence; committed CSV, SVG and JSON
+views carry source hashes. Cut lengths are projected prepared-stock extents,
+without kerf or labelled shop trim allowance; STEP defines each cope. Confirm
+actual stock availability before ordering. No obsolete upper-frame tie-ins are
+added a second time.
 
-1. Mark a longitudinal reference line and perpendicular front datum on a rigid,
-   surveyed jig. Set three primary height stops first, then shim the remaining
-   stops without bending the frame into contact. Locate the eight foot/post
-   stations from the per-bed jig table, including the separate Y1575 pair.
-2. Set lower side members, end planes and all posts. Clamp with space for weld
-   access; check side spacing, diagonals and post heights. Tack symmetrically.
-3. Locate table side stringers, seven table crossmembers and the rear rack
-   crossmember. Check the table/rack heights against the raised datum before
-   tacking. Fit the sixteen braces; retain the lowered Z430 front brace endpoints
-   and the full-width front sheet-loading mouth.
-4. Tack opposing sides and bays in rotation, working from the middle toward the
-   ends. Recheck diagonal and height surveys after each tack group. Trial-fit the
-   rail pads, cable-chain supports and vacuum/service routes before closing access.
-5. Complete short, balanced weld runs on opposing joints, alternating sides and
-   bays. Use the qualified shop WPS for heat input, interpass temperature and
-   weld lengths. Avoid completing one side or one long rail-pad seam first. Keep
-   a numbered joint/run record against the generated weld schedule.
-6. Unclamp after cooling, survey free-state distortion, and stress-relieve the
-   frame and welded beam/feet by a process agreed with the fabricator and material
-   supplier. Leave finish-machining allowance; do not finish rail faces beforehand.
-7. Machine the frame rail-pad seats from one common setup/datum. Welded beam feet
-   require stress relief followed by **single-setup machining of the Y-carriage
-   seating faces and X-rail faces**. Record their relative squareness and parallelism.
-8. Inspect dimensions and welds, deburr/clean, protect machined datums, then coat
-   non-datum surfaces. Re-survey after coating and handling. Seal tube ends while
-   retaining any fabrication vent/drain provisions required by the shop process.
+`shop-release.json` is fail-closed. Geometry, service, weld-load/WPS review,
+material/relief procedure, resin application approval, shop capability and signed
+packet review must pass before drawings are released. Actual relief/rest, rail
+seat/alignment and SR6-C modal measurements are later build witnesses. Never
+replace those measurements with simulated sign-offs.
 
-## Rail pads and dual-Y alignment
-
-1. Install the anchored frame on the qualified slab/anchor arrangement. Adjust
-   all eight supports to load-sharing contact; level without twisting the frame.
-   Repeat the datum survey after anchor tightening. The FEM assumption was
-   50,000 N/mm in each translation at every support, not an anchor specification.
-2. Establish the master Y rail against the machined reference face and a surveyed
-   straight reference. Tighten incrementally, recording straightness and height.
-3. Fit the second Y rail using the gantry/carriage spacing and measured parallelism,
-   traversing the full stroke after each tightening group. Verify block preload
-   and free motion; do not pull a skewed rail into alignment using the motors.
-4. Fit the stress-relieved, jointly machined gantry beam/feet. Verify the X rail
-   datum is square to the Y travel and both Y carriage seats are coplanar. This
-   machining establishes mechanical dual-Y squareness.
-5. Set both Y rack lines using a tooth joining gauge across rack joints. Set mesh,
-   preload hinges and reducer backlash without forcing rail alignment. Record
-   rack pitch continuity and pinion engagement over travel.
-6. Establish independent left/right Y home references against the mechanically
-   squared gantry. Set home offsets from the measured square, then repeat homing
-   and a full-travel diagonal check. Electronic squaring must reproduce the
-   mechanical datum rather than conceal beam/foot machining error.
-7. Align X rails, Z rails and spindle tram; verify the 149 mm ram gap, 367.75 mm
-   beam-to-longest-tool lever, full Z coverage, rack/tool-change reach and front
-   sheet-loading sweep. Record straightness, parallelism, diagonals, tram and
-   repeatability with instruments and temperature. Final numerical alignment
-   tolerances need a complete machining/servo/cutting accuracy allocation.
-
-The built-up aluminium Z uses bolted/dowelled ribs, not welded 6082-T6. Machine
-the rail face after assembly. Vacuum zone valves, pump plumbing, chains and hoses
-still need physical service/removal access checks before shop release.
-
-## SR6-C commissioning before cutting acceptance
-
-At the modeled governing poses for both beds, excite X/Y translation and gantry
-roll with an instrumented tap/impact or sine sweep. Measure relative tool/bed
-response as well as frame/gantry response, identify the first participating modes
-and damping, repeat to establish uncertainty, and retain raw data and fit settings.
-Replace the assumed 1% damping and modeled frequencies in the dynamic calculation,
-tune ZVD from the measurements, and re-check ≤0.05 mm contour deviation and
-≤0.05 mm rapid residual at the real planner limits. Required MotionKit OM-R1
-jerk-limited execution and optional shaping must then be checked at the drives.
-This measured acceptance, alignment and cutting qualification remain SR13/SR16
-release gates; the structural model does not close them.
+Condensed check results and source identities: [validation.json](validation.json).
+Full native STEP, solver and run-log evidence is retained in
+`build/sheet-router-evidence/sr6-diy.tar.gz` (extracts as `sr6-diy/`).

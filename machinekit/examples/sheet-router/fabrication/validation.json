@@ -1,0 +1,45 @@
+{
+  "status": "Geometry and service checks pass; weld-load/WPS qualification and supplier/shop checklist remain open",
+  "beds": [
+    {
+      "workY": 2600,
+      "pieces": 68,
+      "contacts": 172,
+      "seamSegments": 944,
+      "geometryFindings": 0,
+      "serviceAssertions": 185,
+      "servicePass": true,
+      "weldGroups": 140,
+      "unresolvedWeldGroups": 38,
+      "released": false
+    },
+    {
+      "workY": 3150,
+      "pieces": 68,
+      "contacts": 170,
+      "seamSegments": 904,
+      "geometryFindings": 0,
+      "serviceAssertions": 185,
+      "servicePass": true,
+      "weldGroups": 138,
+      "unresolvedWeldGroups": 36,
+      "released": false
+    }
+  ],
+  "assemblyAssertions": 426,
+  "assemblyNote": "Full two-bed sweep before lowering only the external stand bar from Z250 to Z75; final lowered-stand geometry then passed 185 native service/access probes per bed.",
+  "screenFixtures": [
+    "analytical axial throat stress",
+    "unresisted collinear moment fails closed",
+    "reversed-edge deduplication"
+  ],
+  "sourceHashes": {
+    "machinekit/examples/sheet-router/SheetRouter.hx": "9ab201cf7661bf8489da05b87f9d10484594acbd422ed7609134f6634d266ff7",
+    "machinekit/examples/sheet-router/SheetRouterFramePreparation.hx": "22b6d017b6388fca6867ccacd4d6e21f0ebec0684c4bb6cff096f15b04f96097",
+    "machinekit/examples/sheet-router/SheetRouterServiceChecks.hx": "f09908e39c963ca4bc9736c3ec64dbf25466a979122b2f2b3cef63bcfdfdd4c7",
+    "machinekit/examples/sheet-router/SheetRouterServiceTable.hx": "80b8170580b205750a96d20094aea1993a14350c6a2f8c139527e1041039b354",
+    "machinekit/examples/sheet-router/SheetValveServiceStand.hx": "5da810e358215045d4ef48c617c497a7a4a684293ba4f0178769df166ad4b2b4",
+    "machinekit/examples/sheet-router/SheetRouterFabrication.hx": "4348c101f416898ff416e2e24ed755a4c995087097662191c8009df9adadc66a"
+  },
+  "evidenceArchive": "build/sheet-router-evidence/sr6-diy.tar.gz"
+}

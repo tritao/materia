@@ -270,8 +270,11 @@ machined.**
     from a reference.
   - the shared rail mount (side bar, push screws, assembly sequence, metrology) is planned in
     `machinekit/RAIL_MOUNTING.md`; the router adopts it after the bench mill (RM6).
-- The frame is welded in a stated sequence and settles before replication, so weld distortion is
-  taken out by the replicated layer. Full stress relief of a 3 m weldment is not available to us.
+- DIY route approved 2026-10-20: full tack/jig, balanced 5 mm stitch welds, interpass
+  cooling/light peening under the WPS; commercial car-bottom thermal relief preferred,
+  VSR fallback; rest and repeat surveys before continuous epoxy-levelled rail seats.
+  No large machining centre for the base. Adjustable jack-screw/shim pads are the alternative.
+  [DIY_ROUTE.md](fabrication/DIY_ROUTE.md) specifies pour, metrology and release gates.
 - Filling the tubes for damping (sand or a polymer concrete) is decided by SR5 modal results, not
   up front.
 - Gantry side plates, Z plate and bearing plates are laser-cut steel or aluminium plate with
@@ -852,6 +855,17 @@ OM-R1 execution, measured-mode commissioning and cutting acceptance remain open.
   - plate holes match their mating parts' bolt patterns (an assembly check);
   - rack joints fall at whole teeth.
 
+**DIY fabrication route (2026-10-20).** Use full jig/tack, balanced nominal 5 mm
+stitches, thermal relief (qualified VSR fallback), rest/survey, epoxy-levelled
+rail seats (adjustable pads alternative), then measured rail parallelism and
+squaring. Do not machine the whole base. Separate beam/feet machining requires
+shop-confirmed travel or controlled indexed datum transfer. Retain welded feet:
+the screened four-quadrant machined bolted joint gives only 1.909 N/µm long-bed
+Y and fails SR-D3. See [joint screen](fem/diy-feet-results.json) and
+[DIY procedure/checklist](fabrication/DIY_ROUTE.md). Prepared tube contacts now
+produce real seams on both beds, but the preliminary arbitrary-moment weld
+screen has unresolved groups; fabrication remains explicitly unreleased.
+
 ### Phase B: machine behaviour in simulation
 
 **SR7. The ATC sequence and tool table (SR-D5).**
@@ -1120,7 +1134,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR4 | revised two-bed drive/rack/screw screen complete; 82 sizing/planner assertions pass | see guide-first revision |
 | SR5 | complete: 36-case raised-datum/extra-leg rerun and new-mode motion check pass; structure frozen | see FEM diagnosis |
 | SR6-C | planned: measured modes/damping and shaper tuning before cutting acceptance | SR13/SR16 gate |
-| SR6 | structure frozen; initial weldment/cut/jig/alignment packet started; tube-end/cope and seam detailing, shop release and service access remain open | see raised-datum revision |
+| SR6 | prepared frame: 68 pieces/bed, valid connected seam graph; DIY relief/rail-seat/alignment procedure and service routing drafted; conservative weld-load screen fails some joint groups, so shop release remains gated | [fabrication packet](fabrication/README.md) |
 | SR7 | planned | |
 | SR8 | planned | |
 | SR9 | planned | |
@@ -1205,7 +1219,7 @@ At the user's request, router work continues in `/home/joao/dev/materia` on
 `main`, reusing its existing toolchain and builds to reduce disk usage. The
 separate `sheet-router` worktree is removed; its branch retains commits
 `e8ec34a25` and `837fea7b1`. SR0 logs are preserved in
-`build/sheet-router-sr0/` in the main checkout. Earlier setup and disk notes
+`build/sheet-router-evidence/unpacked/sheet-router-sr0/` in the main checkout. Earlier setup and disk notes
 above describe the removed worktree; recheck the current main toolchain and
 available disk before the next gate. Unrelated main-checkout edits are preserved.
 
@@ -1263,13 +1277,13 @@ Focused gate (reuses native libraries, does not create another native build):
 The script defaults to `app/build/host/native/cadkit`; `CADKIT_BUILD_ROOT` can
 select another existing CadKit library directory. It compiles only Haxe bytecode
 into the existing MachineKit test tree before running it. Logs for this session
-are under `build/sheet-router-sr0/sr1-*.log`. This is the SR1 focused gate, not a
+are under `build/sheet-router-evidence/unpacked/sheet-router-sr0/sr1-*.log`. This is the SR1 focused gate, not a
 claim that the unfinished SR0 full application baseline has passed.
 
 
 SR1 closing evidence: `machinekit/scripts/test-sheet-router-parts` passed **292
 assertions** through heavy-run (8 GiB cap, 2 GiB requirement), exit 0; log
-`build/sheet-router-sr0/sr1-close.log`. The 25 recipes have valid positive-volume
+`build/sheet-router-evidence/unpacked/sheet-router-sr0/sr1-close.log`. The 25 recipes have valid positive-volume
 solids, stable direct-constructor/recipe identities, BOM rebuilds, connector frames
 and saved-assembly decode. Checks include both rail sizes, a 100 mm/revolution
 helical reference, thrust direction, contact ratio, preload and reducer units,
@@ -1327,7 +1341,7 @@ robot model; its Y speed is derived as 5/3 m/s through a 5:1 reducer. Both Y mot
 remain coupled to the same leader with the 0.5 mm skew bound. Checks also cover FK,
 new hardware solids, reducer inertia/efficiency, cable endpoints, reduced metric
 and ball screws, and invalid bore, supply and belt/reducer combinations. Logs:
-`build/sheet-router-sr0/sr2-gate.log`, `sr2-legacy.log`, `sr2-parts.log`.
+`build/sheet-router-evidence/unpacked/sheet-router-sr0/sr2-gate.log`, `sr2-legacy.log`, `sr2-parts.log`.
 
 The full SR0 application baseline and workshop acceptance remain open. This step
 adds shared builder capabilities; the full `SheetRouter` assembly is SR3.
@@ -1426,7 +1440,7 @@ unit checks also pass. Only the existing runtime object/library was rebuilt;
 no new native build tree was created. The Haxe planner and strict native coupling
 validation are unchanged. Native test logs are `sr3-brake-baseline.log`,
 `sr3-native-brake2.log`, `sr3-native-tests.log` and `sr3-runtime-unit.log` under
-`build/sheet-router-sr0/`. The unoptimised runtime test executable needs a 64 MiB
+`build/sheet-router-evidence/unpacked/sheet-router-sr0/`. The unoptimised runtime test executable needs a 64 MiB
 stack because its large fixture locals exceed the default stack with helper calls.
 
 
@@ -1434,7 +1448,7 @@ The final two-bed CAD/physical gate passed **426 assertions**, including 59
 interference samples per length (27 work poses and 32 fork-path poses). Both
 physical models validate. Assumed assembly mass is **1694.879 kg** at Y=2600 and
 **1847.572 kg** at Y=3150; each BOM has **103 lines**. See
-`build/sheet-router-sr0/sr3-clearance6.log` (exit 0). Cutting paths and open-cover,
+`build/sheet-router-evidence/unpacked/sheet-router-sr0/sr3-clearance6.log` (exit 0). Cutting paths and open-cover,
 raised-shoe fork paths are sampled; arbitrary low moves through rear fixtures
 and closed-cover/tool-change motion are not declared collision-free.
 
@@ -1459,7 +1473,7 @@ their previous geometry. `StartPageTests` passes in `sr3-start-page.log`.
 Closing app evidence: `ProjectSourceTests` case `sheet-router` passes source
 project load, physical model validation, loaded MuJoCo pose hold, affine brake
 command anchors and complete Z/X/Y homing with all three leaders referenced
-(`build/sheet-router-sr0/sr3-app7.log`, exit 0). Final Y capture uses the declared
+(`build/sheet-router-evidence/unpacked/sheet-router-sr0/sr3-app7.log`, exit 0). Final Y capture uses the declared
 0.05 mm/s cap and the existing 20 micrometre return tolerance; no tolerance was
 relaxed. Root free space is approximately 2.0 GiB. SR3 is complete under these
 reference assumptions; SR4 drive sizing/compliance is next. The full SR0 baseline,
@@ -1576,7 +1590,7 @@ by hand, RMS, tooth-load scaling and preload effects, SI conversion, saved-owner
 namespace copying, stiffness rebuild after part edits, both bed lengths, the
 chosen sizing, named dual-400 W Y rejection in both sizing and `PlanCheck`, and
 insufficient-preload rejection. The JSON report is
-`build/sheet-router-sr4/sizing.json`; `SHEET_ROUTER_SIZING_OUTPUT` can select a
+`build/sheet-router-evidence/unpacked/sheet-router-sr4/sizing.json`; `SHEET_ROUTER_SIZING_OUTPUT` can select a
 different output directory. `--checks-only` skips writing the report.
 
 
@@ -1599,8 +1613,8 @@ SR4 closing evidence:
   with the new compiled drive path (`sr4-app.log`, exit 0). The earlier conservative
   Y capture policy remains in force; no homing tolerance was relaxed.
 
-Logs are under `build/sheet-router-sr0/`. The report is under
-`build/sheet-router-sr4/`. Existing native libraries were reused, with no native
+Logs are under `build/sheet-router-evidence/unpacked/sheet-router-sr0/`. The report is under
+`build/sheet-router-evidence/unpacked/sheet-router-sr4/`. Existing native libraries were reused, with no native
 rebuild or new build tree. Root free space is approximately 1.8 GiB. This closes
 SR4 under the stated reference assumptions. SR5 structural reactions, compliance
 and modes are next; SR0 full-baseline and supplier/hardware qualification remain open.

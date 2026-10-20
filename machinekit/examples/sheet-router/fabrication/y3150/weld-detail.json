@@ -1,0 +1,3771 @@
+{
+  "workY": 3150,
+  "sourceSha256": "3b4d26fe8c8946c101cd74e48f4ee2308361225022776088fafac930ded5e88c",
+  "groups": [
+    {
+      "id": "W001",
+      "stocks": [
+        "endBrace0a",
+        "endBrace0b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 60,
+      "extent": "60 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 265998.3512769304,
+        "centroidMm": [
+          800.0,
+          -849.25,
+          305.0000000000005
+        ],
+        "stressBoundMPa": 47.92103954820707,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W002",
+      "stocks": [
+        "endBrace0a",
+        "lower0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.04152455025232,
+        "minimumLineInertiaMm3": 42818.9977418037,
+        "centroidMm": [
+          -375.25,
+          -824.520945261984,
+          185.10099979596
+        ],
+        "stressBoundMPa": 37.07207065803201,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W003",
+      "stocks": [
+        "endBrace0a",
+        "planBrace0a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 245.92982589737565,
+        "minimumLineInertiaMm3": 64252.30764881281,
+        "centroidMm": [
+          -341.918178004269,
+          -816.6625631613674,
+          182.32633828099304
+        ],
+        "stressBoundMPa": 28.658713163799113,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W004",
+      "stocks": [
+        "endBrace0a",
+        "post00"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.04152455025232,
+        "minimumLineInertiaMm3": 42818.9977418037,
+        "centroidMm": [
+          -375.25,
+          -873.979054738016,
+          185.10099979596004
+        ],
+        "stressBoundMPa": 37.07207065803201,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W005",
+      "stocks": [
+        "endBrace0a",
+        "post10"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 324.0207622751262,
+        "minimumLineInertiaMm3": 213293.68543911073,
+        "centroidMm": [
+          1975.2500000000002,
+          -853.2497436920403,
+          424.87551069897694
+        ],
+        "stressBoundMPa": 11.768740560265972,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W006",
+      "stocks": [
+        "endBrace0a",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 91.71324591060312,
+        "minimumLineInertiaMm3": 399.4401761705383,
+        "centroidMm": [
+          1975.2500000000002,
+          -828.5293736190436,
+          462.8989378586071
+        ],
+        "stressBoundMPa": 1490.9473393905337,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W007",
+      "stocks": [
+        "endBrace0b",
+        "lower1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.04152455025223,
+        "minimumLineInertiaMm3": 42818.9977418037,
+        "centroidMm": [
+          1975.2500000000002,
+          -824.5209452619839,
+          185.10099979596
+        ],
+        "stressBoundMPa": 37.072070658032054,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W008",
+      "stocks": [
+        "endBrace0b",
+        "planBrace0b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 245.92982589737522,
+        "minimumLineInertiaMm3": 64252.307648812726,
+        "centroidMm": [
+          1941.9181780042688,
+          -816.6625631613675,
+          182.32633828099316
+        ],
+        "stressBoundMPa": 28.658713163799195,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W009",
+      "stocks": [
+        "endBrace0b",
+        "post00"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 324.0207622751262,
+        "minimumLineInertiaMm3": 213293.68543911056,
+        "centroidMm": [
+          -375.25000000000006,
+          -853.2497436920403,
+          424.87551069897694
+        ],
+        "stressBoundMPa": 11.768740560265979,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W010",
+      "stocks": [
+        "endBrace0b",
+        "post10"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0415245502523,
+        "minimumLineInertiaMm3": 42818.99774180369,
+        "centroidMm": [
+          1975.2500000000002,
+          -873.979054738016,
+          185.10099979596004
+        ],
+        "stressBoundMPa": 37.072070658032025,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W011",
+      "stocks": [
+        "endBrace0b",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 91.71324591060312,
+        "minimumLineInertiaMm3": 399.44017617053896,
+        "centroidMm": [
+          -375.2500000000002,
+          -828.5293736190436,
+          462.8989378586071
+        ],
+        "stressBoundMPa": 1490.9473393905314,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W012",
+      "stocks": [
+        "endBrace1a",
+        "endBrace1b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 155097.11130967876,
+        "centroidMm": [
+          800.0,
+          3672.0,
+          439.9999999999999
+        ],
+        "stressBoundMPa": 44.16883046640298,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W013",
+      "stocks": [
+        "endBrace1a",
+        "frameBack"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 400.0,
+        "minimumLineInertiaMm3": 474026.66666666674,
+        "centroidMm": [
+          1895.4125381529593,
+          3672.0,
+          700.0
+        ],
+        "stressBoundMPa": 8.178279281774195,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W014",
+      "stocks": [
+        "endBrace1a",
+        "frameRight"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 8.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          1975.25,
+          3672.0,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W015",
+      "stocks": [
+        "endBrace1a",
+        "lower0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 238.67738118008947,
+        "minimumLineInertiaMm3": 41971.30834450705,
+        "centroidMm": [
+          -375.24999999999994,
+          3647.129608131903,
+          189.9804182564218
+        ],
+        "stressBoundMPa": 37.81609817899223,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W016",
+      "stocks": [
+        "endBrace1a",
+        "planBrace1b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 246.03056240043946,
+        "minimumLineInertiaMm3": 62584.99244630174,
+        "centroidMm": [
+          -341.911598057279,
+          3639.409528108794,
+          186.6885853325579
+        ],
+        "stressBoundMPa": 28.757800639512205,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W017",
+      "stocks": [
+        "endBrace1a",
+        "post02"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 280.1781348110784,
+        "minimumLineInertiaMm3": 93637.32428956723,
+        "centroidMm": [
+          -375.25,
+          3687.2616115374017,
+          196.23363338374295
+        ],
+        "stressBoundMPa": 24.84958431481978,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W018",
+      "stocks": [
+        "endBrace1a",
+        "post12"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 54447.18336192347,
+        "centroidMm": [
+          1975.25,
+          3672.0,
+          667.0291867145205
+        ],
+        "stressBoundMPa": 31.026801558057116,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W019",
+      "stocks": [
+        "endBrace1b",
+        "frameBack"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 400.0,
+        "minimumLineInertiaMm3": 474026.6666666666,
+        "centroidMm": [
+          -295.41253815295977,
+          3672.0,
+          700.0
+        ],
+        "stressBoundMPa": 8.17827928177418,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W020",
+      "stocks": [
+        "endBrace1b",
+        "frameLeft"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 8.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          -375.25,
+          3672.0,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W021",
+      "stocks": [
+        "endBrace1b",
+        "lower1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 238.67738118008947,
+        "minimumLineInertiaMm3": 41971.30834450706,
+        "centroidMm": [
+          1975.2499999999998,
+          3647.129608131903,
+          189.9804182564218
+        ],
+        "stressBoundMPa": 37.816098178992235,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W022",
+      "stocks": [
+        "endBrace1b",
+        "planBrace1a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 246.03056240043946,
+        "minimumLineInertiaMm3": 62584.99244630138,
+        "centroidMm": [
+          1941.9115980572792,
+          3639.409528108794,
+          186.6885853325579
+        ],
+        "stressBoundMPa": 28.757800639512205,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W023",
+      "stocks": [
+        "endBrace1b",
+        "post02"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 54447.18336192329,
+        "centroidMm": [
+          -375.25,
+          3672.0,
+          667.0291867145205
+        ],
+        "stressBoundMPa": 31.026801558057194,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W024",
+      "stocks": [
+        "endBrace1b",
+        "post12"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 280.1781348110785,
+        "minimumLineInertiaMm3": 93637.32428956736,
+        "centroidMm": [
+          1975.2500000000005,
+          3687.2616115374017,
+          196.233633383743
+        ],
+        "stressBoundMPa": 24.84958431481977,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W025",
+      "stocks": [
+        "frameBack",
+        "frameLeft"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          -375.25,
+          3622.0,
+          750.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W026",
+      "stocks": [
+        "frameBack",
+        "frameRight"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          1975.25,
+          3622.0,
+          750.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W027",
+      "stocks": [
+        "frameBack",
+        "post02"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          -375.25,
+          3672.0,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W028",
+      "stocks": [
+        "frameBack",
+        "post12"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          1975.25,
+          3672.0,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W029",
+      "stocks": [
+        "frameFront",
+        "frameLeft"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          -375.25,
+          -799.25,
+          750.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W030",
+      "stocks": [
+        "frameFront",
+        "frameRight"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          1975.25,
+          -799.25,
+          750.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W031",
+      "stocks": [
+        "frameFront",
+        "post00"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          -375.25,
+          -849.25,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W032",
+      "stocks": [
+        "frameFront",
+        "post10"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          1975.25,
+          -849.25,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W033",
+      "stocks": [
+        "frameLeft",
+        "post00"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          -425.25,
+          -799.25,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W034",
+      "stocks": [
+        "frameLeft",
+        "post01"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 200.0,
+        "minimumLineInertiaMm3": 166666.66666666674,
+        "centroidMm": [
+          -425.25,
+          1411.375,
+          700.0
+        ],
+        "stressBoundMPa": 97.07106781186545,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W035",
+      "stocks": [
+        "frameLeft",
+        "post02"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          -425.25,
+          3622.0,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W036",
+      "stocks": [
+        "frameLeft",
+        "post03"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 200.0,
+        "minimumLineInertiaMm3": 166666.66666666674,
+        "centroidMm": [
+          -425.25,
+          1575.0,
+          700.0
+        ],
+        "stressBoundMPa": 97.07106781186545,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W037",
+      "stocks": [
+        "frameLeft",
+        "sideBrace00a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 328.0,
+        "minimumLineInertiaMm3": 381909.33333333343,
+        "centroidMm": [
+          -425.25,
+          1287.4127957354683,
+          700.0000000000006
+        ],
+        "stressBoundMPa": 10.539029388199292,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W038",
+      "stocks": [
+        "frameLeft",
+        "sideBrace00b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 328.0,
+        "minimumLineInertiaMm3": 381909.33333333343,
+        "centroidMm": [
+          -425.25,
+          -725.2877957354675,
+          700.0000000000003
+        ],
+        "stressBoundMPa": 10.539029388199344,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W039",
+      "stocks": [
+        "frameLeft",
+        "sideBrace01a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 328.0,
+        "minimumLineInertiaMm3": 381909.3333333334,
+        "centroidMm": [
+          -425.25,
+          3548.0377957354704,
+          700.000000000001
+        ],
+        "stressBoundMPa": 10.539029388199161,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W040",
+      "stocks": [
+        "frameLeft",
+        "sideBrace01b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 176.0,
+        "minimumLineInertiaMm3": 37525.89583333334,
+        "centroidMm": [
+          -425.25,
+          1493.1875,
+          700.0000000000003
+        ],
+        "stressBoundMPa": 46.5568259635685,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W041",
+      "stocks": [
+        "frameRight",
+        "post10"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          2025.25,
+          -799.25,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W042",
+      "stocks": [
+        "frameRight",
+        "post11"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 200.0,
+        "minimumLineInertiaMm3": 166666.66666666674,
+        "centroidMm": [
+          2025.25,
+          1411.375,
+          700.0
+        ],
+        "stressBoundMPa": 97.07106781186545,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W043",
+      "stocks": [
+        "frameRight",
+        "post12"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          2025.25,
+          3622.0,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W044",
+      "stocks": [
+        "frameRight",
+        "post13"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 200.0,
+        "minimumLineInertiaMm3": 166666.66666666674,
+        "centroidMm": [
+          2025.25,
+          1575.0,
+          700.0
+        ],
+        "stressBoundMPa": 97.07106781186545,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W045",
+      "stocks": [
+        "frameRight",
+        "sideBrace10a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 328.0,
+        "minimumLineInertiaMm3": 381909.33333333343,
+        "centroidMm": [
+          2025.25,
+          1287.4127957354683,
+          700.0000000000006
+        ],
+        "stressBoundMPa": 10.539029388199292,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W046",
+      "stocks": [
+        "frameRight",
+        "sideBrace10b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 328.0,
+        "minimumLineInertiaMm3": 381909.33333333343,
+        "centroidMm": [
+          2025.25,
+          -725.2877957354675,
+          700.0000000000003
+        ],
+        "stressBoundMPa": 10.539029388199344,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W047",
+      "stocks": [
+        "frameRight",
+        "sideBrace11a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 328.0,
+        "minimumLineInertiaMm3": 381909.3333333334,
+        "centroidMm": [
+          2025.25,
+          3548.0377957354704,
+          700.000000000001
+        ],
+        "stressBoundMPa": 10.539029388199161,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W048",
+      "stocks": [
+        "frameRight",
+        "sideBrace11b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 176.0,
+        "minimumLineInertiaMm3": 37525.89583333334,
+        "centroidMm": [
+          2025.25,
+          1493.1875,
+          700.0000000000003
+        ],
+        "stressBoundMPa": 46.5568259635685,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W049",
+      "stocks": [
+        "lower0",
+        "planBrace0a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 348.0,
+        "minimumLineInertiaMm3": 212624.95323306043,
+        "centroidMm": [
+          -375.25,
+          -783.9852457456795,
+          173.44827586206895
+        ],
+        "stressBoundMPa": 13.819393710022405,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W050",
+      "stocks": [
+        "lower0",
+        "planBrace0b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 138666.66666666672,
+        "centroidMm": [
+          -375.2500000000001,
+          1365.249209345032,
+          180.0
+        ],
+        "stressBoundMPa": 20.665153957909205,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W051",
+      "stocks": [
+        "lower0",
+        "planBrace1a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 248.0,
+        "minimumLineInertiaMm3": 156678.9867805904,
+        "centroidMm": [
+          -375.25,
+          1477.4319441611322,
+          180.0
+        ],
+        "stressBoundMPa": 18.385990273707016,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W052",
+      "stocks": [
+        "lower0",
+        "planBrace1b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 348.0,
+        "minimumLineInertiaMm3": 212624.95323305792,
+        "centroidMm": [
+          -375.25000000000006,
+          3606.73524574568,
+          173.44827586206895
+        ],
+        "stressBoundMPa": 13.819393710022466,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W053",
+      "stocks": [
+        "lower0",
+        "post00"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 368.0,
+        "minimumLineInertiaMm3": 553098.6666666667,
+        "centroidMm": [
+          -425.25,
+          -819.25,
+          180.0
+        ],
+        "stressBoundMPa": 33.30276193975943,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 2,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W054",
+      "stocks": [
+        "lower0",
+        "post01"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 421333.33333333326,
+        "centroidMm": [
+          -425.25,
+          1411.375,
+          180.0
+        ],
+        "stressBoundMPa": 45.83675549612908,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W055",
+      "stocks": [
+        "lower0",
+        "post02"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 368.0,
+        "minimumLineInertiaMm3": 553098.6666666667,
+        "centroidMm": [
+          -425.25,
+          3642.0,
+          180.0
+        ],
+        "stressBoundMPa": 33.30276193975943,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 2,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W056",
+      "stocks": [
+        "lower0",
+        "post03"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 421333.33333333326,
+        "centroidMm": [
+          -425.25,
+          1575.0,
+          180.0
+        ],
+        "stressBoundMPa": 45.83675549612908,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W057",
+      "stocks": [
+        "lower0",
+        "sideBrace00a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 320.0,
+        "minimumLineInertiaMm3": 394666.666666667,
+        "centroidMm": [
+          -425.25,
+          -626.3483896266077,
+          230.0
+        ],
+        "stressBoundMPa": 16.893246400583646,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W058",
+      "stocks": [
+        "lower0",
+        "sideBrace00b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 320.0,
+        "minimumLineInertiaMm3": 394666.666666667,
+        "centroidMm": [
+          -425.25,
+          1188.4733896266084,
+          230.0
+        ],
+        "stressBoundMPa": 16.893246400583514,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W059",
+      "stocks": [
+        "lower0",
+        "sideBrace01a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 656.0,
+        "minimumLineInertiaMm3": 739498.666666666,
+        "centroidMm": [
+          -425.25,
+          1635.8896642441941,
+          230.00000000000006
+        ],
+        "stressBoundMPa": 8.874323291783005,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W060",
+      "stocks": [
+        "lower0",
+        "sideBrace01b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 320.0,
+        "minimumLineInertiaMm3": 394666.666666667,
+        "centroidMm": [
+          -425.25,
+          3449.0983896266093,
+          230.0
+        ],
+        "stressBoundMPa": 16.893246400583454,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W061",
+      "stocks": [
+        "lower1",
+        "planBrace0a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 138666.6666666667,
+        "centroidMm": [
+          1975.25,
+          1365.249209345032,
+          180.0
+        ],
+        "stressBoundMPa": 20.665153957909208,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W062",
+      "stocks": [
+        "lower1",
+        "planBrace0b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 348.0,
+        "minimumLineInertiaMm3": 212624.95323306078,
+        "centroidMm": [
+          1975.25,
+          -783.9852457456795,
+          173.44827586206895
+        ],
+        "stressBoundMPa": 13.819393710022387,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W063",
+      "stocks": [
+        "lower1",
+        "planBrace1a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 348.0,
+        "minimumLineInertiaMm3": 212624.9532330577,
+        "centroidMm": [
+          1975.25,
+          3606.73524574568,
+          173.44827586206895
+        ],
+        "stressBoundMPa": 13.819393710022476,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W064",
+      "stocks": [
+        "lower1",
+        "planBrace1b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 248.0,
+        "minimumLineInertiaMm3": 156678.9867805911,
+        "centroidMm": [
+          1975.25,
+          1477.4319441611322,
+          180.0
+        ],
+        "stressBoundMPa": 18.38599027370696,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W065",
+      "stocks": [
+        "lower1",
+        "post10"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 368.0,
+        "minimumLineInertiaMm3": 553098.6666666667,
+        "centroidMm": [
+          2025.25,
+          -819.25,
+          180.0
+        ],
+        "stressBoundMPa": 33.30276193975943,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 2,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W066",
+      "stocks": [
+        "lower1",
+        "post11"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 421333.33333333326,
+        "centroidMm": [
+          2025.25,
+          1411.375,
+          180.0
+        ],
+        "stressBoundMPa": 45.83675549612908,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W067",
+      "stocks": [
+        "lower1",
+        "post12"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 368.0,
+        "minimumLineInertiaMm3": 553098.6666666667,
+        "centroidMm": [
+          2025.25,
+          3642.0,
+          180.0
+        ],
+        "stressBoundMPa": 33.30276193975943,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 2,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W068",
+      "stocks": [
+        "lower1",
+        "post13"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 421333.33333333326,
+        "centroidMm": [
+          2025.25,
+          1575.0,
+          180.0
+        ],
+        "stressBoundMPa": 45.83675549612908,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W069",
+      "stocks": [
+        "lower1",
+        "sideBrace10a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 320.0,
+        "minimumLineInertiaMm3": 394666.666666667,
+        "centroidMm": [
+          2025.25,
+          -626.3483896266077,
+          230.0
+        ],
+        "stressBoundMPa": 16.893246400583646,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W070",
+      "stocks": [
+        "lower1",
+        "sideBrace10b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 320.0,
+        "minimumLineInertiaMm3": 394666.666666667,
+        "centroidMm": [
+          2025.25,
+          1188.4733896266084,
+          230.0
+        ],
+        "stressBoundMPa": 16.893246400583514,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W071",
+      "stocks": [
+        "lower1",
+        "sideBrace11a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 656.0,
+        "minimumLineInertiaMm3": 739498.666666666,
+        "centroidMm": [
+          2025.25,
+          1635.8896642441941,
+          230.00000000000006
+        ],
+        "stressBoundMPa": 8.874323291783005,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W072",
+      "stocks": [
+        "lower1",
+        "sideBrace11b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 320.0,
+        "minimumLineInertiaMm3": 394666.666666667,
+        "centroidMm": [
+          2025.25,
+          3449.0983896266093,
+          230.0
+        ],
+        "stressBoundMPa": 16.893246400583454,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W073",
+      "stocks": [
+        "planBrace0a",
+        "planBrace0b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 258265.86778688699,
+        "centroidMm": [
+          800.0,
+          281.06250000000034,
+          180.0
+        ],
+        "stressBoundMPa": 15.660609181769722,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W074",
+      "stocks": [
+        "planBrace0a",
+        "planBrace1b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 168.44185070431513,
+        "minimumLineInertiaMm3": 1277.3611600726,
+        "centroidMm": [
+          1968.1015641272963,
+          1413.0757693168819,
+          180.00000000000023
+        ],
+        "stressBoundMPa": 895.8449999062137,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W075",
+      "stocks": [
+        "planBrace0a",
+        "post00"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 26.377382986151986,
+        "minimumLineInertiaMm3": 107.34101861289015,
+        "centroidMm": [
+          -375.25,
+          -853.4942925463291,
+          142.35005320020872
+        ],
+        "stressBoundMPa": 1331.9732532648593,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W076",
+      "stocks": [
+        "planBrace0b",
+        "planBrace1a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 168.44185070431482,
+        "minimumLineInertiaMm3": 1277.3611600725853,
+        "centroidMm": [
+          -368.1015641272962,
+          1413.075769316882,
+          179.9999999999999
+        ],
+        "stressBoundMPa": 895.8449999062215,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W077",
+      "stocks": [
+        "planBrace0b",
+        "post10"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 26.377382986152128,
+        "minimumLineInertiaMm3": 107.3410186128915,
+        "centroidMm": [
+          1975.2499999999998,
+          -853.4942925463292,
+          142.35005320020875
+        ],
+        "stressBoundMPa": 1331.9732532648725,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W078",
+      "stocks": [
+        "planBrace1a",
+        "planBrace1b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 258265.86778688605,
+        "centroidMm": [
+          800.0,
+          2541.6875,
+          180.0
+        ],
+        "stressBoundMPa": 15.660609181769749,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W079",
+      "stocks": [
+        "planBrace1a",
+        "post12"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 36.029439937165535,
+        "minimumLineInertiaMm3": 293.45668443889446,
+        "centroidMm": [
+          1975.2500000000005,
+          3676.6005821206622,
+          144.40677786362954
+        ],
+        "stressBoundMPa": 662.9558649022098,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W080",
+      "stocks": [
+        "planBrace1b",
+        "post02"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 36.029439937165506,
+        "minimumLineInertiaMm3": 293.4566844389039,
+        "centroidMm": [
+          -375.2500000000001,
+          3676.600582120662,
+          144.4067778636295
+        ],
+        "stressBoundMPa": 662.9558649022192,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W081",
+      "stocks": [
+        "post00",
+        "sideBrace00a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 85.09166694018495,
+        "minimumLineInertiaMm3": 10.506487086066045,
+        "centroidMm": [
+          -425.24999999999994,
+          -799.2500000000001,
+          232.46966539993343
+        ],
+        "stressBoundMPa": 107904.74642533697,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W082",
+      "stocks": [
+        "post00",
+        "sideBrace00b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 55833.451430289104,
+        "centroidMm": [
+          -425.25,
+          -799.25,
+          666.3375973314428
+        ],
+        "stressBoundMPa": 30.45103435122903,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W083",
+      "stocks": [
+        "post00",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 360.0,
+        "minimumLineInertiaMm3": 530250.6666666667,
+        "centroidMm": [
+          -425.25,
+          -818.5833333333334,
+          499.25
+        ],
+        "stressBoundMPa": 13.395933818940605,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 2,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W084",
+      "stocks": [
+        "post01",
+        "sideBrace00a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 55833.451430289046,
+        "centroidMm": [
+          -425.25,
+          1361.375,
+          666.3375973314428
+        ],
+        "stressBoundMPa": 30.451034351229055,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W085",
+      "stocks": [
+        "post01",
+        "sideBrace00b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 85.09166694018512,
+        "minimumLineInertiaMm3": 10.506487086066045,
+        "centroidMm": [
+          -425.24999999999994,
+          1361.375,
+          232.4696653999335
+        ],
+        "stressBoundMPa": 107904.74642533698,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W086",
+      "stocks": [
+        "post01",
+        "sideBrace01a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 85.09166694018492,
+        "minimumLineInertiaMm3": 10.506487086066045,
+        "centroidMm": [
+          -425.25,
+          1461.375,
+          232.46966539993346
+        ],
+        "stressBoundMPa": 107904.74642533681,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W087",
+      "stocks": [
+        "post01",
+        "sideBrace01b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 55833.451430289104,
+        "centroidMm": [
+          -425.25,
+          1461.375,
+          666.3375973314428
+        ],
+        "stressBoundMPa": 30.45103435122903,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W088",
+      "stocks": [
+        "post01",
+        "tableCross3"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 26.25,
+        "minimumLineInertiaMm3": 376.8310546875,
+        "centroidMm": [
+          -375.25,
+          1367.9375,
+          499.25
+        ],
+        "stressBoundMPa": 7660.042116804528,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W089",
+      "stocks": [
+        "post01",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 277333.33333333326,
+        "centroidMm": [
+          -425.25,
+          1411.375,
+          499.25
+        ],
+        "stressBoundMPa": 25.94249999410794,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W090",
+      "stocks": [
+        "post02",
+        "sideBrace01a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 55833.4514302887,
+        "centroidMm": [
+          -425.25,
+          3622.0,
+          666.3375973314426
+        ],
+        "stressBoundMPa": 30.45103435122924,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W091",
+      "stocks": [
+        "post02",
+        "sideBrace01b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 85.09166694018538,
+        "minimumLineInertiaMm3": 10.506487086066045,
+        "centroidMm": [
+          -425.24999999999994,
+          3622.0,
+          232.4696653999335
+        ],
+        "stressBoundMPa": 107904.74642533698,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W092",
+      "stocks": [
+        "post02",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 360.0,
+        "minimumLineInertiaMm3": 530250.6666666667,
+        "centroidMm": [
+          -425.25,
+          3641.3333333333335,
+          499.25
+        ],
+        "stressBoundMPa": 13.395933818940597,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 2,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W093",
+      "stocks": [
+        "post03",
+        "sideBrace01a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 372.67414047647685,
+        "minimumLineInertiaMm3": 372381.9323587135,
+        "centroidMm": [
+          -425.24999999999994,
+          1587.295278006742,
+          250.48995494786448
+        ],
+        "stressBoundMPa": 9.629253972792934,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W094",
+      "stocks": [
+        "post03",
+        "sideBrace01b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 400.0,
+        "minimumLineInertiaMm3": 603898.7655851843,
+        "centroidMm": [
+          -425.25,
+          1565.0,
+          654.2927989296925
+        ],
+        "stressBoundMPa": 7.156833325975763,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W095",
+      "stocks": [
+        "post03",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 277333.33333333326,
+        "centroidMm": [
+          -425.25,
+          1575.0,
+          499.25
+        ],
+        "stressBoundMPa": 25.94249999410794,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W096",
+      "stocks": [
+        "post10",
+        "sideBrace10a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 85.09166694018495,
+        "minimumLineInertiaMm3": 10.506487086066045,
+        "centroidMm": [
+          2025.25,
+          -799.2500000000001,
+          232.46966539993343
+        ],
+        "stressBoundMPa": 107904.74642533681,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W097",
+      "stocks": [
+        "post10",
+        "sideBrace10b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 55833.451430289104,
+        "centroidMm": [
+          2025.25,
+          -799.25,
+          666.3375973314428
+        ],
+        "stressBoundMPa": 30.45103435122903,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W098",
+      "stocks": [
+        "post10",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 360.0,
+        "minimumLineInertiaMm3": 530250.6666666667,
+        "centroidMm": [
+          2025.25,
+          -818.5833333333334,
+          499.25
+        ],
+        "stressBoundMPa": 13.395933818940605,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 2,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W099",
+      "stocks": [
+        "post11",
+        "sideBrace10a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 55833.451430289046,
+        "centroidMm": [
+          2025.25,
+          1361.375,
+          666.3375973314428
+        ],
+        "stressBoundMPa": 30.451034351229055,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W100",
+      "stocks": [
+        "post11",
+        "sideBrace10b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 85.09166694018512,
+        "minimumLineInertiaMm3": 10.506487086066045,
+        "centroidMm": [
+          2025.25,
+          1361.375,
+          232.4696653999335
+        ],
+        "stressBoundMPa": 107904.74642533682,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W101",
+      "stocks": [
+        "post11",
+        "sideBrace11a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 85.09166694018492,
+        "minimumLineInertiaMm3": 10.506487086066045,
+        "centroidMm": [
+          2025.25,
+          1461.375,
+          232.46966539993346
+        ],
+        "stressBoundMPa": 107904.74642533681,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W102",
+      "stocks": [
+        "post11",
+        "sideBrace11b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 55833.451430289104,
+        "centroidMm": [
+          2025.25,
+          1461.375,
+          666.3375973314428
+        ],
+        "stressBoundMPa": 30.45103435122903,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W103",
+      "stocks": [
+        "post11",
+        "tableCross3"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 26.25,
+        "minimumLineInertiaMm3": 376.8310546875,
+        "centroidMm": [
+          1975.25,
+          1367.9375,
+          499.25
+        ],
+        "stressBoundMPa": 7660.042116804528,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W104",
+      "stocks": [
+        "post11",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 277333.33333333326,
+        "centroidMm": [
+          2025.25,
+          1411.375,
+          499.25
+        ],
+        "stressBoundMPa": 25.94249999410794,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W105",
+      "stocks": [
+        "post12",
+        "sideBrace11a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 55833.4514302887,
+        "centroidMm": [
+          2025.25,
+          3622.0,
+          666.3375973314426
+        ],
+        "stressBoundMPa": 30.45103435122924,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W106",
+      "stocks": [
+        "post12",
+        "sideBrace11b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 85.09166694018538,
+        "minimumLineInertiaMm3": 10.506487086066045,
+        "centroidMm": [
+          2025.25,
+          3622.0,
+          232.4696653999335
+        ],
+        "stressBoundMPa": 107904.74642533682,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W107",
+      "stocks": [
+        "post12",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 360.0,
+        "minimumLineInertiaMm3": 530250.6666666667,
+        "centroidMm": [
+          2025.25,
+          3641.3333333333335,
+          499.25
+        ],
+        "stressBoundMPa": 13.395933818940597,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 2,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W108",
+      "stocks": [
+        "post13",
+        "sideBrace11a"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 372.67414047647685,
+        "minimumLineInertiaMm3": 372381.93235871335,
+        "centroidMm": [
+          2025.2500000000002,
+          1587.295278006742,
+          250.48995494786448
+        ],
+        "stressBoundMPa": 9.629253972792943,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W109",
+      "stocks": [
+        "post13",
+        "sideBrace11b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 400.0,
+        "minimumLineInertiaMm3": 603898.7655851843,
+        "centroidMm": [
+          2025.25,
+          1565.0,
+          654.2927989296925
+        ],
+        "stressBoundMPa": 7.156833325975763,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W110",
+      "stocks": [
+        "post13",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 277333.33333333326,
+        "centroidMm": [
+          2025.25,
+          1575.0,
+          499.25
+        ],
+        "stressBoundMPa": 25.94249999410794,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W111",
+      "stocks": [
+        "rackCross",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          3159.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W112",
+      "stocks": [
+        "rackCross",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          3159.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W113",
+      "stocks": [
+        "sideBrace00a",
+        "sideBrace00b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 191965.47131801443,
+        "centroidMm": [
+          -425.25,
+          208.76647415507995,
+          437.05164493156457
+        ],
+        "stressBoundMPa": 42.95532040272094,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W114",
+      "stocks": [
+        "sideBrace00a",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 640.0,
+        "minimumLineInertiaMm3": 1122969.4431817979,
+        "centroidMm": [
+          -425.25,
+          538.6433293269248,
+          499.25000000000017
+        ],
+        "stressBoundMPa": 11.155049913036526,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W115",
+      "stocks": [
+        "sideBrace00b",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 728.0,
+        "minimumLineInertiaMm3": 1270770.4096341706,
+        "centroidMm": [
+          -425.25,
+          -13.93459548335233,
+          494.4148351648353
+        ],
+        "stressBoundMPa": 9.036473429989705,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W116",
+      "stocks": [
+        "sideBrace01a",
+        "sideBrace01b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 191965.47131801414,
+        "centroidMm": [
+          -425.25,
+          2469.3914741550793,
+          437.0516449315646
+        ],
+        "stressBoundMPa": 42.95532040272111,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W117",
+      "stocks": [
+        "sideBrace01a",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 640.0,
+        "minimumLineInertiaMm3": 1122969.4431817979,
+        "centroidMm": [
+          -425.25,
+          2799.2683293269265,
+          499.25000000000017
+        ],
+        "stressBoundMPa": 11.155049913036581,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W118",
+      "stocks": [
+        "sideBrace01b",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 728.0,
+        "minimumLineInertiaMm3": 1270770.409634173,
+        "centroidMm": [
+          -425.25,
+          2246.6904045166493,
+          494.4148351648353
+        ],
+        "stressBoundMPa": 9.03647342998963,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W119",
+      "stocks": [
+        "sideBrace10a",
+        "sideBrace10b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 191965.47131801443,
+        "centroidMm": [
+          2025.25,
+          208.76647415507995,
+          437.05164493156457
+        ],
+        "stressBoundMPa": 42.95532040272094,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W120",
+      "stocks": [
+        "sideBrace10a",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 640.0,
+        "minimumLineInertiaMm3": 1122969.4431817979,
+        "centroidMm": [
+          2025.25,
+          538.6433293269248,
+          499.25000000000017
+        ],
+        "stressBoundMPa": 11.155049913036526,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W121",
+      "stocks": [
+        "sideBrace10b",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 728.0,
+        "minimumLineInertiaMm3": 1270770.4096341706,
+        "centroidMm": [
+          2025.25,
+          -13.93459548335233,
+          494.4148351648353
+        ],
+        "stressBoundMPa": 9.036473429989705,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W122",
+      "stocks": [
+        "sideBrace11a",
+        "sideBrace11b"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 240.0,
+        "minimumLineInertiaMm3": 191965.47131801414,
+        "centroidMm": [
+          2025.25,
+          2469.3914741550793,
+          437.0516449315646
+        ],
+        "stressBoundMPa": 42.95532040272111,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W123",
+      "stocks": [
+        "sideBrace11a",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 640.0,
+        "minimumLineInertiaMm3": 1122969.4431817979,
+        "centroidMm": [
+          2025.25,
+          2799.2683293269265,
+          499.25000000000017
+        ],
+        "stressBoundMPa": 11.155049913036581,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W124",
+      "stocks": [
+        "sideBrace11b",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 100000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 728.0,
+        "minimumLineInertiaMm3": 1270770.409634173,
+        "centroidMm": [
+          2025.25,
+          2246.6904045166493,
+          494.4148351648353
+        ],
+        "stressBoundMPa": 9.03647342998963,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W125",
+      "stocks": [
+        "tableCross0",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          -250.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W126",
+      "stocks": [
+        "tableCross0",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          -250.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W127",
+      "stocks": [
+        "tableCross1",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          274.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W128",
+      "stocks": [
+        "tableCross1",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          274.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W129",
+      "stocks": [
+        "tableCross2",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          799.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W130",
+      "stocks": [
+        "tableCross2",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          799.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W131",
+      "stocks": [
+        "tableCross3",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          1324.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W132",
+      "stocks": [
+        "tableCross3",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          1324.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W133",
+      "stocks": [
+        "tableCross4",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          1849.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W134",
+      "stocks": [
+        "tableCross4",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          1849.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W135",
+      "stocks": [
+        "tableCross5",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          2374.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W136",
+      "stocks": [
+        "tableCross5",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          2374.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W137",
+      "stocks": [
+        "tableCross6",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          2899.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    },
+    {
+      "id": "W138",
+      "stocks": [
+        "tableCross6",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          2899.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+    }
+  ],
+  "basis": "5 mm legs, 80 MPa assumed weld-throat stress screen, F=5 kN; moments 0.1 kNm brace/0.25 table/0.75 post-frame. Uses actual selected 3D seam-line inertia; not a code/WPS certification.",
+  "failedGroups": [
+    "W006",
+    "W011",
+    "W014",
+    "W020",
+    "W025",
+    "W026",
+    "W027",
+    "W028",
+    "W029",
+    "W030",
+    "W031",
+    "W032",
+    "W033",
+    "W034",
+    "W035",
+    "W036",
+    "W041",
+    "W042",
+    "W043",
+    "W044",
+    "W074",
+    "W075",
+    "W076",
+    "W077",
+    "W079",
+    "W080",
+    "W081",
+    "W085",
+    "W086",
+    "W088",
+    "W091",
+    "W096",
+    "W100",
+    "W101",
+    "W103",
+    "W106"
+  ]
+}
