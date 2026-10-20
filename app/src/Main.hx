@@ -2481,12 +2481,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     mode = next;
     // The mode's default layout backs "Reset workspace" while it is active.
     workspace.setDefaultLayout(next == EditorMode.Simulate
-      ? EditorWorkspaceLayout.simulateLayout(session.missions != null) : next.layout());
+      ? EditorWorkspaceLayout.simulateLayout(session.missions != null, MachineControlModel.axes(session).length > 0) : next.layout());
     var saved = modeSnapshots.get(next.id);
     if (saved != null) workspace.restorePersisted(saved);
     if(next!=EditorMode.Simulate)workspace.close("inspection-camera");
     else if(inspectionCameraRequested||saved==null&&session.hobbingScenario!=null)openInspectionCamera();
-    if (next == EditorMode.Simulate && session.missions != null) {
+    if (next == EditorMode.Simulate && saved == null && MachineControlModel.axes(session).length > 0) {
+      workspace.activate("machine-control");
+    } else if (next == EditorMode.Simulate && session.missions != null) {
       if (!workspace.isOpen("mission")) workspace.open("mission", "sensors");
       workspace.activate("mission");
     }

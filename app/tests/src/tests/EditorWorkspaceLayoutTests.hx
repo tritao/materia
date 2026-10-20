@@ -25,11 +25,12 @@ class EditorWorkspaceLayoutTests {
     };
     if (layoutValid != 0) return 1;
 
-    for (hasMission in [false, true]) {
-      switch (EditorWorkspaceLayout.simulateLayout(hasMission)) {
+    for (hasMission in [false, true]) for (hasMachine in [false, true]) {
+      switch (EditorWorkspaceLayout.simulateLayout(hasMission, hasMachine)) {
         case DockNode.Split(DockSplitAxis.Horizontal, _, _, DockNode.Tabs(tabs, active)):
-          if (hasMission && (tabs[0] != "mission" || active != "mission")) return 1;
-          if (!hasMission && (tabs.indexOf("mission") >= 0 || active != "sensors")) return 1;
+          if (hasMission && tabs[0] != "mission") return 1;
+          if (!hasMission && tabs.indexOf("mission") >= 0) return 1;
+          if (active != (hasMachine ? "machine-control" : hasMission ? "mission" : "sensors")) return 1;
         default: return 1;
       }
     }
