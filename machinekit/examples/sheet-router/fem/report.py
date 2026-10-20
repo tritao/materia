@@ -71,7 +71,7 @@ def main():
             reciprocity.append(error)
             for foot in range(6):
                 margin=c[3]['supportReactionsN'][str(foot)][2]-math.sqrt(sum(c[j]['supportReactionsN'][str(foot)][2]**2 for j in range(3)))-sum(abs(c[j]['supportReactionsN'][str(foot)][2]) for j in [4,5])
-                if margin<=0:raise ValueError('Linear foundation would lift a foot under the combined envelope')
+                if margin<=0 and data['identity'].get('floorSupport')!='anchored':raise ValueError('Linear foundation would lift a foot under the combined envelope')
                 foot_margins.append(margin)
             for case in c[:3]:
                 budget=case['budgetUmPerN'];fraction=(budget.get('rigid',0)+budget.get('coupling',0)+budget.get('welds',0))/sum(budget.values())
@@ -90,7 +90,12 @@ def main():
             cases.append(dict(axis='XYZ'[axis],pose=worst['pose'],complianceUmPerN=compliance,stiffnessNPerUm=1/compliance,
                 toolRelativeMmAt300N=case['toolRelativeMm'],budgetUmPerN=case['budgetUmPerN']))
         dominant=[next((f for f,m in zip(r['firstModesHz'],r.get('modalParticipation',[])) if m['gantryFraction']>=.5),None) for r in rows]
-        summary.append(dict(workY=length,firstGantryDominantHz=dominant,gantryModeCriterion='At least 50% of estimated modal kinetic energy in moving gantry members; native stock uses Simpson translational mass quadrature',maxReciprocityError=max(reciprocity),minimumCompressiveFootMarginN=min(foot_margins),maxArtificialRigidComplianceFraction=max(rigid_fractions),worstCutting=cases,firstModeRangeHz=[min(r['firstModesHz'][0] for r in rows),max(r['firstModesHz'][0] for r in rows)],
+        all_modes=[dict(pose=r['pose'],**m) for r in rows for m in r['modalParticipation']]
+        lowest_global=min(all_modes,key=lambda m:m['frequencyHz'])
+        lowest_frame=min((m for m in all_modes if m['fractions'].get('frame',0)+m['fractions'].get('bed',0)>=.5),key=lambda m:m['frequencyHz'])
+        lowest_gantry=min((m for m in all_modes if m['gantryFraction']>=.5),key=lambda m:m['frequencyHz'])
+
+        summary.append(dict(workY=length,lowestGlobalMode=lowest_global,lowestFrameDominantMode=lowest_frame,lowestGantryDominantMode=lowest_gantry,firstGantryDominantHz=dominant,gantryModeCriterion='At least 50% of estimated modal kinetic energy in moving gantry members; native stock uses Simpson translational mass quadrature',maxReciprocityError=max(reciprocity),minimumCompressiveFootMarginN=min(foot_margins),maxArtificialRigidComplianceFraction=max(rigid_fractions),worstCutting=cases,firstModeRangeHz=[min(r['firstModesHz'][0] for r in rows),max(r['firstModesHz'][0] for r in rows)],
             modalMotion=relative_modes,largestGravityFrameTwistMm=max(abs(r['cases'][3]['frameTwistMm']) for r in rows),
             maximumForceBalanceRelativeError=max(c['supportForceRelativeError'] for r in rows for c in r['cases']),
             maximumEnergyRelativeError=max(c['energyRelativeError'] or 0 for r in rows for c in r['cases'])))
@@ -123,6 +128,7 @@ def main():
         result['limitations']=[text for text in result['limitations'] if 'nearest-member bed reaction' not in text]
         result['limitations'].append('Rigid table is supported at six bed-stock seats through translational mounting springs; table elasticity still requires qualification. Cabinet devices and blower are independently floor-supported.')
         result['limitations'].append('Other fixed masses attach at nearest stock on a fixed 50 mm analysis grid; distributed mass shape remains approximate. Global frame modes and gantry-dominant modes are reported separately.')
+        result['floorSupport']=dict(case=data['identity'].get('floorSupport','legacy free'),translationNPerMmXYZ=[50000]*3,anchoredDescription='Six finite translational supports in XYZ; no fixed rotations. Anchor/concrete stiffness assumed, not supplier/foundation qualification.',freeDescription='Six vertical springs, X spring at foot 0 and Y springs at feet 0 and 3: minimal 3-2-1 lateral restraint; friction/no-slip assumed, no sliding/contact qualification.')
         result['basis']='Spatial per-block translation springs and plate grillages, actual CAD connectors, moving Z rails; no assumed guide rotational spring'
         result['decisions'].update(beam='Retain steel RHS 200x100x6.3, 200 mm side vertical.',
             xCarriage=str(next(p['thicknessMm'] for p in packet['plates'] if p['id']=='xCarriage'))+' mm flat aluminium plate supported on four X blocks; no closed box selected.',
@@ -137,6 +143,7 @@ def main():
         result['limitations'].append('Direct spindle saddle is represented by a rigid body on four translational mounting springs; clamp, bearing and tool flexibility remain excluded.')
         result['limitations'].append('Welded frame stock connects at interior crossings; beam-foot welds use distributed spatial contacts. Local wall and weld stresses, and built-up aluminium joint qualification, remain excluded.')
         result['limitations'].append('Moving-rail reinforcement uses 60% gross rectangular section and discrete assumed mounting stiffness; plate grillage omits Poisson coupling. Retain these as sensitivity inputs.')
+    result['identity']['modalDiagnosticsSha256']=hashlib.sha256((folder/'source'/'modes.py').read_bytes()).hexdigest()
     (folder/'summary.json').write_text(json.dumps(result,indent=2)+'\n');(folder/'y-loads.json').write_text(json.dumps(yloads,indent=2)+'\n')
     for row in summary:
         print('Y='+str(row['workY'])+' first modes='+str(row['firstModeRangeHz']))

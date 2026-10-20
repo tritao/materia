@@ -1,6 +1,186 @@
 # SR5 structural screen
 
-## Z and frame follow-up — verification pending
+## Anchored modal diagnosis (2026-10-20)
+
+Full 100/50 mm, nine-pose, two-bed rerun of the f47ed13f4 CAD. Six anchored supports each use 50,000 N/mm in XYZ, with no rotational clamp. Foundation values are assumptions, not anchor/slab qualification. All masses and the original 428 mm tool lever are retained.
+
+| Bed Y | Worst X N/µm | Worst Y N/µm | Lowest global Hz | Lowest gantry Hz |
+|---|---:|---:|---:|---:|
+| 2600 | 2.090 | 2.142 | 26.216 (X) | 26.948 (Y) |
+| 3150 | 2.044 | 2.135 | 24.177 (X) | 26.054 (Y) |
+
+All 36 solves pass the numerical gates: maximum static mesh change 0.994%,
+twenty-mode frequency change 1.741%, force-balance error 0.0210%, static energy
+error 0.0042%, and artificial rigid/weld connector compliance 0.0733%. Modal
+strain energy agrees with independently integrated modal kinetic energy within
+1.352%; the beam/spring fixture also recovers 96.55% spring energy for its soft
+rotational-joint mode. Six-gantry-mode profiles below additionally pass forty-mode
+convergence. Minimum combined compressive support margin is 1991 N.
+
+The static target passes under the anchored assumptions, but the 40 Hz gantry
+target fails. At the long-bed centre, the 26.054 Hz mode is beam/head Y sway with
+beam roll about X and non-rigid beam bending: beam 31.3%, frame tubes 28.2%,
+Y drive 23.7%, Y blocks 6.6%, floor 3.9% of strain energy. The Y-drive spring
+combines rack mesh, reducer and preload hinge. Within it, the hinge takes 64.9%
+of compliance (about 15.4% of this mode’s total strain energy), mesh 17.1%
+and reducer 18.0%. Its X/Z carriage
+elastic energy is small; adding head stiffness or mass does not address its cause.
+The lowest 24.177 Hz global mode is X frame/table sway: frame tubes 50.3%,
+braces 27.4%, floor supports 17.8%.
+
+The free-standing long-bed centre reproduces the former 23.7 Hz concern at
+23.692 Hz: Y frame/beam/head sway, with floor supports 30.2%, frame tubes 24.8%,
+beam 17.8% and Y drive 14.8% of strain energy. Its first global X-sway mode is
+9.985 Hz, versus about 5.2–6 Hz before bracing; this free-standing number is a
+single-pose sensitivity, not a full free-standing envelope. Anchored global minima
+are the full-pose values in the table above. Lower frame modes are not dismissed
+by the moving-mass classification.
+
+Retain the 40 mm X plate and aluminium Z for the next geometry pass. Returning X
+to 25 mm gains only 0.390 Hz while failing static stiffness (1.986 X / 1.494 Y
+N/µm at the governing modal pose); steel Z adds 22.95 kg and loses 1.357 Hz.
+Increasing Y block spacing adds 5.20 kg for 0.172 Hz, and HGR30 adds mass without
+helping this Y mode. None of these swaps approaches 40 Hz. This is a coupled
+frame/beam/Y-drive stiffness problem, rather than a defect cured by stiffening
+the Z ram further. Mass reduction remains useful only while preserving the
+static budget; pocketing needs its own structural check.
+
+Recommended next geometry: recover the 60 mm tool lever through the fork/riser
+and matching table/setting-datum redesign, while correcting front-brace loading
+access. Keep the 40 mm X plate and aluminium ram. The subsequent modal stiffness
+iteration must target the slab-to-Y-rail/frame-to-beam load path and Y drive hinge,
+using the measured energy split; lever recovery alone is not claimed to reach
+40 Hz. Fabrication/access decisions and machining requirements are settled in
+[SOURCING.md](../SOURCING.md#fabrication-and-access-decisions-after-the-braced-frame-screen).
+
+Energy columns below are percentages of **modal strain energy**: native CalculiX ELSE totals plus ½kΔu² for every spring. KE is moving-mass kinetic-energy share; ≥50% defines the reported gantry class. Y guides credit block springs only; Y rail bending is not resolved. X includes plate, guide and drive springs; Z includes ram, ribs, rails, guide/screw and saddle joints. Table and artificial rigid offsets are shown so each row accounts for 100%.
+
+Shapes use global XYZ. Each body’s direction is its RMS displacement direction. Beam rotation is a least-squares rigid-body fit, normalized to 1 mm maximum physical-node motion; bend residual is the remaining normalized RMS displacement. Eigenvector sign is arbitrary. These observations distinguish translation, rotation and beam bending without pretending the entire gantry is rigid.
+
+### 2600 mm bed: first six global modes
+
+Pose X=1600, Y=1300, full Z. Lowest frame-dominant mode is 26.216 Hz. These are the first six modes at the lowest-global-frequency pose, not six copies of one branch at different poses.
+
+| Mode | Hz | Moving KE % | Shape | Floor | Frame | Braces | Y guides | Y drive | Feet/welds | Beam | X | Z | Table | Rigid |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 26.216 | 36.4 | frame X, table X, beam X, X carriage X, Z ram X, spindle X; beam RX +0.173 mrad/mm, bend residual 0.017 | 18.7 | 48.1 | 26.9 | 0.6 | 0.2 | 0.1 | 0.8 | 4.2 | 0.2 | 0.2 | 0.0 |
+| 2 | 29.259 | 89.4 | beam Y, X carriage Y, Z ram Y, spindle Y; beam RX +1.223 mrad/mm, bend residual 0.102 | 6.5 | 18.6 | 3.6 | 8.0 | 34.6 | 2.4 | 26.0 | 0.3 | 0.1 | 0.1 | 0.0 |
+| 3 | 34.978 | 0.9 | frame Z; beam RX -0.033 mrad/mm, bend residual 0.005 | 5.4 | 90.5 | 2.8 | 0.0 | 0.1 | 0.0 | 0.2 | 0.0 | 0.0 | 0.7 | 0.1 |
+| 4 | 40.298 | 81.0 | beam Y, X carriage Y, Z ram Y, spindle Y; beam RZ +0.739 mrad/mm, bend residual 0.115 | 2.2 | 20.1 | 2.4 | 0.5 | 23.9 | 0.2 | 50.1 | 0.4 | 0.1 | 0.0 | 0.0 |
+| 5 | 42.761 | 11.2 | frame Z, beam Z, X carriage Z, Z ram Z, spindle Y; beam RX +0.124 mrad/mm, bend residual 0.128 | 5.9 | 82.4 | 3.7 | 0.3 | 0.6 | 0.2 | 6.2 | 0.4 | 0.1 | 0.2 | 0.0 |
+| 6 | 43.778 | 6.5 | frame X, table X, beam Z, X carriage Z, Z ram Z, spindle Z; beam RZ -0.099 mrad/mm, bend residual 0.076 | 5.6 | 74.2 | 6.3 | 3.2 | 0.7 | 0.8 | 8.7 | 0.2 | 0.1 | 0.1 | 0.0 |
+
+### 2600 mm bed: first six gantry-dominant modes
+
+Pose X=800, Y=1300, full Z, chosen for the lowest gantry frequency. Forty modes were extracted on both meshes to resolve six gantry-class modes; all forty frequencies converge within 1.711%.
+
+| Mode | Hz | Moving KE % | Shape | Floor | Frame | Braces | Y guides | Y drive | Feet/welds | Beam | X | Z | Table | Rigid |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 26.948 | 93.2 | beam Y, X carriage Y, Z ram Y, spindle Y; beam RX -1.771 mrad/mm, bend residual 0.123 | 4.6 | 16.2 | 2.9 | 9.7 | 29.2 | 2.7 | 34.3 | 0.3 | 0.1 | 0.1 | 0.0 |
+| 4 | 40.890 | 73.5 | beam Z, X carriage Z, Z ram Z, spindle Z; beam RX +0.535 mrad/mm, bend residual 0.140 | 14.3 | 23.3 | 2.8 | 1.2 | 0.8 | 1.6 | 49.7 | 3.0 | 2.9 | 0.2 | 0.0 |
+| 5 | 41.543 | 78.9 | beam Y, X carriage X, Z ram X, spindle X; beam RZ -0.842 mrad/mm, bend residual 0.125 | 2.3 | 20.9 | 2.2 | 0.4 | 19.4 | 0.1 | 51.6 | 2.9 | 0.2 | 0.0 | 0.0 |
+| 12 | 53.340 | 74.6 | X carriage X, Z ram X, spindle X; beam RZ -0.079 mrad/mm, bend residual 0.020 | 5.8 | 10.8 | 5.3 | 1.2 | 1.3 | 0.3 | 6.8 | 65.6 | 2.7 | 0.3 | 0.0 |
+| 30 | 90.867 | 61.5 | frame Z, table Z, beam Z, X carriage X, Z ram X, spindle X; beam RX -0.156 mrad/mm, bend residual 0.122 | 18.2 | 9.5 | 2.1 | 0.4 | 0.0 | 1.2 | 66.8 | 0.7 | 0.8 | 0.1 | 0.1 |
+| 37 | 102.085 | 93.9 | beam Z, X carriage Z, Z ram Z, spindle Z; beam RX -0.546 mrad/mm, bend residual 0.051 | 0.5 | 4.8 | 0.4 | 0.5 | 0.0 | 1.6 | 12.8 | 41.8 | 37.4 | 0.0 | 0.0 |
+
+### 3150 mm bed: first six global modes
+
+Pose X=1600, Y=1575, full Z. Lowest frame-dominant mode is 24.177 Hz. These are the first six modes at the lowest-global-frequency pose, not six copies of one branch at different poses.
+
+| Mode | Hz | Moving KE % | Shape | Floor | Frame | Braces | Y guides | Y drive | Feet/welds | Beam | X | Z | Table | Rigid |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 24.177 | 31.9 | frame X, table X, beam X, X carriage X, Z ram X, spindle X; beam RX -0.115 mrad/mm, bend residual 0.013 | 17.8 | 50.3 | 27.4 | 0.5 | 0.1 | 0.1 | 0.5 | 3.0 | 0.1 | 0.2 | 0.0 |
+| 2 | 27.920 | 71.2 | beam Y, X carriage Y, Z ram Y, spindle Y; beam RX -1.345 mrad/mm, bend residual 0.103 | 4.9 | 36.7 | 4.5 | 4.5 | 24.9 | 1.5 | 22.6 | 0.2 | 0.1 | 0.1 | 0.0 |
+| 3 | 33.603 | 3.3 | frame Z, beam Z, X carriage Y, Z ram Y, spindle Y; beam RX +0.083 mrad/mm, bend residual 0.095 | 3.0 | 88.1 | 3.9 | 0.4 | 0.2 | 0.1 | 3.9 | 0.1 | 0.0 | 0.3 | 0.0 |
+| 4 | 34.005 | 2.0 | frame X, table X, beam Y, X carriage Y, Z ram Y, spindle Y; beam RZ -0.342 mrad/mm, bend residual 0.031 | 1.9 | 79.6 | 6.1 | 4.1 | 2.8 | 0.9 | 4.4 | 0.0 | 0.0 | 0.1 | 0.0 |
+| 5 | 34.517 | 1.1 | frame Z; beam RX -0.061 mrad/mm, bend residual 0.008 | 5.0 | 90.0 | 3.1 | 0.2 | 0.1 | 0.1 | 0.7 | 0.0 | 0.0 | 0.8 | 0.1 |
+| 6 | 35.267 | 12.2 | frame Z, beam Y, X carriage Y, Z ram Y, spindle Y; beam RZ +0.355 mrad/mm, bend residual 0.064 | 0.9 | 77.3 | 2.5 | 1.3 | 1.6 | 0.9 | 15.2 | 0.1 | 0.0 | 0.1 | 0.0 |
+
+### 3150 mm bed: first six gantry-dominant modes
+
+Pose X=800, Y=1575, full Z, chosen for the lowest gantry frequency. Forty modes were extracted on both meshes to resolve six gantry-class modes; all forty frequencies converge within 1.540%.
+
+| Mode | Hz | Moving KE % | Shape | Floor | Frame | Braces | Y guides | Y drive | Feet/welds | Beam | X | Z | Table | Rigid |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 26.054 | 81.3 | beam Y, X carriage Y, Z ram Y, spindle Y; beam RX -1.813 mrad/mm, bend residual 0.122 | 3.9 | 28.2 | 3.9 | 6.6 | 23.7 | 1.9 | 31.3 | 0.2 | 0.1 | 0.1 | 0.0 |
+| 8 | 41.047 | 68.3 | frame Z, beam Z, X carriage Z, Z ram Z, spindle Z; beam RX +0.577 mrad/mm, bend residual 0.128 | 20.4 | 19.7 | 5.2 | 1.0 | 0.4 | 1.4 | 45.1 | 3.2 | 3.2 | 0.3 | 0.0 |
+| 9 | 42.934 | 89.0 | beam Y, X carriage X, Z ram X, spindle X; beam RZ +0.654 mrad/mm, bend residual 0.107 | 2.1 | 7.8 | 1.6 | 1.0 | 24.0 | 0.8 | 57.7 | 4.8 | 0.3 | 0.0 | 0.0 |
+| 13 | 52.290 | 76.5 | X carriage X, Z ram X, spindle X; beam RZ -0.087 mrad/mm, bend residual 0.013 | 5.6 | 12.9 | 4.1 | 1.4 | 1.5 | 0.3 | 6.2 | 64.7 | 2.9 | 0.4 | 0.0 |
+| 30 | 88.317 | 70.2 | frame Z, table Z, beam Z, X carriage X, Z ram X, spindle X; beam RX -0.130 mrad/mm, bend residual 0.126 | 10.5 | 11.1 | 1.9 | 0.5 | 0.0 | 1.4 | 73.0 | 0.7 | 0.6 | 0.1 | 0.1 |
+| 39 | 101.523 | 89.8 | beam Z, X carriage Z, Z ram Z, spindle Z; beam RX -0.540 mrad/mm, bend residual 0.049 | 1.2 | 7.3 | 1.3 | 0.5 | 0.0 | 1.5 | 11.8 | 39.6 | 36.5 | 0.1 | 0.0 |
+
+### Single-pose sensitivities
+
+Lowest gantry-dominant mode across both beds/all fine-mesh poses; governing target failure. Bed 3150, X=800, Y=1575, full Z, 50 mm mesh. These are analytical property/layout variants at fixed mounting interfaces, not collision-checked replacement CAD. Y-spacing includes longer steel feet and rails; HGR30 includes catalogue mass increments and ZA radial rigidity. Lateral guide stiffness remains assumed. Changing plate thickness requires reworking the actual mounting stack.
+
+| Variant (ranked by tracked gantry frequency gain) | ΔX N/µm | ΔY N/µm | Δfirst gantry Hz | Δtracked branch Hz | Motion-signature MAC | Δmoving Y kg |
+|---|---:|---:|---:|---:|---:|---:|
+| X plate 25 mm | -0.272 | -0.641 | +0.390 | +0.390 | 1.000 | -6.531 |
+| Y blocks 400 mm | -0.004 | +0.040 | +0.172 | +0.172 | 0.999 | +5.200 |
+| welds x0.1 | -0.000 | -0.000 | -0.001 | -0.001 | 1.000 | +0.000 |
+| Y HGR30 | +0.000 | +0.001 | -0.261 | -0.261 | 1.000 | +1.480 |
+| steel Z ram | +0.415 | +0.309 | -1.357 | -1.357 | 1.000 | +22.946 |
+| free levelling feet | -0.005 | -0.001 | -2.362 | -2.362 | 0.982 | +0.000 |
+
+Tracked-branch MAC compares normalized body translations and rotations (200 mm rotation scale), not a consistent-mass matrix MAC. Both the classified first mode and matched branch are reported so threshold swaps are visible. Weld ×0.1 changes translation springs from 10¹⁰ to 10⁹ N/mm and rotation from 10¹³ to 10¹² N·mm/rad; these are quasi-rigid numerical connectors, not qualified weld flexibility. Free supports keep six vertical springs but only X at foot 0 and Y at feet 0/3; friction/no-slip is assumed.
+
+HGR30 uses [HIWIN HGH25CA/HGH30CA](https://www.hiwin.com/wp-content/uploads/Linear_Guideway-E.pdf): radial ZA 539→618 N/µm, block mass increment 0.51→0.88 kg and rail increment 3.21→4.47 kg/m. Incremental mass is added to generic CAD masses; rail bending and supplier mounting-height changes are not resolved.
+
+### Added moving mass
+
+| Member | Previous kg | Revised kg | Added kg |
+|---|---:|---:|---:|
+| xCarriage | 10.886 | 17.417 | +6.531 |
+| zCarriage | 6.623 | 12.030 | +5.407 |
+| beamFootLeft | 5.258 | 7.886 | +2.629 |
+| beamFootRight | 5.258 | 7.886 | +2.629 |
+| beam | 71.934 | 72.502 | +0.569 |
+| shoeLiftBracket | 0.173 | 0.292 | +0.119 |
+| motorYLeftSupport | 0.084 | 0.158 | +0.074 |
+| switchZpositiveLimitMount | 0.159 | 0.156 | -0.004 |
+| switchZhomeMount | 0.072 | 0.068 | -0.004 |
+| switchZnegativeLimitMount | 0.068 | 0.064 | -0.004 |
+| motorZSupport | 0.094 | 0.084 | -0.010 |
+| motorYRightSupport | 0.084 | 0.064 | -0.020 |
+| **Total moving Y** | **175.860** | **193.775** | **+17.915** |
+
+Fixed base braces are not part of moving Y mass. The beam mass also increases slightly because thicker feet change the generated span. Part-level inertia and material mass are changed in each sensitivity, not just a modal denominator.
+
+Artifacts: `build/sheet-router-modal/anchored/{results,summary}.json`, `extended/extended-modes.json`, `sensitivities/sensitivities.json`, and `diagnosis.json`. The full-run solve-time sources, packet hashes and solver hash remain with the results. Extended/sensitivity runs record their source hashes separately. No fabrication release.
+
+
+### Reproduce the anchored review
+
+Use the existing mill FEM virtualenv and prebuilt CalculiX. Keep all outputs on
+root; DATA1 is only read for the earlier moving-mass comparison. The packets used
+here are the exact f47ed13f4 exports copied from
+`build/sheet-router-stiffness/validated/y{2600,3150}` into `anchored/`.
+
+```bash
+export LD_LIBRARY_PATH="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+router_python=machinekit/examples/bench-mill/build/fem/venv/bin/python
+router_ccx=machinekit/examples/bench-mill/build/fem/tools/calculix/usr/bin/ccx
+router_packets=build/sheet-router-modal/anchored
+/home/joao/dev/materia-cache/tools/heavy-run --mem 6G --need 1G --label router-modal-full \
+  "$router_python" machinekit/examples/sheet-router/fem/study.py --packets "$router_packets" --ccx "$router_ccx" --floor anchored
+"$router_python" machinekit/examples/sheet-router/fem/report.py "$router_packets"
+/home/joao/dev/materia-cache/tools/heavy-run --mem 5G --need 1G --label router-modal-sensitivity \
+  "$router_python" machinekit/examples/sheet-router/fem/sensitivity.py --packets "$router_packets" --ccx "$router_ccx" --output build/sheet-router-modal/sensitivities
+/home/joao/dev/materia-cache/tools/heavy-run --mem 5G --need 1G --label router-extended-modes \
+  "$router_python" machinekit/examples/sheet-router/fem/extended_modes.py --packets "$router_packets" --ccx "$router_ccx" --output build/sheet-router-modal/extended
+"$router_python" machinekit/examples/sheet-router/fem/diagnose.py --packets "$router_packets" \
+  --extended build/sheet-router-modal/extended/extended-modes.json \
+  --sensitivities build/sheet-router-modal/sensitivities/sensitivities.json \
+  --baseline /media/joao/DATA1/materia-router-sr6/final
+```
+
+The native beam/rotation/crossing gate, all 37 mill Python regressions, and both
+eccentric Y-drive checks pass. Maximum reserved Y-branch force is 931.07 N; the
+Hertz diagnostic is 725.79 MPa and is not the rack acceptance limit. No CAD was
+changed in this analysis pass. The six sensitivity geometries and fabrication/access
+decisions require their own CAD and supplier qualification before adoption.
+
+## f47ed13f4 CAD and comparison history
 
 The working CAD now selects a 40 mm flat X plate, 30 mm welded steel beam feet,
 180 mm moving-Z rail spacing and a 20 mm Z web with two closed side sections
@@ -16,7 +196,8 @@ than only at their endpoints. A native fixture compares automatic crossing
 connectivity with four explicitly joined arms: both deflect 0.007976131 mm under
 300 N, with four branches at one physical node. Welded beam feet use two spatial
 contacts across the beam footprint instead of a guessed single rotational spring.
-Finite levelling-foot supports remain; no foundation anchors are credited.
+That revision originally used finite levelling-foot supports; the anchored baseline
+and free-standing sensitivity above supersede that support selection.
 Local weld stress, tube-wall flexibility and the built-up aluminium Z joint still
 require qualification.
 
@@ -34,8 +215,8 @@ the corrected comparison, `cad/` the earlier revised CAD, and `cad-screen/` its
 critical-pose screen. Fresh final CAD packets are in `validated/`, exported from an isolated detached
 worktree based on HEAD with only the router patch. Both beds export 171 components
 and 39 stock members using the existing OCCT libraries. This avoids the unrelated
-casting refactor in the shared checkout. The full two-mesh structural rerun remains
-pending; these exports alone do not qualify the structural targets.
+casting refactor in the shared checkout. The full anchored two-mesh rerun is reported above; exports alone do not qualify
+the structural targets.
 The isolated guide gate passes both beds, including closed Z-section validity and
 volume, sixteen frame braces, moving-rail reach and selected drives. The final
 SR4 sizing/planner gate passes 82 assertions. Shared exporter fixtures pass
@@ -49,7 +230,7 @@ The revised long-bed moving Y mass is 193.77 kg. The ideal drive-only estimate i
 mass. The hinge accounts for 64.9% of series drive compliance.
 
 The historical results below retain their original model and geometry; their
-passing checks do not validate this follow-up. No fabrication release.
+results use their original support/model assumptions. No fabrication release.
 
 ## Previous guide-first candidate (SR6, 2026-10-20)
 

@@ -524,17 +524,17 @@ only as sources in docs. Standards (ISO30 / ISO 7388, ER collets, EN 60204-1, IS
 | Rapid XY / Z | 40 / 10 m/min | revised SR4 screen |
 | Cutting feed | up to 20 m/min | assumed |
 | Acceleration XY / Z | 3 / 3 m/s² | assumed |
-| Gantry moving mass | 175.743 kg (175.860 kg long bed), whole moving chain allowance included | revised SR4 CAD mass, assumed geometry/density |
-| X / Z moving mass | 53.355 / 25.696 kg | revised SR4 CAD mass, assumed geometry/density |
+| Gantry moving mass | 193.657 kg (193.775 kg long bed), whole moving chain allowance included | revised SR4 CAD mass, assumed geometry/density |
+| X / Z moving mass | 65.390 / 31.223 kg | revised SR4 CAD mass, assumed geometry/density |
 | Rails | Y HGR25 blocks 280 mm apart; X/Z each two HGR20 rails/four blocks | guide-first candidate |
 | Rack and pinion | helical mn 1.5, β 19°31′42″, 20 T → 100 mm/rev | derived |
 | Reducers | Y 5:1; X 7.5:1; 3 arcmin planetary | SR4 selection, assumed ratings |
 | Servos | Y 2 × 750 W, X 750 W, Z 750 W + brake | revised SR4; catalogue-class assumptions |
 | Pulse resolution | 5000 pulses/rev: Y 4 µm / 167 kHz; X 2.667 µm / 250 kHz at 40 m/min | derived; board rate qualification pending |
 | Z screw | Ø16 × 10 mm, 13 mm assumed race root, 390 mm fixed/free shaft | revised SR4 selection at 10 m/min |
-| Beam | RHS 200 × 100 × 6.3 steel retained as baseline | SR5; carriage/guide redesign required |
-| Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | target; revised screen ≈ 1.00 X / 0.480 Y, still fails |
-| First gantry mode | ≥ 40 Hz | target; revised gantry-dominant screen min 27.25 Hz; global frame min 5.18 Hz |
+| Beam | RHS 200 × 100 × 6.3 steel retained as baseline | anchored screen static pass; modal redesign required |
+| Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | anchored screen minimum 2.044 X / 2.135 Y; passes reduced static target |
+| First gantry mode | ≥ 40 Hz | anchored gantry min 26.054 Hz; global frame min 24.177 Hz; modal target fails |
 | Spindle | ISO30 ATC, ≈ 6 kW S1, 18–24k rpm, 400 V 3~, air-cooled | assumed |
 | VFD | 7.5 kW 400 V with braking resistor and STO | assumed |
 | Tool rack | 8 forks, pneumatic cover, rear rack zone | assumed |
@@ -715,7 +715,7 @@ are released. The worst reserved eccentric Y branch is 874.60 N and both drives 
 the supplier-based rack, reducer, preload and torque checks. See the FEM report for
 classification limits, sourcing conditions and the evidence directory.
 
-**Z/frame follow-up (working; verification pending).** The next geometry uses a
+**Z/frame follow-up (f47ed13f4; anchored structural rerun complete).** The next geometry uses a
 40 mm flat X carriage, 30 mm welded steel feet, closed Z side sections
 25 × 120 × 6 mm and sixteen RHS 80 × 80 × 4 base braces. Moving Z rails are
 180 mm apart. The beam profile and 100 mm side allowance remain; removing the
@@ -726,9 +726,40 @@ was re-screened separately to distinguish model correction from hardware gains.
 Critical-pose diagnostics improve static stiffness but still fail the modal target.
 The router compiles against HEAD in an isolated detached worktree and both beds
 export fresh FEM packets. The two-bed assembly/clearance gate passes 426 assertions,
-sizing/planner passes 82, and guide geometry/travel checks pass. Full two-mesh
-structural verification remains pending. See the
+sizing/planner passes 82, and guide geometry/travel checks pass. The full two-mesh,
+nine-pose, two-bed structural rerun now passes numerical gates and the reduced
+static target: minima 2.044 X / 2.135 Y N/µm. The lowest global mode is 24.177 Hz
+(X frame sway); the lowest gantry mode is 26.054 Hz (Y beam/head sway and beam roll).
+The latter stores 31.3% of strain energy in the beam, 28.2% in frame tubes and
+23.7% in the Y drive. The 40 Hz target still fails. See the
 [FEM follow-up record](fem/README.md). No fabrication release.
+
+**Sensitivity decision.** Retain the 40 mm X plate and aluminium Z ram. A 25 mm
+X plate removes 6.53 kg but gains only 0.390 Hz and fails static stiffness; a steel
+Z adds 22.95 kg and loses 1.357 Hz. Y spacing 400 mm adds 5.20 kg for 0.172 Hz;
+HGR30 adds 1.48 kg moving mass and lowers the mode by 0.261 Hz. Weld springs ×0.1
+change the mode by less than 0.001 Hz. Free feet reduce it to 23.692 Hz, with
+30.2% floor, 24.8% frame, 17.8% beam and 14.8% Y-drive strain energy: the cause
+of the former 23.7 Hz result is resolved. Next CAD work recovers the 60 mm tool
+lever through forks/risers and matching table/setter datums, and fixes front
+loading access; the following modal iteration targets the frame/beam/Y-drive
+load path, not extra Z mass. None of these results grants fabrication release.
+
+**Braced-frame review decisions.** Use anchored slab supports as the analysis
+baseline and free-standing levelling feet as a sensitivity; state the finite
+support stiffness, not a perfect clamp. The present front end braces obstruct
+sheet loading, so the next access pass lowers their upper joints below the plenum
+and verifies the resulting modes. Plenum service is from above, valves from the
+sides, fixed vacuum plumbing stays outside brace crossings, and chains retain
+external/overhead routing. Actual hose and valve-removal paths remain a CAD gate.
+Select bolted/dowelled Z ribs and closing strips, machine the assembled rail face,
+and qualify joint slip instead of crediting welded T6 parent strength. Stress-relieve
+the welded steel beam/feet and machine Y-carriage and X-rail datums in one setup.
+Recover the 60 mm spindle drop through fork/riser clearance changes, with matching
+work-surface/setter height changes; rack height alone cannot fix relative pickup
+clearance. The current pickup geometry stays until the coupled change is verified.
+The detailed decisions and remaining qualification gates are in
+[SOURCING.md](SOURCING.md#fabrication-and-access-decisions-after-the-braced-frame-screen).
 
 **SR6. Frame, fabrication drawings and alignment procedures (SR-D2, SR-D11).**
 - Weldment: tube layout, weld seams and sequence, jig layout (frame points as jig stops), cut
@@ -1005,8 +1036,8 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR2 | done: shared servo/reducer/steel builders; 59 focused assertions, existing gantry/router checks, 292 catalogue assertions | this commit |
 | SR3 | complete: both beds, project load/hold/homing and focused regressions pass | see SR3 notes |
 | SR4 | revised two-bed drive/rack/screw screen complete; 82 sizing/planner assertions pass | see guide-first revision |
-| SR5 | reduced screening complete; revised structural targets still fail | see guide-first revision and FEM report |
-| SR6 | guide-first CAD and clearance checks complete; fabrication gated by SR-D3 | see guide-first revision |
+| SR5 | anchored two-bed/two-mesh rerun complete; static passes, 40 Hz mode fails; mode energy and sensitivities recorded | see FEM diagnosis |
+| SR6 | braced CAD/assembly clearance passes; front sheet loading and service-access redesign open; fabrication gated by modal target | see anchored diagnosis and sourcing decisions |
 | SR7 | planned | |
 | SR8 | planned | |
 | SR9 | planned | |

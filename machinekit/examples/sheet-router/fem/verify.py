@@ -25,11 +25,18 @@ def cantilever(ccx,folder,h,rotational_stiffness=None):
     if rotational_stiffness:expected+=force*length**2/rotational_stiffness+force/1e9
     error=abs(measured/expected-1)
     if error>.03:raise ValueError(f'Analytical beam mismatch {error}: {measured} / {expected}')
+    # Recover native and spring eigenvector energy independently of the router report.
+    from modes import displacements, energy
+    block=text.split('E I G E N V A L U E    N U M B E R')[1]
+    modal_u=displacements(block);native=sum(energy(block,model.groups).values())
+    spring=sum(.5*k*(modal_u[n][i]-modal_u[m][i])**2 for n,m,i,k,_ in model.spring_elements)
+    if native<=0:raise ValueError('Modal native strain energy missing')
+    if rotational_stiffness and spring/(native+spring)<.8:raise ValueError('Soft rotational-joint mode energy must be dominated by its spring')
     modes=frequencies(text)
     # Euler-Bernoulli first weak-plane cantilever mode; shear lowers it slightly.
     analytic_mode=1.8751040687**2/(2*math.pi*length**2)*math.sqrt(youngs*inertia/(7850e-12*area))
     if not rotational_stiffness and abs(modes[0]/analytic_mode-1)>.04:raise ValueError('Modal beam unit/section check failed')
-    return dict(meshMm=h,measuredMm=measured,analyticalMm=expected,relativeError=error,firstModeHz=modes[0],eulerBernoulliModeHz=analytic_mode)
+    return dict(meshMm=h,measuredMm=measured,analyticalMm=expected,relativeError=error,firstModeHz=modes[0],eulerBernoulliModeHz=analytic_mode,modalSpringEnergyFraction=spring/(native+spring))
 
 
 def welded_crossing(ccx,folder):

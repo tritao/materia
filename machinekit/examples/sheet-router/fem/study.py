@@ -33,7 +33,7 @@ def point(p): return (p['x'],p['y'],p['z'])
 class Model:
     def __init__(self,h):
         self.h=h;self.lines=[];self.roots={};self.springs=[];self.masses=[];self.boundary=[]
-        self.native=[];self.queries={};self.parts=[]
+        self.native=[];self.queries={};self.parts=[];self.mode_count=20
     def beam(self,a,b,sec,normal=(0,0,1),material=(210000,0),group='rigid',space='frame'):
         if norm(sub(a,b))<1e-6:return
         d=mul(sub(b,a),1/norm(sub(b,a)))
@@ -63,7 +63,7 @@ class Model:
         for row in self.lines:
             endpoints[row['space']]+=[row['a'],row['b']]
         # Connect interior intersections of welded frame stock, not moving bodies or rigid arms.
-        stock=[row for row in self.lines if row['group']=='frame' and row['space']=='frame']
+        stock=[row for row in self.lines if row['group'] in ('frame','braces') and row['space']=='frame']
         for i,first in enumerate(stock):
             for second in stock[i+1:]:
                 a,b=first['a'],second['a'];u=sub(first['b'],a);v=sub(second['b'],b);w=sub(a,b)
@@ -181,7 +181,7 @@ class Model:
                 if acceleration and moving in acceleration[1]:f[acceleration[0]]-=3*m
                 after += [f'{n},{i+1},{v:.12g}' for i,v in enumerate(f) if abs(v)>1e-14]
             after += ['*DLOAD,OP=NEW']
-            for group in ['frame','gantry','column']:
+            for group in ['frame','braces','gantry','column']:
                 if group not in self.groups:continue
                 if gravity:after += [f'G{group},GRAV,9810,0,0,-1']
                 if acceleration and ((group=='gantry' and 'y' in acceleration[1]) or (group=='column' and 'x' in acceleration[1])):
@@ -189,18 +189,21 @@ class Model:
             after += ['*NODE PRINT,NSET=OBS','U','*NODE PRINT,NSET=OBS','RF']
             for group in self.groups:after += [f'*EL PRINT,ELSET=G{group},TOTALS=ONLY','ELSE']
             after += ['*END STEP']
-        if modal:after += ['*STEP','*FREQUENCY','20','*NODE PRINT,NSET=OBS','U','*END STEP']
+        if modal:
+            after += ['*STEP','*FREQUENCY',str(self.mode_count),'*NODE PRINT,NSET=OBS','U']
+            for group in self.groups:after += [f'*EL PRINT,ELSET=G{group},TOTALS=ONLY','ELSE']
+            after += ['*END STEP']
         return '\n'.join(lines+node_lines(self.nodes)+after)+'\n'
 
 
 def make_model(packet,pose,h):
-    model=Model(h);beams=packet['beams'];parts={p['id']:p for p in packet['parts']};axes={a['axis']:a for a in packet['axes']}
+    model=Model(h);model.mode_count=packet.get('modeCount',20);beams=packet['beams'];parts={p['id']:p for p in packet['parts']};axes={a['axis']:a for a in packet['axes']}
     frame=[b for b in beams if b['id'] not in ('beam','zColumn')]
     # Welded RHS meet on their outer faces. Rigid centreline offsets represent the weld regions.
     base_mass=sum((b['widthMm']*b['heightMm']-(b['widthMm']-2*b['wallMm'])*(b['heightMm']-2*b['wallMm']))*norm(sub(b['startMm'],b['endMm']))*b['densityKgPerMm3'] for b in frame if b['id'].startswith('base/'))
     for b in frame:
         rho=b['densityKgPerMm3']*(parts['base']['massKg']/base_mass if b['id'].startswith('base/') else 1)
-        model.beam(b['startMm'],b['endMm'],section(b),b['sectionX'],(b['youngsMPa'],rho),'frame')
+        model.beam(b['startMm'],b['endMm'],section(b),b['sectionX'],(b['youngsMPa'],rho),'braces' if 'Brace' in b['id'] else 'frame')
     original=list(model.lines);links=set()
     for row in original:
         for p in (row['a'],row['b']):
@@ -215,7 +218,9 @@ def make_model(packet,pose,h):
         return min((project(p,r['a'],r['b']) for r in rows),key=lambda q:norm(sub(p,q)))
     for i,support in enumerate(packet['supports']):
         p=support['pointMm'];q=nearest(p);model.rigid(p,q,'frame');root=model.root('foot'+str(i),p,'frame')
-        model.spring(root,None,[50000 if i==0 else 0,50000 if i in (0,3) else 0,packet['interfaces']['footVerticalNPerMm'],0,0,0],'feet')
+        anchored=packet.get('floorSupport','anchored')=='anchored'
+        lateral=packet['interfaces'].get('footLateralNPerMm',50000)
+        model.spring(root,None,[lateral if anchored or i==0 else 0,lateral if anchored or i in (0,3) else 0,packet['interfaces']['footVerticalNPerMm'],0,0,0],'feet')
     dy=pose['y']-packet['workY']/2;dx=pose['x']-800
     beam=next(b for b in beams if b['id']=='beam');a=add(beam['startMm'],(0,dy,0));b=add(beam['endMm'],(0,dy,0))
     model.beam(a,b,section(beam),beam['sectionX'],(beam['youngsMPa'],beam['densityKgPerMm3']),'gantry','gantry')
@@ -231,7 +236,7 @@ def make_model(packet,pose,h):
             model.rigid(end,contact,'foot'+side)
             moving=model.root('y'+side+label,contact,'foot'+side)
             fixed=model.root('f'+side+label,contact,'frame');q=nearest(contact);model.rigid(q,contact,'frame')
-            model.spring(moving,fixed,[100000,0,539000,0,0,0] if packet.get('guideLayout') else [guidek,ydrive/2,guidek,rotk,rotk,rotk],'Yblocks' if packet.get('guideLayout') else 'Yguides_drive')
+            model.spring(moving,fixed,[g.get('yBlockLateralNPerMm',100000),0,g.get('yBlockRadialNPerMm',539000),0,0,0] if packet.get('guideLayout') else [guidek,ydrive/2,guidek,rotk,rotk,rotk],'Yblocks' if packet.get('guideLayout') else 'Yguides_drive')
         attachment=(fp[0],a[1],a[2]);model.rigid(fp,attachment,'foot'+side)
         r1=model.root('beam'+side,attachment,'gantry');r2=model.root('plate'+side,attachment,'foot'+side)
         if packet.get('beamFootJointWelded'):
@@ -240,7 +245,7 @@ def make_model(packet,pose,h):
                 at=add(fp,(0,offset,plate['thicknessMm']/2))
                 model.rigid(attachment,at,'gantry');model.rigid(add(fp,(0,offset,0)),at,'foot'+side)
                 upper=model.root('weldBeam'+side+label,at,'gantry');lower=model.root('weldFoot'+side+label,at,'foot'+side)
-                model.spring(upper,lower,[1e10]*3+[1e13]*3,'welds')
+                model.spring(upper,lower,[1e10*g.get('weldSpringFactor',1)]*3+[1e13*g.get('weldSpringFactor',1)]*3,'welds')
         else:model.spring(r1,r2,[g['boltTranslationNPerMm']]*3+[bolt]*3,'bolts')
     if packet.get('guideLayout'):
         for side in ['Left','Right']:
@@ -355,7 +360,7 @@ def solve(packet,pose,h,ccx,folder):
         else:energy_error=None
         reactions={}
         for i in range(6):
-            root=model.roots['foot'+str(i)];reactions[str(i)]=[-50000*u[root['ref']][j] if (j==2 or (j==0 and i==0) or (j==1 and i in (0,3))) else 0 for j in range(3)]
+            root=model.roots['foot'+str(i)];ks=next(k for a,b,k,g in model.springs if a=='foot'+str(i) and b is None);reactions[str(i)]=[-ks[j]*u[root['ref']][j] for j in range(3)]
         net=[sum(r[j] for r in reactions.values()) for j in range(3)]
         if name.startswith('cut'):
             force_error=norm(net)/300
@@ -376,30 +381,13 @@ def solve(packet,pose,h,ccx,folder):
             artifact.with_suffix(artifact.suffix+'.gz').write_bytes(packed)
             if gzip.decompress(packed)!=raw:raise ValueError('Solver archive integrity failed')
             artifact.unlink()
-    mode_rows=[]
-    for block in re.split(r'displacements \(vx,vy,vz\)[^\n]*\n',text)[7:]:
-        u={}
-        for line in block.splitlines():
-            columns=line.split()
-            if len(columns)==4 and columns[0].isdigit():u[int(columns[0])]=tuple(float(x.replace('D','E')) for x in columns[1:])
-            elif u:break
-        if not u:continue
-        kinetic=defaultdict(float)
-        for n,m,category in model.mass_loads:kinetic[category]+=m*dot(u[n],u[n])
-        for _,conn,row in model.elements:
-            e,rho=row['material']
-            if not rho:continue
-            _,w,t,*walls=row['sec'];area=w*t-(w-2*walls[0])*(t-2*walls[0])
-            mass=area*norm(sub(model.nodes[conn[0]],model.nodes[conn[2]]))*rho
-            kinetic['y' if row['group']=='gantry' else 'frame']+=mass*sum(weight*dot(u[n],u[n]) for n,weight in zip(conn,(1/6,4/6,1/6)))
-        total=sum(kinetic.values());fractions={key:value/total for key,value in kinetic.items()}
-        mode_rows.append(dict(fractions=fractions,gantryFraction=sum(fractions.get(key,0) for key in ('x','y','z')),
-            relativeToolToBed=norm(sub(u[tip],u[bed]))))
+    from modes import diagnostics
+    mode_rows=diagnostics(model,text,frequencies(text))
     return dict(modalParticipation=mode_rows,independentFloorMassKg=model.independent_floor_mass,pose=pose,meshMm=h,nodes=len(model.nodes),beamElements=len(model.elements),firstModesHz=frequencies(text),cases=cases)
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--packets',type=Path,required=True);parser.add_argument('--ccx',type=Path,required=True);parser.add_argument('--one',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--packets',type=Path,required=True);parser.add_argument('--ccx',type=Path,required=True);parser.add_argument('--one',action='store_true');parser.add_argument('--floor',choices=('anchored','free'),default='anchored');args=parser.parse_args()
     reports=[]
     snapshot=args.packets/'source';snapshot.mkdir(exist_ok=True)
     for source in Path(__file__).parent.glob('*.py'):shutil.copy2(source,snapshot/source.name)
@@ -414,10 +402,10 @@ def main():
         if packet['units']!={'length':'mm','force':'N','mass':'kg','youngsModulus':'MPa'}:raise ValueError('Unsupported packet units')
         for part in packet['parts']:
             if part['stepFile'] and hashlib.sha256((manifest.parent/part['stepFile']).read_bytes()).hexdigest()!=part['stepSha256']:raise ValueError('STEP integrity failed: '+part['id'])
-    identity=dict(frontGuideSha256=hashlib.sha256(Path(__file__).with_name('front_guides.py').read_bytes()).hexdigest(),packetSha256=hashes,studySha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-        gmshVersion=gmsh.__version__,ccxSha256=hashlib.sha256(args.ccx.read_bytes()).hexdigest())
+    identity=dict(modalDiagnosticsSha256=hashlib.sha256(Path(__file__).with_name('modes.py').read_bytes()).hexdigest(),frontGuideSha256=hashlib.sha256(Path(__file__).with_name('front_guides.py').read_bytes()).hexdigest(),packetSha256=hashes,studySha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        floorSupport=args.floor,footLateralNPerMm=50000,footVerticalNPerMm=50000,gmshVersion=gmsh.__version__,ccxSha256=hashlib.sha256(args.ccx.read_bytes()).hexdigest())
     for length in [2600,3150]:
-        packet=json.loads((args.packets/f'y{length}'/'manifest.json').read_text())
+        packet=json.loads((args.packets/f'y{length}'/'manifest.json').read_text());packet['floorSupport']=args.floor
         poses=packet['poses'][4:5] if args.one else packet['poses']
         for i,pose in enumerate(poses):
             for h in ([200] if args.one else [100,50]):
