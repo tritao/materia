@@ -110,6 +110,13 @@ masters and their flatness, add a replication allowance and grout gap to
 change also updates `MillFrame`'s seat inserts and adds replication layer and
 grout solids for the FEM packet.
 
+Replication sets the plane only. Lateral straightness, rail parallelism and
+squareness between axes come from steel side bars with push screws, adjusted
+at assembly against a straightedge and a granite square: see
+[../../RAIL_MOUNTING.md](../../RAIL_MOUNTING.md) (decisions, phases RM0–RM6)
+and [../../METROLOGY_SOURCING.md](../../METROLOGY_SOURCING.md) (instruments and
+compounds). Open code-review findings are in [REVIEW.md](REVIEW.md).
+
 Four side-open foot pockets expose adjustment nuts. M16 foot envelopes pass
 through 18 mm steel seat bores and separate stem openings in the casting. Front
 foot stations sit beneath a full-height bridge; underside cores start behind it.

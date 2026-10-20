@@ -636,6 +636,14 @@ the machine design rather than the casting:
   jig references, release, hole protection and evidence. Replication masters,
   jigs and their metrology are fabrication-package items; nothing is shimmed
   later.
+- *Amendment 2026-10-20 (`machinekit/RAIL_MOUNTING.md`).* Rail relationships
+  also have **in-plane** kinds: straightness of a master rail edge, parallelism
+  of a follower rail, and squareness between axes within the rail plane. Their
+  route is "adjusted at assembly": a cast-in steel side bar with push screws,
+  aligned against a straightedge, the master rail or a granite square, with the
+  measured profile attached as evidence. Replication still owns the plane. The
+  rail-mount family that declares these lives in MachineKit (RM2); step 2 of
+  phase 7 owns the relationship records (RM4).
 
 ### Foundation-level declarations
 
@@ -1260,7 +1268,10 @@ insert, covering, seam and restraint, using the phase 3 box where practical.
 Record actual dimensions, release behavior, core deformation, thermocouple
 traces (thickest section centre, core surface, a panel face), voids found at
 demold against the fill analysis's predicted pockets, compaction method and its
-measured settings, and insert pull-out if tested. Fit or confirm `ResinCureSpec`
+measured settings, and insert pull-out if tested. Include the rail edge trial
+from `machinekit/RAIL_MOUNTING.md` (RM6): a replicated pad about 1 m long, a
+real rail aligned with push screws, straightness before and after torque and
+after one week. Fit or confirm `ResinCureSpec`
 values from the traces and supplier data. Adjust recipe values from evidence.
 Review full mold loads, handling, insert anchorage and finishing.
 

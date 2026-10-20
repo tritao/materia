@@ -268,6 +268,8 @@ machined.**
     indicator on a block;
   - self-levelling epoxy gives flatness to gravity, not straightness, so straightness always comes
     from a reference.
+  - the shared rail mount (side bar, push screws, assembly sequence, metrology) is planned in
+    `machinekit/RAIL_MOUNTING.md`; the router adopts it after the bench mill (RM6).
 - The frame is welded in a stated sequence and settles before replication, so weld distortion is
   taken out by the replicated layer. Full stress relief of a 3 m weldment is not available to us.
 - Filling the tubes for damping (sand or a polymer concrete) is decided by SR5 modal results, not
