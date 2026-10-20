@@ -1,6 +1,6 @@
 ---
 title: Identity
-description: How things keep their names: stable scene identities and persistent topological names.
+description: "How things keep their names: stable scene identities and persistent topological names."
 status: stub
 ---
 

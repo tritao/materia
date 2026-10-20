@@ -1,6 +1,6 @@
 ---
 title: Diagnostics
-description: How every layer reports problems: reject bad input, report where and why.
+description: "How every layer reports problems: reject bad input, report where and why."
 status: stub
 ---
 

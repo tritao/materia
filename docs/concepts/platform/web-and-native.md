@@ -1,6 +1,6 @@
 ---
 title: Web vs. native
-description: The same editor in the browser: what is shared and what differs.
+description: "The same editor in the browser: what is shared and what differs."
 status: stub
 ---
 

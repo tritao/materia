@@ -1,6 +1,6 @@
 ---
 title: Fidelity levels
-description: Kinematic, Ideal and Physical simulation: what each proves and what it does not.
+description: "Kinematic, Ideal and Physical simulation: what each proves and what it does not."
 status: stub
 ---
 

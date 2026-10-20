@@ -1,6 +1,6 @@
 ---
 title: Manufacturing outputs
-description: How a model becomes a shop packet: cut lists, weld sequences, sheet plans, tooling.
+description: "How a model becomes a shop packet: cut lists, weld sequences, sheet plans, tooling."
 status: stub
 ---
 

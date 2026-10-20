@@ -115,5 +115,9 @@ place.
 - D2 started. The concept skeleton, *The life of a machine* (draft) and the
   glossary are in `docs/concepts/` (71f9d100e). *Conventions* is drafted and
   answers the four open questions from *The life of a machine*.
-- Open-core decisions drafted in [OPEN_CORE.md](OPEN_CORE.md) and waiting on
-  review.
+- Open-core licensing accepted: Apache-2.0, CC BY 4.0 for docs, DCO
+  ([OPEN_CORE.md](OPEN_CORE.md)).
+- D1 done except hosting: the Starlight site in `docs/site/` builds every page
+  under `docs/`, fails on invalid front matter or broken internal links, and
+  runs in CI (`.github/workflows/docs.yml`, uploads the built site). Choosing
+  and wiring the host (Cloudflare Pages or Netlify) is still open.

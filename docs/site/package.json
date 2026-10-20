@@ -1,0 +1,17 @@
+{
+  "name": "materia-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "dev": "node scripts/sync.mjs && astro dev",
+    "build": "node scripts/sync.mjs && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.5",
+    "astro": "7.3.6",
+    "sharp": "0.34.4",
+    "starlight-links-validator": "0.26.0"
+  }
+}

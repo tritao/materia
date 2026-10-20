@@ -1,6 +1,6 @@
 ---
 title: Specialized models
-description: Sheet metal, gears, BIM and humans: domain layers over the same core.
+description: "Sheet metal, gears, BIM and humans: domain layers over the same core."
 status: stub
 ---
 
