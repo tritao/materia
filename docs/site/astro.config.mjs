@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import mermaid from "astro-mermaid";
 import starlightLinksValidator from "starlight-links-validator";
 import { slugOf } from "./scripts/routes.mjs";
 
@@ -24,6 +25,8 @@ function conceptGroups() {
 
 export default defineConfig({
 	integrations: [
+		// Renders ```mermaid blocks in the browser, following the light/dark theme. Must precede Starlight.
+		mermaid({ theme: "neutral", autoTheme: true }),
 		starlight({
 			title: "Materia",
 			description: "Design, simulate, plan and run machines, from CAD to the controller.",

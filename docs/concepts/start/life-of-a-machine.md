@@ -16,14 +16,23 @@ editor from the Start page, and played in simulation. Every step below names the
 concept it relies on and links to the page that explains it. Where the picker
 does not exercise a stage, the step says so and names the example that does.
 
-```
- geometry ─► components ─► assembly ─► scene artifact ─► editor
-                              │
-                              ├─► kinematics ─► limits
-                              │                   │
-       mission (pick/place) ──┴─► motion plan ◄───┘
-                                      │
-                       simulation ◄───┴───► runtime ─► device / controller
+```mermaid
+flowchart TB
+  subgraph model [Model it]
+    direction LR
+    geometry[Geometry] --> components[Components] --> assembly[Assembly] --> artifact[Scene artifact] --> editor[Editor]
+  end
+  subgraph plan [Plan it]
+    direction LR
+    kinematics[Kinematics] --> limits[Derived limits] --> motion[Motion plan]
+    mission["Mission (pick, place)"] --> motion
+  end
+  subgraph run [Run it]
+    direction LR
+    runtime[Runtime] --> simulation[Simulated world]
+    runtime --> device[Device / controller]
+  end
+  model --> plan --> run
 ```
 
 <!-- figure: one persistent 3D view of the picker that changes with each step

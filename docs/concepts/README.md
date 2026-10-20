@@ -96,6 +96,9 @@ Rules:
   units, two names for one idea, a boundary the code does not follow), record it
   under **Open questions** at the bottom of the page and file it. Do not write
   around it.
+- Diagrams are Mermaid code blocks (GitHub and the site both render them);
+  the few key diagrams may be hand-made SVG using the site's colour variables.
+  Never ASCII art. Data figures are computed by `docs/figures`, never drawn.
 - Plans, TODOs and handoffs stay where they are. Distil their decisions into
   these pages; do not link readers into them.
 

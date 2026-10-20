@@ -24,10 +24,12 @@ it; nothing else crosses.
 
 ### From program to plan
 
-```
-MotionProgram ──► ProgramCompiler ──► ExecutionPlan ──► runtime ──► simulation
- (what to do)       (planning)        (the contract)       │
-                                                           └──► device segments ──► controller
+```mermaid
+flowchart LR
+  program["Motion program<br/>(what to do)"] --> compiler["ProgramCompiler<br/>(planning)"] --> plan["Execution plan<br/>(the contract)"]
+  plan --> runtime[Runtime]
+  runtime --> simulation[Simulation]
+  runtime --> segments[Device segments] --> controller[Controller]
 ```
 
 A **motion program** says what is wanted: move linearly here, move freely
