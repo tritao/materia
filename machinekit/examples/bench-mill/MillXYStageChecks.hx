@@ -18,6 +18,34 @@ class MillXYStageChecks {
 	static function near(a:Float, b:Float, label:String):Void check(Math.abs(a - b) < 1e-6, '$label ($a vs $b)');
 
 	public static function main():Void {
+  var capacity=new MillCapacityLayout(),large=new MillGuidedXYStage(capacity.guidedXY());
+  large.validate();
+  check(large.table.parameterNumber("width")==capacity.tableWidth,"shared table keeps VMC width");
+  check(large.table.parameterNumber("thickness")==capacity.tableThickness,"shared table keeps VMC thickness");
+  check(large.saddle.parameterNumber("width")==capacity.saddleWidth,"shared saddle keeps VMC width");
+  check(large.saddle.parameterNumber("blockClearance")==6.6,"HG25 saddle uses M6 clearance rather than M4");
+  check(large.saddle.values().boolean("ribbed")&&!large.saddle.values().boolean("motorPocket"),"VMC ribs do not invent a Small drive pocket");
+  var largeModel=new AssemblyModel("mm");large.addTo(largeModel,"");
+  var largeState=new AssemblyState(largeModel.definition("shared-cross-slide"));
+  for(x in [-capacity.xTravel/2,0,capacity.xTravel/2])for(y in [-capacity.yTravel/2,0,capacity.yTravel/2]) {
+   largeState.setJoint("x",x);largeState.setJoint("y",y);largeState.forwardKinematics();
+   var table=largeState.worldPose("table"),saddle=largeState.worldPose("saddle");
+   near(table.x,-x,"VMC shared table X");near(table.y,capacity.spindleY-y,"VMC shared table Y");
+   near(table.z,capacity.tableBottom,"VMC preserved table datum");near(saddle.x,0,"VMC saddle independent of X");
+  }
+  var sharedParts:Array<machinekit.component.MachineComponent> =[large.saddle,large.table];
+  for(c in sharedParts) {
+   var part=c.geometry();check(part.valid()&&part.solidCount()==1,"shared VMC cross slide has connected valid geometry");part.close();
+  }
+  var restoredLarge=MachineAssembly.decode(large.encode(),MachineKitComponents.standard());
+  restoredLarge.validate();
+  var restoredTable=restoredLarge.components().filter(row -> row.id=="table")[0].component;
+  near(restoredTable.parameterNumber("width"),capacity.tableWidth,"VMC table width survives assembly persistence");
+  near(restoredTable.parameterNumber("thickness"),capacity.tableThickness,"VMC deck thickness survives assembly persistence");
+  near(restoredTable.connector("top").frame.z,capacity.tableThickness,"restored table top connector follows deck thickness");
+  var enlarged=new MillCapacityLayout(500,350,450),larger=new MillGuidedXYStage(enlarged.guidedXY());
+  larger.validate();
+  near(larger.table.parameterNumber("width"),800,"larger travel derives table width through the same builder");
 		AxisBuilderChecks.run();
 		assertions += MillDesignCheckTests.run();
 		var reference = new BenchMill(false, false), f = MillFramePreview.layout(reference), z = MillFramePreview.zLayout(

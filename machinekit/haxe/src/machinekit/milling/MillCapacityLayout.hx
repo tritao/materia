@@ -87,6 +87,15 @@ class MillCapacityLayout {
 			throw "Capacity study cannot retain guide support, fixture or column clearance";
 	}
 
+ public function guidedXY():MillGuidedXYStage.MillGuidedXYLayout return {
+  centreY:spindleY,yRailSpacing:frame.yRailSpacing,yRailStart:frame.yRailStart,yRailPlane:frame.railPlane,
+  yRail:new machinekit.motion.HgRail("HGR25R",frame.yRailLength),xRail:new machinekit.motion.HgRail("HGR25R",xRailLength),
+  block:new machinekit.motion.HgBlock("HGH25CA"),xHalfTravel:xTravel/2,yHalfTravel:yTravel/2,
+  xOvertravel:overtravel,yOvertravel:overtravel,xBlockSpan:xBlockSpan,yBlockSpan:yBlockSpan,xRailSpacing:xRailSpacing,
+  saddleWidth:saddleWidth,saddleDepth:saddleDepth,saddleHeight:saddleHeight,
+  tableWidth:tableWidth,tableDepth:tableDepth,tableThickness:tableThickness,riserHeight:riserHeight,driveInterfaces:false
+ };
+
 	public function zLayout():MillZAxisLayout return new MillZAxisLayout(frame,headBottom+zTravel,headHeight,spindleY,
 		-zTravel,"HGH25CA",new machinekit.motion.HgBlock("HGH25CA"),null,
 		{blockSpan:zBlockSpan,carriageWidth:carriageWidth,carriageHeight:carriageHeight,carriageThickness:carriageThickness,

@@ -24,7 +24,7 @@ class MillProject {
  }
  public static function large():Bytes {
   var layout=new MillCapacityLayout();
-  return new MillMachiningSetup(MillCapacityStudy.build(layout,false),["x","y","zAxis/z"],"table",layout.tableTop)
+  return new MillMachiningSetup(MillCapacityStudy.build(layout,false),["xyStage/x","xyStage/y","zAxis/z"],"xyStage/table",layout.tableTop)
    .scene("mill-large",["400 x 300 x 380 mm packaging study; XY drives are not fitted. Shared bearing-block mission uses kinematic preview bounds."]);
  }
 

@@ -1,7 +1,7 @@
 # Compact VMC capacity study
 
-This is a separate packaging study alongside the committed 250 × 160 × 250 mm
-mill. Open the `compact-vmc` entrypoint of `materia.project.json` (the old
+This is the larger capacity configuration of the shared mill assembly, alongside
+the 250 × 160 × 250 mm Small configuration. Open the `compact-vmc` entrypoint of `materia.project.json` (the old
 `materia.capacity.project.json` remains a compatibility shortcut), or run from the repository root:
 
 ```sh
@@ -58,9 +58,14 @@ is a named exclusion, not a general collision exemption. Column height now follo
 rail/bearing mount instead of leaving an unused 200 mm extension behind the motor.
 The original reference 750 W servo, 16×5 screw and BK12/BF12 supports are restored
 for packaging; this is not a completed drive selection or load/critical-speed check.
-The saddle, table and risers are solid packaging envelopes. They have
-no finished slots, screw corridors, bearing seats or drilling. The fixture is an
-envelope, not a purchased vise.
+The XY stage now shares `MillGuidedXYStage`, `MillCrossSaddle` and
+`MillCrossTable` with Small. The larger saddle has ribs, relieved guide pads,
+side access pockets and M6 carriage mounting holes/bolts. The 700 × 400 × 50 mm
+T-slot table has integral support ribs. Geometry follows the HG25 pattern and the
+existing table height; it does not reuse the Small motor pocket or nut seat.
+The guides and joints are nested under `xyStage/`, matching Small. XY screws,
+motors, bearing seats and nut attachments are still unfitted. The capacity-only
+fixture is an envelope, not a purchased vise.
 
 ## Checks and limits
 
@@ -81,7 +86,7 @@ claim. Fixtures move with the table, not with the spindle.
 Checks cover the represented packaging. They do not qualify hardware absent from
 the study. In particular:
 
-1. Detail the table and saddle, including nut and bearing access. Fit
+1. Integrate the XY nut and bearing attachments and service access. Fit
    candidate SFU20/SFU25 drives from the local catalog and check complete races,
    supports, couplings, screw buckling and critical speeds.
 2. Size Leadshine motors from the resulting moving masses, payload, acceleration,
@@ -95,4 +100,5 @@ the study. In particular:
    including payload and cutting loads, before choosing Vallder feet.
 
 No finished-machine mass or X7-equivalent performance is claimed. The study is a
-reviewable starting layout; neither the original mill nor its previews are changed.
+reviewable starting layout, with shared geometry rather than an independent set
+of saddle/table placeholders.

@@ -6,6 +6,7 @@ import machinekit.milling.MillZAxis;
 import machinekit.milling.MillZAxisLayout;
 import machinekit.milling.MillZAxisIntegrity;
 import machinekit.milling.MillXYStage;
+import machinekit.milling.MillGuidedXYStage;
 import machinekit.milling.MillXYStageIntegrity;
 import machinekit.milling.MillXYStageLayout;
 import machinekit.motion.LinearRail;
@@ -67,20 +68,22 @@ class MillFramePreview {
 	}
 
 	public static function concept(reference:BenchMill, frame:MillFrame, ?motorAdjustment:Float, ?drive:machinekit.milling.MillSpindleDrivePart):MachineAssembly {
-		var result = structure(frame);
-		var spindleLayout:MillZAxisLayout = frame.zAxis;
-		attachSpindle(reference,result,spindleLayout,motorAdjustment,drive);
-		if (frame.xyAxis == null) throw "Full mill concept needs XY steel drive seats";
-		var xy = new MillXYStage(frame.xyAxis);
-		result.include("xyStage", xy);
-		var framePoses:Map<String, AssemblyFrame> = frame.solvedPoses();
-		result.addMemberConnector("frame/base/driveYFixed", "stageSeat",
-			F.compose(F.inverse(framePoses.get("base/driveYFixed")), xy.zeroPose("fixedPedestalY")));
-		result.addMemberConnector("xyStage/fixedPedestalY", "frameSeat", F.identity());
-		result.addMate("xy-on-base", "fixed", "frame/base/driveYFixed", "stageSeat", "xyStage/fixedPedestalY", "frameSeat");
+  if(frame.xyAxis==null)throw "Full mill concept needs XY steel drive seats";
+  return assemble(reference,frame,new MillXYStage(frame.xyAxis),motorAdjustment,drive);
+ }
 
-		return result;
-	}
+ /** Both sizes use the same frame/Z/spindle and guided cross-slide assembly path. */
+ public static function assemble(reference:BenchMill,frame:MillFrame,xy:MillGuidedXYStage,
+   ?motorAdjustment:Float,?drive:machinekit.milling.MillSpindleDrivePart):MachineAssembly {
+  var result=structure(frame);
+  attachSpindle(reference,result,frame.zAxis,motorAdjustment,drive);
+  result.include("xyStage",xy);
+  var poses:Map<String,AssemblyFrame> =frame.solvedPoses();
+  result.addMemberConnector("frame/base/casting","stageSeat",F.compose(F.inverse(poses.get("base/casting")),xy.zeroPose("railYLeft")));
+  result.addMemberConnector("xyStage/railYLeft","frameSeat",F.identity());
+  result.addMate("xy-on-base","fixed","frame/base/casting","stageSeat","xyStage/railYLeft","frameSeat");
+  return result;
+ }
 
 	/** Complete shared spindle payload for both machine configurations. */
 	public static function attachSpindle(reference:BenchMill,result:MachineAssembly,spindleLayout:MillZAxisLayout,

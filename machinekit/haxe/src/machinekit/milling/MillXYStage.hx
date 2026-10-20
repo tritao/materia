@@ -1,6 +1,5 @@
 package machinekit.milling;
 
-import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.Transmission;
 import machinekit.component.ComponentValues;
 import machinekit.motion.*;
@@ -14,45 +13,15 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 /** Supported nested Y saddle / X table. Each real prismatic joint drives its screw;
  * motors and bearing housings stay on their carrying structure, rotors follow the screws.
  */
-class MillXYStage extends AxisBuilder {
+class MillXYStage extends MillGuidedXYStage {
 	public final layout:MillXYStageLayout;
-	public final saddle:MillCrossSaddle;
-	public final table:MillCrossTable;
 
 	public function new(layout:MillXYStageLayout) {
-		super();
-		if (layout == null) throw "XY stage needs a layout";
+		super(requireGuides(layout));
 		this.layout = layout;
-		var l = layout, f = l.frame;
+		var l = layout;
 		var y = orient(0, l.yScrewStart, l.yScrewZ, [0, 0, 1], [0, -1, 0]);
-		if(l.supplierY)supplierYDrive(y);else drive("Y", y, l.yScrew, l.yScrewStart - l.yFixedY, l.yScrewStart - l.yFloatingY, 100, 40, null);
-		var yp:Array<AssemblyFrame> = [];
-		for (side in [-1, 1]) {
-			var rail = orient(side * f.yRailSpacing / 2, f.yRailStart, f.railPlane + l.block.spec.railHeight, [0, 0, 1], [0, 1, 0]);
-			attach('railY${side < 0 ? "Left" : "Right"}', LinearRail.metric(l.profile, f.yRailLength), rail, "fixedPedestalY");
-			for (span in [-l.yBlockSpan, l.yBlockSpan]) yp.push(orient(
-				side * f.yRailSpacing / 2,
-				l.centreY + span,
-				f.railPlane + l.block.spec.railHeight,
-				[0, 0, 1],
-				[0, 1, 0]
-			));
-		}
-		slide(
-			{id: "y", lower: -l.yHalfTravel, upper: l.yHalfTravel, initial: 0},
-			"railYLeft",
-			"blockY0",
-			l.block,
-			yp[0],
-			{x: 0, y: -1, z: 0},
-			yp.slice(1), l.yOvertravel);
-		saddle = new MillCrossSaddle(new ComponentValues().setNumber("bore", 58).setNumber("boreZ", 0).setNumber("depth", l.saddleDepth).setBoolean("ribbed", true).setBoolean("blockAccess",true).setBoolean("nutBoss",true).setBoolean("nutServiceAccess",true).setNumber("crossRailSpacing",l.xRailSpacing).setNumber("crossRailLength",l.xRailLength).setNumber("crossRailWidth",l.block.spec.railWidth).setNumber("guideSpacing",f.yRailSpacing).setNumber("blockSpan",l.yBlockSpan).setNumber("blockHolePitchB",l.block.spec.blockHolePitchB).setNumber("blockHolePitchC",l.block.spec.blockHolePitchC));
-		attach("saddle", saddle, F.translation(0, l.centreY, l.saddleBottom), "blockY0");
-		for (i in 1...4) attach('blockY$i', l.block, yp[i], "saddle");
-		for (i in 0...4) for (hole in 1...5) {
-			var p = F.compose(yp[i],l.block.connector('mount$hole').frame);
-			attach('blockYBolt$i-$hole',SocketHeadCapScrew.metric("M4",MillCrossSaddle.BLOCK_SCREW_LENGTH),F.translation(p.x,p.y,l.saddleBottom+MillCrossSaddle.BLOCK_SEAT),"saddle");
-		}
+		if(l.supplierY)supplierYDrive(y);else drive("Y", y, l.yScrew, l.yScrewStart - l.yFixedY, l.yScrewStart - l.yFloatingY, 100, 40, "railYLeft");
 		var yFace = l.centreY - l.saddleDepth / 2;
 		var nutMountPose=F.compose(y,F.translation(0,0,l.yScrewStart-yFace));
 		attach("nutBracketY",new MillYNutMount(new ComponentValues().setBoolean("reinforced",true).setBoolean("serviceAccess",true)),nutMountPose,"saddle");
@@ -64,39 +33,6 @@ class MillXYStage extends AxisBuilder {
 		attach("nutY", l.nut, F.compose(y, F.translation(0, 0, l.yScrewStart - yFace - l.nut.bodyLength - l.nut.flangeThickness)), "nutBracketY");
 		var x = orient(l.xScrewStart, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]);
 		foldedXDrive(x);
-		var xp:Array<AssemblyFrame> = [];
-		for (side in [-1, 1]) {
-			attach(
-				'railX${side < 0 ? "Front" : "Rear"}',
-				LinearRail.metric(l.profile, l.xRailLength),
-				orient(
-					-l.xRailLength / 2,
-					l.centreY + side * l.xRailSpacing / 2,
-					l.xRailPlane + l.block.spec.railHeight,
-					[0, 0, 1],
-					[1, 0, 0]
-				),
-				"saddle"
-			);
-			for (span in [-l.xBlockSpan, l.xBlockSpan]) xp.push(orient(
-				span,
-				l.centreY + side * l.xRailSpacing / 2,
-				l.xRailPlane + l.block.spec.railHeight,
-				[0, 0, 1],
-				[1, 0, 0]
-			));
-		}
-		slide(
-			{id: "x", lower: -l.xHalfTravel, upper: l.xHalfTravel, initial: 0},
-			"railXFront",
-			"blockX0",
-			l.block,
-			xp[0],
-			{x: -1, y: 0, z: 0},
-			xp.slice(1), l.xOvertravel);
-		table = new MillCrossTable(l.tableDepth, l.xRailSpacing);
-		attach("table", table, F.translation(0, l.centreY, l.tableBottom), "blockX0");
-		for (i in 1...4) attach('blockX$i', l.block, xp[i], "table");
 		movingNut("X", x, -l.xScrewStart, "table", true);
 		for (a in ["X", "Y"]) {
 			var id = a.toLowerCase(), along = a == "X" ? [1.0, 0.0, 0.0] : [0.0, -1.0, 0.0];
@@ -123,14 +59,18 @@ class MillXYStage extends AxisBuilder {
 		attach("motorCoverX", new MillMotorCover(new ComponentValues().setNumber("width", 84).setNumber("depth", 38).setNumber("height", 142)),
 			F.fromRotationMatrix(-226, l.centreY, l.saddleBottom, [0,1,0, -1,0,0, 0,0,1]), "motorMountX");
 		exposeConnector("mount", "fixedPedestalY", "mount");
-		exposeConnector("table", "table", "top");
 		MillYNutDesignChecks.declare(this);
 	}
+
+ static function requireGuides(layout:MillXYStageLayout):MillGuidedXYStage.MillGuidedXYLayout {
+  if(layout==null)throw "XY stage needs a layout";
+  return layout.guided();
+ }
 
  /** Selected Leadshine/HZMotion Y drive; the X return drive retains its own layout. */
  function supplierYDrive(shaft:AssemblyFrame):Void {
   var l=layout;
-  place("fixedPedestalY",new MillYDriveSeat(false),F.translation(0,l.yFixedY,l.yMountPlane));
+  attach("fixedPedestalY",new MillYDriveSeat(false),F.translation(0,l.yFixedY,l.yMountPlane),"railYLeft");
   attach("floatingPedestalY",new MillYDriveSeat(true),F.translation(0,l.yFloatingY,l.yMountPlane),"fixedPedestalY");
   var mountPose=orient(0,l.yMotorFace,l.yScrewZ-25,[0,0,1],[0,-1,0]);
   var mount=new machinekit.assembly.HzMotionComponent("M60D-BK12-C",null,"unspecified","supplier-step");

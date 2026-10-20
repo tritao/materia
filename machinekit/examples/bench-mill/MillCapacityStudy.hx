@@ -8,7 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact;
 
-/** Separate capacity study. Plates stand for unfinished saddle/table designs.
+/** Separate capacity study. Shares the detailed cross-slide geometry with Small.
  * The shared Z axis is complete geometry with provisional drive sizing; XY drives are not fitted.
  */
 class MillCapacityStudy {
@@ -17,50 +17,26 @@ class MillCapacityStudy {
  static function near(a:Float,b:Float,label:String):Void check(Math.abs(a-b)<1e-5,label+": "+a+" vs "+b);
 
  public static function build(l:MillCapacityLayout,fixtureEnvelope:Bool=true):MachineAssembly {
-  var z=l.zLayout(),frame=new MillFrame(l.frame,z),axis=new MillZAxis(z),a=MillFramePreview.structure(frame);
-  var poses:Map<String,AssemblyFrame> = frame.solvedPoses(),zero:Map<String,AssemblyFrame> = [];
-  for(row in frame.components())zero.set("frame/"+row.id,poses.get(row.id));
-  for(row in axis.components())zero.set("zAxis/"+row.id,axis.zeroPose(row.id));
-  function add(id:String,c:MachineComponent,p:AssemblyFrame,parent:String,axis:String=""):Void {
-   a.addComponent(id,c,p);zero.set(id,p);
-   a.addMemberConnector(parent,"to-"+id,F.compose(F.inverse(zero.get(parent)),p));
-   a.addMemberConnector(id,"seat",F.identity());
-   if(axis=="")a.addMate("mount-"+id,"fixed",parent,"to-"+id,id,"seat");
-   else {
-    var direction={x:axis=="x"?-1.0:0,y:axis=="y"?-1.0:0,z:axis=="z"?1.0:0};
-    var lower=axis=="x"?-l.xTravel/2:axis=="y"?-l.yTravel/2:0.0;
-    var upper=axis=="x"?l.xTravel/2:axis=="y"?l.yTravel/2:l.zTravel;
-    a.addMateOnAxis(axis,"prismatic",parent,"to-"+id,id,"seat",direction,axis=="z"?l.zTravel/2:0,
-     {lower:lower,upper:upper,velocity:null,effort:null,overtravel:l.overtravel});
-   }
+  var z=l.zLayout(),frame=new MillFrame(l.frame,z),xy=new MillGuidedXYStage(l.guidedXY());
+  var a=MillFramePreview.assemble(new BenchMill(false,false),frame,xy);
+  if(fixtureEnvelope) {
+   a.addComponent("fixture-envelope",new MillPanel(200,150,l.fixtureHeight),F.translation(0,l.spindleY,l.tableTop));
+   a.addMemberConnector("xyStage/table","fixtureSeat",F.translation(0,0,l.tableThickness));
+   a.addMemberConnector("fixture-envelope","seat",F.identity());
+   a.addMate("fixture-on-table","fixed","xyStage/table","fixtureSeat","fixture-envelope","seat");
   }
-  var g=HgReferenceData.spec("HGH25CA");
-  function horizontal(x:Float,y:Float,z:Float,alongX:Bool):AssemblyFrame return alongX?
-   F.fromRotationMatrix(x,y,z,[0,0,1, 1,0,0, 0,1,0]):F.fromRotationMatrix(x,y,z,[-1,0,0, 0,0,1, 0,1,0]);
-  add("saddle",new MillPanel(l.saddleWidth,l.saddleDepth,l.saddleHeight,"cast iron"),F.translation(0,l.spindleY,l.saddleBottom),"frame/base/casting","y");
-  add("table",new MillPanel(l.tableWidth,l.tableDepth,l.tableThickness,"cast iron"),F.translation(0,l.spindleY,l.tableBottom),"saddle","x");
-  if(fixtureEnvelope)add("fixture-envelope",new MillPanel(200,150,l.fixtureHeight),F.translation(0,l.spindleY,l.tableTop),"table");
-  for(side in [-1,1]) {
-   add('railY$side',new HgRail("HGR25R",l.frame.yRailLength),horizontal(side*l.frame.yRailSpacing/2,l.frame.yRailStart,l.frame.railPlane+g.railHeight,false),"frame/base/casting");
-   add('railX$side',new HgRail("HGR25R",l.xRailLength),horizontal(-l.xRailLength/2,l.spindleY+side*l.xRailSpacing/2,l.xRailPlane+g.railHeight,true),"saddle");
-   add('riser$side',new MillPanel(l.tableWidth,60,l.riserHeight,"cast iron"),F.translation(0,l.spindleY+side*l.xRailSpacing/2,l.xRailPlane+g.blockHeight),"table");
-   for(end in [-1,1]) {
-    add('blockY$side-$end',new HgBlock("HGH25CA"),horizontal(side*l.frame.yRailSpacing/2,l.spindleY+end*l.yBlockSpan,l.frame.railPlane+g.railHeight,false),"saddle");
-    add('blockX$side-$end',new HgBlock("HGH25CA"),horizontal(end*l.xBlockSpan,l.spindleY+side*l.xRailSpacing/2,l.xRailPlane+g.railHeight,true),"table");
-   }
-  }
-  MillFramePreview.attachSpindle(new BenchMill(false,false),a,z);
   return a;
  }
 
  static function scene(a:MachineAssembly):haxe.io.Bytes return MillProject.scene(a,"mill-large",[
-  "400 x 300 x 380 mm layout; XY saddle/table remain envelopes and XY drives are not fitted.",
+  "400 x 300 x 380 mm layout; Shared ribbed saddle and T-slot table; XY drives are not fitted.",
   "Shared full Z and spindle assemblies, including pneumatic release. Motor/screw sizing and structural performance remain provisional."]);
  public static function preview():haxe.io.Bytes return scene(build(new MillCapacityLayout()));
 
  static function zMoving(id:String):Bool return StringTools.startsWith(id,"spindle/")||(StringTools.startsWith(id,"zAxis/")&&MillZAxis.isTranslating(id.substr(6)));
- static function xyMoving(id:String):Bool return id=="saddle"||id=="table"||id=="fixture-envelope"||StringTools.startsWith(id,"riser")||StringTools.startsWith(id,"blockX")||StringTools.startsWith(id,"blockY")||StringTools.startsWith(id,"railX");
- static function xMoving(id:String):Bool return id=="table"||id=="fixture-envelope"||StringTools.startsWith(id,"riser")||StringTools.startsWith(id,"blockX");
+ static function xyMoving(id:String):Bool return id=="fixture-envelope" ||
+  (StringTools.startsWith(id,"xyStage/")&&!StringTools.startsWith(id,"xyStage/railY"));
+ static function xMoving(id:String):Bool return id=="fixture-envelope"||id=="xyStage/table"||StringTools.startsWith(id,"xyStage/blockX");
 
  static function sweep(b:PartBox,id:String,l:MillCapacityLayout):PartBox {
   var dx=xMoving(id)?l.xTravel/2+l.overtravel:0.0;
@@ -143,8 +119,8 @@ class MillCapacityStudy {
   check(true,"Shared Z assembly clears frame and stationary hardware through overtravel");
   var model=new AssemblyModel("mm");a.addTo(model,"");var state=new AssemblyState(model.definition("capacity"));
   for(x in [-l.xTravel/2,0,l.xTravel/2])for(y in [-l.yTravel/2,0,l.yTravel/2])for(z in [-l.zTravel,-l.zTravel/2,0.0]) {
-   state.setJoint("x",x);state.setJoint("y",y);state.setJoint("zAxis/z",z);state.forwardKinematics();
-   var table=state.worldPose("table"),saddle=state.worldPose("saddle"),head=state.worldPose("zAxis/head"),spindle=state.worldPose("spindle/spindle");
+   state.setJoint("xyStage/x",x);state.setJoint("xyStage/y",y);state.setJoint("zAxis/z",z);state.forwardKinematics();
+   var table=state.worldPose("xyStage/table"),saddle=state.worldPose("xyStage/saddle"),head=state.worldPose("zAxis/head"),spindle=state.worldPose("spindle/spindle");
    near(table.x,-x,"table X");near(table.y,l.spindleY-y,"table Y");near(saddle.x,0,"saddle independent of X");
    near(head.z,l.headBottom+l.zTravel+z,"head Z");near(spindle.z,l.gaugeZ+l.zTravel+z,"spindle gauge Z");
    check(l.tableWidth/2-Math.abs(x)>=150,"X table edge coverage");check(l.tableDepth/2-Math.abs(y)>=50,"Y table edge coverage");
@@ -168,9 +144,9 @@ class MillCapacityStudy {
   var misplaced=block.translated(new Vector(0,-2,0));common=misplaced.intersect(uniform);
   check(common.volume()>1,"guide audit detects a 2 mm seating error");common.close();misplaced.close();uniform.close();block.close();
 
-  state.setJoint("x",0);state.setJoint("y",0);state.setJoint("zAxis/z",-l.zTravel);state.forwardKinematics();
+  state.setJoint("xyStage/x",0);state.setJoint("xyStage/y",0);state.setJoint("zAxis/z",-l.zTravel);state.forwardKinematics();
   var cache=new PosedParts(),boxes:Map<String,PartBox> = [],rows=a.components();
-  for(id in ["frame/base/casting","frame/column/casting","zAxis/head","saddle","table","zAxis/carriage"]) {
+  for(id in ["frame/base/casting","frame/column/casting","zAxis/head","xyStage/saddle","xyStage/table","zAxis/carriage"]) {
    var shape=cache.local(rows.filter(row -> row.id==id)[0].component);check(shape.valid()&&shape.solidCount()==1,"Connected valid study solid: "+id);
   }
   for(row in rows)boxes.set(row.id,sweep(cache.box(row.component,state.worldPose(row.id)),row.id,l));
@@ -183,7 +159,7 @@ class MillCapacityStudy {
    check(v<1e-5,'Continuous swept envelopes collide: $first / $second ($v mm3)');
   }
   for(row in rows)if(xyMoving(row.id)||StringTools.startsWith(row.id,"spindle/"))for(other in rows)if(!xyMoving(other.id)&&!zMoving(other.id)) {
-   if(StringTools.startsWith(row.id,"blockY")&&StringTools.startsWith(other.id,"railY"))continue;
+   if(StringTools.startsWith(row.id,"xyStage/blockY")&&StringTools.startsWith(other.id,"xyStage/railY"))continue;
    if(StringTools.startsWith(row.id,"blockZ")&&StringTools.startsWith(other.id,"railZ"))continue;
    clear(row.id,other.id);
   }

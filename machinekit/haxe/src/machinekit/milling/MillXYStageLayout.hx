@@ -135,6 +135,15 @@ class MillXYStageLayout {
 		checkRace(xScrew, -xHalfTravel - nut.bodyLength - nut.flangeThickness - xScrewStart, xHalfTravel - xScrewStart);
 	}
 
+ public function guided():MillGuidedXYStage.MillGuidedXYLayout return {
+  centreY:centreY,yRailSpacing:frame.yRailSpacing,yRailStart:frame.yRailStart,yRailPlane:frame.railPlane,
+  yRail:LinearRail.metric(profile,frame.yRailLength),xRail:LinearRail.metric(profile,xRailLength),block:block,
+  xHalfTravel:xHalfTravel,yHalfTravel:yHalfTravel,xOvertravel:xOvertravel,yOvertravel:yOvertravel,
+  xBlockSpan:xBlockSpan,yBlockSpan:yBlockSpan,xRailSpacing:xRailSpacing,
+  saddleWidth:450,saddleDepth:saddleDepth,saddleHeight:SADDLE_HEIGHT,tableWidth:400,tableDepth:tableDepth,
+  tableThickness:TABLE_HEIGHT,riserHeight:RISER_HEIGHT,driveInterfaces:true
+ };
+
 	function checkRace(screw:BallScrew, nutStart:Float, nutEnd:Float):Void {
 		if (nutStart < BallScrew.INPUT_JOURNAL_LENGTH + clearance ||
 			nutEnd > screw.totalLength - BallScrew.JOURNAL_LENGTH - clearance)

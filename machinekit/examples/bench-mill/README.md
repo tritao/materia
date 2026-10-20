@@ -6,6 +6,14 @@ layout with the same complete Z and spindle assemblies, including drawbar and
 pneumatic release. `spindle-drive` is the editable motor study. The older bench
 mill and enclosed cell belong to their own project. Shared model code and build
 tooling remain in this directory.
+Both sizes share `MillFramePreview.assemble` and `MillGuidedXYStage`: one nested
+Y-saddle/X-table assembly, ribbed saddle geometry, parameterized T-slot table,
+rail/block placement and catalog-sized saddle bolts. Small attaches its existing
+XY drives through `MillXYStage`; Compact VMC supplies its HG25 geometry and larger
+stack dimensions through `MillCapacityLayout`. Compact VMC retains its original
+travel and table/spindle datums. Its XY drives remain unfitted, and it has no
+Small motor pockets, nut seats or implied drive ratings.
+
 Run `haxeon.json` to check and generate `build/mill/small.mtrg` and `large.mtrg`.
 
 Open the source project and use the **Configuration** selector to choose **Small**
