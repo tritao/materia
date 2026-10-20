@@ -133,7 +133,7 @@ typedef InsertAnchorage = {
 
 enum abstract DesignChangeKind(String) to String {
 	var LiftingPoints = "lifting-points";
-	var DraftOrSplit = "draft-or-split";
+	var ReleaseAlternative = "release-alternative";
 	var InterfaceAllowance = "interface-allowance";
 }
 

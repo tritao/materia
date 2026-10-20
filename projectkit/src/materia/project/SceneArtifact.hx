@@ -127,6 +127,7 @@ typedef SceneArtifactProject = {
   @:optional var inspectionCameras:Array<SceneArtifactInspectionCamera>;
   /** Preferred orbit angle when opening the generated assembly; radians, Z up. */
   @:optional var initialView:SceneArtifactView;
+  @:optional var variant:String;
   @:optional var job:String;
   var dynamicParts:Array<String>;
   var motions:Array<SceneArtifactProjectMotion>;
@@ -755,6 +756,19 @@ typedef SceneArtifactFloorPose = {
 	var yaw:Float;
 }
 
+/** A named, single-program machining mission, executed by the CNC player. */
+typedef SceneArtifactMachiningMission = {
+  var id:String;
+  var label:String;
+}
+
+/** Geometric setup condition, in metres for translation and radians for rotation. */
+typedef SceneArtifactMachiningSetupJoint = {
+  var joint:String;
+  var position:Float;
+  var tolerance:Float;
+}
+
 /**
  * A machining job the generator made for its own machine, with everything needed to run it (since
  * version 20). Lengths are metres, whatever the scene's unit.
@@ -773,6 +787,10 @@ typedef SceneArtifactFloorPose = {
  * limits are the motors' and drives', and the controller's step rate caps them further.
  */
 typedef SceneArtifactMachining = {
+  @:optional var setupJoints:Array<SceneArtifactMachiningSetupJoint>;
+	/** Explicit ideal-motion preview: travel checks apply, motor-load qualification does not. */
+	@:optional var kinematicPreview:Bool;
+	@:optional var mission:SceneArtifactMachiningMission;
 	@:optional var powerUpOffsets:Array<SceneArtifactPowerUpOffset>;
 	@:optional var powerUpSideOffsets:Array<SceneArtifactPowerUpSideOffset>;
 	var program:String;
@@ -1074,6 +1092,14 @@ class SceneArtifact {
   public static function decodeProject(raw:Dynamic):SceneArtifactProject {
     var parts:Dynamic = Reflect.field(raw, "dynamicParts"), motions:Dynamic = Reflect.field(raw, "motions");
     var job:Dynamic = Reflect.field(raw, "job");
+    var variant:Dynamic=Reflect.field(raw,"variant");
+    if(variant!=null&&(!Std.isOfType(variant,String)||StringTools.trim(variant).length==0||variant.length>500))
+      throw "Invalid artifact project variant";
+    if(variant!=null) {
+      var variantText:String=variant;
+      for(i in 0...variantText.length)if(variantText.charCodeAt(i)==0)throw "Invalid artifact project variant";
+    }
+    if(variant!=null&&job!=null)throw "Artifact project cannot select both a variant and a legacy job";
     if (!Std.isOfType(parts, Array) || !Std.isOfType(motions, Array) ||
         (job != null && (!Std.isOfType(job, String) || job.length == 0 || job.length > 500)))
       throw "Invalid artifact project settings";
@@ -1133,7 +1159,7 @@ class SceneArtifact {
       }
     }
     if(cameras.length>16)throw "Too many inspection cameras";
-    return {job: job, dynamicParts: dynamicParts, motions: tracks, initialView: view,inspectionCameras:rawCameras==null?null:cameras};
+    return {variant:variant,job: job, dynamicParts: dynamicParts, motions: tracks, initialView: view,inspectionCameras:rawCameras==null?null:cameras};
   }
 
   static function validateProject(project:SceneArtifactProject, data:SceneArtifactData):Void {
@@ -3048,6 +3074,14 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 	static function validateMachining(machining:SceneArtifactMachining, parts:Map<String, Bool>,
 			definition:Null<AssemblyDefinition>):Void {
 		function fail(detail:String):Void throw 'Scene artifact machining job $detail';
+		if (machining.mission != null) {
+      for (text in [machining.mission.id, machining.mission.label]) {
+        if (text == null || StringTools.trim(text).length == 0 || text.length > 500)
+          fail("has an invalid mission identity");
+        for (i in 0...text.length) if (text.charCodeAt(i) == 0) fail("has an invalid mission identity");
+      }
+      if (machining.loop == true) fail("mission must finish rather than loop automatically");
+    }
 		validatePowerUpOffsets(machining.powerUpOffsets, definition);
 		validatePowerUpSideOffsets(machining.powerUpSideOffsets, definition);
 		if (machining.program == null) fail("has no program");
@@ -3059,11 +3093,25 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 		var occurrences = new Map<String, Bool>(), joints = new Map<String, Bool>();
 		for (occurrence in definition.occurrences) occurrences.set(occurrence.id, true);
 		for (joint in definition.joints) joints.set(joint.id, true);
+    var setupIds=new Map<String,Bool>();
+    if(machining.setupJoints!=null)for(condition in machining.setupJoints) {
+      if(!joints.exists(condition.joint)||setupIds.exists(condition.joint)||
+        !finite(condition.position)||!finite(condition.tolerance)||condition.tolerance<=0)
+        fail("has an invalid setup joint condition");
+      setupIds.set(condition.joint,true);
+      if(machining.axes!=null&&machining.axes.indexOf(condition.joint)>=0)
+        fail("setup condition cannot constrain a machining axis");
+    }
 		if (machining.axes == null || machining.axes.length != 3) fail("needs three axes");
 		for (index in 0...3) {
 			var axis = machining.axes[index];
 			if (!joints.exists(axis) || machining.axes.indexOf(axis) != index) fail('axis "$axis" is not a distinct joint');
 		}
+    if(machining.kinematicPreview==true)for(axis in machining.axes) {
+      var limit:materia.assembly.AssemblyDefinition.AssemblyJointLimits=[for(j in definition.joints)if(j.id==axis)j.limits][0];
+      if(limit.velocity==null||limit.acceleration==null||!finite(limit.velocity)||!finite(limit.acceleration)||limit.velocity<=0||limit.acceleration<=0)
+        fail("kinematic preview requires explicit positive velocity and acceleration bounds");
+    }
 		if (!occurrences.exists(machining.spindle)) fail('spindle "${machining.spindle}" is not an occurrence');
 		if (machining.stocks == null) fail("needs a stock occurrence list");
 		var stockIds = new Map<String, Bool>();
@@ -3120,6 +3168,14 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 			workOffset: [for (value in list(Reflect.field(decoded, "workOffset"))) number(value)],
 			tools: tools,
 			stocks: [for (stock in list(Reflect.field(decoded, "stocks"))) text(stock)]};
+    var setupJoints:Dynamic=Reflect.field(decoded,"setupJoints");
+    if(setupJoints!=null)machining.setupJoints=[for(condition in list(setupJoints)) {
+      joint:text(Reflect.field(condition,"joint")),position:number(Reflect.field(condition,"position")),
+      tolerance:number(Reflect.field(condition,"tolerance"))}];
+    var kinematicPreview:Dynamic=Reflect.field(decoded,"kinematicPreview");
+    if(kinematicPreview!=null)machining.kinematicPreview=Std.isOfType(kinematicPreview,Bool)?(kinematicPreview:Bool):fail();
+    var mission:Dynamic=Reflect.field(decoded,"mission");
+    if(mission!=null)machining.mission={id:text(Reflect.field(mission,"id")),label:text(Reflect.field(mission,"label"))};
 		var sacrificial:Dynamic = Reflect.field(decoded, "sacrificial");
 		if (sacrificial != null) machining.sacrificial = [for (id in list(sacrificial)) text(id)];
 		var toolPart:Dynamic = Reflect.field(decoded, "toolPart");

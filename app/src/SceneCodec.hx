@@ -104,9 +104,14 @@ class SceneCodec {
     var value:Dynamic = Reflect.field(root, "project");
     if (value == null) return null;
     if (Reflect.field(root, "script") != null) throw "A scene cannot have both script and project owners";
-    if (numberField(value, "version") != 1) throw "Unsupported generated project record version";
+    var version=numberField(value,"version");
+    if(version!=1&&version!=2)throw "Unsupported generated project record version";
     var reference = stringField(value, "reference");
+    var variantId=optionalText(value,"variantId");
+    if(variantId!=null&&(StringTools.trim(variantId).length==0||variantId.length>500||containsNul(variantId)))throw "Invalid project variant ID";
     var jobId = optionalText(value, "jobId");
+    if(variantId!=null&&version!=2)throw "Project variant selection requires record version 2";
+    if(variantId!=null&&jobId!=null)throw "A project selection cannot contain both variantId and jobId";
     if (jobId != null && (jobId.length == 0 || jobId.length > 500)) throw "Invalid project job ID";
     var assemblyState = optionalText(value, "assemblyState");
     if (assemblyState != null && assemblyState.length > 2000000)
@@ -167,9 +172,10 @@ class SceneCodec {
       }
       instanceRecords.push({sourceId: sourceId, id: id, overrides: instanceEdits});
     }
-    var record:ProjectSceneRecord = {version: 1, reference: reference, overrides: overrideRecords,
+    var record:ProjectSceneRecord = {version: Std.int(version), reference: reference, overrides: overrideRecords,
       removed: removedIds, instances: instanceRecords, assemblyState: assemblyState,
       assemblyDependentJoints: assemblyDependentJoints};
+    if(variantId!=null)record.variantId=variantId;
     if (jobId != null) record.jobId = jobId;
     if (assemblyMates != null) record.assemblyMates = assemblyMates;
     return record;

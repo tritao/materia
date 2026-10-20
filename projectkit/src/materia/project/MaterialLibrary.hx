@@ -33,6 +33,8 @@ class MaterialLibrary {
     polycarbonate(),
     material("polyurethane", "Polyurethane", [0.26, 0.34, 0.37], 0.0, 0.65, 1200, "polyurethane PU"),
     material("plywood-birch", "Birch plywood", [0.70, 0.55, 0.34], 0.0, 0.72, 680, "birch plywood"),
+    // Assumed layout density; lot-specific permeability is supplied by the spoilboard recipe.
+    material("mdf", "MDF (nominal)", [0.66, 0.51, 0.34], 0.0, 0.85, 750, "MDF"),
     toolingEPS(),
     toolingBoard(),
     mineralCast(),

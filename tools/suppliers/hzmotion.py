@@ -59,7 +59,7 @@ def render(data):
     parts = [{k: p[k] for k in RUNTIME_FIELDS} for p in data['parts']]
     cad = json.loads(REFERENCE.with_name('hzmotion-cad.json').read_text())
     verified = [{'model': a['model'], 'sha256': a['sha256'], 'translation': a['normalization']['translationMm'],
-                 'rotation': a['normalization'].get('rotation', [1,0,0,0,1,0,0,0,1])}
+                 'rotation': a['normalization'].get('rotation', [1,0,0,0,1,0,0,0,1]), **({'interfaces': a['interfaces']} if 'interfaces' in a else {})}
                 for a in cad['assets'] if a['interfaceReview']['status'] == 'verified-reference']
     legacy = ' public static function legacyParts():Array<HzMotionSpec> {var rows=parts();for(p in rows){p.drawingRevision=' + literal(data['legacyRevision']) + ';'
     for model, fields in data['legacyOverrides'].items():

@@ -1,47 +1,53 @@
 {
-	"version": 1,
-	"package": {
-		"name": "machinekit-bench-mill-example"
-	},
-	"entry": "BenchMillPreview",
-	"sources": [
-		"BenchMill.hx",
-		"BenchMillPreview.hx",
-		"BearingBlock.hx",
-		"BearingBlockJob.hx",
-		"../cnc-router/CncRouter.hx",
-		"EnclosedBenchMill.hx"
-	],
-	"sourceRoots": [
-		".",
-		"../cnc-router"
-	],
-	"dependencies": {
-		"robotkit-autonomy": {
-			"path": "../../../robotkit/autonomy"
-		},
-		"projectkit": {
-			"path": "../../../projectkit"
-		},
-		"cadkit": {
-			"path": "../../../cadkit"
-		},
-		"machinekit": {
-			"path": "../../"
-		},
-		"manufacturingkit": {
-			"path": "../../../manufacturingkit"
-		},
-		"toolpathkit": {
-			"path": "../../../toolpathkit"
-		},
-		"camkit": {
-			"path": "../../../camkit"
-		},
-		"cnckit": {
-			"path": "../../../cnckit"
-		}
-	},
-	"target": "host",
-	"outputDir": "build"
+  "version": 1,
+  "package": {
+    "name": "machinekit-bench-mill-example"
+  },
+  "entry": "MillProject",
+  "sources": [
+    "BenchMill.hx",
+    "BenchMillPreview.hx",
+    "BearingBlock.hx",
+    "BearingBlockJob.hx",
+    "../cnc-router/CncRouter.hx",
+    "EnclosedBenchMill.hx",
+    "MillProject.hx",
+    "MillFramePreview.hx",
+    "MillCapacityStudy.hx",
+    "MillMotorStudy.hx",
+    "MillMachiningSetup.hx",
+    "BearingBlockJob.hx"
+  ],
+  "sourceRoots": [
+    ".",
+    "../cnc-router"
+  ],
+  "dependencies": {
+    "robotkit-autonomy": {
+      "path": "../../../robotkit/autonomy"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../"
+    },
+    "manufacturingkit": {
+      "path": "../../../manufacturingkit"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
 }

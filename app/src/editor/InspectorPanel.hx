@@ -37,6 +37,27 @@ class InspectorPanel {
     var style = fillStyle();
     style.padding = new Insets(10.0, 10.0, 10.0, 10.0);
     style.background = appearance.theme.tokens.surface;
+    var groupKey = app.treeModel.selectionKey();
+    var group = app.treeModel.groupInfo(groupKey);
+    if (group != null) {
+      var editable = !app.documents.blocked();
+      var visibility = new Button(app.treeModel.visibilityState(groupKey).own ? "Hide assembly" : "Show assembly", null, function() {
+        if (!app.documents.blocked()) app.treeModel.toggleVisibility(groupKey);
+      });
+      var isolate = new Button("Isolate assembly", null, function() {
+        if (!app.documents.blocked()) app.treeModel.isolateSelected();
+      });
+      visibility.enabled = isolate.enabled = editable;
+      var rows:Array<KeyedView> = [
+        new KeyedView("heading",sectionHeading(group.label)),
+        new KeyedView("assembly-summary",new Text("Assembly · " + group.count + " part occurrences · " + group.shown + " shown")),
+        new KeyedView("assembly-path",new Text(group.path == "" ? "Root assembly" : group.path)),
+        new KeyedView("frame",sceneAction("assembly-frame","scene.frame-selected","Frame assembly",null)),
+        new KeyedView("visibility",visibility),
+        new KeyedView("isolate",isolate)
+      ];
+      return new Column("inspector-assembly",rows,style);
+    }
     var selected = scene.object(scene.selectedId);
     if (selected == null) {
       var emptyRows:Array<KeyedView> = [

@@ -1,24 +1,121 @@
 {
-	"format": "materia.project",
-	"version": 1,
-	"name": "Bench mill",
-	"defaultEntrypoint": "mill",
-	"build": {
-		"system": "haxeon",
-		"manifest": "haxeon.json"
-	},
-	"entrypoints": {
-		"mill": {
-			"kind": "cad-preview",
-			"module": "BenchMillPreview",
-			"function": "mill",
-			"cache": {"inputs": []}
-		},
-		"enclosed": {
-			"kind": "cad-preview",
-			"module": "BenchMillPreview",
-			"function": "enclosed",
-			"cache": {"inputs": []}
-		}
-	}
+  "format": "materia.project",
+  "version": 1,
+  "name": "Mill",
+  "defaultEntrypoint": "small",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
+  "entrypoints": {
+    "small": {
+      "kind": "cad-preview",
+      "module": "MillProject",
+      "function": "small",
+      "cache": {
+        "inputs": [
+          "MillProject.hx",
+          "MillFramePreview.hx",
+          "../../haxe/src/machinekit/milling/MillFrame.hx",
+          "../../haxe/src/machinekit/milling/MillXYStage.hx",
+          "../../haxe/src/machinekit/milling/MillZAxis.hx",
+          "../../haxe/src/machinekit/milling/MillZAxisLayout.hx",
+          "../../haxe/src/machinekit/milling/MillSpindleHead.hx",
+          "MillMachiningSetup.hx",
+          "BearingBlockJob.hx",
+          "BearingBlock.hx",
+          "../../haxe/src/machinekit/milling/MillXYStageLayout.hx",
+          "../../haxe/src/machinekit/milling/MillBeltMotorPlate.hx",
+          "../../haxe/src/machinekit/milling/MillCrossSaddle.hx",
+          "../../haxe/src/machinekit/milling/MillZDriveAdapter.hx",
+          "../../haxe/src/machinekit/motion/HzMotionDrawingScrew.hx",
+          "../../haxe/src/machinekit/assembly/HzMotionData.hx",
+          "../../haxe/src/machinekit/milling/MillSpindleDrivePart.hx",
+          "../../haxe/src/machinekit/motion/LeadshineServo.hx",
+          "../../haxe/src/machinekit/motion/LeadshineServoLargeCatalog.hx",
+          "../../haxe/src/machinekit/milling/MillServoMount.hx",
+          "../../haxe/src/machinekit/milling/MillZCarriage.hx",
+          "../../haxe/src/machinekit/milling/MillZBearingPlate.hx",
+          "../../haxe/src/machinekit/assembly/HzMotionComponent.hx",
+          "../../haxe/src/machinekit/assembly/HzMotionCatalog.hx",
+          "../../haxe/src/machinekit/motion/SfuNut.hx",
+          "../../haxe/src/machinekit/motion/SfuFamilyData.hx"
+        ]
+      }
+    },
+    "compact-vmc": {
+      "kind": "cad-preview",
+      "module": "MillProject",
+      "function": "large",
+      "cache": {
+        "inputs": [
+          "MillProject.hx",
+          "MillFramePreview.hx",
+          "../../haxe/src/machinekit/milling/MillFrame.hx",
+          "../../haxe/src/machinekit/milling/MillXYStage.hx",
+          "../../haxe/src/machinekit/milling/MillZAxis.hx",
+          "../../haxe/src/machinekit/milling/MillZAxisLayout.hx",
+          "../../haxe/src/machinekit/milling/MillSpindleHead.hx",
+          "MillCapacityStudy.hx",
+          "../../haxe/src/machinekit/milling/MillCapacityLayout.hx",
+          "MillMachiningSetup.hx",
+          "BearingBlockJob.hx",
+          "BearingBlock.hx",
+          "../../haxe/src/machinekit/milling/MillXYStageLayout.hx",
+          "../../haxe/src/machinekit/milling/MillBeltMotorPlate.hx",
+          "../../haxe/src/machinekit/milling/MillCrossSaddle.hx",
+          "../../haxe/src/machinekit/milling/MillZDriveAdapter.hx",
+          "../../haxe/src/machinekit/motion/HzMotionDrawingScrew.hx",
+          "../../haxe/src/machinekit/assembly/HzMotionData.hx",
+          "../../haxe/src/machinekit/milling/MillSpindleDrivePart.hx",
+          "../../haxe/src/machinekit/motion/LeadshineServo.hx",
+          "../../haxe/src/machinekit/motion/LeadshineServoLargeCatalog.hx",
+          "../../haxe/src/machinekit/milling/MillServoMount.hx",
+          "../../haxe/src/machinekit/milling/MillZCarriage.hx",
+          "../../haxe/src/machinekit/milling/MillZBearingPlate.hx",
+          "../../haxe/src/machinekit/assembly/HzMotionComponent.hx",
+          "../../haxe/src/machinekit/assembly/HzMotionCatalog.hx",
+          "../../haxe/src/machinekit/motion/SfuNut.hx",
+          "../../haxe/src/machinekit/motion/SfuFamilyData.hx"
+        ]
+      }
+    },
+    "spindle-drive": {
+      "kind": "cad-preview",
+      "documentInput": true,
+      "reconcilesSavedRecipe": true,
+      "module": "MillMotorStudy",
+      "function": "preview",
+      "cache": {
+        "inputs": [
+          "MillMotorStudy.hx",
+          "MillFramePreview.hx"
+        ]
+      }
+    }
+  },
+  "defaultVariant": "small",
+  "variants": [
+    {
+      "id": "small",
+      "label": "Small",
+      "entrypoint": "small",
+      "summary": "250 \u00d7 160 \u00d7 250 mm. Complete mechanical mill with selected Y drive and shared spindle. Includes the shared bearing-block machining mission (kinematic preview).",
+      "kind": "configuration"
+    },
+    {
+      "id": "compact-vmc",
+      "label": "Compact VMC",
+      "entrypoint": "compact-vmc",
+      "summary": "400 \u00d7 300 \u00d7 380 mm. Shared ribbed cross-slide and T-slot table with HG25 guides, complete Z and spindle. XY drives and sizing remain pending. Includes the bearing-block machining mission (kinematic preview).",
+      "kind": "configuration"
+    },
+    {
+      "id": "spindle-drive",
+      "label": "Spindle drive study",
+      "entrypoint": "spindle-drive",
+      "summary": "Editable Leadshine spindle-drive study on the reference mill.",
+      "kind": "study"
+    }
+  ]
 }

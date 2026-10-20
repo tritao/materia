@@ -24,16 +24,26 @@ class SceneVisibility {
     return false;
   }
   /** Regenerated hierarchy membership is derived. Rebind saved group masks to its current subtree. */
-  public static function rebind(scene:EditorScene, groups:Map<String,Array<String>>):Void {
+  public static function rebind(scene:EditorScene, groups:Map<String,Array<String>>, ?legacyGroups:Map<String,Array<String>>):Void {
     var active:Map<String,Bool> = [];
     for(item in scene.items())for(key in item.hiddenBy)if(groups.exists(key))active.set(key,true);
+    // Old body and Parts keys do not identify authored assemblies. Preserve their
+    // effective hiding as local part flags instead of guessing a new owning group.
+    var legacyHidden:Map<String,Bool> = [];
+    if(legacyGroups!=null)for(item in scene.items())for(key in item.hiddenBy) {
+      if(groups.exists(key) || key=="isolate:scene")continue;
+      var members=legacyGroups.get(key);
+      if(members==null)legacyHidden.set(item.id,true);
+      else for(id in members)legacyHidden.set(id,true);
+    }
     var states:Array<VisibilityState> = [], changed=false;
     for(item in scene.items()) {
       var masks:Array<String> = [];
       if(item.hiddenBy.indexOf("isolate:scene")>=0)masks.push("isolate:scene");
       for(key in active.keys())if(groups.get(key).indexOf(item.id)>=0)masks.push(key);
-      if(!same(item.hiddenBy,masks))changed=true;
-      states.push({id:item.id,visible:item.visible,hiddenBy:masks});
+      var visible=item.visible&&!legacyHidden.exists(item.id);
+      if(visible!=item.visible || !same(item.hiddenBy,masks))changed=true;
+      states.push({id:item.id,visible:visible,hiddenBy:masks});
     }
     if(changed)apply(scene,states);
   }

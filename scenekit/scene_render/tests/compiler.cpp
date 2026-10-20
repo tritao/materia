@@ -1011,6 +1011,35 @@ void runtime_pose_overrides_render_and_pick_without_mutating_snapshot() {
     assert(!runtime_index.pick_ray(design_ray).node.valid());
     assert(runtime_index.pick_ray(runtime_ray).node == node);
 
+    // Zoom/pan between simulation ticks keeps the pose unchanged. Incremental
+    // culling must agree with a fresh plan at the live pose, not the authored one.
+    auto camera_view = view;
+    camera_view.camera.enabled = true;
+    camera_view.camera.view_projection[0] = 0.2f;
+    camera_view.camera.view_projection[12] = -0.8f;
+    auto camera_plan = nkscene::compile(snapshot, camera_view);
+    assert(camera_plan.visible_items() == 1);
+    for (const float center : {4.0f, -4.0f, 4.0f}) {
+        camera_view.camera.view_projection[0] = 0.25f;
+        camera_view.camera.view_projection[12] = -center * 0.25f;
+        const auto expected = nkscene::compile(snapshot, camera_view);
+        const auto refreshed = nkscene::refresh(camera_plan, snapshot, camera_view);
+        assert(!refreshed.plan_rebuilt);
+        assert(camera_plan.visible_items() == expected.visible_items());
+        assert(camera_plan.culled_items() == expected.culled_items());
+        assert(camera_plan.transforms().front().transform.matrix[12] == 4.0f);
+    }
+    camera_view.camera.view_projection[0] = 0.1f;
+    camera_view.camera.view_projection[12] = 0.0f;
+    for (const float direction : {1.0f, -1.0f, 1.0f}) {
+        camera_view.clip_planes = {{{direction, 0.0f, 0.0f}, 0.0f, true}};
+        const auto expected = nkscene::compile(snapshot, camera_view);
+        const auto refreshed = nkscene::refresh(camera_plan, snapshot, camera_view);
+        assert(!refreshed.plan_rebuilt);
+        assert(camera_plan.visible_items() == expected.visible_items());
+        assert(camera_plan.culled_items() == expected.culled_items());
+    }
+
     // Presentation poses affect consumers of the view, while the immutable
     // scene snapshot continues to describe the authored transform.
     assert(snapshot.find(node)->world_transform.transform.matrix[12] == -4.0f);

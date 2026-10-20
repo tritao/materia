@@ -7,12 +7,12 @@ import machinekit.component.ComponentRecipeSupport as P;
 
 /** Steel U stand carries the stationary motor above the upper bearing plate.
  * Open sides allow access to the coupling and spring-applied shaft brake.
- * Hole pitch is an explicit assumed interface until a motor is selected.
+ * The caller supplies the selected motor hole pitch and pilot recess.
  */
 class MillZMotorStand extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 	public static function parameters():Array<ComponentParameter> return [
-			P.flag("anchored",false), P.length("registerDiameter",0),
+			P.flag("anchored",false), P.length("registerDiameter",0), P.length("registerDepth",2),
 			P.length("width", 100), P.length("depth", 100), P.length("height", 32.5),
 			P.length("plate", 8), P.length("leg", 12), P.length("shaftBore", 22), P.length("boltPitch", 40)];
 	public static function recipeType():ComponentType {
@@ -42,7 +42,7 @@ class MillZMotorStand extends MachineComponent {
 			for (y in [-parameterNumber("boltPitch") / 2, parameterNumber("boltPitch") / 2]) tools.push(Part.cylinderSpan(3.3, h - t - 1, h + 1, x, y));
 		if (values().boolean("anchored")) for (side in [-1,1]) tools.push(Part.cylinderAlongY(1.65,-d/2-1,-d/2+10,side*(w-leg)/2,16));
 		if (values().boolean("anchored")) for (x in [-70.0,70.0]) tools.push(Part.cylinderSpan(3.3,-1,9,x,-35));
-		if (parameterNumber("registerDiameter") > 0) tools.push(Part.cylinderSpan(parameterNumber("registerDiameter")/2,h-2,h+1));
+		if (parameterNumber("registerDiameter") > 0) tools.push(Part.cylinderSpan(parameterNumber("registerDiameter")/2,h-parameterNumber("registerDepth"),h+1));
 		return Solids.cut(Solids.union(pieces), tools);
 	}
 }

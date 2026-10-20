@@ -21,26 +21,40 @@ class CastingFeatures {
 			x:Float = 0, y:Float = 0, z:Float = 0):CastingBox
 		return {id: id, width: width, depth: depth, height: height, pose: F.translation(x, y, z)};
 
+	/** Layout boxes are serialized through the shared neutral casting codec. */
 	public static function encode(features:Array<CastingBox>):String {
 		validate(features);
-		return Json.stringify(features);
+		return materia.casting.CastingPatterns.encode([for (row in features) {
+			id:row.id, kind:materia.casting.CastingFeature.CastingFeatureKind.Clearance,
+			geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:row.width,depth:row.depth,height:row.height,pose:row.pose},
+			openings:[],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,owner:null,adjustable:[],derivedFrom:null
+		}]);
 	}
-
+	/** Preserve legacy layout cuts while explicitly declaring their exterior openings. */
+	public static function encodeForBody(features:Array<CastingBox>,width:Float,depth:Float,height:Float):String {
+		// Reservation splits can leave cut fragments wholly outside the body.
+        // They have no CAD effect and are not valid finished casting features.
+        var active:Array<CastingBox> = [];
+        for(row in features) {
+            var b=CastingCells.bounds(row);
+            if(Math.min(b[3],width/2)>Math.max(b[0],-width/2)+1e-9 &&
+               Math.min(b[4],depth/2)>Math.max(b[1],-depth/2)+1e-9 &&
+               Math.min(b[5],height)>Math.max(b[2],0)+1e-9)active.push(row);
+        }
+        var records=materia.casting.CastingPatterns.decode(encode(active));
+		var envelope=materia.casting.CastingEnvelope.build(width,depth,height);
+		for(row in records)row.openings=materia.casting.CastingCavities.reachedOpenings(envelope,row.geometry);
+		return materia.casting.CastingPatterns.encode(records);
+	}
 	public static function decode(text:String):Array<CastingBox> {
-		var raw:Dynamic = Json.parse(text);
-		if (!Std.isOfType(raw, Array)) throw "Casting features must be an array";
-		var rows:Array<Dynamic> = cast raw;
-		if (rows.length > 256) throw "Too many casting features";
-		var result:Array<CastingBox> = [];
-		for (row in rows) {
-			if (row == null || !Std.isOfType(Reflect.field(row, "id"), String)) throw "Casting feature needs an id";
-			var pose = Reflect.field(row, "pose");
-			result.push({id: Reflect.field(row, "id"), width: number(row, "width"), depth: number(row, "depth"),
-				height: number(row, "height"), pose: {x: number(pose, "x"), y: number(pose, "y"), z: number(pose, "z"),
-				qx: number(pose, "qx"), qy: number(pose, "qy"), qz: number(pose, "qz"), qw: number(pose, "qw")}});
-		}
-		validate(result);
-		return result;
+		return [for (row in materia.casting.CastingPatterns.decode(text))
+			{id:row.id,width:row.geometry.width,depth:row.geometry.depth,height:row.geometry.height,pose:row.geometry.pose}];
+	}
+	/** Read only: historical baseline report, never a new component recipe. */
+	public static function decodeLegacyBaseline(text:String):Array<CastingBox> {
+		var rows:Array<Dynamic> = cast Json.parse(text), result:Array<CastingBox> = [];
+		for(row in rows)result.push({id:row.id,width:row.width,depth:row.depth,height:row.height,pose:row.pose});
+		validate(result);return result;
 	}
 
 	static function number(row:Dynamic, field:String):Float {

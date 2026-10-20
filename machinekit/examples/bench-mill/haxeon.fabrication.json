@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-mill-fabrication"
+  },
+  "entry": "MillFabricationPreview",
+  "sources": [
+    "BenchMill.hx",
+    "BenchMillPreview.hx",
+    "BearingBlock.hx",
+    "BearingBlockJob.hx",
+    "../cnc-router/CncRouter.hx",
+    "EnclosedBenchMill.hx",
+    "MillBasePreview.hx",
+    "MillFramePreview.hx",
+    "MillMoldSetup.hx",
+    "MillMoldPreview.hx",
+    "MillMoldChecks.hx",
+    "MillFabricationSetup.hx",
+    "MillFabricationPreview.hx",
+    "MillMoldStudy.hx"
+  ],
+  "sourceRoots": [
+    ".",
+    "../cnc-router"
+  ],
+  "dependencies": {
+    "robotkit-autonomy": {
+      "path": "../../../robotkit/autonomy"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../"
+    },
+    "manufacturingkit": {
+      "path": "../../../manufacturingkit"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/fabrication-runner"
+}

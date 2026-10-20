@@ -31,9 +31,9 @@ class BoxPlannerTests {
 		d = ToolingCodec.snapshot(d);
 		d.recipe.minimumLigament = 2;
 		d.input.inserts[0].height = 10;
-		d.input.inserts[0].boreDiameter = 5;
+		d.input.inserts[0].holes = materia.casting.InsertHoleGeometry.through(5,d.input.inserts[0].height);
 		var recess = d.input.features.filter(f -> f.kind == "insert-recess")[0];
-		recess.height = 10;
+		recess.geometry.height = 10;
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
 		var p = BoxMoldPlanner.plan(d), encoded = BoxMoldCodec.encode(p);
 		check(BoxMoldCodec.encode(BoxMoldCodec.decode(encoded)) == encoded, "mold canonical persistence");
@@ -68,7 +68,8 @@ class BoxPlannerTests {
 		o.mode = CoreSupportMode.BedSocket;
 		rejects(() -> BoxMoldPlanner.plan(d, o), "bed socket cannot alter a solid casting floor");
 		var bedDoc = ToolingCodec.snapshot(d);
-		bedDoc.input.features.filter(f -> f.kind == "void")[0].pose.z = 40;
+		bedDoc.input.features.filter(f -> f.kind != "insert-recess")[0].geometry.pose.z = 40;
+        bedDoc.input.features.filter(f -> f.kind != "insert-recess")[0].openings=[materia.casting.CastingPatterns.face("body.z-max")];
 		bedDoc.setup.sourceFingerprint = ToolingCodec.inputFingerprint(bedDoc.input);
 		var bed = BoxMoldPlanner.plan(bedDoc), core = bed.cores[0];
 		check(core.support.kind == CoreSupportKind.BedSocket && bed.supportPanels.length == 0, "bed opening selects routed socket");

@@ -18,10 +18,21 @@ SceneKit. `src/Main.hx` composes:
 The editor starts with an empty scene in a perspective view. Use `--demo` to
 load the two starter boxes, the BIM example, and sample telemetry.
 Click an object in the viewport or hierarchy to select it; the yellow outline
-tracks selection. Picking in 3D also highlights the corresponding Hierarchy row,
+tracks selection. A completed viewport click selects the hit part directly; repeated
+clicks keep that part selected. Select an assembly in the tree to select its members.
+Picking in 3D also highlights the corresponding Hierarchy row,
 opens its ancestor groups and scrolls it into view without moving keyboard focus.
 An active tree search is preserved, with the selected row included so it remains
 reachable. Redraws preserve scroll position and manual branch expansion.
+Generated assemblies are organized by their authored subassemblies. Each part
+occurrence appears once under its owner; rigid bodies and moving joints do not
+reparent parts. Assemblies show their part count and have an inspector with
+Frame, Hide/Show, and Isolate actions. A part row acts on that occurrence only.
+Double-click an assembly or part to frame it. Joint controls remain in **Machine**.
+Older exports without ownership metadata appear under their root assembly until
+regenerated. Saved visibility from the former body/Parts hierarchy is preserved
+as individual part visibility; **Show all** clears it.
+
 Edit Name, Position X/Y (metres), Width, Height, Colour
 (`#RRGGBB`), or Visible in the inspector.
 Use the eye at the right of a Hierarchy row, or press **Space** while that tree
@@ -31,6 +42,14 @@ an object or parent mask is hiding it. A dash in an open group eye indicates
 that some descendants are hidden. Group changes include filtered-out and
 collapsed descendants, preserving each child's own Visible setting and nested
 group state. The search field and other text inputs keep their normal Space behavior.
+
+The viewport toolbar's **Visibility** button opens the same hierarchy as a
+checkbox popup. It stays open while toggling components and has its own expansion
+and scroll state, independent of the scene tree's search and selection. Mixed
+checkboxes indicate partially visible groups. Expand an assembly to control its
+children; showing a hidden parent preserves child settings. **Show all** and
+**Isolate selected** are also available in the popup. Escape or an outside click
+closes it. Visibility controls remain available during simulation.
 
 Right-click an object or group for **Isolate selected** or **Show all**. Isolation
 preserves hidden descendants when the selected row is a group; Show all clears
@@ -127,26 +146,44 @@ current step until you scroll away; **Follow current step** resumes following. U
 shared Play/Pause, Step, Reset, and Stop controls to run the simulation. Mission steps
 are read-only here.
 
-Projects can declare named jobs in their source manifest. A job selects an entrypoint,
-so its geometry, process settings and mission are loaded together. The viewport card
-and Mission panel share a job selector; **Show steps** opens the panel. Switching is
-available before simulation starts, and locked while running or paused. Jobs build
-in the background with Cancel; a failed or cancelled build leaves the current scene
-intact. Saved `.materia` documents retain the selected job ID.
+## Project configurations and views
 
-The stationary Robot welding cards are presets of one project with five jobs:
-`complete`, `single-seam`, `tube-post`, `woven-seam`, and `multipass`. Existing projects
-without job metadata keep their default entrypoint. Source manifests declare jobs as:
+Project variants select complete generated scenes independently of runtime missions.
+Use **Configuration**, **Study**, and **Demo** in the viewport card or **Project**
+panel. These selectors are separate from the Mission panel and never create a
+mission or playback status for a plain machine. Open the source `.project.json`;
+a prebuilt `.mtrg` contains only the selected geometry and cannot regenerate another
+configuration. Source selection is locked while simulation is running or paused.
 
 ```json
-"defaultJob": "single-seam",
-"jobs": [{"id": "single-seam", "label": "Single seam",
-          "summary": "Plate T-joint", "entrypoint": "seam"}]
+"defaultVariant": "small",
+"variants": [
+  {"id": "small", "label": "Small", "kind": "configuration",
+   "summary": "Small machine", "entrypoint": "small"},
+  {"id": "compact-vmc", "label": "Compact VMC", "kind": "configuration",
+   "summary": "Larger machine study", "entrypoint": "compact-vmc"},
+  {"id": "spindle", "label": "Spindle drive", "kind": "study",
+   "summary": "Motor study", "entrypoint": "spindle-drive"}
+]
 ```
 
-Each job's `entrypoint` names an existing entry in `entrypoints`. Job IDs are unique;
-`defaultJob` must name one. Source job selection is unavailable for prebuilt `.mtrg`
-artifacts, which contain an already generated scene.
+IDs must be unique, entrypoints must exist, and `defaultVariant` must name a variant.
+Kinds are `configuration`, `study`, or `demo`. Only one scene variant is installed
+at a time: selecting a study does not imply that it inherits the selected machine
+configuration. Empty inactive selectors make that distinction visible.
+
+The project controller builds replacements in the background with Cancel. Failure,
+cancellation, document changes and simulation locks preserve the installed scene
+and selection. Saved `.materia` documents store `variantId` in project-record version
+2; older applications reject that version instead of silently loading the default
+geometry. Portable artifact metadata also retains the selected variant.
+
+Existing `jobs`/`defaultJob` manifests, including the robot welder's seam presets,
+remain supported and appear as **Scene preset** in the Project UI. Runtime mission
+steps stay in Mission. Legacy `jobId` documents retain their format; if their source
+has migrated to variants, reopening regenerates the matching variant and the next
+save writes version 2. A manifest must not mix `variants` and legacy `jobs` lists.
+Projects with neither keep their `defaultEntrypoint`.
 
 
 ## Workers in scene documents
@@ -781,3 +818,13 @@ actual cut requires closed/locked feedback. Faults never restart a cycle.
 The adjacent Visible / Transparent / Hidden controls are presentation only.
 Physical bodies, switches and guard-lock logic remain installed, and the
 inspection camera keeps its own cutaway visibility.
+A CNC job may carry `machining.mission: {id, label}`. This names a finite,
+single-program machining task executed by the existing CNC player. Its Mission
+view follows the player's real state, including feed hold, failure and completion;
+it does not create robot steps or a second executor. Named machining missions
+require `loop: false` (or omitted). Existing unlabelled CNC demos remain compatible.
+`machining.kinematicPreview: true` explicitly opts a packaging model into ideal
+motion with authored positive axis velocity and acceleration limits. Travel and
+stock/tool geometry checks still apply; motor-load plan checks and drive-error
+allowances do not. The Mission view displays this mode. Omitting the flag retains
+the existing drive-qualified CNC behavior.

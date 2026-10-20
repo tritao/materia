@@ -416,9 +416,10 @@ class AssemblyIntegrity {
 	}
 
 	function checkRack(state:AssemblyState, rest:Map<String, Float>, leader:LeaderMove, coupling:String, pinion:String, rack:String):Void {
-		var wheel = gear(pinion);
-		if (wheel == null || !Std.isOfType(flat.member(rack), Rack)) return;
-		var radius = wheel.pitchDiameter / 2;
+        var wheel=flat.member(pinion),bar=flat.member(rack);
+        if((!Std.isOfType(wheel,SpurGear)&&!Std.isOfType(wheel,machinekit.transmission.HelicalPinion)) ||
+            (!Std.isOfType(bar,Rack)&&!Std.isOfType(bar,machinekit.transmission.HelicalRack)))return;
+        var radius=machinekit.transmission.RackGeometry.pinion(wheel).diameter/2;
 		var poses = stepped(state, rest, leader, [pinion, rack]);
 		var wheelPose = poses.before[0], rackPose = poses.before[1];
 		var centre = AssemblyFrames.transformPoint(wheelPose, 0, 0, 0);

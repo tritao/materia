@@ -15,13 +15,22 @@ import machinekit.transmission.TimingPulley;
  * Geometry is a redesign study, not a supplier-qualified mount or enclosure.
  */
 class MillSpindleDrivePart extends MachineComponent {
+	/** Shared installed Leadshine selection; belt and carrier remain fabricated parts. */
+	public static function installed(headHeight:Float):MillSpindleDrivePart {
+		var motor=LeadshineServo.model("ELM2L-1500LA100FT-H MS1AE");
+		return new MillSpindleDrivePart(new ComponentValues().setToken("motor",motor.designation)
+			.setInteger("motorTeeth",60).setInteger("spindleTeeth",20)
+			.setNumber("centres",110)
+			.setNumber("guardRearLimit",178)
+			.setNumber("faceZ",251+motor.rating.shaftLength).setNumber("mountBottom",Bt30Cartridge.SEAT+headHeight));
+	}
 	static var recipe:Null<ComponentType>;
 	static var guardRecipe:Null<ComponentType>;
 	public static function parameters(role:String="carrier"):Array<ComponentParameter> return [
 		P.choice("role",[role],role),
 		P.choice("motor",["ASSUMED-BT30-MOTOR-2200W"].concat(LeadshineServo.catalog().designations()),"ELM2M-2900LD180FT-H"),
 		P.count("motorTeeth",96),P.count("spindleTeeth",18),P.length("centres",180),
-		P.length("faceZ",330),P.length("mountBottom",140)];
+		P.length("faceZ",330),P.length("mountBottom",140),P.length("guardRearLimit",0)];
 	public static function recipeType(role:String="carrier"):ComponentType {
 		if(role=="guard") {
 			if(guardRecipe==null)guardRecipe=new ComponentType("machinekit.milling.spindle-drive-study-guard",parameters("guard"),v->new MillSpindleDrivePart(v));
@@ -41,6 +50,8 @@ class MillSpindleDrivePart extends MachineComponent {
 		super("MILL-SPINDLE-DRIVE-"+v.token("role"),"Selectable spindle drive "+v.token("role"),"steel",false,v);
 		// Validate tooth counts against actual shaft bores, not just belt pitch.
 		motorPulley(); spindlePulley();
+		if(parameterNumber("guardRearLimit")>0 && parameterNumber("guardRearLimit")<centres()+motorPulley().pitchDiameter/2+5)
+			throw "Guard rear wall needs at least 5 mm clearance beyond the motor pulley pitch circle";
 		addConnector("mount",Mount,Solids.axial(0,0,0));
 	}
 	public function motor():ServoMotor return parameterToken("motor")=="ASSUMED-BT30-MOTOR-2200W"
@@ -79,15 +90,17 @@ class MillSpindleDrivePart extends MachineComponent {
 	public function guardRadius():Float {
 		var screw=machinekit.standard.SocketHeadCapScrew.metric(screwSize(),20),boltRadius=0.0;
 		for(p in mountingHoles())boltRadius=Math.max(boltRadius,Math.sqrt(p.x*p.x+p.y*p.y));
-		return Math.max(Math.max(96,Math.max(motorPulley().pitchDiameter,spindlePulley().pitchDiameter)/2+20),boltRadius+screw.spec.headDiameter/2+6);
+		return Math.max(Math.max(60,Math.max(motorPulley().pitchDiameter,spindlePulley().pitchDiameter)/2+10),boltRadius+screw.spec.headDiameter/2+9);
 	}
 	public function guardBoltX():Float return guardRadius()+6;
+	public function guardBoltY():Float return 90;
 	public function plateWidth():Float return Math.max(Math.max(188,motorFace()+24),2*(guardBoltX()+8));
 	public function plateRear():Float return Math.max(180,parameterNumber("centres")+motorFace()/2+10);
 	static function box(w:Float,d:Float,z0:Float,z1:Float,x:Float=0,y:Float=0):Part
 		return Part.prism([new Vector(x-w/2,y-d/2),new Vector(x+w/2,y-d/2),new Vector(x+w/2,y+d/2),new Vector(x-w/2,y+d/2)],z0,z1);
 	static function slot(radius:Float,y:Float,z0:Float,z1:Float,x:Float=0):Part {
-		var profile=Sketch.slot(10+2*radius,2*radius,new Plane(new Vector(x,y,z0),Vector.Y(),Vector.Z()));
+		// Cover whole-tooth centre correction plus the full +/-5 mm adjustment.
+		var profile=Sketch.slot(20+2*radius,2*radius,new Plane(new Vector(x,y,z0),Vector.Y(),Vector.Z()));
 		try {var result=profile.extrude(z1-z0);profile.close();return result;}catch(e:Dynamic){profile.close();throw e;}
 	}
 	override public function componentType():Null<ComponentType> return recipeType(parameterToken("role"));
@@ -109,7 +122,7 @@ class MillSpindleDrivePart extends MachineComponent {
 						cuts.push(keep(Part.cylinderSpan(3.3,bottom-1,bottom+11,side*68,y)));
 						cuts.push(keep(Part.cylinderSpan(5.5,plate-1,face()+1,side*68,y)));
 					}
-					cuts.push(keep(Part.cylinderSpan(1.65,plate-1,plate+8,side*guardBoltX(),112)));
+					cuts.push(keep(Part.cylinderSpan(1.65,plate-1,plate+8,side*guardBoltX(),guardBoltY())));
 					cuts.push(keep(Part.cylinderSpan(8,plate-1,face()+1,side*60,35)));
 				}
 				cuts.push(keep(slot((motor().rating.shaftDiameter+2)/2,nominal,plate-1,face()+1)));
@@ -122,11 +135,19 @@ class MillSpindleDrivePart extends MachineComponent {
 				}
 			} else {
 				var radius=guardRadius(),centre=centres(),top=face()-10;
-				function capsule(r:Float,z:Float,h:Float):Part {
+				function capsule(r:Float,z:Float,h:Float,inner:Bool=false):Part {
 					var sketch=Sketch.slot(centre+2*r,2*r,new Plane(new Vector(0,centre/2,z),Vector.Y(),Vector.Z()));
-					try {var p=sketch.extrude(h);sketch.close();return p;}catch(e:Dynamic){sketch.close();throw e;}
+					try {
+						var p=sketch.extrude(h);sketch.close();
+						if(parameterNumber("guardRearLimit")>0) {
+							var limit=parameterNumber("guardRearLimit")-(inner?2:0);
+							var clip=box(2*r+2,limit+r+1,z-1,z+h+1,0,(limit-r-1)/2);
+							var result=p.intersect(clip);clip.close();p.close();return result;
+						}
+						return p;
+					}catch(e:Dynamic){sketch.close();throw e;}
 				}
-				var outer=keep(capsule(radius,250,top-250)),inner=keep(capsule(radius-2,249,top-248));
+				var outer=keep(capsule(radius,250,top-250)),inner=keep(capsule(radius-2,249,top-248,true));
 				pieces.push(keep(Solids.cut(outer,[inner])));pieces.push(keep(capsule(radius,top-2,2)));
 				cuts.push(keep(box(width+2,rear-front,top-3,top+1,0,(front+rear)/2)));
 				cuts.push(keep(Part.cylinderSpan(12,249,top+1)));
@@ -134,8 +155,8 @@ class MillSpindleDrivePart extends MachineComponent {
 					cuts.push(keep(box(144,104,top-3,top+1)));
 				for(x in [-60.0,60.0])for(y in [-35.0,35.0])cuts.push(keep(Part.cylinderSpan(8,249,top+1,x,y)));
 				for(side in [-1,1]) {
-					pieces.push(keep(box(20,20,top-4,top-2,side*(radius+4),112)));
-					cuts.push(keep(Part.cylinderSpan(2.25,top-5,top+1,side*guardBoltX(),112)));
+					pieces.push(keep(box(20,20,top-4,top-2,side*(radius+4),guardBoltY())));
+					cuts.push(keep(Part.cylinderSpan(2.25,top-5,top+1,side*guardBoltX(),guardBoltY())));
 				}
 			}
 			var joined=keep(Solids.union(pieces));return Solids.cut(joined,cuts);

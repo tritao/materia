@@ -1,0 +1,1 @@
+{"version":1,"package":{"name":"manufacturingkit-foundation-tests"},"entry":"FoundationModelTests","sourceRoots":["src"],"dependencies":{"manufacturingkit":{"path":"../.."}},"target":"host","outputDir":"build"}

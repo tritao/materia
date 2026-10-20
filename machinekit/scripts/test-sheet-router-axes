@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Focused SR2 gate; invoke through heavy-run. Reuses existing native libraries.
+set -euo pipefail
+materia_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+cadkit_build="${CADKIT_BUILD_ROOT:-$materia_root/app/build/host/native/cadkit}"
+[[ -f "$cadkit_build/libcadkit-core.so" ]] || { echo "Set CADKIT_BUILD_ROOT to an existing CadKit native library directory" >&2; exit 1; }
+output="$materia_root/machinekit/tests/build/host/sheet-router-axes.hl"
+export HAXEON_COMPILER_SERVER=0
+"$materia_root/haxeon/scripts/haxeon" build --compiler-only --project "$materia_root/machinekit/tests/haxeon.sheet-router-axes.json" --output "$output"
+native_paths="$cadkit_build:$materia_root/haxeon/.tools/hashlink:$materia_root/haxeon/out"
+for directory in "$materia_root"/app/build/host/native/*; do
+    [[ -d "$directory" ]] && native_paths="$native_paths:$directory"
+done
+export LD_LIBRARY_PATH="$native_paths${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$materia_root/haxeon/.tools/hashlink/hl" "$output" "$@"

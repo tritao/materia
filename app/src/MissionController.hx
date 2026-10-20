@@ -1,64 +1,36 @@
 package app;
 
-import app.ProjectJobs.ProjectJob;
 import app.MissionPlayer.MissionProgress;
 import materia.project.SceneArtifact.SceneArtifactMission;
 
 typedef MissionViewState = {
   var generation:Int;
-  var jobs:Array<ProjectJob>;
-  var selectedJob:Null<String>;
-  var summary:String;
   var mission:Null<SceneArtifactMission>;
+  var machining:Null<materia.project.SceneArtifact.SceneArtifactMachiningMission>;
+  var machiningStatus:String;
+  var machiningPreview:Bool;
+  var hasWork:Bool;
   /** Every program's robot controller, in authored order; empty for the one implicit controller. */
   var programs:Array<String>;
   var selectedProgram:String;
   var progress:Null<MissionProgress>;
   var status:String;
-  var switchAllowed:Bool;
-  var simulationActive:Bool;
-  var loading:Bool;
-  var error:Null<String>;
 }
 
-/** Shared application state for mission views; job replacement is prepared before installation. */
+/** Runtime mission execution and progress. Project variants are managed separately. */
 class MissionController {
   final session:ProjectDocumentSession;
   final simulation:ApplicationSimulation;
-  final requestChange:(Void->Void)->Void;
-  final changed:Void->Void;
-  final installed:Void->Void;
-  final blocked:Void->Bool;
   final inspect:String->Void;
-  var generation = -1;
-  var jobs:Array<ProjectJob> = [];
-  var failure:Null<String> = null;
-  var loading:Null<ProjectLoadJob> = null;
-  var reference:Null<String>;
-  var loadGeneration = -1;
+  final changed:Void->Void;
   /** The robot controller whose program the views follow; null follows the first. */
   var program:Null<String> = null;
 
-  public function new(session:ProjectDocumentSession, simulation:ApplicationSimulation,
-      requestChange:(Void->Void)->Void, changed:Void->Void, installed:Void->Void,
-      blocked:Void->Bool, inspect:String->Void) {
-    this.session = session; this.simulation = simulation; this.requestChange = requestChange;
-    this.changed = changed; this.installed = installed; this.blocked = blocked; this.inspect = inspect;
-  }
-
-  public function isLoading():Bool return loading != null;
-
-  function sync():Void {
-    if (generation == session.generation) return;
-    generation = session.generation;
-    jobs = []; failure = null;
-    var path = session.projectReference;
-    if (path != null && !ProjectSourceLoader.isPrebuilt(path))
-      try jobs = ProjectJobs.read(path) catch (error:Dynamic) failure = Std.string(error);
+  public function new(session:ProjectDocumentSession,simulation:ApplicationSimulation,changed:Void->Void,inspect:String->Void) {
+    this.session=session;this.simulation=simulation;this.changed=changed;this.inspect=inspect;
   }
 
   public function snapshot():MissionViewState {
-    sync();
     // The one implicit controller of a scene without modelled controllers is "".
     var programs:Array<String> = session.missions == null ? [] :
       [for (work in session.missions) work.controllerId == null ? "" : work.controllerId];
@@ -72,14 +44,18 @@ class MissionController {
     if (mission == null && session.missions != null)
       for (work in session.missions) if (mission == null && (work.controllerId == null ? "" : work.controllerId) == chosen) mission = work;
     if (mission != null && mission.loop == true) status += " · Loop " + (progress == null ? 1 : progress.loop);
-    var summary = "";
-    for (job in jobs) if (job.id == session.projectJob) summary = job.summary;
-    var task = loading;
-    if (task != null) status = "Loading job · " + task.control.currentPhase();
-    return {generation:generation, jobs:jobs.copy(), selectedJob:session.projectJob, summary:summary,
-      mission:mission, programs:programs, selectedProgram:chosen,
-      progress:progress, status:status, switchAllowed:!simulation.isActive() && task == null && !blocked(),
-      simulationActive:simulation.isActive(), loading:task != null, error:failure};
+    var cncJob=session.cncJob;
+    var machining=cncJob==null?null:cncJob.mission;
+    var machiningStatus="";
+    if(machining!=null) {
+      var cnc=simulation.cncPlayer();
+      machiningStatus=cnc==null?"Ready · Play to start":cnc.failure!=null?"Stopped · "+ProgramErrorMessage.fromFailure(cnc.failure).title:
+        cnc.finished()?"Completed":!cnc.hasStarted()?"Ready · Play to start":!simulation.isRunning()?"Paused":cnc.held()?"Held":
+        "Running"+(cnc.currentLine>0?" · line "+cnc.currentLine:"")+cnc.statusDetail();
+    }
+    if(mission==null)status=machining==null?"No mission":machining.label+" · "+machiningStatus;
+    return {generation:session.generation,mission:mission,machining:machining,machiningStatus:machiningStatus,machiningPreview:cncJob!=null&&cncJob.kinematicPreview==true,hasWork:mission!=null||machining!=null,programs:programs,selectedProgram:chosen,
+      progress:progress,status:status};
   }
 
   /** Follow the program of robot controller `id`. */
@@ -87,48 +63,6 @@ class MissionController {
     if (session.missions == null || [for (work in session.missions) if (work.controllerId == id) work].length != 1)
       throw 'No program runs on controller "$id"';
     program = id;
-    changed();
-  }
-
-  public function selectJob(id:String):Void {
-    var state = snapshot();
-    if (!state.switchAllowed || id == state.selectedJob) return;
-    var valid = false;
-    for (job in state.jobs) if (job.id == id) valid = true;
-    if (!valid) throw 'Unknown project job "$id"';
-    var path = session.projectReference;
-    var expectedGeneration = session.generation;
-    if (path == null) return;
-    requestChange(function() {
-      if (simulation.isActive() || isLoading() || session.generation != expectedGeneration) return;
-      reference = path; loadGeneration = session.generation; failure = null;
-      loading = new ProjectLoadJob(path, id);
-      changed();
-    });
-  }
-
-  public function tick():Void {
-    var task = loading;
-    if (task == null) return;
-    if (session.generation != loadGeneration) { cancel(); return; }
-    if (!task.isFinished()) { changed(); return; }
-    loading = null;
-    if (!task.wasCancelled()) try {
-      var candidate = task.take();
-      // The document and simulation may have changed while generation was in flight.
-      if (simulation.isActive()) throw "Stop simulation before changing jobs";
-      var path = reference;
-      if (path == null) throw "Job source is missing";
-      session.openGeneratedProject(candidate, path);
-      sync();
-      installed();
-    } catch (error:Dynamic) failure = "Could not load job: " + Std.string(error);
-    changed();
-  }
-
-  public function cancel():Void {
-    if (loading != null) loading.control.cancel();
-    loading = null;
     changed();
   }
 

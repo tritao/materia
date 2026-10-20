@@ -1,5 +1,8 @@
 import cadkit.Shape;
 class HzMotionCadAudit {
+ static function machinePlacement(p:cadkit.modeling.Part,x:Float,y:Float,z:Float,r:Array<Float>):cadkit.modeling.Part {
+  return p.placed(new cadkit.modeling.Location(new cadkit.modeling.Plane(new cadkit.modeling.Vector(x,y,z),new cadkit.modeling.Vector(r[0],r[3],r[6]),new cadkit.modeling.Vector(r[2],r[5],r[8]))));
+ }
  static function main() {
   var root=Sys.getEnv("MATERIA_ROOT");
   if(root==null)throw "Set MATERIA_ROOT to repository root";
@@ -33,6 +36,38 @@ class HzMotionCadAudit {
      for(c in circles){var o:Array<Float> = c.o,d:Array<Float> = c.d;
       if(Math.abs(c.r-hole.r)<0.001&&Math.abs(o[0]-side*hole.x)<0.001&&Math.abs(o[2]-hole.z)<0.001&&Math.abs(d[1])>0.999)found=true;}
      if(!found)throw "BK12 base mounting hole differs from PDF p12 P/P1/E/C1/C2";
+    }
+   }
+   if(r.model=="M80E-BK15-C") {
+    var motor=false,base=false,pilot=false,bearing=false;
+    for(p in planes){var n:Array<Float> = p.normal,c:Array<Float> = p.center;
+     if(Math.abs(n[2]-1)<0.001&&Math.abs(c[2]-109)<0.001&&p.area>3000)motor=true;
+     if(Math.abs(n[1]+1)<0.001&&Math.abs(c[1]+28)<0.001&&p.area>2000)base=true;}
+    for(c in circles){var mn:Array<Float> = c.min,mx:Array<Float> = c.max;
+     if(Math.abs(c.r-35)<0.001&&Math.abs(mn[2]-103)<0.001&&Math.abs(mx[2]-108.5)<0.001)pilot=true;
+     if(Math.abs(c.r-7.5)<0.001&&Math.abs(mn[2]-7.6)<0.001&&Math.abs(mx[2]-24.4)<0.001)bearing=true;}
+    if(!motor||!base||!pilot||!bearing)throw "BK15 datums or bearing bore changed";
+    // Regression: copying trimmed geometry during two rigid placements used to
+    // pass local import validation, then fail at the installed machine datum.
+    var source=new cadkit.modeling.Part(s);
+    var normalized=machinePlacement(source,0,28,109,[-1,0,0,0,1,0,0,0,-1]);
+    for(height in [1040.0,1440.0]) {
+     var installed=machinePlacement(normalized,0,300,height,[-1,0,0,0,1,0,0,0,-1]);
+     if(!installed.valid()||installed.solidCount()!=solids.length||Math.abs(installed.volume()-s.volume())>1e-4)throw "Rigid STEP placement changed topology or volume";
+     installed.close();
+    }
+    normalized.close();
+
+    for(x in [-90/(2*Math.sqrt(2)),90/(2*Math.sqrt(2))])for(y in [-90/(2*Math.sqrt(2)),90/(2*Math.sqrt(2))]) {
+     var found=false;
+     for(c in circles){var o:Array<Float> = c.o,d:Array<Float> = c.d;if(Math.abs(c.r-2.5)<0.001&&Math.abs(o[0]-x)<0.001&&Math.abs(o[1]-y)<0.001&&Math.abs(d[2])>0.999)found=true;}
+     if(!found)throw "BK15 motor M6 bolt circle changed";
+    }
+    for(hole in [{x:29.0,z:67.0},{x:27.0,z:22.0},{x:27.0,z:7.0}])for(side in [-1,1]) {
+     var found=false;
+     for(c in circles){var o:Array<Float> = c.o,d:Array<Float> = c.d;
+      if(Math.abs(c.r-3.3)<0.001&&Math.abs(o[0]-side*hole.x)<0.001&&Math.abs(o[2]-hole.z)<0.001&&Math.abs(d[1])>0.999)found=true;}
+     if(!found)throw "BK15 measured base-hole pattern changed";
     }
    }
    if(r.model=="BF12"||r.model=="BF15") {

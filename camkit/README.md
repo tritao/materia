@@ -115,3 +115,34 @@ automatically (see the CadKit README), so run:
 ```sh
 ./haxeon/scripts/haxeon run --project camkit/tests/haxeon.json
 ```
+
+
+## Tooling panels
+
+`CamToolingPanels.build(panel, settings)` validates a ManufacturingKit `PanelPlan`
+and returns ordered setups with `ToolpathProgram`s. Each source operation makes
+one profile, pocket (including open-side rebates), or drill call, retaining the
+source ID in provenance. Named access pockets precede their deeper cuts;
+non-release faces precede the setup containing the outside contour, which is cut
+last. Every setup records its face and original setup ID. Negative-Z machining
+reflects X about the finished bounding profile midline; the raw blank lower-left
+origin includes the explicitly declared margin. Z0 is the active machining face.
+
+Settings are metres/m/s: tool library, chord tolerance, safe Z, RPM, cutting and
+plunge feeds, step-down, step-over fraction, blank margin, work origin, fixtures
+and machine travel. Cutter diameters must exactly match the operation, including
+relief tools. The bridge checks stock/fixtures/travel before returning programs;
+`CncWriter` applies those checks again for LinuxCNC export. Stock clearance does
+not qualify workholding or release a part after its final outside cut.
+
+`CamContour` retains its polyline vertices and optionally the exact line/arc
+boundary supplied by this adapter. `CamExactBoundary` compensates that exact
+boundary in native CAD (mm), then samples the centreline to the declared metre
+chord tolerance. This avoids treating a cutter-radius relief as an undersized
+polygon. Regular offsets can discard isolated matched-radius relief centres:
+CamJob machines them with separate vertical entries under the same operation,
+after a CAD boolean proves the full cutter disc lies in the removable region.
+A cutter-sized circular profile/pocket similarly uses its point centreline.
+Callers without exact metadata retain the existing polyline offset behavior.
+Machine-specific feeds, axial-plunge suitability, tool lengths, fixtures and
+part retention remain explicit shop qualification inputs.

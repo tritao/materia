@@ -1,11 +1,25 @@
 {
   "format": "materia.project",
   "version": 1,
-  "name": "Bench mill — selectable Leadshine spindle drive",
+  "name": "Mill \u2014 spindle-drive study (shortcut)",
   "defaultEntrypoint": "mill",
-  "build": {"system": "haxeon", "manifest": "haxeon.motor-study.json"},
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
   "entrypoints": {
-    "mill": {"kind": "cad-preview", "documentInput": true, "reconcilesSavedRecipe": true,
-      "module": "MillMotorStudy", "function": "preview", "cache": {"inputs": ["MillMotorStudy.hx", "MillFramePreview.hx"]}}
+    "mill": {
+      "kind": "cad-preview",
+      "documentInput": true,
+      "reconcilesSavedRecipe": true,
+      "module": "MillMotorStudy",
+      "function": "preview",
+      "cache": {
+        "inputs": [
+          "MillMotorStudy.hx",
+          "MillFramePreview.hx"
+        ]
+      }
+    }
   }
 }

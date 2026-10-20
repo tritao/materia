@@ -36,7 +36,7 @@ class HobberTrayAnchorStudy {
       if(Math.abs(p.y)>300)tabs.push(C.box(p.id+"-seat",60,80,4,p.x,p.y<0?-d[1]/2+40:d[1]/2-40,z));
       else tabs.push(C.box(p.id+"-seat",80,60,4,p.x<0?-d[0]/2+40:d[0]/2-40,p.y,z));
     }
-    var cores=C.decode(FoundationLayout.bodyValues("bed").token("voids"));
+    var cores=C.decode(FoundationLayout.bodyValues("bed").token("features"));
     var lightening=[for(c in cores)if(StringTools.startsWith(c.id,"core-"))c];
     var service=[for(c in cores)if(!StringTools.startsWith(c.id,"core-"))c];
     var remaining=CastingCells.outsideBoxes(lightening,[for(b in bosses)CastingCells.bounds(b)]).concat(service);

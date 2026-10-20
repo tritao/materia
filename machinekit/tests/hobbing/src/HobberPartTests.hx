@@ -12,7 +12,7 @@ class HobberPartTests {
   static function near(a:Float,b:Float,tolerance:Float,label:String):Void check(Math.abs(a-b)<=tolerance,'$label: $a vs $b');
   static function rejects(fn:Void->Void,label:String):Void {var failed=false;try fn()catch(_:Dynamic)failed=true;check(failed,label);}
   static function members():Array<MachineComponent>return [new TorqueMotor(),new AngularContactBearing(),new CrossedRollerBearing(),new RotaryEncoderRing(),
-    new HobSpindlePart("shaft"),new HobSpindlePart("drawbar"),new HobSpindlePart("bearingRetainer"),new HobSpindlePart("bearingLocknut"),new FlexsplineCupBlank(),new MandrelSleeve(),new Hob(),new HobArbor(),new OutboardSupport(),new ExpandingMandrel(),new RotaryClamp(),new TablePlaten(),new TableHousing(),new SpindleHousing(),new SwivelHousing(),new MineralCasting(),new CastInsert()];
+    new HobSpindlePart("shaft"),new HobSpindlePart("drawbar"),new HobSpindlePart("bearingRetainer"),new HobSpindlePart("bearingLocknut"),new FlexsplineCupBlank(),new MandrelSleeve(),new Hob(),new HobArbor(),new OutboardSupport(),new ExpandingMandrel(),new RotaryClamp(),new TablePlaten(),new TableHousing(),new SpindleHousing(),new SwivelHousing(),new MineralCasting(),new CastInsert(new ComponentValues().setToken("role","generic-mount"))];
   public static function run():Void {
     var registry=MachineKitComponents.standard(),parts=members();
     var rendered=new Hob(new ComponentValues().setBoolean("renderTeeth",true));
@@ -48,7 +48,7 @@ class HobberPartTests {
     check(largeBearing.bom.partNumber!=new CrossedRollerBearing().bom.partNumber,"compact swivel bearing has a distinct BOM size");
     var oldColumn=registry.byId("machinekit.hobbing.mineral-casting-body").create(new ComponentValues().setToken("kind","column").setNumber("width",200).setNumber("depth",180).setNumber("height",600));
     near(oldColumn.parameterNumber("height"),600,0,"legacy column retains original height");
-    check(oldColumn.values().token("voids").indexOf("driveSeat")<0,"legacy column does not acquire a new drive insert recess");
+    check(oldColumn.values().token("features").indexOf("driveSeat")<0,"legacy column does not acquire a new drive insert recess");
     for(p in parts){var metadata=EngineeringMetadata.of(p);
       check((metadata==null)==(Std.isOfType(p,MineralCasting)||Std.isOfType(p,CastInsert)),"engineering provenance optional on structural parts and present on rated motion parts");
       if(metadata!=null){var rebuilt=p.componentType().create(p.values());

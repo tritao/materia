@@ -40,6 +40,9 @@ class ToolingReadiness {
 				ToolingIds.validate(id);
 			if (check.status != Pass && check.status != Fail && check.status != Pending && check.status != Unsupported)
 				throw "Invalid tooling validation status";
+			var expected = check.status == Pass ? Info : check.status == Pending ? Warning : Error;
+			if (check.severity != expected)
+				throw "Invalid tooling validation severity/status consistency";
 			if (check.status != Pass && blocked.indexOf(check.rule) < 0)
 				blocked.push(check.rule);
 		}

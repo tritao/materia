@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "package": {
+    "name": "project-variant-fixture"
+  },
+  "entry": "VariantPreview",
+  "sources": [
+    "VariantPreview.hx"
+  ],
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "projectkit": {
+      "path": "../../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../../cadkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

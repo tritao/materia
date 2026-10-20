@@ -336,6 +336,9 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 	public function mountScrew(length:Float):SocketHeadCapScrew
 		return SocketHeadCapScrew.metric(variant.mountScrew, length);
 
+	override public function axisMotor():Null<AxisMotor> return new AxisMotor(this,spec.face,variant.shaftDiameter,
+        variant.shaftLength, depth->mountingCutout(depth));
+
 	/** Cutting tool for a plate in front of the face (z=0..thickness): pilot and bolt clearances. */
 	public function mountingCutout(thickness:Float, pilotClearance:Float = 0.2, fit:ClearanceFit = Medium):Part {
 		if (!(thickness > 0)) throw "Motor mounting plate needs a positive thickness";

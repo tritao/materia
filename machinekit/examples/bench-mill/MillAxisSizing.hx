@@ -88,8 +88,8 @@ class MillAxisSizing {
    var p=m.component.massProperties();mass+=p.mass;masses.push({member:m.id,kg:p.mass});
   }
   if(masses.length==0)throw 'No moving members for ${data.axis}';
-  var motor=cast(member(a,data.motor),ServoMotor),screw=cast(member(a,data.screw),BallScrew);
-  var nut=cast(member(a,data.axis=="z"?"zAxis/nut":"xyStage/nut"+data.axis.toUpperCase()),BallNut);
+  var motor=cast(member(a,data.motor),ServoMotor),screw=cast(member(a,data.screw),LeadScrew);
+  var nut=cast(member(a,data.axis=="z"?"zAxis/nut":"xyStage/nut"+data.axis.toUpperCase()),LeadScrewNut);
   var relation=LeadScrew.relation(screw,nut,1),ratio=1.0,beltEfficiency=1.0,beltDrag=0.0;
   if(data.axis=="x") {
    var belt=cast(member(a,"xyStage/beltX"),TimingBelt);
@@ -112,9 +112,7 @@ class MillAxisSizing {
   var screwRpm=d.maximumRpm*ratio,availableRated=motor.rating.ratedTorque/RESERVE;
   var ratedSpeed=motor.rating.ratedSpeed*60/(2*Math.PI),maxSpeed=motor.rating.maxSpeed*60/(2*Math.PI);
   var powerPass=d.rmsNm<=availableRated&&d.peakNm*RESERVE<=motor.rating.peakTorque&&d.maximumRpm<=ratedSpeed&&screwRpm<=critical;
-  var brake=data.vertical?cast(member(a,"zAxis/brake-shell-0"),ShaftBrakePart):null;
   var hold=gravity*q; // frictionless backdrive is conservative; no reliance on guide friction.
-  var delay=brake==null?0:brake.applicationDelaySeconds();
   var candidates:Array<Dynamic> = [];
   for(name in LeadshineServo.catalog().designations()) {
    var candidate=LeadshineServo.model(name),r=candidate.rating;
@@ -136,10 +134,9 @@ class MillAxisSizing {
    sustainedCutTorqueNm:sustainedCut,sustainedCutUtilizationWithReserve:sustainedCut*RESERVE/motor.rating.ratedTorque,
    sustainedCutScreenPass:sustainedCut*RESERVE<=motor.rating.ratedTorque,
    ratedSpeedRegion:d.maximumRpm<=ratedSpeed,torqueAndSpeedScreenPass:powerPass,studyInertiaTargetPass:d.inertiaRatio<=INERTIA_RATIO_TARGET,
-   zHolding:data.vertical?{frictionlessHoldingNm:hold,requiredHoldingWithReserveNm:hold*RESERVE,assumedBrakeHoldingNm:brake.holdingTorque(),
-    assumedBrakeScreenPass:hold*RESERVE<=brake.holdingTorque(),applicationDelaySeconds:delay,
-    freeFallDistanceDuringDelayMm:0.5*G*delay*delay*1000,
-    qualification:"4 Nm brake and timing are assumptions; dynamic stopping, regenerative bus, release sequencing and power-loss safety unqualified"}:null,
+   zHolding:data.vertical?{frictionlessHoldingNm:hold,requiredHoldingWithReserveNm:hold*RESERVE,internalBrakePresent:Std.isOfType(motor,LeadshineServo)&&cast(motor,LeadshineServo).spec.brake,
+    holdingCapacityQualified:false,
+    qualification:"Internal Leadshine brake torque and timing are unpublished locally; dynamic stopping, release sequencing and power-loss safety unqualified"}:null,
    leadshineCandidates:candidates};
  }
  public static function main():Void {
@@ -148,7 +145,7 @@ class MillAxisSizing {
   var axes:Array<AxisData> = [
    {axis:"x",root:"xyStage/blockX0",motor:"xyStage/motorX",screw:"xyStage/screwX",rotating:["xyStage/screwX","xyStage/screwRetainerX","xyStage/screwPulleyX","xyStage/motorPulleyX"],bearingSpan:xy.xFloatingX-xy.xFixedX,stroke:50,travel:2*xy.xHalfTravel,vertical:false},
    {axis:"y",root:"xyStage/blockY0",motor:"xyStage/motorY",screw:"xyStage/screwY",rotating:["xyStage/screwY","xyStage/screwRetainerY","xyStage/couplingY"],bearingSpan:Math.abs(xy.yFixedY-xy.yFloatingY),stroke:50,travel:2*xy.yHalfTravel,vertical:false},
-   {axis:"z",root:"zAxis/blockLeftLower",motor:"zAxis/motor",screw:"zAxis/screw",rotating:["zAxis/screw","zAxis/screwRetainer","zAxis/coupling","zAxis/brake-hub","zAxis/brake-disc"],bearingSpan:Math.abs(z.fixedZ-z.floatingZ),stroke:50,travel:Math.abs(z.lower),vertical:true}];
+   {axis:"z",root:"zAxis/blockLeftLower",motor:"zAxis/motor",screw:"zAxis/screw",rotating:["zAxis/screw","zAxis/coupling"],bearingSpan:Math.abs(z.fixedZ-z.floatingZ),stroke:50,travel:Math.abs(z.lower),vertical:true}];
   var baseline=MillFramePreview.concept(c.reference,c.frame),baseReports=[for(axis in axes)axisReport(baseline,axis)];
   near(baseReports[2].cadMovingMassKg,MillMotorStudy.movingMass(baseline),"Z moving subtree agrees with spindle study");
   if(baseReports[1].cadMovingMassKg<=baseReports[0].cadMovingMassKg)throw "Y must include nested X stage mass";
@@ -167,7 +164,13 @@ class MillAxisSizing {
     ratedPowerScreenPass:m.rating.ratedTorque*m.rating.ratedSpeed*0.95>=2200,
     continuousAtTargetQualified:false,missing:"matched continuous curve/duty, belt power and spindle bearing limits"}});
   }
-  var report={status:"local mechanical model preliminary sizing; no axis has a supplier-qualified motor/drive selection",scope:"mechanical MillFramePreview concept; legacy BenchMill control model is different",
+  var compactLayout=new MillCapacityLayout(),compact=MillCapacityStudy.build(compactLayout,false),compactZ=compactLayout.zLayout();
+  var compactZReport=axisReport(compact,{axis:"z",root:"zAxis/blockLeftLower",motor:"zAxis/motor",screw:"zAxis/screw",
+   rotating:["zAxis/screw","zAxis/coupling"],
+   bearingSpan:Math.abs(compactZ.fixedZ-compactZ.floatingZ),stroke:50,travel:Math.abs(compactZ.lower),vertical:true});
+  var installedDrive=MillSpindleDrivePart.installed(z.headHeight),installedMotor=installedDrive.motor();
+  var installedWatts=installedMotor.rating.ratedTorque*installedMotor.rating.ratedSpeed*0.95;
+  var report={status:"local mechanical model preliminary sizing; no axis has a supplier-qualified motor/drive selection",scope:"Small XYZ and Compact Z; Compact XY drives remain unfitted; legacy BenchMill control model is different",
    assumptions:{payloadKg:PAYLOAD_KG,cuttingForcePerAxisN:CUTTING_N,accelerationMPerS2:ACCELERATION,rapidMmMin:RAPID_MM_MIN,cuttingFeedMmMin:FEED_MM_MIN,
     extraGuideAndSealDragN:GUIDE_DRAG_N,reserveFactor:RESERVE,inertiaRatioStudyTarget:INERTIA_RATIO_TARGET,
     duty:"50 mm cutting traverse, 50 mm rapid return, 1 second powered dwell; triangular profiles when needed",
@@ -176,10 +179,11 @@ class MillAxisSizing {
     inertia:"CAD rotating inertia excludes motor shaft because motor rotor inertia already includes it; screw side reflected by ratio squared; belt mass excluded",
     criticalSpeed:"existing LeadScrew Euler-Bernoulli model, BK fixed/BF simple, bearing centre span, 80% first bending speed",
     candidateScope:"isolated motor comparison with unchanged mechanics; no supplier interchangeability, voltage/drive compatibility or candidate mass propagation to other axes claimed"},
-   axes:baseReports,baselineSpindle:{motor:"ASSUMED-BT30-MOTOR-2200W",targetRpm:8000,targetOutputWatts:2200,
-    assumedBeltEfficiency:0.95,outputWattsAtRatedPoint:2200*0.95,ratedPowerScreenPass:false,
-    continuousAtTargetQualified:false,note:"2.2 kW motor rating is before belt losses; it does not deliver 2.2 kW at the tool"},spindleAlternatives:variants,
-   blockers:["Installed axis motors are generic assumptions, not selected Leadshine products", "Matched motor/drive torque-speed and thermal duty curves", "Measured friction, process cutting loads and production cycle", "Regenerative energy and bus/braking resistor limits", "Z brake supplier holding and emergency-stop data, power-loss validation", "Screw DN, buckling, axial load, bearings and coupling/belt capacity", "Servo tuning, stiffness, backlash and following error are not established by torque sizing"]};
+   axes:baseReports,compactZAxis:compactZReport,baselineSpindle:{motor:installedMotor.designation,targetRpm:8000,targetOutputWatts:2200,
+    spindleToMotorSpeedRatio:installedDrive.speedRatio(),motorRpmAtTarget:8000/installedDrive.speedRatio(),
+    assumedBeltEfficiency:0.95,outputWattsAtRatedPoint:installedWatts,ratedPowerScreenPass:installedWatts>=2200,
+    continuousAtTargetQualified:false,note:"Selected 1.5 kW motor does not meet the historical 2.2 kW tool-output target"},spindleAlternatives:variants,
+   blockers:["Selected Leadshine motors are not yet qualified with installed drives and wiring", "Matched motor/drive torque-speed and thermal duty curves", "Measured friction, process cutting loads and production cycle", "Regenerative energy and bus/braking resistor limits", "Z brake supplier holding and emergency-stop data, power-loss validation", "Screw DN, buckling, axial load, bearings and coupling/belt capacity", "Servo tuning, stiffness, backlash and following error are not established by torque sizing"]};
   var dir=Sys.getEnv("MILL_AXIS_SIZING_OUTPUT");if(dir==null)dir=Sys.getCwd()+"/build/axis-sizing";
   if(!sys.FileSystem.exists(dir))sys.FileSystem.createDirectory(dir);
   sys.io.File.saveContent(dir+"/axis-sizing.json",Json.stringify(report,null,"  "));

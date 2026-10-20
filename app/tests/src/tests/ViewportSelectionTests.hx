@@ -19,7 +19,7 @@ class ViewportSelectionTests {
     var data=SceneVisibilityTests.data();
     for(item in data) {item.x=item.id=="project:tool" ? 0 : 10;}
     var definition=SceneVisibilityTests.definition();
-    for(occurrence in definition.occurrences)occurrence.includePath="machine/axes";
+    for(occurrence in definition.occurrences)occurrence.includePath="machine/axes/tooling";
     var scene=new EditorScene(data),tree=new EditorSceneTree(scene,definition);
     var host=new UiHostContext(null,new NativeKitEvents(),function(){},function(){});
     var style=new LayoutStyle();style.width=LayoutAxis.grow();style.height=LayoutAxis.grow();
@@ -31,26 +31,29 @@ class ViewportSelectionTests {
     viewport.selectionTree=tree;
     var frame=new LayoutFrame(800,600);
     try {
-      ui.submit(viewport,frame);viewport.camera.frame(0,0,0,4,3,2,800/600);
+      ui.submit(viewport,frame);
+      tree.selectKey(tree.assemblyKey("machine/axes"));viewport.frameSelected();
+      check(Math.abs(viewport.camera.targetX-5)<0.00001,"frame assembly uses the union of member bounds");
+      tree.selectKey("project:tool");viewport.frameSelected();
+      check(Math.abs(viewport.camera.targetX)<0.00001,"frame part uses only that occurrence");
+      tree.selectKey("scene");viewport.camera.frame(0,0,0,4,3,2,800/600);
       var point=viewport.camera.project(0,0,0,800,600);if(point==null)throw "Missing projected test point";
       var x=point.x,y=point.y,path=tree.objectPath("project:tool");
-      check(path.length>=6,"fixture has deep authored and moving-body groups");
+      check(path.length>=6,"fixture has deep authored assembly groups");
       check(viewport.pick(x,y)=="project:tool","ray hits the nested part");
       var original=tree.selectionKey();ui.pointerDown(x,y,0);
       check(tree.selectionKey()==original,"press alone does not advance hierarchy");
       ui.pointerCancel(0,x,y);check(tree.selectionKey()==original,"cancelled click does not select");
       var history=scene.document.history.undoCount;
-      for(key in path.slice(1)) {
+      for (attempt in 0...3) {
         ui.pointerDown(x,y,0);ui.pointerUp(x,y,0);
-        check(tree.selectionKey()==key,'completed click selects hierarchy level $key');
-        check(tree.selectedObjects().indexOf("project:tool")>=0,"group highlight includes clicked descendant");
+        check(tree.selectionKey()=="project:tool","each completed click selects the hit part directly");
+        check(tree.selectedObjects().length==1 && tree.selectedObjects()[0]=="project:tool","viewport selection highlights only the hit occurrence");
         var view=scene.configureRenderView(new nativekit.scene.SceneView(),viewport.camera.viewProjection(800/600),null,null,-1,null,false);
-        check(view.selectionOverrideCount()==tree.selectedObjects().length,"render view highlights every selected group member");
+        check(view.selectionOverrideCount()==1,"render view highlights only the selected part");
         check(ui.focus.focusedId!=null,"click leaves the viewport focused for Space");
       }
-      ui.pointerDown(x,y,0);ui.pointerUp(x,y,0);
-      check(tree.selectionKey()=="project:tool","clicking a leaf stays at that leaf");
-      check(scene.document.history.undoCount==history,"drilling never adds undo entries");
+      check(scene.document.history.undoCount==history,"selection never adds undo entries");
       ui.key(UiEventKind.KeyDown,UiKey.Space);
       check(!scene.isVisible("project:tool"),"Space hides viewport selection");
       check(tree.selectionKey()=="project:tool","hidden part stays selected in tree");
@@ -64,23 +67,28 @@ class ViewportSelectionTests {
       check(scene.isVisible("project:tool"),"document edit guard blocks Space");tree.canChangeVisibility=()->true;
       ui.key(UiEventKind.KeyDown,UiKey.Space,UiModifier.Shift);ui.key(UiEventKind.KeyUp,UiKey.Space,UiModifier.Shift);
       check(scene.isVisible("project:tool"),"modified Space does not toggle visibility");
-      // A new camera position, or another tree selection, starts from the outer group.
+      // Camera changes and previous group selections never change the viewport selection scope.
       viewport.camera.orbit(1,0);point=viewport.camera.project(0,0,0,800,600);if(point==null)throw "Missing reprojection";x=point.x;y=point.y;
-      ui.pointerDown(x,y,0);ui.pointerUp(x,y,0);check(tree.selectionKey()==path[1],"camera movement resets drilling");
+      ui.pointerDown(x,y,0);ui.pointerUp(x,y,0);check(tree.selectionKey()=="project:tool","camera movement preserves direct part picking");
+      tree.selectKey(path[1]);
       ui.pointerDown(2,2,0);ui.pointerUp(2,2,0);
       check(tree.selectionKey()=="scene" && tree.selectedObjects().length==0,"empty-space click clears a tree-only group selection and highlight");
       ui.pointerDown(x,y,0);ui.pointerUp(x,y,0);
-      check(tree.selectionKey()==path[1],"click after empty space restarts at outer group");
+      check(tree.selectionKey()=="project:tool","click after empty space selects the hit part");
+      tree.selectKey(path[1]);
       ui.key(UiEventKind.KeyDown,UiKey.Space);ui.key(UiEventKind.KeyUp,UiKey.Space);
       check(!scene.isVisible("project:tool") && !scene.isVisible("project:base"),"group Space hides the whole subtree");
       check(tree.selectionKey()==path[1],"hidden group remains selected");
       scene.document.undo();tree.selectKey("project:cover");
-      ui.pointerDown(x,y,0);ui.pointerUp(x,y,0);check(tree.selectionKey()==path[1],"external selection resets drilling");
+      ui.pointerDown(x,y,0);ui.pointerUp(x,y,0);check(tree.selectionKey()=="project:tool","viewport click replaces external selection with the hit part");
+      tree.selectKey(path[1]);
+      ui.pointerDown(x,y,0);ui.pointerUp(x,y,0);
+      check(tree.selectionKey()=="project:tool","viewport click replaces an assembly selection with the hit part");
       tree.selectKey("project:cover");
       ui.pointerDown(x,y,0);ui.pointerMove(x+20,y+10);ui.pointerUp(x+20,y+10,0);
-      check(tree.selectionKey()=="project:tool","drag selects the physical part without drilling");
+      check(tree.selectionKey()=="project:tool","drag selects the physical part directly");
       check(viewport.navigationPointer==null,"drag releases pointer capture");
-      // Revealing all ancestors also works for the groups introduced by viewport drilling.
+      // Direct viewport selection reveals every authored ancestor in the tree.
       var treeUi=new UiContext(null,fonts),treeStyle=new LayoutStyle();treeStyle.width=LayoutAxis.fixed(300);treeStyle.height=LayoutAxis.fixed(160);
       var widget=new TreeView("selection-reveal",tree,treeStyle,tree.scrollController,160,tree.selectionKey(),["scene"]);
       widget.onStateReady=tree.synchronizeSelection;

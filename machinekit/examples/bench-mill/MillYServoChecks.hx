@@ -9,29 +9,7 @@ import materia.project.SceneArtifact;
 
 /** Selected Y drive in the real mill frame and XY stage, including the existing X return drive. */
 class MillYServoChecks {
- public static function preview():haxe.io.Bytes {
-  var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=new HiwinHgh15ca(),z=MillFramePreview.zLayout(reference,f,guide);
-  var l=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,true),frame=new MillFrame(f,z,l),stage=new MillXYStage(l);
-  var assembly=new MachineAssembly();assembly.include("frame",frame);assembly.include("xyStage",stage);
-  var poses:Map<String,AssemblyFrame> = frame.solvedPoses();
-  assembly.addMemberConnector("frame/base/driveYFixed","stageSeat",F.compose(F.inverse(poses.get("base/driveYFixed")),stage.zeroPose("fixedPedestalY")));
-  assembly.addMemberConnector("xyStage/fixedPedestalY","frameSeat",F.identity());
-  assembly.addMate("y-drive-on-frame","fixed","frame/base/driveYFixed","stageSeat","xyStage/fixedPedestalY","frameSeat");
-  var model=new AssemblyModel("mm");assembly.addTo(model,"");
-  var parts:Array<materia.project.SceneArtifact.SceneArtifactPart> = [];
-  for(m in assembly.components()){
-   var geometry=m.component.geometry(),mass:MassProperties;
-   if((Std.isOfType(m.component,HzMotionComponent)&&m.id=="xyStage/floatingBearingY")||Std.isOfType(m.component,HiwinHgh15ca)){
-    var physical=geometry.massProperties();
-    mass=new MassProperties(physical.volume*1e-9*7850,physical.centerOfMass,machinekit.component.MassProperties.MassSource.Computed(Preview));
-   }else mass=m.component.massProperties();
-   parts.push(AssemblyPreview.part(m.id,m.component.description,geometry,m.component.materialId,null,mass));
-  }
-  return SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:parts,assemblyDefinition:model.definition("mill-selected-y-drive"),
-   recipeDiagnostics:["Selected Leadshine/HZMotion Y drive in the mechanical mill frame. BF12 installed ring is a nominal DIN471 envelope.",
-   "BF12 and detailed HGH15CA masses: preview uses steel-volume estimates only; excluded from sizing. Y drive stiffness is unspecified; lead is kinematic only.",
-   "Coupling remains a dimensional reference, with no selected supplier SKU. This is not a manufacturing release."]});
- }
+ public static function preview():haxe.io.Bytes return MillProject.small();
 
  static function check(ok:Bool,message:String):Void {if(!ok)throw message;}
  static function checkDetailedBlockSection():Void {
@@ -107,13 +85,13 @@ class MillYServoChecks {
   }
   Sys.println("Thirty mm fastener key approaches passed");
   var model=new AssemblyModel("mm");stage.addTo(model,"");var state=new AssemblyState(model.definition("mill-y-servo"));
-  for(travel in [-80.0,0,80]){
+  for(travel in [-l.yHalfTravel,0,l.yHalfTravel]){
    state.setJoint("y",travel);state.forwardKinematics();
    for(m in stage.components())if(!MillXYStageIntegrity.yFixed(m.id))for(id in drive)
     if(id!="screwY"||m.id!="nutY")overlap(m.component,state.worldPose(m.id),stage.component(id),state.worldPose(id),'Y=$travel ${m.id}/$id');
    check(Math.abs(state.joint("screwY-turn")+travel*2*Math.PI/5)<1e-6,"Signed 5 mm lead preserved");
    check(Math.abs(state.worldPose("motorY").y-l.yMotorFace)<1e-6,"Motor remains fixed");
-   check(Math.abs(state.worldPose("saddle").y-(l.centreY-travel))<1e-6,"160 mm Y travel preserved");
+   check(Math.abs(state.worldPose("saddle").y-(l.centreY-travel))<1e-6,"Configured Y travel preserved");
   }
   cache.close();
   Sys.println("Sampled drive motion passed; running full-stroke audit");
@@ -123,7 +101,7 @@ class MillYServoChecks {
   check(restored.components().filter(m->m.id=="motorY")[0].component.designation==l.yMotor.designation,"Selected motor survives save");
   var root=Sys.getEnv("MATERIA_ROOT"),dir=root+"/machinekit/examples/bench-mill/build/y-servo";
   sys.FileSystem.createDirectory(dir);
-  sys.io.File.saveContent(dir+"/checks.json",haxe.Json.stringify({status:"nominal CAD integration; not strength or preload qualification",clearances:rows,motor:l.yMotor.designation,travelMm:160,
+  sys.io.File.saveContent(dir+"/checks.json",haxe.Json.stringify({status:"nominal CAD integration; not strength or preload qualification",clearances:rows,motor:l.yMotor.designation,travelMm:2*l.yHalfTravel,railLengthMm:f.yRailLength,baseDepthMm:f.baseDepth,frontY:f.front,
    fullStrokeAudit:"passed conservative XY/XYZ sweep and motor extraction",toolApproachMm:30,yOvertravelMm:l.yOvertravel,bayRoofZ:l.yBayTop,shaftPassageMm:[22,22],yCompliance:"unspecified; kinematic lead only",motorFaceY:l.yMotorFace,screwLengthMm:l.yDriveScrew.totalLength,clipState:"nominal DIN471 installed envelope; raw supplier clip retained separately",pending:["supplier coupling SKU","effective motor thread engagement","joint loads and preload","retaining ring elasticity and exact installed form"]},null,"  "));
   sys.io.File.saveContent(dir+"/xy-stage.assembly.json",stage.encode());
   sys.io.File.saveBytes(dir+"/mill-y-servo.mtrg",preview());

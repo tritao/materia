@@ -21,6 +21,25 @@ class EnclosureRuntimeTests {
     var fitted=HobberEnclosurePreview.assembled(machine);
     var data=HobberEnclosurePreview.runtimeScene(fitted.assembly,machine,fitted.shell.layout.stroke);
     var artifact=SceneArtifact.decode(SceneArtifact.encode(data));
+    var loaded=new ProjectArtifactLoader().load(SceneArtifact.encode(artifact));
+    var physical=loaded.physical;
+    if(physical==null)throw "Missing fitted physical data";
+    var assemblyDefinition=artifact.assemblyDefinition;
+    if(assemblyDefinition==null)throw "Missing fitted assembly";
+    check(assemblyDefinition.joints.filter(j->j.role==materia.assembly.AssemblyDefinition.AssemblyJointRole.Closure).length>0,
+      "Enclosure mounting constraints remain authored");
+    var bridge=cadbridge.AssemblySimulationBridge.toRobotModel(assemblyDefinition,physical);
+    check(bridge.closures.filter(c->c.parent==c.child).length==0,
+      "Rigid mounting closures do not create physics constraints from a body to itself");
+    var badMountArtifact=SceneArtifact.decode(SceneArtifact.encode(data));
+    var badMountDefinition=badMountArtifact.assemblyDefinition;
+    if(badMountDefinition==null)throw "Missing mounting test assembly";
+    var badMount=badMountDefinition.joints.filter(j->j.role==materia.assembly.AssemblyDefinition.AssemblyJointRole.Closure)[0];
+    badMount.childConnector="baseMount0";
+    var badMountRejected=false;
+    try {cadbridge.AssemblySimulationBridge.toRobotModel(badMountDefinition,physical);}
+    catch(e:Dynamic){badMountRejected=Std.string(e).indexOf("Inconsistent rigid assembly closure")>=0;}
+    check(badMountRejected,"Inconsistent mounts inside one rigid body are rejected before physics");
     var cameraProject=artifact.project;
     check(cameraProject!=null&&cameraProject.inspectionCameras!=null&&cameraProject.inspectionCameras.length==3,"Inspection presets survive artifact roundtrip");
     var badCamera=SceneArtifact.decode(SceneArtifact.encode(data));
@@ -39,7 +58,6 @@ class EnclosureRuntimeTests {
     invalidGuard.spindleJoints.push(invalidGuard.doorJoint);
     var rejected=false;try {SceneArtifact.encode(invalid);}catch(_ : Dynamic){rejected=true;}
     check(rejected,"Artifact rejects hazardous-motion feedback bound to the door itself");
-    var loaded=new ProjectArtifactLoader().load(SceneArtifact.encode(artifact));
     var project=new ProjectDocumentSession(null,false),simulation=new ApplicationSimulation(new RobotWorld(),ApplicationSimulation.MUJOCO);
     project.openGeneratedProject(loaded,"guard-runtime-test");
     try {

@@ -4462,8 +4462,9 @@ class ProjectSourceTests {
 
   /** The enclosure's pressure-clamped vise holds the bearing-block job. */
   static function checkEnclosedMillProject(root:String):Void {
-    var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.enclosed.project.json");
-    var generated = MateriaProjectRunner.loadProject(manifest);
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.bench.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest,null,null,"enclosed");
+    check(generated.projectVariant == "enclosed", "enclosed bench mill loads from its own project");
     check(generated.controllers != null && generated.controllers.length == 1 &&
       generated.controllers[0].id == "cncController", "enclosed mill exports its wired CNC controller");
     var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
@@ -4480,7 +4481,9 @@ class ProjectSourceTests {
       'assembly bridge keeps the 32 mm vise cylinder force in newtons, got $viseEffort');
     check([for (joint in model.joints) if (joint.type == JointType.Prismatic) joint].length == 5,
       "enclosed project retains three mill axes, door and jaw");
-    check(generated.cncJob != null, "enclosed mill exports its clamped bearing-block job");
+    check(generated.cncJob != null && generated.cncJob.mission != null &&
+      generated.cncJob.mission.id == "bearing-block" && !generated.cncJob.loop,
+      "enclosed mill exports a named, finite bearing-block mission");
     var state = new AssemblyState(definition);
     var opening = state.worldConnector("chipTray", "doorOpening");
     var datum = state.worldConnector("mill/vise/body", "datum");
@@ -6556,6 +6559,67 @@ class ProjectSourceTests {
     } catch (error:Dynamic) { harness.dispose(); throw error; }
   }
 
+  /** Full-sheet source project loads, holds on MuJoCo and homes XYZ in Z/X/Y order. */
+  static function checkSheetRouter(root:String):Void {
+    var manifest=FileSystem.fullPath(root+"/machinekit/examples/sheet-router/materia.project.json");
+    var generated=MateriaProjectRunner.loadProject(manifest);
+    var definition=requiredAssemblyDefinition(generated.assemblyDefinition);
+    var model=AssemblySimulationBridge.toRobotModel(definition,generated.physical,generated.assemblyState).model;
+    check(model.validate().length==0,"Sheet router source produces a valid physical model");
+    var axes:Array<motionkit.axis.MotionAxisBlueprint> =[];
+    for(id in ["z","x","y"])for(joint in model.joints)if(joint.id==id) {
+      var limits=model.coupledLimits(id,new SteadyLoads());
+      axes.push(new motionkit.axis.MotionAxisBlueprint(id,[id],joint.limits.lower,joint.limits.upper,
+        Math.min(0.1,limits.requireVelocity()),Math.min(0.5,limits.requireAcceleration()),joint.limits.lower));
+    }
+    check(axes.length==3,"Sheet router selects three machining leaders");
+    var blueprint=motionkit.robot.MotionSystemBlueprint.fromRobotModel(model,axes);
+    // Assumed commissioning policy: square the loaded Y at 0.05 mm/s on its final pass.
+    blueprint.homingCaptureSpeedLimits.set("y",0.00005);
+    var harness=new SimulationHarness(0.01,1,robotkit.runtime.SimulationSpace.MUJOCO);
+    try {
+      var runtime=harness.simulation.addRobot(blueprint.runtime);
+      var robot=new robotkit.simulation.SimulatedRobot("sheet-router",runtime,model.name,
+        [for(link in model.links)link.name],[for(joint in model.joints)joint.name]);
+      var motion=new motionkit.robot.MotionSystem(robot,blueprint);
+      motion.configureRuntimeHoming(runtime,()->{},harness.simulation.homingSides(0));
+      var before=runtime.snapshot();
+      for(tick in 0...100) {
+        harness.step();
+        var sample=runtime.snapshot();
+        check(sample.faultCode==0,"Sheet router hold fault "+sample.faultCode+" at tick "+tick+", joints "+
+          [for(index in 0...model.joints.length)model.joints[index].id+":"+sample.q.get(index)].join(","));
+        motion.update(0.01);
+      }
+      var held=runtime.snapshot();
+      for(index in 0...model.joints.length) {
+        var terms=[for(term in model.couplings)if(term.follower==model.joints[index].id)term];
+        if(terms.length==0)continue;
+        var expected=0.0;
+        for(term in terms)for(leader in 0...model.joints.length)if(model.joints[leader].id==term.leader)
+          expected+=term.ratio*held.setpoint.get(leader)+term.offset;
+        check(Math.abs(held.setpoint.get(index)-expected)<1e-6,"Brake startup retains coupled command anchors");
+      }
+      for(index in 0...model.joints.length)if(["x","y","z"].indexOf(model.joints[index].id)>=0)
+        check(Math.abs(held.q.get(index)-before.q.get(index))<0.0002,"Sheet router MuJoCo holds "+model.joints[index].id);
+      motion.home();
+      var ticks=0;
+      while(motion.homingStatus()!="Complete"&&ticks++<60000) {
+        harness.step();motion.update(0.01);
+        if(ticks%10000==0) {
+          var sample=runtime.snapshot();
+          Sys.println("Sheet router homing "+ticks+" "+motion.homingStatus()+" "+
+            [for(index in 0...model.joints.length)model.joints[index].id+":q="+sample.q.get(index)+",v="+sample.dq.get(index)+",held="+sample.setpoint.get(index)].join("; "));
+        }
+      }
+      check(motion.homingStatus()=="Complete","Sheet router homes: "+motion.homingStatus());
+      for(index in 0...model.joints.length)if(["x","y","z"].indexOf(model.joints[index].id)>=0)
+        check(runtime.isReferenced(index),"Sheet router homes "+model.joints[index].id);
+      harness.dispose();
+    } catch(error:Dynamic) {harness.dispose();throw error;}
+    Sys.println("Sheet router source load, MuJoCo hold and homing passed");
+  }
+
   static function checkCncRouter(root:String, belts:Bool = false):Void {
     var kind = belts ? "belt router" : "screw router";
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/" + (belts ? "belts/" : "") + "materia.project.json");
@@ -7400,6 +7464,7 @@ class ProjectSourceTests {
       suite("cell", checkTendingControllers),
       suite("interface", checkTendingRobotInterface),
       suite("tending", root -> checkMachineTending(root, TendingCheck.Production)),
+      suite("sheet-router", checkSheetRouter),
       suite("cnc-router", root -> checkCncRouter(root)),
       suite("belts", checkBeltRouter),
       suite("corexy", checkCoreXyPlotter),

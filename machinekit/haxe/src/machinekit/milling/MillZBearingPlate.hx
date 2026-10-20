@@ -10,7 +10,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 class MillZBearingPlate extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 	public static function parameters():Array<ComponentParameter> return [
-			P.flag("guideRelief",false),P.length("guideSpacing",220),P.length("guideWidth",15),
+			P.length("bearingTapDepth",0),P.length("bearingPitch",46),P.length("bearingHole",5.5),P.flag("guideRelief",false),P.length("guideSpacing",220),P.length("guideWidth",15),
 			P.flag("topAnchors",false), P.length("width", 220), P.length("height", 80), P.length("thickness", 20),
 			P.length("crossShaftZ", 0), P.length("bearingZ", 40), P.length("anchorZ", 10), P.length("anchorSpacing", 180)];
 	public static function recipeType():ComponentType {
@@ -33,7 +33,7 @@ class MillZBearingPlate extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var t = parameterNumber("thickness"), tools:Array<Part> = [];
-		for (x in [-23.0, 23.0]) tools.push(Part.cylinderAlongY(2.75, -t / 2 - 1, t / 2 + 1, x, parameterNumber("bearingZ")));
+		for (x in [-parameterNumber("bearingPitch")/2, parameterNumber("bearingPitch")/2]) tools.push(Part.cylinderAlongY(parameterNumber("bearingHole")/2, parameterNumber("bearingTapDepth")>0?t/2-parameterNumber("bearingTapDepth"):-t/2-1, t / 2 + 1, x, parameterNumber("bearingZ")));
 		for (side in [-1, 1]) tools.push(Part.cylinderAlongY(3.3, -t / 2 - 1, t / 2 + 1,
 			side * parameterNumber("anchorSpacing") / 2, parameterNumber("anchorZ")));
 		if (parameterNumber("crossShaftZ") > 0) tools.push(Part.cylinderAlongY(12, -t/2-1, t/2+1, 0, parameterNumber("crossShaftZ")));

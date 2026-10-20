@@ -125,7 +125,34 @@ static void terminal_intervals() {
     equivalent(stopped, fresh, 0.1);
 }
 
+// Near the ramp/cruise transition, two distinct normalized nodes may round
+// to the same absolute path coordinate. Every nearby valid path must prepare.
+static void rounded_ramp_grid() {
+    const double velocity=0.02, acceleration=0.1;
+    const double begin=0.017500000000000016;
+    double length=velocity*velocity/acceleration;
+    for(int variant=0;variant<32;++variant) {
+        length=std::nextafter(length,std::numeric_limits<double>::infinity());
+        mk_path_sample samples[3]{};
+        const double distances[]={0,begin,begin+length};
+        for(int i=0;i<3;++i) {
+            samples[i].struct_size=sizeof(mk_path_sample); samples[i].joint_count=1;
+            samples[i].s=samples[i].position[0]=distances[i];samples[i].first[0]=1;
+        }
+        mk_path_handle path{};
+        assert(mk_path_create(samples,3,&path)==MK_OK);
+        mk_path_timing_session_handle session{};
+        assert(mk_path_timing_session_create(path,&velocity,&acceleration,1,nullptr,0,
+            1e-7,0,&session)==MK_OK);
+        double lower=0,upper=0;
+        assert(mk_path_timing_session_entry_interval(session,0,0,1,&lower,&upper)==MK_OK);
+        assert(upper>0);
+        mk_path_timing_session_destroy(session);mk_path_destroy(path);
+    }
+}
+
 int main() {
+    rounded_ramp_grid();
     terminal_intervals();
     entry_intervals();
     for (int spans : {2, 9000}) {

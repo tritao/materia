@@ -206,10 +206,8 @@ class StartPanel {
   /** Spinner, current phase and elapsed time for a running build, with a Cancel button. */
   static function loadingRow(app:ReferenceEditorApp, entry:ExampleEntry):View {
     var tokens = app.appearance.theme.tokens;
-    var job = app.startJob;
-    var text = "Opening " + entry.title + "...";
-    if (job != null)
-      text += " " + job.control.currentPhase() + " · " + Std.int(job.elapsedSeconds()) + " s";
+    var status=app.projectLoadingStatus();
+    var text=status==null?"Opening "+entry.title:status.title+" · "+status.phase+" · "+status.elapsedSeconds+" s";
     var rowStyle = new LayoutStyle();
     rowStyle.width = LayoutAxis.grow();
     rowStyle.direction = LayoutDirection.LeftToRight;
@@ -219,8 +217,9 @@ class StartPanel {
       new KeyedView("spinner", new Spinner("start-loading-spinner", "Opening " + entry.title)),
       new KeyedView("text", new Text(text, null, tokens.accent, TextStyleOverride.text(13.0)))
     ];
-    if (job != null) {
+    if (status != null) {
       var cancel = new Button("Cancel", null, function() app.cancelExampleLoad(), "start-cancel-load");
+      cancel.enabled=!status.cancelling;
       cancel.variant = ButtonVariant.Secondary;
       items.push(new KeyedView("cancel", cancel));
     }

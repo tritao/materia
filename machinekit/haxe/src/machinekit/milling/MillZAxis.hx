@@ -1,7 +1,6 @@
 package machinekit.milling;
 
 import machinekit.assembly.AxisBuilder;
-import machinekit.assembly.Transmission;
 import machinekit.component.ComponentValues;
 import machinekit.motion.*;
 import machinekit.standard.SocketHeadCapScrew;
@@ -9,7 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Mechanical Z assembly with one real prismatic joint and a coupled screw.
- * Includes the stationary motor, brake, coupling, two supported bearings and
+ * Includes the stationary braked motor, integrated fixed housing, coupling and
  * moving carriage/head. Electrical control and spindle payload attach outside.
  */
 class MillZAxis extends AxisBuilder {
@@ -22,77 +21,62 @@ class MillZAxis extends AxisBuilder {
 		if (layout == null) throw "Z assembly needs a layout";
 		this.layout = layout;
 		var l = layout, f = l.frame, width = f.zRailSpacing + f.seatWidth;
-		var upper = new MillZBearingPlate(new ComponentValues().setBoolean("topAnchors",true).setNumber("width", width)
-			.setNumber("height", l.upperHeight).setNumber("thickness", l.mountThickness)
-			.setNumber("bearingZ", l.fixedZ - l.upperBottom).setNumber("anchorZ", 10).setNumber("anchorSpacing", f.zRailSpacing));
+		var upper = new MillZDriveAdapter(new ComponentValues().setNumber("motorOffset",l.motorFace-l.upperBottom).setNumber("stemHeight",Math.max(60,114-(l.motorFace-l.upperBottom))).setNumber("width",width).setNumber("spacing",f.zRailSpacing).setNumber("thickness",l.mountThickness));
 		place("fixedMount", upper, F.translation(0, f.columnFront - l.mountThickness / 2, l.upperBottom));
-		var lower = new MillZBearingPlate(new ComponentValues().setNumber("width", width)
+		var lower = new MillZBearingPlate(new ComponentValues().setNumber("bearingPitch",54).setNumber("bearingHole",5).setNumber("bearingTapDepth",15).setNumber("width", width)
 			.setNumber("height", l.lowerHeight).setNumber("thickness", l.mountThickness)
 			.setBoolean("guideRelief",l.crossDriveZ!=null).setNumber("guideSpacing",f.yRailSpacing).setNumber("guideWidth",l.block.spec.railWidth)
 			.setNumber("crossShaftZ", l.crossDriveZ == null ? 0 : l.crossDriveZ - f.railPlane)
 			.setNumber("bearingZ", l.lowerHeight / 2).setNumber("anchorZ", 10).setNumber("anchorSpacing", f.zRailSpacing));
 		attach("floatingMount", lower, F.translation(0, f.columnFront - l.mountThickness / 2, f.railPlane), "fixedMount");
-		attach("fixedBearing", l.fixed, down(0, l.screwY, l.fixedZ), "fixedMount");
-		attach("floatingBearing", l.floating, down(0, l.screwY, l.floatingZ), "floatingMount");
-		var stand = new MillZMotorStand(new ComponentValues().setNumber("width", l.motor.rating.bodyDiameter + 20)
-			.setNumber("depth", l.motor.rating.bodyDiameter + 20).setNumber("height", l.motorStandHeight)
-			.setNumber("plate", l.motorPlateThickness).setNumber("shaftBore", l.motor.rating.shaftDiameter + 3)
-			.setNumber("boltPitch", l.motor.rating.bodyDiameter / 2+10).setBoolean("anchored",true).setNumber("registerDiameter",30));
-		attach("motorStand", stand, F.translation(0, l.screwY, l.motorStandBottom), "fixedMount");
-		for (x in [-70.0,70.0]) attach('standBolt$x',SocketHeadCapScrew.metric("M6",20),F.translation(x,l.screwY-35,l.motorStandBottom+8),"motorStand");
-		var standWidth=l.motor.rating.bodyDiameter+20;
-		attach("couplingGuard",new MillZCouplingGuard(new ComponentValues().setNumber("width",standWidth).setNumber("height",l.motorStandHeight-l.motorPlateThickness-8)),
-			F.translation(0,l.screwY-standWidth/2-1,l.motorStandBottom+8),"motorStand");
-		for (side in [-1,1]) attach('guardBolt$side',SocketHeadCapScrew.metric("M4",10),
-			F.fromRotationMatrix(side*(standWidth-12)/2,l.screwY-standWidth/2-2,l.motorStandBottom+16,[1,0,0, 0,0,-1, 0,1,0]),"couplingGuard");
-		var motorPitch=l.motor.rating.bodyDiameter/2+10;
-		for (x in [-motorPitch/2,motorPitch/2]) for (y in [-motorPitch/2,motorPitch/2]) attach('motorBolt$x-$y',SocketHeadCapScrew.metric("M6",20),
-			F.fromRotationMatrix(x,l.screwY+y,l.motorFace-l.motorPlateThickness,[1,0,0, 0,-1,0, 0,0,-1]),"motorStand");
-		attach("motor", l.motor, down(0, l.screwY, l.motorFace), "motorStand");
+		attach("motorMount", l.fixed, down(0,f.columnFront,l.motorFace),"fixedMount");
+		attach("floatingBearing", l.floating, down(0,f.columnFront,l.floatingZ+10),"floatingMount");
+		for(side in [-1,1]) {
+			attach('floatingBolt$side',SocketHeadCapScrew.metric("M6",45),F.fromRotationMatrix(side*27,f.columnFront+32,l.floatingZ,[1,0,0,0,0,1,0,-1,0]),"floatingMount");
+		}
+		var mounting=l.motor.mounting();if(mounting==null)throw "Z motor needs catalog mounting data";
+		attach("motor",l.motor,down(0,l.screwY,l.motorFace),"motorMount");
+		for(p in mounting.holes)attach('motorBolt${p.x}-${p.y}',SocketHeadCapScrew.metric("M6",16),
+			F.translation(-p.x,l.screwY+p.y,l.motorFace+mounting.flangeThickness),"motorMount");
+		for(i in 0...l.fixed.spec.baseHoles.length){var h=l.fixed.spec.baseHoles[i];
+			attach('mountBolt$i',SocketHeadCapScrew.metric("M6",45),
+			F.fromRotationMatrix(-h.x,f.columnFront+32,l.motorFace-h.z,[1,0,0, 0,0,1, 0,-1,0]),"motorMount");}
 		place("screw", l.screw, down(0, l.screwY, l.screwTop));
-		connect("fixedBearing", "screw");
-		addMateOnAxis("screw-turn", "continuous", "fixedBearing", "to-screw", "screw", "attach-screw",
+		connect("motorMount", "screw");
+		addMateOnAxis("screw-turn", "continuous", "motorMount", "to-screw", "screw", "attach-screw",
 			{x: 0, y: 0, z: -1});
 		attach("motorShaft", l.motor.shaft(), down(0, l.screwY, l.motorFace), "screw");
-		attach("screwRetainer", l.screw.retainer(), F.compose(zeroPose("screw"), F.translation(0, 0, machinekit.motion.BallScrewRetainer.STATION)), "screw");
-		attach("coupling", l.coupling, down(0, l.screwY, l.screwTop + l.coupling.length / 2), "screw");
-		var brakePose = down(0, l.screwY, l.motorFace - l.motorPlateThickness);
-		for (role in ["front", "shell", "back"]) for (sector in 0...ShaftBrakePart.sectorCount(l.brake.bore, role))
-			attach('brake-$role-$sector', new ShaftBrakePart(l.brake.bore, role, sector), brakePose, "motorStand");
-		for (role in ["hub", "disc"]) attach('brake-$role', new ShaftBrakePart(l.brake.bore, role), brakePose, "screw");
+		attach("coupling", l.coupling, down(0, l.screwY, l.motorFace-17), "screw");
 
 		var railPose = F.fromRotationMatrix(0, 0, 0, [-1,0,0, 0,-1,0, 0,0,1]);
 		for (side in [-1, 1]) {
 			var name = side < 0 ? "Left" : "Right";
 			var pose = F.compose(F.translation(side * f.zRailSpacing / 2, f.columnFront - l.block.spec.railHeight,
 				f.railPlane + f.zRailStart), railPose);
-			attach('rail$name', LinearRail.metric(l.profile, f.zRailLength), pose, "fixedMount");
+			attach('rail$name', l.rail, pose, "fixedMount");
 		}
 		carriage = new MillZCarriage(new ComponentValues().setNumber("width", l.carriageWidth).setNumber("height", l.carriageHeight)
-			.setNumber("thickness", l.carriageThickness).setNumber("nutReach", l.screwY - l.carriageBack)
+			.setToken("nutModel","SFU2005").setNumber("thickness", l.carriageThickness).setNumber("nutReach", l.screwY - l.carriageBack)
 			.setNumber("nutCentreZ", l.carriageHeight / 2).setNumber("nutPlate", l.nutPlateThickness)
-			.setNumber("headBoltX", l.carriageWidth / 2 - 12)
+			.setNumber("headBoltX", l.headValues.number("boltX")).setNumber("headBoltZ", l.headValues.get("boltZ") == null ? 42 : l.headValues.number("boltZ"))
 			.setNumber("railSpacing", f.zRailSpacing).setNumber("blockSpan", l.blockSpan).setToken("profile", l.profile));
 		var blockPoses:Array<AssemblyFrame> = [];
 		for (side in [-1, 1]) for (span in [-l.blockSpan, l.blockSpan]) blockPoses.push(
 			F.compose(F.translation(side * f.zRailSpacing / 2, f.columnFront - l.block.spec.railHeight, l.headCentre + span), railPose));
 		slide({id: "z", lower: l.lower, upper: 0, initial: 0}, "railLeft", "blockLeftLower", l.block, blockPoses[0],
-			{x: 0, y: 0, z: 1}, blockPoses.slice(1));
+			{x: 0, y: 0, z: 1}, blockPoses.slice(1), l.overtravel);
 		attach("carriage", carriage, F.translation(0, l.carriageBack, l.headCentre - l.carriageHeight / 2), "blockLeftLower");
 		var names = ["blockLeftLower", "blockLeftUpper", "blockRightLower", "blockRightUpper"];
 		for (i in 1...names.length) attach(names[i], l.block, blockPoses[i], "carriage");
 		attach("nut", l.nut, down(0, l.screwY, l.headCentre + l.nut.bodyLength / 2), "carriage");
-		head = new MillZHead(new ComponentValues().setNumber("width", 180).setNumber("spindleDiameter",90).setBoolean("bt30Mounts",true).setBoolean("centeredMotor",true).setNumber("height", l.headHeight)
-			.setNumber("rootExtension", l.headRootExtension).setNumber("rearWidth", l.carriageWidth).setNumber("boltX", l.carriageWidth / 2 - 12)
-			.setNumber("reach", l.headBack - l.spindleY + Bt30Cartridge.DIAMETER / 2 + 10)
-			.setNumber("spindleReach", l.headBack - l.spindleY));
+		head = new MillZHead(l.headValues);
 		attach("head", head, F.translation(0, l.headBack, l.headBottom), "carriage");
-		for (side in [-1, 1]) for (row in [-1, 1]) attach('headBolt$side$row', SocketHeadCapScrew.metric("M6", 16),
+		for (side in [-1, 1]) for (row in [-1, 1]) attach('headBolt$side$row', SocketHeadCapScrew.metric("M6", l.headBoltLength),
 			F.fromRotationMatrix(side * head.parameterNumber("boltX"), l.headBack - head.parameterNumber("rearPlate") + MillZHead.COUNTERBORE_DEPTH,
 				l.headCentre + row * head.parameterNumber("boltZ"),
 				[1,0,0, 0,0,-1, 0,1,0]), "head");
-		addTransmission("z-lead", "z", "screw-turn", Transmission.LeadScrew("screw", "nut"), screwSense("z", [0.0, 0.0, -1.0]));
-		supportScrew("z-lead", l.fixed.support, l.floating.support);
+		addCoupling("z-lead","z","screw-turn",-2*Math.PI/l.screw.thread.signedLead());
+		// Supplier bearing stiffness/preload is not published: kinematic coupling only.
 		exposeConnector("mount", "fixedMount", "mount");
 		exposeConnector("head", "head", "mount");
 		exposeConnector("spindle", "head", "spindle");

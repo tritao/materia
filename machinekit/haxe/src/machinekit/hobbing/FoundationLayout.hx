@@ -117,7 +117,7 @@ class FoundationLayout {
       }
     }
     return new ComponentValues().setNumber("width",d[0]).setNumber("depth",d[1]).setNumber("height",d[2])
-      .setToken("voids",CastingFeatures.encode(cores));
+      .setToken("features",CastingFeatures.encodeForBody(cores,d[0],d[1],d[2]));
   }
   public static function placements(kind:String):Array<CastInsertPlacement> return
     [for(row in inserts(kind)) {id:row.id,part:insert(row),pose:row.pose}];
@@ -163,6 +163,14 @@ class FoundationLayout {
     }
     return out;
   }
+  public static function insertRole(label:String):materia.casting.InsertSpec.InsertRole return switch label {
+    case "table seat", "table plate": TableMount;
+    case "column carriage sole", "column plate": ColumnMount;
+    case "preloaded column guide seat", "Z rail seat", "rail seat": GuideSeat;
+    case "lifting point": LiftingMount;
+    case "threaded bush", "M6 tray clamp nominal threaded insert envelope": ThreadedAnchor;
+    default: GenericMount;
+  };
   public static function insert(row:InsertLocation):CastInsert return new CastInsert(new ComponentValues().setNumber("width",row.width)
-    .setNumber("depth",row.depth).setNumber("height",row.height).setNumber("boreDiameter",row.id=="tablePlate"?40:StringTools.startsWith(row.id,"trayClampSeat")?6:0).setToken("role",row.role));
+    .setNumber("depth",row.depth).setNumber("height",row.height).setToken("holes",machinekit.structural.InsertHoles.through(row.id=="tablePlate"?40:StringTools.startsWith(row.id,"trayClampSeat")?6:0)).setToken("role",insertRole(row.role)).setToken("label",row.role));
 }

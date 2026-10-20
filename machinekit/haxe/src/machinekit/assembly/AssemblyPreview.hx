@@ -20,7 +20,8 @@ import materia.units.LengthUnit;
  */
 class AssemblyPreview {
 	/** Scene of `assembly` in millimetres, with its joints and initial pose; `assemblyId` names the definition. */
-	public static function scene(assembly:MachineAssembly, assemblyId:String):SceneArtifactData {
+	public static function scene(assembly:MachineAssembly, assemblyId:String, maxGeometricFaces:Int = 0):SceneArtifactData {
+        if(maxGeometricFaces<0)throw "Preview geometric-face limit must be nonnegative";
 		assembly.validate();
 		var model = new AssemblyModel("mm");
 		assembly.addTo(model, "");
@@ -37,6 +38,7 @@ class AssemblyPreview {
 		var definitions:Map<String, AssemblyComponentDefinition> = [for (item in definition.definitions) item.id => item];
 		var definitionByDesignation = new Map<String, Array<String>>();
 		for (entry in assembly.components()) {
+            if(Sys.getEnv("MACHINEKIT_PREVIEW_TRACE")=="1") {Sys.println("Assembly preview mass: "+entry.id);Sys.stdout().flush();}
 			var collision = machinekit.component.CollisionHullFacet.of(entry.component);
 			var mass = entry.component.massProperties();
 			var inertia = mass.inertia;
@@ -64,9 +66,10 @@ class AssemblyPreview {
 				definitionId = entry.id;
 				if (candidates == null) {candidates = []; definitionByDesignation.set(designationKey, candidates);}
 				candidates.push(definitionId);
+                if(Sys.getEnv("MACHINEKIT_PREVIEW_TRACE")=="1") {Sys.println("Assembly preview mesh: "+entry.id);Sys.stdout().flush();}
 				var rendered = part(definitionId, entry.component.designation,
 					entry.component.geometry(ComponentDetail.Preview), entry.component.materialId, null,
-					mass);
+					mass,maxGeometricFaces);
         if (Std.isOfType(entry.component, machinekit.transmission.TimingBelt)) {
           var belt:machinekit.transmission.TimingBelt = cast entry.component;
           var moving = [for (value in machineMotion.belts) if (value.occurrence == entry.id) value];
@@ -181,11 +184,13 @@ class AssemblyPreview {
 
 	/**
 	 * One scene part: tessellated mesh, material colour and mass properties. Closes `part`. The mesh
+	 * `maxGeometricFaces` bounds automatic face-mate descriptors (0 keeps all); explicit
+     * assembly connectors and the complete mesh remain available. The mesh
 	 * deviates from the solid by a small fraction of its size, or by at most `deflection` (in the part's
 	 * units) when given, for a mesh that is measured against rather than only looked at.
 	 */
 	public static function part(id:String, name:String, part:Part, materialId:String,
-			?deflection:Float, ?massProperties:MassProperties):SceneArtifactPart {
+			?deflection:Float, ?massProperties:MassProperties, maxGeometricFaces:Int = 0):SceneArtifactPart {
 		var material = MaterialLibrary.require(materialId);
 		var color = material.visual.baseColor;
 		try {
@@ -216,7 +221,7 @@ class AssemblyPreview {
 					tensor.xz, tensor.yz, tensor.zz],
 				vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
 				edgeSegments: mesh.edgeSegments, edgeIds: mesh.edgeIds,
-				faceDescriptors: cadkit.parametric.GeometricConnectors.describeFaces(part.shape),
+				faceDescriptors: maxGeometricFaces>0&&part.shape.subshapeCount(CadKit.ShapeKind.Face)>maxGeometricFaces ? null : cadkit.parametric.GeometricConnectors.describeFaces(part.shape),
 				threads: Threads.renderData(part.shape),
 				faceRanges: [for (range in mesh.faceRanges) {
 					faceIndex: range.faceIndex, firstIndex: range.firstIndex, indexCount: range.indexCount

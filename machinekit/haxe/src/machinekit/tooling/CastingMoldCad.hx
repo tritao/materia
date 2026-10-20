@@ -29,6 +29,7 @@ typedef MoldDemoldingStep = {var id:String; var kind:DemoldingStepKind; var memb
 typedef CastingMoldAssessment = {var diagnostics:machinekit.assembly.Diagnostics; var geometry:Null<CastingMoldReview>;}
 
 typedef CastingMoldReview = {
+	var fingerprint:String;
 	var handling:HandlingPlan;
 	var demoldingSteps:Array<MoldDemoldingStep>;
 	var symmetricDifferenceMm3:Float;
@@ -93,10 +94,12 @@ class CastingMoldCad {
 
 	public static function steel(p:CastingMoldPlan, id:String):Part {
 		var i = p.document.input.inserts.filter(i -> i.id == id)[0];
-		var component = new CastInsert(new ComponentValues().setNumber("width", i.width)
+		var component = new CastInsert(new ComponentValues().setToken("role", i.role)
+			.setToken("label", i.label)
+			.setNumber("width", i.width)
 			.setNumber("depth", i.depth)
 			.setNumber("height", i.height)
-			.setNumber("boreDiameter", i.boreDiameter));
+			.setToken("holes", machinekit.structural.InsertHoles.fromNeutral(i.holes)));
 		var local = component.geometry();
 		try {
 			var out = PosedParts.moved(local, F.compose(p.document.setup.sourceToMold, i.pose));
@@ -237,9 +240,10 @@ class CastingMoldCad {
 			var part = new CastInsert(new ComponentValues().setNumber("width", i.width)
 				.setNumber("depth", i.depth)
 				.setNumber("height", i.height)
-				.setNumber("boreDiameter", i.boreDiameter)
+				.setToken("holes", machinekit.structural.InsertHoles.fromNeutral(i.holes))
 				.setNumber("positionTolerance", i.positionTolerance)
-				.setToken("role", i.sourceRole));
+				.setToken("role", i.role)
+				.setToken("label", i.label));
 			a.addComponent(materia.tooling.ToolingIds.derive("insert-", i.id), part, pose);
 		}
 		if (!exploded) {
@@ -554,6 +558,7 @@ class CastingMoldCad {
 				if (!part.shape.isClosed())
 					part.close();
 			return {
+				fingerprint: materia.tooling.casting.CastingMoldCodec.fingerprint(p),
 				handling: p.handling,
 				demoldingSteps: steps(p, demolding.removalOrder),
 				symmetricDifferenceMm3: difference,
@@ -563,7 +568,15 @@ class CastingMoldCad {
 				demolding: demolding,
 				permanentGroups: permanent,
 				assemblyGroups: groups,
-				validation: p.validation.copy(),
+				validation: p.validation.concat([
+					for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
+						materia.tooling.export.ToolingLoads.check("tooling.cad."
+							+ name, [p.document.input.id],
+							materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass, "Exact CAD "
+							+ name
+							+ " check passed.",
+							[materia.tooling.casting.CastingMoldCodec.fingerprint(p)])
+				]),
 				fabrication: p.fabrication,
 				assemblyMotions: assemblyMotions,
 				demoldingMotions: demoldingMotions

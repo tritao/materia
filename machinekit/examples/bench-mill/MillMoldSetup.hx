@@ -35,7 +35,7 @@ class MillMoldSetup {
 				fillHeightMm: height,
 				freeboardMm: 0,
 				sourceToMold: F.fromRotationMatrix(0, 0, height, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
-				features: [for (f in input.features) if (f.kind == "void") strategy(f.id)]
+				features: [for (f in input.features) if (f.kind != "insert-recess") strategy(f.id)]
 			},
 			recipe: {
 				id: "mill-base-panel-eps-review",
@@ -69,7 +69,7 @@ class MillMoldSetup {
 					plugMaterial: "steel",
 					sealMargin: 3,
 					sealMaterial: "pending compatible sealing compound",
-					minimumBridgeWidth: 80,
+					minimumBridgeWidth: 40,
 					locatingPinDiameter: 6,
 					supportScrewDiameter: 6,
 					supportClearanceDiameter: 7,
@@ -92,7 +92,15 @@ class MillMoldSetup {
 				resinSpec: "pending binder",
 				releaseSpec: "pending release and seam system",
 				adhesiveSpec: "pending EPS compatible adhesive",
-				processEvidence: []
+				processEvidence: [],
+				designReview: {
+					minimumCornerRadiusMm: null,
+					minimumInsertCoverMm: null,
+					minimumInsertEdgeMm: null,
+					minimumFixingAccessMm: null,
+					minimumLiftingPoints: null,
+					removalClearanceMm: null
+				}
 			}
 		};
 	}
@@ -100,6 +108,12 @@ class MillMoldSetup {
 	public static function strategy(id:String):materia.tooling.casting.CastingSetup.CastingFeatureStrategy {
 		var strategy:materia.tooling.casting.CastingSetup.CoreStrategy;
 		var direction:Null<{x:Float, y:Float, z:Float}>;
+		var priority = switch id {
+			case "foot-access-LeftFront", "foot-access-LeftRear", "foot-access-RightFront", "foot-access-RightRear": 30;
+			case "foot-stem-LeftFront", "foot-stem-LeftRear", "foot-stem-RightFront", "foot-stem-RightRear": 20;
+			case "front-y-bearing-seat", "rear-y-drive-seat": 10;
+			default: 0;
+		};
 		switch id {
 			case "underside-0-0", "underside-0-1", "underside-1-0", "underside-1-1", "underside-2-0", "underside-2-1":
 				strategy = SacrificialEPS;
@@ -124,7 +138,7 @@ class MillMoldSetup {
 			strategy: strategy,
 			withdrawal: direction,
 			draftDegrees: 0,
-			priority: 0
+			priority: priority
 		};
 	}
 
@@ -145,8 +159,7 @@ class MillMoldSetup {
 				for (i in input.inserts)
 					{
 						insertId: i.id,
-						route: i.role == "guide-seat"
-						|| i.role == "bearing-seat" ? Replicated : i.role == "column-mount" ? AsCast : Machined,
+						route: materia.tooling.casting.CastingMoldPlanner.sourceRoute(i.finish),
 						allowance: null,
 						masterReference: null,
 						masterFlatnessMm: null,

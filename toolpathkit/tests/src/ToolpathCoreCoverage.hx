@@ -168,6 +168,18 @@ class ToolpathCoreCoverage {
     rejects(function() occupied.validate(cut, library), "clamp");
     rejects(function() new SetupStock(-1, 1, -1, 1, 0,
       -0.2, 0.1, [clamp]), "safe Z");
+    var shaped=new ToolLibrary();
+    shaped.set(toolpathkit.tool.Tool.shaped(4,0.045,
+      toolpathkit.tool.CutterProfile.flat(0.004,0.01).withShank(0.004,0.005).withHolder(0.02,0.03)));
+    var shortCut=[ToolpathOp.ToolChange(4,span),ToolpathOp.ToolLengthOffset(4,0.045,span),ToolpathOp.Move(Cut,
+      PathGeometry.Line(new Point3(0,0,0),new Point3(0.001,0,-0.001)),0.01,0,span)];
+    var holderFixture=new Setup("1",new Point3(0,0,0),
+      new SetupStock(-1,1,-1,1,0,-0.2,0.2,[new Fixture("jaw",0.004,0.01,-0.003,0.003,0.02,0.03)]));
+    rejects(function() holderFixture.validate(shortCut,shaped),"non-cutting tool profile");
+    var aboveHolder=new Setup("1",new Point3(0,0,0),
+      new SetupStock(-1,1,-1,1,0,-0.2,0.2,[new Fixture("above",0.004,0.01,-0.003,0.003,0.06,0.07)]));
+    aboveHolder.validate(shortCut,shaped);
+    check(true,"fixture above finite holder does not collide");
     rejects(function() new Setup("1", new Point3(0, 0, 0))
       .validate(cut, library), "needs stock");
   }

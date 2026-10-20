@@ -32,7 +32,7 @@ class MateriaProjectRunner {
   static final projectToolMutex:Mutex = new Mutex();
 
   /** Inspect a project without compiling or executing its entrypoint. */
-  public static function executionRequirement(projectPath:String, ?jobId:String):ProjectExecutionRequirement {
+  public static function executionRequirement(projectPath:String, ?variantId:String):ProjectExecutionRequirement {
     var manifestPath = FileSystem.fullPath(projectPath);
     if (!FileSystem.exists(manifestPath) || FileSystem.isDirectory(manifestPath))
       throw 'Materia project file not found: $manifestPath';
@@ -42,7 +42,7 @@ class MateriaProjectRunner {
     var build = field(root, "build");
     if (fieldText(build, "system") != "haxeon") throw "Materia project requires the Haxeon build system";
     var entries = field(root, "entrypoints");
-    var entryId = ProjectJobs.entrypoint(root, jobId);
+    var entryId = ProjectVariants.entrypoint(root, variantId);
     var entry = Reflect.field(entries, entryId);
     if (entry == null) throw 'Materia project has no default entrypoint "$entryId"';
     if (fieldText(entry, "kind") != "cad-preview")
@@ -58,11 +58,12 @@ class MateriaProjectRunner {
   public static function load(projectPath:String):Array<SceneObjectData> return loadProject(projectPath).objects;
 
   public static function loadProject(projectPath:String, ?recipeDocument:String,
-      ?control:ProjectLoadControl, ?jobId:String):GeneratedAssemblyScene {
-    var scene = loadGeneratedProject(projectPath, recipeDocument, control, jobId);
+      ?control:ProjectLoadControl, ?variantId:String):GeneratedAssemblyScene {
+    var scene = loadGeneratedProject(projectPath, recipeDocument, control, variantId);
     var manifestPath = FileSystem.fullPath(projectPath);
-    var selected = ProjectJobs.selected(Json.parse(File.getContent(manifestPath)), jobId);
-    scene.projectJob = selected == null ? null : selected.id;
+    var selected = ProjectVariants.selected(Json.parse(File.getContent(manifestPath)), variantId);
+    scene.projectVariant = selected == null || selected.kind=="job" ? null : selected.id;
+    scene.projectJob = selected == null || selected.kind!="job" ? null : selected.id;
     var motion = motionDocument(manifestPath);
     scene.robotMotions = projectMotions(motion, scene);
     applyDynamicParts(manifestPath, scene);
@@ -127,13 +128,13 @@ class MateriaProjectRunner {
   }
 
   static function loadGeneratedProject(projectPath:String, ?recipeDocument:String,
-      ?control:ProjectLoadControl, ?jobId:String):GeneratedAssemblyScene {
-    return previewRecords(generateArtifact(projectPath, recipeDocument, control, jobId), control);
+      ?control:ProjectLoadControl, ?variantId:String):GeneratedAssemblyScene {
+    return previewRecords(generateArtifact(projectPath, recipeDocument, control, variantId), control);
   }
 
   /** Produces immutable portable bytes; publishing needs no native scene handles. */
   public static function generateArtifact(projectPath:String, ?recipeDocument:String,
-      ?control:ProjectLoadControl, ?jobId:String):Bytes {
+      ?control:ProjectLoadControl, ?variantId:String):Bytes {
     var manifestPath = FileSystem.fullPath(projectPath);
     if (!FileSystem.exists(manifestPath) || FileSystem.isDirectory(manifestPath))
       throw 'Materia project file not found: $manifestPath';
@@ -148,7 +149,7 @@ class MateriaProjectRunner {
     if (!FileSystem.exists(haxeonManifest) || FileSystem.isDirectory(haxeonManifest))
       throw 'Haxeon project manifest not found: $haxeonManifest';
     var entrypoints = field(root, "entrypoints"),
-      entryId = ProjectJobs.entrypoint(root, jobId),
+      entryId = ProjectVariants.entrypoint(root, variantId),
       entry:Dynamic = Reflect.field(entrypoints, entryId);
     if (entry == null) throw 'Materia project has no default entrypoint "$entryId"';
     var kind = fieldText(entry, "kind");
@@ -237,16 +238,17 @@ class MateriaProjectRunner {
   }
 
   /** Resolves source-only runtime settings into a self-contained downloadable artifact. */
-  public static function exportArtifact(projectPath:String, ?jobId:String):Bytes {
+  public static function exportArtifact(projectPath:String, ?variantId:String):Bytes {
     var path = FileSystem.fullPath(projectPath);
-    var artifact = SceneArtifact.decodeView(generateArtifact(path, null, null, jobId));
+    var artifact = SceneArtifact.decodeView(generateArtifact(path, null, null, variantId));
     var manifest:Dynamic = Json.parse(File.getContent(path));
-    var selected = ProjectJobs.selected(manifest, jobId);
+    var selected = ProjectVariants.selected(manifest, variantId);
     var motion:Dynamic = motionDocument(path);
     var dynamicParts:Dynamic = Reflect.field(manifest, "dynamicParts");
     var parts:Array<Dynamic> = dynamicParts == null ? [] : cast dynamicParts;
     var tracks:Array<Dynamic> = motion == null ? [] : cast Reflect.field(motion, "tracks");
-    artifact.project = SceneArtifact.decodeProject({job: selected == null ? null : selected.id,
+    artifact.project = SceneArtifact.decodeProject({variant:selected==null||selected.kind=="job"?null:selected.id,
+      job: selected == null || selected.kind!="job" ? null : selected.id,
       dynamicParts: parts, motions: tracks});
     return SceneArtifact.encode(artifact);
   }
@@ -526,7 +528,7 @@ class MateriaProjectRunner {
       item.z = worldCenter.z * generated.metresPerUnit;
       item.rotation = [pose.qx, pose.qy, pose.qz, pose.qw];
     }
-    return {objects: objects, inspectionCameras:generated.inspectionCameras, initialView: generated.initialView, projectJob: generated.projectJob,
+    return {objects: objects, inspectionCameras:generated.inspectionCameras, initialView: generated.initialView, projectVariant:generated.projectVariant, projectJob: generated.projectJob,
       geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: state.definition,
       assemblyState: state.record(), assemblyModel: state.model, localCentersByDefinition: generated.localCentersByDefinition,
       faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition, metresPerUnit: generated.metresPerUnit, physical: generated.physical,

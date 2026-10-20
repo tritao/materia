@@ -334,11 +334,12 @@ class CoreSupports {
 			});
 		}
 		for (index in 0...rows.length) {
-			var y = rows[index],
-				width = Math.min(r.hardware.minimumBridgeWidth, [
-					for (c in cores)
-						if (Math.abs(c.cavity.y + c.cavity.depth / 2 - y) < 1e-7) c.cavity.depth
-				][0] / 2);
+			var y = rows[index], width = 0.0;
+			for (core in cores)
+				if (Math.abs(core.cavity.y + core.cavity.depth / 2 - y) < 1e-7)
+					width = Math.max(width, core.cavity.depth / 2);
+			if (width < r.hardware.minimumBridgeWidth)
+				throw "Core row cannot provide the minimum bridge width";
 			var id = "core-bridge-" + index,
 				beam = PanelJoints.blank(id, b.width + 2 * (pad + edge), width, r.panel, r.routerDiameter, l),
 				bx = b.x - pad - edge,
@@ -374,7 +375,7 @@ class CoreSupports {
 				if (Math.abs(c.cavity.y + c.cavity.depth / 2 - y) < 1e-7) {
 					c.bridgeId = id;
 					var f = c.foamLayers[0];
-					c.bridgeBondAreaMm2 = f.width * width;
+					c.bridgeBondAreaMm2 = f.width * Math.max(0, Math.min(y + width / 2, f.y + f.depth) - Math.max(y - width / 2, f.y));
 					place(PanelJoints.blank(c.carrierId, f.width, f.depth, r.panel, r.routerDiameter, l), f.x, f.y, b.z + b.height);
 				}
 		}

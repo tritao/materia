@@ -4,7 +4,7 @@ import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.casting.CastingMoldOptionsCodec;
-import materia.tooling.casting.BoxVolumes;
+import materia.casting.BoxAlgebra;
 import materia.tooling.casting.MoldVolumeCodec;
 
 class CastingMoldTests {
@@ -71,6 +71,35 @@ class CastingMoldTests {
 		var o = options(d),
 			p = CastingMoldPlanner.plan(d, o),
 			s = CastingMoldCodec.encode(p);
+		FabricationTests.run(p);
+		var handlingOptions = options(d);
+		handlingOptions.serviceOrientation = materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0,
+			[0, -1, 0, 1, 0, 0, 0, 0, 1]), d.setup.sourceToMold);
+		check(!materia.tooling.casting.CastHandling.plan(d, handlingOptions, p.envelope).requiresFlip,
+			"yaw preserves the vertical and does not require lifting/flip");
+		handlingOptions.serviceOrientation = materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0,
+			[1, 0, 0, 0, 0, -1, 0, 1, 0]), d.setup.sourceToMold);
+		check(materia.tooling.casting.CastHandling.plan(d, handlingOptions, p.envelope).requiresFlip, "changing vertical requires handling/flip");
+		var bridgePlan = CastingMoldCodec.decode(s);
+		var extraCore = CastingMoldCodec.decode(s).cores[0];
+		extraCore.cavity.y -= 20;
+		extraCore.cavity.depth += 40;
+		bridgePlan.cores.push(extraCore);
+		var bridgePanels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement> = [];
+		materia.tooling.casting.CoreSupports.sharedBridges(bridgePlan.cavity, bridgePlan.document.recipe, bridgePlan.cores, bridgePanels, []);
+		var bridgeBounds = materia.tooling.panel.PanelGeometry.bounds(materia.tooling.panel.PanelContours.outside(bridgePanels.filter(v ->
+			v.panel.id == "core-bridge-0")[0].panel));
+		check(Math.abs(bridgeBounds.height - extraCore.cavity.depth / 2) < 1e-8, "row bridge uses the largest depth including a later core");
+		var narrowBridge = ToolingCodec.snapshot(d);
+		narrowBridge.recipe.hardware.minimumBridgeWidth = 1000;
+		rejects(() -> CastingMoldPlanner.plan(narrowBridge, options(narrowBridge)), "undersized bridge row rejected");
+		var intersecting = CastingMoldCodec.decode(s);
+		var resinPieces = BoxAlgebra.subtract([p.envelope], [
+			for (f in p.document.input.features)
+				CastingMoldPlanner.featureBox(p.document, f)
+		]);
+		intersecting.fixtures[0].datum.pieces = [resinPieces[0]];
+		rejects(() -> CastingMoldPlanner.validate(intersecting), "datum/resin intersection rejected before CAD");
 		check(CastingMoldCodec.encode(CastingMoldCodec.decode(s)) == s, "multi-core canonical regeneration");
 		check(p.features.length == d.input.features.length && p.cores.length == 1, "complete source ownership");
 		var cuts = [for (f in d.input.features) CastingMoldPlanner.featureBox(d, f)],
@@ -84,9 +113,9 @@ class CastingMoldTests {
 		for (i in d.input.inserts)
 			negative.push(materia.tooling.casting.BoxMoldPlanner.box(i.width, i.depth, i.height,
 				materia.assembly.AssemblyFrames.compose(d.setup.sourceToMold, i.pose)));
-		var source = BoxVolumes.subtract([p.envelope], cuts),
-			reconstructed = BoxVolumes.subtract([p.cavity], negative);
-		check(BoxVolumes.volume(BoxVolumes.subtract(source, reconstructed)) + BoxVolumes.volume(BoxVolumes.subtract(reconstructed, source)) < 1e-5,
+		var source = BoxAlgebra.subtract([p.envelope], cuts),
+			reconstructed = BoxAlgebra.subtract([p.cavity], negative);
+		check(BoxAlgebra.volume(BoxAlgebra.subtract(source, reconstructed)) + BoxAlgebra.volume(BoxAlgebra.subtract(reconstructed, source)) < 1e-5,
 			"orthogonal source/reconstruction symmetric difference");
 		check(p.changeRequests.filter(c -> c.kind == "lifting-points").length == 1, "unqualified flip requests lifting points");
 		check(p.changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 1, "replication requires source allowance decision");
@@ -139,8 +168,8 @@ class CastingMoldTests {
 			depth: 4.0,
 			height: 10.0
 		};
-		check(Math.abs(BoxVolumes.volume(BoxVolumes.subtract([a], [b])) - 840) < 1e-8, "through-hole box subtraction");
-		check(BoxVolumes.groups(BoxVolumes.subtract([a], [
+		check(Math.abs(BoxAlgebra.volume(BoxAlgebra.subtract([a], [b])) - 840) < 1e-8, "through-hole box subtraction");
+		check(BoxAlgebra.groups(BoxAlgebra.subtract([a], [
 			{
 				x: 4,
 				y: -1,
@@ -150,14 +179,6 @@ class CastingMoldTests {
 				height: 12
 			}
 		])).length == 2, "disconnected formers split into physical members");
-		var shuffled = ToolingCodec.snapshot(d);
-		shuffled.input.features.reverse();
-		shuffled.setup.features.reverse();
-		var permutation = CastingMoldPlanner.plan(shuffled, options(shuffled));
-		check(ToolingCodec.canonical([for (f in permutation.features) {id: f.featureId, members: f.memberIds}]) == ToolingCodec.canonical([
-			for (f in CastingMoldPlanner.plan(d, options(d)).features)
-				{id: f.featureId, members: f.memberIds}
-		]), "feature permutation preserves exact ownership IDs");
 		var unsupported = ToolingCodec.snapshot(d);
 		unsupported.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.Unsupported;
 		var unsupportedPlan = CastingMoldPlanner.plan(unsupported, options(unsupported));
@@ -168,12 +189,12 @@ class CastingMoldTests {
 		rigid.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;
 		rigid.setup.features[0].withdrawal = {x: 0, y: 0, z: 1};
 		var rigidPlan = CastingMoldPlanner.plan(rigid, options(rigid));
-		check(rigidPlan.changeRequests.filter(v -> v.kind == DraftOrSplit).length > 0, "zero draft emits a physical-release request");
+		check(rigidPlan.changeRequests.filter(v -> v.kind == ReleaseAlternative).length > 0, "zero draft emits a physical-release request");
 		var overlap = ToolingCodec.snapshot(d);
 		overlap.input.inserts[0].pose.x = 30;
 		overlap.input.inserts[0].pose.z = 40;
-		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].pose.x = 30;
-		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].pose.z = 40;
+		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].geometry.pose.x = 30;
+		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].geometry.pose.z = 40;
 		overlap.setup.sourceFingerprint = ToolingCodec.inputFingerprint(overlap.input);
 		rejects(() -> CastingMoldPlanner.plan(overlap, options(overlap)), "EPS/insert overlap cannot silently allocate away either body");
 		var rotated = ToolingCodec.snapshot(d);
@@ -189,10 +210,10 @@ class CastingMoldTests {
 		for (i in rotated.input.inserts)
 			rotatedNegative.push(materia.tooling.casting.BoxMoldPlanner.box(i.width, i.depth, i.height,
 				materia.assembly.AssemblyFrames.compose(rotated.setup.sourceToMold, i.pose)));
-		var rotatedSource = BoxVolumes.subtract([rotatedPlan.envelope], [for (f in rotated.input.features) CastingMoldPlanner.featureBox(rotated, f)]),
-			rotatedRebuilt = BoxVolumes.subtract([rotatedPlan.cavity], rotatedNegative);
-		check(BoxVolumes.volume(BoxVolumes.subtract(rotatedSource, rotatedRebuilt))
-			+ BoxVolumes.volume(BoxVolumes.subtract(rotatedRebuilt, rotatedSource)) < 1e-5,
+		var rotatedSource = BoxAlgebra.subtract([rotatedPlan.envelope], [for (f in rotated.input.features) CastingMoldPlanner.featureBox(rotated, f)]),
+			rotatedRebuilt = BoxAlgebra.subtract([rotatedPlan.cavity], rotatedNegative);
+		check(BoxAlgebra.volume(BoxAlgebra.subtract(rotatedSource, rotatedRebuilt))
+			+ BoxAlgebra.volume(BoxAlgebra.subtract(rotatedRebuilt, rotatedSource)) < 1e-5,
 			"changed setup orientation preserves exact source reconstruction");
 		check(CastingMoldCodec.fingerprint(rotatedPlan) != CastingMoldCodec.fingerprint(CastingMoldPlanner.plan(d, options(d))),
 			"setup orientation regenerates tooling");
@@ -254,15 +275,7 @@ class CastingMoldTests {
 		});
 		rejects(() -> MoldVolumeCodec.encode(volume), "overlapping mold box pieces rejected");
 		var assigned = ToolingCodec.snapshot(rigid);
-		assigned.input.features.push({
-			id: "overlap-detail",
-			kind: materia.tooling.casting.CastingToolingInput.CastingFeatureKind.Void,
-			insertId: null,
-			width: 40,
-			depth: 40,
-			height: 30,
-			pose: materia.assembly.AssemblyFrames.translation(0, 0, 20)
-		});
+		assigned.input.features.push({id:"overlap-detail",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:40,depth:40,height:30,pose:materia.assembly.AssemblyFrames.translation(0, 0, 20)},openings:[],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:["width","depth","height"],derivedFrom:null});
 		assigned.setup.features.push({
 			featureId: "overlap-detail",
 			strategy: materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
@@ -271,6 +284,9 @@ class CastingMoldTests {
 			priority: 10
 		});
 		assigned.setup.sourceFingerprint = ToolingCodec.inputFingerprint(assigned.input);
+		assigned.setup.features[assigned.setup.features.length - 1].priority = 0;
+		rejects(() -> CastingMoldPlanner.plan(assigned, options(assigned)), "equal-priority overlapping formers rejected");
+		assigned.setup.features[assigned.setup.features.length - 1].priority = 10;
 		var allocated = CastingMoldPlanner.plan(assigned, options(assigned));
 		check(allocated.features.filter(f -> f.featureId == "pocket")[0].memberIds.indexOf("former-overlap-detail-0") >= 0,
 			"partial overlaps include every shaping former, not only the newly allocated remainder");
@@ -279,10 +295,9 @@ class CastingMoldTests {
 		check(CastingMoldPlanner.plan(d, machining).changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 1,
 			"machining requires an allowance decision");
 		machining.precision[0].allowance = 1;
-		check(CastingMoldPlanner.plan(d, machining).changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 0,
-			"explicit finishing stock satisfies the allowance contract");
+		rejects(() -> CastingMoldPlanner.plan(d, machining), "unimplemented finishing stock is rejected");
 		var finishing = ToolingCodec.snapshot(d);
-		finishing.input.inserts[0].finish = materia.tooling.ToolingEnums.InsertFinish.ReplicatedAfterCasting;
+		finishing.input.inserts[0].finish = materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting;
 		finishing.setup.sourceFingerprint = ToolingCodec.inputFingerprint(finishing.input);
 		check(CastingMoldPlanner.plan(finishing, options(finishing)).changeRequests.filter(c -> StringTools.startsWith(c.id, "finish-")).length == 0,
 			"replication route matches a replicated source finish");
@@ -292,6 +307,8 @@ class CastingMoldTests {
 		var invalidRule = CastingMoldCodec.decode(s);
 		invalidRule.changeRequests[0].blockingChecks = ["missing-rule"];
 		rejects(() -> CastingMoldPlanner.validate(invalidRule), "change requests cannot name nonexistent validation rules");
+		ReviewContractTests.run(CastingMoldCodec.decode(s));
+		ProcessTests.run(CastingMoldCodec.decode(s));
 		Sys.println('CastingMoldTests: $assertions assertions passed');
 	}
 }

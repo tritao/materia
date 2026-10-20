@@ -23,6 +23,12 @@ class MachineKitComponents {
 		machinekit.control.ControlComponents.register(registry);
 		registry.register(machinekit.structural.LevelingFoot.recipeType());
 		registry.register(machinekit.structural.LevelingSeat.recipeType());
+		machinekit.routing.RoutingComponents.register(registry);
+		registry.register(machinekit.power.Vfd.recipeType());
+		registry.register(machinekit.power.BrakeResistor.recipeType());
+		registry.register(machinekit.power.Contactor.recipeType());
+		registry.register(machinekit.power.CircuitBreaker.recipeType());
+		registry.register(machinekit.structural.LevellingFoot.recipeType());
 		registry.register(machinekit.structural.RectTubeMember.recipeType());
 		registry.register(machinekit.structural.BlockBracket.recipeType());
 		registry.register(machinekit.structural.ProfileMember.tslotRecipeType());

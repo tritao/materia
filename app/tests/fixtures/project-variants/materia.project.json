@@ -1,0 +1,83 @@
+{
+  "format": "materia.project",
+  "version": 1,
+  "name": "Project variant fixture",
+  "defaultEntrypoint": "small",
+  "defaultVariant": "small",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
+  "entrypoints": {
+    "small": {
+      "kind": "cad-preview",
+      "module": "VariantPreview",
+      "function": "small",
+      "cache": {
+        "inputs": [
+          "VariantPreview.hx"
+        ]
+      }
+    },
+    "large": {
+      "kind": "cad-preview",
+      "module": "VariantPreview",
+      "function": "large",
+      "cache": {
+        "inputs": [
+          "VariantPreview.hx"
+        ]
+      }
+    },
+    "motor-study": {
+      "kind": "cad-preview",
+      "module": "VariantPreview",
+      "function": "large",
+      "cache": {
+        "inputs": [
+          "VariantPreview.hx"
+        ]
+      }
+    },
+    "demo": {
+      "kind": "cad-preview",
+      "module": "VariantPreview",
+      "function": "small",
+      "cache": {
+        "inputs": [
+          "VariantPreview.hx"
+        ]
+      }
+    }
+  },
+  "variants": [
+    {
+      "id": "small",
+      "label": "small",
+      "kind": "configuration",
+      "entrypoint": "small",
+      "summary": "Variant fixture small"
+    },
+    {
+      "id": "large",
+      "label": "large",
+      "kind": "configuration",
+      "entrypoint": "large",
+      "summary": "Variant fixture large"
+    },
+    {
+      "id": "motor-study",
+      "label": "motor-study",
+      "kind": "study",
+      "entrypoint": "motor-study",
+      "summary": "Variant fixture motor-study"
+    },
+    {
+      "id": "demo",
+      "label": "demo",
+      "kind": "demo",
+      "entrypoint": "demo",
+      "summary": "Variant fixture demo"
+    }
+  ]
+}

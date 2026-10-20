@@ -21,13 +21,13 @@ class ProjectLoadJob {
   var workerPhase:String = "";
   #end
 
-  public function new(projectPath:String, ?jobId:String, ?loadControl:ProjectLoadControl) {
+  public function new(projectPath:String, ?variantId:String, ?loadControl:ProjectLoadControl) {
     control = loadControl == null ? new ProjectLoadControl() : loadControl;
     startedAt = Sys.time();
     var self = this;
     #if wasm
     try {
-      if (jobId != null) throw "Browser loading cannot select a source project job";
+      if (variantId != null) throw "Browser loading cannot select a source project variant";
       if (!ProjectSourceLoader.isPrebuilt(projectPath)) throw "Browser loading requires a prebuilt .mtrg artifact";
       var metadata = sys.FileSystem.metadata(projectPath);
       if (metadata == null || sys.FileSystem.isDirectory(projectPath) || metadata.size > 150000000)
@@ -57,7 +57,7 @@ class ProjectLoadJob {
     Thread.create(function() {
       var loaded:Null<GeneratedAssemblyScene> = null;
       var problem:Null<String> = null;
-      try loaded = ProjectSourceLoader.load(projectPath, null, self.control, jobId)
+      try loaded = ProjectSourceLoader.load(projectPath, null, self.control, variantId)
       catch (error:Dynamic) problem = Std.string(error);
       self.control.phase("Waiting for the editor");
       self.mutex.acquire();

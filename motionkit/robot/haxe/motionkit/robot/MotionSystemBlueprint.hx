@@ -17,6 +17,9 @@ class MotionSystemBlueprint {
   public var replacementMarginOwnerPeriods:Int = 2;
   /** Optional measured upper bound for homing command/observation response, in seconds. */
   public var homingLatencySeconds:Null<Float> = null;
+  /** Optional commissioned final capture speed caps by logical axis, in SI units/s.
+   * Edge capture removes sampling error, but not load-dependent drive deflection. */
+  public final homingCaptureSpeedLimits:Map<String,Float> = [];
   /** Owner period used for replacement lead; defaults to fixedTimestepSeconds. */
   public var replacementOwnerPeriodSeconds:Float;
 

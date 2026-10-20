@@ -28,7 +28,7 @@ class HomingAxis {
   public final upperTravel:Float;
 
   public function new(id:String, joint:Int, switches:Array<JointSwitch>, velocity:Float,
-      acceleration:Float, lower:Float, upper:Float, overtravel:Float, home:Float, timestep:Float, ?dynamics:HomingDynamics, ?maximumCaptureOverrun:Float) {
+      acceleration:Float, lower:Float, upper:Float, overtravel:Float, home:Float, timestep:Float, ?dynamics:HomingDynamics, ?maximumCaptureOverrun:Float, ?captureSpeedLimit:Float) {
     if (id == null || id.length == 0 || joint < 0 || switches == null || switches.length == 0)
       throw "Homing axis requires an ID, joint and physical home switches";
     for (value in [velocity, acceleration, overtravel, timestep])
@@ -67,8 +67,11 @@ class HomingAxis {
     if (maximumCaptureOverrun != null && (!Math.isFinite(maximumCaptureOverrun) || maximumCaptureOverrun <= 0))
       throw "Captured-edge overrun budget must be finite and positive";
     var captureRoom = maximumCaptureOverrun == null ? margin : Math.min(margin, maximumCaptureOverrun - 2 * precision);
-    capturedApproachSpeed = switches.length > 1 && maximumCaptureOverrun == null ? latchSpeed :
+    if(captureSpeedLimit!=null && (!Math.isFinite(captureSpeedLimit)||captureSpeedLimit<=0))
+      throw "Homing capture speed cap must be finite and positive";
+    var capturedSpeed = switches.length > 1 && maximumCaptureOverrun == null ? latchSpeed :
       captureRoom > 0 ? this.dynamics.speedForRoom(captureRoom, seekSpeed) : latchSpeed;
+    capturedApproachSpeed = captureSpeedLimit==null?capturedSpeed:Math.min(capturedSpeed,captureSpeedLimit);
     // A sampled closing observation may already be past the switch by one owner interval.
     releaseSearchDistance = releaseDistance + release + seekSpeed * timestep;
     maximumTravel = upper - lower + 2 * overtravel;

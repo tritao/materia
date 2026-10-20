@@ -620,6 +620,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final telemetry:TelemetryPanel;
   final missionPanel = new app.editor.MissionPanel();
   public var missionController(default, null):MissionController;
+  public var projectVariants(default,null):ProjectVariantController;
   final cncPanel = new app.editor.CncPanel();
   final machineControlPanel = new app.editor.MachineControlPanel();
   final inspectionCamera = new app.editor.InspectionCameraPanel();
@@ -667,10 +668,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   // The worker-thread build behind startLoading, when the example is a project.
   var startJob:Null<ExampleLoadJob> = null;
   var startFailure:Null<String> = null;
+  var projectFeedbackKey = "";
   var reportedMissionFailure:Null<String> = null;
   final startExamples = new app.editor.ExampleBrowser();
-  // The Start page was opened only to show a launch project's progress, so it closes once that opens.
-  var closeStartAfterOpen:Bool = false;
   var lastRecordedPath:Null<String> = null;
   // Each mode keeps the layout it was left in; the mode set itself is never persisted.
   final modeSnapshots:Map<String, DockWorkspaceSnapshot> = new Map();
@@ -687,6 +687,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var hierarchyAddY:Float = 120.0;
   var renameId:Null<String> = null;
   var renameValue:String = "";
+  var visibilityPopupVisible:Bool = false;
+  var visibilityPopupX:Float = 0;
+  var visibilityPopupY:Float = 0;
   var viewportOptionsVisible:Bool = false;
   var viewportOptionsX:Float = 0.0;
   var viewportOptionsY:Float = 0.0;
@@ -788,14 +791,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (chooser == null) complete(null, "File dialogs require the desktop host");
       else chooser.choose(save, path, complete);
     }, documentChanged, commitActiveDrag, cancelActiveDrag);
-    missionController = new MissionController(session, simulation, documents.requestRun, invalidateView,
+    projectVariants = new ProjectVariantController(session, simulation, documents.requestRun, invalidateView,
       function() { documentChanged(); commands.execute("scene.fit-all"); },
-      function() return documents.blocked(),
+      function() return documents.blocked());
+    missionController = new MissionController(session,simulation,invalidateView,
       function(id) { scene.selectTreeKey("project:" + id); invalidateView(); });
-    documents.busy = function() return startLoading != null || missionController.isLoading() || simulationBuild != null || simulationStop != null;
+    documents.busy = function() return startLoading != null || projectVariants.isLoading() || simulationBuild != null || simulationStop != null;
     documents.openArtifact = openProjectInBackground;
     if (hostContext != null) hostContext.onCloseRequested = function(close) {
-      missionController.cancel();
+      projectVariants.cancel();
       // A running build must not keep the window from closing: cancel it and let the normal prompt run.
       if (startJob != null) {
         startJob.control.cancel();
@@ -973,6 +977,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
       windowLayers.push(new StackChild("hierarchy-rename-dialog", renameDialog(), 0.0, 0.0, 40,
         LayoutAxis.grow(), LayoutAxis.grow()));
     }
+    if(visibilityPopupVisible&&documentDialog==null) {
+      treeModel.canChangeVisibility=()->!documents.blocked();
+      treeModel.onVisibilityChanged=()->{commands.refresh();invalidateView();};
+      windowLayers.push(new StackChild("component-visibility",app.editor.VisibilityPanel.popup(treeModel,
+        visibilityPopupX,visibilityPopupY,viewportWidth,viewportHeight,!documents.blocked(),()->{visibilityPopupVisible=false;invalidateView();}),0,0,25,
+        LayoutAxis.grow(),LayoutAxis.grow()));
+    }
     if (viewportOptionsVisible && documentDialog == null) {
       var optionIds = ["scene.grid-spacing-0.1", "scene.grid-spacing-0.2", "scene.grid-spacing-0.5"];
       optionIds = optionIds.concat([
@@ -1055,7 +1066,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function tick():Void {
     pollSimulationStop();
     pollSimulationBuild();
-    missionController.tick();
+    projectVariants.tick();
     var queued = startLoading;
     if (queued != null) {
       var job = startJob;
@@ -1072,12 +1083,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
             ExampleCatalog.finish(this, queued, job.take());
             job.control.phase("Rendering the first project frame");
             projectFrameControl = job.control;
-            if (closeStartAfterOpen) workspace.close("start");
           } catch (failure:Dynamic) {
             startFailure = "Could not open " + queued.title + ": " + Std.string(failure);
             log(startFailure);
           }
-          closeStartAfterOpen = false;
           invalidateView();
         }
       } else if (startLoadDelay > 0) {
@@ -1093,6 +1102,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         invalidateView();
       }
     }
+    var feedback=projectLoadingRevisionKey();
+    if(feedback!=projectFeedbackKey){projectFeedbackKey=feedback;invalidateView();}
     if (simulationStop == null && simulation.isActive() && simulation.isRunning()) {
       simulation.pump();
       if (hostContext != null) hostContext.requestFrame();
@@ -1208,17 +1219,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /**
-   * Queues a project as if it had been chosen on the Start page, and shows that page so the build's
-   * progress and Cancel button are visible while it runs. The build runs on a worker thread, so the
-   * caller returns at once and the window keeps painting; `tick()` opens the result.
+   * Queues a project without changing workspace tabs. Shared editor chrome owns loading feedback;
+   * the worker keeps the window responsive and tick() installs the result.
    */
   public function openProjectInBackground(path:String):Void {
+    startFailure = null;
     projectOpenStartedAt = Sys.time();
     projectFrameControl = null;
     startLoading = ExampleCatalog.launchEntry(path);
     startLoadDelay = 3;
-    closeStartAfterOpen = workspace.get("start") != null && !workspace.isOpen("start");
-    showStartPage();
+    invalidateView();
   }
 
   /** CPU render completion; this measures frame submission, not monitor scan-out. */
@@ -1254,10 +1264,34 @@ class ReferenceEditorApp implements DesktopUiApplication {
   /** Stops a project build that is running for the Start page. */
   function cancelExampleLoad():Void {
     var job = startJob;
-    if (job == null) return;
+    if (job == null) {startLoading=null;invalidateView();return;}
     job.control.phase("Cancelling");
     job.control.cancel();
     invalidateView();
+  }
+
+  function projectLoadingStatus():Null<app.ProjectLoadingStatus> {
+    var entry=startLoading;
+    if(entry==null)return projectVariants.loadingStatus();
+    var job=startJob;
+    return {title:"Opening "+entry.title,phase:job==null?"Starting":job.control.currentPhase(),
+      elapsedSeconds:job==null?0:Std.int(job.elapsedSeconds()),cancelling:job!=null&&job.control.isCancelled()};
+  }
+
+  function projectLoadingFailure():Null<String> return startFailure??projectVariants.snapshot().error;
+
+  function projectLoadingRevisionKey():String {
+    var status=projectLoadingStatus();
+    return status==null?"idle:"+projectLoadingFailure():
+      status.title+":"+status.phase+":"+status.elapsedSeconds+":"+status.cancelling;
+  }
+
+  function cancelProjectLoading():Void {
+    if(startLoading!=null)cancelExampleLoad();else projectVariants.requestCancel();
+  }
+
+  function dismissProjectLoadingFailure():Void {
+    startFailure=null;projectVariants.dismissFailure();invalidateView();
   }
 
   function requestOpenPath(path:String):Void {
@@ -1316,7 +1350,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       simulationStop = null;
     }
     if (simulationBuild != null) { simulationBuild.close(); simulationBuild = null; }
-    missionController.cancel();
+    projectVariants.cancel();
     if (projectUiExtension != null) projectUiExtension.dispose();
     if (sceneCollision != null) sceneCollision.dispose();
     sceneCollision = null;
@@ -1530,6 +1564,24 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   // The mode strip is tinted while a simulation is active, so the non-editing state is obvious.
   function contextBar(compact:Bool):View {
+    var loading=projectLoadingStatus(),failure=projectLoadingFailure();
+    if(loading!=null||failure!=null) {
+      var items:Array<KeyedView> = [];
+      var text:String;
+      if(loading!=null) {
+        items.push(new KeyedView("spinner",new haxeon.ui.widgets.controls.Spinner("project-loading-spinner",loading.title)));
+        text=(viewportWidth>=700?shortenLabel(loading.title,viewportWidth>=1000?30:20)+" · ":"")+
+          shortenLabel(loading.phase,viewportWidth>=1000?40:viewportWidth>=700?24:20)+" · "+loading.elapsedSeconds+" s";
+      }else text=shortenLabel(failure,Std.int(Math.max(16,Math.min(100,(viewportWidth-130)/7))));
+      items.push(new KeyedView("status",new Text(text,null,loading==null?appearance.theme.tokens.danger:appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0))));
+      items.push(new KeyedView("space",new Spacer("project-loading-space",LayoutAxis.grow(),LayoutAxis.fixed(1))));
+      var action=new Button(loading==null?"Dismiss":loading.cancelling?"Cancelling…":"Cancel",null,
+        loading==null?dismissProjectLoadingFailure:cancelProjectLoading,loading==null?"project-loading-dismiss":"project-loading-cancel");
+      action.enabled=loading==null||!loading.cancelling;action.variant=ButtonVariant.Secondary;
+      items.push(new KeyedView("action",action));
+      return new Row("editor-project-loading",items,toolbarRowStyle(CONTEXT_BAR_HEIGHT,appearance.toolbar));
+    }
     var items:Array<KeyedView> = [
       new KeyedView("modes", modeSwitcher(compact)),
       new KeyedView("space", new Spacer("context-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
@@ -1654,7 +1706,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return "document=" + session.label() + ":commands=" + commands.revision + ":state=" + topBarCommandState() +
       ":active=" + simulation.isActive() + ":running=" + simulation.isRunning() +
       ":failed=" + (mission != null && mission.failure != null) + ":chip=" + simulationStateLabel() +
-      ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible;
+      ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible+":project-load="+projectLoadingRevisionKey();
   }
 
   function statusBarRevisionKey():String {
@@ -1711,6 +1763,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function statusSelectionLabel():String {
+    var loading=projectLoadingStatus();
+    if(loading!=null)return loading.title+" · "+loading.phase;
+    if(projectLoadingFailure()!=null)return "Project could not be opened";
     var selected = scene.object(scene.selectedId);
     var left = simulation.error != null ? "Simulation error: " + simulation.error :
       selected == null ? "Ready" : selected.label + " selected";
@@ -1761,6 +1816,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("sensors", "Sensors", false, true, IconName.Radar));
     result.register(new DockPanelDescriptor("console", "Console", true, true, IconName.Terminal));
     result.register(new DockPanelDescriptor("telemetry", "Telemetry", true, true, IconName.Activity));
+    result.register(new DockPanelDescriptor("project", "Project", true, true, IconName.Activity));
     result.register(new DockPanelDescriptor("mission", "Mission", true, true, IconName.Activity));
     result.register(new DockPanelDescriptor("cnc", "CNC", true, true, IconName.Terminal));
 
@@ -1776,7 +1832,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         function(_, width) return perspectivePanel(width),
         // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
         // none of its inputs changed: this key includes the current simulation presentation.
-        function() return perspectiveRevisionKey() + ":inspection=" + inspectionCamera.presentationKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible +
+        function() return perspectiveRevisionKey() + ":inspection=" + inspectionCamera.presentationKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible + ":visibility=" + visibilityPopupVisible +
           ":viewportPresentation=" + (perspectiveViewport == null ? "" : perspectiveViewport.presentationKey()) +
           ":collisions=" + collisionsVisible + "/" + collisionNearMillimetres),
       new DockPanelContent("inspection-camera", function(_) return inspectionCamera.build(this)),
@@ -1795,9 +1851,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":dark=" + appearance.dark),
       new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, appearance.theme.tokens.surface,
         appearance.theme.tokens.textSecondary, simulation)),
-      new DockPanelContent("mission", function(_) return missionPanel.build(missionController, appearance.theme.tokens)),
+      new DockPanelContent("project", function(_) return app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"project-panel")),
+      new DockPanelContent("mission", function(_) return missionPanel.build(missionController, appearance.theme.tokens, function() {
+        workspace.open("cnc", "inspector");workspace.activate("cnc");invalidateView();
+      })),
       new DockPanelContent("cnc", function(_) return cncPanel.build(simulation, appearance.theme.tokens,
-        printerLink.connected() || printerLink.error != null ? printerLink.summary() : null))
+        printerLink.connected() || printerLink.error != null ? printerLink.summary() : null, session))
     ];
 
     result.setDefaultLayout(EditorWorkspaceLayout.defaultLayout());
@@ -1992,6 +2051,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     controls.push(new KeyedView("snap", viewportToolbarAction("viewport-snap",
       "scene.toggle-grid-snap", "Snap", IconName.Magnet, compact)));
     controls.push(new KeyedView("options", options));
+    var visibility=new Button(compact?"":"Visibility",null,null,"viewport-visibility");
+    visibility.variant=ButtonVariant.Navigation;visibility.leadingIcon=IconName.Inspect;visibility.trailingIcon=IconName.ChevronDown;
+    visibility.classes=["viewport-tool"];visibility.accessibilityLabel="Component visibility";visibility.selected=visibilityPopupVisible;
+    visibility.onClickEvent=event->{
+      var bounds=menuTriggerBounds(event);visibilityPopupX=bounds.x;visibilityPopupY=bounds.y+bounds.height;
+      viewportOptionsVisible=false;viewAngleMenuVisible=false;visibilityPopupVisible=!visibilityPopupVisible;invalidateView();
+    };
+    controls.push(new KeyedView("visibility",visibility));
     var edgeMode=new Button(compact ? "" : app.CadEdgeModes.label(scene.cadEdgeMode),null,()->{
       scene.setCadEdgeMode(app.CadEdgeModes.next(scene.cadEdgeMode));invalidateView();
     },"viewport-cad-edge-mode");
@@ -2044,14 +2111,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new StackChild("scene", content, 0.0, 0.0, 0, LayoutAxis.grow(), LayoutAxis.grow()),
       new StackChild("view-angle", viewAngle, 10.0, 10.0, 1)
     ];
-    var missionState = missionController.snapshot();
-    if (missionState.mission != null || missionState.jobs.length > 0) {
-      var overlayWidth = Math.max(120.0, Math.min(300.0, (availableWidth > 0 ? availableWidth : 400.0) - 20.0));
-      layers.push(new StackChild("mission-controls",
-        app.editor.MissionJobView.build(missionController, appearance.theme.tokens, "viewport-mission", function() {
-          workspace.open("mission", workspace.isOpen("sensors") ? "sensors" : "inspector");
-          workspace.activate("mission"); invalidateView();
-        }), 10.0, 54.0, 2, LayoutAxis.fixed(overlayWidth), LayoutAxis.fit(), false));
+    var missionState = missionController.snapshot(),variantState=projectVariants.snapshot();
+    var sceneControls:Array<KeyedView> = [];
+    if(variantState.variants.length>0||variantState.error!=null)
+      sceneControls.push(new KeyedView("project",app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"viewport-project")));
+    if(missionState.hasWork)
+      sceneControls.push(new KeyedView("mission",app.editor.MissionStatusView.build(missionController,appearance.theme.tokens,"viewport-mission",function() {
+        workspace.open("mission",workspace.isOpen("sensors")?"sensors":"inspector");
+        workspace.activate("mission");invalidateView();
+      })));
+    if(sceneControls.length>0) {
+      var overlayStyle=new LayoutStyle();overlayStyle.width=LayoutAxis.grow();overlayStyle.childGap=10;
+      overlayStyle.padding=new Insets(10,10,10,10);overlayStyle.background=appearance.theme.tokens.surfaceRaised;
+      var width=Math.max(120.0,Math.min(300.0,(availableWidth>0?availableWidth:400.0)-20.0));
+      layers.push(new StackChild("project-controls",new Column("viewport-project-controls",sceneControls,overlayStyle),
+        10,54,2,LayoutAxis.fixed(width),LayoutAxis.fit(),false));
     }
     if(mode==EditorMode.Simulate&&inspectionCamera.overlay) {
       var cameraWidth=Math.min(360.0,Math.max(180.0,availableWidth>0?availableWidth*0.4:320));
@@ -2059,14 +2133,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
         Math.max(10,(availableWidth>0?availableWidth:400)-cameraWidth-10),54,3,LayoutAxis.fixed(cameraWidth),LayoutAxis.fixed(280)));
     }
     var canvas:View = new Stack("perspective-canvas-overlay", layers);
-    var sceneControls=app.editor.HobberScenePanel.build(this);
+    var hobberControls=app.editor.HobberScenePanel.build(this);
     var viewportRows:Array<KeyedView> = [
       new KeyedView("toolbar", toolbar),
       new KeyedView("divider", divider),
       new KeyedView("canvas", new SizedBox("viewport-canvas-slot", canvas,
         LayoutAxis.grow(), LayoutAxis.grow()))
     ];
-    if(sceneControls!=null)viewportRows.insert(1,new KeyedView("machine-scenario",sceneControls));
+    if(hobberControls!=null)viewportRows.insert(1,new KeyedView("machine-scenario",hobberControls));
     return new Column("perspective-with-toolbar",viewportRows,panelStyle);
   }
 
@@ -2260,6 +2334,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function documentChanged():Void {
+    startFailure=null;
     if (preferences != null && session.path != null && session.path != lastRecordedPath) {
       lastRecordedPath = session.path;
       preferences.addRecent(session.path);
@@ -2276,6 +2351,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if(ownership!=null){simulation.setBackend(ownership.backend());simulation.setTimestep(ownership.timestep());}
       log("Document configuration replaced");
       sceneGeneration = session.generation;
+      visibilityPopupVisible=false;
       if (MachineControlModel.axes(session).length > 0) {
         if (!workspace.isOpen("machine-control")) workspace.open("machine-control", "inspector");
         workspace.activate("machine-control");

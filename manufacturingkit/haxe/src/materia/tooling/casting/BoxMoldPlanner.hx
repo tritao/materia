@@ -13,7 +13,7 @@ import materia.tooling.panel.PanelContours;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelAssemblyPlan.PanelPlacement;
 import materia.tooling.panel.PanelAssemblyPlan.PanelAssemblyRecord;
-import materia.tooling.casting.CastingToolingInput.CastingFeatureKind;
+import materia.casting.CastingFeature.CastingFeatureKind;
 import materia.tooling.casting.CastingSetup.CoreStrategy;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.casting.MoldPlan.PenetrationPlan;
@@ -106,12 +106,11 @@ class BoxMoldPlanner {
 		var supportPanels:Array<PanelPlacement> = [];
 		var cores:Array<materia.tooling.casting.MoldPlan.CorePlan> = [];
 		for (f in d.input.features)
-			if (f.kind == CastingFeatureKind.Void) {
+			if (f.kind != CastingFeatureKind.InsertRecess) {
 				var strategy = d.setup.features.filter(s -> s.featureId == f.id)[0];
 				if (strategy.strategy != CoreStrategy.SacrificialEPS)
 					throw "Box template supports EPS only";
-				var cut = box(f.width, f.depth, f.height, F.compose(d.setup.sourceToMold, f.pose)),
-					cb = clipped(cut, b),
+				var cb = CastingMoldPlanner.featureBox(d,f),
 					l = r.linerThickness;
 				if (cb.x <= b.x || cb.y <= b.y || cb.x + cb.width >= b.x + b.width || cb.y + cb.depth >= b.y + b.depth)
 					throw "EPS core needs an internal pocket accessible through fill face";
@@ -165,7 +164,7 @@ class BoxMoldPlanner {
 		if (Math.abs(face.z - b.z) > 1e-7
 			|| normal.z > -1 + 1e-8
 			|| Math.abs(volume(clipped(ib, b)) - volume(ib)) > 1e-5
-			|| Math.abs(insert.boreDiameter - r.hardware.insertBoreDiameter) > 1e-8)
+			|| Math.abs(materia.casting.InsertHoleGeometry.diameter(insert.holes) - r.hardware.insertBoreDiameter) > 1e-8)
 			throw "Insert mounting face must seat on bed with fixing bore";
 		// Tapping/engagement evidence is still required; a through bore is not a qualified thread.
 		var fixing = r.hardware.insertClearanceDiameter,
@@ -182,7 +181,7 @@ class BoxMoldPlanner {
 			sealMaterial: r.hardware.sealMaterial,
 			sealingFace: face,
 			plug: {
-				diameter: insert.boreDiameter,
+				diameter: materia.casting.InsertHoleGeometry.diameter(insert.holes),
 				length: r.hardware.plugDepth,
 				materialSpec: r.hardware.plugMaterial
 			}
@@ -274,7 +273,7 @@ class BoxMoldPlanner {
 			throw "Insert sealing face differs from fixture";
 		var plug = record.plug;
 		if (plug == null
-			|| plug.diameter != i.boreDiameter
+			|| plug.diameter != materia.casting.InsertHoleGeometry.diameter(i.holes)
 			|| plug.length <= 0
 			|| plug.length > i.height
 			|| StringTools.trim(plug.materialSpec).length == 0)

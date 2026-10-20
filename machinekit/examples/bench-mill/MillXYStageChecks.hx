@@ -4,6 +4,7 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.PosedParts;
 import machinekit.component.MachineKitComponents;
 import machinekit.milling.*;
+import machinekit.motion.BallScrew;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyFrames as F;
 
@@ -18,6 +19,34 @@ class MillXYStageChecks {
 	static function near(a:Float, b:Float, label:String):Void check(Math.abs(a - b) < 1e-6, '$label ($a vs $b)');
 
 	public static function main():Void {
+  var capacity=new MillCapacityLayout(),large=new MillGuidedXYStage(capacity.guidedXY());
+  large.validate();
+  check(large.table.parameterNumber("width")==capacity.tableWidth,"shared table keeps VMC width");
+  check(large.table.parameterNumber("thickness")==capacity.tableThickness,"shared table keeps VMC thickness");
+  check(large.saddle.parameterNumber("width")==capacity.saddleWidth,"shared saddle keeps VMC width");
+  check(large.saddle.parameterNumber("blockClearance")==6.6,"HG25 saddle uses M6 clearance rather than M4");
+  check(large.saddle.values().boolean("ribbed")&&!large.saddle.values().boolean("motorPocket"),"VMC ribs do not invent a Small drive pocket");
+  var largeModel=new AssemblyModel("mm");large.addTo(largeModel,"");
+  var largeState=new AssemblyState(largeModel.definition("shared-cross-slide"));
+  for(x in [-capacity.xTravel/2,0,capacity.xTravel/2])for(y in [-capacity.yTravel/2,0,capacity.yTravel/2]) {
+   largeState.setJoint("x",x);largeState.setJoint("y",y);largeState.forwardKinematics();
+   var table=largeState.worldPose("table"),saddle=largeState.worldPose("saddle");
+   near(table.x,-x,"VMC shared table X");near(table.y,capacity.spindleY-y,"VMC shared table Y");
+   near(table.z,capacity.tableBottom,"VMC preserved table datum");near(saddle.x,0,"VMC saddle independent of X");
+  }
+  var sharedParts:Array<machinekit.component.MachineComponent> =[large.saddle,large.table];
+  for(c in sharedParts) {
+   var part=c.geometry();check(part.valid()&&part.solidCount()==1,"shared VMC cross slide has connected valid geometry");part.close();
+  }
+  var restoredLarge=MachineAssembly.decode(large.encode(),MachineKitComponents.standard());
+  restoredLarge.validate();
+  var restoredTable=restoredLarge.components().filter(row -> row.id=="table")[0].component;
+  near(restoredTable.parameterNumber("width"),capacity.tableWidth,"VMC table width survives assembly persistence");
+  near(restoredTable.parameterNumber("thickness"),capacity.tableThickness,"VMC deck thickness survives assembly persistence");
+  near(restoredTable.connector("top").frame.z,capacity.tableThickness,"restored table top connector follows deck thickness");
+  var enlarged=new MillCapacityLayout(500,350,450),larger=new MillGuidedXYStage(enlarged.guidedXY());
+  larger.validate();
+  near(larger.table.parameterNumber("width"),800,"larger travel derives table width through the same builder");
 		AxisBuilderChecks.run();
 		assertions += MillDesignCheckTests.run();
 		var reference = new BenchMill(false, false), f = MillFramePreview.layout(reference), z = MillFramePreview.zLayout(
@@ -62,7 +91,7 @@ class MillXYStageChecks {
 				near(table.z, l.tableBottom, "table stays level");
 				near(saddle.x, 0, "saddle independent of X");
 				near(saddle.y, l.centreY - y, "saddle follows Y");
-				near(motorX.x, -195, "X motor independent of X");
+				near(motorX.x, MillXYStageLayout.X_MOTOR_FACE, "X motor independent of X");
 				near(motorX.y, l.centreY - y, "X drive rides saddle");
 				near(motorY.y, l.yMotorFace, "Y motor remains fixed");
 				near(state.joint("motorX-turn"), -state.joint("screwX-turn"), "opposed motor axis follows return belt");
@@ -94,6 +123,10 @@ class MillXYStageChecks {
 			near(cache.overlap(axis.component(id), poses.get(id), axis.saddle, poses.get("saddle")), 0, 'return drive clears saddle: $id');
 		}
 		var motorBody=cache.posed(axis.component("motorX"),poses.get("motorX"));
+		check(l.motor.designation=="ELM2H-0400LA60F","X uses the actual Leadshine catalog motor");
+		near(cache.overlap(axis.component("motorX"),poses.get("motorX"),axis.component("motorMountX"),poses.get("motorMountX")),0,"X pilot recess clears catalog motor");
+		check(MillXYStageLayout.X_BELT_PLANE+15<=MillXYStageLayout.X_MOTOR_FACE-l.motor.spec.pilotHeight,"Pulley clears motor pilot");
+		check(MillXYStageLayout.X_BELT_PLANE+15-l.xScrewStart>=BallScrew.JOURNAL_DIAMETER*0.75,"X screw engages at least 0.75 journal diameters of pulley bore");
 		var saddleBody=cache.posed(axis.saddle,poses.get("saddle"));
 		var rebuiltSaddle=cache.posed(restored.components().filter(m->m.id=="saddle")[0].component,poses.get("saddle"));
 		for (i in 0...4) for (hole in 1...5) {
@@ -120,7 +153,8 @@ class MillXYStageChecks {
 		var nutBody=cache.posed(axis.component("nutY"),poses.get("nutY"));
 		var nutSaddle=cache.posed(axis.saddle,poses.get("saddle"));
 		var legacyAdapter=cache.posed(new MillYNutMount(new machinekit.component.ComponentValues().setBoolean("reinforced",true)),poses.get("nutBracketY"));
-		var legacySaddle=axis.saddle.values().setBoolean("nutServiceAccess",false);
+		// Isolate the old grease-bore defect from the current motor-pocket redesign.
+		var legacySaddle=axis.saddle.values().setBoolean("nutServiceAccess",false).setBoolean("motorPocket",false);
 		var oldHost=new MillCrossSaddle(legacySaddle).geometry();
 		var ring=machinekit.component.Solids.cut(cadkit.modeling.Part.cylinderSpan(8,36,76,0,-l.saddleDepth/2+5),
 			[cadkit.modeling.Part.cylinderSpan(5,35,77,0,-l.saddleDepth/2+5)]);

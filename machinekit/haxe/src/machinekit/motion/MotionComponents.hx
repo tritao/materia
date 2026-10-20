@@ -9,6 +9,10 @@ class MotionComponents {
 		registry.register(AngularContactBearing.recipeType());
 		registry.register(CrossedRollerBearing.recipeType());
 		registry.register(RotaryEncoderRing.recipeType());
+		registry.register(PlanetaryReducer.recipeType());
+		registry.register(CableChain.recipeType());
+		registry.register(BrakeServo.recipeType());
+
 		registry.register(LinearBearing.recipeType());
 		registry.register(PillowBlock.recipeType());
 		registry.register(PurchasedRotaryPart.recipeType());
@@ -26,6 +30,7 @@ class MotionComponents {
 		registry.register(NemaStepper.namedRecipeType());
 		registry.register(NemaStepper.genericRecipeType());
 		registry.register(ServoMotor.namedRecipeType());
+		registry.register(AxisServoMotor.recipeType());
 		registry.register(LeadshineServo.recipeType());
 		registry.register(ShaftBrakePart.recipeType());
 		registry.register(MotorDriver.recipeType());

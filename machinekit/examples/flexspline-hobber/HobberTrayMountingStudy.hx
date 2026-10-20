@@ -17,7 +17,7 @@ class HobberTrayMountingStudy {
     var proposal:Dynamic=haxe.Json.parse(sys.io.File.getContent(path));
     var points:Array<Array<Float>> = proposal.sockets.positionsMm,tabs:Array<Array<Float>> = proposal.casting.localRebatesXYMm;
     var z=FoundationLayout.dimensions("bed")[2]+proposal.sockets.mouthZMm;
-    var cores=C.decode(FoundationLayout.bodyValues("bed").token("voids"));
+    var cores=C.decode(FoundationLayout.bodyValues("bed").token("features"));
     var bosses=[for(p in points)[p[0]-25,p[1]-25,z-65,p[0]+25,p[1]+25,z]];
     var lightening=[for(c in cores)if(StringTools.startsWith(c.id,"core-"))c];
     var service=[for(c in cores)if(!StringTools.startsWith(c.id,"core-"))c];

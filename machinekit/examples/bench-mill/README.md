@@ -1,4 +1,51 @@
-# Bench mill and mineral-cast machine design
+# Mill and mineral-cast machine design
+
+Use **`materia.project.json`** as the main project. Its `small` entrypoint is the
+Small configuration with the selected Y drive; `compact-vmc` is the Compact VMC
+layout with the same complete Z and spindle assemblies, including drawbar and
+pneumatic release. `spindle-drive` is the editable motor study. The older bench
+mill and enclosed cell belong to their own project. Shared model code and build
+tooling remain in this directory.
+Both sizes share `MillFramePreview.assemble` and `MillGuidedXYStage`: one nested
+Y-saddle/X-table assembly, ribbed saddle geometry, parameterized T-slot table,
+rail/block placement and catalog-sized saddle bolts. Small attaches its existing
+XY drives through `MillXYStage`; Compact VMC supplies its HG25 geometry and larger
+stack dimensions through `MillCapacityLayout`. Compact VMC retains its original
+travel and table/spindle datums. Its XY drives remain unfitted, and it has no
+Small motor pockets, nut seats or implied drive ratings.
+
+Run `haxeon.json` to check and generate `build/mill/small.mtrg` and `large.mtrg`.
+
+Open the source project and use the **Configuration** selector to choose **Small**
+or **Compact VMC**. Stop simulation before switching. Opening a generated `.mtrg` file gives a single scene and does not expose the project selector.
+
+Small and Compact VMC include **Machine bearing block**, a named CNC mission. Play
+runs the shared bearing-block program once; the Mission panel follows its actual
+CNC execution state and the CNC panel provides feed hold, resume and program
+inspection. Both configurations use a shared ZPP AR155-I pneumatic vise and manual TS96-155
+zero-point plate, with supplier STEP geometry and a tapped table adapter. Jaw
+motion is geometric; air ports are exposed for a future verified pneumatic binding. Stock seating, work offset
+and effective tool length derive from the table, vise and BT30 spindle. See
+[WORKHOLDING.md](WORKHOLDING.md) for dimensions, source and reconstruction limits.
+Open **`materia.bench.project.json`** for the independent **Bench mill** project,
+with **Open bench mill** and **Enclosed cell** configurations. The enclosed cell
+adds its pneumatic vise and door. Its bearing-block program is also a named,
+single-pass mission. The legacy standalone entrypoint uses the same mission identity and finite execution.
+The Start page has separate **Mill** and **Bench mills** cards. The spindle-drive
+study belongs to the Small/VMC project. There is no Demo selector: configurations
+select hardware, studies select design setups, and the Mission panel presents the task loaded with the machine.
+
+The Small and Compact VMC missions are **kinematic machining previews**:
+axis commands use explicit 20 mm/s velocity and 100 mm/s² acceleration assumptions. They do not qualify motor sizing,
+cutting forces, structural performance or production capacity. The capacity-only
+preview keeps its fixture envelope and contains no cutting mission.
+
+Run `haxeon.machining.json` for G-code, datum and travel checks on both setups;
+`app/tests/mill-missions/haxeon.json` exercises the actual CNC mission executor.
+Its default backend is deterministic; set `MILL_MISSION_BACKEND=mujoco` to check
+the desktop backend. The execution tests retain the real machine geometry and
+joints while disabling general physical contacts; cutter/holder/stock interaction
+is checked by the CNC kernel. These tests do not qualify machine contact dynamics.
 
 The working legacy `BenchMill` has 250 mm X, 150 mm Y and 250 mm Z travel.
 `MillFramePreview` develops a separate mechanical concept with 250 mm X, 160 mm Y and 250 mm Z travel.
@@ -409,3 +456,20 @@ Each column side now uses one continuous steel Z mounting strip for the rail
 and both bearing anchors. The `railSeat`, `bearingLowerFace` and
 `bearingUpperFace` regions retain their mounting datums on `column/railZLeft`
 and `column/railZRight`. FEM bearing loads still use only the upper 20 mm region.
+
+The [Compact VMC capacity study](CAPACITY_STUDY.md) derives a
+400 × 300 × 380 mm working envelope with a 700 × 400 mm table. Open
+`materia.capacity.project.json` for its movable packaging preview. It has its own
+build outputs and does not replace the smaller mill. Drives, structural stiffness
+and finished-machine capacity still require qualification at the larger size.
+
+Both VMC configurations now use catalog Leadshine motors for every installed drive.
+See [MOTOR_MOUNTS.md](MOTOR_MOUNTS.md) for the selected models, supplier/custom
+mount split and the Compact variant’s still-unfitted XY drives. The spindle selection
+is 1.5 kW with a 3:1 speed-increasing belt, replacing the assumed 2.2 kW envelope.
+
+The Small and Compact VMC Z drives share an HZMotion M80E-BK15-C integrated
+motor/bearing housing and BF15 support, with an SFU2005 screw. A flat T adapter
+fits the housing between the guide rails, replacing the separate stand/bearing
+stack. See `MOTOR_MOUNTS.md` for the STEP/drawing discrepancies and outstanding
+brake, fastener and load qualifications.

@@ -37,10 +37,10 @@ class GantryPlate extends MachineComponent {
 	public final width:Float;
 	public final depth:Float;
 	public final height:Float;
-	public final motor:Null<NemaStepper>;
+	public final motor:Null<MachineComponent>;
 	public final motorFace:Null<AssemblyFrame>;
 	public function new(name:String, width:Float, depth:Float, height:Float,
-			?motor:NemaStepper, ?motorFace:AssemblyFrame) {
+			?motor:MachineComponent, ?motorFace:AssemblyFrame) {
 		for (value in [width, depth, height])
 			if (!Math.isFinite(value) || value <= 0) throw "Gantry plate dimensions must be positive";
 		if ((motor == null) != (motorFace == null)) throw "A motor mounting plate needs its motor face";
@@ -58,7 +58,7 @@ class GantryPlate extends MachineComponent {
 		return Solids.building([], owned -> {
 			var block = Part.box(width, depth, height);
 			owned.push(block);
-			var cutout = mounted.mountingCutout(width + depth + height);
+			var cutout = machinekit.motion.AxisMotor.of(mounted).mountingCutout(width + depth + height);
 			owned.push(cutout);
 			var x = AssemblyFrames.transformVector(face, 1, 0, 0), z = AssemblyFrames.transformVector(face, 0, 0, 1);
 			var tool = cutout.placed(new Location(new Plane(new Vector(face.x, face.y, face.z),
@@ -67,6 +67,28 @@ class GantryPlate extends MachineComponent {
 			return Solids.cut(block, [tool]);
 		});
 	}
+}
+
+/** Built-up Z plate with two closed side stiffeners; rail mounting face stays flat.
+ * Weld/heat-treatment and final machining remain fabrication qualification inputs. */
+class GantryStiffenedPlate extends GantryPlate {
+    public final ribDepth:Float; public final ribWidth:Float; public final ribWall:Float;
+    public function new(width:Float,depth:Float,height:Float,ribDepth:Float,ribWidth:Float,ribWall:Float) {
+        super("Z carriage side boxes "+Dimension.format(ribWidth)+"x"+Dimension.format(ribDepth)+"x"+Dimension.format(ribWall),width,depth,height);
+        for(v in [ribDepth,ribWidth,ribWall])if(!Math.isFinite(v)||v<=0)throw "Invalid Z stiffener dimensions";
+        if(2*ribWall>=Math.min(ribDepth,ribWidth)||2*ribWidth>=width)throw "Z stiffener walls consume section";
+        this.ribDepth=ribDepth;this.ribWidth=ribWidth;this.ribWall=ribWall;
+    }
+    override public function geometry(detail:ComponentDetail=Preview):Part return Solids.building([],parts->{
+        parts.push(Part.box(width,depth,height));
+        for(sign in [-1,1]) {
+            var outer=Part.box(ribWidth,depth,ribDepth),inner=Part.box(ribWidth-2*ribWall,depth+2,ribDepth-2*ribWall);
+            var bore=inner.translated(new Vector(0,0,ribWall));inner.close();
+            var hollow=Solids.cut(outer,[bore]);
+            var placed=hollow.translated(new Vector(sign*(width-ribWidth)/2,0,height));hollow.close();parts.push(placed);
+        }
+        return Solids.union(parts);
+    });
 }
 
 /** Stationary journal supporting a belt idler's bore. */
@@ -183,14 +205,30 @@ class GantryBoredBracket extends GantryPlate {
 
 /** Frame/carriage bridge with clearance for the actual motor shaft or pinion. */
 class GantryMotorSupport extends GantryBoredBracket {
-	public final mountedMotor:NemaStepper;
+	public final mountedMotor:MachineComponent;
 	public final shaftFace:AssemblyFrame;
-	public function new(name:String, width:Float, depth:Float, height:Float, motor:NemaStepper,
+	public function new(name:String, width:Float, depth:Float, height:Float, motor:MachineComponent,
 			shaftFace:AssemblyFrame, ?sections:Array<Array<Float>>, ?clearanceDiameter:Float) {
-		var bore = clearanceDiameter == null ? motor.variant.shaftDiameter + 0.5 : clearanceDiameter;
-		if (!Math.isFinite(bore) || bore < motor.variant.shaftDiameter + 0.5)
+		var bore = clearanceDiameter == null ? machinekit.motion.AxisMotor.of(motor).shaftDiameter + 0.5 : clearanceDiameter;
+		if (!Math.isFinite(bore) || bore < machinekit.motion.AxisMotor.of(motor).shaftDiameter + 0.5)
 			throw "Motor support clearance must cover its shaft";
 		super(name, width, depth, height, shaftFace, bore, sections);
 		mountedMotor = motor; this.shaftFace = shaftFace;
 	}
+}
+
+/** Side tab and front bridge around a column wider than its Z carriage. */
+class GantrySwitchTrigger extends MachineComponent {
+    final width:Float;final depth:Float;final height:Float;
+    final bridgeWidth:Float;final bridgeDepth:Float;final bridgeX:Float;final bridgeY:Float;
+    public function new(width:Float,depth:Float,height:Float,bridgeWidth:Float,bridgeDepth:Float,bridgeX:Float,bridgeY:Float) {
+        super("GANTRY-STEPPED-TRIGGER-"+[width,depth,height,bridgeWidth,bridgeDepth,bridgeX,bridgeY].join("-"),"Gantry stepped Z switch trigger","steel",true);
+        this.width=width;this.depth=depth;this.height=height;this.bridgeWidth=bridgeWidth;this.bridgeDepth=bridgeDepth;this.bridgeX=bridgeX;this.bridgeY=bridgeY;
+        for(value in [width,depth,height,bridgeWidth,bridgeDepth])if(value<=0||!Math.isFinite(value))throw "Invalid stepped switch trigger";
+    }
+    override public function hasGeometry():Bool return true;
+    override public function geometry(detail:ComponentDetail=Preview):Part {
+        var blank=Part.box(bridgeWidth,bridgeDepth,height),bridge=blank.translated(new Vector(bridgeX,bridgeY,0));blank.close();
+        return Solids.union([Part.box(width,depth,height),bridge]);
+    }
 }

@@ -7,7 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 
 /** Horizontal direct-drive cage. +Z goes from pedestal toward motor; +Y is up.
  * Low anchor holes run through the legs and meet the pedestal's front tapped holes.
- * Motor pattern is an explicit generic envelope, pending vendor selection.
+ * Motor receiving pattern follows the 60 mm Leadshine catalog interface.
  */
 class MillServoMount extends MachineComponent {
 	static var recipe:Null<ComponentType>;
@@ -41,7 +41,10 @@ class MillServoMount extends MachineComponent {
 		];
 		for (side in [-1, 1]) pieces.push(Part.box(12, d, 39).translated(new Vector(side * (w / 2 - 6), cy, 8)));
 		var tools = [Part.cylinderSpan(14.1, -1, 9), Part.cylinderSpan(8.5, 46, 56)];
-		for (x in [-15.0, 15.0]) for (y in [-15.0, 15.0]) tools.push(Part.cylinderSpan(2.75, 46, 56, x, y));
+		var mounting=machinekit.motion.LeadshineServo.model("ELM2H-0400LA60F").mounting();
+		if(mounting==null)throw "Servo cage needs catalog mounting data";
+		tools.push(Part.cylinderSpan((mounting.pilotDiameter+0.2)/2,55-mounting.pilotHeight-0.2,56));
+		for(p in mounting.holes)tools.push(Part.cylinderSpan(mounting.holeDiameter/2,46,56,p.x,p.y));
 		for (side in [-1, 1]) tools.push(Part.cylinderSpan(
 			3.3,
 			-1,

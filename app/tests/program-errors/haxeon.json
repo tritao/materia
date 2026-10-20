@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "entry": "tests.ProgramErrorMessageTests",
+  "sourceRoots": [
+    "../src"
+  ],
+  "scopeSourceRoots": false,
+  "target": "host",
+  "outputDir": "build",
+  "dependencies": {
+    "app": {
+      "path": "../.."
+    }
+  }
+}

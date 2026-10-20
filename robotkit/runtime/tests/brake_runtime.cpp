@@ -1,5 +1,6 @@
 #include "robotkit_runtime.hpp"
 #include <cassert>
+#include <cmath>
 #include <cstring>
 #include <memory>
 
@@ -10,19 +11,24 @@ public:
     bool owns_path_clock = false;
     uint64_t sequence = 0;
     double position = 0.0;
+    double follower_position = 0.0;
+    uint32_t joints = 1;
     rk_robot_command last{};
     bool executes_trajectory_queue() const noexcept override { return owns_path_clock; }
     rk_result apply(const rk_robot_command &command) override {
         last = command;
-        if (command.kind == RK_COMMAND_JOINT_TARGETS && command.target_count)
-            position = command.targets[0].target;
+        if (command.kind == RK_COMMAND_JOINT_TARGETS) for (uint32_t i = 0; i < command.target_count; ++i) {
+            if (command.targets[i].joint == 0) position = command.targets[i].target;
+            if (command.targets[i].joint == 1) follower_position = command.targets[i].target;
+        }
         return RK_OK;
     }
     rk_result sample(uint64_t timestamp, rk_robot_state &state) override {
         state.struct_size = sizeof(state);
         state.source_timestamp_ns = timestamp;
-        state.joint_count = 1;
+        state.joint_count = joints;
         state.position[0] = position;
+        if (joints > 1) state.position[1] = follower_position;
         state.sensor_count = 1;
         if (fresh) ++sequence;
         state.sensors[0].sequence = sequence;
@@ -96,6 +102,43 @@ int main() {
         assert(cold.apply_pending_commands(20'000'000) == RK_OK);
         assert(starting->position == 0.4);
         assert(release_coil(cold));
+    }
+    {
+        // A loaded compliant screw settles away from its braked shaft. Powering
+        // the brake must keep the commanded coupling anchor, while the separate
+        // release hold continues to use observed positions until feedback arrives.
+        auto coupled = blueprint();
+        coupled->joint_count = 2; coupled->link_count = 3;
+        coupled->links[2] = coupled->links[1];
+        coupled->joints[1] = coupled->joints[0]; coupled->joints[1].joint = 1;
+        coupled->joints[1].parent_link = 1; coupled->joints[1].child_link = 2;
+        coupled->joint_servo[1] = coupled->joint_servo[0];
+        coupled->coupling_count = 1;
+        coupled->couplings[0] = {0, 1, -1000.0, 0.0};
+        coupled->coupling_stiffness[0] = 100.0;
+        coupled->sensor_joint[0] = 1; coupled->brakes[0].joint = 1;
+        assert(rk_robot_runtime_blueprint_validate(coupled.get()) == RK_OK);
+        auto elastic = std::make_shared<BrakeFeedbackEndpoint>();
+        elastic->joints = 2; elastic->position = 0.000006;
+        robotkit::RobotRuntime checked(*coupled, elastic, std::chrono::milliseconds(10));
+        assert(checked.publish_sample(0) == RK_OK);
+        assert(checked.apply_pending_commands(10'000'000) == RK_OK);
+        assert(checked.publish_sample(10'000'000) == RK_OK);
+        rk_robot_snapshot held{}; held.struct_size = sizeof(held);
+        assert(checked.snapshot_full(held) == RK_OK);
+        assert(std::abs(held.setpoint_position[1] + 1000.0 * held.setpoint_position[0]) < 1e-12);
+        assert(elastic->last.targets[1].target == 0.0); // observed shaft is held during release
+        robotkit::PlanRequest home{};
+        home.sequence = home.plan_id = home.model_revision = 1;
+        home.flags = RK_PLAN_HOMING;
+        home.segments.segments.resize(1);
+        auto &first = home.segments.segments[0];
+        first.joint_count = 2; first.degree = 3; first.duration_ns = 1'000'000'000;
+        for (uint32_t joint = 0; joint < 2; ++joint) {
+            home.start_position[joint] = held.setpoint_position[joint];
+            first.coefficients[joint].value[0] = home.start_position[joint];
+        }
+        assert(checked.submit_plan(home) == RK_OK);
     }
     auto endpoint = std::make_shared<BrakeFeedbackEndpoint>();
     robotkit::RobotRuntime runtime(*spec, endpoint, std::chrono::milliseconds(10));

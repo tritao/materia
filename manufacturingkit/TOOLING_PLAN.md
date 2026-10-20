@@ -1,6 +1,6 @@
 # Reusable panel tooling and mineral-casting molds
 
-Status: phases 1–4 implemented. The single-pocket and full mill-base molds are geometry reviews; fabrication and physical qualification remain pending.
+Status: phases 1–5 and the phase 6 process-analysis foundation are implemented as review tooling. The fabrication package reports unresolved process, structural, fixture and finishing requirements; physical qualification remains pending.
 
 ## Implementation progress
 
@@ -101,12 +101,212 @@ Status: phases 1–4 implemented. The single-pocket and full mill-base molds are
   and 27 design-interface assertions pass. The box example and full mill review
   package regenerate; the complete hardware assembly restores exactly using one
   shared bed datum, within the assembly connector limit.
-- [ ] Phase 5: assembly validation and fabrication package.
+- [x] Phase 5: assembly validation and fabrication review package.
+  `tooling.export.ToolingFabrication` adds versioned process/load inputs, typed
+  material/temperature checks, peak-head pressure and gross core uplift, declared
+  rectangular plate/brace/fastener capacity estimates, and per-core restraint
+  checks. Missing data stays pending; cutout plates and localized support loads
+  need qualified models. Styrene/EPS incompatibility fails; cure qualification now comes only from CureReport (review 23).
+  Exact sequence/coverage/reconstruction checks remain the CAD gate.
+  Neutral sheet requirements and deterministic shelf layouts retain part IDs and
+  revisions without inventory mutation or contour-nesting claims. The package
+  includes per-panel operation CSV, EPS/steel/hardware lists, reusable/consumable
+  groups, fit and round/slot locator coupons, and a fingerprinted physical trial
+  template. ManufacturingKit still imports only ProjectKit and writes no drawings.
+  `CamToolingPanels` maps operations 1:1 onto CamJob profile/pocket/drill, uses
+  declared tool/feed/setup/stock/fixtures/travel and exports checked LinuxCNC
+  programs through the existing CncWriter. Underside reflection, pocket-access
+  prerequisites and last outside cuts are explicit. Exact arcs are retained as
+  optional CamContour boundary metadata: CamKit's exact native offset is needed
+  because polygon offsets reject cutter-radius reliefs. Isolated matched-radius
+  relief centres get disc-checked vertical entries within the same operation;
+  output centrelines retain the declared chord tolerance. No compensation is
+  applied to neutral profiles. This extension replaces the original polyline-only
+  offset assumption for tooling; general arc-native IR is deferred.
+  `haxeon.fabrication.json -- --checks` generates a fresh full package under
+  `build/tooling/base-fabrication/`, with hashed manifest/verification and a
+  normalized STEP timestamp for repeatable output. Shop feeds/workholding,
+  non-panel machining, precision masters/dams/plugs, source change requests and
+  physical qualification remain explicit blockers rather than fabricated data.
+  Validation: 216 pure tooling, 105 panel-CAM, 12,456 existing CamKit, 339 native
+  tooling and 151 full-mill assertions pass. The sheet bridge passes the existing
+  sheet-plan validator. All 19 panel/coupon parts produce 25 checked programs;
+  the assembly-derived hardware BOM contains 76 pieces. Two full generations
+  have identical manifests and all 650 artifact hashes; tampering is rejected.
+  Source/reconstructed CAD symmetric difference is zero.
 - [ ] Phase 6: design-stage moldability feedback and casting process analysis.
-- [ ] Phase 7: mill column and independent pedestal example.
-- [ ] Phase 8: physical calibration and release.
+  Process-analysis foundation implemented: independent strict `CastingProcessSpec`
+  version 3 binds resin/thermal/fill/screening inputs to the exact recipe fingerprint.
+  `FillAnalysis` computes exact orthogonal event-plane connectivity, limiting
+  trapped volumes, source-owned ceilings and candidate vent points, ideal
+  level/volume/mass/head/time curves and per-core submerged uplift. It uses the
+  existing disjoint box algebra and symbolic right-hand limits, rather than
+  sampled heights or native offsets. Independent CadKit Boolean fixtures verify
+  the volumes and component topology; the full package cross-checks its resin
+  volume against the fingerprint-bound source CAD review. Non-orthogonal fill
+  geometry remains unsupported. Connected coplanar ceilings use a conservative
+  bounding-width rule; an unknown air-escape limit stays pending.
+  `CureAnalysis` adds a lumped estimate and coupled implicit 1D conduction/reaction
+  for declared slabs; review 24/29 adds autocatalytic kinetics and completion gates.
+  Insulated heating, nonlinear energy balance and inert-slab Fourier cooling
+  fixtures pass. Residual reaction heat prevents early-stop qualification;
+  missing data and actual-section numerical convergence/coverage/calibration
+  remain blocking, and nonconvergent solves report unsupported.
+  Process checks join the existing fabrication manifest and Diagnostics without
+  clearing planner requests. The mill's supplier properties, temperatures,
+  margin, ceiling-width limit and section definitions are intentionally unknown.
+  Further phase 6 work adds `MoldOrientationStudy`: explicit candidate documents
+  run the real planner, fabrication checks and source fill/cure analyses, with
+  fingerprint-bound CAD assessments supplied by MachineKit. Deterministic ranking
+  uses planning/strategy/CAD feasibility gates, then the declared trapped-volume,
+  worst-cure-margin, flip, panel-count and sheet-count tuple (review 26). Effort reports production panels/unique
+  geometry, production-only blank sheet utilization, EPS consumption, formers,
+  logical hardware stacks and handling mass/flip; failed planning has no invented
+  effort values. The mill compares inverted/upright/side-on setups, preserving
+  feature withdrawal directions under rotation. Alternatives retain the current
+  support policy: failure requests support redesign, not an inherent impossibility.
+  `OrthogonalSections` extracts complete opposing-face material spans along all
+  three axes, with exact volume coverage and source face ownership. Partition
+  sizes are not wall thickness. A span becomes a `CureSection` only with explicit
+  thermal boundaries; nonrectangular inscribed thickness now has the bounded
+  exposed-face search described below.
+  `MoldPlayback` emits static scenes from the exact checked assembly/demolding
+  orders and expands grouped fixtures/hardware explicitly. It retains the cured
+  casting at withdrawal clearance and shows the service-orientation endpoint;
+  pending loose fixings, release and lift/flip qualifications are not cleared.
+  Castability screening now reuses exact fill/ceiling and planner draft records,
+  with typed source-owned review proposals, aggregate-based minimum passage and
+  rectangular-solid maximum section checks. Recipe-bound process spec version 2
+  requires explicit nullable screening limits/evidence and rejects version 1.
+  Widening proposals carry measured/target separations, axes and representative
+  regions; vent proposals retain exact ceiling points and require routing/sealing.
+  Junctions require explicit thermal-model coverage, and EPS breakout
+  stays pending physical access/release trials. The source is never edited and
+  suggestions cannot clear checks. Each orientation includes the same screening;
+  `castability-analysis.json` and `castability-review.md` join the hashed fabrication package.
+  Remaining phase 6 work: broader radius/insert-cover/access rules, accepted
+  source-parameter proposals with replan demonstrations, qualified 3D junction
+  thermal coverage, and column orientation/design-study integration. No phase 6 completion or physical release is claimed.
+  Process-foundation validation: 492 pure tooling assertions (276 process), 361 native tooling
+  assertions (22 independent process/CAD) and 151 full-mill assertions pass.
+  Two full generations have byte-identical manifests and all 654 artifact hashes,
+  including the external `--process-spec` input path; 25 programs pass CAM checks. The current
+  inverted base has no topologically trapped air; its 70,107,544 mm3 mix region
+  agrees with CAD. Readiness remains false: 22 passing and 147 pending records,
+  including undeclared broad-ceiling/cure inputs and the existing qualification
+  and source-change requirements.
+  Orientation/section/playback validation: 524 pure, 367 native and 239 full-mill
+  assertions pass. The package contains 156 checked-order scene snapshots and
+  815 hashed artifacts, with 25 checked CNC programs. Two final generations have
+  byte-identical manifests and all 815 hashes, and the assembled/released scenes
+  open successfully in Materia. Inverted is the preferred
+  review setup under the existing support policy; upright/side-on fail the
+  fill-open shared bridge requirement while still producing source fill/cure
+  reports. All three have no topological air trap in this model. Planar spans
+  reconstruct native BREP fixtures by symmetric difference on each axis. Static
+  visual-only scenes retain pending release/flip states and do not substitute
+  viewer collision boxes for the exact saved review. Actual final readiness is
+  false: 23 passing, 147 pending and one unsupported junction-thickness rule.
+  Castability screening validation: 571 pure tooling assertions (47 castability),
+  28 independent native process/CAD and 239 full-mill assertions pass. The full
+  package has 23 passing, 155 pending and one unsupported check; the 9 mm minimum
+  opposing-face span cannot be approved against an undeclared aggregate size.
+  The feedback contains 23 review actions: six EPS breakout trials, thirteen
+  rigid-former release reviews, three process-limit declarations and junction
+  analysis. No source change, automatic vent or physical release is claimed.
+  Junction geometry and coverage follow-up: `JunctionThickness` computes largest
+  Euclidean inscribed-sphere intervals from exact exposed rectangles, with
+  source-owned faces, a contained witness and Lipschitz branch-and-bound upper
+  bounds. Work exhaustion retains bounds and cannot claim convergence. The mill
+  converges to 216.99–217.47 mm at 0.5 mm diameter tolerance; native checks verify
+  the witness against actual foundation CAD and compare exposed surface area.
+  `ThermalCoverage` accounts for explicit slab-to-span bindings and exact uncovered
+  volume; stale geometry, wrong thickness/ownership, mixed axes and duplicate
+  assignments fail. Process spec 3 requires span IDs and a geometry fingerprint
+  (empty/null for an unbound example), rejects prior formats, and shares bindings
+  across same-geometry plan/document report stamps. Section report 2, process and
+  orientation reports 3 and castability report 2 carry the new results.
+  Geometry coverage does not qualify junction heat flow. Nonrectangular junction
+  modelling stays pending. A lumped thermal estimate never bypasses missing
+  coverage, junction modelling or invalid authored bindings (review 24). The current mill has no authored
+  slabs, so all 70,107,544 mm3 is explicitly unbound. No material data, 3D thermal
+  result, source change or physical release is invented.
+  Validation: 616 pure tooling, 32 independent native process/CAD and 243 full-mill
+  assertions pass. The 819-artifact package has 24 passing and 157 pending checks,
+  with no failed/unsupported records; junction thermal modelling and the missing
+  material/physical evidence remain pending, so fabrication readiness is false.
+- [ ] Phase 7: foundation design model: typed casting features with openings and
+  owners, insert holes from `DesignInterfaces`, design-owned interface
+  requirements, datums, lifting inserts and foundation joints, then drafted,
+  radiused and profiled features. Precedes the column.
+  Compilation recovery checkpoint (step 1 remains in progress): source features,
+  insert roles/finishes and hole patterns now use neutral `materia.casting` records;
+  old JSON boxes and boreDiameter recipes are rejected. Tooling schema 6 and
+  box/casting-mold schema 5 have no prior-format path. The shared box algebra is
+  used by fill, collision and section screening; planar cut/body intersection is
+  centralized and non-box cavities are rejected by feature ID by box consumers.
+  The adapter copies source facts and `DesignInterfaces` holes. The old hobber
+  receives only required type/import and recipe-key changes.
+  The remaining step-1 rules, core-fragment grouping, hole-pattern fixture
+  expansion and unified levelling-foot family are not claimed complete; steps 2
+  and 3 remain pending. Current fixtures still declare explicit setup strategies.
+  Validation: 1,712 neutral tooling/process assertions, 17 independent foundation
+  record/algebra assertions, 49 casting assertions and 375 native tooling
+  assertions pass. Full mill review passes 248 assertions and both package modes
+  pass manifest tamper checks (40 programs, 837 full-package artifacts). Frozen
+  pre-migration mill CAD and the sloped-foot cut/body intersection pass four
+  independent native assertions. Readiness remains false: 14 Pass, 250 Pending, 15 Unsupported;
+  no physical coupon trial is recorded.
+- [ ] Phase 8: mill column and independent pedestal example.
+- [ ] Phase 9: physical calibration and release.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
+
+## Manufacturing review follow-up
+
+- [x] Review 1–9, panel CAM: measured-length multi-tool programs (G43/G49),
+  dependency-preserving grouping, explicit single-tool review fallback, declared
+  spoilboard/breakthrough, qualified-vacuum retention route, Z-only start, spindle
+  dwell, open-side square-rebate extension, arc/blend tolerance, cut direction,
+  nominal/measured diameter matching and machine-coordinate qualification gates.
+  Panel tests include outside/relief compensation, full contour mirror, square
+  rebate cutter coverage, tool offset sequencing, direction and CAM-depth rejection.
+  The 276 panel assertions and 12,457 existing CamKit assertions pass. The records export yields 44 review programs, with five ordered bed files;
+  all 19 per-panel CAM records stay pending under the study setup. The mill
+  remains not fabrication-ready: tools/fixtures/vacuum and a recorded coupon trial
+  are not qualified. Tabs/onion skins are not claimed by the vacuum route.
+- [x] Review 10–13: gross displaced-volume uplift and X/Y restraint bounds
+  for every rigid former and datum, with separate evidenced capacities. Real
+  machined/support panels explicitly report an Unsupported structural model.
+  Manifest v2 hashes readiness/validation and verifies recomputed readiness;
+  unknown hardware is included in the BOM and blocks qualification.
+  The neutral suites pass 630 assertions, including lateral restraint failure;
+  the records export passes artifact and manifest metadata tamper checks.
+- [x] Review 14–21: vertical-only flip detection; maximum-depth row bridges
+  with a real minimum (mill study minimum explicitly 40 mm, not qualified);
+  unapplied finishing allowances remain change requests, replication requires
+  master/release data, equal-priority former overlaps reject. Release requests
+  include bed backing and explicitly exclude unimplemented draft/split routes.
+  CastInsert roles are choices with separate labels; foundations expose recess
+  links and finish routes follow source intent. Neutral validation rejects datum
+  intrusion into resin; datum profiles remain explicitly unsupported. Removed
+  the codec-sorted permutation test. Neutral and native tooling suites pass;
+  the mill records export passes manifest integrity checks.
+- [x] Review 22–30: subtract tooling projections from fill openings and reject
+  zero open area; curved openings needing an exact projection remain Unsupported.
+  Trapped air is removed from the level curve and each level reports panel heads.
+  CureReport is the sole cure authority (fabrication spec 3 / process spec 4),
+  including EPS-containing adhesive, resin identity and gel limits. Autocatalytic
+  kinetics, remaining-heat completion and energy accounting are implemented;
+  first-order kinetics are analytical fixtures and cannot qualify a reactive mix.
+  The lumped estimate requires margin and never clears coverage/junction rules.
+  Planned orientation candidates call CastingProcessAnalysis directly, emit the
+  declared metric tuple and deciding reason, and retain actual review validation.
+  Full export compares symmetric difference against foundation.body.geometry().
+  Validation: 1,675 neutral assertions, 34 native process assertions and 243 mill
+  assertions pass. The 840-artifact full export has zero foundation symmetric
+  difference, 13 Pass / 175 Pending / 15 Unsupported, and passes manifest tamper
+  checks. There is no recorded coupon trial and the mold is not fabrication-ready.
 
 ## Objective and first deliverable
 
@@ -164,7 +364,8 @@ Baseline at the start of implementation; the progress list above records changes
   inside profiles, pockets with depth steps and drilled holes, with stock/fixture
   checks and LinuxCNC export. `CamSheetProfiles` is the precedent for bridging
   ManufacturingKit records into CAM. CamKit and ToolpathKit work in metres and
-  `CamContour` is a polyline.
+  `CamContour` retains polyline vertices; phase 5 adds exact boundary metadata
+  for native cutter compensation of matched-radius reliefs.
 - The hot-wire foam cutter (`machinekit/examples/foam-cutter/PLAN.md`) plans a
   `camkit.foam.FoamJob` that accepts a CadKit solid or two paired profiles and
   checks ruledness between foam faces. It is not on main yet.
@@ -236,7 +437,7 @@ compatibility path for the old encoding.
 | `ToolingRecipe` | ID/revision, panel/core stock, joint policy, process limits, fit allowances, seal/liner thickness, hardware choices, resin cure spec, mix properties |
 | `PanelStockSpec` | Material reference, nominal and measured thickness, variation, coated face, stock dimensions, permitted rotations/direction |
 | `CoreStockSpec` | EPS grade reference, available block sizes, density, declared compression/temperature limits, layer adhesive, evidence references |
-| `CastingToolingInput` | Source ID/revision/hash, supported envelope, named void features, insert geometry/poses, precision datums |
+| `CastingToolingInput` | Source ID/revision/hash, supported envelope, typed `materia.casting` features, inserts with holes and interface requirements, datum scheme, foundation joints (phase 7) |
 | `CastingSetup` | Source-to-mold transform, gravity/fill direction, open face, parting choices, feature overrides, support and finishing datums, compaction, fill height, pour rate and pour points, initial/ambient temperature |
 | `CompactionSpec` | Method (vibration table, external vibrators, internal poker, none), mold-bed interface, declared frequency/amplitude/duration or pending, evidence |
 | `InsertAnchorage` | Insert reference, anchorage kind (studs, undercut, bonded keys), geometry, declared pull-out/shear capacity or pending, evidence |
@@ -249,7 +450,7 @@ compatibility path for the old encoding.
 | `DesignChangeRequest` | Source feature/insert IDs, requested change (draft, lifting insert, split, radius, access), reason, blocking checks |
 | `ResinCureSpec` | Supplier/grade reference, solvent family, heat of reaction, kinetic model and parameters (or an adiabatic temperature-rise curve), resin mass fraction, mix density/specific heat/conductivity, gel and limit temperatures, evidence; each value or pending |
 | `FillReport` | Setup/source fingerprints, critical levels, level-volume curve, resin mass, trapped-air pockets (volume, ceiling faces, source/tooling IDs, proposed vent point), head and buoyancy per level, fill time when a pour rate is declared |
-| `CureReport` | Recipe/setup fingerprints, analysed sections (source IDs, thickness, boundary conditions), adiabatic bound, 1D peak temperature and time, margin to each limit, 3D result reference when run, validation evidence |
+| `CureReport` | Recipe/setup fingerprints, analysed sections (source IDs, thickness, boundary conditions), lumped estimate (not a spatial upper bound), 1D peak temperature and time, margin to each limit, 3D result reference when run, validation evidence |
 | `MoldPlan` | Panels, formers, cores, fixtures, braces, hardware, penetrations, steps, change requests, assumptions and source provenance |
 | `ToolingValidation` | Rule ID, affected IDs, severity, evidence, and pass/fail/pending/unsupported status |
 | `ToolingManifest` | Format version, units, revisions/hashes, generated files, validation status, quantities and replacement groups |
@@ -260,8 +461,9 @@ inferred from depth or shape. Parametric cut shapes (relieved rectangle, circle,
 obround) may be the stored form, provided each yields one exact line/arc contour
 through a single function shared by CAD, drawings and CAM. Contours keep exact arcs
 in the record; `CamToolingPanels` samples arcs to a declared chord tolerance
-while `CamContour` remains a polyline, and stops sampling once CamKit contours
-carry arcs. Profiles are finished geometry: CamKit applies cutter compensation.
+while `CamContour` retains a sampled representation and optional exact line/arc
+boundary metadata for CamKit compensation (added in phase 5 for matched-radius
+reliefs). Profiles are finished geometry: CamKit applies cutter compensation.
 
 `DesignChangeRequest` is how tooling asks for a casting change it may not make
 itself. Requests are reported against source IDs and block fabrication readiness
@@ -283,14 +485,187 @@ envelope parameters. Existing casting recipes must reconstruct unchanged.
 The planning input must describe how the casting envelope is built, including
 the flared foot when present. A bounding box alone is insufficient. Support
 explicit box and extruded-profile envelopes first; reject unsupported shapes.
-Clip design-cut tools to the casting envelope: existing cuts deliberately extend
-beyond casting faces, and those extensions are not literal finished cavity sizes.
+Until phase 7, clip design-cut tools to the casting envelope: existing cuts
+deliberately extend beyond casting faces, and those extensions are not literal
+finished cavity sizes. Phase 7 replaces this clipping with declared openings and
+one shared finished-cavity function.
 
 Store plan/setup records in a versioned tooling JSON format separate from sheet
 inventory. Validate codec input, bounded record counts and referential integrity.
 Use deterministic serialization and source/recipe fingerprints. Geometry or
 recipe changes invalidate generated reports and physical qualification tied to
 the previous version. Do not serialize native CAD resources.
+
+## Foundation design model
+
+The mold pipeline is sound, but the casting description it starts from is too
+thin, and several tooling workarounds come from that: a feature-ID strategy table
+in the mill setup, clipping of deliberately oversize design cuts, hardware written
+into insert labels, precision requirements held in mold options, and box-only
+geometry that blocks drafted formers, corner-radius rules and non-orthogonal fill
+analysis. Phase 7 replaces the source model before the column and pedestal are
+built on it. Each step is one schema change with no compatibility path: casting
+recipes, tooling inputs, codecs and fingerprints move together, and generated
+packages are regenerated.
+
+### Ownership
+
+- `materia.casting`, a new ManufacturingKit package with no CadKit or MachineKit
+  imports, holds the neutral casting design records and closed vocabularies that
+  the design and the tooling share: feature kinds, openings, feature geometry,
+  insert role and finish, interface requirements, datums and foundation joints.
+  `InsertRole` and `InsertFinish` move here from `materia.tooling.ToolingEnums`.
+- `machinekit.structural` (`MineralCasting`, `MineralFoundation`, `CastInsert`)
+  stores these records as recipe parameters and realizes them as CAD. It defines
+  no second feature type.
+- `machinekit.design.DesignInterfaces` stays the hole and datum model for steel
+  inserts; it uses CadKit thread specifications, so it remains in MachineKit.
+- `FoundationToolingAdapter` becomes a copy: neutral records, plus hole interfaces
+  converted to neutral hole records, fingerprinted. It infers nothing.
+- One exact disjoint-box algebra lives in `materia.casting`. It replaces both
+  ManufacturingKit's `BoxVolumes` (fill analysis) and the hobber branch's
+  `machinekit.structural.CastingCells` (collision hulls, section stiffness), so
+  collision, stiffness screening and fill analysis share one implementation.
+
+This is the single casting tooling plan. The `flexspline-hobber` branch's
+`machinekit/CASTING_TOOLING_PLAN.md` (CT0–CT10, unimplemented) is superseded; its
+replication-relationship, fixture-constraint, batch and printed-piece decisions
+are folded in here (interface requirements, insert fixtures, fill analysis and
+deferred scope).
+
+### Typed casting features
+
+`CastingFeature` replaces `CastingFeatures.CastingBox`, which is an ID, size and
+pose stored in a JSON text parameter.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | Stable source ID |
+| `kind` | `Lightening`, `ServiceOpening`, `InterfaceRecess`, `InsertRecess` or `Clearance` |
+| `geometry` | Design cut: box, or straight prism from a closed line/arc profile; it may cross the body boundary only through declared openings |
+| `openings` | Body faces, or other feature IDs, the feature opens through; empty means enclosed |
+| `draft`, `cornerRadius` | Wall draft along a declared withdrawal axis and internal corner radius; zero is explicit |
+| `owner` | The interface or insert the feature serves, or null |
+| `adjustable` | Dimensions the design allows proposals to change (lightening cores yes, interface recesses no) |
+| `derivedFrom` | The design feature this one was split from when retained webs, backing or bosses are subtracted from it, or null |
+
+- Retained material (support webs, backing under precision seats, foot bosses) is
+  subtracted from a design feature by the shared box algebra. Each resulting
+  fragment keeps a stable ID and `derivedFrom`, so tooling can group the
+  fragments of one bay into one core unit and castability can report against the
+  design feature that the designer edits.
+
+- A feature stores design intent: its cut and the body faces or features it
+  opens through. The finished cavity (cut ∩ body) is derived by one function in
+  `materia.casting`, exact for the planar envelopes this model supports, and
+  every consumer uses it; no consumer clips cuts itself. Where a cut crosses a
+  non-orthogonal body face, such as the column's sloped foot, the finished
+  cavity is a line-profile prism even though the cut is a box. A cut may extend
+  beyond the body only across declared openings, by no fixed margin; a declared
+  opening the cut does not reach, or a breakout through an undeclared face, is
+  an error. CAD realization still extends tools internally for robust booleans.
+- Consumers that support only boxes report a non-box finished cavity as
+  Unsupported with its feature ID until step 3, never approximating it.
+- `MineralFoundation` generates insert recesses from its inserts with
+  `kind = InsertRecess` and the insert as `owner`; recess links derive from that.
+- Default mold strategies follow from kind and openings through recipe rules
+  (for example, a lightening pocket open to the fill face becomes an EPS core and
+  an interface recess a rigid former). A setup overrides a strategy by naming the
+  feature ID. Unknown kinds fail. The mill's ID-keyed strategy table is deleted.
+- Castability proposals change only `adjustable` dimensions; other features get
+  change requests.
+
+### Feature geometry beyond boxes
+
+- Draft and corner radius are realized in CAD, in the planner (formers get drafted
+  walls; EPS cores ignore draft unless declared), in drawings and in CAM, where a
+  corner radius below the router radius fails with the feature ID.
+- Prism features from line/arc profiles cover chamfered and stepped recesses.
+  Other shapes stay unsupported.
+- Box algebra remains the exact fast path for features that are axis-aligned boxes
+  in the setup. Other regions use CadKit booleans at the same critical levels, as
+  the fill analysis originally specified. `OrthogonalSections` and
+  `JunctionThickness` report non-box regions as unsupported until they gain an
+  exact method. Drafted rigid formers become supported, and their release request
+  clears through draft rather than only through EPS or a source change.
+
+### Steel inserts
+
+- Insert holes come from a `DesignInterfaces` facet on `CastInsert`: patterns of
+  `HoleInterface` with thread via `ThreadSpec`, tap drill, blind or through and
+  counterbore. They replace `boreDiameter` and hardware text in labels such as
+  "nominal M12 tap drill". Bore masks, plugs, insert-sealed penetrations and
+  fixture fixings come from these holes.
+- Anchorage (headed studs, undercuts, bonded keys) is insert geometry and feeds
+  `InsertAnchorage`; its capacity stays pending evidence.
+- `finish` becomes typed tokens; `label` is display text only.
+
+### Interface requirements
+
+Precision intent belongs to the design. Each precision insert or foundation
+interface carries an `InterfaceRequirement`: route (as cast, machined, ground,
+replicated), allowance (machining stock or replication/grout gap), the finishes
+the interface permits, and position tolerance. The casting geometry includes the
+allowance. A route that the geometry cannot achieve is a design change request.
+
+Accuracy requirements are **relationships**, not single faces, and they come from
+the machine design rather than the casting:
+
+- `InterfaceRelationship`: coplanar, parallel, perpendicular or a distance between
+  datums, with a tolerance. Members are interface IDs or **machine axes** (for
+  example, the hobber column's Z-rail seats parallel to the C axis and its table
+  seat square to it). The machine assembly declares them; each insert's
+  requirement references the relationships it takes part in.
+- A replicated relationship is produced by a **replication jig**: release-coated
+  masters (ground bars, plates, granite squares, or an axis master such as a
+  ground arbor on the C-axis line) held in the design relationship on one rigid
+  reference frame, each on three-point jack supports with locks. Simpler finishes
+  stay available where the interface allows them: the real rail as master,
+  self-levelling (one gravity plane only) or face-down replication on a surface
+  plate. The jig planner chooses only among permitted finishes.
+- Each relationship names its metrology: instrument and method (electronic level,
+  indicators against the axis master, autocollimator or laser) and the stated
+  uncertainty. The measurement chain must fit inside the tolerance, or the
+  relationship stays pending.
+- The mold options' `PrecisionInterface` keeps only process choices: master and
+  jig references, release, hole protection and evidence. Replication masters,
+  jigs and their metrology are fabrication-package items; nothing is shimmed
+  later.
+
+### Foundation-level declarations
+
+- **Datum scheme:** primary, secondary and tertiary datum faces or features for
+  replication, machining and fixtures. Masters and datum fixtures reference them.
+- **Lifting and handling:** `LiftingMount` inserts placed by the design. Handling
+  checks use them, and the lifting-point castability rule proposes positions from
+  casting mass and centre of mass.
+- **Foundation joints:** the base–column interface becomes an explicit joint
+  between two foundations, with grout or replication gap, jacking screws, anchor
+  pattern and cure-before-torque. It replaces the standing change request.
+
+### Layout parameters
+
+`MillFrame` builds features from named layout parameters instead of inline numbers
+(shoulder clearance 12, recess depth 21, foot access 90 × 100 at 40, stem
+20 × 20 × 42, seat width 106, bores 10.2 and 18). Tap drills derive from thread
+specifications. Shared feature patterns (open underside pocket grids, foot access
+with stem, recesses beside guide seats, retained webs and backing) live in one
+builder in `machinekit.structural`.
+
+- The foot pattern starts from the hobber branch's `CastingFootPocket`
+  (side-access pocket, removable plate bearing up against a registered roof,
+  stem clearance, reserved boss) with its constants as parameters, reconciled
+  with the mill's foot access and stem. The plate register is an
+  `InterfaceRecess` owned by the removable plate.
+- One levelling-foot component family replaces the overlapping `LevellingFoot`,
+  `MillLevelingFoot` and the branch's `LevelingFoot`/`LevelingSeat`, with variants
+  for screw, pad, removable plate and nuts.
+- On main, phase 7 converts the mill. Main's `machinekit.hobbing.FoundationLayout`
+  is the superseded HB5 layout; the `flexspline-hobber` branch has rewritten it,
+  so the hobber foundations convert when that branch rebases onto phase 7, not
+  twice. That rebase also deletes `LegacyFoundationRecipes`, the
+  `hobbing.MineralFoundation` compatibility adapter and the `legacy` layout flags,
+  and adopts typed roles and labels.
 
 ## Generation pipeline
 
@@ -395,6 +770,13 @@ box-shaped inserts alone do not establish an anchorage design; anchorage is an
 `InsertAnchorage` record per insert, and its geometry joins the void and overlap
 checks once supplied.
 
+Every insert fixture is checked for full constraint: its pins, slots, faces and
+clamps must remove all six degrees of freedom of the insert, with no redundant
+locator fighting another. The check reports the free or over-constrained
+directions per insert. The fixture's stated accuracy budget is the insert
+tolerance minus its finishing allowance; fixtures must not block the pour where
+the mix must flow, and each must come off after cure.
+
 Precision inserts are normally fixed by bolting through the bed or a datum bar
 into their own threaded holes. Those holes penetrate a contact panel but are
 closed by the insert's mounting face: record them as insert-sealed penetrations
@@ -419,7 +801,7 @@ Record per seat:
 
 Grouted joints record the gap, jacking/squaring method, bolt sleeves and cure
 before torque. Replication masters, dams and plugs are tooling items in the
-fabrication package. Phase 8 coupons cover replication thickness, flatness
+fabrication package. Phase 9 coupons cover replication thickness, flatness
 transfer and bond to the steel seat.
 
 ## Validation and readiness
@@ -599,7 +981,7 @@ them into the `Diagnostics` used by `FoundationIntegrity.check`, keyed by source
 feature IDs so a later editor can highlight them; this release adds no app UI.
 `MillDesignStudy` writes the metrics alongside its existing outputs.
 
-Recipe limits start as declared assumptions. When phase 8 evidence revises a
+Recipe limits start as declared assumptions. When phase 9 evidence revises a
 recipe (aggregate size, achievable insert tolerance, minimum ligament, cure peak
 by section), the design rules use the revised values; feedback reports which
 recipe revision and evidence each threshold came from.
@@ -623,9 +1005,14 @@ solid in mold coordinates, already checked against the source.
   feature IDs owning those faces and its highest point (the proposed vent) are
   reported.
 - Component topology changes only at critical heights: the z values of
-  vertices, horizontal faces and curved-face extrema. Evaluate just above each
-  critical height with CadKit booleans, so the result is exact for the supported
-  geometry, with no sampling. Unsupported surface kinds fail.
+  vertices, horizontal faces and curved-face extrema. For the implemented
+  orthogonal mold contract, exact disjoint-box algebra evaluates the symbolic
+  right-hand limit at each critical plane: ending cells disappear and surviving
+  cells retain their limiting volume. CadKit Boolean/component fixtures verify
+  this calculation independently. This replaces the initial native-only proposal
+  for orthogonal fill, avoids epsilon-height volume loss and needs no sampling.
+  General curved/sloped fill regions require a future CadKit event/extrema path;
+  they must not be approximated by bounding boxes.
 - Report the level-volume curve, resin mass, liquid head on each panel and the
   submerged volume, and so buoyancy, of each core at each level. With a declared
   pour rate, add a time axis. The load checks use the worst level, not only the
@@ -633,21 +1020,27 @@ solid in mold coordinates, already checked against the source.
   the end of the fill.
 - A vent becomes a `PenetrationPlan` of class fill/vent through tooling, or a
   `DesignChangeRequest` when it has to pass through the casting design.
+- **Pour plan.** From the resin mass and the recipe's mix (binder and aggregate
+  fractions by weight), report material quantities, the batch count for the
+  declared mixer capacity and working time, and the pour sequence with each
+  batch's level range. Undeclared mixer or working-time data leave it pending.
 
 The flat free surface is an idealisation: a vibrated paste traps at least these
 pockets, and may trap more under broad flat ceilings. The air-escape-width rule
-covers that case, and phase 8 compares predicted pockets with demolded voids.
+covers that case, and phase 9 compares predicted pockets with demolded voids.
 
 ### Cure temperature
 
 The exotherm matters because EPS softens near its declared limit, resin systems
 have gel and limit temperatures, and temperature differences move inserts.
-Three tiers, each run only when the previous one cannot pass:
+Three levels of analysis; a screening result never clears coverage or junction checks:
 
-1. **Adiabatic bound.** Peak rise is at most w·H/c, from the resin mass fraction,
-   heat of reaction and mix specific heat, for any geometry. If initial
-   temperature plus this bound is below every limit by the recipe margin, the
-   check passes without kinetics.
+1. **Lumped estimate.** The remaining reaction rise w·H/c is a uniform-mix
+   estimate. Conduction can preheat unreacted material, so adding it to the
+   maximum initial/environment temperature is not a spatial upper bound. A
+   screening Pass requires a positive declared margin to every material/gel
+   limit; it cannot qualify a casting without the separate thermal-model and
+   physical-evidence checks.
 2. **Section model.** Transient 1D conduction through each section, with heat
    generation from the `ResinCureSpec` kinetics and boundary conditions from the
    mold: panel (board conductivity, thickness and convection), EPS (near
@@ -655,9 +1048,10 @@ Three tiers, each run only when the previous one cannot pass:
    thicknesses come from the casting: distances between opposing planar faces for
    walls and ribs, and the largest inscribed thickness at junctions. Other shapes
    are unsupported until a medial-axis method exists. Implicit time stepping in
-   ManufacturingKit, verified against the adiabatic bound and the analytical
-   inert-slab cooling series before use. The 1D result is conservative for wall
-   interiors, not for junctions.
+   ManufacturingKit, verified against the insulated energy balance, convective reactive refinement
+   and analytical inert-slab cooling series. No slab Pass is allowed until the
+   remaining reaction heat is below its declared tolerance. A slab result does
+   not establish a junction result.
 3. **3D transient.** Only when a junction or thick block is within the recipe
    margin after tier 2. Use the existing Gmsh/CalculiX pipeline and its
    solver-fixture gate. Cure heat generation uses either a CalculiX DFLUX user
@@ -666,8 +1060,8 @@ Three tiers, each run only when the previous one cannot pass:
    shared deck writer out of the bench-mill example when this second consumer
    needs it.
 
-Missing kinetics or mix properties leave tiers 2 and 3 pending; the adiabatic
-bound alone can still pass a check. Phase 8 thermocouples (thickest section
+Missing kinetics or mix properties leave thermal qualification pending. A lumped
+screening Pass never removes model coverage blockers. Physical-trial thermocouples (thickest section
 centre, core surface, a panel face) validate peak temperature and time to peak
 within a declared tolerance, attached to the recipe revision.
 
@@ -783,18 +1177,58 @@ and the analytical inert-slab series with no reaction; missing kinetics yields
 pending, never pass. The base and column orientation comparison includes trapped
 air and cure margin.
 
-### 7. Column and independent structure
+### 7. Foundation design model
+
+Implement `materia.casting` and the source model described under foundation
+design model, in three steps:
+
+1. **Records.** Typed features with openings, finished extents, owners,
+   adjustable dimensions and `derivedFrom`; shared vocabulary and the one box
+   algebra in `materia.casting`; insert holes through `DesignInterfaces`; typed
+   finish; named mill layout parameters, the shared feature builder and one
+   levelling-foot family; the adapter reduced to a copy. Geometry stays box-only.
+2. **Requirements.** Interface requirements with the allowance in the casting
+   geometry; interface relationships with axis members, replication jigs and
+   metrology; insert-fixture constraint checks; the datum scheme, lifting inserts
+   and the base–column joint.
+3. **Geometry.** Draft, corner radius and prism features through CAD, planner,
+   drawings, CAM and the phase 6 analyses.
+
+Acceptance: after step 1 the mill base and column rebuild with zero symmetric
+difference against their previous CAD; fill, collision hulls and section
+stiffness give identical results through the shared box algebra, and fragments
+group by `derivedFrom`. `MillMoldSetup` has no
+feature-ID strategy table, and an override names its feature explicitly. No code
+outside the shared finished-cavity function clips design cuts; an unreached
+declared opening, or an undeclared breakout, is rejected. A column cut crossing
+the sloped foot yields an exact prism finished cavity that box-only consumers
+report as Unsupported by feature ID. Every penetration record traces
+to a `HoleInterface`, and no insert label carries hardware data. A replicated
+seat's allowance appears in the casting geometry and clears its allowance request,
+while master and release stay pending evidence. A relationship whose metrology
+uncertainty exceeds its tolerance stays pending; an under- or over-constrained
+fixture reports the affected directions. The lifting-point and column-joint
+requests clear when the design declares them and return when removed. A drafted
+former fixture passes release and clears its release request; a prism feature with
+a corner radius below the router radius fails with its ID. Fill analysis agrees
+with CAD booleans on a sloped-ceiling fixture, and box-feature results are
+unchanged. Castability proposals change only adjustable dimensions.
+
+### 8. Column and independent structure
 
 Add the column setup, stepped/flared envelope support, intersecting channels and
-side-removal details. Add a small mineral-cast pedestal example with different
-dimensions, insert layout and opening direction using the shared planner.
+side-removal details on the phase 7 model. Add an independent structure using
+the shared planner with different dimensions, insert layout and opening direction.
+If the `flexspline-hobber` branch has landed on the phase 7 model, that is the
+hobber's monolithic plinth (930 × 800 × 800 mm) and column, including the C-axis
+replication relationships; otherwise a small mineral-cast pedestal example.
 
 Acceptance: both selected mill foundations generate complete review packages;
 the pedestal uses shared records/joints/planner with configuration only. Changing
 stock thickness, casting size, opening direction and core strategy requires no
 mill-specific conditionals in the libraries. Existing frame geometry is unchanged.
 
-### 8. Physical calibration and release
+### 9. Physical calibration and release
 
 Fabricate a joint coupon and a representative small mold with EPS core, steel
 insert, covering, seam and restraint, using the phase 3 box where practical.
@@ -862,10 +1296,12 @@ directories; commit source setups, small test fixtures and documentation.
 
 General BREP parting-surface discovery, arbitrary contour nesting, robotic mold
 assembly, wiring core cutting definitions into `FoamJob` (after foam-cutter lands
-on main), CNC posts beyond CamKit's LinuxCNC writer, arc contours in CamKit,
-rotational removal paths, automatic hardware optimization, automatic application
+on main), CNC posts beyond CamKit's LinuxCNC writer,
+general arc-native CAM IR, rotational removal paths, automatic hardware optimization, automatic application
 of design-change proposals, parting-surface search beyond listed orientations,
-the 3D cure tier unless a section needs it, the items under "Not modelled", mold
+the 3D cure tier unless a section needs it, printed mold pieces (a former
+strategy for shapes panels and foam cannot make, segmented to the printer's build
+volume and emitted as `Slicer` jobs), sand-cast metals, the items under "Not modelled", mold
 FEM beyond what closed-form checks cannot cover, full structural qualification and app
 editing UI are follow-on work. Preserve extension points for them without implementing
 placeholder subsystems. The initial release succeeds when the shared libraries
@@ -905,3 +1341,59 @@ are installed as groups, then EPS and reusable fixtures separate after bond rele
 The directional blocking graphs come from exact sweeps, not reversing one assumed
 physical process. Exact AABB rejection only removes pairs that cannot have a
 positive-volume intersection; the remaining pairs use native booleans.
+
+
+Phase 5 fabrication review and checks:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fabrication.json -- --checks
+./haxeon/scripts/haxeon run --project=camkit/tests/haxeon.json
+```
+
+The full package includes the existing CAD/sequence checks, declared load/process
+reports, per-panel checked LinuxCNC, lists, layouts and physical coupon templates.
+`-- --records-only --checks` writes an independent records/CAM package with CAD
+validation pending. Neither entry manufactures the coupon or releases the mold.
+
+
+## Follow-up review: 51dbe29ee..fc0b267b7
+
+- [x] CAM 1–7: honest single-tool G49 touch-off instructions and per-tool diameter/
+  shape comments; dependency-aware minimum-load ordering; onion skin plus final
+  removal pass or force-qualified vacuum; declared cutter reach, drill pecking,
+  through-only breakthrough and machine spoilboard plane; directed raster/on
+  loops, proven local pocket links and near-surface rapid approaches. Shipped
+  settings and real CAM reach/depth rejection have acceptance tests. The bed's
+  access graph requires four loads, rather than the suggested three.
+- [x] Fabrication/planner 8–14: actual foam/bridge bond overlap; reject unsupported
+  precision allowance; required typed insert roles and separate labels; reject
+  unsupported plate-support submissions; hashed hardware validation cannot be
+  dropped by callers; manifest status/severity consistency; fill-clipped datum
+  intersection; renamed release-alternative request.
+- [x] Process 15–18: conservative unknown EPS/adhesive handling; residual-heat cure
+  extension with declared cap and Pending at cap; separate heat-removing-face
+  thickness interval; thermal boundary ownership and cross-axis coverage checks.
+- [x] Orientation/export 19–20: CAD emits its own four evidence records; candidates
+  share analysis, catch process failures independently and mark unplanned cases
+  Unsupported; rank failures/open requests first after feasibility; actual
+  foundation CAD volume must agree with the fill report independently.
+- [x] Castability/materials 21–23: conditional release proposals, recipe-driven
+  source-only level-1 rules and design metrics, explicit proposed parameter/value,
+  accepted insert-width/recess change followed by replan test; FoundationIntegrity
+  Diagnostics and MillDesignStudy integration; raw cure/fabrication coverage and
+  EPS consistency; obsolete first-order/upper-bound claims removed.
+
+The coupon trial, measured tools, machine work-origin/fixtures and physical
+material/process evidence remain outstanding. These changes do not release
+fabrication. See the mill TOOLING_README for current study settings and commands.
+
+Validation for this follow-up: neutral tooling/process suites pass 1,712 assertions;
+CAM panel tests 293 and general CamKit 12,386; CncKit 436; native tooling 375;
+casting 49; full mill acceptance 248. Both records-only and full fabrication
+exports pass manifest integrity/tamper checks, including dropped hardware checks
+and invalid status/severity. The full package contains 837 hashed artifacts and
+40 review programs; readiness remains false (14 Pass, 250 Pending, 15 Unsupported).
+The actual foundation symmetric difference is zero. Review and coupon archives
+are regenerated from the verified parent manifest; no physical trial is recorded.
+The optional broad recipe-contract run still needs the external HGH15CA reference
+asset; the default casting suite and native/full tooling checks pass without it.

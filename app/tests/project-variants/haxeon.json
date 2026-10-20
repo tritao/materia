@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "entry": "tests.ProjectVariantsTests",
+  "sourceRoots": [
+    "../src"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

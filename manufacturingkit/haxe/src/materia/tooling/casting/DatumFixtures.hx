@@ -1,4 +1,5 @@
 package materia.tooling.casting;
+import materia.casting.BoxAlgebra;
 
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingIds;
@@ -37,7 +38,7 @@ class DatumFixtures {
 					depth: pw,
 					height: top - floor
 				});
-			datum.pieces = BoxVolumes.subtract(datum.pieces, []);
+			datum.pieces = BoxAlgebra.subtract(datum.pieces, []);
 		}
 		var id = datum.id, pinDiameter = h.fixturePinDiameter, d = pinDiameter + r.jointClearance, embed = h.fixturePinEmbed;
 		var primary = ToolingIds.derive("", id, "-primary-pin"),
@@ -101,13 +102,13 @@ class DatumFixtures {
 			pose: pose
 		});
 		var mask:Null<SupportHardware> = null;
-		if (i.boreDiameter > 0) {
+		if (materia.casting.InsertHoleGeometry.diameter(i.holes) > 0) {
 			if (h.plugMaterial != "steel")
 				throw "Unsupported nominal bore-mask material";
 			mask = {
 				id: ToolingIds.derive("mask-", i.id),
 				kind: BoreMask,
-				diameter: i.boreDiameter,
+				diameter: materia.casting.InsertHoleGeometry.diameter(i.holes),
 				length: i.height,
 				pose: F.compose(p.document.setup.sourceToMold, i.pose)
 			};
@@ -125,7 +126,7 @@ class DatumFixtures {
 				y: withdrawal.y,
 				z: Math.abs(withdrawal.x) > 0.9 ? 0 : 1
 			},
-			boreMaskWithdrawal: i.boreDiameter == 0 ? null : {x: 0, y: 0, z: Math.abs(withdrawal.x) > 0.9 ? 1 : -1},
+			boreMaskWithdrawal: materia.casting.InsertHoleGeometry.diameter(i.holes) == 0 ? null : {x: 0, y: 0, z: Math.abs(withdrawal.x) > 0.9 ? 1 : -1},
 			lateralLocation: {primaryId: primary, secondaryId: secondary, baselineMm: h.fixturePinSpacing},
 			receiverThreadSpec: h.insertThreadSpec,
 			fixingId: fixing,
@@ -169,7 +170,7 @@ class DatumFixtures {
 					throw "Fixture sealing footprint does not cover bed penetration";
 			}
 			var source = p.document.input.inserts.filter(i -> i.id == f.insertId)[0];
-			if ((source.boreDiameter > 0) != (f.boreMask != null))
+			if ((materia.casting.InsertHoleGeometry.diameter(source.holes) > 0) != (f.boreMask != null))
 				throw "Source bore needs an explicit release mask";
 		}
 	}

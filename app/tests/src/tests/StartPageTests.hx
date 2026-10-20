@@ -55,11 +55,21 @@ class StartPageTests {
     check(browser.filtered(all).length == 0, "search and category compose");
     browser.search("");
     var machining = browser.filtered(all);
-    check(machining.length == 3, "router, bench mills and press brake form three machining families");
+    check(machining.length == 5, "mill, bench mills, desktop router, sheet router and press brake form separate machining families");
+    check([for (family in machining) if (family.id == "sheet-router") family].length == 1, "sheet router is directly accessible");
     var mills = [for (family in machining) if (family.id == "bench-mills") family];
     check(mills.length == 1 && mills[0].examples.length == 2 &&
       mills[0].examples[0].id == "bench-mill" && mills[0].examples[1].id == "enclosed-bench-mill",
       "both bench mill variants share exactly one card");
+    var modernMills = [for (family in machining) if (family.id == "mill") family];
+    check(modernMills.length == 1 && modernMills[0].examples.length == 1,
+      "Small and Compact VMC have their own project card, separate from bench mills");
+    var benchEntry=ExampleCatalog.find("bench-mill");
+    if(benchEntry==null)throw "Bench mill entry is missing";
+    switch benchEntry.kind {
+      case Project(path): check(StringTools.endsWith(path,"materia.bench.project.json"),"bench mill card opens its own project");
+      default: throw "Bench mill must open a source project";
+    }
     var presses = [for (family in machining) if (family.id == "press-brake") family];
     check(presses.length == 1 && presses[0].examples.length == 1 && presses[0].examples[0].id == "press-brake",
       "the press brake remains directly accessible in its own machining card");
@@ -117,6 +127,43 @@ class StartPageTests {
       check(content != null && content.resolved != null, "start content has bounds");
       checkCardBounds(narrow, content.globalBounds().x + content.globalBounds().width);
     }
+    // Loading feedback belongs to the editor, even when the Start tab is closed.
+    editor.workspace.close("start");
+    editor.openProjectInBackground("app/tests/fixtures/project-variants/materia.project.json");
+    check(!editor.workspace.isOpen("start"),"opening a project preserves workspace tabs");
+    var pending=new PendingExampleLoadJob();
+    editor.startJob=pending;
+    pending.control.phase("Generating geometry");
+    editor.tick();
+    check(editor.statusSelectionLabel().indexOf("Generating geometry")>=0,"busy status does not say Ready");
+    for(width in [1600,800,480]) {
+      var loadingFrame=new LayoutFrame(width,768);
+      var loadingRoot=editor.submit(loadingFrame);
+      var cancel=find(loadingRoot,"project-loading-cancel");
+      var status=editor.projectLoadingStatus();if(status==null)throw "Expected pending project status";
+      check(findLabel(loadingRoot,status.title)!=null&&cancel!=null&&cancel.resolved!=null,
+        "global progress and cancel exist without Start at width "+width);
+      var bounds=cancel.globalBounds();
+      check(bounds.width>0&&bounds.x>=0&&bounds.x+bounds.width<=width,"Cancel remains on screen");
+    }
+    var before=editor.topBarRevisionKey();
+    pending.control.phase("Preparing geometry and physics");
+    editor.tick();
+    check(editor.topBarRevisionKey()!=before,"phase changes invalidate retained toolbar");
+    check(editor.statusSelectionLabel().indexOf("Preparing geometry")>=0,"new phase reaches shared status");
+    check(findLabel(editor.submit(frame),"Preparing geometry and physics",true)!=null,
+      "phase update reaches retained toolbar text");
+    click(editor,frame,"project-loading-cancel");
+    check(pending.control.isCancelled()&&editor.startLoading!=null,"Cancel requests stop and waits for worker completion");
+    pending.finished=true;editor.tick();
+    check(find(editor.submit(frame),"editor-project-loading")==null,"cancelled completion clears global busy state");
+    editor.startFailure="Could not open test project";editor.invalidateView();
+    check(find(editor.submit(frame),"project-loading-dismiss")!=null,"failure stays visible without Start");
+    click(editor,frame,"project-loading-dismiss");
+    check(editor.projectLoadingFailure()==null,"global error is dismissible");
+    editor.openProjectInBackground("app/tests/fixtures/project-variants/materia.project.json");
+    click(editor,frame,"project-loading-cancel");
+    check(editor.startLoading==null&&editor.startJob==null,"queued load can be cancelled before a worker starts");
     editor.dispose();
     fonts.dispose();
   }
@@ -138,6 +185,13 @@ class StartPageTests {
     return null;
   }
 
+  static function findLabel(node:RenderNode,label:String,contains:Bool=false):Null<RenderNode> {
+    if(node.semantics!=null&&node.semantics.label!=null&&
+      (contains?node.semantics.label.indexOf(label)>=0:node.semantics.label==label))return node;
+    for(child in node.children){var result=findLabel(child,label,contains);if(result!=null)return result;}
+    return null;
+  }
+
   static function click(editor:ReferenceEditorApp, frame:LayoutFrame, key:String):Void {
     var node:RenderNode = cast find(editor.submit(frame), key);
     check(node != null && node.resolved != null, "control exists: " + key);
@@ -148,4 +202,13 @@ class StartPageTests {
     editor.ui.pointerUp(x, y, 0);
     editor.submit(frame);
   }
+}
+
+/** Deterministic pending operation: no compiler or child process is started. */
+private class PendingExampleLoadJob extends app.ExampleLoadJob {
+  public var finished=false;
+  public function new() {
+    super({id:"loading-test",title:"Test project",description:[],tag:"",kind:app.editor.ExampleCatalog.ExampleKind.WorkerRackToTable});
+  }
+  override public function isFinished():Bool return finished;
 }

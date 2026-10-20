@@ -4114,7 +4114,9 @@ static cad_result do_cad_shape_place(cad_shape handle, cad_vec3 origin, cad_vec3
         transform.SetValues(dx.X(),dy.X(),dz.X(),p.X(), dx.Y(),dy.Y(),dz.Y(),p.Y(), dx.Z(),dy.Z(),dz.Z(),p.Z());
         auto named = model_named(handle);
         const auto& source = named.shape;
-        BRepBuilderAPI_Transform operation(source, transform, true);
+        // A proper rigid placement preserves geometry and tolerances through TopLoc.
+        // Copying the geometry can invalidate trimmed STEP faces after translation.
+        BRepBuilderAPI_Transform operation(source, transform, false);
         if (record) collect_operation_history(operation, source, nullptr, *record);
         naming::AlgorithmHistory<BRepBuilderAPI_Transform> naming_history(operation);
         names = naming::propagate({named}, &naming_history, operation.Shape());

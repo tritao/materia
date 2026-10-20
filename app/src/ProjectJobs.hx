@@ -10,7 +10,7 @@ typedef ProjectJob = {
   var entrypoint:String;
 }
 
-/** Project-owned presets select complete generated scenes, never just a runtime mission. */
+/** Legacy project scene presets. New projects declare typed ProjectVariants instead. */
 class ProjectJobs {
   public static function read(path:String):Array<ProjectJob> return decode(Json.parse(File.getContent(path)));
 

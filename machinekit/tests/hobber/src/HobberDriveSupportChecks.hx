@@ -29,7 +29,7 @@ class HobberDriveSupportChecks {
     sys.io.File.saveContent(path,parts.join("\n"));
   }
   public static function run():Void {
-    var machine=new FlexsplineHobber(),body=machine.bed.body.geometry(),cells=CastingCells.material(machine.bed.body.parameterNumber("width"),800,800,CastingFeatures.decode(machine.bed.body.values().token("voids")));
+    var machine=new FlexsplineHobber(),body=machine.bed.body.geometry(),cells=CastingCells.material(machine.bed.body.parameterNumber("width"),800,800,CastingFeatures.decode(machine.bed.body.values().token("features")));
     var row=machine.bed.insertLocations().filter(p->p.id=="driveSeat")[0],raw=Part.box(row.part.parameterNumber("width"),row.part.parameterNumber("depth"),50);
     var backing=PosedParts.moved(raw,F.compose(row.pose,F.translation(0,0,-50)));raw.close();
     var missing=backing.subtract(body),missingVolume=missing.volume(),required=backing.volume();missing.close();backing.close();
@@ -39,7 +39,7 @@ class HobberDriveSupportChecks {
       for(p in ribProbes(body)){n++;probes.push(p);if(!measureOnly&&p.missingMm3>0.001)throw 'Missing casting support ${p.label}: ${p.missingMm3} mm3';}
       n++;if(body.solidCount()!=1)throw "Bed casting is disconnected";
       n++;if(Math.abs(CastingCells.volume(cells)-body.volume())>body.volume()*1e-9)throw "Section cells disagree with exact CAD";
-      var compact=CastingCells.compact(cells),cuts=CastingFeatures.decode(machine.bed.body.values().token("voids"));
+      var compact=CastingCells.compact(cells),cuts=CastingFeatures.decode(machine.bed.body.values().token("features"));
       n++;if(Math.abs(CastingCells.volume(compact)-body.volume())>body.volume()*1e-9)throw "Collision compaction changes exact CAD volume";
       for(b in compact){n++;if(b[0]<-machine.bed.body.parameterNumber("width")/2||b[3]>machine.bed.body.parameterNumber("width")/2||b[1]<-400||b[4]>400||b[2]<0||b[5]>800)throw "Collision box leaves casting envelope";
         for(cut in cuts){var c=CastingCells.bounds(cut),v=1.0;for(a in 0...3)v*=Math.max(0,Math.min(b[a+3],c[a+3])-Math.max(b[a],c[a]));

@@ -53,7 +53,7 @@ class HobberZDriveChecks {
       shaftTopZMm:730,shaftBottomZMm:310,motorFaceZMm:765,motorTopZMm:910,fixedBearingZMm:fixed.z,floatingBearingZMm:floating.z,
       screwLengthMm:420,nutCentreAtZeroZMm:418,minimumRaceMarginMm:minimumRaceMargin,minimumSaddleDriveClearanceMm:minimumMovingGap,
       driveInsertMissingBackingMm3:missingMm3,castingBackingMm:125,columnCastingKg:m.column.castingByWeight().kg,
-      columnCells:CastingCells.material(400,200,500,CastingFeatures.decode(m.column.body.values().token("voids"))),
+      columnCells:CastingCells.material(400,200,500,CastingFeatures.decode(m.column.body.values().token("features"))),
       scope:"Geometry, mechanical travel and thread sign only; structural stiffness and brake performance unqualified."};
     var output=Sys.getEnv("HOBBER_Z_DRIVE_EVIDENCE");if(output!=null)sys.io.File.saveContent(output,haxe.Json.stringify(report));
     Sys.println("HOBBER_Z_DRIVE_PASS "+haxe.Json.stringify(report));

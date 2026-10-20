@@ -63,7 +63,7 @@ class HobberBaseInterfaceStudy {
     var panel=PanelCatalogue.require(CONSTRUCTION),sheet=panel.thicknessMm();panel.validate();
     if(sheet!=13||Std.string(panel.fabrication)!="RouterCut"||panel.qualifications.coolantRecord!=null||panel.qualifications.heatLimitC!=null)
       throw "Review the preliminary 13 mm router-cut material policy";
-    var d=FoundationLayout.dimensions("bed"),cores=CastingFeatures.decode(FoundationLayout.bodyValues("bed").token("voids"));
+    var d=FoundationLayout.dimensions("bed"),cores=CastingFeatures.decode(FoundationLayout.bodyValues("bed").token("features"));
     // Compare the seats with the pre-rebate machine voids, excluding the now-authored tray features.
     cores=[for(core in cores)if(!StringTools.startsWith(core.id,"tray-"))core];
     var raised=seating("raised",SHALLOW_DEPTH,sheet,d,cores),flush=seating("flush",sheet+GASKET,sheet,d,cores);

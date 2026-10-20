@@ -17,8 +17,8 @@ class FlexsplineHobberBaseReport {
     var oldRaw:Dynamic=Reflect.field(raw,"base"),old={massKg:number(oldRaw,"massKg"),width:number(oldRaw,"width"),depth:number(oldRaw,"depth"),height:number(oldRaw,"height"),voids:Std.string(Reflect.field(oldRaw,"voids"))};
     var oldMoving=number(raw,"movingXKg"),oldColumn=number(Reflect.field(raw,"column"),"massKg"),oldInserts=number(raw,"columnInsertMassKg");
     var body=machine.bed.body;
-    var cells=CastingCells.material(body.parameterNumber("width"),body.parameterNumber("depth"),body.parameterNumber("height"),CastingFeatures.decode(body.values().token("voids")));
-    var oldCells=CastingCells.material(old.width,old.depth,old.height,CastingFeatures.decode(old.voids));
+    var cells=CastingCells.material(body.parameterNumber("width"),body.parameterNumber("depth"),body.parameterNumber("height"),CastingFeatures.decode(body.values().token("features")));
+    var oldCells=CastingCells.material(old.width,old.depth,old.height,CastingFeatures.decodeLegacyBaseline(old.voids));
     var nativeBody=body.geometry();var nativeVolume=nativeBody.volume();nativeBody.close();
     if(Math.abs(CastingCells.volume(cells)-nativeVolume)>nativeVolume*1e-9)throw "Casting collision/beam cells disagree with exact CAD volume";
     var span=HobberXLayout.front().footSpan,half=span/2;

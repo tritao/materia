@@ -31,7 +31,7 @@ class CamArcFixture {
     machine.toolLibrary.set(tool);
     var gcode = machine.export(arcs, CamTestSetup.standard());
     check(gcode.indexOf("G2 ") >= 0 || gcode.indexOf("G3 ") >= 0, "arcs reach the G-code as G2/G3");
-    var imported = machine.compileDetailed(gcode);
+    var imported = machine.compileDetailed(gcode, new Point3(0.03,0.03,0.02));
     check(imported.diagnostics.length == 0 && imported.program.ops.length == arcs.ops.length,
       'arc G-code round trips: ${imported.diagnostics}');
     for (index in 0...arcs.ops.length) switch [arcs.ops[index], imported.program.ops[index]] {
@@ -40,8 +40,8 @@ class CamArcFixture {
           case Arc(_, _, _, _): true;
           case _: false;
         };
-        // An arc keeps its length; the first move starts wherever the importing
-        // machine stands, so lines are compared by where they end.
+        // Import uses the declared initial pose so the Z-only first retract
+        // preserves its XY location; arcs also retain their complete length.
         if (arc) check(Math.abs(GeometryTools.length(a) - GeometryTools.length(b)) < 1e-8,
           'arc G-code keeps arc $index');
         else check(GeometryTools.pointAt(a, GeometryTools.length(a)).distanceTo(

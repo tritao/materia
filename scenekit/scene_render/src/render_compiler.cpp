@@ -10,10 +10,17 @@ namespace {
 
 std::atomic_uint64_t next_gpu_identity{1};
 
-bool culled(const SceneNode &node, const SceneCamera &camera,
-            const SceneView &view) noexcept {
-    return render_internal::culled_by_camera(node.bounds, camera) ||
-           render_internal::culled_by_clip_planes(node.bounds, view.clip_planes);
+bool culled(const SceneSnapshot &snapshot, const SceneNode &node,
+            const SceneCamera &camera, const SceneView &view) noexcept {
+    auto bounds = node.bounds;
+    const auto pose = std::find_if(view.pose_overrides.begin(), view.pose_overrides.end(),
+                                  [&node](const auto &value) { return value.node == node.node; });
+    if (pose != view.pose_overrides.end()) {
+        if (const auto *geometry = snapshot.find_geometry(node.geometry))
+            bounds = render_internal::transformed_bounds(geometry->bounds, pose->world_transform);
+    }
+    return render_internal::culled_by_camera(bounds, camera) ||
+           render_internal::culled_by_clip_planes(bounds, view.clip_planes);
 }
 
 bool has_domain_in(const ChangeSet &changes, ChangeDomain domain) noexcept {
@@ -820,7 +827,7 @@ RenderUpdate update(RenderPlan &plan, const SceneSnapshot &snapshot, const Chang
         if (item_index == invalid_item_index || !node)
             continue;
         auto &item = plan.items_[item_index];
-        const auto item_culled = culled(*node, camera, view);
+        const auto item_culled = culled(snapshot, *node, camera, view);
         const auto was_culled = has_render_flag(item.flags, RenderFlags::Culled);
         if (item_culled == was_culled)
             continue;

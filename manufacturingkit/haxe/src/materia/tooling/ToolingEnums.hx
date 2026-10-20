@@ -16,25 +16,6 @@ enum abstract StockDirection(String) to String {
 	var WidthAligned = "width-aligned";
 }
 
-enum abstract InsertRole(String) to String {
-	var TableMount = "table-mount";
-	var LiftingMount = "lifting-mount";
-	var ThreadedAnchor = "threaded-anchor";
-	var GenericMount = "generic-mount";
-	var GuideSeat = "guide-seat";
-	var BearingSeat = "bearing-seat";
-	var ColumnMount = "column-mount";
-	var LevelingSeat = "leveling-seat";
-	var HatchMount = "hatch-mount";
-}
-
-enum abstract InsertFinish(String) to String {
-	var GroundAfterCasting = "ground-after-casting";
-	var MachinedAfterCasting = "machined-after-casting";
-	var ReplicatedAfterCasting = "replicated-after-casting";
-	var SourceAsCast = "as-cast";
-}
-
 enum abstract MachiningSide(String) to String {
 	var PositiveZ = "positive-z";
 	var NegativeZ = "negative-z";

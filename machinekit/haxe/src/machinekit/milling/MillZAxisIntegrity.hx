@@ -13,37 +13,38 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * this is a geometric audit, not a load-capacity or machine safety assessment.
  */
 class MillZAxisIntegrity {
-	public static function check(axis:MillZAxis, frame:MillFrame):Diagnostics {
+	public static function check(axis:MillZAxis, frame:MillFrame, overtravel:Float = 0):Diagnostics {
 		if (axis == null || frame == null || axis.layout.frame != frame.layout)
 			throw "Z clearance audit needs matching frame and axis datums";
 		var owned:Array<Part> = [];
 		var result:Diagnostics;
-		try result = run(axis, frame, owned) catch (error:Dynamic) { close(owned); throw error; }
+		if (!Math.isFinite(overtravel) || overtravel < 0 || overtravel > axis.layout.overtravel) throw "Z audit overtravel exceeds the guide reserve";
+		try result = run(axis, frame, owned, overtravel) catch (error:Dynamic) { close(owned); throw error; }
 		close(owned);
 		return result;
 	}
-	static function run(axis:MillZAxis, frame:MillFrame, owned:Array<Part>):Diagnostics {
+	static function run(axis:MillZAxis, frame:MillFrame, owned:Array<Part>, margin:Float):Diagnostics {
 		var out = new Diagnostics(), l = axis.layout, f = l.frame;
 		var poses:Map<String, AssemblyFrame> = axis.solvedPoses();
 		// Swept boxes enclose every moving structural part throughout the
 		// complete stroke. No discrete sampling is used for the CAD clearance proof.
-		var travel = -l.lower, face = l.headCentre - l.nut.bodyLength / 2 - l.nut.flangeThickness;
+		var lower = l.lower-margin, travel = -l.lower+2*margin, face = l.headCentre + l.nut.bodyLength / 2 - l.nut.flangeOffset - l.nut.flangeThickness;
 		var shelfDepth = l.screwY - l.carriageBack + l.bracketWidth / 2;
 		var swept = [
-			box(owned, l.carriageWidth, l.carriageThickness, l.carriageHeight + travel, 0, l.carriageBack - l.carriageThickness / 2, l.headCentre - l.carriageHeight / 2 + l.lower),
-			box(owned, l.bracketWidth, shelfDepth, l.nutPlateThickness + MillZCarriage.GUSSET_HEIGHT + travel, 0, l.carriageBack + shelfDepth / 2, face - l.nutPlateThickness - MillZCarriage.GUSSET_HEIGHT + l.lower),
-			box(owned, l.nut.flangeDiameter, l.nut.flangeDiameter, l.nut.bodyLength + l.nut.flangeThickness + travel, 0, l.screwY, face + l.lower),
-			headSweep(axis, owned)];
+			box(owned, l.carriageWidth, l.carriageThickness, l.carriageHeight + travel, 0, l.carriageBack - l.carriageThickness / 2, l.headCentre - l.carriageHeight / 2 + lower),
+			box(owned, l.bracketWidth, shelfDepth, l.nutPlateThickness + MillZCarriage.GUSSET_HEIGHT + travel, 0, l.carriageBack + shelfDepth / 2, face - l.nutPlateThickness - MillZCarriage.GUSSET_HEIGHT + lower),
+			box(owned, l.nut.flangeDiameter, l.nut.flangeDiameter, l.nut.overallLength + travel, 0, l.screwY, l.headCentre + l.nut.bodyLength/2 - l.nut.overallLength + lower),
+			headSweep(axis, owned, margin)];
 		for (side in [-1, 1]) for (span in [-l.blockSpan, l.blockSpan]) swept.push(
 			box(owned, l.block.spec.blockWidth, l.block.spec.blockHeight - l.block.spec.railHeight, l.block.spec.blockLength + travel,
 				side * f.zRailSpacing / 2, (l.carriageBack + f.columnFront - l.block.spec.railHeight) / 2,
-				l.headCentre + span - l.block.spec.blockLength / 2 + l.lower));
+				l.headCentre + span - l.block.spec.blockLength / 2 + lower));
 		for (member in axis.components()) if (StringTools.startsWith(member.id, "headBolt")) {
 			var local = member.component.geometry(); owned.push(local);
 			var part = PosedParts.moved(local, poses.get(member.id)); owned.push(part);
 			var b = PosedParts.boxOf(part);
 			swept.push(box(owned, b.maxX-b.minX, b.maxY-b.minY, b.maxZ-b.minZ+travel,
-				(b.minX+b.maxX)/2, (b.minY+b.maxY)/2, b.minZ+l.lower));
+				(b.minX+b.maxX)/2, (b.minY+b.maxY)/2, b.minZ+lower));
 		}
 		var framePoses:Map<String, AssemblyFrame> = frame.solvedPoses();
 		for (member in frame.components()) {
@@ -54,7 +55,7 @@ class MillZAxisIntegrity {
 				out.error("mill-z.channel-clearance", member.id, "Central nut shelf does not retain its specified casting clearance over full travel");
 			fixed.close();
 		}
-		for (id in ["fixedMount", "floatingMount", "fixedBearing", "floatingBearing", "motorStand", "couplingGuard", "motor", "railLeft", "railRight"]) {
+		for (id in ["fixedMount", "floatingMount", "motorMount", "floatingBearing", "motor", "railLeft", "railRight"]) {
 			var part = axis.components().filter(m -> m.id == id)[0].component.geometry();
 			owned.push(part);
 			var fixed = PosedParts.moved(part, poses.get(id)); owned.push(fixed); part.close();
@@ -69,12 +70,12 @@ class MillZAxisIntegrity {
 		var local = Part.box(w, d, h); owned.push(local);
 		var moved = local.translated(new Vector(x, y, z)); owned.push(moved); local.close(); return moved;
 	}
-	static function headSweep(axis:MillZAxis, owned:Array<Part>):Part {
+	static function headSweep(axis:MillZAxis, owned:Array<Part>, margin:Float):Part {
 		var head = axis.head.geometry(); owned.push(head);
 		var bounds = head.shape.bounds(), low = bounds.get_min(), high = bounds.get_max();
 		var pose = axis.zeroPose("head"), l = axis.layout;
-		return box(owned, high.get_x()-low.get_x(), high.get_y()-low.get_y(), high.get_z()-low.get_z()-l.lower,
-			pose.x+(low.get_x()+high.get_x())/2, pose.y+(low.get_y()+high.get_y())/2, pose.z+low.get_z()+l.lower);
+		return box(owned, high.get_x()-low.get_x(), high.get_y()-low.get_y(), high.get_z()-low.get_z()-l.lower+2*margin,
+			pose.x+(low.get_x()+high.get_x())/2, pose.y+(low.get_y()+high.get_y())/2, pose.z+low.get_z()+l.lower-margin);
 	}
 	static function close(owned:Array<Part>):Void {
 		for (part in owned) if (!part.shape.isClosed()) part.close();

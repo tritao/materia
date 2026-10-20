@@ -103,6 +103,9 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 	/** Stated damping of the coupling's response, as a ratio of critical damping. */
 	@:id(11) @:optional var dampingRatio:Null<Float>;
 	@:id(12) @:optional var calibration:Null<materia.assembly.BeltCalibration>;
+	/** Physical rack-drive series elements, rebuilt from current component values. */
+	@:id(13) @:optional var rackReducer:Null<String>;
+	@:id(14) @:optional var rackPreload:Null<String>;
 }
 
 /**

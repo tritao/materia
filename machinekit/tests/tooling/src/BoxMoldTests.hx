@@ -85,7 +85,7 @@ class BoxMoldTests {
 					check(report.validation.length > 0 && !report.fabrication.ready, "physical qualification pending");
 				}
 		var metric = SinglePocketSetup.document();
-		metric.input.inserts[0].boreDiameter = 6.8;
+		metric.input.inserts[0].holes = materia.casting.InsertHoleGeometry.through(6.8,metric.input.inserts[0].height);
 		metric.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(metric.input);
 		metric.recipe.hardware.insertBoreDiameter = 6.8;
 		metric.recipe.hardware.insertScrewDiameter = 8;

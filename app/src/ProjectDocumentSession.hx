@@ -72,7 +72,9 @@ class ProjectDocumentSession {
   public var generation(default, null):Int = 0;
   public var scriptOwnership(default,null):Null<ScriptOwnership> = null;
   public var projectReference(default,null):Null<String> = null;
-  /** Selected entrypoint in the source project's job list, when it defines one. */
+  /** Selected configuration, study or demo in the source project. */
+  public var projectVariant(default,null):Null<String> = null;
+  /** Legacy source-job ID; new variants use projectVariant. */
   public var projectJob(default,null):Null<String> = null;
   var initialAssemblyState:Null<AssemblyStateRecord> = null;
   /** Source definition bound to the runtime; compiled models own a separate snapshot. */
@@ -278,6 +280,7 @@ class ProjectDocumentSession {
       generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.missions, generated.robotTools,
       generated.robotSensors, generated.machineMotion, generated.assemblyModel, generated.controllers, generated.signals,
       generated.printJob);
+    projectVariant = generated.projectVariant;
     projectJob = generated.projectJob;
     initialView = generated.initialView;
     inspectionCameras=generated.inspectionCameras==null?[]:generated.inspectionCameras.copy();
@@ -353,16 +356,16 @@ class ProjectDocumentSession {
     reference = FileSystem.fullPath(reference);
     var savedRecipe:Null<String> = Reflect.field(root, "recipeDocument");
     var diagnostics:Array<String> = [];
-    var projectRequirement = ProjectSourceLoader.executionRequirement(reference, project.jobId);
+    var projectRequirement = ProjectSourceLoader.executionRequirement(reference, (project.variantId ?? project.jobId));
     var generated = ProjectSourceLoader.load(reference,
-      projectRequirement.reconcilesSavedRecipe ? savedRecipe : null, null, project.jobId);
+      projectRequirement.reconcilesSavedRecipe ? savedRecipe : null, null, (project.variantId ?? project.jobId));
     if (projectRequirement.reconcilesSavedRecipe) {
       if (generated.recipeDiagnostics != null)
         for (diagnostic in generated.recipeDiagnostics) diagnostics.push(diagnostic);
     } else if (!ProjectSourceLoader.isPrebuilt(reference) && savedRecipe != null && generated.recipeDocument != null) {
       var reconciled = reconcileRecipe(generated.recipeDocument, savedRecipe, diagnostics);
       if (reconciled.changed)
-        generated = ProjectSourceLoader.load(reference, reconciled.text, null, project.jobId);
+        generated = ProjectSourceLoader.load(reference, reconciled.text, null, (project.variantId ?? project.jobId));
       else
         generated.recipeDocument = reconciled.text;
     }
@@ -415,6 +418,7 @@ class ProjectDocumentSession {
     recipeDocument = nextRecipe;
     projectReference = reference;
     projectBaseline = baseline;
+    projectVariant = generated.projectVariant;
     projectJob = generated.projectJob;
     initialView = generated.initialView;
     inspectionCameras=generated.inspectionCameras==null?[]:generated.inspectionCameras.copy();
@@ -1093,6 +1097,7 @@ class ProjectDocumentSession {
     sensors = nextSensors;
     scriptOwnership=nextOwnership;
     projectReference = null;
+    projectVariant = null;
     projectJob = null;
     initialView = null;inspectionCameras=[];
     recipeDocument = null;
@@ -1229,11 +1234,12 @@ class ProjectDocumentSession {
     }
     var savedAssemblyState = projectAssemblyDefinition == null || assemblyRuntime == null ? null
       : AssemblyDefinitionCodec.encodeState(projectAssemblyDefinition, initialAssemblyState == null ? assemblyRuntime.record() : initialAssemblyState);
-    var record:ProjectSceneRecord = {version: 1, reference: relativeReference(destination, reference),
+    var record:ProjectSceneRecord = {version: projectVariant==null?1:2, reference: relativeReference(destination, reference),
       overrides: overrides, removed: removed, instances: instances,
       assemblyState: savedAssemblyState,
       assemblyDependentJoints: savedDependentJoints()};
-    if (projectJob != null) record.jobId = projectJob;
+    if(projectVariant!=null)record.variantId=projectVariant;
+    else if (projectJob != null) record.jobId = projectJob;
     if (!assemblyMates.isEmpty()) record.assemblyMates = assemblyMates.encode();
     return {record: record, authored: authored};
   }

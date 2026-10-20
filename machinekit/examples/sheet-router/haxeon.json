@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-sheet-router-example"
+  },
+  "entry": "SheetRouterPreview",
+  "sources": [
+    "SheetRouter.hx",
+    "SheetRouterSpec.hx",
+    "SheetRouterPreview.hx",
+    "SheetRouterSizing.hx"
+  ],
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../"
+    },
+    "machinekit-robot": {
+      "path": "../../robot"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

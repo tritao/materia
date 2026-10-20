@@ -140,7 +140,7 @@ class ProjectArtifactLoader {
         new RobotMotionTrack("assembly:" + definition.id, 0, motion.loop, motion.keys, motion.joint)];
     }
 
-    return {objects: records, inspectionCameras:project==null?null:project.inspectionCameras, initialView: project == null ? null : project.initialView, projectJob: project == null ? null : project.job, robotMotions: motions,
+    return {objects: records, inspectionCameras:project==null?null:project.inspectionCameras, initialView: project == null ? null : project.initialView, projectVariant:project==null?null:project.variant, projectJob: project == null ? null : project.job, robotMotions: motions,
       geometryBySnapshot: geometryBySnapshot,
       assemblyDefinition: artifact.assemblyDefinition,
       assemblyState: runtimeState == null ? null : runtimeState.record(),
@@ -193,7 +193,7 @@ class ProjectArtifactLoader {
     for (stock in machining.stocks) entered.push(stock);
     for (id in entered) for (record in records) if (record.id == "project:" + id) record.collisionEnabled = false;
     var target = machining.target;
-    return {source: machining.program, axes: machining.axes, spindle: machining.spindle,
+    return {setupJoints:machining.setupJoints,kinematicPreview:machining.kinematicPreview,mission:machining.mission, source: machining.program, axes: machining.axes, spindle: machining.spindle,
       channelScope: machining.channelScope, workOffset: machining.workOffset, loop: machining.loop == true,
       tools: [for (tool in machining.tools) Tool.shaped(tool.number, tool.length, CutterProfile.decode(tool.profile))],
       stocks: machining.stocks.copy(), stockSources: stockSources, target: target == null ? null : partMesh(target),

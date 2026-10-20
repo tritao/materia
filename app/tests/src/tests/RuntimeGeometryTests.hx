@@ -3,6 +3,8 @@ package tests;
 import app.EditorScene;
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
+import nativekit.scene.SceneView;
+import nativekit.scene.Transform;
 
 /** Runtime geometry shown in parts, such as stock a simulated machine is cutting, and how it ends. */
 @:access(app.EditorScene)
@@ -28,9 +30,53 @@ class RuntimeGeometryTests {
   static function live(scene:EditorScene, node:nativekit.scene.NodeId):Bool
     return scene.renderSnapshot().findNode(node) != null;
 
+  static function poseTriangle(x:Float):GeometryData {
+    var positions=Bytes.alloc(36),normals=Bytes.alloc(36),indices=Bytes.alloc(12);
+    var points=[x-0.1,-0.1,0.0,x+0.1,-0.1,0.0,x,0.1,0.0];
+    for(i in 0...9)positions.setFloat(i*4,points[i]);
+    for(i in 0...3){normals.setFloat(i*12+8,1);indices.setInt32(i*4,i);}
+    var geometry=new GeometryData();geometry.addStream(1,2,positions,3,12);geometry.addStream(2,2,normals,3,12);
+    geometry.setIndexBuffer(indices,3);geometry.setBounds(x-0.1,-0.1,0,x+0.1,0.1,0);
+    return geometry;
+  }
+  static function hit(scene:EditorScene,view:SceneView,x:Float,y:Float):String
+    return scene.hoverHitRayWithView(view,x,y,2,0,0,-1).id;
+
+  static function posedChunksFollowOwner():Void {
+    var scene=new EditorScene([{id:"stock",label:"Stock",type:"rectangle",x:0.0,y:0.0,z:0.0,
+      width:1.0,height:1.0,depth:0.1,collisionEnabled:false,dynamicBody:false,mass:1.0,
+      red:0.5,green:0.5,blue:0.5,visible:true}]);
+    try {
+      var changed:Map<Int,GeometryData> = [0=>poseTriangle(0.3)];
+      scene.setRuntimeGeometryParts("stock",2,changed);
+      var half=Math.PI/4;
+      var pose:app.ApplicationSimulation.SimulationPoseVisual={id:"stock",position:[1,2,0],rotation:[0,0,Math.sin(half),Math.cos(half)]};
+      var projection=Transform.identity().set(0,0.1).set(5,0.1).set(10,0.1);
+      var rest=scene.configureRenderView(new SceneView(),projection,null,null,-1,null,false);
+      check(hit(scene,rest,0.3,0)=="stock","chunk geometry is pickable at its authored position");
+      var view=scene.configureRenderView(new SceneView(),projection,[pose],null,-1,null,false);
+      check(hit(scene,view,1,2.3)=="stock","stock chunks follow owner translation and rotation: hit="+hit(scene,view,1,2.3)+", overrides="+view.poseOverrideCount());
+      check(hit(scene,view,0.3,0)=="scene","stock chunks leave the saved position");
+      scene.setRuntimeGeometryParts("stock",2,[0=>poseTriangle(0.5),1=>poseTriangle(-0.3)]);
+      view=scene.configureRenderView(new SceneView(),projection,[pose],null,-1,null,false);
+      check(hit(scene,view,1,2.5)=="stock"&&hit(scene,view,1,1.7)=="stock","replaced and newly created chunks share the live stock frame");
+      check(hit(scene,view,1,2.3)=="scene","replaced chunks remove their prior surface");
+      pose.position=[-2,1,0];pose.rotation=[0,0,0,1];
+      view=scene.configureRenderView(new SceneView(),projection,[pose],null,-1,null,false);
+      check(hit(scene,view,-1.5,1)=="stock"&&hit(scene,view,-2.3,1)=="stock","all chunks follow subsequent live poses");
+      var authored=scene.configureRenderView(new SceneView(),projection,null,null,-1,null,false);
+      check(hit(scene,authored,0.5,0)=="stock","unposed view retains authored coordinates");
+      scene.clearRuntimeGeometry("stock");
+      view=scene.configureRenderView(new SceneView(),projection,[pose],null,-1,null,false);
+      check(view.poseOverrideCount()==1&&hit(scene,view,-2,1)=="stock","clearing chunks restores the posed original solid");
+    }catch(error:Dynamic){scene.dispose();throw error;}
+    scene.dispose();
+  }
+
   public static function main():Int {
     var scene = new EditorScene([]);
     try {
+      posedChunksFollowOwner();
       check(scene.createRectangle(), "runtime geometry test creates an object");
       var id = scene.selectedId;
       var authored = scene.runtimeFor(id).geometry;

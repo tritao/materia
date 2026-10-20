@@ -468,6 +468,20 @@ class AssemblySimulationBridge {
 					if (!parentIncluded && !childIncluded) continue;
 					if (!parentIncluded || !childIncluded) throw 'Assembly closure "${edge.id}" crosses controllers';
 				}
+        // Fixed tree mounts are already collapsed into rigid links. A redundant
+        // fixed assembly closure within that link remains an authored constraint,
+        // but must not become an invalid physics constraint from a body to itself.
+        var parentLink=linkOf(edge.parent).id,childLink=linkOf(edge.child).id;
+        if(parentLink==childLink && edge.type==AssemblyJointType.Fixed) {
+          var a=AssemblyFrames.compose(offsetOf(edge.parent),connector(definitions.get(occurrenceDefinition(definition,edge.parent)),edge.parentConnector));
+          var b=AssemblyFrames.compose(offsetOf(edge.child),connector(definitions.get(occurrenceDefinition(definition,edge.child)),edge.childConnector));
+          var dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
+          var tolerance=edge.closureTolerance==null?1e-6/scale:edge.closureTolerance;
+          var rotation=1-Math.abs(a.qx*b.qx+a.qy*b.qy+a.qz*b.qz+a.qw*b.qw);
+          if(Math.sqrt(dx*dx+dy*dy+dz*dz)>tolerance || rotation>1e-5)
+            throw 'Inconsistent rigid assembly closure "${edge.id}"';
+          continue;
+        }
         closures.push(edge.id);
         var frame = AssemblyFrames.compose(offsetOf(edge.parent),
           connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector));

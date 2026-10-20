@@ -6,6 +6,7 @@ import machinekit.milling.MillZAxis;
 import machinekit.milling.MillZAxisLayout;
 import machinekit.milling.MillZAxisIntegrity;
 import machinekit.milling.MillXYStage;
+import machinekit.milling.MillGuidedXYStage;
 import machinekit.milling.MillXYStageIntegrity;
 import machinekit.milling.MillXYStageLayout;
 import machinekit.motion.LinearRail;
@@ -16,17 +17,24 @@ import materia.assembly.AssemblyFrames as F;
  * The legacy BenchMill keeps its independent, working motion/control model.
  */
 class MillFramePreview {
-	public static function layout(reference:BenchMill):MillFrameLayout {
+	public static function layout(reference:BenchMill, ?yTravel:machinekit.milling.MillYTravel):MillFrameLayout {
 		var state:Map<String, AssemblyFrame> = reference.solvedPoses();
-		var y:AssemblyFrame = state.get("railYLeft"), z:AssemblyFrame = state.get("railZLeft");
+		var z:AssemblyFrame = state.get("railZLeft");
 		var column:AssemblyFrame = state.get("column");
-		var yRail:LinearRail = cast reference.components().filter(row -> row.id == "railYLeft")[0].component;
 		var zRail:LinearRail = cast reference.components().filter(row -> row.id == "railZLeft")[0].component;
 		var rise = stageRise(reference);
-		return new MillFrameLayout({yRailSpacing: 220, yRailStart: y.y - 100, yRailLength: yRail.length + 88,
+		if (yTravel == null) yTravel = new machinekit.milling.MillYTravel();
+		var guide = machinekit.motion.LinearRailBlock.metric(BenchMill.RAIL);
+		var spindle:AssemblyFrame = state.get("spindle");
+		var centreY = spindle.y;
+		if (centreY + yTravel.halfTravel + yTravel.tableDepth / 2 + yTravel.clearance >
+			column.y - reference.column.depth / 2 - guide.spec.railHeight)
+			throw "Y travel/table depth exceeds spindle reach: increase column-to-spindle clearance before increasing Y stroke";
+		var railStart = yTravel.railStart(centreY, guide), railEnd = yTravel.railEnd(centreY, guide);
+		return new MillFrameLayout({yRailSpacing: 220, yRailStart: railStart, yRailLength: railEnd - railStart,
 			columnFront: column.y - reference.column.depth / 2, columnHeight: reference.column.height + rise + 40 + spindleStackRise(reference),
 			zRailSpacing: Math.max(180, reference.column.railSpacing),
-			zRailStart: z.z - reference.base.height + 100, zRailLength: zRail.length + rise - 60 + spindleStackRise(reference)}, {baseWidth: 520, columnFootWidth: 440, frontExtension: 40, footPockets: true});
+			zRailStart: z.z - reference.base.height + 100, zRailLength: zRail.length + rise - 60 + spindleStackRise(reference)}, {baseWidth: 520, columnFootWidth: 440, frontExtension: yTravel.frontExtension, footPockets: true, yTravel: yTravel});
 	}
 
 	public static function spindleStackRise(reference:BenchMill):Float {
@@ -60,9 +68,28 @@ class MillFramePreview {
 	}
 
 	public static function concept(reference:BenchMill, frame:MillFrame, ?motorAdjustment:Float, ?drive:machinekit.milling.MillSpindleDrivePart):MachineAssembly {
-		var result = structure(frame);
-		var spindleLayout:MillZAxisLayout = frame.zAxis;
-		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout,motorAdjustment,drive);
+  if(frame.xyAxis==null)throw "Full mill concept needs XY steel drive seats";
+  return assemble(reference,frame,new MillXYStage(frame.xyAxis),motorAdjustment,drive);
+ }
+
+ /** Both sizes use the same frame/Z/spindle and guided cross-slide assembly path. */
+ public static function assemble(reference:BenchMill,frame:MillFrame,xy:MillGuidedXYStage,
+   ?motorAdjustment:Float,?drive:machinekit.milling.MillSpindleDrivePart):MachineAssembly {
+  var result=structure(frame);
+  attachSpindle(reference,result,frame.zAxis,motorAdjustment,drive);
+  result.include("xyStage",xy);
+  var poses:Map<String,AssemblyFrame> =frame.solvedPoses();
+  result.addMemberConnector("frame/base/casting","stageSeat",F.compose(F.inverse(poses.get("base/casting")),xy.zeroPose("railYLeft")));
+  result.addMemberConnector("xyStage/railYLeft","frameSeat",F.identity());
+  result.addMate("xy-on-base","fixed","frame/base/casting","stageSeat","xyStage/railYLeft","frameSeat");
+  return result;
+ }
+
+	/** Complete shared spindle payload for both machine configurations. */
+	public static function attachSpindle(reference:BenchMill,result:MachineAssembly,spindleLayout:MillZAxisLayout,
+		?motorAdjustment:Float,?drive:machinekit.milling.MillSpindleDrivePart):Void {
+		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout,motorAdjustment,
+			drive==null?machinekit.milling.MillSpindleDrivePart.installed(spindleLayout.headHeight):drive);
 		var spindleOrigin = spindleParts.gauge;
 		var tool = new machinekit.milling.FlatEndMill(new machinekit.component.ComponentValues().setNumber("diameter",reference.tool.diameter)
 			.setNumber("fluteLength",reference.tool.fluteLength).setNumber("stickout",reference.tool.stickout));
@@ -71,19 +98,10 @@ class MillFramePreview {
 		spindleParts.addMemberConnector("tool","seat",F.identity());
 		spindleParts.addMate("tool-in-holder","fixed","holder","toolSeat","tool","seat");
 		result.include("spindle", spindleParts);
-		if (frame.xyAxis == null) throw "Full mill concept needs XY steel drive seats";
-		var xy = new MillXYStage(frame.xyAxis);
-		result.include("xyStage", xy);
-		var framePoses:Map<String, AssemblyFrame> = frame.solvedPoses();
-		result.addMemberConnector("frame/base/driveYFixed", "stageSeat",
-			F.compose(F.inverse(framePoses.get("base/driveYFixed")), xy.zeroPose("fixedPedestalY")));
-		result.addMemberConnector("xyStage/fixedPedestalY", "frameSeat", F.identity());
-		result.addMate("xy-on-base", "fixed", "frame/base/driveYFixed", "stageSeat", "xyStage/fixedPedestalY", "frameSeat");
-		var axis = new MillZAxis(frame.zAxis);
+		var axis = new MillZAxis(spindleLayout);
 		result.addMemberConnector("zAxis/head", "spindlePayload", F.compose(F.inverse(axis.zeroPose("head")), spindleOrigin));
 		result.addMemberConnector("spindle/spindle", "headSeat", F.identity());
 		result.addMate("spindle-on-head", "fixed", "zAxis/head", "spindlePayload", "spindle/spindle", "headSeat");
-		return result;
 	}
 
 	static function writeServiceStudy(assembly:MachineAssembly, layout:MillZAxisLayout, directory:String):Void {

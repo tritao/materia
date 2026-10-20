@@ -4,16 +4,16 @@ import haxe.Json;
 import materia.tooling.ToolingEnums.ToolingLengthUnit;
 import materia.tooling.ToolingEnums.CoatedFace;
 import materia.tooling.ToolingEnums.StockDirection;
-import materia.tooling.ToolingEnums.InsertRole;
-import materia.tooling.ToolingEnums.InsertFinish;
+import materia.casting.InsertSpec.InsertRole;
+import materia.casting.InsertSpec.InsertFinish;
 import haxe.crypto.Sha256;
 import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.tooling.ToolingPrism.ToolingPoint2;
 import materia.tooling.casting.CastingToolingInput;
-import materia.tooling.casting.CastingToolingInput.CastingToolingFeature;
+import materia.casting.CastingFeature;
 import materia.tooling.casting.CastingToolingInput.CastingToolingInsert;
-import materia.tooling.casting.CastingToolingInput.CastingFeatureKind;
+import materia.casting.CastingFeature.CastingFeatureKind;
 import materia.tooling.casting.CastingSetup;
 import materia.tooling.casting.CastingSetup.CoreStrategy;
 import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
@@ -24,7 +24,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 4;
+	public static inline var VERSION = 6;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -76,7 +76,7 @@ class ToolingCodec {
 		var envelope:Array<ToolingPrism> = [for (p in array(raw, "envelope")) readPrism(p)];
 		if (envelope.length == 0)
 			throw "Tooling input needs an envelope";
-		var features:Array<CastingToolingFeature> = [for (f in array(raw, "features")) readFeature(f)];
+		var features = materia.casting.CastingFeatureCodec.snapshot(array(raw,"features"));
 		var inserts:Array<CastingToolingInsert> = [for (i in array(raw, "inserts")) readInsert(i)];
 		unique(envelope, p -> p.id, "envelope");
 		unique(features, f -> f.id, "features");
@@ -86,15 +86,13 @@ class ToolingCodec {
 			byId.set(i.id, i);
 		var referenced = new Map<String, Bool>();
 		for (f in features) {
-			if (f.kind == Void) {
-				if (f.insertId != null)
-					throw 'Void ${f.id} cannot reference an insert';
-			} else {
-				var i = f.insertId == null ? null : byId.get(f.insertId);
-				if (i == null || referenced.exists(f.insertId))
+			if (f.kind == InsertRecess) {
+				var i = f.owner == null ? null : byId.get(f.owner);
+				if (i == null || referenced.exists(f.owner))
 					throw 'Invalid insert reference on ${f.id}';
-				if (f.width != i.width || f.depth != i.depth || f.height != i.height || !sameFrame(f.pose, i.pose))
-					throw 'Insert recess ${f.id} does not match insert ${i.id}';
+                if(f.geometry.width!=i.width||f.geometry.depth!=i.depth||f.geometry.height!=i.height||!sameFrame(f.geometry.pose,i.pose))
+                    throw 'Insert recess ${f.id} does not match insert ${i.id}';
+
 				referenced.set(i.id, true);
 			}
 		}
@@ -144,26 +142,8 @@ class ToolingCodec {
 		};
 	}
 
-	static function readFeature(raw:Dynamic):CastingToolingFeature {
-		object(raw, ["id", "kind", "insertId", "width", "depth", "height", "pose"], "feature");
-		var kind:CastingFeatureKind = switch string(raw, "kind") {
-			case "void":
-				Void;
-			case "insert-recess":
-				InsertRecess;
-			default:
-				throw "Unsupported casting feature kind";
-		};
-		return {
-			id: string(raw, "id"),
-			kind: kind,
-			insertId: nullableString(raw, "insertId"),
-			width: positive(raw, "width"),
-			depth: positive(raw, "depth"),
-			height: positive(raw, "height"),
-			pose: frame(raw, "pose")
-		};
-	}
+	static function readFeature(raw:Dynamic):CastingFeature
+		return materia.casting.CastingFeatureCodec.snapshot([raw])[0];
 
 	static function readInsert(raw:Dynamic):CastingToolingInsert {
 		object(raw, [
@@ -171,27 +151,26 @@ class ToolingCodec {
 			"width",
 			"depth",
 			"height",
-			"boreDiameter",
+			"holes",
 			"pose",
 			"role",
-			"sourceRole",
+			"label",
 			"positionTolerance",
 			"finish"
 		], "insert");
 		var w = positive(raw, "width"),
-			d = positive(raw, "depth"),
-			bore = nonnegative(raw, "boreDiameter");
-		if (bore >= Math.min(w, d))
-			throw "Insert bore consumes its seat";
+			d = positive(raw, "depth");
+        var holes=materia.casting.InsertHole.InsertHoleCodec.snapshot(Reflect.field(raw,"holes"));
+        for(hole in holes)if(hole.diameter>=Math.min(w,d))throw "Insert bore consumes its seat";
 		return {
 			id: string(raw, "id"),
 			width: w,
 			depth: d,
 			height: positive(raw, "height"),
-			boreDiameter: bore,
+			holes: holes,
 			pose: frame(raw, "pose"),
 			role: insertRole(string(raw, "role")),
-			sourceRole: string(raw, "sourceRole"),
+			label: string(raw, "label"),
 			positionTolerance: positive(raw, "positionTolerance"),
 			finish: insertFinish(string(raw, "finish"))
 		};
@@ -210,9 +189,9 @@ class ToolingCodec {
 		var fingerprint = string(raw, "sourceFingerprint");
 		if (fingerprint != inputFingerprint(input))
 			throw "Stale tooling setup: source fingerprint does not match";
-		var byId = new Map<String, CastingToolingFeature>();
+		var byId = new Map<String, CastingFeature>();
 		for (f in input.features)
-			if (f.kind == Void)
+			if (f.kind != InsertRecess)
 				byId.set(f.id, f);
 		var used = new Map<String, Bool>();
 		var features:Array<CastingFeatureStrategy> = [];
@@ -298,8 +277,23 @@ class ToolingCodec {
 			"resinSpec",
 			"releaseSpec",
 			"adhesiveSpec",
-			"processEvidence"
+			"processEvidence",
+			"designReview"
 		], "recipe");
+		var limits = Reflect.field(raw, "designReview");
+		object(limits, [
+			"minimumCornerRadiusMm",
+			"minimumInsertCoverMm",
+			"minimumInsertEdgeMm",
+			"minimumFixingAccessMm",
+			"minimumLiftingPoints",
+			"removalClearanceMm"
+		], "casting review limits");
+		function optionalLimit(key:String):Null<Float>
+			return Reflect.field(limits, key) == null ? null : nonnegative(limits, key);
+		var lifting:Null<Int> = Reflect.field(limits, "minimumLiftingPoints") == null ? null : integer(limits, "minimumLiftingPoints");
+		if (lifting != null && lifting < 0)
+			throw "Invalid minimum lifting points";
 		var p = Reflect.field(raw, "panel"), c = Reflect.field(raw, "core");
 		var hw = Reflect.field(raw, "hardware");
 		object(hw, [
@@ -455,7 +449,15 @@ class ToolingCodec {
 			resinSpec: string(raw, "resinSpec"),
 			releaseSpec: string(raw, "releaseSpec"),
 			adhesiveSpec: string(raw, "adhesiveSpec"),
-			processEvidence: evidence(raw, "processEvidence")
+			processEvidence: evidence(raw, "processEvidence"),
+			designReview: {
+				minimumCornerRadiusMm: optionalLimit("minimumCornerRadiusMm"),
+				minimumInsertCoverMm: optionalLimit("minimumInsertCoverMm"),
+				minimumInsertEdgeMm: optionalLimit("minimumInsertEdgeMm"),
+				minimumFixingAccessMm: optionalLimit("minimumFixingAccessMm"),
+				minimumLiftingPoints: lifting,
+				removalClearanceMm: optionalLimit("removalClearanceMm")
+			}
 		};
 	}
 
@@ -483,29 +485,12 @@ class ToolingCodec {
 				throw "Invalid panel direction constraint";
 		};
 
-	public static function insertRole(value:String):InsertRole
-		return switch value {
-			case "table-mount":
-				InsertRole.TableMount;
-			case "lifting-mount":
-				InsertRole.LiftingMount;
-			case "threaded-anchor":
-				InsertRole.ThreadedAnchor;
-			case "generic-mount":
-				InsertRole.GenericMount;
-			case "guide-seat":
-				InsertRole.GuideSeat;
-			case "bearing-seat":
-				InsertRole.BearingSeat;
-			case "column-mount":
-				InsertRole.ColumnMount;
-			case "leveling-seat":
-				InsertRole.LevelingSeat;
-			case "hatch-mount":
-				InsertRole.HatchMount;
-			default:
-				throw "Invalid insert role";
-		};
+	public static function insertRole(value:String):InsertRole {
+		for (role in materia.casting.InsertSpec.InsertRoles.values())
+			if ((role : String) == value)
+				return role;
+		throw "Invalid insert role";
+	}
 
 	public static function insertFinish(value:String):InsertFinish
 		return switch value {
