@@ -78,6 +78,12 @@ class RobotModel {
     return coupling;
   }
 
+  /** Whether joint `id` is the follower of a spring coupling (`JointCoupling.isSpring`): a belt stretches from it. */
+  public function followsSpring(id:JointId):Bool {
+    for (coupling in couplings) if (coupling.follower == id && coupling.isSpring()) return true;
+    return false;
+  }
+
   /**
    * Joint `id`'s limits, tightened by every joint that moves with it through couplings and by
    * the actuators that drive them, in `id`'s units. A lead screw's speed limit caps the axis it
@@ -94,12 +100,6 @@ class RobotModel {
    * coupled motor velocity sums in their planner and retain follower limits in the runtime.
    * Each axis likewise gets only its share of such a motor's force, in proportion to its ratio.
    */
-  /** Whether joint `id` is the follower of a spring coupling (`JointCoupling.isSpring`): a belt stretches from it. */
-  public function followsSpring(id:JointId):Bool {
-    for (coupling in couplings) if (coupling.follower == id && coupling.isSpring()) return true;
-    return false;
-  }
-
   public function coupledLimits(id:JointId, ?steady:SteadyLoads, ?motorSpaceVelocity:Bool = false):JointLimits {
     var joint = [for (candidate in joints) if (candidate.id == id) candidate];
     if (joint.length != 1) throw 'Robot model has no joint "$id"';
