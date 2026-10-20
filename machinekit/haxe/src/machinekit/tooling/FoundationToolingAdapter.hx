@@ -90,14 +90,14 @@ class FoundationToolingAdapter {
 				height: i.number("height"),
 				boreDiameter: i.number("boreDiameter"),
 				pose: row.pose,
-				role: sourceRole(i.token("role")),
-				sourceRole: i.token("role"),
+				role: cast i.token("role"),
+				sourceRole: i.token("label"),
 				positionTolerance: i.number("positionTolerance"),
 				finish: sourceFinish(i.token("finish"))
 			});
-			// MineralFoundation owns this ID convention for its generated full-box cuts.
-			recesses.set('insert-${row.id}', row.id);
 		}
+		for (link in foundation.insertRecessLinks())
+			recesses.set(link.recessId, link.insertId);
 		var features:Array<CastingToolingFeature> = [];
 		for (f in CastingFeatures.decode(v.token("voids"))) {
 			var insertId = recesses.get(f.id);
@@ -128,29 +128,5 @@ class FoundationToolingAdapter {
 			case "replicated after casting": InsertFinish.ReplicatedAfterCasting;
 			case "as cast": InsertFinish.SourceAsCast;
 			default: throw "Unsupported source insert finish: " + label;
-		};
-
-	static function sourceRole(label:String):InsertRole
-		return switch label {
-			case "rail seat", "Y guide seat", "Z guide seat":
-				InsertRole.GuideSeat;
-			case "Y drive bearing seat", "Z bearing mount anchor":
-				InsertRole.BearingSeat;
-			case "column mounting anchor — nominal M12 tap drill", "column sole clamping pad", "column sole pad":
-				InsertRole.ColumnMount;
-			case "leveling screw seat", "foundation foot seat":
-				InsertRole.LevelingSeat;
-			case "rear motor hatch anchor":
-				InsertRole.HatchMount;
-			case "table plate":
-				InsertRole.TableMount;
-			case "threaded bush":
-				InsertRole.ThreadedAnchor;
-			case "lifting point":
-				InsertRole.LiftingMount;
-			case "column plate":
-				InsertRole.ColumnMount;
-			default:
-				throw 'Unknown source insert role: $label';
 		};
 }

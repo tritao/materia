@@ -28,9 +28,9 @@ class CastHandling {
 		if (!Math.isFinite(mass) || !Math.isFinite(mx) || !Math.isFinite(my) || !Math.isFinite(mz) || mass <= 0)
 			throw "Casting handling requires positive mass";
 		var relative = F.compose(o.serviceOrientation, F.inverse(d.setup.sourceToMold));
-		var rotation = relative.qx * relative.qx + relative.qy * relative.qy + relative.qz * relative.qz;
+		var vertical = F.transformVector(relative, 0, 0, 1);
 		return {
-			requiresFlip: rotation > 1e-16,
+			requiresFlip: vertical.z < 1 - 1e-8,
 			moldToService: relative,
 			castingMassKg: mass,
 			centerOfMassMoldMm: {x: mx / mass, y: my / mass, z: mz / mass}

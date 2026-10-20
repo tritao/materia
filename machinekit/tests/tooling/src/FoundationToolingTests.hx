@@ -237,15 +237,12 @@ class FoundationToolingTests {
 			"hobber table plate role explicit");
 		check(hobber.inserts.filter(i -> i.id == "columnPlate")[0].role == materia.tooling.ToolingEnums.InsertRole.ColumnMount,
 			"hobber column plate role explicit");
-		var unknown = new CastInsert(new ComponentValues().setToken("role", "unknown role"));
-		var unknownFoundation = new MineralFoundation(values, [{id: "unknown", part: unknown, pose: F.identity()}]);
-		var unknownMessage = "";
-		try {
-			FoundationToolingAdapter.snapshot(unknownFoundation, "unknown", 1);
-		} catch (e:Dynamic) {
-			unknownMessage = Std.string(e);
-		}
-		check(unknownMessage.indexOf("Unknown source insert role") >= 0, "unknown source roles fail explicitly");
+		var rejectedRole = false;
+		try
+			new CastInsert(new ComponentValues().setToken("role", "unknown role"))
+		catch (e:Dynamic)
+			rejectedRole = true;
+		check(rejectedRole, "unknown source roles fail at the typed source parameter");
 		equivalent(new machinekit.hobbing.MineralCastBed(), "hobber-bed");
 		equivalent(new machinekit.hobbing.MineralCastColumn(), "hobber-column");
 		var finished = new CastInsert(new ComponentValues().setToken("finish", "replicated after casting"));

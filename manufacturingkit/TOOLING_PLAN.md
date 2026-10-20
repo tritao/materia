@@ -260,8 +260,16 @@ See [README.md](README.md#casting-tooling-inputs) for the implemented API and ch
   unknown hardware is included in the BOM and blocks qualification.
   The neutral suites pass 630 assertions, including lateral restraint failure;
   the records export passes artifact and manifest metadata tamper checks.
-- [ ] Review 14–21: handling, shared bridges, finishing stock, former overlap/
-  release, typed source insert roles/links and neutral datum/resin validation.
+- [x] Review 14–21: vertical-only flip detection; maximum-depth row bridges
+  with a real minimum (mill study minimum explicitly 40 mm, not qualified);
+  unapplied finishing allowances remain change requests, replication requires
+  master/release data, equal-priority former overlaps reject. Release requests
+  include bed backing and explicitly exclude unimplemented draft/split routes.
+  CastInsert roles are choices with separate labels; foundations expose recess
+  links and finish routes follow source intent. Neutral validation rejects datum
+  intrusion into resin; datum profiles remain explicitly unsupported. Removed
+  the codec-sorted permutation test. Neutral and native tooling suites pass;
+  the mill records export passes manifest integrity checks.
 - [ ] Review 22–30: actual fill openings, single cure authority, thermal model
   corrections, EPS compatibility, shared orientation analysis/ranking, actual CAD
   comparison, trapped-volume/head curves and stronger process fixtures.

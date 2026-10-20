@@ -15,7 +15,18 @@ class CastInsert extends MachineComponent {
 			P.length("depth", 400),
 			P.length("height", 20),
 			P.length("positionTolerance", 0.01),
-			P.text("role", "rail seat"),
+			P.choice("role", [
+				"table-mount",
+				"lifting-mount",
+				"threaded-anchor",
+				"generic-mount",
+				"guide-seat",
+				"bearing-seat",
+				"column-mount",
+				"leveling-seat",
+				"hatch-mount"
+			], "guide-seat"),
+			P.text("label", "rail seat"),
 			P.choice("finish", [
 				"ground after casting",
 				"machined after casting",
@@ -41,7 +52,7 @@ class CastInsert extends MachineComponent {
 			throw "Insert needs a role";
 		if (v.get("material") != null && v.token("material") != "steel")
 			throw "Cast insert requires steel";
-		super("CAST-IN-INSERT", "Cast-in steel " + v.token("role") + ", " + v.token("finish"), "steel", false, v);
+		super("CAST-IN-INSERT", "Cast-in steel " + v.token("label") + ", " + v.token("finish"), "steel", false, v);
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Mount, Solids.axial(0, 0, parameterNumber("height")));
 	}

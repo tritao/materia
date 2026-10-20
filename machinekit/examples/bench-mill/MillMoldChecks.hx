@@ -93,8 +93,9 @@ class MillMoldChecks {
 		check(report.assemblyGroups.length == 2 && report.permanentGroups.length == 2, "two shared row fixtures");
 		check(report.assembly.assemblyOrder[0] == "bed", "bed installed first");
 		check(p.changeRequests.filter(c -> c.kind == "lifting-points").length == 1, "handling lift/flip request");
-		check(p.options.precision.filter(s -> s.route == "replicated").length == 4 && p.options.groutedJoints.length == 1,
-			"reviewed finishing routes retained");
+		check(p.options.precision.filter(s -> s.route != CastingMoldPlanner.sourceRoute(p.document.input.inserts.filter(i -> i.id == s.insertId)[0].finish))
+			.length == 0 && p.options.groutedJoints.length == 1,
+			"finishing routes follow typed source intent");
 		equivalent(frame, p);
 		junctionGeometry(frame, p);
 		for (c in p.cores) {
@@ -114,7 +115,11 @@ class MillMoldChecks {
 		var profiled = mismatched.formers.filter(f -> f.volume.profiles.length > 0)[0];
 		profiled.volume.profiles[0].depth += 1;
 		rejects(() -> CastingMoldPlanner.validate(mismatched), "former sealing profile must match panel operation");
-		check(p.changeRequests.filter(c -> c.kind == "draft-or-split").length == p.document.setup.features.filter(f -> f.strategy == "reusable-former").length,
+		check(p.changeRequests.filter(c -> c.kind == "draft-or-split")
+			.length == p.document.setup.features.filter(f -> f.strategy == "reusable-former")
+			.length
+				+ p.formers.filter(f -> f.featureIds.length == 0)
+					.length,
 			"every zero-draft rigid feature has a release decision");
 		check(p.validation.filter(v -> StringTools.startsWith(v.rule, "tooling.fixture.attachment.")).length == 12,
 			"fixture attachments are tooling pending records");

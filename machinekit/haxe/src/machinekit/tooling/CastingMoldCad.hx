@@ -240,7 +240,8 @@ class CastingMoldCad {
 				.setNumber("height", i.height)
 				.setNumber("boreDiameter", i.boreDiameter)
 				.setNumber("positionTolerance", i.positionTolerance)
-				.setToken("role", i.sourceRole));
+				.setToken("role", i.role)
+				.setToken("label", i.sourceRole));
 			a.addComponent(materia.tooling.ToolingIds.derive("insert-", i.id), part, pose);
 		}
 		if (!exploded) {

@@ -142,7 +142,7 @@ class ToolingTests {
 				plugMaterial: "steel",
 				sealMargin: 3,
 				sealMaterial: "pending compatible sealing compound",
-				minimumBridgeWidth: 80,
+				minimumBridgeWidth: 40,
 				locatingPinDiameter: 6,
 				supportScrewDiameter: 6,
 				supportClearanceDiameter: 7,

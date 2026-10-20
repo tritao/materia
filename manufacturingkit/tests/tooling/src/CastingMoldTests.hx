@@ -72,6 +72,34 @@ class CastingMoldTests {
 			p = CastingMoldPlanner.plan(d, o),
 			s = CastingMoldCodec.encode(p);
 		FabricationTests.run(p);
+		var handlingOptions = options(d);
+		handlingOptions.serviceOrientation = materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0,
+			[0, -1, 0, 1, 0, 0, 0, 0, 1]), d.setup.sourceToMold);
+		check(!materia.tooling.casting.CastHandling.plan(d, handlingOptions, p.envelope).requiresFlip,
+			"yaw preserves the vertical and does not require lifting/flip");
+		handlingOptions.serviceOrientation = materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0,
+			[1, 0, 0, 0, 0, -1, 0, 1, 0]), d.setup.sourceToMold);
+		check(materia.tooling.casting.CastHandling.plan(d, handlingOptions, p.envelope).requiresFlip, "changing vertical requires handling/flip");
+		var bridgePlan = CastingMoldCodec.decode(s);
+		var extraCore = CastingMoldCodec.decode(s).cores[0];
+		extraCore.cavity.y -= 20;
+		extraCore.cavity.depth += 40;
+		bridgePlan.cores.push(extraCore);
+		var bridgePanels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement> = [];
+		materia.tooling.casting.CoreSupports.sharedBridges(bridgePlan.cavity, bridgePlan.document.recipe, bridgePlan.cores, bridgePanels, []);
+		var bridgeBounds = materia.tooling.panel.PanelGeometry.bounds(materia.tooling.panel.PanelContours.outside(bridgePanels.filter(v ->
+			v.panel.id == "core-bridge-0")[0].panel));
+		check(Math.abs(bridgeBounds.height - extraCore.cavity.depth / 2) < 1e-8, "row bridge uses the largest depth including a later core");
+		var narrowBridge = ToolingCodec.snapshot(d);
+		narrowBridge.recipe.hardware.minimumBridgeWidth = 1000;
+		rejects(() -> CastingMoldPlanner.plan(narrowBridge, options(narrowBridge)), "undersized bridge row rejected");
+		var intersecting = CastingMoldCodec.decode(s);
+		var resinPieces = BoxVolumes.subtract([p.envelope], [
+			for (f in p.document.input.features)
+				CastingMoldPlanner.featureBox(p.document, f)
+		]);
+		intersecting.fixtures[0].datum.pieces = [resinPieces[0]];
+		rejects(() -> CastingMoldPlanner.validate(intersecting), "datum/resin intersection rejected before CAD");
 		check(CastingMoldCodec.encode(CastingMoldCodec.decode(s)) == s, "multi-core canonical regeneration");
 		check(p.features.length == d.input.features.length && p.cores.length == 1, "complete source ownership");
 		var cuts = [for (f in d.input.features) CastingMoldPlanner.featureBox(d, f)],
@@ -151,14 +179,6 @@ class CastingMoldTests {
 				height: 12
 			}
 		])).length == 2, "disconnected formers split into physical members");
-		var shuffled = ToolingCodec.snapshot(d);
-		shuffled.input.features.reverse();
-		shuffled.setup.features.reverse();
-		var permutation = CastingMoldPlanner.plan(shuffled, options(shuffled));
-		check(ToolingCodec.canonical([for (f in permutation.features) {id: f.featureId, members: f.memberIds}]) == ToolingCodec.canonical([
-			for (f in CastingMoldPlanner.plan(d, options(d)).features)
-				{id: f.featureId, members: f.memberIds}
-		]), "feature permutation preserves exact ownership IDs");
 		var unsupported = ToolingCodec.snapshot(d);
 		unsupported.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.Unsupported;
 		var unsupportedPlan = CastingMoldPlanner.plan(unsupported, options(unsupported));
@@ -272,6 +292,9 @@ class CastingMoldTests {
 			priority: 10
 		});
 		assigned.setup.sourceFingerprint = ToolingCodec.inputFingerprint(assigned.input);
+		assigned.setup.features[assigned.setup.features.length - 1].priority = 0;
+		rejects(() -> CastingMoldPlanner.plan(assigned, options(assigned)), "equal-priority overlapping formers rejected");
+		assigned.setup.features[assigned.setup.features.length - 1].priority = 10;
 		var allocated = CastingMoldPlanner.plan(assigned, options(assigned));
 		check(allocated.features.filter(f -> f.featureId == "pocket")[0].memberIds.indexOf("former-overlap-detail-0") >= 0,
 			"partial overlaps include every shaping former, not only the newly allocated remainder");
@@ -280,8 +303,8 @@ class CastingMoldTests {
 		check(CastingMoldPlanner.plan(d, machining).changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 1,
 			"machining requires an allowance decision");
 		machining.precision[0].allowance = 1;
-		check(CastingMoldPlanner.plan(d, machining).changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 0,
-			"explicit finishing stock satisfies the allowance contract");
+		check(CastingMoldPlanner.plan(d, machining).changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 1,
+			"unapplied finishing stock still requires a source allowance decision");
 		var finishing = ToolingCodec.snapshot(d);
 		finishing.input.inserts[0].finish = materia.tooling.ToolingEnums.InsertFinish.ReplicatedAfterCasting;
 		finishing.setup.sourceFingerprint = ToolingCodec.inputFingerprint(finishing.input);

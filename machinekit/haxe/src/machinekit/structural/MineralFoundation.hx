@@ -17,12 +17,16 @@ typedef CastInsertPlacement = {
  */
 class MineralFoundation extends MachineAssembly {
 	public final body:MineralCasting;
+
 	final inserts:Array<CastInsertPlacement>;
+	final recessLinks:Array<{recessId:String, insertId:String}>;
 
 	public function new(bodyValues:ComponentValues, placements:Array<CastInsertPlacement>, ?rootInsert:String) {
 		super();
-		if (placements == null) throw "Foundation needs an insert list";
+		if (placements == null)
+			throw "Foundation needs an insert list";
 		inserts = [];
+		recessLinks = [];
 		var v = machinekit.component.ComponentRecipeSupport.resolve(MineralCasting.parameters(), bodyValues);
 		var features = CastingFeatures.decode(v.token("voids"));
 		var ids:Map<String, Bool> = ["casting" => true];
@@ -30,14 +34,21 @@ class MineralFoundation extends MachineAssembly {
 			if (row == null || row.id == null || row.id.length == 0 || ids.exists(row.id) || row.part == null)
 				throw "Foundation inserts need unique ids and steel parts";
 			ids.set(row.id, true);
-			var recess:machinekit.structural.CastingFeatures.CastingBox = {id: 'insert-${row.id}', width: row.part.parameterNumber("width"),
-				depth: row.part.parameterNumber("depth"), height: row.part.parameterNumber("height"), pose: row.pose};
+			var recess:machinekit.structural.CastingFeatures.CastingBox = {
+				id: 'insert-${row.id}',
+				width: row.part.parameterNumber("width"),
+				depth: row.part.parameterNumber("depth"),
+				height: row.part.parameterNumber("height"),
+				pose: row.pose
+			};
 			// Codec validation also takes ownership of a copy of the caller's frame.
 			var copy = CastingFeatures.decode(CastingFeatures.encode([recess]))[0];
 			features.push(copy);
+			recessLinks.push({recessId: copy.id, insertId: row.id});
 			inserts.push({id: row.id, part: row.part, pose: copy.pose});
 		}
-		if (rootInsert != null && (rootInsert == "casting" || !ids.exists(rootInsert))) throw "Unknown foundation root insert";
+		if (rootInsert != null && (rootInsert == "casting" || !ids.exists(rootInsert)))
+			throw "Unknown foundation root insert";
 		v.setToken("voids", CastingFeatures.encode(features));
 		body = new MineralCasting(v);
 		addComponent("casting", body);
@@ -52,12 +63,21 @@ class MineralFoundation extends MachineAssembly {
 			}
 			exposeConnector(row.id, row.id, "top");
 		}
-		if (rootInsert != null) exposeConnector("mount", rootInsert, "mount");
-		else exposeConnector("mount", "casting", "mount");
+		if (rootInsert != null)
+			exposeConnector("mount", rootInsert, "mount");
+		else
+			exposeConnector("mount", "casting", "mount");
 	}
 
-	public function insertLocations():Array<CastInsertPlacement> return [for (row in inserts)
-		{id: row.id, part: row.part, pose: F.compose(F.identity(), row.pose)}];
+	public function insertLocations():Array<CastInsertPlacement>
+		return [
+			for (row in inserts)
+				{id: row.id, part: row.part, pose: F.compose(F.identity(), row.pose)}
+		];
 
-	public function castingByWeight():{material:String, kg:Float} return body.castingByWeight();
+	public function insertRecessLinks():Array<{recessId:String, insertId:String}>
+		return [for (link in recessLinks) {recessId: link.recessId, insertId: link.insertId}];
+
+	public function castingByWeight():{material:String, kg:Float}
+		return body.castingByWeight();
 }

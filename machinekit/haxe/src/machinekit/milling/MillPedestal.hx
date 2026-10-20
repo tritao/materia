@@ -16,10 +16,16 @@ class MillPedestal extends MineralFoundation {
 		var features = CastingFeatures.grid(width, depth, height, 90, 100, 90, 25, 1, 2);
 		features.push(CastingFeatures.box("service-opening", 360, 100, 380, 0, -depth / 2 + 40, 150));
 		features.push(CastingFeatures.box("rib-passage", 360, 27, 380, 0, 0, 150));
-		var v = new ComponentValues().setNumber("width", width).setNumber("depth", depth).setNumber("height", height)
-			.setNumber("cornerChamfer", 30).setToken("voids", CastingFeatures.encode(features));
-		var cap = new CastInsert(new ComponentValues().setNumber("width", width).setNumber("depth", depth)
-			.setNumber("height", 20).setToken("role", "mill support cap"));
+		var v = new ComponentValues().setNumber("width", width)
+			.setNumber("depth", depth)
+			.setNumber("height", height)
+			.setNumber("cornerChamfer", 30)
+			.setToken("voids", CastingFeatures.encode(features));
+		var cap = new CastInsert(new ComponentValues().setNumber("width", width)
+			.setNumber("depth", depth)
+			.setNumber("height", 20)
+			.setToken("role", "generic-mount")
+			.setToken("label", "mill support cap"));
 		super(v, [{id: "cap", part: cap, pose: AssemblyFrames.translation(0, 0, height - 12)}]);
 	}
 }
