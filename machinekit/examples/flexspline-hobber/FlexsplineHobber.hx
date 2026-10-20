@@ -45,11 +45,16 @@ class FlexsplineHobber extends MachineAssembly {
     for(i in 0...footCentres.length){
       var p=footCentres[i],x=p.x+HobberXLayout.front().bedCentre,y=p.y;
       var roof=-590+FoundationLayout.FOOT_ROOF,plateBottom=roof-FoundationLayout.FOOT_PLATE_THICKNESS;
-      fixAt("footSeat"+i,new machinekit.structural.LevelingSeat(),F.translation(x,y,plateBottom),"bed/casting",F.alongY(x,y,roof,0,0,1));
-      var nutValues=new ComponentValues().setToken("variant","nut");
-      fixAt("footNut"+i,new machinekit.structural.LevelingSeat(nutValues),F.translation(x,y,plateBottom-19),"footSeat"+i,F.alongY(x,y,plateBottom,0,0,1));
-      fixAt("footLocknut"+i,new machinekit.structural.LevelingSeat(nutValues),F.translation(x,y,plateBottom-38),"footNut"+i,F.alongY(x,y,plateBottom-19,0,0,1));
-      fixAt("foot"+i,new machinekit.structural.LevelingFoot(new ComponentValues().setNumber("recessDepth",FoundationLayout.FOOT_ROOF)),F.translation(x,y,-637),"footNut"+i);
+      var plate=machinekit.structural.LevelingFoot.of(Plate(FoundationLayout.FOOT_PLATE_WIDTH,
+        FoundationLayout.FOOT_PLATE_WIDTH,FoundationLayout.FOOT_PLATE_THICKNESS,26));
+      fixAt("footSeat"+i,plate,F.translation(x,y,plateBottom),"bed/casting",F.alongY(x,y,roof,0,0,1));
+      var footThread=machinekit.standard.FastenerThreads.metric(24,3);
+      var nut=machinekit.structural.LevelingFoot.of(Nut(Hexagon(36),19,footThread));
+      fixAt("footNut"+i,nut,F.translation(x,y,plateBottom-19),"footSeat"+i,F.alongY(x,y,plateBottom,0,0,1));
+      fixAt("footLocknut"+i,nut,F.translation(x,y,plateBottom-38),"footNut"+i,F.alongY(x,y,plateBottom-19,0,0,1));
+      var foot=machinekit.structural.LevelingFoot.of(Foot(100,15,footThread,15,
+        47+FoundationLayout.FOOT_ROOF+25,47+FoundationLayout.FOOT_ROOF,Nominal,NoCollar));
+      fixAt("foot"+i,foot,F.translation(x,y,-637),"footNut"+i);
     }
     var installed:machinekit.motion.PrecisionRotaryAxis=rotaryAxis==null?new machinekit.motion.PurchasedRotaryTable():rotaryAxis;
     table=installed.assembly();tableSpec=installed.specification();

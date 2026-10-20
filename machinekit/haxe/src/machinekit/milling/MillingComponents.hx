@@ -9,7 +9,6 @@ class MillingComponents {
 		registry.register(Rke92VisePart.recipeType());
 		registry.register(ZppComponent.recipeType());
 		registry.register(MillFixtureAdapter.recipeType());
-		registry.register(MillLevelingFoot.recipeType());
 		registry.register(MillMotorCover.recipeType());
 		registry.register(MillDriveHatch.recipeType());
 		registry.register(MillYNutBridge.recipeType());

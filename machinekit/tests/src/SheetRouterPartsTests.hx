@@ -5,7 +5,7 @@ import machinekit.transmission.*;
 import machinekit.routing.*;
 import machinekit.power.*;
 import machinekit.control.*;
-import machinekit.structural.LevellingFoot;
+import machinekit.structural.LevelingFoot;
 
 /** SR1 tests: engineering identities, assembly interfaces, recipes, and valid owned solids. */
 class SheetRouterPartsTests {
@@ -49,13 +49,13 @@ class SheetRouterPartsTests {
       SafetyRelay.recipeType(),
       EmergencyStopButton.recipeType(),
       ControlCabinet.recipeType(),
-      LevellingFoot.recipeType()
+      LevelingFoot.recipeType()
     ];
     var direct:Array<AssumedCatalogComponent> = [new PlanetaryReducer(),new CableChain(),new BrakeServo(),
       new HelicalRack(),new HelicalPinion(),new PreloadedPinionMount(),new AtcSpindle(),new ToolHolder(),new Collet(),
       new ToolFork(),new ToolRack(),new ToolLengthSetter(),new DustShoe(),new VacuumTable(),new Spoilboard(),
       new VacuumBlower(),new VacuumZoneValve(),new Vfd(),new BrakeResistor(),new Contactor(),new CircuitBreaker(),
-      new SafetyRelay(),new EmergencyStopButton(),new ControlCabinet(),new LevellingFoot()];
+      new SafetyRelay(),new EmergencyStopButton(),new ControlCabinet(),new LevelingFoot()];
     for(part in direct) {
       var copy=part.componentType().create(part.values());
       check(part.designation==copy.designation,'direct constructor identity '+part.designation);

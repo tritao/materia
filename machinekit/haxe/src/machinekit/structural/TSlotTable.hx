@@ -6,7 +6,6 @@ import machinekit.assembly.AxisBuilder;
 import machinekit.structural.TSlotTableParts.TableAngle;
 import machinekit.structural.TSlotTableParts.TableSlotNut;
 import machinekit.structural.TSlotTableParts.TableTop;
-import machinekit.structural.TSlotTableParts.TableLevellingFoot;
 import machinekit.structural.TSlotTableParts.TableExtrusion;
 import machinekit.structural.TSlotTableParts.TableRearBrace;
 import machinekit.structural.TSlotTableParts.TableFootPlate;
@@ -221,7 +220,9 @@ class TSlotTable extends MachineAssembly {
 	}
 
 	function addFoot(ix:Int,iy:Int,x:Float,y:Float,locknut:HexNut):Void {
-		addPart('foot-$ix-$iy',new TableLevellingFoot(profile.size,footHeight,hardware.footEngagement,hardware.footThread),
+		addPart('foot-$ix-$iy',LevelingFoot.of(Foot(profile.size,8,
+			machinekit.standard.FastenerThreads.metric(hardware.footSpec().diameter,hardware.footSpec().pitch),
+			7,footHeight+hardware.footEngagement,footHeight,ThreadRoot,NoCollar)),
 			AssemblyFrames.translation(x,y,0));
 		box('foot-$ix-$iy',profile.size,profile.size,footHeight+hardware.footEngagement,x,y,0);
 		addPart('foot-locknut-$ix-$iy',locknut,AssemblyFrames.translation(x,y,footHeight-locknut.height));

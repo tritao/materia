@@ -54,7 +54,7 @@ class SheetRouter extends Gantry {
         base=buildBase(left,right,front,back,zeroPose("frameFront").z-50,bedBottom);
         attach("base",base,F.identity(),"frameFront");
         buildChainSupports();
-        var foot=new LevellingFoot();
+        var foot=new LevelingFoot();
         for(side in 0...2)for(end in 0...4) {
             var x=side==0?left:right,y=end==3?1575:front+(back-front)*end/2;
             attach('foot${side}${end}',foot,F.translation(x,y,0),"base");

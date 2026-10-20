@@ -3,7 +3,7 @@ import machinekit.structural.TSlotTableHardware;
 import machinekit.structural.TSlotTableParts.TableAngle;
 import machinekit.structural.TSlotTableParts.TableTop;
 import machinekit.structural.TSlotTableParts.TableSlotNut;
-import machinekit.structural.TSlotTableParts.TableLevellingFoot;
+import machinekit.structural.LevelingFoot;
 import machinekit.structural.TSlotExtrusion;
 import machinekit.component.ComponentDetail;
 import machinekit.assembly.AssemblyPreview;
@@ -18,7 +18,8 @@ import cadkit.modeling.AssemblyState;
 
 /** Size-independent construction, hardware fit, machining and preview integration checks. */
 class TendingTableChecks {
-	static function check(ok:Bool,message:String):Void { if (!ok) throw message; }
+	static var assertions = 0;
+	static function check(ok:Bool,message:String):Void { assertions++; if (!ok) throw message; }
 	static function near(a:Float,b:Float,message:String):Void check(Math.abs(a-b)<0.001,message+': $a != $b');
 	static function rejects(build:Void->Void,message:String):Void {
 		var failed=false;
@@ -68,7 +69,17 @@ class TendingTableChecks {
 		for (entry in components) {
 			if (StringTools.endsWith(entry.id,"-screw")) bolts++;
 			if (StringTools.endsWith(entry.id,"-nut")) nuts++;
-			if (Std.isOfType(entry.component,TableLevellingFoot)) feet++;
+			if (Std.isOfType(entry.component,LevelingFoot)) {
+				feet++;
+				var foot:LevelingFoot = cast entry.component;
+				switch foot.specification() {
+					case Foot(_, _, thread, _, _, mount, ThreadRoot, NoCollar):
+						near(thread.majorDiameter,h.footSpec().diameter,"Source foot thread diameter");
+						near(thread.pitch,h.footSpec().pitch,"Source foot thread pitch");
+						near(mount,table.footHeight,"Source foot mounting datum");
+					default: throw "T-slot table must use the shared thread-root foot variant";
+				}
+			}
 			if (Std.isOfType(entry.component,TableAngle)) angles++;
 		}
 		check(bolts==2*angleCount+4+(table.rearBrace ? 2 : 0)+(table.hasOutriggers ? 8 : 0) && bolts==nuts,"Two fasteners per bracket, four top fasteners and optional brace pair");
@@ -219,6 +230,6 @@ class TendingTableChecks {
 			{profile:table.profile.designation,width:table.width,depth:table.depth,height:table.height,
 			 base:{width:table.baseWidth,depth:table.baseDepth,offsetX:table.baseOffsetX,offsetY:table.baseOffsetY},
 			 cuts:table.memberCuts(),topHoles:table.topMounts(),footMountMachining:table.machining(),footAdjustment:table.footAdjustment(),bom:table.billOfMaterials().lines()}],null,"  "));
-		trace("T-slot table detailing: seven size/footprint/hardware variants, CAD holes, BOM, collision and rejection checks passed");
+		Sys.println('TendingTableChecks: $assertions assertions passed; seven size/footprint/hardware variants');
 	}
 }

@@ -1832,6 +1832,44 @@ hobber conversion commits and before fixing sockets:
   fabrication readiness **false**. Review ZIP **791** entries; trial ZIP **52**
   entries / **8** programs. No physical coupon result has been recorded.
 
-The remaining records-stage task is the single levelling-foot component family.
-Requirements (step 2), general draft/radius/prism/CAM and non-box process geometry
-(step 3), phase 8 structures and phase 9 physical calibration remain open.
+The records stage is complete, including the levelling-foot family below. Requirements (step 2),
+general draft/radius/prism/CAM and non-box process geometry (step 3), phase 8
+structures and phase 9 physical calibration remain open.
+
+
+### Phase 7 records: shared levelling-foot family
+
+- [x] One `structural.LevelingFoot` recipe with strict `LevelingFootSpec` schema
+  **1**: complete nominal foot, separate screw, pad, removable plate and round/hex
+  nut. Metric threads are saved explicitly and realized as semantic CAD threads.
+  Unknown fields/versions and the retired recipes are rejected; no compatibility
+  path. `LevellingFoot`, `MillLevelingFoot`, `LevelingSeat` and the table-specific
+  `TableLevellingFoot` are deleted.
+- [x] Migrate the mill, hobber, sheet router and T-slot tending tables. The mill's
+  choice belongs to `MillCastingDetails`; the hobber's plate/register dimensions
+  belong to `FoundationLayout`. Table mating threads and tap drills derive from
+  the hardware specification without constructing dummy screws.
+- [x] Preserve the previous nominal solids by exact symmetric difference. Local
+  floor/mount datums preserve installed geometry; the mill's four installed feet
+  independently match their prior world solids. Separate hobber nuts and plates
+  remain real BOM items; complete nominal bought feet remain one item each.
+  Load ratings and supplier conformity are not inferred from geometry.
+- [x] Main compiles. Validation: shared family **115**; native FoundationTooling
+  **107**, Panel **132**, BoxMold **157**, Process **34** (**430** total);
+  hobber foot/gravity **190**; FlexsplineHobber **1,131**; HobberPart **1,038**;
+  router parts **292**; full router **426**; TendingTable **12,886** over seven
+  variants; MillMoldChecks **249**.
+- [x] Refresh the main mold, full and records-only fabrication packages and
+  review/trial archives; manifest integrity/tamper checks pass. Full package:
+  **790 artifacts / 40 programs / 17 Pass / 258 Pending / 15 Unsupported**;
+  records-only: **117 artifacts / 40 programs**; review/trial ZIPs **791/52**
+  entries. Both artifact hash sets verify independently. Physical coupon
+  evidence remains absent and fabrication readiness remains **false**.
+
+Broader baseline issue, unchanged by this stage: `MillFrameChecks` reports
+`column steel pair Z (214 vs 224)` on both unchanged `26f0b2ba6` and the migrated
+source. It locates the base anchor's top with `layout.insertThickness` (20 mm)
+although the accepted blind-thread design uses a 30 mm anchor. Its later direct
+insert-dimension accesses also predate the body-record migration. That other
+session's check was not edited or weakened. The dedicated installed-foot tests
+and current mold/frozen-geometry checks pass independently.

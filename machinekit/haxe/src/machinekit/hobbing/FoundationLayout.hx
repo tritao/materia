@@ -38,6 +38,7 @@ class FoundationLayout {
 	public static inline final FOOT_STEM_CLEARANCE = 28.0;
 	public static inline final FOOT_REGISTER_CLEARANCE = 1.0;
 	public static inline final FOOT_PLATE_THICKNESS = 15.0;
+	public static inline final FOOT_PLATE_WIDTH = 110.0;
 
 	static function faces(names:Array<String>):Array<CastingOpening>
 		return [for (name in names) C.face(name)];
@@ -154,8 +155,8 @@ class FoundationLayout {
 					FOOT_STEM_CLEARANCE, FOOT_SUPPORT_TOP, faces([opening]),
 					faces(["body.z-min"]).concat([C.feature('core-${i < 2 ? 0 : 1}-0')]), {
 						owner: "footSeat" + i, openings: [C.feature('foot$i-access')],
-						width: machinekit.structural.LevelingSeat.PLATE_WIDTH + FOOT_REGISTER_CLEARANCE,
-						depth: machinekit.structural.LevelingSeat.PLATE_WIDTH + FOOT_REGISTER_CLEARANCE,
+						width: FOOT_PLATE_WIDTH + FOOT_REGISTER_CLEARANCE,
+						depth: FOOT_PLATE_WIDTH + FOOT_REGISTER_CLEARANCE,
 						thickness: FOOT_PLATE_THICKNESS
 					}));
 			}

@@ -1,6 +1,6 @@
 import machinekit.hobbing.FoundationLayout;
 import machinekit.hobbing.FoundationLayout as Pocket;
-import machinekit.structural.LevelingSeat;
+import machinekit.structural.LevelingFoot;
 import machinekit.component.MachineKitComponents;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.PosedParts;
@@ -17,7 +17,7 @@ class HobberFootChecks {
     check(machine.bed.insertLocations().filter(p->StringTools.startsWith(p.id,"foot")).length==0,"no permanently embedded foot anchors");
     var restored=MachineAssembly.decode(machine.encode(),MachineKitComponents.standard());
     check(restored.components().length==members.length,"separate foot hardware persists");
-    var body=machine.bed.body.geometry(),plate=new LevelingSeat(),cache=new PosedParts();
+    var body=machine.bed.body.geometry(),plate=LevelingFoot.of(Plate(Pocket.FOOT_PLATE_WIDTH,Pocket.FOOT_PLATE_WIDTH,Pocket.FOOT_PLATE_THICKNESS,26)),cache=new PosedParts();
     var plateShape=plate.geometry(),began=Sys.time();
     function volumeInBody(shape:Part):Float {var common=shape.intersect(body);var v=common.volume();common.close();return v;}
     function box(w:Float,d:Float,h:Float,x:Float,y:Float,z:Float):Part {var raw=Part.box(w,d,h),p=raw.translated(new Vector(x,y,z));raw.close();return p;}
@@ -61,7 +61,7 @@ class HobberFootChecks {
     }
     check(base.beam.status=="unsupported"&&base.beam.newMinimumIyMm4==null&&base.beam.passed==false,
       "round socket sections do not become a passing beam screen");
-    var contactArea=machinekit.structural.LevelingSeat.PLATE_WIDTH*machinekit.structural.LevelingSeat.PLATE_WIDTH-Pocket.FOOT_STEM_CLEARANCE*Pocket.FOOT_STEM_CLEARANCE;
+    var contactArea=Pocket.FOOT_PLATE_WIDTH*Pocket.FOOT_PLATE_WIDTH-Pocket.FOOT_STEM_CLEARANCE*Pocket.FOOT_STEM_CLEARANCE;
     var result={assertions:n,seconds:Sys.time()-began,footCount:3,pocketRoofMm:Pocket.FOOT_ROOF,pocketFloorMm:Pocket.FOOT_FLOOR,
       roofThicknessMm:Pocket.FOOT_SUPPORT_TOP-Pocket.FOOT_ROOF,plateMm:[110,110,15],stemClearanceMm:28,thread:"M24x3 nominal, semantic threads",
       worstFootReactionN:reaction,meanRoofBearingStressMPa:reaction/contactArea,

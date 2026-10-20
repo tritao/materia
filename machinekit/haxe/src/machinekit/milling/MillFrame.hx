@@ -151,7 +151,7 @@ class MillFrame extends MachineAssembly {
 			for (sx in [-1, 1])
 				for (sy in [-1, 1]) {
 					var id = corner(sx, sy);
-					addComponent('levelingFoot$id', new MillLevelingFoot());
+					addComponent('levelingFoot$id', machinekit.structural.LevelingFoot.of(details.levelingFoot));
 					addMate('leveling-foot-$id', "fixed", 'base/foot$id', "top", 'levelingFoot$id', "mount");
 				}
 

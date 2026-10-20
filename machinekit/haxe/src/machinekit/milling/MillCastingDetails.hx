@@ -17,6 +17,8 @@ class MillCastingDetails {
 	public var frontBearingSeatWidth:Float = 106;
 	public var rearBayDesignClearance:Float = 1;
 	public var levelingClearanceDiameter:Float = 18;
+	/** Nominal complete foot in its floor frame; the assembly mates its 90 mm datum to the seat. */
+	public var levelingFoot:machinekit.structural.LevelingFootSpec;
 	public var selectedShaftClearance:Float = 22;
 	/** 30 mm stock accommodates the selected M12 service screw, full thread,
 	 * bottoming-tap runout, tip gap and intact policy back wall. */
@@ -35,6 +37,8 @@ class MillCastingDetails {
 	public var hatchAnchorThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
 
 	public function new() {
+		levelingFoot = Foot(70, 20, machinekit.standard.FastenerThreads.metric(16, 2),
+			20, 115, 90, Nominal, RoundCollar(28, 10, 90));
 		columnAnchorThread = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(12).mating());
 		hatchAnchorThread = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(4).mating());
 	}

@@ -9,7 +9,6 @@ import cadkit.threads.ThreadSpec;
 import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
-import machinekit.standard.SocketHeadCapScrew;
 import machinekit.structural.TSlotTable.TableTopMount;
 
 /** Shared primitives for the generator; all sizes are mm. */
@@ -60,10 +59,11 @@ class TableSlotNut extends MachineComponent {
 	}
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var screw = SocketHeadCapScrew.metric(hardware.boltSize,10);
+		var screw = hardware.screwSpec();
+		var thread = machinekit.standard.FastenerThreads.metric(screw.diameter,screw.pitch).mating();
 		return Solids.building([], owned -> {
 			var body=Part.box(hardware.nutLength,hardware.nutWidth,hardware.nutThickness); owned.push(body);
-			var bore=TSlotTableParts.threadBore(screw.diameter/2,-0.1,hardware.nutThickness+0.1,screw.thread.mating()); owned.push(bore);
+			var bore=TSlotTableParts.threadBore(screw.diameter/2,-0.1,hardware.nutThickness+0.1,thread); owned.push(bore);
 			return Solids.cut(body,[bore]);
 		});
 	}
@@ -89,21 +89,6 @@ class TableTop extends MachineComponent {
 	});
 }
 
-/** Foot stem uses the thread-root CAD envelope; its mating thread is carried by the leg bore. */
-class TableLevellingFoot extends MachineComponent {
-	final diameter:Float; final height:Float; final engagement:Float; final size:String;
-	public function new(diameter:Float, height:Float, engagement:Float, size:String) {
-		this.diameter=diameter; this.height=height; this.engagement=engagement; this.size=size;
-		super('TABLE-FOOT-$size-D$diameter-H$height-E$engagement', "Threaded levelling foot", "steel", true);
-	}
-	override public function hasGeometry():Bool return true;
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var screw=SocketHeadCapScrew.metric(size,engagement);
-		return Solids.union([Part.cylinderSpan(diameter/2,0,8),
-			Part.cylinderSpan(screw.thread.externalMinorDiameter()/2,7,height+engagement)]);
-	}
-}
-
 class TableExtrusion extends MachineComponent {
 	final profile:TSlotExtrusion; final length:Float; final foot:Null<TSlotTableHardware>;
 	public function new(profile:TSlotExtrusion,length:Float,?foot:TSlotTableHardware) {
@@ -119,8 +104,9 @@ class TableExtrusion extends MachineComponent {
 		var footHardware:TSlotTableHardware=cast foot;
 		return Solids.building([], owned -> {
 			var body=profile.geometry(length); owned.push(body);
-			var screw=SocketHeadCapScrew.metric(footHardware.footThread,footHardware.footEngagement);
-			var bore=TSlotTableParts.threadBore(screw.spec.tapDrill/2,-0.1,footHardware.footEngagement+2,screw.thread.mating()); owned.push(bore);
+			var foot=footHardware.footSpec();
+			var thread=machinekit.standard.FastenerThreads.metric(foot.diameter,foot.pitch).mating();
+			var bore=TSlotTableParts.threadBore(foot.tapDrill/2,-0.1,footHardware.footEngagement+2,thread); owned.push(bore);
 			return Solids.cut(body,[bore]);
 		});
 	}
@@ -160,8 +146,9 @@ class TableFootPlate extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([], owned -> {
 		var body=Part.box(width,length,thickness); owned.push(body);
-		var foot=SocketHeadCapScrew.metric(hardware.footThread,hardware.footEngagement);
-		var tap=TSlotTableParts.threadBore(foot.spec.tapDrill/2,-0.1,thickness+0.1,foot.thread.mating()); owned.push(tap);
+		var foot=hardware.footSpec();
+		var thread=machinekit.standard.FastenerThreads.metric(foot.diameter,foot.pitch).mating();
+		var tap=TSlotTableParts.threadBore(foot.tapDrill/2,-0.1,thickness+0.1,thread); owned.push(tap);
 		var tools=[tap];
 		for (side in [-1,1]) {
 			var bore=TSlotTableParts.bore(hardware.screwSpec().clearanceMedium/2,-0.1,thickness+0.1,0,side*width/2);
