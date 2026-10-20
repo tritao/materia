@@ -424,6 +424,16 @@ class MachineAssembly {
 		return ratio;
 	}
 
+	/** Bind the physical rack-drive allowance owners; SI properties are derived on export/rebuild. */
+	public function setRackDriveParts(id:String, reducer:Null<String>, preload:Null<String>):Void {
+		var entry=ownTransmission(id);
+		switch entry.source {case RackAndPinion(_,_): case _:throw "Rack drive allowances need a rack transmission";}
+		if(reducer!=null)requireMember(reducer);
+		if(preload!=null)requireMember(preload);
+		entry.rackReducer=reducer;entry.rackPreload=preload;
+		changed();
+	}
+
 	/** Change each stated allowance independently; rebuilding keeps the fields left alone. */
 	public function setTransmissionOverrides(id:String, stiffness:AllowanceEdit = Leave,
 			backlash:AllowanceEdit = Leave, drag:AllowanceEdit = Leave):Void {

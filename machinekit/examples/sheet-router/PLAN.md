@@ -291,32 +291,39 @@ machined.**
 - Targets (assumed): static stiffness at the tool tip ≥ 2 N/µm in X and Y at full Z extension;
   first gantry mode ≥ 40 Hz.
 
-**SR-D4. All four axes are AC servos through 5:1 reducers. Y and X drive helical racks, Z a ball
-screw.**
-- Rack: helical, normal module 1.5, helix 19°31′42″. With 20 pinion teeth that is exactly
-  100 mm per pinion turn (π·1.5·20 / cos β), so 20 mm per motor turn after 5:1.
-- Y uses two 750 W servos, one per side, with skew guard and squaring from G8/G12. X uses one 400 W
-  servo. Z uses a 400 W servo with a brake on a 16 or 20 mm ball screw with 5 mm lead (SR4 chooses).
-- **The pinion is preloaded into the rack.** The motor and reducer sit on a hinged plate pushed in
-  by a spring of stated force, so rack height and pitch errors do not open backlash or bind. The
-  model carries the preload spring as a part and its stiffness in the drive's compliance.
-- The helix puts axial thrust on the reducer bearings. The rack model carries the helix angle and
-  the thrust.
-- **Reducer:** a low-backlash planetary (assumed 5 arcmin, about 23 µm at the 15.9 mm pitch radius)
-  or a 5:1 timing-belt reduction (no backlash, more compliance). SR4 chooses from the compliance
-  and backlash budget; both are modelled.
-- The **drives close the position loop** (pulse-train position mode). Our board sends pulses and
-  reads the drive's encoder output back (SR-D7).
-- Sizing (assumed motor class: 750 W 2.39/7.16 N·m, 400 W 1.27/3.8 N·m rated/peak; η 0.85):
-  - Y: about 640 N rated and 1.9 kN peak per side, against a need of about 400 N per side
-    (150 kg gantry × 3 m/s² + 300 N cut + friction);
-  - X: about 340 N rated and 1 kN peak, against about 60 kg × 3 m/s² + 300 N;
-  - 40 m/min is 2000 motor rpm.
-- **Rejected:**
-  - ball screws on Y and X: 2.8 m and 1.7 m screws whip unless the nut rotates;
-  - belts on the axes: they stretch over 2.8 m;
-  - straight racks: noisier, with less contact ratio;
-  - closed-loop steppers: they lose torque above about 1000 rpm, which is where 40 m/min sits.
+**SR-D4. Servo axes use planetary helical-rack XY drives and a direct ball-screw Z.**
+- Rack: helical normal module 1.5, helix 19°31′42″, 20 pinion teeth: exactly
+  100 mm per pinion turn. Y has 5:1 reduction (20 mm/motor turn); X has 7.5:1
+  (13.333 mm/motor turn), selected by the SR4 torque screen.
+- Y uses two 750 W servos, X one 400 W servo. Z uses a braked 400 W servo and
+  the 16 x 5 ball screw. Catalogue ratings and all bought-part dimensions remain assumed.
+- Planetaries have an assumed 3 arcmin backlash, 12,000 N m/rad output stiffness,
+  95% efficiency, 80/160 N m rated/peak output torque and 1500/2000 N axial/radial
+  bearing limits. The rack's separate 95% efficiency gives 90.25% through XY.
+- **Pinions are preloaded into the racks.** The selected spring-stack reference has
+  550 N initial spring force, 4000 N/mm rate and 0.5 mm working stroke. The 70/100 mm
+  spring/pinion arms give 385 N at the pinion. Its equivalent tangential compliance,
+  reducer torsion, rack mesh stiffness and both rack/pinion and reducer backlash reach
+  the planner. These are required spring-stack properties, not a qualified supplier part.
+- Helical thrust and the preload's opposing-flank tooth loads enter the SR4 bearing,
+  Lewis bending and Hertz contact screens. No contact-ratio load-sharing credit is taken.
+- The screen uses 3 m/s², 300 N cutting allowance, 30 N guide/seal drag and **1.5
+  torque reserve**, with a 100 mm loaded out-and-back and one second powered dwell.
+  It separately checks sustained cutting. SR13 replaces the cutting allowance.
+- XY retains 40 m/min: 2000 motor rpm in Y and 3000 in X. **Z rapid is 5 m/min**
+  (1000 rpm). Its 608.25 mm fixed/free screw has a conservative operating critical-speed
+  bound near 1191 rpm; neither 16 mm nor a same-span 20 mm screw meets the earlier
+  15 m/min proposal. A faster Z needs a revised physical support/layout study.
+- The matched belt-reduction proposal has 300 mm free spans and assumed EA=100 kN.
+  It has more elastic compliance than the planetary and requires 159/239 mm driven
+  pitch diameters in place of the 80 mm housing. Its mount, tooth capacity and supplier
+  belt data are unqualified, so the planetary remains selected. Belt tooth clearance
+  is included; zero backlash is not assumed.
+- The drives close their position loops in pulse-train mode; the board sends pulses
+  and reads encoder output (SR-D7). SR4 does not qualify servo tuning or following error.
+- **Rejected by the SR4 screen:** the original 400 W X at 5:1 and dual 400 W Y motors
+  at 3 m/s². Insufficient preload is a separate named failure. Long screws on X/Y,
+  long axis belts, straight racks and closed-loop steppers remain outside this concept.
 
 **SR-D5. An ISO30 ATC spindle and a linear rack at the rear of the bed from v1.**
 - Spindle (assumed):
@@ -513,19 +520,19 @@ only as sources in docs. Standards (ISO30 / ISO 7388, ER collets, EN 60204-1, IS
 | Quantity | Value | Source |
 |---|---|---|
 | Work area Y × X | 2600 × 1600 mm (Y 3150 option) | decided (SR-D1) |
-| Travel Y / X / Z | ≈ 2800 (incl. rack zone) / 1600 / 250 mm | assumed |
+| Travel Y / X / Z | 2900 (3450 option) / 1600 / 250 mm, including 300 mm rack zone | SR3 layout |
 | Gantry clearance to spoilboard | 150 mm | assumed |
-| Rapid XY / Z | 40 / 15 m/min | assumed |
+| Rapid XY / Z | 40 / 5 m/min | SR4 screen; earlier 15 m/min Z rejected |
 | Cutting feed | up to 20 m/min | assumed |
 | Acceleration XY / Z | 3 / 3 m/s² | assumed |
-| Gantry moving mass | ≈ 150 kg (beam ≈ 57 kg at 28.4 kg/m) | estimate |
-| X carriage + Z + spindle | ≈ 60 kg (spindle ≈ 20 kg) | assumed |
+| Gantry moving mass | 149.170 kg (149.287 kg long bed), whole moving chain allowance included | SR4 CAD mass, assumed geometry/density |
+| X / Z moving mass | 47.119 / 23.018 kg | SR4 CAD mass, assumed geometry/density |
 | Rails | HGR25 on Y (2 blocks per side), HGR20 on X and Z | assumed |
 | Rack and pinion | helical mn 1.5, β 19°31′42″, 20 T → 100 mm/rev | derived |
-| Reducers | 5:1, ≤ 5 arcmin (planetary) | assumed |
+| Reducers | Y 5:1; X 7.5:1; 3 arcmin planetary | SR4 selection, assumed ratings |
 | Servos | Y 2 × 750 W, X 400 W, Z 400 W + brake | assumed |
-| Pulse resolution | 5000 pulses/motor rev → 4 µm; 167 kHz at 40 m/min | derived |
-| Z screw | Ø16 or Ø20 × 5 mm ball screw | assumed |
+| Pulse resolution | 5000 pulses/rev: Y 4 µm / 167 kHz; X 2.667 µm / 250 kHz at 40 m/min | derived; board rate qualification pending |
+| Z screw | Ø16 × 5 mm, 13 mm race root, direct drive, fixed/free | SR4 selection at 5 m/min; assumed dimensions |
 | Beam | RHS 200 × 100 × 6.3 steel, ≈ 11 µm at 300 N mid-span | estimate |
 | Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | target |
 | First gantry mode | ≥ 40 Hz | target |
@@ -915,7 +922,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR1 | done: 25 assumed part recipes, HGR20/25 rows; focused gate 292 assertions | this commit |
 | SR2 | done: shared servo/reducer/steel builders; 59 focused assertions, existing gantry/router checks, 292 catalogue assertions | this commit |
 | SR3 | complete: both beds, project load/hold/homing and focused regressions pass | see SR3 notes |
-| SR4 | planned | |
+| SR4 | complete: two-bed sizing and rack compliance; focused, planner, assembly and app gates pass | see SR4 notes |
 | SR5 | planned | |
 | SR6 | planned | |
 | SR7 | planned | |
@@ -1259,3 +1266,141 @@ command anchors and complete Z/X/Y homing with all three leaders referenced
 relaxed. Root free space is approximately 2.0 GiB. SR3 is complete under these
 reference assumptions; SR4 drive sizing/compliance is next. The full SR0 baseline,
 hardware dimensions/ratings and electrical/safety acceptance remain open.
+
+
+## SR4 — drive sizing and compliance
+
+`SheetRouterSizing` derives X/Y/Z translating masses from the actual mate-tree
+subtrees and component `massProperties()`. A whole routed chain is added when
+its moving carrier follows the axis but the chain is attached outside that subtree;
+a chain already in the subtree is not counted twice. This bounds changing suspended
+chain mass. Output rotary inertia uses each pinion/output shaft or screw/coupling's
+centroidal tensor plus the parallel-axis term about local Z, converted from kg mm²
+to kg m². Rotor nameplate inertia already includes the motor shaft, which is excluded
+from the CAD rotary sum.
+
+For travel per motor radian q and N motors, linear load inertia per motor is
+`mass * q² / N`. Output inertia is divided by reduction squared; reducer input
+inertia is then added. The reported inertia ratio divides this external inertia
+by motor rotor inertia. Torque adds gravity, cutting and drag magnitudes to the
+accelerating mass, divided by efficiency; rotor acceleration is not penalised by
+transmission efficiency. External rotary inertia also receives a conservative loss
+penalty, including the input-side reducer inertia; its true input-side acceleration
+torque is smaller than that bound. Deceleration torque is also bounded by adding magnitudes,
+so the duty RMS is conservative. Motor speed stays inside the declared rated-speed
+region; there is no invented continuous curve above that region. A sustained-cut
+check prevents an easy duty/dwell from concealing insufficient continuous torque.
+
+Y uses equal nominal motor shares in this translational screen. Eccentric cutting
+and moving-mass moments can change individual guide/drive reactions; SR5 must
+check that side-load envelope with the structural model. No yaw/load-sharing
+qualification is claimed by the present one-coordinate Y model.
+
+The assumptions are 3 m/s² on all axes, 300 N cutting per axis, 30 N guide/seal drag,
+1.5 torque reserve, 100 mm loaded out-and-back travel and one second powered dwell.
+These duty and reserve values are study policy, not measured production data. The
+selected reference motors pass at both bed lengths; the report records the original
+X reduction and dual 400 W Y alternatives with named failures.
+
+| Axis | CAD moving mass, kg | Motor | Reduction | Required rpm | Peak / RMS torque per motor, N m | External/rotor inertia |
+|---|---:|---|---:|---:|---:|---:|
+| X | 47.119 | 400 W | 7.5:1 | 3000 | 1.211 / 0.787 | 4.649 |
+| Y, 2600 bed | 149.170 | 2 x 750 W | 5:1 | 2000 | 1.506 / 0.978 | 6.470 |
+| Y, 3150 bed | 149.287 | 2 x 750 W | 5:1 | 2000 | 1.506 / 0.979 | 6.475 |
+| Z | 23.018 | 400 W + brake | direct | 1000 | 0.904 / 0.453 | 1.047 |
+
+Torque entries precede the 1.5 reserve. The 16 mm Z screw's conservative fixed/free
+Euler buckling load is about 1964 N, versus about 937 N reserved peak axial demand.
+Its 1191 rpm operating bound already includes the existing 0.8 critical-speed factor.
+A 20 mm candidate with 17 mm race root at the same span reaches about 1557 rpm;
+its larger diameter alone cannot restore 3000 rpm. Retaining 16 mm at 5 m/min avoids
+claiming a new support arrangement that is absent from the assembly. The brake's
+assumed 2.5 N m holding rating exceeds the 0.269 N m reserved static gravity demand;
+this is a static screen, not emergency-stop or power-loss validation.
+
+`RackDriveSizing` models rack mesh, output reducer torsion and spring hinge in
+series. In SI, `Cgear = radius² / Ktheta` and
+`Chinge = tan(alpha_t)² / (springRate * (springArm/leverArm)²)`.
+The hinge is a conservative small-displacement, closed-mesh proxy. The selected
+spring stack gives about 8.532 MN/m per rack drive (17.065 MN/m for dual Y).
+Three arcmin reducer backlash plus 0.04 mm combined rack/pinion allowance gives
+about 53.889 µm lost travel on reversal. Cutting plus guide drag and reversal
+uses about 92.565 µm in X and 73.227 µm in Y, within the 0.1 mm drive allocation.
+Reserved acceleration plus reversal remains below the separate 0.2 mm drive
+allocation. These are drive-only budgets: SR5 must add rails, joints and structure
+before claiming whole-machine tool-tip accuracy or the 2 N/µm target.
+
+The belt proposal uses `C = radius² * span / (2 * EA * drivenRadius²)` for two
+straight, equally loaded spans. The assumed 100 kN EA and the existing HTD5M tooth
+clearance are explicit report inputs. Its capacity, tension setting, pulley inertia
+and physical mount are unqualified, so the comparison does not certify a complete
+belt alternative. The planetary is retained for its higher elastic stiffness and
+existing compact mounting envelope.
+
+Tooth strength is a screening calculation with no load-sharing credit: Lewis
+bending with 20-degree full-depth virtual tooth count, and Hertz line contact
+against a plane rack flank. Steel E=210 GPa, nu=0.3, a 1.5 tooth load factor and
+assumed 200/700 MPa root/contact limits are explicit. Reserved acceleration force
+is the input, and preload's opposing-flank normal loads are included. The checks
+also cover reducer continuous/peak output torque, helical axial thrust, radial
+bearing load including preload, and preload against reserved separating force.
+Material heat treatment, root fillet, fatigue life, lubrication and load-distribution
+qualification remain open; no ISO/JGMA certification is claimed.
+
+Physical reducer/preload owners are optional fields on the rack transmission
+record. They survive namespace copying, and their current component values rebuild
+stiffness/backlash into the assembly coupling, rather than being cached overrides.
+`PlanCheck` already uses a generic coupled-drive Jacobian; it now receives the
+complete rack path. Its load calculation also corrects a geared-coordinate error:
+output-joint inertia (which already includes reflected rotor armature) is divided
+by the actuator ratio squared exactly once on return to rotor coordinates; follower
+drag torque is divided by reduction and efficiency. Direct-drive defaults retain
+their existing coordinates.
+
+Formula and scope references: [Oriental Motor sizing](https://blog.orientalmotor.com/motor-sizing-basics-part-3-acceleration-torque-and-rms-torque),
+[KHK rack selection and qualification](https://khkgears.net/pdf/rack-tech.pdf),
+[OFFBEAT Hertz verification](https://foam-for-nuclear.gitlab.io/offbeat/test_cases/Verification/mechanics/contact/hertzContact/index.html),
+and [THK permissible screw speed](https://www.thk.com/us/en/products/ball_screw/selection/0007/).
+They support calculation conventions and limitations; they do not verify the
+reference parts' dimensions or ratings.
+
+Reproduce without another native build:
+
+```sh
+/home/joao/dev/materia-cache/tools/heavy-run --mem 10G --need 2G --label sr4-sizing -- \
+  machinekit/scripts/test-sheet-router-sizing
+```
+
+The focused gate is registered in MachineKit smoke. It checks inertia and torque
+by hand, RMS, tooth-load scaling and preload effects, SI conversion, saved-owner
+namespace copying, stiffness rebuild after part edits, both bed lengths, the
+chosen sizing, named dual-400 W Y rejection in both sizing and `PlanCheck`, and
+insufficient-preload rejection. The JSON report is
+`build/sheet-router-sr4/sizing.json`; `SHEET_ROUTER_SIZING_OUTPUT` can select a
+different output directory. `--checks-only` skips writing the report.
+
+
+SR4 closing evidence:
+
+- The final focused gate passes **82 assertions** (`sr4-close.log`, exit 0).
+  The independent Y hand calculation is
+  `(149.169596 / 2) * (0.1 / (2*pi*5))² = 0.0007557020 kg m²`
+  per motor for translating inertia, before reducer-input and output rotary inertia.
+  The report agrees. Reserved tooth screens peak at about **117 MPa bending and
+  682 MPa contact in X**; initial spring force 550 N gives 385 N at the pinion,
+  above the reserved X/Y separating demands of about 273/225 N.
+- Existing planner checks pass **3865 assertions** (`sr4-plan-regression.log`).
+- Catalogue checks pass **292 assertions**, shared servo/steel checks pass **59**,
+  and all five exact legacy signatures match (`sr4-assembly-regression.log`).
+  The two-bed physical/layout/BOM gate passes **308 assertions** with
+  `--skip-clearance`. Geometry is unchanged by ratio, backlash, spring force/rate
+  and study rapid selections; the full sampled CAD sweeps remain the SR3 evidence.
+- The actual app source project loads, holds on MuJoCo and completes Z/X/Y homing
+  with the new compiled drive path (`sr4-app.log`, exit 0). The earlier conservative
+  Y capture policy remains in force; no homing tolerance was relaxed.
+
+Logs are under `build/sheet-router-sr0/`. The report is under
+`build/sheet-router-sr4/`. Existing native libraries were reused, with no native
+rebuild or new build tree. Root free space is approximately 1.8 GiB. This closes
+SR4 under the stated reference assumptions. SR5 structural reactions, compliance
+and modes are next; SR0 full-baseline and supplier/hardware qualification remain open.

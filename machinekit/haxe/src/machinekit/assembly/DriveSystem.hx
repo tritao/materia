@@ -197,6 +197,33 @@ class DriveSystem {
 		var mechanical = flat.definition;
 		var relation = TransmissionResolver.resolve(record, flat.member);
 		switch record.source {
+			case RackAndPinion(pinionId,rackId):
+				if(record.rackReducer!=null||record.rackPreload!=null) {
+					if(rackId==null||!Std.isOfType(flat.member(pinionId),machinekit.transmission.HelicalPinion)||
+							!Std.isOfType(flat.member(rackId),machinekit.transmission.HelicalRack))
+						throw new TransmissionDesignError("Series rack allowances need matching helical parts");
+					var reducer:Null<machinekit.motion.PlanetaryReducer> = null;
+					var preload:Null<machinekit.transmission.PreloadedPinionMount> = null;
+					if(record.rackReducer!=null) {
+						var part=flat.member(record.rackReducer);
+						if(!Std.isOfType(part,machinekit.motion.PlanetaryReducer))throw new TransmissionDesignError("Rack reducer has no torsional allowance");
+						reducer=cast part;
+					}
+					if(record.rackPreload!=null) {
+						var part=flat.member(record.rackPreload);
+						if(!Std.isOfType(part,machinekit.transmission.PreloadedPinionMount))throw new TransmissionDesignError("Rack preload has no spring allowance");
+						preload=cast part;
+					}
+					var compliance=machinekit.sizing.RackDriveSizing.compliance(cast flat.member(pinionId),cast flat.member(rackId),reducer,preload);
+					if(record.stiffness==null) {
+						relation.stiffness=compliance.stiffnessNPerM/1000;
+						relation.setBasis("stiffness",ValueBasis.Assumed,"unverified rack mesh, reducer torsion and preload hinge stiffness");
+					}
+					if(record.backlash==null) {
+						relation.backlash=compliance.backlashM*1000;
+						relation.setBasis("backlash",ValueBasis.Assumed,"unverified rack and reducer backlash");
+					}
+				}
 			case LeadScrew(screwId,nutId):
 				var screw:machinekit.motion.LeadScrew = cast flat.member(screwId);
 				// During addTransmission the screw's rotary mate may not exist yet. The complete
@@ -767,6 +794,8 @@ class DriveSystem {
 			source: TransmissionResolver.mapSource(transmission.source, map), sense: transmission.sense,
 			leaderZero: transmission.leaderZero};
 		copy.stiffness = transmission.stiffness;
+		if(transmission.rackReducer!=null)copy.rackReducer=map(transmission.rackReducer);
+		if(transmission.rackPreload!=null)copy.rackPreload=map(transmission.rackPreload);
 		copy.dampingRatio = transmission.dampingRatio;
 		if (transmission.calibration != null) copy.calibration = materia.assembly.BeltCalibration.BeltCalibrations.copy(transmission.calibration,map);
 		copy.backlash = transmission.backlash;

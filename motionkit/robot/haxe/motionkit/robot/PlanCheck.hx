@@ -58,6 +58,8 @@ class PlanCheckOptions {
  * under the plan's forces. It reads the plan's polynomial segments, so the same check serves a
  * simulation and a device.
  *
+ * Rack drives use the same load Jacobian as screws and belts; assembled mesh, reducer and hinge
+ * allowances reach the accuracy check through the coupling compliance and backlash.
  * The model's actuators, couplings, masses and inertias supply everything: see `DriveLoads`. Joint
  * `jointIds[i]` is plan joint `i`; axes the plan does not move are not checked.
  */

@@ -16,6 +16,8 @@ class SheetRouterSpec {
     public final rackZone:Float = 300;
     public final longestTool:Float = 120;
     public final sheetThickness:Float = 40;
+    /** SR4 fixed/free 608 mm screw screen; 15 m/min exceeds its critical-speed bound. */
+    public final rapidZMmPerMinute:Float = 5000;
     public function new(workY:Float = 2600) {
         if(!Math.isFinite(workY)||workY<2600)throw "Sheet router work length must be at least 2600 mm";
         this.workY=workY;
@@ -27,8 +29,8 @@ class SheetRouterSpec {
             "HFS5-4040","HFS5-4040",true,None,0.5,new machinekit.power.DcVoltage(560),16,300,100,200,180,{
                 railProfileY:"HGR25",yBlockSpacing:140,railPadHeight:12,
                 motor:Servo("GENERIC-HV-SERVO-750W"),motorX:Servo("GENERIC-HV-SERVO-400W"),motorZ:BrakedServo("400"),
-                reducer:new PlanetaryReducer(),reducerX:new PlanetaryReducer(new ComponentValues().setNumber("bore",14)),
-                preload:new machinekit.transmission.PreloadedPinionMount(),
+                reducer:new PlanetaryReducer(new ComponentValues().setNumber("backlash",3)),reducerX:new PlanetaryReducer(new ComponentValues().setNumber("bore",14).setNumber("ratio",7.5).setNumber("backlash",3)),
+                preload:new machinekit.transmission.PreloadedPinionMount(new ComponentValues().setNumber("springForce",550).setNumber("springRate",4000).setNumber("stroke",0.5)),
                 structure:Steel(new RectTube(100,100,6),new RectTube(100,200,6.3)),cableChain:new CableChain(),
                 cableChainOffsetY:{x:-80.0,y:0.0,z:150.0},cableChainOffsetX:{x:0.0,y:200.0,z:250.0}
             });

@@ -376,6 +376,9 @@ class AxisBuilder extends MachineAssembly {
             var location=AssemblyFrames.compose(target,AssemblyFrames.inverse(preload.connector("pinion").frame));
             attach(id+"Preload",preload,location,motor);
         }
+        if(Std.isOfType(pinion,machinekit.transmission.HelicalPinion) &&
+                (preload!=null||Std.isOfType(reducer,machinekit.motion.PlanetaryReducer)))
+            setRackDriveParts(id+"-rack",stage.id,preload==null?null:id+"Preload");
 	}
 
 	/**
