@@ -387,10 +387,19 @@ class EditorPerspectiveViewport implements View {
 
   public function frameSelected():Void {
     orbitPivot = null;
-    var selected = scene.object(scene.selectedId);
-    if (selected != null) {
-      var transform = displayTransform(selected);
-      var bounds=transformedBounds(transform,selected.width,selected.height,selected.depth);
+    var ids = selectionTree == null ? [scene.selectedId] : selectionTree.selectedObjects();
+    var bounds:Array<Float> = null;
+    for (id in ids) {
+      var item = scene.object(id);
+      if (item == null) continue;
+      var next = transformedBounds(displayTransform(item),item.width,item.height,item.depth);
+      if (bounds == null) bounds = next;
+      else for (axis in 0...3) {
+        bounds[axis] = Math.min(bounds[axis],next[axis]);
+        bounds[axis+3] = Math.max(bounds[axis+3],next[axis+3]);
+      }
+    }
+    if (bounds != null) {
       camera.frame((bounds[0]+bounds[3])/2,(bounds[1]+bounds[4])/2,(bounds[2]+bounds[5])/2,
         bounds[3]-bounds[0],bounds[4]-bounds[1],bounds[5]-bounds[2],aspect());
       host.requestFrame();

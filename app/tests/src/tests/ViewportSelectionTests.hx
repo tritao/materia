@@ -19,7 +19,7 @@ class ViewportSelectionTests {
     var data=SceneVisibilityTests.data();
     for(item in data) {item.x=item.id=="project:tool" ? 0 : 10;}
     var definition=SceneVisibilityTests.definition();
-    for(occurrence in definition.occurrences)occurrence.includePath="machine/axes";
+    for(occurrence in definition.occurrences)occurrence.includePath="machine/axes/tooling";
     var scene=new EditorScene(data),tree=new EditorSceneTree(scene,definition);
     var host=new UiHostContext(null,new NativeKitEvents(),function(){},function(){});
     var style=new LayoutStyle();style.width=LayoutAxis.grow();style.height=LayoutAxis.grow();
@@ -31,10 +31,15 @@ class ViewportSelectionTests {
     viewport.selectionTree=tree;
     var frame=new LayoutFrame(800,600);
     try {
-      ui.submit(viewport,frame);viewport.camera.frame(0,0,0,4,3,2,800/600);
+      ui.submit(viewport,frame);
+      tree.selectKey(tree.assemblyKey("machine/axes"));viewport.frameSelected();
+      check(Math.abs(viewport.camera.targetX-5)<0.00001,"frame assembly uses the union of member bounds");
+      tree.selectKey("project:tool");viewport.frameSelected();
+      check(Math.abs(viewport.camera.targetX)<0.00001,"frame part uses only that occurrence");
+      tree.selectKey("scene");viewport.camera.frame(0,0,0,4,3,2,800/600);
       var point=viewport.camera.project(0,0,0,800,600);if(point==null)throw "Missing projected test point";
       var x=point.x,y=point.y,path=tree.objectPath("project:tool");
-      check(path.length>=6,"fixture has deep authored and moving-body groups");
+      check(path.length>=6,"fixture has deep authored assembly groups");
       check(viewport.pick(x,y)=="project:tool","ray hits the nested part");
       var original=tree.selectionKey();ui.pointerDown(x,y,0);
       check(tree.selectionKey()==original,"press alone does not advance hierarchy");

@@ -49,8 +49,7 @@ class HierarchyPanel {
       app.log("Selected " + id);
       app.invalidateView();
     }, function(id) {
-      if (app.treeModel.isGroup(id)) return;
-      app.scene.selectTreeKey(id);
+      app.treeModel.selectKey(id);
       app.commands.execute("scene.frame-selected");
       app.log("Framed " + id);
     }, null, null);

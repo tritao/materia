@@ -20,9 +20,8 @@ class VisibilityPanel implements TreeViewModel {
  public function rootKeyAt(index:Int):String return "scene";
  public function childCount(key:String):Int return tree.visibilityChildren(key).length;
  public function childKeyAt(key:String,index:Int):String return tree.visibilityChildren(key)[index];
- public function initiallyExpanded(key:String):Bool return key=="scene" || tree.visibilityChildren("scene").indexOf(key)>=0 ||
-  (!tree.isGroup(key)&&tree.visibilityGroup(key)) ||
-  (tree.isGroup(key)&&key.indexOf(":",6)<0);
+ // Show primary assemblies on first open; deeper ownership remains independently expandable.
+ public function initiallyExpanded(key:String):Bool return tree.objectPath(key).length<=3;
  public function estimatedExtent():Float return 32;
  public function extentIsUniform():Bool return true;
  public function extentAt(key:String):Float return 32;

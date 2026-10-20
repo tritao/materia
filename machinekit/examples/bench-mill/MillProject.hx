@@ -43,7 +43,9 @@ class MillProject {
    } else mass=row.component.massProperties();
    parts.push(AssemblyPreview.part(row.id,row.component.description,geometry,row.component.materialId,null,mass));
   }
-  return SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:parts,assemblyDefinition:model.definition(id),
+  var definition=model.definition(id);
+  AssemblyPreview.preserveOwnership(definition,assembly.definition());
+  return SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:parts,assemblyDefinition:definition,
    recipeDiagnostics:diagnostics.concat(["Imported bearing/carriage masses use display-only steel-volume estimates; not engineering sizing inputs."])});
  }
 
@@ -58,6 +60,15 @@ class MillProject {
   var decoded=SceneArtifact.decode(bytes);
   for(id in ["xyStage/screwX","xyStage/screwY","zAxis/screw","spindle/drawbar","spindle/cylinder","spindle/motor","spindle/belt"])
    if(decoded.parts.filter(p -> p.id==id).length!=1)throw "Unified small scene is missing "+id;
+  var exported=decoded.assemblyDefinition;
+  if(exported==null)throw "Unified small scene is missing its assembly";
+  var owned=0;
+  for(occurrence in assembly.definition().occurrences)if(occurrence.includePath!=null) {
+   owned++;
+   if(exported.occurrences.filter(o -> o.id==occurrence.id&&o.includePath==occurrence.includePath).length!=1)
+    throw "Unified small scene lost assembly ownership for "+occurrence.id;
+  }
+  if(owned==0)throw "Unified small scene ownership check needs authored subassemblies";
   sys.io.File.saveBytes(dir+"/small.mtrg",bytes);
   sys.io.File.saveContent(dir+"/small.assembly.json",assembly.encode());
   Sys.println("Unified small mill payload, motor removal and scene completeness passed");

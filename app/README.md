@@ -22,6 +22,15 @@ tracks selection. Picking in 3D also highlights the corresponding Hierarchy row,
 opens its ancestor groups and scrolls it into view without moving keyboard focus.
 An active tree search is preserved, with the selected row included so it remains
 reachable. Redraws preserve scroll position and manual branch expansion.
+Generated assemblies are organized by their authored subassemblies. Each part
+occurrence appears once under its owner; rigid bodies and moving joints do not
+reparent parts. Assemblies show their part count and have an inspector with
+Frame, Hide/Show, and Isolate actions. A part row acts on that occurrence only.
+Double-click an assembly or part to frame it. Joint controls remain in **Machine**.
+Older exports without ownership metadata appear under their root assembly until
+regenerated. Saved visibility from the former body/Parts hierarchy is preserved
+as individual part visibility; **Show all** clears it.
+
 Edit Name, Position X/Y (metres), Width, Height, Colour
 (`#RRGGBB`), or Visible in the inspector.
 Use the eye at the right of a Hierarchy row, or press **Space** while that tree

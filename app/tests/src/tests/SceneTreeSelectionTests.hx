@@ -53,7 +53,7 @@ class SceneTreeSelectionTests {
       ui.submit(tree,frame);
       scene.select("project:tool");
       tree=make();root=ui.submit(tree,frame);
-      check(tree.isExpanded("scene") && tree.isExpanded("project:base") && tree.isExpanded("project:slide") && tree.isExpanded("parts:slide"),
+      check(tree.isExpanded("scene") && tree.isExpanded(model.assemblyKey()) && tree.isExpanded(model.assemblyKey("machine/slide")) && tree.isExpanded(model.assemblyKey("machine/slide/tooling")),
         "3D selection opens all collapsed ancestors");
       check(selected(root,"project:tool") && tree.selectedKey=="project:tool","viewport selection overrides retained tree selection");
       check(tree.controller.offsetY>1000,"selected offscreen row is scrolled into the viewport");
@@ -62,23 +62,23 @@ class SceneTreeSelectionTests {
       var offset=tree.controller.offsetY;
       tree=make();ui.submit(tree,frame);
       check(tree.controller.offsetY==offset,"unchanged selection leaves scroll alone");
-      tree.setExpanded("parts:slide",false);
+      tree.setExpanded(model.assemblyKey("machine/slide/tooling"),false);
       tree=make();ui.submit(tree,frame);
-      check(!tree.isExpanded("parts:slide"),"explicit collapse remains closed until a new selection");
+      check(!tree.isExpanded(model.assemblyKey("machine/slide/tooling")),"explicit collapse remains closed until a new selection");
       scene.select("project:cover");tree=make();root=ui.submit(tree,frame);
-      check(selected(root,"project:cover") && tree.isExpanded("parts:base"),"select another part in a different Parts group");
+      check(selected(root,"project:cover") && tree.isExpanded(model.assemblyKey("machine")),"select another part in a different assembly");
       scene.select("project:bracket");tree=make();root=ui.submit(tree,frame);
-      check(selected(root,"project:bracket"),"selection within one Parts group also refreshes the row");
+      check(selected(root,"project:bracket"),"selection within one assembly also refreshes the row");
       model.setFilter("cover");tree=make("selection-filtered");ui.submit(tree,frame);
       scene.select("project:tool");tree=make("selection-filtered");root=ui.submit(tree,frame);
       check(selected(root,"project:tool"),"viewport-picked row remains reachable through the active filter");
-      check(model.childCount("parts:base")==1,"selection reveal preserves the search filter for other rows");
+      check(model.childCount(model.assemblyKey("machine"))==2,"selection reveal preserves the search filter for other rows");
       model.setFilter("");tree=make();root=ui.submit(tree,frame);
       check(selected(root,"project:tool"),"clearing search restores the current selection rather than stale retained state");
       scene.select("scene");tree=make();root=ui.submit(tree,frame);
       check(selected(root,"scene"),"clearing 3D selection highlights the Scene row");
-      model.selectKey("parts:base");tree=make();root=ui.submit(tree,frame);
-      check(selected(root,"parts:base"),"tree-only group selection is retained");
+      model.selectKey(model.assemblyKey("machine"));tree=make();root=ui.submit(tree,frame);
+      check(selected(root,model.assemblyKey("machine")),"tree-only group selection is retained");
       scene.select("project:cover");tree=make();root=ui.submit(tree,frame);
       check(selected(root,"project:cover"),"viewport selection replaces a selected group");
       check(!scene.document.isDirty,"selection and expansion never dirty the document");
