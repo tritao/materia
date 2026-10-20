@@ -80,7 +80,7 @@ class SheetRouterFemExport {
         var axes:Array<Dynamic> = [];
         for(axis in ["x","y","z"])axes.push(SheetRouterSizing.report(machine,axis));
         var result={schemaVersion:1,study:"sheet-router-sr5",status:"reduced structural screening; assumed interfaces",
-            beamFootJointWelded:machine.spec.beamFootWelded,beamFootWeldLegMm:machine.spec.beamFootWelded?6:0,
+            beamFootJointWelded:machine.spec.beamFootWelded,beamFootWeldLegMm:machine.spec.beamFootWelded?8:0,
             guideLayout:machine.spec.frontGuides,yBlockSpacing:machine.spec.yBlockSpacing,
             units:{length:"mm",force:"N",mass:"kg",youngsModulus:"MPa"},workY:spec.workY,parts:exported.parts,
             materials:exported.materials,totalMassKg:exported.totalMassKg,selectedBodies:selected,beams:beams,plates:plates,

@@ -16,6 +16,65 @@ Extract only the needed archive and remove its loose copy when finished. Old
 embedded source/hash path names identify the original run, and remain unchanged.
 New SR6 and later checks use `build/sheet-router-work/` as disposable working space.
 
+## SR6 prepared-joint weld qualification (2026-10-20)
+
+**132/132 weld groups pass on each bed at 100 million full-load reversals.**
+This replaces the arbitrary-moment allocation for the original 38/36 open
+groups: 28 per bed pass with actual reactions, while 10/8 grazing groups are
+removed with deliberate non-weld cope clearances. Fabrication release remains
+gated on the named shop/material/epoxy acceptances in
+[the packet](../fabrication/README.md).
+
+| Bed Y | Worst X / Y stiffness, N/µm | Joint-model first mode, Hz | Contour / rapid residual, mm | Maximum weld range, MPa |
+| --- | --- | ---: | --- | ---: |
+| 2600 | 2.2067 / 2.0499 | 27.4295 | 0.013237 / 0.013474 | 11.8251 |
+| 3150 | 2.1712 / 2.0426 | 26.9863 | 0.020090 / 0.012841 | 12.4316 |
+
+Limits remain ≥2 N/µm and ≤0.05 mm motion error. The conservative FAT36
+cut-off is **12.6693 MPa**, with γMf=1.15 and the m=3/m=5 two-slope curve.
+The governing long-bed rear-frame corner has 1.9% modelled fatigue margin.
+No lifetime or fatigue category is relaxed. Maximum factored throat strength
+demand is 32.233 MPa against 207.846 MPa on the assumed S235 material basis.
+
+The model uses 68 separately prepared stocks, actual spatial weld runs and
+exact rigid-offset MPCs. It removes old proximity ties and replaces the old
+lumped beam-foot springs with the two accessible physical fillets per foot.
+Six positive spring quadrature points preserve each contact's full line-group
+stiffness; forces/moments are recovered directly from native spring reactions.
+Actual 5/6/8 mm legs and open-end/full-size-tab effective lengths are used.
+See [the derivation and detail corrections](../fabrication/WELD_QUALIFICATION.md).
+These frequencies belong to this prepared-joint idealisation; the older
+merged-joint frozen-layout results below retain their own model.
+
+Coverage is nine full-Z static poses per bed at 50 mm mesh, plus 100 mm checks
+at the governing modal, middle and fatigue-controlling poses. Both governing
+modal poses use 40 modes. Dynamic checks use 20/40 modes, 0.5%/1% damping,
+the configured 3 m/s² and 20 m/s³, 20 m/min contour and 40 m/min rapid, with
+0.5/0.25 ms steps. Both time-step and modal-truncation checks pass: maximum
+tool change is 0.0000113 mm; maximum modal-truncation weld-range change is
+0.0094 MPa. All 24 static packets pass native force-balance and coupling-energy
+guards (worst relative force imbalance 0.000203; artificial energy fraction
+0.0000413); worst modal mass/strain-energy mismatch is below 1%.
+The native wrench fixture, seven effective-length/life regressions, 33 mill
+plus seven router exporter assertions, and fresh two-bed CAD exports pass.
+
+Reproduction uses existing CCX and the retained planner sampler, without an
+OCCT rebuild. Extract `build/sheet-router-evidence/sr6-qualified.tar.gz` under
+`build/sheet-router-evidence/unpacked/`, then from the repository root:
+
+```sh
+machinekit/examples/sheet-router/fem/check-welds.sh \
+  build/sheet-router-evidence/unpacked/sr6-qualified/packets \
+  machinekit/examples/sheet-router/fabrication \
+  build/sheet-router-evidence/unpacked/sr6-qualified/previous-weld-details \
+  build/sheet-router-work/weld-rerun
+```
+
+The driver publishes a review packet under its output directory and never signs
+shop release. Per-group committed tables and source hashes are in
+[fabrication/validation.json](../fabrication/validation.json). The retained
+archive includes all native decks, reactions, modal/dynamic checks and logs.
+
 
 ## Approved SR-D3 rerun and structural freeze (2026-10-20)
 

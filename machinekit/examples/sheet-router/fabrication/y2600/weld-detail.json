@@ -1,6 +1,6 @@
 {
   "workY": 2600,
-  "sourceSha256": "12f73ba059cc8a0000fa738460e7b2ac2b4ff24a56fe2ea90f69cbe2add3a394",
+  "sourceSha256": "81cb133104cb8bfe7270ea4047bd78768ab276575feaa93c9c7ea7e99a049d42",
   "groups": [
     {
       "id": "W001",
@@ -27,7 +27,9 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W002",
@@ -54,7 +56,9 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W003",
@@ -67,21 +71,23 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 246.38662715214215,
-        "minimumLineInertiaMm3": 81146.97670379479,
+        "lengthMm": 255.5349489304644,
+        "minimumLineInertiaMm3": 95918.70394548566,
         "centroidMm": [
-          -334.917646476119,
-          -817.1066546527327,
-          182.6355075405895
+          -336.01270226988186,
+          -817.6572296649351,
+          182.4467089783851
         ],
-        "stressBoundMPa": 24.34344947440963,
+        "stressBoundMPa": 25.55092456332573,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W004",
@@ -108,7 +114,9 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W005",
@@ -135,7 +143,9 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W006",
@@ -162,7 +172,9 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W007",
@@ -189,7 +201,9 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W008",
@@ -202,21 +216,23 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 246.3866271521423,
-        "minimumLineInertiaMm3": 81146.97670379507,
+        "lengthMm": 255.53494893046468,
+        "minimumLineInertiaMm3": 95918.70394548611,
         "centroidMm": [
-          1934.917646476119,
-          -817.1066546527327,
-          182.6355075405895
+          1936.0127022698819,
+          -817.6572296649351,
+          182.44670897838506
         ],
-        "stressBoundMPa": 24.34344947440958,
+        "stressBoundMPa": 25.550924563325644,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W009",
@@ -243,7 +259,9 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W010",
@@ -270,7 +288,9 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W011",
@@ -297,7 +317,9 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W012",
@@ -324,7 +346,9 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W013",
@@ -337,51 +361,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 400.0,
-        "minimumLineInertiaMm3": 474026.66666666674,
+        "lengthMm": 408.0,
+        "minimumLineInertiaMm3": 485589.33333333326,
         "centroidMm": [
-          1895.4125381529593,
+          1896.5662138754503,
           3122.0,
           700.0
         ],
-        "stressBoundMPa": 8.178279281774195,
+        "stressBoundMPa": 8.555694869706878,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W014",
-      "stocks": [
-        "endBrace1a",
-        "frameRight"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 100000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 7.999999999999545,
-        "minimumLineInertiaMm3": 0.0,
-        "centroidMm": [
-          1975.25,
-          3121.9999999999977,
-          700.0
-        ],
-        "stressBoundMPa": null,
-        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W015",
       "stocks": [
         "endBrace1a",
         "lower0"
@@ -405,10 +404,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W016",
+      "id": "W015",
       "stocks": [
         "endBrace1a",
         "planBrace1b"
@@ -418,24 +419,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 246.49512384273834,
-        "minimumLineInertiaMm3": 78682.47451781291,
+        "lengthMm": 255.64344562106038,
+        "minimumLineInertiaMm3": 92219.46609117973,
         "centroidMm": [
-          -334.9091108910919,
-          3089.853196486844,
-          187.4072839547555
+          -336.0040073862225,
+          3090.403661583643,
+          187.16445388627434
         ],
-        "stressBoundMPa": 24.508557362570194,
+        "stressBoundMPa": 26.316796554896275,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W017",
+      "id": "W016",
       "stocks": [
         "endBrace1a",
         "post02"
@@ -459,10 +462,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W018",
+      "id": "W017",
       "stocks": [
         "endBrace1a",
         "post12"
@@ -472,24 +477,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 240.0,
-        "minimumLineInertiaMm3": 54447.18336192347,
+        "lengthMm": 248.0,
+        "minimumLineInertiaMm3": 61220.842012378416,
         "centroidMm": [
           1975.25,
           3122.0,
-          667.0291867145205
+          667.7379226269554
         ],
-        "stressBoundMPa": 31.026801558057116,
+        "stressBoundMPa": 29.15716174924318,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W019",
+      "id": "W018",
       "stocks": [
         "endBrace1b",
         "frameBack"
@@ -499,51 +506,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 400.0,
-        "minimumLineInertiaMm3": 474026.6666666666,
+        "lengthMm": 408.0,
+        "minimumLineInertiaMm3": 485589.33333333326,
         "centroidMm": [
-          -295.41253815295977,
+          -296.5662138754508,
           3122.0,
           700.0
         ],
-        "stressBoundMPa": 8.17827928177418,
+        "stressBoundMPa": 8.555694869706853,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W020",
-      "stocks": [
-        "endBrace1b",
-        "frameLeft"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 100000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 7.999999999999545,
-        "minimumLineInertiaMm3": 0.0,
-        "centroidMm": [
-          -375.25,
-          3121.9999999999977,
-          700.0
-        ],
-        "stressBoundMPa": null,
-        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W021",
+      "id": "W019",
       "stocks": [
         "endBrace1b",
         "lower1"
@@ -567,10 +549,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W022",
+      "id": "W020",
       "stocks": [
         "endBrace1b",
         "planBrace1a"
@@ -580,24 +564,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 246.49512384273888,
-        "minimumLineInertiaMm3": 78682.4745178149,
+        "lengthMm": 255.64344562106137,
+        "minimumLineInertiaMm3": 92219.46609118229,
         "centroidMm": [
-          1934.9091108910918,
-          3089.853196486844,
-          187.40728395475546
+          1936.0040073862228,
+          3090.4036615836435,
+          187.16445388627426
         ],
-        "stressBoundMPa": 24.50855736256969,
+        "stressBoundMPa": 26.316796554895515,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W023",
+      "id": "W021",
       "stocks": [
         "endBrace1b",
         "post02"
@@ -607,24 +593,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 240.0,
-        "minimumLineInertiaMm3": 54447.18336192329,
+        "lengthMm": 248.0,
+        "minimumLineInertiaMm3": 61220.84201237827,
         "centroidMm": [
           -375.25,
           3122.0,
-          667.0291867145205
+          667.7379226269554
         ],
-        "stressBoundMPa": 31.026801558057194,
+        "stressBoundMPa": 29.157161749243237,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W024",
+      "id": "W022",
       "stocks": [
         "endBrace1b",
         "post12"
@@ -648,13 +636,73 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W023",
+      "stocks": [
+        "frameBack",
+        "frameLeft"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          -375.25,
+          3072.0,
+          750.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W024",
+      "stocks": [
+        "frameBack",
+        "frameRight"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          1975.25,
+          3072.0,
+          750.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W025",
       "stocks": [
         "frameBack",
-        "frameLeft"
+        "post02"
       ],
       "forceEnvelopeN": 5000,
       "momentEnvelopeNmm": 750000,
@@ -665,76 +713,24 @@
         "minimumLineInertiaMm3": 0.0,
         "centroidMm": [
           -375.25,
-          3072.0,
-          750.0
+          3122.0,
+          700.0
         ],
         "stressBoundMPa": null,
         "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
         "allowableMPa": 80,
         "passes": false
       },
-      "excludedFlushButtEdges": 1,
+      "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W026",
       "stocks": [
         "frameBack",
-        "frameRight"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 750000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 100.0,
-        "minimumLineInertiaMm3": 0.0,
-        "centroidMm": [
-          1975.25,
-          3072.0,
-          750.0
-        ],
-        "stressBoundMPa": null,
-        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 1,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W027",
-      "stocks": [
-        "frameBack",
-        "post02"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 750000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 100.0,
-        "minimumLineInertiaMm3": 0.0,
-        "centroidMm": [
-          -375.25,
-          3122.0,
-          700.0
-        ],
-        "stressBoundMPa": null,
-        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W028",
-      "stocks": [
-        "frameBack",
         "post12"
       ],
       "forceEnvelopeN": 5000,
@@ -756,10 +752,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W029",
+      "id": "W027",
       "stocks": [
         "frameFront",
         "frameLeft"
@@ -783,10 +781,12 @@
       },
       "excludedFlushButtEdges": 1,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W030",
+      "id": "W028",
       "stocks": [
         "frameFront",
         "frameRight"
@@ -810,10 +810,12 @@
       },
       "excludedFlushButtEdges": 1,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W031",
+      "id": "W029",
       "stocks": [
         "frameFront",
         "post00"
@@ -837,10 +839,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W032",
+      "id": "W030",
       "stocks": [
         "frameFront",
         "post10"
@@ -864,13 +868,73 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W031",
+      "stocks": [
+        "frameLeft",
+        "post00"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 100.0,
+        "minimumLineInertiaMm3": 0.0,
+        "centroidMm": [
+          -425.25,
+          -799.25,
+          700.0
+        ],
+        "stressBoundMPa": null,
+        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 1,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W032",
+      "stocks": [
+        "frameLeft",
+        "post01"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 750000,
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
+      "strengthScreen": {
+        "lengthMm": 200.0,
+        "minimumLineInertiaMm3": 166666.66666666674,
+        "centroidMm": [
+          -425.25,
+          1136.375,
+          700.0
+        ],
+        "stressBoundMPa": 97.07106781186545,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": false
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W033",
       "stocks": [
         "frameLeft",
-        "post00"
+        "post02"
       ],
       "forceEnvelopeN": 5000,
       "momentEnvelopeNmm": 750000,
@@ -881,7 +945,7 @@
         "minimumLineInertiaMm3": 0.0,
         "centroidMm": [
           -425.25,
-          -799.25,
+          3072.0,
           700.0
         ],
         "stressBoundMPa": null,
@@ -891,66 +955,14 @@
       },
       "excludedFlushButtEdges": 1,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W034",
       "stocks": [
         "frameLeft",
-        "post01"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 750000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 200.0,
-        "minimumLineInertiaMm3": 166666.66666666674,
-        "centroidMm": [
-          -425.25,
-          1136.375,
-          700.0
-        ],
-        "stressBoundMPa": 97.07106781186545,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W035",
-      "stocks": [
-        "frameLeft",
-        "post02"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 750000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 100.0,
-        "minimumLineInertiaMm3": 0.0,
-        "centroidMm": [
-          -425.25,
-          3072.0,
-          700.0
-        ],
-        "stressBoundMPa": null,
-        "capacityReason": "collinear seam group cannot resist the assumed arbitrary moment",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 1,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W036",
-      "stocks": [
-        "frameLeft",
         "post03"
       ],
       "forceEnvelopeN": 5000,
@@ -972,10 +984,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W037",
+      "id": "W035",
       "stocks": [
         "frameLeft",
         "sideBrace00a"
@@ -999,10 +1013,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W038",
+      "id": "W036",
       "stocks": [
         "frameLeft",
         "sideBrace00b"
@@ -1026,10 +1042,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W039",
+      "id": "W037",
       "stocks": [
         "frameLeft",
         "sideBrace01a"
@@ -1053,10 +1071,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W040",
+      "id": "W038",
       "stocks": [
         "frameLeft",
         "sideBrace01b"
@@ -1080,10 +1100,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W041",
+      "id": "W039",
       "stocks": [
         "frameRight",
         "post10"
@@ -1107,10 +1129,12 @@
       },
       "excludedFlushButtEdges": 1,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W042",
+      "id": "W040",
       "stocks": [
         "frameRight",
         "post11"
@@ -1134,10 +1158,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W043",
+      "id": "W041",
       "stocks": [
         "frameRight",
         "post12"
@@ -1161,10 +1187,12 @@
       },
       "excludedFlushButtEdges": 1,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W044",
+      "id": "W042",
       "stocks": [
         "frameRight",
         "post13"
@@ -1188,10 +1216,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W045",
+      "id": "W043",
       "stocks": [
         "frameRight",
         "sideBrace10a"
@@ -1215,10 +1245,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W046",
+      "id": "W044",
       "stocks": [
         "frameRight",
         "sideBrace10b"
@@ -1242,10 +1274,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W047",
+      "id": "W045",
       "stocks": [
         "frameRight",
         "sideBrace11a"
@@ -1269,10 +1303,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W048",
+      "id": "W046",
       "stocks": [
         "frameRight",
         "sideBrace11b"
@@ -1296,10 +1332,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W049",
+      "id": "W047",
       "stocks": [
         "lower0",
         "planBrace0a"
@@ -1309,24 +1347,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 341.6991737686262,
-        "minimumLineInertiaMm3": 177761.23253543582,
+        "lengthMm": 239.69917376862622,
+        "minimumLineInertiaMm3": 43501.201931538264,
         "centroidMm": [
           -375.25,
-          -787.9777801129951,
-          173.3274641116228
+          -773.2227587548971,
+          180.0
         ],
-        "stressBoundMPa": 15.236891974899441,
+        "stressBoundMPa": 36.57898752605794,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W050",
+      "id": "W048",
       "stocks": [
         "lower0",
         "planBrace0b"
@@ -1336,24 +1376,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 138666.66666666663,
+        "lengthMm": 239.6991737686244,
+        "minimumLineInertiaMm3": 43501.201931536685,
         "centroidMm": [
           -375.25000000000017,
-          1095.8603091205882,
-          180.0
+          1060.347758754897,
+          179.99999999999994
         ],
-        "stressBoundMPa": 20.104581350592746,
+        "stressBoundMPa": 36.57898752605913,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W051",
+      "id": "W049",
       "stocks": [
         "lower0",
         "planBrace1a"
@@ -1363,24 +1405,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 248.0,
-        "minimumLineInertiaMm3": 125377.36966952393,
+        "lengthMm": 239.69917376862668,
+        "minimumLineInertiaMm3": 43501.20193153974,
         "centroidMm": [
           -375.25,
-          1197.959798432626,
-          180.0
+          1212.4022412451034,
+          179.99999999999997
         ],
-        "stressBoundMPa": 20.256302084118502,
+        "stressBoundMPa": 36.57898752605706,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W052",
+      "id": "W050",
       "stocks": [
         "lower0",
         "planBrace1b"
@@ -1390,24 +1434,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 341.6991737686235,
-        "minimumLineInertiaMm3": 177761.2325354315,
+        "lengthMm": 239.6991737686235,
+        "minimumLineInertiaMm3": 43501.20193153581,
         "centroidMm": [
           -375.2500000000001,
-          3060.7277801129953,
-          173.3274641116227
+          3045.9727587548973,
+          179.99999999999994
         ],
-        "stressBoundMPa": 15.236891974899706,
+        "stressBoundMPa": 36.578987526059684,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W053",
+      "id": "W051",
       "stocks": [
         "lower0",
         "post00"
@@ -1431,10 +1477,12 @@
       },
       "excludedFlushButtEdges": 2,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W054",
+      "id": "W052",
       "stocks": [
         "lower0",
         "post01"
@@ -1458,10 +1506,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W055",
+      "id": "W053",
       "stocks": [
         "lower0",
         "post02"
@@ -1485,10 +1535,12 @@
       },
       "excludedFlushButtEdges": 2,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W056",
+      "id": "W054",
       "stocks": [
         "lower0",
         "post03"
@@ -1512,10 +1564,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W057",
+      "id": "W055",
       "stocks": [
         "lower0",
         "sideBrace00a"
@@ -1539,10 +1593,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W058",
+      "id": "W056",
       "stocks": [
         "lower0",
         "sideBrace00b"
@@ -1566,10 +1622,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W059",
+      "id": "W057",
       "stocks": [
         "lower0",
         "sideBrace01a"
@@ -1593,10 +1651,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W060",
+      "id": "W058",
       "stocks": [
         "lower0",
         "sideBrace01b"
@@ -1620,10 +1680,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W061",
+      "id": "W059",
       "stocks": [
         "lower1",
         "planBrace0a"
@@ -1633,24 +1695,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 138666.66666666672,
+        "lengthMm": 239.6991737686244,
+        "minimumLineInertiaMm3": 43501.20193153643,
         "centroidMm": [
           1975.25,
-          1095.8603091205882,
-          180.0
+          1060.3477587548973,
+          180.00000000000006
         ],
-        "stressBoundMPa": 20.10458135059274,
+        "stressBoundMPa": 36.57898752605923,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W062",
+      "id": "W060",
       "stocks": [
         "lower1",
         "planBrace0b"
@@ -1660,24 +1724,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 341.6991737686275,
-        "minimumLineInertiaMm3": 177761.23253543652,
+        "lengthMm": 239.69917376862747,
+        "minimumLineInertiaMm3": 43501.201931538155,
         "centroidMm": [
-          1975.25,
-          -787.9777801129949,
-          173.32746411162282
+          1975.2500000000002,
+          -773.2227587548967,
+          180.0
         ],
-        "stressBoundMPa": 15.236891974899418,
+        "stressBoundMPa": 36.5789875260581,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W063",
+      "id": "W061",
       "stocks": [
         "lower1",
         "planBrace1a"
@@ -1687,24 +1753,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 341.6991737686235,
-        "minimumLineInertiaMm3": 177761.2325354299,
+        "lengthMm": 239.6991737686235,
+        "minimumLineInertiaMm3": 43501.201931535645,
         "centroidMm": [
           1975.25,
-          3060.7277801129953,
-          173.3274641116228
+          3045.9727587548973,
+          180.00000000000006
         ],
-        "stressBoundMPa": 15.236891974899816,
+        "stressBoundMPa": 36.578987526059805,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W064",
+      "id": "W062",
       "stocks": [
         "lower1",
         "planBrace1b"
@@ -1714,24 +1782,26 @@
       "nominalOnMm": 40,
       "extent": "40 mm stitches at <=120 mm spacing",
       "strengthScreen": {
-        "lengthMm": 248.0,
-        "minimumLineInertiaMm3": 125377.3696695223,
+        "lengthMm": 239.69917376862668,
+        "minimumLineInertiaMm3": 43501.20193153888,
         "centroidMm": [
           1975.25,
-          1197.959798432626,
-          180.0
+          1212.4022412451031,
+          179.99999999999997
         ],
-        "stressBoundMPa": 20.256302084118694,
+        "stressBoundMPa": 36.57898752605759,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W065",
+      "id": "W063",
       "stocks": [
         "lower1",
         "post10"
@@ -1755,10 +1825,12 @@
       },
       "excludedFlushButtEdges": 2,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W066",
+      "id": "W064",
       "stocks": [
         "lower1",
         "post11"
@@ -1782,10 +1854,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W067",
+      "id": "W065",
       "stocks": [
         "lower1",
         "post12"
@@ -1809,10 +1883,12 @@
       },
       "excludedFlushButtEdges": 2,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W068",
+      "id": "W066",
       "stocks": [
         "lower1",
         "post13"
@@ -1836,10 +1912,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W069",
+      "id": "W067",
       "stocks": [
         "lower1",
         "sideBrace10a"
@@ -1863,10 +1941,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W070",
+      "id": "W068",
       "stocks": [
         "lower1",
         "sideBrace10b"
@@ -1890,10 +1970,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W071",
+      "id": "W069",
       "stocks": [
         "lower1",
         "sideBrace11a"
@@ -1917,10 +1999,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W072",
+      "id": "W070",
       "stocks": [
         "lower1",
         "sideBrace11b"
@@ -1944,10 +2028,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W073",
+      "id": "W071",
       "stocks": [
         "planBrace0a",
         "planBrace0b"
@@ -1971,10 +2057,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W074",
+      "id": "W072",
       "stocks": [
         "planBrace0a",
         "planBrace1b"
@@ -1984,51 +2072,26 @@
       "nominalOnMm": null,
       "extent": "continuous available eligible edges",
       "strengthScreen": {
-        "lengthMm": 178.6674238593226,
-        "minimumLineInertiaMm3": 2793.072368589492,
+        "lengthMm": 176.09326297016105,
+        "minimumLineInertiaMm3": 2314.889655071136,
         "centroidMm": [
-          1964.2410179099804,
-          1138.423016778328,
-          180.0
+          1964.0873958450318,
+          1138.2985377688549,
+          179.99999999999994
         ],
-        "stressBoundMPa": 414.3159120810939,
+        "stressBoundMPa": 498.19116070349565,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": false
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W075",
-      "stocks": [
-        "planBrace0a",
-        "post00"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 100000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 31.723807897018276,
-        "minimumLineInertiaMm3": 127.50953587574895,
-        "centroidMm": [
-          -375.25,
-          -854.8981667787514,
-          142.28278519550315
-        ],
-        "stressBoundMPa": 1395.9193078159049,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W076",
+      "id": "W073",
       "stocks": [
         "planBrace0b",
         "planBrace1a"
@@ -2038,51 +2101,26 @@
       "nominalOnMm": null,
       "extent": "continuous available eligible edges",
       "strengthScreen": {
-        "lengthMm": 178.66742385932213,
-        "minimumLineInertiaMm3": 2793.0723685893317,
+        "lengthMm": 176.09326297016133,
+        "minimumLineInertiaMm3": 2314.889655071165,
         "centroidMm": [
-          -364.2410179099804,
-          1138.423016778328,
-          179.9999999999999
+          -364.0873958450318,
+          1138.298537768855,
+          179.99999999999994
         ],
-        "stressBoundMPa": 414.3159120811182,
+        "stressBoundMPa": 498.1911607034895,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": false
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W077",
-      "stocks": [
-        "planBrace0b",
-        "post10"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 100000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 31.72380789701853,
-        "minimumLineInertiaMm3": 127.50953587575125,
-        "centroidMm": [
-          1975.25,
-          -854.8981667787514,
-          142.28278519550315
-        ],
-        "stressBoundMPa": 1395.9193078158803,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W078",
+      "id": "W074",
       "stocks": [
         "planBrace1a",
         "planBrace1b"
@@ -2106,64 +2144,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W079",
-      "stocks": [
-        "planBrace1a",
-        "post12"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 100000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 41.37586484803157,
-        "minimumLineInertiaMm3": 373.5327153259426,
-        "centroidMm": [
-          1975.2500000000002,
-          3128.2887931806667,
-          144.05517303134118
-        ],
-        "stressBoundMPa": 600.7901062631328,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W080",
-      "stocks": [
-        "planBrace1b",
-        "post02"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 100000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 41.375864848030545,
-        "minimumLineInertiaMm3": 373.53271532592146,
-        "centroidMm": [
-          -375.2500000000001,
-          3128.2887931806663,
-          144.05517303134113
-        ],
-        "stressBoundMPa": 600.7901062631345,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W081",
+      "id": "W075",
       "stocks": [
         "post00",
         "sideBrace00a"
@@ -2187,10 +2173,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W082",
+      "id": "W076",
       "stocks": [
         "post00",
         "sideBrace00b"
@@ -2214,37 +2202,41 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W083",
+      "id": "W077",
       "stocks": [
         "post00",
         "tableSide0"
       ],
       "forceEnvelopeN": 5000,
       "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 40,
-      "extent": "40 mm stitches at <=120 mm spacing",
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
       "strengthScreen": {
-        "lengthMm": 360.0,
-        "minimumLineInertiaMm3": 530250.6666666667,
+        "lengthMm": 592.0,
+        "minimumLineInertiaMm3": 870083.891891892,
         "centroidMm": [
           -425.25,
-          -818.5833333333334,
+          -812.7364864864865,
           499.25
         ],
-        "stressBoundMPa": 13.395933818940605,
+        "stressBoundMPa": 8.379237880506189,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 2,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W084",
+      "id": "W078",
       "stocks": [
         "post01",
         "sideBrace00a"
@@ -2268,10 +2260,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W085",
+      "id": "W079",
       "stocks": [
         "post01",
         "sideBrace00b"
@@ -2295,10 +2289,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W086",
+      "id": "W080",
       "stocks": [
         "post01",
         "sideBrace01a"
@@ -2322,10 +2318,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W087",
+      "id": "W081",
       "stocks": [
         "post01",
         "sideBrace01b"
@@ -2349,64 +2347,41 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W088",
-      "stocks": [
-        "post01",
-        "tableCross3"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 26.25,
-        "minimumLineInertiaMm3": 376.8310546875,
-        "centroidMm": [
-          -375.25,
-          1092.9375,
-          499.25
-        ],
-        "stressBoundMPa": 7660.042116804528,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W089",
+      "id": "W082",
       "stocks": [
         "post01",
         "tableSide0"
       ],
       "forceEnvelopeN": 5000,
       "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 40,
-      "extent": "40 mm stitches at <=120 mm spacing",
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
       "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 277333.33333333326,
+        "lengthMm": 400.0,
+        "minimumLineInertiaMm3": 973333.3333333335,
         "centroidMm": [
           -425.25,
           1136.375,
           499.25
         ],
-        "stressBoundMPa": 25.94249999410794,
+        "stressBoundMPa": 9.437481830458111,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 6,
+      "fullSizeEnds": true
     },
     {
-      "id": "W090",
+      "id": "W083",
       "stocks": [
         "post02",
         "sideBrace01a"
@@ -2430,10 +2405,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W091",
+      "id": "W084",
       "stocks": [
         "post02",
         "sideBrace01b"
@@ -2457,37 +2434,41 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W092",
+      "id": "W085",
       "stocks": [
         "post02",
         "tableSide0"
       ],
       "forceEnvelopeN": 5000,
       "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 40,
-      "extent": "40 mm stitches at <=120 mm spacing",
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
       "strengthScreen": {
-        "lengthMm": 360.0,
-        "minimumLineInertiaMm3": 530250.6666666667,
+        "lengthMm": 592.0,
+        "minimumLineInertiaMm3": 870083.8918918921,
         "centroidMm": [
           -425.25,
-          3091.3333333333335,
+          3085.4864864864867,
           499.25
         ],
-        "stressBoundMPa": 13.395933818940597,
+        "stressBoundMPa": 8.37923788050618,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 2,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W093",
+      "id": "W086",
       "stocks": [
         "post03",
         "sideBrace01a"
@@ -2511,10 +2492,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W094",
+      "id": "W087",
       "stocks": [
         "post03",
         "sideBrace01b"
@@ -2538,64 +2521,41 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W095",
-      "stocks": [
-        "post03",
-        "tableCross4"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 15.66666666666606,
-        "minimumLineInertiaMm3": 80.11033950616184,
-        "centroidMm": [
-          -375.24999999999994,
-          1528.9166666666665,
-          499.24999999999994
-        ],
-        "stressBoundMPa": 35565.76206852644,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W096",
+      "id": "W088",
       "stocks": [
         "post03",
         "tableSide0"
       ],
       "forceEnvelopeN": 5000,
       "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 40,
-      "extent": "40 mm stitches at <=120 mm spacing",
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
       "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 277333.33333333326,
+        "lengthMm": 400.0,
+        "minimumLineInertiaMm3": 973333.3333333335,
         "centroidMm": [
           -425.25,
           1575.0,
           499.25
         ],
-        "stressBoundMPa": 25.94249999410794,
+        "stressBoundMPa": 9.437481830458111,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W097",
+      "id": "W089",
       "stocks": [
         "post10",
         "sideBrace10a"
@@ -2619,10 +2579,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W098",
+      "id": "W090",
       "stocks": [
         "post10",
         "sideBrace10b"
@@ -2646,37 +2608,41 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W099",
+      "id": "W091",
       "stocks": [
         "post10",
         "tableSide1"
       ],
       "forceEnvelopeN": 5000,
       "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 40,
-      "extent": "40 mm stitches at <=120 mm spacing",
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
       "strengthScreen": {
-        "lengthMm": 360.0,
-        "minimumLineInertiaMm3": 530250.6666666667,
+        "lengthMm": 592.0,
+        "minimumLineInertiaMm3": 870083.891891892,
         "centroidMm": [
           2025.25,
-          -818.5833333333334,
+          -812.7364864864865,
           499.25
         ],
-        "stressBoundMPa": 13.395933818940605,
+        "stressBoundMPa": 8.379237880506189,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 2,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W100",
+      "id": "W092",
       "stocks": [
         "post11",
         "sideBrace10a"
@@ -2700,10 +2666,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W101",
+      "id": "W093",
       "stocks": [
         "post11",
         "sideBrace10b"
@@ -2727,10 +2695,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W102",
+      "id": "W094",
       "stocks": [
         "post11",
         "sideBrace11a"
@@ -2754,10 +2724,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W103",
+      "id": "W095",
       "stocks": [
         "post11",
         "sideBrace11b"
@@ -2781,64 +2753,41 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W104",
-      "stocks": [
-        "post11",
-        "tableCross3"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 26.25,
-        "minimumLineInertiaMm3": 376.8310546875,
-        "centroidMm": [
-          1975.25,
-          1092.9375,
-          499.25
-        ],
-        "stressBoundMPa": 7660.042116804528,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W105",
+      "id": "W096",
       "stocks": [
         "post11",
         "tableSide1"
       ],
       "forceEnvelopeN": 5000,
       "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 40,
-      "extent": "40 mm stitches at <=120 mm spacing",
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
       "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 277333.33333333326,
+        "lengthMm": 400.0,
+        "minimumLineInertiaMm3": 973333.3333333335,
         "centroidMm": [
           2025.25,
           1136.375,
           499.25
         ],
-        "stressBoundMPa": 25.94249999410794,
+        "stressBoundMPa": 9.437481830458111,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 6,
+      "fullSizeEnds": true
     },
     {
-      "id": "W106",
+      "id": "W097",
       "stocks": [
         "post12",
         "sideBrace11a"
@@ -2862,10 +2811,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W107",
+      "id": "W098",
       "stocks": [
         "post12",
         "sideBrace11b"
@@ -2889,37 +2840,41 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W108",
+      "id": "W099",
       "stocks": [
         "post12",
         "tableSide1"
       ],
       "forceEnvelopeN": 5000,
       "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 40,
-      "extent": "40 mm stitches at <=120 mm spacing",
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
       "strengthScreen": {
-        "lengthMm": 360.0,
-        "minimumLineInertiaMm3": 530250.6666666667,
+        "lengthMm": 592.0,
+        "minimumLineInertiaMm3": 870083.8918918921,
         "centroidMm": [
           2025.25,
-          3091.3333333333335,
+          3085.4864864864867,
           499.25
         ],
-        "stressBoundMPa": 13.395933818940597,
+        "stressBoundMPa": 8.37923788050618,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 2,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W109",
+      "id": "W100",
       "stocks": [
         "post13",
         "sideBrace11a"
@@ -2943,10 +2898,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W110",
+      "id": "W101",
       "stocks": [
         "post13",
         "sideBrace11b"
@@ -2970,64 +2927,41 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W111",
-      "stocks": [
-        "post13",
-        "tableCross4"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": null,
-      "extent": "continuous available eligible edges",
-      "strengthScreen": {
-        "lengthMm": 15.66666666666606,
-        "minimumLineInertiaMm3": 80.11033950616184,
-        "centroidMm": [
-          1975.25,
-          1528.9166666666665,
-          499.24999999999994
-        ],
-        "stressBoundMPa": 35565.76206852644,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": false
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W112",
+      "id": "W102",
       "stocks": [
         "post13",
         "tableSide1"
       ],
       "forceEnvelopeN": 5000,
       "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 40,
-      "extent": "40 mm stitches at <=120 mm spacing",
+      "nominalOnMm": null,
+      "extent": "continuous available eligible edges",
       "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 277333.33333333326,
+        "lengthMm": 400.0,
+        "minimumLineInertiaMm3": 973333.3333333335,
         "centroidMm": [
           2025.25,
           1575.0,
           499.25
         ],
-        "stressBoundMPa": 25.94249999410794,
+        "stressBoundMPa": 9.437481830458111,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W113",
+      "id": "W103",
       "stocks": [
         "rackCross",
         "tableSide0"
@@ -3051,10 +2985,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W114",
+      "id": "W104",
       "stocks": [
         "rackCross",
         "tableSide1"
@@ -3078,10 +3014,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W115",
+      "id": "W105",
       "stocks": [
         "sideBrace00a",
         "sideBrace00b"
@@ -3105,10 +3043,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W116",
+      "id": "W106",
       "stocks": [
         "sideBrace00a",
         "tableSide0"
@@ -3132,10 +3072,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W117",
+      "id": "W107",
       "stocks": [
         "sideBrace00b",
         "tableSide0"
@@ -3159,10 +3101,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W118",
+      "id": "W108",
       "stocks": [
         "sideBrace01a",
         "sideBrace01b"
@@ -3186,10 +3130,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W119",
+      "id": "W109",
       "stocks": [
         "sideBrace01a",
         "tableSide0"
@@ -3213,10 +3159,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W120",
+      "id": "W110",
       "stocks": [
         "sideBrace01b",
         "tableSide0"
@@ -3240,10 +3188,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W121",
+      "id": "W111",
       "stocks": [
         "sideBrace10a",
         "sideBrace10b"
@@ -3267,10 +3217,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W122",
+      "id": "W112",
       "stocks": [
         "sideBrace10a",
         "tableSide1"
@@ -3294,10 +3246,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W123",
+      "id": "W113",
       "stocks": [
         "sideBrace10b",
         "tableSide1"
@@ -3321,10 +3275,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W124",
+      "id": "W114",
       "stocks": [
         "sideBrace11a",
         "sideBrace11b"
@@ -3348,10 +3304,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W125",
+      "id": "W115",
       "stocks": [
         "sideBrace11a",
         "tableSide1"
@@ -3375,10 +3333,12 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
-      "id": "W126",
+      "id": "W116",
       "stocks": [
         "sideBrace11b",
         "tableSide1"
@@ -3402,12 +3362,304 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W117",
+      "stocks": [
+        "tableCross0",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          -250.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W118",
+      "stocks": [
+        "tableCross0",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          -250.5,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W119",
+      "stocks": [
+        "tableCross1",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          182.83333333333331,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860577,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W120",
+      "stocks": [
+        "tableCross1",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          182.83333333333331,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860577,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W121",
+      "stocks": [
+        "tableCross2",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          -375.25,
+          616.1666666666665,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W122",
+      "stocks": [
+        "tableCross2",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 80,
+      "extent": "80 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 160.0,
+        "minimumLineInertiaMm3": 85333.33333333337,
+        "centroidMm": [
+          1975.25,
+          616.1666666666665,
+          499.25
+        ],
+        "stressBoundMPa": 61.89773205860575,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W123",
+      "stocks": [
+        "tableCross3",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 168.0,
+        "minimumLineInertiaMm3": 114404.5089285714,
+        "centroidMm": [
+          -375.25,
+          1025.9404761904761,
+          499.25
+        ],
+        "stressBoundMPa": 52.697646906826606,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W124",
+      "stocks": [
+        "tableCross3",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 168.0,
+        "minimumLineInertiaMm3": 114404.5089285714,
+        "centroidMm": [
+          1975.25,
+          1025.9404761904761,
+          499.25
+        ],
+        "stressBoundMPa": 52.697646906826606,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W125",
+      "stocks": [
+        "tableCross4",
+        "tableSide0"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 168.0,
+        "minimumLineInertiaMm3": 125909.33333333334,
+        "centroidMm": [
+          -375.25,
+          1460.7857142857142,
+          499.25
+        ],
+        "stressBoundMPa": 50.42939186148604,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
+    },
+    {
+      "id": "W126",
+      "stocks": [
+        "tableCross4",
+        "tableSide1"
+      ],
+      "forceEnvelopeN": 5000,
+      "momentEnvelopeNmm": 250000,
+      "nominalOnMm": 40,
+      "extent": "40 mm stitches at <=120 mm spacing",
+      "strengthScreen": {
+        "lengthMm": 168.0,
+        "minimumLineInertiaMm3": 125909.33333333334,
+        "centroidMm": [
+          1975.25,
+          1460.7857142857142,
+          499.25
+        ],
+        "stressBoundMPa": 50.42939186148604,
+        "capacityReason": "finite weld-group inertia",
+        "allowableMPa": 80,
+        "passes": true
+      },
+      "excludedFlushButtEdges": 0,
+      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W127",
       "stocks": [
-        "tableCross0",
+        "tableCross5",
         "tableSide0"
       ],
       "forceEnvelopeN": 5000,
@@ -3419,7 +3671,7 @@
         "minimumLineInertiaMm3": 85333.33333333337,
         "centroidMm": [
           -375.25,
-          -250.5,
+          1916.1666666666665,
           499.25
         ],
         "stressBoundMPa": 61.89773205860575,
@@ -3429,12 +3681,14 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W128",
       "stocks": [
-        "tableCross0",
+        "tableCross5",
         "tableSide1"
       ],
       "forceEnvelopeN": 5000,
@@ -3446,7 +3700,7 @@
         "minimumLineInertiaMm3": 85333.33333333337,
         "centroidMm": [
           1975.25,
-          -250.5,
+          1916.1666666666665,
           499.25
         ],
         "stressBoundMPa": 61.89773205860575,
@@ -3456,12 +3710,14 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W129",
       "stocks": [
-        "tableCross1",
+        "tableCross6",
         "tableSide0"
       ],
       "forceEnvelopeN": 5000,
@@ -3473,291 +3729,23 @@
         "minimumLineInertiaMm3": 85333.33333333337,
         "centroidMm": [
           -375.25,
-          182.83333333333331,
+          2349.5,
           499.25
         ],
-        "stressBoundMPa": 61.89773205860577,
+        "stressBoundMPa": 61.89773205860575,
         "capacityReason": "finite weld-group inertia",
         "allowableMPa": 80,
         "passes": true
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     },
     {
       "id": "W130",
       "stocks": [
-        "tableCross1",
-        "tableSide1"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 80,
-      "extent": "80 mm stitches at <=120 mm spacing",
-      "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 85333.33333333337,
-        "centroidMm": [
-          1975.25,
-          182.83333333333331,
-          499.25
-        ],
-        "stressBoundMPa": 61.89773205860577,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": true
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W131",
-      "stocks": [
-        "tableCross2",
-        "tableSide0"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 80,
-      "extent": "80 mm stitches at <=120 mm spacing",
-      "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 85333.33333333337,
-        "centroidMm": [
-          -375.25,
-          616.1666666666665,
-          499.25
-        ],
-        "stressBoundMPa": 61.89773205860575,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": true
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W132",
-      "stocks": [
-        "tableCross2",
-        "tableSide1"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 80,
-      "extent": "80 mm stitches at <=120 mm spacing",
-      "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 85333.33333333337,
-        "centroidMm": [
-          1975.25,
-          616.1666666666665,
-          499.25
-        ],
-        "stressBoundMPa": 61.89773205860575,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": true
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W133",
-      "stocks": [
-        "tableCross3",
-        "tableSide0"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 80,
-      "extent": "80 mm stitches at <=120 mm spacing",
-      "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 85333.33333333337,
-        "centroidMm": [
-          -375.25,
-          1049.5,
-          499.25
-        ],
-        "stressBoundMPa": 61.89773205860575,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": true
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W134",
-      "stocks": [
-        "tableCross3",
-        "tableSide1"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 80,
-      "extent": "80 mm stitches at <=120 mm spacing",
-      "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 85333.33333333337,
-        "centroidMm": [
-          1975.25,
-          1049.5,
-          499.25
-        ],
-        "stressBoundMPa": 61.89773205860575,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": true
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W135",
-      "stocks": [
-        "tableCross4",
-        "tableSide0"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 80,
-      "extent": "80 mm stitches at <=120 mm spacing",
-      "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 85333.33333333337,
-        "centroidMm": [
-          -375.25,
-          1482.833333333333,
-          499.25
-        ],
-        "stressBoundMPa": 61.89773205860575,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": true
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W136",
-      "stocks": [
-        "tableCross4",
-        "tableSide1"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 80,
-      "extent": "80 mm stitches at <=120 mm spacing",
-      "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 85333.33333333337,
-        "centroidMm": [
-          1975.25,
-          1482.833333333333,
-          499.25
-        ],
-        "stressBoundMPa": 61.89773205860575,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": true
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W137",
-      "stocks": [
-        "tableCross5",
-        "tableSide0"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 80,
-      "extent": "80 mm stitches at <=120 mm spacing",
-      "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 85333.33333333337,
-        "centroidMm": [
-          -375.25,
-          1916.1666666666665,
-          499.25
-        ],
-        "stressBoundMPa": 61.89773205860575,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": true
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W138",
-      "stocks": [
-        "tableCross5",
-        "tableSide1"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 80,
-      "extent": "80 mm stitches at <=120 mm spacing",
-      "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 85333.33333333337,
-        "centroidMm": [
-          1975.25,
-          1916.1666666666665,
-          499.25
-        ],
-        "stressBoundMPa": 61.89773205860575,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": true
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W139",
-      "stocks": [
-        "tableCross6",
-        "tableSide0"
-      ],
-      "forceEnvelopeN": 5000,
-      "momentEnvelopeNmm": 250000,
-      "nominalOnMm": 80,
-      "extent": "80 mm stitches at <=120 mm spacing",
-      "strengthScreen": {
-        "lengthMm": 160.0,
-        "minimumLineInertiaMm3": 85333.33333333337,
-        "centroidMm": [
-          -375.25,
-          2349.5,
-          499.25
-        ],
-        "stressBoundMPa": 61.89773205860575,
-        "capacityReason": "finite weld-group inertia",
-        "allowableMPa": 80,
-        "passes": true
-      },
-      "excludedFlushButtEdges": 0,
-      "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
-    },
-    {
-      "id": "W140",
-      "stocks": [
         "tableCross6",
         "tableSide1"
       ],
@@ -3780,15 +3768,919 @@
       },
       "excludedFlushButtEdges": 0,
       "sequence": "tack all; opposite sides/faces; centre-out; interpass cooling",
-      "qualification": "Conservative joint-family load allocation; actual load-path/WPS shop review required"
+      "qualification": "Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release",
+      "legMm": 5,
+      "fullSizeEnds": false
     }
   ],
-  "basis": "5 mm legs, 80 MPa assumed weld-throat stress screen, F=5 kN; moments 0.1 kNm brace/0.25 table/0.75 post-frame. Uses actual selected 3D seam-line inertia; not a code/WPS certification.",
+  "rejectedShortRuns": [
+    {
+      "group": "W003",
+      "pieces": [
+        "endBrace0a-p0",
+        "planBrace0a-p0"
+      ],
+      "physicalRunMm": 5.14832177832227,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W003",
+      "pieces": [
+        "endBrace0a-p0",
+        "planBrace0a-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W003",
+      "pieces": [
+        "endBrace0a-p0",
+        "planBrace0a-p0"
+      ],
+      "physicalRunMm": 6.386627152142143,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W005",
+      "pieces": [
+        "endBrace0a-p0",
+        "post10-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W008",
+      "pieces": [
+        "endBrace0b-p0",
+        "planBrace0b-p0"
+      ],
+      "physicalRunMm": 6.386627152142313,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W008",
+      "pieces": [
+        "endBrace0b-p0",
+        "planBrace0b-p0"
+      ],
+      "physicalRunMm": 5.148321778322384,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W008",
+      "pieces": [
+        "endBrace0b-p0",
+        "planBrace0b-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W009",
+      "pieces": [
+        "endBrace0b-p1",
+        "post00-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W013",
+      "pieces": [
+        "endBrace1a-p0",
+        "frameBack-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W013",
+      "pieces": [
+        "endBrace1a-p0",
+        "frameBack-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W015",
+      "pieces": [
+        "endBrace1a-p0",
+        "planBrace1b-p1"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W015",
+      "pieces": [
+        "endBrace1a-p0",
+        "planBrace1b-p1"
+      ],
+      "physicalRunMm": 5.1483217783220425,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W015",
+      "pieces": [
+        "endBrace1a-p0",
+        "planBrace1b-p1"
+      ],
+      "physicalRunMm": 6.495123842738345,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W017",
+      "pieces": [
+        "endBrace1a-p0",
+        "post12-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W017",
+      "pieces": [
+        "endBrace1a-p0",
+        "post12-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W018",
+      "pieces": [
+        "endBrace1b-p1",
+        "frameBack-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W018",
+      "pieces": [
+        "endBrace1b-p1",
+        "frameBack-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W020",
+      "pieces": [
+        "endBrace1b-p0",
+        "planBrace1a-p0"
+      ],
+      "physicalRunMm": 6.495123842738869,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W020",
+      "pieces": [
+        "endBrace1b-p0",
+        "planBrace1a-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W020",
+      "pieces": [
+        "endBrace1b-p0",
+        "planBrace1a-p0"
+      ],
+      "physicalRunMm": 5.148321778322497,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W021",
+      "pieces": [
+        "endBrace1b-p1",
+        "post02-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W021",
+      "pieces": [
+        "endBrace1b-p1",
+        "post02-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W035",
+      "pieces": [
+        "frameLeft-p0",
+        "sideBrace00a-p1"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W035",
+      "pieces": [
+        "frameLeft-p0",
+        "sideBrace00a-p1"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W036",
+      "pieces": [
+        "frameLeft-p0",
+        "sideBrace00b-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W036",
+      "pieces": [
+        "frameLeft-p0",
+        "sideBrace00b-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W037",
+      "pieces": [
+        "frameLeft-p0",
+        "sideBrace01a-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W037",
+      "pieces": [
+        "frameLeft-p0",
+        "sideBrace01a-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W038",
+      "pieces": [
+        "frameLeft-p0",
+        "sideBrace01b-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W038",
+      "pieces": [
+        "frameLeft-p0",
+        "sideBrace01b-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W043",
+      "pieces": [
+        "frameRight-p0",
+        "sideBrace10a-p1"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W043",
+      "pieces": [
+        "frameRight-p0",
+        "sideBrace10a-p1"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W044",
+      "pieces": [
+        "frameRight-p0",
+        "sideBrace10b-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W044",
+      "pieces": [
+        "frameRight-p0",
+        "sideBrace10b-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W045",
+      "pieces": [
+        "frameRight-p0",
+        "sideBrace11a-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W045",
+      "pieces": [
+        "frameRight-p0",
+        "sideBrace11a-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W046",
+      "pieces": [
+        "frameRight-p0",
+        "sideBrace11b-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W046",
+      "pieces": [
+        "frameRight-p0",
+        "sideBrace11b-p2"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W051",
+      "pieces": [
+        "lower0-p0",
+        "post00-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W051",
+      "pieces": [
+        "lower0-p0",
+        "post00-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W051",
+      "pieces": [
+        "lower0-p0",
+        "post00-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W051",
+      "pieces": [
+        "lower0-p0",
+        "post00-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W053",
+      "pieces": [
+        "lower0-p0",
+        "post02-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W053",
+      "pieces": [
+        "lower0-p0",
+        "post02-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W053",
+      "pieces": [
+        "lower0-p0",
+        "post02-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W053",
+      "pieces": [
+        "lower0-p0",
+        "post02-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W055",
+      "pieces": [
+        "lower0-p0",
+        "sideBrace00a-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W055",
+      "pieces": [
+        "lower0-p0",
+        "sideBrace00a-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W056",
+      "pieces": [
+        "lower0-p0",
+        "sideBrace00b-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W056",
+      "pieces": [
+        "lower0-p0",
+        "sideBrace00b-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W057",
+      "pieces": [
+        "lower0-p0",
+        "sideBrace01a-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W057",
+      "pieces": [
+        "lower0-p0",
+        "sideBrace01a-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W058",
+      "pieces": [
+        "lower0-p0",
+        "sideBrace01b-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W058",
+      "pieces": [
+        "lower0-p0",
+        "sideBrace01b-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W063",
+      "pieces": [
+        "lower1-p0",
+        "post10-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W063",
+      "pieces": [
+        "lower1-p0",
+        "post10-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W063",
+      "pieces": [
+        "lower1-p0",
+        "post10-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W063",
+      "pieces": [
+        "lower1-p0",
+        "post10-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W065",
+      "pieces": [
+        "lower1-p0",
+        "post12-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W065",
+      "pieces": [
+        "lower1-p0",
+        "post12-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W065",
+      "pieces": [
+        "lower1-p0",
+        "post12-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W065",
+      "pieces": [
+        "lower1-p0",
+        "post12-p0"
+      ],
+      "physicalRunMm": 12.0,
+      "effectiveRunMm": 4.928932188134525,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W067",
+      "pieces": [
+        "lower1-p0",
+        "sideBrace10a-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W067",
+      "pieces": [
+        "lower1-p0",
+        "sideBrace10a-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W068",
+      "pieces": [
+        "lower1-p0",
+        "sideBrace10b-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W068",
+      "pieces": [
+        "lower1-p0",
+        "sideBrace10b-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W069",
+      "pieces": [
+        "lower1-p0",
+        "sideBrace11a-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W069",
+      "pieces": [
+        "lower1-p0",
+        "sideBrace11a-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W070",
+      "pieces": [
+        "lower1-p0",
+        "sideBrace11b-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W070",
+      "pieces": [
+        "lower1-p0",
+        "sideBrace11b-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W107",
+      "pieces": [
+        "sideBrace00b-p1",
+        "tableSide0-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W107",
+      "pieces": [
+        "sideBrace00b-p1",
+        "tableSide0-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W110",
+      "pieces": [
+        "sideBrace01b-p1",
+        "tableSide0-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W110",
+      "pieces": [
+        "sideBrace01b-p1",
+        "tableSide0-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W110",
+      "pieces": [
+        "sideBrace01b-p3",
+        "tableSide0-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W110",
+      "pieces": [
+        "sideBrace01b-p3",
+        "tableSide0-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W113",
+      "pieces": [
+        "sideBrace10b-p1",
+        "tableSide1-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W113",
+      "pieces": [
+        "sideBrace10b-p1",
+        "tableSide1-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W116",
+      "pieces": [
+        "sideBrace11b-p1",
+        "tableSide1-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W116",
+      "pieces": [
+        "sideBrace11b-p1",
+        "tableSide1-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W116",
+      "pieces": [
+        "sideBrace11b-p3",
+        "tableSide1-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W116",
+      "pieces": [
+        "sideBrace11b-p3",
+        "tableSide1-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W123",
+      "pieces": [
+        "tableCross3-p0",
+        "tableSide0-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W123",
+      "pieces": [
+        "tableCross3-p0",
+        "tableSide0-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W124",
+      "pieces": [
+        "tableCross3-p0",
+        "tableSide1-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W124",
+      "pieces": [
+        "tableCross3-p0",
+        "tableSide1-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W125",
+      "pieces": [
+        "tableCross4-p0",
+        "tableSide0-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W125",
+      "pieces": [
+        "tableCross4-p0",
+        "tableSide0-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W126",
+      "pieces": [
+        "tableCross4-p0",
+        "tableSide1-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    },
+    {
+      "group": "W126",
+      "pieces": [
+        "tableCross4-p0",
+        "tableSide1-p0"
+      ],
+      "physicalRunMm": 4.0,
+      "effectiveRunMm": 0,
+      "reason": "effective run shorter than max(30 mm, 6 throats); no structural weld credited"
+    }
+  ],
+  "basis": "Historical extent-selection screen uses 5 mm legs and 80 MPa, F=5 kN; moments 0.1 kNm brace/0.25 table/0.75 post-frame. Actual leg sizes/end requirements are in each group and weld-stitches.csv. Reaction qualification supersedes the arbitrary load allocation; not a WPS certification.",
   "failedGroups": [
     "W006",
     "W011",
-    "W014",
-    "W020",
+    "W023",
+    "W024",
     "W025",
     "W026",
     "W027",
@@ -3799,29 +4691,19 @@
     "W032",
     "W033",
     "W034",
-    "W035",
-    "W036",
+    "W039",
+    "W040",
     "W041",
     "W042",
-    "W043",
-    "W044",
-    "W074",
+    "W072",
+    "W073",
     "W075",
-    "W076",
-    "W077",
     "W079",
     "W080",
-    "W081",
-    "W085",
-    "W086",
-    "W088",
-    "W091",
-    "W095",
-    "W097",
-    "W101",
-    "W102",
-    "W104",
-    "W107",
-    "W111"
+    "W084",
+    "W089",
+    "W093",
+    "W094",
+    "W098"
   ]
 }

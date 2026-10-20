@@ -65,9 +65,20 @@ class SheetRouterFramePreparation {
             var row=stocks[i],body=new Part(row.raw.shape.cloneShape()),cutters:Array<String> = [];
             for(j in 0...i) {
                 var mate=stocks[j];if(!overlap(body,mate.envelope))continue;
-                var common=body.shape.common(mate.envelope.shape),volume=common.volume();common.close();
-                if(volume<0.01)continue;
-                var cut=body.subtract(mate.envelope);body.close();body=cut;cutters.push(mate.id);removedVolumeMm3+=volume;
+                // Crossmembers load the continuous table stringers. A small
+                // cope clearance prevents a grazing post edge being treated as
+                // an additional, fatigue-sensitive structural weld.
+                var relief=((StringTools.startsWith(row.id,"tableCross")||StringTools.startsWith(row.id,"planBrace"))&&StringTools.startsWith(mate.id,"post"))
+                    ||(StringTools.startsWith(row.id,"endBrace")&&(mate.id=="frameLeft"||mate.id=="frameRight"));
+                var tool=mate.envelope;
+                if(relief) {
+                    var d=mate.end.subtract(mate.start).normalized(),x=mate.reference.cross(d).normalized();
+                    var blank=Part.box(mate.profile.width+2,mate.profile.height+2,mate.end.subtract(mate.start).length()+2);
+                    tool=blank.placed(new Location(new Plane(mate.start.subtract(d),x,d)));blank.close();
+                }
+                var common=body.shape.common(tool.shape),volume=common.volume();common.close();
+                if(volume<0.01) {if(relief)tool.close();continue;}
+                var cut=body.subtract(tool);if(relief)tool.close();body.close();body=cut;cutters.push(mate.id+(relief?": 1 mm non-weld cope clearance":""));removedVolumeMm3+=volume;
             }
             if(body.isEmpty())failures.push(row.id+": preparation removed the entire stock");
             var count=body.solidCount();

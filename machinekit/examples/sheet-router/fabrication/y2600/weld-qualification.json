@@ -1,0 +1,4780 @@
+{
+  "workY": 2600,
+  "status": "reaction qualification PASS",
+  "fabricationReleased": false,
+  "fatigueCycles": 100000000,
+  "staticPoses": 9,
+  "staticMeshesMm": [
+    50,
+    100
+  ],
+  "coarseCheckPoses": [
+    {
+      "x": 1600,
+      "y": 1300,
+      "z": 200
+    },
+    {
+      "x": 800,
+      "y": 0,
+      "z": 200
+    },
+    {
+      "x": 800,
+      "y": 1300,
+      "z": 200
+    }
+  ],
+  "dynamicPose": {
+    "x": 800,
+    "y": 0,
+    "z": 200
+  },
+  "dynamicModeCounts": [
+    20,
+    40
+  ],
+  "dynamicTimeStepsS": [
+    0.0005,
+    0.00025
+  ],
+  "dampingRatios": [
+    0.005,
+    0.01
+  ],
+  "basis": {
+    "fuMPa": 360,
+    "betaW": 0.8,
+    "gammaM2": 1.25,
+    "gravityFactor": 1.35,
+    "variableFactor": 1.5,
+    "fatigueCategoryMPa": 36,
+    "longitudinalShearCategoryMPa": 80,
+    "fatigueCycles": 100000000,
+    "fatigueGammaMf": 1.15,
+    "legMm": "5 nominal; 6 at middle post/stringer; 8 at beam feet; see each contact",
+    "fatigueRange": "traction-vector interval diameter against FAT36; conservative for the FAT36 normal/transverse and FAT80 longitudinal shear interaction; EN 1993-1-9:2005 Figure 7.1 m=3 to 5 million then m=5 to the 100-million-cycle cut-off"
+  },
+  "loadEnvelope": "Concurrent signed 300 N XYZ cuts and 3 m/s\u00b2 XYZ inertia; gravity; G=1.35 Q=1.5 for strength, unfactored full reversals for fatigue. Dynamic XY contour and rapid transitions at governing modal pose.",
+  "model": "68 separate prepared stocks, exact rigid-offset MPCs and actual spatial weld springs; no old proximity ties. Isolated short runs and flush butt edges carry no credited weld load.",
+  "detailCorrections": [
+    "1 mm non-weld cope relief removes grazing crossmember/post, plan-brace/post and end-brace/top-rail contacts",
+    "Post/stringer joints use full accessible runs; middle post01/post11 joints have 6 mm legs; 2600-bed middle joints require full-size tabbed ends",
+    "Beam feet: two 92 mm fillets per foot, 8 mm legs, full-size run-on/off tab ends; no inaccessible all-around credit"
+  ],
+  "coverage": {
+    "geometryFindings": [],
+    "preparedPieces": 68,
+    "groups": 132,
+    "creditedGroups": 132,
+    "uncreditedGroups": 0
+  },
+  "failedGroups": [],
+  "previousOpenGroupReview": [
+    {
+      "previousId": "W006",
+      "stocks": [
+        "endBrace0a",
+        "tableSide1"
+      ],
+      "currentId": "W006",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W011",
+      "stocks": [
+        "endBrace0b",
+        "tableSide0"
+      ],
+      "currentId": "W011",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W014",
+      "stocks": [
+        "endBrace1a",
+        "frameRight"
+      ],
+      "currentId": null,
+      "resolution": "REMOVED: deliberate non-weld cope clearance; connected alternative load path checked"
+    },
+    {
+      "previousId": "W020",
+      "stocks": [
+        "endBrace1b",
+        "frameLeft"
+      ],
+      "currentId": null,
+      "resolution": "REMOVED: deliberate non-weld cope clearance; connected alternative load path checked"
+    },
+    {
+      "previousId": "W025",
+      "stocks": [
+        "frameBack",
+        "frameLeft"
+      ],
+      "currentId": "W023",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W026",
+      "stocks": [
+        "frameBack",
+        "frameRight"
+      ],
+      "currentId": "W024",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W027",
+      "stocks": [
+        "frameBack",
+        "post02"
+      ],
+      "currentId": "W025",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W028",
+      "stocks": [
+        "frameBack",
+        "post12"
+      ],
+      "currentId": "W026",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W029",
+      "stocks": [
+        "frameFront",
+        "frameLeft"
+      ],
+      "currentId": "W027",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W030",
+      "stocks": [
+        "frameFront",
+        "frameRight"
+      ],
+      "currentId": "W028",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W031",
+      "stocks": [
+        "frameFront",
+        "post00"
+      ],
+      "currentId": "W029",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W032",
+      "stocks": [
+        "frameFront",
+        "post10"
+      ],
+      "currentId": "W030",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W033",
+      "stocks": [
+        "frameLeft",
+        "post00"
+      ],
+      "currentId": "W031",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W034",
+      "stocks": [
+        "frameLeft",
+        "post01"
+      ],
+      "currentId": "W032",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W035",
+      "stocks": [
+        "frameLeft",
+        "post02"
+      ],
+      "currentId": "W033",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W036",
+      "stocks": [
+        "frameLeft",
+        "post03"
+      ],
+      "currentId": "W034",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W041",
+      "stocks": [
+        "frameRight",
+        "post10"
+      ],
+      "currentId": "W039",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W042",
+      "stocks": [
+        "frameRight",
+        "post11"
+      ],
+      "currentId": "W040",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W043",
+      "stocks": [
+        "frameRight",
+        "post12"
+      ],
+      "currentId": "W041",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W044",
+      "stocks": [
+        "frameRight",
+        "post13"
+      ],
+      "currentId": "W042",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W074",
+      "stocks": [
+        "planBrace0a",
+        "planBrace1b"
+      ],
+      "currentId": "W072",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W075",
+      "stocks": [
+        "planBrace0a",
+        "post00"
+      ],
+      "currentId": null,
+      "resolution": "REMOVED: deliberate non-weld cope clearance; connected alternative load path checked"
+    },
+    {
+      "previousId": "W076",
+      "stocks": [
+        "planBrace0b",
+        "planBrace1a"
+      ],
+      "currentId": "W073",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W077",
+      "stocks": [
+        "planBrace0b",
+        "post10"
+      ],
+      "currentId": null,
+      "resolution": "REMOVED: deliberate non-weld cope clearance; connected alternative load path checked"
+    },
+    {
+      "previousId": "W079",
+      "stocks": [
+        "planBrace1a",
+        "post12"
+      ],
+      "currentId": null,
+      "resolution": "REMOVED: deliberate non-weld cope clearance; connected alternative load path checked"
+    },
+    {
+      "previousId": "W080",
+      "stocks": [
+        "planBrace1b",
+        "post02"
+      ],
+      "currentId": null,
+      "resolution": "REMOVED: deliberate non-weld cope clearance; connected alternative load path checked"
+    },
+    {
+      "previousId": "W081",
+      "stocks": [
+        "post00",
+        "sideBrace00a"
+      ],
+      "currentId": "W075",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W085",
+      "stocks": [
+        "post01",
+        "sideBrace00b"
+      ],
+      "currentId": "W079",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W086",
+      "stocks": [
+        "post01",
+        "sideBrace01a"
+      ],
+      "currentId": "W080",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W088",
+      "stocks": [
+        "post01",
+        "tableCross3"
+      ],
+      "currentId": null,
+      "resolution": "REMOVED: deliberate non-weld cope clearance; connected alternative load path checked"
+    },
+    {
+      "previousId": "W091",
+      "stocks": [
+        "post02",
+        "sideBrace01b"
+      ],
+      "currentId": "W084",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W095",
+      "stocks": [
+        "post03",
+        "tableCross4"
+      ],
+      "currentId": null,
+      "resolution": "REMOVED: deliberate non-weld cope clearance; connected alternative load path checked"
+    },
+    {
+      "previousId": "W097",
+      "stocks": [
+        "post10",
+        "sideBrace10a"
+      ],
+      "currentId": "W089",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W101",
+      "stocks": [
+        "post11",
+        "sideBrace10b"
+      ],
+      "currentId": "W093",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W102",
+      "stocks": [
+        "post11",
+        "sideBrace11a"
+      ],
+      "currentId": "W094",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W104",
+      "stocks": [
+        "post11",
+        "tableCross3"
+      ],
+      "currentId": null,
+      "resolution": "REMOVED: deliberate non-weld cope clearance; connected alternative load path checked"
+    },
+    {
+      "previousId": "W107",
+      "stocks": [
+        "post12",
+        "sideBrace11b"
+      ],
+      "currentId": "W098",
+      "resolution": "PASS"
+    },
+    {
+      "previousId": "W111",
+      "stocks": [
+        "post13",
+        "tableCross4"
+      ],
+      "currentId": null,
+      "resolution": "REMOVED: deliberate non-weld cope clearance; connected alternative load path checked"
+    }
+  ],
+  "groups": [
+    {
+      "id": "W001",
+      "stocks": [
+        "endBrace0a",
+        "endBrace0b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 105.85786437626899,
+      "staticDesignMPa": 2.2298735259322973,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.2280063959531315,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W002",
+      "stocks": [
+        "endBrace0a",
+        "lower0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 211.75725330279042,
+      "staticDesignMPa": 1.3196461498595897,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.3890032309826798,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W003",
+      "stocks": [
+        "endBrace0a",
+        "planBrace0a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288072,
+      "staticDesignMPa": 2.8637223885066443,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.3096509054207541,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W004",
+      "stocks": [
+        "endBrace0a",
+        "post00"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 211.75725330279042,
+      "staticDesignMPa": 2.3405101090140445,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.6067712523080613,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W005",
+      "stocks": [
+        "endBrace0a",
+        "post10"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 270.5232875920679,
+      "staticDesignMPa": 1.4582607804843148,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.5738745052661977,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W006",
+      "stocks": [
+        "endBrace0a",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 91.71324591060312,
+      "staticDesignMPa": 4.249571843909472,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.400301607498223,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W007",
+      "stocks": [
+        "endBrace0b",
+        "lower1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 211.75725330279033,
+      "staticDesignMPa": 1.303633613784045,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.3964808147858194,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W008",
+      "stocks": [
+        "endBrace0b",
+        "planBrace0b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.57359312880726,
+      "staticDesignMPa": 2.465706947030421,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.31739075383292586,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W009",
+      "stocks": [
+        "endBrace0b",
+        "post00"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 270.5232875920679,
+      "staticDesignMPa": 1.562678009686463,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.5629789703965016,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W010",
+      "stocks": [
+        "endBrace0b",
+        "post10"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 211.7572533027904,
+      "staticDesignMPa": 2.2246593737910296,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.5932568477599132,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W011",
+      "stocks": [
+        "endBrace0b",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 91.71324591060312,
+      "staticDesignMPa": 4.236207219008747,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.4039177628880797,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W012",
+      "stocks": [
+        "endBrace1a",
+        "endBrace1b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.85786437626876,
+      "staticDesignMPa": 3.928680426337397,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.422225012486389,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W013",
+      "stocks": [
+        "endBrace1a",
+        "frameBack"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 329.28932188134564,
+      "staticDesignMPa": 2.9882555251950533,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.1988155798393707,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W014",
+      "stocks": [
+        "endBrace1a",
+        "lower0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 210.39310993262757,
+      "staticDesignMPa": 1.116260586437389,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.3037887267161394,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W015",
+      "stocks": [
+        "endBrace1a",
+        "planBrace1b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288075,
+      "staticDesignMPa": 2.674207002949452,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.4224339693548084,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W016",
+      "stocks": [
+        "endBrace1a",
+        "post02"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 244.82279575175087,
+      "staticDesignMPa": 2.3897978958573107,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.4713999596568922,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W017",
+      "stocks": [
+        "endBrace1a",
+        "post12"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.57359312880675,
+      "staticDesignMPa": 4.033605648142675,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.6101763608994455,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W018",
+      "stocks": [
+        "endBrace1b",
+        "frameBack"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 329.28932188134513,
+      "staticDesignMPa": 3.0215846097776957,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.1888845784101658,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W019",
+      "stocks": [
+        "endBrace1b",
+        "lower1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 210.39310993262757,
+      "staticDesignMPa": 1.2159742033050713,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.3011342669191916,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W020",
+      "stocks": [
+        "endBrace1b",
+        "planBrace1a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.57359312880735,
+      "staticDesignMPa": 2.9756213468933645,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.42518024228118945,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W021",
+      "stocks": [
+        "endBrace1b",
+        "post02"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.57359312880675,
+      "staticDesignMPa": 4.0527384382109135,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.618866054059287,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W022",
+      "stocks": [
+        "endBrace1b",
+        "post12"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 244.82279575175102,
+      "staticDesignMPa": 2.5702415062732187,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.46346797195473005,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W023",
+      "stocks": [
+        "frameBack",
+        "frameLeft"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.9289321881345,
+      "staticDesignMPa": 17.909583674015796,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 9.082576709046013,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W024",
+      "stocks": [
+        "frameBack",
+        "frameRight"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.9289321881345,
+      "staticDesignMPa": 17.749824664568642,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 9.030744468292095,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W025",
+      "stocks": [
+        "frameBack",
+        "post02"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.92893218813438,
+      "staticDesignMPa": 12.820172604391605,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 5.75432972943623,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W026",
+      "stocks": [
+        "frameBack",
+        "post12"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.92893218813438,
+      "staticDesignMPa": 12.718585201525064,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 5.757737506289913,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W027",
+      "stocks": [
+        "frameFront",
+        "frameLeft"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.9289321881345,
+      "staticDesignMPa": 24.335645576669588,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 10.917021596806109,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W028",
+      "stocks": [
+        "frameFront",
+        "frameRight"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.9289321881345,
+      "staticDesignMPa": 24.12067327291189,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 10.918218400204262,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W029",
+      "stocks": [
+        "frameFront",
+        "post00"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.9289321881345,
+      "staticDesignMPa": 22.766570054766692,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 9.26611217455083,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W030",
+      "stocks": [
+        "frameFront",
+        "post10"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.9289321881345,
+      "staticDesignMPa": 22.437439863755266,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 9.274290250763682,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W031",
+      "stocks": [
+        "frameLeft",
+        "post00"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.92893218813455,
+      "staticDesignMPa": 17.471559145123923,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 10.425775117871554,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W032",
+      "stocks": [
+        "frameLeft",
+        "post01"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 185.8578643762691,
+      "staticDesignMPa": 9.245881180852754,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 5.9359068729450355,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W033",
+      "stocks": [
+        "frameLeft",
+        "post02"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.92893218813455,
+      "staticDesignMPa": 9.952452401112746,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 8.323453661383576,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W034",
+      "stocks": [
+        "frameLeft",
+        "post03"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 185.8578643762691,
+      "staticDesignMPa": 11.997448558068484,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 5.3321759484402556,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W035",
+      "stocks": [
+        "frameLeft",
+        "sideBrace00a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.57359312880732,
+      "staticDesignMPa": 10.119826721464204,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 4.544732244432674,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W036",
+      "stocks": [
+        "frameLeft",
+        "sideBrace00b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288071,
+      "staticDesignMPa": 15.940541038742689,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 8.235801226800277,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W037",
+      "stocks": [
+        "frameLeft",
+        "sideBrace01a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.57359312880664,
+      "staticDesignMPa": 11.837032030710711,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 5.673819507512955,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W038",
+      "stocks": [
+        "frameLeft",
+        "sideBrace01b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.57359312880754,
+      "staticDesignMPa": 3.390138938792797,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.8450244369532296,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W039",
+      "stocks": [
+        "frameRight",
+        "post10"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.92893218813461,
+      "staticDesignMPa": 17.395739978103563,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 10.415987090246439,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W040",
+      "stocks": [
+        "frameRight",
+        "post11"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 185.857864376269,
+      "staticDesignMPa": 8.967886868460688,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 5.921584121472839,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W041",
+      "stocks": [
+        "frameRight",
+        "post12"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 92.92893218813438,
+      "staticDesignMPa": 9.858252758398828,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 8.318206487322078,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W042",
+      "stocks": [
+        "frameRight",
+        "post13"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 185.857864376269,
+      "staticDesignMPa": 11.255167598587118,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 5.329512345345848,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W043",
+      "stocks": [
+        "frameRight",
+        "sideBrace10a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.57359312880743,
+      "staticDesignMPa": 9.960291018626558,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 4.50420925076007,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W044",
+      "stocks": [
+        "frameRight",
+        "sideBrace10b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288072,
+      "staticDesignMPa": 15.648767922216631,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 8.231358498270964,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W045",
+      "stocks": [
+        "frameRight",
+        "sideBrace11a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.57359312880675,
+      "staticDesignMPa": 11.717758082348897,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 5.669443799797768,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W046",
+      "stocks": [
+        "frameRight",
+        "sideBrace11b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.57359312880766,
+      "staticDesignMPa": 3.289636020276883,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.8426303954890573,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W047",
+      "stocks": [
+        "lower0",
+        "planBrace0a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.2727668974333,
+      "staticDesignMPa": 4.081509724990343,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.5113203299941388,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W048",
+      "stocks": [
+        "lower0",
+        "planBrace0b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.27276689743172,
+      "staticDesignMPa": 5.107537776595446,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.8375384507394197,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W049",
+      "stocks": [
+        "lower0",
+        "planBrace1a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.272766897434,
+      "staticDesignMPa": 6.378762113966982,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.9638450102287908,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W050",
+      "stocks": [
+        "lower0",
+        "planBrace1b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.27276689743036,
+      "staticDesignMPa": 3.5586886455281737,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.495024161367681,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W051",
+      "stocks": [
+        "lower0",
+        "post00"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 263.4314575050762,
+      "staticDesignMPa": 4.210903207085044,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.8939733853856996,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W052",
+      "stocks": [
+        "lower0",
+        "post01"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.8578643762691,
+      "staticDesignMPa": 32.232098819476725,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 6.081166234227062,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W053",
+      "stocks": [
+        "lower0",
+        "post02"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 263.43145750507574,
+      "staticDesignMPa": 3.2567477905660147,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.8450931046557095,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W054",
+      "stocks": [
+        "lower0",
+        "post03"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.8578643762691,
+      "staticDesignMPa": 29.930238927972894,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 7.316981810873134,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W055",
+      "stocks": [
+        "lower0",
+        "sideBrace00a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 461.0050506338832,
+      "staticDesignMPa": 1.5144973097715082,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.3284047536743845,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W056",
+      "stocks": [
+        "lower0",
+        "sideBrace00b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 461.0050506338833,
+      "staticDesignMPa": 2.023622328308256,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.42869277134117545,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W057",
+      "stocks": [
+        "lower0",
+        "sideBrace01a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 461.0050506338844,
+      "staticDesignMPa": 2.8929582700515133,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.6712706010953561,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W058",
+      "stocks": [
+        "lower0",
+        "sideBrace01b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 461.0050506338817,
+      "staticDesignMPa": 1.3168375833023165,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.38646116928135904,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W059",
+      "stocks": [
+        "lower1",
+        "planBrace0a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.27276689743172,
+      "staticDesignMPa": 5.850659792339345,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.8361029551172262,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W060",
+      "stocks": [
+        "lower1",
+        "planBrace0b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.27276689743456,
+      "staticDesignMPa": 3.600727023338295,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.5101273565621401,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W061",
+      "stocks": [
+        "lower1",
+        "planBrace1a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.27276689743036,
+      "staticDesignMPa": 4.209593140705508,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.4989850244908148,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W062",
+      "stocks": [
+        "lower1",
+        "planBrace1b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.272766897434,
+      "staticDesignMPa": 5.957515437816637,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.9807358556784962,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W063",
+      "stocks": [
+        "lower1",
+        "post10"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 263.4314575050764,
+      "staticDesignMPa": 3.9945381134760627,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.8885725025613129,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W064",
+      "stocks": [
+        "lower1",
+        "post11"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.85786437626922,
+      "staticDesignMPa": 31.95017948786977,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 6.051671411554173,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W065",
+      "stocks": [
+        "lower1",
+        "post12"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 263.43145750507597,
+      "staticDesignMPa": 3.3710363424416183,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.8391770826958056,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W066",
+      "stocks": [
+        "lower1",
+        "post13"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.85786437626922,
+      "staticDesignMPa": 26.91062380037954,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 7.278503658166038,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W067",
+      "stocks": [
+        "lower1",
+        "sideBrace10a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 461.0050506338833,
+      "staticDesignMPa": 1.5457727840841196,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.32604902719819123,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W068",
+      "stocks": [
+        "lower1",
+        "sideBrace10b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 461.0050506338834,
+      "staticDesignMPa": 1.9570932884306065,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.4275335823953977,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W069",
+      "stocks": [
+        "lower1",
+        "sideBrace11a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 461.00505063388454,
+      "staticDesignMPa": 2.7028747155439277,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.6717016788652049,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W070",
+      "stocks": [
+        "lower1",
+        "sideBrace11b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 461.0050506338818,
+      "staticDesignMPa": 1.269673438435773,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.3841912953444355,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W071",
+      "stocks": [
+        "planBrace0a",
+        "planBrace0b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.85786437626905,
+      "staticDesignMPa": 21.424346831592246,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.091767924046309,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W072",
+      "stocks": [
+        "planBrace0a",
+        "planBrace1b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 161.9511273464301,
+      "staticDesignMPa": 3.5779357170074806,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.5137638358596743,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W073",
+      "stocks": [
+        "planBrace0b",
+        "planBrace1a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 161.95112734643038,
+      "staticDesignMPa": 3.4454324138009342,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.530674046055651,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W074",
+      "stocks": [
+        "planBrace1a",
+        "planBrace1b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.85786437626905,
+      "staticDesignMPa": 21.445581559578944,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.287041146980118,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W075",
+      "stocks": [
+        "post00",
+        "sideBrace00a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 147.36014904704822,
+      "staticDesignMPa": 2.7456474991295776,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.8490914452445276,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W076",
+      "stocks": [
+        "post00",
+        "sideBrace00b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288071,
+      "staticDesignMPa": 12.325929364162283,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 4.493154119602643,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W077",
+      "stocks": [
+        "post00",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 549.5735931288073,
+      "staticDesignMPa": 2.016504026399466,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.9472345672925158,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W078",
+      "stocks": [
+        "post01",
+        "sideBrace00a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288071,
+      "staticDesignMPa": 6.664230614187153,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.9400566606531084,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W079",
+      "stocks": [
+        "post01",
+        "sideBrace00b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 147.36014904704828,
+      "staticDesignMPa": 7.146602229979096,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.9455665849287658,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W080",
+      "stocks": [
+        "post01",
+        "sideBrace01a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 147.3601490470481,
+      "staticDesignMPa": 7.314328135019808,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.5419453127155516,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W081",
+      "stocks": [
+        "post01",
+        "sideBrace01b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288071,
+      "staticDesignMPa": 3.665327070396019,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.4588062312922374,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W082",
+      "stocks": [
+        "post01",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        6.0
+      ],
+      "throatMm": [
+        4.242640687119285
+      ],
+      "minimumEffectiveLengthPerContactMm": 200.0,
+      "staticDesignMPa": 18.948932877728996,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 11.581353832263995,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W083",
+      "stocks": [
+        "post02",
+        "sideBrace01a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288071,
+      "staticDesignMPa": 9.128557816416563,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 3.3186419524270785,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W084",
+      "stocks": [
+        "post02",
+        "sideBrace01b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 147.3601490470484,
+      "staticDesignMPa": 2.1812917393980022,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.7806681591272406,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W085",
+      "stocks": [
+        "post02",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 549.5735931288073,
+      "staticDesignMPa": 2.3578807154095176,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.9034160803574501,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W086",
+      "stocks": [
+        "post03",
+        "sideBrace01a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 131.7157287525382,
+      "staticDesignMPa": 6.221984755244425,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.290063942990975,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W087",
+      "stocks": [
+        "post03",
+        "sideBrace01b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 131.7157287525381,
+      "staticDesignMPa": 4.133259053302426,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.5038227282018877,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W088",
+      "stocks": [
+        "post03",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 185.8578643762691,
+      "staticDesignMPa": 19.688358092259804,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 8.842857436949455,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W089",
+      "stocks": [
+        "post10",
+        "sideBrace10a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 147.36014904704817,
+      "staticDesignMPa": 2.6518991208682325,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.8419173535457467,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W090",
+      "stocks": [
+        "post10",
+        "sideBrace10b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288072,
+      "staticDesignMPa": 12.189840324646868,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 4.492532408279779,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W091",
+      "stocks": [
+        "post10",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 549.5735931288071,
+      "staticDesignMPa": 2.0215280244338496,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.9433484662836524,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W092",
+      "stocks": [
+        "post11",
+        "sideBrace10a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288072,
+      "staticDesignMPa": 6.562385316354154,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.9141254147381357,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W093",
+      "stocks": [
+        "post11",
+        "sideBrace10b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 147.36014904704828,
+      "staticDesignMPa": 7.288892357161933,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.9358284905645966,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W094",
+      "stocks": [
+        "post11",
+        "sideBrace11a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 147.36014904704817,
+      "staticDesignMPa": 6.640777196176822,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.5276019531571599,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W095",
+      "stocks": [
+        "post11",
+        "sideBrace11b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288072,
+      "staticDesignMPa": 3.660551156543233,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.449360076189959,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W096",
+      "stocks": [
+        "post11",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        6.0
+      ],
+      "throatMm": [
+        4.242640687119285
+      ],
+      "minimumEffectiveLengthPerContactMm": 200.0,
+      "staticDesignMPa": 18.48537756714444,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 11.576585221044823,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W097",
+      "stocks": [
+        "post12",
+        "sideBrace11a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 197.5735931288072,
+      "staticDesignMPa": 8.986274964050939,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 3.3172588089821535,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W098",
+      "stocks": [
+        "post12",
+        "sideBrace11b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 147.36014904704828,
+      "staticDesignMPa": 2.021773331152814,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.7817253957586662,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W099",
+      "stocks": [
+        "post12",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 549.5735931288071,
+      "staticDesignMPa": 2.3006097924722857,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.8965760634067466,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W100",
+      "stocks": [
+        "post13",
+        "sideBrace11a"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 131.71572875253833,
+      "staticDesignMPa": 6.015359949447495,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.2730748595651558,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W101",
+      "stocks": [
+        "post13",
+        "sideBrace11b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 131.7157287525382,
+      "staticDesignMPa": 4.107601510027285,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.5076119009813174,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W102",
+      "stocks": [
+        "post13",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 185.857864376269,
+      "staticDesignMPa": 18.909630048125866,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 8.81754878848645,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W103",
+      "stocks": [
+        "rackCross",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 29.779226410068603,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.6108528814843812,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W104",
+      "stocks": [
+        "rackCross",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 29.039708567391187,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.596759420093604,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W105",
+      "stocks": [
+        "sideBrace00a",
+        "sideBrace00b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.8578643762691,
+      "staticDesignMPa": 13.1242784884673,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.8998161622754757,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W106",
+      "stocks": [
+        "sideBrace00a",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 263.4314575050762,
+      "staticDesignMPa": 2.6194242066643785,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.257510677388318,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W107",
+      "stocks": [
+        "sideBrace00b",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 263.4314575050763,
+      "staticDesignMPa": 3.281749627394248,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.2923421216703033,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W108",
+      "stocks": [
+        "sideBrace01a",
+        "sideBrace01b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.8578643762691,
+      "staticDesignMPa": 18.743595446446324,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 3.7629884264917712,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W109",
+      "stocks": [
+        "sideBrace01a",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 263.4314575050754,
+      "staticDesignMPa": 3.8784267702300865,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.5344933613885021,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W110",
+      "stocks": [
+        "sideBrace01b",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 329.289321881346,
+      "staticDesignMPa": 1.5048697361692953,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.6091054342889706,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W111",
+      "stocks": [
+        "sideBrace10a",
+        "sideBrace10b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.85786437626922,
+      "staticDesignMPa": 13.312727438922103,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.8848117960220407,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W112",
+      "stocks": [
+        "sideBrace10a",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 263.4314575050763,
+      "staticDesignMPa": 2.6118011884574353,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.2560120154920402,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/coarse/y2600-x1600-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W113",
+      "stocks": [
+        "sideBrace10b",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 263.4314575050764,
+      "staticDesignMPa": 3.2024479486249753,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.290702454872395,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W114",
+      "stocks": [
+        "sideBrace11a",
+        "sideBrace11b"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 65.85786437626922,
+      "staticDesignMPa": 18.344363780438137,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 3.758814802203954,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W115",
+      "stocks": [
+        "sideBrace11a",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 263.4314575050755,
+      "staticDesignMPa": 3.8204597539822673,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.5255727857250958,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y2600/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      }
+    },
+    {
+      "id": "W116",
+      "stocks": [
+        "sideBrace11b",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 329.2893218813461,
+      "staticDesignMPa": 1.4670570862981487,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 0.6012597373389726,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W117",
+      "stocks": [
+        "tableCross0",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 10.193730890826297,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.7813272471272552,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W118",
+      "stocks": [
+        "tableCross0",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 10.265145387059144,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.783310927180822,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y0/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      }
+    },
+    {
+      "id": "W119",
+      "stocks": [
+        "tableCross1",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 9.934743074405477,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.685141264375614,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W120",
+      "stocks": [
+        "tableCross1",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 10.008634527975099,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.6863035839911342,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W121",
+      "stocks": [
+        "tableCross2",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 10.045176344206872,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.7198271392900537,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W122",
+      "stocks": [
+        "tableCross2",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 10.06035316410456,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 2.7163314938836964,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W123",
+      "stocks": [
+        "tableCross3",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 131.71572875253827,
+      "staticDesignMPa": 10.407256273345334,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 3.0230540117101015,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W124",
+      "stocks": [
+        "tableCross3",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 131.71572875253827,
+      "staticDesignMPa": 10.501338517714952,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 3.026801837118436,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W125",
+      "stocks": [
+        "tableCross4",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 131.71572875253827,
+      "staticDesignMPa": 12.7057479388685,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 5.546578293415122,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W126",
+      "stocks": [
+        "tableCross4",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 131.71572875253827,
+      "staticDesignMPa": 12.786577324419719,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 5.54644003339289,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W127",
+      "stocks": [
+        "tableCross5",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 12.770411700691017,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 3.6580652305647954,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W128",
+      "stocks": [
+        "tableCross5",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 12.78865223163735,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 3.6568301445701388,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W129",
+      "stocks": [
+        "tableCross6",
+        "tableSide0"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 8.824246718999849,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.764137672072736,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "W130",
+      "stocks": [
+        "tableCross6",
+        "tableSide1"
+      ],
+      "status": "PASS",
+      "detail": "fillets at prepared RHS cope/contact; flush butt edges excluded",
+      "legMm": [
+        5.0
+      ],
+      "throatMm": [
+        3.5355339059327373
+      ],
+      "minimumEffectiveLengthPerContactMm": 145.85786437626905,
+      "staticDesignMPa": 9.0231095581266,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 1.7671264180599258,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x800-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "GFL",
+      "stocks": [
+        "beam",
+        "beamFootLeft"
+      ],
+      "status": "PASS",
+      "detail": "RHS sidewall-to-foot fillets with full-size tabbed ends",
+      "legMm": [
+        8
+      ],
+      "throatMm": [
+        5.65685424949238
+      ],
+      "minimumEffectiveLengthPerContactMm": 184,
+      "staticDesignMPa": 13.624039089472584,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 11.79970821730166,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x0-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      }
+    },
+    {
+      "id": "GFR",
+      "stocks": [
+        "beam",
+        "beamFootRight"
+      ],
+      "status": "PASS",
+      "detail": "RHS sidewall-to-foot fillets with full-size tabbed ends",
+      "legMm": [
+        8
+      ],
+      "throatMm": [
+        5.65685424949238
+      ],
+      "minimumEffectiveLengthPerContactMm": 184,
+      "staticDesignMPa": 13.676833485639973,
+      "staticAllowableMPa": 207.84609690826528,
+      "fatigueRangeMPa": 11.82504873037677,
+      "fatigueAllowableMPa": 12.669281670375343,
+      "fatigueCategoryMPa": 36,
+      "longitudinalShearCategoryMPa": 80,
+      "fatigueControllingSource": "build/sheet-router-work/sr6-qualification/improved/reactions/y2600-x1600-y1300/reactions.json",
+      "fatigueControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "staticControllingPose": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      }
+    }
+  ],
+  "limitations": [
+    "Reduced elastic member/joint model; excludes RHS wall distortion and local weld-toe notch stress",
+    "FAT36 full traction-vector cut-off is a conservative weld-throat screen, not a certified hot-spot/parent-metal fatigue assessment",
+    "WPS/access, full-size tab end witnesses, material identity, relief, epoxy application and shop datum-transfer capability require recorded acceptance; no simulated sign-off"
+  ]
+}

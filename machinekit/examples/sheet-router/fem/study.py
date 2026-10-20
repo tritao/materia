@@ -196,8 +196,8 @@ class Model:
         return '\n'.join(lines+node_lines(self.nodes)+after)+'\n'
 
 
-def make_model(packet,pose,h):
-    model=Model(h);model.mode_count=packet.get('modeCount',20);beams=packet['beams'];parts={p['id']:p for p in packet['parts']};axes={a['axis']:a for a in packet['axes']}
+def make_model(packet,pose,h,model=None):
+    model=Model(h) if model is None else model;model.mode_count=packet.get('modeCount',20);beams=packet['beams'];parts={p['id']:p for p in packet['parts']};axes={a['axis']:a for a in packet['axes']}
     frame=[b for b in beams if b['id'] not in ('beam','zColumn')]
     # Welded RHS meet on their outer faces. Rigid centreline offsets represent the weld regions.
     base_mass=sum((b['widthMm']*b['heightMm']-(b['widthMm']-2*b['wallMm'])*(b['heightMm']-2*b['wallMm']))*norm(sub(b['startMm'],b['endMm']))*b['densityKgPerMm3'] for b in frame if b['id'].startswith('base/'))

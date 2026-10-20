@@ -84,8 +84,12 @@ Use a machine-grade, low-shrinkage, self-levelling epoxy whose supplier approves
 this layer range, sustained bolt/contact pressure, working temperature and cure
 conditions. [DIAMANT EP-Flow](https://diamant-polymer.de/en/product-overview/ep-flow/)
 is a sourcing candidate explicitly intended for self-levelling mechanical
-engineering supports; its product page does **not** establish our 2–6 mm layer
-qualification. Obtain that TDS/application confirmation and pour a full-length
+engineering supports. Its [public TDS, version 07/2022](https://diamant-polymer.de/en/wp-content/uploads/sites/2/diamant-technical-data-sheet-special-products-ep-flow.pdf),
+checked 2026-10-20, lists 57 MPa compressive strength, 8.5 GPa modulus,
+9:1 mixing by mass, 60 min pot life, and full cure in 24 h at 20 °C.
+It permits layers up to 100 mm but gives **no minimum layer or sustained
+rail-bolt contact/creep rating**. Those values do not qualify our 2–6 mm layer.
+Obtain the application confirmation and pour a full-length
 witness or representative coupon before release. Do not substitute decorative
 casting resin. [DWH 310 FL](https://diamant-polymer.de/en/shop/dwh/310-fl/)
 is a machine-interface replication candidate; its moulded-surface accuracy is
@@ -126,6 +130,57 @@ may be left hanging from jack screws or pulled into contact by mounting bolts.
 The same dimensional acceptance targets apply.
 
 ## Beam/feet and ordinary machine-shop work
+
+The **complete welded beam-and-both-feet unit** must be machined after relief
+and the rest/survey, not the beam and feet separately before welding. Both beds
+use the same bare unit: **2550.5 × 364 × 230 mm**, approximately **88.28 kg**
+before weld metal, machining allowance and fixtures. A 35 mm foot blank finished
+to 30 mm adds 5 mm raw height (235 mm bare unit) and about 2.63 kg before facing;
+confirm actual stock and face allowances with the shop. The 230 mm height includes
+the 200 mm beam and 30 mm feet. Quote the unit in every required orientation;
+allow approximately 2800 × 600 × 500 mm for support/clamping, subject to the
+shop's actual fixture. A 2 m table does not by itself provide the required travel.
+
+The foot welding detail uses two **8 mm fillets per foot**, along the two
+accessible RHS sidewall/foot intersections, **92 mm finished length each**.
+Use sacrificial run-on/run-off tabs at both ends of every run. After cooling,
+remove the tabs and blend without reducing the finished run or its full-size
+end sections. Inspect those end sections; without this verified detail the
+effective length loses one throat at each end and the qualification is invalid.
+At an outside beam end, the temporary tab assembly must continue **both**
+intersecting surfaces; a flat foot-plate extension alone does not develop a
+full-size weld beyond the terminating RHS sidewall. Confirm the tab arrangement,
+actual rolled RHS corner radii/root gap and effective throat with the WPS
+witness detail before releasing this joint.
+Do not claim an all-around weld: the nominal beam-end overhang beyond a foot
+edge is only 4 mm. The source-derived reaction model credits these two fillets
+and the finished 30 mm foot plate, not extra raw stock. The 8 mm leg gives a
+5.657 mm throat, below the 6.3 mm RHS wall; its larger size is a specific
+100-million-reversal fatigue correction, not the default for the frame.
+The middle post01/post11-to-table-stringer joints similarly use **6 mm legs**
+over their full accessible cope runs. On the **2600 bed**, these four 100 mm
+runs per joint also require run-on/off tabs and verified full-size finished
+ends; the 3150-bed assessment retains ordinary effective-end deductions.
+All remaining base groups retain 5 mm
+legs. Apply the balanced sequence and cooling requirements to these larger
+local details too; record WPS/access and full-size-tab witness acceptance.
+
+The signed shop checklist must name these faces and measurements:
+
+| Datum/feature | Machining and inspection requirement |
+| --- | --- |
+| A: both lower Y-carriage seating faces on the welded feet | Face from one transferred datum; combined coplanarity ≤0.02 mm across the 2450.5 mm carriage-centre span; local flatness ≤0.01 mm per bearing seat. |
+| B: the two front X-rail mounting lands | Face after relief; common-plane/straightness error ≤0.02 mm over the full 2132 mm rail length; land separation 150 mm ±0.02 mm. |
+| A to B | Perpendicularity ≤0.02 mm over 200 mm, measured with a calibrated square/indicator or equivalent survey. |
+| Foot reference edges and carriage hole coordinates | Locate from A/B and the measured centre span; supply the checked mating-block hole table. Do not locate the two sides independently from as-welded edges. |
+| Indexed setups, if required | Retain a common datum and overlap witness; transfer error ≤0.01 mm and final combined-face tolerances above still apply. Record readings before unclamping and after re-supporting. |
+
+Record the actual machine table, travel, supported overhang, fixture drawing,
+relief record, temperature and inspection readings against the unit identifier.
+If the shop cannot demonstrate these relationships across the welded unit, its
+machining release remains blocked; base epoxy levelling does not substitute for
+this operation. Final dual-Y squaring still uses the measured adjustment
+procedure below.
 
 The beam blank is about **2550.5 mm long**, so a nominal 2 m shop bed must not be
 assumed to face all datums in one uninterrupted travel. Ask the shop to confirm

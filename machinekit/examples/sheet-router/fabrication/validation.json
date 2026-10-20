@@ -1,45 +1,146 @@
 {
-  "status": "Geometry and service checks pass; weld-load/WPS qualification and supplier/shop checklist remain open",
+  "status": "132/132 reaction-qualified groups per bed at 100 million reversals; fabrication release remains gated on the listed shop/material/epoxy acceptances",
+  "fatigueCycles": 100000000,
   "beds": [
     {
       "workY": 2600,
       "pieces": 68,
-      "contacts": 172,
-      "seamSegments": 944,
+      "contacts": 158,
+      "seamSegments": 920,
       "geometryFindings": 0,
       "serviceAssertions": 185,
       "servicePass": true,
-      "weldGroups": 140,
-      "unresolvedWeldGroups": 38,
+      "preparedMassKg": 1022.294493721748,
+      "weldGroups": 132,
+      "failedWeldGroups": [],
+      "previousOpenGroups": 38,
+      "removedGrazingGroups": 10,
+      "maximumFatigueRangeMPa": 11.82504873037677,
+      "maximumFactoredStrengthMPa": 32.232098819476725,
+      "worstXYNPerUm": [
+        2.2066710236552396,
+        2.0499147222800223
+      ],
+      "firstSixModesHz": [
+        27.42951,
+        28.51464,
+        37.10049,
+        37.31998,
+        42.0521,
+        47.78021
+      ],
       "released": false
     },
     {
       "workY": 3150,
       "pieces": 68,
-      "contacts": 170,
-      "seamSegments": 904,
+      "contacts": 160,
+      "seamSegments": 880,
       "geometryFindings": 0,
       "serviceAssertions": 185,
       "servicePass": true,
-      "weldGroups": 138,
-      "unresolvedWeldGroups": 36,
+      "preparedMassKg": 1095.544304612322,
+      "weldGroups": 132,
+      "failedWeldGroups": [],
+      "previousOpenGroups": 36,
+      "removedGrazingGroups": 8,
+      "maximumFatigueRangeMPa": 12.431579856290682,
+      "maximumFactoredStrengthMPa": 32.11432948304197,
+      "worstXYNPerUm": [
+        2.1711695363457104,
+        2.0426122255207333
+      ],
+      "firstSixModesHz": [
+        26.98625,
+        28.1983,
+        36.34325,
+        37.62767,
+        38.3399,
+        42.07809
+      ],
       "released": false
     }
   ],
-  "assemblyAssertions": 426,
-  "assemblyNote": "Full two-bed sweep before lowering only the external stand bar from Z250 to Z75; final lowered-stand geometry then passed 185 native service/access probes per bed.",
-  "screenFixtures": [
-    "analytical axial throat stress",
-    "unresisted collinear moment fails closed",
-    "reversed-edge deduplication"
+  "fineStaticPosesPerBed": 9,
+  "coarseCriticalPosesPerBed": 3,
+  "meshesMm": [
+    50,
+    100
   ],
+  "motionConvergence": {
+    "status": "PASS",
+    "checks": [
+      {
+        "workY": 2600,
+        "timeStepToolDeltaMm": 8.789939918952064e-06,
+        "timeStepFatigueDeltaMPa": 0.00124239835310469,
+        "mode20To40ToolDeltaMm": 1.1205219465680247e-05,
+        "mode20To40FatigueDeltaMPa": 0.009393958830342886,
+        "maximumContourDeviationMm": 0.013236910521760025,
+        "maximumResidualMm": 0.013474476177600897,
+        "maximumDynamicWeldRangeMPa": 9.048752839765992
+      },
+      {
+        "workY": 3150,
+        "timeStepToolDeltaMm": 1.1265442481089849e-05,
+        "timeStepFatigueDeltaMPa": 0.0008368181470297387,
+        "mode20To40ToolDeltaMm": 6.250923278319537e-06,
+        "mode20To40FatigueDeltaMPa": 0.005775371245917205,
+        "maximumContourDeviationMm": 0.020089532961321765,
+        "maximumResidualMm": 0.012840839410402441,
+        "maximumDynamicWeldRangeMPa": 9.08826279053326
+      }
+    ]
+  },
+  "nativeExporterAssertions": {
+    "mill": 33,
+    "router": 7
+  },
+  "effectiveLengthAndLifeRegressions": 7,
+  "assemblyAssertions": 426,
+  "assemblyNote": "Historical full assembly sweep before lowering only the external stand bar from Z250 to Z75; final prepared geometry subsequently passed 185 native service/access probes per bed. The new native cover/setter sweep is recorded separately under SR7.",
+  "evidenceArchive": "build/sheet-router-evidence/sr6-qualified.tar.gz",
   "sourceHashes": {
     "machinekit/examples/sheet-router/SheetRouter.hx": "9ab201cf7661bf8489da05b87f9d10484594acbd422ed7609134f6634d266ff7",
-    "machinekit/examples/sheet-router/SheetRouterFramePreparation.hx": "22b6d017b6388fca6867ccacd4d6e21f0ebec0684c4bb6cff096f15b04f96097",
+    "machinekit/examples/sheet-router/SheetRouterSpec.hx": "e9bd8a9ea938fc77e67469086a3689412777b749ef6d6454901bb324bb578ca3",
+    "machinekit/examples/sheet-router/SheetRouterFramePreparation.hx": "c20a2ea5f623074fbf52cfd433c98911a37e62add715e93bd2c668723dab7f30",
+    "machinekit/examples/sheet-router/SheetRouterFemExport.hx": "07db92e25561bf5c38050ea31df4dbd73f8df986c5b756b3b39a7b39ee97a4f5",
+    "machinekit/examples/sheet-router/SheetRouterFabrication.hx": "4348c101f416898ff416e2e24ed755a4c995087097662191c8009df9adadc66a",
     "machinekit/examples/sheet-router/SheetRouterServiceChecks.hx": "f09908e39c963ca4bc9736c3ec64dbf25466a979122b2f2b3cef63bcfdfdd4c7",
     "machinekit/examples/sheet-router/SheetRouterServiceTable.hx": "80b8170580b205750a96d20094aea1993a14350c6a2f8c139527e1041039b354",
     "machinekit/examples/sheet-router/SheetValveServiceStand.hx": "5da810e358215045d4ef48c617c497a7a4a684293ba4f0178769df166ad4b2b4",
-    "machinekit/examples/sheet-router/SheetRouterFabrication.hx": "4348c101f416898ff416e2e24ed755a4c995087097662191c8009df9adadc66a"
+    "machinekit/examples/sheet-router/fabrication/detail.py": "e7299cb08129d4d788c3d44c09ba7823a82bc03e33e4dc3a79c68b5beafc2b2d",
+    "machinekit/examples/sheet-router/fabrication/render.py": "9d40cd54725b3d57c66c795faa3b719b5f02ed3a89ea8639e652bf606a976520",
+    "machinekit/examples/sheet-router/fem/study.py": "069642aa57b4ed203d6f5959cfb6fe1a82e494e7cf72a7189a257404eaf64ef1",
+    "machinekit/examples/sheet-router/fem/qualify_welds.py": "d411defc1a955c10b9e2734d2ad93c8e1dc1479ec875d943286e431a7b9c5354",
+    "machinekit/examples/sheet-router/fem/check-welds.sh": "9b6c18139b5fbca1e0a43e5bc5116bcf34b3590a4f24c484b40e004d78fca30a",
+    "machinekit/examples/sheet-router/fem/weld_checks.py": "cd3b25dfdfa0b5c2d69b61ddd1c21f178eaa9b2e809501f131ae212469ce3b34",
+    "machinekit/examples/sheet-router/fem/weld_convergence.py": "172ef191d2388a8236281e5ab5627cde524146a317a46594d2122091718c5cd6",
+    "machinekit/examples/sheet-router/fem/weld_dynamics.py": "3b297aff01b4c4adf3ccb622990d8dd3a82763a38f618bcd63d0924dc71ee98e",
+    "machinekit/examples/sheet-router/fem/weld_effective.py": "1692dbaf7d306f3bab9a7ed447d320d2f2b47bca5ad517563f0992d57dd6779d",
+    "machinekit/examples/sheet-router/fem/weld_model.py": "98cd794f7a7966468439f10f784cecbd043015bd259932b12b59253eb2d8d8d1",
+    "machinekit/examples/sheet-router/fem/weld_motion_checks.py": "ac921811f53ac82024802e0d1b6e65df87a60551920f85dc986688116cce2766",
+    "machinekit/examples/sheet-router/fem/weld_qualification.py": "3278f393fc4303ca61bcfa73877443b6aa34b61101ffb7b3f6511fd0b6a94688",
+    "machinekit/examples/sheet-router/fem/weld_report.py": "c04b2cd101b02d95255b8fbfa664e24b43701a19c537a1602f0c77c4a5212944"
   },
-  "evidenceArchive": "build/sheet-router-evidence/sr6-diy.tar.gz"
+  "wrenchFixture": {
+    "forceRelativeError": 3.046309237639934e-08,
+    "momentRelativeError": 1.1676713131814628e-07,
+    "recoveredForceN": [
+      -300.0,
+      -399.99998000000005,
+      -500.00000800000004
+    ],
+    "recoveredMomentNmm": [
+      -10000.000560185332,
+      -20000.00210016656,
+      -29999.996210028898
+    ]
+  },
+  "nativeConsistency": {
+    "staticPackets": 24,
+    "maximumRelativeForceImbalance": 0.0002024050651349766,
+    "maximumArtificialEnergyFraction": 4.129964595203592e-05,
+    "maximumModalEnergyRelativeError": 0.00994634683440454
+  }
 }

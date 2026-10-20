@@ -14,31 +14,43 @@ and extracts seams from the prepared B-rep contacts. Both beds have 68 pieces:
 
 | Bed Y | Joined contacts | Native seam segments | Geometry findings |
 | --- | ---: | ---: | ---: |
-| 2600 | 172 | 944 | 0 |
-| 3150 | 170 | 904 | 0 |
+| 2600 | 158 | 920 | 0 |
+| 3150 | 160 | 880 | 0 |
 
 These replace the initial square-ended packet's eighty unresolved weld
 annotations and zero seams. Native edge counts are not weld instructions.
-`weld-stitches.csv` selects nominal 5 mm legs and starts with 40 mm opposed
-stitches, increasing extent only where the preliminary capacity screen requires
-it. Flush Butt edges are excluded rather than assigned imaginary fillets.
+`weld-stitches.csv` records the physical selected runs and their actual leg
+sizes/end requirements. Flush Butt edges are excluded rather than assigned
+imaginary fillets. Deliberate 1 mm cope clearances remove grazing contacts
+between crossmembers/plan braces and posts, and end braces and upper rails.
 
-**Weld qualification remains open.** The conservative screen uses 5 kN force and
-arbitrary-direction family moments of 0.1 kNm (brace), 0.25 kNm (table/rack) and
-0.75 kNm (post/frame), with an assumed 80 MPa throat-stress limit. These are
-engineering screening allocations, not extracted joint loads or a qualified
-WPS. 38 short-bed and 36 long-bed short/collinear seam groups do not pass this
-allocation, even at their full available length. `weld-detail.json` identifies every failed group and retains
-null stress where an arbitrary moment is unresisted. Resolve with verified
-joint-load directions and/or a detailed connection before shop release; do not
-increase bead size or silently waive a failed group.
+**Qualification uses extracted joint reactions.** The original arbitrary-moment
+screen's 38/36 open groups are mapped by stock names in each per-bed
+`weld-qualification.json`. That allocation remains historical extent-selection
+evidence in `weld-detail.json`; it does not decide strength after actual
+reactions are available. The separate prepared-stock model checks every
+physical piece-pair weld, all nine full-Z static poses per bed, and a modal
+dynamic envelope at the governing pose. It credits 130 base weld groups and
+the two beam-foot groups on each bed.
+
+Use **100 million full-load reversals**, 3 m/s² plus the cutting allowance,
+FAT36/FAT80 detail categories and the conservative **12.669 MPa** FAT36 cut-off.
+The per-group CSV records leg, throat, range, limit and pass/fail. Required
+corrections are full post/stringer runs, 6 mm middle post/stringer fillets
+(tabbed full-size ends on the short bed), and two 92 mm, 8 mm-leg tabbed fillets
+per beam foot. The gantry CSV uses local coordinates from the beam's left end,
+beam Y centreline and lower foot datum. Follow
+[WELD_QUALIFICATION.md](WELD_QUALIFICATION.md) for the model, sources, effective
+lengths, actual load cases and limitations. No full-penetration or higher
+fatigue-category upgrade is assumed.
 
 The prepared steel mass is approximately 1022.3 kg (short) and 1095.6 kg (long),
 using 7850 kg/m³. Removing intersecting interior metal reduces the original
 fixed-frame union mass by approximately 69.1/73.2 kg. The frozen beam-centreline
-model does not represent this local connection preparation or certify its weld
-stiffness. The prior full structural rerun remains evidence for the frozen
-layout, not a strength qualification of these draft connections.
+model does not represent this local connection preparation. The reaction model
+replaces those merged frame joints with separate prepared stocks and spatial
+weld springs; the prior full structural rerun remains evidence for the frozen
+layout, not the source of the new local weld reactions.
 
 ## DIY fabrication and metrology
 
@@ -47,8 +59,10 @@ balanced short stitches, thermal relief (VSR fallback), rest and repeat survey,
 epoxy-levelled or adjustable rail seats, rails, measured squaring, then SR6-C.
 The procedure includes furnace envelope/payload, 2–6 mm proposed epoxy layers,
 steel rail-bolt threads, alignment instruments and tolerances. Resin application
-approval and witness qualification remain required. The beam/feet go separately
-to an ordinary shop; its actual travel and indexed datum transfer must be agreed.
+approval and witness qualification remain required. The complete relieved
+**2550.5 × 364 × 230 mm, 88.28 kg** welded beam-and-feet unit goes separately
+to an ordinary shop. Its actual travel/support and indexed datum transfer must
+meet the named A/B face tolerances in the checklist.
 
 Two bolted/dowelled foot models were checked at both beds' modal and static-X/Y
 governing poses. The improved machined-face candidate still gives only
@@ -100,5 +114,6 @@ seat/alignment and SR6-C modal measurements are later build witnesses. Never
 replace those measurements with simulated sign-offs.
 
 Condensed check results and source identities: [validation.json](validation.json).
-Full native STEP, solver and run-log evidence is retained in
-`build/sheet-router-evidence/sr6-diy.tar.gz` (extracts as `sr6-diy/`).
+The earlier DIY draft remains in `build/sheet-router-evidence/sr6-diy.tar.gz`.
+The reaction-qualified native STEP, solver and run-log evidence is retained in
+`build/sheet-router-evidence/sr6-qualified.tar.gz` (extracts as `sr6-qualified/`).

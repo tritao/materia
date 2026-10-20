@@ -275,6 +275,11 @@ machined.**
   VSR fallback; rest and repeat surveys before continuous epoxy-levelled rail seats.
   No large machining centre for the base. Adjustable jack-screw/shim pads are the alternative.
   [DIY_ROUTE.md](fabrication/DIY_ROUTE.md) specifies pour, metrology and release gates.
+- Fatigue duty approved 2026-10-20: **100 million full-load reversals**, using
+  3 m/s² inertia plus the cutting allowance. Apply the EN 1993-1-9 FAT36
+  variable-amplitude cut-off (12.669 MPa with γMf=1.15), not the provisional
+  ten-million-cycle duty. Qualified reaction tables and required 6/8 mm local
+  details are in [the weld packet](fabrication/WELD_QUALIFICATION.md).
 - Filling the tubes for damping (sand or a polymer concrete) is decided by SR5 modal results, not
   up front.
 - Gantry side plates, Z plate and bearing plates are laser-cut steel or aluminium plate with
@@ -863,8 +868,21 @@ shop-confirmed travel or controlled indexed datum transfer. Retain welded feet:
 the screened four-quadrant machined bolted joint gives only 1.909 N/µm long-bed
 Y and fails SR-D3. See [joint screen](fem/diy-feet-results.json) and
 [DIY procedure/checklist](fabrication/DIY_ROUTE.md). Prepared tube contacts now
-produce real seams on both beds, but the preliminary arbitrary-moment weld
-screen has unresolved groups; fabrication remains explicitly unreleased.
+produce real seams on both beds. Actual reaction qualification passes all
+**132 weld groups per bed** at the approved 100-million-reversal duty: all nine
+full-Z static poses, three critical coarse-mesh poses, and governing-pose
+dynamic histories with 20/40 modes and 0.5/0.25 ms time steps. The original
+38/36 open groups become 28 reaction-qualified groups per bed plus 10/8
+deliberate non-weld cope clearances. No life or fatigue category is relaxed.
+
+**SR6 release remains gated**, rather than marked complete: qualified WPS/access
+and tabbed-end/parent-metal detail acceptance; steel identity and relief route;
+supplier approval/witness for the 2–6 mm epoxy rail seats; and shop confirmation
+of whole-unit beam/feet machining and datum-transfer capability. The signed
+checklist must cover the relieved **2550.5 × 364 × 230 mm, 88.28 kg** welded
+unit and the A/B faces/tolerances in the DIY procedure. Measured build witnesses
+and SR6-C still follow fabrication. Continue SR7/SR8 while these shop facts are
+open; do not release fabrication files by replacing them with simulated sign-offs.
 
 ### Phase B: machine behaviour in simulation
 
@@ -1134,7 +1152,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR4 | revised two-bed drive/rack/screw screen complete; 82 sizing/planner assertions pass | see guide-first revision |
 | SR5 | complete: 36-case raised-datum/extra-leg rerun and new-mode motion check pass; structure frozen | see FEM diagnosis |
 | SR6-C | planned: measured modes/damping and shaper tuning before cutting acceptance | SR13/SR16 gate |
-| SR6 | prepared frame: 68 pieces/bed, valid connected seam graph; DIY relief/rail-seat/alignment procedure and service routing drafted; conservative weld-load screen fails some joint groups, so shop release remains gated | [fabrication packet](fabrication/README.md) |
+| SR6 | reaction qualification passes 132/132 weld groups per bed at 100 million reversals; geometry/service checks pass and metrology method is documented; fabrication release blocked on the named WPS, material/relief, epoxy and whole-unit machining acceptances | [fabrication packet](fabrication/README.md) |
 | SR7 | planned | |
 | SR8 | planned | |
 | SR9 | planned | |

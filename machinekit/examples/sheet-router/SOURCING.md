@@ -20,8 +20,10 @@ per-move ZVD is the router fallback. SR6-C commissioning must measure modes and
 damping, tune the shaper and re-check the motion budget before cutting acceptance.
 The full raised-datum plus leg-pair rerun passes the revised model requirement;
 freeze the overall structure for SR6. See PLAN SR-D3, `fem/sr-d3-results.json`,
-and the current rerun record in `fem/README.md`. Prepared seam graphs now pass geometry checks; weld-load/WPS qualification and
-shop release remain open in `fabrication/README.md`.
+and the current rerun record in `fem/README.md`. Prepared seam graphs and
+132/132 reaction-qualified weld groups per bed pass the 100-million-reversal
+screen. WPS/detail, material/relief, epoxy and shop-machining acceptances still
+gate fabrication release in `fabrication/README.md`.
 
 ## DIY fabrication route (user-approved 2026-10-20)
 
@@ -38,6 +40,15 @@ long-bed worst Y versus 2.044 welded, failing SR-D3 despite the DIY advantages.
 Use an ordinary shop for the separate 2550.5 mm beam/feet, checking bed/travel and
 indexed datum transfer. Full method and numerical tolerances:
 [fabrication/DIY_ROUTE.md](fabrication/DIY_ROUTE.md).
+
+SR6 weld duty is **100 million full-load reversals** at 3 m/s² plus the cutting
+allowance. Use the FAT36 variable-amplitude cut-off, 12.669 MPa with γMf=1.15;
+do not retain the provisional ten-million-cycle basis. The reaction-detail
+corrections are full post/stringer runs, 6 mm legs at the middle post joints
+(full-size tabbed ends on the short bed), and two accessible 92 mm, 8 mm-leg
+fillets per beam foot with full-size tabbed ends. No all-around beam-end fillet
+is credited. See [qualification basis](fabrication/WELD_QUALIFICATION.md) and
+the full relieved-unit machining envelope/faces in the DIY checklist.
 
 ## Guides
 
@@ -207,7 +218,8 @@ mode-energy and sensitivity tables in [fem/README.md](fem/README.md).
 
 
 The working follow-up uses a 40 mm flat X plate, 30 mm steel feet continuously
-welded to the beam footprint (6 mm nominal fillet), and two closed 25 × 120 × 6 mm
+welded to the beam footprint (the historical 6 mm fillet is superseded by the
+SR6 tabbed 8 mm detail above), and two closed 25 × 120 × 6 mm
 side sections on the 20 mm Z web. The frame receives sixteen RHS 80 × 80 × 4
 braces. Built-up aluminium joints, heat treatment and subsequent rail-seat
 machining need manufacturing qualification. The router compiles against HEAD in an isolated detached worktree and both

@@ -4,15 +4,15 @@
   "digitalChecks": {
     "preparedSeams": true,
     "serviceAccess": true,
-    "weldStrengthScreen": false,
-    "diyProcedure": true
+    "diyProcedure": true,
+    "weldReactionQualification": true
   },
   "pending": [
-    "Actual joint-load allocation and WPS/access review; resolve every failed strength-screen group",
+    "Qualified WPS/access and full-size tabbed-end acceptance; parent-metal/toe detail review",
     "Steel identification and heat-treater cycle/payload confirmation, or approved VSR procedure",
-    "Selected machine epoxy TDS approves 2\u20136 mm layer/contact pressure and cure; witness-pour qualification",
-    "Shop confirms supported beam length/travel and indexed datum-transfer tolerances",
-    "Shop-release review signed against the exact prepared STEP/seam/service packet hashes"
+    "Epoxy supplier approval of 2\u20136 mm layer and sustained rail contact pressure/creep, plus witness pour",
+    "Shop confirms whole welded beam-and-feet unit travel/support and datum-transfer tolerances",
+    "Shop-release review signed against the exact STEP/seam/service/qualification packet hashes"
   ],
   "buildWitnesses": [
     "Thermal/VSR before-after-rest dimensional records",
@@ -20,5 +20,6 @@
     "Rail parallelism/diagonals/dual-Y homing records",
     "SR6-C measured modes/damping and motion-error recheck"
   ],
-  "sourceSha256": "12f73ba059cc8a0000fa738460e7b2ac2b4ff24a56fe2ea90f69cbe2add3a394"
+  "sourceSha256": "81cb133104cb8bfe7270ea4047bd78768ab276575feaa93c9c7ea7e99a049d42",
+  "reactionQualification": "weld-qualification.json"
 }

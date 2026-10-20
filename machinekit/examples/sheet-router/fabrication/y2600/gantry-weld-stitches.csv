@@ -1,0 +1,5 @@
+group,seam,leg_mm,throat_mm,length_mm,start_x,start_y,start_z,end_x,end_y,end_z,full_size_ends,instruction
+GFL,GFL-1,8,5.65685424949238,92,4.0,-50.0,30.0,96.0,-50.0,30.0,True,Sacrificial run-on/off tabs; verify full-size finished ends; alternate left-front/right-rear/left-rear/right-front; cool per WPS
+GFL,GFL1,8,5.65685424949238,92,4.0,50.0,30.0,96.0,50.0,30.0,True,Sacrificial run-on/off tabs; verify full-size finished ends; alternate left-front/right-rear/left-rear/right-front; cool per WPS
+GFR,GFR-1,8,5.65685424949238,92,2454.5,-50.0,30.0,2546.5,-50.0,30.0,True,Sacrificial run-on/off tabs; verify full-size finished ends; alternate left-front/right-rear/left-rear/right-front; cool per WPS
+GFR,GFR1,8,5.65685424949238,92,2454.5,50.0,30.0,2546.5,50.0,30.0,True,Sacrificial run-on/off tabs; verify full-size finished ends; alternate left-front/right-rear/left-rear/right-front; cool per WPS

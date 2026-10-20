@@ -3,6 +3,9 @@ import argparse,csv,hashlib,json,math
 from collections import defaultdict
 from pathlib import Path
 import numpy as np
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'fem'))
+from weld_effective import effective_stitches
 
 
 def weld_stitches(seams,on):
@@ -49,18 +52,30 @@ def main():
             moment=100000 if any('Brace' in n for n in names) else 250000 if any(n.startswith(('table','rackCross')) for n in names) else 750000
             selection=None;check=None
             for on in (40,60,80,120,10000):
+                if any(n.startswith('post') for n in names) and any(n.startswith('tableSide') for n in names) and on<10000:continue
                 selection=weld_stitches(seams,on);check=capacity(selection,5000,moment)
                 if check['passes']:break
             id=f'W{index:03d}';rows.append(dict(id=id,stocks=names,forceEnvelopeN=5000,momentEnvelopeNmm=moment,nominalOnMm=on if on<10000 else None,
                 extent='continuous available eligible edges' if on==10000 else f'{on} mm stitches at <=120 mm spacing',
                 strengthScreen=check,excludedFlushButtEdges=sum(s['type']=='Butt' for s in seams),sequence='tack all; opposite sides/faces; centre-out; interpass cooling',
                 qualification='Conservative joint-family load allocation; actual load-path/WPS shop review required'))
-            for stitch in selection:stitches.append(dict(group=id,**stitch))
+            for stitch in selection:
+                # Reaction qualification requires 6 mm here for 1e8 reversals.
+                # Preserve the full available cope runs; all other base groups
+                # retain the nominal 5 mm legs.
+                if any(n in ('post01','post11') for n in names) and any(n.startswith('tableSide') for n in names):
+                    stitch['legMm']=6
+                    if bed==2600:stitch['fullSizeEnds']=True
+                stitches.append(dict(group=id,**stitch))
+            rows[-1]['legMm']=selection[0]['legMm'] if selection else 5
+            rows[-1]['fullSizeEnds']=bool(selection and selection[0].get('fullSizeEnds',False))
+            rows[-1]['qualification']='Extent-selection screen only; actual reaction qualification and WPS/access acceptance govern release'
         def write(name,header,records):
             with (folder/name).open('w',newline='') as f:
                 w=csv.writer(f,lineterminator='\n');w.writerow(header);w.writerows(records)
-        write('weld-stitches.csv',['group','seam','leg_mm','length_mm','start_x','start_y','start_z','end_x','end_y','end_z'],
-              [[s['group'],s['seam'],s['legMm'],s['lengthMm'],*s['a'],*s['b']] for s in stitches])
+        stitches,rejected_runs=effective_stitches(data,stitches,physical_only=True)
+        write('weld-stitches.csv',['group','seam','leg_mm','length_mm','start_x','start_y','start_z','end_x','end_y','end_z','full_size_ends'],
+              [[s['group'],s['seam'],s['legMm'],s['lengthMm'],*s['a'],*s['b'],str(s.get('fullSizeEnds',False)).lower()] for s in stitches])
         # Alternate opposite frame quadrants; issue only one stitch per joint per
         # round, so a complete joint is never finished before its opposing bays.
         middle=np.mean([r['strengthScreen']['centroidMm'] for r in rows if r['strengthScreen']['centroidMm'] is not None],axis=0)
@@ -81,8 +96,8 @@ def main():
                         id=active[quadrant].pop(0)
                         if queues[id]:order.append([len(order)+1,round_number,id,queues[id].pop(0),'alternate faces; cool per WPS; survey after round'])
         write('weld-sequence.csv',['run','round','group','stitch_csv_row','instruction'],order)
-        result=dict(workY=bed,sourceSha256=hashlib.sha256(source.read_bytes()).hexdigest(),groups=rows,
-            basis='5 mm legs, 80 MPa assumed weld-throat stress screen, F=5 kN; moments 0.1 kNm brace/0.25 table/0.75 post-frame. Uses actual selected 3D seam-line inertia; not a code/WPS certification.',
+        result=dict(workY=bed,sourceSha256=hashlib.sha256(source.read_bytes()).hexdigest(),groups=rows,rejectedShortRuns=rejected_runs,
+            basis='Historical extent-selection screen uses 5 mm legs and 80 MPa, F=5 kN; moments 0.1 kNm brace/0.25 table/0.75 post-frame. Actual leg sizes/end requirements are in each group and weld-stitches.csv. Reaction qualification supersedes the arbitrary load allocation; not a WPS certification.',
             failedGroups=[r['id'] for r in rows if not r['strengthScreen']['passes']])
         (folder/'weld-detail.json').write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
         digital=dict(preparedSeams=not data['seamDiagnostics'] and bool(data['seams']),serviceAccess=data.get('serviceAccess',{}).get('status')=='service access checks pass',
