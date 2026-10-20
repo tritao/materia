@@ -523,12 +523,13 @@ packages are regenerated.
 - `FoundationToolingAdapter` becomes a copy: neutral records, plus hole interfaces
   converted to neutral hole records, fingerprinted. It infers nothing.
 - One exact disjoint-box algebra lives in `materia.casting`. It replaces both
-  ManufacturingKit's `BoxVolumes` (fill analysis) and the hobber branch's
+  ManufacturingKit's `BoxVolumes` (fill analysis) and the hobber's
   `machinekit.structural.CastingCells` (collision hulls, section stiffness), so
   collision, stiffness screening and fill analysis share one implementation.
 
-This is the single casting tooling plan. The `flexspline-hobber` branch's
-`machinekit/CASTING_TOOLING_PLAN.md` (CT0–CT10, unimplemented) is superseded; its
+This is the single casting tooling plan. The hobber's
+`machinekit/CASTING_TOOLING_PLAN.md` (CT0–CT10, unimplemented) is superseded and
+is deleted in phase 7 step 1; its
 replication-relationship, fixture-constraint, batch and printed-piece decisions
 are folded in here (interface requirements, insert fixtures, fill analysis and
 deferred scope).
@@ -564,6 +565,10 @@ pose stored in a JSON text parameter.
   beyond the body only across declared openings, by no fixed margin; a declared
   opening the cut does not reach, or a breakout through an undeclared face, is
   an error. CAD realization still extends tools internally for robust booleans.
+  Openings are declared by the source; computing reached faces is a diagnostic,
+  never how a feature gets its openings. Body faces have stable IDs per envelope
+  prism and face, so coplanar-normal faces (the column's foot side and body side)
+  never share an ID.
 - Consumers that support only boxes report a non-box finished cavity as
   Unsupported with its feature ID until step 3, never approximating it.
 - `MineralFoundation` generates insert recesses from its inserts with
@@ -652,20 +657,36 @@ specifications. Shared feature patterns (open underside pocket grids, foot acces
 with stem, recesses beside guide seats, retained webs and backing) live in one
 builder in `machinekit.structural`.
 
-- The foot pattern starts from the hobber branch's `CastingFootPocket`
+- The foot pattern starts from the hobber's `CastingFootPocket`
   (side-access pocket, removable plate bearing up against a registered roof,
   stem clearance, reserved boss) with its constants as parameters, reconciled
   with the mill's foot access and stem. The plate register is an
   `InterfaceRecess` owned by the removable plate.
 - One levelling-foot component family replaces the overlapping `LevellingFoot`,
-  `MillLevelingFoot` and the branch's `LevelingFoot`/`LevelingSeat`, with variants
+  `MillLevelingFoot` and the hobber's `LevelingFoot`/`LevelingSeat`, with variants
   for screw, pad, removable plate and nuts.
-- On main, phase 7 converts the mill. Main's `machinekit.hobbing.FoundationLayout`
-  is the superseded HB5 layout; the `flexspline-hobber` branch has rewritten it,
-  so the hobber foundations convert when that branch rebases onto phase 7, not
-  twice. That rebase also deletes `LegacyFoundationRecipes`, the
-  `hobbing.MineralFoundation` compatibility adapter and the `legacy` layout flags,
-  and adopts typed roles and labels.
+- The hobber is on main (merged at 28c395bd8) without conversion, so phase 7
+  step 1 converts the mill and the hobber together: one feature type and one box
+  algebra hold on main, not after a later rebase. `FoundationLayout` builds typed
+  features through the shared builder with declared kinds, openings, owners,
+  adjustable dimensions and `derivedFrom` fragments; its `legacy` flags and
+  branches go. `CastingFeatures`, `CastingCells`, `CastingFootPocket`,
+  `LegacyFoundationRecipes` (with `decodeLegacyBaseline` and the HB5 recipe
+  tests) are deleted, and baseline reports are regenerated rather than read in
+  an old format. `hobbing.MineralFoundation` and `hobbing.FoundationIntegrity`
+  fold into the structural classes: bed and column are configured structural
+  foundations, and rail coplanarity waits for step 2 as a declared
+  `InterfaceRelationship` instead of hobber code. Inserts get typed roles and
+  finishes directly, threaded holes through `InsertHoles`, and labels without
+  hardware data.
+- Cast-in fixing sockets (`CastInFixingSocket`, round catalogue sockets) are an
+  insert body variant in `materia.casting.InsertSpec` (box or cylindrical body,
+  plus the same hole records), not a second insert component. A given anchor is
+  modelled one way: the hobber tray anchors are sockets, not also box seats. The
+  socket fixture becomes an input to the shared insert-fixture planner beside
+  `DatumFixtures`: plate size, sites and clamps derive from the foundation's
+  inserts, the demould order comes from the planner's removal sequence, and
+  `SocketFixturePlanner` keeps only socket-specific geometry.
 
 ## Generation pipeline
 
@@ -1186,7 +1207,9 @@ design model, in three steps:
    adjustable dimensions and `derivedFrom`; shared vocabulary and the one box
    algebra in `materia.casting`; insert holes through `DesignInterfaces`; typed
    finish; named mill layout parameters, the shared feature builder and one
-   levelling-foot family; the adapter reduced to a copy. Geometry stays box-only.
+   levelling-foot family; the adapter reduced to a copy; the hobber foundations
+   and fixing sockets converted and their legacy types deleted. Geometry stays
+   box-only.
 2. **Requirements.** Interface requirements with the allowance in the casting
    geometry; interface relationships with axis members, replication jigs and
    metrology; insert-fixture constraint checks; the datum scheme, lifting inserts
@@ -1195,9 +1218,12 @@ design model, in three steps:
    drawings, CAM and the phase 6 analyses.
 
 Acceptance: after step 1 the mill base and column rebuild with zero symmetric
-difference against their previous CAD; fill, collision hulls and section
-stiffness give identical results through the shared box algebra, and fragments
-group by `derivedFrom`. `MillMoldSetup` has no
+difference against their previous CAD, and so do the hobber bed and column;
+fill, collision hulls and section stiffness give identical results through the
+shared box algebra, and fragments group by `derivedFrom`. A body the box hull
+cannot represent reports its collision hull Unsupported rather than omitting it.
+`CastingFeatures`, `CastingCells`, `CastingFootPocket`, `LegacyFoundationRecipes`
+and the hobber `MineralFoundation`/`FoundationIntegrity` no longer exist. `MillMoldSetup` has no
 feature-ID strategy table, and an override names its feature explicitly. No code
 outside the shared finished-cavity function clips design cuts; an unreached
 declared opening, or an undeclared breakout, is rejected. A column cut crossing
@@ -1219,9 +1245,8 @@ unchanged. Castability proposals change only adjustable dimensions.
 Add the column setup, stepped/flared envelope support, intersecting channels and
 side-removal details on the phase 7 model. Add an independent structure using
 the shared planner with different dimensions, insert layout and opening direction.
-If the `flexspline-hobber` branch has landed on the phase 7 model, that is the
-hobber's monolithic plinth (930 × 800 × 800 mm) and column, including the C-axis
-replication relationships; otherwise a small mineral-cast pedestal example.
+The independent structure is the hobber's monolithic plinth (930 × 800 × 800 mm)
+and column on the phase 7 model, including the C-axis replication relationships.
 
 Acceptance: both selected mill foundations generate complete review packages;
 the pedestal uses shared records/joints/planner with configuration only. Changing
@@ -1397,3 +1422,41 @@ The actual foundation symmetric difference is zero. Review and coupon archives
 are regenerated from the verified parent manifest; no physical trial is recorded.
 The optional broad recipe-contract run still needs the external HGH15CA reference
 asset; the default casting suite and native/full tooling checks pass without it.
+
+## Follow-up review: 1bf30dc87 and the hobber merge
+
+Phase 7 step 1 continues from here. First restore main: the MachineKit tooling
+suite fails at `FoundationToolingTests.hx:278` ("Array index out of bounds")
+after the hobber merge, most likely in the hobber bed/column equivalence checks.
+
+- [ ] Source contracts 1–7: callers declare openings, and `reachedOpenings` is
+  diagnostic only; unique body-face IDs per prism and face; flared or chamfered
+  bodies report collision hull Unsupported, and material residue names the
+  feature, not the envelope prism; delete `ToolingRecipe.hardware.insertBoreDiameter`
+  and derive bores from holes; consumers read full `InsertHole` records with
+  frames, not `InsertHoleGeometry.diameter()`; one stored hole encoding (no
+  `depth:null` sentinel, frames not overwritten, real minimum wall, clearance and
+  engagement from the thread spec, not 0.001 placeholders) and multi-hole patterns;
+  finish tokens from `InsertFinish`, as roles already are.
+- [ ] Mill layout 8–12: the remaining MillFrame literals (90/100/40, 20/20/42,
+  160, 80, 22/11, 100, the `-1`/`+2` overshoot margins, `rearBayDesignClearance`,
+  the "M12" literal) become named details or declared openings; thread sizes are
+  typed specs, not strings; callers use the shared foot/underside/retain patterns
+  or the patterns are deleted; one envelope from `MineralCasting.castingEnvelope()`
+  (no rebuild in MillFrame, MillPedestal or MineralFoundation); delete dead
+  `recessLinks`, `ToolingCodec.readFeature` and the `ToolingPrism` alias.
+- [ ] Setup 13–15: delete the MillMoldSetup ID-keyed strategy table in favour of
+  recipe rules on kind and openings, with overrides naming their feature; draft
+  comes only from `feature.draft` (remove setup `draftDegrees`), and corner radius
+  from `feature.cornerRadius`; compare kinds as `InsertRecess`, not strings; typed
+  adjustable dimensions; retained webs and backing subtracted through the algebra
+  with fragments grouped by `derivedFrom` in cores and castability.
+- [ ] Hobber conversion 16–19: as under layout parameters above; regenerate
+  `BASELINE_FOUNDATIONS.json`; delete `machinekit/CASTING_TOOLING_PLAN.md`; fix
+  `machinekit/README.md` (CastingFeatures description, legacy read path).
+- [ ] Tests 20–22: verify the frozen STEP SHA from `reference.json` and decompress
+  natively, without python3; run the sloped-foot cavity through each box-only
+  consumer (fill, sections, planner) and assert Unsupported by feature ID; fragment
+  ID stability under unrelated edits and change under geometry edits; reject old
+  feature and tooling document versions.
+
