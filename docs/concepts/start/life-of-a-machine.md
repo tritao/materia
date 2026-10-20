@@ -261,15 +261,13 @@ PROJECT_SOURCE_ONLY=gantry ./haxeon/scripts/haxeon run --project app/tests/proje
 
 ## Open questions
 
-Writing this page exposed points the concept pages need to settle:
+Writing this page raised four questions. All four are now answered in
+[Conventions](../foundations/conventions.md):
 
-- **Coupling direction.** Assemblies write `follower = leader × ratio + offset`.
-  RobotKit transmissions write `joint = offset + actuator / ratio`. Both are
-  correct, but the docs need one statement of which side is which.
-- **Joint-axis convention.** The MachineKit README says joints act along the
-  connector's +Y. The gantry's sliding mates instead pass an explicit world axis
-  on world-aligned connectors. Pick one rule, or document both.
-- **Joint zero.** Robot-model joint zero is the authored starting pose, not the
-  CAD zero. [Frames and transforms](../foundations/frames.md) should say so.
-- **Units at the seam.** Millimetre assemblies and SI robots are converted in
-  one place. [Conventions](../foundations/conventions.md) should name it.
+- **Coupling direction**: couplings and transmissions use the same ratio
+  (motor-side units per axis-side unit), written from opposite sides.
+- **Joint axis**: a unit axis in the parent connector frame, +Y by default.
+  `AxisBuilder` uses world-aligned connectors, so its axes are world directions.
+- **Joint zero**: robot-model joint zero is the authored initial pose.
+- **Units at the seam**: `AssemblySimulationBridge.toRobotModel` converts
+  millimetre assemblies to SI.

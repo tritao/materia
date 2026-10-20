@@ -86,8 +86,11 @@ pressure Pa and pressure-area force N. Saved MachineAssembly descriptions use
 one current schema version; old schemas are rejected.
 
 Connector frames use the CadKit joint convention: mated frames coincide, and
-revolute or prismatic joints act along the frame's +Y axis. Component CAD
-frames put their axis along +Z, and every connector's +Y points along +Z.
+revolute or prismatic joints act along a unit axis in the parent connector
+frame, +Y unless the mate names another (`addMateOnAxis`). Component CAD frames
+put their axis along +Z, and every connector's +Y points along +Z. `AxisBuilder`
+mates on world-aligned connectors, so its axes are world directions. See
+[Conventions](../docs/concepts/foundations/conventions.md).
 
 Geometry fidelity is selected with `ComponentDetail`: `Envelope` gives exact
 standard boundary dimensions, and `Preview` adds recognizable exterior features

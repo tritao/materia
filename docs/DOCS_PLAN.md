@@ -1,0 +1,119 @@
+---
+title: Documentation plan
+description: How Materia's user manual, developer manual, concept docs and product docs are structured, built and published.
+status: draft
+---
+
+# Documentation plan
+
+## Goal
+
+One documentation site for Materia, released alongside the code. It serves three
+readers:
+
+| Reader | Needs | Main sections |
+|---|---|---|
+| **Machine builders who write code**, the primary reader today | Understand the stack, define a machine, simulate it, run it | Concepts, tutorials, developer guides, API reference |
+| **Editor users** | Open, inspect, modify and simulate machines without writing code | User manual |
+| **Contributors** | Build from source, run tests, change kits | Contributor guide |
+
+Product docs (landing page, feature pages, example gallery, roadmap, release
+notes, licensing) sit on top. Manuals for commercial products come later,
+following [OPEN_CORE.md](OPEN_CORE.md).
+
+## Principles
+
+1. **Diátaxis.** Tutorials (learn by doing), how-to guides (do a task),
+   reference (look it up), explanation (understand). Each page is exactly one
+   of these.
+2. **Generate what changes.** The API reference, snippets, figures and
+   screenshots come from the code. Prose covers what is stable: concepts,
+   intent and boundaries.
+3. **Every figure comes from real Materia code.** It is either computed by the
+   kits when the docs are built, or run live in wasm. Never a JavaScript
+   re-implementation of a concept.
+4. **Docs are tests.** Snippets compile, figures rebuild, links resolve, and
+   CI fails if any of them break.
+5. **Plans are not docs.** `PLAN.md`, `TODO.md` and handoff files stay where
+   they are. Their decisions are distilled into concept pages; readers are
+   never sent into them.
+6. **Honest about maturity.** The project is 0.x and every kit has a stability
+   label. Docs are versioned by release tag, plus a "main" view.
+
+## Site structure
+
+```
+docs/
+  concepts/        explanation: what Materia is and how it fits together
+  tutorials/       end-to-end: first machine, gantry, router, arm
+  guides/          how-to: import STEP, add a transmission, export a BOM, ...
+  manual/          editor user manual: commands, panels, project files
+  reference/       generated API reference per kit, CLI, file formats
+  contributing/    build, test, worktrees, haxeon notes
+  machines/        open machine build guides (BOM, fabrication, assembly, commissioning)
+  products/        commercial product manuals (later)
+  OPEN_CORE.md
+  DOCS_PLAN.md
+```
+
+Kit READMEs stay short (what the kit is, how to build and test it) and link to
+the site for concepts.
+
+## Technology
+
+| Need | Choice | Notes |
+|---|---|---|
+| Site generator | **Astro + Starlight**, pages in MDX | Search, versioning, sidebar; islands load interactive components only when they scroll into view |
+| 3D figures | **three.js** over baked glTF | Small and universal; switch to a slim SceneKit viewer if one is built (it would also be a product feature) |
+| 2D plots | **Observable Plot** (SVG) | Light and accessible |
+| Live widgets | **Haxeon wasm-gc docs runtime** | Pure-Haxe kits first; native kits once their wasm size is measured |
+| Full editor embeds | The existing web build, deep-linked, loaded on click | Cached by a service worker, so one download serves the whole site |
+| API reference | Generated from Haxeon's typed output | Check whether Haxeon can emit Haxe's `-xml` dump (then `dox` works); otherwise write a small generator over the typed AST |
+| Hosting | **Cloudflare Pages** or **Netlify** | Threads in the editor need COOP/COEP headers, which GitHub Pages cannot set; check per-file size limits against the release wasm |
+
+## Interactive figures
+
+Three weights, chosen per figure:
+
+1. **Baked** (most figures). A Haxeon `docs-figures` program runs the real kits
+   natively at docs build time, as `app/web/examples/WebExampleExport.hx`
+   already does for examples, and writes JSON/glTF. The page lets the reader
+   scrub time, toggle layers and choose between precomputed variants. A static
+   image fallback serves print, PDF and search.
+2. **Live** (where the reader's input is the point). A small wasm-gc runtime of
+   pure-Haxe kits, exposing a few functions. Candidates: MachineKit
+   (transmissions and derived limits), CncKit (G-code and diagnostics),
+   ToolpathKit and StockKit.
+3. **Open in Materia** (tutorials and *The life of a machine*). The full web
+   editor, deep-linked to an example and a starting state.
+
+Figure snapshots are compared in CI; a changed output is reviewed like a
+changed test.
+
+## Phases
+
+| Phase | Work | Done when |
+|---|---|---|
+| **D0** | Inventory: tag every existing `.md` as keep, merge, internal or delete; final site map; stability label per kit | Inventory table committed; labels in `materia.workspace.json` |
+| **D1** | Site skeleton: Starlight serving `docs/`, link check, CI build and preview deploys | Every page renders; broken links fail CI |
+| **D2** | Concepts, first six: Life of a machine, Conventions, Execution plans, Fidelity levels, Assemblies and mates, Controller boundary | Six pages at `status: reviewed`; their open questions resolved or filed |
+| **D3** | Figure pipeline and first figure (paths vs. trajectories, baked from MotionKit) | Figure rebuilds in CI; snapshot check |
+| **D4** | Getting started and the gantry tutorial, with "Open in Materia" | A new reader goes from clone to a running mission by following it |
+| **D5** | API reference generator for every kit | Reference pages built from code, linked from concept pages |
+| **D6** | Docs runtime spike: MachineKit + CncKit in wasm-gc, size measured; transmissions and G-code widgets | Widgets live on their concept pages |
+| **D7** | The remaining concept pages; the user manual for the editor | No stubs left in `concepts/` |
+| **D8** | First open machine build guide (sheet router) | BOM, fabrication packet, assembly, commissioning published |
+| **D9** | Product pages: landing, features, gallery, roadmap, release notes, licensing | Site ready to announce |
+| **Later** | Commercial product manuals, structured for the Machinery Regulation | Per product |
+
+**Release gate.** Before the site is announced, the decisions in
+[OPEN_CORE.md](OPEN_CORE.md) are made and the LICENSE and notices files are in
+place.
+
+## Status
+
+- D2 started. The concept skeleton, *The life of a machine* (draft) and the
+  glossary are in `docs/concepts/` (71f9d100e). *Conventions* is drafted and
+  answers the four open questions from *The life of a machine*.
+- Open-core decisions drafted in [OPEN_CORE.md](OPEN_CORE.md) and waiting on
+  review.

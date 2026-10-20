@@ -380,7 +380,8 @@ It moves and renames code this plan touches. Rules:
 - `machinekit/examples/gantry-picker/`: a ~1.5 × 1.0 × 0.5 m belt-driven gantry (rack-and-pinion Y
   optional) with a suction tool on the flange. It moves boxes from an infeed table to a pallet
   pattern using the existing pick/place mission and scene objects.
-- Scene validation rejects `machining` plus `mission` (G-D10).
+- Scene validation rejects `machining` plus `mission` (G-D10). Validation now allows both when
+  they name distinct controller owners (`SceneArtifact`).
 - Start-page entry. MachineKit smoke `GantryPickerChecks`.
 - `ProjectSourceTests.checkGantryPicker`, mirroring `checkRobotArm`:
   - every box lands within 2 mm / 2° of its slot;
