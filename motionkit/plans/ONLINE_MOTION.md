@@ -85,5 +85,55 @@ Acceptance: the router's governing-pose contour and transition cases at ≤ 0.05
 added cycle time reported, plus no regression on the printer corner, Paint and weld seam cases. The router's
 SR13/SR16 control steps depend on this.
 
+**OM-R1 breakdown.** Axis jerk along a path is `q''' = q'·s''' + 3·q''·s'·s'' + q'''(s)·s'^3`. It has two
+independent sources, and each needs its own fix:
+- **Timing (`s'''`).** TOPP-RA stages have constant path acceleration, so `s''` jumps at every stage join. No
+  TOPP-RA constraint can bound this.
+- **Geometry (`q''` jumps, `q'''`).** Circular corner fillets and G-code line–arc joins step in curvature. Axis
+  acceleration then jumps by `κ·s'^2`, whatever the timing.
+
+Current state, so steps don't redo it:
+- Ruckig is vendored and wrapped (`mk_generate_state_to_state`) and is used for free entry/exit moves.
+- Jerk limits exist in `PlanningLimits`/`ToolpathMotionBinding` but path timing ignores them.
+- `InputShaper`/`mk_shape_trajectory` support ZV/MZV/EI, not ZVD.
+- The router's "jerk-limited 0.011 mm" figure was a 1-DOF straight-edge Ruckig probe with exact stops; it is
+  not yet evidence for curved multi-axis contours.
+
+Steps:
+- **J0. Measure.** Add axis jerk to continuous certification and the plan report. Record baselines on the
+  router contour, printer corner, Paint and weld seam cases.
+- **J1. Ruckig for rapids and rest-to-rest straight moves.** Time G0/air moves, and straight cuts with exact
+  stops, with Ruckig phase synchronization. On linear axes a rest-to-rest phase-synchronized move is an exact
+  straight line, so geometry and `RapidClearance` are unchanged. This targets the rapid-to-cut residual
+  directly.
+- **J2. Curvature-continuous corners.** `CornerBlender` emits G2 blends (clothoid pair or the existing
+  `QuinticBlend`) within the same tolerance budget instead of circular fillets. Unavoidable curvature steps
+  (line–arc joins from G-code) get a short in-tolerance clothoid transition. Where no transition fits, a speed
+  cap keeps the acceleration step `Δκ·s'^2` within an explicit per-drive bound.
+- **J3. Jerk filter on the time law.** Keep TOPP-RA. Filter s(t) with a twice-applied moving average of length
+  `T = a/J`, which bounds `s'''` and keeps the tool exactly on the geometry.
+  - Plan TOPP-RA against speed caps pulled earlier along s by `s'·T`, so the lagging filtered law cannot enter
+    a slower zone too fast.
+  - Certify velocity, acceleration and jerk continuously; the existing stretch is the fallback.
+  - Streaming carries a fixed delay `T`. TR3 safe stops include the filter tail.
+- **J4. Shaping.** Add ZVD to `InputShaper`. Allow shaping on s(t) (geometry-exact; equal to per-axis shaping
+  on straight lines) as well as per axis. Tune from measured modes.
+- **J5. Ruckig on s for stops.** Feed hold, stream-starvation stops and resume use 1-DOF Ruckig on the path
+  parameter: jerk-limited and still on the path, consistent with "stops on a path stay on the path".
+- **J6. Acceptance.** Rerun the router dynamic-error screen on real multi-axis contours with arcs and blended
+  corners, replacing the straight-edge probe. Target ≤ 0.05 mm, with cycle-time cost reported. The printer,
+  Paint and weld cases must not regress.
+- **J7. Research, only if J3 costs too much cycle time.** Ruckig-on-s look-ahead: blocks with constant caps
+  and look-ahead junction speeds, which is the classic S-curve feed planner. Or third-order TOPP.
+
+Not candidates for process paths:
+- per-axis Ruckig on contours (leaves the geometry);
+- MoveIt-style Ruckig waypoint smoothing without a certified deviation bound.
+
+All outputs are polynomials that go through the existing certification, lowering, integer clock and device
+compilation; there is no second execution path. Per-drive jerk limits need real values (OM-D2) instead of the
+`25 × acceleration` placeholder. Order: J0 first; J1, J2 and J3 can run in parallel; J4–J6 follow; J7 only if
+needed.
+
 **Order.** OM0 -> OM1 -> OM2 -> OM3 -> OM4 -> OM5; OM-R1 independent. Starts after 3d-printing lands;
 independent of `simkit/plans/FIDELITY.md` and the pellet printer, so it may run in parallel with them.
