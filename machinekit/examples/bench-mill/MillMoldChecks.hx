@@ -67,7 +67,7 @@ class MillMoldChecks {
 			}
 			check(Math.abs(area - source.shape.area()) < 1e-3, "mill exposed rectangles agree with actual foundation BREP area");
 			for (extra in [-1e-5, 0.05]) {
-				var ball = new cadkit.modeling.Part(cadkit.Shape.sphere(report.lowerDiameterMm / 2 + extra));
+				var ball = new cadkit.modeling.Part(cadkit.Shape.sphere((extra < 0 ? report.lowerDiameterMm : report.upperDiameterMm) / 2 + extra));
 				owned.push(ball);
 				var placed = ball.translated(new Vector(report.witness.x, report.witness.y, report.witness.z));
 				owned.push(placed);

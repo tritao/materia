@@ -118,11 +118,11 @@ class MillFrame extends MachineAssembly {
 					openings: [CastingPatterns.face("body.z-max")],
 					part: new CastInsert(new ComponentValues().setNumber("width", footWidth)
 						.setNumber("depth", footDepth)
-						.setNumber("height", l.insertThickness)
-						.setToken("holes", flared ? InsertHoles.tappedThrough(details.columnAnchorThread, l.insertThickness) : InsertHoles.through(0, l.insertThickness))
+						.setNumber("height", details.columnAnchorThickness)
+						.setToken("holes", flared ? InsertHoles.tappedThrough(details.columnAnchorThread, details.columnAnchorThickness) : InsertHoles.through(0, details.columnAnchorThickness))
 						.setToken("role", "column-mount")
 						.setToken("label", "column mounting anchor")),
-					pose: F.translation(x, y - l.baseCentreY, l.railPlane - l.insertThickness)
+					pose: F.translation(x, y - l.baseCentreY, l.railPlane - details.columnAnchorThickness)
 				});
 				if (l.footPockets) {
 					var fx = sx * (l.baseWidth / 2 - l.wall),

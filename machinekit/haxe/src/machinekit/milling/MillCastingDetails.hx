@@ -17,6 +17,8 @@ class MillCastingDetails {
 	public var rearBayDesignClearance:Float = 1;
 	public var levelingClearanceDiameter:Float = 18;
 	public var selectedShaftClearance:Float = 22;
+	/** 30 mm stock reserved for the policy blind M12 anchor and standard service screw. */
+	public var columnAnchorThickness:Float = 30;
 	public var hatchAnchorWidth:Float = 20;
 	public var hatchAnchorDepth:Float = 20;
 	public var hatchAnchorThickness:Float = 10;

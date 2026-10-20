@@ -1673,3 +1673,17 @@ hobber conversion commits and before fixing sockets:
   mill's inserts get source-thread fixings (and the through-hole plugs above);
   fixture tests declare openings rather than filling them from `reachedOpenings`.
 
+
+### Blind-anchor stock design change
+
+- `MillCastingDetails.columnAnchorThickness`: **20 → 30 mm** for the four base
+  column-joint anchors, preserving the mounting plane. This reserves stock for
+  the C45 / class 8.8 blind-thread policy, tapping runout and the derived standard
+  service screw; the protection migration follows separately.
+- Independent BREP difference against the previous frozen mill base: **96,000 mm³
+  removed, 0 mm³ added**. The mill-base STEP fixture is deliberately refrozen for
+  this design change. Mill-column and both hobber fixtures remain byte-identical.
+- The junction witness enlargement uses the solver's upper diameter; containment
+  still uses its lower diameter. Main validation: **36 FoundationDesign**
+  assertions (all frozen differences zero), **248 MillMoldChecks** assertions.
+  Fabrication readiness remains false.
