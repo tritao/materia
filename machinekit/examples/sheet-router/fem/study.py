@@ -62,13 +62,28 @@ class Model:
         endpoints=defaultdict(list)
         for row in self.lines:
             endpoints[row['space']]+=[row['a'],row['b']]
+        # Connect interior intersections of welded frame stock, not moving bodies or rigid arms.
+        stock=[row for row in self.lines if row['group']=='frame' and row['space']=='frame']
+        for i,first in enumerate(stock):
+            for second in stock[i+1:]:
+                a,b=first['a'],second['a'];u=sub(first['b'],a);v=sub(second['b'],b);w=sub(a,b)
+                uu,vv,uv=dot(u,u),dot(v,v),dot(u,v);den=uu*vv-uv*uv
+                if den<=1e-12*uu*vv:continue
+                t=(uv*dot(v,w)-vv*dot(u,w))/den
+                q=(uu*dot(v,w)-uv*dot(u,w))/den
+                if not (-1e-8<=t<=1+1e-8 and -1e-8<=q<=1+1e-8):continue
+                p=add(a,mul(u,t))
+                if norm(sub(p,add(b,mul(v,q))))<1e-5:endpoints['frame'].append(p)
         for row in self.lines:
             a,b=row['a'],row['b'];d=sub(b,a);l=norm(d)
             cuts={0.0,1.0}
             for p in endpoints[row['space']]:
                 t=dot(sub(p,a),d)/(l*l)
                 if 1e-8<t<1-1e-8 and norm(sub(p,add(a,mul(d,t))))<1e-5:cuts.add(t)
-            cuts=sorted(cuts)
+            merged=[]
+            for t in sorted(cuts):
+                if not merged or (t-merged[-1])*l>1e-5:merged.append(t)
+            cuts=merged
             for t,u in zip(cuts,cuts[1:]):
                 start=add(a,mul(d,t));end=add(a,mul(d,u))
                 key=(row['space'],tuple(sorted((tuple(round(x,6) for x in start),tuple(round(x,6) for x in end)))))
@@ -219,7 +234,14 @@ def make_model(packet,pose,h):
             model.spring(moving,fixed,[100000,0,539000,0,0,0] if packet.get('guideLayout') else [guidek,ydrive/2,guidek,rotk,rotk,rotk],'Yblocks' if packet.get('guideLayout') else 'Yguides_drive')
         attachment=(fp[0],a[1],a[2]);model.rigid(fp,attachment,'foot'+side)
         r1=model.root('beam'+side,attachment,'gantry');r2=model.root('plate'+side,attachment,'foot'+side)
-        model.spring(r1,r2,[g['boltTranslationNPerMm']]*3+[bolt]*3,'bolts')
+        if packet.get('beamFootJointWelded'):
+            # The beam bears/welds across its full Y footprint, not at one point.
+            for label,offset in [('Front',-beam['widthMm']/2),('Rear',beam['widthMm']/2)]:
+                at=add(fp,(0,offset,plate['thicknessMm']/2))
+                model.rigid(attachment,at,'gantry');model.rigid(add(fp,(0,offset,0)),at,'foot'+side)
+                upper=model.root('weldBeam'+side+label,at,'gantry');lower=model.root('weldFoot'+side+label,at,'foot'+side)
+                model.spring(upper,lower,[1e10]*3+[1e13]*3,'welds')
+        else:model.spring(r1,r2,[g['boltTranslationNPerMm']]*3+[bolt]*3,'bolts')
     if packet.get('guideLayout'):
         for side in ['Left','Right']:
             d=next(d for d in pose['drives'] if d['id']=='pinionY'+side);q=tuple(d['pointMm'])

@@ -32,7 +32,20 @@ def front_carriage(model,packet,pose,a,b,axes):
     else:
         shelf=plates['zFlangeShelf'];shelfcentre=add(point(shelf['poseMm']),(dx,dy,shelf['thicknessMm']/2))
         shelfback=(shelfcentre[0],zc[1],shelfcentre[2]);zcontacts.append(shelfback)
+    ribdepth=zp.get('ribDepthMm',0);ribthick=zp.get('ribThicknessMm',0);ribwidth=zp.get('ribWidthMm',ribthick)
+    ribxs=[zc[0]+side*(zp['widthMm']-ribwidth)/2 for side in (-1,1)] if ribdepth else []
+    if ribdepth:
+        riblevels=sorted(set([zc[2]-zp['depthMm']/2,zc[2]+zp['depthMm']/2]+[q[2] for q in zcontacts]))
+        for x in ribxs:
+            for z in riblevels:zcontacts.append((x,zc[1],z))
     xcentre=grill('xCarriage','x',xcontacts,'Xplate');zcentre=grill('zCarriage','z',zcontacts,'Zplate')
+    # Integral side ribs share the plate material and mass from the CAD solid.
+    # Cross-section offsets transmit bending; no extra guide rotational spring.
+    if ribdepth:
+        y=zp['poseMm']['y']-zp['thicknessMm']-ribdepth/2
+        for x in ribxs:
+            for z,w in zip(riblevels,riblevels[1:]):model.beam((x,y,z),(x,y,w),(('BOX',ribwidth,ribdepth,*([ribthick]*4)) if ribwidth>ribthick else ('RECT',ribthick,ribdepth)),(1,0,0),(zp['youngsMPa'],0),'Zribs','z')
+            for z in riblevels:model.rigid((x,zc[1],z),(x,y,z),'z')
     for i,block in enumerate(xb):
         q=tuple(block['railPointMm']);support=project(q,a,b);model.rigid(support,q,'gantry')
         fixed=model.root('Xfixed'+str(i),q,'gantry');moving=model.root('Xmoving'+str(i),q,'x')

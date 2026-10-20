@@ -12,6 +12,14 @@ class SheetRouterGuideChecks {
         check(Math.abs(Math.PI*alternative.pitchDiameter()-100)<1e-7,"module 2 / 15 teeth preserves 100 mm/rev without undercut");
         for(length in [2600.0,3150.0]) {
             var machine=new SheetRouter(new SheetRouterSpec(length)),state=new AssemblyState(machine.definition());
+            check(machine.routerSpec.gantry().beamFootWelded,"welded beam feet selected");
+            var zPlate:machinekit.gantry.GantryParts.GantryStiffenedPlate=cast machine.component("zCarriage");
+            var solid=zPlate.geometry();
+            var expected=zPlate.width*zPlate.depth*zPlate.height+2*zPlate.depth*(zPlate.ribWidth*zPlate.ribDepth-(zPlate.ribWidth-2*zPlate.ribWall)*(zPlate.ribDepth-2*zPlate.ribWall));
+            check(solid.valid()&&Math.abs(solid.volume()/expected-1)<1e-7,"closed Z side sections have valid geometry and volume");solid.close();
+            var braces=0;
+            for(member in machine.base.frame.analysisMembers())if(member.name.indexOf("Brace")>=0)braces++;
+            check(braces==16,"sixteen frame braces selected");
             var fixed=state.worldPose("blockZ"),rail=state.worldPose("railZ");
             state.setJoint("z",machine.routerSpec.travelZ);state.forwardKinematics();
             check(Math.abs(state.worldPose("blockZ").z-fixed.z)<1e-6,"Z blocks remain on X carriage");

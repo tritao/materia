@@ -1,8 +1,59 @@
 # SR5 structural screen
 
-## Guide-first candidate (SR6, 2026-10-20)
+## Z and frame follow-up — verification pending
 
-The current CAD implements the guide-first revision in [SOURCING.md](../SOURCING.md).
+The working CAD now selects a 40 mm flat X plate, 30 mm welded steel beam feet,
+180 mm moving-Z rail spacing and a 20 mm Z web with two closed side sections
+25 × 120 × 6 mm. Sixteen RHS 80 × 80 × 4 frame diagonals brace the sides,
+ends and lower plane. The original RHS 200 × 100 × 6.3 beam and 100 mm side
+allowance remain. Removing that allowance failed native clearance: the outboard
+Z screw intersected the base at X=0. The shoe lift has an offset bracket, and the
+right Y motor support is lowered to clear the rack. The final geometry is validated against HEAD in an isolated worktree;
+the checks and remaining structural work are recorded below.
+
+The beam model now joins welded frame members at interior intersections, rather
+than only at their endpoints. A native fixture compares automatic crossing
+connectivity with four explicitly joined arms: both deflect 0.007976131 mm under
+300 N, with four branches at one physical node. Welded beam feet use two spatial
+contacts across the beam footprint instead of a guessed single rotational spring.
+Finite levelling-foot supports remain; no foundation anchors are credited.
+Local weld stress, tube-wall flexibility and the built-up aluminium Z joint still
+require qualification.
+
+Model correction must be separated from hardware improvement. `compare.py`
+re-solves the previous exact CAD with the corrected model at two critical poses
+per bed, recording packet and source hashes. At the long-bed centre, the old
+hardware gives 1.751 N/µm X and 0.487 N/µm Y. The earlier export of the revised
+hardware gives 2.253 X and 2.135 Y at that pose, but its lowest classified
+gantry-dominant mode is only 23.688 Hz. This is a single-mesh diagnostic, not
+acceptance evidence. It predates the final motor-support clearance
+fix. Mixed frame/gantry modes remain relevant regardless of classification.
+
+Working evidence is under `build/sheet-router-stiffness`: `baseline/` contains
+the corrected comparison, `cad/` the earlier revised CAD, and `cad-screen/` its
+critical-pose screen. Fresh final CAD packets are in `validated/`, exported from an isolated detached
+worktree based on HEAD with only the router patch. Both beds export 171 components
+and 39 stock members using the existing OCCT libraries. This avoids the unrelated
+casting refactor in the shared checkout. The full two-mesh structural rerun remains
+pending; these exports alone do not qualify the structural targets.
+The isolated guide gate passes both beds, including closed Z-section validity and
+volume, sixteen frame braces, moving-rail reach and selected drives. The final
+SR4 sizing/planner gate passes 82 assertions. Shared exporter fixtures pass
+33 mill plus seven router assertions, native beam/spring/crossing fixtures pass,
+and all 37 mill Python regressions pass. Both beds pass the complete assembly
+and clearance sweep: 426 assertions, including travel extremes and tool-rack
+approaches. Logs are retained in `build/sheet-router-stiffness/isolated-validation/`.
+
+The revised long-bed moving Y mass is 193.77 kg. The ideal drive-only estimate is
+47.23 Hz, falling to 36.78 Hz with half hinge stiffness, or 45.03 Hz with 10% extra
+mass. The hinge accounts for 64.9% of series drive compliance.
+
+The historical results below retain their original model and geometry; their
+passing checks do not validate this follow-up. No fabrication release.
+
+## Previous guide-first candidate (SR6, 2026-10-20)
+
+This historical candidate implements the first guide revision in [SOURCING.md](../SOURCING.md).
 The initial SR5 results below describe the superseded single-block assembly.
 The new candidate uses two X rails/four blocks, moving Z rails/four fixed blocks,
 280 mm Y block spacing, flat 25/20 mm X/Z plates, 20 mm steel feet and a direct

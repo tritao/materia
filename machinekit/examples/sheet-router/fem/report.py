@@ -74,7 +74,7 @@ def main():
                 if margin<=0:raise ValueError('Linear foundation would lift a foot under the combined envelope')
                 foot_margins.append(margin)
             for case in c[:3]:
-                budget=case['budgetUmPerN'];fraction=(budget.get('rigid',0)+budget.get('coupling',0))/sum(budget.values())
+                budget=case['budgetUmPerN'];fraction=(budget.get('rigid',0)+budget.get('coupling',0)+budget.get('welds',0))/sum(budget.values())
                 if fraction>.001:raise ValueError('Artificial rigid members materially affect compliance')
                 rigid_fractions.append(fraction)
             for side in ['Left','Right']:
@@ -125,9 +125,9 @@ def main():
         result['limitations'].append('Other fixed masses attach at nearest stock on a fixed 50 mm analysis grid; distributed mass shape remains approximate. Global frame modes and gantry-dominant modes are reported separately.')
         result['basis']='Spatial per-block translation springs and plate grillages, actual CAD connectors, moving Z rails; no assumed guide rotational spring'
         result['decisions'].update(beam='Retain steel RHS 200x100x6.3, 200 mm side vertical.',
-            xCarriage='25 mm flat aluminium plate supported on four X blocks; no closed box selected.',
+            xCarriage=str(next(p['thicknessMm'] for p in packet['plates'] if p['id']=='xCarriage'))+' mm flat aluminium plate supported on four X blocks; no closed box selected.',
             zGuides='Four fixed Z blocks on X carriage, two rails on moving plate; 200 mm travel.',
-            sidePlates='20 mm steel gantry feet after the guide-only trial identified their bending contribution.')
+            sidePlates=str(next(p['thicknessMm'] for p in packet['plates'] if p['id']=='beamFootLeft'))+' mm steel gantry feet; '+('welded across full beam footprint.' if packet.get('beamFootJointWelded') else 'bolted beam attachment.'))
         yaxis=next(a for a in packet['axes'] if a['axis']=='y')
         stiffness=yaxis['compliance']['stiffnessNPerM'];hinge=yaxis['compliance']['hingeMPerN'];mass=yaxis['movingMassKg']
         result['yDriveSensitivity']=dict(workY=packet['workY'],movingMassKg=mass,combinedStiffnessNPerM=2*stiffness,hingeComplianceFraction=hinge*stiffness,idealDriveOnlyHz=math.sqrt(2*stiffness/mass)/(2*math.pi),halfHingeStiffnessHz=math.sqrt(2/(1/stiffness+hinge)/mass)/(2*math.pi),tenPercentHeavierHz=math.sqrt(2*stiffness/(1.1*mass))/(2*math.pi))
@@ -135,6 +135,7 @@ def main():
         result['limitations'][0]='Per-block radial stiffness: HG20C ZA 460 N/um, HG25C ZA 539 N/um. Lateral stiffness remains assumed at 100 N/um; no guide rotational spring.'
         result['limitations']=[t for t in result['limitations'] if not t.startswith('20 mm feet, a closed bridge') and not t.startswith('Large predicted deflections')]
         result['limitations'].append('Direct spindle saddle is represented by a rigid body on four translational mounting springs; clamp, bearing and tool flexibility remain excluded.')
+        result['limitations'].append('Welded frame stock connects at interior crossings; beam-foot welds use distributed spatial contacts. Local wall and weld stresses, and built-up aluminium joint qualification, remain excluded.')
         result['limitations'].append('Moving-rail reinforcement uses 60% gross rectangular section and discrete assumed mounting stiffness; plate grillage omits Poisson coupling. Retain these as sensitivity inputs.')
     (folder/'summary.json').write_text(json.dumps(result,indent=2)+'\n');(folder/'y-loads.json').write_text(json.dumps(yloads,indent=2)+'\n')
     for row in summary:

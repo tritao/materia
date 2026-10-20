@@ -32,6 +32,28 @@ def cantilever(ccx,folder,h,rotational_stiffness=None):
     return dict(meshMm=h,measuredMm=measured,analyticalMm=expected,relativeError=error,firstModeHz=modes[0],eulerBernoulliModeHz=analytic_mode)
 
 
+def welded_crossing(ccx,folder):
+    ends=[(-500.,0.,0.),(500.,0.,0.),(0.,-500.,0.),(0.,500.,0.)]
+    values=[]
+    for explicit in (False,True):
+        model=Model(100);section=('BOX',60,60,4,4,4,4)
+        pairs=[(p,(0.,0.,0.)) for p in ends] if explicit else [(ends[0],ends[1]),(ends[2],ends[3])]
+        for a,b in pairs:model.beam(a,b,section,material=(210000,0),group='frame')
+        for i,p in enumerate(ends):model.root('fixed'+str(i),p,'frame')
+        model.queries={'tip':((0.,0.,0.),'frame')};model.mesh()
+        node=model.query_nodes['tip']
+        branches=sum(node in (conn[0],conn[-1]) for _,conn,row in model.elements if row['group']=='frame')
+        if branches!=4:raise ValueError('Welded crossing does not share four branches')
+        for root in model.roots.values():model.boundary += [(root['ref'],1,3),(root['rot'],1,3)]
+        run=folder/('explicit' if explicit else 'automatic');run.mkdir(parents=True,exist_ok=True)
+        (run/'frame.inp').write_text(model.deck([('bend',{node:(0,0,300)},False,None)],modal=False))
+        run_solver(ccx,run,120)
+        values.append(tables((run/'frame.dat').read_text())[(1,'U')][node][2])
+    error=abs(values[0]/values[1]-1)
+    if error>1e-6:raise ValueError('Automatic welded crossing differs from explicit split')
+    return dict(automaticMm=values[0],explicitSplitMm=values[1],relativeError=error,branches=4)
+
+
 def mill_reference(before,after):
     a=json.loads((before/'manifest.json').read_text());b=json.loads((after/'manifest.json').read_text())
     a.pop('provenance');b.pop('provenance')
@@ -48,7 +70,7 @@ def main():
     rotation=cantilever(a.ccx.resolve(),a.output/'rotation',100,1e8)
     convergence=abs(rows[0]['measuredMm']/rows[1]['measuredMm']-1)
     if convergence>.01:raise ValueError('Beam mesh convergence exceeds 1%')
-    result=dict(beam=rows,rotation=rotation,meshRelativeChange=convergence)
+    result=dict(beam=rows,rotation=rotation,meshRelativeChange=convergence,weldedCrossing=welded_crossing(a.ccx.resolve(),a.output/'crossing'))
     if a.mill_before and a.mill_after:result['millReference']=mill_reference(a.mill_before,a.mill_after)
     (a.output/'verification.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))
 

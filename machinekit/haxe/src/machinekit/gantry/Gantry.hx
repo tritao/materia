@@ -8,6 +8,7 @@ import machinekit.gantry.RotaryHead.CaHead;
 import cadkit.modeling.AssemblyState;
 import machinekit.gantry.GantryParts.GantryExtrusion;
 import machinekit.gantry.GantryParts.GantryPlate;
+import machinekit.gantry.GantryParts.GantryStiffenedPlate;
 import machinekit.gantry.GantryParts.GantryIdlerPin;
 import machinekit.gantry.GantryParts.GantryBeltClamp;
 import machinekit.gantry.GantryParts.GantryNutMount;
@@ -174,7 +175,9 @@ class Gantry extends AxisBuilder {
             slideRail(axes[2],"xCarriage","railZ",LinearRail.metric(spec.railProfile,columnLength),
                 orient(-layout.zRailSpacing/2,zRailY,railBottom,[0.0,1,0],up),{x:0.0,y:0.0,z:-1.0},fixedBlocks);
             var zWidth=layout.zRailSpacing+guide.railWidth+40;
-            attach("zCarriage",new GantryPlate("Z carriage",zWidth,columnLength,layout.movingThickness),
+            var zPlate:GantryPlate=layout.zRibDepth==null?new GantryPlate("Z carriage",zWidth,columnLength,layout.movingThickness):
+                new GantryStiffenedPlate(zWidth,columnLength,layout.movingThickness,cast layout.zRibDepth,cast layout.zRibWidth,cast layout.zRibWall);
+            attach("zCarriage",zPlate,
                 orient(0,movingY,railBottom+columnLength/2,[0.0,0,1],[0.0,-1,0]),"railZ");
             attach("railZRight",LinearRail.metric(spec.railProfile,columnLength),
                 orient(layout.zRailSpacing/2,zRailY,railBottom,[0.0,1,0],up),"zCarriage");
@@ -568,6 +571,8 @@ class Gantry extends AxisBuilder {
 			}
 			if (max[axis] - min[axis] <= 1e-7) throw "Gantry motor bracket has no supporting contact area";
 		}
+        // A thicker beam foot must not lift the bridge into the fixed Y rack.
+        if(spec.frontGuides!=null&&id=="motorYRightSupport")max[2]=Math.min(max[2],host.min[2]+16);
 		var pose = AssemblyFrames.translation((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, min[2]);
 		attach(id, new GantryMotorSupport(id, max[0] - min[0], max[1] - min[1], max[2] - min[2], motor,
 			AssemblyFrames.compose(AssemblyFrames.inverse(pose), face), null, clearanceDiameter), pose, parent);

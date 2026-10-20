@@ -7,7 +7,7 @@ have these ratings.
 ## Guides
 
 Use two front-face X rails, 150 mm apart vertically, with two blocks per rail
-300 mm apart along X. Z has two moving rails 160 mm apart and four stationary
+300 mm apart along X. Z has two moving rails 180 mm apart and four stationary
 blocks on the X carriage, 200 mm apart vertically. Y has two blocks per side
 280 mm apart. The beam remains steel RHS 200 × 100 × 6.3, 200 mm side vertical.
 
@@ -67,6 +67,16 @@ for the authored 120 mm longest-tool envelope: shorter-tool reach and the real t
 range still require qualification with the tool table.
 
 ## Structural decisions
+
+The working follow-up uses a 40 mm flat X plate, 30 mm steel feet continuously
+welded to the beam footprint (6 mm nominal fillet), and two closed 25 × 120 × 6 mm
+side sections on the 20 mm Z web. The frame receives sixteen RHS 80 × 80 × 4
+braces. Built-up aluminium joints, heat treatment and subsequent rail-seat
+machining need manufacturing qualification. The router compiles against HEAD in an isolated detached worktree and both
+beds export fresh FEM CAD packets. Assembly/clearance passes 426 assertions,
+sizing/planner passes 82, and guide geometry/travel checks pass. The full
+structural rerun remains pending. The diagnostic and corrected-baseline evidence is in
+[fem/README.md](fem/README.md); the results below describe the previous candidate.
 
 Start with flat carriage plates and the spatial guide pattern. A box bridge has
 not been selected. The first guide-only run moved the dominant Y contribution to

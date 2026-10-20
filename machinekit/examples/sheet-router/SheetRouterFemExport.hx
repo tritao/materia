@@ -39,6 +39,9 @@ class SheetRouterFemExport {
             if(selected.indexOf(member.id)>=0&&Std.isOfType(member.component,GantryPlate)) {
                 var plate:GantryPlate=cast member.component;
                 plates.push({id:member.id,widthMm:plate.width,depthMm:plate.depth,thicknessMm:plate.height,
+                    ribDepthMm:Std.isOfType(plate,machinekit.gantry.GantryParts.GantryStiffenedPlate)?cast(plate,machinekit.gantry.GantryParts.GantryStiffenedPlate).ribDepth:0,
+                    ribWidthMm:Std.isOfType(plate,machinekit.gantry.GantryParts.GantryStiffenedPlate)?cast(plate,machinekit.gantry.GantryParts.GantryStiffenedPlate).ribWidth:0,
+                    ribThicknessMm:Std.isOfType(plate,machinekit.gantry.GantryParts.GantryStiffenedPlate)?cast(plate,machinekit.gantry.GantryParts.GantryStiffenedPlate).ribWall:0,
                     poseMm:pose,youngsMPa:modulus(material.physical.youngsModulusPa,member.component.materialSpec())});
             }
         }
@@ -77,6 +80,7 @@ class SheetRouterFemExport {
         var axes:Array<Dynamic> = [];
         for(axis in ["x","y","z"])axes.push(SheetRouterSizing.report(machine,axis));
         var result={schemaVersion:1,study:"sheet-router-sr5",status:"reduced structural screening; assumed interfaces",
+            beamFootJointWelded:machine.spec.beamFootWelded,beamFootWeldLegMm:machine.spec.beamFootWelded?6:0,
             guideLayout:machine.spec.frontGuides,yBlockSpacing:machine.spec.yBlockSpacing,
             units:{length:"mm",force:"N",mass:"kg",youngsModulus:"MPa"},workY:spec.workY,parts:exported.parts,
             materials:exported.materials,totalMassKg:exported.totalMassKg,selectedBodies:selected,beams:beams,plates:plates,

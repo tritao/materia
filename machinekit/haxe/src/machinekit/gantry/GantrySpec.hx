@@ -31,11 +31,15 @@ typedef FrontGuideLayout = {
     var zBlockSpacing:Float;
     var carriageThickness:Float;
     var movingThickness:Float;
+    @:optional var zRibDepth:Float;
+    @:optional var zRibWidth:Float;
+    @:optional var zRibWall:Float;
 }
 
 typedef GantryOptions = {
     @:optional var frontGuides:FrontGuideLayout;
     @:optional var beamFootThickness:Null<Float>;
+    @:optional var beamFootWelded:Bool;
     @:optional var beamFootMaterial:String;
     @:optional var railProfileY:String;
     @:optional var yBlockSpacing:Null<Float>;
@@ -76,6 +80,7 @@ class GantrySpec {
 	public final motorFrame:Int;
     public final frontGuides:Null<FrontGuideLayout>;
     public final beamFootThickness:Float;
+    public final beamFootWelded:Bool;
     public final beamFootMaterial:Null<String>;
     public final railProfileY:String;
     public final yBlockSpacing:Float;
@@ -129,11 +134,18 @@ class GantrySpec {
         var selected:GantryOptions=options==null?{motor:null}:options;
         beamFootThickness=selected.beamFootThickness==null?12:selected.beamFootThickness;
         beamFootMaterial=selected.beamFootMaterial;
+        beamFootWelded=selected.beamFootWelded==true;
+        if(beamFootWelded&&beamFootMaterial!="steel")throw "Welded gantry feet require steel feet";
         if(!Math.isFinite(beamFootThickness)||beamFootThickness<=0)throw "Invalid beam foot thickness";
         frontGuides=selected.frontGuides;
         if(frontGuides!=null)for(value in [frontGuides.xRailSpacing,frontGuides.xBlockSpacing,frontGuides.zRailSpacing,
                 frontGuides.zBlockSpacing,frontGuides.carriageThickness,frontGuides.movingThickness])
             if(!Math.isFinite(value)||value<=0)throw "Front guide dimensions must be finite and positive";
+        if(frontGuides!=null&&frontGuides.zRibDepth!=null) {
+            var ribs:Array<Null<Float>> = [frontGuides.zRibDepth,frontGuides.zRibWidth,frontGuides.zRibWall];
+            for(v in ribs)
+                if(v==null||!Math.isFinite(cast v)||(cast v:Float)<=0)throw "Z stiffeners require depth, width and wall";
+        }
         railProfileY=selected.railProfileY==null?railProfile:selected.railProfileY;
         yBlockSpacing=selected.yBlockSpacing==null?0:selected.yBlockSpacing;
         railPadHeight=selected.railPadHeight==null?0:selected.railPadHeight;

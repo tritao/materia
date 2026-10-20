@@ -69,6 +69,28 @@ class GantryPlate extends MachineComponent {
 	}
 }
 
+/** Built-up Z plate with two closed side stiffeners; rail mounting face stays flat.
+ * Weld/heat-treatment and final machining remain fabrication qualification inputs. */
+class GantryStiffenedPlate extends GantryPlate {
+    public final ribDepth:Float; public final ribWidth:Float; public final ribWall:Float;
+    public function new(width:Float,depth:Float,height:Float,ribDepth:Float,ribWidth:Float,ribWall:Float) {
+        super("Z carriage side boxes "+Dimension.format(ribWidth)+"x"+Dimension.format(ribDepth)+"x"+Dimension.format(ribWall),width,depth,height);
+        for(v in [ribDepth,ribWidth,ribWall])if(!Math.isFinite(v)||v<=0)throw "Invalid Z stiffener dimensions";
+        if(2*ribWall>=Math.min(ribDepth,ribWidth)||2*ribWidth>=width)throw "Z stiffener walls consume section";
+        this.ribDepth=ribDepth;this.ribWidth=ribWidth;this.ribWall=ribWall;
+    }
+    override public function geometry(detail:ComponentDetail=Preview):Part return Solids.building([],parts->{
+        parts.push(Part.box(width,depth,height));
+        for(sign in [-1,1]) {
+            var outer=Part.box(ribWidth,depth,ribDepth),inner=Part.box(ribWidth-2*ribWall,depth+2,ribDepth-2*ribWall);
+            var bore=inner.translated(new Vector(0,0,ribWall));inner.close();
+            var hollow=Solids.cut(outer,[bore]);
+            var placed=hollow.translated(new Vector(sign*(width-ribWidth)/2,0,height));hollow.close();parts.push(placed);
+        }
+        return Solids.union(parts);
+    });
+}
+
 /** Stationary journal supporting a belt idler's bore. */
 class GantryIdlerPin extends MachineComponent {
 	public final diameter:Float;

@@ -715,6 +715,21 @@ are released. The worst reserved eccentric Y branch is 874.60 N and both drives 
 the supplier-based rack, reducer, preload and torque checks. See the FEM report for
 classification limits, sourcing conditions and the evidence directory.
 
+**Z/frame follow-up (working; verification pending).** The next geometry uses a
+40 mm flat X carriage, 30 mm welded steel feet, closed Z side sections
+25 × 120 × 6 mm and sixteen RHS 80 × 80 × 4 base braces. Moving Z rails are
+180 mm apart. The beam profile and 100 mm side allowance remain; removing the
+allowance makes the outboard Z screw intersect the base at X=0.
+The structural model now connects welded interior stock intersections and resolves
+beam-foot welds across their footprint. A native crossing fixture passes; old CAD
+was re-screened separately to distinguish model correction from hardware gains.
+Critical-pose diagnostics improve static stiffness but still fail the modal target.
+The router compiles against HEAD in an isolated detached worktree and both beds
+export fresh FEM packets. The two-bed assembly/clearance gate passes 426 assertions,
+sizing/planner passes 82, and guide geometry/travel checks pass. Full two-mesh
+structural verification remains pending. See the
+[FEM follow-up record](fem/README.md). No fabrication release.
+
 **SR6. Frame, fabrication drawings and alignment procedures (SR-D2, SR-D11).**
 - Weldment: tube layout, weld seams and sequence, jig layout (frame points as jig stops), cut
   list.

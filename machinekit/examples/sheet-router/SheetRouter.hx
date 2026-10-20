@@ -119,7 +119,7 @@ class SheetRouter extends Gantry {
     }
     function lift(joint:String,id:String,part:MachineComponent,pose:AssemblyFrame,parent:String,cylinder:PneumaticCylinder,stroke:Float,initial:Float):Void {
         var along=joint=="rackCoverLift"?[0.0,-1.0,0.0]:[0.0,0.0,-1.0];
-        var anchorX=joint=="rackCoverLift"?120.0:-120.0;
+        var anchorX=joint=="rackCoverLift"?120.0:-150.0;
         var anchorZ=joint=="rackCoverLift"?60.0:40.0;
         var up=joint=="rackCoverLift"?[0.0,0.0,1.0]:[0.0,1.0,0.0];
         hang(id,part,pose,parent);
@@ -132,7 +132,8 @@ class SheetRouter extends Gantry {
         var extension=initial-cylinder.bodyLength-cylinder.stemLength;
         var body=AxisBuilder.orient(pose.x+anchorX+along[0]*extension,pose.y+along[1]*extension,pose.z+anchorZ+along[2]*extension,up,along);
         attach(c,cylinder,body,parent);
-        attach(joint+"Bracket",new GantryPlate("lift rod bracket",80,20,anchorZ),
+        if(joint=="shoeLift")attach(joint+"Bracket",new SheetShoeLiftBracket(),pose,id);
+        else attach(joint+"Bracket",new GantryPlate("lift rod bracket",80,20,anchorZ),
             F.translation(pose.x+anchorX,pose.y,pose.z),id);
         attach(joint+"Rod",cylinder.movingRod(),AxisBuilder.orient(pose.x+anchorX,pose.y,pose.z+anchorZ,up,along),id);
         attach(v,new SolenoidValve(),F.translation(pose.x+(joint=="shoeLift"?-220:220),pose.y,pose.z+200),parent);
@@ -209,6 +210,35 @@ class SheetRouter extends Gantry {
             member('tableSide$side',[x,front,bed-40],[x,back,bed-40],cross);
             for(end in 0...3)welds.push({a:'tableSide$side',b:'post$side$end',legSize:5});
         }
+        // Triangulate side, end and lower planes without crossing the work envelope.
+        var brace=new RectTube(80,80,4);
+        for(side in 0...2)for(bay in 0...2) {
+            var x=side==0?left:right,y0=front+(back-front)*bay/2,y1=front+(back-front)*(bay+1)/2;
+            member('sideBrace${side}${bay}a',[x,y0,180],[x,y1,top],brace);
+            member('sideBrace${side}${bay}b',[x,y1,180],[x,y0,top],brace);
+            welds.push({a:'sideBrace${side}${bay}a',b:'sideBrace${side}${bay}b',legSize:5});
+            for(name in ['sideBrace${side}${bay}a','sideBrace${side}${bay}b']) {
+                welds.push({a:name,b:'lower$side',legSize:5});
+                welds.push({a:name,b:'post$side$bay',legSize:5});
+                welds.push({a:name,b:'post$side${bay+1}',legSize:5});
+            }
+        }
+        for(end in 0...2) {
+            var y=end==0?front:back;
+            member('endBrace${end}a',[left,y,180],[right,y,top],brace);
+            member('endBrace${end}b',[right,y,180],[left,y,top],brace);
+            welds.push({a:'endBrace${end}a',b:'endBrace${end}b',legSize:5});
+            for(name in ['endBrace${end}a','endBrace${end}b'])for(side in 0...2)
+                welds.push({a:name,b:'post$side${end*2}',legSize:5});
+        }
+        for(bay in 0...2) {
+            var y0=front+(back-front)*bay/2,y1=front+(back-front)*(bay+1)/2;
+            member('planBrace${bay}a',[left,y0,180],[right,y1,180],brace);
+            member('planBrace${bay}b',[right,y0,180],[left,y1,180],brace);
+            welds.push({a:'planBrace${bay}a',b:'planBrace${bay}b',legSize:5});
+            for(name in ['planBrace${bay}a','planBrace${bay}b'])for(side in 0...2)
+                welds.push({a:name,b:'lower$side',legSize:5});
+        }
         return new WeldedFrame('sheet-router-${routerSpec.workY}',frame,ids,[],welds);
     }
     /** Axis coordinate needed to bring the spindle gauge to a world position. */
@@ -220,6 +250,18 @@ class SheetRouterTool extends MachineComponent {
     public function new(length:Float) {super('REFERENCE-ROUTER-TOOL-$length','Longest assumed router tool envelope','steel',true);this.length=length;addConnector("tip",Axis,F.translation(0,0,-length));}
     override public function hasGeometry():Bool return true;
     override public function geometry(detail:ComponentDetail=Preview):Part return Part.cylinderSpan(6,-length,0);
+}
+
+/** Offset lifting bracket passes below the moving plate and outside its side boxes. */
+class SheetShoeLiftBracket extends MachineComponent {
+    public function new() {super("SHEET-SHOE-OFFSET-LIFT","Offset shoe lift bracket","steel",true);}
+    override public function hasGeometry():Bool return true;
+    override public function geometry(detail:ComponentDetail=Preview):Part return Solids.building([],parts->{
+        for(b in [{x:-120.0,z:-20.0,w:110.0,h:6.0},{x:-150.0,z:-20.0,w:20.0,h:60.0},{x:-150.0,z:34.0,w:40.0,h:6.0}]) {
+            var blank=Part.box(b.w,20,b.h),placed=blank.translated(new Vector(b.x,0,b.z));blank.close();parts.push(placed);
+        }
+        return Solids.union(parts);
+    });
 }
 
 /** Two spaced clamps react spindle moments into a vertical plate through a bolt couple. */
