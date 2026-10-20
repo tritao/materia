@@ -37,7 +37,7 @@ class CastingLevelOne {
 		var checks:Array<ToolingValidation> = [],
 			proposals:Array<CastabilityProposal> = [];
 		var metrics:CastingDesignMetrics = {
-			minimumCornerRadiusMm: d.input.features.filter(f -> f.kind != InsertRecess).length > 0 ? 0 : null,
+			minimumCornerRadiusMm: null,
 			minimumInsertEdgeMm: null,
 			minimumEmbeddedDepthMm: null,
 			minimumFixingAccessLandMm: null,
@@ -69,6 +69,38 @@ class CastingLevelOne {
 				proposals.push(proposal);
 			}
 		}
+		var radiusByParent = new Map<String, Float>();
+		for (feature in d.input.features)
+			if (feature.kind != InsertRecess) {
+				var parent = feature.derivedFrom == null ? feature.id : feature.derivedFrom;
+				var previous = radiusByParent.get(parent);
+				radiusByParent.set(parent, previous == null ? feature.cornerRadius : Math.min(previous, feature.cornerRadius));
+			}
+		for (radius in radiusByParent)
+			metrics.minimumCornerRadiusMm = metrics.minimumCornerRadiusMm == null ? radius : Math.min(metrics.minimumCornerRadiusMm, radius);
+		var parents = [for (parent in radiusByParent.keys()) parent];
+		parents.sort(Reflect.compare);
+		for (parent in parents)
+			finding("process.level1.corner-radius." + parent, parent, radiusByParent.get(parent), limits.minimumCornerRadiusMm,
+				"Source corner radius needs the declared minimum; any change requires design acceptance and replanning.", null,
+				limits.minimumCornerRadiusMm);
+		var support = CastingMoldPlanner.sourceSupport(d.input);
+		var unsupported = support.filter(check -> check.status == Unsupported);
+		if (unsupported.length > 0) {
+			for (check in unsupported) {
+				var parents:Array<String> = [];
+				for (id in check.affectedIds) {
+					var sources = d.input.features.filter(feature -> feature.id == id);
+					var parent = sources.length == 0 || sources[0].derivedFrom == null ? id : sources[0].derivedFrom;
+					if (parents.indexOf(parent) < 0) parents.push(parent);
+				}
+				parents.sort(Reflect.compare);
+				checks.push(FillAnalysis.check("process.level1.geometry." + parents.join("-"),
+					parents, Unsupported, check.message, []));
+			}
+			return {validation: checks, proposals: proposals, metrics: metrics};
+		}
+
 		var envelope:MoldBox;
 		try
 			envelope = CastingMoldPlanner.envelope(d)
@@ -77,19 +109,7 @@ class CastingLevelOne {
 				"Source-only box screening cannot represent this envelope: " + Std.string(error), []));
 			return {validation: checks, proposals: proposals, metrics: metrics};
 		}
-		var radiusByParent = new Map<String, Float>();
-		for (feature in d.input.features)
-			if (feature.kind != InsertRecess) {
-				var parent = feature.derivedFrom == null ? feature.id : feature.derivedFrom;
-				var previous = radiusByParent.get(parent);
-				radiusByParent.set(parent, previous == null ? feature.cornerRadius : Math.min(previous, feature.cornerRadius));
-			}
-		var parents = [for (parent in radiusByParent.keys()) parent];
-		parents.sort(Reflect.compare);
-		for (parent in parents)
-			finding("process.level1.corner-radius." + parent, parent, radiusByParent.get(parent), limits.minimumCornerRadiusMm,
-				"Source corner radius needs the declared minimum; any change requires design acceptance and replanning.", null,
-				limits.minimumCornerRadiusMm);
+
 		for (insert in d.input.inserts) {
 			var box = BoxMoldPlanner.box(insert.width, insert.depth, insert.height, F.compose(d.setup.sourceToMold, insert.pose));
 			var edge = Math.min(Math.min(box.x - envelope.x, envelope.x + envelope.width - box.x - box.width),

@@ -4,7 +4,6 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CastingMoldCodec;
-import materia.casting.BoxAlgebra;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.FillAnalysis;
 import materia.tooling.process.CureAnalysis;
@@ -54,13 +53,9 @@ class CastingProcessAnalysis {
 			gravityMps2: gravityMps2,
 			fabrication: fabrication == null ? null : {resinReference: fabrication.resinReference, adhesiveContainsEPS: fabrication.adhesiveContainsEPS}
 		}));
-		var features = p.document.input.features.copy();
-		features.sort((a, b) -> Reflect.compare(a.id, b.id));
-		var boundaries:Array<FillBoundary> = [
-			for (f in features)
-				{id: f.id, box: CastingMoldPlanner.featureBox(p.document, f)}
-		];
-		var resin = BoxAlgebra.subtract([p.envelope], [for (b in boundaries) b.box]);
+		var geometry = materia.tooling.casting.CastingSourceRegions.derive(p.document);
+		if (geometry.regions == null)
+			throw [for (check in geometry.validation) check.message].join("\n");
 		var projection = FillTooling.project(p);
 		var panels:Array<FillPanel> = [
 			for (member in p.panels.members.concat(p.supportPanels)) {
@@ -73,9 +68,14 @@ class CastingProcessAnalysis {
 				{id: member.panel.id, bottomMm: Math.max(p.envelope.z, bottom)};
 			}
 		];
-		var fill = FillAnalysis.analyze(p.document.input.id, sourceFingerprint, fingerprint, resin, boundaries,
-			[for (c in p.cores) {id: c.id, boxes: [c.cavity]}], p.document.setup.fillHeightMm, p.document.recipe.mixDensityKgM3, gravityMps2,
-			spec.pourRateMm3PerSecond, spec.maximumAirEscapeWidthMm, null, projection.blockers, panels);
+		var fillAssessment = FillAnalysis.assessRegions(geometry, p.document.setup.fillHeightMm, {
+			sourceFingerprint: sourceFingerprint, processFingerprint: fingerprint,
+			cores: [for (c in p.cores) {id: c.id, boxes: [c.cavity]}], densityKgM3: p.document.recipe.mixDensityKgM3,
+			gravityMps2: gravityMps2, pourRateMm3PerSecond: spec.pourRateMm3PerSecond,
+			maximumAirEscapeWidthMm: spec.maximumAirEscapeWidthMm, extraLevels: [], fillObstructions: projection.blockers, panels: panels
+		});
+		if (fillAssessment.report == null) throw "Unsupported source fill geometry";
+		var fill:FillAnalysis.FillReport = cast fillAssessment.report;
 		if (projection.unsupportedIds.length > 0)
 			fill.validation.push(FillAnalysis.check("process.fill.tooling-projection", projection.unsupportedIds,
 				materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,
@@ -89,9 +89,9 @@ class CastingProcessAnalysis {
 			fabrication == null ? materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending : fabrication.resinReference != spec.cure.reference ? materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail : materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass,
 			"Cure reference must name the same resin as the fabrication solvent record.",
 			fabrication == null ? [] : [fabrication.resinReference, spec.cure.reference]));
-		var sections = OrthogonalSections.analyze(p.document.input.id, sourceFingerprint, resin, boundaries);
-		fill.validation = fill.validation.concat(FillAnalysis.sourceSupport(p.document.input));
-		sections.validation = sections.validation.concat(OrthogonalSections.sourceSupport(p.document.input));
+		var sectionAssessment = OrthogonalSections.assessRegions(geometry, sourceFingerprint);
+		if (sectionAssessment.report == null) throw "Unsupported source section geometry";
+		var sections:OrthogonalSections.OrthogonalSectionReport = cast sectionAssessment.report;
 		for (contact in spec.faceContacts)
 			if (sections.junction.faces.filter(face -> ThermalFaces.id(face) == contact.faceId).length != 1)
 				throw "Unknown thermal face contact: " + contact.faceId;

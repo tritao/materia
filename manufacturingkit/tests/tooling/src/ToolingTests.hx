@@ -179,7 +179,24 @@ class ToolingTests {
 		};
 	}
 
+	static function withdrawalTie():Void {
+		var d = fixture();
+		d.input.features = d.input.features.filter(f -> f.kind == materia.casting.CastingFeature.CastingFeatureKind.InsertRecess);
+		d.input.features.push(materia.casting.CastingPatterns.box("through-opening", ServiceOpening,
+			[materia.casting.CastingPatterns.face("body.z-min"), materia.casting.CastingPatterns.face("body.z-max")], 20, 20, 100));
+		d.setup.features = [];
+		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
+		rejects(() -> ToolingCodec.snapshot(d), "Ambiguous former withdrawal");
+		d.setup.features = [{featureId: "through-opening", strategy: ReusableFormer, priority: 5, withdrawal: {x: 0, y: 0, z: 1}}];
+		var chosen = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.snapshot(d));
+		var direction:{x:Float, y:Float, z:Float} = cast chosen[0].withdrawal;
+		check(chosen.length == 1 && direction.z == 1, "an explicit source feature override resolves withdrawal ambiguity");
+		check(materia.tooling.casting.CastingStrategies.standardRules().filter(rule -> rule.priority != 0).length == 0,
+			"generic strategy rules contain no machine-specific ownership priorities");
+	}
+
 	public static function main():Void {
+		withdrawalTie();
 		var original = fixture(),
 			encoded = ToolingCodec.encode(original),
 			decoded = ToolingCodec.decode(encoded);

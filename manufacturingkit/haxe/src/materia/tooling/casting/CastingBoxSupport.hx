@@ -12,7 +12,7 @@ class CastingBoxSupport {
 			if (!CastingCavities.supportsBoxes(cavity))
 				checks.push(FillAnalysis.check(rule + "." + cavity.featureId, [cavity.featureId], Unsupported,
 					"Unsupported non-box finished cavity: " + cavity.featureId, []));
-		if (checks.length == 0 && !CastingCavities.supportsBoxes({featureId: input.id, parentId: input.id, pieces: input.envelope}))
+		if (checks.length == 0 && !CastingCavities.supportsBoxes({featureId: input.id, parentId: input.id, geometry: materia.casting.CastingCavities.FinishedCavityGeometry.Prisms(input.envelope)}))
 			checks.push(FillAnalysis.check(rule + "." + input.id, [input.id], Unsupported,
 				"Unsupported non-box casting envelope: " + input.id, []));
 		if (checks.length == 0)

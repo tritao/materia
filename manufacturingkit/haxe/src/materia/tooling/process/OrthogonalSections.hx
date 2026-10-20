@@ -45,12 +45,30 @@ typedef OrthogonalSectionReport = {
 	var validation:Array<ToolingValidation>;
 }
 
+typedef OrthogonalSectionAssessment = {
+	var report:Null<OrthogonalSectionReport>;
+	var validation:Array<ToolingValidation>;
+}
+
 /** Coordinate-compressed rays span the entire material interval between opposite
  * physical faces. Boolean partition sizes are never mistaken for wall thickness.
  */
 class OrthogonalSections {
 	public static function sourceSupport(input:materia.tooling.casting.CastingToolingInput):Array<ToolingValidation>
 		return materia.tooling.casting.CastingBoxSupport.check(input, "process.sections.geometry");
+	public static function assessSource(document:materia.tooling.ToolingDocument, sourceFingerprint:String):OrthogonalSectionAssessment
+		return assessRegions(materia.tooling.casting.CastingSourceRegions.derive(document), sourceFingerprint);
+
+	public static function assessRegions(geometry:materia.tooling.casting.CastingSourceRegions.CastingBoxRegions,
+			sourceFingerprint:String):OrthogonalSectionAssessment {
+		var checks = materia.tooling.casting.CastingSourceRegions.checks(geometry, "process.sections.geometry");
+		if (geometry.regions == null) return {report: null, validation: checks};
+		var regions:{resin:Array<MoldBox>, boundaries:Array<FillBoundary>} = cast geometry.regions;
+		var report = analyze(geometry.sourceId, sourceFingerprint, regions.resin, regions.boundaries);
+		report.validation = report.validation.concat(checks);
+		return {report: report, validation: report.validation.copy()};
+	}
+
 	static inline var EPS = 1e-7;
 
 	static function lo(b:MoldBox, a:Int):Float

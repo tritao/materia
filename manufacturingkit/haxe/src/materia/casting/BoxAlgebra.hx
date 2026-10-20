@@ -188,9 +188,20 @@ class BoxAlgebra {
 		var cavities = CastingCavities.derive(body, features);
 		// Validate cavities before the envelope, preserving the source feature in diagnostics.
 		var cuts = [for (c in cavities) for (b in CastingCavities.boxes(c)) b];
-		var region = [
-			for (p in body) for (b in CastingCavities.boxes({featureId: p.id, parentId: p.id, pieces: [p]})) b
-		];
+		var region:Array<Box3> = [];
+		for (prism in body) {
+			var residue:CastingCavities.FinishedCastingCavity = {
+				featureId: prism.id, parentId: prism.id,
+				geometry: CastingCavities.FinishedCavityGeometry.Prisms([prism])
+			};
+			if (!CastingCavities.supportsBoxes(residue)) {
+				var ids = [for (feature in features) feature.id];
+				ids.sort(Reflect.compare);
+				throw ids.length == 0 ? "Unsupported non-box casting material envelope: " + prism.id
+					: "Unsupported non-box casting material residue after features: " + ids.join(", ");
+			}
+			for (box in CastingCavities.boxes(residue)) region.push(box);
+		}
 		return coalesce(subtract(region, cuts));
 	}
 
@@ -198,6 +209,8 @@ class BoxAlgebra {
 	public static function retain(features:Array<CastingFeature>, supports:Array<Box3>):Array<CastingFeature> {
 		var result:Array<CastingFeature> = [];
 		for (f in features) {
+			if (f.draft.degrees != 0 || f.cornerRadius != 0)
+				throw "Unsupported non-box retained-support subtraction: " + f.id;
 			var cells = coalesce(subtract([CastingBounds.feature(f)], supports));
 			if (cells.length == 1 && compare(cells[0], CastingBounds.feature(f)) == 0) {
 				result.push(f);

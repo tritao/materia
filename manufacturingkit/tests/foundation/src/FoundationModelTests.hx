@@ -36,7 +36,7 @@ class FoundationModelTests {
 		check(BoxAlgebra.volume(CastingCavities.boxes(derived)) == 30000, "exact box cavity");
 		cut.geometry.height = 26;
 		cut.geometry.pose.z = -1;
-		check(volume(CastingCavities.derive(body, [cut])[0].pieces[0]) == 30000, "cut margin does not change finished cavity");
+		check(volume(CastingCavities.prisms(CastingCavities.derive(body, [cut])[0])[0]) == 30000, "cut margin does not change finished cavity");
 		cut.openings = [];
 		rejects(() -> CastingCavities.derive(body, [cut]), "Undeclared casting breakout: pocket");
 		cut.openings = [P.face("body.x-min")];
@@ -47,15 +47,14 @@ class FoundationModelTests {
 		footFront.openings = [P.face("foot.y-min")];
 		check(CastingCavities.derive(flare, [footFront]).length == 1,
 			"coplanar foot and body faces retain distinct opening identities");
-		var access = P.box("access", ServiceOpening, [], 60, 30, 30, 65, 0, 25);
-		access.openings = CastingCavities.reachedOpenings(flare, access.geometry);
+		var access = P.box("access", ServiceOpening, [P.face("foot.side-2")], 60, 30, 30, 65, 0, 25);
 		check(access.openings.filter(o -> o.target == "foot.side-2").length == 1, "sloped foot opening is named exactly");
 		var wedge = CastingCavities.derive(flare, [access])[0];
-		check(wedge.pieces.length == 1, "foot intersection is one exact prism");
+		check(materia.casting.CastingCavities.prisms(wedge).length == 1, "foot intersection is one exact prism");
 		var expected = (35.0 + (80 - (55 - 20) * 30 / 40) - 35) / 2 * 30 * 30;
 		// At z=25 the sloped boundary is x=76.25; at z=55 it is x=53.75.
 		expected = ((76.25 - 35) + (53.75 - 35)) / 2 * 30 * 30;
-		check(Math.abs(volume(wedge.pieces[0]) - expected) < 1e-8, "sloped-foot cut has analytic wedge volume");
+		check(Math.abs(volume(materia.casting.CastingCavities.prisms(wedge)[0]) - expected) < 1e-8, "sloped-foot cut has analytic wedge volume");
 		rejects(() -> CastingCavities.boxes(wedge), "Unsupported non-box finished cavity: access");
 		var cells = [
 			{
@@ -147,13 +146,17 @@ class FoundationModelTests {
 		rejects(() -> CastingCavities.derive(body, [tilted]), "Unsupported casting feature: almost-axis");
 		var drafted = P.box("drafted-intent", Lightening, [], 10, 10, 10, 0, 0, 10);
 		drafted.draft.degrees = 2;
-		rejects(() -> CastingCavities.derive(body, [drafted]), "Unsupported drafted or rounded casting feature: drafted-intent");
+		var draftIntent = CastingCavities.derive(body, [drafted])[0];
+		check(!CastingCavities.supportsBoxes(draftIntent), "draft intent decodes without approximating its finished geometry");
+		rejects(() -> CastingCavities.boxes(draftIntent), "Unsupported non-box finished cavity: drafted-intent");
 		var legacy:Dynamic = haxe.Json.parse(CastingFeatureCodec.encode([parent]));
 		legacy.version = 1;
 		rejects(() -> CastingFeatureCodec.decode(haxe.Json.stringify(legacy)), "Unsupported casting feature schema");
 		var flared = CastingEnvelope.build(100, 80, 120, 0, 160, 60, 20);
 		var crossing = P.box("sloped-foot-crossing", ServiceOpening, [P.face("foot.side-2")], 60, 30, 30, 65, 0, 25);
 		rejects(() -> BoxAlgebra.material(flared, [crossing]), "Unsupported non-box finished cavity: sloped-foot-crossing");
+		var upperPocket = P.box("upper-pocket", Lightening, [], 20, 20, 20, 0, 0, 80);
+		rejects(() -> BoxAlgebra.material(flared, [upperPocket]), "Unsupported non-box casting material residue after features: upper-pocket");
 		var holes = TestInsertHoles.through(6, 20);
 		holes[0].thread = {
 			designation: "M7",

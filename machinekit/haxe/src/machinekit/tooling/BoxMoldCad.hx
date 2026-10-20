@@ -68,7 +68,7 @@ class BoxMoldCad {
 			var body = Solids.union(items);
 			items.resize(0);
 			items.push(body);
-			for(c in materia.casting.CastingCavities.derive(p.document.input.envelope,p.document.input.features))for(piece in c.pieces) {
+			for(c in materia.casting.CastingCavities.derive(p.document.input.envelope,p.document.input.features))for(piece in materia.casting.CastingCavities.prisms(c)) {
 				var local=Part.prism([for(v in piece.profile)new Vector(v.x,v.y)],0,piece.height);
 				try items.push(PosedParts.moved(local,F.compose(p.document.setup.sourceToMold,piece.pose))) catch(e:Dynamic){local.close();throw e;}
 				local.close();

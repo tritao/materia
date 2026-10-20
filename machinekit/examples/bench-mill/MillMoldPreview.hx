@@ -10,17 +10,29 @@ class MillMoldPreview {
 		var dir = root + "/build/tooling/base";
 		sys.FileSystem.createDirectory(root + "/build/tooling");
 		sys.FileSystem.createDirectory(dir);
-		sys.io.File.saveContent(dir + "/source-input.json", Json.stringify(input, null, "\t") + "\n");
-		var plan = CastingMoldPlanner.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
+		var document = MillMoldSetup.document(frame);
+		var sourceReview = CastingMoldPlanner.assess(document, MillMoldSetup.options(frame));
+		if (sourceReview.plan == null) {
+			var reportDir = root + "/build/tooling/base-source-assessment/" + sourceReview.sourceFingerprint;
+			machinekit.tooling.ToolingFiles.directory(reportDir);
+			sys.io.File.saveContent(reportDir + "/source-document.json", materia.tooling.ToolingCodec.encode(document));
+			sys.io.File.saveContent(reportDir + "/source-assessment.json", Json.stringify(sourceReview, null, "\t") + "\n");
+			Sys.println("Unsupported source geometry: " + reportDir + "; no current mold geometry was generated.");
+			return;
+		}
+		var plan:materia.tooling.casting.CastingMoldPlan = cast sourceReview.plan;
 		var assessment = machinekit.tooling.CastingMoldCad.assess(plan),
 			review = assessment.geometry;
 		if (review == null) {
-			sys.io.File.saveContent(dir + "/mold-plan.json", CastingMoldCodec.encode(plan));
-			sys.io.File.saveContent(dir + "/review.json",
+			var reportDir = root + "/build/tooling/base-source-assessment/" + sourceReview.sourceFingerprint;
+			machinekit.tooling.ToolingFiles.directory(reportDir);
+			sys.io.File.saveContent(reportDir + "/mold-plan.json", CastingMoldCodec.encode(plan));
+			sys.io.File.saveContent(reportDir + "/review.json",
 				Json.stringify({validation: plan.validation, diagnostics: assessment.diagnostics.items, fabrication: plan.fabrication}, null, "\t"));
-			Sys.println("Unsupported tooling strategy: wrote blocking plan/diagnostics; geometry was not generated.");
+			Sys.println("Unsupported tooling strategy: " + reportDir + "; no current mold geometry was generated.");
 			return;
 		}
+		sys.io.File.saveContent(dir + "/source-input.json", Json.stringify(input, null, "\t") + "\n");
 		sys.io.File.saveContent(dir + "/review.json", Json.stringify(review, null, "\t") + "\n");
 		if (Sys.args().indexOf("--checks") >= 0)
 			MillMoldChecks.run(frame, plan, review);

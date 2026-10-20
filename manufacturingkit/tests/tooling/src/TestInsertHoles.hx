@@ -1,8 +1,8 @@
 import materia.casting.InsertHole;
 class TestInsertHoles {
 	public static function through(diameter:Float, depth:Float):Array<InsertHole> {
-		if (diameter == 0)
-			return [];
+		if (!Math.isFinite(diameter + depth) || diameter <= 0 || depth <= 0)
+			throw "Test hole pattern requires positive drilling dimensions";
 		return [
 			{
 				id: "fixing",

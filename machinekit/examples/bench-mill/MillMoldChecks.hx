@@ -134,6 +134,12 @@ class MillMoldChecks {
 		check(p.changeRequests.filter(c -> c.kind == "fixture-attachment").length == 0, "tool-only fixture attachments are not casting changes");
 		check(report.handling.castingMassKg > 0 && report.demoldingSteps[report.demoldingSteps.length - 1].kind == "flip-to-service",
 			"mass/CoM and flip appear in demolding sequence");
+		for (corner in ["LeftFront", "LeftRear", "RightFront", "RightRear"]) {
+			var stems = p.document.input.features.filter(feature -> feature.id == "foot-stem-" + corner);
+			check(stems.length == 1 && stems[0].geometry.pose.z + stems[0].geometry.height == frame.layout.casting.footAccessFloor,
+				"foot stem ends at its authored access-floor contact");
+		}
+
 		var sourceFixings = [for (fixture in p.fixtures) for (fixing in fixture.fixings) fixing];
 		check(sourceFixings.length == 4, "the four mill column anchors get source-thread fixture screws");
 		for (fixture in p.fixtures) for (fixing in fixture.fixings) {

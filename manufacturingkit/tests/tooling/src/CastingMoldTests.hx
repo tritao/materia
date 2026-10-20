@@ -67,7 +67,37 @@ class CastingMoldTests {
 			liftingEvidence: []
 		};
 
+	static function unrealizedGeometry():Void {
+		for (draft in [true, false]) {
+			var d = ToolingTests.fixture();
+			var feature = d.input.features.filter(f -> f.kind != materia.casting.CastingFeature.CastingFeatureKind.InsertRecess)[0];
+			if (draft) feature.draft.degrees = 3; else feature.cornerRadius = 4;
+			d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
+			var encoded = ToolingCodec.encode(d);
+			check(ToolingCodec.encode(ToolingCodec.decode(encoded)) == encoded, "non-box intent survives its strict source codec");
+			var assessment = CastingMoldPlanner.assess(d, options(d));
+			check(assessment.plan == null && !assessment.fabrication.ready && assessment.changeRequests.length == 1,
+				"draft/radius capability gap produces an explicit unrealized assessment and source request");
+			check(assessment.changeRequests[0].sourceIds.indexOf(feature.id) >= 0
+				&& assessment.validation.filter(v -> v.status == "unsupported" && v.affectedIds.indexOf(feature.id) >= 0).length == 1,
+				"unrealized request and Unsupported name the actual source feature");
+			var levelOne = materia.tooling.process.CastingLevelOne.analyze(d);
+			check(levelOne.validation.filter(v -> v.status == "unsupported" && v.affectedIds.indexOf(feature.id) >= 0).length == 1,
+				"plan-free castability accepts the intent and reports its geometry capability gap");
+		}
+		var family = ToolingTests.fixture();
+		var child = family.input.features.filter(f -> f.kind != materia.casting.CastingFeature.CastingFeatureKind.InsertRecess)[0];
+		child.derivedFrom = "authored-pocket";
+		child.cornerRadius = 3;
+		family.setup.sourceFingerprint = ToolingCodec.inputFingerprint(family.input);
+		var review = materia.tooling.process.CastingLevelOne.analyze(family);
+		check(review.metrics.minimumCornerRadiusMm == 3
+			&& review.validation.filter(v -> v.status == "unsupported" && v.affectedIds.indexOf("authored-pocket") >= 0).length == 1,
+			"unrealized fragment castability reports its authored parent and preserves known radius metadata");
+	}
+
 	public static function run(d:ToolingDocument):Void {
+		unrealizedGeometry();
 		d = ToolingCodec.snapshot(d);
 		d.recipe.minimumLigament = 2;
 		var o = options(d),

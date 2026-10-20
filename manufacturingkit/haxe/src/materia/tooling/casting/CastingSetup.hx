@@ -8,6 +8,11 @@ enum abstract CoreStrategy(String) to String {
 	var Unsupported = "unsupported";
 }
 
+class CoreStrategies {
+	public static function values():Array<CoreStrategy> return [CoreStrategy.SacrificialEPS, CoreStrategy.ReusableFormer, CoreStrategy.Unsupported];
+	public static function tokens():Array<String> return [for (strategy in values()) (strategy:String)];
+}
+
 /** Directions are expressed in mold coordinates, never source coordinates. */
 typedef CastingFeatureStrategy = {
 	var featureId:String;

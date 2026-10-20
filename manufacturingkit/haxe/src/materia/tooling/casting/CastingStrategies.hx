@@ -19,6 +19,16 @@ enum abstract WithdrawalAxis(String) to String {
 	var Z = "z";
 }
 
+class WithdrawalAxes {
+	public static function values():Array<WithdrawalAxis> return [WithdrawalAxis.X, WithdrawalAxis.Y, WithdrawalAxis.Z];
+	public static function tokens():Array<String> return [for (axis in values()) (axis:String)];
+}
+
+class StrategyOpenings {
+	public static function values():Array<StrategyOpening> return [StrategyOpening.BodyOpening, StrategyOpening.Enclosed];
+	public static function tokens():Array<String> return [for (opening in values()) (opening:String)];
+}
+
 typedef CastingStrategyRule = {
 	var kind:CastingFeatureKind;
 	var opening:StrategyOpening;
@@ -39,7 +49,7 @@ class CastingStrategies {
 					kind: kind,
 					opening: opening,
 					strategy: kind == Lightening || opening == Enclosed ? SacrificialEPS : ReusableFormer,
-					priority: kind == ServiceOpening ? 30 : kind == Clearance ? 20 : 0,
+					priority: 0,
 					preferredAxis: kind == ServiceOpening ? X : Z
 				});
 		}
@@ -54,13 +64,13 @@ class CastingStrategies {
 			CastingFeatureCodec.fields(row, ["kind", "opening", "strategy", "priority", "preferredAxis"]);
 			var kind = R.string(row, "kind"), opening = R.string(row, "opening"), strategy = R.string(row, "strategy");
 			var axis = R.string(row, "preferredAxis"), priority = R.number(row, "priority");
-			if (["lightening", "service-opening", "interface-recess", "clearance"].indexOf(kind) < 0)
+			if ((CastingFeatureKinds.tokens().indexOf(kind) < 0 || kind == (CastingFeatureKind.InsertRecess:String)))
 				throw "Unknown casting strategy feature kind: " + kind;
-			if (opening != "body-opening" && opening != "enclosed")
+			if (StrategyOpenings.tokens().indexOf(opening) < 0)
 				throw "Invalid casting strategy opening condition";
-			if (["sacrificial-eps", "reusable-former", "unsupported"].indexOf(strategy) < 0)
+			if (materia.tooling.casting.CastingSetup.CoreStrategies.tokens().indexOf(strategy) < 0)
 				throw "Invalid casting rule strategy";
-			if (["x", "y", "z"].indexOf(axis) < 0 || priority != Math.floor(priority) || Math.abs(priority) > 1000000)
+			if (WithdrawalAxes.tokens().indexOf(axis) < 0 || priority != Math.floor(priority) || Math.abs(priority) > 1000000)
 				throw "Invalid casting strategy axis or priority";
 			var id = kind + "/" + opening;
 			if (ids.exists(id))
@@ -100,15 +110,15 @@ class CastingStrategies {
 				var normals = [for (o in openings) {id: o.target, normal: CastingCavities.bodyFaceNormal(document.input.envelope, o.target)}];
 				function coordinate(v:{x:Float, y:Float, z:Float}):Float
 					return rule.preferredAxis == X ? v.x : rule.preferredAxis == Y ? v.y : v.z;
-				normals.sort((a, b) -> {
-					var aa = coordinate(a.normal), bb = coordinate(b.normal);
-					if (Math.abs(Math.abs(aa) - Math.abs(bb)) > 1e-9)
-						return Reflect.compare(Math.abs(bb), Math.abs(aa));
-					if (Math.abs(aa - bb) > 1e-9)
-						return Reflect.compare(bb, aa);
-					return Reflect.compare(a.id, b.id);
-				});
-				var normal = normals[0].normal;
+				var best = 0.0;
+				for (candidate in normals) best = Math.max(best, Math.abs(coordinate(candidate.normal)));
+				var candidates = normals.filter(candidate -> Math.abs(Math.abs(coordinate(candidate.normal)) - best) <= 1e-9);
+				var normal = candidates[0].normal;
+				for (candidate in candidates) {
+					var v = candidate.normal;
+					if (Math.abs(v.x - normal.x) + Math.abs(v.y - normal.y) + Math.abs(v.z - normal.z) > 1e-9)
+						throw "Ambiguous former withdrawal; declare an explicit setup override: " + feature.id;
+				}
 				direction = F.transformVector(document.setup.sourceToMold, normal.x, normal.y, normal.z);
 			}
 			result.push({featureId: feature.id, strategy: rule.strategy, priority: rule.priority, withdrawal: direction});

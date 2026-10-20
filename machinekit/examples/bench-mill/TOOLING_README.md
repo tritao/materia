@@ -71,6 +71,13 @@ thread exit disk that meets casting material. Fixing holes carry their fixture
 screw and preserve the blind steel back wall. Threaded hardware has explicit
 release steps before the checked linear withdrawal sequence.
 
+Draft and radius intent is preserved in the source. The box tooling template
+reports unsupported geometry with its source ID and a linked request. CAD,
+fill and section assessments produce no substitute geometry or numeric report.
+The sloped-foot fixture exercises the actual fill, section and planner entry
+points against its independent CAD cut. Unsupported command-line assessments
+are written under `build/tooling/base-source-assessment/<source fingerprint>/`.
+
 The inverted setup puts rail faces toward the bed, underside cavities toward the
 fill face and the nominal rail mounting plane at mold Z=0. The casting envelope
 starts 4 mm above that datum in this source instance. Backing formers fill that

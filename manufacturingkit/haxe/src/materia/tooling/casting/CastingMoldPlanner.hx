@@ -15,6 +15,15 @@ import materia.tooling.panel.PanelContours;
 import materia.tooling.panel.PanelGeometry;
 import materia.tooling.ToolingEnums.MachiningSide;
 
+/** Source assessment can decline geometry without manufacturing a box stand-in. */
+typedef CastingMoldAssessment = {
+	var sourceFingerprint:String;
+	var plan:Null<CastingMoldPlan>;
+	var validation:Array<materia.tooling.ToolingValidation>;
+	var changeRequests:Array<DesignChangeRequest>;
+	var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
+}
+
 /** Orthogonal review template for multiple explicit EPS/former strategies.
  * All casting dimensions come from the source document. It never adds design cuts.
  */
@@ -35,22 +44,45 @@ class CastingMoldPlanner {
 			F.compose(d.setup.sourceToMold, F.compose(e.pose, F.translation((xs[0] + xs[3]) / 2, (ys[0] + ys[3]) / 2, 0))));
 	}
 
-	public static function featureBox(d:ToolingDocument,f:materia.casting.CastingFeature):MoldBox {
-		var cavity=materia.casting.CastingCavities.derive(d.input.envelope,d.input.features).filter(c->c.featureId==f.id)[0];
-		var boxes=materia.casting.CastingCavities.boxes(cavity);
-		if(boxes.length!=1)throw "Unsupported non-box finished cavity: "+f.id;
-		var box=boxes[0];
-		return BoxMoldPlanner.box(box.width,box.depth,box.height,F.compose(d.setup.sourceToMold,F.translation(box.x+box.width/2,box.y+box.depth/2,box.z)));
+	public static function featureBox(d:ToolingDocument, f:materia.casting.CastingFeature):MoldBox {
+		var cavities = materia.casting.CastingCavities.derive(d.input.envelope, d.input.features);
+		var cavity = cavities.filter(c -> c.featureId == f.id)[0];
+		var boxes = materia.casting.CastingCavities.boxes(cavity);
+		if (boxes.length != 1) throw "Unsupported non-box finished cavity: " + f.id;
+		var box = boxes[0];
+		return BoxMoldPlanner.box(box.width, box.depth, box.height,
+			F.compose(d.setup.sourceToMold, F.translation(box.x + box.width / 2, box.y + box.depth / 2, box.z)));
+	}
+
+	public static function assess(document:ToolingDocument, authored:CastingMoldOptions):CastingMoldAssessment {
+		var d = ToolingCodec.snapshot(document), options = CastingMoldOptionsCodec.snapshot(authored);
+		var checks = sourceSupport(d.input);
+		var unsupported = checks.filter(check -> check.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported);
+		if (unsupported.length > 0) {
+			var changes:Array<DesignChangeRequest> = [for (check in unsupported) {
+				id: materia.tooling.ToolingIds.derive("geometry-", check.affectedIds.join("-")),
+				kind: DesignChangeKind.ReleaseAlternative,
+				sourceIds: check.affectedIds.copy(),
+				reason: check.message + ". Select supported source geometry or implement profile-capable tooling before fabrication.",
+				blockingChecks: [check.rule]
+			}];
+			return {sourceFingerprint: ToolingCodec.documentFingerprint(d), plan: null, validation: checks,
+				changeRequests: changes, fabrication: materia.tooling.ToolingValidation.ToolingReadiness.evaluate(checks)};
+		}
+		var result = build(d, options, checks);
+		return {sourceFingerprint: result.sourceFingerprint, plan: result, validation: result.validation.copy(),
+			changeRequests: result.changeRequests.copy(), fabrication: result.fabrication};
 	}
 
 	public static function plan(document:ToolingDocument, authored:CastingMoldOptions):CastingMoldPlan {
-		var d = ToolingCodec.snapshot(document);
-		var geometryChecks = sourceSupport(d.input);
-		var unsupported = geometryChecks.filter(check -> check.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported);
-		if (unsupported.length > 0)
-			throw [for (check in unsupported) check.message].join("\n");
-		var o = CastingMoldOptionsCodec.snapshot(authored), e = envelope(d), r = d.recipe, t = r.panel.measuredThickness,
-			l = r.minimumLigament;
+		var assessment = assess(document, authored);
+		if (assessment.plan == null)
+			throw [for (check in assessment.validation) check.message].join("\n");
+		return cast assessment.plan;
+	}
+
+	static function build(d:ToolingDocument, o:CastingMoldOptions, geometryChecks:Array<materia.tooling.ToolingValidation>):CastingMoldPlan {
+		var e = envelope(d), r = d.recipe, t = r.panel.measuredThickness, l = r.minimumLigament;
 		if (o.precision.length != d.input.inserts.length || o.anchorage.length != d.input.inserts.length)
 			throw "Every insert needs precision and anchorage records";
 		for (j in o.groutedJoints)
@@ -185,7 +217,7 @@ class CastingMoldPlanner {
 					});
 					result.features.push({featureId: f.id, kind: EPSFeature, memberIds: [id]});
 					epsBoxes.push(cb);
-				} else if (s.strategy == CoreStrategy.Unsupported || f.draft.degrees > 0) {
+				} else if (s.strategy == CoreStrategy.Unsupported) {
 					result.features.push({featureId: f.id, kind: UnsupportedFeature, memberIds: []});
 					request(result, "unsupported-" + f.id, ReleaseAlternative, [f.id],
 						"This planner supports only orthogonal zero-draft rigid formers or fill-open EPS. Drafted/split formers are unsupported; choose supported EPS or revise the source to a supported geometry.",

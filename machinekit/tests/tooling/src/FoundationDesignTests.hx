@@ -55,21 +55,58 @@ class FoundationDesignTests {
 			id: "foot-fixture", revision: 1, lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			envelope: source.castingEnvelope(), features: [feature], inserts: []
 		};
-		for (checks in [
-			materia.tooling.process.FillAnalysis.sourceSupport(input),
-			materia.tooling.process.OrthogonalSections.sourceSupport(input),
-			materia.tooling.casting.CastingMoldPlanner.sourceSupport(input)
-		]) {
+		var frame = MillMoldSetup.frame();
+		var document = MillMoldSetup.document(frame), options = MillMoldSetup.options(frame);
+		document.input = input;
+		document.setup.sourceToMold = F.identity();
+		document.setup.fillHeightMm = 120;
+		document.setup.features = [];
+		document.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(input);
+		options.precision = []; options.anchorage = []; options.groutedJoints = [];
+		var settings:materia.tooling.process.FillAnalysis.FillSourceSettings = {
+			sourceFingerprint: materia.tooling.ToolingCodec.documentFingerprint(document), processFingerprint: "source-screen",
+			cores: [], densityKgM3: 2200, gravityMps2: 9.81, pourRateMm3PerSecond: null,
+			maximumAirEscapeWidthMm: null, extraLevels: [], fillObstructions: [], panels: []
+		};
+		var fill = materia.tooling.process.FillAnalysis.assessSource(document, settings);
+		var sections = materia.tooling.process.OrthogonalSections.assessSource(document, settings.sourceFingerprint);
+		var planned = materia.tooling.casting.CastingMoldPlanner.assess(document, options);
+		for (checks in [fill.validation, sections.validation, planned.validation]) {
 			assertions++;
 			if (checks.filter(check -> check.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported
 				&& check.affectedIds.indexOf(feature.id) >= 0).length != 1)
-				throw "Box-only consumer must report the exact non-box source feature";
+				throw "Actual box-only consumer must report the exact non-box source feature";
 		}
+		assertions++;
+		if (fill.report != null || sections.report != null || planned.plan != null || planned.fabrication.ready
+			|| planned.changeRequests.length != 1 || planned.changeRequests[0].blockingChecks[0] != planned.validation[0].rule)
+			throw "Unsupported source must have no approximate analysis or mold and must retain a source-linked request";
+		var foundation = new machinekit.structural.MineralFoundation(values.copy()
+			.setToken("features", CastingPatterns.encode([feature])), []);
+		var diagnostics = machinekit.structural.FoundationIntegrity.castingReview(foundation, document);
+		assertions++;
+		if (diagnostics.diagnostics.items.filter(item -> StringTools.startsWith(item.code, "casting.collision-hull.unsupported")).length != 1
+			|| diagnostics.unsupported == 0)
+			throw "Collision-hull Unsupported must reach the real foundation design diagnostics";
+		var boxDocument = materia.tooling.ToolingCodec.snapshot(document);
+		boxDocument.input.id = "box-control";
+		boxDocument.input.envelope = materia.casting.CastingEnvelope.build(100, 80, 120);
+		boxDocument.input.features = [];
+		boxDocument.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(boxDocument.input);
+		settings.sourceFingerprint = materia.tooling.ToolingCodec.documentFingerprint(boxDocument);
+		var boxFill = materia.tooling.process.FillAnalysis.assessSource(boxDocument, settings);
+		var boxSections = materia.tooling.process.OrthogonalSections.assessSource(boxDocument, settings.sourceFingerprint);
+		var fillReport:materia.tooling.process.FillAnalysis.FillReport = cast boxFill.report;
+		var sectionReport:materia.tooling.process.OrthogonalSections.OrthogonalSectionReport = cast boxSections.report;
+		assertions++;
+		if (boxFill.report == null || boxSections.report == null || fillReport.geometricResinVolumeMm3 != 960000
+			|| sectionReport.mixVolumeMm3 != 960000)
+			throw "Supported box source entry points must run the actual fill and section algorithms";
 		var localTool = Part.box(60, 30, 30),
 			tool = localTool.translated(new Vector(65, 0, 25));
 		localTool.close();
 		var reference = tool.intersect(body);
-		var actual = Solids.union([for (p in cavity.pieces) prism(p)]);
+		var actual = Solids.union([for (p in materia.casting.CastingCavities.prisms(cavity)) prism(p)]);
 		same(reference, actual, "foot-crossing cut/body intersection");
 		reference.close();
 		actual.close();
@@ -83,6 +120,24 @@ class FoundationDesignTests {
 		assertions++;
 		if (message.indexOf("Unsupported non-box finished cavity: foot-crossing") < 0)
 			throw "Box consumer lost feature ID";
+	}
+
+	static function unrealizedSource():Void {
+		for (rounded in [false, true]) {
+			var feature = CastingPatterns.box("unrealized", materia.casting.CastingFeature.CastingFeatureKind.Lightening,
+				[CastingPatterns.face("body.z-min")], 20, 20, 20);
+			if (rounded) feature.cornerRadius = 3; else feature.draft.degrees = 3;
+			var source = new MineralCasting(new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 120)
+				.setToken("features", CastingPatterns.encode([feature])));
+			assertions++;
+			if (source.collisionHullQualification.status != machinekit.structural.CastingCollisionQualification.CastingCollisionStatus.Unsupported)
+				throw "Unrealized source intent must not publish an approximate collision hull";
+			var failed = false;
+			try { var body = source.geometry(); body.close(); }
+			catch (error:Dynamic) failed = Std.string(error).indexOf("Unsupported casting cavity geometry: unrealized") >= 0;
+			assertions++;
+			if (!failed) throw "CAD must not silently omit the unrealized design feature";
+		}
 	}
 
 	static function buriedThreadExit():Void {
@@ -132,6 +187,7 @@ class FoundationDesignTests {
 	}
 
 	public static function main():Void {
+		unrealizedSource();
 		buriedThreadExit();
 		var flat = new machinekit.assembly.Diagnostics();
 		machinekit.design.DesignChecks.blindFastener(flat, "flat-bottom anchor", 40, 20, 23.5, 27, 0, 30, 15.6, 1.75, 3);

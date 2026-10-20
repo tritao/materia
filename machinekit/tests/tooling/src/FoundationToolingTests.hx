@@ -46,7 +46,7 @@ class FoundationToolingTests {
 		}
 		var body = Solids.union(envelope);
 		return Solids.building([body], parts -> {
-			for (c in materia.casting.CastingCavities.derive(input.envelope,input.features))for(p in c.pieces) {
+			for (c in materia.casting.CastingCavities.derive(input.envelope,input.features))for(p in materia.casting.CastingCavities.prisms(c)) {
 				var local=Part.prism([for(v in p.profile)new Vector(v.x,v.y)],0,p.height);
 				try parts.push(PosedParts.moved(local,p.pose)) catch(e:Dynamic){local.close();throw e;}
 				local.close();
@@ -183,13 +183,14 @@ class FoundationToolingTests {
 		return input;
 	}
 
-    static function declareFixtureOpenings(values:ComponentValues):ComponentValues {
-        values=machinekit.component.ComponentRecipeSupport.resolve(machinekit.structural.MineralCasting.parameters(),values);
-        var envelope=materia.casting.CastingEnvelope.build(values.number("width"),values.number("depth"),values.number("height"),values.number("cornerChamfer"),values.number("footWidth"),values.number("footHeight"),values.number("footShoulder"));
-        var features=CastingPatterns.decode(values.token("features"));
-        for(feature in features)feature.openings=materia.casting.CastingCavities.reachedOpenings(envelope,feature.geometry);
-        return values.copy().setToken("features",CastingPatterns.encode(features));
-    }
+	static function declareFixtureOpenings(values:ComponentValues, declarations:Map<String, Array<String>>):ComponentValues {
+		var features = CastingPatterns.decode(values.token("features"));
+		for (feature in features) {
+			if (!declarations.exists(feature.id)) throw "Fixture needs explicit opening declarations: " + feature.id;
+			feature.openings = [for (id in declarations.get(feature.id)) CastingPatterns.face(id)];
+		}
+		return values.copy().setToken("features", CastingPatterns.encode(features));
+	}
 	public static function main():Void {
 		var values = new ComponentValues().setNumber("width", 240)
 			.setNumber("depth", 200)
@@ -233,14 +234,14 @@ class FoundationToolingTests {
 
 		var chamfered = values.copy();
 		chamfered.setNumber("cornerChamfer", 12);
-		var chamferedInput = equivalent(new MineralFoundation(declareFixtureOpenings(chamfered), placements), "chamfered-foundation");
+		var chamferedInput = equivalent(new MineralFoundation(declareFixtureOpenings(chamfered, ["underside" => ["body.z-min"], "side-opening" => ["body.x-min"]]), placements), "chamfered-foundation");
 		check(chamferedInput.envelope[0].profile.length == 8, "chamfer represented by actual profile");
 		var flared = values.copy();
 		flared.setNumber("footWidth", 320).setNumber("footHeight", 100).setNumber("footShoulder", 50);
 		var flaredPlacements:Array<CastInsertPlacement> = [placements[0], {id: placements[1].id, part: placements[1].part, pose: placements[1].pose, openings: [CastingPatterns.face("foot.y-min")]}];
-		var flaredInput = equivalent(new MineralFoundation(declareFixtureOpenings(flared), flaredPlacements), "flared-foundation");
+		var flaredInput = equivalent(new MineralFoundation(declareFixtureOpenings(flared, ["underside" => ["foot.z-min"], "side-opening" => ["body.x-min", "foot.side-4"]]), flaredPlacements), "flared-foundation");
 		check(flaredInput.envelope.length == 2 && flaredInput.envelope[1].id == "foot", "flared foot is an additive oriented prism");
-		equivalent(new MineralFoundation(declareFixtureOpenings(flared.setNumber("cornerChamfer", 12)), flaredPlacements), "flared-chamfered-foundation");
+		equivalent(new MineralFoundation(declareFixtureOpenings(flared.setNumber("cornerChamfer", 12), ["underside" => ["foot.z-min"], "side-opening" => ["body.x-min", "foot.side-4"]]), flaredPlacements), "flared-chamfered-foundation");
 
 		// Existing independent machine family exercises the same adapter unchanged.
 		var hobber = FoundationToolingAdapter.snapshot(new machinekit.hobbing.MineralCastBed(), "typed-hobber", 1);

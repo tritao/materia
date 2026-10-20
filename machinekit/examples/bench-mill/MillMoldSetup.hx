@@ -10,6 +10,15 @@ import materia.assembly.AssemblyFrames as F;
 
 /** Tooling uses the complete frame instantiated by the mechanical preview. */
 class MillMoldSetup {
+	/** Mill overlap ownership is a recipe choice, independent of generic rules. */
+	static function featureRules():Array<materia.tooling.casting.CastingStrategies.CastingStrategyRule> {
+		var rules = materia.tooling.casting.CastingStrategies.standardRules();
+		for (rule in rules)
+			rule.priority = rule.kind == materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening ? 30
+				: rule.kind == materia.casting.CastingFeature.CastingFeatureKind.Clearance ? 20 : 0;
+		return rules;
+	}
+
 	public static function frame():MillFrame {
 		var reference = new BenchMill(false, false),
 			layout = MillFramePreview.layout(reference);
@@ -42,7 +51,7 @@ class MillMoldSetup {
 				}]
 			},
 			recipe: {
-				featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
+				featureRules: featureRules(),
 				id: "mill-base-panel-eps-review",
 				revision: 1,
 				panel: stock,

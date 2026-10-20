@@ -49,6 +49,21 @@ typedef FillReport = {
 	var validation:Array<ToolingValidation>;
 }
 
+typedef FillSourceSettings = {
+	var sourceFingerprint:String;
+	var processFingerprint:String;
+	var cores:Array<FillCore>;
+	var densityKgM3:Float;
+	var gravityMps2:Float;
+	var pourRateMm3PerSecond:Null<Float>;
+	var maximumAirEscapeWidthMm:Null<Float>;
+	var extraLevels:Array<Float>;
+	var fillObstructions:Array<MoldBox>;
+	var panels:Array<FillPanel>;
+}
+
+typedef FillAssessment = {var report:Null<FillReport>; var validation:Array<ToolingValidation>;}
+
 /** Exact rectilinear event-plane analysis. Air connectivity is evaluated in the
  * right-hand limit at each critical height: boxes ending there disappear,
  * surviving boxes retain their limiting volume. No offset height or pose sampling.
@@ -57,6 +72,21 @@ typedef FillReport = {
 class FillAnalysis {
 	public static function sourceSupport(input:materia.tooling.casting.CastingToolingInput):Array<ToolingValidation>
 		return materia.tooling.casting.CastingBoxSupport.check(input, "process.fill.geometry");
+	public static function assessSource(document:materia.tooling.ToolingDocument, settings:FillSourceSettings):FillAssessment
+		return assessRegions(materia.tooling.casting.CastingSourceRegions.derive(document), document.setup.fillHeightMm, settings);
+
+	public static function assessRegions(geometry:materia.tooling.casting.CastingSourceRegions.CastingBoxRegions,
+			fillHeightMm:Float, settings:FillSourceSettings):FillAssessment {
+		var checks = materia.tooling.casting.CastingSourceRegions.checks(geometry, "process.fill.geometry");
+		if (geometry.regions == null) return {report: null, validation: checks};
+		var regions:{resin:Array<MoldBox>, boundaries:Array<FillBoundary>} = cast geometry.regions;
+		var report = analyze(geometry.sourceId, settings.sourceFingerprint, settings.processFingerprint,
+			regions.resin, regions.boundaries, settings.cores, fillHeightMm, settings.densityKgM3, settings.gravityMps2,
+			settings.pourRateMm3PerSecond, settings.maximumAirEscapeWidthMm, settings.extraLevels, settings.fillObstructions, settings.panels);
+		report.validation = report.validation.concat(checks);
+		return {report: report, validation: report.validation.copy()};
+	}
+
 	static inline var EPS = 1e-7;
 
 	public static function check(rule:String, ids:Array<String>, status:ToolingCheckStatus, message:String, evidence:Array<String>):ToolingValidation

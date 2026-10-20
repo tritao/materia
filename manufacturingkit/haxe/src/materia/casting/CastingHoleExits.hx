@@ -16,10 +16,11 @@ class CastingHoleExits {
 			var polygon = section(prism, exit);
 			if (polygon.length >= 3) material.push(polygon);
 		}
+		if (material.length == 0) return false;
 		for (cavity in cavities) {
 			var source = features.filter(feature -> feature.id == cavity.featureId)[0];
 			if (source.owner == owner || source.openings.length == 0) continue;
-			for (prism in cavity.pieces) {
+			for (prism in materia.casting.CastingCavities.prisms(cavity)) {
 				var opening = section(prism, exit);
 				if (opening.length < 3) continue;
 				var next:Array<Array<CastingPoint2>> = [];

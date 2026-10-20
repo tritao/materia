@@ -10,6 +10,13 @@ enum abstract CastingFeatureKind(String) to String {
 	var Clearance = "clearance";
 }
 
+class CastingFeatureKinds {
+	public static function values():Array<CastingFeatureKind>
+		return [CastingFeatureKind.Lightening, CastingFeatureKind.ServiceOpening, CastingFeatureKind.InterfaceRecess,
+			CastingFeatureKind.InsertRecess, CastingFeatureKind.Clearance];
+	public static function tokens():Array<String> return [for (kind in values()) (kind:String)];
+}
+
 enum abstract CastingGeometryKind(String) to String {
 	var Box = "box";
 }
@@ -20,6 +27,11 @@ enum abstract CastingDimension(String) to String {
 	var Height = "height";
 	var Draft = "draft";
 	var CornerRadius = "cornerRadius";
+}
+
+class CastingDimensions {
+	public static function values():Array<CastingDimension> return [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height, CastingDimension.Draft, CastingDimension.CornerRadius];
+	public static function tokens():Array<String> return [for (dimension in values()) (dimension:String)];
 }
 
 enum abstract CastingOpeningKind(String) to String {

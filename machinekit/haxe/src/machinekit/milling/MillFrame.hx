@@ -4,6 +4,7 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentValues;
 import machinekit.component.Solids;
 import machinekit.structural.CastInsert;
+import materia.casting.InsertSpec.InsertRole;
 import materia.casting.CastingPatterns;
 import machinekit.structural.CastingFeaturePatterns;
 import machinekit.structural.InsertHoles;
@@ -120,7 +121,7 @@ class MillFrame extends MachineAssembly {
 						.setNumber("depth", footDepth)
 						.setNumber("height", details.columnAnchorThickness)
 						.setToken("holes", flared ? InsertHoles.tappedBlind(details.columnAnchorThread, details.columnAnchorThickness) : InsertHoles.fromNeutral([]))
-						.setToken("role", "column-mount")
+						.setToken("role", InsertRole.ColumnMount)
 						.setToken("label", "column mounting anchor")),
 					pose: F.translation(x, y - l.baseCentreY, l.railPlane - details.columnAnchorThickness)
 				});
@@ -140,7 +141,7 @@ class MillFrame extends MachineAssembly {
 							.setNumber("depth", l.wall)
 							.setNumber("height", l.insertThickness)
 							.setToken("holes", InsertHoles.through(details.levelingClearanceDiameter, l.insertThickness))
-							.setToken("role", "leveling-seat")
+							.setToken("role", InsertRole.LevelingSeat)
 							.setToken("label", "leveling screw seat")),
 						pose: F.translation(fx, fy, details.footAccessFloor - l.insertThickness)
 					});
@@ -200,7 +201,7 @@ class MillFrame extends MachineAssembly {
 							.setNumber("depth", details.hatchAnchorDepth)
 							.setNumber("height", details.hatchAnchorThickness)
 							.setToken("holes", InsertHoles.tappedBlind(details.hatchAnchorThread, details.hatchAnchorThickness))
-							.setToken("role", "hatch-mount")
+							.setToken("role", InsertRole.HatchMount)
 							.setToken("label", "rear motor hatch anchor")),
 						pose: F.fromRotationMatrix(sx * details.hatchAnchorSideOffset, a.yServiceRear - details.hatchAnchorRearInset - l.columnCentreY, z - l.railPlane, [1, 0, 0, 0, 0, 1, 0, -1, 0])
 					});
@@ -269,7 +270,7 @@ class MillFrame extends MachineAssembly {
 							.setNumber("depth", footDepth)
 							.setNumber("height", l.insertThickness)
 							.setToken("holes", InsertHoles.through(details.columnAnchorThread.clearanceDiameter, l.insertThickness))
-							.setToken("role", "column-mount")
+							.setToken("role", InsertRole.ColumnMount)
 							.setToken("label", "column sole clamping pad"))
 					} : row
 			];

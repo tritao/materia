@@ -1668,7 +1668,7 @@ hobber conversion commits and before fixing sockets:
   diameter is carried on the hole record from the standard
   (`ThreadedHoleChoice.clearanceDiameter`); fixtures and the box planner use it
   instead of rebuilding it from `minClearance`. Policy IDs are named constants.
-- [ ] Source sentinels 5–7: no diameter-0 "no holes" sentinel (`InsertHoles`,
+- [x] Source sentinels 5–7: no diameter-0 "no holes" sentinel (`InsertHoles`,
   `InsertHoleGeometry`, `MillFrame` `through(0, …)`); pass an empty list. Move the
   `InsertHoleGeometry.through` test helper and its test policy ID out of neutral
   code. Thread sizes are typed thread specs, not "M12"/"M4" strings; no dummy
@@ -1678,18 +1678,18 @@ hobber conversion commits and before fixing sockets:
   in `CastingStrategies` and `CastingFeatureCodec` come from the enum values.
   - Protection stage completes empty source patterns, test-only pattern helpers,
     typed thread choices, resolved clearance/thread depth and derived service
-    screw length. Contact-derived stem height, remaining role tokens/pedestal
-    details and feature/strategy enum lists remain in this checklist item.
-- [ ] Strategy rules 8–9: withdrawal ties fail or require an explicit override,
+    screw length. Review cleanup completes contact-derived stem height, typed
+    mill roles, named pedestal layout details and enum-derived vocabulary lists.
+- [x] Strategy rules 8–9: withdrawal ties fail or require an explicit override,
   never an alphabetical face ID; rule priorities live in the recipe, not as
   library defaults copied from the mill.
-- [ ] Unsupported reporting 10–11: `CastingCavities.derive` accepts draft and
+- [x] Unsupported reporting 10–11: `CastingCavities.derive` accepts draft and
   corner-radius intent instead of throwing at decode; box-only consumers report
   such features Unsupported by feature ID, so the planner and castability branches
   for draft and radius are reachable. The collision-hull Unsupported result
   reaches the design diagnostics (component or assembly checks), and a chamfered
   or flared body's residue names features, not the envelope prism.
-- [ ] Tests 12–14: run the sloped-foot cavity through the real fill, section and
+- [x] Tests 12–14: run the sloped-foot cavity through the real fill, section and
   planner consumers, not three wrappers of one check; `MillMoldChecks` asserts the
   mill's inserts get source-thread fixings (and the through-hole plugs above);
   fixture tests declare openings rather than filling them from `reachedOpenings`.
@@ -1708,3 +1708,46 @@ hobber conversion commits and before fixing sockets:
   still uses its lower diameter. Main validation: **36 FoundationDesign**
   assertions (all frozen differences zero), **248 MillMoldChecks** assertions.
   Fabrication readiness remains false.
+
+### Stage-1 review cleanup after `271ff0d1f`
+
+- Foot stems end at their access-floor contact; frozen base/column CAD remains
+  unchanged. Pedestal dimensions and chamber counts have named parameters; mill
+  roles use `InsertRole`. Feature, dimension and strategy vocabularies derive
+  from their enum values. Fixture opening declarations are explicit.
+- Generic strategy rules have unranked priority; mill ownership priorities live
+  in `MillMoldSetup`. Distinct withdrawal directions tied on the preferred axis
+  require an explicit feature override. Equal normals need no artificial face-ID
+  tie-break. Regression tests exercise both rejection and explicit resolution.
+- Derived cavity geometry is tagged as realized prisms or unsupported intent.
+  Draft/radius metadata survives strict source codecs. CAD requests for unrealized
+  features fail with the source ID; box consumers return Unsupported, with no
+  stand-in geometry. `CastingMoldPlanner.assess` returns a source-linked request
+  and no plan. Fill and section source entry points share one exact region
+  projection and the existing analysis algorithms; unsupported results have no
+  numeric report. The real process pipeline uses these entry points.
+- Collision-hull Unsupported reaches `FoundationIntegrity.castingReview`
+  diagnostics and validation. Non-box material residue identifies its source
+  features. Plan-free castability preserves known radius metadata and reports
+  unsupported fragments against their authored parent. Unsupported CLI reports
+  use fingerprinted assessment directories, preserving the last successful
+  export's source/geometry association.
+- Worktree validation: neutral Tooling **69**, Panel **52**, BoxPlanner **41**,
+  Fabrication **46**, ReviewContract **30**, JunctionThermal **36**, Castability
+  **58**, OrientationSection **43**, Process **1,313**, CastingMold **68**
+  (**1,756** total); FoundationModel **40**; FoundationDesign **54**, all four
+  frozen differences and sloped-foot CAD intersection zero; native **385**;
+  MillMoldChecks **249**; HobberPart **1,038**; FlexsplineHobber **1,131**;
+  Z drive **37**, drive support **29,164**, feet **102**. Pinned supplier references
+  were loaded read-only with their existing SHA checks. Main rerun passes Casting
+  **50**, native **385**, FoundationDesign **54**, MillMoldChecks **249**. Full
+  export repeats **249** mill checks and passes manifest integrity/tamper checks.
+  Mold, full and records-only packages and review/coupon archives are refreshed:
+  **790** hashed artifacts, **40** review programs, **17 Pass / 258 Pending /
+  15 Unsupported**, readiness **false**; review ZIP **791** entries, coupon ZIP
+  **52** entries / **8** programs. Persisted source/mold schemas remain **8 / 7**,
+  with hole recipes **3**; tagged derived geometry is runtime data, not a second
+  stored source encoding. No physical coupon evidence is recorded.
+- Fixing-socket cut-over awaits the requested geometry-scope decision: cylindrical
+  recesses require explicit Unsupported for the hobber's box-based collision and
+  section outputs until generalized geometry, or bringing that support forward.

@@ -93,7 +93,7 @@ class CastingFeatureCodec {
 			if (ids.exists(f.id))
 				throw "Duplicate casting feature: " + f.id;
 			ids.set(f.id, true);
-			if ([Lightening, ServiceOpening, InterfaceRecess, InsertRecess, Clearance].indexOf(f.kind) < 0)
+			if (CastingFeatureKinds.values().indexOf(f.kind) < 0)
 				throw "Unknown casting feature kind: " + f.id;
 			var g = f.geometry;
 			fields(g, ["kind", "width", "depth", "height", "pose"]);
@@ -132,7 +132,7 @@ class CastingFeatureCodec {
 			}
 			var dimensions = new Map<String, Bool>();
 			for (d in f.adjustable) {
-				if (["width", "depth", "height", "draft", "cornerRadius"].indexOf(d) < 0 || dimensions.exists(d))
+				if (CastingDimensions.tokens().indexOf(d) < 0 || dimensions.exists(d))
 					throw "Invalid adjustable dimension: " + f.id;
 				dimensions.set(d, true);
 			}

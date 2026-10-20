@@ -12,7 +12,8 @@ class MillCastingDetails {
 	public var footAccessFloor:Float = 40;
 	public var footInnerClearance:Float = 1;
 	public var footStemSize:Float = 20;
-	public var footStemTop:Float = 41;
+	public var footStemTop(get, never):Float;
+	function get_footStemTop():Float return footAccessFloor;
 	public var frontBearingSeatWidth:Float = 106;
 	public var rearBayDesignClearance:Float = 1;
 	public var levelingClearanceDiameter:Float = 18;

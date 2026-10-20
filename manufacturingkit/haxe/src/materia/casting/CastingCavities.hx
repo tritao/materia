@@ -5,7 +5,16 @@ import materia.casting.CastingPrism;
 import materia.casting.CastingPrism.CastingPoint2;
 import materia.assembly.AssemblyFrames as F;
 
-typedef FinishedCastingCavity = {var featureId:String; var parentId:String; var pieces:Array<CastingPrism>;}
+enum FinishedCavityGeometry {
+	Prisms(pieces:Array<CastingPrism>);
+	UnsupportedGeometry(reason:String);
+}
+
+typedef FinishedCastingCavity = {
+	var featureId:String;
+	var parentId:String;
+	var geometry:FinishedCavityGeometry;
+}
 typedef CastingFace3 = {var id:String; var points:Array<{x:Float, y:Float, z:Float}>;}
 
 /** Single source of cut ∩ body. Supported envelopes are disjoint convex prisms
@@ -24,8 +33,14 @@ class CastingCavities {
 			faces = boundary(body),
 			result:Array<FinishedCastingCavity> = [];
 		for (f in records) {
-			if (f.draft.degrees != 0 || f.cornerRadius != 0)
-				throw "Unsupported drafted or rounded casting feature: " + f.id;
+			if (f.draft.degrees != 0 || f.cornerRadius != 0) {
+				for (opening in f.openings)
+					if (opening.kind == BodyFace && faces.filter(face -> face.id == opening.target).length == 0)
+						throw "Unknown casting body face: " + opening.target;
+				result.push({featureId: f.id, parentId: f.derivedFrom == null ? f.id : f.derivedFrom,
+					geometry: UnsupportedGeometry("Drafted or rounded feature realization is not implemented")});
+				continue;
+			}
 			var b = CastingBounds.feature(f),
 				pieces:Array<CastingPrism> = [];
 			for (prism in body) {
@@ -84,14 +99,21 @@ class CastingCavities {
 			for (id in reached)
 				if (f.openings.filter(o -> o.kind == BodyFace && o.target == id).length == 0)
 					throw "Undeclared casting breakout: " + f.id + " " + id;
-			result.push({featureId: f.id, parentId: f.derivedFrom == null ? f.id : f.derivedFrom, pieces: pieces});
+			result.push({featureId: f.id, parentId: f.derivedFrom == null ? f.id : f.derivedFrom, geometry: Prisms(pieces)});
 		}
 		return result;
 	}
 
+	/** CAD and all consumers share the same realization gate; no empty stand-in. */
+	public static function prisms(cavity:FinishedCastingCavity):Array<CastingPrism> return switch cavity.geometry {
+		case Prisms(pieces): pieces;
+		case UnsupportedGeometry(reason): throw "Unsupported casting cavity geometry: " + cavity.featureId + ": " + reason;
+	};
+
 	public static function boxes(cavity:FinishedCastingCavity):Array<Box3> {
+		if (!supportsBoxes(cavity)) throw "Unsupported non-box finished cavity: " + cavity.featureId;
 		var result:Array<Box3> = [];
-		for (p in cavity.pieces) {
+		for (p in prisms(cavity)) {
 			if (!isBoxPrism(p))
 				throw "Unsupported non-box finished cavity: " + cavity.featureId;
 			var xs = [for (v in p.profile) v.x],
@@ -110,7 +132,10 @@ class CastingCavities {
 	}
 
 	public static function supportsBoxes(cavity:FinishedCastingCavity):Bool
-		return cavity.pieces.length > 0 && cavity.pieces.filter(piece -> !isBoxPrism(piece)).length == 0;
+		return switch cavity.geometry {
+			case Prisms(pieces): pieces.length > 0 && pieces.filter(piece -> !isBoxPrism(piece)).length == 0;
+			case UnsupportedGeometry(_): false;
+		};
 
 	static function isBoxPrism(p:CastingPrism):Bool {
 		if (p.profile.length != 4)
@@ -128,6 +153,7 @@ class CastingCavities {
 		return true;
 	}
 
+	/** Diagnostic only. Source callers declare openings; this must not populate intent. */
 	public static function reachedOpenings(body:Array<CastingPrism>, geometry:CastingGeometry):Array<CastingOpening> {
 		var b = CastingBounds.box(geometry), ids:Array<String> = [];
 		for (face in boundary(body))
