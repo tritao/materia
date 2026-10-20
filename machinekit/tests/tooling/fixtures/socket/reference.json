@@ -1,0 +1,11 @@
+{
+  "format": "machinekit.nominal-socket-reference",
+  "version": 1,
+  "product": "PFEIFER 05.250.064.040",
+  "documentRevision": "sha256:8cc485b6908661ee4b21f9079ec052cff06361a94b47bb6994a5d57ba6cd1e98",
+  "geometryStatus": "nominal-study",
+  "basis": "Frozen exterior of the retired socket component, translated to the shared insert frame Z=0..40. This is not manufacturer CAD or physical qualification.",
+  "file": "nominal-crimped-exterior.step.gz",
+  "stepSha256": "79ff7e12bbd13845e75f49fecfac811bfad4d5632ef7cdb36392dc32b56f71ec",
+  "stepBytes": 341358
+}

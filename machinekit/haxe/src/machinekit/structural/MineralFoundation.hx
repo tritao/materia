@@ -40,10 +40,7 @@ class MineralFoundation extends MachineAssembly {
 				id: 'insert-${row.id}',
 				kind: InsertRecess,
 				geometry: {
-					kind: Box,
-					width: row.part.parameterNumber("width"),
-					depth: row.part.parameterNumber("depth"),
-					height: row.part.parameterNumber("height"),
+					solid: materia.casting.CastingFeature.CastingGeometrySolid.Insert(row.part.bodySpec()),
 					pose: F.compose(F.identity(), row.pose)
 				},
 				openings: [for (opening in row.openings) {kind: opening.kind, target: opening.target}],

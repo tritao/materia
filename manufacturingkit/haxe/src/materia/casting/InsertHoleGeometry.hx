@@ -12,11 +12,18 @@ class InsertHoleGeometry {
 		throw "Unsupported non-axial insert hole: " + hole.id;
 	}
 
-	/** Actual radial stock beside a drilling pattern, including its counterbore. */
+	static function maximumRadius(hole:InsertHole):Float {
+		var diameter = hole.diameter;
+		if (hole.counterbore != null) diameter = Math.max(diameter, hole.counterbore.diameter);
+		if (hole.relief != null) diameter = Math.max(diameter, hole.relief.diameter);
+		return diameter / 2;
+	}
+
+	/** Actual radial stock beside drilling, including counterbore and thread relief. */
 	public static function radialWall(width:Float, depth:Float, height:Float, hole:InsertHole):Float {
 		var direction = axis(hole), entry = [hole.frame.x, hole.frame.y, hole.frame.z];
 		var low = [-width / 2, -depth / 2, 0.0], high = [width / 2, depth / 2, height];
-		var radius = (hole.counterbore == null ? hole.diameter : hole.counterbore.diameter) / 2;
+		var radius = maximumRadius(hole);
 		var wall = Math.POSITIVE_INFINITY;
 		for (index in 0...3)
 			if (index != direction)
@@ -44,7 +51,7 @@ class InsertHoleGeometry {
 				|| hole.extent == Blind && hole.depth > available + 1e-7)
 				throw "Insert hole depth disagrees with its extent: " + hole.id;
 			var length = Math.min(available, hole.depth);
-			var radius = (hole.counterbore == null ? hole.diameter : hole.counterbore.diameter) / 2;
+			var radius = maximumRadius(hole);
 			var boundsLow = [for (v in entry) v - radius], boundsHigh = [for (v in entry) v + radius];
 			boundsLow[axis] = Math.min(entry[axis], entry[axis] + components[axis] * length);
 			boundsHigh[axis] = Math.max(entry[axis], entry[axis] + components[axis] * length);
@@ -69,6 +76,15 @@ class InsertHoleGeometry {
 				var cb = hole.counterbore;
 				removed = Math.PI * (cb.diameter * cb.diameter - hole.diameter * hole.diameter) / 4 * cb.depth;
 				center = materia.assembly.AssemblyFrames.transformPoint(hole.frame, 0, 0, cb.depth / 2);
+				volume -= removed;
+				mx -= removed * center.x;
+				my -= removed * center.y;
+				mz -= removed * center.z;
+			}
+			if (hole.relief != null) {
+				var relief = hole.relief, reliefLength = length - relief.start;
+				removed = Math.PI * (relief.diameter * relief.diameter - hole.diameter * hole.diameter) / 4 * reliefLength;
+				center = materia.assembly.AssemblyFrames.transformPoint(hole.frame, 0, 0, relief.start + reliefLength / 2);
 				volume -= removed;
 				mx -= removed * center.x;
 				my -= removed * center.y;

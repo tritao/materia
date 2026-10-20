@@ -1,4 +1,6 @@
 package materia.tooling.casting;
+
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.casting.BoxAlgebra;
 
 import materia.assembly.AssemblyFrames as F;
@@ -29,7 +31,7 @@ typedef CastingMoldAssessment = {
  */
 class CastingMoldPlanner {
 	public static function sourceSupport(input:CastingToolingInput):Array<materia.tooling.ToolingValidation>
-		return CastingBoxSupport.check(input, "tooling.feature.box-geometry");
+		return CastingBoxSupport.check(input, "tooling.feature.box-geometry").concat(InsertQualifications.check(input.inserts));
 	public static function envelope(d:ToolingDocument):MoldBox {
 		var rows = d.input.envelope;
 		if (rows.length != 1 || rows[0].profile.length != 4)
@@ -101,7 +103,8 @@ class CastingMoldPlanner {
 			}
 		var bodies = new Map<String, MoldBox>(), low = e.z;
 		for (i in d.input.inserts) {
-			var b = BoxMoldPlanner.box(i.width, i.depth, i.height, F.compose(d.setup.sourceToMold, i.pose));
+			var dimensions = InsertBodies.box(i.body, i.id);
+			var b = BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(d.setup.sourceToMold, i.pose));
 			bodies.set(i.id, b);
 			low = Math.min(low, b.z);
 			if (o.precision.filter(p -> p.insertId == i.id).length != 1 || o.anchorage.filter(p -> p.insertId == i.id).length != 1)
@@ -231,8 +234,9 @@ class CastingMoldPlanner {
 		var ordered = ownershipOrder(d.input.features, strategies);
 		// Datum fixtures occupy negative space only; neutral validation checks their resin clearance.
 		for (i in d.input.inserts) {
+			var dimensions = InsertBodies.box(i.body, i.id);
 			var pose = F.compose(d.setup.sourceToMold, i.pose),
-				face = F.compose(pose, F.translation(0, 0, i.height)),
+				face = F.compose(pose, F.translation(0, 0, dimensions.height)),
 				normal = F.transformVector(face, 0, 0, 1),
 				body = bodies.get(i.id);
 			if (body == null)
@@ -579,6 +583,7 @@ class CastingMoldPlanner {
 
 	public static function sourceRoute(finish:materia.casting.InsertSpec.InsertFinish):PrecisionRoute
 		return switch finish {
+			case AsSupplied: PrecisionRoute.AsSupplied;
 			case GroundAfterCasting, MachinedAfterCasting: PrecisionRoute.Machined;
 			case ReplicatedAfterCasting: PrecisionRoute.Replicated;
 			case SourceAsCast: PrecisionRoute.AsCast;

@@ -231,10 +231,7 @@ class BoxAlgebra {
 				fragment.derivedFrom = f.derivedFrom == null ? f.id : f.derivedFrom;
 				fragment.id = fragment.derivedFrom + "-fragment-" + haxe.crypto.Sha256.encode(haxe.Json.stringify(limits(b))).substr(0, 20);
 				fragment.geometry = {
-					kind: Box,
-					width: b.width,
-					depth: b.depth,
-					height: b.height,
+					solid: Cut(CastingSolid.Box(b.width, b.depth, b.height)),
 					pose: materia.assembly.AssemblyFrames.translation(b.x + b.width / 2, b.y + b.depth / 2, b.z)
 				};
 				// A retained support may close a formerly open face. Keep only openings that survive.

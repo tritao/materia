@@ -26,6 +26,9 @@ class ToolingReview {
 		for (f in materia.tooling.casting.CastingStrategies.resolve(d)) if (f.strategy == Unsupported)
 			result.push({ruleId: "tooling.core-strategy", subjectId: f.featureId, severity: Error, status: Unsupported,
 				message: "No supported tooling strategy has been selected for this feature", evidence: []});
+		for (check in materia.tooling.casting.InsertQualifications.check(d.input.inserts))
+			result.push({ruleId: check.rule, subjectId: check.affectedIds[0], status: check.status,
+				severity: check.severity, message: check.message, evidence: check.evidence.copy()});
 		return result;
 	}
 }

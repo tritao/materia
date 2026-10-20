@@ -14,12 +14,7 @@ import machinekit.structural.InsertHoles;
 
 typedef InsertLocation = {
 	var id:String;
-	var role:InsertRole;
-	var label:String;
-	var finish:InsertFinish;
-	var width:Float;
-	var depth:Float;
-	var height:Float;
+	var part:CastInsert;
 	var pose:AssemblyFrame;
 	var openings:Array<CastingOpening>;
 	@:optional var clampHeight:Float;
@@ -58,16 +53,19 @@ class FoundationLayout {
 		return supports;
 	}
 
+	static function boxInsert(id:String, role:InsertRole, label:String, w:Float, d:Float, h:Float,
+			pose:AssemblyFrame, openings:Array<String>, holes:String):InsertLocation {
+		return {id:id,part:new CastInsert(CastInsert.boxValues(w,d,h).setToken("role",role)
+			.setToken("label",label).setToken("finish",GroundAfterCasting).setToken("holes",holes)),
+			pose:pose,openings:faces(openings)};
+	}
+
 	public static function enclosureSeats():Array<InsertLocation> {
 		var out:Array<InsertLocation> = [];
-		for (x in [-1, 1]) for (y in [-1, 1])
-			out.push({
-				id: 'enclosureSeat${x + 1}${y + 1}', role: EnclosureMount, label: "enclosure frame dry-side mounting pad",
-				finish: GroundAfterCasting, width: 80, depth: 80, height: 20,
-				openings: faces([y < 0 ? "body.y-min" : "body.y-max"]),
-				pose: F.fromRotationMatrix(x * (HobberXLayout.front().bedLength / 2 - 100), y * 380, 720,
-					[1.0, 0, 0, 0, 0, y, 0, -y, 0])
-			});
+		for (x in [-1,1]) for (y in [-1,1])
+			out.push(boxInsert('enclosureSeat${x+1}${y+1}',EnclosureMount,"enclosure frame dry-side mounting pad",80,80,20,
+				F.fromRotationMatrix(x*(HobberXLayout.front().bedLength/2-100),y*380,720,[1.0,0,0,0,0,y,0,-y,0]),
+				[y < 0 ? "body.y-min" : "body.y-max"],InsertHoles.fromNeutral([])));
 		return out;
 	}
 
@@ -85,15 +83,29 @@ class FoundationLayout {
 		];
 	}
 
+	/** Unverified exterior study choices; published bore/thread dimensions live in the catalogue variant. */
+	public static inline final TRAY_SOCKET_OUTSIDE_DIAMETER = 8.0;
+	public static inline final TRAY_SOCKET_RELIEF_DIAMETER = 6.2;
+	public static inline final TRAY_SOCKET_TAIL_WIDTH = 11.0;
+	public static inline final TRAY_SOCKET_TAIL_THICKNESS = 2.2;
+	public static inline final TRAY_SOCKET_TAIL_WAVE = 1.4;
+	public static inline final TRAY_SOCKET_TAIL_BLEND = 0.5;
+	public static inline final TRAY_SOCKET_POSITION_TOLERANCE = 0.5;
+
+	public static function traySocket():CastInsert
+		return machinekit.structural.FixingSockets.pfeiferStudy({outsideDiameter:TRAY_SOCKET_OUTSIDE_DIAMETER,
+			reliefDiameter:TRAY_SOCKET_RELIEF_DIAMETER,tailWidth:TRAY_SOCKET_TAIL_WIDTH,
+			tailThickness:TRAY_SOCKET_TAIL_THICKNESS,tailWave:TRAY_SOCKET_TAIL_WAVE,tailBlend:TRAY_SOCKET_TAIL_BLEND},
+			TRAY_SOCKET_POSITION_TOLERANCE);
+
 	public static function trayClampSeats():Array<InsertLocation> {
 		var out:Array<InsertLocation> = [], d = dimensions("bed");
-		function add(x:Float, y:Float, height:Float = 11):Void
-			out.push({id: "trayClampSeat" + out.length, role: ThreadedAnchor, label: "tray clamp seat", finish: GroundAfterCasting,
-				width: 20, depth: 20, height: 20, openings: faces(["body.z-max"]),
-				pose: F.translation(x, y, d[2] - 20), clampHeight: height});
-		for (side in [-1, 1]) for (x in [-1, 0, 1]) add(x * (d[0] / 2 - 100), side * (d[1] / 2 - 35));
-		for (side in [-1, 1]) for (y in [-150.0, 150.0]) add(side * (d[0] / 2 - 35), y);
-		for (y in [-75.0, 75.0]) add(d[0] / 2 - 35, y, 17);
+		function add(x:Float,y:Float,height:Float = 11):Void
+			out.push({id:"trayClampSeat"+out.length,part:traySocket(),openings:faces(["body.z-max"]),
+				pose:F.translation(x,y,d[2]-machinekit.structural.FixingSockets.LENGTH),clampHeight:height});
+		for (side in [-1,1]) for (x in [-1,0,1]) add(x*(d[0]/2-100),side*(d[1]/2-35));
+		for (side in [-1,1]) for (y in [-150.0,150.0]) add(side*(d[0]/2-35),y);
+		for (y in [-75.0,75.0]) add(d[0]/2-35,y,17);
 		return out;
 	}
 
@@ -172,48 +184,36 @@ class FoundationLayout {
 	}
 
 	public static function placements(kind:String):Array<CastInsertPlacement>
-		return [for (row in inserts(kind)) {id: row.id, part: insert(row), pose: row.pose, openings: row.openings}];
+		return [for (row in inserts(kind)) {id:row.id,part:row.part,pose:row.pose,openings:row.openings}];
 
 	public static function inserts(kind:String):Array<InsertLocation> {
 		dimensions(kind);
 		var out:Array<InsertLocation> = [];
-		function add(id:String, role:InsertRole, label:String, w:Float, d:Float, h:Float,
-			x:Float, y:Float, z:Float, openings:Array<String>):Void
-			out.push({id: id, role: role, label: label, finish: GroundAfterCasting, width: w, depth: d, height: h,
-				pose: F.translation(x, y, z), openings: faces(openings)});
+		function add(id:String,role:InsertRole,label:String,w:Float,d:Float,h:Float,x:Float,y:Float,z:Float,
+				openings:Array<String>,holes:String):Void
+			out.push(boxInsert(id,role,label,w,d,h,F.translation(x,y,z),openings,holes));
+		var none = InsertHoles.fromNeutral([]);
 		if (kind == "bed") {
 			var layout = HobberXLayout.front(), centre = layout.bedCentre;
 			out = enclosureSeats().concat(trayClampSeats());
-			add("tablePlate", TableMount, "table seat", 280, 280, 20, -centre, 0, TABLE_SEAT - 20 + UPPER_OFFSET, []);
-			for (side in [-1, 1]) out.push({id: side < 0 ? "railLeft" : "railRight", role: GuideSeat, label: "preloaded column guide seat",
-				finish: GroundAfterCasting, width: BED_RAIL_SEAT_WIDTH, depth: layout.railLength, height: 20,
-				pose: F.fromRotationMatrix(layout.railStart + layout.railLength / 2 - centre, side * BED_RAIL_CENTRE,
-					200 + UPPER_OFFSET, [0.0, 1, 0, -1, 0, 0, 0, 0, 1]), openings: faces(["body.z-max"])});
-			out.push({id: "driveSeat", role: DriveMount, label: "central X screw channel seat", finish: GroundAfterCasting,
-				width: 100, depth: layout.motorFace - layout.deckStart, height: 20,
-				pose: F.fromRotationMatrix((layout.motorFace + layout.deckStart) / 2 - centre, 0, 120 + UPPER_OFFSET,
-					[0.0, 1, 0, -1, 0, 0, 0, 0, 1]), openings: []});
-			for (side in [-1, 1]) add(side < 0 ? "liftLeft" : "liftRight", LiftingMount, "lifting point",
-				30, 30, 30, -150 - centre, side * 310, 180 + UPPER_OFFSET, ["body.z-max"]);
+			add("tablePlate",TableMount,"table seat",280,280,20,-centre,0,TABLE_SEAT-20+UPPER_OFFSET,[],InsertHoles.through(40,20));
+			for (side in [-1,1]) out.push(boxInsert(side < 0 ? "railLeft" : "railRight",GuideSeat,"preloaded column guide seat",
+				BED_RAIL_SEAT_WIDTH,layout.railLength,20,
+				F.fromRotationMatrix(layout.railStart+layout.railLength/2-centre,side*BED_RAIL_CENTRE,200+UPPER_OFFSET,
+					[0.0,1,0,-1,0,0,0,0,1]),["body.z-max"],none));
+			out.push(boxInsert("driveSeat",DriveMount,"central X screw channel seat",100,layout.motorFace-layout.deckStart,20,
+				F.fromRotationMatrix((layout.motorFace+layout.deckStart)/2-centre,0,120+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1]),[],none));
+			for (side in [-1,1]) add(side < 0 ? "liftLeft" : "liftRight",LiftingMount,"lifting point",30,30,30,
+				-150-centre,side*310,180+UPPER_OFFSET,["body.z-max"],none);
 		} else {
-			add("basePlate", ColumnMount, "column carriage sole", 380, 100, 20, 0, -40, -10, ["body.z-min"]);
-			for (side in [-1, 1]) out.push({id: side < 0 ? "railLeft" : "railRight", role: GuideSeat, label: "Z rail seat",
-				finish: GroundAfterCasting, width: 35, depth: 480, height: 20,
-				pose: F.fromRotationMatrix(side * 145, 90, 245, [1.0, 0, 0, 0, 0, 1, 0, -1, 0]), openings: faces(["body.y-max"])});
-			out.push({id: "driveSeat", role: DriveMount, label: "central Z drive back seat", finish: GroundAfterCasting,
-				width: 100, depth: 460, height: 20,
-				pose: F.fromRotationMatrix(0, HobberZLayout.SEAT_COLUMN_Y, 250, [-1.0, 0, 0, 0, 0, 1, 0, 1, 0]), openings: []});
-			for (side in [-1, 1]) add(side < 0 ? "liftLeft" : "liftRight", LiftingMount, "lifting point",
-				25, 25, 20, side * 160, -40, 490, ["body.z-max"]);
+			add("basePlate",ColumnMount,"column carriage sole",380,100,20,0,-40,-10,["body.z-min"],none);
+			for (side in [-1,1]) out.push(boxInsert(side < 0 ? "railLeft" : "railRight",GuideSeat,"Z rail seat",35,480,20,
+				F.fromRotationMatrix(side*145,90,245,[1.0,0,0,0,0,1,0,-1,0]),["body.y-max"],none));
+			out.push(boxInsert("driveSeat",DriveMount,"central Z drive back seat",100,460,20,
+				F.fromRotationMatrix(0,HobberZLayout.SEAT_COLUMN_Y,250,[-1.0,0,0,0,0,1,0,1,0]),[],none));
+			for (side in [-1,1]) add(side < 0 ? "liftLeft" : "liftRight",LiftingMount,"lifting point",25,25,20,
+				side*160,-40,490,["body.z-max"],none);
 		}
 		return out;
-	}
-
-	public static function insert(row:InsertLocation):CastInsert {
-		var holes = row.role == ThreadedAnchor ? InsertHoles.tappedBlind(InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(6).mating()), row.height)
-			: row.role == TableMount ? InsertHoles.through(40, row.height) : InsertHoles.fromNeutral([]);
-		return new CastInsert(new ComponentValues().setNumber("width", row.width).setNumber("depth", row.depth)
-			.setNumber("height", row.height).setToken("holes", holes).setToken("role", row.role)
-			.setToken("label", row.label).setToken("finish", row.finish));
 	}
 }

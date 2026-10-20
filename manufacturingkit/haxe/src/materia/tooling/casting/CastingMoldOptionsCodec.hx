@@ -50,6 +50,7 @@ class CastingMoldOptionsCodec {
 				"evidence"
 			]);
 			var route:PrecisionRoute = switch text(p, "route") {
+				case "as-supplied": AsSupplied;
 				case "replicated": Replicated;
 				case "machined": Machined;
 				case "as-cast": AsCast;

@@ -5,6 +5,12 @@ import materia.casting.CastingEnvelope;
 import materia.casting.CastingCavities;
 import materia.casting.BoxAlgebra;
 import materia.casting.CastingFeatureCodec;
+import materia.casting.CastingSolid.CastingSolidCodec;
+import materia.casting.CastingSolid;
+import materia.casting.InsertSpec.InsertBody;
+import materia.casting.InsertSpec.InsertBodyCodec;
+import materia.casting.InsertOrigin;
+import materia.casting.InsertOrigin.InsertOriginCodec;
 
 class FoundationModelTests {
 	static var assertions = 0;
@@ -28,13 +34,17 @@ class FoundationModelTests {
 		return materia.casting.CastingPolygons.area(p.profile) * p.height;
 
 	public static function main():Void {
+		insertBodies();
+		threadRelief();
+		solidFeatures();
+		insertOrigin();
 		var body = CastingEnvelope.build(100, 80, 100);
 		var cut = P.box("pocket", Lightening, [P.face("body.z-min")], 40, 30, 25, 0, 0, 0, null, [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height]);
 		var encoded = CastingFeatureCodec.encode([cut]);
 		check(CastingFeatureCodec.encode(CastingFeatureCodec.decode(encoded)) == encoded, "typed feature codec roundtrip");
 		var derived = CastingCavities.derive(body, [cut])[0];
 		check(BoxAlgebra.volume(CastingCavities.boxes(derived)) == 30000, "exact box cavity");
-		cut.geometry.height = 26;
+		cut.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(40, 30, 26));
 		cut.geometry.pose.z = -1;
 		check(volume(CastingCavities.prisms(CastingCavities.derive(body, [cut])[0])[0]) == 30000, "cut margin does not change finished cavity");
 		cut.openings = [];
@@ -123,7 +133,7 @@ class FoundationModelTests {
 		check(withUnrelated.length == 2 && withUnrelated[0].id == fragments[0].id && withUnrelated[1].id == fragments[1].id,
 			"unrelated feature edits and order preserve fragment IDs");
 		var wider = CastingFeatureCodec.snapshot([parent])[0];
-		wider.geometry.width += 2;
+		wider.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(102, 60, 20));
 		var changed = BoxAlgebra.retain([wider], supports);
 		check(changed.length == 2 && changed[0].id != fragments[0].id && changed[1].id != fragments[1].id,
 			"geometry edits change fragment IDs");
@@ -191,5 +201,106 @@ class FoundationModelTests {
 		check(Math.abs(BoxAlgebra.minimumIy(sections, 0, 40) - 10 * 10 * 10 * 10 / 12) < 1e-6,
 			"a resolved narrow gap still controls the minimum section stiffness");
 		Sys.println("FoundationModelTests: " + assertions + " assertions passed");
+	}
+
+	static function insertBodies():Void {
+		var box = CastingSolidCodec.snapshot({kind: "box", width: 20, depth: 30, height: 40});
+		var cylinder = CastingSolidCodec.snapshot({kind: "cylinder", diameter: 8, height: 40});
+		check(switch box {case Box(w, d, h): w == 20 && d == 30 && h == 40; default: false;}, "primitive box dimensions");
+		check(switch cylinder {case Cylinder(d, h): d == 8 && h == 40; default: false;}, "primitive cylinder dimensions");
+		var cut = materia.casting.CastingPatterns.box("shape-domain", materia.casting.CastingFeature.CastingFeatureKind.Lightening, [], 8, 8, 40, 0, 0, 0);
+		cut.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Insert(Primitive(cylinder));
+		rejects(() -> CastingFeatureCodec.snapshot([cut]), "Design cut cannot use insert retention geometry");
+		cut.kind = materia.casting.CastingFeature.CastingFeatureKind.InsertRecess;
+		cut.owner = "source-insert";
+		cut.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Cut(cylinder);
+		rejects(() -> CastingFeatureCodec.snapshot([cut]), "Insert recess requires source insert geometry");
+		var formed = CrimpedSocket(Cylinder(8, 25), {length: 15, width: 11, thickness: 2.2, wave: 1.4, blend: 0.5});
+		for (body in [Primitive(box), Primitive(cylinder), formed]) {
+			var encoded = InsertBodyCodec.encode(body);
+			check(InsertBodyCodec.encode(InsertBodyCodec.decode(encoded)) == encoded, "strict insert exterior round trip");
+			check(InsertBodyCodec.encode(InsertBodyCodec.snapshot(body)) == encoded, "typed insert exterior snapshot");
+			var spec:materia.casting.InsertSpec = {body: body, holes: [], origin: Fabricated};
+			var copied = materia.casting.InsertSpec.InsertSpecCodec.snapshot(materia.casting.InsertSpec.InsertSpecCodec.record(spec));
+			check(copied.holes.length == 0 && InsertBodyCodec.encode(copied.body) == encoded, "one insert contract without invented holes");
+		}
+		var copied = InsertBodyCodec.snapshot(formed);
+		switch formed {case CrimpedSocket(_, tail): tail.width = 12; default:}
+		check(switch copied {case CrimpedSocket(_, tail): tail.width == 11; default: false;}, "snapshot detaches retention dimensions");
+		rejects(() -> CastingSolidCodec.snapshot({kind: "sphere", diameter: 8}), "Unsupported casting solid kind");
+		rejects(() -> CastingSolidCodec.snapshot({kind: "cylinder", diameter: 0, height: 40}), "finite and positive");
+		rejects(() -> CastingSolidCodec.record(Cylinder(Math.NaN, 40)), "finite and positive");
+		rejects(() -> CastingSolidCodec.record(Box(20, -30, 40)), "finite and positive");
+		rejects(() -> CastingSolidCodec.snapshot({kind: "cylinder", diameter: 8, height: 40, tail: null}), "Unexpected casting record fields");
+		rejects(() -> InsertBodyCodec.record(CrimpedSocket(Box(8, 8, 25), {length:15, width:11, thickness:2.2, wave:1.4, blend:0.5})), "mouth must be cylindrical");
+		rejects(() -> InsertBodyCodec.record(CrimpedSocket(Cylinder(8, 25), {length:15, width:7, thickness:2.2, wave:1.4, blend:0.5})), "Inconsistent insert crimped tail");
+		rejects(() -> CastingSolidCodec.snapshot({kind: "box", width: 20, depth: 30}), "Unexpected casting record fields");
+		rejects(() -> CastingSolidCodec.snapshot({kind: "cylinder", diameter: "8", height: 40}), "Invalid casting number");
+		rejects(() -> materia.casting.InsertSpec.InsertSpecCodec.snapshot({body: InsertBodyCodec.record(Primitive(box)), holes: null, origin: {kind:"fabricated"}}), "Invalid insert hole list");
+	}
+
+	static function threadRelief():Void {
+		var hole = TestInsertHoles.through(5, 25)[0];
+		hole.extent = Blind;
+		hole.thread = {designation: "M6", majorDiameter: 6, pitch: 1, starts: 1, hand: Right,
+			internal: true, toleranceClass: "6H", profile: Metric};
+		hole.tapDrill = 5;
+		hole.threadDepth = 6;
+		hole.clearanceDiameter = 6.6;
+		hole.relief = {diameter: 6.2, start: 6};
+		hole.limits.threaded = {minEngagement: 6, minTipGap: 1};
+		var copy = materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
+		check(copy.threadDepth == 6 && copy.depth == 25 && copy.relief != null && copy.relief.start == 6 && copy.relief.diameter == 6.2,
+			"short thread and deeper clearance bore remain distinct");
+		hole.relief.start = 5;
+		rejects(() -> materia.casting.InsertHole.InsertHoleCodec.snapshot([hole]), "Invalid insert thread relief");
+		hole.relief.start = 6;
+		hole.relief.diameter = 6;
+		rejects(() -> materia.casting.InsertHole.InsertHoleCodec.snapshot([hole]), "Invalid insert thread relief");
+		hole.relief.diameter = 6.2;
+		hole.extent = Through;
+		rejects(() -> materia.casting.InsertHole.InsertHoleCodec.snapshot([hole]), "Invalid insert thread relief");
+	}
+
+	static function solidFeatures():Void {
+		var feature = P.box("round-port", ServiceOpening, [P.face("body.z-max")], 1, 1, 1, 0, 0, 80);
+		feature.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(8, 40));
+		var encoded = CastingFeatureCodec.encode([feature]);
+		check(CastingFeatureCodec.encode(CastingFeatureCodec.decode(encoded)) == encoded, "solid feature schema roundtrip");
+		var cavity = CastingCavities.derive(CastingEnvelope.build(100, 80, 100), [feature])[0];
+		check(switch cavity.geometry {
+			case SolidIntersection(body, cut, _): body.length == 1 && body[0].height == 100
+				&& materia.casting.CastingFeature.CastingGeometrySolids.height(cut.geometry.solid) == 40 && cut.geometry.pose.z == 80;
+			default: false;
+		}, "non-box derivation retains the exact cut/body expression without clipping the design cut");
+		rejects(() -> CastingCavities.boxes(cavity), "Unsupported non-box finished cavity: round-port");
+		var previous:Dynamic = haxe.Json.parse(encoded);
+		previous.version = 2;
+		rejects(() -> CastingFeatureCodec.decode(haxe.Json.stringify(previous)), "Unsupported casting feature schema");
+	}
+
+	static function insertOrigin():Void {
+		var body = Primitive(Box(20, 30, 40));
+		var holes:Array<materia.casting.InsertHole> = [];
+		var product:materia.casting.InsertOrigin.CatalogueInsert = {manufacturer:"test supplier", reference:"fixture-product",
+			revision:"drawing-1", holePolicyId:"fixture-policy", document:"fixture-drawing", geometryBasis:NominalStudy,
+			geometryFingerprint:null, evidence:[]};
+		var origin = Catalogue(product);
+		var nominal = InsertOriginCodec.snapshot(origin, body, holes);
+		check(switch nominal {case Catalogue(p): p.geometryBasis == NominalStudy; default:false;}, "catalogue origin is explicitly nominal");
+		check(switch InsertOriginCodec.snapshot(Fabricated, body, holes) {case Fabricated:true; default:false;}, "fabricated origin is explicit");
+		rejects(() -> InsertOriginCodec.snapshot(null, body, holes), "Missing insert origin");
+		product.evidence = [{reference:"fixture-measurements", sha256:haxe.crypto.Sha256.encode("synthetic test evidence")}];
+		rejects(() -> InsertOriginCodec.snapshot(origin, body, holes), "Nominal insert geometry cannot claim verified geometry evidence");
+		product.geometryBasis = Measured;
+		product.geometryFingerprint = InsertOriginCodec.geometryFingerprint(product, body, holes);
+		var measured = InsertOriginCodec.snapshot(origin, body, holes);
+		check(switch measured {case Catalogue(p):p.evidence.length == 1; default:false;}, "evidence binds the complete insert");
+		product.revision = "drawing-2";
+		rejects(() -> InsertOriginCodec.snapshot(origin,body,holes),"bound to different geometry");
+		product.revision = "drawing-1";
+		rejects(() -> InsertOriginCodec.snapshot(origin, Primitive(Box(22,30,40)), holes), "bound to different geometry");
+		holes = TestInsertHoles.through(5,40);
+		rejects(() -> InsertOriginCodec.snapshot(origin, body, holes), "bound to different geometry");
 	}
 }

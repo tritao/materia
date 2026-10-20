@@ -34,7 +34,9 @@ class FoundationStudyGeometry {
 		return result;
 	}
 
-	public static function insertRegion(row:machinekit.hobbing.FoundationLayout.InsertLocation):FoundationStudyRegion
-		return {id: row.id, kind: InsertRecess,
-			box: CastingBounds.box({kind: Box, width: row.width, depth: row.depth, height: row.height, pose: row.pose})};
+	public static function insertRegion(row:machinekit.hobbing.FoundationLayout.InsertLocation):FoundationStudyRegion {
+		row.part.boxDimensions(row.id); // Explicit source-ID gate; this study cannot approximate a round insert.
+		return {id:row.id,kind:InsertRecess,box:CastingBounds.box({
+			solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(row.part.bodySpec()),pose:row.pose})};
+	}
 }

@@ -69,6 +69,8 @@ class CastingTests {
 		var parts:Array<MachineComponent> = [
 			casting,
 			new CastInsert(new ComponentValues().setToken("role", "generic-mount")),
+			new CastInsert(new ComponentValues().setToken("role", "threaded-anchor")
+				.setToken("body", materia.casting.InsertSpec.InsertBodyCodec.encode(materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Cylinder(12, 40))))),
 			new machinekit.milling.MillSupportTray(new ComponentValues().setNumber("width", 1200)
 				.setNumber("depth", 900)
 				.setNumber("millX", -80)
@@ -87,6 +89,8 @@ class CastingTests {
 		}
 		rejects(() -> new MineralCasting(new ComponentValues().setToken("material", "steel")), "casting material lock");
 		rejects(() -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setNumber("positionTolerance", 0)), "insert tolerance positive");
+		rejects(() -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setNumber("width", 40)),
+			"obsolete insert dimensions are rejected instead of overriding the typed body");
 		rejects(() -> new MineralCasting(new ComponentValues().setNumber("cornerChamfer", 400)), "oversized chamfer");
 		rejects(() -> CastingPatterns.decode('[{"id":"missing-dimensions"}]'), "malformed feature");
 		rejects(() -> CastingPatterns.encode([core, core]), "duplicate feature ids");
@@ -94,9 +98,7 @@ class CastingTests {
 		var cores = CastingPatterns.grid(650, 550, 120, 30, 20, 20, 25);
 		check(cores.length == 4, "cross-ribbed layout has four cores");
 
-		var insert = new CastInsert(new ComponentValues().setNumber("width", 40)
-			.setNumber("depth", 30)
-			.setNumber("height", 20)
+		var insert = new CastInsert(CastInsert.boxValues(40, 30, 20)
 			.setToken("role", "generic-mount")
 			.setToken("label", "test mount"));
 		var placements:Array<CastInsertPlacement> = [{id: "seat", part: insert,
@@ -151,10 +153,7 @@ class CastingTests {
 		}
 		var material = MaterialLibrary.require("mineral-cast").physical;
 		check(material.propertiesAssumed == true && material.youngsModulusPa == 35e9, "bulk properties retain assumed provenance");
-		var bored = new CastInsert(new ComponentValues().setToken("role", "generic-mount")
-			.setNumber("width", 40)
-			.setNumber("depth", 40)
-			.setNumber("height", 20)
+		var bored = new CastInsert(CastInsert.boxValues(40, 40, 20).setToken("role", "generic-mount")
 			.setToken("holes",machinekit.structural.InsertHoles.through(18,20)));
 		var boredShape = bored.geometry();
 		check(boredShape.valid() && boredShape.solidCount() == 1, "bored foot seat remains one solid");

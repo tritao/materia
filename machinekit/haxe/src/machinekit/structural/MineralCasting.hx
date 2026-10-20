@@ -1,8 +1,6 @@
 package machinekit.structural;
 
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
-import machinekit.assembly.PosedParts;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 import machinekit.structural.CastingCollisionQualification.CastingCollisionStatus;
@@ -23,7 +21,7 @@ class MineralCasting extends MachineComponent {
 	public static function parameters():Array<ComponentParameter> return [
 		P.length("width", 650), P.length("depth", 550), P.length("height", 120),
 		P.length("footWidth", 0), P.length("footHeight", 0), P.length("footShoulder", 0), P.length("cornerChamfer", 0),
-		P.text("features", '{"version":2,"features":[]}')
+		P.text("features", CastingPatterns.encode([]))
 	];
 
 	public static function recipeType():ComponentType {
@@ -75,27 +73,15 @@ class MineralCasting extends MachineComponent {
 		super.setMaterial(spec);
 	}
 
-	static function prism(p:CastingPrism):Part {
-		var local = Part.prism([for (v in p.profile) new Vector(v.x, v.y)], 0, p.height);
-		try {
-			var placed = PosedParts.moved(local, p.pose);
-			local.close();
-			return placed;
-		} catch (error:Dynamic) {
-			local.close();
-			throw error;
-		}
-	}
-
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var parts:Array<Part> = [];
 		try {
-			for (p in castingEnvelope()) parts.push(prism(p));
+			for (p in castingEnvelope()) parts.push(CastingCavityCad.prism(p));
 			var body = Solids.union(parts);
 			parts = [];
 			return Solids.building([body], owned -> {
 				for (cavity in finishedCavities())
-					for (piece in CastingCavities.prisms(cavity)) owned.push(Solids.named(prism(piece), cavity.featureId));
+					owned.push(Solids.named(CastingCavityCad.part(cavity), cavity.featureId));
 				return Solids.cut(owned[0], owned.slice(1));
 			});
 		} catch (error:Dynamic) {

@@ -1,5 +1,7 @@
 package materia.tooling.process;
 
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
+
 import materia.tooling.casting.CastingMoldPlan;
 import materia.casting.BoxAlgebra;
 import materia.tooling.casting.BoxMoldPlanner;
@@ -121,8 +123,10 @@ class FillTooling {
 		}
 		for (core in p.cores)
 			add(core.cavity);
-		for (insert in p.document.input.inserts)
-			add(BoxMoldPlanner.box(insert.width, insert.depth, insert.height, F.compose(p.document.setup.sourceToMold, insert.pose)));
+		for (insert in p.document.input.inserts) {
+			var dimensions = InsertBodies.box(insert.body, insert.id);
+			add(BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(p.document.setup.sourceToMold, insert.pose)));
+		}
 		var unique:Array<String> = [];
 		for (id in unsupportedIds)
 			if (unique.indexOf(id) < 0)

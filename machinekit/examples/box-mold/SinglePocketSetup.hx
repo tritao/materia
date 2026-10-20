@@ -19,10 +19,7 @@ class SinglePocketSetup {
 				{
 					id: "seat",
 					openings: [CastingPatterns.face("body.z-max")],
-					part: new CastInsert(new ComponentValues().setToken("role", "guide-seat")
-						.setNumber("width", 40)
-						.setNumber("depth", 35)
-						.setNumber("height", 15)
+					part: new CastInsert(CastInsert.boxValues(40, 35, 15).setToken("role", "guide-seat")
 						.setToken("holes",machinekit.structural.InsertHoles.tappedBlind(machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(6).mating()),15))),
 					pose: F.translation(80, 0, 85)
 				}

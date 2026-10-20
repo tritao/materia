@@ -1,3 +1,4 @@
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.CastingFeature.CastingDimension;
 import materia.tooling.ToolingDocument;
@@ -106,7 +107,7 @@ class CastingMoldTests {
 		FabricationTests.run(p);
 		var sourceThreads = ToolingCodec.snapshot(d);
 		sourceThreads.recipe.hardware.fixturePinSpacing = 24;
-		var threads = TestInsertHoles.through(5, sourceThreads.input.inserts[0].height);
+		var threads = TestInsertHoles.through(5, InsertBodies.height(sourceThreads.input.inserts[0].body));
 		threads[0].thread = {designation: "M6", majorDiameter: 6, pitch: 1, starts: 1, hand: Right,
 			internal: true, toleranceClass: "6H", profile: Metric};
 		threads[0].tapDrill = 5;
@@ -119,7 +120,7 @@ class CastingMoldTests {
 		second.id = "second";
 		second.frame.y = 5;
 		threads.push(second);
-		var unused = TestInsertHoles.through(3, sourceThreads.input.inserts[0].height)[0];
+		var unused = TestInsertHoles.through(3, InsertBodies.height(sourceThreads.input.inserts[0].body))[0];
 		unused.id = "unused";
 		unused.frame.x = 10;
 		unused.thread = threads[0].thread;
@@ -221,9 +222,11 @@ class CastingMoldTests {
 		for (f in p.fixtures)
 			for (b in f.datum.pieces)
 				negative.push(b);
-		for (i in d.input.inserts)
-			negative.push(materia.tooling.casting.BoxMoldPlanner.box(i.width, i.depth, i.height,
+		for (i in d.input.inserts) {
+			var dimensions = InsertBodies.box(i.body, i.id);
+			negative.push(materia.tooling.casting.BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height,
 				materia.assembly.AssemblyFrames.compose(d.setup.sourceToMold, i.pose)));
+		}
 		var source = BoxAlgebra.subtract([p.envelope], cuts),
 			reconstructed = BoxAlgebra.subtract([p.cavity], negative);
 		check(BoxAlgebra.volume(BoxAlgebra.subtract(source, reconstructed)) + BoxAlgebra.volume(BoxAlgebra.subtract(reconstructed, source)) < 1e-5,
@@ -323,7 +326,7 @@ class CastingMoldTests {
 			for (b in f.datum.pieces)
 				rotatedNegative.push(b);
 		for (i in rotated.input.inserts)
-			rotatedNegative.push(materia.tooling.casting.BoxMoldPlanner.box(i.width, i.depth, i.height,
+			rotatedNegative.push(materia.tooling.casting.BoxMoldPlanner.box(InsertBodies.box(i.body, i.id).width, InsertBodies.box(i.body, i.id).depth, InsertBodies.box(i.body, i.id).height,
 				materia.assembly.AssemblyFrames.compose(rotated.setup.sourceToMold, i.pose)));
 		var rotatedSource = BoxAlgebra.subtract([rotatedPlan.envelope], [for (f in rotated.input.features) CastingMoldPlanner.featureBox(rotated, f)]),
 			rotatedRebuilt = BoxAlgebra.subtract([rotatedPlan.cavity], rotatedNegative);
@@ -390,7 +393,7 @@ class CastingMoldTests {
 		});
 		rejects(() -> MoldVolumeCodec.encode(volume), "overlapping mold box pieces rejected");
 		var assigned = ToolingCodec.snapshot(rigid);
-		assigned.input.features.push({id:"overlap-detail",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:40,depth:40,height:30,pose:materia.assembly.AssemblyFrames.translation(0, 0, 20)},openings:[],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null});
+		assigned.input.features.push({id:"overlap-detail",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(40,40,30)),pose:materia.assembly.AssemblyFrames.translation(0, 0, 20)},openings:[],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null});
 		assigned.setup.features.push({
 			featureId: "overlap-detail",
 			strategy: materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,

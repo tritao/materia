@@ -16,6 +16,7 @@ typedef BlindThreadInterface = {
 }
 typedef CounterboreInterface = {var radius:Float; var depth:Float; var bearingDepth:Float;}
 typedef HoleInterface = {
+	@:optional var relief:materia.casting.InsertHole.InsertBoreRelief;
 	@:optional var insertClearanceDiameter:Float;
 	@:optional var insertLimits:materia.casting.InsertHole.InsertHoleLimits;
 	var id:String; var frame:AssemblyFrame; var radius:Float; var depth:Float;
@@ -54,6 +55,14 @@ class DesignInterfaces implements ComponentFacet {
 				for(v in [t.tapDrill,t.usableDepth,t.cylindricalDepth,t.stock,t.minEngagement,t.minTipGap,t.minBack]) positive(v);
 				if(!Math.isFinite(t.point)||t.point<0||t.spec==null || !t.spec.internal || t.tapDrill<=0 || t.tapDrill>=t.spec.majorDiameter || Math.abs(h.depth-t.cylindricalDepth-t.point)>1e-6) throw "Inconsistent blind drilling depth";
 			}
+			if (h.relief != null) {
+				var r = h.relief;
+				positive(r.diameter); positive(r.start);
+				if (h.thread == null || h.through == true || h.counterbore != null
+					|| r.diameter <= h.thread.spec.majorDiameter || r.start >= h.depth
+					|| Math.abs(r.start - h.thread.usableDepth) > 1e-8)
+					throw "Invalid interface thread relief";
+			}
 			if(h.approach!=null) {positive(h.approach.radius);positive(h.approach.length);}
 		}
 		for(d in datums) {name(d.id,ids);validFrame(d.frame);}
@@ -73,6 +82,12 @@ class DesignInterfaces implements ComponentFacet {
 		try for(h in holes) {
 			var local=Part.cylinderSpan(h.radius,-1,h.depth+(h.through==true?1:0));
 			tools.push(PosedParts.moved(local,h.frame));local.close();
+			if (h.relief != null) {
+				var relief = Part.cylinderSpan(h.relief.diameter / 2, h.relief.start, h.depth);
+				try tools.push(PosedParts.moved(relief, h.frame))
+				catch (error:Dynamic) {relief.close(); throw error;}
+				relief.close();
+			}
 			if(h.counterbore!=null) {
 				var cb=Part.cylinderSpan(h.counterbore.radius,-1,h.counterbore.depth);
 				tools.push(PosedParts.moved(cb,h.frame)); cb.close();

@@ -9,16 +9,14 @@ import materia.casting.InsertSpec.InsertFinish;
 import materia.casting.CastingFeature;
 import materia.casting.InsertHole;
 
-/** Steel box envelope with explicit drilling patterns; dimensions are in mm.
- * The matching casting recess is the full box, including the bore footprint.
- * Local +Z identifies the mounting-face normal; the face is at local Z = height.
+/** Neutral insert exterior and source drilling patterns, in mm.
+ * Local +Z identifies the mounting-face normal, at the body's height.
  */
 typedef CastingToolingInsert = {
 	var id:String;
-	var width:Float;
-	var depth:Float;
-	var height:Float;
+	var body:materia.casting.InsertSpec.InsertBody;
 	var holes:Array<InsertHole>;
+	var origin:materia.casting.InsertOrigin;
 	var material:materia.casting.InsertMaterial.InsertMaterialSpec;
 	var pose:AssemblyFrame;
 	var role:InsertRole;

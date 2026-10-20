@@ -5,11 +5,18 @@ import materia.assembly.AssemblyCodec;
 
 /** Strict source schema; no old box-list encoding is accepted. */
 class CastingFeatureCodec {
-	public static inline var VERSION = 2;
+	public static inline var VERSION = 3;
 
 	public static function encode(features:Array<CastingFeature>):String {
-		var copy = snapshot(features);
-		return haxe.Json.stringify({version: VERSION, features: copy});
+		var records:Array<Dynamic> = [];
+		for (feature in snapshot(features)) {
+			var record:Dynamic = {};
+			for (key in Reflect.fields(feature))
+				Reflect.setField(record, key, Reflect.field(feature, key));
+			Reflect.setField(record, "geometry", {solid: CastingFeature.CastingGeometrySolids.record(feature.geometry.solid), pose: feature.geometry.pose});
+			records.push(record);
+		}
+		return haxe.Json.stringify({version: VERSION, features: records});
 	}
 
 	public static function decode(text:String):Array<CastingFeature> {
@@ -42,7 +49,7 @@ class CastingFeatureCodec {
 			var g:Dynamic = Reflect.field(row, "geometry"),
 				d:Dynamic = Reflect.field(row, "draft"),
 				axis:Dynamic = Reflect.field(d, "axis");
-			fields(g, ["kind", "width", "depth", "height", "pose"]);
+			fields(g, ["solid", "pose"]);
 			fields(d, ["degrees", "axis"]);
 			fields(axis, ["x", "y", "z"]);
 			var openings:Array<CastingOpening> = [];
@@ -60,10 +67,7 @@ class CastingFeatureCodec {
 				id: CastingRecordCodec.string(row, "id"),
 				kind: cast CastingRecordCodec.string(row, "kind"),
 				geometry: {
-					kind: cast CastingRecordCodec.string(g, "kind"),
-					width: CastingRecordCodec.number(g, "width"),
-					depth: CastingRecordCodec.number(g, "depth"),
-					height: CastingRecordCodec.number(g, "height"),
+					solid: CastingFeature.CastingGeometrySolids.snapshot(Reflect.field(g, "solid")),
 					pose: CastingRecordCodec.frame(Reflect.field(g, "pose"))
 				},
 				openings: openings,
@@ -96,12 +100,19 @@ class CastingFeatureCodec {
 			if (CastingFeatureKinds.values().indexOf(f.kind) < 0)
 				throw "Unknown casting feature kind: " + f.id;
 			var g = f.geometry;
-			fields(g, ["kind", "width", "depth", "height", "pose"]);
-			if (g.kind != Box)
-				throw "Unsupported casting feature geometry: " + f.id;
-			for (v in [g.width, g.depth, g.height])
-				if (!Math.isFinite(v) || v <= 0)
-					throw "Invalid casting feature dimensions: " + f.id;
+			fields(g, ["solid", "pose"]);
+			switch g.solid {
+				case Cut(solid):
+					if (f.kind == InsertRecess) throw "Insert recess requires source insert geometry: " + f.id;
+					CastingSolid.CastingSolidCodec.validate(solid);
+				case Insert(body):
+					if (f.kind != InsertRecess) throw "Design cut cannot use insert retention geometry: " + f.id;
+					InsertSpec.InsertBodyCodec.validate(body);
+			}
+			var radiusLimit = switch CastingFeature.CastingGeometrySolids.mouth(g.solid) {
+				case Box(width, depth, _): Math.min(width, depth) / 2;
+				case Cylinder(diameter, _): diameter / 2;
+			};
 			AssemblyCodec.validateFrame(g.pose);
 			fields(f.draft, ["degrees", "axis"]);
 			fields(f.draft.axis, ["x", "y", "z"]);
@@ -111,7 +122,7 @@ class CastingFeatureCodec {
 				|| f.draft.degrees >= 45
 				|| Math.abs(a.x * a.x + a.y * a.y + a.z * a.z - 1) > 1e-8)
 				throw "Invalid casting feature draft: " + f.id;
-			if (!Math.isFinite(f.cornerRadius) || f.cornerRadius < 0 || f.cornerRadius > Math.min(g.width, g.depth) / 2)
+			if (!Math.isFinite(f.cornerRadius) || f.cornerRadius < 0 || f.cornerRadius > radiusLimit)
 				throw "Invalid casting feature corner radius: " + f.id;
 			if (f.owner != null)
 				identifier(f.owner);

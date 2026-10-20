@@ -1,5 +1,7 @@
 package machinekit.tooling;
 
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
@@ -77,16 +79,8 @@ class BoxMoldCad {
 		});
 	}
 
-	static function insert(p:MoldPlan):CastInsert {
-		var i = p.document.input.inserts[0];
-		return new CastInsert(new ComponentValues().setNumber("width", i.width)
-			.setNumber("depth", i.depth)
-			.setNumber("height", i.height)
-			.setToken("holes", machinekit.structural.InsertHoles.fromNeutral(i.holes))
-			.setNumber("positionTolerance", i.positionTolerance)
-			.setToken("role", i.role)
-			.setToken("label", i.label));
-	}
+	static function insert(p:MoldPlan):CastInsert
+		return ToolingInsertCad.component(p.document.input.inserts[0]);
 
 	public static function assembly(p:MoldPlan, exploded:Bool = false):MachineAssembly {
 		BoxMoldPlanner.validate(p);

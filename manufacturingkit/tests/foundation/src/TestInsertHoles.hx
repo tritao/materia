@@ -13,6 +13,7 @@ class TestInsertHoles {
 				thread: null,
 				tapDrill: null,
 				threadDepth: null,
+				relief: null,
 				clearanceDiameter: diameter,
 				counterbore: null,
 				limits: {

@@ -24,6 +24,48 @@ class FoundationDesignTests {
 		Sys.println(id + " symmetric difference: " + difference);
 	}
 
+	/** The accepted socket cut-over is an explicit design correction to the frozen box seats.
+	 * Keep the pre-socket STEP as an independent control: restore its twelve 20 mm
+	 * seat voids, then remove only the declared source socket cavities.
+	 */
+	static function socketSeats(foundation:machinekit.structural.MineralFoundation):Array<materia.casting.Box3> {
+		var sockets = foundation.insertLocations().filter(row -> switch row.part.insertSpec().origin {
+			case Catalogue(product): product.reference == machinekit.structural.FixingSockets.PFEIFER_REFERENCE;
+			default:false;
+		});
+		assertions++;
+		if (sockets.length != 12) throw "Hobber tray must use twelve catalogue sockets, with no duplicate box seats";
+		return [for (row in sockets) {
+			var hole = row.part.insertSpec().holes[0], mouth = F.compose(row.pose,hole.frame);
+			{x:mouth.x-10,y:mouth.y-10,z:mouth.z-20,width:20.0,depth:20.0,height:20.0};
+		}];
+	}
+
+	static function socketDesignChange(previous:Part,foundation:machinekit.structural.MineralFoundation):Part {
+		var oldSeats = socketSeats(foundation);
+		var restored = Solids.building([new Part(previous.shape.cloneShape())], parts -> {
+			for (box in oldSeats) {
+				var local = Part.box(box.width,box.depth,box.height);
+				try parts.push(PosedParts.moved(local,F.translation(box.x+box.width/2,box.y+box.depth/2,box.z)))
+				catch (error:Dynamic) {local.close(); throw error;}
+				local.close();
+			}
+			return Solids.union(parts);
+		});
+		var source = foundation.body;
+		var ids = source.castingFeatures().filter(feature -> !materia.casting.CastingFeature.CastingGeometrySolids.isBox(feature.geometry.solid));
+		assertions++;
+		if (ids.length != oldSeats.length || ids.filter(feature -> feature.kind != InsertRecess).length != 0)
+			throw "Socket correction must change only source-owned insert recesses";
+		var names = [for (feature in ids) feature.id];
+		return Solids.building([restored], parts -> {
+			for (cavity in source.finishedCavities())
+				if (names.indexOf(cavity.featureId) >= 0)
+					parts.push(machinekit.structural.CastingCavityCad.part(cavity));
+			return Solids.cut(parts[0],parts.slice(1));
+		});
+	}
+
 	static function prism(p:materia.casting.CastingPrism):Part {
 		var local = Part.prism([for (v in p.profile) new Vector(v.x, v.y)], 0, p.height);
 		try {
@@ -143,8 +185,7 @@ class FoundationDesignTests {
 	static function buriedThreadExit():Void {
 		var choice = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(12).mating());
 		var dimensions = new ComponentValues().setNumber("width", 100).setNumber("depth", 100).setNumber("height", 60);
-		var insertValues = new ComponentValues().setToken("role", "threaded-anchor")
-			.setNumber("width", 40).setNumber("depth", 40).setNumber("height", 25);
+		var insertValues = machinekit.structural.CastInsert.boxValues(40, 40, 25).setToken("role", "threaded-anchor");
 		var failed = false;
 		try new machinekit.structural.MineralFoundation(dimensions, [{
 			id: "anchor", pose: F.translation(0, 0, 35),
@@ -200,7 +241,7 @@ class FoundationDesignTests {
 		if (!negativePoint) throw "A flat bottom must not admit an invalid negative drill point";
 
 
-		var spec = machinekit.standard.SocketHeadCapScrew.metric("M12", 35).thread.mating();
+		var spec = machinekit.standard.FastenerThreads.coarse(12).mating();
 		var limits = machinekit.design.ThreadedHolePolicy.resolve(spec, C45Bright);
 		assertions++;
 		if (Math.abs(limits.minEngagement - 15.6) > 1e-9 || limits.minTipGap != spec.pitch || limits.minBack != 3
@@ -234,8 +275,8 @@ class FoundationDesignTests {
 			throw "Insert hole pattern must retain frames and resolved policy through the facet";
 		copied[1].counterbore = {diameter: 12, depth: 3};
 		var analytic = materia.casting.InsertHoleGeometry.massProperties(50, 40, 20, copied);
-		var insert = new machinekit.structural.CastInsert(new ComponentValues()
-			.setToken("role", "generic-mount").setNumber("width", 50).setNumber("depth", 40).setNumber("height", 20)
+		var insert = new machinekit.structural.CastInsert(machinekit.structural.CastInsert.boxValues(50, 40, 20)
+			.setToken("role", "generic-mount")
 			.setToken("holes", machinekit.structural.InsertHoles.fromNeutral(copied)));
 		var solid = insert.geometry(), physical = solid.massProperties();
 		solid.close();
@@ -248,8 +289,8 @@ class FoundationDesignTests {
 		blind.extent = materia.casting.InsertHole.HoleExtent.Blind;
 		blind.depth = 8;
 		blind.counterbore = {diameter: 12, depth: 3};
-		var blindInsert = new machinekit.structural.CastInsert(new ComponentValues()
-			.setToken("role", "generic-mount").setNumber("width", 50).setNumber("depth", 40).setNumber("height", 20)
+		var blindInsert = new machinekit.structural.CastInsert(machinekit.structural.CastInsert.boxValues(50, 40, 20)
+			.setToken("role", "generic-mount")
 			.setToken("holes", machinekit.structural.InsertHoles.fromNeutral([blind])));
 		var drilled = blindInsert.geometry(), actualBlind = drilled.massProperties();
 		var pin = machinekit.tooling.ToolingPin.boreMask(blind).geometry(), mask = PosedParts.moved(pin, blind.frame);
@@ -272,11 +313,11 @@ class FoundationDesignTests {
 		if (recovered[0].limits.policyId != custom.policyId || recovered[0].limits.overrides[0].value != 18
 			|| machinekit.structural.InsertHoles.fromNeutral(recovered) != overridden)
 			throw "Insert facet lost resolved limits or their recorded overrides";
-		var target = new machinekit.structural.CastInsert(new ComponentValues()
-			.setToken("role", "generic-mount").setNumber("width", 50).setNumber("depth", 40).setNumber("height", 20)
+		var target = new machinekit.structural.CastInsert(machinekit.structural.CastInsert.boxValues(50, 40, 20)
+			.setToken("role", "generic-mount")
 			.setToken("holes", machinekit.structural.InsertHoles.tappedThrough(machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(12).mating()), 20)));
-		var clamp = new machinekit.structural.CastInsert(new ComponentValues()
-			.setToken("role", "generic-mount").setNumber("width", 50).setNumber("depth", 50).setNumber("height", 5)
+		var clamp = new machinekit.structural.CastInsert(machinekit.structural.CastInsert.boxValues(50, 50, 5)
+			.setToken("role", "generic-mount")
 			.setToken("holes", machinekit.structural.InsertHoles.through(14, 5)));
 		var screw = machinekit.standard.SocketHeadCapScrew.metric("M12", 30, machinekit.standard.PropertyClass.Steel88);
 		var head = materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 25, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
@@ -328,9 +369,10 @@ class FoundationDesignTests {
 			{id: "hobber-column", part: new machinekit.hobbing.MineralCastColumn()}
 		];
 		var baseline:Dynamic = haxe.Json.parse(sys.io.File.getContent(root + "/../../../../examples/flexspline-hobber/BASELINE_FOUNDATIONS.json"));
-		if (baseline.format != "machinekit.foundation-baseline" || baseline.version != 2)
+		if (baseline.format != "machinekit.foundation-baseline" || baseline.version != 3)
 			throw "Unsupported foundation migration baseline";
 		var frozenRows:Array<Dynamic> = cast baseline.currentBeforeMigration;
+		var currentRows:Array<Dynamic> = [];
 		for (row in foundations) {
 			var process = sys.io.Process.run("gzip", ["-dc", root + "/" + row.id + ".step.gz"]);
 			var text = process.readStdout(), status = process.exitCode();
@@ -345,7 +387,26 @@ class FoundationDesignTests {
 				throw "Frozen migration CAD fixture fingerprint mismatch: " + row.id;
 			var previous = new Part(cadkit.Shape.importStepText(text)),
 				actual = row.part.body.geometry();
-			same(previous, actual, row.id);
+			if (row.id == "hobber-bed") {
+				var corrected = socketDesignChange(previous,row.part);
+				try {
+					same(corrected,actual,"hobber-bed explicit socket design correction");
+					var added = actual.subtract(previous), removed = previous.subtract(actual);
+					try Sys.println("hobber-bed socket correction: added="+added.volume()+" removed="+removed.volume()+" mm3")
+					catch (error:Dynamic) {added.close(); removed.close(); throw error;}
+					added.close(); removed.close();
+				} catch (error:Dynamic) {corrected.close(); previous.close(); actual.close(); throw error;}
+				corrected.close();
+			} else same(previous,actual,row.id);
+			var sourceInput = machinekit.tooling.FoundationToolingAdapter.snapshot(row.part,row.id,1);
+			var unsupported = row.part.body.finishedCavities().filter(cavity -> !CastingCavities.supportsBoxes(cavity));
+			var boxSupported = row.part.body.collisionHullQualification.status == machinekit.structural.CastingCollisionQualification.CastingCollisionStatus.Supported;
+			var boxes = boxSupported ? row.part.body.materialBoxes() : null;
+			var half = row.id == "hobber-bed" ? machinekit.hobbing.HobberXLayout.front().footSpan/2 : row.part.body.parameterNumber("width")/2;
+			currentRows.push({id:row.id,sourceFingerprint:materia.tooling.ToolingCodec.inputFingerprint(sourceInput),
+				sourceCodecVersion:materia.tooling.ToolingCodec.VERSION,volumeMm3:actual.volume(),massKg:row.part.body.massProperties().mass,
+				boxStatus:boxSupported ? "pass" : "unsupported",boxReason:row.part.body.collisionHullQualification.reason,unsupportedFeatures:[for (cavity in unsupported) cavity.featureId],
+				minimumIyMm4:boxes == null ? null : materia.casting.BoxAlgebra.minimumIy(boxes,-half,half)});
 			previous.close();
 			actual.close();
 			if (StringTools.startsWith(row.id, "hobber-")) {
@@ -356,17 +417,30 @@ class FoundationDesignTests {
 					z: materia.casting.CastingRecordCodec.number(box, "z"), width: materia.casting.CastingRecordCodec.number(box, "width"),
 					depth: materia.casting.CastingRecordCodec.number(box, "depth"), height: materia.casting.CastingRecordCodec.number(box, "height")
 				}];
-				var cells = row.part.body.materialBoxes();
+				var half:Float = frozen.halfSpan;
+				var historicalIy = materia.casting.BoxAlgebra.minimumIy(previousCells,-half,half), frozenIy:Float = frozen.minimumIy;
+				assertions++;
+				if (Math.abs(historicalIy-frozenIy) > frozenIy*1e-10) throw "Shared algebra changes historical frozen section Iy: " + row.id;
+				var boxFeatures = row.part.body.castingFeatures().filter(feature -> materia.casting.CastingFeature.CastingGeometrySolids.isBox(feature.geometry.solid));
+				var cells = materia.casting.BoxAlgebra.material(row.part.body.castingEnvelope(),boxFeatures);
+				if (kind == "bed") previousCells = materia.casting.BoxAlgebra.coalesce(previousCells.concat(socketSeats(row.part)));
 				var difference = materia.casting.BoxAlgebra.volume(materia.casting.BoxAlgebra.subtract(cells, previousCells))
 					+ materia.casting.BoxAlgebra.volume(materia.casting.BoxAlgebra.subtract(previousCells, cells));
 				assertions++;
 				if (difference > 1e-6)
 					throw "Shared algebra changes frozen hobber material: " + row.id;
 				assertions++;
-				if (Math.abs(materia.casting.BoxAlgebra.volume(cells) - frozen.volume) > 1e-6)
+				if (Math.abs(materia.casting.BoxAlgebra.volume(cells) - materia.casting.BoxAlgebra.volume(previousCells)) > 1e-6)
 					throw "Shared algebra changes frozen hobber volume: " + row.id;
-				var half:Float = frozen.halfSpan, expected:Float = frozen.minimumIy;
-				var iy = row.part.body.minimumSectionIy(-half, half);
+				var expected = materia.casting.BoxAlgebra.minimumIy(previousCells,-half,half);
+				var iy = materia.casting.BoxAlgebra.minimumIy(cells,-half,half);
+				if (kind == "bed") {
+					var message = "";
+					try row.part.body.minimumSectionIy(-half,half) catch (error:Dynamic) message = Std.string(error);
+					assertions++;
+					if (message.indexOf("Unsupported non-box finished cavity: insert-trayClampSeat") < 0)
+						throw "Final casting box-only stiffness must name its unsupported socket feature";
+				}
 				assertions++;
 				if (Math.abs(iy - expected) > expected * 1e-10)
 					throw "Shared algebra changes frozen hobber minimum section Iy: " + row.id + ": " + iy + " vs " + expected;
@@ -384,6 +458,11 @@ class FoundationDesignTests {
 				if (row.part.insertLocations().filter(insert -> insert.id == "driveSeat")[0].part.parameterToken("role") != "drive-mount")
 					throw "Hobber drive seats require their explicit source role";
 			}
+		}
+		if (Sys.args().indexOf("--write-baseline-current") >= 0) {
+			Reflect.setField(baseline,"currentDesign",currentRows);
+			Reflect.setField(baseline,"currentDesignBasis","Exact native volumes; box-only section results are Unsupported for socket recesses, never approximated.");
+			sys.io.File.saveContent(root+"/../../../../examples/flexspline-hobber/BASELINE_FOUNDATIONS.json",haxe.Json.stringify(baseline,null,"  ")+"\n");
 		}
 		slopedFoot();
 		Sys.println("FoundationDesignTests: " + assertions + " assertions passed");

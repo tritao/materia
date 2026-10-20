@@ -14,6 +14,8 @@ import materia.casting.CastingPrism.CastingPoint2;
 import materia.tooling.casting.CastingToolingInput;
 import materia.casting.CastingFeature;
 import materia.tooling.casting.CastingToolingInput.CastingToolingInsert;
+import materia.casting.CastingSolid;
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.casting.CastingFeature.CastingFeatureKind;
 import materia.tooling.casting.CastingSetup;
 import materia.tooling.casting.CastingSetup.CoreStrategy;
@@ -25,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 8;
+	public static inline var VERSION = 9;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -42,6 +44,22 @@ class ToolingCodec {
 		if (string(raw, "format") != FORMAT || integer(raw, "version") != VERSION)
 			throw "Unsupported tooling format or version";
 		return readDocument(Reflect.field(raw, "document"));
+	}
+
+	/** Persist source geometry once when a native source component needs no mold setup. */
+	public static function encodeInput(input:CastingToolingInput):String {
+		var text = canonical({format:FORMAT+"-source",version:VERSION,input:inputSnapshot(input)})+"\n";
+		checkSize(text);
+		return text;
+	}
+
+	public static function decodeInput(text:String):CastingToolingInput {
+		checkSize(text);
+		var raw:Dynamic = Json.parse(text);
+		object(raw,["format","version","input"],"tooling source");
+		if (string(raw,"format") != FORMAT+"-source" || integer(raw,"version") != VERSION)
+			throw "Unsupported tooling source format or version";
+		return readInput(Reflect.field(raw,"input"));
 	}
 
 	/** Accepts typed records through exactly the same validation as decoded JSON. */
@@ -93,8 +111,8 @@ class ToolingCodec {
 				var i = f.owner == null ? null : byId.get(f.owner);
 				if (i == null || referenced.exists(f.owner))
 					throw 'Invalid insert reference on ${f.id}';
-                if(f.geometry.width!=i.width||f.geometry.depth!=i.depth||f.geometry.height!=i.height||!sameFrame(f.geometry.pose,i.pose))
-                    throw 'Insert recess ${f.id} does not match insert ${i.id}';
+				if (canonical(f.geometry.solid) != canonical(materia.casting.CastingFeature.CastingGeometrySolid.Insert(i.body)) || !sameFrame(f.geometry.pose, i.pose))
+					throw 'Insert recess ${f.id} does not match insert ${i.id}';
 
 				referenced.set(i.id, true);
 			}
@@ -149,26 +167,34 @@ class ToolingCodec {
 	static function readInsert(raw:Dynamic):CastingToolingInsert {
 		object(raw, [
 			"id",
-			"width",
-			"depth",
-			"height",
+			"body",
 			"holes",
+			"origin",
 			"pose",
 			"role",
 			"label",
 			"positionTolerance", "material",
 			"finish"
 		], "insert");
-		var w = positive(raw, "width"),
-			d = positive(raw, "depth");
-        var holes=materia.casting.InsertHole.InsertHoleCodec.snapshot(Reflect.field(raw,"holes"));
-        for(hole in holes)if(hole.diameter>=Math.min(w,d))throw "Insert bore consumes its seat";
+		var source = materia.casting.InsertSpec.InsertSpecCodec.snapshot({
+			body: Reflect.field(raw, "body"), holes: Reflect.field(raw, "holes"), origin: Reflect.field(raw, "origin")
+		});
+		var body = source.body;
+		var boreWidth = switch InsertBodies.mouth(body) {
+			case Box(w, d, _): Math.min(w, d);
+			case Cylinder(diameter, _): diameter;
+		};
+		var holes = source.holes;
+		for (hole in holes) {
+			var diameter = hole.relief == null ? hole.diameter : hole.relief.diameter;
+			if (hole.counterbore != null) diameter = Math.max(diameter, hole.counterbore.diameter);
+			if (diameter >= boreWidth) throw "Insert bore consumes its seat";
+		}
 		return {
 			id: string(raw, "id"),
-			width: w,
-			depth: d,
-			height: positive(raw, "height"),
+			body: body,
 			holes: holes,
+			origin: source.origin,
 			pose: frame(raw, "pose"),
 			role: insertRole(string(raw, "role")),
 			label: string(raw, "label"),
@@ -619,6 +645,14 @@ class ToolingCodec {
 
 	/** Sort object keys as well as named records so field construction order is irrelevant. */
 	public static function canonical(value:Dynamic):String {
+		if (Std.isOfType(value, materia.casting.InsertSpec.InsertBody))
+			return canonical(materia.casting.InsertSpec.InsertBodyCodec.record(cast value));
+		if (Std.isOfType(value, materia.casting.CastingFeature.CastingGeometrySolid))
+			return canonical(materia.casting.CastingFeature.CastingGeometrySolids.record(cast value));
+		if (Std.isOfType(value, materia.casting.InsertOrigin))
+			return canonical(materia.casting.InsertOrigin.InsertOriginCodec.record(cast value));
+		if (Std.isOfType(value, CastingSolid))
+			return canonical(materia.casting.CastingSolid.CastingSolidCodec.record(cast value));
 		if (value == null)
 			return "null";
 		if (Std.isOfType(value, String) || Std.isOfType(value, Bool) || Std.isOfType(value, Float) || Std.isOfType(value, Int))

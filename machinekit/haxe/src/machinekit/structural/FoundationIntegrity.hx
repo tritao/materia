@@ -24,7 +24,11 @@ class FoundationIntegrity {
 			var normal = F.transformVector(actual, 0, 0, 1),
 				nominal = F.transformVector(expected, 0, 0, 1);
 			var tilt = Math.sqrt(Math.pow(normal.x - nominal.x, 2) + Math.pow(normal.y - nominal.y, 2) + Math.pow(normal.z - nominal.z, 2));
-			if (distance + tilt * Math.max(row.part.parameterNumber("width"), row.part.parameterNumber("depth")) > tolerance)
+			var faceSpan = switch materia.casting.InsertSpec.InsertBodyCodec.mouth(row.part.bodySpec()) {
+				case Box(width, depth, _): Math.max(width, depth);
+				case Cylinder(diameter, _): diameter;
+			};
+			if (distance + tilt * faceSpan > tolerance)
 				out.error("foundation.insert-plane", row.id, 'Insert "${row.id}" is outside its position/face-parallelism tolerance');
 		}
 		return out;

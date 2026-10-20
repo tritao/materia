@@ -32,7 +32,7 @@ class MillMoldPreview {
 			Sys.println("Unsupported tooling strategy: " + reportDir + "; no current mold geometry was generated.");
 			return;
 		}
-		sys.io.File.saveContent(dir + "/source-input.json", Json.stringify(input, null, "\t") + "\n");
+		sys.io.File.saveContent(dir + "/source-input.json", materia.tooling.ToolingCodec.canonical(input) + "\n");
 		sys.io.File.saveContent(dir + "/review.json", Json.stringify(review, null, "\t") + "\n");
 		if (Sys.args().indexOf("--checks") >= 0)
 			MillMoldChecks.run(frame, plan, review);

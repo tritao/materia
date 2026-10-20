@@ -1,3 +1,4 @@
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.tooling.casting.BoxMoldPlanner;
 import materia.tooling.ToolingCodec;
 import materia.tooling.casting.CoreSupport.CoreSupportMode;
@@ -100,14 +101,17 @@ class BoxMoldTests {
 		var metric = SinglePocketSetup.document();
 		// The M8 blind policy needs thicker stock than the M6 example.
 		var metricInsert = metric.input.inserts[0];
-		metricInsert.height = 20;
+		var insertSize = InsertBodies.box(metricInsert.body, metricInsert.id);
+		metricInsert.body = materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(insertSize.width, insertSize.depth, 20));
 		metricInsert.pose.z -= 5;
 		for (feature in metric.input.features)
 			if (feature.owner == metricInsert.id) {
-				feature.geometry.height = metricInsert.height;
+				feature.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Insert(metricInsert.body);
 				feature.geometry.pose.z = metricInsert.pose.z;
 			}
-		metric.input.inserts[0].holes = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.tappedBlind(machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(8).mating()), metric.input.inserts[0].height));
+		var threadChoice = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(8).mating());
+		var blindPattern = machinekit.structural.InsertHoles.tappedBlind(threadChoice, InsertBodies.height(metric.input.inserts[0].body));
+		metric.input.inserts[0].holes = machinekit.structural.InsertHoles.records(blindPattern);
 		metric.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(metric.input);
 		metric.recipe.hardware.supportScrewDiameter = 8;
 		metric.recipe.hardware.supportClearanceDiameter = 9;

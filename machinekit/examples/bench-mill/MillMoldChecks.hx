@@ -136,7 +136,7 @@ class MillMoldChecks {
 			"mass/CoM and flip appear in demolding sequence");
 		for (corner in ["LeftFront", "LeftRear", "RightFront", "RightRear"]) {
 			var stems = p.document.input.features.filter(feature -> feature.id == "foot-stem-" + corner);
-			check(stems.length == 1 && stems[0].geometry.pose.z + stems[0].geometry.height == frame.layout.casting.footAccessFloor,
+			check(stems.length == 1 && stems[0].geometry.pose.z + materia.casting.CastingFeature.CastingGeometrySolids.height(stems[0].geometry.solid) == frame.layout.casting.footAccessFloor,
 				"foot stem ends at its authored access-floor contact");
 		}
 
@@ -148,7 +148,7 @@ class MillMoldChecks {
 			var penetration = fixture.penetrations.filter(pen -> pen.sourceHoleId == hole.id)[0];
 			check(hole.thread != null && hole.extent == materia.casting.InsertHole.HoleExtent.Blind && penetration.plug == null
 				&& fixing.engagement + materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minTipGap <= hole.depth + 1e-7
-				&& insert.height - hole.depth >= hole.limits.minBack,
+				&& materia.casting.InsertSpec.InsertBodyCodec.height(insert.body) - hole.depth >= hole.limits.minBack,
 				"source fixing preserves the blind C45 back wall and has no buried plug");
 		}
 		for (f in p.fixtures) {

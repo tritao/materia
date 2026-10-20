@@ -75,7 +75,7 @@ class InsertHoles {
 		if (!Math.isFinite(diameter + depth) || diameter <= 0 || depth <= 0)
 			throw "Insert drilling dimensions must be finite and positive";
 		return haxe.Json.stringify({
-			version: 3,
+			version: 4,
 			holes: [
 				{
 					id: "fixing",
@@ -86,6 +86,7 @@ class InsertHoles {
 					thread: thread == null ? null : threadRecord(thread),
 					tapDrill: thread == null ? null : diameter,
 					threadDepth: thread == null ? null : depth,
+					relief: null,
 					clearanceDiameter: thread == null ? diameter
 						: machinekit.standard.SocketHeadCapScrew.catalog().get(thread.designation).clearanceMedium,
 					counterbore: null,
@@ -97,12 +98,12 @@ class InsertHoles {
 	}
 
 	public static function fromNeutral(holes:Array<InsertHole>):String
-		return haxe.Json.stringify({version: 3, holes: InsertHoleCodec.snapshot(holes)});
+		return haxe.Json.stringify({version: 4, holes: InsertHoleCodec.snapshot(holes)});
 
 	public static function records(text:String):Array<InsertHole> {
 		var raw:Dynamic = haxe.Json.parse(text);
 		materia.casting.CastingFeatureCodec.fields(raw, ["version", "holes"]);
-		if (raw.version != 3 || !Std.isOfType(raw.holes, Array))
+		if (raw.version != 4 || !Std.isOfType(raw.holes, Array))
 			throw "Unsupported insert hole recipe";
 		var holes:Array<Dynamic> = cast raw.holes;
 		return InsertHoleCodec.snapshot(cast holes);
@@ -111,7 +112,9 @@ class InsertHoles {
 	public static function facet(holes:Array<InsertHole>, width:Float, depth:Float, height:Float):DesignInterfaces {
 		var rows:Array<HoleInterface> = [];
 		for (h in holes) {
-			if (h.diameter >= Math.min(width, depth))
+			var boreDiameter = h.relief == null ? h.diameter : h.relief.diameter;
+			if (h.counterbore != null) boreDiameter = Math.max(boreDiameter, h.counterbore.diameter);
+			if (boreDiameter >= Math.min(width, depth))
 				throw "Insert hole consumes its seat: " + h.id;
 			var thread:Null<BlindThreadInterface> = null;
 			var limits = h.limits;
@@ -133,6 +136,7 @@ class InsertHoles {
 			}
 			rows.push({
 				insertLimits: limits,
+				relief: h.relief,
 				insertClearanceDiameter: h.clearanceDiameter,
 				id: h.id,
 				frame: h.frame,
@@ -166,6 +170,7 @@ class InsertHoles {
 					thread: h.thread == null ? null : threadRecord(h.thread.spec),
 					tapDrill: h.thread == null ? null : h.thread.tapDrill,
 					threadDepth: h.thread == null ? null : h.thread.usableDepth,
+					relief: h.relief == null ? null : {diameter: h.relief.diameter, start: h.relief.start},
 					clearanceDiameter: h.insertClearanceDiameter,
 					counterbore: h.counterbore == null ? null : {
 						diameter: 2 * h.counterbore.radius,

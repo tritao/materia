@@ -90,6 +90,7 @@ typedef MoldOpening = {
 }
 
 enum abstract PrecisionRoute(String) to String {
+	var AsSupplied = "as-supplied";
 	var Replicated = "replicated";
 	var Machined = "machined";
 	var AsCast = "as-cast";

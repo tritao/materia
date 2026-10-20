@@ -1,4 +1,6 @@
 package materia.tooling.casting;
+
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.casting.BoxAlgebra;
 
 import materia.assembly.AssemblyFrames as F;
@@ -19,7 +21,8 @@ class CastHandling {
 			mz += kg * (b.z + b.height / 2);
 		}
 		for (i in d.input.inserts) {
-			var steel = materia.casting.InsertHoleGeometry.massProperties(i.width, i.depth, i.height, i.holes);
+			var dimensions = InsertBodies.box(i.body, i.id);
+			var steel = materia.casting.InsertHoleGeometry.massProperties(dimensions.width, dimensions.depth, dimensions.height, i.holes);
 			var kg = steel.volume * d.recipe.steelDensityKgM3 * 1e-9;
 			var center = F.transformPoint(F.compose(d.setup.sourceToMold, i.pose), steel.center.x, steel.center.y, steel.center.z);
 			mass += kg;

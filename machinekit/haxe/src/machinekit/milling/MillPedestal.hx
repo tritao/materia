@@ -25,9 +25,7 @@ class MillPedestal extends MineralFoundation {
 			.setNumber("height", height)
 			.setNumber("cornerChamfer", d.cornerChamfer)
 			.setToken("features", CastingPatterns.encode(features));
-		var cap = new CastInsert(new ComponentValues().setNumber("width", width)
-			.setNumber("depth", depth)
-			.setNumber("height", d.capThickness)
+		var cap = new CastInsert(CastInsert.boxValues(width, depth, d.capThickness)
 			.setToken("role", InsertRole.GenericMount)
 			.setToken("label", "mill support cap"));
 		super(v, [{

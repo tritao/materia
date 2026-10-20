@@ -1763,7 +1763,7 @@
     }
   },
   "format": "machinekit.foundation-baseline",
-  "version": 2,
+  "version": 3,
   "currentBeforeMigration": [
     {
       "id": "bed",
@@ -9765,5 +9765,65 @@
       "halfSpan": 190
     }
   ],
-  "migrationSourceCommit": "864370774"
+  "migrationSourceCommit": "864370774",
+  "currentDesign": [
+    {
+      "id": "mill-base",
+      "sourceFingerprint": "4f87a9e96265d76c0d024b34fdb698a45aaef0dcda33b22e46857bbe5145bb80",
+      "sourceCodecVersion": 9,
+      "volumeMm3": 70011543.99999999,
+      "massKg": 168.0277056,
+      "boxStatus": "pass",
+      "boxReason": "Exact disjoint-box material hulls",
+      "unsupportedFeatures": [],
+      "minimumIyMm4": 441059422.4090705
+    },
+    {
+      "id": "mill-column",
+      "sourceFingerprint": "b7f9c2d735a5c22b73eb1a13688258b60048b19fb5f102f5da709d8c31ec8bd2",
+      "sourceCodecVersion": 9,
+      "volumeMm3": 41925099.99999999,
+      "massKg": 100.62023999999998,
+      "boxStatus": "unsupported",
+      "boxReason": "Flared or chamfered envelopes require non-box collision decomposition",
+      "unsupportedFeatures": [],
+      "minimumIyMm4": null
+    },
+    {
+      "id": "hobber-bed",
+      "sourceFingerprint": "d244a2e95b47896c0590490dd88e0e3294915a2423514aae17e78874027abd78",
+      "sourceCodecVersion": 9,
+      "volumeMm3": 350008859.82848215,
+      "massKg": 840.0212635883572,
+      "boxStatus": "unsupported",
+      "boxReason": "Unsupported collision geometry for features: insert-trayClampSeat0, insert-trayClampSeat1, insert-trayClampSeat10, insert-trayClampSeat11, insert-trayClampSeat2, insert-trayClampSeat3, insert-trayClampSeat4, insert-trayClampSeat5, insert-trayClampSeat6, insert-trayClampSeat7, insert-trayClampSeat8, insert-trayClampSeat9",
+      "unsupportedFeatures": [
+        "insert-trayClampSeat0",
+        "insert-trayClampSeat1",
+        "insert-trayClampSeat10",
+        "insert-trayClampSeat11",
+        "insert-trayClampSeat2",
+        "insert-trayClampSeat3",
+        "insert-trayClampSeat4",
+        "insert-trayClampSeat5",
+        "insert-trayClampSeat6",
+        "insert-trayClampSeat7",
+        "insert-trayClampSeat8",
+        "insert-trayClampSeat9"
+      ],
+      "minimumIyMm4": null
+    },
+    {
+      "id": "hobber-column",
+      "sourceFingerprint": "50fa9ced19f5a1d72ae7f61ef365fec8d62680f89cfd912bac6d8c5f94b7bebe",
+      "sourceCodecVersion": 9,
+      "volumeMm3": 18059500.00000001,
+      "massKg": 43.34280000000003,
+      "boxStatus": "pass",
+      "boxReason": "Exact disjoint-box material hulls",
+      "unsupportedFeatures": [],
+      "minimumIyMm4": 515253226.29969406
+    }
+  ],
+  "currentDesignBasis": "Exact native volumes; box-only section results are Unsupported for socket recesses, never approximated."
 }

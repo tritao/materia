@@ -18,19 +18,21 @@ class FlexsplineHobberBaseReport {
       var parent=haxe.io.Path.directory(root);if(parent==root||parent.length==0)throw "Cannot find typed foundation baseline";root=parent;
     }
     var raw:Dynamic=haxe.Json.parse(sys.io.File.getContent(root+"/machinekit/examples/flexspline-hobber/BASELINE_FOUNDATIONS.json"));
-    if(raw.format!="machinekit.foundation-baseline"||raw.version!=2)throw "Unsupported foundation baseline format/version";
+    if(raw.format!="machinekit.foundation-baseline"||raw.version!=3)throw "Unsupported foundation baseline format/version";
     function number(row:Dynamic,key:String):Float {var value:Dynamic=Reflect.field(row,key);return cast value;}
     var oldRaw:Dynamic=Reflect.field(raw,"base"),old={massKg:number(oldRaw,"massKg"),width:number(oldRaw,"width"),depth:number(oldRaw,"depth"),height:number(oldRaw,"height")};
     var oldMoving=number(raw,"movingXKg"),oldColumn=number(Reflect.field(raw,"column"),"massKg"),oldInserts=number(raw,"columnInsertMassKg");
     var body=machine.bed.body;
-    var cells=body.materialBoxes();
+    var unsupported=body.finishedCavities().filter(cavity->!materia.casting.CastingCavities.supportsBoxes(cavity));
+    var cells=unsupported.length==0?body.materialBoxes():null;
     var rows:Array<Dynamic> = cast oldRaw.cells;
     var oldCells:Array<Box3> = [for(row in rows) {x:R.number(row,"x"),y:R.number(row,"y"),z:R.number(row,"z"),
       width:R.number(row,"width"),depth:R.number(row,"depth"),height:R.number(row,"height")}];
     var nativeBody=body.geometry();var nativeVolume=nativeBody.volume();nativeBody.close();
-    if(Math.abs(BoxAlgebra.volume(cells)-nativeVolume)>nativeVolume*1e-9)throw "Casting collision/beam cells disagree with exact CAD volume";
+    if(cells!=null&&Math.abs(BoxAlgebra.volume(cells)-nativeVolume)>nativeVolume*1e-9)throw "Casting collision/beam cells disagree with exact CAD volume";
     var span=HobberXLayout.front().footSpan,half=span/2;
-    var oldI=BoxAlgebra.minimumIy(oldCells,-430,430),newI=BoxAlgebra.minimumIy(cells,-half,half),e=35000.0;
+    var oldI=BoxAlgebra.minimumIy(oldCells,-430,430),e=35000.0;
+    var newI:Null<Float> = cells==null?null:BoxAlgebra.minimumIy(cells,-half,half);
     var baseKg=0.0,columnKg=0.0,total=0.0;for(m in machine.components()){var mass=m.component.massProperties().mass;total+=mass;
       if(StringTools.startsWith(m.id,"bed/"))baseKg+=mass;if(StringTools.startsWith(m.id,"column/"))columnKg+=mass;}
     var def=machine.definition();
@@ -51,20 +53,26 @@ class FlexsplineHobberBaseReport {
         if(ids.exists(m.id)){c.x+=x-legalX;loadX+=mass.mass*c.x;}allX+=mass.mass*c.x;allY+=mass.mass*c.y;}
       loadX/=moving;var a=loadX+180;
       if(a<=0||a>=span)throw "Moving weight lies outside beam support span";
-      var ov=beam(a,a,oldMoving*9.80665,e*oldI),ot=beam(180,a,oldMoving*9.80665,e*oldI),
-        nv=beam(a,a,moving*9.80665,e*newI,span),nt=beam(180,a,moving*9.80665,e*newI,span);
-      // 121 mm hob above X guide plane; 233 mm work above table mount.
-      var oldError=[(121*ov[1]-233*ot[1])*1000,(ov[0]-ot[0])*1000],newError=[(121*nv[1]-(363-FoundationLayout.TABLE_SEAT)*nt[1])*1000,(nv[0]-nt[0])*1000];
-      for(k in 0...2){oldLo[k]=Math.min(oldLo[k],oldError[k]);oldHi[k]=Math.max(oldHi[k],oldError[k]);newLo[k]=Math.min(newLo[k],newError[k]);newHi[k]=Math.max(newHi[k],newError[k]);}
+      var ov=beam(a,a,oldMoving*9.80665,e*oldI),ot=beam(180,a,oldMoving*9.80665,e*oldI);
+      var oldError=[(121*ov[1]-233*ot[1])*1000,(ov[0]-ot[0])*1000];
+      var newError:Null<Array<Float>> = null;
+      if(newI!=null){
+        var sectionI:Float=cast newI;
+        var nv=beam(a,a,moving*9.80665,e*sectionI,span),nt=beam(180,a,moving*9.80665,e*sectionI,span);
+        newError=[(121*nv[1]-(363-FoundationLayout.TABLE_SEAT)*nt[1])*1000,(nv[0]-nt[0])*1000];
+        for(k in 0...2){newLo[k]=Math.min(newLo[k],newError[k]);newHi[k]=Math.max(newHi[k],newError[k]);}
+      }
+      for(k in 0...2){oldLo[k]=Math.min(oldLo[k],oldError[k]);oldHi[k]=Math.max(oldHi[k],oldError[k]);}
       var rear=(allX/total+180)/span,front=1-rear,skew=(allY/total)/330;
       var reactions=[(front-skew)/2,(front+skew)/2,rear];
       for(r in reactions){if(r<=0)throw "Machine centre of mass leaves three-foot support triangle";worstFoot=Math.max(worstFoot,r*total*9.80665);}
       samples.push({xMm:x,movingLoadWorkXMm:loadX,oldRelativeRadialVerticalUm:oldError,newRelativeRadialVerticalUm:newError,footReactionN:[for(r in reactions)r*total*9.80665]});
     }
-    var oldRange=Math.sqrt(Math.pow(oldHi[0]-oldLo[0],2)+Math.pow(oldHi[1]-oldLo[1],2)),newRange=Math.sqrt(Math.pow(newHi[0]-newLo[0],2)+Math.pow(newHi[1]-newLo[1],2));
+    var oldRange=Math.sqrt(Math.pow(oldHi[0]-oldLo[0],2)+Math.pow(oldHi[1]-oldLo[1],2));
+    var newRange:Null<Float> = newI==null?null:Math.sqrt(Math.pow(newHi[0]-newLo[0],2)+Math.pow(newHi[1]-newLo[1],2));
     var allocation=gearkit.Iso1328.tolerance(machine.spec,"Falpha",6)*0.2;
     if(body.massProperties().mass/moving<5)throw "Base-to-X moving mass ratio below 5:1";
-    if(2*newRange>allocation)throw "Base needs resizing: assumed 0.5x E deflection exceeds profile allocation";
+    if(newRange!=null&&2*newRange>allocation)throw "Base needs resizing: assumed 0.5x E deflection exceeds profile allocation";
     var work=machine.workOrigin.z;if(work<950||work>1100)throw "Work height outside target";
     if(worstFoot>15000)throw "Levelling foot exceeds assumed 15 kN design target";
     return {baseCastingKg:body.massProperties().mass,baseAssemblyKg:baseKg,machineKg:total,
@@ -72,8 +80,12 @@ class FlexsplineHobberBaseReport {
       column:{beforeCastingKg:oldColumn,afterCastingKg:machine.column.body.massProperties().mass,beforeAssemblyKg:oldColumn+oldInserts,afterAssemblyKg:columnKg},
       beforeLoadingRevision:Reflect.field(raw,"beforeLoadingRevision"),dimensionsMm:[body.parameterNumber("width"),body.parameterNumber("depth"),body.parameterNumber("height")],workingHeightMm:work,feet:{count:3,radialSpacingMm:span,frontTangentialSpacingMm:660,heightMm:47,floorClearanceMm:47,overallFootEnvelopeMm:232,pocketRoofAboveCastingBottomMm:160,removableSeat:true,worstReactionN:worstFoot,assumedTargetPerFootN:15000,vibrationMounts:false},
       table:{form:Std.isOfType(machine.table,machinekit.motion.PurchasedRotaryTable)?"purchased":"built",faceDiameterMm:machine.tableSpec.number("faceDiameter"),heightMm:machine.tableSpec.number("height"),throughBoreMm:machine.tableSpec.number("bore"),seatWorkZMm:FoundationLayout.TABLE_SEAT,fieldValues:machine.tableSpec.report(),basis:"per-field catalog/measured/assumed data; face/flange/centering provisional; bearing construction not claimed"},
-      coolantReservedLitres:7.92,beam:{youngsNPerMm2:e,spanMm:span,oldMinimumIyMm4:oldI,newMinimumIyMm4:newI,
-        oldChangeBoundUm:oldRange,newChangeBoundUm:newRange,atHalfModulusChangeBoundUm:2*newRange,assumedProfileAllocationUm:allocation,passed:true,samples:samples,
+      coolantReservedLitres:7.92,castingVolumeMm3:nativeVolume,
+      beam:{status:newI==null?"unsupported":"pass",rule:"foundation.beam.nonbox",
+        sourceFeatureIds:[for(cavity in unsupported)cavity.featureId],
+        youngsNPerMm2:e,spanMm:span,oldMinimumIyMm4:oldI,newMinimumIyMm4:newI,
+        oldChangeBoundUm:oldRange,newChangeBoundUm:newRange,atHalfModulusChangeBoundUm:newRange==null?null:2*newRange,
+        assumedProfileAllocationUm:allocation,passed:newI!=null,samples:samples,
         basis:"Simply supported Euler-Bernoulli beam; minimum net orthogonal casting section over foot span, steel ignored; X-group weight lumped at its measured CAD mass centre; full mechanism X25..retract evaluated by exact prismatic COM translation, reference moving mass; old 210 mm bed uses its original 860 mm support span over the new X range; previous heavy-plinth/full-stroke result is retained separately; 121 mm guide Abbe height; current work-to-table-seat lever follows TABLE_SEAT; old table lever233 mm; bound combines radial and vertical peak-to-peak changes. Assumed E sensitivity 0.5x..2x. Excludes floor/foot compliance, torsion, joints, local contact and modes; external FEA remains open."}};
   }
 }

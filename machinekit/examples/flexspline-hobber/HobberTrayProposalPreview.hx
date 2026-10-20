@@ -51,23 +51,23 @@ class HobberTrayProposalPreview {
       Solids.cut(polygon(shifted(inner,15),seat+15,seat+17),[polygon(inner,seat+14,seat+18)]),[0.15,0.65,0.40]);
     add("outer-tape-proposal","PROPOSAL: outer gasket loop; shown 15 mm above installed position",
       Solids.cut(polygon(shifted(outer,5),seat+15,seat+17),[polygon(shifted(outer,20),seat+14,seat+18)]),[0.15,0.65,0.40]);
-    var socket=new machinekit.structural.CastInFixingSocket();
+    var socket=machinekit.hobbing.FoundationLayout.traySocket();
     var socketGeometry=socket.geometry();
     if(socketGeometry.solidCount()!=1)throw "Socket must be one solid";
-    var freeProbe=Part.cylinderSpan(2.4,-24,-0.2),freeCommon=socketGeometry.intersect(freeProbe);
+    var freeProbe=Part.cylinderSpan(2.4,16,39.8),freeCommon=socketGeometry.intersect(freeProbe);
     if(freeCommon.volume()>0.001)throw "Socket blind insertion cavity is obstructed";
     freeCommon.close();freeProbe.close();
-    var closedProbe=Part.cylinderSpan(0.5,-26,-25.1),closedCommon=socketGeometry.intersect(closedProbe);
+    var closedProbe=Part.cylinderSpan(0.5,14,14.9),closedCommon=socketGeometry.intersect(closedProbe);
     if(closedCommon.volume()<0.1)throw "Socket tail must close the insertion cavity";
     closedCommon.close();closedProbe.close();socketGeometry.close();
     var recipeAssembly=new machinekit.assembly.MachineAssembly();recipeAssembly.addComponent("socket",socket);
     var recreated=machinekit.assembly.MachineAssembly.decode(recipeAssembly.encode());
-    var recreatedSocket:machinekit.structural.CastInFixingSocket=cast recreated.components()[0].component;
-    if(recreatedSocket.parameterNumber("threadLength")!=6||recreatedSocket.parameterNumber("boreDepth")!=25)throw "Socket recipe lost dimensions";
+    var recreatedSocket:machinekit.structural.CastInsert=cast recreated.components()[0].component;
+    if(recreatedSocket.insertSpec().holes[0].threadDepth!=6||recreatedSocket.insertSpec().holes[0].depth!=25)throw "Socket recipe lost dimensions";
     for(i in 0...points.length) {
       var pt=points[i];
       add("anchor-socket-"+i,"PROPOSAL: M6 x 40 socket, blind bore and crimped tail; OD/tail nominal",
-        move(socket.geometry(),pt[0],pt[1],seat),[0.67,0.70,0.74]);
+        move(socket.geometry(),pt[0],pt[1],seat-machinekit.structural.FixingSockets.LENGTH),[0.67,0.70,0.74]);
       add("compression-sleeve-"+i,"PROPOSAL: removable compression sleeve OD10 ID6.6 x 8 mm; lifted with sheet",
         move(Solids.cut(Part.cylinderSpan(5,seat+40,seat+48),[Part.cylinderSpan(3.3,seat+39,seat+49)]),pt[0],pt[1],0),[0.75,0.76,0.78]);
     }

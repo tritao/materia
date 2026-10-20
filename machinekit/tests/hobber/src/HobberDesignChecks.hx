@@ -84,7 +84,7 @@ class HobberDesignChecks {
         try {
           if(item.kind=="bed"){
             var drive=foundation.insertLocations().filter(p->p.id=="driveSeat")[0];
-            var raw=cadkit.modeling.Part.box(drive.part.parameterNumber("width"),drive.part.parameterNumber("depth"),50);
+            var raw=cadkit.modeling.Part.box(drive.part.boxDimensions(drive.id).width,drive.part.boxDimensions(drive.id).depth,50);
             var slab=PosedParts.moved(raw,F.compose(drive.pose,F.translation(0,0,-50)));raw.close();
             var missing=slab.subtract(body),volume=missing.volume();missing.close();slab.close();
             count++;if(volume>0.001)throw 'X drive insert lacks 50 mm full-footprint casting backing: $volume mm3';
@@ -92,14 +92,14 @@ class HobberDesignChecks {
           }
           if(item.kind=="column"){
             var drive=foundation.insertLocations().filter(p->p.id=="driveSeat")[0];
-            var raw=cadkit.modeling.Part.box(drive.part.parameterNumber("width"),drive.part.parameterNumber("depth"),125);
+            var raw=cadkit.modeling.Part.box(drive.part.boxDimensions(drive.id).width,drive.part.boxDimensions(drive.id).depth,125);
             var slab=PosedParts.moved(raw,F.compose(drive.pose,F.translation(0,0,-125)));raw.close();
             var missing=slab.subtract(body),volume=missing.volume();missing.close();slab.close();
             count++;if(volume>0.001)throw 'Central Z drive seat lacks 125 mm full casting backing: $volume mm3';
           }
           for(row in foundation.insertLocations())if(row.id=="railLeft"||row.id=="railRight"){
             var backing=item.kind=="bed"?row.pose.z:10.0;
-            var raw=cadkit.modeling.Part.box(row.part.parameterNumber("width"),row.part.parameterNumber("depth"),backing);
+            var raw=cadkit.modeling.Part.box(row.part.boxDimensions(row.id).width,row.part.boxDimensions(row.id).depth,backing);
             var slab=PosedParts.moved(raw,F.compose(localPoses.get(row.id),F.translation(0,0,-backing)));raw.close();
             var unsupported=slab.subtract(body),missing=unsupported.volume();unsupported.close();slab.close();
             count++;if(missing>0.001)throw 'rail insert ${item.kind}/${row.id} lacks full casting backing: $missing mm3';

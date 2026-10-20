@@ -26,8 +26,10 @@ class CastingBounds {
 	}
 
 	public static function box(g:CastingGeometry):Box3 {
+		var dimensions = CastingFeature.CastingGeometrySolids.box(g.solid, "casting geometry");
 		var low = [g.pose.x, g.pose.y, g.pose.z], high = low.copy();
-		var localLow = [-g.width / 2, -g.depth / 2, 0.0], localHigh = [g.width / 2, g.depth / 2, g.height];
+		var localLow = [-dimensions.width / 2, -dimensions.depth / 2, 0.0];
+		var localHigh = [dimensions.width / 2, dimensions.depth / 2, dimensions.height];
 		var directions = [F.transformVector(g.pose, 1, 0, 0), F.transformVector(g.pose, 0, 1, 0), F.transformVector(g.pose, 0, 0, 1)];
 		var used = new Map<Int, Bool>();
 		for (local in 0...3) {

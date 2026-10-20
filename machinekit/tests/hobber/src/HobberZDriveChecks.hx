@@ -19,7 +19,7 @@ class HobberZDriveChecks {
     var part:machinekit.motion.BallScrew=cast members.filter(p->p.id=="Zscrew")[0].component;
     near(part.totalLength,420,"screw length");
     var flange=m.column.insertLocations().filter(p->p.id=="driveSeat")[0],body=m.column.body.geometry();
-    var raw=Part.box(flange.part.parameterNumber("width"),flange.part.parameterNumber("depth"),125),back=PosedParts.moved(raw,F.compose(flange.pose,F.translation(0,0,-125)));raw.close();
+    var raw=Part.box(flange.part.boxDimensions(flange.id).width,flange.part.boxDimensions(flange.id).depth,125),back=PosedParts.moved(raw,F.compose(flange.pose,F.translation(0,0,-125)));raw.close();
     var missing=back.subtract(body),missingMm3=missing.volume();missing.close();back.close();
     check(missingMm3<0.001,"125 mm full casting backing behind drive insert");check(body.solidCount()==1,"column remains monolithic");body.close();
     var coupling=cache.posed(members.filter(p->p.id=="Zcoupling")[0].component,state.worldPose("Zcoupling"));

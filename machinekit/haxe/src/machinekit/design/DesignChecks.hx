@@ -17,13 +17,17 @@ class DesignChecks {
 
 	public static function blindFastener(out:Diagnostics, subject:String, length:Float, grip:Float,
 		threadDepth:Float, cylindricalDrillDepth:Float, drillTip:Float, thickness:Float,
-		minEngagement:Float, minTipGap:Float, minBack:Float):Void {
+		minEngagement:Float, minTipGap:Float, minBack:Float, ?reliefStart:Float):Void {
 		// Zero is a physical flat-bottom bore, not an unknown drill point.
 		if (!Math.isFinite(drillTip) || drillTip < 0) throw "Invalid blind drill point";
 		for (v in [length,grip,threadDepth,cylindricalDrillDepth,thickness,minEngagement,minTipGap,minBack])
 			if (!Math.isFinite(v) || v <= 0) throw "Invalid blind fastener stack";
-		minimum(out,subject+" thread engagement",length-grip,minEngagement);
-		minimum(out,subject+" screw tip gap",threadDepth-(length-grip),minTipGap);
+		if (reliefStart != null && (!Math.isFinite(reliefStart) || reliefStart <= 0
+			|| Math.abs(reliefStart - threadDepth) > 1e-8 || reliefStart >= cylindricalDrillDepth))
+			throw "Invalid blind thread relief";
+		minimum(out,subject+" thread engagement",Math.min(length-grip,threadDepth),minEngagement);
+		var tipLimit = reliefStart == null ? threadDepth : cylindricalDrillDepth;
+		minimum(out,subject+" screw tip gap",tipLimit-(length-grip),minTipGap);
 		minimum(out,subject+" tap runout",cylindricalDrillDepth-threadDepth,0.5);
 		minimum(out,subject+" back wall",thickness-cylindricalDrillDepth-drillTip,minBack);
 	}

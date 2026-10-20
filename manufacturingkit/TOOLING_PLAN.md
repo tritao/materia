@@ -744,14 +744,47 @@ builder in `machinekit.structural`.
   `InterfaceRelationship` instead of hobber code. Inserts get typed roles and
   finishes directly, threaded holes through `InsertHoles`, and labels without
   hardware data.
-- Cast-in fixing sockets (`CastInFixingSocket`, round catalogue sockets) are an
-  insert body variant in `materia.casting.InsertSpec` (box or cylindrical body,
-  plus the same hole records), not a second insert component. A given anchor is
-  modelled one way: the hobber tray anchors are sockets, not also box seats. The
-  socket fixture becomes an input to the shared insert-fixture planner beside
-  `DatumFixtures`: plate size, sites and clamps derive from the foundation's
-  inserts, the demould order comes from the planner's removal sequence, and
-  `SocketFixturePlanner` keeps only socket-specific geometry.
+- Cast-in fixing sockets use `InsertSpec.InsertBody` and the common `CastInsert`
+  component. `CastingSolid` is a pure Box/Cylinder primitive. Insert bodies are
+  `Primitive(solid)` or `CrimpedSocket(mouth, tail)`; retention geometry cannot be
+  attached to a design cut. Source-owned insert recesses preserve that complete
+  exterior through `CastingCavities.derive` and the shared `CastingCavityCad` backend.
+- `InsertOrigin` is required: `Fabricated` or `Catalogue(product)`. A catalogue
+  product identifies its manufacturer, reference, document revision and hole
+  policy, with explicit nominal/drawing/measured geometry evidence. Geometry
+  evidence binds product identity, revision, body and holes. All of this enters
+  the source fingerprint. Nominal exteriors remain Pending until verified.
+- The PFEIFER 05.250.064.040 source variant uses its published 6 mm mouth thread
+  and 25 mm blind bore with a separate enlarged relief. Its document revision is
+  the downloaded PDF's SHA-256. Engagement follows the explicit catalogue policy;
+  C45 service/fixture engagement rules are unchanged. OD, relief and crimp dimensions
+  are declared nominal study choices, not supplier CAD or anchorage qualification.
+- The hobber tray's twelve anchors are sockets, with no duplicate rectangular steel
+  seats. This is an explicit casting design correction: frozen pre-socket CAD is
+  independently checked after restoring its old box voids and subtracting only the
+  declared socket cavities. The unchanged mill and hobber-column controls retain
+  zero symmetric difference. The retired socket's nominal exterior is separately
+  frozen and fingerprinted to prove the body migration has zero symmetric difference.
+- `InsertFixturePlanner` owns source-hole selection, protection and plate layout
+  beside `DatumFixtures`. It derives the carrier blank from the casting envelope,
+  sites from source holes, and locator/clamp locations from declared layout options.
+  Stock screw selection checks engagement, relief, tip clearance and far-end protection.
+  There are no threaded tooling receivers. Missing source threads produce a design
+  change request; unused holes retain protection, and fixing holes carry no mask.
+- The coupon uses this same planner and `InsertFixtureCad`, with a neutral source
+  casting component. Its release sequence is a topological order of the native
+  blocking graph, with explicit unscrewing before translation. The old duplicate
+  socket component, coupon source encoding and `SocketFixturePlanner` are deleted;
+  product-only retention geometry is realized by the common insert CAD builder.
+  Sealing, fixture accuracy, wall closure, cure and mineral-cast anchorage still
+  require physical evidence. No fabrication-ready claim follows from CAD checks.
+- Exact round cavities are brought forward for this socket stage. Box-only fill,
+  hull and section consumers report the actual unsupported source feature IDs;
+  they never substitute bounding boxes. The box algebra continues to validate
+  the exact intermediate before round cuts. Draft/radius and general prism/CAM
+  realization remain step 3. The source/mold/feature/hole formats for this stage
+  are 9/8/3/4, with no prior-format reader.
+
 
 ## Generation pipeline
 
@@ -1748,6 +1781,57 @@ hobber conversion commits and before fixing sockets:
   **52** entries / **8** programs. Persisted source/mold schemas remain **8 / 7**,
   with hole recipes **3**; tagged derived geometry is runtime data, not a second
   stored source encoding. No physical coupon evidence is recorded.
-- Fixing-socket cut-over awaits the requested geometry-scope decision: cylindrical
-  recesses require explicit Unsupported for the hobber's box-based collision and
-  section outputs until generalized geometry, or bringing that support forward.
+### Fixing-socket stage (phase 7 records)
+
+- [x] Keep `CastingSolid` pure Box/Cylinder. Insert-only retention is the required
+  `CrimpedSocket(mouth, tail)` variant in `InsertSpec`; cuts cannot carry it.
+  `InsertOrigin` is required Fabricated/Catalogue, with product/revision/policy
+  and evidence bound to the geometry fingerprint. The superseded standalone
+  `InsertBody.hx` draft and preparatory paragraph are removed.
+- [x] Use the catalogue's 6 mm thread and 25 mm blind bore with explicit relief;
+  retain C45/8.8 engagement unchanged. Stainless 1.4571, the product reference,
+  PDF SHA-256 revision and policy enter the source fingerprint. Nominal OD,
+  relief and crimp dimensions remain Pending until geometry verification.
+- [x] Replace all twelve hobber tray box anchors with common source-insert socket
+  variants. Keep the old STEP as an independent design-change control: restoring
+  its old box voids and subtracting only source socket cavities has zero symmetric
+  difference to the new bed. Actual change: **83,936.284 mm3 added / 7,611.456 mm3
+  removed**. Mill base/column and hobber column remain zero-difference controls.
+  The retired nominal socket exterior is independently frozen and fingerprinted.
+- [x] Share source-hole fixing/protection and carrier generation in
+  `InsertFixturePlanner`, used beside `DatumFixtures` and by `BoxMoldPlanner`.
+  Carrier bounds/sites/layout, declared stock screws, masks and classified
+  penetrations derive from the input and options. Fixing screws run through
+  clearance-only tooling into source threads. Missing threads generate requests;
+  unsupported fixture integration, sealing and accuracy remain Pending.
+- [x] Use common insert/source CAD and exact native removal graphs for the coupon.
+  Unscrewing is an explicit prerequisite; retained screw heads are a negative
+  control. The old socket component, duplicate coupon encoding and hard-coded
+  `SocketFixturePlanner` are deleted. The coupon passes **79 assertions / 46
+  exact initial pairs**, including full hex-key access, source-hole traceability,
+  exterior subtraction, scene/assembly restoration and computed removal order.
+- [x] Preserve exact box-algebra checks on the live intermediate before round
+  recesses; reconstruct the final body through exact cavity booleans. Final
+  box-only hull/section results are explicitly Unsupported by feature ID.
+  Gravity reactions remain active independently of that beam limitation:
+  **190 foot assertions** cover positive loads and weight balance at all 21
+  positions; worst reaction **5,189.449 N**, average roof bearing **0.459 MPa**.
+  This is not a roof bending, creep, fatigue or dynamic qualification.
+- [x] Use source/mold/feature/hole formats **9/8/3/4**, with no old-format reader;
+  regenerate the foundation baseline as format **3**. Main compiles again.
+  Validation: FoundationModel **80**; neutral Tooling **92**, Panel **52**,
+  BoxPlanner **41**, Fabrication **46**, ReviewContract **30**, JunctionThermal
+  **36**, Castability **58**, OrientationSection **43**, Process **1,313** and
+  CastingMold **68** (**1,779** total); native FoundationTooling **107**, Panel
+  **132**, BoxMold **157**, Process **34** (**430** total); FoundationDesign
+  **60**; Casting **54**; MillMoldChecks **249**; HobberPart **1,038**;
+  FlexsplineHobber **1,131**; Z drive **37**; drive support **22,031**.
+- [x] Regenerate main's mold, full and records-only packages, review/trial ZIPs
+  and socket coupon artifacts. Full manifest integrity/tamper checks pass:
+  **790 artifacts / 40 programs / 17 Pass / 258 Pending / 15 Unsupported**,
+  fabrication readiness **false**. Review ZIP **791** entries; trial ZIP **52**
+  entries / **8** programs. No physical coupon result has been recorded.
+
+The remaining records-stage task is the single levelling-foot component family.
+Requirements (step 2), general draft/radius/prism/CAM and non-box process geometry
+(step 3), phase 8 structures and phase 9 physical calibration remain open.

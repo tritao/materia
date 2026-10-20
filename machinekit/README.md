@@ -34,7 +34,10 @@ Mineral-cast foundations use shared components in `machinekit.structural`:
 - `MineralCasting`: a recipe-backed body with corner chamfers and named box voids.
 - `materia.casting.CastingFeature`: typed design cuts, declared openings, ownership and adjustable dimensions.
 - `CastingFeaturePatterns`: shared grids, foot access/registers and retained supports; one neutral box algebra serves fill, collision hulls and section stiffness.
-- `CastInsert`: a steel insert envelope with a finished mounting plane and position tolerance.
+- `CastInsert`: a typed primitive/crimped insert body, source hole interfaces,
+  required fabricated/catalogue origin, finished mounting plane and position
+  tolerance. `CastInsert.boxValues(w, d, h)` builds a box recipe; the `body`
+  parameter is the one stored exterior.
 - `MineralFoundation`: separately itemised casting and steel, subtracting each insert's
   recess from the casting so their masses do not overlap.
 - `FoundationIntegrity`: insert position/normal checks and checks that precision

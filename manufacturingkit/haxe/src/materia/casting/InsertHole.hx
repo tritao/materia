@@ -22,6 +22,8 @@ enum abstract InsertThreadProfile(String) to String {
 
 typedef InsertThread = {var designation:String; var majorDiameter:Float; var pitch:Float; var starts:Int; var hand:InsertThreadHand; var internal:Bool; var toleranceClass:String; var profile:InsertThreadProfile;}
 typedef InsertCounterbore = {var diameter:Float; var depth:Float;}
+/** Enlarged blind bore beyond a short entry thread, continuing to hole depth. */
+typedef InsertBoreRelief = {var diameter:Float; var start:Float;}
 typedef InsertHoleLimits = {
 	var policyId:String;
 	var threaded:Null<{minEngagement:Float, minTipGap:Float}>;
@@ -44,6 +46,7 @@ typedef InsertHole = {
 	/** ISO 273 medium bolt-clearance diameter, resolved by the source design. */
 	var clearanceDiameter:Float;
 	var counterbore:Null<InsertCounterbore>;
+	var relief:Null<InsertBoreRelief>;
 	var limits:InsertHoleLimits;
 }
 
@@ -72,7 +75,7 @@ class InsertHoleCodec {
 				"extent",
 				"thread",
 				"tapDrill", "clearanceDiameter", "threadDepth",
-				"counterbore", "limits"
+				"counterbore", "relief", "limits"
 			]);
 			var t:Dynamic = Reflect.field(row, "thread"),
 				cb:Dynamic = Reflect.field(row, "counterbore");
@@ -131,6 +134,7 @@ class InsertHoleCodec {
 				clearanceDiameter: CastingRecordCodec.number(row, "clearanceDiameter"),
 				threadDepth: Reflect.field(row, "threadDepth") == null ? null : CastingRecordCodec.number(row, "threadDepth"),
 				counterbore: counterbore,
+				relief: relief(Reflect.field(row, "relief")),
 				limits: limits(Reflect.field(row, "limits"), thread != null)
 			});
 		}
@@ -143,7 +147,7 @@ class InsertHoleCodec {
 				"extent",
 				"thread",
 				"tapDrill", "clearanceDiameter", "threadDepth",
-				"counterbore", "limits"
+				"counterbore", "relief", "limits"
 			]);
 			CastingFeatureCodec.identifier(h.id);
 			if (ids.exists(h.id))
@@ -162,6 +166,8 @@ class InsertHoleCodec {
 					throw "Invalid insert thread";
 				if (h.threadDepth == null || h.threadDepth <= 0 || h.threadDepth > h.depth)
 					throw "Invalid usable insert thread depth: " + h.id;
+				if (threadLimits(h).minEngagement > (cast h.threadDepth:Float) + 1e-8)
+					throw "Insert thread cannot meet engagement rule: " + h.id;
 				if (!thread.internal
 					|| h.tapDrill == null
 					|| h.tapDrill <= 0
@@ -170,6 +176,13 @@ class InsertHoleCodec {
 					throw "Invalid insert tapping geometry";
 			} else if (h.tapDrill != null || h.threadDepth != null)
 				throw "Tap drill requires a thread specification";
+			if (h.relief != null) {
+				var r:InsertBoreRelief = cast h.relief;
+				if (h.thread == null || h.extent != Blind || h.counterbore != null
+					|| r.start <= 0 || r.start >= h.depth || Math.abs(r.start - (cast h.threadDepth:Float)) > 1e-8
+					|| r.diameter <= h.thread.majorDiameter)
+					throw "Invalid insert thread relief: " + h.id;
+			}
 			if (h.counterbore != null) {
 				var cb:InsertCounterbore = cast h.counterbore;
 				CastingFeatureCodec.fields(cb, ["diameter", "depth"]);
@@ -179,6 +192,12 @@ class InsertHoleCodec {
 		}
 		result.sort((a, b) -> Reflect.compare(a.id, b.id));
 		return result;
+	}
+
+	static function relief(raw:Dynamic):Null<InsertBoreRelief> {
+		if (raw == null) return null;
+		CastingFeatureCodec.fields(raw, ["diameter", "start"]);
+		return {diameter: CastingRecordCodec.number(raw, "diameter"), start: CastingRecordCodec.number(raw, "start")};
 	}
 
 	static function limits(raw:Dynamic, threaded:Bool):InsertHoleLimits {

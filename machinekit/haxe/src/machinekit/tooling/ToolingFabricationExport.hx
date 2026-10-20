@@ -1,5 +1,7 @@
 package machinekit.tooling;
 
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
+
 import materia.tooling.ToolingCodec;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingFabrication.FabricationPlan;
@@ -320,18 +322,20 @@ class ToolingFabricationExport {
 				"consumption"
 			]
 		];
-		for (i in p.document.input.inserts)
+		for (i in p.document.input.inserts) {
+			var dimensions = InsertBodies.box(i.body, i.id);
 			insertRows.push([
 				i.id,
 				(i.role : String),
 				(i.finish : String),
-				Std.string(i.width),
-				Std.string(i.depth),
-				Std.string(i.height),
+				Std.string(dimensions.width),
+				Std.string(dimensions.depth),
+				Std.string(dimensions.height),
 				ToolingCodec.canonical(i.holes),
 				"1",
 				"per-casting"
 			]);
+		}
 		text(dir, "embedded-inserts.csv", ToolingFabrication.csv(insertRows));
 		data(dir, "replacement-groups.json", f.replacementGroups);
 

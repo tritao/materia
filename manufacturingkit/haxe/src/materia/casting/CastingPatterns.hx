@@ -11,10 +11,7 @@ class CastingPatterns {
 			id: id,
 			kind: kind,
 			geometry: {
-				kind: Box,
-				width: width,
-				depth: depth,
-				height: height,
+				solid: kind == InsertRecess ? Insert(InsertSpec.InsertBody.Primitive(CastingSolid.Box(width, depth, height))) : Cut(CastingSolid.Box(width, depth, height)),
 				pose: F.translation(x, y, z)
 			},
 			openings: openings,

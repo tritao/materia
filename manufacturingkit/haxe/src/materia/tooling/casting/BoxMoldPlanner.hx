@@ -1,5 +1,7 @@
 package materia.tooling.casting;
 
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
+
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.tooling.ToolingDocument;
@@ -157,9 +159,10 @@ class BoxMoldPlanner {
 			throw "Single-pocket template needs one core and one insert";
 		CoreSupports.build(cores[0], b, r, options, assembly.members[0], supportPanels, penetrations);
 		var insert = d.input.inserts[0],
+			dimensions = InsertBodies.box(insert.body, insert.id),
 			ip = F.compose(d.setup.sourceToMold, insert.pose),
-			ib = box(insert.width, insert.depth, insert.height, ip),
-			face = F.compose(ip, F.translation(0, 0, insert.height)),
+			ib = box(dimensions.width, dimensions.depth, dimensions.height, ip),
+			face = F.compose(ip, F.translation(0, 0, dimensions.height)),
 			normal = F.transformVector(face, 0, 0, 1);
 		if (Math.abs(face.z - b.z) > 1e-7
 			|| normal.z > -1 + 1e-8
@@ -167,7 +170,7 @@ class BoxMoldPlanner {
 			throw "Insert mounting face must seat on bed with fixing bore";
 		var fixings:Array<materia.tooling.casting.CastingMoldPlan.InsertFixtureFixing> = [];
 		for (hole in insert.holes) {
-			var selected = InsertFixings.select(hole, ip, face, r.hardware);
+			var selected = InsertFixturePlanner.select(hole, ip, face, r.hardware);
 			if (selected == null)
 				continue;
 			var entry = selected.entry;
@@ -206,13 +209,13 @@ class BoxMoldPlanner {
 					fixings: fixings,
 					boreMasks: [for (hole in insert.holes) if (fixings.filter(f -> f.sourceHoleId == hole.id).length == 0) {
 						var entry = F.compose(F.compose(d.setup.sourceToMold, insert.pose), hole.frame), axis = F.transformVector(entry, 0, 0, 1);
-						InsertFixings.mask(hole, materia.tooling.ToolingIds.derive("mask-", hole.id), r.hardware.plugDepth,
+						InsertFixturePlanner.mask(hole, materia.tooling.ToolingIds.derive("mask-", hole.id), r.hardware.plugDepth,
 							{x: -axis.x, y: -axis.y, z: -axis.z});
 					}],
 					threadProtection: FixingScrewAndResinSidePlug,
 					finishingAllowance: null,
 					datumEvidence: [],
-					datums: datums(face, insert.width, insert.depth),
+					datums: datums(face, dimensions.width, dimensions.depth),
 					precision: {
 						insertId: insert.id,
 						route: CastingMoldPlanner.sourceRoute(insert.finish),
@@ -259,7 +262,8 @@ class BoxMoldPlanner {
 				reason: "Provide qualified lifting points and handling for the inverted casting",
 				blockingChecks: ["loads-handling"]
 			});
-		result.validation = result.validation.concat(InsertFixings.protectionValidation(insert));
+		result.validation = result.validation.concat(InsertFixturePlanner.protectionValidation(insert));
+		result.validation = result.validation.concat(InsertQualifications.check(d.input.inserts));
 		result.fabrication = materia.tooling.ToolingValidation.ToolingReadiness.evaluate(result.validation);
 		validate(result);
 		return result;
@@ -279,6 +283,7 @@ class BoxMoldPlanner {
 	public static function validateInsertSeal(p:MoldPlan, record:PenetrationPlan):Void {
 		var fixture = p.fixtures.filter(f -> f.insertId == record.insertId)[0],
 			i = p.document.input.inserts.filter(i -> i.id == record.insertId)[0];
+		var dimensions = InsertBodies.box(i.body, i.id);
 		var member = p.panels.members.filter(m -> m.panel.id == record.panelId)[0],
 			op = member.panel.operations.filter(o -> o.id == record.operationId)[0];
 		if (record.sealingFace == null || ToolingCodec.canonical(record.sealingFace) != ToolingCodec.canonical(fixture.mountingFace))
@@ -295,7 +300,7 @@ class BoxMoldPlanner {
 				throw "Invalid insert bore plug";
 		} else if (plug != null)
 			throw "Blind fixing hole needs no resin-side plug";
-		if (ToolingCodec.canonical(fixture.datums) != ToolingCodec.canonical(datums(fixture.mountingFace, i.width, i.depth)))
+		if (ToolingCodec.canonical(fixture.datums) != ToolingCodec.canonical(datums(fixture.mountingFace, dimensions.width, dimensions.depth)))
 			throw "Invalid insert fixture datums";
 		var inverse = F.inverse(fixture.mountingFace),
 			margin = record.sealMargin;
@@ -326,10 +331,10 @@ class BoxMoldPlanner {
 			}
 		];
 		var bounds = materia.tooling.panel.PanelGeometry.bounds(transformed);
-		if (bounds.x < -i.width / 2 + margin
-			|| bounds.y < -i.depth / 2 + margin
-			|| bounds.x + bounds.width > i.width / 2 - margin
-			|| bounds.y + bounds.height > i.depth / 2 - margin)
+		if (bounds.x < -dimensions.width / 2 + margin
+			|| bounds.y < -dimensions.depth / 2 + margin
+			|| bounds.x + bounds.width > dimensions.width / 2 - margin
+			|| bounds.y + bounds.height > dimensions.depth / 2 - margin)
 			throw "Insert sealing margin exceeded";
 		if (!op.through || Math.abs(fixture.mountingFace.z - p.cavity.z) > 1e-7)
 			throw "Insert seal face misses bed";
@@ -433,7 +438,7 @@ class BoxMoldPlanner {
 				var hole = holes[0];
 				var entry = F.compose(F.compose(plan.document.setup.sourceToMold, insert.pose), hole.frame);
 				var axis = F.transformVector(entry, 0, 0, 1);
-				var expectedMask = InsertFixings.mask(hole, materia.tooling.ToolingIds.derive("mask-", hole.id),
+				var expectedMask = InsertFixturePlanner.mask(hole, materia.tooling.ToolingIds.derive("mask-", hole.id),
 					plan.document.recipe.hardware.plugDepth, {x: -axis.x, y: -axis.y, z: -axis.z});
 				if (ToolingCodec.canonical(mask) != ToolingCodec.canonical(expectedMask))
 					throw "Bore mask differs from source hole depth budget";

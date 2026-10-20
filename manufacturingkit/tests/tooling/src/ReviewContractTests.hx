@@ -1,3 +1,4 @@
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingValidation;
 import materia.tooling.casting.CastingMoldPlan;
@@ -68,13 +69,13 @@ class ReviewContractTests {
 		changed.setup.sourceFingerprint = ToolingCodec.inputFingerprint(changed.input);
 		var review = CastingLevelOne.analyze(changed);
 		var proposals = review.proposals.filter(v -> v.rule == "process.level1.insert-edge.seat");
-		check(proposals.length == 1 && proposals[0].sourceParameterId == "input.inserts.seat.width" && proposals[0].proposedValue == 34,
+		check(proposals.length == 1 && proposals[0].sourceParameterId == "input.inserts.seat.body.solid.width" && proposals[0].proposedValue == 34,
 			"source-only edge review supplies a mapped width/value proposal");
 		check(review.metrics.minimumInsertEdgeMm == 2
 			&& review.metrics.minimumCornerRadiusMm == 0, "level-1 metrics retain actual source geometry");
 		var accepted = CastingLevelOne.apply(changed, proposals[0]);
 		var replanned = CastingMoldPlanner.plan(accepted, p.options);
-		check(replanned.document.input.inserts[0].width == 34 && replanned.sourceFingerprint != p.sourceFingerprint,
+		check(InsertBodies.box(replanned.document.input.inserts[0].body, "seat").width == 34 && replanned.sourceFingerprint != p.sourceFingerprint,
 			"accepted source proposal updates linked recess and successfully replans");
 		check(CastingLevelOne.analyze(accepted).validation.filter(v -> v.rule == "process.level1.insert-edge.seat"
 			&& v.status == "pass").length == 1,

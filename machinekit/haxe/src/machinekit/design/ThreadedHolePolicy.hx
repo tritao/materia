@@ -78,6 +78,8 @@ class ThreadedHolePolicy {
 	}
 
 	public static function resolve(spec:ThreadSpec, material:InsertMaterial, ?overrides:HoleLimitOverrides):ResolvedHoleLimits {
+		if (material != materia.casting.InsertMaterial.C45Bright && material != materia.casting.InsertMaterial.C45Ground)
+			throw "C45 threaded hole policy requires C45 stock; purchased sockets need their own declared policy";
 		if (spec == null || !spec.internal || !Math.isFinite(spec.majorDiameter)
 			|| !Math.isFinite(spec.pitch) || spec.majorDiameter <= 0 || spec.pitch <= 0)
 			throw "Threaded hole policy requires a valid internal thread";

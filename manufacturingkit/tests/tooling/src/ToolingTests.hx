@@ -36,6 +36,105 @@ class ToolingTests {
 		check(message != null && message.indexOf(expected) >= 0, 'Expected "$expected", got "$message"');
 	}
 
+	static function relievedFixing():Void {
+		var hole = TestInsertHoles.through(5, 25)[0];
+		hole.frame = F.identity();
+		hole.extent = Blind;
+		hole.thread = {designation: "M6", majorDiameter: 6, pitch: 1, starts: 1, hand: Right,
+			internal: true, toleranceClass: "6H", profile: Metric};
+		hole.tapDrill = 5;
+		hole.threadDepth = 6;
+		hole.clearanceDiameter = 6.6;
+		hole.limits.threaded = {minEngagement: 6, minTipGap: 1};
+		var hardware = fixture().recipe.hardware;
+		check(materia.tooling.casting.InsertFixturePlanner.select(hole, F.identity(), F.identity(), hardware) == null,
+			"short blind thread has no tip clearance without an explicit relief");
+		hole.relief = {diameter: 6.2, start: 6};
+		var fixing = materia.tooling.casting.InsertFixturePlanner.select(hole, F.identity(), F.identity(), hardware);
+		check(fixing != null && fixing.engagement == 6 && fixing.clearanceDiameter == 6.6 && fixing.plug == null,
+			"source relief permits short-thread fixing without a buried plug");
+		hole.limits.threaded.minEngagement = 7;
+		check(materia.tooling.casting.InsertFixturePlanner.select(hole, F.identity(), F.identity(), hardware) == null,
+			"deep relief never contributes thread engagement");
+	}
+
+	static function sharedFixturePlate():Void {
+		var d = fixture(), hole = d.input.inserts[0].holes[0];
+		d.input.inserts[0].pose.z = 80;
+		d.input.features.filter(feature -> feature.owner == "seat")[0].geometry.pose.z = 80;
+		hole.extent = Blind; hole.depth = 16; hole.threadDepth = 12; hole.tapDrill = 6.8;
+		hole.thread = {designation:"M8",majorDiameter:8,pitch:1.25,starts:1,hand:Right,internal:true,toleranceClass:"6H",profile:Metric};
+		hole.diameter = 6.8; hole.clearanceDiameter = 9;
+		hole.limits.threaded = {minEngagement:8,minTipGap:1};
+		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
+		var options:materia.tooling.casting.InsertFixturePlanner.InsertPlateOptions = {
+			id:"test-carrier",insertIds:["seat"],contactZ:0,edgeMargin:50,locatorEndInset:40,locatorSideInset:20,
+			screwStock:[{thread:cast hole.thread,lengths:[25,30,35],washerThickness:1.6,driverDiameter:16,driverToolDiameter:6}]
+		};
+		var plan = materia.tooling.casting.InsertFixturePlanner.plate(d,options);
+		check(plan.sites.length == 1 && plan.sites[0].sourceHoleId == hole.id && plan.sites[0].screwLength == 30,
+			"shared plate derives fixing site and selects stock screw from source depth budget");
+		check(plan.penetrations.filter(pen -> pen.kind == InsertSealed && pen.sourceHoleId == hole.id && pen.sealingFace != null
+			&& pen.plug == null && pen.sealMaterial == d.recipe.hardware.sealMaterial).length == 1,
+			"shared carrier records the source-thread penetration and its insert sealing face");
+		check(plan.assembly.members.length == 2 && plan.assembly.members[1].pose.z == options.contactZ-d.recipe.panel.measuredThickness,
+			"shared plate thickness and placement derive from measured stock");
+		check(!materia.tooling.ToolingValidation.ToolingReadiness.evaluate(plan.validation).ready,
+			"nominal fixture geometry does not qualify seal and accuracy");
+		options.screwStock[0].lengths = [25,35];
+		materia.tooling.casting.InsertFixturePlanner.validatePlate(plan);
+		check(plan.options.screwStock[0].lengths.length == 3,"fixture keeps a detached copy of declared stock choices");
+		plan.sites[0].screwLength = 35;
+		rejects(() -> materia.tooling.casting.InsertFixturePlanner.validatePlate(plan),"Insert fixture plan differs");
+		plan.sites[0].screwLength = 30;
+		rejects(() -> materia.tooling.casting.InsertFixturePlanner.plate(d,options), "No stock fixture screw satisfies");
+		options.screwStock[0].lengths = [30];
+		options.insertIds = ["seat","seat"];
+		rejects(() -> materia.tooling.casting.InsertFixturePlanner.plate(d,options), "Duplicate fixture insert");
+		options.insertIds = ["seat"];
+		var side = materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
+		side.id = "side.service";
+		side.frame = F.fromRotationMatrix(20,0,10,[0,0,-1,0,1,0,1,0,0]);
+		side.depth = 12; side.threadDepth = 10;
+		d.input.inserts[0].holes.push(side);
+		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
+		var withMask = materia.tooling.casting.InsertFixturePlanner.plate(d,options);
+		check(withMask.sites.length == 1 && withMask.masks.length == 1 && withMask.masks[0].protection.sourceHoleId == side.id,
+			"unused source hole retains protection, including a valid derived ID for a dotted hole ID");
+		d.input.inserts[0].holes = [];
+		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
+		var absent = materia.tooling.casting.InsertFixturePlanner.plate(d,options);
+		check(absent.sites.length == 0 && absent.changeRequests.length == 1 && absent.validation.filter(row -> row.rule == "tooling.fixture.source-hole.seat").length == 1,
+			"missing source thread blocks fixture without inventing a hole");
+	}
+
+	static function nominalProduct():Void {
+		var document = fixture();
+		var product:materia.casting.InsertOrigin.CatalogueInsert = {manufacturer:"fixture supplier",reference:"fixture-insert",
+			revision:"fixture-v1",holePolicyId:document.input.inserts[0].holes[0].limits.policyId,document:"fixture-drawing",
+			geometryBasis: materia.casting.InsertOrigin.InsertGeometryBasis.NominalStudy, geometryFingerprint: null, evidence: []};
+		document.input.inserts[0].origin = Catalogue(product);
+		document.setup.sourceFingerprint = ToolingCodec.inputFingerprint(document.input);
+		var review = ToolingReview.inspect(document);
+		check(review.filter(row -> row.ruleId == "tooling.insert.geometry.seat" && row.status == "pending").length == 1,
+			"input review retains nominal product geometry as pending");
+		var source = materia.tooling.casting.CastingMoldPlanner.sourceSupport(document.input);
+		check(!materia.tooling.ToolingValidation.ToolingReadiness.evaluate(source).ready,
+			"exactly supported box geometry does not clear nominal product qualification");
+		var fingerprint = ToolingCodec.inputFingerprint(document.input);
+		product.reference = "different-fixture-product";
+		check(ToolingCodec.inputFingerprint(document.input) != fingerprint, "product identity enters the source fingerprint");
+		product.reference = "fixture-insert";
+		product.revision = "fixture-v2";
+		check(ToolingCodec.inputFingerprint(document.input) != fingerprint, "catalogue revision enters the source fingerprint");
+		product.revision = "fixture-v1";
+		product.holePolicyId = "other-policy";
+		rejects(() -> ToolingCodec.snapshot(document), "Catalogue insert hole policy differs from product declaration");
+		product.holePolicyId = document.input.inserts[0].holes[0].limits.policyId;
+		document.input.inserts[0].origin = null;
+		rejects(() -> ToolingCodec.snapshot(document), "Missing insert origin");
+	}
+
 	static function fixture():ToolingDocument {
 		var input:CastingToolingInput = {
 			id: "sample-foundation",
@@ -67,15 +166,14 @@ class ToolingTests {
 				}
 			],
 			features: [
-				{id:"pocket",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:100,depth:80,height:61,pose:F.translation(0, 0, -1)},openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null},
-				{id:"insert-seat",kind:InsertRecess,owner:"seat",geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:40,depth:30,height:20,pose:F.translation(80, 0, 90)},openings:[materia.casting.CastingPatterns.face("body.z-max"),materia.casting.CastingPatterns.face("body.x-max")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null}
+				{id:"pocket",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(100,80,61)),pose:F.translation(0, 0, -1)},openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null},
+				{id:"insert-seat",kind:InsertRecess,owner:"seat",geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40,30,20))),pose:F.translation(80, 0, 90)},openings:[materia.casting.CastingPatterns.face("body.z-max"),materia.casting.CastingPatterns.face("body.x-max")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null}
 			],
 			inserts: [
 				{
 					id: "seat",
-					width: 40,
-					depth: 30,
-					height: 20,
+					body: materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40, 30, 20)),
+					origin: materia.casting.InsertOrigin.Fabricated,
 					holes: TestInsertHoles.through(8,20),
 					pose: F.translation(80, 0, 90),
 					role: InsertRole.GuideSeat,
@@ -197,10 +295,25 @@ class ToolingTests {
 
 	public static function main():Void {
 		withdrawalTie();
+		relievedFixing();
+		sharedFixturePlate();
+		nominalProduct();
 		var original = fixture(),
 			encoded = ToolingCodec.encode(original),
 			decoded = ToolingCodec.decode(encoded);
 		check(ToolingCodec.encode(decoded) == encoded, "canonical roundtrip");
+		var detachedSource = ToolingCodec.encodeInput(original.input);
+		check(ToolingCodec.encodeInput(ToolingCodec.decodeInput(detachedSource)) == detachedSource,
+			"detached casting source uses the same strict input records");
+		var sourceRecord:Dynamic = Json.parse(detachedSource);
+		sourceRecord.version = ToolingCodec.VERSION-1;
+		rejects(() -> ToolingCodec.decodeInput(Json.stringify(sourceRecord)),"Unsupported tooling source format or version");
+		var stored:Dynamic = Json.parse(encoded), storedInsert = items(stored.document.input.inserts)[0];
+		check(storedInsert.body.kind == "primitive" && storedInsert.body.solid.kind == "box" && storedInsert.body.solid.width == 40
+			&& !Reflect.hasField(storedInsert, "width") && !Reflect.hasField(storedInsert, "depth")
+			&& !Reflect.hasField(storedInsert, "height"), "one neutral body encoding without duplicate insert dimensions");
+		storedInsert.width = 40;
+		rejects(() -> ToolingCodec.decode(Json.stringify(stored)), "Unknown insert field: width");
 		var stock = fixture();
 		stock.input.inserts[0].material = materia.casting.InsertMaterial.InsertMaterials.specification(C45Ground);
 		check(ToolingCodec.inputFingerprint(stock.input) != ToolingCodec.inputFingerprint(original.input),
@@ -214,7 +327,7 @@ class ToolingTests {
 			"insert manufacturing interfaces survive roundtrip");
 		var top = F.transformPoint(decoded.setup.sourceToMold, 0, 0, 100);
 		check(Math.abs(top.z) < 1e-9, "setup maps rail-side source top to bed");
-		check(decoded.input.features[1].geometry.pose.z == -1 && decoded.input.features[1].geometry.height == 61,
+		check(decoded.input.features[1].geometry.pose.z == -1 && materia.casting.CastingFeature.CastingGeometrySolids.height(decoded.input.features[1].geometry.solid) == 61,
 			"design-cut extensions preserved, not misrepresented as clipped cavity sizes");
 		decoded.input.envelope[0].profile[0].x = -999;
 		decoded.input.inserts[0].pose.x = -999;
@@ -240,7 +353,8 @@ class ToolingTests {
 			"body opening and mold orientation derive a default former withdrawal");
 		ordered.recipe.panel.measuredThickness = 17.6;
 		check(ToolingCodec.recipeFingerprint(ordered.recipe) != before, "measured stock changes recipe fingerprint");
-		ordered.input.features[1].geometry.height += 1;
+		var size = materia.casting.CastingFeature.CastingGeometrySolids.box(ordered.input.features[1].geometry.solid, "pocket");
+		ordered.input.features[1].geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(size.width, size.depth, size.height + 1));
 		rejects(() -> ToolingCodec.encode(ordered), "Stale tooling setup");
 		ordered.setup.sourceFingerprint = ToolingCodec.inputFingerprint(ordered.input);
 		check(ToolingCodec.encode(ordered).length > 0, "explicitly rebind setup to updated source");

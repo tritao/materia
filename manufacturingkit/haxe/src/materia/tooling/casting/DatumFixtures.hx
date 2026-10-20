@@ -1,4 +1,6 @@
 package materia.tooling.casting;
+
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.casting.BoxAlgebra;
 
 import materia.assembly.AssemblyFrames as F;
@@ -36,7 +38,8 @@ class DatumFixtures {
 	}
 	public static function add(p:CastingMoldPlan, i:CastingToolingInsert, face:materia.assembly.AssemblyRecord.AssemblyFrame, datum:MoldVolume,
 			withdrawal:{x:Float, y:Float, z:Float}, bed:PanelPlacement, pocketId:Null<String>):Void {
-		p.validation = p.validation.concat(InsertFixings.protectionValidation(i));
+		var dimensions = InsertBodies.box(i.body, i.id);
+		p.validation = p.validation.concat(InsertFixturePlanner.protectionValidation(i));
 		var r = p.document.recipe,
 			h = r.hardware,
 			dt = h.datumThickness,
@@ -62,7 +65,7 @@ class DatumFixtures {
 			secondary = ToolingIds.derive("", id, "-secondary-pin");
 		var pinSpacing = h.fixturePinSpacing, pinAlongY = false;
 		for (hole in i.holes) {
-			var fixing = InsertFixings.select(hole, F.compose(p.document.setup.sourceToMold, i.pose), face, h);
+			var fixing = InsertFixturePlanner.select(hole, F.compose(p.document.setup.sourceToMold, i.pose), face, h);
 			if (fixing != null)
 				pinSpacing = Math.max(pinSpacing, fixing.clearanceDiameter + d + h.secondaryPinTravel + 2 * r.minimumLigament);
 		}
@@ -126,7 +129,7 @@ class DatumFixtures {
 		var fixings:Array<InsertFixtureFixing> = [];
 		var sourceCandidates = 0;
 		for (hole in i.holes) {
-			var selected = InsertFixings.select(hole, F.compose(p.document.setup.sourceToMold, i.pose), face, h);
+			var selected = InsertFixturePlanner.select(hole, F.compose(p.document.setup.sourceToMold, i.pose), face, h);
 			if (selected == null)
 				continue;
 			var entry = selected.entry, engagement = selected.engagement;
@@ -192,7 +195,7 @@ class DatumFixtures {
 			if (h.plugMaterial != "steel")
 				throw "Unsupported nominal bore-mask material";
 			var entry = F.compose(F.compose(p.document.setup.sourceToMold, i.pose), hole.frame);
-			var protection = InsertFixings.mask(hole, ToolingIds.derive("mask-", i.id + "-" + hole.id), h.plugDepth,
+			var protection = InsertFixturePlanner.mask(hole, ToolingIds.derive("mask-", i.id + "-" + hole.id), h.plugDepth,
 				maskWithdrawal(p, i, hole, withdrawal));
 			var mask:SupportHardware = {
 				id: ToolingIds.derive("mask-", i.id + "-" + hole.id),
@@ -209,7 +212,7 @@ class DatumFixtures {
 		}
 		p.fixtures.push({
 			insertId: i.id,
-			datums: BoxMoldPlanner.datums(face, i.width, i.depth),
+			datums: BoxMoldPlanner.datums(face, dimensions.width, dimensions.depth),
 			datum: datum,
 			mountingFace: face,
 			withdrawal: withdrawal,
@@ -271,7 +274,7 @@ class DatumFixtures {
 					var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
 					var fixing = fixings[0], screws = p.hardware.filter(h -> h.id == fixing.hardwareId);
 					var entry = F.compose(F.compose(p.document.setup.sourceToMold, source.pose), hole.frame);
-					var selected = InsertFixings.select(hole, F.compose(p.document.setup.sourceToMold, source.pose), f.mountingFace,
+					var selected = InsertFixturePlanner.select(hole, F.compose(p.document.setup.sourceToMold, source.pose), f.mountingFace,
 						p.document.recipe.hardware);
 					var penetrations = f.penetrations.filter(pen -> pen.sourceHoleId == hole.id && pen.operationId == fixing.operationId);
 					if (selected == null || penetrations.length != 1
@@ -307,7 +310,7 @@ class DatumFixtures {
 				if (protections.length != 1)
 					throw "Source hole needs one unique release mask: " + hole.id;
 				var protection = protections[0], hardware = p.hardware.filter(h -> h.id == protection.hardwareId);
-				var expectedProtection = InsertFixings.mask(hole, protection.hardwareId, p.document.recipe.hardware.plugDepth,
+				var expectedProtection = InsertFixturePlanner.mask(hole, protection.hardwareId, p.document.recipe.hardware.plugDepth,
 					maskWithdrawal(p, source, hole, f.withdrawal));
 				if (ToolingCodec.canonical(protection) != ToolingCodec.canonical(expectedProtection))
 					throw "Source thread protection differs from its depth budget: " + hole.id;

@@ -1,3 +1,4 @@
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.assembly.AssemblyFrames as F;
 import haxe.Json;
 import materia.tooling.ToolingDocument;
@@ -31,9 +32,10 @@ class BoxPlannerTests {
 	public static function run(d:ToolingDocument):Void {
 		d = ToolingCodec.snapshot(d);
 		d.recipe.minimumLigament = 2;
-		d.input.inserts[0].height = 15;
+		var insertSize = InsertBodies.box(d.input.inserts[0].body, "seat");
+		d.input.inserts[0].body = materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(insertSize.width, insertSize.depth, 15));
 		d.input.inserts[0].pose.z = 85;
-		d.input.inserts[0].holes = TestInsertHoles.through(5,d.input.inserts[0].height);
+		d.input.inserts[0].holes = TestInsertHoles.through(5,InsertBodies.height(d.input.inserts[0].body));
 		var hole = d.input.inserts[0].holes[0];
 		hole.thread = {designation: "M6", majorDiameter: 6, pitch: 1, starts: 1, hand: Right,
 			internal: true, toleranceClass: "6H", profile: Metric};
@@ -43,7 +45,7 @@ class BoxPlannerTests {
 		hole.limits = {policyId: "steel-threaded-hole-v1", threaded: {minEngagement: 6, minTipGap: 1},
 			minBack: 1.5, minWall: 3, minClearance: 0.6, overrides: []};
 		var recess = d.input.features.filter(f -> f.kind == "insert-recess")[0];
-		recess.geometry.height = 15;
+		recess.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Insert(d.input.inserts[0].body);
 		recess.geometry.pose.z = 85;
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
 		var pattern = ToolingCodec.snapshot(d);
@@ -58,7 +60,7 @@ class BoxPlannerTests {
 		var shallow = materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
 		shallow.depth = materia.casting.InsertHole.InsertHoleCodec.threadLimits(shallow).minEngagement
 			+ materia.casting.InsertHole.InsertHoleCodec.threadLimits(shallow).minTipGap + pattern.recipe.hardware.plugDepth - 0.1;
-		check(materia.tooling.casting.InsertFixings.select(shallow,
+		check(materia.tooling.casting.InsertFixturePlanner.select(shallow,
 			F.compose(pattern.setup.sourceToMold, pattern.input.inserts[0].pose), patterned.fixtures[0].mountingFace,
 			pattern.recipe.hardware) == null, "screw and far-end plug cannot consume the same depth");
 		check(patterned.penetrations.filter(p -> p.insertId == "seat" && p.sourceHoleId != null).length == 2,

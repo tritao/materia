@@ -201,7 +201,7 @@ class OrientationSectionTests {
 		check(withdrawal != null && Math.abs(withdrawal.x) < 1e-8 && Math.abs(withdrawal.y - 1) < 1e-8, "source withdrawal direction rotates with the feature");
 		var revised = ToolingCodec.snapshot(p.document), e = p.envelope;
 		revised.input.revision++;
-		revised.input.features.push({id:"extra-pocket",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:10,depth:10,height:8,pose:materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(revised.setup.sourceToMold),
+		revised.input.features.push({id:"extra-pocket",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(10,10,8)),pose:materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(revised.setup.sourceToMold),
 				materia.assembly.AssemblyFrames.translation(e.x + 20, e.y + 20, e.z + e.height - 8))},openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null});
 		revised.setup.features.push({
 			featureId: "extra-pocket",

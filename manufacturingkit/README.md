@@ -33,11 +33,18 @@ adds the panel contracts and joint generators described below. Mold generation
 and the full fabrication/CAM package remain subsequent stages.
 
 - `CastingToolingInput` describes an additive union of convex profile prisms,
-  box-shaped design cuts and separately classified steel inserts/recesses.
+  solid design cuts and separately classified steel inserts/recesses. Design cuts
+  use pure Box/Cylinder `CastingSolid` primitives. `InsertSpec.InsertBody` stores
+  a primitive or an insert-only crimped socket exterior; source-owned recesses
+  preserve that exterior. Design cuts cannot carry socket retention geometry. Required fabricated/catalogue origins preserve product
+  revision, hole policy and geometry evidence; nominal catalogue exteriors remain
+  Pending. Box-only analysis rejects non-box regions.
 - Coordinates are right-handed and explicitly in millimetres. Each prism
   extrudes a counterclockwise local XY profile along +Z; each box is centered
-  in local X/Y with its bottom at Z = 0. Cut extensions outside the casting
-  remain design tools and must be clipped by the later planner.
+  in local X/Y with its bottom at Z = 0. `CastingCavities.derive` computes the
+  finished cut/body intersection once. Source cuts may cross only declared
+  openings; consumers never clip them locally. Box-only consumers report
+  unsupported geometry against its source feature.
 - `CastingSetup.sourceToMold` maps source coordinates into a mold frame with
   +Z upward, gravity toward -Z and the open fill side toward +Z. Every ordinary
   void requires a core strategy. Reusable formers require a unit withdrawal
@@ -53,10 +60,11 @@ and the full fabrication/CAM package remain subsequent stages.
   Named collections and object fields are canonicalized for stable fingerprints;
   profile vertices retain geometric order. UTF-8 document size is limited to
   2 MiB, named collections to 512 records and convex profiles to 64 vertices.
-  Codec version 4 requires explicit hardware choices, fit allowances, core wire axis,
-  fill height and freeboard. Closed vocabularies are typed; earlier versions are
+  Codec version 9 includes typed insert bodies and required origins, source hole
+  policies, full thread depth, standard bolt clearances and explicit blind relief, alongside the hardware,
+  fit, core wire axis, fill-height and freeboard records. Closed vocabularies are typed; earlier versions are
   rejected with no compatibility reader.
-  An insert's original design label is preserved separately as `sourceRole`.
+  An insert's display text is preserved separately as `label`.
 - Bind `setup.sourceFingerprint` using `ToolingCodec.inputFingerprint(input)`.
   Source changes invalidate that binding even if the revision was not updated.
   `recipeFingerprint` and `documentFingerprint` identify other manufacturing-input
@@ -66,8 +74,9 @@ and the full fabrication/CAM package remain subsequent stages.
 
 MachineKit's `machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,
 id, revision)` converts existing `MineralFoundation` definitions through their
-public APIs. It preserves chamfers, flared feet, feature IDs, insert bore/finish/
-tolerance and local mounting frames without retaining source components.
+public APIs. It copies neutral features and authoritative interface hole records,
+typed insert material/role/finish, tolerance and local frames without retaining
+source components or inventing holes.
 ManufacturingKit's records and codecs remain usable independently of that adapter.
 
 Run the pure tooling checks and the adapter's CAD equivalence checks:
@@ -150,18 +159,19 @@ continuous swept blocking graphs. ManufacturingKit emits no CAD or drawing text.
 
 See [box-mold example](../machinekit/examples/box-mold/README.md). The initial
 supported template has one rectangular envelope, one bed-accessible or fill-accessible EPS pocket
-and one bed-facing insert with recipe-selected bore, thread, screw and clearance
-diameters. The example selects M6; the library does not infer a thread from a hole. Reusable
+and one bed-facing insert with a declared source thread and resolved hole limits.
+The fixture screw passes through clearance-only bed/datum holes into that steel
+thread. The example selects M6; the library does not infer a thread from a hole. Reusable
 formers and nonorthogonal setups are rejected. Physical qualification remains
-pending, including a broad-area core restraint, accurate independent insert
-datums, anchorage, finishing stock, material/process evidence and handling.
+pending, including a broad-area core restraint, fixture accuracy and constraint
+qualification, anchorage, finishing stock, material/process evidence and handling.
 
 
 Core supports are reusable neutral records in `casting.CoreSupport` and generated
 by `CoreSupports`. Pass optional `CoreSupportOptions` to `BoxMoldPlanner.plan`;
 defaults use `Auto`, one-third measured stock for embed depth, recipe joint
 clearance and the declared recipe adhesive-line thickness. The options codec validates closed enum modes,
-finite dimensions and unknown fields; mold codec version 4 persists them and
+finite dimensions and unknown fields; mold codec version 8 persists them and
 rejects earlier versions. Auto chooses a bed socket when the cavity opens onto the bed,
 otherwise a bridge when it opens onto the fill face. Explicit incompatible modes
 fail without changing the source casting.

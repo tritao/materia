@@ -1,5 +1,7 @@
 package machinekit.tooling;
 
+import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
@@ -94,12 +96,7 @@ class CastingMoldCad {
 
 	public static function steel(p:CastingMoldPlan, id:String):Part {
 		var i = p.document.input.inserts.filter(i -> i.id == id)[0];
-		var component = new CastInsert(new ComponentValues().setToken("role", i.role)
-			.setToken("label", i.label)
-			.setNumber("width", i.width)
-			.setNumber("depth", i.depth)
-			.setNumber("height", i.height)
-			.setToken("holes", machinekit.structural.InsertHoles.fromNeutral(i.holes)));
+		var component = ToolingInsertCad.component(i);
 		var local = component.geometry();
 		try {
 			var out = PosedParts.moved(local, F.compose(p.document.setup.sourceToMold, i.pose));
@@ -192,7 +189,8 @@ class CastingMoldCad {
 
 	static function insertBox(p:CastingMoldPlan, id:String):MoldBox {
 		var i = p.document.input.inserts.filter(i -> i.id == id)[0];
-		return materia.tooling.casting.BoxMoldPlanner.box(i.width, i.depth, i.height, F.compose(p.document.setup.sourceToMold, i.pose));
+		var dimensions = InsertBodies.box(i.body, i.id);
+		return materia.tooling.casting.BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(p.document.setup.sourceToMold, i.pose));
 	}
 
 	static function panelWorld(m:materia.tooling.panel.PanelAssemblyPlan.PanelPlacement):Part {
@@ -266,13 +264,7 @@ class CastingMoldCad {
 			var pose = F.compose(p.document.setup.sourceToMold, i.pose);
 			if (exploded)
 				pose.x += b.width * 1.8;
-			var part = new CastInsert(new ComponentValues().setNumber("width", i.width)
-				.setNumber("depth", i.depth)
-				.setNumber("height", i.height)
-				.setToken("holes", machinekit.structural.InsertHoles.fromNeutral(i.holes))
-				.setNumber("positionTolerance", i.positionTolerance)
-				.setToken("role", i.role)
-				.setToken("label", i.label));
+			var part = ToolingInsertCad.component(i);
 			a.addComponent(materia.tooling.ToolingIds.derive("insert-", i.id), part, pose);
 		}
 		if (!exploded) {

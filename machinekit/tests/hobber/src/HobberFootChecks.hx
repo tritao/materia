@@ -48,7 +48,19 @@ class HobberFootChecks {
       }
     }catch(e:Dynamic){plateShape.close();body.close();cache.close();throw e;}
     plateShape.close();body.close();cache.close();
-    var base=FlexsplineHobberBaseReport.measure(machine),reaction:Float=base.feet.worstReactionN;
+    var base=FlexsplineHobberBaseReport.measure(machine);
+    check(base.feet!=null&&base.feet.worstReactionN!=null,"gravity reactions are reported independently of beam support");
+    var reaction:Float=base.feet.worstReactionN;
+    check(Math.isFinite(reaction)&&reaction>0,"worst foot reaction is finite and positive");
+    var samples:Array<Dynamic> = base.beam.samples;
+    check(samples.length==21,"gravity study covers the full declared X positions");
+    for(sample in samples){
+      var forces:Array<Float> = sample.footReactionN,sum=0.0;
+      for(force in forces){check(Math.isFinite(force)&&force>0,"each primary foot carries a positive finite load");sum+=force;}
+      check(Math.abs(sum-base.machineKg*9.80665)<base.machineKg*9.80665*1e-9,"foot reactions balance total machine weight");
+    }
+    check(base.beam.status=="unsupported"&&base.beam.newMinimumIyMm4==null&&base.beam.passed==false,
+      "round socket sections do not become a passing beam screen");
     var contactArea=machinekit.structural.LevelingSeat.PLATE_WIDTH*machinekit.structural.LevelingSeat.PLATE_WIDTH-Pocket.FOOT_STEM_CLEARANCE*Pocket.FOOT_STEM_CLEARANCE;
     var result={assertions:n,seconds:Sys.time()-began,footCount:3,pocketRoofMm:Pocket.FOOT_ROOF,pocketFloorMm:Pocket.FOOT_FLOOR,
       roofThicknessMm:Pocket.FOOT_SUPPORT_TOP-Pocket.FOOT_ROOF,plateMm:[110,110,15],stemClearanceMm:28,thread:"M24x3 nominal, semantic threads",

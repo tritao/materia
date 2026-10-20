@@ -93,14 +93,19 @@ class AssemblyDesignChecks {
 			material(out,id+" counterbore minimum wall "+h.minWall,{id:id,frame:h.frame,volume:RingVolume(c.radius+h.minWall,c.radius,0,c.depth)},host);
 			start=c.depth;
 		}
-		material(out,id+" minimum wall "+h.minWall,{id:id,frame:h.frame,volume:RingVolume(h.radius+h.minWall,h.radius,start,h.depth)},host);
+		material(out,id+" minimum wall "+h.minWall,{id:id,frame:h.frame,volume:RingVolume(h.radius+h.minWall,h.radius,start,h.relief == null ? h.depth : h.relief.start)},host);
+		if (h.relief != null) {
+			var r = h.relief, radius = r.diameter / 2;
+			clear(out,id+" thread relief",{id:id,frame:h.frame,volume:CylinderVolume(radius,r.start,h.depth)},host);
+			material(out,id+" relief minimum wall "+h.minWall,{id:id,frame:h.frame,volume:RingVolume(radius+h.minWall,radius,r.start,h.depth)},host);
+		}
 		if(h.thread!=null) {
 			var t=h.thread;
 			if(Math.abs(t.tapDrill/2-h.radius)>1e-6) out.error("design.tap-size",id,"Tap drill does not match thread designation");
 			if (h.through != true) {
 				DesignChecks.minimum(out,id+" tap runout",t.cylindricalDepth-t.usableDepth,0.5);
 				DesignChecks.minimum(out,id+" drill back wall",t.stock-h.depth,t.minBack);
-				material(out,id+" actual back wall "+t.minBack,{id:id,frame:h.frame,volume:CylinderVolume(h.radius,h.depth,h.depth+t.minBack)},host);
+				material(out,id+" actual back wall "+t.minBack,{id:id,frame:h.frame,volume:CylinderVolume(h.relief == null ? h.radius : h.relief.diameter/2,h.depth,h.depth+t.minBack)},host);
 			}
 		}
 		if(h.approach!=null) clear(out,id+" drill/tap approach",{id:id,frame:h.frame,volume:CylinderVolume(h.approach.radius,-h.approach.length,0)},host);
@@ -121,7 +126,7 @@ class AssemblyDesignChecks {
 		if (h.through == true)
 			DesignChecks.minimum(out,id+" thread engagement",Math.min(screw.shankLength()-grip,t.usableDepth),t.minEngagement);
 		else
-			DesignChecks.blindFastener(out,id,screw.shankLength(),grip,t.usableDepth,t.cylindricalDepth,t.point,t.stock,t.minEngagement,t.minTipGap,t.minBack);
+			DesignChecks.blindFastener(out,id,screw.shankLength(),grip,t.usableDepth,t.cylindricalDepth,t.point,t.stock,t.minEngagement,t.minTipGap,t.minBack,h.relief == null ? null : h.relief.start);
 		if(screw.shankLength()-screw.threadedLength()>grip+1e-6)out.error("design.unthreaded-shank",id,"Unthreaded shank enters tapped hole");
 		var intervals:Array<{start:Float,end:Float}> = [];
 		for(ref in through) {
