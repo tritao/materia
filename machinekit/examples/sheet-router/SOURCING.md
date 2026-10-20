@@ -66,7 +66,73 @@ and approach poses fit within the reduced Z travel. The 200 mm stroke is provisi
 for the authored 120 mm longest-tool envelope: shorter-tool reach and the real tool-length
 range still require qualification with the tool table.
 
+## Fabrication and access decisions after the braced-frame screen
+
+The installation baseline is anchored to a structural slab at all six support
+stations, using separate anchor brackets/base plates, steel levelling/packing and
+grouted bearing seats. Do not rely on a rubber levelling pad to transmit anchor
+shear. The structural screen assumes 50,000 N/mm in X, Y and Z at each station,
+with no rotational clamp; these are provisional foundation stiffnesses requiring
+anchor/slab qualification. Free-standing levelling feet are a sensitivity with
+50,000 N/mm vertical at all six, and minimal 3-2-1 lateral springs of the same
+stiffness (X at foot 0; Y at feet 0 and 3). This assumes friction without slip;
+it does not establish sliding or overturning safety.
+
+The sixteen-brace layout is a structural candidate, not an accepted service layout.
+The front end X braces currently cross the 554.25 mm sheet-loading plane: straight
+front loading is blocked. In the next CAD pass, lower the front pair's upper joints
+to at most 430 mm, below the 479.25 mm plenum underside, retaining the lower-plan
+triangulation and side/rear braces. Recheck frame modes before adopting that change.
+Keep the front approach free across the full 1600 mm sheet width. Do not make a
+load-carrying brace removable during operation.
+
+Service the plenum from above with the spoilboard removed; zone valves must be
+removable through side service openings. Put the vacuum header, pump and isolation
+valves outside the right frame, with fixed hoses clamped along the longitudinal
+members and routed around brace joints, not through the lower X crossings. Reserve
+side openings for valve/tool removal and hose bend radii. Y cable chain stays
+outside the left rail; X chain remains above/behind the beam. Existing assembly
+clearance establishes chain envelopes, not flexible hose bend/service access.
+The next CAD pass must route actual hoses and demonstrate each valve removal path.
+
+Select bolted and dowelled aluminium Z ribs, with machined channels and bolted
+closing strips, rather than welding a 6082-T6 assembly. The current two closed
+side sections represent the fully composite stiffness envelope; fastener pitch,
+interface slip and closing-strip compliance still require a joint design and
+sensitivity before that stiffness can be credited for fabrication. Machine the
+assembled rail face and guide datums after fabrication. Do not apply parent T6
+strength to a welded heat-affected zone: loss is process dependent, as shown by
+[this 6082-T6 welding study](https://doi.org/10.1007/s00170-025-15395-0).
+
+Weld the steel beam feet before stress relief. Machine the Y-carriage mounting
+faces and both X-rail seats in one fixture/setup after stress relief, using a
+common datum scheme with the beam. Dual-Y squaring must follow those machined
+datums, with final rail alignment and servo homing only trimming residual error.
+Specify the stress-relief cycle with the weldment/material supplier; qualify local
+tube-wall and weld stresses separately from the beam screen.
+
+Recover the 60 mm spindle drop through a fork/riser redesign, not by accepting a
+428 mm beam-centre-to-tool-tip lever permanently. Rack height alone cannot change
+the plate-to-fork clearance at the same holder engagement: both move together at
+pickup. Move the obstructing fork support/riser behind or outside the projected
+Z-plate/rail ends, then raise the spindle datum 60 mm. Raise the work surface and
+setter datum by the same amount to preserve the 200 mm stroke and full-depth
+cutting reach. Recompute rack heights, all pickup/approach poses, shorter-tool
+reach, shoe lift and plenum supports in that CAD pass; do not claim it is already
+clear. The lever target is about 368 mm. Keep the present verified pickup geometry
+until this coupled change passes assembly and structural checks.
+
 ## Structural decisions
+
+The full anchored screen gives worst X/Y 2.044/2.135 N/µm, a 24.177 Hz global
+X frame-sway mode and 26.054 Hz gantry Y-sway/beam-roll mode. Keep X at 40 mm and
+Z aluminium: 25 mm X loses the static target for only 0.390 Hz, while steel Z
+adds 22.95 kg and lowers the mode. Do not buy HGR30 or longer Y feet on this mode's
+behalf: their screened gains are negligible or negative. The next geometry pass
+recovers the 60 mm lever and clears sheet loading as described above. Further
+modal stiffness work belongs in the frame/beam/Y-drive path. See the complete
+mode-energy and sensitivity tables in [fem/README.md](fem/README.md).
+
 
 The working follow-up uses a 40 mm flat X plate, 30 mm steel feet continuously
 welded to the beam footprint (6 mm nominal fillet), and two closed 25 × 120 × 6 mm
@@ -75,7 +141,8 @@ braces. Built-up aluminium joints, heat treatment and subsequent rail-seat
 machining need manufacturing qualification. The router compiles against HEAD in an isolated detached worktree and both
 beds export fresh FEM CAD packets. Assembly/clearance passes 426 assertions,
 sizing/planner passes 82, and guide geometry/travel checks pass. The full
-structural rerun remains pending. The diagnostic and corrected-baseline evidence is in
+anchored structural rerun passes static X/Y targets but still fails 40 Hz. Mode shapes,
+energy shares, sensitivities and the corrected-baseline evidence are in
 [fem/README.md](fem/README.md); the results below describe the previous candidate.
 
 Start with flat carriage plates and the spatial guide pattern. A box bridge has
