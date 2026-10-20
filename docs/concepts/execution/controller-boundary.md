@@ -109,11 +109,15 @@ stateDiagram-v2
     Running --> Held: hold
     Held --> Running: resume
   }
-  Moving --> Stopped: stop, abort
-  Moving --> Faulted: e-stop, link loss, underflow, fault
-  Stopped --> [*]: new session
-  Faulted --> [*]: new session
+  Moving --> Stopped: stop
+  Stopped --> Moving: new queue
+  Moving --> Latched: abort, e-stop, link loss, underflow, fault
+  Latched --> [*]: new session
 ```
+
+After a commanded **stop**, the device accepts a new queue and the session
+continues. After an **abort**, emergency stop, link loss, underflow or fault,
+the stop is latched: the device refuses new queues until a new session starts.
 
 ## In Materia
 
@@ -174,16 +178,14 @@ the runtime: the scope of a commercial controller.
 
 ## Open questions
 
-- **Recovering after an emergency stop.** The host sends `RESET_SAFETY`, but
-  the virtual device and the bench board ignore it, and a stopped device
-  refuses new queues. Recovery appears to need a new session.
+- **Recovering from a latched stop.** The host sends `RESET_SAFETY`, but the
+  virtual device and the bench board do not act on it, so recovery from an
+  abort, emergency stop or fault is a new session. Whether a device should clear
+  a latched stop within a session, and when, is undecided.
 - **No device-side position limits.** Both reference boards pass ±1e12 (none);
   position limits are enforced only on the host.
 - **Stops leave the path.** Only hold stays on the path; a stop or fault brakes
   each axis independently.
-- **`DEVICE_PROTOCOL.md` is behind the code**: frame sizes (session record
-  5,013 bytes, not 4,940), deployment schema (6, not 5), and missing sections
-  for homing, inputs and `RESET_SAFETY`.
 - **Bench placeholders**: the controller id `baadf00d…`, placeholder heater
   pins, and welder ADC pins (PB0/PB1) that the switch inputs also use.
 - **A conformance suite for third-party controllers** does not exist yet as a

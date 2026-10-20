@@ -16,9 +16,26 @@ After hardware ships, a wire revision is immutable.
 The four-byte sync marker is `RKD6`. A frame is marker (4), message type (1), reserved zero
 (1), little-endian payload length (2), payload, then little-endian CRC-32/IEEE
 (4), calculated over every preceding byte. The largest current payload is the
-session record (4,940 bytes), so the frame maximum is 4,952 bytes.
+session record (5,013 bytes), so the frame maximum is 5,025 bytes.
 A receiver rejects unknown types, wrong lengths, a nonzero reserved byte,
 CRC mismatch, or malformed session, segment and event records.
+
+| Type | Message | Direction | Payload |
+| ---: | --- | --- | --- |
+| 1 | `SESSION_BEGIN6` | host → device | `SessionBegin6`: expected controller, actuators, channels, inputs |
+| 2 | `SESSION_ACK6` | device → host | `SessionAck6`: own id, status, tick rates, capacities, profile, digest |
+| 3, 4 | `TIME_SYNC_REQUEST`, `TIME_SYNC_REPLY` | both | clock samples |
+| 5 | `QUEUE_BEGIN` | host → device | `QueueBegin6`: revision, replacement boundary, expected state |
+| 6 | `SEGMENT` | host → device | `Segment6Header` + one `Segment6Coefficients` per actuator |
+| 7 | `COMMIT` | host → device | `Commit6`: committed through tick |
+| 8–12 | `HOLD`, `RESUME`, `ABORT`, `STOP`, `EMERGENCY_STOP` | host → device | none |
+| 13 | `RESET_SAFETY` | host → device | none (see [Recovery](#recovery-after-a-stop)) |
+| 14 | `QUEUE_STATUS` | device → host | `QueueStatus6` |
+| 15 | `STATE6` | device → host | `State6Header` + `ActuatorState6` per actuator + `InputState6` per input |
+| 16 | `EVENT` | host → device | `Event6`: a channel value at a path tick |
+| 17 | `SENSOR6` | device → host | `Sensor6Header` + `Sensor6Value` rows |
+| 18 | `CONTROLLER_OUTPUT` | host → device | `ControllerOutput6` |
+| 21–24 | `HOMING_SCOPE`, `HOMING_SIDE`, `HOMING_CONTROL_ACK`, `HOMING_COUNTER_BATCH` | see [Homing](#inputs-and-homing) | |
 
 `device_wire6.wire.idl` is the canonical fixed-record schema; `wire6.json`
 generates Rust and C++ codecs. Segment coefficients are `f32` in local seconds,
@@ -85,7 +102,7 @@ with `cargo run --manifest-path robotkit/device_protocol/Cargo.toml --example
 frame_vectors`. Native and Rust framing validate the same record.
 
 
-Protocol version 8 also carries steps per actuator unit, actuator rate limits,
+Wire revision 8 also carries steps per actuator unit, actuator rate limits,
 direction setup ticks, source joint indices, transmission ratios and dual-drive
 skew bounds, all derived by the host from the model and the deployment's
 wiring. Nothing about them is compiled into firmware.
@@ -93,7 +110,7 @@ The host converts joint polynomials to actuator polynomials before encoding and
 rejects motion faster than either the authored actuator rate or one step per
 device step tick. The no_std device generator uses the configured direction
 setup and minimum step interval, and checks dual-drive skew from step feedback.
-Protocol version 9 declares up to 32 channels in the session, including stable
+Wire revision 9 declares up to 32 channels in the session, including stable
 IDs, kinds and safe values. An `EVENT` carries its queue revision, plan ID,
 device path tick, channel index, typed value and HOLD policy. The host maps
 each `TimedEvent` from plan-relative path time with the same frozen clock
@@ -102,7 +119,7 @@ its path clock crosses their ticks. HOLD makes configured channels safe,
 RESUME restores `RestoreOnResume` values, and STOP, ABORT or a fault discards
 future events and sets every channel to its declared safe value, except that a
 commanded STOP or ABORT leaves a channel whose stop policy is keep-on-stop as it
-is (protocol version 12), so a vacuum holding a part does not drop it when the
+is (wire revision 12), so a vacuum holding a part does not drop it when the
 arm is stopped. An emergency stop, link loss or fault still makes every channel
 safe. Stopping the motion never touches the channels: they are the events'. Replacement discards
 events at or after the replacement boundary. The virtual event log records
@@ -110,15 +127,16 @@ scheduled path ticks, applied path ticks and device ticks.
 
 No RKD6 hardware has shipped. Before the first hardware release, an in-place
 schema revision is permitted with a `PROTOCOL_VERSION` bump and regenerated
-Rust and C++ codecs, lock, and shared vectors. The schema freezes at the first
-hardware release; subsequent changes must preserve that released wire format
-or negotiate a new version.
+Rust and C++ codecs, lock, and shared vectors. There is no version negotiation:
+peers require the exact wire revision. After the first hardware release, a
+change to the wire format is a new revision that every board must be reflashed
+for, or a new generation.
 
 | Quantity | RKD6 bound | Source |
 | --- | ---: | --- |
 | Maximum actuators | 64 | schema |
-| Maximum frame | 4,920 bytes | 8 + 4,908 + 4 |
-| Maximum segment frame | 1,648 bytes | 8 + 36 + 64 × 25 + 4 |
+| Maximum frame | 5,025 bytes | 8 + 5,013 (`SessionBegin6`) + 4 |
+| Maximum segment frame | 2,160 bytes | 8 + 36 + 64 × 33 + 4 |
 | Step tick default | 40 kHz | LA-D2; board may configure another rate |
 | Segment queue depth | negotiated | `SESSION_ACK6.segment_capacity` |
 | Event queue depth | negotiated | `SESSION_ACK6.event_capacity` |
@@ -169,7 +187,7 @@ simulation owner clock.
 
 ## Device profiles and serial deployment
 
-Protocol version 10 adds `SESSION_ACK6.profile`. Full devices report profile 1,
+Wire revision 10 adds `SESSION_ACK6.profile`. Full devices report profile 1,
 support degree up to their declared maximum, queue segments and generate steps.
 Minimal devices report profile 2, maximum degree 1, and a small queue (the
 reference device has eight slots). They output position setpoints and generate
@@ -179,7 +197,7 @@ and revalidates the lowered path. It accounts for frames in flight when
 streaming into a small queue. Qualification reports minimum baud, queue depth
 and period before construction succeeds.
 
-Protocol version 11 adds two `QUEUE_STATUS6` fields. `received_until_ticks` is
+Wire revision 11 adds two `QUEUE_STATUS6` fields. `received_until_ticks` is
 the end of the last segment the device holds, so a replacement is accepted only
 at a boundary the device has, as it reports, rather than one a commit implied.
 `received_bytes` counts every byte the device has read since the session began
@@ -215,7 +233,7 @@ clock: far enough that the device keeps moving through a host stall such as a
 garbage collection, and no further, so the path beyond stays open to
 replacement.
 
-Protocol version 12 (one in-place revision, before any hardware release) has two
+Wire revision 12 (one in-place revision, before any hardware release) has two
 changes to `SESSION_BEGIN6`. `channel_stop_policy` is one byte per channel: 0
 makes the channel safe on every stop, 1 keeps it through a commanded STOP or
 ABORT, as the host runtime's `RK_CHANNEL_KEEP_ON_STOP` does. The configuration
@@ -237,7 +255,8 @@ count or step tick is `RK_ERROR_MODEL_MISMATCH`. Firmware is therefore per
 board type: it carries the channel count, pins, tick rates and the unique id
 the chip already has, and a configuration change never needs a reflash.
 
-Deployment schema v5 implies RKD6 and omits `protocol`. Its `device.controller`
+Deployment schema v6 implies RKD6 and omits `protocol`; v6 added the robot's
+`profile` (its roles, kept separate from the mechanical model). Its `device.controller`
 is the 32-hex-digit unique id of the board; the layout wires channels to the
 model's actuators (see `robotkit.device.DeviceBinding`). The motor's full steps
 and driver microstepping come from the machine model. The layout states direction
@@ -283,3 +302,38 @@ Compiler failures have typed reasons. A conversion or limit failure involving a
 merged row (or its seam) may retry the original rows. Clock failures, invalid
 source data, and failures confined to untouched rows return directly. The result
 records whether a retry occurred and its cause. None of this changes wire records.
+
+## Inputs and homing
+
+`SESSION_BEGIN6` declares up to 64 switch inputs: `input_actuator` names the
+actuator each input belongs to and `input_active_high` its polarity. The device
+captures every edge in its step-clock domain (`device_protocol/src/input_capture.rs`)
+and `STATE6` appends one `InputState6` row per input after the actuator rows:
+closing and opening counts, and the step count and device tick of the last
+captured edge. Limit-switch faults are the host's: its runtime latches
+`RK_FAULT_LIMIT_SWITCH` from these observations; the device only captures them.
+
+Homing a dual-drive axis (two motors on one joint, such as a gantry's two Y
+sides) uses messages 21 to 24, each carrying the session, a strictly increasing
+sequence and a homing scope:
+
+- `HOMING_SCOPE` begins or ends a homing scope over a pair of actuators with its
+  skew bound, or stops homing in a controlled way while keeping the scope.
+- `HOMING_SIDE` holds one side while the other keeps moving, so each side can
+  stop on its own switch and the axis is squared.
+- `HOMING_COUNTER_BATCH` shifts both sides' origins at once, in actuator units;
+  physical step counts do not change.
+- `HOMING_CONTROL_ACK` is the device's answer: accepted or rejected.
+
+## Recovery after a stop
+
+After a commanded `STOP` has brought the machine to rest, the device accepts a
+new queue revision and motion continues in the same session. After `ABORT`,
+`EMERGENCY_STOP`, link loss, underflow, dual-drive skew or a process fault, the
+scheduled core refuses every new queue (`QueueError::Stopped`); recovery is a
+new session. `RESET_SAFETY` (13) is defined and sent by the host, which clears
+its own queue state, but the reference devices do not act on it: the virtual
+device answers it as unhandled and the Nucleo board ignores it. Whether a device
+should clear a latched stop on `RESET_SAFETY` within a session, and under what
+conditions, is an open decision.
+
