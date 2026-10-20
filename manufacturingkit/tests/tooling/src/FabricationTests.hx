@@ -41,6 +41,7 @@ class FabricationTests {
 			braces: [],
 			fasteners: [],
 			coreRestraints: [],
+			rigidRestraints: [],
 			blankMarginMm: 10,
 			blankKerfMm: 3.2,
 			couponClearancesMm: [0.2, 0.3, 0.4]
@@ -158,6 +159,58 @@ class FabricationTests {
 		check(ToolingFabrication.plan(p, s).validation.filter(c -> c.rule == "fabrication.fastener.test-fasteners"
 			&& c.status == "fail").length == 1,
 			"fastener reaction exceeds capacity");
+		var rigid = [for (v in p.formers) v.volume].concat([for (v in p.fixtures) v.datum]);
+		check(rigid.length > 0, "fixture includes rigid tooling");
+		for (member in rigid) {
+			check(f.loads.estimates.filter(v -> v.id == member.id).length == 1, "every rigid former and datum has an uplift estimate");
+			check(f.loads.estimates.filter(v -> v.id == member.id + "-lateral-x").length == 1, "every rigid former and datum has a lateral estimate");
+		}
+		var wetPlan = materia.tooling.casting.CastingMoldCodec.decode(materia.tooling.casting.CastingMoldCodec.encode(p));
+		var wetMembers = [for (v in wetPlan.formers) v.volume].concat([for (v in wetPlan.fixtures) v.datum]);
+		var wetMember = wetMembers[0], envelope = wetPlan.envelope;
+		wetMember.profiles = [];
+		wetMember.cuts = [];
+		wetMember.pieces = [
+			{
+				x: envelope.x,
+				y: envelope.y,
+				z: envelope.z,
+				width: 10,
+				depth: 20,
+				height: 10
+			}
+		];
+		s = spec();
+		s.rigidRestraints = [
+			{
+				memberId: rigid[0].id,
+				upliftCapacityN: 1e12,
+				lateralXCapacityN: 1e-12,
+				lateralYCapacityN: 1e12,
+				evidence: ["test restraint"]
+			}
+		];
+		var rigidLoads = ToolingLoads.report(wetPlan, s);
+		var lateral = rigidLoads.estimates.filter(v -> v.id == rigid[0].id + "-lateral-x")[0];
+		check(lateral.forceN > 1e-12, "rigid fixture is immersed and exercises lateral loading");
+		check(rigidLoads.validation.filter(v -> v.rule == "fabrication.rigid-restraint." + rigid[0].id && v.status == "fail").length == 1,
+			"lateral weakness fails despite adequate uplift capacity");
+		s.rigidRestraints.push(s.rigidRestraints[0]);
+		rejects(() -> ToolingLoads.report(wetPlan, s), "Duplicate rigid tooling restraint");
+		s.rigidRestraints = [
+			{
+				memberId: "unknown-member",
+				upliftCapacityN: 1,
+				lateralXCapacityN: 1,
+				lateralYCapacityN: 1,
+				evidence: []
+			}
+		];
+		rejects(() -> ToolingLoads.report(wetPlan, s), "Unknown rigid tooling restraint member");
+		for (member in p.panels.members)
+			if (member.panel.operations.length > 1)
+				check(f.validation.filter(v -> v.rule == "fabrication.plate." + member.panel.id && v.status == "unsupported").length == 1,
+					"each machined panel declares its structural model gap");
 		var plate = ToolingLoads.plate(1000, 1, 1, 0.02, 3e9, 0.3),
 			d = 3e9 * Math.pow(0.02, 3) / (12 * (1 - 0.3 * 0.3));
 		check(Math.abs(plate.deflectionMm * 0.001 * d / 1000 - 0.00406235) < 1e-7, "Navier simply-supported square uniform-load coefficient");

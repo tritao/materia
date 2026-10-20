@@ -93,6 +93,7 @@ class FabricationSpecCodec {
 			"braces",
 			"fasteners",
 			"coreRestraints",
+			"rigidRestraints",
 			"blankMarginMm",
 			"blankKerfMm",
 			"couponClearancesMm"
@@ -133,6 +134,7 @@ class FabricationSpecCodec {
 			"maximumDeflectionMm"
 		], ["panelIds"]);
 		rows(v.fasteners, ["id"], ["allowableN"], ["loadIds", "hardwareIds"]);
+		rows(v.rigidRestraints, ["memberId"], ["upliftCapacityN", "lateralXCapacityN", "lateralYCapacityN"], []);
 		rows(v.coreRestraints, ["coreId"], ["allowableN", "bearingAreaMm2", "allowableBearingPa"], []);
 		if (v.adhesiveContainsEPS != null && !Std.isOfType(v.adhesiveContainsEPS, Bool))
 			throw "Invalid adhesive EPS declaration";
@@ -194,6 +196,16 @@ class FabricationSpecCodec {
 						evidence: texts(row.evidence)
 					}
 			],
+			rigidRestraints: [
+				for (row in list(v.rigidRestraints))
+					{
+						memberId: cast(row.memberId, String),
+						upliftCapacityN: cast(row.upliftCapacityN, Float),
+						lateralXCapacityN: cast(row.lateralXCapacityN, Float),
+						lateralYCapacityN: cast(row.lateralYCapacityN, Float),
+						evidence: texts(row.evidence)
+					}
+			],
 			coreRestraints: [
 				for (row in list(v.coreRestraints))
 					{
@@ -208,20 +220,21 @@ class FabricationSpecCodec {
 		result.plates.sort((a, b) -> Reflect.compare(a.panelId, b.panelId));
 		result.braces.sort((a, b) -> Reflect.compare(a.id, b.id));
 		result.fasteners.sort((a, b) -> Reflect.compare(a.id, b.id));
+		result.rigidRestraints.sort((a, b) -> Reflect.compare(a.memberId, b.memberId));
 		result.coreRestraints.sort((a, b) -> Reflect.compare(a.coreId, b.coreId));
 		result.couponClearancesMm.sort((a, b) -> Reflect.compare(a, b));
 		return result;
 	}
 
 	public static function encode(v:FabricationSpec):String
-		return ToolingCodec.canonical({format: "materia.fabrication-spec", version: 1, spec: snapshot(v)});
+		return ToolingCodec.canonical({format: "materia.fabrication-spec", version: 2, spec: snapshot(v)});
 
 	public static function decode(s:String):FabricationSpec {
 		if (s == null || haxe.io.Bytes.ofString(s).length > 1048576)
 			throw "Fabrication spec exceeds limit";
 		var v:Dynamic = haxe.Json.parse(s);
 		object(v, ["format", "version", "spec"]);
-		if (v.format != "materia.fabrication-spec" || v.version != 1)
+		if (v.format != "materia.fabrication-spec" || v.version != 2)
 			throw "Unsupported fabrication spec version";
 		return snapshot(v.spec);
 	}

@@ -77,7 +77,7 @@ class MillFabricationPreview {
 			checks.push(ToolingLoads.check("fabrication.geometry-and-sequence", [p.document.input.id], ToolingCheckStatus.Pending,
 				"Records-only export did not run CAD/sequence validation.", []));
 		}
-		ToolingFabricationExport.write(p, f, dir);
+		checks = checks.concat(ToolingFabricationExport.write(p, f, dir));
 		var panels = ToolingFabricationExport.panels(p, f),
 			settings = MillFabricationSetup.cam(panels);
 		if (Math.abs(settings.blankMargin * 1000 - f.spec.blankMarginMm) > 1e-7)
@@ -186,6 +186,32 @@ class MillFabricationPreview {
 			if (!rejected)
 				throw "Manifest failed to reject a modified coupon record";
 			ToolingPackageManifest.verify(dir);
+			var manifestPath = dir + "/manifest.json",
+				original = sys.io.File.getContent(manifestPath);
+			function rejectsManifest(change:Dynamic->Void, expected:String):Void {
+				var altered:Dynamic = haxe.Json.parse(original);
+				change(altered);
+				sys.io.File.saveContent(manifestPath, ToolingCodec.canonical(altered));
+				var error = "";
+				try
+					ToolingPackageManifest.verify(dir)
+				catch (e:Dynamic)
+					error = Std.string(e);
+				sys.io.File.saveContent(manifestPath, original);
+				if (error.indexOf(expected) < 0)
+					throw "Manifest tamper regression: " + error;
+			}
+			rejectsManifest(m -> m.fabrication.ready = true, "readiness differs");
+			rejectsManifest(m -> m.replacementGroups = new Array<Dynamic>(), "package fingerprint differs");
+			rejectsManifest(m -> {
+				var records:Array<Dynamic> = cast m.validation;
+				records[0].message = "altered validation";
+			}, "validation differs");
+			rejectsManifest(m -> m.version = 1, "Unsupported tooling manifest");
+			ToolingPackageManifest.verify(dir);
+			var unknown = new machinekit.tooling.ToolingBlock();
+			if (ToolingFabricationExport.classify(unknown).classification != UnsupportedHardware)
+				throw "Unknown hardware was silently ignored";
 			Sys.println("Fabrication manifest integrity/tamper checks passed");
 		}
 

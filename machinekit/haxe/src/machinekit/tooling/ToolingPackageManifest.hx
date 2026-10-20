@@ -8,6 +8,21 @@ import materia.tooling.export.ToolingManifest;
 
 /** Deterministic inventory of a freshly generated directory, excluding this manifest itself. */
 class ToolingPackageManifest {
+	static function fingerprint(manifest:Dynamic):String {
+		return haxe.crypto.Sha256.encode(ToolingCodec.canonical({
+			format: manifest.format,
+			version: manifest.version,
+			phase: manifest.phase,
+			lengthUnit: manifest.lengthUnit,
+			sourceFingerprint: manifest.sourceFingerprint,
+			fabricationFingerprint: manifest.fabricationFingerprint,
+			files: manifest.files,
+			fabrication: manifest.fabrication,
+			validation: manifest.validation,
+			replacementGroups: manifest.replacementGroups
+		}));
+	}
+
 	static function digest(bytes:haxe.io.Bytes):String {
 		var value = haxe.crypto.Sha256.make(bytes), hex = new StringBuf();
 		for (i in 0...value.length)
@@ -50,20 +65,18 @@ class ToolingPackageManifest {
 		records.sort((a, b) -> Reflect.compare(a.path, b.path));
 		var manifest:ToolingManifest = {
 			format: "materia.tooling-manifest",
-			version: 1,
+			version: 2,
 			phase: 5,
 			lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			sourceFingerprint: f.sourceFingerprint,
 			fabricationFingerprint: f.fingerprint,
-			packageFingerprint: haxe.crypto.Sha256.encode(ToolingCodec.canonical({
-				input: f.fingerprint,
-				files: records
-			})),
+			packageFingerprint: "",
 			files: records,
 			fabrication: ToolingReadiness.evaluate(all),
 			validation: all,
 			replacementGroups: f.replacementGroups
 		};
+		manifest.packageFingerprint = fingerprint(manifest);
 		sys.io.File.saveContent(dir + "/manifest.json", ToolingCodec.canonical(manifest) + "\n");
 	}
 
@@ -85,7 +98,26 @@ class ToolingPackageManifest {
 
 	public static function verify(dir:String):Void {
 		var manifest:Dynamic = haxe.Json.parse(sys.io.File.getContent(dir + "/manifest.json"));
-		if (manifest.format != "materia.tooling-manifest" || manifest.version != 1)
+		var keys = [
+			"format",
+			"version",
+			"phase",
+			"lengthUnit",
+			"sourceFingerprint",
+			"fabricationFingerprint",
+			"packageFingerprint",
+			"files",
+			"fabrication",
+			"validation",
+			"replacementGroups"
+		];
+		for (key in Reflect.fields(manifest))
+			if (keys.indexOf(key) < 0)
+				throw "Unknown tooling manifest field";
+		for (key in keys)
+			if (!Reflect.hasField(manifest, key))
+				throw "Missing tooling manifest field";
+		if (manifest.format != "materia.tooling-manifest" || manifest.version != 2)
 			throw "Unsupported tooling manifest";
 		if (!Std.isOfType(manifest.files, Array))
 			throw "Invalid tooling manifest files";
@@ -105,7 +137,30 @@ class ToolingPackageManifest {
 			if (bytes.length != file.bytes || digest(bytes) != file.sha256)
 				throw "Tooling artifact hash differs: " + name;
 		}
-		var expected = haxe.crypto.Sha256.encode(ToolingCodec.canonical({input: manifest.fabricationFingerprint, files: files}));
+		if (!Std.isOfType(manifest.validation, Array))
+			throw "Invalid tooling validation records";
+		var rawValidation:Array<Dynamic> = cast manifest.validation;
+		var validation:Array<ToolingValidation> = [
+			for (row in rawValidation) {
+				var ids:Array<Dynamic> = cast row.affectedIds;
+				var evidence:Array<Dynamic> = cast row.evidence;
+				{
+					rule: row.rule,
+					affectedIds: [for (id in ids) Std.string(id)],
+					status: cast row.status,
+					severity: cast row.severity,
+					message: row.message,
+					evidence: [for (item in evidence) Std.string(item)]
+				};
+			}
+		];
+		var readiness = ToolingReadiness.evaluate(validation);
+		if (ToolingCodec.canonical(readiness) != ToolingCodec.canonical(manifest.fabrication))
+			throw "Tooling readiness differs from validation";
+		var report = haxe.Json.parse(sys.io.File.getContent(dir + "/fabrication-validation.json"));
+		if (ToolingCodec.canonical(validation) != ToolingCodec.canonical(report))
+			throw "Tooling validation differs from its hashed artifact";
+		var expected = fingerprint(manifest);
 		if (expected != manifest.packageFingerprint)
 			throw "Tooling package fingerprint differs";
 	}

@@ -16,6 +16,9 @@ enum abstract LoadEstimateKind(String) to String {
 	var BraceUniformBeam = "brace-uniform-beam";
 	var FastenerEqualShare = "fastener-equal-share";
 	var SupportUplift = "support-uplift";
+	var RigidGrossUpliftBound = "rigid-gross-uplift-bound";
+	var RigidLateralXBound = "rigid-lateral-x-bound";
+	var RigidLateralYBound = "rigid-lateral-y-bound";
 }
 
 typedef LoadEstimate = {
@@ -152,6 +155,17 @@ class ToolingLoads {
 			}
 			demands.set(demand.id, demand);
 			r.estimates.push(demand);
+			var outline = PanelContours.outside(m.panel);
+			var plain = m.panel.operations.length == 1
+				&& outline.length == 4
+				&& outline.filter(e -> e.center != null).length == 0
+				&& outline.filter(e -> Math.abs(e.end.x - e.start.x) > 1e-7 && Math.abs(e.end.y - e.start.y) > 1e-7).length == 0;
+			if (!plain || !isWall) {
+				r.validation.push(check("fabrication.plate." + m.panel.id, [m.panel.id], Unsupported,
+					"This panel has rebates/holes/tabs, a nonrectangular boundary or local support loads. No structural model for its actual geometry is implemented; rectangular plate capacity is not credited.",
+					[]));
+				continue;
+			}
 			var supports = s.plates.filter(v -> v.panelId == m.panel.id);
 			if (supports.length == 0) {
 				r.validation.push(check("fabrication.plate." + m.panel.id, [m.panel.id], Pending,
@@ -165,17 +179,6 @@ class ToolingLoads {
 				positive(n);
 			if (v.spanXmm > b.width || v.spanYmm > b.height)
 				throw "Plate span exceeds panel blank";
-			var outline = PanelContours.outside(m.panel);
-			var plain = m.panel.operations.length == 1
-				&& outline.length == 4
-				&& outline.filter(e -> e.center != null).length == 0
-				&& outline.filter(e -> Math.abs(e.end.x - e.start.x) > 1e-7 && Math.abs(e.end.y - e.start.y) > 1e-7).length == 0;
-			if (!plain || !isWall) {
-				r.validation.push(check("fabrication.plate." + m.panel.id, [m.panel.id], Unsupported,
-					"Closed-form rectangular plate model does not cover tabs, cuts, rebates or nonrectangular profiles; use a qualified structural model.",
-					v.evidence));
-				continue;
-			}
 			var a = plate(design, v.spanXmm * 0.001, v.spanYmm * 0.001, m.panel.stock.measuredThickness * 0.001, v.youngPa, v.poisson);
 			demand.deflectionMm = a.deflectionMm;
 			demand.stressPa = a.stressPa;
@@ -215,6 +218,81 @@ class ToolingLoads {
 			r.validation.push(check("fabrication.core-restraint." + c.id, [c.id], status,
 				"Gross displaced mix uplift, without EPS weight credit; attachment and dimensional bearing limits require evidence.", evidence));
 		}
+		var rigid = [for (former in p.formers) former.volume].concat([for (fixture in p.fixtures) fixture.datum]);
+		rigid.sort((a, b) -> Reflect.compare(a.id, b.id));
+		for (member in rigid) {
+			var clipped:Array<materia.tooling.casting.MoldPlan.MoldBox> = [];
+			for (box in materia.tooling.casting.MoldVolumeBounds.pieces(member)) {
+				var wet = BoxVolumes.intersection(box, p.envelope);
+				if (wet != null) {
+					wet.height = Math.min(wet.height, p.document.setup.fillHeightMm - wet.z);
+					if (wet.height > 1e-7)
+						clipped.push(wet);
+				}
+			}
+			var volume = BoxVolumes.volume(clipped),
+				zmin = p.document.setup.fillHeightMm;
+			for (box in clipped)
+				zmin = Math.min(zmin, box.z);
+			function projection(axis:Int):Float {
+				var footprints:Array<materia.tooling.casting.MoldPlan.MoldBox> = [
+					for (box in clipped)
+						{
+							x: axis == 0 ? box.y : box.x,
+							y: axis == 2 ? box.y : box.z,
+							z: 0,
+							width: axis == 0 ? box.depth : box.width,
+							depth: axis == 2 ? box.depth : box.height,
+							height: 1
+						}
+				];
+				return BoxVolumes.volume(BoxVolumes.subtract(footprints, []));
+			}
+			var pressure = (p.document.recipe.mixDensityKgM3 * s.gravityMps2 * Math.max(0, p.document.setup.fillHeightMm - zmin) * 0.001
+				+ extra) * s.loadFactor;
+			var uplift = (p.document.recipe.mixDensityKgM3 * s.gravityMps2 * volume * 1e-9 + extra * projection(2) * 1e-6) * s.loadFactor;
+			var lateralX = pressure * projection(0) * 1e-6,
+				lateralY = pressure * projection(1) * 1e-6;
+			for (demand in [
+				{id: member.id, kind: RigidGrossUpliftBound, force: uplift},
+				{id: materia.tooling.ToolingIds.derive("", member.id, "-lateral-x"), kind: RigidLateralXBound, force: lateralX},
+				{id: materia.tooling.ToolingIds.derive("", member.id, "-lateral-y"), kind: RigidLateralYBound, force: lateralY}
+			]) {
+				var load:LoadEstimate = {
+					id: demand.id,
+					kind: demand.kind,
+					pressurePa: pressure,
+					forceN: demand.force,
+					displacedVolumeMm3: volume,
+					deflectionMm: null,
+					stressPa: null
+				};
+				if (demands.exists(load.id))
+					throw "Duplicate load estimate ID";
+				r.estimates.push(load);
+				demands.set(load.id, load);
+			}
+			var restraints = s.rigidRestraints.filter(v -> v.memberId == member.id);
+			if (restraints.length > 1)
+				throw "Duplicate rigid tooling restraint";
+			var status:ToolingCheckStatus = volume == 0 ? Pass : Pending,
+				evidence:Array<String> = [];
+			if (restraints.length == 1) {
+				var restraint = restraints[0];
+				for (n in [restraint.upliftCapacityN, restraint.lateralXCapacityN, restraint.lateralYCapacityN])
+					positive(n);
+				evidence = restraint.evidence;
+				status = uplift > restraint.upliftCapacityN
+					|| lateralX > restraint.lateralXCapacityN
+					|| lateralY > restraint.lateralYCapacityN ? Fail : compact && evidence.length > 0 ? Pass : Pending;
+			}
+			r.validation.push(check("fabrication.rigid-restraint." + member.id, [member.id], status,
+				"Gross displaced-volume uplift and unbalanced X/Y peak-pressure bounds, with no self-weight credit. Profile bounds and ignored holes are conservative; uplift and lateral attachment capacities need evidence.",
+				evidence));
+		}
+		for (restraint in s.rigidRestraints)
+			if (rigid.filter(v -> v.id == restraint.memberId).length != 1)
+				throw "Unknown rigid tooling restraint member";
 		for (v in s.plates)
 			if (!demands.exists(v.panelId))
 				throw "Unknown plate panel";

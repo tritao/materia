@@ -167,6 +167,14 @@ class MoldOrientationStudy {
 	public static function compare(a:MoldOrientationResult, b:MoldOrientationResult):Int {
 		if (a.planningSucceeded != b.planningSucceeded)
 			return a.planningSucceeded ? -1 : 1;
+		var aUnsupported = a.validation.filter(v -> StringTools.startsWith(v.rule, "tooling.feature.unsupported.")
+			&& v.status == ToolingCheckStatus.Unsupported)
+			.length > 0;
+		var bUnsupported = b.validation.filter(v -> StringTools.startsWith(v.rule, "tooling.feature.unsupported.")
+			&& v.status == ToolingCheckStatus.Unsupported)
+			.length > 0;
+		if (aUnsupported != bUnsupported)
+			return aUnsupported ? 1 : -1;
 		if (a.geometryChecked != b.geometryChecked)
 			return a.geometryChecked ? -1 : 1;
 		for (status in [ToolingCheckStatus.Fail, ToolingCheckStatus.Unsupported]) {

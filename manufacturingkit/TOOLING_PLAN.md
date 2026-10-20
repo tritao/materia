@@ -253,8 +253,13 @@ See [README.md](README.md#casting-tooling-inputs) for the implemented API and ch
   all 19 per-panel CAM records stay pending under the study setup. The mill
   remains not fabrication-ready: tools/fixtures/vacuum and a recorded coupon trial
   are not qualified. Tabs/onion skins are not claimed by the vacuum route.
-- [ ] Review 10–13: rigid-tooling loads, explicit panel-model gaps, manifest
-  readiness integrity and unknown hardware reporting.
+- [x] Review 10–13: gross displaced-volume uplift and X/Y restraint bounds
+  for every rigid former and datum, with separate evidenced capacities. Real
+  machined/support panels explicitly report an Unsupported structural model.
+  Manifest v2 hashes readiness/validation and verifies recomputed readiness;
+  unknown hardware is included in the BOM and blocks qualification.
+  The neutral suites pass 630 assertions, including lateral restraint failure;
+  the records export passes artifact and manifest metadata tamper checks.
 - [ ] Review 14–21: handling, shared bridges, finishing stock, former overlap/
   release, typed source insert roles/links and neutral datum/resin validation.
 - [ ] Review 22–30: actual fill openings, single cure authority, thermal model

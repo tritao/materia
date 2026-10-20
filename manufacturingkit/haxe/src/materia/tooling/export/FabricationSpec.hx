@@ -47,6 +47,14 @@ typedef CoreRestraint = {
 	var evidence:Array<String>;
 }
 
+typedef RigidToolingRestraint = {
+	var memberId:String;
+	var upliftCapacityN:Float;
+	var lateralXCapacityN:Float;
+	var lateralYCapacityN:Float;
+	var evidence:Array<String>;
+}
+
 typedef FabricationSpec = {
 	var revision:Int;
 	var sheetMaterialId:String;
@@ -69,6 +77,7 @@ typedef FabricationSpec = {
 	var braces:Array<BraceSupport>;
 	var fasteners:Array<FastenerCapacity>;
 	var coreRestraints:Array<CoreRestraint>;
+	var rigidRestraints:Array<RigidToolingRestraint>;
 	var blankMarginMm:Float;
 	var blankKerfMm:Float;
 	var couponClearancesMm:Array<Float>;

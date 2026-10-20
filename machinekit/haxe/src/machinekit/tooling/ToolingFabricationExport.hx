@@ -15,8 +15,42 @@ import cadkit.drawing.Dxf;
 import cadkit.sheetmetal.Point2;
 import cadkit.sheetmetal.Segment;
 
+enum abstract HardwareClassification(String) to String {
+	var NonHardware = "non-hardware";
+	var SupportedHardware = "supported-hardware";
+	var UnsupportedHardware = "unsupported-hardware";
+}
+
+typedef HardwareDimensions = {
+	var classification:HardwareClassification;
+	var lengthMm:Null<Float>;
+	var diameterMm:Null<Float>;
+}
+
 /** Lists and shop-review drawings from neutral records. No alternative SVG/DXF writers. */
 class ToolingFabricationExport {
+	public static function classify(component:machinekit.component.MachineComponent):HardwareDimensions {
+		if (Std.isOfType(component, ToolingPanel)
+			|| Std.isOfType(component, ToolingVolume)
+			|| Std.isOfType(component, machinekit.structural.CastInsert))
+			return {classification: NonHardware, lengthMm: null, diameterMm: null};
+		if (Std.isOfType(component, machinekit.standard.SocketHeadCapScrew)) {
+			var screw:machinekit.standard.SocketHeadCapScrew = cast component;
+			return {classification: SupportedHardware, lengthMm: screw.length, diameterMm: screw.diameter};
+		}
+		if (Std.isOfType(component, machinekit.standard.FlatWasher)) {
+			var washer:machinekit.standard.FlatWasher = cast component;
+			return {classification: SupportedHardware, lengthMm: washer.thickness, diameterMm: washer.outerDiameter};
+		}
+		if (Std.isOfType(component, machinekit.standard.HexNut)) {
+			var nut:machinekit.standard.HexNut = cast component;
+			return {classification: SupportedHardware, lengthMm: nut.height, diameterMm: null};
+		}
+		if (Std.isOfType(component, ToolingPin))
+			return {classification: SupportedHardware, lengthMm: component.parameterNumber("length"), diameterMm: component.parameterNumber("diameter")};
+		return {classification: UnsupportedHardware, lengthMm: null, diameterMm: null};
+	}
+
 	static function text(dir:String, name:String, s:String):Void
 		sys.io.File.saveContent(dir + "/" + name, s);
 
@@ -34,7 +68,9 @@ class ToolingFabricationExport {
 		return result;
 	}
 
-	public static function write(p:CastingMoldPlan, f:FabricationPlan, dir:String):Void {
+	public static function write(p:CastingMoldPlan, f:FabricationPlan, dir:String):Array<materia.tooling.ToolingValidation> {
+		var classificationChecks:Array<materia.tooling.ToolingValidation> = [];
+		var unknown:Array<{memberId:String, typeId:Null<String>}> = [];
 		if (f.sourceFingerprint != materia.tooling.casting.CastingMoldCodec.fingerprint(p))
 			throw "Stale fabrication plan";
 		sys.FileSystem.createDirectory(dir);
@@ -221,23 +257,18 @@ class ToolingFabricationExport {
 		var members = assembly.components();
 		members.sort((a, b) -> Reflect.compare(a.id, b.id));
 		for (member in members) {
-			var component = member.component, length = "", diameter = "";
-			if (Std.isOfType(component, machinekit.standard.SocketHeadCapScrew)) {
-				var screw:machinekit.standard.SocketHeadCapScrew = cast component;
-				length = Std.string(screw.length);
-				diameter = Std.string(screw.diameter);
-			} else if (Std.isOfType(component, machinekit.standard.FlatWasher)) {
-				var washer:machinekit.standard.FlatWasher = cast component;
-				length = Std.string(washer.thickness);
-				diameter = Std.string(washer.outerDiameter);
-			} else if (Std.isOfType(component, machinekit.standard.HexNut)) {
-				var nut:machinekit.standard.HexNut = cast component;
-				length = Std.string(nut.height);
-			} else if (Std.isOfType(component, ToolingPin)) {
-				length = Std.string(component.parameterNumber("length"));
-				diameter = Std.string(component.parameterNumber("diameter"));
-			} else
+			var component = member.component, dimensions = classify(component);
+			if (dimensions.classification == NonHardware)
 				continue;
+			if (dimensions.classification == UnsupportedHardware) {
+				var type = component.componentType();
+				unknown.push({memberId: member.id, typeId: type == null ? null : type.id});
+				classificationChecks.push(materia.tooling.export.ToolingLoads.check("fabrication.hardware." + member.id, [member.id],
+					materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,
+					"Unclassified hardware type is retained in the BOM; dimensions and procurement require an explicit handler.", []));
+			}
+			var length = dimensions.lengthMm == null ? "" : Std.string(dimensions.lengthMm),
+				diameter = dimensions.diameterMm == null ? "" : Std.string(dimensions.diameterMm);
 			var planned = p.hardware.filter(h -> h.id == member.id),
 				item = component.bom;
 			bill.addComponent(component);
@@ -254,6 +285,7 @@ class ToolingFabricationExport {
 		}
 		text(dir, "hardware.csv", ToolingFabrication.csv(hardwareRows));
 		data(dir, "planned-hardware.json", p.hardware);
+		data(dir, "hardware-unsupported.json", unknown);
 		var lines = bill.lines();
 		lines.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
 		data(dir, "hardware-bom.json", lines);
@@ -336,5 +368,6 @@ class ToolingFabricationExport {
 		text(dir, "coupon-instructions.md",
 			"# Fit and restraint trial\n\nREVIEW ONLY. This record does not qualify the full mold.\n\nFabrication input: " + f.fingerprint +
 			"\n\n1. Measure stock thickness at several locations and retain the supplier/tool references.\n2. Cut the receiver and plug from the same stock, face and tools as the planned panels. Slots fit-0 onward correspond to the ordered clearances in fabrication-plan.json.\n3. Record slot/tab dimensions and fit, with repeatable insertion and withdrawal. Record pin alignment separately using the planned round/slot locator pair.\n4. Trial both a glued bed socket and a bridge/carrier where the source cavity permits; record core movement under a measured load at least equal to its reported design uplift. Adhesive, EPS bearing, joint strength and cure exposure need their own evidence.\n5. Enter observations in coupon-trial.csv and revise the recipe explicitly. A successful coupon alone does not release the full mold.\n");
+		return classificationChecks;
 	}
 }

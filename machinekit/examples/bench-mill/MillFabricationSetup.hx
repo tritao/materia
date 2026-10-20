@@ -24,6 +24,7 @@ class MillFabricationSetup {
 			braces: [],
 			fasteners: [],
 			coreRestraints: [],
+			rigidRestraints: [],
 			blankMarginMm: 12,
 			blankKerfMm: 3.2,
 			couponClearancesMm: [0.1, 0.2, 0.3]
@@ -67,7 +68,8 @@ class MillFabricationSetup {
 		};
 
 	public static function cam(panels:Array<PanelPlan>):PanelCamSettings {
-		if (panels.length == 0) throw "Panel machining requires panels";
+		if (panels.length == 0)
+			throw "Panel machining requires panels";
 		var diameters:Array<Float> = [];
 		for (p in panels)
 			for (op in p.operations)
@@ -89,10 +91,11 @@ class MillFabricationSetup {
 			travelSpace: MachineCoordinates,
 			workOriginReference: null,
 			nominalDiameters: [
-				for (i in 0...diameters.length) {
-					number: i + 1,
-					diameter: diameters[i] * 0.001
-				}
+				for (i in 0...diameters.length)
+					{
+						number: i + 1,
+						diameter: diameters[i] * 0.001
+					}
 			],
 			safeZ: 0.012,
 			spindleRpm: 12000,
