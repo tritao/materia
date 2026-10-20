@@ -469,8 +469,8 @@ the flared foot when present. A bounding box alone is insufficient. Support
 explicit box and extruded-profile envelopes first; reject unsupported shapes.
 Until phase 7, clip design-cut tools to the casting envelope: existing cuts
 deliberately extend beyond casting faces, and those extensions are not literal
-finished cavity sizes. Phase 7 makes features finished geometry with declared
-openings and deletes this clipping.
+finished cavity sizes. Phase 7 replaces this clipping with declared openings and
+one shared finished-cavity function.
 
 Store plan/setup records in a versioned tooling JSON format separate from sheet
 inventory. Validate codec input, bounded record counts and referential integrity.
@@ -524,7 +524,7 @@ pose stored in a JSON text parameter.
 | --- | --- |
 | `id` | Stable source ID |
 | `kind` | `Lightening`, `ServiceOpening`, `InterfaceRecess`, `InsertRecess` or `Clearance` |
-| `geometry` | Box, or straight prism from a closed line/arc profile; the finished cavity, exactly inside the body |
+| `geometry` | Design cut: box, or straight prism from a closed line/arc profile; it may cross the body boundary only through declared openings |
 | `openings` | Body faces, or other feature IDs, the feature opens through; empty means enclosed |
 | `draft`, `cornerRadius` | Wall draft along a declared withdrawal axis and internal corner radius; zero is explicit |
 | `owner` | The interface or insert the feature serves, or null |
@@ -537,10 +537,17 @@ pose stored in a JSON text parameter.
   fragments of one bay into one core unit and castability can report against the
   design feature that the designer edits.
 
-- Feature geometry is the finished cavity. CAD realization extends its cutting
-  tools past declared openings internally for robust booleans; nothing outside
-  CAD sees the overshoot. A declared opening must lie on a body face or a named
-  feature, and a cut that breaks out where no opening is declared is an error.
+- A feature stores design intent: its cut and the body faces or features it
+  opens through. The finished cavity (cut ∩ body) is derived by one function in
+  `materia.casting`, exact for the planar envelopes this model supports, and
+  every consumer uses it; no consumer clips cuts itself. Where a cut crosses a
+  non-orthogonal body face, such as the column's sloped foot, the finished
+  cavity is a line-profile prism even though the cut is a box. A cut may extend
+  beyond the body only across declared openings, by no fixed margin; a declared
+  opening the cut does not reach, or a breakout through an undeclared face, is
+  an error. CAD realization still extends tools internally for robust booleans.
+- Consumers that support only boxes report a non-box finished cavity as
+  Unsupported with its feature ID until step 3, never approximating it.
 - `MineralFoundation` generates insert recesses from its inserts with
   `kind = InsertRecess` and the insert as `owner`; recess links derive from that.
 - Default mold strategies follow from kind and openings through recipe rules
@@ -1174,8 +1181,10 @@ difference against their previous CAD; fill, collision hulls and section
 stiffness give identical results through the shared box algebra, and fragments
 group by `derivedFrom`. `MillMoldSetup` has no
 feature-ID strategy table, and an override names its feature explicitly. No code
-outside CAD realization clips or extends design cuts; an opening that is not on a
-body face, or an undeclared breakout, is rejected. Every penetration record traces
+outside the shared finished-cavity function clips design cuts; an unreached
+declared opening, or an undeclared breakout, is rejected. A column cut crossing
+the sloped foot yields an exact prism finished cavity that box-only consumers
+report as Unsupported by feature ID. Every penetration record traces
 to a `HoleInterface`, and no insert label carries hardware data. A replicated
 seat's allowance appears in the casting geometry and clears its allowance request,
 while master and release stay pending evidence. A relationship whose metrology
