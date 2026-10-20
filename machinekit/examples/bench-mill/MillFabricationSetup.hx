@@ -13,8 +13,7 @@ class MillFabricationSetup {
 			sheetMaterialId: "tooling-coated-board",
 			solvent: Unknown,
 			adhesiveContainsEPS: null,
-			curePeakC: null,
-			cureEvidence: [],
+			resinReference: "pending binder",
 			compatibilityEvidence: [],
 			gravityMps2: 9.80665,
 			loadFactor: 1.5,
@@ -54,6 +53,7 @@ class MillFabricationSetup {
 				mixSpecificHeatJPerKgK: null,
 				mixConductivityWPerMK: null,
 				resinMaximumTemperatureC: null,
+				gelMaximumTemperatureC: null,
 				kinetics: null,
 				evidence: []
 			},
@@ -63,7 +63,8 @@ class MillFabricationSetup {
 				timeStepSeconds: 30,
 				durationSeconds: 86400,
 				convergenceToleranceC: 0.000001,
-				maximumIterations: 100
+				maximumIterations: 100,
+				remainingHeatToleranceC: 0.01
 			}
 		};
 

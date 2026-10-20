@@ -40,6 +40,7 @@ typedef FabricationPlan = {
 	var lengthUnit:String;
 	var sourceFingerprint:String;
 	var fingerprint:String;
+	var cureFingerprint:Null<String>;
 	var spec:FabricationSpec;
 	var panelRequirements:Array<SheetPartRequirement>;
 	var sheetStock:materia.sheet.SheetStockSpec;
@@ -131,7 +132,7 @@ class ToolingFabrication {
 		return result;
 	}
 
-	public static function plan(p:CastingMoldPlan, authored:FabricationSpec):FabricationPlan {
+	public static function plan(p:CastingMoldPlan, authored:FabricationSpec, ?cure:materia.tooling.process.CureAnalysis.CureReport):FabricationPlan {
 		CastingMoldPlanner.validate(p);
 		var s = FabricationSpecCodec.snapshot(authored),
 			checks = p.validation.copy();
@@ -141,15 +142,15 @@ class ToolingFabrication {
 			&& s.solvent == StyreneBearing ? Fail : s.solvent == Unknown || s.compatibilityEvidence.length == 0 ? Pending : Pass,
 			"Styrene-bearing resin is incompatible with EPS; the actual resin/EPS/adhesive/release combination requires compatibility evidence.",
 			s.compatibilityEvidence));
-		var limit = p.document.recipe.core.maximumTemperatureC;
-		checks.push(ToolingLoads.check("fabrication.materials.cure", [p.document.recipe.id],
-			!eps ? Pass : s.curePeakC != null
-			&& limit != null
-			&& s.curePeakC >= limit ? Fail : s.curePeakC == null
-				|| limit == null
-				|| s.cureEvidence.length == 0
-				|| p.document.recipe.core.evidence.length == 0 ? Pending : Pass,
-			"Assessed cure peak must remain below the declared EPS temperature limit; missing cure inputs stay pending.", s.cureEvidence));
+		if (cure != null && (cure.sourceFingerprint != CastingMoldCodec.fingerprint(p) || cure.resinReference != s.resinReference))
+			throw "Stale fabrication cure report";
+		var cureChecks = cure == null ? [] : cure.validation;
+		var cureStatus:materia.tooling.ToolingDiagnostic.ToolingCheckStatus = Pending;
+		if (cureChecks.length > 0)
+			cureStatus = cureChecks.filter(v -> v.status == Fail).length > 0 ? Fail : cureChecks.filter(v -> v.status != Pass).length > 0 ? Pending : Pass;
+		checks.push(ToolingLoads.check("fabrication.materials.cure", [p.document.recipe.id], cureStatus,
+			"Derived exclusively from the source-bound CureReport, including limits, coverage and calibration.",
+			cure == null ? [] : [cure.processFingerprint]));
 		var loads = ToolingLoads.report(p, s);
 		checks = checks.concat(loads.validation);
 		for (c in p.changeRequests)
@@ -181,10 +182,15 @@ class ToolingFabrication {
 		var source = CastingMoldCodec.fingerprint(p);
 		return {
 			format: "materia.tooling-fabrication",
-			version: 1,
+			version: 2,
 			lengthUnit: "mm",
 			sourceFingerprint: source,
-			fingerprint: haxe.crypto.Sha256.encode(source + FabricationSpecCodec.encode(s)),
+			fingerprint: haxe.crypto.Sha256.encode(ToolingCodec.canonical({
+				source: source,
+				spec: s,
+				cure: cure
+			})),
+			cureFingerprint: cure == null ? null : cure.processFingerprint,
 			spec: s,
 			panelRequirements: requirements,
 			sheetStock: {

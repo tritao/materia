@@ -1,6 +1,7 @@
 package materia.tooling.process;
 
 enum abstract CureKineticsKind(String) to String {
+	var AutocatalyticArrhenius = "autocatalytic-arrhenius";
 	var FirstOrderArrhenius = "first-order-arrhenius";
 }
 
@@ -9,6 +10,9 @@ typedef CureKinetics = {
 	var preExponentialPerSecond:Float;
 	var activationEnergyJPerMol:Float;
 	var initialConversion:Float;
+	var autocatalyticPreExponentialPerSecond:Float;
+	var autocatalyticExponentM:Float;
+	var reactionExponentN:Float;
 }
 
 enum abstract ThermalBoundaryKind(String) to String {
@@ -52,6 +56,7 @@ typedef ResinCureSpec = {
 	var mixSpecificHeatJPerKgK:Null<Float>;
 	var mixConductivityWPerMK:Null<Float>;
 	var resinMaximumTemperatureC:Null<Float>;
+	var gelMaximumTemperatureC:Null<Float>;
 	var kinetics:Null<CureKinetics>;
 	var evidence:Array<String>;
 }
@@ -62,6 +67,7 @@ typedef CureSolverSettings = {
 	var durationSeconds:Float;
 	var convergenceToleranceC:Float;
 	var maximumIterations:Int;
+	var remainingHeatToleranceC:Float;
 }
 
 /** Recipe-bound screening assumptions, not qualified process capacities.

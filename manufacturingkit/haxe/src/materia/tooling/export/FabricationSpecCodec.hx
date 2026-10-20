@@ -82,8 +82,7 @@ class FabricationSpecCodec {
 			"sheetMaterialId",
 			"solvent",
 			"adhesiveContainsEPS",
-			"curePeakC",
-			"cureEvidence",
+			"resinReference",
 			"compatibilityEvidence",
 			"gravityMps2",
 			"loadFactor",
@@ -98,16 +97,17 @@ class FabricationSpecCodec {
 			"blankKerfMm",
 			"couponClearancesMm"
 		]);
+		strings([v.resinReference]);
 		if (!Std.isOfType(v.revision, Int) || v.revision < 1)
 			throw "Invalid fabrication revision";
 		if (v.solvent != "unknown" && v.solvent != "styrene-bearing" && v.solvent != "styrene-free")
 			throw "Invalid resin solvent family";
 		for (k in ["gravityMps2", "loadFactor", "blankMarginMm", "blankKerfMm"])
 			number(Reflect.field(v, k));
-		for (k in ["curePeakC", "compactionPressurePa"])
+		for (k in ["compactionPressurePa"])
 			if (Reflect.field(v, k) != null)
 				number(Reflect.field(v, k));
-		for (k in ["cureEvidence", "compatibilityEvidence", "compactionEvidence"])
+		for (k in ["compatibilityEvidence", "compactionEvidence"])
 			strings(Reflect.field(v, k));
 		for (x in list(v.couponClearancesMm))
 			number(x);
@@ -148,8 +148,7 @@ class FabricationSpecCodec {
 			sheetMaterialId: v.sheetMaterialId,
 			solvent: cast v.solvent,
 			adhesiveContainsEPS: v.adhesiveContainsEPS,
-			curePeakC: v.curePeakC,
-			cureEvidence: texts(v.cureEvidence),
+			resinReference: cast v.resinReference,
 			compatibilityEvidence: texts(v.compatibilityEvidence),
 			gravityMps2: v.gravityMps2,
 			loadFactor: v.loadFactor,
@@ -227,14 +226,14 @@ class FabricationSpecCodec {
 	}
 
 	public static function encode(v:FabricationSpec):String
-		return ToolingCodec.canonical({format: "materia.fabrication-spec", version: 2, spec: snapshot(v)});
+		return ToolingCodec.canonical({format: "materia.fabrication-spec", version: 3, spec: snapshot(v)});
 
 	public static function decode(s:String):FabricationSpec {
 		if (s == null || haxe.io.Bytes.ofString(s).length > 1048576)
 			throw "Fabrication spec exceeds limit";
 		var v:Dynamic = haxe.Json.parse(s);
 		object(v, ["format", "version", "spec"]);
-		if (v.format != "materia.fabrication-spec" || v.version != 2)
+		if (v.format != "materia.fabrication-spec" || v.version != 3)
 			throw "Unsupported fabrication spec version";
 		return snapshot(v.spec);
 	}

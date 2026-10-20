@@ -30,8 +30,7 @@ class FabricationTests {
 			sheetMaterialId: "tooling-coated-board",
 			solvent: Unknown,
 			adhesiveContainsEPS: null,
-			curePeakC: null,
-			cureEvidence: [],
+			resinReference: "test-only resin",
 			compatibilityEvidence: [],
 			gravityMps2: 9.80665,
 			loadFactor: 1.5,
@@ -115,20 +114,8 @@ class FabricationTests {
 		check(ToolingFabrication.plan(p, s).validation.filter(c -> c.rule == "fabrication.materials.compatibility"
 			&& c.status == "fail").length == 1,
 			"styrene plus EPS fails outright");
-		var doc = ToolingCodec.snapshot(p.document);
-		doc.recipe.core.maximumTemperatureC = 60;
-		doc.recipe.core.evidence = ["test-only EPS limit"];
-		var limited = CastingMoldPlanner.plan(doc, p.options);
-		s = spec();
-		s.curePeakC = 60;
-		s.cureEvidence = ["test-only assessed peak"];
-		check(ToolingFabrication.plan(limited, s).validation.filter(c -> c.rule == "fabrication.materials.cure"
-			&& c.status == "fail").length == 1,
-			"cure peak at EPS limit fails");
-		s.curePeakC = 59;
-		check(ToolingFabrication.plan(limited, s).validation.filter(c -> c.rule == "fabrication.materials.cure"
-			&& c.status == "pass").length == 1,
-			"below-limit evidenced cure passes its own rule only");
+		check(f.validation.filter(c -> c.rule == "fabrication.materials.cure" && c.status == "pending").length == 1,
+			"fabrication cannot invent an assessed cure peak without a CureReport");
 		var core = p.cores[0],
 			load = f.loads.estimates.filter(v -> v.id == core.id)[0];
 		var expected = core.cavity.width * core.cavity.depth * core.cavity.height * 1e-9 * p.document.recipe.mixDensityKgM3 * s.gravityMps2 * s.loadFactor;

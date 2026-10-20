@@ -201,7 +201,7 @@ class CastabilityAnalysis {
 					checks.push(FillAnalysis.check(rule, [strategy.featureId], Pending,
 						"Run the real planner and exact swept removal checks for rigid-former extraction; adhesion needs physical evidence.", []));
 				proposals.push(proposal(rule, [strategy.featureId], SplitOrSacrificial, DesignReview,
-					"Evaluate a split former or sacrificial alternative, or revise source draft. Select explicitly and rerun the real planner and CAD removal graph."));
+					"This planner cannot realize drafted or split formers. Only supported fill-open EPS or a source change to supported release geometry clears this request; rerun planning and exact CAD checks."));
 			} else {
 				checks.push(FillAnalysis.check(rule, [strategy.featureId], Unsupported, "Feature has no supported tooling strategy.", []));
 				proposals.push(proposal(rule, [strategy.featureId], SplitOrSacrificial, ToolingReview,

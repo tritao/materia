@@ -10,12 +10,14 @@ import materia.tooling.casting.MoldPlan.MoldBox;
 
 typedef FillBoundary = {var id:String; var box:MoldBox;}
 typedef FillCore = {var id:String; var boxes:Array<MoldBox>;}
+typedef FillPanel = {var id:String; var bottomMm:Float;}
 typedef FillCeiling = {var sourceIds:Array<String>; var box:MoldBox;}
 
 typedef AirPocket = {
 	var id:String;
 	var sealedAtMm:Float;
 	var volumeMm3:Float;
+	var boxes:Array<MoldBox>;
 	var ceilingFaces:Array<FillCeiling>;
 	var sourceIds:Array<String>;
 
@@ -29,6 +31,7 @@ typedef FillLevel = {
 	var mixMassKg:Float;
 	var timeSeconds:Null<Float>;
 	var maximumHeadPa:Float;
+	var panelHeads:Array<{id:String, headPa:Float}>;
 	var cores:Array<{id:String, submergedVolumeMm3:Float, grossUpliftN:Float}>;
 }
 
@@ -38,6 +41,9 @@ typedef FillReport = {
 	var model:String;
 	var criticalHeightsMm:Array<Float>;
 	var totalMixVolumeMm3:Float;
+	var geometricResinVolumeMm3:Float;
+	var openFillAreaMm2:Float;
+	var openFillFootprints:Array<MoldBox>;
 	var levels:Array<FillLevel>;
 	var trappedPockets:Array<AirPocket>;
 	var validation:Array<ToolingValidation>;
@@ -110,11 +116,12 @@ class FillAnalysis {
 	}
 
 	/** A face is represented by its exact XY footprint and zero height. */
-	static function ceilings(group:Array<MoldBox>, all:Array<MoldBox>, fill:Float, boundaries:Array<FillBoundary>, sourceId:String):Array<FillCeiling> {
+	static function ceilings(group:Array<MoldBox>, all:Array<MoldBox>, fill:Float, boundaries:Array<FillBoundary>, sourceId:String,
+			?open:Array<MoldBox>):Array<FillCeiling> {
 		var faces:Array<FillCeiling> = [];
 		for (b in group) {
 			var z = b.z + b.height;
-			if (z >= fill - EPS)
+			if (z >= fill - EPS && open == null)
 				continue;
 			var footprint = {
 				x: b.x,
@@ -124,7 +131,7 @@ class FillAnalysis {
 				depth: b.depth,
 				height: 1.0
 			};
-			var cover:Array<MoldBox> = [];
+			var cover:Array<MoldBox> = z >= fill - EPS && open != null ? open.copy() : [];
 			for (c in all)
 				if (c.z <= z + EPS && c.z + c.height > z + EPS)
 					cover.push({
@@ -147,7 +154,7 @@ class FillAnalysis {
 
 	public static function analyze(sourceId:String, sourceFingerprint:String, processFingerprint:String, region:Array<MoldBox>,
 			boundaries:Array<FillBoundary>, cores:Array<FillCore>, fillHeightMm:Float, densityKgM3:Float, gravityMps2:Float, pourRate:Null<Float>,
-			airEscapeWidth:Null<Float>, ?extraLevels:Array<Float>):FillReport {
+			airEscapeWidth:Null<Float>, ?extraLevels:Array<Float>, ?fillObstructions:Array<MoldBox>, ?panels:Array<FillPanel>):FillReport {
 		ToolingIds.validate(sourceId);
 		if (region.length == 0
 			|| region.length > 2048
@@ -188,6 +195,21 @@ class FillAnalysis {
 				throw "Invalid fill box or insufficient fill height";
 		}
 		var boxes = sorted(BoxVolumes.subtract(sorted(region), []));
+		var footprint:Array<MoldBox> = [
+			for (box in boxes)
+				if (box.z + box.height >= fillHeightMm - EPS) {
+					x: box.x,
+					y: box.y,
+					z: 0.0,
+					width: box.width,
+					depth: box.depth,
+					height: 1.0
+				}
+		];
+		var open = BoxVolumes.subtract(footprint, fillObstructions == null ? [] : fillObstructions);
+		var openArea = BoxVolumes.volume(open);
+		if (openArea <= EPS)
+			throw "Fill face has zero open area";
 		var heights:Array<Float> = [fillHeightMm];
 		for (b in boxes) {
 			heights.push(b.z);
@@ -198,7 +220,14 @@ class FillAnalysis {
 		for (h in critical) {
 			var air = above(boxes, h);
 			for (component in BoxVolumes.groups(air)) {
-				if (component.filter(b -> b.z + b.height >= fillHeightMm - EPS).length > 0)
+				var vented = false;
+				for (box in component)
+					if (box.z + box.height >= fillHeightMm - EPS)
+						for (opening in open)
+							if (Math.min(box.x + box.width, opening.x + opening.width) - Math.max(box.x, opening.x) > EPS
+								&& Math.min(box.y + box.depth, opening.y + opening.depth) - Math.max(box.y, opening.y) > EPS)
+								vented = true;
+				if (vented)
 					continue;
 				var known = false;
 				for (old in prior)
@@ -208,7 +237,7 @@ class FillAnalysis {
 								known = true;
 				if (known)
 					continue;
-				var faces = ceilings(component, boxes, fillHeightMm, boundaries, sourceId);
+				var faces = ceilings(component, boxes, fillHeightMm, boundaries, sourceId, open);
 				if (faces.length == 0)
 					throw "Trapped air component has no ceiling";
 				var highest = faces[0];
@@ -226,6 +255,7 @@ class FillAnalysis {
 					id: ToolingIds.derive("air-", hash, ""),
 					sealedAtMm: h,
 					volumeMm3: BoxVolumes.volume(component),
+					boxes: sorted(component),
 					ceilingFaces: faces,
 					sourceIds: ids,
 					proposedVentPoint: {
@@ -251,7 +281,7 @@ class FillAnalysis {
 				+ p.volumeMm3
 				+ " mm3. Candidate vent requires routing or another setup.",
 				[sourceFingerprint]));
-		var broad = ceilings(boxes, boxes, fillHeightMm, boundaries, sourceId);
+		var broad = ceilings(boxes, boxes, fillHeightMm, boundaries, sourceId, open);
 		if (airEscapeWidth == null)
 			checks.push(check("process.fill.air-escape-width", [sourceId], ToolingCheckStatus.Pending,
 				"No recipe air-escape-width limit declared; connected air alone does not qualify paste filling.", []));
@@ -318,16 +348,25 @@ class FillAnalysis {
 				throw "Duplicate fill core ID";
 			seen.set(c.id, true);
 		}
+		var trapped = BoxVolumes.subtract([for (group in prior) for (box in group) box], []);
+		var panelRecords = panels == null ? [] : panels.copy();
+		panelRecords.sort((a, b) -> Reflect.compare(a.id, b.id));
 		var levels:Array<FillLevel> = [];
 		for (h in unique(outputLevels))
 			if (h >= floor - EPS && h <= fillHeightMm + EPS) {
-				var v = submerged(boxes, h);
+				var v = submerged(boxes, h) - submerged(trapped, h);
 				levels.push({
 					heightMm: h,
 					mixVolumeMm3: v,
 					mixMassKg: v * densityKgM3 * 1e-9,
 					timeSeconds: pourRate == null ? null : v / pourRate,
 					maximumHeadPa: Math.max(0, h - floor) * 0.001 * densityKgM3 * gravityMps2,
+					panelHeads: [
+						for (panel in panelRecords) {
+							id: panel.id,
+							headPa: Math.max(0, h - panel.bottomMm) * 0.001 * densityKgM3 * gravityMps2
+						}
+					],
 					cores: [
 						for (c in cores) {
 							var displacement = submerged(BoxVolumes.subtract(sorted(c.boxes), []), h);
@@ -341,7 +380,10 @@ class FillAnalysis {
 			processFingerprint: processFingerprint,
 			model: "exact-orthogonal-flat-free-surface",
 			criticalHeightsMm: critical,
-			totalMixVolumeMm3: BoxVolumes.volume(boxes),
+			totalMixVolumeMm3: BoxVolumes.volume(boxes) - BoxVolumes.volume(trapped),
+			geometricResinVolumeMm3: BoxVolumes.volume(boxes),
+			openFillAreaMm2: openArea,
+			openFillFootprints: sorted(open),
 			levels: levels,
 			trappedPockets: pockets,
 			validation: checks

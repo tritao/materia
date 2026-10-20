@@ -115,7 +115,7 @@ review and load/access checks below; phase 8 supplies physical evidence.
 ```
 
 `MillFabricationSetup` declares process/load inputs and study CAM settings. Its
-resin/adhesive compatibility, assessed cure peak, compaction pressure, material
+resin/adhesive compatibility, computed cure inputs, compaction pressure, material
 properties, support/connection capacities and shop workholding are deliberately
 unqualified. The entry uses `build/fabrication-runner/` and generates into a fresh
 staging directory. It publishes `build/tooling/base-fabrication/` only after the
@@ -188,13 +188,17 @@ The fill volume is checked against the exact source CAD review in a full export;
 a records-only run leaves that agreement pending. Candidate vents on a failing
 fixture are suggestions, not automatically drilled or sealed tooling holes.
 
-Cure reports do not invent a resin heat output or claim that EPS is safe. They
-provide an environment-aware adiabatic bound when inputs exist, and a tested
-implicit 1D reaction/conduction solver for declared planar sections. Missing mix,
-kinetic and boundary data, actual-section numerical convergence, section/junction
-coverage and thermocouple calibration remain blocking. The existing assessed
-cure-peak/material check is retained. All new checks enter the final hashed
-manifest and fabrication Diagnostics alongside the existing design requests.
+Cure reports do not invent resin properties or claim that EPS is safe. The
+lumped adiabatic estimate requires a positive declared margin and is not a
+spatial upper bound: conduction can preheat unreacted material. It never clears
+thermal coverage or junction checks. The implicit 1D solver supports declared
+autocatalytic kinetics, checks remaining reaction heat before allowing a section
+Pass, and reports a global energy balance. First-order kinetics are kept for
+analytic fixtures only. Resin identity must match the fabrication solvent
+record, and gel/material limits include EPS-containing adhesive even without
+foam cores. `fabrication.materials.cure` derives only from CureReport; there is
+no second assessed-peak field. Material data, numerical convergence, geometry
+coverage and thermocouple evidence remain blocking.
 
 The process analysis now includes extracted opposing-face planar spans, the
 orientation comparison and checked-order playback described below. Complex
@@ -294,7 +298,7 @@ the junction's heat flow. The present process setup declares no thermal sections
 so all 70,107,544 mm3 remains unbound. Supplier data, actual boundary conditions,
 a junction thermal model and physical calibration are still needed.
 
-In a version-3 process file every authored section needs `spanIds` and
+In a version-4 process file every authored section needs `spanIds` and
 `geometryFingerprint`. Use empty IDs and null for an unbound numerical example.
 For real coverage, take span IDs and the geometry fingerprint from
 `section-geometry.json` and match its thickness/source faces, while explicitly
@@ -325,3 +329,20 @@ fixture geometry, measured lengths or a qualified machine-coordinate work origin
 keeps the per-panel CAM check pending. The mill's zero-length study tools are split
 into pending single-tool files; they are not qualified machine programs. Shop
 feeds, machine travel, setup and the physical coupon trial remain required.
+
+The reviewed fill opening subtracts all tooling at or above fill height before
+checking air connectivity. Curved openings requiring an unimplemented exact
+projection are blocked conservatively and marked Unsupported. The level curve
+subtracts sealed air and reports head for each panel at each level. A full export
+writes `fill-foundation-cad-check.json`, with symmetric difference against the
+actual foundation CAD; the current result is zero.
+
+Orientation candidates that plan successfully use the same process analysis as
+the selected mold. The report declares its feasibility gates and metric tuple:
+trapped volume, worst cure margin (unknown last), flip, panels and sheets, with a
+reason for each ordering. Actual CAD-review validation is forwarded unchanged.
+Real panels with rebates/holes have an explicit Unsupported structural model;
+rigid formers and datum fixtures have uplift and lateral restraint requirements.
+Manifest v2 hashes readiness and validation and recomputes readiness on verify.
+The full review package currently has 840 artifacts, 13 passing checks, 175
+pending and 15 unsupported. **Not fabrication-ready; no coupon trial recorded.**

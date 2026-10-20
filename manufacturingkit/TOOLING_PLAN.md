@@ -106,7 +106,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   material/temperature checks, peak-head pressure and gross core uplift, declared
   rectangular plate/brace/fastener capacity estimates, and per-core restraint
   checks. Missing data stays pending; cutout plates and localized support loads
-  need qualified models. Styrene/EPS and assessed cure peaks at the EPS limit fail.
+  need qualified models. Styrene/EPS incompatibility fails; cure qualification now comes only from CureReport (review 23).
   Exact sequence/coverage/reconstruction checks remain the CAD gate.
   Neutral sheet requirements and deterministic shelf layouts retain part IDs and
   revisions without inventory mutation or contour-nesting claims. The package
@@ -146,8 +146,8 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   volume against the fingerprint-bound source CAD review. Non-orthogonal fill
   geometry remains unsupported. Connected coplanar ceilings use a conservative
   bounding-width rule; an unknown air-escape limit stays pending.
-  `CureAnalysis` adds an environment-aware adiabatic bound and coupled implicit
-  1D conduction/first-order Arrhenius reaction for explicitly declared slabs.
+  `CureAnalysis` adds a lumped estimate and coupled implicit 1D conduction/reaction
+  for declared slabs; review 24/29 adds autocatalytic kinetics and completion gates.
   Insulated heating, nonlinear energy balance and inert-slab Fourier cooling
   fixtures pass. Residual reaction heat prevents early-stop qualification;
   missing data and actual-section numerical convergence/coverage/calibration
@@ -158,8 +158,8 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   Further phase 6 work adds `MoldOrientationStudy`: explicit candidate documents
   run the real planner, fabrication checks and source fill/cure analyses, with
   fingerprint-bound CAD assessments supplied by MachineKit. Deterministic ranking
-  prioritizes completed planning/CAD checks, then failures, unsupported rules,
-  source requests and pending checks. Effort reports production panels/unique
+  uses planning/strategy/CAD feasibility gates, then the declared trapped-volume,
+  worst-cure-margin, flip, panel-count and sheet-count tuple (review 26). Effort reports production panels/unique
   geometry, production-only blank sheet utilization, EPS consumption, formers,
   logical hardware stacks and handling mass/flip; failed planning has no invented
   effort values. The mill compares inverted/upright/side-on setups, preserving
@@ -227,8 +227,8 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   across same-geometry plan/document report stamps. Section report 2, process and
   orientation reports 3 and castability report 2 carry the new results.
   Geometry coverage does not qualify junction heat flow. Nonrectangular junction
-  modelling stays pending; a safe adiabatic tier can bypass missing cooling
-  coverage but never invalid authored bindings. The current mill has no authored
+  modelling stays pending. A lumped thermal estimate never bypasses missing
+  coverage, junction modelling or invalid authored bindings (review 24). The current mill has no authored
   slabs, so all 70,107,544 mm3 is explicitly unbound. No material data, 3D thermal
   result, source change or physical release is invented.
   Validation: 616 pure tooling, 32 independent native process/CAD and 243 full-mill
@@ -270,9 +270,21 @@ See [README.md](README.md#casting-tooling-inputs) for the implemented API and ch
   intrusion into resin; datum profiles remain explicitly unsupported. Removed
   the codec-sorted permutation test. Neutral and native tooling suites pass;
   the mill records export passes manifest integrity checks.
-- [ ] Review 22–30: actual fill openings, single cure authority, thermal model
-  corrections, EPS compatibility, shared orientation analysis/ranking, actual CAD
-  comparison, trapped-volume/head curves and stronger process fixtures.
+- [x] Review 22–30: subtract tooling projections from fill openings and reject
+  zero open area; curved openings needing an exact projection remain Unsupported.
+  Trapped air is removed from the level curve and each level reports panel heads.
+  CureReport is the sole cure authority (fabrication spec 3 / process spec 4),
+  including EPS-containing adhesive, resin identity and gel limits. Autocatalytic
+  kinetics, remaining-heat completion and energy accounting are implemented;
+  first-order kinetics are analytical fixtures and cannot qualify a reactive mix.
+  The lumped estimate requires margin and never clears coverage/junction rules.
+  Planned orientation candidates call CastingProcessAnalysis directly, emit the
+  declared metric tuple and deciding reason, and retain actual review validation.
+  Full export compares symmetric difference against foundation.body.geometry().
+  Validation: 1,675 neutral assertions, 34 native process assertions and 243 mill
+  assertions pass. The 840-artifact full export has zero foundation symmetric
+  difference, 13 Pass / 175 Pending / 15 Unsupported, and passes manifest tamper
+  checks. There is no recorded coupon trial and the mold is not fabrication-ready.
 
 ## Objective and first deliverable
 
@@ -416,7 +428,7 @@ compatibility path for the old encoding.
 | `DesignChangeRequest` | Source feature/insert IDs, requested change (draft, lifting insert, split, radius, access), reason, blocking checks |
 | `ResinCureSpec` | Supplier/grade reference, solvent family, heat of reaction, kinetic model and parameters (or an adiabatic temperature-rise curve), resin mass fraction, mix density/specific heat/conductivity, gel and limit temperatures, evidence; each value or pending |
 | `FillReport` | Setup/source fingerprints, critical levels, level-volume curve, resin mass, trapped-air pockets (volume, ceiling faces, source/tooling IDs, proposed vent point), head and buoyancy per level, fill time when a pour rate is declared |
-| `CureReport` | Recipe/setup fingerprints, analysed sections (source IDs, thickness, boundary conditions), adiabatic bound, 1D peak temperature and time, margin to each limit, 3D result reference when run, validation evidence |
+| `CureReport` | Recipe/setup fingerprints, analysed sections (source IDs, thickness, boundary conditions), lumped estimate (not a spatial upper bound), 1D peak temperature and time, margin to each limit, 3D result reference when run, validation evidence |
 | `MoldPlan` | Panels, formers, cores, fixtures, braces, hardware, penetrations, steps, change requests, assumptions and source provenance |
 | `ToolingValidation` | Rule ID, affected IDs, severity, evidence, and pass/fail/pending/unsupported status |
 | `ToolingManifest` | Format version, units, revisions/hashes, generated files, validation status, quantities and replacement groups |
@@ -815,12 +827,14 @@ covers that case, and phase 8 compares predicted pockets with demolded voids.
 
 The exotherm matters because EPS softens near its declared limit, resin systems
 have gel and limit temperatures, and temperature differences move inserts.
-Three tiers, each run only when the previous one cannot pass:
+Three levels of analysis; a screening result never clears coverage or junction checks:
 
-1. **Adiabatic bound.** Peak rise is at most w·H/c, from the resin mass fraction,
-   heat of reaction and mix specific heat, for any geometry. If the maximum initial/ambient/boundary
-   temperature plus the remaining-reaction bound is below every limit by the recipe margin, the
-   check passes without kinetics.
+1. **Lumped estimate.** The remaining reaction rise w·H/c is a uniform-mix
+   estimate. Conduction can preheat unreacted material, so adding it to the
+   maximum initial/environment temperature is not a spatial upper bound. A
+   screening Pass requires a positive declared margin to every material/gel
+   limit; it cannot qualify a casting without the separate thermal-model and
+   physical-evidence checks.
 2. **Section model.** Transient 1D conduction through each section, with heat
    generation from the `ResinCureSpec` kinetics and boundary conditions from the
    mold: panel (board conductivity, thickness and convection), EPS (near
@@ -828,9 +842,10 @@ Three tiers, each run only when the previous one cannot pass:
    thicknesses come from the casting: distances between opposing planar faces for
    walls and ribs, and the largest inscribed thickness at junctions. Other shapes
    are unsupported until a medial-axis method exists. Implicit time stepping in
-   ManufacturingKit, verified against the adiabatic bound and the analytical
-   inert-slab cooling series before use. The 1D result is conservative for wall
-   interiors, not for junctions.
+   ManufacturingKit, verified against the insulated energy balance, convective reactive refinement
+   and analytical inert-slab cooling series. No slab Pass is allowed until the
+   remaining reaction heat is below its declared tolerance. A slab result does
+   not establish a junction result.
 3. **3D transient.** Only when a junction or thick block is within the recipe
    margin after tier 2. Use the existing Gmsh/CalculiX pipeline and its
    solver-fixture gate. Cure heat generation uses either a CalculiX DFLUX user
@@ -839,8 +854,8 @@ Three tiers, each run only when the previous one cannot pass:
    shared deck writer out of the bench-mill example when this second consumer
    needs it.
 
-Missing kinetics or mix properties leave tiers 2 and 3 pending; the adiabatic
-bound alone can still pass a check. Phase 8 thermocouples (thickest section
+Missing kinetics or mix properties leave thermal qualification pending. A lumped
+screening Pass never removes model coverage blockers. Physical-trial thermocouples (thickest section
 centre, core surface, a panel face) validate peak temperature and time to peak
 within a declared tolerance, attached to the recipe revision.
 

@@ -11,23 +11,50 @@ import materia.tooling.process.FillAnalysis;
 /** Neutral process results enter the same fabrication manifest/readiness gate. */
 class ToolingProcessExport {
 	public static function write(p:CastingMoldPlan, spec:CastingProcessSpec, gravityMps2:Float, dir:String,
-			review:Null<machinekit.tooling.CastingMoldCad.CastingMoldReview>):Array<ToolingValidation> {
-		var report = CastingProcessAnalysis.analyze(p, spec, gravityMps2);
+			review:Null<machinekit.tooling.CastingMoldCad.CastingMoldReview>, ?fabrication:materia.tooling.export.FabricationSpec,
+			?foundation:machinekit.structural.MineralFoundation):Array<ToolingValidation> {
+		var report = CastingProcessAnalysis.analyze(p, spec, gravityMps2, fabrication);
 		var checks = report.validation.filter(v -> StringTools.startsWith(v.rule, "process."));
-		if (review == null)
+		if (review == null || foundation == null)
 			checks.push(FillAnalysis.check("process.fill.cad-volume-agreement", [p.document.input.id], ToolingCheckStatus.Pending,
 				"Records-only fill geometry has not been cross-checked against reconstructed/source CAD.", []));
 		else {
 			if (review.fingerprint != report.sourceFingerprint)
 				throw "Stale process CAD review";
-			var cadSourceVolumeMm3 = review.sourceVolumeMm3;
-			if (!Math.isFinite(cadSourceVolumeMm3) || cadSourceVolumeMm3 <= 0)
-				throw "Invalid process CAD volume";
-			var difference = Math.abs(cadSourceVolumeMm3 - report.fill.totalMixVolumeMm3);
-			if (difference > Math.max(1e-5, cadSourceVolumeMm3 * 1e-9))
-				throw "Fill-region/CAD volume differs: " + difference;
+			var actualInput = FoundationToolingAdapter.snapshot(foundation, p.document.input.id, p.document.input.revision);
+			if (ToolingCodec.inputFingerprint(actualInput) != ToolingCodec.inputFingerprint(p.document.input))
+				throw "Process CAD foundation differs from source revision";
+			var resources:Array<cadkit.modeling.Part> = [];
+			var difference = 0.0;
+			try {
+				var local = foundation.body.geometry();
+				resources.push(local);
+				var actual = machinekit.assembly.PosedParts.moved(local, p.document.setup.sourceToMold);
+				resources.push(actual);
+				var region = CastingMoldCad.source(p);
+				resources.push(region);
+				var missing = actual.subtractAll([region]);
+				resources.push(missing);
+				var extra = region.subtractAll([actual]);
+				resources.push(extra);
+				difference = missing.volume() + extra.volume();
+				if (!Math.isFinite(difference) || difference > Math.max(1e-5, actual.volume() * 1e-9))
+					throw "Fill-region/actual foundation symmetric difference: " + difference;
+			} catch (error:Dynamic) {
+				for (part in resources)
+					part.close();
+				throw error;
+			}
+			for (part in resources)
+				part.close();
+			sys.io.File.saveContent(dir + "/fill-foundation-cad-check.json", ToolingCodec.canonical({
+				sourceFingerprint: report.sourceFingerprint,
+				reference: "foundation.body.geometry() transformed to mold coordinates",
+				symmetricDifferenceMm3: difference
+			}) + "\n");
 			checks.push(FillAnalysis.check("process.fill.cad-volume-agreement", [p.document.input.id], ToolingCheckStatus.Pass,
-				"Exact orthogonal resin-region volume agrees with the source/reconstruction CAD review.", [report.sourceFingerprint]));
+				"Symmetric difference against actual foundation.body.geometry() passed; see fill-foundation-cad-check.json.",
+				[report.sourceFingerprint, "fill-foundation-cad-check.json"]));
 		}
 		sys.io.File.saveContent(dir + "/casting-process-spec.json", materia.tooling.process.ProcessSpecCodec.encode(report.spec));
 		sys.io.File.saveContent(dir + "/fill-analysis.json", ToolingCodec.canonical(report.fill) + "\n");

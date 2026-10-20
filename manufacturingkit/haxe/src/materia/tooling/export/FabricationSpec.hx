@@ -61,10 +61,8 @@ typedef FabricationSpec = {
 	var solvent:ResinSolvent;
 	var adhesiveContainsEPS:Null<Bool>;
 
-	/** Assessed peak, supplied until phase 6 computes a cure report; never guessed. */
-	var curePeakC:Null<Float>;
+	var resinReference:String;
 
-	var cureEvidence:Array<String>;
 	var compatibilityEvidence:Array<String>;
 	var gravityMps2:Float;
 	var loadFactor:Float;

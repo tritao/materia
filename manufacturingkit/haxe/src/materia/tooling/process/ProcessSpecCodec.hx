@@ -4,7 +4,7 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
 import materia.tooling.process.CastingProcessSpec;
 
-/** Strict independent v3 format. Reconstructs typed records after validation. */
+/** Strict independent v4 format. Reconstructs typed records after validation. */
 class ProcessSpecCodec {
 	static function object(v:Dynamic, keys:Array<String>):Void {
 		if (v == null || !Reflect.isObject(v) || Std.isOfType(v, Array) || Std.isOfType(v, String))
@@ -126,6 +126,7 @@ class ProcessSpecCodec {
 			"mixSpecificHeatJPerKgK",
 			"mixConductivityWPerMK",
 			"resinMaximumTemperatureC",
+			"gelMaximumTemperatureC",
 			"kinetics",
 			"evidence"
 		]);
@@ -136,17 +137,29 @@ class ProcessSpecCodec {
 				"kind",
 				"preExponentialPerSecond",
 				"activationEnergyJPerMol",
-				"initialConversion"
+				"initialConversion",
+				"autocatalyticPreExponentialPerSecond",
+				"autocatalyticExponentM",
+				"reactionExponentN"
 			]);
-			if (k.kind != "first-order-arrhenius")
+			if (k.kind != "first-order-arrhenius" && k.kind != "autocatalytic-arrhenius")
 				throw "Unsupported cure kinetics";
 			kinetics = {
-				kind: FirstOrderArrhenius,
+				kind: cast k.kind,
 				preExponentialPerSecond: number(k.preExponentialPerSecond, 1e-30, 1e30),
 				activationEnergyJPerMol: number(k.activationEnergyJPerMol, 0, 1e7),
-				initialConversion: number(k.initialConversion, 0, 1)
+				initialConversion: number(k.initialConversion, 0, 1),
+				autocatalyticPreExponentialPerSecond: number(k.autocatalyticPreExponentialPerSecond, 0, 1e30),
+				autocatalyticExponentM: number(k.autocatalyticExponentM, 0.01, 10),
+				reactionExponentN: number(k.reactionExponentN, 1, 10)
 			};
 		}
+		if (kinetics != null
+			&& (kinetics.kind == AutocatalyticArrhenius
+				&& kinetics.autocatalyticPreExponentialPerSecond <= 0
+				|| kinetics.kind == FirstOrderArrhenius
+				&& (kinetics.autocatalyticPreExponentialPerSecond != 0 || kinetics.reactionExponentN != 1)))
+			throw "Inconsistent cure kinetics parameters";
 		var sections:Array<CureSection> = [], ids:Array<String> = [];
 		for (s in list(v.sections, 128)) {
 			object(s, [
@@ -191,14 +204,16 @@ class ProcessSpecCodec {
 			"timeStepSeconds",
 			"durationSeconds",
 			"convergenceToleranceC",
-			"maximumIterations"
+			"maximumIterations",
+			"remainingHeatToleranceC"
 		]);
 		var solver:CureSolverSettings = {
 			cells: integer(s.cells, 3, 201),
 			timeStepSeconds: number(s.timeStepSeconds, 1e-6, 1e7),
 			durationSeconds: number(s.durationSeconds, 1e-6, 1e9),
 			convergenceToleranceC: number(s.convergenceToleranceC, 1e-10, 0.1),
-			maximumIterations: integer(s.maximumIterations, 2, 1000)
+			maximumIterations: integer(s.maximumIterations, 2, 1000),
+			remainingHeatToleranceC: number(s.remainingHeatToleranceC, 1e-9, 1)
 		};
 		if (solver.durationSeconds / solver.timeStepSeconds > 2000000.0 / solver.cells)
 			throw "Cure solver work limit exceeded";
@@ -219,6 +234,7 @@ class ProcessSpecCodec {
 				mixSpecificHeatJPerKgK: optional(c.mixSpecificHeatJPerKgK, 1e-9, 1e9),
 				mixConductivityWPerMK: optional(c.mixConductivityWPerMK, 1e-12, 1e6),
 				resinMaximumTemperatureC: optional(c.resinMaximumTemperatureC, -273.14, 2000),
+				gelMaximumTemperatureC: optional(c.gelMaximumTemperatureC, -273.14, 2000),
 				kinetics: kinetics,
 				evidence: texts(c.evidence)
 			},
@@ -228,7 +244,7 @@ class ProcessSpecCodec {
 	}
 
 	public static function encode(v:CastingProcessSpec):String {
-		var text = ToolingCodec.canonical({format: "materia.casting-process", version: 3, spec: snapshot(v)}) + "\n";
+		var text = ToolingCodec.canonical({format: "materia.casting-process", version: 4, spec: snapshot(v)}) + "\n";
 		if (haxe.io.Bytes.ofString(text).length > 2097152)
 			throw "Casting process size limit";
 		return text;
@@ -246,7 +262,7 @@ class ProcessSpecCodec {
 			throw error;
 		}
 		object(v, ["format", "version", "spec"]);
-		if (v.format != "materia.casting-process" || v.version != 3)
+		if (v.format != "materia.casting-process" || v.version != 4)
 			throw "Unsupported casting process format/version";
 		return snapshot(v.spec);
 	}

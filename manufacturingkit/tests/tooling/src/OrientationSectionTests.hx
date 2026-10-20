@@ -122,6 +122,34 @@ class OrientationSectionTests {
 		check(comparison.preferredReviewCandidateId == null, "pure planner cannot claim a CAD-validated preference");
 		check(ToolingCodec.canonical(comparison) == ToolingCodec.canonical(MoldOrientationStudy.run([a, b], FabricationTests.spec())),
 			"candidate-order permutation deterministic");
+		var shared = materia.tooling.process.CastingProcessAnalysis.analyze(p, s, FabricationTests.spec().gravityMps2, FabricationTests.spec());
+		check(ToolingCodec.canonical(comparison.rankedCandidates[0].fill) == ToolingCodec.canonical(shared.fill),
+			"planned study uses exactly the shared process fill records");
+		check(ToolingCodec.canonical(comparison.rankedCandidates[0].cure) == ToolingCodec.canonical(shared.cure),
+			"planned study uses exactly the shared cure records");
+		check(comparison.rankingRule.indexOf("trapped volume") >= 0 && comparison.rankedCandidates[0].decidingReason.length > 0,
+			"ranking declares its tuple and deciding reason");
+		var first = comparison.rankedCandidates[0],
+			second = comparison.rankedCandidates[1];
+		first.rankMetrics.trappedVolumeMm3 = 1;
+		second.rankMetrics.trappedVolumeMm3 = 2;
+		check(MoldOrientationStudy.compare(first, second) < 0, "ranking minimises trapped volume first");
+		second.rankMetrics.trappedVolumeMm3 = 1;
+		first.rankMetrics.worstCureMarginC = 1;
+		second.rankMetrics.worstCureMarginC = 2;
+		check(MoldOrientationStudy.compare(first, second) > 0, "ranking maximises worst cure margin second");
+		first.rankMetrics.worstCureMarginC = 2;
+		first.rankMetrics.requiresFlip = true;
+		second.rankMetrics.requiresFlip = false;
+		check(MoldOrientationStudy.compare(first, second) > 0, "ranking then avoids a flip");
+		first.rankMetrics.requiresFlip = false;
+		first.rankMetrics.panels = 10;
+		second.rankMetrics.panels = 9;
+		check(MoldOrientationStudy.compare(first, second) > 0, "ranking then minimises panels");
+		first.rankMetrics.panels = 9;
+		first.rankMetrics.sheets = 2;
+		second.rankMetrics.sheets = 1;
+		check(MoldOrientationStudy.compare(first, second) > 0, "ranking then minimises sheets");
 		var effort = comparison.rankedCandidates[0].effort;
 		if (effort == null)
 			throw "Missing planned effort";

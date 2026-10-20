@@ -72,11 +72,15 @@ class ProcessTests {
 				mixSpecificHeatJPerKgK: 1000,
 				mixConductivityWPerMK: 1,
 				resinMaximumTemperatureC: 120,
+				gelMaximumTemperatureC: 120,
 				kinetics: {
 					kind: FirstOrderArrhenius,
 					preExponentialPerSecond: 0.01,
 					activationEnergyJPerMol: 0,
-					initialConversion: 0
+					initialConversion: 0,
+					autocatalyticPreExponentialPerSecond: 0,
+					autocatalyticExponentM: 1,
+					reactionExponentN: 1
 				},
 				evidence: ["analytic-fixture"]
 			},
@@ -97,7 +101,8 @@ class ProcessTests {
 				timeStepSeconds: 1,
 				durationSeconds: 1000,
 				convergenceToleranceC: 1e-8,
-				maximumIterations: 100
+				maximumIterations: 100,
+				remainingHeatToleranceC: 0.01
 			}
 		};
 
@@ -106,6 +111,61 @@ class ProcessTests {
 		if (rows.length != 1)
 			throw "Missing/duplicate cure rule: " + rule;
 		return rows[0].status;
+	}
+
+	/** Independent dense-height reference: explicit face graph, no event-plane
+	 * solver or BoxVolumes.groups. Its first sampled trapped volume approaches
+	 * the analytic right-hand limit as the height step shrinks.
+	 */
+	static function sampledTraps(region:Array<MoldBox>, step:Float):Float {
+		var prior:Array<Array<Int>> = [], total = 0.0, index = 0;
+		while ((index + 0.37) * step < 10) {
+			var height = (index + 0.37) * step;
+			var cells:Array<{id:Int, box:MoldBox}> = [];
+			for (i in 0...region.length) {
+				var b = region[i], z = Math.max(height, b.z), top = b.z + b.height;
+				if (top > z)
+					cells.push({id: i, box: {
+						x: b.x,
+						y: b.y,
+						z: z,
+						width: b.width,
+						depth: b.depth,
+						height: top - z
+					}});
+			}
+			while (cells.length > 0) {
+				var group = [cells.shift()], cursor = 0;
+				while (cursor < group.length) {
+					var a = group[cursor++].box, j = cells.length - 1;
+					while (j >= 0) {
+						var b = cells[j].box;
+						var overlap = [
+							Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x),
+							Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y),
+							Math.min(a.z + a.height, b.z + b.height) - Math.max(a.z, b.z)
+						];
+						if (overlap.filter(v -> v < -1e-8).length == 0 && overlap.filter(v -> v > 1e-8).length >= 2)
+							group.push(cells.splice(j, 1)[0]);
+						j--;
+					}
+				}
+				if (group.filter(v -> v.box.z + v.box.height >= 10 - 1e-8).length > 0)
+					continue;
+				var known = false;
+				for (old in prior)
+					for (cell in group)
+						if (old.indexOf(cell.id) >= 0)
+							known = true;
+				if (!known) {
+					prior.push([for (cell in group) cell.id]);
+					for (cell in group)
+						total += cell.box.width * cell.box.depth * cell.box.height;
+				}
+			}
+			index++;
+		}
+		return total;
 	}
 
 	public static function run(p:CastingMoldPlan):Void {
@@ -122,8 +182,35 @@ class ProcessTests {
 		near(pocket.proposedVentPoint.z, 6, 1e-10, "vent proposal at ceiling");
 		check(pocket.sourceIds.indexOf("ceiling-feature") >= 0, "pocket has source feature ownership");
 		check(trapped.validation.filter(r -> r.status == "fail").length == 1, "trapped pocket blocks readiness");
-		check(ToolingCodec.canonical(fill(region, [1, 3, 5, 9]).trappedPockets) == ToolingCodec.canonical(trapped.trappedPockets),
-			"noncritical output levels do not change pocket IDs or volumes");
+		var dense = fill(region, [for (i in 0...1001) i / 100.0]);
+		for (level in dense.levels) {
+			var h = level.heightMm;
+			var analytic = 4 * Math.min(h, 10) + 4 * Math.min(h, 2) + 8 * Math.min(h, 6) - 8 * Math.max(0, Math.min(h, 6) - 2);
+			near(level.mixVolumeMm3, analytic, 1e-9, "dense level curve excludes air above its side-neck seal");
+		}
+		near(trapped.totalMixVolumeMm3, 64, 1e-9, "trapped air is excluded from final mix quantity");
+		near(trapped.geometricResinVolumeMm3, 96, 1e-9, "geometric cavity volume remains separately available");
+		var multiple = fill(region.concat([box(-6, 0, 4, 8), box(-2, 0, 2, 3)]));
+		check(multiple.trappedPockets.length == 2, "two independently side-sealed pockets");
+		near(multiple.trappedPockets[0].volumeMm3 + multiple.trappedPockets[1].volumeMm3, 72, 1e-9, "multiple pocket volumes counted once");
+		var nested = fill(region.concat([box(8, 0, 2, 8)]));
+		check(nested.trappedPockets.length == 1
+			&& nested.trappedPockets[0].ceilingFaces.length >= 2, "one trapped component retains nested ceiling levels");
+		near(nested.trappedPockets[0].volumeMm3, 56, 1e-9, "nested ceiling limiting volume");
+		near(sampledTraps(region, 0.01), 32, 0.1, "dense independent face graph approaches side-neck limiting volume");
+		near(sampledTraps(region.concat([box(-6, 0, 4, 8), box(-2, 0, 2, 3)]), 0.01), 72, 0.1, "dense independent graph agrees on multiple pockets");
+		near(sampledTraps(region.concat([box(8, 0, 2, 8)]), 0.01), 56, 0.1, "dense independent graph agrees on nested ceilings");
+		var twoTops = [box(0, 0, 2, 10), box(2, 0, 2, 2), box(4, 0, 2, 10)];
+		var covered = FillAnalysis.analyze("body", "s", "p", twoTops, [], [], 10, 2400, 10, null, null, [5], [box(4, 0, 2, 1)],
+			[{id: "low-wall", bottomMm: 0}, {id: "high-wall", bottomMm: 4}]);
+		near(covered.openFillAreaMm2, 4, 1e-9, "bridge footprint is subtracted from open fill area");
+		check(covered.trappedPockets.length == 1, "tool-covered top cannot vent an isolated pocket");
+		near(covered.trappedPockets[0].sealedAtMm, 2, 1e-9, "covered top seals at side neck");
+		var halfway = covered.levels.filter(v -> v.heightMm == 5)[0];
+		near(halfway.panelHeads.filter(v -> v.id == "low-wall")[0].headPa, 120, 1e-9, "per-level low panel head");
+		near(halfway.panelHeads.filter(v -> v.id == "high-wall")[0].headPa, 24, 1e-9, "per-level elevated panel head");
+		rejects(() -> FillAnalysis.analyze("body", "s", "p", twoTops, [], [], 10, 2400, 10, null, null, null, [box(0, 0, 6, 1)]),
+			"Fill face has zero open area");
 		region.reverse();
 		check(ToolingCodec.canonical(fill(region)) == ToolingCodec.canonical(trapped), "fill independent of member order");
 		var vented = region.concat([box(6, 6, 2, 4)]),
@@ -230,22 +317,22 @@ class ProcessTests {
 		near(insulated.peakTemperatureC, 20 + 50 * expectedAlpha, 1e-6, "insulated solver matches exact backward-Euler reaction energy");
 		for (t in insulated.finalTemperaturesC)
 			near(t, insulated.peakTemperatureC, 1e-6, "insulated temperature uniform");
-		near(insulated.futurePeakBoundC, 70, 1e-6, "insulated future bound retains all reaction energy");
+		near(insulated.futurePeakEstimateC, 70, 1e-6, "insulated future bound retains all reaction energy");
 		check(insulated.peakTemperatureC <= 70 + 1e-6, "reaction cannot exceed adiabatic upper bound");
 		s.cure.kinetics.initialConversion = 0.25;
 		var partial = CureAnalysis.section(s.sections[0], s, 2400);
-		near(partial.futurePeakBoundC, 57.5, 1e-6, "initial conversion reduces remaining reaction energy");
+		near(partial.futurePeakEstimateC, 57.5, 1e-6, "initial conversion reduces remaining reaction energy");
 		s = spec();
 		s.cure.kinetics = null;
 		var safe = CureAnalysis.analyze("body", "s", "p", s, 2400, 100, true);
-		check(status(safe, "process.cure.adiabatic-bound") == "pass", "adiabatic bound can pass without kinetics");
+		check(status(safe, "process.cure.lumped-estimate") == "pass", "adiabatic bound can pass without kinetics");
 		check(safe.sections.length == 0, "passing upper bound skips section tier");
 		var uncertain = CureAnalysis.analyze("body", "s", "p", s, 2400, 60, true);
-		check(status(uncertain, "process.cure.adiabatic-bound") == "pending", "high upper bound is not proof of overheating");
+		check(status(uncertain, "process.cure.lumped-estimate") == "pending", "high upper bound is not proof of overheating");
 		check(status(uncertain, "process.cure.section.wall") == "pending"
 			&& uncertain.sections.length == 0, "missing kinetics cannot pass section tier");
 		s.cure.resinMassFraction = null;
-		check(CureAnalysis.analyze("body", "s", "p", s, 2400, 60, true).adiabaticPeakBoundC == null, "missing material property produces no invented bound");
+		check(CureAnalysis.analyze("body", "s", "p", s, 2400, 60, true).lumpedPeakEstimateC == null, "missing material property produces no invented bound");
 		s = spec();
 		var overheated = CureAnalysis.analyze("body", "s", "p", s, 2400, 60, true);
 		check(status(overheated, "process.cure.section.wall") == "fail", "predicted section peak above EPS limit fails");
@@ -253,7 +340,7 @@ class ProcessTests {
 		var short = CureAnalysis.analyze("body", "s", "p", s, 2400, 60, true);
 		check(status(short, "process.cure.section.wall") == "pending", "early termination cannot hide future heat");
 		check(short.sections[0].peakTemperatureC < 60
-			&& short.sections[0].futurePeakBoundC > 60, "short run reports residual exotherm bound");
+			&& short.sections[0].futurePeakEstimateC > 60, "short run reports residual exotherm bound");
 		// Arrhenius coupling changes rate as the reaction heats the slab.
 		s = spec();
 		s.cure.kinetics.activationEnergyJPerMol = 40000;
@@ -272,10 +359,10 @@ class ProcessTests {
 			"nonconverged solve becomes a blocking model record");
 		s = spec();
 		s.ambientTemperatureC = null;
-		check(status(CureAnalysis.analyze("body", "s", "p", s, 2400, 100, true), "process.cure.adiabatic-bound") == "pending",
+		check(status(CureAnalysis.analyze("body", "s", "p", s, 2400, 100, true), "process.cure.lumped-estimate") == "pending",
 			"unknown ambient temperature cannot qualify upper bound");
 		s.ambientTemperatureC = 100;
-		check(status(CureAnalysis.analyze("body", "s", "p", s, 2400, 100, true), "process.cure.adiabatic-bound") == "pending",
+		check(status(CureAnalysis.analyze("body", "s", "p", s, 2400, 100, true), "process.cure.lumped-estimate") == "pending",
 			"hot environment included in upper bound");
 		// Inert slab cooling: exact Fourier sine series at the midplane.
 		s = spec();
@@ -303,10 +390,57 @@ class ProcessTests {
 		s.sections[0].right = boundary(Convection);
 		var convection = CureAnalysis.section(s.sections[0], s, 1000);
 		check(convection.finalTemperaturesC[40] > fine.finalTemperaturesC[40], "finite convection cools slower than fixed-temperature faces");
+		var reactive = spec();
+		reactive.sections[0].left = boundary(Convection);
+		reactive.sections[0].right = boundary(Convection);
+		reactive.cure.kinetics.kind = AutocatalyticArrhenius;
+		reactive.cure.kinetics.preExponentialPerSecond = 2000;
+		reactive.cure.kinetics.autocatalyticPreExponentialPerSecond = 10000;
+		reactive.cure.kinetics.activationEnergyJPerMol = 30000;
+		reactive.solver.timeStepSeconds = 0.1;
+		reactive.solver.durationSeconds = 1200;
+		var refinements:Array<CureSectionResult> = [];
+		for (cells in [11, 21, 41]) {
+			reactive.solver.cells = cells;
+			var result = CureAnalysis.section(reactive.sections[0], reactive, 2400);
+			refinements.push(result);
+			check(result.reactionHeatJPerM2 > 0 && result.boundaryHeatOutJPerM2 > 0, "convective reactive fixture exercises heat generation and heat loss");
+			near(result.energyResidualJPerM2, 0, 1e-4, "global reactive/convection energy balance");
+			check(result.reactionComplete, "reactive run reaches declared remaining-heat tolerance");
+		}
+		check(Math.abs(refinements[2].peakTemperatureC - refinements[1].peakTemperatureC) < Math.abs(refinements[1].peakTemperatureC
+			- refinements[0].peakTemperatureC),
+			"spatial refinement reduces convective reactive peak change");
+		near(refinements[2].peakTemperatureC, refinements[1].peakTemperatureC, 0.2, "refined reactive peak agreement");
+		reactive.solver.durationSeconds = 1;
+		var incomplete = CureAnalysis.analyze("body", "s", "p", reactive, 2400, 100, true);
+		check(!incomplete.sections[0].reactionComplete && status(incomplete, "process.cure.section.wall") == "pending",
+			"short reactive run cannot pass on a lumped screening estimate");
+		reactive.cure.gelMaximumTemperatureC = 21;
+		reactive.solver.durationSeconds = 1200;
+		check(status(CureAnalysis.analyze("body", "s", "p", reactive, 2400, 100, true), "process.cure.section.wall") == "fail",
+			"gel-temperature limit is independently enforced");
 		s = spec();
 		s.recipeFingerprint = ToolingCodec.recipeFingerprint(p.document.recipe);
 		s.sections = [];
 		var integrated = CastingProcessAnalysis.analyze(p, s, 9.80665);
+		var resinMismatch = FabricationTests.spec();
+		resinMismatch.resinReference = "another resin";
+		check(CastingProcessAnalysis.analyze(p, s, 9.80665, resinMismatch)
+			.validation.filter(v -> v.rule == "process.cure.resin-identity" && v.status == "fail")
+			.length == 1,
+			"cure and solvent resin identity must agree");
+		var adhesiveDocument = ToolingCodec.snapshot(p.document);
+		for (strategy in adhesiveDocument.setup.features)
+			if (strategy.strategy == materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS) {
+				strategy.strategy = materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;
+				strategy.withdrawal = {x: 0, y: 0, z: 1};
+			}
+		var adhesivePlan = materia.tooling.casting.CastingMoldPlanner.plan(adhesiveDocument, p.options);
+		resinMismatch.adhesiveContainsEPS = true;
+		check(adhesivePlan.cores.length == 0
+			&& CastingProcessAnalysis.analyze(adhesivePlan, s, 9.80665, resinMismatch).cure.limits.filter(v -> v.id == "eps-core-stock").length == 1,
+			"EPS adhesive is checked even without foam cores");
 		for (v in p.validation)
 			check(integrated.validation.filter(r -> r.rule == v.rule
 				&& ToolingCodec.canonical(r) == ToolingCodec.canonical(v)).length == 1,
@@ -320,11 +454,11 @@ class ProcessTests {
 		safeSpec.cure.heatOfReactionJPerKgResin = 0;
 		safeSpec.sections = [];
 		var safeReport = CastingProcessAnalysis.analyze(safePlan, safeSpec, 9.80665);
-		check(safeReport.cure.validation.filter(v -> v.rule == "process.cure.adiabatic-bound" && v.status == "pass").length == 1,
+		check(safeReport.cure.validation.filter(v -> v.rule == "process.cure.lumped-estimate" && v.status == "pass").length == 1,
 			"safe adiabatic bound does not require a cooling-model geometry proof");
 		check(safeReport.validation.filter(v -> v.rule == "process.cure.geometric-coverage"
-			|| v.rule == "process.cure.junction-model").length == 0,
-			"unused missing cooling coverage does not block a safe adiabatic tier");
+			|| v.rule == "process.cure.junction-model").length > 0,
+			"lumped screening never drops geometric coverage or junction model blockers");
 		safeSpec.sections = [
 			{
 				id: "stale-bound-section",

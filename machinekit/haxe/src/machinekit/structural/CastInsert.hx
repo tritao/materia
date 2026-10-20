@@ -3,6 +3,7 @@ package machinekit.structural;
 import cadkit.modeling.Part;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
+import materia.tooling.ToolingEnums.InsertRole;
 
 /** Cast-in steel design envelope; local +Z is the finished mounting-plane normal. */
 class CastInsert extends MachineComponent {
@@ -16,16 +17,16 @@ class CastInsert extends MachineComponent {
 			P.length("height", 20),
 			P.length("positionTolerance", 0.01),
 			P.choice("role", [
-				"table-mount",
-				"lifting-mount",
-				"threaded-anchor",
-				"generic-mount",
-				"guide-seat",
-				"bearing-seat",
-				"column-mount",
-				"leveling-seat",
-				"hatch-mount"
-			], "guide-seat"),
+				InsertRole.TableMount,
+				InsertRole.LiftingMount,
+				InsertRole.ThreadedAnchor,
+				InsertRole.GenericMount,
+				InsertRole.GuideSeat,
+				InsertRole.BearingSeat,
+				InsertRole.ColumnMount,
+				InsertRole.LevelingSeat,
+				InsertRole.HatchMount
+			], InsertRole.GuideSeat),
 			P.text("label", "rail seat"),
 			P.choice("finish", [
 				"ground after casting",
@@ -48,8 +49,8 @@ class CastInsert extends MachineComponent {
 				throw "Insert dimensions and tolerance must be positive";
 		if (v.number("boreDiameter") >= Math.min(v.number("width"), v.number("depth")))
 			throw "Insert bore consumes its seat";
-		if (StringTools.trim(v.token("role")).length == 0)
-			throw "Insert needs a role";
+		if (StringTools.trim(v.token("label")).length == 0)
+			throw "Insert needs a label";
 		if (v.get("material") != null && v.token("material") != "steel")
 			throw "Cast insert requires steel";
 		super("CAST-IN-INSERT", "Cast-in steel " + v.token("label") + ", " + v.token("finish"), "steel", false, v);

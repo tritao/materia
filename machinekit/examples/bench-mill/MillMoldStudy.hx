@@ -47,10 +47,7 @@ class MillMoldStudy {
 				demoldingSteps: review.demoldingSteps.length,
 				assemblyBlockingEdges: review.assembly.blocking.length,
 				demoldingBlockingEdges: review.demolding.blocking.length,
-				validation: [
-					FillAnalysis.check("orientation.geometry", [p.document.input.id], ToolingCheckStatus.Pass,
-						"Exact source reconstruction, boundary coverage and separate continuous assembly/demolding graphs passed.", [hash])
-				]
+				validation: review.validation
 			};
 		});
 	}
@@ -91,12 +88,13 @@ class MillMoldStudy {
 				+ " |");
 		for (r in report.rankedCandidates) {
 			text.push("\n## " + r.id + "\n");
+			text.push(r.decidingReason + ": " + ToolingCodec.canonical(r.rankMetrics));
 			if (r.planningFailure != null)
 				text.push("Planning failed: " + r.planningFailure);
 			text.push("Casting mass: "
 				+ r.handling.castingMassKg
 				+ " kg. Adiabatic peak bound: "
-				+ r.cure.adiabaticPeakBoundC
+				+ r.cure.lumpedPeakEstimateC
 				+ " C (null means unknown).");
 			if (r.effort != null) {
 				var e = r.effort;

@@ -38,7 +38,18 @@ class ProcessNativeTests {
 				owned.push(ToolingBlock.placedBox(b));
 			var source = Part.fuseAll(owned);
 			owned.push(source);
-			check(Math.abs(source.volume() - report.totalMixVolumeMm3) < 1e-7, "fill region agrees with fused BREP volume");
+			check(Math.abs(source.volume() - report.geometricResinVolumeMm3) < 1e-7, "fill region agrees with fused BREP volume");
+			var trappedParts:Array<Part> = [];
+			for (pocket in report.trappedPockets)
+				for (box in pocket.boxes) {
+					var part = ToolingBlock.placedBox(box);
+					owned.push(part);
+					trappedParts.push(part);
+				}
+			var fluid = trappedParts.length == 0 ? source : source.subtractAll(trappedParts);
+			if (fluid != source)
+				owned.push(fluid);
+			check(Math.abs(fluid.volume() - report.totalMixVolumeMm3) < 1e-7, "actual liquid quantity excludes BREP trapped-air region");
 			for (level in report.levels) {
 				if (level.heightMm == 0)
 					continue;
@@ -51,7 +62,7 @@ class ProcessNativeTests {
 					height: level.heightMm + 1
 				});
 				owned.push(mask);
-				var below = source.intersect(mask);
+				var below = fluid.intersect(mask);
 				owned.push(below);
 				check(Math.abs(below.volume() - level.mixVolumeMm3) < 1e-7, "fill curve agrees with independent BREP intersection at " + level.heightMm);
 			}

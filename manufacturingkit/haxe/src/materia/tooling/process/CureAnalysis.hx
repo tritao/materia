@@ -13,10 +13,16 @@ typedef CureSectionResult = {
 	var finalTemperaturesC:Array<Float>;
 	var finalConversions:Array<Float>;
 
-	/** Residual reaction energy is included; a short simulation cannot pass by stopping early. */
-	var futurePeakBoundC:Float;
+	/** Estimate only; conduction can preheat unreacted material. Completion is checked separately. */
+	var futurePeakEstimateC:Float;
 
 	var steps:Int;
+	var remainingHeatC:Float;
+	var reactionComplete:Bool;
+	var reactionHeatJPerM2:Float;
+	var boundaryHeatOutJPerM2:Float;
+	var storedHeatJPerM2:Float;
+	var energyResidualJPerM2:Float;
 }
 
 typedef CureLimitResult = {
@@ -27,9 +33,10 @@ typedef CureLimitResult = {
 
 typedef CureReport = {
 	var sourceFingerprint:String;
+	var resinReference:String;
 	var processFingerprint:String;
 	var adiabaticRiseC:Null<Float>;
-	var adiabaticPeakBoundC:Null<Float>;
+	var lumpedPeakEstimateC:Null<Float>;
 	var sections:Array<CureSectionResult>;
 	var limits:Array<CureLimitResult>;
 	var validation:Array<ToolingValidation>;
@@ -101,6 +108,7 @@ class CureAnalysis {
 		var temperature = [for (_ in 0...n) (initial : Float)],
 			alpha = [for (_ in 0...n) c.kinetics == null ? 0.0 : c.kinetics.initialConversion];
 		var peak:Float = initial, peakTime = 0.0, time = 0.0, steps = 0;
+		var reactionHeat = 0.0, boundaryHeat = 0.0;
 		while (time < settings.durationSeconds) {
 			var dt = Math.min(settings.timeStepSeconds, settings.durationSeconds - time),
 				guess = temperature.copy();
@@ -111,13 +119,22 @@ class CureAnalysis {
 			var l = coefficient(section.left, conductivity, dx) * dt / (capacity * dx);
 			var q = coefficient(section.right, conductivity, dx) * dt / (capacity * dx);
 			for (_ in 0...settings.maximumIterations) {
+				var alphaError = 0.0;
 				for (i in 0...n) {
 					if (c.kinetics != null && rise > 0) {
 						var kelvin = guess[i] + 273.15;
 						if (kelvin <= 0)
 							throw "Invalid cure temperature";
-						var rate = c.kinetics.preExponentialPerSecond * Math.exp(-c.kinetics.activationEnergyJPerMol / (GAS_CONSTANT * kelvin));
-						nextAlpha[i] = (alpha[i] + dt * rate) / (1 + dt * rate);
+						var k = c.kinetics;
+						var rate = k.preExponentialPerSecond;
+						if (k.kind == AutocatalyticArrhenius)
+							rate = (rate
+								+ k.autocatalyticPreExponentialPerSecond * Math.pow(nextAlpha[i],
+									k.autocatalyticExponentM)) * Math.pow(Math.max(0, 1 - nextAlpha[i]), k.reactionExponentN - 1);
+						rate *= Math.exp(-k.activationEnergyJPerMol / (GAS_CONSTANT * kelvin));
+						var updated = (alpha[i] + dt * rate) / (1 + dt * rate);
+						alphaError = Math.max(alphaError, Math.abs(updated - nextAlpha[i]) * rise);
+						nextAlpha[i] = updated;
 					} else
 						nextAlpha[i] = alpha[i];
 				}
@@ -141,13 +158,20 @@ class CureAnalysis {
 					error = Math.max(error, Math.abs(accepted[i] - guess[i]));
 				}
 				guess = accepted;
-				if (error <= settings.convergenceToleranceC) {
+				if (Math.max(error, alphaError) <= settings.convergenceToleranceC) {
 					converged = true;
 					break;
 				}
 			}
 			if (!converged)
 				throw "Cure solver did not converge; refine timestep";
+			for (i in 0...n)
+				reactionHeat += capacity * dx * rise * (nextAlpha[i] - alpha[i]);
+			for (side in [0, 1]) {
+				var boundary = side == 0 ? section.left : section.right;
+				if (boundary.kind != Insulated)
+					boundaryHeat += coefficient(boundary, conductivity, dx) * (accepted[side == 0 ? 0 : n - 1] - required(boundary.temperatureC)) * dt;
+			}
 			time += dt;
 			steps++;
 			temperature = accepted;
@@ -166,6 +190,10 @@ class CureAnalysis {
 		for (b in [section.left, section.right])
 			if (b.kind != Insulated)
 				hottest = Math.max(hottest, required(b.temperatureC));
+		var storedHeat = 0.0;
+		for (value in temperature)
+			storedHeat += capacity * dx * (value - initial);
+		var remainingHeat = rise * (1 - leastConverted);
 		return {
 			id: section.id,
 			sourceIds: section.sourceIds.copy(),
@@ -174,8 +202,14 @@ class CureAnalysis {
 			timeToPeakSeconds: peakTime,
 			finalTemperaturesC: temperature,
 			finalConversions: alpha,
-			futurePeakBoundC: Math.max(peak, hottest + rise * (1 - leastConverted)),
-			steps: steps
+			futurePeakEstimateC: Math.max(peak, hottest + rise * (1 - leastConverted)),
+			steps: steps,
+			remainingHeatC: remainingHeat,
+			reactionComplete: remainingHeat <= settings.remainingHeatToleranceC,
+			reactionHeatJPerM2: reactionHeat,
+			boundaryHeatOutJPerM2: boundaryHeat,
+			storedHeatJPerM2: storedHeat,
+			energyResidualJPerM2: storedHeat - reactionHeat + boundaryHeat
 		};
 	}
 
@@ -202,11 +236,12 @@ class CureAnalysis {
 			peak = environment + rise * remaining;
 		}
 		var limits:Array<CureLimitResult> = [
-			{id: sourceId, maximumTemperatureC: spec.cure.resinMaximumTemperatureC, marginC: null}
+			{id: sourceId, maximumTemperatureC: spec.cure.resinMaximumTemperatureC, marginC: null},
+			{id: "resin-gel", maximumTemperatureC: spec.cure.gelMaximumTemperatureC, marginC: null}
 		];
 		if (hasEPS)
 			limits.push({id: "eps-core-stock", maximumTemperatureC: epsLimitC, marginC: null});
-		var boundSafe = peak != null && spec.temperatureMarginC != null;
+		var boundSafe = peak != null && spec.temperatureMarginC != null && spec.temperatureMarginC > 0;
 		for (limit in limits) {
 			if (limit.maximumTemperatureC == null || peak == null || spec.temperatureMarginC == null)
 				boundSafe = false;
@@ -216,14 +251,14 @@ class CureAnalysis {
 					boundSafe = false;
 			}
 		}
-		checks.push(FillAnalysis.check("process.cure.adiabatic-bound", [sourceId], boundSafe ? ToolingCheckStatus.Pass : ToolingCheckStatus.Pending,
-			boundSafe ? "Adiabatic bound is below every declared limit with the declared margin." : "Adiabatic bound cannot qualify this recipe: missing inputs/limits/margin, or cooling analysis required. An upper bound exceeding a limit is not proof of overheating.",
+		checks.push(FillAnalysis.check("process.cure.lumped-estimate", [sourceId], boundSafe ? ToolingCheckStatus.Pass : ToolingCheckStatus.Pending,
+			boundSafe ? "Lumped adiabatic estimate is below declared limits with the required margin. This is not a spatial upper bound or whole-casting qualification." : "Lumped estimate lacks inputs, limits or required margin, or exceeds a screening limit. Spatial preheating is not bounded by this estimate.",
 			[processFingerprint]));
 		checks.push(FillAnalysis.check("process.cure.material-evidence", [sourceId],
 			spec.cure.evidence.length > 0 ? ToolingCheckStatus.Pass : ToolingCheckStatus.Pending,
 			"Mix heat capacity, conductivity, resin fraction, reaction heat and kinetic model need supplier/trial provenance; references do not qualify physical calibration.",
 			spec.cure.evidence));
-		if (!boundSafe) {
+		{
 			if (spec.sections.length == 0)
 				checks.push(FillAnalysis.check("process.cure.section-coverage", [sourceId], ToolingCheckStatus.Pending,
 					"Opposing-face slab sections and junction coverage are not qualified. No whole-casting thermal pass from a nominal section.", []));
@@ -248,7 +283,8 @@ class CureAnalysis {
 				checks.push(FillAnalysis.check("process.cure.convergence." + s.id, s.sourceIds, ToolingCheckStatus.Pending,
 					"Analytic solver fixtures pass; the actual section still requires time/space convergence with its declared material and boundary data.",
 					[processFingerprint]));
-				var exceeded = false, safe = spec.temperatureMarginC != null;
+				var exceeded = false,
+					safe = spec.temperatureMarginC != null && spec.temperatureMarginC > 0 && result.reactionComplete;
 				for (limit in limits) {
 					if (limit.maximumTemperatureC == null)
 						safe = false;
@@ -256,7 +292,7 @@ class CureAnalysis {
 						if (result.peakTemperatureC >= limit.maximumTemperatureC)
 							exceeded = true;
 						if (spec.temperatureMarginC == null
-							|| result.futurePeakBoundC >= limit.maximumTemperatureC - spec.temperatureMarginC)
+							|| result.peakTemperatureC + result.remainingHeatC >= limit.maximumTemperatureC - spec.temperatureMarginC)
 							safe = false;
 					}
 				}
@@ -266,9 +302,13 @@ class CureAnalysis {
 					exceeded ? ToolingCheckStatus.Fail : safe ? ToolingCheckStatus.Pass : ToolingCheckStatus.Pending,
 					"Declared 1D slab peak="
 					+ result.peakTemperatureC
-					+ " C; bound including remaining reaction="
-					+ result.futurePeakBoundC
-					+ " C. This section does not establish junction or whole-casting coverage.",
+					+ " C; residual-heat estimate="
+					+ result.futurePeakEstimateC
+					+ " C; remaining reaction heat="
+					+ result.remainingHeatC
+					+ " C; completion="
+					+ result.reactionComplete
+					+ ". This is not an upper bound and does not establish junction/whole-casting coverage.",
 					s.evidence.concat(spec.cure.evidence)));
 			}
 			// Declared examples do not prove automatic opposing-face/junction coverage.
@@ -276,13 +316,18 @@ class CureAnalysis {
 				checks.push(FillAnalysis.check("process.cure.section-coverage", [sourceId], ToolingCheckStatus.Pending,
 					"Declared slab results require geometric section/junction coverage before whole-casting release.", []));
 		}
+		checks.push(FillAnalysis.check("process.cure.kinetics-model",
+			[sourceId], rise == 0 || spec.cure.kinetics != null && spec.cure.kinetics.kind == AutocatalyticArrhenius ? ToolingCheckStatus.Pass : ToolingCheckStatus.Pending,
+			"Reactive fabrication requires declared autocatalytic kinetics; first-order kinetics are retained for analytic fixtures only.",
+			spec.cure.evidence));
 		checks.push(FillAnalysis.check("process.cure.physical-calibration", [sourceId], ToolingCheckStatus.Pending,
 			"Thermocouple traces for the actual mix, core surface and thickest section are required for qualification.", []));
 		return {
 			sourceFingerprint: sourceFingerprint,
+			resinReference: spec.cure.reference,
 			processFingerprint: processFingerprint,
 			adiabaticRiseC: rise,
-			adiabaticPeakBoundC: peak,
+			lumpedPeakEstimateC: peak,
 			sections: results,
 			limits: limits,
 			validation: checks
