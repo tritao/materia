@@ -114,12 +114,72 @@ class ProcessNativeTests {
 				part.close();
 	}
 
+	static function verifyJunction():Void {
+		var boxes:Array<MoldBox> = [
+			{
+				x: -5,
+				y: -1,
+				z: -4,
+				width: 10,
+				depth: 2,
+				height: 8
+			},
+			{
+				x: -1,
+				y: -5,
+				z: -4,
+				width: 2,
+				depth: 10,
+				height: 8
+			}
+		];
+		var report = materia.tooling.process.JunctionThickness.analyze("junction", "source", boxes, [], {diameterToleranceMm: 0.01, maximumCells: 50000});
+		var owned:Array<Part> = [];
+		try {
+			var blocks:Array<Part> = [];
+			for (box in boxes) {
+				var part = ToolingBlock.placedBox(box);
+				owned.push(part);
+				blocks.push(part);
+			}
+			var source = Part.fuseAll(blocks);
+			owned.push(source);
+			var area = 0.0;
+			for (face in report.faces) {
+				var b = face.region;
+				area += face.axis == SectionAxis.X ? b.depth * b.height : face.axis == SectionAxis.Y ? b.width * b.height : b.width * b.depth;
+			}
+			check(Math.abs(source.shape.area() - area) < 1e-7, "exposed rectangles agree with independent BREP surface area");
+			for (extra in [-1e-6, 0.01]) {
+				var ball = new Part(cadkit.Shape.sphere(report.lowerDiameterMm / 2 + extra));
+				owned.push(ball);
+				var placed = ball.translated(new cadkit.modeling.Vector(report.witness.x, report.witness.y, report.witness.z));
+				owned.push(placed);
+				var outside = placed.subtract(source);
+				owned.push(outside);
+				check(extra < 0?outside.volume()<1e-8:outside.volume()>1e-7,
+					extra < 0 ? "witness sphere is inside native union" : "enlarging witness sphere crosses native boundary");
+			}
+			check(report.lowerDiameterMm <= 2 * Math.sqrt(2) + 1e-7 && report.upperDiameterMm >= 2 * Math.sqrt(2) - 1e-7,
+				"native cross fixture agrees with analytic global interval");
+		} catch (error:Dynamic) {
+			for (part in owned)
+				if (!part.shape.isClosed())
+					part.close();
+			throw error;
+		}
+		for (part in owned)
+			if (!part.shape.isClosed())
+				part.close();
+	}
+
 	public static function main():Void
 		run();
 
 	public static function run():Void {
 		verify(false);
 		verify(true);
+		verifyJunction();
 		Sys.println('ProcessNativeTests: $assertions assertions passed');
 	}
 }

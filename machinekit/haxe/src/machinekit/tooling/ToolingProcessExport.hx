@@ -41,6 +41,17 @@ class ToolingProcessExport {
 			"All dimensions/points are in mold coordinates (mm).",
 			""
 		];
+		var junction = report.sections.junction;
+		text.push("Largest inscribed diameter: " + junction.lowerDiameterMm + ".." + junction.upperDiameterMm + " mm; numerical tolerance reached: "
+			+ junction.converged + ". Witness: " + ToolingCodec.canonical(junction.witness) + "; nearby source faces: "
+			+ junction.witnessSourceIds.join(", ") + ".");
+		text.push("Declared slab geometry covers "
+			+ report.thermalCoverage.coveredVolumeMm3
+			+ " of "
+			+ report.thermalCoverage.totalVolumeMm3
+			+ " mm3; "
+			+ report.thermalCoverage.uncoveredVolumeMm3
+			+ " mm3 remains unbound. Junction heat flow and cure evidence are separate requirements.\n");
 		for (v in report.castability.validation)
 			text.push("- `" + v.rule + "` (" + v.status + ") [" + v.affectedIds.join(", ") + "]: " + v.message);
 		text.push("\n## Suggested actions\n");
@@ -53,6 +64,8 @@ class ToolingProcessExport {
 				text.push("  Candidate point: " + ToolingCodec.canonical(proposal.point) + ".");
 		}
 		sys.io.File.saveContent(dir + "/castability-review.md", text.join("\n") + "\n");
+		sys.io.File.saveContent(dir + "/junction-thickness.json", ToolingCodec.canonical(report.sections.junction) + "\n");
+		sys.io.File.saveContent(dir + "/thermal-coverage.json", ToolingCodec.canonical(report.thermalCoverage) + "\n");
 		sys.io.File.saveContent(dir + "/section-geometry.json", ToolingCodec.canonical(report.sections) + "\n");
 		sys.io.File.saveContent(dir + "/process-diagnostics.json", ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items) + "\n");
 		return checks;

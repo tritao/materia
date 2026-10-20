@@ -30,6 +30,12 @@ typedef ThermalBoundary = {
 typedef CureSection = {
 	var id:String;
 	var sourceIds:Array<String>;
+
+	/** Exact extracted spans, empty for an unbound authored solver example. */
+	var spanIds:Array<String>;
+
+	var geometryFingerprint:Null<String>;
+
 	var thicknessMm:Float;
 	var left:ThermalBoundary;
 	var right:ThermalBoundary;

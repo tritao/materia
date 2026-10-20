@@ -52,12 +52,14 @@ typedef CastabilityReport = {
 	var processFingerprint:String;
 	var minimumOpposingFaceSpanMm:Float;
 	var maximumInscribedThicknessMm:Null<Float>;
+	var maximumDiameterLowerMm:Float;
+	var maximumDiameterUpperMm:Float;
 	var validation:Array<ToolingValidation>;
 	var proposals:Array<CastabilityProposal>;
 }
 
 /** Cheap screening over exact shared section/fill records. No CFD, adhesion,
- * inscribed-junction approximation, geometry edits or duplicate sweep solver.
+ * geometry edits or duplicate sweep solver.
  */
 class CastabilityAnalysis {
 	static function sources(ids:Array<String>):Array<String> {
@@ -141,24 +143,27 @@ class CastabilityAnalysis {
 				limits.evidence));
 			proposals.push(proposal(maximumRule, [root], DeclareLimit, ProcessReview,
 				"Declare a section screening limit with material/thermal evidence; a limit alone does not qualify cure."));
-		} else if (maximum == null) {
-			checks.push(FillAnalysis.check(maximumRule, [root], Unsupported,
-				"Complex-junction inscribed thickness is unsupported; axial beam lengths cannot substitute for thermal thickness.", limits.evidence));
-			proposals.push(proposal(maximumRule, [root], AnalyzeJunction, ProcessReview,
-				"Resolve junction inscribed thickness and thermal coverage before accepting the declared section limit."));
 		} else {
-			var fails = maximum > limits.maximumSectionThicknessMm + 1e-7;
-			checks.push(FillAnalysis.check(maximumRule, [root], fails ? Fail : Pass,
-				"Exact rectangular-solid inscribed thickness "
-				+ maximum
-				+ " mm compared with declared section limit "
+			var bound = sections.junction;
+			var fails = bound.lowerDiameterMm > limits.maximumSectionThicknessMm + 1e-7;
+			var passes = bound.upperDiameterMm <= limits.maximumSectionThicknessMm + 1e-7;
+			checks.push(FillAnalysis.check(maximumRule, bound.witnessSourceIds, fails ? Fail : passes ? Pass : Pending,
+				"Largest inscribed diameter is bounded by "
+				+ bound.lowerDiameterMm
+				+ ".."
+				+ bound.upperDiameterMm
+				+ " mm against declared limit "
 				+ limits.maximumSectionThicknessMm
-				+ " mm; this screen does not replace cure analysis.",
+				+ " mm. Geometry does not replace cure analysis.",
 				limits.evidence));
 			if (fails)
-				proposals.push(proposal(maximumRule, [root], ReduceSection, DesignReview,
-					"Add or enlarge a pocket to reduce this solid section to the target, or qualify a different cure process. Recheck structural performance.",
-					maximum, limits.maximumSectionThicknessMm));
+				proposals.push(proposal(maximumRule, bound.witnessSourceIds, ReduceSection, DesignReview,
+					"Add or enlarge a pocket near this witness to reduce the section, or qualify a different cure process. Recheck structural performance.",
+					bound.lowerDiameterMm, limits.maximumSectionThicknessMm, null, null, bound.witness));
+			else if (!passes)
+				proposals.push(proposal(maximumRule, bound.witnessSourceIds, AnalyzeJunction, ProcessReview,
+					"Refine the inscribed-diameter interval until it resolves this limit; no midpoint acceptance.", null, limits.maximumSectionThicknessMm,
+					null, null, bound.witness));
 		}
 		// Keep the exact fill rule/status/ownership: suggestions do not clear it.
 		for (check in fill.validation) {
@@ -174,7 +179,7 @@ class CastabilityAnalysis {
 				null, null, null, null, pocket.proposedVentPoint));
 		if (maximum == null && limits.maximumSectionThicknessMm == null)
 			proposals.push(proposal(maximumRule, [root], AnalyzeJunction, ProcessReview,
-				"Complex junctions have no inscribed thickness result. Resolve their geometry and thermal coverage before selecting section/cure limits."));
+				"Junction diameter bounds are available. Resolve junction heat flow and thermal coverage before accepting section/cure limits."));
 		var strategies = d.setup.features.copy();
 		strategies.sort((a, b) -> Reflect.compare(a.featureId, b.featureId));
 		for (strategy in strategies) {
@@ -206,11 +211,13 @@ class CastabilityAnalysis {
 		checks.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		proposals.sort((a, b) -> Reflect.compare(a.id, b.id));
 		return {
-			version: 1,
+			version: 2,
 			sourceFingerprint: fill.sourceFingerprint,
 			processFingerprint: fill.processFingerprint,
 			minimumOpposingFaceSpanMm: minimum,
 			maximumInscribedThicknessMm: maximum,
+			maximumDiameterLowerMm: sections.junction.lowerDiameterMm,
+			maximumDiameterUpperMm: sections.junction.upperDiameterMm,
 			validation: checks,
 			proposals: proposals
 		};

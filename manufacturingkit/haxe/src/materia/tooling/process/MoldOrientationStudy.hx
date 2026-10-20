@@ -64,6 +64,7 @@ typedef MoldOrientationResult = {
 	var cure:CureReport;
 	var sections:OrthogonalSections.OrthogonalSectionReport;
 	var castability:CastabilityAnalysis.CastabilityReport;
+	var thermalCoverage:ThermalCoverage.ThermalCoverageReport;
 	var handling:HandlingPlan;
 	var effort:Null<MoldEffortMetrics>;
 	var changeRequests:Array<DesignChangeRequest>;
@@ -235,6 +236,7 @@ class MoldOrientationStudy {
 				cure: cure,
 				sections: sections,
 				castability: CastabilityAnalysis.analyze(d, spec, fill, sections, fingerprint, processFingerprint),
+				thermalCoverage: ThermalCoverage.analyze(d.input.id, sections, spec, processFingerprint),
 				handling: CastHandling.plan(d, candidate.options, envelope),
 				effort: null,
 				changeRequests: [],
@@ -283,6 +285,14 @@ class MoldOrientationStudy {
 							"Candidate CAD/swept-graph assessment failed: " + Std.string(error), [result.planFingerprint]));
 				}
 			}
+			var boundSafe = cure.validation.filter(v -> v.rule == "process.cure.adiabatic-bound"
+				&& v.status == ToolingCheckStatus.Pass).length > 0;
+			if (!boundSafe)
+				result.validation = result.validation.concat(result.thermalCoverage.validation);
+			else {
+				result.validation = result.validation.filter(v -> v.rule != "process.sections.junction-thickness");
+				result.validation = result.validation.concat(result.thermalCoverage.validation.filter(v -> v.status == ToolingCheckStatus.Fail));
+			}
 			for (check in result.castability.validation)
 				if (result.validation.filter(v -> v.rule == check.rule).length == 0)
 					result.validation.push(check);
@@ -293,7 +303,7 @@ class MoldOrientationStudy {
 		var best = results[0],
 			preferred = best.planningSucceeded && best.geometryChecked && count(best, ToolingCheckStatus.Fail) == 0 ? best.id : null;
 		return {
-			version: 2,
+			version: 3,
 			sourceFingerprint: source,
 			rankingRule: "planned, CAD-checked, failures, unsupported, source requests, pending, candidate ID",
 			rankedCandidates: results,

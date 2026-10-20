@@ -84,6 +84,8 @@ class ProcessTests {
 				{
 					id: "wall",
 					sourceIds: ["body"],
+					spanIds: [],
+					geometryFingerprint: null,
 					thicknessMm: 20,
 					left: boundary(Insulated),
 					right: boundary(Insulated),
@@ -310,8 +312,38 @@ class ProcessTests {
 				&& ToolingCodec.canonical(r) == ToolingCodec.canonical(v)).length == 1,
 				"process report retains exact planner rule " + v.rule);
 		check(!integrated.fabrication.ready, "analysis cannot clear existing mold blockers");
+		var safeDocument = ToolingCodec.snapshot(p.document);
+		safeDocument.recipe.core.maximumTemperatureC = 1000;
+		var safePlan = materia.tooling.casting.CastingMoldPlanner.plan(safeDocument, p.options);
+		var safeSpec = spec();
+		safeSpec.recipeFingerprint = ToolingCodec.recipeFingerprint(safeDocument.recipe);
+		safeSpec.cure.heatOfReactionJPerKgResin = 0;
+		safeSpec.sections = [];
+		var safeReport = CastingProcessAnalysis.analyze(safePlan, safeSpec, 9.80665);
+		check(safeReport.cure.validation.filter(v -> v.rule == "process.cure.adiabatic-bound" && v.status == "pass").length == 1,
+			"safe adiabatic bound does not require a cooling-model geometry proof");
+		check(safeReport.validation.filter(v -> v.rule == "process.cure.geometric-coverage"
+			|| v.rule == "process.cure.junction-model").length == 0,
+			"unused missing cooling coverage does not block a safe adiabatic tier");
+		safeSpec.sections = [
+			{
+				id: "stale-bound-section",
+				sourceIds: [p.document.input.id],
+				spanIds: ["missing-span"],
+				geometryFingerprint: haxe.crypto.Sha256.encode("stale"),
+				thicknessMm: 20,
+				left: boundary(Insulated),
+				right: boundary(Insulated),
+				evidence: []
+			}
+		];
+		check(CastingProcessAnalysis.analyze(safePlan, safeSpec, 9.80665)
+			.validation.filter(v -> v.rule == "process.cure.binding.stale-bound-section" && v.status == "fail")
+			.length == 1,
+			"safe adiabatic tier never hides an invalid authored geometry binding");
 		s.recipeFingerprint = haxe.crypto.Sha256.encode("stale");
 		rejects(() -> CastingProcessAnalysis.analyze(p, s, 9.80665), "Stale process recipe");
+		JunctionThermalTests.run(spec());
 		CastabilityTests.run(p, spec());
 		OrientationSectionTests.run(p, spec());
 		Sys.println('ProcessTests: $assertions assertions passed');

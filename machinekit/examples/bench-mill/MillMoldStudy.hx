@@ -105,6 +105,15 @@ class MillMoldStudy {
 			}
 			text.push("Castability: minimum opposing-face span " + r.castability.minimumOpposingFaceSpanMm + " mm; " + r.castability.proposals.length
 				+ " review suggestions (not applied).");
+			text.push("Inscribed diameter: "
+				+ r.sections.junction.lowerDiameterMm
+				+ ".."
+				+ r.sections.junction.upperDiameterMm
+				+ " mm (geometry tolerance reached: "
+				+ r.sections.junction.converged
+				+ "). Unbound thermal volume: "
+				+ r.thermalCoverage.uncoveredVolumeMm3
+				+ " mm3; geometry bounds do not establish a junction thermal model.");
 			for (v in r.validation)
 				if (v.status != ToolingCheckStatus.Pass)
 					text.push("- `" + v.rule + "` (" + v.status + "): " + v.message);

@@ -32,12 +32,15 @@ typedef PlanarSectionSpan = {
 typedef OrthogonalSectionReport = {
 	var version:Int;
 	var sourceFingerprint:String;
+	var geometryFingerprint:String;
 	var spans:Array<PlanarSectionSpan>;
 	var mixVolumeMm3:Float;
 	var coveredVolumeByAxisMm3:Array<{axis:SectionAxis, volumeMm3:Float}>;
 
-	/** Exact for a rectangular solid. Complex junctions require a medial-axis/3D model. */
+	/** Exact scalar for a rectangular solid. Nonrectangular geometry uses the junction interval. */
 	var maximumInscribedThicknessMm:Null<Float>;
+
+	var junction:JunctionThickness.JunctionThicknessReport;
 
 	var validation:Array<ToolingValidation>;
 }
@@ -92,7 +95,7 @@ class OrthogonalSections {
 	 * This supplies geometric thickness/source IDs; it does not qualify 3D junction coverage.
 	 */
 	public static function cureSection(span:PlanarSectionSpan, left:CastingProcessSpec.ThermalBoundary, right:CastingProcessSpec.ThermalBoundary,
-			evidence:Array<String>):CastingProcessSpec.CureSection {
+			evidence:Array<String>, geometryFingerprint:String):CastingProcessSpec.CureSection {
 		ToolingIds.validate(span.id);
 		if (!Math.isFinite(span.thicknessMm) || span.thicknessMm <= 0 || Math.abs(span.endMm - span.startMm - span.thicknessMm) > EPS)
 			throw "Invalid extracted cure section";
@@ -106,6 +109,8 @@ class OrthogonalSections {
 		return {
 			id: span.id,
 			sourceIds: ids,
+			spanIds: [span.id],
+			geometryFingerprint: geometryFingerprint,
 			thicknessMm: span.thicknessMm,
 			left: left,
 			right: right,
@@ -221,18 +226,26 @@ class OrthogonalSections {
 			d = maximum[1] - minimum[1],
 			h = maximum[2] - minimum[2];
 		var rectangular = Math.abs(w * d * h - volume) <= Math.max(1e-6, volume * 1e-10);
+		var junction = JunctionThickness.analyze(sourceId, sourceFingerprint, boxes, boundaries);
 		return {
-			version: 1,
+			version: 2,
 			sourceFingerprint: sourceFingerprint,
+			geometryFingerprint: haxe.crypto.Sha256.encode(ToolingCodec.canonical({spans: result, volumeMm3: volume})),
 			spans: result,
 			mixVolumeMm3: volume,
 			coveredVolumeByAxisMm3: coverage,
 			maximumInscribedThicknessMm: rectangular ? Math.min(w, Math.min(d, h)) : null,
+			junction: junction,
 			validation: [
 				FillAnalysis.check("process.sections.planar-coverage", [sourceId], ToolingCheckStatus.Pass,
 					"Opposing-face material intervals cover the exact resin volume independently on all three axes.", [sourceFingerprint]),
-				FillAnalysis.check("process.sections.junction-thickness", [sourceId], rectangular ? ToolingCheckStatus.Pass : ToolingCheckStatus.Unsupported,
-					rectangular ? "Rectangular solid: largest inscribed diameter equals its shortest dimension." : "Complex junction inscribed thickness is not inferred from ray chords; a medial-axis/3D thermal model is required.",
+				FillAnalysis.check("process.sections.junction-thickness", [sourceId],
+					junction.converged ? ToolingCheckStatus.Pass : ToolingCheckStatus.Pending,
+					"Largest inscribed diameter bounded by exposed-face distance: "
+					+ junction.lowerDiameterMm
+					+ ".."
+					+ junction.upperDiameterMm
+					+ " mm. Numerical geometry convergence does not qualify junction heat flow.",
 					[sourceFingerprint])
 			]
 		};

@@ -8,6 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CastingMoldCodec;
+import materia.tooling.process.OrthogonalSections.SectionAxis;
 
 /** Real mill acceptance cases; source CAD is an independent reference to the planner. */
 class MillMoldChecks {
@@ -44,6 +45,47 @@ class MillMoldChecks {
 		original.close();
 	}
 
+	static function junctionGeometry(frame:MillFrame, p:CastingMoldPlan):Void {
+		var boundaries:Array<materia.tooling.process.FillAnalysis.FillBoundary> = [
+			for (feature in p.document.input.features)
+				{id: feature.id, box: CastingMoldPlanner.featureBox(p.document, feature)}
+		];
+		var resin = materia.tooling.casting.BoxVolumes.subtract([p.envelope], [for (boundary in boundaries) boundary.box]);
+		var report = materia.tooling.process.JunctionThickness.analyze(p.document.input.id, CastingMoldCodec.fingerprint(p), resin, boundaries);
+		check(report.converged, "actual mill junction diameter reaches its declared numerical tolerance");
+		var owned:Array<cadkit.modeling.Part> = [];
+		try {
+			var local = frame.base.body.geometry();
+			owned.push(local);
+			var source = PosedParts.moved(local, p.document.setup.sourceToMold);
+			owned.push(source);
+			var area = 0.0;
+			for (face in report.faces) {
+				var b = face.region;
+				area += face.axis == SectionAxis.X ? b.depth * b.height : face.axis == SectionAxis.Y ? b.width * b.height : b.width * b.depth;
+			}
+			check(Math.abs(area - source.shape.area()) < 1e-3, "mill exposed rectangles agree with actual foundation BREP area");
+			for (extra in [-1e-5, 0.05]) {
+				var ball = new cadkit.modeling.Part(cadkit.Shape.sphere(report.lowerDiameterMm / 2 + extra));
+				owned.push(ball);
+				var placed = ball.translated(new Vector(report.witness.x, report.witness.y, report.witness.z));
+				owned.push(placed);
+				var outside = placed.subtract(source);
+				owned.push(outside);
+				check(extra < 0?outside.volume()<1e-3:outside.volume()>1e-3,
+					extra < 0 ? "mill witness sphere lies inside actual foundation CAD" : "enlarged mill witness crosses actual foundation CAD");
+			}
+		} catch (error:Dynamic) {
+			for (part in owned)
+				if (!part.shape.isClosed())
+					part.close();
+			throw error;
+		}
+		for (part in owned)
+			if (!part.shape.isClosed())
+				part.close();
+	}
+
 	public static function run(frame:MillFrame, p:CastingMoldPlan, report:machinekit.tooling.CastingMoldCad.CastingMoldReview):Void {
 		check(p.cores.length == 6 && p.fixtures.length == 12, "actual mill pocket and insert inventory");
 		check(p.features.length == p.document.input.features.length && p.features.length == 31, "every full-frame feature classified");
@@ -54,6 +96,7 @@ class MillMoldChecks {
 		check(p.options.precision.filter(s -> s.route == "replicated").length == 4 && p.options.groutedJoints.length == 1,
 			"reviewed finishing routes retained");
 		equivalent(frame, p);
+		junctionGeometry(frame, p);
 		for (c in p.cores) {
 			check(c.foamLayers.length == 2, "EPS layers fit 100 mm stock");
 			var first = c.foamLayers[0],

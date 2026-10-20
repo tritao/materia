@@ -198,7 +198,7 @@ manifest and fabrication Diagnostics alongside the existing design requests.
 
 The process analysis now includes extracted opposing-face planar spans, the
 orientation comparison and checked-order playback described below. Complex
-junction thickness, broader design rules, accepted source edits and column studies remain outstanding.
+qualified junction heat flow, broader design rules, accepted source edits and column studies remain outstanding.
 The mold is still a review package.
 
 
@@ -246,7 +246,7 @@ on all three axes. It merges through Boolean partition boundaries, preserves
 source face IDs and verifies each axis covers the full mix volume. The output
 can supply `CureSection` thickness/source IDs when actual thermal boundary data
 are declared. Chord lengths do not establish a complex junction's inscribed
-thickness; that check remains unsupported instead of crediting a thin fragment.
+thickness; the exposed-face search supplies bounded Euclidean thickness instead.
 
 Authored thermal section/boundary assignments apply to the selected orientation.
 Alternative candidates reuse material properties but require their own boundary
@@ -263,7 +263,7 @@ orientation candidate. The report retains existing fill topology/ceiling and
 planner draft checks, adds aggregate-based passage and section-size screens,
 and keeps EPS breakout trials explicitly pending. Nothing changes the casting.
 
-The strict process input is now version 2 (version 1 is rejected). Its required
+The strict process input is now version 3 (versions 1 and 2 are rejected). Its required
 `castability` object declares `maximumAggregateSizeMm`,
 `minimumPassageAggregateRatio`, `maximumSectionThicknessMm` and `evidence`.
 The mill leaves these limits null until the actual mix/process is selected.
@@ -275,5 +275,30 @@ measured/target dimensions, an axis and a representative region, or a candidate
 vent point, all in mold coordinates (mm). A design reviewer must map a proposed
 face separation to actual source parameters and replan a new source revision.
 Vents need a continuous route and sealing plan; no penetration is added by the
-report. Junction inscribed thickness remains unsupported, and cure, structural,
+report. Junction inscribed diameter now has explicit numerical bounds; junction heat flow, cure, structural,
 release and handling evidence remain independent requirements.
+
+
+## Junction bounds and thermal coverage
+
+The full and records-only packages now include `junction-thickness.json` and
+`thermal-coverage.json`. The orientation comparison and `castability-review.md`
+show the same geometric bounds and unbound thermal volume. The initial mill search
+finds a largest-inscribed-diameter interval of 216.99–217.47 mm within a declared
+0.5 mm numerical tolerance. The witness and nearby source faces are recorded;
+full-mill acceptance checks its containment against the actual foundation CAD,
+checks that enlarging it crosses the boundary, and compares exposed surface area.
+
+This is a geometric thickness result. It does not claim that a 217 mm slab models
+the junction's heat flow. The present process setup declares no thermal sections,
+so all 70,107,544 mm3 remains unbound. Supplier data, actual boundary conditions,
+a junction thermal model and physical calibration are still needed.
+
+In a version-3 process file every authored section needs `spanIds` and
+`geometryFingerprint`. Use empty IDs and null for an unbound numerical example.
+For real coverage, take span IDs and the geometry fingerprint from
+`section-geometry.json` and match its thickness/source faces, while explicitly
+specifying the actual left/right thermal conditions. Unknown/stale references,
+wrong dimensions or repeated span assignments fail. Even complete slab volume
+coverage leaves nonrectangular junction modelling pending. Review exports may
+contain failures; no suggestion changes the source casting or releases fabrication.

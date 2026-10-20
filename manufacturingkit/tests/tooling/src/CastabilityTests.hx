@@ -91,8 +91,8 @@ class CastabilityTests {
 		var point:{x:Float, y:Float, z:Float} = cast vents[0].point;
 		check(point.z == 6 && vents[0].owner == ToolingReview, "vent is a tooling-routing candidate at exact ceiling");
 		check(trapped.validation.filter(v -> v.rule == vents[0].rule && v.status == "fail").length == 1, "vent suggestion never clears trap");
-		check(status(trapped, "process.castability.maximum-section") == "unsupported", "complex junction is not replaced by axial chords");
-		check(trapped.proposals.filter(v -> v.action == AnalyzeJunction).length == 1, "junction requests supported thermal coverage");
+		check(status(trapped, "process.castability.maximum-section") == "pass", "certified junction upper bound clears a large screen limit");
+		check(trapped.proposals.filter(v -> v.action == AnalyzeJunction).length == 0, "resolved geometry does not request an unsupported thickness algorithm");
 		var before = ToolingCodec.canonical(trapped);
 		region.reverse();
 		check(ToolingCodec.canonical(analyze(region, boundaries)) == before, "geometry order does not change findings or proposal IDs");
@@ -103,6 +103,38 @@ class CastabilityTests {
 		check(status(broad, "process.fill.air-escape-width") == "fail", "broad ceiling uses real fill rule");
 		check(broad.proposals.filter(v -> v.action == ReviewCeiling && v.sourceIds.indexOf(owner) >= 0).length == 1,
 			"broad ceiling suggestion retains feature IDs");
+		var cross:Array<MoldBox> = [
+			{
+				x: -5,
+				y: -1,
+				z: -4,
+				width: 10,
+				depth: 2,
+				height: 8
+			},
+			{
+				x: -1,
+				y: -5,
+				z: -4,
+				width: 2,
+				depth: 10,
+				height: 8
+			}
+		];
+		var crossSections = OrthogonalSections.analyze(d.input.id, source, cross, []);
+		crossSections.junction = materia.tooling.process.JunctionThickness.analyze(d.input.id, source, cross, [],
+			{diameterToleranceMm: 1e-8, maximumCells: 20});
+		var crossFill = FillAnalysis.analyze(d.input.id, source, "process", cross, [], [], 4, 2400, 10, null, null);
+		var interval = crossSections.junction;
+		s.castability.maximumSectionThicknessMm = (interval.lowerDiameterMm + interval.upperDiameterMm) / 2;
+		var unresolved = CastabilityAnalysis.analyze(d, s, crossFill, crossSections, source, "process");
+		check(status(unresolved, "process.castability.maximum-section") == "pending", "straddling thickness interval never accepts its midpoint");
+		s.castability.maximumSectionThicknessMm = interval.upperDiameterMm + 1;
+		check(status(CastabilityAnalysis.analyze(d, s, crossFill, crossSections, source, "process"), "process.castability.maximum-section") == "pass",
+			"safe upper bound can resolve a screen without geometry convergence");
+		s.castability.maximumSectionThicknessMm = interval.lowerDiameterMm - 1;
+		check(status(CastabilityAnalysis.analyze(d, s, crossFill, crossSections, source, "process"), "process.castability.maximum-section") == "fail",
+			"unsafe lower bound rejects a screen without geometry convergence");
 		s.castability.maximumAggregateSizeMm = null;
 		s.castability.maximumSectionThicknessMm = null;
 		s.maximumAirEscapeWidthMm = null;

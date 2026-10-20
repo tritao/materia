@@ -18,6 +18,7 @@ typedef CastingProcessReport = {
 	var cure:CureReport;
 	var sections:OrthogonalSections.OrthogonalSectionReport;
 	var castability:CastabilityAnalysis.CastabilityReport;
+	var thermalCoverage:ThermalCoverage.ThermalCoverageReport;
 	var validation:Array<materia.tooling.ToolingValidation>;
 	var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
 }
@@ -65,13 +66,22 @@ class CastingProcessAnalysis {
 			.length > 0)
 			sectionChecks = sectionChecks.filter(v -> v.rule != "process.sections.junction-thickness");
 		var castability = CastabilityAnalysis.analyze(p.document, spec, fill, sections, sourceFingerprint, fingerprint, p.validation);
-		var validation = p.validation.concat(cure.validation).concat(sectionChecks);
+		var thermalCoverage = ThermalCoverage.analyze(p.document.input.id, sections, spec, fingerprint);
+		var boundSafe = cure.validation.filter(v -> v.rule == "process.cure.adiabatic-bound"
+			&& v.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass)
+			.length > 0;
+		var coverageChecks = boundSafe ? thermalCoverage.validation.filter(v ->
+			v.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail) : thermalCoverage.validation;
+		var cureChecks = cure.validation;
+		if (thermalCoverage.validation.filter(v -> v.status != materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length == 0)
+			cureChecks = cureChecks.filter(v -> v.rule != "process.cure.section-coverage");
+		var validation = p.validation.concat(cureChecks).concat(sectionChecks).concat(coverageChecks);
 		for (check in castability.validation)
 			if (validation.filter(v -> v.rule == check.rule).length == 0)
 				validation.push(check);
 		validation.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		return {
-			version: 2,
+			version: 3,
 			sourceFingerprint: sourceFingerprint,
 			processFingerprint: fingerprint,
 			spec: spec,
@@ -79,6 +89,7 @@ class CastingProcessAnalysis {
 			cure: cure,
 			sections: sections,
 			castability: castability,
+			thermalCoverage: thermalCoverage,
 			validation: validation,
 			fabrication: materia.tooling.ToolingValidation.ToolingReadiness.evaluate(validation)
 		};

@@ -4,7 +4,7 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
 import materia.tooling.process.CastingProcessSpec;
 
-/** Strict independent v2 format. Reconstructs typed records after validation. */
+/** Strict independent v3 format. Reconstructs typed records after validation. */
 class ProcessSpecCodec {
 	static function object(v:Dynamic, keys:Array<String>):Void {
 		if (v == null || !Reflect.isObject(v) || Std.isOfType(v, Array) || Std.isOfType(v, String))
@@ -149,7 +149,16 @@ class ProcessSpecCodec {
 		}
 		var sections:Array<CureSection> = [], ids:Array<String> = [];
 		for (s in list(v.sections, 128)) {
-			object(s, ["id", "sourceIds", "thicknessMm", "left", "right", "evidence"]);
+			object(s, [
+				"id",
+				"sourceIds",
+				"spanIds",
+				"geometryFingerprint",
+				"thicknessMm",
+				"left",
+				"right",
+				"evidence"
+			]);
 			var sid = text(s.id);
 			ToolingIds.validate(sid);
 			if (ids.indexOf(sid) >= 0)
@@ -158,9 +167,17 @@ class ProcessSpecCodec {
 			var sources = texts(s.sourceIds, true);
 			if (sources.length == 0)
 				throw "Cure section needs source IDs";
+			var sectionFingerprint:Null<String> = s.geometryFingerprint == null ? null : text(s.geometryFingerprint);
+			if (sectionFingerprint != null && !~/^[a-f0-9]{64}$/.match(sectionFingerprint))
+				throw "Invalid cure section geometry fingerprint";
+			var spanIds = texts(s.spanIds, true);
+			if (spanIds.length > 0 && sectionFingerprint == null)
+				throw "Bound cure section requires geometry fingerprint";
 			sections.push({
 				id: sid,
 				sourceIds: sources,
+				spanIds: spanIds,
+				geometryFingerprint: sectionFingerprint,
 				thicknessMm: number(s.thicknessMm, 1e-6, 1e6),
 				left: boundary(s.left),
 				right: boundary(s.right),
@@ -211,7 +228,7 @@ class ProcessSpecCodec {
 	}
 
 	public static function encode(v:CastingProcessSpec):String {
-		var text = ToolingCodec.canonical({format: "materia.casting-process", version: 2, spec: snapshot(v)}) + "\n";
+		var text = ToolingCodec.canonical({format: "materia.casting-process", version: 3, spec: snapshot(v)}) + "\n";
 		if (haxe.io.Bytes.ofString(text).length > 2097152)
 			throw "Casting process size limit";
 		return text;
@@ -229,7 +246,7 @@ class ProcessSpecCodec {
 			throw error;
 		}
 		object(v, ["format", "version", "spec"]);
-		if (v.format != "materia.casting-process" || v.version != 2)
+		if (v.format != "materia.casting-process" || v.version != 3)
 			throw "Unsupported casting process format/version";
 		return snapshot(v.spec);
 	}

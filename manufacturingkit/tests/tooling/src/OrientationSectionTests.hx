@@ -72,7 +72,8 @@ class OrientationSectionTests {
 		]);
 		var junction = OrthogonalSections.analyze("body", "hash", shape, []);
 		check(junction.maximumInscribedThicknessMm == null, "nonrectangular junction never uses a chord as an inscribed diameter");
-		check(junction.validation.filter(v -> v.status == "unsupported").length == 1, "unsupported junction remains explicit");
+		check(junction.validation.filter(v -> v.rule == "process.sections.junction-thickness" && v.status == "pass").length == 1,
+			"junction diameter has converged bounds without claiming thermal coverage");
 		for (axis in junction.coveredVolumeByAxisMm3)
 			close(axis.volumeMm3, 128000, "junction coverage exact");
 		shape.reverse();
@@ -98,7 +99,7 @@ class OrientationSectionTests {
 			heatTransferWPerM2K: null,
 			evidence: []
 		};
-		var derived = OrthogonalSections.cureSection(owners.spans.filter(x -> x.axis == Z)[0], boundary, boundary, []);
+		var derived = OrthogonalSections.cureSection(owners.spans.filter(x -> x.axis == Z)[0], boundary, boundary, [], owners.geometryFingerprint);
 		check(derived.thicknessMm == 20 && derived.sourceIds.indexOf("core") >= 0,
 			"extracted thickness feeds the cure-section contract with explicit thermal boundaries");
 		s = ProcessSpecCodec.snapshot(s);
@@ -213,6 +214,8 @@ class OrientationSectionTests {
 			{
 				id: "bad-source",
 				sourceIds: ["missing-source"],
+				spanIds: [],
+				geometryFingerprint: null,
 				thicknessMm: 20,
 				left: boundary,
 				right: boundary,

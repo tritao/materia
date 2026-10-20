@@ -297,7 +297,7 @@ dependency. Coupon fabrication and physical evidence collection require a shop.
 
 `materia.tooling.process.CastingProcessAnalysis.analyze(plan, spec, gravity)`
 extends the real mold validation with `FillReport` and `CureReport`. The strict
-`ProcessSpecCodec` version 2 is independent of existing source/mold/fabrication
+`ProcessSpecCodec` version 3 is independent of existing source/mold/fabrication
 encodings; its required recipe fingerprint rejects stale process inputs. Actual
 material values, evidence, temperatures, pour rate, ceiling escape-width limit,
 thermal boundaries and slab definitions are declared or explicitly unknown.
@@ -338,8 +338,8 @@ refinement. Independent native CAD fixtures verify fill volumes and connectivity
 `OrthogonalSections` now extracts opposing-face planar material spans with exact
 three-axis coverage and source IDs, independently of Boolean box partition sizes.
 `cureSection` uses those dimensions only after the caller supplies explicit thermal
-boundaries. Complex junction inscribed thickness stays unsupported; rectangular
-solids have an exact shortest-dimension result. The report is part of process
+boundaries. Rectangular solids have an exact shortest-dimension result; nonrectangular
+solids now receive the bounded junction analysis described below. The report is part of process
 validation and does not clear thermal calibration or geometric coverage requirements.
 
 `MoldOrientationStudy` compares explicit same-source candidates with real mold,
@@ -351,18 +351,19 @@ planning never receives invented fabrication metrics. The mill example supplies
 three orientations and static checked-order playback scenes.
 
 `CastabilityAnalysis` adds recipe-bound section screening and typed review
-suggestions to the same process report and orientation candidates. Version 2 of
+suggestions to the same process report and orientation candidates. Version 3 of
 `CastingProcessSpec` requires `castability`: nullable maximum aggregate size,
-minimum passage/aggregate ratio, maximum section thickness and evidence. Version
-1 is rejected; no thresholds or process properties are silently supplied.
+minimum passage/aggregate ratio, maximum section thickness and evidence. Versions
+1 and 2 are rejected; no thresholds or process properties are silently supplied.
 
 The minimum passage screen compares complete opposing-face spans against the
 aggregate size times the declared ratio. It is a conservative geometry screen,
 not a prediction of mix transport. A widening suggestion names the source faces,
 axis, measured/target separation and a representative material strip in mold mm.
-The maximum-section screen uses exact inscribed thickness only for rectangular
-solids. Complex junctions request supported geometry/thermal coverage; long-axis
-chords are never substituted for junction thickness. A declared section limit
+The maximum-section screen uses the inscribed-diameter interval for general
+orthogonal solids: a lower bound above the limit fails, an upper bound within it
+passes, and a straddling interval remains pending. Long-axis chords are never
+substituted for junction thickness. A declared section limit
 is an assumption for screening and cannot replace the independent cure gate.
 
 Trapped-air and broad-ceiling findings reuse the exact fill results. Suggested
@@ -375,5 +376,43 @@ are separate from accepted `DesignChangeRequest`s and never edit the source or
 clear readiness. The JSON and human-readable review join the hashed mill package.
 
 Remaining phase 6 work includes broader radius/cover/access rules, accepted
-source-parameter proposals and replan demonstrations, complex junction/3D thermal
+source-parameter proposals and replan demonstrations, qualified 3D junction thermal
 coverage, and column orientation/design-study integration.
+
+
+### Junction thickness and thermal geometry coverage
+
+`JunctionThickness` computes Euclidean largest-inscribed-sphere bounds for an
+orthogonal solid union. It removes internal box faces, splits exposed rectangles
+by source ownership, and evaluates distance to those actual boundary rectangles.
+Adaptive subdivision retains an upper bound for every live cell using the
+1-Lipschitz distance field, tightened by distance to a fixed face. No maximum is
+accepted from sampled centres alone. The witness sphere supplies the lower bound;
+the largest remaining cell bound supplies the upper bound. Numerical defaults are
+0.5 mm diameter tolerance and 20,000 evaluated cells, selectable through
+`JunctionSearchSettings`. A work limit leaves a valid interval and `converged=false`.
+These are numerical settings, not recipe acceptance thresholds. Rectangular-solid
+scalar thickness remains exact; nonrectangular results are explicitly intervals.
+
+`OrthogonalSectionReport` version 2 includes these bounds, exposed faces, witness
+and nearby source IDs. `CastabilityReport` version 2 compares both bounds against
+the declared section limit. Geometry convergence does not establish a cooling
+boundary, a slab approximation at a junction, or cure safety.
+
+`ThermalCoverage` accounts exactly for the resin volume bound to authored slabs.
+Process-spec version 3 requires each `CureSection` to carry `spanIds` and
+`geometryFingerprint`. Empty span IDs and a null fingerprint describe an unbound
+solver example; source IDs alone cannot prove coverage. Use
+`OrthogonalSections.cureSection(span, left, right, evidence, report.geometryFingerprint)`
+to bind actual dimensions and faces after declaring their real thermal boundaries.
+Stale geometry, unknown spans, mismatched thickness/source faces, mixed axes and
+multiple assignments fail. Uncovered regions and their volume are exported.
+The geometry fingerprint is independent of the enclosing plan/document report
+stamp, so identical geometry in an orientation study retains its explicit binding.
+
+Full volume coverage is distinct from junction-model validity. Nonrectangular
+junction heat flow remains pending a qualified 3D model; a sphere is not a slab.
+An independently safe adiabatic bound needs no cooling-coverage proof, but invalid
+authored bindings still fail. Numerical convergence, supplier data and physical
+thermal calibration remain separate gates. No 3D cure model is invoked or inferred
+when its required material data and tier-2 trigger are unknown.
