@@ -207,6 +207,8 @@ def make_model(packet,pose,h):
     original=list(model.lines);links=set()
     for row in original:
         for p in (row['a'],row['b']):
+            # Explicit architecture joints replace proximity guesses at these endpoints.
+            if any(norm(sub(p,start))<1e-5 for start,_ in packet.get('analysisFrameLinksMm',[])):continue
             for other in original:
                 if row is other:continue
                 q=project(p,other['a'],other['b']);distance=norm(sub(p,q))
@@ -214,6 +216,7 @@ def make_model(packet,pose,h):
                     if any(norm(sub(p,project(p,r['a'],r['b'])))<1e-5 and norm(sub(q,project(q,r['a'],r['b'])))<1e-5 for r in original):continue
                     key=tuple(sorted((tuple(p),tuple(q))))
                     if key not in links:model.rigid(p,q,'frame');links.add(key)
+    for start,end in packet.get('analysisFrameLinksMm',[]):model.rigid(start,end,'frame')
     def nearest(p,rows=original):
         return min((project(p,r['a'],r['b']) for r in rows),key=lambda q:norm(sub(p,q)))
     for i,support in enumerate(packet['supports']):
@@ -313,7 +316,7 @@ def make_model(packet,pose,h):
                 distance=min(length,max(0,round(norm(sub(at,row['a']))/50)*50))
                 anchor=add(row['a'],mul(direction,distance/length))
                 root=model.root('fixedMass'+str(len(model.masses)),anchor,'frame')
-        else:root=zroot if category=='z' else xroot if category=='x' else yroot if category=='y' else min(('foot'+str(i) for i in range(6)),key=lambda r:norm(sub(centre,model.roots[r]['p'])))
+        else:root=zroot if category=='z' else xroot if category=='x' else yroot if category=='y' else min(('foot'+str(i) for i in range(len(packet['supports']))),key=lambda r:norm(sub(centre,model.roots[r]['p'])))
         if category=='z' and hasattr(model,'spindle_root') and p['id'] in ('spindle','holder','collet','longestTool','spindleRelease','shoe','shoeLiftRod'):root=model.spindle_root
         t=p['centroidalInertiaKgMm2World'];inertia=[[t['xx'],t['xy'],t['xz']],[t['xy'],t['yy'],t['yz']],[t['xz'],t['yz'],t['zz']]]
         model.masses.append((root,p['massKg'],centre,inertia,category))
@@ -359,7 +362,7 @@ def solve(packet,pose,h,ccx,folder):
             budget={k:v/300/300*1000 for k,v in budget.items()}
         else:energy_error=None
         reactions={}
-        for i in range(6):
+        for i in range(len(packet['supports'])):
             root=model.roots['foot'+str(i)];ks=next(k for a,b,k,g in model.springs if a=='foot'+str(i) and b is None);reactions[str(i)]=[-ks[j]*u[root['ref']][j] for j in range(3)]
         net=[sum(r[j] for r in reactions.values()) for j in range(3)]
         if name.startswith('cut'):

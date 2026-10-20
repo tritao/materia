@@ -747,6 +747,30 @@ lever through forks/risers and matching table/setter datums, and fixes front
 loading access; the following modal iteration targets the frame/beam/Y-drive
 load path, not extra Z mass. None of these results grants fabrication release.
 
+**Dynamic requirement decision pending (SR-D3 unchanged).** The proposed alternative
+is ≤ 0.05 mm motion-induced contour deviation and rapid-to-cut residual, from the
+review's engineering allocation, not an industry tolerance. Native TOPPRA timing
+has acceleration steps and no certified jerk bound; default PlanningLimits jerk
+20 m/s³ only applies when a jerk-limited backend is used. At the governing pose,
+current TOPPRA gives 0.073 mm contour /0.085 mm residual; per-move ZVD gives
+0.026/0.004 mm for 38.38 ms added per move. Native jerk-limited motion gives
+0.011/0.008 mm unshaped. A hypothetical uniformly stiffened40 Hz structure gives
+0.084/0.037 mm with the same TOPPRA contour: frequency alone is not the requirement.
+Damping, frequency/pose variability, servo following, backlash and cutting force
+remain qualification inputs; do not replace the 40 Hz rule without a user decision.
+
+**Architecture screen complete; no variant adopted.** Deep300×200×6 under-table
+side girders add309 kg for−0.083 Hz. An extra leg pair directly under Y=1575 adds
+25.4 kg fixed mass and gains 1.431 Hz; there is already a middle pair at Y=1411.375.
+Lowering the beam10 mm with 20 mm feet gains 0.043 Hz while keeping the Z stack and
+149 mm gap fixed; larger lowering conflicts with rail seating. Top/front X rails
+and a flexible bridge add2.75 kg moving mass and lose0.217 Hz. The screen is paired
+100/50 mm at one pose. Prefer motion-policy validation to these changes; keep the
+independent fork/table/front-loading redesign moving. Recovering60 mm while
+preserving the 149 mm gap requires raising the complete Z-guide/ram datum, not
+just the spindle, with matching table and rack datums. Full details are in the
+[FEM motion/architecture review](fem/README.md).
+
 **Braced-frame review decisions.** Use anchored slab supports as the analysis
 baseline and free-standing levelling feet as a sensitivity; state the finite
 support stiffness, not a perfect clamp. The present front end braces obstruct

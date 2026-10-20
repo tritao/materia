@@ -66,6 +66,25 @@ and approach poses fit within the reduced Z travel. The 200 mm stroke is provisi
 for the authored 120 mm longest-tool envelope: shorter-tool reach and the real tool-length
 range still require qualification with the tool table.
 
+## Motion-error and architecture decisions
+
+Keep SR-D3's40 Hz rule until the user decides whether the proposed0.05 mm
+motion-error allocation plus shaping replaces it. The allocation comes from the
+review, not a universal wood/plastics tolerance. The actual CNC path backend does
+not certify the shared20 m/s³ jerk default. Native jerk-limited motion or per-move
+ZVD is promising in the frozen-pose modal screen; neither has been installed or
+qualified on the machine. Static cutting deflection, assumed0.054 mm backlash,
+servo tracking and damping still prevent a finished-part accuracy claim.
+
+Do not source the 309 kg deep-side-girder change or the top/front X rail bridge from
+this screen: neither improves the governing mode. One extra anchored leg pair
+under the governing gantry position gains 1.43 Hz for 25.4 kg fixed mass; the frame
+already has a middle pair, so this is a fourth pair, not a missing existing one.
+Keep the 40 mm X plate and aluminium Z. The next clearance-only CAD pass raises
+the entire Z-guide/ram datum60 mm with the table/rack; raising just the spindle
+would reduce the 149 mm ram clearance to 89 mm. Verify the resulting guide travel,
+loading envelope and full assembly before adopting that geometry.
+
 ## Fabrication and access decisions after the braced-frame screen
 
 The installation baseline is anchored to a structural slab at all six support
@@ -115,7 +134,8 @@ Recover the 60 mm spindle drop through a fork/riser redesign, not by accepting a
 428 mm beam-centre-to-tool-tip lever permanently. Rack height alone cannot change
 the plate-to-fork clearance at the same holder engagement: both move together at
 pickup. Move the obstructing fork support/riser behind or outside the projected
-Z-plate/rail ends, then raise the spindle datum 60 mm. Raise the work surface and
+Z-plate/rail ends, then raise the complete Z-guide/ram datum 60 mm (taller X plate), carrying the
+spindle with it. Raise the work surface and
 setter datum by the same amount to preserve the 200 mm stroke and full-depth
 cutting reach. Recompute rack heights, all pickup/approach poses, shorter-tool
 reach, shoe lift and plenum supports in that CAD pass; do not claim it is already

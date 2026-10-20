@@ -1,5 +1,88 @@
 # SR5 structural screen
 
+## Motion-error requirement and architecture screen (2026-10-20)
+
+**SR-D3 is unchanged:** the ≥40 Hz gantry rule remains a hard target pending a user decision. The proposed alternative below is an engineering motion-error allocation, not approval to build or a total part-tolerance claim. No local plate/block/rail iteration was adopted.
+
+### Proposed dynamic-error allocation and actual planner limits
+
+Use ≤ 0.05 mm tool/workpiece geometric contour deviation during finishing, and ≤ 0.05 mm residual displacement after rapid-to-cut handover, as proposed in the review. The 0.05 mm value comes from that suggested engineering allocation, not an industry-wide wood/plastics tolerance. Confirm it against actual product drawings and finishing loads before replacing SR-D3. Servo tracking, backlash, cutter/spindle compliance and cutting-force dynamics are excluded. The 300 N structural load alone gives about 0.140 mm static Y deflection; a 50 N finishing load gives 0.0234 mm. The assumed drive backlash is about 0.054 mm. Thus these motion-only results do **not** establish0.05 mm finished-part accuracy.
+
+Planner caps are3 m/s²,20 m/min contour and 40 m/min rapid. `PlanningLimits.hx` supplies an assumed default jerk of 20 m/s³. Actual CNC FollowPath timing uses TOPPRA without a certified jerk bound; its acceleration phases have steps. Native Ruckig is therefore reported separately as the jerk-limited execution alternative, not silently substituted for today’s contour timing. `planner_sample.cpp` calls the prebuilt MotionKit libraries directly. Their reserves give39.2 m/min initial rapid and 19.960 m/min final cut in the TOPPRA transition; Ruckig reaches40/20. No OCCT/native library was rebuilt.
+
+Frozen governing pose: long bed, X=800/Y=1575, full Z. Test contour is a 300×180 mm L-shaped panel with a 180×80 mm notch, six exact-stop edges. Transition is a 300 mm Y move from rapid to contour speed. Damping is assumed1%, with 0.5/2/5% damping and ±10/15% frequency tests. Shapers are tuned to the first **tool-participating gantry** mode,26.05352 Hz, rather than the lower mostly-common frame mode.
+
+| Planner | Structure / shaping | Peak contour error mm | Rapid-to-cut residual mm | Added time per move ms |
+|---|---|---:|---:|---:|
+| toppra | 26 Hz, none | 0.07275 | 0.08528 | 0.00 |
+| toppra | 26 Hz, ZV | 0.02844 | 0.00826 | 19.19 |
+| toppra | 26 Hz, ZVD | 0.02551 | 0.00377 | 38.38 |
+| toppra | 40 Hz stiffness-scaled, unshaped | 0.08372 | 0.03695 | 0.00 |
+| ruckig | 26 Hz, none | 0.01120 | 0.00831 | 0.00 |
+| ruckig | 26 Hz, ZV | 0.00098 | 0.00030 | 19.19 |
+| ruckig | 26 Hz, ZVD | 0.00089 | 0.00017 | 38.38 |
+| ruckig | 40 Hz stiffness-scaled, unshaped | 0.00093 | 0.00076 | 0.00 |
+
+Table values use0.25 ms time steps; comparison with 0.5 ms changes contour peaks by at most0.00074 mm and residual peaks by 0.00105 mm. Residual is the maximum norm during0.5 s after the command/shaper tail, not just a conveniently sampled endpoint. The40 Hz case uniformly scales stiffness by(40/26.05352)² at unchanged mass/mode shapes; residual flexibility is scaled too. It is not a proposed CAD design. Frequency alone does not bound a specific acceleration-pulse response: phase changes can worsen the contour peak while reducing peak elastic following error.
+
+ZV uses two positive impulses separated by half the damped period; ZVD is their convolution, giving three impulses and one period duration. [NASA’s input-shaping study](https://ntrs.nasa.gov/api/citations/19950024365/downloads/19950024365.pdf) gives the command-shaping basis. Each exact-stop edge drains its filter before the next edge to preserve corner geometry: add19.19 ms for ZV or38.38 ms for ZVD per move,115/230 ms for this six-edge contour. Continuous filtering would have a different time/corner-rounding tradeoff and was not substituted here. Cutting events must follow the shaped handover, not the original timestamp. No shaper has been installed in the controller.
+
+Under the damping/frequency uncertainty screen, maximum TOPPRA contour/residual errors are:
+
+| Case | Maximum contour mm | Maximum residual mm |
+|---|---:|---:|
+| 26 Hz none | 0.35803 | 0.18605 |
+| 26 Hz ZV | 0.07374 | 0.04022 |
+| 26 Hz ZVD | 0.03726 | 0.00948 |
+| 40 Hz unshaped | 0.08892 | 0.07011 |
+
+ZVD remains inside the proposed motion allocation in these cases; ZV does not under ±15% frequency variation. Jerk-limited current-design motion stays below0.013 mm contour and 0.010 mm residual without shaping in this screen, at a longer contour time (4.435 s versus3.554 s TOPPRA; TOPPRA+ZVD is 3.784 s). These are conditional model predictions requiring measured damping, modal tracking over travel and actual execution/servo validation.
+
+### Tool participation and truncation check
+
+For each mode, the tool-minus-workpiece eigenvector is multiplied by its generalized inertial-force participation for the actual X- or Y-moving mass set, divided by generalized mass. We integrate the damped modal equations against native sampled acceleration. Static residual flexibility preserves the full FE acceleration-load compliance; it is not treated as additional dynamic modes.
+
+| Mode | Hz | X→tool-X acceleration residue | Y→tool-Y acceleration residue |
+|---|---:|---:|---:|
+| 1 | 24.178 | 0.091399 | 0.000037 |
+| 2 | 26.054 | -0.000002 | 0.713745 |
+| 3 | 33.548 | -0.000001 | 0.026930 |
+| 4 | 34.048 | -0.000053 | 0.000503 |
+| 5 | 34.504 | 0.000021 | -0.002983 |
+| 6 | 35.509 | 0.005409 | 0.000128 |
+| 8 | 41.047 | 0.002900 | 0.017678 |
+| 9 | 42.934 | 0.117002 | 0.000878 |
+| 13 | 52.290 | 0.925437 | 0.000007 |
+
+The first3/6 global modes are insufficient after first-mode shaping: TOPPRA+ZVD predicts only0.008 mm contour error with six modes, versus0.026 mm with 40. The52.29 Hz X-carriage/drive mode has strong tool participation. Twenty and forty modes agree within about 0.0006 mm for the principal contour/residual results; the forty-mode result is retained. Peak **elastic following error**, which includes tangential lag rather than only contour-normal deviation, is 0.205 mm for current TOPPRA and 0.101 mm with ZVD. It must not be confused with geometric contour error.
+
+### One architecture screen at the governing pose
+
+Anchored floor baseline is retained. These are100/50 mm single-pose screens, not adopted CAD. Fixed-mass estimates use gross stock corrected by the baseline CAD-union/gross-stock ratio; no supplier fabrication drawing is implied. The deep-girder case uses the review’s allowed RHS 300×200 alternative, not an unmodelled claim for welded skins.
+
+| Variant | Δgantry Hz | Δglobal Hz | ΔX / ΔY N/µm | Δmoving / Δframe kg | Beam-to-tip mm |
+|---|---:|---:|---:|---:|---:|
+| deep side girders | -0.083 | +1.792 | -0.002 / -0.004 | +0.00 / +308.74 | 427.75 |
+| additional leg pair | +1.431 | +0.527 | +0.026 / +0.028 | +0.00 / +25.42 | 427.75 |
+| beam down 10 mm | +0.043 | +0.080 | -0.003 / -0.068 | -5.26 / +0.00 | 417.75 |
+| top/front X rails | -0.217 | -0.089 | -0.235 / +0.164 | +2.75 / +0.00 | 427.75 |
+
+**deep side girders**: Replace both under-table side stringers with closed RHS 300 vertical x200x6; keep top datum fixed. Existing crossmembers/braces retained. Rigid section offsets connect real intersecting members. Gross-stock mass uses baseline CAD-union/gross ratio; local weld/wall effects excluded.
+
+**additional leg pair**: Baseline already has a middle pair: six feet at three stations. Add a fourth pair directly beneath Y=1575 rather than counting the existing middle pair twice. Added posts/feet share the anchored 50,000 N/mm XYZ support assumption.
+
+**beam down 10 mm**: 20 mm feet instead of 30 lower the beam 10 mm. X rails and Z ram remain at their original absolute heights: ram-to-sheet gap stays149 mm. Upper front X rail has only5 mm nominal edge margin; 60 mm beam lowering is geometrically infeasible with this rail seating and clearance. Shorter feet are not ideal rigid links.
+
+**top/front X rails**: Upper X rail on beam top, lower rail on front: roll-couple span214 mm instead of 150 mm. Rotate block radial/lateral stiffness and component inertia; add a flexible20 mm horizontal bridge, including its2.75 kg mass. No rigid bridge bypass. Tool lever and 149 mm ram clearance unchanged; mounting is a concept, not collision-checked CAD.
+
+The baseline already has six feet, including a middle pair at Y=1411.375; the added pair is at governing Y=1575. The top/front rail option includes rotated directional block springs and component inertia, and a flexible20 mm bridge (not a rigid shortcut). Larger beam lowering was rejected as geometrically infeasible with the current149 mm ram clearance and rail seating. The10 mm case keeps the entire Z stack at its original absolute height.
+
+Coarse/fine changes in **frequency deltas** are below0.0042 Hz; all variants retain the same tracked gantry branch (body-motion MAC≥ 0.996). The additional leg pair is the only useful modal improvement here, but27.484 Hz is still far below40. Do not add309 kg of deep side members or adopt the split-rail bridge on this evidence.
+
+**Recommendation:** validate a jerk-limited contour execution policy and/or per-move ZVD against measured modes and finishing requirements before redesigning the entire machine for a frequency proxy. Retain SR-D3 until the user chooses. Continue the independent clearance work: raise the complete Z-guide/ram datum60 mm together with the table/rack, recover the tool lever to 367.75 mm while keeping149 mm clearance, and lower the front braces out of the sheet-loading path. This requires a taller X plate, not merely moving the spindle relative to its plate. No architecture variant above was selected.
+
+Artifacts remain on root under `build/sheet-router-system/`: native planner sampler, `dynamic/dynamic-error.json`, `dynamic/responses.{svg,png}`, `architecture/architecture.json`, paired coarse results and source/provenance hashes. Independent SDOF step and ZV/ZVD cancellation/DC-gain fixtures pass.
+
 ## Anchored modal diagnosis (2026-10-20)
 
 Full 100/50 mm, nine-pose, two-bed rerun of the f47ed13f4 CAD. Six anchored supports each use 50,000 N/mm in XYZ, with no rotational clamp. Foundation values are assumptions, not anchor/slab qualification. All masses and the original 428 mm tool lever are retained.

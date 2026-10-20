@@ -25,7 +25,11 @@ def front_carriage(model,packet,pose,a,b,axes):
     xb=[r for r in blocks if r['axis']=='x'];zb=[r for r in blocks if r['axis']=='z']
     drive={d['id']:d['pointMm'] for d in pose['drives']}
     xp,_=shifted_plate('xCarriage');zp,zc=shifted_plate('zCarriage')
-    xcontacts=[tuple(r['railPointMm']) for r in xb+zb]+[tuple(drive['pinionX']),tuple(drive['screwZNut'])]
+    top_bridge=packet.get('analysisTopXBridge')
+    def mount_contact(block):
+        q=tuple(block['railPointMm'])
+        return (q[0],xp['poseMm']['y']-xp['thicknessMm']/2,top_bridge['midZMm']) if block.get('topMounted') else q
+    xcontacts=[mount_contact(r) for r in xb]+[tuple(r['railPointMm']) for r in zb]+[tuple(drive['pinionX']),tuple(drive['screwZNut'])]
     zcontacts=[tuple(r['railPointMm']) for r in zb]+[tuple(drive['screwZNut'])]
     saddle=pose.get('spindleMountsMm')
     if saddle:zcontacts += [tuple(q) for q in saddle]
@@ -48,8 +52,12 @@ def front_carriage(model,packet,pose,a,b,axes):
             for z in riblevels:model.rigid((x,zc[1],z),(x,y,z),'z')
     for i,block in enumerate(xb):
         q=tuple(block['railPointMm']);support=project(q,a,b);model.rigid(support,q,'gantry')
+        if block.get('topMounted'):
+            anchor=mount_contact(block);end=(q[0],q[1],top_bridge['midZMm'])
+            model.beam(anchor,end,('RECT',xp['widthMm']/2,top_bridge['thicknessMm']),(1,0,0),(xp['youngsMPa'],0),'Xplate','x')
+            model.rigid(end,q,'x')
         fixed=model.root('Xfixed'+str(i),q,'gantry');moving=model.root('Xmoving'+str(i),q,'x')
-        model.spring(moving,fixed,[0,block['radialNPerMm'],block['lateralNPerMm'],0,0,0],'Xblocks')
+        model.spring(moving,fixed,block.get('translationNPerMmXYZ',[0,block['radialNPerMm'],block['lateralNPerMm']])+[0,0,0],'Xblocks')
     q=tuple(drive['pinionX']);model.rigid(project(q,a,b),q,'gantry')
     fixed=model.root('XdriveFixed',q,'gantry');moving=model.root('XdriveMoving',q,'x')
     model.spring(moving,fixed,[axes['x']['compliance']['stiffnessNPerM']/1000,0,0,0,0,0],'Xdrive')
