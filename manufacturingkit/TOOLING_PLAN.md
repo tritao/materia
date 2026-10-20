@@ -440,7 +440,8 @@ compatibility path for the old encoding.
 | `CastingToolingInput` | Source ID/revision/hash, supported envelope, typed `materia.casting` features, inserts with holes and interface requirements, datum scheme, foundation joints (phase 7) |
 | `CastingSetup` | Source-to-mold transform, gravity/fill direction, open face, parting choices, feature overrides, support and finishing datums, compaction, fill height, pour rate and pour points, initial/ambient temperature |
 | `CompactionSpec` | Method (vibration table, external vibrators, internal poker, none), mold-bed interface, declared frequency/amplitude/duration or pending, evidence |
-| `InsertAnchorage` | Insert reference, anchorage kind (studs, undercut, bonded keys), geometry, declared pull-out/shear capacity or pending, evidence |
+| `InsertAnchorage` | Insert reference, anchorage kind (bolted anchors, welded studs, undercut, bonded keys), anchor holes and hardware, embedment, bearing area, spacing and cover, declared pull-out/shear capacity or pending, evidence |
+| `InsertManufacturing` | Insert reference, steel grade and blank stock, pre-cast operations (cut, square, drill and tap, anchors, deburr, surface preparation), post-cast operations with their stock, inspection points before casting, thread protection, procurement `Make(process)` |
 | `PanelPlan` | Stable ID, exact 2D profile, stock/thickness, mold pose, contact face, joints, operations, label zone, removal motion |
 | `PanelOperation` | Stable ID, kind (outside/inside profile, pocket, rebate, drill), exact line/arc contour or hole centres, machining face, depth, through/blind, setup |
 | `JointPlan` | Paired member/edge references, joint kind, datum role, clearances, reliefs, fastening and assembly direction |
@@ -610,8 +611,30 @@ pose stored in a JSON text parameter.
   fingerprint. No placeholder or unknown limit enters `DesignInterfaces`. Hand-set
   limits on existing parts (`MillYNutMount`, `MillCrossSaddle`) move to the policy
   when those parts are next touched.
-- Anchorage (headed studs, undercuts, bonded keys) is insert geometry and feeds
-  `InsertAnchorage`; its capacity stays pending evidence.
+- Anchorage is insert geometry and feeds `InsertAnchorage`; its capacity stays
+  pending evidence until a pull-out coupon is recorded. The default kind is
+  **bolted anchors**: blind tapped holes in the insert's back face, from
+  `InsertHoles` and the `ThreadedHolePolicy`, with standard bolts (or threaded rod
+  with nut) and washers screwed in before the pour. The heads and washers are the
+  bearing anchors, and no welding heat reaches the precision faces. The fasteners
+  are real standard components placed in the insert, so they appear in the BOM,
+  in overlap checks against cores, formers and fixtures, and in the fill analysis
+  (air under heads and washers). Design rules check back wall to the mounting
+  face, clearance to the front mounting holes, embedment, head bearing area,
+  spacing and cover to the casting surface. Each bolt is torqued to a shoulder or
+  set with retaining threadlocker so the thread has no play. Welded studs,
+  undercuts and bonded keys remain other kinds; none is assumed.
+- Each insert is a made part with an `InsertManufacturing` record derived from the
+  insert, its holes, anchorage and interface requirement. It holds the steel
+  grade and blank, the pre-cast operations (cut and square, drill and tap, fit
+  anchors, deburr, degrease and bond-ready surface preparation), and the post-cast
+  operations. An insert finished after casting is cast oversize by its finishing
+  stock, so the stock is in the insert geometry as well as the casting allowance.
+  Holes whose positions relative to other inserts are tighter than the insert
+  placement tolerance are drilled after casting, as the interface requirement
+  decides. Flatness and hole positions are inspected before the insert enters the
+  mold. The package gets insert drawings through `cadkit.drawing`, an operation
+  sheet, and `Make(process)` BOM lines in the `BOM_PLAN.md` vocabulary.
 - `finish` becomes typed tokens; `label` is display text only.
 
 ### Interface requirements
@@ -1229,8 +1252,9 @@ design model, in three steps:
    box-only.
 2. **Requirements.** Interface requirements with the allowance in the casting
    geometry; interface relationships with axis members, replication jigs and
-   metrology; insert-fixture constraint checks; the datum scheme, lifting inserts
-   and the base–column joint.
+   metrology; insert-fixture constraint checks; bolted insert anchorage and the
+   insert manufacturing records with drawings and operation sheets; the datum
+   scheme, lifting inserts and the base–column joint.
 3. **Geometry.** Draft, corner radius and prism features through CAD, planner,
    drawings, CAM and the phase 6 analyses.
 
@@ -1250,7 +1274,13 @@ to a `HoleInterface`, and no insert label carries hardware data. A replicated
 seat's allowance appears in the casting geometry and clears its allowance request,
 while master and release stay pending evidence. A relationship whose metrology
 uncertainty exceeds its tolerance stays pending; an under- or over-constrained
-fixture reports the affected directions. The lifting-point and column-joint
+fixture reports the affected directions. Every mill insert has bolted anchors
+whose holes pass the hole policy and clear its mounting holes, whose hardware is
+in the BOM and the overlap checks, and whose capacity stays pending; an anchor
+too close to the mounting face, another hole or the casting surface fails with
+the insert ID. Every insert has a drawing, an operation sheet and a pre-cast
+inspection list, and an insert finished after casting carries its stock in its
+own geometry. The lifting-point and column-joint
 requests clear when the design declares them and return when removed. A drafted
 former fixture passes release and clears its release request; a prism feature with
 a corner radius below the router radius fails with its ID. Fill analysis agrees
@@ -1341,7 +1371,8 @@ directories; commit source setups, small test fixtures and documentation.
 
 General BREP parting-surface discovery, arbitrary contour nesting, robotic mold
 assembly, wiring core cutting definitions into `FoamJob` (after foam-cutter lands
-on main), CNC posts beyond CamKit's LinuxCNC writer,
+on main), CNC posts beyond CamKit's LinuxCNC writer, CAM for the steel inserts
+(CamKit has no tapping or facing yet; inserts are drawn and made or bought),
 general arc-native CAM IR, rotational removal paths, automatic hardware optimization, automatic application
 of design-change proposals, parting-surface search beyond listed orientations,
 the 3D cure tier unless a section needs it, printed mold pieces (a former
