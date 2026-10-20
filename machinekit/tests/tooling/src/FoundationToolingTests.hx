@@ -148,7 +148,15 @@ class FoundationToolingTests {
 				resinSpec: "unselected",
 				releaseSpec: "unselected",
 				adhesiveSpec: "unselected",
-				processEvidence: []
+				processEvidence: [],
+				designReview: {
+					minimumCornerRadiusMm: null,
+					minimumInsertCoverMm: null,
+					minimumInsertEdgeMm: null,
+					minimumFixingAccessMm: null,
+					minimumLiftingPoints: null,
+					removalClearanceMm: null
+				}
 			}
 		};
 		input = ToolingCodec.decode(ToolingCodec.encode(document)).input;
@@ -193,7 +201,11 @@ class FoundationToolingTests {
 				CastingFeatures.box("underside", 100, 80, 61, 0, 0, -1),
 				CastingFeatures.box("side-opening", 30, 60, 40, -110, 0, 90)
 			]));
-		var seat = new CastInsert(new ComponentValues().setNumber("width", 40).setNumber("depth", 30).setNumber("height", 20).setNumber("boreDiameter", 8));
+		var seat = new CastInsert(new ComponentValues().setToken("role", "generic-mount")
+			.setNumber("width", 40)
+			.setNumber("depth", 30)
+			.setNumber("height", 20)
+			.setNumber("boreDiameter", 8));
 		var placements:Array<CastInsertPlacement> = [
 			{id: "topSeat", part: seat, pose: F.translation(80, 0, 170)},
 			{
@@ -237,6 +249,14 @@ class FoundationToolingTests {
 			"hobber table plate role explicit");
 		check(hobber.inserts.filter(i -> i.id == "columnPlate")[0].role == materia.tooling.ToolingEnums.InsertRole.ColumnMount,
 			"hobber column plate role explicit");
+		var missingRole = false;
+		try
+			new CastInsert()
+		catch (error:Dynamic)
+			missingRole = Std.string(error).indexOf("Missing component parameter") >= 0;
+		check(missingRole, "CastInsert requires an explicit role with no guide-seat fallback");
+		var requiredSchema = CastInsert.parameters().filter(v -> v.name == "role")[0];
+		check(requiredSchema.defaultValue == machinekit.component.ComponentValue.Unset, "role choice has no default value");
 		var rejectedRole = false;
 		try
 			new CastInsert(new ComponentValues().setToken("role", "unknown role"))
@@ -245,7 +265,7 @@ class FoundationToolingTests {
 		check(rejectedRole, "unknown source roles fail at the typed source parameter");
 		equivalent(new machinekit.hobbing.MineralCastBed(), "hobber-bed");
 		equivalent(new machinekit.hobbing.MineralCastColumn(), "hobber-column");
-		var finished = new CastInsert(new ComponentValues().setToken("finish", "replicated after casting"));
+		var finished = new CastInsert(new ComponentValues().setToken("role", "generic-mount").setToken("finish", "replicated after casting"));
 		var finishFoundation = new MineralFoundation(values, [{id: "finished", part: finished, pose: F.identity()}]);
 		check(FoundationToolingAdapter.snapshot(finishFoundation, "finish-contract", 1)
 			.inserts[0].finish == materia.tooling.ToolingEnums.InsertFinish.ReplicatedAfterCasting,

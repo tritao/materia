@@ -50,6 +50,16 @@ class ToolingPackageManifest {
 			}
 		}
 		var all = f.validation.concat(checks);
+		var hardwareReport = dir + "/hardware-validation.json";
+		if (!sys.FileSystem.exists(hardwareReport))
+			throw "Missing hardware validation report";
+		for (row in readValidation(haxe.Json.parse(sys.io.File.getContent(hardwareReport)))) {
+			var existing = all.filter(v -> v.rule == row.rule);
+			if (existing.length == 0)
+				all.push(row);
+			else if (existing.length != 1 || ToolingCodec.canonical(existing[0]) != ToolingCodec.canonical(row))
+				throw "Conflicting hardware validation";
+		}
 		all.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		var seen = new Map<String, Bool>();
 		for (check in all) {
@@ -65,7 +75,7 @@ class ToolingPackageManifest {
 		records.sort((a, b) -> Reflect.compare(a.path, b.path));
 		var manifest:ToolingManifest = {
 			format: "materia.tooling-manifest",
-			version: 2,
+			version: 3,
 			phase: 5,
 			lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			sourceFingerprint: f.sourceFingerprint,
@@ -96,6 +106,26 @@ class ToolingPackageManifest {
 			sys.io.File.saveContent(path, normalized);
 	}
 
+	static function readValidation(raw:Dynamic):Array<ToolingValidation> {
+		if (!Std.isOfType(raw, Array))
+			throw "Invalid tooling validation records";
+		var rawValidation:Array<Dynamic> = cast raw;
+		return [
+			for (row in rawValidation) {
+				var ids:Array<Dynamic> = cast row.affectedIds;
+				var evidence:Array<Dynamic> = cast row.evidence;
+				{
+					rule: row.rule,
+					affectedIds: [for (id in ids) Std.string(id)],
+					status: cast row.status,
+					severity: cast row.severity,
+					message: row.message,
+					evidence: [for (item in evidence) Std.string(item)]
+				};
+			}
+		];
+	}
+
 	public static function verify(dir:String):Void {
 		var manifest:Dynamic = haxe.Json.parse(sys.io.File.getContent(dir + "/manifest.json"));
 		var keys = [
@@ -117,7 +147,7 @@ class ToolingPackageManifest {
 		for (key in keys)
 			if (!Reflect.hasField(manifest, key))
 				throw "Missing tooling manifest field";
-		if (manifest.format != "materia.tooling-manifest" || manifest.version != 2)
+		if (manifest.format != "materia.tooling-manifest" || manifest.version != 3)
 			throw "Unsupported tooling manifest";
 		if (!Std.isOfType(manifest.files, Array))
 			throw "Invalid tooling manifest files";
@@ -139,21 +169,12 @@ class ToolingPackageManifest {
 		}
 		if (!Std.isOfType(manifest.validation, Array))
 			throw "Invalid tooling validation records";
-		var rawValidation:Array<Dynamic> = cast manifest.validation;
-		var validation:Array<ToolingValidation> = [
-			for (row in rawValidation) {
-				var ids:Array<Dynamic> = cast row.affectedIds;
-				var evidence:Array<Dynamic> = cast row.evidence;
-				{
-					rule: row.rule,
-					affectedIds: [for (id in ids) Std.string(id)],
-					status: cast row.status,
-					severity: cast row.severity,
-					message: row.message,
-					evidence: [for (item in evidence) Std.string(item)]
-				};
-			}
-		];
+		var validation = readValidation(manifest.validation);
+		if (files.filter(file -> file.path == "hardware-validation.json").length != 1)
+			throw "Missing hashed hardware validation";
+		for (record in readValidation(haxe.Json.parse(sys.io.File.getContent(dir + "/hardware-validation.json"))))
+			if (validation.filter(v -> ToolingCodec.canonical(v) == ToolingCodec.canonical(record)).length != 1)
+				throw "Hardware validation omitted from readiness";
 		var readiness = ToolingReadiness.evaluate(validation);
 		if (ToolingCodec.canonical(readiness) != ToolingCodec.canonical(manifest.fabrication))
 			throw "Tooling readiness differs from validation";

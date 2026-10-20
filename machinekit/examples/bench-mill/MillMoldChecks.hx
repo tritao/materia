@@ -89,6 +89,13 @@ class MillMoldChecks {
 	public static function run(frame:MillFrame, p:CastingMoldPlan, report:machinekit.tooling.CastingMoldCad.CastingMoldReview):Void {
 		check(p.cores.length == 6 && p.fixtures.length == 12, "actual mill pocket and insert inventory");
 		check(p.features.length == p.document.input.features.length && p.features.length == 31, "every full-frame feature classified");
+		for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
+			check(report.validation.filter(v -> v.rule == "tooling.cad." + name && v.status == "pass").length == 1,
+				"CAD review owns its " + name + " evidence");
+		var design = machinekit.structural.FoundationIntegrity.castingReview(frame.base, p.document);
+		check(design.validation.length > 0
+			&& design.metrics.liftingPointCount == p.document.input.inserts.filter(i -> i.role == materia.tooling.ToolingEnums.InsertRole.LiftingMount).length,
+			"source-level design metrics map into foundation integrity");
 		check(report.symmetricDifferenceMm3 < 1e-3 && !report.fabrication.ready, "review geometry passes without fabricating readiness");
 		check(report.assemblyGroups.length == 2 && report.permanentGroups.length == 2, "two shared row fixtures");
 		check(report.assembly.assemblyOrder[0] == "bed", "bed installed first");
@@ -115,7 +122,7 @@ class MillMoldChecks {
 		var profiled = mismatched.formers.filter(f -> f.volume.profiles.length > 0)[0];
 		profiled.volume.profiles[0].depth += 1;
 		rejects(() -> CastingMoldPlanner.validate(mismatched), "former sealing profile must match panel operation");
-		check(p.changeRequests.filter(c -> c.kind == "draft-or-split")
+		check(p.changeRequests.filter(c -> c.kind == "release-alternative")
 			.length == p.document.setup.features.filter(f -> f.strategy == "reusable-former")
 			.length
 				+ p.formers.filter(f -> f.featureIds.length == 0)

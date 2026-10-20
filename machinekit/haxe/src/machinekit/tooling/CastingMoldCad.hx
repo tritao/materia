@@ -94,7 +94,9 @@ class CastingMoldCad {
 
 	public static function steel(p:CastingMoldPlan, id:String):Part {
 		var i = p.document.input.inserts.filter(i -> i.id == id)[0];
-		var component = new CastInsert(new ComponentValues().setNumber("width", i.width)
+		var component = new CastInsert(new ComponentValues().setToken("role", i.role)
+			.setToken("label", i.label)
+			.setNumber("width", i.width)
 			.setNumber("depth", i.depth)
 			.setNumber("height", i.height)
 			.setNumber("boreDiameter", i.boreDiameter));
@@ -241,7 +243,7 @@ class CastingMoldCad {
 				.setNumber("boreDiameter", i.boreDiameter)
 				.setNumber("positionTolerance", i.positionTolerance)
 				.setToken("role", i.role)
-				.setToken("label", i.sourceRole));
+				.setToken("label", i.label));
 			a.addComponent(materia.tooling.ToolingIds.derive("insert-", i.id), part, pose);
 		}
 		if (!exploded) {
@@ -566,7 +568,15 @@ class CastingMoldCad {
 				demolding: demolding,
 				permanentGroups: permanent,
 				assemblyGroups: groups,
-				validation: p.validation.copy(),
+				validation: p.validation.concat([
+					for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
+						materia.tooling.export.ToolingLoads.check("tooling.cad."
+							+ name, [p.document.input.id],
+							materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass, "Exact CAD "
+							+ name
+							+ " check passed.",
+							[materia.tooling.casting.CastingMoldCodec.fingerprint(p)])
+				]),
 				fabrication: p.fabrication,
 				assemblyMotions: assemblyMotions,
 				demoldingMotions: demoldingMotions

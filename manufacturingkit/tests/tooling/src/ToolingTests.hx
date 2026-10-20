@@ -94,7 +94,7 @@ class ToolingTests {
 					boreDiameter: 8,
 					pose: F.translation(80, 0, 90),
 					role: InsertRole.GuideSeat,
-					sourceRole: "rail seat",
+					label: "rail seat",
 					positionTolerance: 0.01,
 					finish: InsertFinish.GroundAfterCasting
 				}
@@ -165,7 +165,15 @@ class ToolingTests {
 			resinSpec: "binder unselected",
 			releaseSpec: "covering unselected",
 			adhesiveSpec: "adhesive unselected",
-			processEvidence: []
+			processEvidence: [],
+			designReview: {
+				minimumCornerRadiusMm: null,
+				minimumInsertCoverMm: null,
+				minimumInsertEdgeMm: null,
+				minimumFixingAccessMm: null,
+				minimumLiftingPoints: null,
+				removalClearanceMm: null
+			}
 		};
 		return {
 			input: input,

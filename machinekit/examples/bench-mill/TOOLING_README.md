@@ -298,12 +298,15 @@ the junction's heat flow. The present process setup declares no thermal sections
 so all 70,107,544 mm3 remains unbound. Supplier data, actual boundary conditions,
 a junction thermal model and physical calibration are still needed.
 
-In a version-4 process file every authored section needs `spanIds` and
+In a version-5 process file every authored section needs `spanIds` and
 `geometryFingerprint`. Use empty IDs and null for an unbound numerical example.
 For real coverage, take span IDs and the geometry fingerprint from
 `section-geometry.json` and match its thickness/source faces, while explicitly
 specifying the actual left/right thermal conditions. Unknown/stale references,
-wrong dimensions or repeated span assignments fail. Even complete slab volume
+wrong dimensions, mismatched face boundary kinds, repeated span assignments or
+overlapping coverage across section axes fail. EPS faces are insulated; the open
+face removes heat only when declared. `faceContacts` declares reviewed overrides
+by stable thermal-face ID; numerical heat-transfer data belongs to the section. Even complete slab volume
 coverage leaves nonrectangular junction modelling pending. Review exports may
 contain failures; no suggestion changes the source casting or releases fabrication.
 
@@ -323,12 +326,23 @@ include the declared breakthrough allowance into a stock-bottom spoilboard plane
 Square rebates extend their open contour sides outside the finished outline in
 CAM; the neutral profile and CAD remain finished geometry.
 
-This route requires a declared vacuum-hold qualification for the final outside
-profile. It does not generate tabs or an onion skin. Missing vacuum evidence,
-fixture geometry, measured lengths or a qualified machine-coordinate work origin
-keeps the per-panel CAM check pending. The mill's zero-length study tools are split
-into pending single-tool files; they are not qualified machine programs. Shop
-feeds, machine travel, setup and the physical coupon trial remain required.
+The study route leaves a 0.5 mm onion skin, then makes a separate final-depth
+outside-profile pass. A vacuum alternative requires contact area, holding force,
+cutting force, safety factor and evidence; a reference string cannot qualify it.
+Missing fixture geometry, measured lengths or a qualified machine-coordinate work
+origin keeps the per-panel CAM check pending. Each single-tool G49 file says to
+touch off Z with that tool, and comments its nominal/measured diameter and shape
+after M6. The bed needs four loads: T3 pockets, T2 pins, T5 fixing holes, T3 outline.
+Three would violate declared access dependencies or outside-last.
+
+Study tool reach is explicitly 25 mm flute length / 30 mm stick-out, awaiting
+measurement. Cuts beyond reach fail. Drilling deeper than three diameters pecks
+in 3 mm increments. Blind operations get no breakthrough allowance; through
+operations use the separately declared machine spoilboard plane at Z = -18 mm.
+Raster passes follow the declared cutting direction; proven links within an
+already cleared pocket use local clearance. Approaches rapid to surface plus
+clearance before feeding. Shop feeds, machine travel, setup and the physical
+coupon trial remain required.
 
 The reviewed fill opening subtracts all tooling at or above fill height before
 checking air connectivity. Curved openings requiring an unimplemented exact
@@ -338,11 +352,37 @@ writes `fill-foundation-cad-check.json`, with symmetric difference against the
 actual foundation CAD; the current result is zero.
 
 Orientation candidates that plan successfully use the same process analysis as
-the selected mold. The report declares its feasibility gates and metric tuple:
-trapped volume, worst cure margin (unknown last), flip, panels and sheets, with a
-reason for each ordering. Actual CAD-review validation is forwarded unchanged.
-Real panels with rebates/holes have an explicit Unsupported structural model;
-rigid formers and datum fixtures have uplift and lateral restraint requirements.
-Manifest v2 hashes readiness and validation and recomputes readiness on verify.
-The full review package currently has 840 artifacts, 13 passing checks, 175
-pending and 15 unsupported. **Not fabrication-ready; no coupon trial recorded.**
+the selected mold. Candidates without a plan report Unsupported; a process error
+fails that candidate without aborting the comparison. Only the CAD review's own
+four reconstruction, coverage and graph records establish geometry evidence.
+After feasibility gates the ranking compares failures and open change requests
+before trapped volume, worst cure margin, flip, panels and sheets, and records
+its deciding reason.
+
+The section screen also computes a thickness interval against heat-removing
+faces: an EPS-backed, one-side-cooled slab has twice its geometric thickness.
+Cure continues beyond the nominal duration until residual heat meets the declared
+tolerance or maximum extension is reached; the latter remains Pending. Unknown
+adhesive composition is treated as potentially containing EPS. The raw cure report
+and fabrication material check share coverage records and EPS assumptions.
+
+Source-level recipe thresholds cover sharp corners, insert cover/edge/access,
+lifting points and removal direction. They feed FoundationIntegrity Diagnostics
+and MillDesignStudy metrics. Proposals state a source parameter and value when
+supported; an explicitly accepted insert-width proposal can update the linked
+recess and replan. Unknown mappings remain explicit. Non-null precision finishing
+allowance is rejected until supported. Insert roles are required; labels are
+separate from their shared typed role vocabulary.
+
+Real panels with rebates/holes retain an explicit Unsupported structural model;
+supplying a plate support for one throws. Manifest v3 hashes readiness and
+validation, folds in hardware checks independently of caller forwarding, and
+verifies enum values, severity consistency and recomputed readiness. Current
+strict formats are Tooling v5, CastingMold v4 and Process v5; old encodings have
+no compatibility path.
+
+The latest full rerun passes 248 mill acceptance assertions and manifest tamper
+checks. Its 837 hashed artifacts include 40 review programs. Validation reports
+14 Pass, 250 Pending and 15 Unsupported, with zero foundation symmetric difference.
+
+**Not fabrication-ready; no coupon trial recorded.**

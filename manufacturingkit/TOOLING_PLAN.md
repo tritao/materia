@@ -1106,3 +1106,46 @@ The full package includes the existing CAD/sequence checks, declared load/proces
 reports, per-panel checked LinuxCNC, lists, layouts and physical coupon templates.
 `-- --records-only --checks` writes an independent records/CAM package with CAD
 validation pending. Neither entry manufactures the coupon or releases the mold.
+
+
+## Follow-up review: 51dbe29ee..fc0b267b7
+
+- [x] CAM 1–7: honest single-tool G49 touch-off instructions and per-tool diameter/
+  shape comments; dependency-aware minimum-load ordering; onion skin plus final
+  removal pass or force-qualified vacuum; declared cutter reach, drill pecking,
+  through-only breakthrough and machine spoilboard plane; directed raster/on
+  loops, proven local pocket links and near-surface rapid approaches. Shipped
+  settings and real CAM reach/depth rejection have acceptance tests. The bed's
+  access graph requires four loads, rather than the suggested three.
+- [x] Fabrication/planner 8–14: actual foam/bridge bond overlap; reject unsupported
+  precision allowance; required typed insert roles and separate labels; reject
+  unsupported plate-support submissions; hashed hardware validation cannot be
+  dropped by callers; manifest status/severity consistency; fill-clipped datum
+  intersection; renamed release-alternative request.
+- [x] Process 15–18: conservative unknown EPS/adhesive handling; residual-heat cure
+  extension with declared cap and Pending at cap; separate heat-removing-face
+  thickness interval; thermal boundary ownership and cross-axis coverage checks.
+- [x] Orientation/export 19–20: CAD emits its own four evidence records; candidates
+  share analysis, catch process failures independently and mark unplanned cases
+  Unsupported; rank failures/open requests first after feasibility; actual
+  foundation CAD volume must agree with the fill report independently.
+- [x] Castability/materials 21–23: conditional release proposals, recipe-driven
+  source-only level-1 rules and design metrics, explicit proposed parameter/value,
+  accepted insert-width/recess change followed by replan test; FoundationIntegrity
+  Diagnostics and MillDesignStudy integration; raw cure/fabrication coverage and
+  EPS consistency; obsolete first-order/upper-bound claims removed.
+
+The coupon trial, measured tools, machine work-origin/fixtures and physical
+material/process evidence remain outstanding. These changes do not release
+fabrication. See the mill TOOLING_README for current study settings and commands.
+
+Validation for this follow-up: neutral tooling/process suites pass 1,712 assertions;
+CAM panel tests 293 and general CamKit 12,386; CncKit 436; native tooling 375;
+casting 49; full mill acceptance 248. Both records-only and full fabrication
+exports pass manifest integrity/tamper checks, including dropped hardware checks
+and invalid status/severity. The full package contains 837 hashed artifacts and
+40 review programs; readiness remains false (14 Pass, 250 Pending, 15 Unsupported).
+The actual foundation symmetric difference is zero. Review and coupon archives
+are regenerated from the verified parent manifest; no physical trial is recorded.
+The optional broad recipe-contract run still needs the external HGH15CA reference
+asset; the default casting suite and native/full tooling checks pass without it.

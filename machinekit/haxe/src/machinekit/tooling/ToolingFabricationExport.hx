@@ -286,6 +286,7 @@ class ToolingFabricationExport {
 		text(dir, "hardware.csv", ToolingFabrication.csv(hardwareRows));
 		data(dir, "planned-hardware.json", p.hardware);
 		data(dir, "hardware-unsupported.json", unknown);
+		data(dir, "hardware-validation.json", classificationChecks);
 		var lines = bill.lines();
 		lines.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
 		data(dir, "hardware-bom.json", lines);

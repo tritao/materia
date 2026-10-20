@@ -12,21 +12,29 @@ class ComponentParameter {
 	public final minimum:Null<Float>;
 	public final maximum:Null<Float>;
 
-	public function new(name:String, type:ComponentParameterType, defaultValue:ComponentValue,
-			?unit:String, ?minimum:Float, ?maximum:Float) {
-		if (name == null || name.length == 0) throw "Component parameter needs a name";
+	public function new(name:String, type:ComponentParameterType, defaultValue:ComponentValue, ?unit:String, ?minimum:Float, ?maximum:Float) {
+		if (name == null || name.length == 0)
+			throw "Component parameter needs a name";
 		this.name = name;
 		this.type = type;
 		this.defaultValue = defaultValue;
 		this.unit = unit;
 		this.minimum = minimum;
 		this.maximum = maximum;
-		validate(defaultValue);
+		if (defaultValue != Unset)
+			validate(defaultValue);
 	}
 
 	public function validate(value:ComponentValue):Void {
-		if (value == null) throw 'Missing component parameter "$name"';
+		if (value == Unset)
 			switch type {
+				case Optional(_):
+				case _:
+					throw 'Missing component parameter "$name"';
+			}
+		if (value == null)
+			throw 'Missing component parameter "$name"';
+		switch type {
 			case Optional(inner):
 				if (value != Unset)
 					new ComponentParameter(name, inner, value, unit, minimum, maximum);
@@ -57,17 +65,22 @@ class ComponentParameter {
 				}
 			case CatalogDesignation(index):
 				switch value {
-					case Token(v): if (v == null || index.designations().indexOf(v) < 0) throw 'Unknown catalog designation "$v" for component parameter "$name"';
+					case Token(v): if (v == null || index.designations()
+							.indexOf(v) < 0) throw 'Unknown catalog designation "$v" for component parameter "$name"';
 					default: wrongType();
 				}
 		}
 	}
 
 	function validateNumber(value:Float):Void {
-		if (!Math.isFinite(value)) throw 'Non-finite component parameter "$name"';
-		if (minimum != null && value < minimum) throw 'Component parameter "$name" is below its minimum';
-		if (maximum != null && value > maximum) throw 'Component parameter "$name" is above its maximum';
+		if (!Math.isFinite(value))
+			throw 'Non-finite component parameter "$name"';
+		if (minimum != null && value < minimum)
+			throw 'Component parameter "$name" is below its minimum';
+		if (maximum != null && value > maximum)
+			throw 'Component parameter "$name" is above its maximum';
 	}
 
-	function wrongType():Void throw 'Wrong value type for component parameter "$name"';
+	function wrongType():Void
+		throw 'Wrong value type for component parameter "$name"';
 }

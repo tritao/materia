@@ -39,7 +39,17 @@ typedef ToolingHardware = {
 	var fixtureSlotToolDiameter:Float;
 }
 
+typedef CastingReviewLimits = {
+	var minimumCornerRadiusMm:Null<Float>;
+	var minimumInsertCoverMm:Null<Float>;
+	var minimumInsertEdgeMm:Null<Float>;
+	var minimumFixingAccessMm:Null<Float>;
+	var minimumLiftingPoints:Null<Int>;
+	var removalClearanceMm:Null<Float>;
+}
+
 typedef ToolingRecipe = {
+	var designReview:CastingReviewLimits;
 	var id:String;
 	var revision:Int;
 	var panel:PanelStockSpec;

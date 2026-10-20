@@ -31,7 +31,17 @@ typedef PanelCamSettings = {
 	var singleToolPrograms:Bool;
 	var spoilboardPlane:Null<Float>;
 	var breakthroughAllowance:Float;
-	var vacuumHoldReference:Null<String>;
+	var onionSkinDepth:Null<Float>;
+	var vacuumHold:Null<{
+		reference:String,
+		areaMm2:Float,
+		holdingForceN:Float,
+		cuttingForceN:Float,
+		safetyFactor:Float
+	}>;
+	var approachClearance:Float;
+	var drillPeckRatio:Float;
+	var drillPeckDepth:Float;
 	var travelSpace:PanelTravelSpace;
 	var workOriginReference:Null<String>;
 	var safeZ:Float;
@@ -183,6 +193,7 @@ class CamToolingPanels {
 			|| !Math.isFinite(settings.blendTolerance)
 			|| settings.blendTolerance <= 0)
 			throw "Invalid panel CAM tolerances";
+		var matchedTools = new Map<Int, Tool>();
 		function matched(op:PanelOperation):Tool {
 			var nominal = settings.nominalDiameters.filter(t -> Math.abs(t.diameter - op.toolDiameter * 0.001) < 1e-10);
 			if (nominal.length != 1)
@@ -190,7 +201,11 @@ class CamToolingPanels {
 			var candidates = settings.tools.filter(t -> t.number == nominal[0].number);
 			if (candidates.length != 1 || Math.abs(candidates[0].diameter - nominal[0].diameter) > settings.diameterMatchTolerance + 1e-12)
 				throw "Panel CAM measured diameter exceeds matching tolerance: " + op.id;
-			return candidates[0];
+			var tool = candidates[0];
+			if (!matchedTools.exists(tool.number))
+				matchedTools.set(tool.number,
+					new Tool(tool.number, tool.length, tool.diameter, tool.cutter, tool.fluteLength, tool.stickOut, nominal[0].diameter));
+			return matchedTools.get(tool.number);
 		}
 		var nominalNumbers = new Map<Int, Bool>();
 		for (nominal in settings.nominalDiameters) {
@@ -216,7 +231,10 @@ class CamToolingPanels {
 			settings.plungeFeed,
 			settings.stepDown,
 			settings.stepOverFraction,
-			settings.spindleSpinUpSeconds
+			settings.spindleSpinUpSeconds,
+			settings.approachClearance,
+			settings.drillPeckRatio,
+			settings.drillPeckDepth
 		])
 			if (!Math.isFinite(v) || v <= 0)
 				throw "Invalid panel CAM settings";
@@ -226,6 +244,21 @@ class CamToolingPanels {
 			|| settings.plungeFeed > settings.feed
 			|| settings.travel == null)
 			throw "Invalid panel CAM setup";
+		if (settings.onionSkinDepth != null
+			&& (!Math.isFinite(settings.onionSkinDepth)
+				|| settings.onionSkinDepth <= 0
+				|| settings.onionSkinDepth >= p.stock.measuredThickness * 0.001))
+			throw "Invalid panel onion-skin depth";
+		var vacuum = settings.vacuumHold;
+		if (vacuum != null) {
+			for (value in [vacuum.areaMm2, vacuum.holdingForceN, vacuum.cuttingForceN, vacuum.safetyFactor])
+				if (!Math.isFinite(value) || value <= 0)
+					throw "Invalid vacuum capacity declaration";
+			if (!declared(vacuum.reference)
+				|| vacuum.safetyFactor < 1
+				|| vacuum.holdingForceN < vacuum.cuttingForceN * vacuum.safetyFactor)
+				throw "Vacuum holding force is inadequate for declared cutting force";
+		}
 		var bounds = PanelGeometry.bounds(PanelContours.outside(p));
 		var groups = new Map<String, Array<PanelOperation>>();
 		for (op in p.operations) {
@@ -250,21 +283,7 @@ class CamToolingPanels {
 			var operations = groups.get(key),
 				ordered:Array<PanelOperation> = [];
 			operations.sort((a, b) -> Reflect.compare(a.id, b.id));
-			while (ordered.length < operations.length) {
-				var ready = operations.filter(o -> ordered.indexOf(o) < 0
-					&& (o.accessVia == null || ordered.filter(parent -> parent.id == o.accessVia).length == 1)
-					&& (o.kind != OutsideProfile || ordered.length == operations.length - 1));
-				if (ready.length == 0)
-					throw "Cyclic panel CAM operation prerequisites";
-				var previous = ordered.length == 0 ? -1 : matched(ordered[ordered.length - 1]).number;
-				ready.sort((a, b) -> {
-					var at = matched(a).number, bt = matched(b).number;
-					if ((at == previous) != (bt == previous))
-						return at == previous ? -1 : 1;
-					return at != bt ? at - bt : Reflect.compare(a.id, b.id);
-				});
-				ordered.push(ready[0]);
-			}
+			ordered = PanelToolOrder.order(operations, op -> matched(op).number);
 			var batches:Array<Array<PanelOperation>> = [];
 			for (op in ordered) {
 				if (batches.length == 0
@@ -276,30 +295,42 @@ class CamToolingPanels {
 			for (batchIndex in 0...batches.length) {
 				ordered = batches[batchIndex];
 				var selected = [
-					for (tool in settings.tools) if (ordered.filter(op -> matched(op).number == tool.number).length > 0) tool
+					for (tool in settings.tools)
+						if (ordered.filter(op -> matched(op).number == tool.number)
+							.length > 0) matched(ordered.filter(op -> matched(op).number == tool.number)[0])
 				];
 				if (selected.length > 1 && selected.filter(t -> t.length <= 0).length > 0)
 					throw "Panel CAM multi-tool programs require measured positive tool lengths";
 				var stock = new SetupStock(0, bounds.width * 0.001
 					+ 2 * settings.blankMargin, 0, bounds.height * 0.001
 					+ 2 * settings.blankMargin, 0,
-					-p.stock.measuredThickness * 0.001, settings.safeZ, settings.fixtures, settings.spoilboardPlane, settings.breakthroughAllowance);
+					-p.stock.measuredThickness * 0.001, settings.safeZ, settings.fixtures, settings.spoilboardPlane,
+					ordered.filter(op -> op.through).length > 0 ? settings.breakthroughAllowance : 0);
 				var setup = new Setup("1", settings.workOrigin, stock);
 				var longest = 0.0;
 				for (tool in selected)
 					longest = Math.max(longest, tool.length);
 				var job = new CamJob(settings.safeZ, settings.spindleRpm, new Point3(0, 0, settings.safeZ + longest), settings.blendTolerance,
-					settings.arcTolerance, settings.spindleSpinUpSeconds, true, settings.cutDirection);
+					settings.arcTolerance, settings.spindleSpinUpSeconds, true, settings.cutDirection, settings.approachClearance);
 				var mirrored = operations[0].side == NegativeZ;
 				for (op in ordered) {
 					var tool = matched(op);
+					if (tool.fluteLength == null || tool.stickOut == null)
+						throw "Panel CAM requires declared flute length and stick-out";
 					var depth = -(op.depth * 0.001 + (op.through ? settings.breakthroughAllowance : 0));
+					if (-depth > tool.fluteLength + 1e-10 || -depth + settings.approachClearance > tool.stickOut + 1e-10)
+						throw "Panel CAM depth exceeds flute length/stick-out: " + op.id;
 					var source = op.kind == Rebate ? openRebate(op, PanelContours.outside(p), tool.diameter * 500) : op;
 					var c = contour(source, settings.chordTolerance, mirrored, bounds.x, bounds.y, bounds.width, settings.blankMargin);
 					switch op.kind {
 						case OutsideProfile, InsideProfile:
-							job.profile(c, tool, depth, settings.feed, op.kind == OutsideProfile ? "outside" : "inside", settings.stepDown,
-								settings.plungeFeed, op.id);
+							if (op.kind == OutsideProfile && settings.onionSkinDepth != null) {
+								var skinPlane = -p.stock.measuredThickness * 0.001 + settings.onionSkinDepth;
+								job.profile(c, tool, skinPlane, settings.feed, "outside", settings.stepDown, settings.plungeFeed, op.id);
+								job.profile(c, tool, depth, settings.feed, "outside", skinPlane - depth, settings.plungeFeed, op.id, skinPlane);
+							} else
+								job.profile(c, tool, depth, settings.feed, op.kind == OutsideProfile ? "outside" : "inside", settings.stepDown,
+									settings.plungeFeed, op.id);
 						case Pocket, Rebate:
 							job.pocket(c, tool, depth, settings.feed, tool.diameter * settings.stepOverFraction, settings.stepDown, settings.plungeFeed, op.id);
 						case Drill:
@@ -308,7 +339,9 @@ class CamToolingPanels {
 							job.drill([
 								new Point3((mirrored ? bounds.width - x : x) * 0.001 + settings.blankMargin,
 									(b.y + b.height / 2 - bounds.y) * 0.001 + settings.blankMargin, 0)
-							], tool, depth, settings.safeZ, settings.plungeFeed, op.id);
+							],
+								tool, depth, Math.min(settings.safeZ, settings.approachClearance), settings.plungeFeed, op.id,
+								-depth > settings.drillPeckRatio * tool.diameter ? settings.drillPeckDepth : 0);
 						default:
 							throw "Unsupported panel CAM operation kind";
 					}
@@ -325,8 +358,10 @@ class CamToolingPanels {
 					pending.push("Tool lengths/measurement evidence are unqualified");
 				if (settings.travelSpace != MachineCoordinates || !declared(settings.workOriginReference))
 					pending.push("Travel/work origin is not qualified in machine coordinates");
-				if (ordered.filter(op -> op.kind == OutsideProfile).length > 0 && !declared(settings.vacuumHoldReference))
-					pending.push("Final outside profile requires declared vacuum-hold qualification");
+				if (ordered.filter(op -> op.kind == OutsideProfile).length > 0
+					&& settings.onionSkinDepth == null
+					&& settings.vacuumHold == null)
+					pending.push("Final outside profile requires onion-skin removal or evidenced vacuum force capacity");
 				result.push({
 					id: materia.tooling.ToolingIds.derive("", p.id, "-" + key + (batches.length > 1 ? "-part-" + (batchIndex + 1) : "")),
 					side: operations[0].side,

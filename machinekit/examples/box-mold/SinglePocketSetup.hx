@@ -18,7 +18,8 @@ class SinglePocketSetup {
 			[
 				{
 					id: "seat",
-					part: new CastInsert(new ComponentValues().setNumber("width", 40)
+					part: new CastInsert(new ComponentValues().setToken("role", "guide-seat")
+						.setNumber("width", 40)
 						.setNumber("depth", 35)
 						.setNumber("height", 15)
 						.setNumber("boreDiameter", 5)),
@@ -104,7 +105,15 @@ class SinglePocketSetup {
 				resinSpec: "pending resin selection",
 				releaseSpec: "pending nonbonding seal and covering",
 				adhesiveSpec: "pending EPS compatible adhesive",
-				processEvidence: []
+				processEvidence: [],
+				designReview: {
+					minimumCornerRadiusMm: null,
+					minimumInsertCoverMm: null,
+					minimumInsertEdgeMm: null,
+					minimumFixingAccessMm: null,
+					minimumLiftingPoints: null,
+					removalClearanceMm: null
+				}
 			}
 		};
 	}

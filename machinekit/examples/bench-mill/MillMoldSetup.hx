@@ -92,7 +92,15 @@ class MillMoldSetup {
 				resinSpec: "pending binder",
 				releaseSpec: "pending release and seam system",
 				adhesiveSpec: "pending EPS compatible adhesive",
-				processEvidence: []
+				processEvidence: [],
+				designReview: {
+					minimumCornerRadiusMm: null,
+					minimumInsertCoverMm: null,
+					minimumInsertEdgeMm: null,
+					minimumFixingAccessMm: null,
+					minimumLiftingPoints: null,
+					removalClearanceMm: null
+				}
 			}
 		};
 	}

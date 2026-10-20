@@ -54,6 +54,8 @@ typedef OrientationGeometryAssessment = {
 }
 
 typedef OrientationMetricTuple = {
+	var failCount:Int;
+	var openChangeRequests:Int;
 	var trappedVolumeMm3:Float;
 	var worstCureMarginC:Null<Float>;
 	var requiresFlip:Bool;
@@ -71,12 +73,12 @@ typedef MoldOrientationResult = {
 	var geometryChecked:Bool;
 	var planningFailure:Null<String>;
 	var sequence:Null<OrientationGeometryAssessment>;
-	var fill:FillReport;
-	var cure:CureReport;
-	var sections:OrthogonalSections.OrthogonalSectionReport;
-	var castability:CastabilityAnalysis.CastabilityReport;
-	var thermalCoverage:ThermalCoverage.ThermalCoverageReport;
-	var handling:HandlingPlan;
+	var fill:Null<FillReport>;
+	var cure:Null<CureReport>;
+	var sections:Null<OrthogonalSections.OrthogonalSectionReport>;
+	var castability:Null<CastabilityAnalysis.CastabilityReport>;
+	var thermalCoverage:Null<ThermalCoverage.ThermalCoverageReport>;
+	var handling:Null<HandlingPlan>;
 	var effort:Null<MoldEffortMetrics>;
 	var changeRequests:Array<DesignChangeRequest>;
 	var validation:Array<ToolingValidation>;
@@ -189,6 +191,8 @@ class MoldOrientationStudy {
 		if (a.geometryChecked != b.geometryChecked)
 			return a.geometryChecked ? -1 : 1;
 		for (value in [
+			Reflect.compare(a.rankMetrics.failCount, b.rankMetrics.failCount),
+			Reflect.compare(a.rankMetrics.openChangeRequests, b.rankMetrics.openChangeRequests),
 			Reflect.compare(a.rankMetrics.trappedVolumeMm3, b.rankMetrics.trappedVolumeMm3),
 			Reflect.compare(b.rankMetrics.worstCureMarginC == null ? Math.NEGATIVE_INFINITY : b.rankMetrics.worstCureMarginC,
 				a.rankMetrics.worstCureMarginC == null ? Math.NEGATIVE_INFINITY : a.rankMetrics.worstCureMarginC),
@@ -220,7 +224,7 @@ class MoldOrientationStudy {
 				throw "Orientation candidates must use the same source revision";
 			source = input;
 			var spec = ProcessSpecCodec.snapshot(candidate.process);
-			CastingProcessAnalysis.validateSectionSources(d, spec);
+
 			if (spec.recipeFingerprint != ToolingCodec.recipeFingerprint(d.recipe))
 				throw "Stale orientation process recipe";
 			var plan:Null<CastingMoldPlan> = null,
@@ -229,38 +233,16 @@ class MoldOrientationStudy {
 				plan = CastingMoldPlanner.plan(d, candidate.options)
 			catch (error:Dynamic)
 				planningFailure = Std.string(error);
-			var shared:Null<CastingProcessReport> = plan == null ? null : CastingProcessAnalysis.analyze(plan, spec, fabrication.gravityMps2, fabrication);
-			var envelope = CastingMoldPlanner.envelope(d);
-			var fill:FillReport,
-				cure:CureReport,
-				sections:OrthogonalSections.OrthogonalSectionReport;
-			if (shared != null) {
-				fill = shared.fill;
-				cure = shared.cure;
-				sections = shared.sections;
-			} else {
-				var features = d.input.features.copy();
-				features.sort((a, b) -> Reflect.compare(a.id, b.id));
-				var boundaries:Array<FillBoundary> = [for (f in features) {id: f.id, box: CastingMoldPlanner.featureBox(d, f)}];
-				var resin = BoxVolumes.subtract([envelope], [for (b in boundaries) b.box]);
-				var cores:Array<FillCore> = [];
-				for (strategy in d.setup.features)
-					if (strategy.strategy == materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS) {
-						var feature = features.filter(f -> f.id == strategy.featureId)[0],
-							clipped = BoxVolumes.intersection(envelope, CastingMoldPlanner.featureBox(d, feature));
-						if (clipped != null)
-							cores.push({id: materia.tooling.ToolingIds.derive("core-", feature.id), boxes: [clipped]});
-					}
-				var processFingerprint = haxe.crypto.Sha256.encode(ToolingCodec.canonical({document: fingerprint, spec: spec,
-					gravity: fabrication.gravityMps2}));
-				fill = FillAnalysis.analyze(d.input.id, fingerprint, processFingerprint, resin, boundaries, cores, d.setup.fillHeightMm,
-					d.recipe.mixDensityKgM3, fabrication.gravityMps2, spec.pourRateMm3PerSecond, spec.maximumAirEscapeWidthMm);
-				cure = CureAnalysis.analyze(d.input.id, fingerprint, processFingerprint, spec, d.recipe.mixDensityKgM3,
-					d.recipe.core.maximumTemperatureC, cores.length > 0
-					|| fabrication.adhesiveContainsEPS == true);
-				sections = OrthogonalSections.analyze(d.input.id, fingerprint, resin, boundaries);
-			}
-			var processFingerprint = fill.processFingerprint;
+			var shared:Null<CastingProcessReport> = null,
+				processFailure:Null<String> = null;
+			if (plan != null)
+				try
+					shared = CastingProcessAnalysis.analyze(plan, spec, fabrication.gravityMps2, fabrication)
+				catch (error:Dynamic)
+					processFailure = Std.string(error);
+			var fill = shared == null ? null : shared.fill;
+			var cure = shared == null ? null : shared.cure;
+			var sections = shared == null ? null : shared.sections;
 			var result:MoldOrientationResult = {
 				id: candidate.id,
 				documentFingerprint: fingerprint,
@@ -269,6 +251,8 @@ class MoldOrientationStudy {
 				geometryChecked: false,
 				planningFailure: planningFailure,
 				rankMetrics: {
+					failCount: 0,
+					openChangeRequests: 0,
 					trappedVolumeMm3: 0,
 					worstCureMarginC: null,
 					requiresFlip: false,
@@ -280,20 +264,25 @@ class MoldOrientationStudy {
 				fill: fill,
 				cure: cure,
 				sections: sections,
-				castability: shared == null ? CastabilityAnalysis.analyze(d, spec, fill, sections, fingerprint, processFingerprint) : shared.castability,
-				thermalCoverage: shared == null ? ThermalCoverage.analyze(d.input.id, sections, spec, processFingerprint) : shared.thermalCoverage,
-				handling: CastHandling.plan(d, candidate.options, envelope),
+				castability: shared == null ? null : shared.castability,
+				thermalCoverage: shared == null ? null : shared.thermalCoverage,
+				handling: plan == null ? null : plan.handling,
 				effort: null,
 				changeRequests: [],
-				validation: shared == null ? fill.validation.concat(cure.validation).concat(sections.validation) : shared.validation.copy()
+				validation: shared == null ? [] : shared.validation.copy()
 			};
 			if (plan == null)
-				result.validation.push(FillAnalysis.check("orientation.planner", [d.input.id], ToolingCheckStatus.Fail,
+				result.validation.push(FillAnalysis.check("orientation.planner", [d.input.id], ToolingCheckStatus.Unsupported,
 					"Mold planning failed: " + result.planningFailure, [fingerprint]));
 			else {
 				result.planningSucceeded = true;
 				result.planFingerprint = CastingMoldCodec.fingerprint(plan);
 				result.changeRequests = plan.changeRequests.copy();
+				if (shared == null) {
+					result.validation = result.validation.concat(plan.validation);
+					result.validation.push(FillAnalysis.check("orientation.process", [d.input.id], ToolingCheckStatus.Fail,
+						"Candidate process analysis failed: " + processFailure, [fingerprint]));
+				}
 
 				var fabricated:Null<FabricationPlan> = null;
 				try
@@ -319,17 +308,21 @@ class MoldOrientationStudy {
 						if (checks == null || checks.length == 0)
 							throw "Empty candidate geometry assessment";
 						result.validation = result.validation.concat(checks);
-						result.geometryChecked = checks.filter(v -> v.status != ToolingCheckStatus.Pass).length == 0;
+						result.geometryChecked = checks.filter(v -> StringTools.startsWith(v.rule, "tooling.cad.")).length == 4
+							&& ["reconstruction", "coverage", "assembly-graph", "demolding-graph"].filter(name -> checks.filter(v -> v.rule == "tooling.cad."
+								+ name
+								&& v.status == ToolingCheckStatus.Pass)
+								.length == 1)
+								.length == 4;
 					} catch (error:Dynamic)
 						result.validation.push(FillAnalysis.check("orientation.geometry", [d.input.id], ToolingCheckStatus.Fail,
 							"Candidate CAD/swept-graph assessment failed: " + Std.string(error), [result.planFingerprint]));
 				}
 			}
-			if (shared == null)
-				result.validation = result.validation.concat(result.thermalCoverage.validation);
-			for (check in result.castability.validation)
-				if (result.validation.filter(v -> v.rule == check.rule).length == 0)
-					result.validation.push(check);
+			if (result.castability != null)
+				for (check in result.castability.validation)
+					if (result.validation.filter(v -> v.rule == check.rule).length == 0)
+						result.validation.push(check);
 			var unique = new Map<String, ToolingValidation>();
 			for (record in result.validation) {
 				if (unique.exists(record.rule) && ToolingCodec.canonical(unique.get(record.rule)) != ToolingCodec.canonical(record))
@@ -338,19 +331,23 @@ class MoldOrientationStudy {
 			}
 			result.validation = [for (record in unique) record];
 			var trapped = 0.0;
-			for (pocket in fill.trappedPockets)
-				trapped += pocket.volumeMm3;
+			if (fill != null)
+				for (pocket in fill.trappedPockets)
+					trapped += pocket.volumeMm3;
 			var margin:Null<Float> = null, allLimits = true;
-			for (limit in cure.limits) {
-				if (limit.marginC == null)
-					allLimits = false;
-				else
-					margin = margin == null ? limit.marginC : Math.min(margin, limit.marginC);
-			}
+			if (cure != null)
+				for (limit in cure.limits) {
+					if (limit.marginC == null)
+						allLimits = false;
+					else
+						margin = margin == null ? limit.marginC : Math.min(margin, limit.marginC);
+				}
 			result.rankMetrics = {
+				failCount: count(result, ToolingCheckStatus.Fail),
+				openChangeRequests: result.changeRequests.length,
 				trappedVolumeMm3: trapped,
 				worstCureMarginC: allLimits ? margin : null,
-				requiresFlip: result.handling.requiresFlip,
+				requiresFlip: result.handling != null && result.handling.requiresFlip,
 				panels: result.effort == null ? null : result.effort.panels,
 				sheets: result.effort == null ? null : result.effort.sheetCount
 			};
@@ -366,7 +363,7 @@ class MoldOrientationStudy {
 			var otherUnsupported = other.validation.filter(v -> StringTools.startsWith(v.rule, "tooling.feature.unsupported.")
 				&& v.status == ToolingCheckStatus.Unsupported)
 				.length > 0;
-			var reason = result.planningSucceeded != other.planningSucceeded ? "planning feasibility" : unsupported != otherUnsupported ? "supported feature strategies" : result.geometryChecked != other.geometryChecked ? "CAD assessment" : result.rankMetrics.trappedVolumeMm3 != other.rankMetrics.trappedVolumeMm3 ? "trapped volume" : result.rankMetrics.worstCureMarginC != other.rankMetrics.worstCureMarginC ? "worst cure margin" : result.rankMetrics.requiresFlip != other.rankMetrics.requiresFlip ? "required flip" : result.rankMetrics.panels != other.rankMetrics.panels ? "panel count" : result.rankMetrics.sheets != other.rankMetrics.sheets ? "sheet count" : "stable ID after a metric tie";
+			var reason = result.planningSucceeded != other.planningSucceeded ? "planning feasibility" : unsupported != otherUnsupported ? "supported feature strategies" : result.geometryChecked != other.geometryChecked ? "CAD assessment" : result.rankMetrics.failCount != other.rankMetrics.failCount ? "failure count" : result.rankMetrics.openChangeRequests != other.rankMetrics.openChangeRequests ? "open change requests" : result.rankMetrics.trappedVolumeMm3 != other.rankMetrics.trappedVolumeMm3 ? "trapped volume" : result.rankMetrics.worstCureMarginC != other.rankMetrics.worstCureMarginC ? "worst cure margin" : result.rankMetrics.requiresFlip != other.rankMetrics.requiresFlip ? "required flip" : result.rankMetrics.panels != other.rankMetrics.panels ? "panel count" : result.rankMetrics.sheets != other.rankMetrics.sheets ? "sheet count" : "stable ID after a metric tie";
 			result.decidingReason = "Compared with "
 				+ other.id
 				+ ", decided by "
@@ -377,9 +374,9 @@ class MoldOrientationStudy {
 		var best = results[0],
 			preferred = best.planningSucceeded && best.geometryChecked && count(best, ToolingCheckStatus.Fail) == 0 ? best.id : null;
 		return {
-			version: 4,
+			version: 5,
 			sourceFingerprint: source,
-			rankingRule: "feasibility gates: planned, supported feature strategies, CAD checked; then trapped volume ascending, worst cure margin descending (unknown last), flip false first, panel count, sheet count, stable ID",
+			rankingRule: "feasibility gates: planned, supported feature strategies, CAD checked; then failure count, open change requests, trapped volume ascending, worst cure margin descending (unknown last), flip false first, panel count, sheet count, stable ID",
 			rankedCandidates: results,
 			preferredReviewCandidateId: preferred
 		};

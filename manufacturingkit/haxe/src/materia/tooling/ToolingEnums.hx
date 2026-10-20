@@ -45,3 +45,22 @@ enum abstract ContactFace(String) to String {
 	var PositiveZ = "positive-z";
 	var NegativeZ = "negative-z";
 }
+
+/** Typed role vocabulary shared by source schemas and neutral validation. */
+class InsertRoles {
+	public static function values():Array<InsertRole>
+		return [
+			InsertRole.TableMount,
+			InsertRole.LiftingMount,
+			InsertRole.ThreadedAnchor,
+			InsertRole.GenericMount,
+			InsertRole.GuideSeat,
+			InsertRole.BearingSeat,
+			InsertRole.ColumnMount,
+			InsertRole.LevelingSeat,
+			InsertRole.HatchMount
+		];
+
+	public static function tokens():Array<String>
+		return [for (role in values()) (role : String)];
+}

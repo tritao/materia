@@ -36,8 +36,10 @@ typedef CastingToolingInsert = {
 	var boreDiameter:Float;
 	var pose:AssemblyFrame;
 	var role:InsertRole;
+
 	/** Original source label, preserved without using it as a closed vocabulary. */
-	var sourceRole:String;
+	var label:String;
+
 	var positionTolerance:Float;
 	var finish:InsertFinish;
 }

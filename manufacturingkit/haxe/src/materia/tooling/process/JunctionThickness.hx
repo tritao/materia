@@ -214,8 +214,8 @@ class JunctionThickness {
 		return top;
 	}
 
-	public static function analyze(sourceId:String, fingerprint:String, region:Array<MoldBox>, owners:Array<FillBoundary>,
-			?settings:JunctionSearchSettings):JunctionThicknessReport {
+	public static function analyze(sourceId:String, fingerprint:String, region:Array<MoldBox>, owners:Array<FillBoundary>, ?settings:JunctionSearchSettings,
+			?heatFaces:Array<ThicknessFace>):JunctionThicknessReport {
 		ToolingIds.validate(sourceId);
 		if (settings == null)
 			settings = {diameterToleranceMm: 0.5, maximumCells: 20000};
@@ -240,7 +240,9 @@ class JunctionThickness {
 		for (o in sortedOwners)
 			ToolingIds.validate(o.id);
 		var boxes = BoxVolumes.subtract(ordered, []),
-			faces = boundary(sourceId, boxes, sortedOwners);
+			faces = heatFaces == null ? boundary(sourceId, boxes, sortedOwners) : heatFaces;
+		if (faces.length == 0)
+			throw "Thermal thickness needs at least one heat-removing face";
 		if (boxes.length > settings.maximumCells)
 			throw "Junction search budget below initial cell count";
 		var lower = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY],
@@ -251,6 +253,9 @@ class JunctionThickness {
 				upper[a] = Math.max(upper[a], lo(b, a) + size(b, a));
 			}
 		var cap = Math.min(upper[0] - lower[0], Math.min(upper[1] - lower[1], upper[2] - lower[2])) / 2;
+		if (heatFaces != null)
+			cap = Math.sqrt(Math.pow(upper[0] - lower[0], 2) + Math.pow(upper[1] - lower[1], 2) + Math.pow(upper[2] - lower[2], 2))
+				+ distance({x: lower[0], y: lower[1], z: lower[2]}, faces[0]);
 		var heap:Array<SearchCell> = [], best:SearchCell = null, count = 0;
 		for (b in boxes) {
 			var c = cell(b, faces, cap);
@@ -258,6 +263,22 @@ class JunctionThickness {
 			count++;
 			if (best == null || c.radius > best.radius)
 				best = c;
+			if (heatFaces != null)
+				for (x in [b.x, b.x + b.width])
+					for (y in [b.y, b.y + b.depth])
+						for (z in [b.z, b.z + b.height]) {
+							var point = {x: x, y: y, z: z},
+								radius = Math.POSITIVE_INFINITY;
+							for (face in faces)
+								radius = Math.min(radius, distance(point, face));
+							if (radius > best.radius)
+								best = {
+									box: b,
+									radius: radius,
+									upper: c.upper,
+									point: point
+								};
+						}
 		}
 		while (heap.length > 0 && 2 * (heap[0].upper - best.radius) > settings.diameterToleranceMm && count + 2 <= settings.maximumCells) {
 			var current = pop(heap);

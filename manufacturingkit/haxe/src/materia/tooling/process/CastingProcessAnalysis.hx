@@ -82,26 +82,33 @@ class CastingProcessAnalysis {
 				"Curved tooling openings intersect the fill footprint. They are conservatively blocked; exact curved projection is not implemented.", []));
 		validateSectionSources(p.document, spec);
 		var cure = CureAnalysis.analyze(p.document.input.id, sourceFingerprint, fingerprint, spec, p.document.recipe.mixDensityKgM3,
-			p.document.recipe.core.maximumTemperatureC, p.cores.length > 0 || fabrication != null && fabrication.adhesiveContainsEPS == true);
+			p.document.recipe.core.maximumTemperatureC, p.cores.length > 0
+			|| fabrication == null
+			|| fabrication.adhesiveContainsEPS != false);
 		cure.validation.push(FillAnalysis.check("process.cure.resin-identity", [p.document.recipe.id],
 			fabrication == null ? materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending : fabrication.resinReference != spec.cure.reference ? materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail : materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass,
 			"Cure reference must name the same resin as the fabrication solvent record.",
 			fabrication == null ? [] : [fabrication.resinReference, spec.cure.reference]));
 		var sections = OrthogonalSections.analyze(p.document.input.id, sourceFingerprint, resin, boundaries);
+		for (contact in spec.faceContacts)
+			if (sections.junction.faces.filter(face -> ThermalFaces.id(face) == contact.faceId).length != 1)
+				throw "Unknown thermal face contact: " + contact.faceId;
 		var sectionChecks = sections.validation;
 		var castability = CastabilityAnalysis.analyze(p.document, spec, fill, sections, sourceFingerprint, fingerprint, p.validation);
-		var thermalCoverage = ThermalCoverage.analyze(p.document.input.id, sections, spec, fingerprint);
+		var thermalCoverage = ThermalCoverage.analyze(p.document.input.id, sections, spec, fingerprint, p.document);
 		var coverageChecks = thermalCoverage.validation;
-		var cureChecks = cure.validation;
-		if (thermalCoverage.validation.filter(v -> v.status != materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length == 0)
-			cureChecks = cureChecks.filter(v -> v.rule != "process.cure.section-coverage");
-		var validation = p.validation.concat(cureChecks).concat(sectionChecks).concat(coverageChecks);
+		var geometric = thermalCoverage.validation.filter(v -> v.rule == "process.cure.geometric-coverage")[0];
+		cure.validation = cure.validation.filter(v -> v.rule != "process.cure.section-coverage");
+		cure.validation.push(FillAnalysis.check("process.cure.section-coverage", geometric.affectedIds, geometric.status, geometric.message,
+			geometric.evidence));
+		cure.validation = cure.validation.concat(coverageChecks);
+		var validation = p.validation.concat(cure.validation).concat(sectionChecks);
 		for (check in castability.validation)
 			if (validation.filter(v -> v.rule == check.rule).length == 0)
 				validation.push(check);
 		validation.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		return {
-			version: 4,
+			version: 5,
 			sourceFingerprint: sourceFingerprint,
 			processFingerprint: fingerprint,
 			spec: spec,

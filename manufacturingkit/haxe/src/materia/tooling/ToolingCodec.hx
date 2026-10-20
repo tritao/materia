@@ -24,7 +24,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 4;
+	public static inline var VERSION = 5;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -174,7 +174,7 @@ class ToolingCodec {
 			"boreDiameter",
 			"pose",
 			"role",
-			"sourceRole",
+			"label",
 			"positionTolerance",
 			"finish"
 		], "insert");
@@ -191,7 +191,7 @@ class ToolingCodec {
 			boreDiameter: bore,
 			pose: frame(raw, "pose"),
 			role: insertRole(string(raw, "role")),
-			sourceRole: string(raw, "sourceRole"),
+			label: string(raw, "label"),
 			positionTolerance: positive(raw, "positionTolerance"),
 			finish: insertFinish(string(raw, "finish"))
 		};
@@ -298,8 +298,23 @@ class ToolingCodec {
 			"resinSpec",
 			"releaseSpec",
 			"adhesiveSpec",
-			"processEvidence"
+			"processEvidence",
+			"designReview"
 		], "recipe");
+		var limits = Reflect.field(raw, "designReview");
+		object(limits, [
+			"minimumCornerRadiusMm",
+			"minimumInsertCoverMm",
+			"minimumInsertEdgeMm",
+			"minimumFixingAccessMm",
+			"minimumLiftingPoints",
+			"removalClearanceMm"
+		], "casting review limits");
+		function optionalLimit(key:String):Null<Float>
+			return Reflect.field(limits, key) == null ? null : nonnegative(limits, key);
+		var lifting:Null<Int> = Reflect.field(limits, "minimumLiftingPoints") == null ? null : integer(limits, "minimumLiftingPoints");
+		if (lifting != null && lifting < 0)
+			throw "Invalid minimum lifting points";
 		var p = Reflect.field(raw, "panel"), c = Reflect.field(raw, "core");
 		var hw = Reflect.field(raw, "hardware");
 		object(hw, [
@@ -455,7 +470,15 @@ class ToolingCodec {
 			resinSpec: string(raw, "resinSpec"),
 			releaseSpec: string(raw, "releaseSpec"),
 			adhesiveSpec: string(raw, "adhesiveSpec"),
-			processEvidence: evidence(raw, "processEvidence")
+			processEvidence: evidence(raw, "processEvidence"),
+			designReview: {
+				minimumCornerRadiusMm: optionalLimit("minimumCornerRadiusMm"),
+				minimumInsertCoverMm: optionalLimit("minimumInsertCoverMm"),
+				minimumInsertEdgeMm: optionalLimit("minimumInsertEdgeMm"),
+				minimumFixingAccessMm: optionalLimit("minimumFixingAccessMm"),
+				minimumLiftingPoints: lifting,
+				removalClearanceMm: optionalLimit("removalClearanceMm")
+			}
 		};
 	}
 
@@ -483,29 +506,12 @@ class ToolingCodec {
 				throw "Invalid panel direction constraint";
 		};
 
-	public static function insertRole(value:String):InsertRole
-		return switch value {
-			case "table-mount":
-				InsertRole.TableMount;
-			case "lifting-mount":
-				InsertRole.LiftingMount;
-			case "threaded-anchor":
-				InsertRole.ThreadedAnchor;
-			case "generic-mount":
-				InsertRole.GenericMount;
-			case "guide-seat":
-				InsertRole.GuideSeat;
-			case "bearing-seat":
-				InsertRole.BearingSeat;
-			case "column-mount":
-				InsertRole.ColumnMount;
-			case "leveling-seat":
-				InsertRole.LevelingSeat;
-			case "hatch-mount":
-				InsertRole.HatchMount;
-			default:
-				throw "Invalid insert role";
-		};
+	public static function insertRole(value:String):InsertRole {
+		for (role in materia.tooling.ToolingEnums.InsertRoles.values())
+			if ((role : String) == value)
+				return role;
+		throw "Invalid insert role";
+	}
 
 	public static function insertFinish(value:String):InsertFinish
 		return switch value {

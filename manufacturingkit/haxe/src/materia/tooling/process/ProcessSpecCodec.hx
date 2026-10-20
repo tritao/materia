@@ -4,7 +4,7 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
 import materia.tooling.process.CastingProcessSpec;
 
-/** Strict independent v4 format. Reconstructs typed records after validation. */
+/** Strict independent v5 format. Reconstructs typed records after validation. */
 class ProcessSpecCodec {
 	static function object(v:Dynamic, keys:Array<String>):Void {
 		if (v == null || !Reflect.isObject(v) || Std.isOfType(v, Array) || Std.isOfType(v, String))
@@ -98,8 +98,31 @@ class ProcessSpecCodec {
 			"castability",
 			"cure",
 			"sections",
-			"solver"
+			"solver",
+			"faceContacts",
+			"openFaceContact"
 		]);
+		var conditions:Array<{faceId:String, kind:ThermalBoundaryKind, evidence:Array<String>}> = [],
+			faceIds:Array<String> = [];
+		for (condition in list(v.faceContacts, 4096)) {
+			object(condition, ["faceId", "kind", "evidence"]);
+			if (["insulated", "convection", "fixed-temperature"].indexOf(condition.kind) < 0)
+				throw "Invalid thermal contact kind";
+			var faceId = text(condition.faceId);
+			ToolingIds.validate(faceId);
+			if (faceIds.indexOf(faceId) >= 0)
+				throw "Duplicate thermal face condition";
+			faceIds.push(faceId);
+			conditions.push({faceId: faceId, kind: cast condition.kind, evidence: texts(condition.evidence)});
+		}
+		conditions.sort((a, b) -> Reflect.compare(a.faceId, b.faceId));
+		var open:Null<{kind:ThermalBoundaryKind, evidence:Array<String>}> = null;
+		if (v.openFaceContact != null) {
+			object(v.openFaceContact, ["kind", "evidence"]);
+			if (["insulated", "convection", "fixed-temperature"].indexOf(v.openFaceContact.kind) < 0)
+				throw "Invalid thermal contact kind";
+			open = {kind: cast v.openFaceContact.kind, evidence: texts(v.openFaceContact.evidence)};
+		}
 		var id = text(v.id);
 		ToolingIds.validate(id);
 		var fingerprint = text(v.recipeFingerprint);
@@ -203,6 +226,7 @@ class ProcessSpecCodec {
 			"cells",
 			"timeStepSeconds",
 			"durationSeconds",
+			"maximumExtensionSeconds",
 			"convergenceToleranceC",
 			"maximumIterations",
 			"remainingHeatToleranceC"
@@ -211,11 +235,12 @@ class ProcessSpecCodec {
 			cells: integer(s.cells, 3, 201),
 			timeStepSeconds: number(s.timeStepSeconds, 1e-6, 1e7),
 			durationSeconds: number(s.durationSeconds, 1e-6, 1e9),
+			maximumExtensionSeconds: number(s.maximumExtensionSeconds, 0, 1e9),
 			convergenceToleranceC: number(s.convergenceToleranceC, 1e-10, 0.1),
 			maximumIterations: integer(s.maximumIterations, 2, 1000),
 			remainingHeatToleranceC: number(s.remainingHeatToleranceC, 1e-9, 1)
 		};
-		if (solver.durationSeconds / solver.timeStepSeconds > 2000000.0 / solver.cells)
+		if ((solver.durationSeconds + solver.maximumExtensionSeconds) / solver.timeStepSeconds > 2000000.0 / solver.cells)
 			throw "Cure solver work limit exceeded";
 		return {
 			id: id,
@@ -239,12 +264,14 @@ class ProcessSpecCodec {
 				evidence: texts(c.evidence)
 			},
 			sections: sections,
-			solver: solver
+			solver: solver,
+			faceContacts: conditions,
+			openFaceContact: open
 		};
 	}
 
 	public static function encode(v:CastingProcessSpec):String {
-		var text = ToolingCodec.canonical({format: "materia.casting-process", version: 4, spec: snapshot(v)}) + "\n";
+		var text = ToolingCodec.canonical({format: "materia.casting-process", version: 5, spec: snapshot(v)}) + "\n";
 		if (haxe.io.Bytes.ofString(text).length > 2097152)
 			throw "Casting process size limit";
 		return text;
@@ -262,7 +289,7 @@ class ProcessSpecCodec {
 			throw error;
 		}
 		object(v, ["format", "version", "spec"]);
-		if (v.format != "materia.casting-process" || v.version != 4)
+		if (v.format != "materia.casting-process" || v.version != 5)
 			throw "Unsupported casting process format/version";
 		return snapshot(v.spec);
 	}

@@ -31,6 +31,8 @@ class ToolingProcessExport {
 				resources.push(local);
 				var actual = machinekit.assembly.PosedParts.moved(local, p.document.setup.sourceToMold);
 				resources.push(actual);
+				if (Math.abs(report.fill.geometricResinVolumeMm3 - actual.volume()) > Math.max(1e-5, actual.volume() * 1e-9))
+					throw "Fill geometric resin volume differs from actual foundation CAD volume";
 				var region = CastingMoldCad.source(p);
 				resources.push(region);
 				var missing = actual.subtractAll([region]);

@@ -131,6 +131,12 @@ class OrientationSectionTests {
 			"ranking declares its tuple and deciding reason");
 		var first = comparison.rankedCandidates[0],
 			second = comparison.rankedCandidates[1];
+		first.rankMetrics.failCount++;
+		check(MoldOrientationStudy.compare(first, second) > 0, "failure count precedes process metrics");
+		first.rankMetrics.failCount--;
+		first.rankMetrics.openChangeRequests++;
+		check(MoldOrientationStudy.compare(first, second) > 0, "open requests precede process metrics");
+		first.rankMetrics.openChangeRequests--;
 		first.rankMetrics.trappedVolumeMm3 = 1;
 		second.rankMetrics.trappedVolumeMm3 = 2;
 		check(MoldOrientationStudy.compare(first, second) < 0, "ranking minimises trapped volume first");
@@ -176,7 +182,9 @@ class OrientationSectionTests {
 		var failure = MoldOrientationStudy.run([broken, a], FabricationTests.spec()).rankedCandidates[1];
 		check(!failure.planningSucceeded && failure.planningFailure != null && failure.effort == null,
 			"planning failure preserves source fill report without fabricated effort");
-		check(failure.fill.totalMixVolumeMm3 > 0, "fill still evaluated for an unbuildable candidate");
+		check(failure.fill == null
+			&& failure.validation.filter(v -> v.rule == "orientation.planner" && v.status == "unsupported").length == 1,
+			"unplanned candidate has no second process pipeline");
 		var changed = MoldOrientationStudy.reorient(p.document, "turned", materia.assembly.AssemblyFrames.identity());
 		check(ToolingCodec.inputFingerprint(changed.input) == ToolingCodec.inputFingerprint(p.document.input),
 			"reorientation cannot change the source revision");
@@ -237,6 +245,21 @@ class OrientationSectionTests {
 		}).rankedCandidates[0];
 		check(!stale.geometryChecked && stale.validation.filter(v -> v.rule == "orientation.geometry" && v.status == "fail").length == 1,
 			"stale CAD evidence cannot mark a candidate checked");
+		var checked = MoldOrientationStudy.run([a], FabricationTests.spec(), plan -> {
+			return {
+				planFingerprint: materia.tooling.casting.CastingMoldCodec.fingerprint(plan),
+				assemblySteps: 1,
+				demoldingSteps: 1,
+				assemblyBlockingEdges: 0,
+				demoldingBlockingEdges: 0,
+				validation: plan.validation.concat([
+					for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
+						materia.tooling.process.FillAnalysis.check("tooling.cad." + name, [plan.document.input.id],
+							materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass, "CAD test evidence", [])
+				])
+			};
+		}).rankedCandidates[0];
+		check(checked.geometryChecked, "own four CAD records establish geometry despite pending planner checks");
 		var badProcess = ProcessSpecCodec.snapshot(s);
 		badProcess.sections = [
 			{
@@ -256,7 +279,9 @@ class OrientationSectionTests {
 			options: p.options,
 			process: badProcess
 		};
-		rejects(() -> MoldOrientationStudy.run([badCandidate], FabricationTests.spec()), "Unknown cure section source: missing-source");
+		check(MoldOrientationStudy.run([badCandidate], FabricationTests.spec())
+			.rankedCandidates[0].validation.filter(v -> v.rule == "orientation.process" && v.status == "fail").length == 1,
+			"candidate analysis failure is recorded without aborting study");
 		Sys.println('OrientationSectionTests: $assertions assertions passed');
 	}
 }

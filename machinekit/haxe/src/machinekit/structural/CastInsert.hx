@@ -16,17 +16,7 @@ class CastInsert extends MachineComponent {
 			P.length("depth", 400),
 			P.length("height", 20),
 			P.length("positionTolerance", 0.01),
-			P.choice("role", [
-				InsertRole.TableMount,
-				InsertRole.LiftingMount,
-				InsertRole.ThreadedAnchor,
-				InsertRole.GenericMount,
-				InsertRole.GuideSeat,
-				InsertRole.BearingSeat,
-				InsertRole.ColumnMount,
-				InsertRole.LevelingSeat,
-				InsertRole.HatchMount
-			], InsertRole.GuideSeat),
+			P.requiredChoice("role", materia.tooling.ToolingEnums.InsertRoles.tokens()),
 			P.text("label", "rail seat"),
 			P.choice("finish", [
 				"ground after casting",
@@ -38,7 +28,8 @@ class CastInsert extends MachineComponent {
 
 	public static function recipeType():ComponentType {
 		if (recipe == null)
-			recipe = new ComponentType("machinekit.structural.cast-in-steel-insert", parameters(), v -> new CastInsert(v), false, false, null, false);
+			recipe = new ComponentType("machinekit.structural.cast-in-steel-insert", parameters(), v -> new CastInsert(v), false, false, null, false,
+				new ComponentValues().setToken("role", InsertRole.GenericMount));
 		return recipe;
 	}
 

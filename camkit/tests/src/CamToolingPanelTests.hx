@@ -43,7 +43,11 @@ class CamToolingPanelTests {
 			singleToolPrograms: false,
 			spoilboardPlane: -0.012,
 			breakthroughAllowance: 0.001,
-			vacuumHoldReference: null,
+			vacuumHold: null,
+			onionSkinDepth: null,
+			approachClearance: 0.0005,
+			drillPeckRatio: 3,
+			drillPeckDepth: 0.003,
 			travelSpace: MachineCoordinates,
 			workOriginReference: "test machine datum",
 			nominalDiameters: [
@@ -60,7 +64,10 @@ class CamToolingPanelTests {
 			stepDown: 0.004,
 			stepOverFraction: 0.4,
 			blankMargin: 0.01,
-			tools: [new Tool(1, 0.05, 0.002), new Tool(2, 0.06, 0.004)],
+			tools: [
+				new Tool(1, 0.05, 0.002, null, 0.025, 0.03),
+				new Tool(2, 0.06, 0.004, null, 0.025, 0.03)
+			],
 			fixtures: [],
 			travel: new TravelEnvelope(new Point3(-0.1, -0.1, -0.1), new Point3(1, 1, 0.1)),
 			workOrigin: new Point3(0, 0, 0),
@@ -162,7 +169,7 @@ class CamToolingPanelTests {
 		for (index in 0...lines.length) {
 			if (StringTools.endsWith(lines[index], " M6")) {
 				changes++;
-				check(StringTools.startsWith(lines[index + 1], "G43 H"), "every measured tool change immediately applies H offset");
+				check(StringTools.startsWith(lines[index + 2], "G43 H"), "every measured tool change immediately applies H offset");
 			}
 			if (StringTools.endsWith(lines[index], " M3"))
 				check(lines[index + 1] == "G4 P2", "spindle starts have declared spin-up dwell");
@@ -238,7 +245,10 @@ class CamToolingPanelTests {
 			check(closest <= 0.001 + s.arcTolerance, "square rebate cutter sweep reaches the original outline corner without a lip");
 		}
 		var measured = settings();
-		measured.tools = [new Tool(1, 0.05, 0.00196), new Tool(2, 0.06, 0.004)];
+		measured.tools = [
+			new Tool(1, 0.05, 0.00196, null, 0.025, 0.03),
+			new Tool(2, 0.06, 0.004, null, 0.025, 0.03)
+		];
 		var measuredBlank = PanelJoints.blank("measured-diameter", 100, 80, p.stock, 2, 2);
 		var measuredProgram = CamToolingPanels.build(measuredBlank, measured)[0].program,
 			left = Math.POSITIVE_INFINITY;
@@ -249,7 +259,10 @@ class CamToolingPanelTests {
 				case _:
 			}
 		check(Math.abs(left - (0.01 - 0.00196 / 2)) < 1e-8, "actual measured diameter supplies compensation while nominal diameter selects the tool");
-		measured.tools = [new Tool(1, 0.05, 0.0022), new Tool(2, 0.06, 0.004)];
+		measured.tools = [
+			new Tool(1, 0.05, 0.0022, null, 0.025, 0.03),
+			new Tool(2, 0.06, 0.004, null, 0.025, 0.03)
+		];
 		rejects(() -> CamToolingPanels.build(measuredBlank, measured), "matching tolerance");
 		var machineTravel = settings();
 		machineTravel.workOrigin = new Point3(1, 0, 0);
@@ -291,7 +304,10 @@ class CamToolingPanelTests {
 			}
 		rejects(() -> setups[1].setup.validate(negative, setups[1].program.tools), "below stock bottom/spoilboard allowance");
 		var unknown = settings();
-		unknown.tools = [new Tool(1, 0, 0.002), new Tool(2, 0, 0.004)];
+		unknown.tools = [
+			new Tool(1, 0, 0.002, null, 0.025, 0.03),
+			new Tool(2, 0, 0.004, null, 0.025, 0.03)
+		];
 		rejects(() -> CamToolingPanels.build(p, unknown), "multi-tool programs require measured");
 		unknown.singleToolPrograms = true;
 		for (batch in CamToolingPanels.build(p, unknown)) {
@@ -305,9 +321,80 @@ class CamToolingPanelTests {
 			check([for (id in ids.keys()) id].length == 1 && batch.readinessPending.length > 0,
 				"unmeasured tools are only exported as pending single-tool programs");
 		}
+		var touchOff = settings();
+		touchOff.singleToolPrograms = true;
+		touchOff.onionSkinDepth = 0.0005;
+		touchOff.tools = [
+			new Tool(1, 0, 0.002, null, 0.025, 0.03),
+			new Tool(2, 0, 0.004, null, 0.025, 0.03)
+		];
+		var skin = false, removed = false, pecks = 0;
+		for (batch in CamToolingPanels.build(p, touchOff)) {
+			var text = CncWriter.write(batch.program, new CncController(cnckit.CncDialect.LinuxCnc, batch.program.tools));
+			check(text.indexOf("touch off Z with this tool; no length offset") >= 0 && text.indexOf("G43") < 0 && text.indexOf("G49") >= 0,
+				"shipped single-tool touch-off route declares G49 and no length offset");
+			check(text.indexOf(" measured ") >= 0 && text.indexOf(", flat)") >= 0, "tool changes describe nominal/measured diameter and cutter shape");
+			for (op in batch.program.ops)
+				switch op {
+					case Move(Cut, g, _, _, span) if (span.featureRef == "outline"):
+						var point = GeometryTools.pointAt(g, GeometryTools.length(g));
+						if (Math.abs(point.z + 0.0115) < 1e-10)
+							skin = true;
+						if (Math.abs(point.z + 0.013) < 1e-10)
+							removed = true;
+					case Move(Plunge, _, _, _, span) if (span.featureRef == "deep-drill"):
+						pecks++;
+					case _:
+				}
+		}
+		check(skin && removed, "onion skin is left before a separate final removal pass");
+		check(pecks >= 5, "deep drilling uses explicit pecks beyond the declared depth/diameter ratio");
+		var blindStock:toolpathkit.setup.SetupStock = cast setups[0].setup.stock;
+		check(blindStock.breakthroughAllowance == 0, "blind-only setup receives no spoilboard breakthrough allowance");
+		var invalidVacuum = settings();
+		invalidVacuum.vacuumHold = {
+			reference: "bare capacity",
+			areaMm2: 100,
+			holdingForceN: 10,
+			cuttingForceN: 20,
+			safetyFactor: 2
+		};
+		rejects(() -> CamToolingPanels.build(p, invalidVacuum), "holding force is inadequate");
+		invalidVacuum.vacuumHold.holdingForceN = 100;
+		invalidVacuum.vacuumHold.areaMm2 = 0;
+		rejects(() -> CamToolingPanels.build(p, invalidVacuum), "Invalid vacuum capacity");
+		var l = new camkit.CamContour([
+			      new Point3(0, 0, 0),    new Point3(0.03, 0, 0), new Point3(0.03, 0.01, 0),
+			new Point3(0.01, 0.01, 0), new Point3(0.01, 0.03, 0),    new Point3(0, 0.03, 0)
+		]);
+		for (direction in [camkit.CamCutDirection.Climb, camkit.CamCutDirection.Conventional]) {
+			var raster = new camkit.CamJob(0.01, 12000, null, 0, 0, 0, false, direction,
+				0.0005).pocket(l, new Tool(1, 0, 0.002), -0.001, 0.01, 0.0008).finish();
+			var localLinks = 0, oriented = 0;
+			for (op in raster.ops)
+				switch op {
+					case Move(Cut, Line(a, b), _, _, _):
+						if (Math.abs(a.z - 0.0005) < 1e-9 && Math.abs(b.z - 0.0005) < 1e-9)
+							localLinks++;
+						if (Math.abs(a.z + 0.001) < 1e-9 && Math.abs(b.z + 0.001) < 1e-9 && Math.abs(a.y - b.y) < 1e-9) {
+							if (oriented == 0)
+								check(direction == camkit.CamCutDirection.Climb ? b.x > a.x : b.x < a.x,
+									"first raster clearing pass follows declared direction");
+							oriented++;
+						}
+					case _:
+				}
+			check(localLinks > 0 && oriented > 0, "adjacent raster passes link over the cleared layer without safe-Z retractions");
+		}
 		var qualified = settings();
 		qualified.fixtures = [new Fixture("declared-vacuum-base", 0.5, 0.51, 0.5, 0.51, -0.02, 0.005)];
-		qualified.vacuumHoldReference = "fixture-only vacuum test";
+		qualified.vacuumHold = {
+			reference: "fixture-only vacuum test",
+			areaMm2: 10000,
+			holdingForceN: 200,
+			cuttingForceN: 50,
+			safetyFactor: 2
+		};
 		check(CamToolingPanels.build(p, qualified).filter(batch -> batch.readinessPending.length > 0).length == 0,
 			"declared machine coordinates, measured tools, fixtures and vacuum satisfy CAM declaration checks");
 		qualified.travelSpace = WorkCoordinates;
@@ -340,10 +427,16 @@ class CamToolingPanelTests {
 		var bounded = CamToolingPanels.build(long, s);
 		check(bounded[0].id.length <= 128 && bounded[1].id.length <= 128 && bounded[0].id != bounded[1].id, "derived CAM IDs stay bounded and unique");
 		s = settings();
-		s.tools = [new Tool(1, 0, 0.002), new Tool(1, 0, 0.004)];
+		s.tools = [
+			new Tool(1, 0, 0.002, null, 0.025, 0.03),
+			new Tool(1, 0, 0.004, null, 0.025, 0.03)
+		];
 		rejects(() -> CamToolingPanels.build(p, s), "numbers must be unique");
 		s = settings();
-		s.tools = [new Tool(3, 0, 0.003), new Tool(2, 0, 0.004)];
+		s.tools = [
+			new Tool(3, 0, 0.003, null, 0.025, 0.03),
+			new Tool(2, 0, 0.004, null, 0.025, 0.03)
+		];
 		rejects(() -> CamToolingPanels.build(p, s), "matching tolerance");
 		s = settings();
 		s.fixtures = [new Fixture("blocked-pocket", 0.02, 0.05, 0.03, 0.06, -0.012, 0.005)];
@@ -353,8 +446,9 @@ class CamToolingPanelTests {
 		rejects(() -> CamToolingPanels.build(p, s), "travel");
 		s = settings();
 		var bad = panel();
-		bad.operations[1].depth = 13;
-		rejects(() -> CamToolingPanels.build(bad, s), "depth");
+		var shortTool = new Tool(1, 0.05, 0.002, null, 0.003, 0.03);
+		rejects(() -> new camkit.CamJob(0.01, 12000).profile(CamToolingPanels.contour(bad.operations[0], 0.00002), shortTool, -0.012, 0.01),
+			"CAM depth exceeds flute length");
 		rejects(() -> CamToolingPanels.contour(circle, 0), "positive chord tolerance");
 		Sys.println('CamToolingPanelTests: $assertions assertions passed');
 		return assertions;

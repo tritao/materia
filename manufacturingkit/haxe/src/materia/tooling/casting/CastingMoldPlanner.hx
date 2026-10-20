@@ -172,7 +172,7 @@ class CastingMoldPlanner {
 					epsBoxes.push(cb);
 				} else if (s.strategy == CoreStrategy.Unsupported || s.draftDegrees > 0) {
 					result.features.push({featureId: f.id, kind: UnsupportedFeature, memberIds: []});
-					request(result, "unsupported-" + f.id, DraftOrSplit, [f.id],
+					request(result, "unsupported-" + f.id, ReleaseAlternative, [f.id],
 						"This planner supports only orthogonal zero-draft rigid formers or fill-open EPS. Drafted/split formers are unsupported; choose supported EPS or revise the source to a supported geometry.",
 						"tooling.feature.unsupported." + f.id, true);
 				}
@@ -466,18 +466,18 @@ class CastingMoldPlanner {
 				feature.memberIds.sort(Reflect.compare);
 				if (feature.memberIds.length == 0) {
 					feature.kind = UnsupportedFeature;
-					request(result, "unallocated-" + source.id, DraftOrSplit, [source.id],
+					request(result, "unallocated-" + source.id, ReleaseAlternative, [source.id],
 						"Feature has no supported physical tooling owner; choose an explicit alternative.", "tooling.feature.unsupported." + source.id, true);
 				}
 			}
 		for (strategy in d.setup.features)
 			if (strategy.strategy == CoreStrategy.ReusableFormer && strategy.draftDegrees == 0)
-				request(result, "draft-" + strategy.featureId, DraftOrSplit, [strategy.featureId],
+				request(result, "draft-" + strategy.featureId, ReleaseAlternative, [strategy.featureId],
 					"Zero-draft rigid former has no qualified physical release. Only supported EPS or a source change to supported release geometry clears this rule; drafted/split formers are not implemented.",
 					"tooling.former.draft." + strategy.featureId);
 		for (former in result.formers)
 			if (former.featureIds.length == 0 && former.draftDegrees == 0)
-				request(result, "draft-" + former.volume.id, DraftOrSplit, [former.volume.id],
+				request(result, "draft-" + former.volume.id, ReleaseAlternative, [former.volume.id],
 					"Bed-backing zero-draft rigid former needs a source/release change; drafted and split formers are unsupported.",
 					"tooling.former.draft." + former.volume.id);
 		if (result.handling.requiresFlip && !CastHandling.qualified(d, o, result.handling))
@@ -545,6 +545,12 @@ class CastingMoldPlanner {
 			check.severity = materia.tooling.ToolingDiagnostic.ToolingSeverity.Error;
 		}
 		p.validation.push(check);
+	}
+
+	public static function resinAtFill(document:ToolingDocument, envelope:MoldBox):Array<MoldBox> {
+		var wetted = BoxVolumes.copy(envelope);
+		wetted.height = Math.min(wetted.height, document.setup.fillHeightMm - wetted.z);
+		return BoxVolumes.subtract(wetted.height > 0 ? [wetted] : [], [for (feature in document.input.features) featureBox(document, feature)]);
 	}
 
 	public static function validate(p:CastingMoldPlan):Void {
@@ -662,7 +668,7 @@ class CastingMoldPlanner {
 					throw "Former sealing profile differs from panel operation";
 			}
 		}
-		var resin = BoxVolumes.subtract([p.envelope], [for (feature in p.document.input.features) featureBox(p.document, feature)]);
+		var resin = resinAtFill(p.document, p.envelope);
 		for (fixture in p.fixtures) {
 			MoldVolumeCodec.snapshot(fixture.datum);
 			if (fixture.datum.profiles.length > 0)

@@ -86,7 +86,7 @@ class BoxMoldCad {
 			.setNumber("boreDiameter", i.boreDiameter)
 			.setNumber("positionTolerance", i.positionTolerance)
 			.setToken("role", i.role)
-			.setToken("label", i.sourceRole));
+			.setToken("label", i.label));
 	}
 
 	public static function assembly(p:MoldPlan, exploded:Bool = false):MachineAssembly {

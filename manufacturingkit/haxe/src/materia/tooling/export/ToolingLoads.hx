@@ -161,6 +161,8 @@ class ToolingLoads {
 				&& outline.filter(e -> e.center != null).length == 0
 				&& outline.filter(e -> Math.abs(e.end.x - e.start.x) > 1e-7 && Math.abs(e.end.y - e.start.y) > 1e-7).length == 0;
 			if (!plain || !isWall) {
+				if (s.plates.filter(v -> v.panelId == m.panel.id).length > 0)
+					throw "Plate support supplied for panel without structural model: " + m.panel.id;
 				r.validation.push(check("fabrication.plate." + m.panel.id, [m.panel.id], Unsupported,
 					"This panel has rebates/holes/tabs, a nonrectangular boundary or local support loads. No structural model for its actual geometry is implemented; rectangular plate capacity is not credited.",
 					[]));

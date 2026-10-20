@@ -62,7 +62,7 @@ class FillAnalysis {
 			rule: rule,
 			affectedIds: ids.copy(),
 			status: status,
-			severity: status == ToolingCheckStatus.Fail ? Error : status == ToolingCheckStatus.Pass ? Info : Warning,
+			severity: status == ToolingCheckStatus.Pass ? Info : status == ToolingCheckStatus.Pending ? Warning : Error,
 			message: message,
 			evidence: evidence.copy()
 		};
@@ -362,10 +362,11 @@ class FillAnalysis {
 					timeSeconds: pourRate == null ? null : v / pourRate,
 					maximumHeadPa: Math.max(0, h - floor) * 0.001 * densityKgM3 * gravityMps2,
 					panelHeads: [
-						for (panel in panelRecords) {
-							id: panel.id,
-							headPa: Math.max(0, h - panel.bottomMm) * 0.001 * densityKgM3 * gravityMps2
-						}
+						for (panel in panelRecords)
+							{
+								id: panel.id,
+								headPa: Math.max(0, h - panel.bottomMm) * 0.001 * densityKgM3 * gravityMps2
+							}
 					],
 					cores: [
 						for (c in cores) {

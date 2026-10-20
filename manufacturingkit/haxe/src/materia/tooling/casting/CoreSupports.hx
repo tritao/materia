@@ -375,7 +375,7 @@ class CoreSupports {
 				if (Math.abs(c.cavity.y + c.cavity.depth / 2 - y) < 1e-7) {
 					c.bridgeId = id;
 					var f = c.foamLayers[0];
-					c.bridgeBondAreaMm2 = f.width * width;
+					c.bridgeBondAreaMm2 = f.width * Math.max(0, Math.min(y + width / 2, f.y + f.depth) - Math.max(y - width / 2, f.y));
 					place(PanelJoints.blank(c.carrierId, f.width, f.depth, r.panel, r.routerDiameter, l), f.x, f.y, b.z + b.height);
 				}
 		}

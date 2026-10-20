@@ -189,7 +189,7 @@ class CastingMoldTests {
 		rigid.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;
 		rigid.setup.features[0].withdrawal = {x: 0, y: 0, z: 1};
 		var rigidPlan = CastingMoldPlanner.plan(rigid, options(rigid));
-		check(rigidPlan.changeRequests.filter(v -> v.kind == DraftOrSplit).length > 0, "zero draft emits a physical-release request");
+		check(rigidPlan.changeRequests.filter(v -> v.kind == ReleaseAlternative).length > 0, "zero draft emits a physical-release request");
 		var overlap = ToolingCodec.snapshot(d);
 		overlap.input.inserts[0].pose.x = 30;
 		overlap.input.inserts[0].pose.z = 40;
@@ -303,8 +303,7 @@ class CastingMoldTests {
 		check(CastingMoldPlanner.plan(d, machining).changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 1,
 			"machining requires an allowance decision");
 		machining.precision[0].allowance = 1;
-		check(CastingMoldPlanner.plan(d, machining).changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 1,
-			"unapplied finishing stock still requires a source allowance decision");
+		rejects(() -> CastingMoldPlanner.plan(d, machining), "unimplemented finishing stock is rejected");
 		var finishing = ToolingCodec.snapshot(d);
 		finishing.input.inserts[0].finish = materia.tooling.ToolingEnums.InsertFinish.ReplicatedAfterCasting;
 		finishing.setup.sourceFingerprint = ToolingCodec.inputFingerprint(finishing.input);
@@ -316,6 +315,7 @@ class CastingMoldTests {
 		var invalidRule = CastingMoldCodec.decode(s);
 		invalidRule.changeRequests[0].blockingChecks = ["missing-rule"];
 		rejects(() -> CastingMoldPlanner.validate(invalidRule), "change requests cannot name nonexistent validation rules");
+		ReviewContractTests.run(CastingMoldCodec.decode(s));
 		ProcessTests.run(CastingMoldCodec.decode(s));
 		Sys.println('CastingMoldTests: $assertions assertions passed');
 	}

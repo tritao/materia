@@ -19,6 +19,8 @@ typedef CureSectionResult = {
 	var steps:Int;
 	var remainingHeatC:Float;
 	var reactionComplete:Bool;
+	var simulatedSeconds:Float;
+	var extensionCapReached:Bool;
 	var reactionHeatJPerM2:Float;
 	var boundaryHeatOutJPerM2:Float;
 	var storedHeatJPerM2:Float;
@@ -34,6 +36,7 @@ typedef CureLimitResult = {
 typedef CureReport = {
 	var sourceFingerprint:String;
 	var resinReference:String;
+	var hasEPS:Bool;
 	var processFingerprint:String;
 	var adiabaticRiseC:Null<Float>;
 	var lumpedPeakEstimateC:Null<Float>;
@@ -43,7 +46,7 @@ typedef CureReport = {
 }
 
 /** Cell-centred finite-volume slab, backward Euler conduction and backward Euler
- * first-order Arrhenius conversion, iterated together at every step. SI internally.
+ * declared Arrhenius/autocatalytic conversion, iterated together at every step. SI internally.
  * Only declared planar slabs are represented; joints and steel sinks are not invented.
  */
 class CureAnalysis {
@@ -109,8 +112,16 @@ class CureAnalysis {
 			alpha = [for (_ in 0...n) c.kinetics == null ? 0.0 : c.kinetics.initialConversion];
 		var peak:Float = initial, peakTime = 0.0, time = 0.0, steps = 0;
 		var reactionHeat = 0.0, boundaryHeat = 0.0;
-		while (time < settings.durationSeconds) {
-			var dt = Math.min(settings.timeStepSeconds, settings.durationSeconds - time),
+		function remaining():Float {
+			var minimum = alpha[0];
+			for (value in alpha)
+				minimum = Math.min(minimum, value);
+			return rise * (1 - minimum);
+		}
+		var cap = settings.durationSeconds + settings.maximumExtensionSeconds;
+		while (time < cap - 1e-10 && (time < settings.durationSeconds - 1e-10 || remaining() > settings.remainingHeatToleranceC)) {
+			var boundaryTime = time < settings.durationSeconds - 1e-10 ? settings.durationSeconds : cap;
+			var dt = Math.min(settings.timeStepSeconds, boundaryTime - time),
 				guess = temperature.copy();
 			var nextAlpha = alpha.copy(),
 				accepted:Array<Float> = [],
@@ -206,6 +217,8 @@ class CureAnalysis {
 			steps: steps,
 			remainingHeatC: remainingHeat,
 			reactionComplete: remainingHeat <= settings.remainingHeatToleranceC,
+			simulatedSeconds: time,
+			extensionCapReached: remainingHeat > settings.remainingHeatToleranceC && time >= cap - 1e-8,
 			reactionHeatJPerM2: reactionHeat,
 			boundaryHeatOutJPerM2: boundaryHeat,
 			storedHeatJPerM2: storedHeat,
@@ -325,6 +338,7 @@ class CureAnalysis {
 		return {
 			sourceFingerprint: sourceFingerprint,
 			resinReference: spec.cure.reference,
+			hasEPS: hasEPS,
 			processFingerprint: processFingerprint,
 			adiabaticRiseC: rise,
 			lumpedPeakEstimateC: peak,

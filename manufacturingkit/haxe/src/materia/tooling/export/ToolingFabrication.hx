@@ -138,11 +138,14 @@ class ToolingFabrication {
 			checks = p.validation.copy();
 		var eps = p.cores.length > 0;
 		checks.push(ToolingLoads.check("fabrication.materials.compatibility", [p.document.recipe.id],
-			(eps || s.adhesiveContainsEPS == true)
+			(eps || s.adhesiveContainsEPS != false)
 			&& s.solvent == StyreneBearing ? Fail : s.solvent == Unknown || s.compatibilityEvidence.length == 0 ? Pending : Pass,
 			"Styrene-bearing resin is incompatible with EPS; the actual resin/EPS/adhesive/release combination requires compatibility evidence.",
 			s.compatibilityEvidence));
-		if (cure != null && (cure.sourceFingerprint != CastingMoldCodec.fingerprint(p) || cure.resinReference != s.resinReference))
+		if (cure != null
+			&& (cure.sourceFingerprint != CastingMoldCodec.fingerprint(p)
+				|| cure.resinReference != s.resinReference
+				|| cure.hasEPS != (p.cores.length > 0 || s.adhesiveContainsEPS != false)))
 			throw "Stale fabrication cure report";
 		var cureChecks = cure == null ? [] : cure.validation;
 		var cureStatus:materia.tooling.ToolingDiagnostic.ToolingCheckStatus = Pending;

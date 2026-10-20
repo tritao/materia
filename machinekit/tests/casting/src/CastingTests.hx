@@ -68,7 +68,7 @@ class CastingTests {
 		var registry = MachineKitComponents.standard();
 		var parts:Array<MachineComponent> = [
 			casting,
-			new CastInsert(),
+			new CastInsert(new ComponentValues().setToken("role", "generic-mount")),
 			new machinekit.milling.MillSupportTray(new ComponentValues().setNumber("width", 1200)
 				.setNumber("depth", 900)
 				.setNumber("millX", -80)
@@ -86,7 +86,7 @@ class CastingTests {
 			solid.close();
 		}
 		rejects(() -> new MineralCasting(new ComponentValues().setToken("material", "steel")), "casting material lock");
-		rejects(() -> new CastInsert(new ComponentValues().setNumber("positionTolerance", 0)), "insert tolerance positive");
+		rejects(() -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setNumber("positionTolerance", 0)), "insert tolerance positive");
 		rejects(() -> new MineralCasting(new ComponentValues().setNumber("cornerChamfer", 400)), "oversized chamfer");
 		rejects(() -> CastingFeatures.decode('[{"id":"missing-dimensions"}]'), "malformed feature");
 		rejects(() -> CastingFeatures.encode([core, core]), "duplicate feature ids");
@@ -144,7 +144,8 @@ class CastingTests {
 		}
 		var material = MaterialLibrary.require("mineral-cast").physical;
 		check(material.propertiesAssumed == true && material.youngsModulusPa == 35e9, "bulk properties retain assumed provenance");
-		var bored = new CastInsert(new ComponentValues().setNumber("width", 40)
+		var bored = new CastInsert(new ComponentValues().setToken("role", "generic-mount")
+			.setNumber("width", 40)
 			.setNumber("depth", 40)
 			.setNumber("height", 20)
 			.setNumber("boreDiameter", 18));
@@ -152,7 +153,8 @@ class CastingTests {
 		check(boredShape.valid() && boredShape.solidCount() == 1, "bored foot seat remains one solid");
 		near(boredShape.volume(), 40 * 40 * 20 - Math.PI * 9 * 9 * 20, 1e-6, "foot bore removes steel volume");
 		boredShape.close();
-		rejects(() -> new CastInsert(new ComponentValues().setNumber("boreDiameter", 40)), "reject insert bore consuming seat");
+		rejects(() -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setNumber("boreDiameter", 40)),
+			"reject insert bore consuming seat");
 		Sys.println('CastingTests: $assertions assertions passed');
 		if (Sys.args().indexOf("--recipes") >= 0) {
 			RecipeContractTests.run();

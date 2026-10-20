@@ -49,7 +49,7 @@ class ProcessTests {
 			evidence: ["fixture-boundary"]
 		};
 
-	static function spec():CastingProcessSpec
+	public static function spec():CastingProcessSpec
 		return {
 			id: "process-test",
 			revision: 1,
@@ -59,6 +59,8 @@ class ProcessTests {
 			temperatureMarginC: 5,
 			pourRateMm3PerSecond: null,
 			maximumAirEscapeWidthMm: null,
+			faceContacts: [],
+			openFaceContact: null,
 			castability: {
 				maximumAggregateSizeMm: null,
 				minimumPassageAggregateRatio: null,
@@ -100,6 +102,7 @@ class ProcessTests {
 				cells: 41,
 				timeStepSeconds: 1,
 				durationSeconds: 1000,
+				maximumExtensionSeconds: 0,
 				convergenceToleranceC: 1e-8,
 				maximumIterations: 100,
 				remainingHeatToleranceC: 0.01
@@ -125,14 +128,17 @@ class ProcessTests {
 			for (i in 0...region.length) {
 				var b = region[i], z = Math.max(height, b.z), top = b.z + b.height;
 				if (top > z)
-					cells.push({id: i, box: {
-						x: b.x,
-						y: b.y,
-						z: z,
-						width: b.width,
-						depth: b.depth,
-						height: top - z
-					}});
+					cells.push({
+						id: i,
+						box: {
+							x: b.x,
+							y: b.y,
+							z: z,
+							width: b.width,
+							depth: b.depth,
+							height: top - z
+						}
+					});
 			}
 			while (cells.length > 0) {
 				var group = [cells.shift()], cursor = 0;
@@ -325,8 +331,8 @@ class ProcessTests {
 		s = spec();
 		s.cure.kinetics = null;
 		var safe = CureAnalysis.analyze("body", "s", "p", s, 2400, 100, true);
-		check(status(safe, "process.cure.lumped-estimate") == "pass", "adiabatic bound can pass without kinetics");
-		check(safe.sections.length == 0, "passing upper bound skips section tier");
+		check(status(safe, "process.cure.lumped-estimate") == "pass", "lumped screening estimate can pass its margin rule without kinetics");
+		check(safe.sections.length == 0, "missing kinetics leave the section tier unresolved");
 		var uncertain = CureAnalysis.analyze("body", "s", "p", s, 2400, 60, true);
 		check(status(uncertain, "process.cure.lumped-estimate") == "pending", "high upper bound is not proof of overheating");
 		check(status(uncertain, "process.cure.section.wall") == "pending"

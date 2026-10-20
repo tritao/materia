@@ -30,7 +30,8 @@ typedef ThermalCoverageReport = {
  * thermal boundary evidence, junction heat flow and physical qualification.
  */
 class ThermalCoverage {
-	public static function analyze(sourceId:String, sections:OrthogonalSectionReport, raw:CastingProcessSpec, processFingerprint:String):ThermalCoverageReport {
+	public static function analyze(sourceId:String, sections:OrthogonalSectionReport, raw:CastingProcessSpec, processFingerprint:String,
+			?document:materia.tooling.ToolingDocument):ThermalCoverageReport {
 		materia.tooling.ToolingIds.validate(sourceId);
 		var spec = ProcessSpecCodec.snapshot(raw),
 			covered:Array<MoldBox> = [],
@@ -80,6 +81,12 @@ class ThermalCoverage {
 					message = "One slab section cannot bind different axes.";
 				}
 				axis = span.axis;
+				if (document != null
+					&& (!ThermalFaces.matches(span, true, section.left, sections, spec, document)
+						|| !ThermalFaces.matches(span, false, section.right, sections, spec, document))) {
+					status = Fail;
+					message = "Declared slab boundary kind differs from owning thermal faces.";
+				}
 				for (owner in span.lowerSourceIds.concat(span.upperSourceIds))
 					if (ids.indexOf(owner) < 0)
 						ids.push(owner);
@@ -93,6 +100,13 @@ class ThermalCoverage {
 			if (status == Pass)
 				for (span in matched)
 					for (strip in span.strips)
+						if (covered.filter(previous -> BoxVolumes.intersection(previous, strip) != null).length > 0) {
+							status = Fail;
+							message = "Slab volume is covered twice, including assignments across different axes.";
+						}
+			if (status == Pass)
+				for (span in matched)
+					for (strip in span.strips)
 						covered.push(strip);
 			bindings.push({
 				sectionId: section.id,
@@ -103,6 +117,9 @@ class ThermalCoverage {
 			checks.push(FillAnalysis.check("process.cure.binding." + section.id, section.sourceIds, status, message,
 				[sections.sourceFingerprint, processFingerprint]));
 		}
+		checks.push(FillAnalysis.check("process.cure.boundary-ownership", [sourceId],
+			document == null ? Pending : bindings.filter(b -> b.status == Fail).length > 0 ? Fail : Pass,
+			"Slab contact kinds are checked against source-owned EPS, fill-plane and mold-contact faces.", []));
 		var region = [
 			for (span in sections.spans)
 				if (span.axis == X) for (strip in span.strips) strip

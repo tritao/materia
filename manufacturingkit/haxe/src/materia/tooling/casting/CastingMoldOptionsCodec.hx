@@ -55,6 +55,8 @@ class CastingMoldOptionsCodec {
 				case "as-cast": AsCast;
 				default: throw "Invalid precision route";
 			};
+			if (Reflect.field(p, "allowance") != null)
+				throw "Finishing allowance is not implemented; non-null values are rejected";
 			precision.push({
 				insertId: text(p, "insertId"),
 				route: route,

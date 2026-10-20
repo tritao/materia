@@ -91,7 +91,7 @@ class FoundationToolingAdapter {
 				boreDiameter: i.number("boreDiameter"),
 				pose: row.pose,
 				role: cast i.token("role"),
-				sourceRole: i.token("label"),
+				label: i.token("label"),
 				positionTolerance: i.number("positionTolerance"),
 				finish: sourceFinish(i.token("finish"))
 			});

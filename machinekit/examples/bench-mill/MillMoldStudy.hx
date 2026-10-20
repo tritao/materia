@@ -74,9 +74,9 @@ class MillMoldStudy {
 				+ " | "
 				+ r.geometryChecked
 				+ " | "
-				+ r.fill.trappedPockets.length
+				+ (r.fill == null ? "unsupported" : Std.string(r.fill.trappedPockets.length))
 				+ " | "
-				+ r.handling.requiresFlip
+				+ (r.handling == null ? "unsupported" : Std.string(r.handling.requiresFlip))
 				+ " | "
 				+ (r.planningSucceeded ? Std.string(r.changeRequests.length) : "not evaluated")
 				+ " | "
@@ -91,9 +91,14 @@ class MillMoldStudy {
 			text.push(r.decidingReason + ": " + ToolingCodec.canonical(r.rankMetrics));
 			if (r.planningFailure != null)
 				text.push("Planning failed: " + r.planningFailure);
+			if (r.fill == null || r.cure == null || r.sections == null || r.castability == null || r.thermalCoverage == null || r.handling == null) {
+				text.push("Process analysis unsupported or failed; see validation records.");
+				continue;
+			}
+
 			text.push("Casting mass: "
 				+ r.handling.castingMassKg
-				+ " kg. Adiabatic peak bound: "
+				+ " kg. Lumped peak estimate: "
 				+ r.cure.lumpedPeakEstimateC
 				+ " C (null means unknown).");
 			if (r.effort != null) {

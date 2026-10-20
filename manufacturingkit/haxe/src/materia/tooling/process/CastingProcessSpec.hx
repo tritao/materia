@@ -65,6 +65,7 @@ typedef CureSolverSettings = {
 	var cells:Int;
 	var timeStepSeconds:Float;
 	var durationSeconds:Float;
+	var maximumExtensionSeconds:Float;
 	var convergenceToleranceC:Float;
 	var maximumIterations:Int;
 	var remainingHeatToleranceC:Float;
@@ -96,4 +97,6 @@ typedef CastingProcessSpec = {
 	var cure:ResinCureSpec;
 	var sections:Array<CureSection>;
 	var solver:CureSolverSettings;
+	var faceContacts:Array<{faceId:String, kind:ThermalBoundaryKind, evidence:Array<String>}>;
+	var openFaceContact:Null<{kind:ThermalBoundaryKind, evidence:Array<String>}>;
 }
