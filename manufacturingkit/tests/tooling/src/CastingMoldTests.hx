@@ -1,3 +1,4 @@
+import materia.assembly.AssemblyFrames as F;
 import materia.casting.CastingFeature.CastingDimension;
 import materia.tooling.ToolingDocument;
 import materia.tooling.ToolingCodec;
@@ -75,20 +76,29 @@ class CastingMoldTests {
 		FabricationTests.run(p);
 		var sourceThreads = ToolingCodec.snapshot(d);
 		sourceThreads.recipe.hardware.fixturePinSpacing = 24;
-		var threads = materia.casting.InsertHoleGeometry.through(5, sourceThreads.input.inserts[0].height);
+		var threads = TestInsertHoles.through(5, sourceThreads.input.inserts[0].height);
 		threads[0].thread = {designation: "M6", majorDiameter: 6, pitch: 1, starts: 1, hand: Right,
 			internal: true, toleranceClass: "6H", profile: Metric};
 		threads[0].tapDrill = 5;
-		threads[0].limits = {policyId: "steel-threaded-hole-v1", minEngagement: 6, minTipGap: 1,
+		threads[0].threadDepth = threads[0].depth;
+		threads[0].clearanceDiameter = 6.6;
+		threads[0].limits = {policyId: "steel-threaded-hole-v1", threaded: {minEngagement: 6, minTipGap: 1},
 			minBack: 1.5, minWall: 3, minClearance: 0.6, overrides: []};
 		threads[0].frame.y = -5;
 		var second = materia.casting.InsertHole.InsertHoleCodec.snapshot(threads)[0];
 		second.id = "second";
 		second.frame.y = 5;
 		threads.push(second);
-		var unused = materia.casting.InsertHoleGeometry.through(3, sourceThreads.input.inserts[0].height)[0];
+		var unused = TestInsertHoles.through(3, sourceThreads.input.inserts[0].height)[0];
 		unused.id = "unused";
 		unused.frame.x = 10;
+		unused.thread = threads[0].thread;
+		unused.diameter = 5;
+		unused.tapDrill = 5;
+		unused.threadDepth = unused.depth;
+		unused.clearanceDiameter = 6.6;
+		unused.limits = threads[0].limits;
+		unused.frame = F.translation(10, 0, 0);
 		threads.push(unused);
 		sourceThreads.input.inserts[0].holes = threads;
 		sourceThreads.setup.sourceFingerprint = ToolingCodec.inputFingerprint(sourceThreads.input);
@@ -96,11 +106,34 @@ class CastingMoldTests {
 		check(fixed.fixtures[0].fixings.length == 2, "datum selects both accessible source steel threads");
 		check(fixed.fixtures[0].boreMasks.length == 1 && fixed.fixtures[0].boreMasks[0].sourceHoleId == "unused",
 			"only the non-fixing hole receives a bore mask");
+		var unusedMask = fixed.fixtures[0].boreMasks[0];
+		check(unusedMask.plugLength == sourceThreads.recipe.hardware.plugDepth && unusedMask.farEndId != null
+			&& fixed.hardware.filter(h -> h.id == unusedMask.farEndId).length == 1,
+			"unused through-thread has separate entry and resin-side threaded plugs");
+		var needsCap = ToolingCodec.snapshot(sourceThreads);
+		needsCap.input.inserts[0].holes.filter(h -> h.id == "unused")[0].counterbore = {diameter: 8, depth: 2};
+		needsCap.setup.sourceFingerprint = ToolingCodec.inputFingerprint(needsCap.input);
+		var capPlan = CastingMoldPlanner.plan(needsCap, options(needsCap));
+		check(capPlan.validation.filter(v -> v.rule == "tooling.fixture.hole-protection." + needsCap.input.inserts[0].id + ".unused"
+			&& v.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length == 1 && !capPlan.fabrication.ready,
+			"threaded counterbore needs an explicit sealing cap, never a smooth-pin fallback");
+		var protectedHardware = fixed.hardware;
+		fixed.hardware = protectedHardware.filter(h -> h.id != unusedMask.farEndId);
+		rejects(() -> CastingMoldPlanner.validate(fixed), "missing unused-hole far-end mask rejected");
+		fixed.hardware = protectedHardware;
 		for (fixing in fixed.fixtures[0].fixings) {
 			var screw = fixed.hardware.filter(h -> h.id == fixing.hardwareId)[0];
+			var penetration = fixed.fixtures[0].penetrations.filter(pen -> pen.sourceHoleId == fixing.sourceHoleId)[0];
+			check(penetration.plug != null && fixing.engagement + 1 + penetration.plug.length <= threads[0].depth,
+				"through-thread fixing has a resin-side plug and a separate tip gap");
 			check(Math.abs(screw.length - (fixing.entry.z - screw.pose.z + 6)) < 1e-7,
 				"screw clamps the bed and datum with policy thread engagement");
 		}
+		var farEnd = fixed.fixtures[0].penetrations.filter(pen -> pen.sourceHoleId == fixed.fixtures[0].fixings[0].sourceHoleId)[0];
+		var savedPlug = farEnd.plug;
+		farEnd.plug = null;
+		rejects(() -> CastingMoldPlanner.validate(fixed), "missing resin-side protection rejected");
+		farEnd.plug = savedPlug;
 		fixed.hardware.filter(h -> h.id == fixed.fixtures[0].fixings[0].hardwareId)[0].length += 1;
 		rejects(() -> CastingMoldPlanner.validate(fixed), "altered fixing stack rejected");
 		check(p.fixtures[0].fixings.length == 0 && p.changeRequests.filter(r -> r.kind == "insert-fixture-hole").length == 1,
@@ -175,6 +208,9 @@ class CastingMoldTests {
 		o.anchorage.pop();
 		rejects(() -> CastingMoldPlanner.plan(d, o), "missing anchorage not silently qualified");
 		var raw:Dynamic = haxe.Json.parse(s);
+		Reflect.setField(raw, "version", 6);
+		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
+		raw = haxe.Json.parse(s);
 		Reflect.setField(raw, "version", 99);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "unknown mold format rejected");
 		raw = haxe.Json.parse(s);

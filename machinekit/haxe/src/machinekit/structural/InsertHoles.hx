@@ -40,18 +40,43 @@ class InsertHoles {
 			});
 	}
 
-	public static function metricThread(size:String):ThreadedHoleChoice {
-		var screw = machinekit.standard.SocketHeadCapScrew.metric(size, 35);
-		return {thread: screw.thread.mating(), tapDrill: screw.spec.tapDrill, clearanceDiameter: screw.spec.clearanceFine};
+	public static function metricThread(thread:cadkit.threads.ThreadSpec):ThreadedHoleChoice {
+		var spec = machinekit.standard.SocketHeadCapScrew.catalog().get(thread.designation);
+		if (!thread.internal || thread.pitch != spec.pitch)
+			throw "Insert hole choice requires a catalogue internal coarse metric thread";
+		// ISO 273, medium series; use the shared catalogue machining dimensions.
+		return {thread: thread,
+			tapDrill: spec.tapDrill, clearanceDiameter: spec.clearanceMedium};
 	}
 
-	public static function tappedThrough(choice:ThreadedHoleChoice, depth:Float):String
-		return through(choice.tapDrill, depth, choice.thread);
+	public static function tappedThrough(choice:ThreadedHoleChoice, depth:Float):String {
+		var holes = records(through(choice.tapDrill, depth, choice.thread));
+		holes[0].clearanceDiameter = choice.clearanceDiameter;
+		return fromNeutral(holes);
+	}
+
+	/** Flat-bottom blind bore (flat-bottom drill or end mill), followed by tapping.
+	 * Cylindrical depth includes the tip gap and bottoming-tap runout; back wall is
+	 * checked against the actual insert thickness before a recipe is emitted. */
+	public static function tappedBlind(choice:ThreadedHoleChoice, thickness:Float):String {
+		var limits = machinekit.design.ThreadedHolePolicy.resolve(choice.thread, C45Bright);
+		var depth = thickness - limits.minBack;
+		var usable = depth - choice.thread.pitch * machinekit.design.ThreadedHolePolicy.TAP_RUNOUT_PITCHES;
+		if (usable < limits.minEngagement + limits.minTipGap)
+			throw "Blind insert thread needs thicker stock: " + choice.thread.designation;
+		var holes = records(tappedThrough(choice, thickness));
+		holes[0].extent = Blind;
+		holes[0].depth = depth;
+		holes[0].threadDepth = usable;
+		return fromNeutral(holes);
+	}
 
 	public static function through(diameter:Float, depth:Float, ?thread:cadkit.threads.ThreadSpec):String {
+		if (!Math.isFinite(diameter + depth) || diameter <= 0 || depth <= 0)
+			throw "Insert drilling dimensions must be finite and positive";
 		return haxe.Json.stringify({
-			version: 2,
-			holes: diameter == 0 ? [] : [
+			version: 3,
+			holes: [
 				{
 					id: "fixing",
 					frame: F.fromRotationMatrix(0, 0, depth, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
@@ -60,21 +85,24 @@ class InsertHoles {
 					extent: "through",
 					thread: thread == null ? null : threadRecord(thread),
 					tapDrill: thread == null ? null : diameter,
+					threadDepth: thread == null ? null : depth,
+					clearanceDiameter: thread == null ? diameter
+						: machinekit.standard.SocketHeadCapScrew.catalog().get(thread.designation).clearanceMedium,
 					counterbore: null,
 					limits: thread == null ? machinekit.design.ThreadedHolePolicy.clearance(diameter)
-						: machinekit.design.ThreadedHolePolicy.neutral(machinekit.design.ThreadedHolePolicy.resolve(thread, Steel))
+						: machinekit.design.ThreadedHolePolicy.neutral(machinekit.design.ThreadedHolePolicy.resolve(thread, C45Bright))
 				}
 			]
 		});
 	}
 
 	public static function fromNeutral(holes:Array<InsertHole>):String
-		return haxe.Json.stringify({version: 2, holes: InsertHoleCodec.snapshot(holes)});
+		return haxe.Json.stringify({version: 3, holes: InsertHoleCodec.snapshot(holes)});
 
 	public static function records(text:String):Array<InsertHole> {
 		var raw:Dynamic = haxe.Json.parse(text);
 		materia.casting.CastingFeatureCodec.fields(raw, ["version", "holes"]);
-		if (raw.version != 2 || !Std.isOfType(raw.holes, Array))
+		if (raw.version != 3 || !Std.isOfType(raw.holes, Array))
 			throw "Unsupported insert hole recipe";
 		var holes:Array<Dynamic> = cast raw.holes;
 		return InsertHoleCodec.snapshot(cast holes);
@@ -94,17 +122,18 @@ class InsertHoles {
 				thread = {
 					spec: threadSpec(h.thread),
 					tapDrill: tap,
-					usableDepth: h.depth,
+					usableDepth: cast h.threadDepth,
 					cylindricalDepth: h.depth,
 					point: 0,
 					stock: height,
-					minEngagement: limits.minEngagement,
-					minTipGap: limits.minTipGap,
+					minEngagement: InsertHoleCodec.threadLimits(h).minEngagement,
+					minTipGap: InsertHoleCodec.threadLimits(h).minTipGap,
 					minBack: limits.minBack
 				};
 			}
 			rows.push({
 				insertLimits: limits,
+				insertClearanceDiameter: h.clearanceDiameter,
 				id: h.id,
 				frame: h.frame,
 				radius: h.diameter / 2,
@@ -136,6 +165,8 @@ class InsertHoles {
 					extent: h.through == true ? Through : Blind,
 					thread: h.thread == null ? null : threadRecord(h.thread.spec),
 					tapDrill: h.thread == null ? null : h.thread.tapDrill,
+					threadDepth: h.thread == null ? null : h.thread.usableDepth,
+					clearanceDiameter: h.insertClearanceDiameter,
 					counterbore: h.counterbore == null ? null : {
 						diameter: 2 * h.counterbore.radius,
 						depth: h.counterbore.depth

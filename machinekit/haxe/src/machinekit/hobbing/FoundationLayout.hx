@@ -210,8 +210,8 @@ class FoundationLayout {
 	}
 
 	public static function insert(row:InsertLocation):CastInsert {
-		var holes = row.role == ThreadedAnchor ? InsertHoles.tappedThrough(InsertHoles.metricThread("M6"), row.height)
-			: InsertHoles.through(row.role == TableMount ? 40 : 0, row.height);
+		var holes = row.role == ThreadedAnchor ? InsertHoles.tappedBlind(InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(6).mating()), row.height)
+			: row.role == TableMount ? InsertHoles.through(40, row.height) : InsertHoles.fromNeutral([]);
 		return new CastInsert(new ComponentValues().setNumber("width", row.width).setNumber("depth", row.depth)
 			.setNumber("height", row.height).setToken("holes", holes).setToken("role", row.role)
 			.setToken("label", row.label).setToken("finish", row.finish));

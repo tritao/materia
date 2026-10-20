@@ -20,6 +20,7 @@ enum abstract SupportHardwareKind(String) to String {
 	var FixtureScrew = "fixture-screw";
 	var FixturePin = "fixture-pin";
 	var BoreMask = "bore-mask";
+	var BorePlug = "bore-plug";
 }
 
 typedef CoreSupportOptions = {

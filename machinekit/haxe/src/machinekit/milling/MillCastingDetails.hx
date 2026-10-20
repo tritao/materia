@@ -17,8 +17,10 @@ class MillCastingDetails {
 	public var rearBayDesignClearance:Float = 1;
 	public var levelingClearanceDiameter:Float = 18;
 	public var selectedShaftClearance:Float = 22;
-	/** 30 mm stock reserved for the policy blind M12 anchor and standard service screw. */
+	/** 30 mm stock accommodates the selected M12 service screw, full thread,
+	 * bottoming-tap runout, tip gap and intact policy back wall. */
 	public var columnAnchorThickness:Float = 30;
+	public var columnBoltLengthIncrement:Float = 5;
 	public var hatchAnchorWidth:Float = 20;
 	public var hatchAnchorDepth:Float = 20;
 	public var hatchAnchorThickness:Float = 10;
@@ -32,7 +34,7 @@ class MillCastingDetails {
 	public var hatchAnchorThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
 
 	public function new() {
-		columnAnchorThread = machinekit.structural.InsertHoles.metricThread("M12");
-		hatchAnchorThread = machinekit.structural.InsertHoles.metricThread("M4");
+		columnAnchorThread = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(12).mating());
+		hatchAnchorThread = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(4).mating());
 	}
 }

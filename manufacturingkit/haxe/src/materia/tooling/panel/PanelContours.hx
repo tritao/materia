@@ -92,8 +92,16 @@ class PanelContours {
 		return [arc(x, y, r, 0, Math.PI), arc(x, y, r, Math.PI, Math.PI)];
 
 	public static function obround(x:Float, y:Float, w:Float, h:Float):Array<PanelSegment> {
-		if (w < h || h <= 0)
+		if (!Math.isFinite(w + h) || w <= 0 || h <= 0)
 			throw "Invalid obround";
+		if (w < h)
+			return [for (segment in obround(y, -x, h, w)) {
+				kind: segment.kind,
+				start: {x: -segment.start.y, y: segment.start.x},
+				end: {x: -segment.end.y, y: segment.end.x},
+				center: segment.center == null ? null : {x: -segment.center.y, y: segment.center.x},
+				sweep: segment.sweep
+			}];
 		if (w == h)
 			return circle(x, y, h / 2);
 		var a = (w - h) / 2, r = h / 2;

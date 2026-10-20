@@ -6,6 +6,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import materia.casting.CastingCavities;
 import materia.casting.CastingPatterns;
+import materia.assembly.AssemblyFrames as F;
 
 /** Independent frozen pre-migration CAD plus exact neutral/CAD intersection checks. */
 class FoundationDesignTests {
@@ -84,29 +85,86 @@ class FoundationDesignTests {
 			throw "Box consumer lost feature ID";
 	}
 
+	static function buriedThreadExit():Void {
+		var choice = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(12).mating());
+		var dimensions = new ComponentValues().setNumber("width", 100).setNumber("depth", 100).setNumber("height", 60);
+		var insertValues = new ComponentValues().setToken("role", "threaded-anchor")
+			.setNumber("width", 40).setNumber("depth", 40).setNumber("height", 25);
+		var failed = false;
+		try new machinekit.structural.MineralFoundation(dimensions, [{
+			id: "anchor", pose: F.translation(0, 0, 35),
+			openings: [materia.casting.CastingPatterns.face("body.z-max")],
+			part: new machinekit.structural.CastInsert(insertValues
+				.setToken("holes", machinekit.structural.InsertHoles.tappedThrough(choice, 25)))
+		}]) catch (error:Dynamic)
+			failed = Std.string(error).indexOf("Through insert thread exits into casting material: anchor/fixing") >= 0;
+		assertions++;
+		if (!failed) throw "A buried tapped through-hole must be rejected by the source design";
+		var foundation = new machinekit.structural.MineralFoundation(dimensions, [{
+			id: "anchor", pose: F.translation(0, 0, 35),
+			openings: [materia.casting.CastingPatterns.face("body.z-max")],
+			part: new machinekit.structural.CastInsert(insertValues
+				.setToken("holes", machinekit.structural.InsertHoles.tappedBlind(choice, 25)))
+		}]);
+		var hole = machinekit.structural.InsertHoles.records(foundation.insertLocations()[0].part.parameterToken("holes"))[0];
+		assertions++;
+		if (hole.extent != Blind || hole.depth != 22 || hole.clearanceDiameter != 13.5)
+			throw "Blind C45 anchor must preserve its policy back wall and ISO 273 medium clearance";
+		for (width in [40.0, 4.0]) {
+			var opening = machinekit.structural.CastingFeaturePatterns.box("service", ServiceOpening,
+				[materia.casting.CastingPatterns.face("body.z-min")],
+				width, 40, 35, 0, 0, 0);
+			var accepted = true;
+			try new machinekit.structural.MineralFoundation(dimensions.setToken("features", materia.casting.CastingPatterns.encode([opening])), [{
+				id: "anchor", pose: F.translation(0, 0, 35),
+				openings: [materia.casting.CastingPatterns.face("body.z-max"), materia.casting.CastingPatterns.feature("service")],
+				part: new machinekit.structural.CastInsert(insertValues
+					.setToken("holes", machinekit.structural.InsertHoles.tappedThrough(choice, 25)))
+			}]) catch (error:Dynamic) {
+				if (Std.string(error).indexOf("Through insert thread exits into casting material: anchor/fixing") < 0) throw error;
+				accepted = false;
+			}
+			assertions++;
+			if (accepted != (width == 40))
+				throw "The whole thread exit disk must open into the declared feature, not just its centre";
+		}
+
+	}
+
 	public static function main():Void {
+		buriedThreadExit();
+		var flat = new machinekit.assembly.Diagnostics();
+		machinekit.design.DesignChecks.blindFastener(flat, "flat-bottom anchor", 40, 20, 23.5, 27, 0, 30, 15.6, 1.75, 3);
+		flat.throwIfErrors();
+		assertions++;
+		var negativePoint = false;
+		try machinekit.design.DesignChecks.blindFastener(flat, "invalid point", 40, 20, 23.5, 27, -1, 30, 15.6, 1.75, 3)
+		catch (error:Dynamic) negativePoint = Std.string(error).indexOf("Invalid blind drill point") >= 0;
+		assertions++;
+		if (!negativePoint) throw "A flat bottom must not admit an invalid negative drill point";
+
 
 		var spec = machinekit.standard.SocketHeadCapScrew.metric("M12", 35).thread.mating();
-		var limits = machinekit.design.ThreadedHolePolicy.resolve(spec, Steel);
+		var limits = machinekit.design.ThreadedHolePolicy.resolve(spec, C45Bright);
 		assertions++;
-		if (limits.minEngagement != 12 || limits.minTipGap != spec.pitch || limits.minBack != 3
-			|| limits.minWall != 6 || Math.abs(limits.minClearance - 1.2) > 1e-9)
+		if (Math.abs(limits.minEngagement - 15.6) > 1e-9 || limits.minTipGap != spec.pitch || limits.minBack != 3
+			|| limits.minWall != 12 || Math.abs(limits.minClearance - 1.2) > 1e-9)
 			throw "Steel hole policy must resolve dimensional design minima";
-		var custom = machinekit.design.ThreadedHolePolicy.resolve(spec, Steel, {minEngagement: 18});
+		var custom = machinekit.design.ThreadedHolePolicy.resolve(spec, C45Bright, {minEngagement: 18});
 		assertions++;
 		if (custom.minEngagement != 18 || custom.overrides.minEngagement != 18
 			|| custom.minWall != limits.minWall || limits.overrides.minEngagement != null)
 			throw "Hole limit overrides must be recorded without changing policy defaults";
 		var rejected = false;
-		try machinekit.design.ThreadedHolePolicy.resolve(spec, Steel, {minWall: 0})
+		try machinekit.design.ThreadedHolePolicy.resolve(spec, C45Bright, {minWall: 0})
 		catch (e:Dynamic) rejected = Std.string(e).indexOf("finite and positive: minWall") >= 0;
 		assertions++;
 		if (!rejected)
 			throw "Hole policy accepted a placeholder wall limit";
-		var pattern = materia.casting.InsertHoleGeometry.through(6, 20);
+		var pattern = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.through(6, 20));
 		pattern[0].id = "left";
 		pattern[0].frame.x = -10;
-		var right = materia.casting.InsertHoleGeometry.through(6, 20)[0];
+		var right = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.through(6, 20))[0];
 		right.id = "right";
 		right.frame.x = 10;
 		pattern.push(right);
@@ -130,7 +188,7 @@ class FoundationDesignTests {
 			|| Math.abs(analytic.center.x - physical.centerOfMass.x) > 1e-7
 			|| Math.abs(analytic.center.z - physical.centerOfMass.z) > 1e-7)
 			throw "Multi-hole insert mass and centroid must agree with actual drilled steel CAD";
-		var blind = materia.casting.InsertHoleGeometry.through(6, 20)[0];
+		var blind = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.through(6, 20))[0];
 		blind.extent = materia.casting.InsertHole.HoleExtent.Blind;
 		blind.depth = 8;
 		blind.counterbore = {diameter: 12, depth: 3};
@@ -149,7 +207,7 @@ class FoundationDesignTests {
 		if (overlapVolume > 1e-7 || Math.abs(expectedBlind.volume - actualBlind.volume) > 1e-6)
 			throw "Blind counterbore depth and stepped protection must agree with actual CAD";
 		var tapped = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.tappedThrough(
-			machinekit.structural.InsertHoles.metricThread("M12"), 20));
+			machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(12).mating()), 20));
 		tapped[0].limits = machinekit.design.ThreadedHolePolicy.neutral(custom);
 		var overridden = machinekit.structural.InsertHoles.fromNeutral(tapped);
 		var recovered = machinekit.structural.InsertHoles.copy(machinekit.structural.InsertHoles.facet(
@@ -160,11 +218,11 @@ class FoundationDesignTests {
 			throw "Insert facet lost resolved limits or their recorded overrides";
 		var target = new machinekit.structural.CastInsert(new ComponentValues()
 			.setToken("role", "generic-mount").setNumber("width", 50).setNumber("depth", 40).setNumber("height", 20)
-			.setToken("holes", machinekit.structural.InsertHoles.tappedThrough(machinekit.structural.InsertHoles.metricThread("M12"), 20)));
+			.setToken("holes", machinekit.structural.InsertHoles.tappedThrough(machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(12).mating()), 20)));
 		var clamp = new machinekit.structural.CastInsert(new ComponentValues()
-			.setToken("role", "generic-mount").setNumber("width", 50).setNumber("depth", 40).setNumber("height", 5)
+			.setToken("role", "generic-mount").setNumber("width", 50).setNumber("depth", 50).setNumber("height", 5)
 			.setToken("holes", machinekit.structural.InsertHoles.through(14, 5)));
-		var screw = machinekit.standard.SocketHeadCapScrew.metric("M12", 30);
+		var screw = machinekit.standard.SocketHeadCapScrew.metric("M12", 30, machinekit.standard.PropertyClass.Steel88);
 		var head = materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 25, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
 		var joint = new machinekit.assembly.MachineAssembly();
 		joint.addComponent("target", target);
@@ -176,13 +234,13 @@ class FoundationDesignTests {
 		var throughAudit = machinekit.design.AssemblyDesignChecks.check(joint);
 		throughAudit.throwIfErrors();
 		assertions++;
-		joint.replaceComponent("screw", machinekit.standard.SocketHeadCapScrew.metric("M12", 10));
+		joint.replaceComponent("screw", machinekit.standard.SocketHeadCapScrew.metric("M12", 10, machinekit.standard.PropertyClass.Steel88));
 		var shortAudit = machinekit.design.AssemblyDesignChecks.check(joint);
 		assertions++;
 		if (shortAudit.items.filter(item -> item.subject == "through-fixing thread engagement").length != 1)
 			throw "Through-hole fasteners must still enforce numeric engagement limits";
 		rejected = false;
-		try machinekit.structural.InsertHoles.records('{"version":1,"holes":[]}')
+		try machinekit.structural.InsertHoles.records('{"version":2,"holes":[]}')
 		catch (e:Dynamic) rejected = Std.string(e).indexOf("Unsupported insert hole recipe") >= 0;
 		assertions++;
 		if (!rejected)
@@ -190,6 +248,15 @@ class FoundationDesignTests {
 		var cwd = Sys.getCwd(),
 			root = (sys.FileSystem.exists(cwd + "/machinekit") ? cwd + "/machinekit/tests/tooling" : cwd) + "/fixtures/foundation-design";
 		var frame = MillMoldSetup.frame();
+		var columnBolts = frame.components().filter(row -> StringTools.startsWith(row.id, "columnBolt"));
+		assertions++;
+		if (columnBolts.length != 4) throw "Mill needs its four column service screws";
+		for (row in columnBolts) {
+			var bolt:machinekit.standard.SocketHeadCapScrew = cast row.component;
+			assertions++;
+			if (bolt.length != 40 || bolt.propertyClass != machinekit.standard.PropertyClass.Steel88)
+				throw "Mill column service screws must derive the 40 mm stack length and class 8.8";
+		}
 		var mold = materia.tooling.casting.CastingMoldPlanner.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
 		assertions++;
 		if (mold.coreUnits.length != 2 || mold.coreUnits.filter(unit -> unit.coreIds.length == 3 && unit.featureIds.length == 3).length != 2)

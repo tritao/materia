@@ -11,7 +11,8 @@ class CastInsert extends MachineComponent {
 
 	public static function parameters():Array<ComponentParameter>
 		return [
-			P.text("holes", '{"version":2,"holes":[]}'),
+			P.choice("stockMaterial", materia.casting.InsertMaterial.InsertMaterials.tokens(), materia.casting.InsertMaterial.C45Bright),
+			P.text("holes", '{"version":3,"holes":[]}'),
 			P.length("width", 35),
 			P.length("depth", 400),
 			P.length("height", 20),
@@ -42,6 +43,9 @@ class CastInsert extends MachineComponent {
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Mount, Solids.axial(0, 0, parameterNumber("height")));
 	}
+
+	public function insertMaterial():materia.casting.InsertMaterial.InsertMaterialSpec
+		return materia.casting.InsertMaterial.InsertMaterials.specification(cast parameterToken("stockMaterial"));
 
 	override public function componentType():Null<ComponentType>
 		return recipeType();

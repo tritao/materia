@@ -24,8 +24,7 @@ typedef InsertThread = {var designation:String; var majorDiameter:Float; var pit
 typedef InsertCounterbore = {var diameter:Float; var depth:Float;}
 typedef InsertHoleLimits = {
 	var policyId:String;
-	var minEngagement:Float;
-	var minTipGap:Float;
+	var threaded:Null<{minEngagement:Float, minTipGap:Float}>;
 	var minBack:Float;
 	var minWall:Float;
 	var minClearance:Float;
@@ -40,11 +39,22 @@ typedef InsertHole = {
 	var extent:HoleExtent;
 	var thread:Null<InsertThread>;
 	var tapDrill:Null<Float>;
+	/** Full usable thread excludes the tapping runout of a blind hole. */
+	var threadDepth:Null<Float>;
+	/** ISO 273 medium bolt-clearance diameter, resolved by the source design. */
+	var clearanceDiameter:Float;
 	var counterbore:Null<InsertCounterbore>;
 	var limits:InsertHoleLimits;
 }
 
 class InsertHoleCodec {
+	/** Thread-only design rules are absent on plain bores, never unknown on taps. */
+	public static function threadLimits(hole:InsertHole):{minEngagement:Float, minTipGap:Float} {
+		if (hole.thread == null || hole.limits.threaded == null)
+			throw "Threaded hole requires resolved engagement and tip gap: " + hole.id;
+		return cast hole.limits.threaded;
+	}
+
 	public static function snapshot(raw:Dynamic):Array<InsertHole> {
 		if (!Std.isOfType(raw, Array))
 			throw "Invalid insert hole list";
@@ -61,7 +71,7 @@ class InsertHoleCodec {
 				"depth",
 				"extent",
 				"thread",
-				"tapDrill",
+				"tapDrill", "clearanceDiameter", "threadDepth",
 				"counterbore", "limits"
 			]);
 			var t:Dynamic = Reflect.field(row, "thread"),
@@ -118,8 +128,10 @@ class InsertHoleCodec {
 				extent: cast CastingRecordCodec.string(row, "extent"),
 				thread: thread,
 				tapDrill: Reflect.field(row, "tapDrill") == null ? null : CastingRecordCodec.number(row, "tapDrill"),
+				clearanceDiameter: CastingRecordCodec.number(row, "clearanceDiameter"),
+				threadDepth: Reflect.field(row, "threadDepth") == null ? null : CastingRecordCodec.number(row, "threadDepth"),
 				counterbore: counterbore,
-				limits: limits(Reflect.field(row, "limits"))
+				limits: limits(Reflect.field(row, "limits"), thread != null)
 			});
 		}
 		for (h in result) {
@@ -130,7 +142,7 @@ class InsertHoleCodec {
 				"depth",
 				"extent",
 				"thread",
-				"tapDrill",
+				"tapDrill", "clearanceDiameter", "threadDepth",
 				"counterbore", "limits"
 			]);
 			CastingFeatureCodec.identifier(h.id);
@@ -142,17 +154,21 @@ class InsertHoleCodec {
 				throw "Invalid insert hole dimensions";
 			if (h.extent != Through && h.extent != Blind)
 				throw "Invalid insert hole extent";
+			if (!Math.isFinite(h.clearanceDiameter) || h.clearanceDiameter < (h.thread == null ? h.diameter : h.thread.majorDiameter))
+				throw "Invalid insert bolt clearance diameter: " + h.id;
 			if (h.thread != null) {
 				var thread:InsertThread = cast h.thread;
 				if (thread.designation.length == 0 || thread.toleranceClass.length == 0 || thread.majorDiameter <= 0 || thread.pitch <= 0 || thread.starts < 1)
 					throw "Invalid insert thread";
+				if (h.threadDepth == null || h.threadDepth <= 0 || h.threadDepth > h.depth)
+					throw "Invalid usable insert thread depth: " + h.id;
 				if (!thread.internal
 					|| h.tapDrill == null
 					|| h.tapDrill <= 0
 					|| h.tapDrill >= thread.majorDiameter
 					|| Math.abs(h.tapDrill - h.diameter) > 1e-8)
 					throw "Invalid insert tapping geometry";
-			} else if (h.tapDrill != null)
+			} else if (h.tapDrill != null || h.threadDepth != null)
 				throw "Tap drill requires a thread specification";
 			if (h.counterbore != null) {
 				var cb:InsertCounterbore = cast h.counterbore;
@@ -165,19 +181,27 @@ class InsertHoleCodec {
 		return result;
 	}
 
-	static function limits(raw:Dynamic):InsertHoleLimits {
-		CastingFeatureCodec.fields(raw, ["policyId", "minEngagement", "minTipGap", "minBack", "minWall", "minClearance", "overrides"]);
+	static function limits(raw:Dynamic, threaded:Bool):InsertHoleLimits {
+		var names = ["policyId", "threaded", "minBack", "minWall", "minClearance", "overrides"];
+		CastingFeatureCodec.fields(raw, names);
 		var result:InsertHoleLimits = {
 			policyId: CastingRecordCodec.string(raw, "policyId"),
-			minEngagement: CastingRecordCodec.number(raw, "minEngagement"),
-			minTipGap: CastingRecordCodec.number(raw, "minTipGap"),
+			threaded: null,
 			minBack: CastingRecordCodec.number(raw, "minBack"),
 			minWall: CastingRecordCodec.number(raw, "minWall"),
 			minClearance: CastingRecordCodec.number(raw, "minClearance"),
 			overrides: []
 		};
+		if (threaded) {
+			var rules:Dynamic = Reflect.field(raw, "threaded");
+			CastingFeatureCodec.fields(rules, ["minEngagement", "minTipGap"]);
+			var engagement = CastingRecordCodec.number(rules, "minEngagement"), tip = CastingRecordCodec.number(rules, "minTipGap");
+			if (engagement <= 0 || tip <= 0) throw "Invalid threaded insert limits";
+			result.threaded = {minEngagement: engagement, minTipGap: tip};
+		}
+		else if (Reflect.field(raw, "threaded") != null) throw "Plain insert bore cannot carry thread limits";
 		CastingFeatureCodec.identifier(result.policyId);
-		for (name in ["minEngagement", "minTipGap", "minBack", "minWall", "minClearance"]) {
+		for (name in ["minBack", "minWall", "minClearance"]) {
 			var value:Float = Reflect.field(result, name);
 			if (!Math.isFinite(value) || value <= 0)
 				throw "Invalid insert hole limit: " + name;
@@ -188,8 +212,8 @@ class InsertHoleCodec {
 		for (row in rows) {
 			CastingFeatureCodec.fields(row, ["name", "value"]);
 			var name = CastingRecordCodec.string(row, "name"), value = CastingRecordCodec.number(row, "value");
-			if (["minEngagement", "minTipGap", "minBack", "minWall", "minClearance"].indexOf(name) < 0
-				|| seen.exists(name) || value != Reflect.field(result, name))
+			if ((threaded ? ["minEngagement", "minTipGap", "minBack", "minWall", "minClearance"] : ["minBack", "minWall", "minClearance"]).indexOf(name) < 0
+				|| seen.exists(name) || value != Reflect.field(name == "minEngagement" || name == "minTipGap" ? result.threaded : result, name))
 				throw "Inconsistent insert hole limit override: " + name;
 			seen.set(name, true);
 			result.overrides.push({name: name, value: value});

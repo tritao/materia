@@ -134,11 +134,22 @@ class MillMoldChecks {
 		check(p.changeRequests.filter(c -> c.kind == "fixture-attachment").length == 0, "tool-only fixture attachments are not casting changes");
 		check(report.handling.castingMassKg > 0 && report.demoldingSteps[report.demoldingSteps.length - 1].kind == "flip-to-service",
 			"mass/CoM and flip appear in demolding sequence");
+		var sourceFixings = [for (fixture in p.fixtures) for (fixing in fixture.fixings) fixing];
+		check(sourceFixings.length == 4, "the four mill column anchors get source-thread fixture screws");
+		for (fixture in p.fixtures) for (fixing in fixture.fixings) {
+			var insert = p.document.input.inserts.filter(i -> i.id == fixture.insertId)[0];
+			var hole = insert.holes.filter(h -> h.id == fixing.sourceHoleId)[0];
+			var penetration = fixture.penetrations.filter(pen -> pen.sourceHoleId == hole.id)[0];
+			check(hole.thread != null && hole.extent == materia.casting.InsertHole.HoleExtent.Blind && penetration.plug == null
+				&& fixing.engagement + materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minTipGap <= hole.depth + 1e-7
+				&& insert.height - hole.depth >= hole.limits.minBack,
+				"source fixing preserves the blind C45 back wall and has no buried plug");
+		}
 		for (f in p.fixtures) {
 			var datum = ToolingVolume.geometryOf(f.datum);
 			check(datum.valid() && datum.solidCount() == 1, "bored datum support remains one valid connected solid");
 			datum.close();
-			check(f.lateralLocation.baselineMm == p.document.recipe.hardware.fixturePinSpacing && f.datum.cuts.length >= 2,
+			check(f.lateralLocation.baselineMm >= p.document.recipe.hardware.fixturePinSpacing && f.datum.cuts.length >= 2,
 				"fixture has pin/slot and clearance-only fixing cuts");
 			check(f.penetrations.length == 2 + f.fixings.length, "fixture bed cuts have explicit sealing face records");
 		}

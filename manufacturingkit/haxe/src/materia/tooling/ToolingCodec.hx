@@ -25,7 +25,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 7;
+	public static inline var VERSION = 8;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -156,7 +156,7 @@ class ToolingCodec {
 			"pose",
 			"role",
 			"label",
-			"positionTolerance",
+			"positionTolerance", "material",
 			"finish"
 		], "insert");
 		var w = positive(raw, "width"),
@@ -173,6 +173,7 @@ class ToolingCodec {
 			role: insertRole(string(raw, "role")),
 			label: string(raw, "label"),
 			positionTolerance: positive(raw, "positionTolerance"),
+			material: materia.casting.InsertMaterial.InsertMaterials.snapshot(Reflect.field(raw, "material")),
 			finish: insertFinish(string(raw, "finish"))
 		};
 	}

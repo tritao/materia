@@ -29,6 +29,13 @@ class PanelTests {
 	}
 
 	public static function run():Void {
+		var uprightSlot = PanelContours.obround(12, 20, 3.2, 5.2);
+		PanelGeometry.validate(uprightSlot);
+		var uprightBounds = PanelGeometry.bounds(uprightSlot);
+		check(Math.abs(uprightBounds.width - 3.2) + Math.abs(uprightBounds.height - 5.2) < 1e-7,
+			"vertical locator slot retains exact extents");
+		check(Math.abs(PanelGeometry.area(uprightSlot) - (3.2 * 2 + Math.PI * 1.6 * 1.6)) < 1e-7,
+			"vertical locator slot retains exact line/arc area");
 		for (t in [17.6, 18.0, 18.3]) {
 			var stock = PanelJoints.stock(t);
 			var pair = PanelJoints.tabSlot({

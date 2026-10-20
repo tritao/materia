@@ -15,7 +15,7 @@ class FoundationToolingAdapter {
             envelope:foundation.body.castingEnvelope(),features:foundation.body.castingFeatures(),
             inserts:[for(row in foundation.insertLocations()) {
                 id:row.id,width:row.part.parameterNumber("width"),depth:row.part.parameterNumber("depth"),height:row.part.parameterNumber("height"),
-                holes:InsertHoles.copy(DesignInterfaces.of(row.part)),pose:row.pose,role:cast row.part.parameterToken("role"),
+                material:row.part.insertMaterial(),holes:InsertHoles.copy(DesignInterfaces.of(row.part)),pose:row.pose,role:cast row.part.parameterToken("role"),
                 label:row.part.parameterToken("label"),positionTolerance:row.part.parameterNumber("positionTolerance"),finish:cast row.part.parameterToken("finish")
             }]});
     }

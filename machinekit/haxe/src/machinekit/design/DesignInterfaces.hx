@@ -16,6 +16,7 @@ typedef BlindThreadInterface = {
 }
 typedef CounterboreInterface = {var radius:Float; var depth:Float; var bearingDepth:Float;}
 typedef HoleInterface = {
+	@:optional var insertClearanceDiameter:Float;
 	@:optional var insertLimits:materia.casting.InsertHole.InsertHoleLimits;
 	var id:String; var frame:AssemblyFrame; var radius:Float; var depth:Float;
 	@:optional var through:Bool;

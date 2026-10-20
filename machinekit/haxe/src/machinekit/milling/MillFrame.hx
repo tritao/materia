@@ -119,7 +119,7 @@ class MillFrame extends MachineAssembly {
 					part: new CastInsert(new ComponentValues().setNumber("width", footWidth)
 						.setNumber("depth", footDepth)
 						.setNumber("height", details.columnAnchorThickness)
-						.setToken("holes", flared ? InsertHoles.tappedThrough(details.columnAnchorThread, details.columnAnchorThickness) : InsertHoles.through(0, details.columnAnchorThickness))
+						.setToken("holes", flared ? InsertHoles.tappedBlind(details.columnAnchorThread, details.columnAnchorThickness) : InsertHoles.fromNeutral([]))
 						.setToken("role", "column-mount")
 						.setToken("label", "column mounting anchor")),
 					pose: F.translation(x, y - l.baseCentreY, l.railPlane - details.columnAnchorThickness)
@@ -199,7 +199,7 @@ class MillFrame extends MachineAssembly {
 						part: new CastInsert(new ComponentValues().setNumber("width", details.hatchAnchorWidth)
 							.setNumber("depth", details.hatchAnchorDepth)
 							.setNumber("height", details.hatchAnchorThickness)
-							.setToken("holes", InsertHoles.tappedThrough(details.hatchAnchorThread, details.hatchAnchorThickness))
+							.setToken("holes", InsertHoles.tappedBlind(details.hatchAnchorThread, details.hatchAnchorThickness))
 							.setToken("role", "hatch-mount")
 							.setToken("label", "rear motor hatch anchor")),
 						pose: F.fromRotationMatrix(sx * details.hatchAnchorSideOffset, a.yServiceRear - details.hatchAnchorRearInset - l.columnCentreY, z - l.railPlane, [1, 0, 0, 0, 0, 1, 0, -1, 0])
@@ -302,7 +302,11 @@ class MillFrame extends MachineAssembly {
 					var id = corner(sx, sy),
 						anchor = columnInserts.filter(row -> row.id == 'foot$id')[0];
 					var bolt = 'columnBolt$id';
-					addComponent(bolt, machinekit.standard.SocketHeadCapScrew.metric(details.columnAnchorThread.thread.designation, 35));
+					addComponent(bolt, machinekit.standard.SocketHeadCapScrew.metric(details.columnAnchorThread.thread.designation,
+						details.columnBoltLengthIncrement * Math.ceil((l.insertThickness
+							+ machinekit.design.ThreadedHolePolicy.resolve(details.columnAnchorThread.thread, C45Bright).minEngagement)
+							/ details.columnBoltLengthIncrement),
+						machinekit.standard.PropertyClass.Steel88));
 					addMemberConnector('column/foot$id', "boltSeat",
 						F.compose(F.inverse(anchor.pose), F.translation(anchor.pose.x, anchor.pose.y, l.insertThickness)));
 					addMemberConnector(bolt, "seat", F.identity());

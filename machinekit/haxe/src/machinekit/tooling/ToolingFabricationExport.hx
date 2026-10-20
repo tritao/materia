@@ -47,6 +47,10 @@ class ToolingFabricationExport {
 			var nut:machinekit.standard.HexNut = cast component;
 			return {classification: SupportedHardware, lengthMm: nut.height, diameterMm: null};
 		}
+		if (Std.isOfType(component, machinekit.standard.SocketSetScrew)) {
+			var plug:machinekit.standard.SocketSetScrew = cast component;
+			return {classification: SupportedHardware, lengthMm: plug.length, diameterMm: plug.thread.majorDiameter};
+		}
 		if (Std.isOfType(component, ToolingPin))
 			return {classification: SupportedHardware, lengthMm: component.parameterNumber("length"),
 				diameterMm: Math.max(component.parameterNumber("diameter"), component.parameterNumber("headDiameter"))};

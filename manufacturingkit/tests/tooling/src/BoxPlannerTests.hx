@@ -1,3 +1,4 @@
+import materia.assembly.AssemblyFrames as F;
 import haxe.Json;
 import materia.tooling.ToolingDocument;
 import materia.tooling.ToolingCodec;
@@ -30,16 +31,20 @@ class BoxPlannerTests {
 	public static function run(d:ToolingDocument):Void {
 		d = ToolingCodec.snapshot(d);
 		d.recipe.minimumLigament = 2;
-		d.input.inserts[0].height = 10;
-		d.input.inserts[0].holes = materia.casting.InsertHoleGeometry.through(5,d.input.inserts[0].height);
+		d.input.inserts[0].height = 15;
+		d.input.inserts[0].pose.z = 85;
+		d.input.inserts[0].holes = TestInsertHoles.through(5,d.input.inserts[0].height);
 		var hole = d.input.inserts[0].holes[0];
 		hole.thread = {designation: "M6", majorDiameter: 6, pitch: 1, starts: 1, hand: Right,
 			internal: true, toleranceClass: "6H", profile: Metric};
 		hole.tapDrill = 5;
-		hole.limits = {policyId: "steel-threaded-hole-v1", minEngagement: 6, minTipGap: 1,
+		hole.threadDepth = hole.depth;
+		hole.clearanceDiameter = 6.6;
+		hole.limits = {policyId: "steel-threaded-hole-v1", threaded: {minEngagement: 6, minTipGap: 1},
 			minBack: 1.5, minWall: 3, minClearance: 0.6, overrides: []};
 		var recess = d.input.features.filter(f -> f.kind == "insert-recess")[0];
-		recess.geometry.height = 10;
+		recess.geometry.height = 15;
+		recess.geometry.pose.z = 85;
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
 		var pattern = ToolingCodec.snapshot(d);
 		var second = materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
@@ -50,6 +55,12 @@ class BoxPlannerTests {
 		pattern.setup.sourceFingerprint = ToolingCodec.inputFingerprint(pattern.input);
 		var patterned = BoxMoldPlanner.plan(pattern);
 		check(patterned.fixtures[0].fixings.length == 2, "both source threads produce independent fixings");
+		var shallow = materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
+		shallow.depth = materia.casting.InsertHole.InsertHoleCodec.threadLimits(shallow).minEngagement
+			+ materia.casting.InsertHole.InsertHoleCodec.threadLimits(shallow).minTipGap + pattern.recipe.hardware.plugDepth - 0.1;
+		check(materia.tooling.casting.InsertFixings.select(shallow,
+			F.compose(pattern.setup.sourceToMold, pattern.input.inserts[0].pose), patterned.fixtures[0].mountingFace,
+			pattern.recipe.hardware) == null, "screw and far-end plug cannot consume the same depth");
 		check(patterned.penetrations.filter(p -> p.insertId == "seat" && p.sourceHoleId != null).length == 2,
 			"each insert penetration traces to its source hole");
 		check(BoxMoldCodec.encode(BoxMoldCodec.decode(BoxMoldCodec.encode(patterned))) == BoxMoldCodec.encode(patterned),
@@ -59,6 +70,8 @@ class BoxPlannerTests {
 		var noThread = ToolingCodec.snapshot(d);
 		noThread.input.inserts[0].holes[0].thread = null;
 		noThread.input.inserts[0].holes[0].tapDrill = null;
+		noThread.input.inserts[0].holes[0].threadDepth = null;
+		noThread.input.inserts[0].holes[0].limits.threaded = null;
 		noThread.setup.sourceFingerprint = ToolingCodec.inputFingerprint(noThread.input);
 		var blocked = BoxMoldPlanner.plan(noThread);
 		check(blocked.fixtures[0].fixings.length == 0 && blocked.changeRequests.filter(r -> r.kind == "insert-fixture-hole").length == 1
@@ -68,6 +81,9 @@ class BoxPlannerTests {
 		check(p.panels.members.length == 5 && p.penetrations.length == 9, "all sockets/lands and fixing hole classified");
 		check(p.documentFingerprint == ToolingCodec.documentFingerprint(d), "mold provenance");
 		var raw:Dynamic = Json.parse(encoded);
+		Reflect.setField(raw, "version", 6);
+		rejects(() -> BoxMoldCodec.decode(Json.stringify(raw)), "previous mold schema rejected");
+		raw = Json.parse(encoded);
 		Reflect.setField(raw, "version", 99);
 		rejects(() -> BoxMoldCodec.decode(Json.stringify(raw)), "unknown mold version");
 		raw = Json.parse(encoded);

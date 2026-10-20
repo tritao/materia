@@ -114,10 +114,17 @@ class CastingMoldCad {
 	public static function assess(p:CastingMoldPlan):CastingMoldAssessment {
 		CastingMoldPlanner.validate(p);
 		var diagnostics = ToolingDiagnostics.fromValidation(p.validation);
-		if (p.features.filter(f -> f.kind == UnsupportedFeature).length > 0)
+		if (p.features.filter(f -> f.kind == UnsupportedFeature).length > 0
+			|| p.validation.filter(v -> StringTools.startsWith(v.rule, "tooling.fixture.hole-protection.") && v.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length > 0)
 			return {diagnostics: diagnostics, geometry: null};
 		return {diagnostics: diagnostics, geometry: review(p)};
 	}
+
+	public static function threadedMask(p:CastingMoldPlan, h:materia.tooling.casting.CoreSupport.SupportHardware):Bool
+		return h.kind == SupportHardwareKind.BoreMask && boreMaskRecord(p, h.id).hole.thread != null;
+
+	public static function looseHardware(p:CastingMoldPlan, h:materia.tooling.casting.CoreSupport.SupportHardware):Bool
+		return h.kind != SupportHardwareKind.FixturePin && (h.kind != SupportHardwareKind.BoreMask || threadedMask(p, h));
 
 	static function steps(p:CastingMoldPlan, order:Array<String>):Array<MoldDemoldingStep> {
 		var result:Array<MoldDemoldingStep> = [
@@ -126,13 +133,25 @@ class CastingMoldCad {
 				kind: ReleaseHardware,
 				memberIds: [
 					for (h in p.hardware)
-						if (h.kind != SupportHardwareKind.FixturePin && h.kind != SupportHardwareKind.BoreMask) h.id
+						if (looseHardware(p, h) && h.kind != SupportHardwareKind.BorePlug && !threadedMask(p, h)) h.id
 				],
 				dependsOn: [],
 				status: materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending
 			}
 		];
 		var previous = "release-loose-tooling";
+		var entryMasks = [for (h in p.hardware) if (threadedMask(p, h)) h.id];
+		if (entryMasks.length > 0) {
+			result.push({id: "release-entry-thread-masks", kind: ReleaseHardware, memberIds: entryMasks,
+				dependsOn: [previous], status: materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending});
+			previous = "release-entry-thread-masks";
+		}
+		var farPlugs = [for (h in p.hardware) if (h.kind == SupportHardwareKind.BorePlug) h.id];
+		if (farPlugs.length > 0) {
+			result.push({id: "release-far-end-thread-plugs", kind: ReleaseHardware, memberIds: farPlugs,
+				dependsOn: [previous], status: materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending});
+			previous = "release-far-end-thread-plugs";
+		}
 		for (id in order) {
 			var stepId = materia.tooling.ToolingIds.derive("withdraw-", id);
 			result.push({
@@ -259,7 +278,21 @@ class CastingMoldCad {
 		if (!exploded) {
 			for (h in p.hardware) {
 				if (h.kind == SupportHardwareKind.BoreMask)
-					a.addComponent(h.id, ToolingPin.boreMask(boreMaskRecord(p, h.id).hole), h.pose);
+					a.addComponent(h.id, ToolingPin.boreMask(boreMaskRecord(p, h.id).hole, boreMaskRecord(p, h.id).protection.plugLength), h.pose);
+				else if (h.kind == SupportHardwareKind.BorePlug) {
+					var protections = [for (fixture in p.fixtures) for (pen in fixture.penetrations)
+						if (pen.sourceHoleId != null && materia.tooling.ToolingIds.derive("resin-plug-", fixture.insertId + "-" + pen.sourceHoleId) == h.id)
+						{insertId: fixture.insertId, holeId: pen.sourceHoleId}];
+					for (fixture in p.fixtures) for (mask in fixture.boreMasks)
+						if (mask.farEndId == h.id)
+							protections.push({insertId: fixture.insertId, holeId: mask.sourceHoleId});
+					if (protections.length != 1)
+						throw "Resin-side plug has no unique source hole: " + h.id;
+					var source = p.document.input.inserts.filter(i -> i.id == protections[0].insertId)[0];
+					var hole = source.holes.filter(hole -> hole.id == protections[0].holeId)[0];
+					a.addComponent(h.id, machinekit.standard.SocketSetScrew.forThread(
+						machinekit.structural.InsertHoles.threadSpec(hole.thread).mating(), h.length), h.pose);
+				}
 				else if (h.kind == SupportHardwareKind.LocatingPin
 					|| h.kind == SupportHardwareKind.FixturePin)
 					a.addComponent(h.id, new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length)), h.pose);
@@ -477,10 +510,10 @@ class CastingMoldCad {
 				members.push({id: c.id, part: shape, direction: new Vector(0, 0, 1)});
 			}
 			for (h in p.hardware)
-				if (h.kind == SupportHardwareKind.FixturePin || h.kind == SupportHardwareKind.BoreMask) {
-					var component = h.kind == SupportHardwareKind.BoreMask ? ToolingPin.boreMask(boreMaskRecord(p, h.id).hole)
+				if (h.kind == SupportHardwareKind.FixturePin || (h.kind == SupportHardwareKind.BoreMask && !threadedMask(p, h))) {
+					var component = h.kind == SupportHardwareKind.BoreMask ? ToolingPin.boreMask(boreMaskRecord(p, h.id).hole, boreMaskRecord(p, h.id).protection.plugLength)
 						: new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length));
-					var local = component.geometry();
+					var local = component.geometry(machinekit.component.ComponentDetail.Envelope);
 					parts.push(local);
 					var shape = PosedParts.moved(local, h.pose);
 					parts.push(shape);
@@ -549,7 +582,7 @@ class CastingMoldCad {
 					member.direction = new Vector(v.x, v.y, v.z);
 				}
 				if (p.hardware.filter(h -> h.id == member.id
-					&& (h.kind == SupportHardwareKind.FixturePin || h.kind == SupportHardwareKind.BoreMask))
+					&& (h.kind == SupportHardwareKind.FixturePin || (h.kind == SupportHardwareKind.BoreMask && !threadedMask(p, h))))
 					.length == 1)
 					member.direction = new Vector(0, 0, p.hardware.filter(h -> h.id == member.id)[0].kind == SupportHardwareKind.FixturePin ? -1 : 1);
 			}

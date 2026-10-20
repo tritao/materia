@@ -1615,7 +1615,7 @@ hobber conversion commits and before fixing sockets:
   only for through holes that open into declared features. No 6 mm made-to-length
   plug. If a blind hole does not fit, the anchor insert thickens, and the mill is
   refrozen in a separate commit stating the design change.
-- [ ] Hole protection 1–2: a through-tapped fixing hole (the mill's M12 column
+- [x] Hole protection 1–2: a through-tapped fixing hole (the mill's M12 column
   anchors) gets no plug and the screw fills only `minEngagement`, so resin enters
   the rest of the thread from behind and locks the screw. Every through hole is
   closed at its far end by a plug or cap with its own depth budget, and the fixing
@@ -1623,28 +1623,45 @@ hobber conversion commits and before fixing sockets:
   and `BoxMoldPlanner`. Bore masks for tapped holes are threaded plugs or set
   screws of the hole's thread, as standard hardware, not smooth pins at tap-drill
   diameter that leave the thread roots open.
-  - Review implementation is preserved, **uncommitted**, in the detached
-    `casting-hole-protection` worktree (base `419128ce7`); the shared checkout
-    retains the tested hobber conversion `cddaad861`. The candidate uses shared
-    fixing selection/depth budgets, threaded end plugs, explicit release order,
-    a locator baseline clear of the fixing bore, and mold codecs **7**.
-    Candidate neutral assertions: Tooling **64**, Panel **52**, BoxPlanner **41**,
+  - Decisions implemented in `casting-hole-protection`, then copied onto main:
+    buried M12 base anchors and M4 column hatch anchors are blind, with policy
+    steel back walls. The explicit stock change/refreeze is `9fc4c2488`.
+    Accessible through holes retain separate threaded end plugs and depth budgets;
+    source validation intersects the whole thread exit disk with the actual
+    finished cavity sections, without sampled points or a body-boundary margin.
+    Shared fixing selection, locator clearance and threaded-hardware release
+    order serve both planners. Threaded counterbores remain Unsupported until
+    their separate sealing cap is specified.
+  - C45 EN 1.0503 bright/ground stock carries its specified **580 MPa minimum**
+    tensile strength into the source fingerprint. Service and fixture screws are
+    **ISO 4762 class 8.8**. The conservative VDI 2230 strength-band engagement is
+    **1.3D**; clearance is ISO 273 medium. In-house rules explicitly name radial
+    wall, back wall, tip gap and bottoming-tap runout. The blind source bores are
+    **flat-bottom machined bores**, with **2 pitches** of tapping runout excluded
+    from usable thread; no conical drilling point is implied. The M12 base stock
+    is **30 mm**, its drill depth **27 mm**, usable thread **23.5 mm**, engagement
+    minimum **15.6 mm**, and tip gap **1.75 mm**. The derived standard service
+    screw is **40 mm**, with **20 mm** entering the insert through its **20 mm**
+    clamped column pad. M4 blind holes fit the existing **10 mm** stock.
+  - Hole recipes **3**, tooling documents **8**, mold codecs **7**; previous
+    versions are rejected. Neutral holes carry the source clearance diameter and
+    usable thread depth. Plain bores carry no engagement/tip-gap placeholders.
+    Synthetic hole-pattern helpers live in tests, not the neutral library.
+  - Neutral assertions: Tooling **66**, Panel **52**, BoxPlanner **41**,
     Fabrication **46**, ReviewContract **30**, JunctionThermal **36**, Castability
     **58**, OrientationSection **43**, Process **1,313**, CastingMold **59**
-    (**1,742** total); native FoundationTooling **62**, PanelNative **132**,
-    BoxMold **157**, ProcessNative **34** (**385** total). These are candidate
-    results, not a completed review stage: the mill fixing assertion correctly
-    fails because its M12 holes are **20 mm** deep, while the current **12 mm**
-    engagement + **1.75 mm** gap + **8 mm** stock plug require **21.75 mm**.
-    A made-to-length **6 mm** threaded plug would fit the current budget without
-    changing the frozen casting; the alternative is a design change. User input
-    is pending on that route and on the steel-grade / fixture-screw-class basis
-    for sourced policy limits. No limit or test was weakened. Protection-package
-    regeneration and this review commit remain blocked on those decisions;
-    fixing sockets have not started. After isolation, main compiles and again
-    passes **381** native and **248** mill assertions. Threaded counterbores carry an explicit
-    Unsupported rule until their separate sealing cap is specified.
-- [ ] Hole policy 3–4: each `ThreadedHolePolicy` constant names its source (for
+    (**1,744** total); FoundationModel **38**. Main: Casting **50** (including recipe
+    contracts), FoundationTooling **62**, PanelNative **132**, BoxMold **157**,
+    ProcessNative **34** (**385** native total), FoundationDesign **47** (all four
+    frozen differences and the foot cut/body difference zero), MillMoldChecks
+    **245**. Base mold and full/records-only fabrication packages regenerated;
+    full export repeats **245** mill checks and passes manifest integrity/tamper
+    tests. **790** hashed artifacts, **40** review programs, **17 Pass / 258 Pending /
+    15 Unsupported**, readiness **false**. Review ZIP has **791** entries; the
+    refreshed coupon ZIP has **52** entries and **8** ordered coupon programs.
+    Its filtered panel/program metadata and parent manifest bind to the new full
+    package fingerprint. No physical coupon evidence is recorded.
+- [x] Hole policy 3–4: each `ThreadedHolePolicy` constant names its source (for
   example VDI 2230 engagement for the material pairing, ISO 273 clearance), and the
   radial wall is checked against that source rather than 0.5D. Engagement and tip
   gap exist only on threaded holes; unthreaded holes carry none. The clearance
@@ -1659,6 +1676,10 @@ hobber conversion commits and before fixing sockets:
   `footStemTop` derives from contact, not the old +1. Role tokens use
   `InsertRole`; MillPedestal feature numbers become named details. String lists
   in `CastingStrategies` and `CastingFeatureCodec` come from the enum values.
+  - Protection stage completes empty source patterns, test-only pattern helpers,
+    typed thread choices, resolved clearance/thread depth and derived service
+    screw length. Contact-derived stem height, remaining role tokens/pedestal
+    details and feature/strategy enum lists remain in this checklist item.
 - [ ] Strategy rules 8–9: withdrawal ties fail or require an explicit override,
   never an alphabetical face ID; rule priorities live in the recipe, not as
   library defaults copied from the mill.

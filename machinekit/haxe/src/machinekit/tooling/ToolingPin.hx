@@ -34,7 +34,14 @@ class ToolingPin extends MachineComponent {
     override public function componentType():Null<ComponentType> return recipeType();
     override public function hasGeometry():Bool return true;
     override public function setMaterial(spec:String):Void {if(spec!="steel")throw "Tooling pin requires steel";super.setMaterial(spec);}
-    public static function boreMask(hole:materia.casting.InsertHole):ToolingPin {
+    public static function boreMask(hole:materia.casting.InsertHole, ?plugLength:Float):MachineComponent {
+        if (hole.thread != null) {
+            if (plugLength == null)
+                throw "Threaded bore protection requires a selected plug length: " + hole.id;
+            if (hole.counterbore != null)
+                throw "Threaded counterbore protection needs a sealing cap: " + hole.id;
+            return machinekit.standard.SocketSetScrew.forThread(machinekit.structural.InsertHoles.threadSpec(hole.thread).mating(), cast plugLength);
+        }
         return new ToolingPin(new ComponentValues().setNumber("diameter",hole.diameter).setNumber("length",hole.depth)
             .setNumber("headDiameter",hole.counterbore == null ? 0 : hole.counterbore.diameter)
             .setNumber("headLength",hole.counterbore == null ? 0 : hole.counterbore.depth));

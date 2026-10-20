@@ -23,7 +23,7 @@ class SinglePocketSetup {
 						.setNumber("width", 40)
 						.setNumber("depth", 35)
 						.setNumber("height", 15)
-						.setToken("holes",machinekit.structural.InsertHoles.tappedThrough(machinekit.structural.InsertHoles.metricThread("M6"),15))),
+						.setToken("holes",machinekit.structural.InsertHoles.tappedBlind(machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(6).mating()),15))),
 					pose: F.translation(80, 0, 85)
 				}
 			]);
@@ -74,7 +74,7 @@ class SinglePocketSetup {
 				steelDensityKgM3: 7850,
 				handlingLoadFactor: 1.5,
 				hardware: {
-					plugDepth: 2,
+					plugDepth: 5,
 					plugMaterial: "steel",
 					sealMargin: 3,
 					sealMaterial: "pending compatible sealing compound",

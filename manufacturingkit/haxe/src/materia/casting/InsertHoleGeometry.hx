@@ -79,24 +79,4 @@ class InsertHoleGeometry {
 			throw "Insert drilling consumes its stock";
 		return {volume: volume, center: {x: mx / volume, y: my / volume, z: mz / volume}};
 	}
-	public static function through(diameter:Float, depth:Float):Array<InsertHole> {
-		if (diameter == 0)
-			return [];
-		return [
-			{
-				id: "fixing",
-				frame: materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, depth, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
-				diameter: diameter,
-				depth: depth,
-				extent: Through,
-				thread: null,
-				tapDrill: null,
-				counterbore: null,
-				limits: {
-					policyId: "test-clearance-hole-v1", minEngagement: diameter, minTipGap: diameter / 10,
-					minBack: diameter / 4, minWall: diameter / 2, minClearance: diameter / 10, overrides: []
-				}
-			}
-		];
-	}
 }

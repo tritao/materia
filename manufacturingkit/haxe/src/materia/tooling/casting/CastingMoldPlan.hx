@@ -203,6 +203,8 @@ typedef CastingMoldOptions = {
 typedef BoreMaskProtection = {
 	var sourceHoleId:String;
 	var hardwareId:String;
+	var plugLength:Null<Float>;
+	var farEndId:Null<String>;
 	var withdrawal:{x:Float, y:Float, z:Float};
 }
 

@@ -27,7 +27,7 @@ class DatumFixtures {
 		var stock = F.compose(p.document.setup.sourceToMold, insert.pose);
 		var entry = F.compose(stock, hole.frame), axis = F.transformVector(entry, 0, 0, 1);
 		var sign = -1.0;
-		if (hole.extent == materia.casting.InsertHole.HoleExtent.Through) {
+		if (hole.thread == null && hole.extent == materia.casting.InsertHole.HoleExtent.Through) {
 			var preferred = F.transformVector(stock, 0, 0, Math.abs(withdrawal.z) < 0.9 ? -1 : 1);
 			if (axis.x * preferred.x + axis.y * preferred.y + axis.z * preferred.z > 0)
 				sign = 1;
@@ -36,6 +36,7 @@ class DatumFixtures {
 	}
 	public static function add(p:CastingMoldPlan, i:CastingToolingInsert, face:materia.assembly.AssemblyRecord.AssemblyFrame, datum:MoldVolume,
 			withdrawal:{x:Float, y:Float, z:Float}, bed:PanelPlacement, pocketId:Null<String>):Void {
+		p.validation = p.validation.concat(InsertFixings.protectionValidation(i));
 		var r = p.document.recipe,
 			h = r.hardware,
 			dt = h.datumThickness,
@@ -59,11 +60,28 @@ class DatumFixtures {
 		var id = datum.id, pinDiameter = h.fixturePinDiameter, d = pinDiameter + r.jointClearance, embed = h.fixturePinEmbed;
 		var primary = ToolingIds.derive("", id, "-primary-pin"),
 			secondary = ToolingIds.derive("", id, "-secondary-pin");
+		var pinSpacing = h.fixturePinSpacing, pinAlongY = false;
+		for (hole in i.holes) {
+			var fixing = InsertFixings.select(hole, F.compose(p.document.setup.sourceToMold, i.pose), face, h);
+			if (fixing != null)
+				pinSpacing = Math.max(pinSpacing, fixing.clearanceDiameter + d + h.secondaryPinTravel + 2 * r.minimumLigament);
+		}
+		if (pinSpacing > h.fixturePinSpacing) {
+			var feet = datum.pieces.filter(piece -> Math.abs(piece.z - floor) < 1e-7);
+			var requiredSpan = pinSpacing + d + h.secondaryPinTravel + 2 * r.minimumLigament;
+			var alongX = feet.filter(piece -> piece.width >= requiredSpan).length > 0;
+			var alongY = feet.filter(piece -> piece.depth >= requiredSpan).length > 0;
+			pinAlongY = !alongX && alongY;
+			// A support too small for the required baseline remains blocked by the
+			// normal bore/ligament checks; no source hole or support is invented.
+			if (!alongX && !alongY)
+				pinSpacing = h.fixturePinSpacing;
+		}
 		var penetrations:Array<PenetrationPlan> = [];
 		for (index in 0...2) {
 			var operationId = index == 0 ? primary : secondary;
-			var x = index == 0 ? cx - h.fixturePinSpacing / 2 : index == 1 ? cx + h.fixturePinSpacing / 2 : cx,
-				y = cy;
+			var offset = index == 0 ? -pinSpacing / 2 : pinSpacing / 2;
+			var x = cx + (pinAlongY ? 0 : offset), y = cy + (pinAlongY ? offset : 0);
 			var diameter = d;
 			var depth = r.panel.measuredThickness;
 			var operation = PanelJoints.operation(operationId, Drill, PanelContours.circle(x - bed.pose.x, y - bed.pose.y, diameter / 2), depth, diameter);
@@ -89,7 +107,7 @@ class DatumFixtures {
 				sealingFace: F.translation(x, y, floor),
 				plug: null
 			});
-			var receiver = index == 1 ? PanelContours.obround(x, y, d + h.secondaryPinTravel, d) : PanelContours.circle(x, y, d / 2);
+			var receiver = index == 1 ? PanelContours.obround(x, y, d + (pinAlongY ? 0 : h.secondaryPinTravel), d + (pinAlongY ? h.secondaryPinTravel : 0)) : PanelContours.circle(x, y, d / 2);
 			if (index == 1 && h.fixtureSlotToolDiameter > d + 1e-7)
 				throw "Fixture secondary-slot cutter exceeds slot width";
 			var receiverDepth = embed;
@@ -108,16 +126,13 @@ class DatumFixtures {
 		var fixings:Array<InsertFixtureFixing> = [];
 		var sourceCandidates = 0;
 		for (hole in i.holes) {
-			var entry = F.compose(p.document.setup.sourceToMold, F.compose(i.pose, hole.frame));
-			var axis = F.transformVector(entry, 0, 0, 1);
-			if (hole.thread == null || axis.z < 1 - 1e-8 || Math.abs(entry.z - face.z) > 1e-7)
+			var selected = InsertFixings.select(hole, F.compose(p.document.setup.sourceToMold, i.pose), face, h);
+			if (selected == null)
 				continue;
+			var entry = selected.entry, engagement = selected.engagement;
 			var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
-			var engagement = hole.limits.minEngagement;
-			if (engagement + (hole.extent == materia.casting.InsertHole.HoleExtent.Blind ? hole.limits.minTipGap : 0) > hole.depth + 1e-7)
-				continue;
 			sourceCandidates++;
-			var diameter = thread.majorDiameter + 2 * hole.limits.minClearance;
+			var diameter = selected.clearanceDiameter;
 			// A straight clearance bore must remain inside the supporting datum.
 			var path:Array<MoldBox> = [{x: entry.x - diameter / 2, y: entry.y - diameter / 2,
 				z: Math.max(floor, bed.pose.z + r.panel.measuredThickness), width: diameter, depth: diameter,
@@ -140,7 +155,13 @@ class DatumFixtures {
 				sealingIds: [ToolingIds.derive("insert-", i.id), datum.id], sealSpec: h.sealMaterial});
 			penetrations.push({panelId: bed.panel.id, operationId: fixingId, kind: InsertSealed,
 				insertId: i.id, sourceHoleId: hole.id, coreId: null, sealMargin: h.sealMargin, sealMaterial: h.sealMaterial,
-				sealingFace: F.translation(entry.x, entry.y, floor), plug: null});
+				sealingFace: F.translation(entry.x, entry.y, floor), plug: selected.plug});
+			if (selected.plug != null) {
+				var plug = selected.plug;
+				p.hardware.push({id: ToolingIds.derive("resin-plug-", i.id + "-" + hole.id), kind: BorePlug,
+					diameter: plug.diameter, length: plug.length,
+					pose: F.compose(entry, F.translation(0, 0, hole.depth - plug.length))});
+			}
 			var depth = entry.z - floor;
 			if (depth > 1e-7) {
 				var receiver = PanelJoints.operation(fixingId, Drill, PanelContours.circle(entry.x, entry.y, diameter / 2),
@@ -170,16 +191,21 @@ class DatumFixtures {
 				continue;
 			if (h.plugMaterial != "steel")
 				throw "Unsupported nominal bore-mask material";
-			var entry = F.compose(p.document.setup.sourceToMold, F.compose(i.pose, hole.frame));
+			var entry = F.compose(F.compose(p.document.setup.sourceToMold, i.pose), hole.frame);
+			var protection = InsertFixings.mask(hole, ToolingIds.derive("mask-", i.id + "-" + hole.id), h.plugDepth,
+				maskWithdrawal(p, i, hole, withdrawal));
 			var mask:SupportHardware = {
 				id: ToolingIds.derive("mask-", i.id + "-" + hole.id),
 				kind: BoreMask,
-				diameter: hole.diameter,
-				length: hole.depth,
+				diameter: hole.thread == null ? hole.diameter : hole.thread.majorDiameter,
+				length: protection.plugLength == null ? hole.depth : protection.plugLength,
 				pose: entry
 			};
 			p.hardware.push(mask);
-			masks.push({sourceHoleId: hole.id, hardwareId: mask.id, withdrawal: maskWithdrawal(p, i, hole, withdrawal)});
+			masks.push(protection);
+			if (protection.farEndId != null)
+				p.hardware.push({id: protection.farEndId, kind: BorePlug, diameter: mask.diameter, length: mask.length,
+					pose: F.compose(entry, F.translation(0, 0, hole.depth - mask.length))});
 		}
 		p.fixtures.push({
 			insertId: i.id,
@@ -193,7 +219,7 @@ class DatumFixtures {
 				y: withdrawal.y,
 				z: Math.abs(withdrawal.x) > 0.9 ? 0 : 1
 			},
-			lateralLocation: {primaryId: primary, secondaryId: secondary, baselineMm: h.fixturePinSpacing},
+			lateralLocation: {primaryId: primary, secondaryId: secondary, baselineMm: pinSpacing},
 			fixings: fixings,
 			penetrations: penetrations,
 			boreMasks: masks
@@ -244,19 +270,33 @@ class DatumFixtures {
 				if (fixings.length > 0) {
 					var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
 					var fixing = fixings[0], screws = p.hardware.filter(h -> h.id == fixing.hardwareId);
-					var entry = F.compose(p.document.setup.sourceToMold, F.compose(source.pose, hole.frame));
+					var entry = F.compose(F.compose(p.document.setup.sourceToMold, source.pose), hole.frame);
+					var selected = InsertFixings.select(hole, F.compose(p.document.setup.sourceToMold, source.pose), f.mountingFace,
+						p.document.recipe.hardware);
+					var penetrations = f.penetrations.filter(pen -> pen.sourceHoleId == hole.id && pen.operationId == fixing.operationId);
+					if (selected == null || penetrations.length != 1
+						|| ToolingCodec.canonical(penetrations[0].plug) != ToolingCodec.canonical(selected.plug))
+						throw "Fixture fixing resin-side protection differs from source depth budget: " + hole.id;
+					if (selected.plug != null) {
+						var plug = selected.plug;
+						var hardware = p.hardware.filter(h -> h.id == ToolingIds.derive("resin-plug-", source.id + "-" + hole.id));
+						if (hardware.length != 1 || hardware[0].kind != BorePlug || hardware[0].diameter != plug.diameter
+							|| hardware[0].length != plug.length
+							|| ToolingCodec.canonical(hardware[0].pose) != ToolingCodec.canonical(F.compose(entry, F.translation(0, 0, hole.depth - plug.length))))
+							throw "Missing or inconsistent resin-side fixing plug hardware: " + hole.id;
+					}
 					var receivers = f.datum.cuts.filter(cut -> cut.operation.id == fixing.operationId);
 					var expected = PanelContours.circle(entry.x, entry.y,
-						(thread.majorDiameter + 2 * hole.limits.minClearance) / 2);
+						hole.clearanceDiameter / 2);
 					if (receivers.length != 1 || receivers[0].operation.kind != Drill || !receivers[0].operation.through
 						|| ToolingCodec.canonical(receivers[0].operation.contour) != ToolingCodec.canonical(expected))
 						throw "Datum fixing receiver must be a source-sized clearance bore";
 					if (fixings.length != 1 || hole.thread == null || screws.length != 1
 						|| screws[0].kind != FixtureScrew || screws[0].diameter != thread.majorDiameter
-						|| Math.abs(screws[0].length - (entry.z - screws[0].pose.z + hole.limits.minEngagement)) > 1e-7
+						|| Math.abs(screws[0].length - (entry.z - screws[0].pose.z + materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minEngagement)) > 1e-7
 						|| Math.abs(screws[0].pose.x - entry.x) + Math.abs(screws[0].pose.y - entry.y) > 1e-7
 						|| f.penetrations.filter(pen -> pen.sourceHoleId == hole.id && pen.operationId == fixing.operationId).length != 1
-						|| fixing.engagement != hole.limits.minEngagement
+						|| fixing.engagement != materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minEngagement
 						|| fixing.threadSpec != thread.designation
 						|| ToolingCodec.canonical(fixing.entry) != ToolingCodec.canonical(entry)
 						|| f.boreMasks.filter(mask -> mask.sourceHoleId == hole.id).length != 0)
@@ -267,9 +307,20 @@ class DatumFixtures {
 				if (protections.length != 1)
 					throw "Source hole needs one unique release mask: " + hole.id;
 				var protection = protections[0], hardware = p.hardware.filter(h -> h.id == protection.hardwareId);
-				var entry = F.compose(p.document.setup.sourceToMold, F.compose(source.pose, hole.frame));
-				if (hardware.length != 1 || hardware[0].kind != BoreMask || hardware[0].diameter != hole.diameter
-					|| hardware[0].length != hole.depth || ToolingCodec.canonical(hardware[0].pose) != ToolingCodec.canonical(entry)
+				var expectedProtection = InsertFixings.mask(hole, protection.hardwareId, p.document.recipe.hardware.plugDepth,
+					maskWithdrawal(p, source, hole, f.withdrawal));
+				if (ToolingCodec.canonical(protection) != ToolingCodec.canonical(expectedProtection))
+					throw "Source thread protection differs from its depth budget: " + hole.id;
+				if (protection.farEndId != null) {
+					var far = p.hardware.filter(h -> h.id == protection.farEndId);
+					var entry = F.compose(F.compose(p.document.setup.sourceToMold, source.pose), hole.frame);
+					if (far.length != 1 || far[0].kind != BorePlug || far[0].length != protection.plugLength
+						|| ToolingCodec.canonical(far[0].pose) != ToolingCodec.canonical(F.compose(entry, F.translation(0, 0, hole.depth - far[0].length))))
+						throw "Missing resin-side thread mask: " + hole.id;
+				}
+				var entry = F.compose(F.compose(p.document.setup.sourceToMold, source.pose), hole.frame);
+				if (hardware.length != 1 || hardware[0].kind != BoreMask || hardware[0].diameter != (hole.thread == null ? hole.diameter : hole.thread.majorDiameter)
+					|| hardware[0].length != (protection.plugLength == null ? hole.depth : protection.plugLength) || ToolingCodec.canonical(hardware[0].pose) != ToolingCodec.canonical(entry)
 					|| ToolingCodec.canonical(protection.withdrawal) != ToolingCodec.canonical(maskWithdrawal(p, source, hole, f.withdrawal)))
 					throw "Bore mask differs from its source hole: " + hole.id;
 			}

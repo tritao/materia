@@ -2,9 +2,7 @@ package machinekit.design;
 
 import cadkit.threads.ThreadSpec;
 
-enum abstract InsertMaterial(String) to String {
-	var Steel = "steel";
-}
+typedef InsertMaterial = materia.casting.InsertMaterial;
 
 /** Nominal thread paired with its declared machining and clearance sizes. */
 typedef ThreadedHoleChoice = {
@@ -33,11 +31,26 @@ typedef ResolvedHoleLimits = {
 
 /** Design minima, independent of anchorage or coupon evidence. Distances are mm. */
 class ThreadedHolePolicy {
-	public static inline var STEEL_POLICY_ID = "steel-threaded-hole-v1";
-	public static inline var STEEL_ENGAGEMENT_DIAMETERS = 1.0;
+	public static inline var CLEARANCE_POLICY_ID = "c45-clearance-hole-v2";
+	public static inline var STEEL_POLICY_ID = "c45-iso4762-8.8-vdi2230-v2";
+	/** VDI 2230 Part 1 theoretical 1.3D for Rm >500 MPa / class 8.8,
+	 * conservatively using that strength band for C45 bright Rm >=580 MPa.
+	 * Bossard, Length of engaged thread, 01-2025, bracketed VDI values:
+	 * https://assets.eu.ctfassets.net/0vp0u5uh75zd/3wPlDC2XQOYT3XOdwCk6lz/9a9282ffd29746a7a7f6b0149509f1cf/052_Length_engaged_thread_Fastening_EN_01_2025.pdf
+	 * Effective full-thread overlap excludes runout and chamfer.
+	 */
+	public static inline var STEEL_ENGAGEMENT_DIAMETERS = 1.3;
+	/** In-house machining allowance: two pitches for a bottoming tap runout.
+	 * Usable full thread ends before this zone; drill depth includes it. */
+	public static inline var TAP_RUNOUT_PITCHES = 2.0;
+	/** In-house: one pitch of free usable thread beyond the screw tip. */
 	public static inline var TIP_GAP_PITCHES = 1.0;
+	/** In-house: a quarter diameter of intact steel closes the resin path. */
 	public static inline var BACK_WALL_DIAMETERS = 0.25;
-	public static inline var RADIAL_WALL_DIAMETERS = 0.5;
+	/** In-house: one diameter of radial steel limits edge breakout and dilation;
+	 * this geometric rule does not establish anchorage capacity in the casting. */
+	public static inline var RADIAL_WALL_DIAMETERS = 1.0;
+	/** In-house minimum separation between machined features; not bolt clearance. */
 	public static inline var CLEARANCE_DIAMETERS = 0.1;
 
 	public static function neutral(limits:ResolvedHoleLimits):materia.casting.InsertHole.InsertHoleLimits {
@@ -49,18 +62,17 @@ class ThreadedHolePolicy {
 		}
 		overrides.sort((a, b) -> Reflect.compare(a.name, b.name));
 		return {
-			policyId: limits.policyId, minEngagement: limits.minEngagement, minTipGap: limits.minTipGap,
+			policyId: limits.policyId, threaded: {minEngagement: limits.minEngagement, minTipGap: limits.minTipGap},
 			minBack: limits.minBack, minWall: limits.minWall, minClearance: limits.minClearance, overrides: overrides
 		};
 	}
 
-	/** Unthreaded bores retain numeric design limits; engagement is inapplicable to their checks. */
+	/** Unthreaded bores carry only applicable geometric rules. */
 	public static function clearance(diameter:Float):materia.casting.InsertHole.InsertHoleLimits {
 		if (!Math.isFinite(diameter) || diameter <= 0)
 			throw "Clearance hole policy requires a positive diameter";
 		return {
-			policyId: "steel-clearance-hole-v1", minEngagement: diameter,
-			minTipGap: diameter * CLEARANCE_DIAMETERS, minBack: diameter * BACK_WALL_DIAMETERS,
+			policyId: CLEARANCE_POLICY_ID, threaded: null, minBack: diameter * BACK_WALL_DIAMETERS,
 			minWall: diameter * RADIAL_WALL_DIAMETERS, minClearance: diameter * CLEARANCE_DIAMETERS, overrides: []
 		};
 	}
@@ -69,8 +81,8 @@ class ThreadedHolePolicy {
 		if (spec == null || !spec.internal || !Math.isFinite(spec.majorDiameter)
 			|| !Math.isFinite(spec.pitch) || spec.majorDiameter <= 0 || spec.pitch <= 0)
 			throw "Threaded hole policy requires a valid internal thread";
-		if (material != Steel)
-			throw "Unsupported threaded hole material: " + material;
+		if (materia.casting.InsertMaterial.InsertMaterials.specification(material).minimumTensileStrengthMPa <= 500)
+			throw "Threaded hole policy requires steel with Rm >500 MPa";
 		var recorded:HoleLimitOverrides = {
 			minEngagement: null, minTipGap: null, minBack: null, minWall: null, minClearance: null
 		};

@@ -32,6 +32,19 @@ class BoxMoldTests {
 	}
 
 	public static function run():Void {
+		var hole = SinglePocketSetup.document().input.inserts[0].holes[0];
+		var protection = machinekit.tooling.ToolingPin.boreMask(hole, 5);
+		check(Std.isOfType(protection, machinekit.standard.SocketSetScrew), "tapped-hole protection is standard threaded hardware");
+		var plug:machinekit.standard.SocketSetScrew = cast protection;
+		check(plug.thread.majorDiameter == (cast hole.thread : materia.casting.InsertHole.InsertThread).majorDiameter && plug.thread.pitch == (cast hole.thread : materia.casting.InsertHole.InsertThread).pitch && !plug.thread.internal,
+			"plug carries the mating source thread, rather than a smooth tap-drill pin");
+		var shape = plug.geometry();
+		check(shape.shape.threadedFaces().length == 1, "plug CAD retains its external thread attribute");
+		var end = cadkit.modeling.Part.cylinderSpan(1, plug.length - plug.thread.pitch / 2, plug.length);
+		var leak = end.subtract(shape);
+		var leakVolume = leak.volume();
+		leak.close(); end.close(); shape.close();
+		check(leakVolume < 1e-7, "driving socket leaves a solid resin-sealing end");
 		for (t in [18.0, 17.8])
 			for (rotated in [false, true])
 				for (bed in [false, true]) {
@@ -85,7 +98,16 @@ class BoxMoldTests {
 					check(report.validation.length > 0 && !report.fabrication.ready, "physical qualification pending");
 				}
 		var metric = SinglePocketSetup.document();
-		metric.input.inserts[0].holes = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.tappedThrough(machinekit.structural.InsertHoles.metricThread("M8"), metric.input.inserts[0].height));
+		// The M8 blind policy needs thicker stock than the M6 example.
+		var metricInsert = metric.input.inserts[0];
+		metricInsert.height = 20;
+		metricInsert.pose.z -= 5;
+		for (feature in metric.input.features)
+			if (feature.owner == metricInsert.id) {
+				feature.geometry.height = metricInsert.height;
+				feature.geometry.pose.z = metricInsert.pose.z;
+			}
+		metric.input.inserts[0].holes = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.tappedBlind(machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(8).mating()), metric.input.inserts[0].height));
 		metric.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(metric.input);
 		metric.recipe.hardware.supportScrewDiameter = 8;
 		metric.recipe.hardware.supportClearanceDiameter = 9;

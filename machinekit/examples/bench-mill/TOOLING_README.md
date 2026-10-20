@@ -56,6 +56,21 @@ source ID in `feature-inventory.json`. The kit includes:
   `core-units.json` groups the foam pieces by their authored core intent.
 
 
+The insert stock specification is C45 EN 1.0503 bright or ground bar, with a
+580 MPa minimum tensile strength; service and fixture screws are class 8.8.
+Buried M12 base anchors and M4 column hatch anchors have blind, flat-bottom
+machined bores followed by bottoming taps. Usable thread excludes two pitches of
+runout. The base anchors use named 30 mm stock and derived 40 mm service screws.
+Their mounting plane is unchanged; the casting refreeze records 96,000 mm³ of
+additional steel recess. Insert manufacturing and physical qualification remain
+part of the pending work.
+
+Tapped bore masks are threaded set screws carrying the source thread. Accessible
+through holes have a separately budgeted end closure; source checks reject a
+thread exit disk that meets casting material. Fixing holes carry their fixture
+screw and preserve the blind steel back wall. Threaded hardware has explicit
+release steps before the checked linear withdrawal sequence.
+
 The inverted setup puts rail faces toward the bed, underside cavities toward the
 fill face and the nominal rail mounting plane at mold Z=0. The casting envelope
 starts 4 mm above that datum in this source instance. Backing formers fill that

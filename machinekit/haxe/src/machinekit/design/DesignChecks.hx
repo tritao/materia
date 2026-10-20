@@ -18,7 +18,9 @@ class DesignChecks {
 	public static function blindFastener(out:Diagnostics, subject:String, length:Float, grip:Float,
 		threadDepth:Float, cylindricalDrillDepth:Float, drillTip:Float, thickness:Float,
 		minEngagement:Float, minTipGap:Float, minBack:Float):Void {
-		for (v in [length,grip,threadDepth,cylindricalDrillDepth,drillTip,thickness,minEngagement,minTipGap,minBack])
+		// Zero is a physical flat-bottom bore, not an unknown drill point.
+		if (!Math.isFinite(drillTip) || drillTip < 0) throw "Invalid blind drill point";
+		for (v in [length,grip,threadDepth,cylindricalDrillDepth,thickness,minEngagement,minTipGap,minBack])
 			if (!Math.isFinite(v) || v <= 0) throw "Invalid blind fastener stack";
 		minimum(out,subject+" thread engagement",length-grip,minEngagement);
 		minimum(out,subject+" screw tip gap",threadDepth-(length-grip),minTipGap);

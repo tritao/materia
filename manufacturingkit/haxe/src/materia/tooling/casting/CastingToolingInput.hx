@@ -19,6 +19,7 @@ typedef CastingToolingInsert = {
 	var depth:Float;
 	var height:Float;
 	var holes:Array<InsertHole>;
+	var material:materia.casting.InsertMaterial.InsertMaterialSpec;
 	var pose:AssemblyFrame;
 	var role:InsertRole;
 

@@ -76,11 +76,12 @@ class ToolingTests {
 					width: 40,
 					depth: 30,
 					height: 20,
-					holes: materia.casting.InsertHoleGeometry.through(8,20),
+					holes: TestInsertHoles.through(8,20),
 					pose: F.translation(80, 0, 90),
 					role: InsertRole.GuideSeat,
 					label: "rail seat",
 					positionTolerance: 0.01,
+					material: materia.casting.InsertMaterial.InsertMaterials.specification(C45Bright),
 					finish: InsertFinish.GroundAfterCasting
 				}
 			]
@@ -119,7 +120,7 @@ class ToolingTests {
 			steelDensityKgM3: 7850,
 			handlingLoadFactor: 1.5,
 			hardware: {
-				plugDepth: 2,
+				plugDepth: 5,
 				plugMaterial: "steel",
 				sealMargin: 3,
 				sealMaterial: "pending compatible sealing compound",
@@ -183,6 +184,13 @@ class ToolingTests {
 			encoded = ToolingCodec.encode(original),
 			decoded = ToolingCodec.decode(encoded);
 		check(ToolingCodec.encode(decoded) == encoded, "canonical roundtrip");
+		var stock = fixture();
+		stock.input.inserts[0].material = materia.casting.InsertMaterial.InsertMaterials.specification(C45Ground);
+		check(ToolingCodec.inputFingerprint(stock.input) != ToolingCodec.inputFingerprint(original.input),
+			"insert stock condition enters the source fingerprint");
+		var boreRules = decoded.input.inserts[0].holes[0].limits;
+		check(boreRules.threaded == null && Reflect.fields(boreRules).indexOf("minEngagement") < 0,
+			"plain bores carry no placeholder engagement or tip-gap rules");
 		check(decoded.input.features[0].id == "insert-seat", "features canonicalized by ID");
 		check(original.input.features[0].id == "pocket", "canonicalization does not reorder caller arrays");
 		check(decoded.input.inserts[0].holes[0].diameter == 8 && decoded.input.inserts[0].positionTolerance == 0.01,
@@ -230,7 +238,7 @@ class ToolingTests {
 			rejects(() -> ToolingCodec.decode(Json.stringify(raw)), expected);
 		}
 		corrupt(r -> {
-			r.version = 6;
+			r.version = 7;
 		}, "Unsupported tooling format");
 		corrupt(r -> {
 			r.version = 1.5;
@@ -286,6 +294,7 @@ class ToolingTests {
 		}, "Missing recess");
 		corrupt(r -> {
 			items(items(r.document.input.inserts)[0].holes)[0].diameter = 40;
+			items(items(r.document.input.inserts)[0].holes)[0].clearanceDiameter = 40;
 		}, "bore consumes");
 		corrupt(r -> {
 			items(r.document.input.inserts)[0].role = "unrecognized";

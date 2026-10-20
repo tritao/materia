@@ -62,6 +62,7 @@ class MineralFoundation extends MachineAssembly {
 			throw "Unknown foundation root insert";
 		v.setToken("features", CastingPatterns.encode(features));
 		body = new MineralCasting(v);
+		validateHoleExits();
 		addComponent("casting", body);
 		for (row in inserts) {
 			addComponent(row.id, row.part, row.pose);
@@ -78,6 +79,25 @@ class MineralFoundation extends MachineAssembly {
 			exposeConnector("mount", rootInsert, "mount");
 		else
 			exposeConnector("mount", "casting", "mount");
+	}
+
+	/** A through thread needs an accessible exit, never a closure buried in resin.
+	 * The actual finished cavities are authoritative; the insert's own recess is
+	 * excluded because a point on its boundary cannot establish access behind it.
+	 */
+	function validateHoleExits():Void {
+		var cavities = body.finishedCavities();
+		for (row in inserts)
+			for (hole in InsertHoles.records(row.part.parameterToken("holes"))) {
+				if (hole.extent != Through || hole.thread == null)
+					continue;
+				var frame = F.compose(row.pose, hole.frame);
+				var exit = F.compose(frame, F.translation(0, 0, hole.depth));
+				var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
+				if (materia.casting.CastingHoleExits.intersectsMaterial(body.castingEnvelope(), cavities,
+					body.castingFeatures(), exit, thread.majorDiameter / 2, row.id))
+					throw "Through insert thread exits into casting material: " + row.id + "/" + hole.id;
+			}
 	}
 
 	public function insertLocations():Array<CastInsertPlacement>

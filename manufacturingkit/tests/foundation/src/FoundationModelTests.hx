@@ -154,7 +154,7 @@ class FoundationModelTests {
 		var flared = CastingEnvelope.build(100, 80, 120, 0, 160, 60, 20);
 		var crossing = P.box("sloped-foot-crossing", ServiceOpening, [P.face("foot.side-2")], 60, 30, 30, 65, 0, 25);
 		rejects(() -> BoxAlgebra.material(flared, [crossing]), "Unsupported non-box finished cavity: sloped-foot-crossing");
-		var holes = materia.casting.InsertHoleGeometry.through(6, 20);
+		var holes = TestInsertHoles.through(6, 20);
 		holes[0].thread = {
 			designation: "M7",
 			majorDiameter: 7,
@@ -166,6 +166,9 @@ class FoundationModelTests {
 			profile: Metric
 		};
 		holes[0].tapDrill = 6;
+		holes[0].threadDepth = holes[0].depth;
+		holes[0].clearanceDiameter = 7.5;
+		holes[0].limits.threaded = {minEngagement: 7, minTipGap: 1};
 		var copied = materia.casting.InsertHole.InsertHoleCodec.snapshot(holes);
 		check(copied[0].thread != null && copied[0].thread.designation == "M7", "thread data has portable typed tokens");
 		copied[0].diameter = 5;

@@ -162,13 +162,16 @@ class BoxMoldCad {
 					if (plug.materialSpec != "steel")
 						throw "Unsupported nominal bore plug material";
 					a.addComponent(materia.tooling.ToolingIds.derive("resin-plug-", hole.id),
-						new ToolingPin(new ComponentValues().setNumber("diameter", plug.diameter).setNumber("length", plug.length)),
+						machinekit.standard.SocketSetScrew.forThread(machinekit.structural.InsertHoles.threadSpec(thread).mating(), plug.length),
 						F.compose(fixing.entry, F.translation(0, 0, hole.depth - plug.length)));
 				}
 			}
 			for (mask in fixture.boreMasks) {
 				var hole = i.holes.filter(h -> h.id == mask.sourceHoleId)[0];
-				a.addComponent(mask.hardwareId, ToolingPin.boreMask(hole), F.compose(pose, hole.frame));
+				a.addComponent(mask.hardwareId, ToolingPin.boreMask(hole, mask.plugLength), F.compose(pose, hole.frame));
+				if (mask.farEndId != null)
+					a.addComponent(mask.farEndId, ToolingPin.boreMask(hole, mask.plugLength),
+						F.compose(F.compose(pose, hole.frame), F.translation(0, 0, hole.depth - (cast mask.plugLength : Float))));
 			}
 
 			var poses = a.solvedPoses(), bedPose = poses.get("bed");

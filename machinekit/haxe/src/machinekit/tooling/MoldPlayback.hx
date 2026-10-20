@@ -104,7 +104,7 @@ class MoldPlayback {
 		}
 		var loose:Array<String> = [];
 		for (h in p.hardware)
-			if (h.kind != SupportHardwareKind.FixturePin && h.kind != SupportHardwareKind.BoreMask)
+			if (CastingMoldCad.looseHardware(p, h))
 				for (part in expand(h.id, []))
 					if (loose.indexOf(part) < 0)
 						loose.push(part);

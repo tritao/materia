@@ -111,7 +111,7 @@ class FoundationToolingTests {
 				steelDensityKgM3: 7850,
 				handlingLoadFactor: 1.5,
 				hardware: {
-					plugDepth: 2,
+					plugDepth: 5,
 					plugMaterial: "steel",
 					sealMargin: 3,
 					sealMaterial: "pending compatible sealing compound",
