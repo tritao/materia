@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-21",
+  "step": "SR10",
+  "status": "pass",
+  "import_assertions": 42,
+  "existing_drawing_assertions": 653,
+  "default_spline_tolerance_mm": 0.01,
+  "default_gap_tolerance_mm": 0.05,
+  "native_rebuild": false,
+  "source_sha256": {
+    "cadkit/haxe/src/cadkit/drawing/Dxf.hx": "402202b0407ba7a4dea5160f2d87ac705c7f584ee5dbc90ec4620758bffce938",
+    "cadkit/haxe/src/cadkit/drawing/DxfReader.hx": "3648311a159442fd0edf1ad59f9648786e5841a7937ca699b2e9a4bca866bdb1",
+    "cadkit/haxe/src/cadkit/drawing/DxfSpline.hx": "e1f8433f56f0e2c0877856539ce4a66087789544250d084e4768811f3936d59d",
+    "cadkit/haxe/src/cadkit/drawing/DxfContours.hx": "3c50b49997a41da3ad6a275c73e1549603aa52c6ad4d4a0d51e1898298eaf20f",
+    "cadkit/haxe/tests/dxf-import/DxfImportChecks.hx": "392dee49971db80f185a9ecb46bb72d7154b6bf995e49b7e4285d06ca3c1a775",
+    "cadkit/haxe/tests/dxf-import/haxeon.json": "1a562bfec479cf4dacd87aef327bd5031c70b747c45f435032bc65f4e9a012b9"
+  }
+}

@@ -972,6 +972,9 @@ G55–G59, configurable pitch and placed per-part targets feed the CNC preview.
 ### Phase C: CAM
 
 **SR10. DXF import.**
+Implemented planar centreline reader and exact contour nesting: [dxf/README.md](dxf/README.md).
+42 import + 653 existing drawing assertions pass; 0.01 mm spline tolerance and explicit unit/gap diagnostics.
+
 - CadKit DXF reader: LINE, ARC, CIRCLE, LWPOLYLINE with bulges, POLYLINE, SPLINE sampled to a
   stated tolerance, INSERT expanded, layers and units.
 - Closed-contour assembly with a gap tolerance; inside and outside nesting of contours into parts
@@ -1199,7 +1202,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR7 | native checks pass: 42 policy assertions, 83 static poses/bed, four complete exchanges and focused SR-D3 recheck; app/SR16 dispatch and purchased hardware acceptance remain gated | [ATC packet](atc/README.md) |
 | SR8 | planning screen passes: 16 core + 30 router assertions; measured vacuum/friction, actual forces/web strength and physical overcut datum remain cutting-acceptance gates | [vacuum packet](vacuum/README.md) |
 | SR9 | complete | Compact/dense equivalence; both 0.5 mm full-sheet backends under 300 MB; 20 MB sidecar; 388 ProjectKit + 8 worker + 5 artifact/app assertions. [Evidence](sheet-scale/README.md). |
-| SR10 | planned | |
+| SR10 | complete | Exact arcs/bulges, units/layers, INSERT and bounded spline sampling; 42 import + 653 writer assertions. [Evidence](dxf/README.md). |
 | SR11 | planned | |
 | SR12 | planned | |
 | SR13 | planned | |

@@ -5,6 +5,8 @@ import haxe.io.Bytes;
 
 /** ASCII R12 drawing writer. Curves remain exact; clockwise arcs use the negative-Z OCS. */
 class Dxf {
+	public static function read(source:String,?options:cadkit.drawing.DxfReader.DxfReadOptions):cadkit.drawing.DxfReader.DxfDocument
+		return DxfReader.read(source,options);
 	static function pair(output:StringBuf, code:Int, value:String):Void {
 		output.add(code); output.add("\n"); output.add(value); output.add("\n");
 	}
