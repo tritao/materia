@@ -601,6 +601,15 @@ pose stored in a JSON text parameter.
   counterbore. They replace `boreDiameter` and hardware text in labels such as
   "nominal M12 tap drill". Bore masks, plugs, insert-sealed penetrations and
   fixture fixings come from these holes.
+- Hole limits (minimum engagement, tip gap, back wall, wall and clearance) are
+  design rules, not evidence, so they are always numbers. A named
+  `ThreadedHolePolicy` in `machinekit.design` resolves them from the thread
+  specification and the insert material (for example, engagement as a multiple
+  of nominal diameter for steel). A hole may override a value explicitly. The
+  neutral hole record stores the resolved numbers and the policy ID, both in the
+  fingerprint. No placeholder or unknown limit enters `DesignInterfaces`. Hand-set
+  limits on existing parts (`MillYNutMount`, `MillCrossSaddle`) move to the policy
+  when those parts are next touched.
 - Anchorage (headed studs, undercuts, bonded keys) is insert geometry and feeds
   `InsertAnchorage`; its capacity stays pending evidence.
 - `finish` becomes typed tokens; `label` is display text only.
