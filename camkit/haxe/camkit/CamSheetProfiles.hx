@@ -7,6 +7,35 @@ import cadkit.units.LengthUnits;
 
 /** Rectangular MachineKit sheet blanks as CNC profile inputs. */
 class CamSheetProfiles {
+  /** SR10 exact part boundaries are mm; CAM placement and cutting coordinates are metres. */
+  public static function fromDxf(part:cadkit.drawing.DxfContours.DxfPart,surfaceZMetres:Float=0.0,
+      chordToleranceMetres:Float=0.00005):{outer:CamContour,holes:Array<CamContour>} {
+    if(part==null||!Math.isFinite(surfaceZMetres)||!Math.isFinite(chordToleranceMetres)||chordToleranceMetres<=0)
+      throw "DXF CAM needs a part, finite surface and positive chord tolerance";
+    function contour(loop:Array<cadkit.sheetmetal.Segment>):CamContour {
+      var boundary:Array<cadkit.sheetmetal.Segment> = [],points:Array<Point3> = [];
+      for(s in loop) {
+        var count=s.isLine()?1:Std.int(Math.max(1,Math.ceil(Math.abs(s.sweep)/Math.PI)));
+        for(i in 0...count) {
+          var segment=s.isLine()?cadkit.sheetmetal.Segment.line(new cadkit.sheetmetal.Point2(s.start.x*0.001,s.start.y*0.001),
+            new cadkit.sheetmetal.Point2(s.end.x*0.001,s.end.y*0.001)):
+            cadkit.sheetmetal.Segment.arc(new cadkit.sheetmetal.Point2(s.arcCenter().x*0.001,s.arcCenter().y*0.001),
+              s.radius*0.001,s.startAngle+s.sweep*i/count,s.sweep/count);
+          boundary.push(segment);
+          var steps=1;
+          if(!segment.isLine()) {
+            var angle=2*Math.acos(Math.max(-1,Math.min(1,1-chordToleranceMetres/segment.radius)));
+            steps=Std.int(Math.max(2,Math.ceil(Math.abs(segment.sweep)/angle)));
+          }
+          if(steps>1000000||points.length+steps>1000000)throw "DXF CAM contour exceeds sampling limit";
+          for(j in 0...steps){var p=segment.point(j/steps);points.push(new Point3(p.x,p.y,surfaceZMetres));}
+        }
+      }
+      var result=new CamContour(points,true);result.exactBoundary=boundary;result.chordTolerance=chordToleranceMetres;return result;
+    }
+    return {outer:contour(part.outer.segments),holes:[for(hole in part.holes)contour(hole.segments)]};
+  }
+
   public static function fromPlan(plan:SheetCutPlan, placementId:String,
       ?surfaceZMetres:Float = 0.0):CamContour {
     if (plan == null) throw "CAM needs a sheet cut plan";

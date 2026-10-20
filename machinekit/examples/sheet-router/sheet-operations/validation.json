@@ -1,0 +1,576 @@
+{
+  "date": "2026-10-21",
+  "step": "SR11",
+  "status": "pass",
+  "core_assertions": 46,
+  "legacy_assertions": 293,
+  "cabinet_assertions": 10,
+  "cabinet": {
+    "assertions": 10,
+    "reports": [
+      {
+        "workY": 2600,
+        "spacingMm": 1,
+        "forcePerPartN": 300,
+        "safetyFactor": 2,
+        "unsafe": {
+          "components": [
+            {
+              "boundsMaxM": [
+                1.6,
+                2.6,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 15078.654631881494,
+              "margin": 25.131091053135822,
+              "normalForceN": 30157.30926376299,
+              "passes": true,
+              "requiredLateralN": 600,
+              "supportAreaM2": 4.156188,
+              "supportByZoneM2": [
+                0.6936,
+                0.689788,
+                0.6928,
+                0.6928,
+                0.6936,
+                0.6936
+              ]
+            },
+            {
+              "boundsMaxM": [
+                1.58,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                1.5300000000000002,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 9.069917921939414,
+              "margin": 0.015116529869899023,
+              "normalForceN": 18.139835843878828,
+              "passes": false,
+              "requiredLateralN": 600,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0,
+                0.0025,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            8.957795004436831e-07,
+            8.967519035444295e-07,
+            8.962756244746751e-07,
+            8.962756244746751e-07,
+            8.957795004436831e-07,
+            8.957795004436831e-07
+          ],
+          "coveredAreaByZoneM2": [
+            0.6936,
+            0.6922879999999999,
+            0.6928,
+            0.6928,
+            0.6936,
+            0.6936
+          ],
+          "equivalentThroughKerfLengthM": 0.2186666666666818,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 10370.153798454612,
+            "headerPressurePa": 9129.631183369409,
+            "open": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "totalFlowM3PerHour": 175.5581544185446,
+            "zoneFlowM3PerHour": [
+              29.24913954055546,
+              29.28047818136726,
+              29.26512880775548,
+              29.26512880775548,
+              29.24913954055546,
+              29.24913954055546
+            ],
+            "zonePressurePa": [
+              9070.045674703877,
+              9069.917921939414,
+              9069.980511144026,
+              9069.980511144026,
+              9070.045674703877,
+              9070.045674703877
+            ]
+          },
+          "programLine": 1,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0.0013120000000000909,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 1
+            }
+          ]
+        },
+        "sequence": [
+          {
+            "operation": "small-hole",
+            "components": 1,
+            "holdingMargin": 25.157092540106582,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 2.5599999994851963e-07
+          },
+          {
+            "operation": "small-profile",
+            "components": 1,
+            "holdingMargin": 25.14758806825033,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 2.2991999995378154e-05
+          },
+          {
+            "operation": "panel-0-0-profile",
+            "components": 1,
+            "holdingMargin": 24.99259310794862,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003181799999361634
+          },
+          {
+            "operation": "panel-0-1-profile",
+            "components": 1,
+            "holdingMargin": 24.837452931986725,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00031817999993613566
+          },
+          {
+            "operation": "panel-1-0-profile",
+            "components": 1,
+            "holdingMargin": 24.682828633070745,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00031819199993637914
+          },
+          {
+            "operation": "panel-1-1-profile",
+            "components": 1,
+            "holdingMargin": 24.528801663259934,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003181919999364069
+          },
+          {
+            "operation": "panel-2-0-profile",
+            "components": 1,
+            "holdingMargin": 24.37618988058291,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003181799999367463
+          },
+          {
+            "operation": "panel-2-1-profile",
+            "components": 1,
+            "holdingMargin": 24.224154620888378,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00031817999993676016
+          }
+        ],
+        "minimumHoldingMargin": 24.224154620888378,
+        "finalReport": {
+          "components": [
+            {
+              "boundsMaxM": [
+                1.6,
+                2.6,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 14534.492772533027,
+              "margin": 24.224154620888378,
+              "normalForceN": 29068.985545066054,
+              "passes": true,
+              "requiredLateralN": 600,
+              "supportAreaM2": 4.053928,
+              "supportByZoneM2": [
+                0.667275,
+                0.675321,
+                0.670021,
+                0.679607,
+                0.676578,
+                0.685126
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            9.202523686600581e-07,
+            9.127660932819042e-07,
+            9.177976178295561e-07,
+            9.086589245850723e-07,
+            9.114821361021554e-07,
+            9.034529888155597e-07
+          ],
+          "coveredAreaByZoneM2": [
+            0.667275,
+            0.675321,
+            0.670021,
+            0.679607,
+            0.676578,
+            0.685126
+          ],
+          "equivalentThroughKerfLengthM": 17.678666666666675,
+          "minimumSupportThicknessMm": 3,
+          "point": {
+            "blowerPressurePa": 10279.521693534218,
+            "headerPressurePa": 9023.581358998243,
+            "open": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "totalFlowM3PerHour": 176.6457396775893,
+            "zoneFlowM3PerHour": [
+              29.69089054083529,
+              29.452580141887694,
+              29.612757118543566,
+              29.32180372344063,
+              29.41170014971275,
+              29.156008003169394
+            ],
+            "zonePressurePa": [
+              8962.182413814673,
+              8963.164080974157,
+              8962.505138894037,
+              8963.699423799524,
+              8963.331682166823,
+              8964.374696030687
+            ]
+          },
+          "programLine": 1,
+          "retainedWebNeedsForceQualification": true,
+          "throughKerfAreaM2": 0.10607200000000006,
+          "warnings": []
+        },
+        "axes": "Z rays for component/holding check; tri-dexel geometry checked in core fixture"
+      },
+      {
+        "workY": 3150,
+        "spacingMm": 1,
+        "forcePerPartN": 300,
+        "safetyFactor": 2,
+        "unsafe": {
+          "components": [
+            {
+              "boundsMaxM": [
+                1.6,
+                3.15,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 16046.115662490345,
+              "margin": 26.743526104150575,
+              "normalForceN": 32092.23132498069,
+              "passes": true,
+              "requiredLateralN": 600,
+              "supportAreaM2": 5.036187999999999,
+              "supportByZoneM2": [
+                0.84,
+                0.8361879999999999,
+                0.84,
+                0.84,
+                0.84,
+                0.84
+              ]
+            },
+            {
+              "boundsMaxM": [
+                1.58,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                1.5300000000000002,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 7.965282914784453,
+              "margin": 0.013275471524640755,
+              "normalForceN": 15.930565829568906,
+              "passes": false,
+              "requiredLateralN": 600,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0,
+                0.0025,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.0852713178462613e-06,
+            1.0864917829625068e-06,
+            1.0852713178462613e-06,
+            1.0852713178462613e-06,
+            1.0852713178462613e-06,
+            1.0852713178462613e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.84,
+            0.8386879999999999,
+            0.84,
+            0.84,
+            0.84,
+            0.84
+          ],
+          "equivalentThroughKerfLengthM": 0.2186666666666818,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 9436.753046445332,
+            "headerPressurePa": 8032.8872844650305,
+            "open": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "totalFlowM3PerHour": 186.75896344265595,
+            "zoneFlowM3PerHour": [
+              31.120758294694028,
+              31.155171969185826,
+              31.120758294694028,
+              31.120758294694028,
+              31.120758294694028,
+              31.120758294694028
+            ],
+            "zonePressurePa": [
+              7965.432182447162,
+              7965.282914784452,
+              7965.432182447162,
+              7965.432182447162,
+              7965.432182447162,
+              7965.432182447162
+            ]
+          },
+          "programLine": 1,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0.0013120000000000909,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 1
+            }
+          ]
+        },
+        "sequence": [
+          {
+            "operation": "small-hole",
+            "components": 1,
+            "holdingMargin": 26.76724799993792,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 2.5599999994851963e-07
+          },
+          {
+            "operation": "small-profile",
+            "components": 1,
+            "holdingMargin": 26.75802119006599,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 2.2991999995364276e-05
+          },
+          {
+            "operation": "panel-0-0-profile",
+            "components": 1,
+            "holdingMargin": 26.6246179330916,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003037439999390573
+          },
+          {
+            "operation": "panel-0-1-profile",
+            "components": 1,
+            "holdingMargin": 26.491657626159885,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00030374399993902956
+          },
+          {
+            "operation": "panel-1-0-profile",
+            "components": 1,
+            "holdingMargin": 26.359141626296122,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00030374399993929324
+          },
+          {
+            "operation": "panel-1-1-profile",
+            "components": 1,
+            "holdingMargin": 26.227050522445538,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003037439999393071
+          },
+          {
+            "operation": "panel-2-0-profile",
+            "components": 1,
+            "holdingMargin": 26.095392622760325,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00030374399993965406
+          },
+          {
+            "operation": "panel-2-1-profile",
+            "components": 1,
+            "holdingMargin": 25.96415638962473,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00030374399993965406
+          },
+          {
+            "operation": "panel-3-0-profile",
+            "components": 1,
+            "holdingMargin": 25.833361429080856,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003037439999396402
+          },
+          {
+            "operation": "panel-3-1-profile",
+            "components": 1,
+            "holdingMargin": 25.702988905412862,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003037439999396402
+          }
+        ],
+        "minimumHoldingMargin": 25.702988905412862,
+        "finalReport": {
+          "components": [
+            {
+              "boundsMaxM": [
+                1.6,
+                3.15,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 15421.793343247717,
+              "margin": 25.702988905412862,
+              "normalForceN": 30843.586686495433,
+              "passes": true,
+              "requiredLateralN": 600,
+              "supportAreaM2": 4.905391999999999,
+              "supportByZoneM2": [
+                0.8104399999999999,
+                0.820792,
+                0.813712,
+                0.825712,
+                0.812352,
+                0.822384
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.113040310093549e-06,
+            1.103486437816232e-06,
+            1.1099190697835542e-06,
+            1.0986787597063498e-06,
+            1.1113392248222907e-06,
+            1.1017745736597596e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.8104399999999999,
+            0.820792,
+            0.813712,
+            0.825712,
+            0.812352,
+            0.822384
+          ],
+          "equivalentThroughKerfLengthM": 22.434666666666658,
+          "minimumSupportThicknessMm": 3,
+          "point": {
+            "blowerPressurePa": 9347.819472049587,
+            "headerPressurePa": 7927.863556121703,
+            "open": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "totalFlowM3PerHour": 187.82616633540493,
+            "zoneFlowM3PerHour": [
+              31.489777283022775,
+              31.224092355396106,
+              31.402991164548958,
+              31.090350837699596,
+              31.44248014230026,
+              31.176474552437213
+            ],
+            "zonePressurePa": [
+              7858.799251987589,
+              7859.9597515438045,
+              7859.179411130117,
+              7860.540207709044,
+              7859.0065631370935,
+              7860.16670484156
+            ]
+          },
+          "programLine": 1,
+          "retainedWebNeedsForceQualification": true,
+          "throughKerfAreaM2": 0.13460799999999995,
+          "warnings": []
+        },
+        "axes": "Z rays for component/holding check; tri-dexel geometry checked in core fixture"
+      }
+    ]
+  },
+  "qualification_gates": [
+    "retained-tab material/strength and cutting-force qualification at SR13",
+    "actual tool-gauge and Z/spoilboard overcut reach before cutting",
+    "MotionKit OM-R1 and modal commissioning before SR13/SR16 acceptance"
+  ],
+  "source_sha256": {
+    "camkit/haxe/camkit/CamJob.hx": "45dd300d47cc9b82b9fcbbafeac688f06b36bd4029579ea4bae2407c877f30c4",
+    "camkit/haxe/camkit/CamSheetProfiles.hx": "c973dc53205761f873e9cd844a347e6dba1e87d4f9a8f8b80de05971f6cbbc87",
+    "camkit/haxe/camkit/CamSheetProfile.hx": "7f10c2a955bf172c68ab735bf1eb9cfa510866340df5bdd0e4528a401b6d36b8",
+    "camkit/haxe/camkit/CamSheetOrder.hx": "c1471f49ee10caf903f7d73c431ccf9b09c444af122829bea061f2520999b71c",
+    "machinekit/examples/sheet-router/SheetRouterSheetChecks.hx": "b701d70fc2e9871d141ef4eead319f99f26c42f0bd4ad38527ff3fc27f6789d7",
+    "machinekit/examples/sheet-router/haxeon.sheet-ops.json": "71f1c8cc597559991b72b92eddeecc1d605156b01ad3ac06ad187595069ba507",
+    "camkit/tests/sheets/haxeon.regression.json": "407debfd29d0e39892e6be274fc10024a226969167e2f49830d58f7a27034792",
+    "camkit/tests/sheets/haxeon.json": "bb2f923c26192e54ab432f7ba7bc659cd24699d72faab09dbaf26f7f5aca9b1c",
+    "camkit/tests/sheets/SheetOperationsChecks.hx": "1cde07463419851c81af04fc17eb89fa92a3f6d3cd52a33cc111bb2c224fbeb1",
+    "camkit/tests/sheets/SheetLegacyChecks.hx": "d9406b476c2984dd99ab4b8be1945b8876aa43a7f49fd07cb6e5aecd57b2c6f5"
+  }
+}

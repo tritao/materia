@@ -36,6 +36,8 @@ class CamJob {
 
 	var current:Point3;
 	var selectedTool:Int = -1;
+	var requestedSpindleRpm:Float;
+	var selectedSpindleRpm:Float = -1;
 
 	/** The G43 length in effect; moves are programmed at the tool tip. */
 	var activeLength:Float = 0.0;
@@ -73,7 +75,83 @@ class CamJob {
 		this.arcTolerance = arcTolerance;
 		this.safeZ = safeZ;
 		this.spindleRpm = spindleRpm;
+		this.requestedSpindleRpm = spindleRpm;
 		current = initial == null ? new Point3(0.0, 0.0, 0.0) : initial;
+	}
+
+	/** Modal operation RPM; the next operation emits a speed change even when the tool stays loaded. */
+	public function withSpindleSpeed(rpm:Float):CamJob {
+		if (!Math.isFinite(rpm) || rpm <= 0) throw "CAM operation RPM must be positive";
+		requestedSpindleRpm = rpm;
+		return this;
+	}
+
+	/** Sheet profile with explicit tabs, optional onion/skin pass, tangent leads and profile ramps. */
+	public function sheetProfile(contour:CamContour, tool:Tool, bottom:Float, feed:Float,
+			settings:camkit.CamSheetProfile.CamSheetProfileSettings):CamJob {
+		require(contour, tool, bottom, feed);
+		if (settings == null) throw "Sheet profile settings are required";
+		var plan = CamSheetProfile.plan(contour,tool,settings);
+		var skin:Float = settings.onionSkin == null ? 0.0 : settings.onionSkin;
+		if (!Math.isFinite(skin) || skin < 0 || bottom + skin >= contour.z) throw "Invalid onion-skin thickness";
+		for (tab in plan.tabs) if (bottom + tab.thickness >= contour.z) throw "Tabs must be thinner than the sheet";
+		var step:Float = settings.stepDown == null ? 0.002 : settings.stepDown;
+		var levels = depthLevels(contour.z,bottom+skin,step);
+		if (skin > 0 && settings.skinPass == true) levels.push(bottom);
+		var entryFeed = checkedEntryFeed(feed,settings.plungeFeed);
+		var direction = settings.direction == null ? CamCutDirection.Climb : settings.direction;
+		if (settings.spindleRpm != null) withSpindleSpeed(settings.spindleRpm);
+		var span = nextSpan(settings.featureRef); selectTool(tool,span);
+		for (i in 0...levels.length) {
+			var level = levels[i], prior = i == 0 ? contour.z : levels[i-1];
+			var pass = CamSheetProfile.pass(plan,level,prior,bottom,plan.rampLength > 0);
+			var start = GeometryTools.pointAt(pass[0],0);
+			var leadIn = plan.leadRadius > 0 ? CamSheetProfile.lead(plan,start.z,direction,false) : null;
+			var entry = leadIn == null ? start : GeometryTools.pointAt(leadIn,0);
+			rapidToSafeXY(entry.x,entry.y,span);
+			rapid(new Point3(entry.x,entry.y,Math.min(safeZ,prior+approachClearance)),span);
+			feedTo(entry,entryFeed,span);
+			if (leadIn != null) feedGeometry(leadIn,feed,span);
+			for (g in pass) sheetGeometry(g,feed,entryFeed,span);
+			// A ramp descends over its first run; finish the entire perimeter at this level.
+			if (plan.rampLength > 0) for (g in CamSheetProfile.pass(plan,level,level,bottom,false)) sheetGeometry(g,feed,entryFeed,span);
+			if (plan.leadRadius > 0) feedGeometry(CamSheetProfile.lead(plan,level,direction,true),feed,span);
+			rapid(new Point3(current.x,current.y,safeZ),span);
+		}
+		return this;
+	}
+
+	function sheetGeometry(g:PathGeometry,feed:Float,plungeFeed:Float,span:Provenance):Void {
+		var a=GeometryTools.pointAt(g,0),b=GeometryTools.pointAt(g,GeometryTools.length(g));
+		var vertical=switch(g){case Line(_,_):Math.abs(a.x-b.x)<1e-12&&Math.abs(a.y-b.y)<1e-12;case _:false;};
+		var kind=b.z<a.z-1e-12?(vertical?MoveKind.Plunge:MoveKind.Ramp):MoveKind.Cut;
+		ops.push(ToolpathOp.Move(kind,g,vertical?plungeFeed:feed,Math.abs(a.z-b.z)>1e-12?0:blendTolerance,span));
+		current=b;
+	}
+
+	/** Bidirectional raster surfacing of the declared rectangle; cutter centres reach every edge. */
+	public function surface(low:Point3,high:Point3,tool:Tool,depth:Float,feed:Float,stepOver:Float,
+			stepDown:Float=0.002,?plungeFeed:Float,?featureRef:String):CamJob {
+		if (low==null||high==null||high.x<=low.x||high.y<=low.y||Math.abs(low.z-high.z)>1e-10||
+			!Math.isFinite(depth)||depth>=low.z||!Math.isFinite(feed)||feed<=0||!Math.isFinite(stepOver)||
+			stepOver<=0||tool==null||stepOver>tool.diameter||safeZ<=low.z) throw "Invalid surfacing rectangle or cutting parameters";
+		for(p in [low,high])if(!Math.isFinite(p.x)||!Math.isFinite(p.y)||!Math.isFinite(p.z))throw "Surfacing bounds must be finite";
+		checkReach(tool,low.z-depth);
+		var entryFeed=checkedEntryFeed(feed,plungeFeed),span=nextSpan(featureRef);
+		var levels=depthLevels(low.z,depth,stepDown),rows=Std.int(Math.ceil((high.y-low.y)/stepOver));
+		if (rows>100000)throw "Surfacing row limit exceeded";
+		selectTool(tool,span);
+		for(i in 0...levels.length) {
+			var level=levels[i],prior=i==0?low.z:levels[i-1],left=low.x-tool.diameter/2,right=high.x+tool.diameter/2;
+			rapidToSafeXY(left,low.y,span);rapid(new Point3(left,low.y,Math.min(safeZ,prior+approachClearance)),span);
+			feedTo(new Point3(left,low.y,level),entryFeed,span);
+			for(row in 0...rows+1) {
+				var y=low.y+(high.y-low.y)*row/rows,x=row%2==0?right:left;
+				feedTo(new Point3(current.x,y,level),feed,span);feedTo(new Point3(x,y,level),feed,span);
+			}
+			rapid(new Point3(current.x,current.y,safeZ),span);
+		}
+		return this;
 	}
 
 	/** Offset closed profile; `outside` and `inside` use the cutter radius. */
@@ -506,10 +584,15 @@ class CamJob {
 				ops.push(ToolpathOp.Move(MoveKind.Retract, PathGeometry.Line(current, target), 0.0, 0.0, span));
 				current = target;
 			}
-			ops.push(ToolpathOp.Spindle(Clockwise, spindleRpm, span));
+			ops.push(ToolpathOp.Spindle(Clockwise, requestedSpindleRpm, span));
 			if (spindleSpinUpSeconds > 0)
 				ops.push(ToolpathOp.Dwell(spindleSpinUpSeconds, span));
 			selectedTool = tool.number;
+			selectedSpindleRpm = requestedSpindleRpm;
+		} else if (selectedSpindleRpm != requestedSpindleRpm) {
+			ops.push(ToolpathOp.Spindle(Clockwise,requestedSpindleRpm,span));
+			if (spindleSpinUpSeconds > 0) ops.push(ToolpathOp.Dwell(spindleSpinUpSeconds,span));
+			selectedSpindleRpm = requestedSpindleRpm;
 		}
 	}
 

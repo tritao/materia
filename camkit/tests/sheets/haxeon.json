@@ -1,0 +1,5 @@
+{
+ "version":1,"package":{"name":"cam-sheet-checks"},"entry":"SheetOperationsChecks","sourceRoots":["."],
+ "dependencies":{"camkit":{"path":"../.."},"stockkit":{"path":"../../../stockkit"}},"target":"host",
+ "outputDir":"../../../build/sheet-router-work/sr11/core"
+}

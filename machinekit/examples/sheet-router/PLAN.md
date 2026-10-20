@@ -987,6 +987,11 @@ Implemented planar centreline reader and exact contour nesting: [dxf/README.md](
   - layer-to-operation mapping.
 
 **SR11. Sheet operations (SR-D10).**
+Implemented and checked: [sheet-operations/README.md](sheet-operations/README.md).
+46 core + 293 legacy + 10 both-bed cabinet assertions pass. Tabs retain the small parts;
+SR8 connected-component holding passes, with web strength and physical overcut/tool reach still
+explicit SR13/commissioning gates.
+
 - In `camkit`:
   - profile tabs (auto and manual), onion skin and skin pass;
   - leads and profile ramps; climb or conventional;
@@ -1203,7 +1208,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR8 | planning screen passes: 16 core + 30 router assertions; measured vacuum/friction, actual forces/web strength and physical overcut datum remain cutting-acceptance gates | [vacuum packet](vacuum/README.md) |
 | SR9 | complete | Compact/dense equivalence; both 0.5 mm full-sheet backends under 300 MB; 20 MB sidecar; 388 ProjectKit + 8 worker + 5 artifact/app assertions. [Evidence](sheet-scale/README.md). |
 | SR10 | complete | Exact arcs/bulges, units/layers, INSERT and bounded spline sampling; 42 import + 653 writer assertions. [Evidence](dxf/README.md). |
-| SR11 | planned | |
+| SR11 | complete | Tabs/onion/skin, leads/ramps/direction, operation RPM, pecks/surfacing and SR8 admission ordering; 349 assertions. [Evidence](sheet-operations/README.md). |
 | SR12 | planned | |
 | SR13 | planned | |
 | SR14 | planned | |
