@@ -79,4 +79,12 @@ for (const file of markdownFiles(docs)) {
 	writeFileSync(target, `---\n${lines.join("\n")}\n---\n${rewriteLinks(body, file)}`);
 	count++;
 }
+// Figure data computed by docs/figures (see its DocsFigures.hx) is served next to the pages.
+const figures = join(docs, "figures/data");
+const publicFigures = join(site, "public/figures");
+rmSync(publicFigures, { recursive: true, force: true });
+mkdirSync(publicFigures, { recursive: true });
+for (const name of readdirSync(figures).filter((name) => name.endsWith(".json")))
+	writeFileSync(join(publicFigures, name), readFileSync(join(figures, name)));
+
 console.log(`synced ${count} pages into ${posix.join(...relative(site, out).split("/"))}`);

@@ -3,3 +3,4 @@ dist/
 .astro/
 # Generated from docs/ by scripts/sync.mjs
 src/content/docs/
+public/figures/

@@ -1,0 +1,16 @@
+{
+	"version": 1,
+	"package": {
+		"name": "materia-docs-figures"
+	},
+	"entry": "DocsFigures",
+	"sourceRoots": [
+		"src"
+	],
+	"dependencies": {
+		"motionkit": {
+			"path": "../../motionkit"
+		}
+	},
+	"target": "host"
+}

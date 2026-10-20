@@ -1,0 +1,12 @@
+---
+// Starlight's Markdown wrapper, plus the script that renders `<figure data-figure>` elements from computed data.
+import Default from "@astrojs/starlight/components/MarkdownContent.astro";
+import "../styles/figures.css";
+---
+
+<Default><slot /></Default>
+
+<script>
+	import { renderFigures } from "../scripts/figures";
+	renderFigures();
+</script>

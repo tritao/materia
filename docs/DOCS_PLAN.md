@@ -97,7 +97,7 @@ changed test.
 | **D0** | Inventory: tag every existing `.md` as keep, merge, internal or delete; final site map; stability label per kit | Inventory table committed; labels in `materia.workspace.json` |
 | **D1** | Site skeleton: Starlight serving `docs/`, link check, CI build and preview deploys | Every page renders; broken links fail CI |
 | **D2** | Concepts, first six: Life of a machine, Conventions, Execution plans, Fidelity levels, Assemblies and mates, Controller boundary | Six pages at `status: reviewed`; their open questions resolved or filed |
-| **D3** | Figure pipeline and first figure (paths vs. trajectories, baked from MotionKit) | Figure rebuilds in CI; snapshot check |
+| **D3** | Figure pipeline and first figure (paths vs. trajectories, baked from MotionKit) | Figure recomputed as a workspace test; snapshot check |
 | **D4** | Getting started and the gantry tutorial, with "Open in Materia" | A new reader goes from clone to a running mission by following it |
 | **D5** | API reference generator for every kit | Reference pages built from code, linked from concept pages |
 | **D6** | Docs runtime spike: MachineKit + CncKit in wasm-gc, size measured; transmissions and G-code widgets | Widgets live on their concept pages |
@@ -122,4 +122,9 @@ place.
 - D1 done except hosting: the Starlight site in `docs/site/` builds every page
   under `docs/`, fails on invalid front matter or broken internal links, and
   runs in CI (`.github/workflows/docs.yml`, uploads the built site). Choosing
-  and wiring the host (Cloudflare Pages or Netlify) is still open.
+  and wiring the host is still open: Cloudflare Pages was chosen; the settings
+  are in `docs/site/README.md`.
+- D3 done: `docs/figures` computes figure data with the real kits as a
+  workspace member (`docs-figures`), shares the workspace's native builds, and
+  fails as a test when a committed figure is stale. The first figure (paths vs.
+  trajectories) is live on its concept page.

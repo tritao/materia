@@ -29,6 +29,7 @@ export default defineConfig({
 			description: "Design, simulate, plan and run machines, from CAD to the controller.",
 			social: [{ icon: "github", label: "GitHub", href: "https://github.com/tritao/materia" }],
 			plugins: [starlightLinksValidator()],
+			components: { MarkdownContent: "./src/components/MarkdownContent.astro" },
 			sidebar: [
 				{ label: "Concepts", items: [{ label: "Overview", slug: "concepts" }, ...conceptGroups()] },
 				{

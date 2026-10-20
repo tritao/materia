@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@astrojs/starlight": "0.42.5",
+    "@observablehq/plot": "0.6.17",
     "astro": "7.3.6",
     "sharp": "0.34.4",
     "starlight-links-validator": "0.26.0"

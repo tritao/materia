@@ -1,0 +1,56 @@
+/* Interactive figures. Series colours are the validated categorical slots 1 and 2, stepped per theme. */
+.materia-figure {
+	--series-1: #2a78d6;
+	--series-2: #eb6834;
+	--figure-ink: var(--sl-color-gray-2);
+	--figure-muted: var(--sl-color-gray-3);
+	--figure-rule: var(--sl-color-gray-5);
+	margin: 1.5rem 0;
+	padding: 1rem;
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0.5rem;
+	color: var(--figure-ink);
+}
+:root[data-theme="dark"] .materia-figure {
+	--series-1: #3987e5;
+	--series-2: #d95926;
+}
+.materia-figure .figure-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 0.75rem;
+	font-size: var(--sl-text-sm);
+}
+.materia-figure .figure-controls input[type="range"] { flex: 1 1 12rem; accent-color: var(--sl-color-accent); }
+.materia-figure .figure-controls button {
+	padding: 0.25rem 0.75rem;
+	border: 1px solid var(--sl-color-gray-4);
+	border-radius: 0.25rem;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+}
+.materia-figure .figure-time { font-variant-numeric: tabular-nums; min-width: 4.5rem; }
+.materia-figure .figure-legend { display: flex; flex-wrap: wrap; gap: 1rem; margin: 0 0 0.5rem; font-size: var(--sl-text-sm); }
+.materia-figure .figure-legend span::before {
+	content: "";
+	display: inline-block;
+	width: 1rem;
+	height: 2px;
+	margin-right: 0.4rem;
+	vertical-align: middle;
+	background: var(--swatch);
+}
+.materia-figure .figure-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+	gap: 0.5rem 1rem;
+}
+.materia-figure .figure-stack { display: grid; gap: 0.25rem; }
+@media (max-width: 40rem) { .materia-figure .figure-grid { grid-template-columns: minmax(0, 1fr); } }
+.materia-figure svg { max-width: 100%; height: auto; overflow: visible; }
+.materia-figure figcaption { margin-top: 0.75rem; font-size: var(--sl-text-sm); color: var(--figure-muted); }
+.materia-figure table { font-size: var(--sl-text-sm); }
+.materia-figure details { margin-top: 0.75rem; font-size: var(--sl-text-sm); }
