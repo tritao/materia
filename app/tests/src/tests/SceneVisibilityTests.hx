@@ -139,6 +139,7 @@ class SceneVisibilityTests {
     generatedScene.dispose();
     generatedRoundtrip();
     uiControls();
+    popupControls();
     scrollbarControls();
     var count=0;
     var key=new UiEvent(UiEventKind.KeyDown,new WidgetId(1),0,0,0,0,0,UiKey.Space);
@@ -207,6 +208,36 @@ class SceneVisibilityTests {
         check(controller.offsetY>before,"scrollbar drag moves the hierarchy");
         check(scene.document.history.undoCount==history,"scrollbar drag does not toggle visibility");
       }
+      ui.dispose();scene.dispose();fonts.dispose();
+    }catch(error:Dynamic){ui.dispose();scene.dispose();fonts.dispose();throw error;}
+  }
+  static function popupControls():Void {
+    var fonts=haxeon.ui.FontCollection.create();
+    fonts.add("haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf");
+    var ui=new haxeon.ui.core.UiContext(null,fonts),scene=new EditorScene(data()),tree=new EditorSceneTree(scene,definition());
+    var dismissed=false,physics=scene.environmentRevision;
+    scene.select("project:other");tree.setFilter("other");
+    var frame=new haxeon.ui.LayoutFrame(480,480);
+    function view():haxeon.ui.core.View return app.editor.VisibilityPanel.popup(tree,450,450,480,480,true,()->{dismissed=true;});
+    try {
+      var root=ui.submit(view(),frame);
+      var cover=findNode(root,node->node.semantics!=null&&node.semantics.label=="cover");
+      check(cover!=null,"popup has unfiltered hierarchy despite scene tree search");
+      var b=cover.globalBounds();
+      check(b.x>=0&&b.x+b.width<=480&&b.y>=0&&b.y+b.height<=480,"popup clamps to the window");
+      ui.pointerDown(b.x+25,b.y+b.height/2,0);ui.pointerUp(b.x+25,b.y+b.height/2,0);
+      check(!scene.isVisible("project:cover")&&!dismissed,"checkbox hides immediately without dismissing popup");
+      check(scene.selectedId=="project:other","checkbox does not change viewport selection");
+      root=ui.submit(view(),frame);
+      var mixed=findNode(root,node->node.semantics!=null&&node.semantics.value=="mixed");
+      check(mixed!=null,"partially hidden parent has a mixed checkbox");
+      tree.toggleVisibility("project:base");tree.toggleVisibility("project:base");
+      check(!scene.isVisible("project:cover")&&scene.isVisible("project:bracket"),"tree and popup share inherited child visibility");
+      scene.document.undo();scene.document.undo();scene.document.undo();
+      check(scene.isVisible("project:cover"),"popup visibility edits undo through the shared document");
+      check(scene.environmentRevision==physics,"popup leaves physics unchanged");
+      root=ui.submit(view(),frame);
+      ui.pointerDown(2,2,0);ui.pointerUp(2,2,0);check(dismissed,"outside click dismisses popup");
       ui.dispose();scene.dispose();fonts.dispose();
     }catch(error:Dynamic){ui.dispose();scene.dispose();fonts.dispose();throw error;}
   }

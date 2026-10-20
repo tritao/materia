@@ -683,6 +683,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var hierarchyAddY:Float = 120.0;
   var renameId:Null<String> = null;
   var renameValue:String = "";
+  var visibilityPopupVisible:Bool = false;
+  var visibilityPopupX:Float = 0;
+  var visibilityPopupY:Float = 0;
   var viewportOptionsVisible:Bool = false;
   var viewportOptionsX:Float = 0.0;
   var viewportOptionsY:Float = 0.0;
@@ -968,6 +971,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (renameId != null && documentDialog == null) {
       windowLayers.push(new StackChild("hierarchy-rename-dialog", renameDialog(), 0.0, 0.0, 40,
         LayoutAxis.grow(), LayoutAxis.grow()));
+    }
+    if(visibilityPopupVisible&&documentDialog==null) {
+      treeModel.canChangeVisibility=()->!documents.blocked();
+      treeModel.onVisibilityChanged=()->{commands.refresh();invalidateView();};
+      windowLayers.push(new StackChild("component-visibility",app.editor.VisibilityPanel.popup(treeModel,
+        visibilityPopupX,visibilityPopupY,viewportWidth,viewportHeight,!documents.blocked(),()->{visibilityPopupVisible=false;invalidateView();}),0,0,25,
+        LayoutAxis.grow(),LayoutAxis.grow()));
     }
     if (viewportOptionsVisible && documentDialog == null) {
       var optionIds = ["scene.grid-spacing-0.1", "scene.grid-spacing-0.2", "scene.grid-spacing-0.5"];
@@ -1815,7 +1825,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         function(_, width) return perspectivePanel(width),
         // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
         // none of its inputs changed: this key includes the current simulation presentation.
-        function() return perspectiveRevisionKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible +
+        function() return perspectiveRevisionKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible + ":visibility=" + visibilityPopupVisible +
           ":viewportPresentation=" + (perspectiveViewport == null ? "" : perspectiveViewport.presentationKey()) +
           ":collisions=" + collisionsVisible + "/" + collisionNearMillimetres),
       new DockPanelContent("machine-control", function(_) return machineControlPanel.build(this)),
@@ -2028,6 +2038,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     controls.push(new KeyedView("snap", viewportToolbarAction("viewport-snap",
       "scene.toggle-grid-snap", "Snap", IconName.Magnet, compact)));
     controls.push(new KeyedView("options", options));
+    var visibility=new Button(compact?"":"Visibility",null,null,"viewport-visibility");
+    visibility.variant=ButtonVariant.Navigation;visibility.leadingIcon=IconName.Inspect;visibility.trailingIcon=IconName.ChevronDown;
+    visibility.classes=["viewport-tool"];visibility.accessibilityLabel="Component visibility";visibility.selected=visibilityPopupVisible;
+    visibility.onClickEvent=event->{
+      var bounds=menuTriggerBounds(event);visibilityPopupX=bounds.x;visibilityPopupY=bounds.y+bounds.height;
+      viewportOptionsVisible=false;viewAngleMenuVisible=false;visibilityPopupVisible=!visibilityPopupVisible;invalidateView();
+    };
+    controls.push(new KeyedView("visibility",visibility));
     var edgeMode=new Button(compact ? "" : app.CadEdgeModes.label(scene.cadEdgeMode),null,()->{
       scene.setCadEdgeMode(app.CadEdgeModes.next(scene.cadEdgeMode));invalidateView();
     },"viewport-cad-edge-mode");
@@ -2289,6 +2307,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if(ownership!=null){simulation.setBackend(ownership.backend());simulation.setTimestep(ownership.timestep());}
       log("Document configuration replaced");
       sceneGeneration = session.generation;
+      visibilityPopupVisible=false;
       if (MachineControlModel.axes(session).length > 0) {
         if (!workspace.isOpen("machine-control")) workspace.open("machine-control", "inspector");
         workspace.activate("machine-control");

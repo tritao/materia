@@ -32,6 +32,14 @@ that some descendants are hidden. Group changes include filtered-out and
 collapsed descendants, preserving each child's own Visible setting and nested
 group state. The search field and other text inputs keep their normal Space behavior.
 
+The viewport toolbar's **Visibility** button opens the same hierarchy as a
+checkbox popup. It stays open while toggling components and has its own expansion
+and scroll state, independent of the scene tree's search and selection. Mixed
+checkboxes indicate partially visible groups. Expand an assembly to control its
+children; showing a hidden parent preserves child settings. **Show all** and
+**Isolate selected** are also available in the popup. Escape or an outside click
+closes it. Visibility controls remain available during simulation.
+
 Right-click an object or group for **Isolate selected** or **Show all**. Isolation
 preserves hidden descendants when the selected row is a group; Show all clears
 all visibility masks and enables every object's Visible setting. These actions

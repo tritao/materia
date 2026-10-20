@@ -100,6 +100,27 @@ class EditorSceneTree implements TreeViewModel {
     var descendants=children.get(key);
     return key=="scene" || isGroup(key) || (descendants!=null && descendants.length>0);
   }
+  /** Unfiltered hierarchy for secondary visibility controls; excludes CAD feature rows. */
+  public function visibilityChildren(key:String):Array<String> {
+    if(key=="scene") {
+      var roots=children.get("scene"),result=roots==null?[]:roots.copy();
+      for(item in scene.items())if(!nested.exists(item.id))result.push(item.id);
+      return result;
+    }
+    var result=children.get(key);return result==null?[]:result.copy();
+  }
+  public function visibilityLabel(key:String):String {
+    if(key=="scene")return "All components";
+    if(isGroup(key)){var title=partsTitles.get(key);return title==null?"Parts":title;}
+    return displayLabel(key);
+  }
+  public function visibilityState(key:String):{shown:Bool,mixed:Bool,own:Bool} {
+    var members=visibilityMembers(key),count=0;
+    for(id in members)if(scene.isVisible(id))count++;
+    var item=scene.object(key);
+    return {shown:count>0,mixed:count>0&&count<members.length,
+      own:visibilityGroup(key)?!SceneVisibility.groupHidden(scene,key,members):item!=null&&item.visible};
+  }
   public function toggleVisibility(key:String):Bool {
     if (canChangeVisibility != null && !canChangeVisibility()) return false;
     var changed=SceneVisibility.toggle(scene,key,visibilityMembers(key),visibilityGroup(key));
