@@ -52,7 +52,7 @@ class InspectionCameraPanel {
     var tools:Array<KeyedView> = [];
     function action(id:String,label:String,fn:Void->Void):Void tools.push(new KeyedView(id,new Button(label,null,fn,"inspection-"+id)));
     action("zoom-in","Zoom +",()->{zoom=Math.max(0.2,zoom/1.4);app.invalidateView();});
-    action("zoom-out","Zoom −",()->{zoom=Math.min(8,zoom*1.4);app.invalidateView();});
+    action("zoom-out","Zoom -",()->{zoom=Math.min(8,zoom*1.4);app.invalidateView();});
     action("reset","Reset",()->{zoom=1;app.invalidateView();});
     action("presentation",inOverlay?"Dock":"Picture in picture",()->{overlay=!inOverlay;
       if(overlay){app.workspace.close("inspection-camera");app.workspace.activate("perspective");app.invalidateView();}
