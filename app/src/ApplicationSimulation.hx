@@ -956,6 +956,17 @@ class ApplicationSimulation {
   public function printFailure():Null<String> return print == null ? null : print.failure;
 
   /** The project's CNC program player, or null when the project has no CNC job. */
+  /** Scenario changes start with a fresh runtime/stock, without editing the machine document. */
+  public function selectHobbingScenario(project:ProjectDocumentSession,id:String):Void {
+    if(["idle","cutting","loading"].indexOf(id)<0)throw "Unknown hobbing scenario";
+    if(running)throw "Pause before changing the scenario";
+    var config=project.machineMotion==null?null:project.machineMotion.hobbing;
+    if(config==null||config.scenario==null)throw "This scene does not define hobbing scenarios";
+    if(project.hobbingScenario==id)return;
+    if(space!=null)reset();
+    project.hobbingScenario=id;
+    if(hobbing!=null)hobbing.selectScenario(id);
+  }
   public function hobbingPlayer():Null<HobbingProgramPlayer> return hobbing;
   public function enclosureController():Null<EnclosureGuardPlayer> return enclosureGuard;
   public function cncPlayer():Null<CncProgramPlayer> return cnc;

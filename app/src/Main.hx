@@ -624,6 +624,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final machineControlPanel = new app.editor.MachineControlPanel();
   final inspectionCamera = new app.editor.InspectionCameraPanel();
   var inspectionCameraRequested=false;
+  public var enclosurePresentation(default,null)="visible";
   static inline var MAX_LOG_LINES:Int = 1000;
   final logLines:Array<String>;
   // The console view edits nothing: it is a read-only text area over this document, so its text is
@@ -1671,7 +1672,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ":error=" + (simulation.error == null ? "" : simulation.error) +
       ":world=" + Std.string(world.status()) + ":presentation=" + presentationRevision +
       ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled +
-      ":mode=" + mode.id + ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
+      ":scenario=" + session.hobbingScenario + ":enclosure=" + enclosurePresentation + ":mode=" + mode.id + ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
       ":viewport=" + viewportWidth + "x" + viewportHeight + ":view=" + viewRevision +
       ":mates=" + Std.string(session.assemblyMateStatus());
   }
@@ -2058,12 +2059,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
         Math.max(10,(availableWidth>0?availableWidth:400)-cameraWidth-10),54,3,LayoutAxis.fixed(cameraWidth),LayoutAxis.fixed(280)));
     }
     var canvas:View = new Stack("perspective-canvas-overlay", layers);
-    return new Column("perspective-with-toolbar", [
+    var sceneControls=app.editor.HobberScenePanel.build(this);
+    var viewportRows:Array<KeyedView> = [
       new KeyedView("toolbar", toolbar),
       new KeyedView("divider", divider),
       new KeyedView("canvas", new SizedBox("viewport-canvas-slot", canvas,
         LayoutAxis.grow(), LayoutAxis.grow()))
-    ], panelStyle);
+    ];
+    if(sceneControls!=null)viewportRows.insert(1,new KeyedView("machine-scenario",sceneControls));
+    return new Column("perspective-with-toolbar",viewportRows,panelStyle);
   }
 
   function viewportToolbarAction(key:String, commandId:String, label:String,
@@ -2118,6 +2122,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function requestInspectionCamera():Void {
     inspectionCameraRequested=true;
     if(mode==EditorMode.Simulate)openInspectionCamera();
+  }
+  public function setEnclosurePresentation(mode:String):Void {
+    if(["visible","transparent","hidden"].indexOf(mode)<0)throw "Unknown enclosure presentation";
+    enclosurePresentation=mode;
+    var motion=session.machineMotion,guard=motion==null?null:motion.enclosureGuard;
+    if(perspectiveViewport!=null)perspectiveViewport.setEnclosurePresentation(guard==null||guard.enclosureParts==null?[]:guard.enclosureParts,mode);
+    invalidateView();
   }
   public function openInspectionCamera():Void {
     if(mode!=EditorMode.Simulate)return;
@@ -2273,6 +2284,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       treeModel.canChangeVisibility = function() return !documents.blocked();
       treeModel.onVisibilityChanged = function() {commands.refresh();invalidateView();};
       treeModel.setFilter(hierarchySearch);
+      enclosurePresentation="visible";
       inspectionCamera.dispose();
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :
@@ -2473,7 +2485,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var saved = modeSnapshots.get(next.id);
     if (saved != null) workspace.restorePersisted(saved);
     if(next!=EditorMode.Simulate)workspace.close("inspection-camera");
-    else if(inspectionCameraRequested)openInspectionCamera();
+    else if(inspectionCameraRequested||saved==null&&session.hobbingScenario!=null)openInspectionCamera();
     if (next == EditorMode.Simulate && session.missions != null) {
       if (!workspace.isOpen("mission")) workspace.open("mission", "sensors");
       workspace.activate("mission");

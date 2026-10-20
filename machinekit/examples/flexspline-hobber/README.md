@@ -9,8 +9,9 @@ The project entry point is `materia.project.json`; run it through Materia's
 project-source loader. `check-quick.sh app` runs the coarse app/cycle smoke check.
 Full reference metrology and error-budget cuts are separate, expensive checks.
 
-Open `inspection.scene.json` for the mechanical inspection view with the electrical
-rack hidden. Its drives and power wiring remain in the underlying assembly.
+Open `hobber.scene.json` and use the enclosure viewing controls for mechanical
+inspection. The electrical rack starts hidden; its wiring and drives remain in
+the assembly.
 
 The head has a front-mounted compact swivel and vertical twin-rail Y stage.
 [LAYOUT_SECTION.svg](LAYOUT_SECTION.svg) shows the dimensioned radial stack.
@@ -24,18 +25,19 @@ the rear. Channel covers remain a design provision.
 
 ### Watch a coarse cut
 
-Open `cutting.scene.json` in Materia. It selects the cutting project, hides the
-separate electrical rack, and displays the hob's relieved teeth. Press **F5** to
-play/pause (or use the toolbar), **Shift+F5** to reset, and **Home** to fit the machine. Frame or zoom
-into the hob and blank to see the teeth emerge from the stock. This is the
-module-1, 40-tooth demonstration; it is not a reference-part grading run.
+Open [hobber.scene.json](hobber.scene.json) or [materia.project.json](materia.project.json)
+in Materia. One assembly contains the detailed hob, cup, mandrel, enclosure and
+guarded door mechanism. The viewport's **Play scenario** controls choose
+**Idle / doors**, **Cutting** (default) or **Load / cut / unload**. Pause before
+changing the scenario; switching resets the runtime and stock, not the document.
+Press **F5** to play/pause, **Shift+F5** to reset and **Home** to fit the machine.
+The module-1, 40-tooth demonstration is not a reference-part grading run.
 
-The electrical rack, power supply and six drive modules are hidden by default in
-all complete-machine entrypoints (`hobber`, `detailed`, `cutting`, `loading`), including direct
-generated-artifact opens. Visibility is authored per occurrence and survives
-saving/reopening; the components, BOM and electrical connections remain present.
-They can be shown again from the scene hierarchy. Saved inspection/cutting view
-overrides retain the same preference.
+The enclosure starts visible. **Transparent** and **Hidden** are view-only;
+physical enclosure bodies, sensors and cutting interlocks remain installed.
+The electrical rack and its drive modules remain hidden by default and can be
+shown from the hierarchy. Simulate opens the independent inspection camera below
+Sensors/CNC; orbit, pan and zoom there do not move the main camera.
 
 The hob spindle now includes a hollow shaft, nose, opposed bearings near the
 tool, bearing retention and a drawbar-retained taper-and-face arbor with drive
@@ -45,17 +47,17 @@ pins. It is an assumed custom interface, not a qualified HSK interface; see
 
 ### Cup loading demonstration
 
-Open [loading.scene.json](loading.scene.json) and press **Play**. The head starts
-at X=110 mm, with Y=Z=0. A one-piece cup (open end/toothed rim down,
-closed end up) approaches from the front, transfers 250 mm with 35 mm clearance,
-then lowers over the collapsed sleeve onto the axial stop, clamps, runs the actual
-coarse tooth-band cut, retracts the head, releases and lifts out. **Reset → Play**
-replays it. The original quick [cutting.scene.json](cutting.scene.json) remains
-available without the handling sequence.
+Select **Load / cut / unload** in that same scene and press **Play**. With the
+doors secured, the head first parks at X=110 mm, Y=Z=0. After measured open-door
+and standstill feedback, the cup approaches from the front, transfers 250 mm at
+35 mm clearance, seats and clamps. The doors close and lock before the real cut.
+The head retracts before the guard opens for release and unloading. Reset then
+Play replays the selected scenario. Transfer and sleeve expansion are illustrative.
 
 The Machine panel provides **Blank**, **Clamped**, **Finished** and **Clamped
 section** inspection views. Inspection is available before cutting or after the
-sequence completes. **Continue sequence** returns from a paused inspection view.
+sequence completes. The legacy manual **Continue sequence** action is unavailable while a guarded
+scenario owns the sequence. Reset then Play returns to the scenario.
 Sectioning is view-only; close it with **Close section**. Inspection does not
 reset or replace the actual cut stock.
 

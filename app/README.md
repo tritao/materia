@@ -766,3 +766,18 @@ Generated scenes may supply `project.inspectionCameras`: unique `id`, `label`,
 occurrence `anchor`, world-aligned `offset` in metres from its displayed centre,
 `span` in metres, `yaw`/`pitch` in radians, and `hiddenPrefixes` of occurrence ids.
 These presets are optional and use the existing scene artifact format.
+
+
+## Unified hobber scene
+
+`machinekit/examples/flexspline-hobber/hobber.scene.json` opens one enclosed
+machine with a detailed tool and cup. The viewport's Play scenario controls
+select Idle / doors, Cutting (default), or Load / cut / unload. Pause before
+changing scenarios; selecting another resets the runtime and stock without
+changing the document. Play drives the selected scenario through measured guard
+feedback. Full-cycle transfers require open/unlocked doors and standstill; the
+actual cut requires closed/locked feedback. Faults never restart a cycle.
+
+The adjacent Visible / Transparent / Hidden controls are presentation only.
+Physical bodies, switches and guard-lock logic remain installed, and the
+inspection camera keeps its own cutaway visibility.

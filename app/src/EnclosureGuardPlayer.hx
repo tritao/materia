@@ -170,6 +170,7 @@ class EnclosureGuardPlayer implements SessionMember {
     commanded=Math.max(limits.lower,Math.min(limits.upper,commanded));
     simulation.driveProcessJoint(robotIndex,doorIndex,commanded,commandedVelocity);
     publishObservation(s);
+    if(cutting!=null)cutting.advanceScenario(this);
   }
   function disposeDoorTrajectory():Void {
     var trajectory=doorTrajectory;doorTrajectory=null;if(trajectory!=null)trajectory.dispose();
@@ -193,6 +194,7 @@ class EnclosureGuardPlayer implements SessionMember {
       case _: "Guard stopped: release conflicting requests and reset the guard.";
     }:switch logic.phase {
       case Secured:
+        cutting!=null&&cutting.scenario=="idle"?"Idle. Door controls available; no cutting program runs.":
         cutting!=null&&cutting.failure!=null?"Cut stopped. Reset the simulation before retrying.":
         cutting!=null&&cutting.guardInterrupted?"Door secured. Reset the simulation before restarting the interrupted cut.":
         cutting!=null&&cutting.completed?"Cut completed. Door closed and locked.":

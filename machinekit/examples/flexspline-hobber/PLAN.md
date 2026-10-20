@@ -2711,3 +2711,30 @@ passes all 85 poses (including A ±15°) with zero unexpected intersections. Fro
 loading still needs 110 mm retract, the top alternative 145 mm. Full saved-scene
 playback passes 982 windows, inspection/reset and zero fixture-envelope contacts;
 the updated scene is open in Materia.
+
+
+### Unified scene and guarded scenarios (2026-10-20)
+
+One `materia.project.json` / `hobber.scene.json` now supplies the detailed
+module-1, 40-tooth demonstration, enclosure, cup, mandrel, controllers and
+inspection cameras. Separate cutting, loading, enclosed and mechanical-inspection
+scene manifests were retired. Isolated hob-tool diagnostics remain.
+
+Play runs Idle / doors, Cutting (default), or Load / cut / unload. The full
+cycle parks with doors secured, opens for transfer, closes and locks before
+cutting, retracts, then opens for unloading. Scenario changes while paused reset
+the runtime and stock without editing the assembly. A fault or interrupted cut
+requires Reset. Transfers and sleeve expansion remain illustrative.
+
+Visible / Transparent / Hidden are camera presentation overrides; bodies,
+switches, the lock and guard logic remain installed. The independent inspection
+camera remains Simulate-only below Sensors/CNC.
+
+Validation: 81,617 guarded scenario assertions pass, including cutting from
+initially open doors and a complete load/cut/unload cycle, each with 982 measured
+gash windows. Idle does not cut; transfers require open/unlocked and standstill
+feedback; cutting requires closed/locked feedback; a boundary fault prevents
+automatic cutting. The existing guard/navigation/presentation regression passes
+10,547 native/UI checks plus 15 status-contract checks. The unified app build and
+scene export succeed; Visible and Transparent were checked in the GPU app.
+Frozen reference cuts and their accepted numerical settings were not changed.

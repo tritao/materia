@@ -1,8 +1,22 @@
 # Fitted hobber enclosure
 
-Open `materia.enclosed.project.json` in Materia. **enclosed** shows the fitted
-shell; **inspection** hides its occurrences. The original project and cutting
-entrypoints are unchanged.
+Open `hobber.scene.json` or `materia.project.json` in Materia. This is the one
+complete machine scene, with detailed hob, cup, fitted enclosure and guard.
+The old cutting, loading and enclosed scene variants have been retired.
+
+The viewport controls select **Idle / doors**, **Cutting** (default), or
+**Load / cut / unload** before Play. Pause before changing the scenario; a change
+resets the runtime and stock while retaining the same authored assembly.
+Cutting closes and locks the doors from measured feedback before starting. The
+full cycle parks the head, opens for loading, closes and locks to cut, retracts
+and opens to unload. An interrupted or faulted cycle requires Reset; it never
+automatically restarts. Transfer and sleeve expansion remain illustrations,
+not a gripper/contact simulation.
+
+**Visible**, **Transparent** and **Hidden** change only the main camera
+presentation. The enclosure bodies, door switches, guard lock and interlocks
+remain active in every viewing mode. Inspection-camera cutaways are independent.
+Idle runs the guard for door operation, without running a cutting program.
 
 The current machine's CAD supplies the envelope: X/Y/Z endpoints, 31 swivel
 angles at one-degree spacing, and rotation-centred spheres for B/C descendants.
@@ -271,8 +285,7 @@ assertions pass, including immediate transport publications, preserved old
 snapshots, reset freshness and the open-design-pose transition.
 
 In Simulate mode, the 3D toolbar's **Camera** button opens an inspection pane
-below the Sensors/CNC tabs; Design hides it. The enclosed
-and cutting scenes provide **Tool contact**, **Workpiece** and **Loading** presets.
+below the Sensors/CNC tabs; Design hides it. The unified scene provides **Tool contact**, **Workpiece** and **Loading** presets.
 Tool contact is a camera-only cutaway hiding the surrounding head and support.
 The first two follow the cup without spinning with it; Loading frames the
 mandrel. The enclosure is hidden only in this camera, leaving the main view and

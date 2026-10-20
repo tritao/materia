@@ -266,12 +266,12 @@ class FlexsplineHobberChecks {
     if(Sys.args().length==2&&Sys.args()[0]=="reference-loads"){referenceLoads(Sys.args()[1]);return;}
     if(Sys.args().length>0&&(Sys.args()[0]=="scene"||Sys.args()[0]=="cutting")){
       var cutting=Sys.args()[0]=="cutting";
-      var data=materia.project.SceneArtifact.decode(cutting?FlexsplineHobberPreview.cutting():FlexsplineHobberPreview.hobber());
+      var data=materia.project.SceneArtifact.decode(HobberEnclosurePreview.scene());
       if(cutting){var moving=data.machineMotion;if(moving==null||moving.hobbing==null)throw "cutting job missing from artifact";
         check(moving.hobbing.teeth==40&&moving.hobbing.gashes==4,"coarse cutting job round-trips typed wire metadata");}
       var definition=data.assemblyDefinition;if(definition==null)throw "preview missing definition";
       var actuators=definition.actuators;if(actuators==null)throw "missing preview drives";
-      check(actuators.length==6&&data.parts.length>30,"project preview exports complete mechanical scene and drives");
+      check(actuators.length==7&&data.parts.length>30,"project preview exports complete mechanical scene and drives");
       Sys.println('FlexsplineHobber scene: $assertions assertions passed, ${data.parts.length} definitions');
     }else run();
   }

@@ -8,7 +8,7 @@ import machinekit.enclosure.EnclosureRules;
 import materia.assembly.AssemblyFrames as F;
 import materia.project.SceneArtifact;
 
-/** Current hobber CAD supplies the enclosure envelope; the existing open machine entrypoints remain available. */
+/** One enclosed machine and runtime; scenarios and view controls never replace the assembly. */
 class HobberEnclosurePreview {
   static function union(a:PartBox,b:PartBox):PartBox return {minX:Math.min(a.minX,b.minX),minY:Math.min(a.minY,b.minY),minZ:Math.min(a.minZ,b.minZ),
     maxX:Math.max(a.maxX,b.maxX),maxY:Math.max(a.maxY,b.maxY),maxZ:Math.max(a.maxZ,b.maxZ)};
@@ -87,7 +87,7 @@ class HobberEnclosurePreview {
       if(StringTools.startsWith(o.id,"machine/")&&external(o.id.substr("machine/".length)))o.visible=false;
     return scene;
   }
-  public static function runtimeScene(assembly:MachineAssembly,machine:FlexsplineHobber,stroke:Float):materia.project.SceneArtifact.SceneArtifactData {
+  public static function runtimeScene(assembly:MachineAssembly,machine:FlexsplineHobber,stroke:Float,scenarios:Bool=false):materia.project.SceneArtifact.SceneArtifactData {
     var scene=defaultView(AssemblyPreview.scene(assembly,"hobber-enclosed"));
     if(scene.machineMotion==null)scene.machineMotion={belts:[]};
     var axes=["machine/X","machine/Y","machine/Z","machine/swivel/A","machine/spindle/B","machine/table/C"];
@@ -97,24 +97,32 @@ class HobberEnclosurePreview {
     scene.machineMotion.enclosureGuard={doorJoint:"enclosure/door/slide",closedSensor:"enclosure/door/closed",openSensor:"enclosure/door/open",
       spindleJoints:[axes[4],axes[5]],axisJoints:axes.slice(0,4),stroke:stroke*0.001,setupSpeedLimit:0.025,
       timeoutSeconds:10,lockTravelSeconds:0.05,linearStandstillTolerance:1e-5,rotaryStandstillTolerance:1e-4,standstillConfirmationSeconds:0.25};
+    var guard:materia.project.SceneArtifact.SceneArtifactEnclosureGuard=scene.machineMotion.enclosureGuard;
+    var definition=scene.assemblyDefinition;if(definition==null)throw "Unified scene needs its assembly";
+    guard.enclosureParts=[for(o in definition.occurrences)if(StringTools.startsWith(o.id,"enclosure/"))o.id];
+    if(scenarios) {
+      var config:materia.project.SceneArtifact.SceneArtifactHobbing=scene.machineMotion.hobbing;
+      config.scenario="cutting";
+      config.handling={sleeve:"machine/mandrelSleeve",outside:machine.mandrel.parameterNumber("outside"),wall:machine.mandrel.parameterNumber("sleeveWall"),
+        length:machine.mandrel.parameterNumber("sleeveLength"),radialTravel:machine.mandrel.parameterNumber("radialFitGap"),retractX:machinekit.hobbing.HobberXLayout.RETRACT,
+        frontApproachMm:machinekit.hobbing.HobberXLayout.FRONT_APPROACH,liftMm:machinekit.hobbing.HobberXLayout.FRONT_LIFT};
+    }
     HobberInspectionViews.apply(scene,machine,"machine/");
     return scene;
   }
-  public static function enclosed():haxe.io.Bytes {
-    var fitted=assembled();return SceneArtifact.encode(runtimeScene(fitted.assembly,fitted.machine,fitted.shell.layout.stroke));
+  public static function unified():materia.project.SceneArtifact.SceneArtifactData {
+    var machine=new FlexsplineHobber(new gearkit.GearSpec(1,40,4,20*Math.PI/180),4,true);
+    var fitted=assembled(machine);
+    return runtimeScene(fitted.assembly,machine,fitted.shell.layout.stroke,true);
   }
-  public static function inspection():haxe.io.Bytes {
-    var scene=SceneArtifact.decode(enclosed());
-    if(scene.assemblyDefinition!=null)for(o in scene.assemblyDefinition.occurrences)if(StringTools.startsWith(o.id,"enclosure/"))o.visible=false;
-    return SceneArtifact.encode(scene);
-  }
+  public static function scene():haxe.io.Bytes return SceneArtifact.encode(unified());
   public static function main():Void {
-    var fitted=assembled(),scene=runtimeScene(fitted.assembly,fitted.machine,fitted.shell.layout.stroke);
+    var scene=unified();
     var root=Sys.getCwd();while(!sys.FileSystem.exists(root+"/machinekit/examples/flexspline-hobber/FlexsplineHobber.hx")){
       var parent=haxe.io.Path.directory(root);if(parent==root||parent.length==0)throw "Cannot locate hobber worktree";root=parent;}
-    var output=root+"/machinekit/examples/flexspline-hobber/build/enclosure";sys.FileSystem.createDirectory(haxe.io.Path.directory(output));sys.FileSystem.createDirectory(output);
+    var output=root+"/machinekit/examples/flexspline-hobber/build/hobber";sys.FileSystem.createDirectory(haxe.io.Path.directory(output));sys.FileSystem.createDirectory(output);
     sys.io.File.saveBytes(output+"/hobber.mtrg",SceneArtifact.encode(scene));
-    sys.io.File.saveContent(output+"/layout.json",haxe.Json.stringify(fitted.report,null,"  "));
-    Sys.println("Hobber enclosure scene and layout report written");
+
+    Sys.println("Unified hobber scene written");
   }
 }

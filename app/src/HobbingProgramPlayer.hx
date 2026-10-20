@@ -14,6 +14,10 @@ import toolpathkit.motion.*;
 
 /** HB8 program executed through the ordinary plan runtime; cuts only measured after-step state. */
 class HobbingProgramPlayer implements SessionMember implements SimulationStepObserver {
+  public var scenario(default,null):Null<String>;
+  public var scenarioStage(default,null)="waiting";
+  var scenarioAccess=false;
+  var parkStarted=false;
   public final job:HobbingJob;
   public final handling:Null<HobbingHandling>;
   public var cutCompleted(default,null)=false;
@@ -50,11 +54,11 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   var guardPermission=true;
   public var guardInterrupted(default,null)=false;
   var guardStopRequested=false;
-  public function canStartGuardedCut():Bool return !started&&!completed&&failure==null&&!guardInterrupted;
+  public function canStartGuardedCut():Bool return scenario!="idle"&&!started&&!completed&&failure==null&&!guardInterrupted;
   public function guardMotionActive():Bool return motion.running;
   public function setGuardPermission(allowed:Bool):Void {
     guardPermission=allowed;
-    if(!allowed&&started&&motion.running&&!guardStopRequested) {
+    if(!allowed&&(started||parkStarted)&&motion.running&&!guardStopRequested) {
       guardStopRequested=true;guardInterrupted=true;
       try motion.stop() catch(error:Dynamic) {
         failure="Guard stop: "+Std.string(error);
@@ -128,7 +132,45 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
       var sc=project.assemblyPreviewCenter(sleeve.definition);sleeveCenter=[for(v in sc)v*project.assemblyUnitMetres()];
     }else sleeveCenter=[0.0,0,0];
     motion=newMotion();stock=new HobbingStock(config,centerMetres);observerId=simulation.addStepObserver(this);
+    selectScenario(project.hobbingScenario==null?config.scenario:project.hobbingScenario);
   }
+  public function selectScenario(id:Null<String>):Void {
+    if(id!=null&&["idle","cutting","loading"].indexOf(id)<0)throw "Unknown hobbing scenario";
+    scenario=id;scenarioStage=id=="idle"?"idle":"waiting";scenarioAccess=false;parkStarted=false;handlingClock=0;
+    if(handling!=null){handling.inspect("sequence");if(id=="cutting"||id=="idle")handling.cutting();else handling.load(0);}
+  }
+  /** Runs on the guard's playback owner after a measured feedback image is published. */
+  public function advanceScenario(guard:EnclosureGuardPlayer):Void {
+    if(scenario==null||scenario=="idle"||completed)return;
+    var s=guard.status();scenarioAccess=s.initialized&&s.open&&!s.locked&&s.axesStandstill&&s.spindleStandstill&&!s.fault;
+    if(s.fault||guardInterrupted||failure!=null){scenarioStage="stopped";scenarioAccess=false;return;}
+    if(!s.initialized)return;
+    if(scenarioStage=="waiting") {
+      if(s.phase=="Open"){guard.requestClose();scenarioStage="securing";}
+      else if(s.canStart){guard.requestCut();scenarioStage=scenario=="loading"?"parking":"cutting";}
+    }else if(scenarioStage=="securing"&&s.canStart){guard.requestCut();scenarioStage=scenario=="loading"?"parking":"cutting";}
+    else if(scenarioStage=="opening-load"||scenarioStage=="opening-unload") {
+      if(s.phase=="Secured"){guard.requestOpen();scenarioStage=scenarioStage=="opening-load"?"wait-load-door":"wait-unload-door";}
+    }else if(scenarioAccess&&(scenarioStage=="wait-load-door"||scenarioStage=="wait-unload-door")) {
+      scenarioStage=scenarioStage=="wait-load-door"?"loading":"unloading";handlingClock=0;
+      if(handling!=null){if(scenarioStage=="loading")handling.load(0);else handling.unload(0);}
+    }else if(scenarioStage=="closing-cut"&&s.phase=="Open"){guard.requestClose();scenarioStage="wait-cut-door";}
+    else if(scenarioStage=="wait-cut-door"&&s.canStart){guard.requestCut();scenarioStage="cutting";headRetracted=false;}
+  }
+  public function scenarioLabel():String return switch(scenarioStage) {
+    case "idle":"Idle - door controls available";
+    case "waiting", "securing", "wait-cut-door":"Waiting for closed and locked feedback";
+    case "parking":"Parking head for loading";
+    case "opening-load", "wait-load-door":"Opening doors for loading";
+    case "loading":"Loading and clamping cup";
+    case "closing-cut":"Closing doors before cutting";
+    case "cutting":cutCompleted?"Retracting head":"Cutting";
+    case "opening-unload", "wait-unload-door":"Opening doors for unloading";
+    case "unloading":"Releasing and unloading cup";
+    case "completed":"Completed";
+    case "stopped":"Stopped - reset before retrying";
+    default:"Ready";
+  };
   function newMotion():ManipulatorMotion return new ManipulatorMotion(robot.robot,compiler,input,()->robot.runtime.pollEvents());
   function input(channel:String):Null<EventValue> {
     var s=robot.robot.snapshot(),b=s.velocities.get(indices[4]);
@@ -139,20 +181,35 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   }
   /** Display-only transfer time; paused playback never advances it. */
   public function advanceHandling(seconds:Float):Void {
-    if(handling!=null&&!completed&&handling.inspection=="sequence"&&(!cutStarted||headRetracted))handlingClock+=seconds;
+    if(scenario!=null) {
+      if(scenario=="loading"&&scenarioAccess&&(scenarioStage=="loading"||scenarioStage=="unloading"))handlingClock+=seconds;
+    }else if(handling!=null&&!completed&&handling.inspection=="sequence"&&(!cutStarted||headRetracted))handlingClock+=seconds;
   }
   public function feed():Void {
     if(disposed)return;
+    if(scenario=="loading"&&!guardInterrupted&&failure==null&&handling!=null&&(scenarioStage=="loading"||scenarioStage=="unloading")) {
+      if(!scenarioAccess)return;
+      if(scenarioStage=="loading") {if(handling.load(handlingClock))scenarioStage="closing-cut";}
+      else if(handling.unload(handlingClock)){completed=true;scenarioStage="completed";}
+      return;
+    }
     if(!guardPermission||guardInterrupted) {
       if(guardStopRequested&&motion.running)motion.update(session.fixedTimestep());
       if(motion.failure!=null)failure=motion.failure;
       return;
     }
-    if(completed||failure!=null)return;
+    if(completed||failure!=null||scenario=="idle")return;
+    if(scenario!=null&&scenarioStage!="cutting"&&scenarioStage!="parking")return;
     try{
+      if(scenarioStage=="parking") {
+        if(!parkStarted){var park=withdrawal;if(park==null)throw "Loading needs a park program";motion.run(park);parkStarted=true;}
+        motion.update(session.fixedTimestep());failure=motion.failure;
+        if(motion.completed){headRetracted=true;scenarioStage="opening-load";}
+        return;
+      }
       var now=session.simulationTime();
       if(handling!=null&&handling.inspection!="sequence")return;
-      if(handling!=null&&!cutStarted){
+      if(scenario==null&&handling!=null&&!cutStarted){
         if(handlingStart<0)handlingStart=handlingClock;
         if(!handling.load(handlingClock-handlingStart))return;
       }
@@ -162,7 +219,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
         motion.update(session.fixedTimestep());failure=motion.failure;
         if(motion.completed){
           cutCompleted=true;elapsed=now-startTime;stock.finish(elapsed,syncError);
-          if(handling==null){completed=true;return;}
+          if(handling==null||scenario=="cutting"){completed=true;scenarioStage="completed";return;}
           var retract=withdrawal;if(retract==null)throw "Missing head withdrawal program";
           motion.run(retract);handling.retracting();
         }
@@ -173,7 +230,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
           var hc=config.handling;if(hc==null)throw "Handling configuration absent";
           var q=robot.robot.snapshot().positions;
           if(Math.abs(x-hc.retractX)>0.01||Math.abs((q.get(indices[2])+offsets[2])*1000)>0.01||Math.abs((q.get(indices[1])+offsets[1])*1000)>0.01)throw "Head has not reached loading park X/Y/Z";
-          headRetracted=true;unloadStart=handlingClock;
+          headRetracted=true;unloadStart=handlingClock;if(scenario=="loading")scenarioStage="opening-unload";
         }
       }else if(handling!=null)completed=handling.unload(handlingClock-unloadStart);
     }catch(e:Dynamic){failure=Std.string(e);motion.abort();}
@@ -246,6 +303,6 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   public function reset():Void{stock.dispose();stock=new HobbingStock(config,centerMetres);motion=newMotion();started=false;cutStarted=false;cutCompleted=false;headRetracted=false;completed=false;failure=null;syncError=0;elapsed=0;
     guardInterrupted=false;guardStopRequested=false;
     handlingStart=-1;handlingClock=0;unloadStart=-1;sleeveDisplay=-1;
-    if(handling!=null){handling.inspect("sequence");handling.load(0);}}
+    if(handling!=null){handling.inspect("sequence");handling.load(0);}selectScenario(scenario);}
   public function dispose():Void{if(disposed)return;beforeReset();disposed=true;simulation.removeStepObserver(observerId);stock.dispose();}
 }

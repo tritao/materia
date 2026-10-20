@@ -170,6 +170,8 @@ typedef SceneArtifactProjectMotion = {
   @:id(11) var rotaryStandstillTolerance:Float;
   /** Consecutive below-threshold physics observations required to confirm standstill. */
   @:id(12) var standstillConfirmationSeconds:Float;
+  /** Presentation group; hiding it never removes runtime bodies or switches. */
+  @:id(13) @:optional var enclosureParts:Array<String>;
 }
 
 /** Gear/hob lengths in mm, angles radians, process speed m/min. */
@@ -195,6 +197,8 @@ typedef SceneArtifactProjectMotion = {
   @:id(18) @:optional var cupLength:Float;
   @:id(19) @:optional var cupEndThickness:Float;
   @:id(20) @:optional var handling:SceneArtifactHobbingHandling;
+  /** Enables the unified idle / cutting / loading scenario selector. */
+  @:id(21) @:optional var scenario:String;
 }
 
 /** Authored handling illustration, millimetres; not a deformation/contact model. */
@@ -1193,8 +1197,13 @@ class SceneArtifact {
         if(definition.sensors==null||[for(sensor in definition.sensors)if(sensor.id==id&&sensor.kind=="joint_switch"&&sensor.joint==guard.doorJoint)sensor].length!=1)
           throw "Enclosure guard end switches must observe its actual door joint";
     }
+    if(guard!=null&&guard.enclosureParts!=null) {
+      var seenParts:Map<String,Bool> = [];
+      for(id in guard.enclosureParts){if(occurrences.indexOf(id)<0||seenParts.exists(id))throw "Invalid enclosure presentation group";seenParts.set(id,true);}
+    }
     var hobbing=motion.hobbing;
     if(hobbing!=null){
+      if(hobbing.scenario!=null&&(["idle","cutting","loading"].indexOf(hobbing.scenario)<0||guard==null||hobbing.handling==null))throw "Unified hobbing scenarios require a guard and handling configuration";
       if(motion.program!=null||motion.digitalProgram!=null||motion.pressBrake!=null||motion.virtualDevice==true||data.machining!=null||data.printing!=null||data.missions!=null)
         throw "Hobbing requires exclusive machine-program ownership";
       if(hobbing.axes==null||hobbing.axes.length!=6||occurrences.indexOf(hobbing.stock)<0)throw "Hobbing needs six joints and a stock occurrence";

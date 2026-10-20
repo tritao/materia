@@ -4234,7 +4234,7 @@ class ProjectSourceTests {
   static function checkHobberInteractive(root:String,loading:Bool=false):Void {
     tests.HobbingHandlingTests.run();
     var scene=Sys.getEnv("HOBBER_GUI_SCENE");
-    if(scene==null)scene=root+"/machinekit/examples/flexspline-hobber/"+(loading?"loading.scene.json":"cutting.scene.json");
+    if(scene==null)scene=root+"/machinekit/examples/flexspline-hobber/"+"hobber.scene.json";
     var fonts=FontCollection.create();fonts.add(root+"/haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
     var editor=new ReferenceEditorApp(fonts,"/tmp/hobber-interactive-"+Sys.getPid()+".json");
     editor.simulation.backgroundPacing=true;
@@ -4244,9 +4244,10 @@ class ProjectSourceTests {
       while(editor.openingProject()&&Sys.time()<openDeadline){editor.tick();Sys.sleep(0.005);}
       check(!editor.openingProject(),"Loading scene finishes project generation");
       function cupBounds():nativekit.scene.Bounds {
-        var nodes=editor.scene.runtimePartNodes("project:blank");
-        return nodes.length==0?editor.scene.info("project:blank").bounds():editor.scene.renderSnapshot().findNode(nodes[0]).bounds();
+        var nodes=editor.scene.runtimePartNodes("project:machine/blank");
+        return nodes.length==0?editor.scene.info("project:machine/blank").bounds():editor.scene.renderSnapshot().findNode(nodes[0]).bounds();
       }
+      editor.simulation.selectHobbingScenario(editor.session,loading?"loading":"cutting");
       var original=cupBounds();
       editor.commands.execute("sim.play");
       var deadline=Sys.time()+60;
@@ -4268,17 +4269,17 @@ class ProjectSourceTests {
         elapsed:player.elapsed,windows:player.stock.stream.passes,report:player.stock.report,logs:editor.logLines}));
       check(player.failure==null,"Desktop hobbing failure: "+player.failure);
       check(player.completed,"Desktop playback completes the cutting job");
-      check(player.sleeveMeshUploads==(loading?1:0),"Sleeve animation uses one cached mesh");
+      check(player.sleeveMeshUploads==1,"Sleeve animation uses one cached mesh");
       check(player.stock.forces.maxTangential>0,"Desktop playback removes material");
       if(loading){
         var handling=player.handling;if(handling==null)throw "Handling timeline missing";
         check(player.cutCompleted&&player.headRetracted,"Cut finishes and head retracts before unload");
         // Scene bounds use the authored CAD transform; viewport applies the live snapshot separately.
-        var item=editor.scene.object("project:blank");
+        var item=editor.scene.object("project:machine/blank");
         if(item==null||item.rotation==null)throw "Cup display frame absent";
         var q=item.rotation;
         var local=app.AssemblyRobot.rotate([-q[0],-q[1],-q[2],q[3]],[(visible.minX+visible.maxX)/2-item.x,(visible.minY+visible.maxY)/2-item.y,(visible.minZ+visible.maxZ)/2-item.z]);
-        var live=[for(p in editor.simulation.capturePresentationSnapshot().environment)if(p.id=="project:blank")p][0];
+        var live=[for(p in editor.simulation.capturePresentationSnapshot().environment)if(p.id=="project:machine/blank")p][0];
         check(live!=null,"Live cup presentation exists");
         var displacement=app.AssemblyRobot.rotate(live.rotation,local);
         check(Math.abs(live.position[0]+displacement[0])<0.0001&&Math.abs(live.position[1]+displacement[1]+0.250)<0.0001,"Front transfer stays on machine -Y after C rotates");
@@ -4309,20 +4310,20 @@ class ProjectSourceTests {
     var generated=MateriaProjectRunner.loadProject(manifest);
     var definition=generated.assemblyDefinition;if(definition==null)throw "hobber has no assembly definition";
     for(id in ["electricalPanel","powerSupply","Xdrive-driver","Ydrive-driver","Zdrive-driver","table-drive-driver","swivel-drive-driver","hob-drive-driver"]){
-      var occurrence=definition.occurrences.filter(o->o.id==id)[0];
+      var occurrence=definition.occurrences.filter(o->o.id=="machine/"+id)[0];
       check(occurrence!=null&&occurrence.visible==false,"Direct hobber project keeps electrical occurrence hidden: "+id);
-      var record=generated.objects.filter(o->o.id=="project:"+id)[0];
+      var record=generated.objects.filter(o->o.id=="project:machine/"+id)[0];
       check(record!=null&&record.visible==false,"Artifact loader honours authored visibility: "+id);
     }
     var model=AssemblySimulationBridge.toRobotModel(definition,generated.physical).model;
-    check(model.actuators.length==6,"hobber exports six independently driven axes");
-    for(axis in ["X","Y","Z"]){var limits=model.coupledLimits(axis,new SteadyLoads());
+    check(model.actuators.length==7,"hobber exports six machine drives plus the guarded door actuator");
+    for(axis in ["X","Y","Z"]){var limits=model.coupledLimits("machine/"+axis,new SteadyLoads());
       check(limits.requireVelocity()>0&&limits.requireAcceleration()>0,'hobber $axis limits derive from screw/motor/load');}
     var blueprint=RobotRuntimeCompiler.compile(model,new robotkit.profile.RobotProfile());
     var process=blueprint.processJoints();
     for(i in 0...model.joints.length){var id=Std.string(model.joints[i].id);
-      if(id=="spindle/B")check(process[i],"hob B is process velocity owned");
-      if(id=="table/C")check(!process[i],"table C remains servo controlled before EGB");}
+      if(id=="machine/spindle/B")check(process[i],"hob B is process velocity owned");
+      if(id=="machine/table/C")check(!process[i],"table C remains servo controlled before EGB");}
     var session=new ProjectDocumentSession(null,false);session.openGeneratedProject(generated,manifest);
     var simulation=new ApplicationSimulation(new RobotWorld());simulation.setBackend(ApplicationSimulation.MUJOCO);
     try {

@@ -33,6 +33,7 @@ class ScenePresentation {
   public var pendingRenderChanges:Null<ChangeSet> = null;
   public var renderNeedsRefresh:Bool = false;
   public var selectionMaterial:Material;
+  public var translucentViewMaterial:Material;
   public var hoverMaterial:Material;
   /** RGB swatches only; the renderer retains every surface's authored material. */
   public var collidingMaterial:Material;

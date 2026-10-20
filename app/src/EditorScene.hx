@@ -350,6 +350,8 @@ class EditorScene {
           restoreSketchDraft(savedDraft);
       }
       var phaseStarted = profileLoadStart();
+      presentation.translucentViewMaterial=scene.createMaterial();
+      scene.setMaterialData(presentation.translucentViewMaterial,MaterialData.opaque(0.6,0.68,0.75).setOpacity(0.15).setOpaque(false).setRoughness(0.6));
       selectionMaterial = scene.createMaterial();
       scene.setMaterialData(selectionMaterial, MaterialData.opaque(1.0, 0.88, 0.35).setRoughness(0.7));
       hoverMaterial = scene.createMaterial();
@@ -1795,6 +1797,8 @@ class EditorScene {
     refreshPresentationIfStale();
     return snapshot;
   }
+
+  public function translucentViewMaterial():Material return presentation.translucentViewMaterial;
 
   public function configureRenderView(view:SceneView, viewProjection:Transform,
       ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1,

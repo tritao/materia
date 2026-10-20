@@ -75,6 +75,8 @@ class EditorPerspectiveViewport implements View {
   var totalRenderSeconds:Float = 0.0;
   final camera:PerspectiveCamera = new PerspectiveCamera();
   var inspection:Null<materia.project.SceneArtifact.SceneArtifactInspectionCamera>;
+  var enclosureIds:Array<String> = [];
+  var enclosureMode="visible";
   var inspectionZoom:Float=1;
   var inspectionTarget:Null<Array<Float>>;
   public var onInspectionZoom:Null<Float->Void> = null;
@@ -109,6 +111,19 @@ class EditorPerspectiveViewport implements View {
       }
     }
     event.preventDefault();event.stopPropagation();
+  }
+  public function setEnclosurePresentation(ids:Array<String>,mode:String):Void {
+    if(["visible","transparent","hidden"].indexOf(mode)<0)throw "Unknown enclosure presentation";
+    if(enclosureMode==mode&&enclosureIds.join("|")==ids.join("|"))return;
+    enclosureIds=ids.copy();enclosureMode=mode;lightingRevision++;host.requestFrame();
+  }
+  function enclosureView(view:SceneView):Void {
+    if(inspection!=null||enclosureMode=="visible")return;
+    for(id in enclosureIds) {
+      var item=scene.object("project:"+id);if(item==null)continue;
+      var nodes=[scene.info(item.id).node()].concat(scene.runtimePartNodes(item.id));
+      for(node in nodes)if(enclosureMode=="hidden")view.setVisibility(node,false);else view.setMaterial(node,scene.translucentViewMaterial());
+    }
   }
   function inspectionHidden(id:String):Bool {
     var preset=inspection;if(preset==null)return false;
@@ -448,6 +463,7 @@ class EditorPerspectiveViewport implements View {
   }
 
   function sectionView(view:SceneView):SceneView {
+    enclosureView(view);
     var plane=sectionPlane;
     if(plane!=null)view.addClipPlane(plane[0],plane[1],plane[2],plane[3]);
     return view;
@@ -474,7 +490,7 @@ class EditorPerspectiveViewport implements View {
     var minX = 1000000000.0, minY = 1000000000.0, minZ = 1000000000.0;
     var maxX = -1000000000.0, maxY = -1000000000.0, maxZ = -1000000000.0;
     for (item in items) {
-      if (!scene.isVisible(item.id)||inspectionHidden(item.id)) continue;
+      if (!scene.isVisible(item.id)||inspectionHidden(item.id)||inspection==null&&enclosureMode=="hidden"&&enclosureIds.indexOf(item.id.substr(8))>=0) continue;
       var transform = displayTransform(item);
       var bounds=transformedBounds(transform,item.width,item.height,item.depth);
       minX=Math.min(minX,bounds[0]);minY=Math.min(minY,bounds[1]);minZ=Math.min(minZ,bounds[2]);
@@ -784,7 +800,7 @@ class EditorPerspectiveViewport implements View {
   function fitCameraClipRange():Void {
     clipBounds.resize(0);
     for (item in scene.items()) {
-      if (!scene.isVisible(item.id)||inspectionHidden(item.id)) continue;
+      if (!scene.isVisible(item.id)||inspectionHidden(item.id)||inspection==null&&enclosureMode=="hidden"&&enclosureIds.indexOf(item.id.substr(8))>=0) continue;
       if (simulationActive) {
         var index = clipBounds.length;
         if (index == clipBoundsScratch.length) clipBoundsScratch.push([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);

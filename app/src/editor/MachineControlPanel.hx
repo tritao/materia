@@ -73,7 +73,9 @@ class MachineControlPanel {
     if(guardPanel!=null)rows.push(new KeyedView("enclosure-guard",guardPanel));
     var viewport=app.perspectiveViewport;
     var cup=app.simulation.hobbingPlayer();
-    if(cup!=null&&cup.handling!=null){
+    var machineMotion=app.session.machineMotion;
+    var cupId=machineMotion==null||machineMotion.hobbing==null?null:machineMotion.hobbing.stock;
+    if(cup!=null&&cup.handling!=null&&(cup.scenario==null||cup.scenario=="loading")){
       var safe=!cup.cutStarted||cup.completed;
       rows.push(new KeyedView("cup-status",new Text(cup.handling.inspection=="sequence"?cup.handling.phase:"Inspection: "+cup.handling.inspection)));
       rows.push(new KeyedView("cup-note",new Text("Guided loading; sleeve expansion illustrative. Reset → Play replays.")));
@@ -88,8 +90,8 @@ class MachineControlPanel {
       }
       rows.push(new KeyedView("cup-views",new Row("cup-views",views,ReferenceEditorApp.actionRowStyle())));
       var resume=new Button("Continue sequence",null,()->{cup.inspectCup("sequence");if(viewport!=null&&viewport.sectionActive()){viewport.clearSection();viewport.fitAll();}app.simulation.start();app.invalidateView();},"cup-continue");
-      resume.enabled=!cup.completed;
-      var section=new Button("Clamped section",null,()->{app.simulation.stop();cup.inspectCup("clamped");if(viewport!=null)viewport.inspectObject("project:blank");app.invalidateView();},"cup-section");
+      resume.enabled=!cup.completed&&cup.scenario==null;
+      var section=new Button("Clamped section",null,()->{app.simulation.stop();cup.inspectCup("clamped");if(viewport!=null)viewport.inspectObject("project:"+cupId);app.invalidateView();},"cup-section");
       section.enabled=safe;
       rows.push(new KeyedView("cup-actions",new Row("cup-actions",[new KeyedView("continue",resume),new KeyedView("section",section)],ReferenceEditorApp.actionRowStyle())));
     }else if(app.session.machineMotion!=null&&app.session.machineMotion.hobbing!=null&&app.session.machineMotion.hobbing.handling!=null){

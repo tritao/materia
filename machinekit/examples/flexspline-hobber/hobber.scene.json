@@ -1,0 +1,11 @@
+{
+  "format": "materia.scene",
+  "version": 2,
+  "objects": [],
+  "sensors": null,
+  "project": {
+    "version": 1,
+    "reference": "materia.project.json",
+    "overrides": []
+  }
+}

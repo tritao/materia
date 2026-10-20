@@ -112,6 +112,7 @@ class ProjectDocumentSession {
   public var robotTools(default, null):Array<SceneArtifactRobotTool> = [];
   /** The sensors on the project's robot, simulated where their parts mount them. */
   public var robotSensors(default, null):Array<SceneArtifactRobotSensor> = [];
+  public var hobbingScenario:Null<String> = null;
   public var machineMotion(default, null):Null<materia.project.SceneArtifact.SceneArtifactMachineMotion> = null;
   public var controllers(default, null):Array<materia.project.SceneArtifact.SceneArtifactCellController> = [];
   public var signals(default, null):Array<materia.project.SceneArtifact.SceneArtifactCellSignal> = [];
@@ -335,6 +336,7 @@ class ProjectDocumentSession {
     robotTools = tools == null ? [] : tools.copy();
     robotSensors = sensors == null ? [] : sensors.copy();
     machineMotion = machine;
+    hobbingScenario=machine==null||machine.hobbing==null?null:machine.hobbing.scenario;
     controllers = cellControllers == null ? [] : cellControllers.copy();
     signals = cellSignals == null ? [] : cellSignals.copy();
     printJob = print;
@@ -429,6 +431,7 @@ class ProjectDocumentSession {
     robotTools = generated.robotTools == null ? [] : generated.robotTools.copy();
     robotSensors = generated.robotSensors == null ? [] : generated.robotSensors.copy();
     machineMotion = generated.machineMotion;
+    hobbingScenario=machineMotion==null||machineMotion.hobbing==null?null:machineMotion.hobbing.scenario;
     controllers = generated.controllers == null ? [] : generated.controllers.copy();
     signals = generated.signals == null ? [] : generated.signals.copy();
     printJob = generated.printJob;
@@ -1108,7 +1111,7 @@ class ProjectDocumentSession {
     missions = null;
     robotTools = [];
     robotSensors = [];
-    machineMotion = null;
+    machineMotion = null;hobbingScenario=null;
     controllers = [];
     signals = [];
     printJob = null;
