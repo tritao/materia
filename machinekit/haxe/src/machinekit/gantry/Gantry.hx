@@ -149,8 +149,9 @@ class Gantry extends AxisBuilder {
             slide(axes[0],"railX","blockX",LinearRailBlock.metric(spec.railProfile),first,{x:1.0,y:0.0,z:0.0},
                 [orient(layout.xBlockSpacing/2,railY,first.z,[0.0,-1,0],alongX)]);
             var plateWidth=Math.max(layout.xBlockSpacing+guide.blockLength+30,layout.zRailSpacing+guide.blockWidth+30);
-            var lowerZ=beamZ;
-            var upperZ=beamZ+layout.zBlockSpacing;
+            var guideOffset:Float=layout.zGuideOffset==null?0:cast layout.zGuideOffset;
+            var lowerZ=beamZ+guideOffset;
+            var upperZ=lowerZ+layout.zBlockSpacing;
             var bottom=Math.min(lowerZ-guide.blockLength/2-30,beamZ-layout.xRailSpacing/2-guide.blockWidth/2-30);
             var top=Math.max(beamZ+layout.xRailSpacing/2+guide.blockWidth/2+30,upperZ+guide.blockLength/2+30);
             attach("xCarriage",new GantryPlate("X carriage",plateWidth,top-bottom,layout.carriageThickness),

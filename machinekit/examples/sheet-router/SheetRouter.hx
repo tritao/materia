@@ -29,6 +29,8 @@ class SheetRouter extends Gantry {
         super(chosen.gantry());routerSpec=chosen;
         homeAfter("y",["z","x"]);
         bindMotorBrake("motorZ","motorZ","sheet-router/z-brake.release","sheet-router/z-brake.released",250,100);
+        // Raise the complete Z pattern, table and rack together: keep 149 mm below the ram
+        // and recover 60 mm of beam-to-tip lever without shortening rail/block coverage.
         // The spindle stands upright, ahead of the slide; gauge is below its body.
         spindle=new AtcSpindle();
         var reach=spindle.n("diameter")/2+18;
@@ -225,8 +227,10 @@ class SheetRouter extends Gantry {
         }
         for(end in 0...2) {
             var y=end==0?front:back;
-            member('endBrace${end}a',[left,y,180],[right,y,top],brace);
-            member('endBrace${end}b',[right,y,180],[left,y,top],brace);
+            // The front mouth must pass a full sheet at boardTop; keep its braces below the plenum.
+            var endTop=end==0?Math.min(top,430):top;
+            member('endBrace${end}a',[left,y,180],[right,y,endTop],brace);
+            member('endBrace${end}b',[right,y,180],[left,y,endTop],brace);
             welds.push({a:'endBrace${end}a',b:'endBrace${end}b',legSize:5});
             for(name in ['endBrace${end}a','endBrace${end}b'])for(side in 0...2)
                 welds.push({a:name,b:'post$side${end*2}',legSize:5});

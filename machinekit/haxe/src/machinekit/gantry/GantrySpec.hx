@@ -31,6 +31,8 @@ typedef FrontGuideLayout = {
     var zBlockSpacing:Float;
     var carriageThickness:Float;
     var movingThickness:Float;
+    /** Raise the complete fixed-Z-block/moving-rail pattern relative to the beam. */
+    @:optional var zGuideOffset:Float;
     @:optional var zRibDepth:Float;
     @:optional var zRibWidth:Float;
     @:optional var zRibWall:Float;
@@ -141,6 +143,7 @@ class GantrySpec {
         if(frontGuides!=null)for(value in [frontGuides.xRailSpacing,frontGuides.xBlockSpacing,frontGuides.zRailSpacing,
                 frontGuides.zBlockSpacing,frontGuides.carriageThickness,frontGuides.movingThickness])
             if(!Math.isFinite(value)||value<=0)throw "Front guide dimensions must be finite and positive";
+        if(frontGuides!=null&&frontGuides.zGuideOffset!=null&&(!Math.isFinite(cast frontGuides.zGuideOffset)||(cast frontGuides.zGuideOffset:Float)<0))throw "Z guide offset must be finite and non-negative";
         if(frontGuides!=null&&frontGuides.zRibDepth!=null) {
             var ribs:Array<Null<Float>> = [frontGuides.zRibDepth,frontGuides.zRibWidth,frontGuides.zRibWall];
             for(v in ribs)

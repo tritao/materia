@@ -522,12 +522,12 @@ only as sources in docs. Standards (ISO30 / ISO 7388, ER collets, EN 60204-1, IS
 |---|---|---|
 | Work area Y × X | 2600 × 1600 mm (Y 3150 option) | decided (SR-D1) |
 | Travel Y / X / Z | 2900 (3450 option) / 1600 / 200 mm, including 300 mm rack zone | SR3 layout |
-| Beam underside / moving Z plate clearance to spoilboard | ≈ 328 / 149 mm at full Z | current CAD envelope |
+| Beam underside / moving Z plate clearance to spoilboard | ≈ 268 / 149 mm at full Z | current CAD envelope |
 | Rapid XY / Z | 40 / 10 m/min | revised SR4 screen |
 | Cutting feed | up to 20 m/min | assumed |
 | Acceleration XY / Z | 3 / 3 m/s² | assumed |
-| Gantry moving mass | 193.657 kg (193.775 kg long bed), whole moving chain allowance included | revised SR4 CAD mass, assumed geometry/density |
-| X / Z moving mass | 65.390 / 31.223 kg | revised SR4 CAD mass, assumed geometry/density |
+| Gantry moving mass | 196.533 kg (196.650 kg long bed), whole moving chain allowance included | revised SR4 CAD mass, assumed geometry/density |
+| X / Z moving mass | 67.819 / 31.223 kg | revised SR4 CAD mass, assumed geometry/density |
 | Rails | Y HGR25 blocks 280 mm apart; X/Z each two HGR20 rails/four blocks | guide-first candidate |
 | Rack and pinion | helical mn 1.5, β 19°31′42″, 20 T → 100 mm/rev | derived |
 | Reducers | Y 5:1; X 7.5:1; 3 arcmin planetary | SR4 selection, assumed ratings |
@@ -535,8 +535,8 @@ only as sources in docs. Standards (ISO30 / ISO 7388, ER collets, EN 60204-1, IS
 | Pulse resolution | 5000 pulses/rev: Y 4 µm / 167 kHz; X 2.667 µm / 250 kHz at 40 m/min | derived; board rate qualification pending |
 | Z screw | Ø16 × 10 mm, 13 mm assumed race root, 390 mm fixed/free shaft | revised SR4 selection at 10 m/min |
 | Beam | RHS 200 × 100 × 6.3 steel retained as baseline | anchored screen static pass; modal redesign required |
-| Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | anchored screen minimum 2.044 X / 2.135 Y; passes reduced static target |
-| First gantry mode | ≥ 40 Hz | anchored gantry min 26.054 Hz; global frame min 24.177 Hz; modal target fails |
+| Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | f47ed full screen passes; raised-datum spot Y minimum 2.023; full new envelope pending |
+| First gantry mode | ≥ 40 Hz | f47ed full gantry min 26.054 Hz; raised-datum spot 25.867 Hz; 40 Hz remains unmet |
 | Spindle | ISO30 ATC, ≈ 6 kW S1, 18–24k rpm, 400 V 3~, air-cooled | assumed |
 | VFD | 7.5 kW 400 V with braking resistor and STO | assumed |
 | Tool rack | 8 forks, pneumatic cover, rear rack zone | assumed |
@@ -786,6 +786,23 @@ work-surface/setter height changes; rack height alone cannot fix relative pickup
 clearance. The current pickup geometry stays until the coupled change is verified.
 The detailed decisions and remaining qualification gates are in
 [SOURCING.md](SOURCING.md#fabrication-and-access-decisions-after-the-braced-frame-screen).
+
+**Raised-datum / front-loading CAD revision.** Raise the complete fixed-Z-block
+and moving-rail pattern 60 mm on the X carriage. The X plate remains 40 mm thick
+and grows 60 mm vertically to support that pattern. The spindle, table, setter,
+rack and forks follow the new datum: beam-centre-to-longest-tool distance is
+367.75 mm, while the full-Z ram-to-sheet gap remains 149 mm. Keep the complete
+557.5 mm Z rails and existing block spacing; do not create an unsupported rail
+skirt to achieve the clearance. Beam underside is 268 mm above the spoilboard.
+Lower the front end-brace upper joints to Z430, below the loading plane; sixteen
+braces remain. Native swept-volume checks pass a 1600× 40 mm sheet through the
+front mouth on both beds, and the full assembly sweep passes 426 assertions.
+Moving Y mass is 196.650 kg on the long bed; the 82 sizing/planner assertions and
+guide travel/coverage gates pass. Four midpoint structural spot checks give
+2.023 N/µm minimum Y, with long-bed centre global/gantry modes 23.764/25.867 Hz.
+They do not replace a full new 18-pose/two-mesh envelope. SR-D3 is unchanged and
+fabrication remains gated. The dynamic-error/architecture tables above analyse
+the preceding f47ed13f4 geometry, not this clearance revision.
 
 **SR6. Frame, fabrication drawings and alignment procedures (SR-D2, SR-D11).**
 - Weldment: tube layout, weld seams and sequence, jig layout (frame points as jig stops), cut
@@ -1063,7 +1080,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR3 | complete: both beds, project load/hold/homing and focused regressions pass | see SR3 notes |
 | SR4 | revised two-bed drive/rack/screw screen complete; 82 sizing/planner assertions pass | see guide-first revision |
 | SR5 | anchored two-bed/two-mesh rerun complete; static passes, 40 Hz mode fails; mode energy and sensitivities recorded | see FEM diagnosis |
-| SR6 | braced CAD/assembly clearance passes; front sheet loading and service-access redesign open; fabrication gated by modal target | see anchored diagnosis and sourcing decisions |
+| SR6 | raised Z/table/rack datum and front-loading sweep pass; full service access and new structural envelope remain open; fabrication gated | see raised-datum revision |
 | SR7 | planned | |
 | SR8 | planned | |
 | SR9 | planned | |

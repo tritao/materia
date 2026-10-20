@@ -1,5 +1,38 @@
 # SR5 structural screen
 
+## Raised Z / table / rack datum: separate clearance revision
+
+The subsequent CAD revision raises the whole fixed-Z-block/moving-rail pattern
+60 mm, with matching table, setter, rack and fork datums. X plate thickness stays
+40 mm; its height grows from 395.75 to 455.75 mm. The 557.5 mm rails and 200 mm Z
+travel remain. Native geometry verifies **367.75 mm beam-to-tool** and **149 mm
+ram-to-sheet clearance** on both beds; rail coverage remains valid throughout
+travel. The table rises to Z614.25 and the front brace upper joints drop to Z430.
+A 1600 mm-wide, 40 mm-thick sheet swept through the front mouth intersects none of
+the base, front/side frame or rail pads. All 426 assembly/clearance and 82
+sizing/planner assertions pass. Long-bed moving Y mass is 196.650 kg.
+
+This is a clearance revision, not a new 40 Hz qualification. Its four midpoint
+50 mm structural spot checks (two X positions on each bed) give:
+
+| Bed / X / Y mm | X / Y N/µm | Global / gantry Hz |
+|---|---:|---:|
+| 2600 /0 /1300 | 2.349 /2.405 | 25.842 /28.646 |
+| 2600 /800 /1300 | 2.377 /2.028 | 25.857 /26.693 |
+| 3150 /0 /1575 | 2.340 /2.402 | 23.764 /27.489 |
+| 3150 /800 /1575 | 2.367 /2.023 | 23.764 /25.867 |
+
+The full new pose/mesh envelope remains pending. **SR-D3 is unchanged.** The
+motion-error, shaping and architecture calculations below use the preceding
+f47ed13f4 geometry; they are not silently relabelled as validation of the raised
+datum. Native packets and checks are in `build/sheet-router-system/cad`,
+`cad-spot`, `layout.log`, `clearance.log` and `sizing.log`.
+
+The optional legacy desktop-router fingerprint check fails identically on clean
+HEAD and with this patch (actual `88f4decf…`, expected `0aaf594d…`). The saved
+pre-change binary still passes all 59 legacy assertions. No fingerprint fixture
+was changed; the required router assembly, sizing and export checks above pass.
+
 ## Motion-error requirement and architecture screen (2026-10-20)
 
 **SR-D3 is unchanged:** the ≥40 Hz gantry rule remains a hard target pending a user decision. The proposed alternative below is an engineering motion-error allocation, not approval to build or a total part-tolerance claim. No local plate/block/rail iteration was adopted.
@@ -79,7 +112,7 @@ The baseline already has six feet, including a middle pair at Y=1411.375; the ad
 
 Coarse/fine changes in **frequency deltas** are below0.0042 Hz; all variants retain the same tracked gantry branch (body-motion MAC≥ 0.996). The additional leg pair is the only useful modal improvement here, but27.484 Hz is still far below40. Do not add309 kg of deep side members or adopt the split-rail bridge on this evidence.
 
-**Recommendation:** validate a jerk-limited contour execution policy and/or per-move ZVD against measured modes and finishing requirements before redesigning the entire machine for a frequency proxy. Retain SR-D3 until the user chooses. Continue the independent clearance work: raise the complete Z-guide/ram datum60 mm together with the table/rack, recover the tool lever to 367.75 mm while keeping149 mm clearance, and lower the front braces out of the sheet-loading path. This requires a taller X plate, not merely moving the spindle relative to its plate. No architecture variant above was selected.
+**Recommendation:** validate a jerk-limited contour execution policy and/or per-move ZVD against measured modes and finishing requirements before redesigning the entire machine for a frequency proxy. Retain SR-D3 until the user chooses. Continue the independent clearance work: raise the complete Z-guide/ram datum 60 mm together with the table/rack, recover the tool lever to 367.75 mm while keeping149 mm clearance, and lower the front braces out of the sheet-loading path. This requires a taller X plate, not merely moving the spindle relative to its plate. No architecture variant above was selected.
 
 Artifacts remain on root under `build/sheet-router-system/`: native planner sampler, `dynamic/dynamic-error.json`, `dynamic/responses.{svg,png}`, `architecture/architecture.json`, paired coarse results and source/provenance hashes. Independent SDOF step and ZV/ZVD cancellation/DC-gain fixtures pass.
 

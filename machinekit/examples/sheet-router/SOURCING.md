@@ -66,24 +66,41 @@ and approach poses fit within the reduced Z travel. The 200 mm stroke is provisi
 for the authored 120 mm longest-tool envelope: shorter-tool reach and the real tool-length
 range still require qualification with the tool table.
 
+## Raised-datum CAD selection
+
+The clearance revision raises the complete Z guide/ram datum 60 mm rather than
+moving the spindle relative to its plate. It preserves the 149 mm ram gap and
+full moving-rail coverage while reducing beam-to-tool distance from 427.75 to
+367.75 mm. The X plate remains 40 mm thick, with 60 mm more height for the fixed
+Z blocks. Table, tool rack, fork seats and setter rise together. Beam underside
+clearance remains 268 mm; no tested architecture variant was adopted.
+
+Front end-brace upper joints are lowered from Z700 to Z430; the complete 1600 mm
+width × 40 mm sheet mouth passes a native swept-volume check. Both beds pass the
+full 426-assertion assembly sweep, guide coverage and 82 sizing/planner assertions.
+The four midpoint structural spot checks retain ≥ 2 N/µm, but the full new pose/mesh
+envelope remains pending and the 40 Hz target still fails. Moving Y mass is now
+196.65 kg on the long bed. Motion-error tables in the FEM report describe the
+preceding geometry and must not be treated as fresh validation of this revision.
+
 ## Motion-error and architecture decisions
 
-Keep SR-D3's40 Hz rule until the user decides whether the proposed0.05 mm
+Keep SR-D3's 40 Hz rule until the user decides whether the proposed 0.05 mm
 motion-error allocation plus shaping replaces it. The allocation comes from the
 review, not a universal wood/plastics tolerance. The actual CNC path backend does
-not certify the shared20 m/s³ jerk default. Native jerk-limited motion or per-move
+not certify the shared 20 m/s³ jerk default. Native jerk-limited motion or per-move
 ZVD is promising in the frozen-pose modal screen; neither has been installed or
-qualified on the machine. Static cutting deflection, assumed0.054 mm backlash,
+qualified on the machine. Static cutting deflection, assumed 0.054 mm backlash,
 servo tracking and damping still prevent a finished-part accuracy claim.
 
 Do not source the 309 kg deep-side-girder change or the top/front X rail bridge from
 this screen: neither improves the governing mode. One extra anchored leg pair
 under the governing gantry position gains 1.43 Hz for 25.4 kg fixed mass; the frame
 already has a middle pair, so this is a fourth pair, not a missing existing one.
-Keep the 40 mm X plate and aluminium Z. The next clearance-only CAD pass raises
-the entire Z-guide/ram datum60 mm with the table/rack; raising just the spindle
-would reduce the 149 mm ram clearance to 89 mm. Verify the resulting guide travel,
-loading envelope and full assembly before adopting that geometry.
+Keep the 40 mm X plate and aluminium Z. The clearance-only CAD pass above raises
+the entire Z-guide/ram datum 60 mm with the table/rack; raising just the spindle
+would reduce the 149 mm ram clearance to 89 mm. Guide travel, the loading envelope
+and assembly have passed; structural and fabrication gates remain.
 
 ## Fabrication and access decisions after the braced-frame screen
 
@@ -98,10 +115,10 @@ stiffness (X at foot 0; Y at feet 0 and 3). This assumes friction without slip;
 it does not establish sliding or overturning safety.
 
 The sixteen-brace layout is a structural candidate, not an accepted service layout.
-The front end X braces currently cross the 554.25 mm sheet-loading plane: straight
-front loading is blocked. In the next CAD pass, lower the front pair's upper joints
-to at most 430 mm, below the 479.25 mm plenum underside, retaining the lower-plan
-triangulation and side/rear braces. Recheck frame modes before adopting that change.
+The previous front end X braces crossed the 554.25 mm sheet-loading plane.
+Their upper joints are now lowered to 430 mm, below the revised 539.25 mm plenum
+underside, with lower-plan triangulation and side/rear braces retained. The front
+loading sweep passes; a full new frame-modal envelope remains a qualification gate.
 Keep the front approach free across the full 1600 mm sheet width. Do not make a
 load-carrying brace removable during operation.
 

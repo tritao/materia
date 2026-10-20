@@ -29,7 +29,7 @@ class SheetRouterSpec {
             "HFS5-4040","HFS5-4040",true,None,0.5,new machinekit.power.DcVoltage(560),16,300,100,200,180,{
                 railProfileY:"HGR25",yBlockSpacing:280,railPadHeight:12,
                 beamFootThickness:30,beamFootMaterial:"steel",beamFootWelded:true,
-                frontGuides:{xRailSpacing:150,xBlockSpacing:300,zRailSpacing:180,zBlockSpacing:200,carriageThickness:40,movingThickness:20,zRibDepth:120,zRibWidth:25,zRibWall:6},
+                frontGuides:{zGuideOffset:60,xRailSpacing:150,xBlockSpacing:300,zRailSpacing:180,zBlockSpacing:200,carriageThickness:40,movingThickness:20,zRibDepth:120,zRibWidth:25,zRibWall:6},
                 motor:Servo("GENERIC-HV-SERVO-750W"),motorX:Servo("GENERIC-HV-SERVO-750W"),motorZ:BrakedServo("750"),
                 reducer:new PlanetaryReducer(new ComponentValues().setNumber("backlash",3)),reducerX:new PlanetaryReducer(new ComponentValues().setNumber("bore",19).setNumber("ratio",7.5).setNumber("backlash",3)),
                 preload:new machinekit.transmission.PreloadedPinionMount(new ComponentValues().setNumber("springForce",550).setNumber("springRate",4000).setNumber("stroke",0.5)),
