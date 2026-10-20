@@ -74,7 +74,7 @@ class SheetRouterFemExport {
                     vector(F.transformPoint(state.worldPose("spindleMount"),x,machine.spindle.n("diameter")/2+18,z))]});
         }
         var supports:Array<Dynamic> = [];
-        for(side in 0...2)for(end in 0...3) {
+        for(side in 0...2)for(end in 0...4) {
             var id='foot${side}${end}';supports.push({id:id,pointMm:vector(state.worldPose(id))});
         }
         var axes:Array<Dynamic> = [];

@@ -55,8 +55,8 @@ class SheetRouter extends Gantry {
         attach("base",base,F.identity(),"frameFront");
         buildChainSupports();
         var foot=new LevellingFoot();
-        for(side in 0...2)for(end in 0...3) {
-            var x=side==0?left:right,y=front+(back-front)*end/2;
+        for(side in 0...2)for(end in 0...4) {
+            var x=side==0?left:right,y=end==3?1575:front+(back-front)*end/2;
             attach('foot${side}${end}',foot,F.translation(x,y,0),"base");
             attach('footCap${side}${end}',new SheetFootCap(),F.translation(x,y,88),"base");
         }
@@ -193,8 +193,8 @@ class SheetRouter extends Gantry {
         for(side in 0...2) {
             var x=side==0?left:right;
             member('lower$side',[x,front,180],[x,back,180],tube);
-            for(end in 0...3) {
-                var y=front+(back-front)*end/2;
+            for(end in 0...4) {
+                var y=end==3?1575:front+(back-front)*end/2;
                 member('post$side$end',[x,y,100],[x,y,top],tube);
                 welds.push({a:'lower$side',b:'post$side$end',legSize:6});
             }
@@ -210,7 +210,7 @@ class SheetRouter extends Gantry {
             welds.push({a:'tableSide$side',b:"rackCross",legSize:5});
             var x=side==0?left:right;
             member('tableSide$side',[x,front,bed-40],[x,back,bed-40],cross);
-            for(end in 0...3)welds.push({a:'tableSide$side',b:'post$side$end',legSize:5});
+            for(end in 0...4)welds.push({a:'tableSide$side',b:'post$side$end',legSize:5});
         }
         // Triangulate side, end and lower planes without crossing the work envelope.
         var brace=new RectTube(80,80,4);

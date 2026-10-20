@@ -24,6 +24,7 @@ class SheetRouterGuideChecks {
             state.setJoint("z",machine.routerSpec.travelZ);state.forwardKinematics();
             check(Math.abs(state.worldPose("blockZ").z-fixed.z)<1e-6,"Z blocks remain on X carriage");
             check(Math.abs(state.worldPose("railZ").z-rail.z+machine.routerSpec.travelZ)<1e-6,"Z rails move with plate");
+            check(Math.abs(machine.zeroPose("foot03").y-1575)<1e-6&&Math.abs(machine.zeroPose("foot13").y-1575)<1e-6,"additional anchored leg pair at Y1575");
             var ram=zPlate.geometry(),posedRam=machinekit.assembly.PosedParts.moved(ram,state.worldPose("zCarriage"));ram.close();
             var gap=posedRam.shape.bounds().get_min().get_z()-machine.boardTop;posedRam.close();
             var tip=state.worldConnector("longestTool","tip"),beam=state.worldPose("beam");
