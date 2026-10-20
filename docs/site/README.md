@@ -30,17 +30,18 @@ contains `: `.
 
 ## Hosting
 
-The site is deployed by Cloudflare Pages from the GitHub repository:
+The site is served by Cloudflare Workers (static assets) and deployed by
+Workers Builds from the GitHub repository on every push to `main`:
 
 | Setting | Value |
 |---|---|
-| Production branch | `main` |
-| Root directory | `docs/site` |
+| Path (root directory) | `docs/site` |
 | Build command | `npm run build` |
-| Build output directory | `dist` |
+| Deploy command | `npx wrangler deploy` |
 | Build watch paths | include `docs/*` |
 
-The Node version comes from `.node-version` in this directory.
+`wrangler.jsonc` names the Worker and points it at `dist/`; the Node version
+comes from `.node-version`.
 
 ## Figures
 

@@ -122,8 +122,8 @@ place.
 - D1 done except hosting: the Starlight site in `docs/site/` builds every page
   under `docs/`, fails on invalid front matter or broken internal links, and
   runs in CI (`.github/workflows/docs.yml`, uploads the built site). Choosing
-  and wiring the host is still open: Cloudflare Pages was chosen; the settings
-  are in `docs/site/README.md`.
+  hosting is Cloudflare Workers static assets deployed by Workers Builds
+  (`docs/site/wrangler.jsonc`, settings in `docs/site/README.md`).
 - D3 done: `docs/figures` computes figure data with the real kits as a
   workspace member (`docs-figures`), shares the workspace's native builds, and
   fails as a test when a committed figure is stale. The first figure (paths vs.
