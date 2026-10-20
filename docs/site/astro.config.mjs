@@ -39,12 +39,15 @@ export default defineConfig({
 					items: [{ label: "Your first machine: a gantry picker", slug: "tutorials/gantry-picker" }],
 				},
 				{ label: "Concepts", items: [{ label: "Overview", slug: "concepts" }, ...conceptGroups()] },
+				{ label: "Editor manual", collapsed: true, items: [{ autogenerate: { directory: "manual" } }] },
 				{ label: "API reference", link: "/reference/" },
+				{ label: "About Materia", collapsed: true, items: [{ autogenerate: { directory: "product" } }] },
 				{
 					label: "Project",
 					items: [
 						{ label: "Open core", slug: "open-core" },
 						{ label: "Documentation plan", slug: "docs-plan" },
+						{ label: "Documentation inventory", slug: "inventory" },
 					],
 				},
 			],

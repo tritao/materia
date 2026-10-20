@@ -94,7 +94,7 @@ changed test.
 
 | Phase | Work | Done when |
 |---|---|---|
-| **D0** | Inventory: tag every existing `.md` as keep, merge, internal or delete; final site map; stability label per kit | Inventory table committed; labels in `materia.workspace.json` |
+| **D0** | Inventory: tag every existing `.md` as keep, merge, internal or delete; final site map; stability label per kit | [INVENTORY.md](INVENTORY.md) committed with the tags, site map and stability labels |
 | **D1** | Site skeleton: Starlight serving `docs/`, link check, CI build and preview deploys | Every page renders; broken links fail CI |
 | **D2** | Concepts, first six: Life of a machine, Conventions, Execution plans, Fidelity levels, Assemblies and mates, Controller boundary | Six pages at `status: reviewed`; their open questions resolved or filed |
 | **D3** | Figure pipeline and first figure (paths vs. trajectories, baked from MotionKit) | Figure recomputed as a workspace test; snapshot check |
@@ -131,10 +131,18 @@ place.
 - D7 concepts done: no stubs left in `concepts/`; every page is a draft
   checked against the code, with its inconsistencies under Open questions.
   Every diagram is laid out to read at the column's width. The editor user
-  manual is next.
+  manual is drafted in [manual/](manual/README.md) from the app code, with the
+  README's disagreements listed per page.
 - D5 done: `docs/api/generate.py` parses every kit the editor uses with
   Haxeon's parser into `docs/api/data/` (27 kits, about 3,700 public types);
   the site renders a page per package under `/reference/` and links type names
   on concept pages to it. The API reference comes from source declarations,
   not the typed program, so a type is shown as the source writes it. CI fails
   when the data is stale.
+- D0 done: [INVENTORY.md](INVENTORY.md) tags all 324 tracked Markdown files
+  (114 keep, 43 merge, 159 internal, 8 delete) and labels each kit's stability
+  (none stable yet). The labels live there rather than in
+  `materia.workspace.json`, whose entries are test projects, not kits. The
+  eight delete candidates are listed for the maintainer, not removed.
+- D9 drafted: [product/](product/README.md) has features, the example gallery
+  and licensing. The roadmap and release notes wait on release decisions.

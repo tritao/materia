@@ -152,6 +152,8 @@ Deferred:
    search.
 5. **Commercial repositories:** where they live, and how they pin the open
    stack.
-6. **NativeKit** (`tritao/nativekit`, own code) needs its own `LICENSE`.
+6. ~~**NativeKit** (`tritao/nativekit`, own code) needs its own `LICENSE`.~~
+   Done: Apache-2.0 (nativekit 2489d27f).
 7. **Full third-party inventory** into one `THIRD_PARTY_NOTICES`, the GPL scan
-   and the asset check from section 5.
+   and the asset check from section 5. Note for the GPL scan: the vendored lz4
+   is partly GPL-2.0-or-later; RobotKit compiles only its BSD `lib/` sources.
