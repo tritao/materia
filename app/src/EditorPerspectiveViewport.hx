@@ -39,11 +39,6 @@ class EditorPerspectiveViewport implements View {
   public final key:String;
   final scene:EditorScene;
   public var selectionTree:Null<EditorSceneTree> = null;
-  var lastPickId = "";
-  var lastPickKey = "";
-  var lastPickX = 0.0;
-  var lastPickY = 0.0;
-  var lastPickCameraRevision = -1;
   var pressLocalX = 0.0;
   var pressLocalY = 0.0;
   var pressObjectId = "scene";
@@ -677,26 +672,23 @@ class EditorPerspectiveViewport implements View {
     return Math.acos(Math.max(-1.0,Math.min(1.0,dot)));
   }
 
-  function selectAt(localX:Float,localY:Float, drill:Bool=false):String {
-    var tree=selectionTree;
-    if(drill && tree!=null) {
-      var hit=pick(localX,localY);
-      var again=hit==lastPickId && tree.selectionKey()==lastPickKey && camera.revision==lastPickCameraRevision &&
-        Math.abs(localX-lastPickX)<5 && Math.abs(localY-lastPickY)<5;
-      var key=tree.pickedKey(hit,again);
-      if(key!=hit || key=="scene") tree.selectKey(key);
-      else selectAt(localX,localY,false);
-      lastPickId=hit;lastPickKey=tree.selectionKey();lastPickX=localX;lastPickY=localY;lastPickCameraRevision=camera.revision;
-      host.requestFrame();return hit;
+  function selectAt(localX:Float,localY:Float):String {
+    var id:String;
+    if (!editingEnabled()) {
+      id=pick(localX,localY);
+      scene.select(id);
+    } else {
+      fitCameraClipRange();
+      var ray=camera.screenRay(localX,localY,viewportWidth,viewportHeight);
+      var view=sectionView(scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null, null, -1, null, cosmeticThreadsVisible));
+      id=scene.selectRayWithView(view,ray.originX,ray.originY,ray.originZ,
+        ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
     }
-    lastPickId="";
-
-    if(!editingEnabled()){var id=pick(localX,localY);scene.select(id);return id;}
-    fitCameraClipRange();
-    var ray=camera.screenRay(localX,localY,viewportWidth,viewportHeight);
-    var view=sectionView(scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null, null, -1, null, cosmeticThreadsVisible));
-    return scene.selectRayWithView(view,ray.originX,ray.originY,ray.originZ,
-      ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
+    // A tree-only assembly selection already has scene.selectedId == "scene".
+    // Clear it explicitly when an empty-space click leaves that object id unchanged.
+    var tree=selectionTree;
+    if (id=="scene" && tree!=null) tree.selectKey("scene");
+    return id;
   }
 
   public static function pickScene(scene:EditorScene, camera:PerspectiveCamera,
@@ -1225,7 +1217,7 @@ class EditorPerspectiveViewport implements View {
         sketchRectangleDrag = null;
         sketchDragRevision++;
       } else if (event.kind == UiEventKind.PointerUp && navigationMode == 7 && !pointerMoved && pressButton==0)
-        selectAt(event.localX,event.localY,true);
+        selectAt(event.localX,event.localY);
       navigationPointer = null; navigationMode = 0;
       clearFlyKeys();
       if (wasOrbiting) host.requestFrame();

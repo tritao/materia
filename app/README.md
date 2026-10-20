@@ -18,7 +18,9 @@ SceneKit. `src/Main.hx` composes:
 The editor starts with an empty scene in a perspective view. Use `--demo` to
 load the two starter boxes, the BIM example, and sample telemetry.
 Click an object in the viewport or hierarchy to select it; the yellow outline
-tracks selection. Picking in 3D also highlights the corresponding Hierarchy row,
+tracks selection. A completed viewport click selects the hit part directly; repeated
+clicks keep that part selected. Select an assembly in the tree to select its members.
+Picking in 3D also highlights the corresponding Hierarchy row,
 opens its ancestor groups and scrolls it into view without moving keyboard focus.
 An active tree search is preserved, with the selected row included so it remains
 reachable. Redraws preserve scroll position and manual branch expansion.

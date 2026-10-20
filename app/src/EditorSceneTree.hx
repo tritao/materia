@@ -63,13 +63,6 @@ class EditorSceneTree implements TreeViewModel {
       if(!scene.selectTreeKey(key) && previous!=selectionKey())scene.refreshSelectionRevision();
     }
   }
-  /** One level per completed click; an unrelated selection starts again at the outer group. */
-  public function pickedKey(id:String, continueDrill:Bool):String {
-    var path=objectPath(id);
-    if(path.length<2)return "scene";
-    var index=continueDrill ? path.indexOf(selectionKey()) : -1;
-    return path[Std.int(Math.min(path.length-1,index<1 ? 1 : index+1))];
-  }
   var selectedMembersKey="";
   var selectedMembers:Array<String> =[];
   public function selectedObjects():Array<String> {
