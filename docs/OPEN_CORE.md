@@ -1,15 +1,15 @@
 ---
 title: Open core
 description: What is open, what is commercial, where the line sits, and which licenses apply.
-status: draft (needs decisions; nothing here is in force yet)
+status: accepted (licenses in force; names and commercial repos deferred)
 ---
 
 # Open core
 
-> **Draft for decision.** No license is in force yet: the repository has no
-> LICENSE file. Until one is added, the code is public but all rights are
-> reserved, so nobody may legally use, copy or modify it. Section 8 lists the
-> decisions needed before release.
+> **Accepted 2026-10-20.** Materia and Haxeon are licensed under Apache-2.0
+> (`LICENSE`, `NOTICE`), docs under CC BY 4.0, and contributions use the DCO
+> (`CONTRIBUTING.md`). Product names and the commercial repositories are
+> deferred (section 8).
 
 ## 1. Principle
 
@@ -135,22 +135,23 @@ scope with the official texts.
   such as ISO 13849-1, which shapes how they are designed, validated and
   documented.
 
-## 8. Decisions needed
+## 8. Decisions
 
-1. **Licenses:** confirm Apache-2.0 for code and designs, and CC-BY-4.0 for
-   docs.
-2. **The device core stays open:** confirm that `robotkit/device_protocol` and
-   the bench board support remain the open reference controller. Recommended:
-   they are already public, and an open protocol with no open implementation
-   would not be credible.
-3. **Contributions:** confirm DCO.
+Taken (2026-10-20):
+
+1. **Licenses:** Apache-2.0 for code and designs, CC BY 4.0 for docs.
+2. **The device core stays open:** `robotkit/device_protocol` and the bench
+   board support are the open reference controller.
+3. **Contributions:** DCO.
+
+Done: `LICENSE` and `NOTICE` in Materia and Haxeon, `CONTRIBUTING.md`.
+
+Deferred:
+
 4. **Names:** product names for the controller and machines, after a clearance
    search.
-5. **Commercial repositories:** where they live (private GitHub org or
-   elsewhere), and how they pin the open stack.
-
-After these decisions:
-
-- Add `LICENSE` (root and Haxeon), `NOTICE` and `THIRD_PARTY_NOTICES`.
-- Add `CONTRIBUTING.md` with the DCO.
-- Move this page to the repository root.
+5. **Commercial repositories:** where they live, and how they pin the open
+   stack.
+6. **NativeKit** (`tritao/nativekit`, own code) needs its own `LICENSE`.
+7. **Full third-party inventory** into one `THIRD_PARTY_NOTICES`, the GPL scan
+   and the asset check from section 5.

@@ -141,3 +141,12 @@ Use the package README files for focused native build and test commands:
 
 When changing a submodule, publish its commit before updating the corresponding
 submodule pointer in Materia so fresh recursive clones remain buildable.
+
+## License
+
+Materia is licensed under the [Apache License 2.0](LICENSE); see also
+[NOTICE](NOTICE). Documentation in [`docs/`](docs/) is licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Submodules and
+vendored dependencies keep their own licenses. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for how contributions are licensed and
+signed off.
