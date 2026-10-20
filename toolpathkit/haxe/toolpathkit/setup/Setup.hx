@@ -8,6 +8,8 @@ import toolpathkit.path.GeometryOffset;
 import toolpathkit.path.ToolpathFrame;
 import toolpathkit.path.Provenance;
 import toolpathkit.tool.ToolLibrary;
+import toolpathkit.tool.CutterProfile;
+import toolpathkit.tool.CutterZone;
 
 /** Stock, clearance and clamp checks in the same work coordinates as CAM IR. */
 class Setup {
@@ -27,14 +29,15 @@ class Setup {
   }
 
   /**
-    Rejects a program before export. The cutter tip disk is swept through
-    each path at the physical tool tip, after the active G43 length.
+    Rejects a program before export. The cutter clearance column and finite
+    shank/holder bands are swept at the physical tip, after the active G43 length.
   **/
   public function validate(ops:Array<ToolpathOp>, tools:ToolLibrary):Void {
     if (ops == null || tools == null) throw "CAM export needs a program and machine";
     if (stock == null) throw "CAM validation needs stock and clearance bounds";
     var frame = new ToolpathFrame(tools, [this]);
     var radius = 0.0;
+    var profile:Null<CutterProfile> = null;
     for (op in ops) {
       frame.advance(op);
       switch op {
@@ -42,20 +45,21 @@ class Setup {
           var tool = tools.tool(number);
           if (tool.diameter <= 0.0) fail(span, 'tool $number needs a positive diameter');
           radius = tool.diameter * 0.5;
+          profile = tool.profile();
         case Move(Rapid, geometry, _, _, span), Move(Link, geometry, _, _, span),
             Move(Retract, geometry, _, _, span):
           checkPath(GeometryOffset.translate(geometry, frame.toTip()), span,
-            radius, false);
+            radius, false, profile);
         case Move(_, geometry, _, _, span):
           checkPath(GeometryOffset.translate(geometry, frame.toTip()), span,
-            radius, true);
+            radius, true, profile);
         case _:
       }
     }
   }
 
   function checkPath(geometry:PathGeometry, span:Provenance, radius:Float,
-      cutting:Bool):Void {
+      cutting:Bool, profile:Null<CutterProfile>):Void {
     var stock = this.stock;
     if (stock == null) throw "CAM validation needs stock and clearance bounds";
     var length = GeometryTools.length(geometry);
@@ -84,21 +88,31 @@ class Setup {
         case Arc(_, arcRadius, _, sweep), Circular(_, arcRadius, _, sweep, _, _):
           arcRadius * (1.0 - Math.cos(Math.abs(sweep) / segments / 2.0));
       };
-      for (fixture in stock.fixtures)
+      for (fixture in stock.fixtures) {
         if (intersectsFixture(previous, current, radius + margin, fixture))
           fail(span, 'cutter intersects fixture "${fixture.name}"');
+        if(profile!=null)for(segment in profile.segments)if(CutterProfile.zoneOf(segment)!=Cutting) {
+          var a=CutterProfile.startOf(segment),b=CutterProfile.endOf(segment);
+          var outer=switch segment {
+            case Line(r0,_,r1,_,_): Math.max(r0,r1);
+            case Arc(cr,cz,r0,z0,_,_,_): cr+Math.sqrt((r0-cr)*(r0-cr)+(z0-cz)*(z0-cz));
+          };
+          if(outer>radius&&intersectsFixture(previous,current,outer+margin,fixture,Math.min(a.z,b.z),Math.max(a.z,b.z)))
+            fail(span, 'non-cutting tool profile intersects fixture "${fixture.name}"');
+        }
+      }
       previous = current;
     }
   }
 
   static function intersectsFixture(a:Point3, b:Point3, radius:Float,
-      fixture:Fixture):Bool {
+      fixture:Fixture, lowZ:Float=0, highZ:Float=Math.POSITIVE_INFINITY):Bool {
     // A cutter tip below the clamp can still leave its shank inside it.
     if (Math.min(a.z, b.z) > fixture.maxZ) return false;
     var lo = 0.0, hi = 1.0;
     // Clip the segment to the fixture's vertical range, then to its expanded XY box.
     for (bound in [
-      {origin:a.z, delta:b.z - a.z, min:Math.NEGATIVE_INFINITY, max:fixture.maxZ},
+      {origin:a.z, delta:b.z - a.z, min:fixture.minZ-highZ, max:fixture.maxZ-lowZ},
       {origin:a.x, delta:b.x - a.x, min:fixture.minX - radius, max:fixture.maxX + radius},
       {origin:a.y, delta:b.y - a.y, min:fixture.minY - radius, max:fixture.maxY + radius}
     ]) {
