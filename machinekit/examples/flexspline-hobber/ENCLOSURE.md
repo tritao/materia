@@ -537,3 +537,11 @@ manufacturer datasheet is saved as a supplier reference. Screws, washers and
 gasket grade still need actual supplier selections. No supplier is selected
 and prices/stock are unverified. This replacement-design BOM stays separate
 from the accepted six-piece enclosure BOM to avoid counting both designs.
+
+### Two-socket mould fixture prototype
+
+The first tooling prototype is documented in [SOCKET_FIXTURE.md](SOCKET_FIXTURE.md).
+It provides a separate native Materia coupon/fixture, router panel drawings,
+temporary and permanent BOM records, explicit mouth sealing and screw-depth
+records, and checked release/withdrawal sequences using the existing tooling
+framework. The complete foundation mould integration remains a later step.

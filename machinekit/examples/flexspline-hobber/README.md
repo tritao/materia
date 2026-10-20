@@ -110,3 +110,6 @@ The replacement rectangular-tray proposal has its own [BOM](tray-bom.json) and
 Run the proposal generator and `haxeon.tray-bom.json` to refresh its sourced JSON
 and CSV exports in `build/tray-mounting/`. It remains separate from the installed
 enclosure BOM until the replacement is integrated.
+
+The [two-socket mould fixture](SOCKET_FIXTURE.md) demonstrates the cast-in socket
+positioning method with its own Materia scenes, tooling BOM and panel drawings.

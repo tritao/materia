@@ -32,6 +32,7 @@ class MachineKitComponents {
 		registry.register(machinekit.structural.CastInsert.recipeType());
 		registry.register(machinekit.structural.CastInFixingSocket.recipeType());
 		registry.register(machinekit.tooling.ToolingPanel.recipeType());
+		registry.register(machinekit.tooling.SocketCoupon.recipeType());
 		registry.register(machinekit.tooling.ToolingPin.recipeType());
 		registry.register(machinekit.tooling.ToolingBlock.recipeType());
 		registry.register(machinekit.tooling.ToolingVolume.recipeType());
