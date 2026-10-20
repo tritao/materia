@@ -1510,7 +1510,35 @@ after the hobber merge, most likely in the hobber bed/column equivalence checks.
   shared heavy runner: FoundationToolingTests **62**, PanelNativeTests **132**,
   BoxMoldTests **153**, ProcessNativeTests **34** assertions pass.
 
-- [ ] Source contracts 1–7: callers declare openings, and `reachedOpenings` is
+- Stage 1 complete on the mill and shared typed contracts. ThreadedHolePolicy
+  resolves numeric steel-hole minima and records explicit overrides. Hole patterns
+  retain their frames/depths and policy in the fingerprint. Source callers declare
+  openings; recipe rules replace the mill strategy table; retained beams/backing
+  create stable fragments grouped into authored core units. Fixture screws clamp
+  through clearance-only bed/datum holes into source steel threads. Fixing holes
+  receive no bore masks; other holes retain their framed masks/counterbores.
+  Missing usable source threads raise blocking design requests; obstructed paths
+  to existing threads remain tooling work, without inventing threads or receivers.
+  Feature schema **2**, hole recipes **2**, tooling document **7**, box/multi-core
+  mold codecs **6** reject earlier encodings; no compatibility path was added.
+  FoundationModelTests **36**; neutral suites: ToolingTests **64**, PanelTests
+  **50**, BoxPlannerTests **39**, FabricationTests **46**, ReviewContractTests
+  **30**, JunctionThermalTests **36**, CastabilityTests **58**,
+  OrientationSectionTests **43**, ProcessTests **1,313**, CastingMoldTests **52**
+  (**1,731** total). Native suites: FoundationToolingTests **62**,
+  PanelNativeTests **132**, BoxMoldTests **153**, ProcessNativeTests **34**,
+  FoundationDesignTests **25**, CastingTests **50**, MillMoldChecks **248**.
+  Main compiles with prebuilt OCCT. All four frozen mill/hobber symmetric
+  differences and the sloped-foot cut/body comparison remain **zero**. Fixture
+  SHA checks decompress through native gzip, without python3. Regenerated base
+  mold, full/records-only fabrication packages and review/coupon archives;
+  manifest integrity/tamper checks pass. The full package has **789** hashed
+  artifacts and **39** review programs: **17 Pass, 262 Pending, 15 Unsupported**,
+  fabrication-ready **false**. No physical coupon trial is recorded. Hobber
+  source conversion remains the next separate stage; its legacy path is not
+  claimed converted by this mill/shared-contract commit.
+
+- [x] Source contracts 1–7 (typed/mill path; legacy hobber removal is stage 2): callers declare openings, and `reachedOpenings` is
   diagnostic only; unique body-face IDs per prism and face; flared or chamfered
   bodies report collision hull Unsupported, and material residue names the
   feature, not the envelope prism; delete `ToolingRecipe.hardware.insertBoreDiameter`
@@ -1519,14 +1547,14 @@ after the hobber merge, most likely in the hobber bed/column equivalence checks.
   `depth:null` sentinel, frames not overwritten, real minimum wall, clearance and
   engagement from the thread spec, not 0.001 placeholders) and multi-hole patterns;
   finish tokens from `InsertFinish`, as roles already are.
-- [ ] Mill layout 8–12: the remaining MillFrame literals (90/100/40, 20/20/42,
+- [x] Mill layout 8–12: the remaining MillFrame literals (90/100/40, 20/20/42,
   160, 80, 22/11, 100, the `-1`/`+2` overshoot margins, `rearBayDesignClearance`,
   the "M12" literal) become named details or declared openings; thread sizes are
   typed specs, not strings; callers use the shared foot/underside/retain patterns
   or the patterns are deleted; one envelope from `MineralCasting.castingEnvelope()`
   (no rebuild in MillFrame, MillPedestal or MineralFoundation); delete dead
   `recessLinks`, `ToolingCodec.readFeature` and the `ToolingPrism` alias.
-- [ ] Setup 13–15: delete the MillMoldSetup ID-keyed strategy table in favour of
+- [x] Setup 13–15: delete the MillMoldSetup ID-keyed strategy table in favour of
   recipe rules on kind and openings, with overrides naming their feature; draft
   comes only from `feature.draft` (remove setup `draftDegrees`), and corner radius
   from `feature.cornerRadius`; compare kinds as `InsertRecess`, not strings; typed
@@ -1535,7 +1563,7 @@ after the hobber merge, most likely in the hobber bed/column equivalence checks.
 - [ ] Hobber conversion 16–19: as under layout parameters above; regenerate
   `BASELINE_FOUNDATIONS.json`; delete `machinekit/CASTING_TOOLING_PLAN.md`; fix
   `machinekit/README.md` (CastingFeatures description, legacy read path).
-- [ ] Tests 20–22: verify the frozen STEP SHA from `reference.json` and decompress
+- [x] Tests 20–22: verify the frozen STEP SHA from `reference.json` and decompress
   natively, without python3; run the sloped-foot cavity through each box-only
   consumer (fill, sections, planner) and assert Unsupported by feature ID; fragment
   ID stability under unrelated edits and change under geometry edits; reject old

@@ -195,32 +195,48 @@ class CastabilityAnalysis {
 		if (maximum == null && limits.maximumSectionThicknessMm == null)
 			proposals.push(proposal(maximumRule, [root], AnalyzeJunction, ProcessReview,
 				"Junction diameter bounds are available. Resolve junction heat flow and thermal coverage before accepting section/cure limits."));
-		var strategies = d.setup.features.copy();
+		var strategies = materia.tooling.casting.CastingStrategies.resolve(d);
 		strategies.sort((a, b) -> Reflect.compare(a.featureId, b.featureId));
+		var reportedParents = new Map<String, Bool>();
 		for (strategy in strategies) {
-			var rule = "process.castability.release." + strategy.featureId;
+			var source = d.input.features.filter(feature -> feature.id == strategy.featureId)[0];
+			var parent = source.derivedFrom == null ? source.id : source.derivedFrom;
+			if (reportedParents.exists(parent))
+				continue;
+			reportedParents.set(parent, true);
+			var rule = "process.castability.release." + parent;
 			if (strategy.strategy == SacrificialEPS) {
-				checks.push(FillAnalysis.check(rule, [strategy.featureId], Pending,
+				checks.push(FillAnalysis.check(rule, [parent], Pending,
 					"EPS breakout accessibility, fragment size and release need a physical trial; a rigid-member sweep does not establish breakup access.",
 					[]));
-				proposals.push(proposal(rule, [strategy.featureId], QualifyBreakout, ToolingReview,
+				proposals.push(proposal(rule, [parent], QualifyBreakout, ToolingReview,
 					"Trial breakout through the declared opening after fixture release; record access, remaining foam and damage against this source revision."));
 			} else if (strategy.strategy == ReusableFormer) {
 				var draftRule = "tooling.former.draft." + strategy.featureId;
-				var actual = plannerChecks == null ? [] : plannerChecks.filter(v -> v.rule == draftRule);
+				var siblings = d.input.features.filter(feature -> (feature.derivedFrom == null ? feature.id : feature.derivedFrom) == parent);
+				var draftRules = [for (feature in siblings) "tooling.former.draft." + feature.id];
+				var actual = plannerChecks == null ? [] : plannerChecks.filter(v -> draftRules.indexOf(v.rule) >= 0);
 				if (actual.length > 0) {
 					for (check in actual)
 						checks.push(check);
-					rule = draftRule;
+					if (siblings.length == 1)
+						rule = draftRule;
+					else {
+						var status = actual.filter(v -> v.status == Unsupported).length > 0 ? Unsupported
+							: actual.filter(v -> v.status == Fail).length > 0 ? Fail
+							: actual.length < siblings.length || actual.filter(v -> v.status == Pending).length > 0 ? Pending : Pass;
+						checks.push(FillAnalysis.check(rule, [parent], status,
+							"Release qualification covers every fragment of the authored core unit.", []));
+					}
 				} else
-					checks.push(FillAnalysis.check(rule, [strategy.featureId], Pending,
+					checks.push(FillAnalysis.check(rule, [parent], Pending,
 						"Run the real planner and exact swept removal checks for rigid-former extraction; adhesion needs physical evidence.", []));
 				if (actual.length == 0 || actual.filter(v -> v.status != Pass).length > 0)
-					proposals.push(proposal(rule, [strategy.featureId], SplitOrSacrificial, DesignReview,
+					proposals.push(proposal(rule, [parent], SplitOrSacrificial, DesignReview,
 						"This planner cannot realize drafted or split formers. Only supported fill-open EPS or a source change to supported release geometry clears this request; rerun planning and exact CAD checks."));
 			} else {
-				checks.push(FillAnalysis.check(rule, [strategy.featureId], Unsupported, "Feature has no supported tooling strategy.", []));
-				proposals.push(proposal(rule, [strategy.featureId], SplitOrSacrificial, ToolingReview,
+				checks.push(FillAnalysis.check(rule, [parent], Unsupported, "Feature has no supported tooling strategy.", []));
+				proposals.push(proposal(rule, [parent], SplitOrSacrificial, ToolingReview,
 					"Select an explicit supported tooling strategy and rerun planning before designing its release."));
 			}
 		}

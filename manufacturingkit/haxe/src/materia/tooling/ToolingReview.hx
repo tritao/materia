@@ -23,7 +23,7 @@ class ToolingReview {
 			d.recipe.core.maximumTemperatureC == null || d.recipe.core.evidence.length == 0)
 			result.push({ruleId: "tooling.core-stock", subjectId: d.recipe.core.materialSpec, severity: Warning, status: Pending,
 				message: "EPS supplier properties or evidence are incomplete", evidence: d.recipe.core.evidence.copy()});
-		for (f in d.setup.features) if (f.strategy == Unsupported)
+		for (f in materia.tooling.casting.CastingStrategies.resolve(d)) if (f.strategy == Unsupported)
 			result.push({ruleId: "tooling.core-strategy", subjectId: f.featureId, severity: Error, status: Unsupported,
 				message: "No supported tooling strategy has been selected for this feature", evidence: []});
 		return result;

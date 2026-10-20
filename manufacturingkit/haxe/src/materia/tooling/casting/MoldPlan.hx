@@ -19,6 +19,7 @@ typedef PenetrationPlan = {
 	var operationId:String;
 	var kind:PenetrationClass;
 	var insertId:Null<String>;
+	@:optional var sourceHoleId:String;
 	var coreId:Null<String>;
 	var sealMargin:Float;
 	var sealMaterial:String;
@@ -70,9 +71,8 @@ typedef InsertFixturePlan = {
 	var body:MoldBox;
 	var mountingFace:AssemblyFrame;
 	var panelId:String;
-	var operationId:String;
-	var fixingDiameter:Float;
-	var threadSpec:String;
+	var fixings:Array<materia.tooling.casting.CastingMoldPlan.InsertFixtureFixing>;
+	var boreMasks:Array<materia.tooling.casting.CastingMoldPlan.BoreMaskProtection>;
 	var threadProtection:FixtureThreadProtection;
 	var finishingAllowance:Null<Float>;
 	var datumEvidence:Array<String>;

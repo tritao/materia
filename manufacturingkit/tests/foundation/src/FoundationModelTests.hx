@@ -1,3 +1,4 @@
+import materia.casting.CastingFeature.CastingDimension;
 import materia.casting.CastingFeature;
 import materia.casting.CastingPatterns as P;
 import materia.casting.CastingEnvelope;
@@ -28,7 +29,7 @@ class FoundationModelTests {
 
 	public static function main():Void {
 		var body = CastingEnvelope.build(100, 80, 100);
-		var cut = P.box("pocket", Lightening, [P.face("body.z-min")], 40, 30, 25, 0, 0, 0, null, ["width", "depth", "height"]);
+		var cut = P.box("pocket", Lightening, [P.face("body.z-min")], 40, 30, 25, 0, 0, 0, null, [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height]);
 		var encoded = CastingFeatureCodec.encode([cut]);
 		check(CastingFeatureCodec.encode(CastingFeatureCodec.decode(encoded)) == encoded, "typed feature codec roundtrip");
 		var derived = CastingCavities.derive(body, [cut])[0];
@@ -41,6 +42,11 @@ class FoundationModelTests {
 		cut.openings = [P.face("body.x-min")];
 		rejects(() -> CastingCavities.derive(body, [cut]), "Unreached declared opening: pocket");
 		var flare = CastingEnvelope.build(100, 80, 120, 0, 160, 60, 20);
+		var footFront = P.box("foot-front", ServiceOpening, [P.face("body.y-min")], 20, 20, 10, 0, -40, 25);
+		rejects(() -> CastingCavities.derive(flare, [footFront]), "Unreached declared opening: foot-front body.y-min");
+		footFront.openings = [P.face("foot.y-min")];
+		check(CastingCavities.derive(flare, [footFront]).length == 1,
+			"coplanar foot and body faces retain distinct opening identities");
 		var access = P.box("access", ServiceOpening, [], 60, 30, 30, 65, 0, 25);
 		access.openings = CastingCavities.reachedOpenings(flare, access.geometry);
 		check(access.openings.filter(o -> o.target == "foot.side-2").length == 1, "sloped foot opening is named exactly");
@@ -89,7 +95,7 @@ class FoundationModelTests {
             "compaction does not reintroduce coincident-plane slivers");
         check(Math.abs(BoxAlgebra.volume(nearPlanes)-8000)<1e-8,
             "near-coincident partition planes preserve union volume");
-		var parent = P.box("bay", Lightening, [], 100, 60, 20, 0, 0, 10, null, ["width", "depth"]);
+		var parent = P.box("bay", Lightening, [], 100, 60, 20, 0, 0, 10, null, [CastingDimension.Width, CastingDimension.Depth]);
 		var fragments = BoxAlgebra.retain([parent], [
 			{
 				x: -10,
@@ -112,6 +118,42 @@ class FoundationModelTests {
 			}
 		]);
 		check(fragments[0].id == repeated[0].id && fragments[1].id == repeated[1].id, "fragment IDs depend on geometry");
+		var supports:Array<materia.casting.Box3> = [{x: -10, y: -30, z: 10, width: 20, depth: 60, height: 20}];
+		var unrelated = P.box("unrelated", Lightening, [], 10, 10, 10, 200, 0, 10);
+		var withUnrelated = BoxAlgebra.retain([unrelated, parent], supports).filter(feature -> feature.derivedFrom == parent.id);
+		check(withUnrelated.length == 2 && withUnrelated[0].id == fragments[0].id && withUnrelated[1].id == fragments[1].id,
+			"unrelated feature edits and order preserve fragment IDs");
+		var wider = CastingFeatureCodec.snapshot([parent])[0];
+		wider.geometry.width += 2;
+		var changed = BoxAlgebra.retain([wider], supports);
+		check(changed.length == 2 && changed[0].id != fragments[0].id && changed[1].id != fragments[1].id,
+			"geometry edits change fragment IDs");
+		var parentAccess = P.box("access", ServiceOpening, [P.feature("bay")], 10, 10, 10, -40, 0, 10);
+		var linked = fragments.concat([parentAccess]);
+		check(CastingCavities.derive(CastingEnvelope.build(200, 100, 60), linked).length == 3,
+			"declared feature openings resolve retained children through their authored parent");
+		parentAccess.geometry.pose.x = 0;
+		rejects(() -> CastingCavities.derive(CastingEnvelope.build(200, 100, 60), fragments.concat([parentAccess])), "Unreached feature opening: access bay");
+		var touchParent = P.box("touch-parent", Lightening, [], 10, 10, 10, 0, 0, 10);
+		var touchAccess = P.box("touch-access", ServiceOpening, [P.feature(touchParent.id)], 10, 10, 10, 10, 10, 10);
+		rejects(() -> CastingCavities.derive(body, [touchParent, touchAccess]), "Unreached feature opening: touch-access touch-parent");
+		touchAccess.geometry.pose.y = 0;
+		check(CastingCavities.derive(body, [touchParent, touchAccess]).length == 2,
+			"feature openings require positive area instead of edge-only contact");
+		var tilted = P.box("almost-axis", Lightening, [], 10, 10, 10, 0, 0, 10);
+		var angle = 1e-5, cosine = Math.cos(angle), sine = Math.sin(angle);
+		tilted.geometry.pose = materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 10,
+			[cosine, -sine, 0, sine, cosine, 0, 0, 0, 1]);
+		rejects(() -> CastingCavities.derive(body, [tilted]), "Unsupported casting feature: almost-axis");
+		var drafted = P.box("drafted-intent", Lightening, [], 10, 10, 10, 0, 0, 10);
+		drafted.draft.degrees = 2;
+		rejects(() -> CastingCavities.derive(body, [drafted]), "Unsupported drafted or rounded casting feature: drafted-intent");
+		var legacy:Dynamic = haxe.Json.parse(CastingFeatureCodec.encode([parent]));
+		legacy.version = 1;
+		rejects(() -> CastingFeatureCodec.decode(haxe.Json.stringify(legacy)), "Unsupported casting feature schema");
+		var flared = CastingEnvelope.build(100, 80, 120, 0, 160, 60, 20);
+		var crossing = P.box("sloped-foot-crossing", ServiceOpening, [P.face("foot.side-2")], 60, 30, 30, 65, 0, 25);
+		rejects(() -> BoxAlgebra.material(flared, [crossing]), "Unsupported non-box finished cavity: sloped-foot-crossing");
 		var holes = materia.casting.InsertHoleGeometry.through(6, 20);
 		holes[0].thread = {
 			designation: "M7",
@@ -128,6 +170,8 @@ class FoundationModelTests {
 		check(copied[0].thread != null && copied[0].thread.designation == "M7", "thread data has portable typed tokens");
 		copied[0].diameter = 5;
 		check(holes[0].diameter == 6, "hole snapshots are detached");
+		holes[0].limits.minWall = 0;
+		rejects(() -> materia.casting.InsertHole.InsertHoleCodec.snapshot(holes), "Invalid insert hole limit: minWall");
 		Sys.println("FoundationModelTests: " + assertions + " assertions passed");
 	}
 }

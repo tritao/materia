@@ -87,7 +87,7 @@ class CamToolingPanels {
 			throw "Panel CAM needs positive chord tolerance";
 		var points:Array<Point3> = [];
 		var exact:Array<cadkit.sheetmetal.Segment> = [];
-		function map(p:materia.tooling.ToolingPrism.ToolingPoint2):cadkit.sheetmetal.Point2 {
+		function map(p:materia.casting.CastingPrism.CastingPoint2):cadkit.sheetmetal.Point2 {
 			var x = p.x - minX;
 			return new cadkit.sheetmetal.Point2((mirrorX ? widthMm - x : x) * 0.001 + margin, (p.y - minY) * 0.001 + margin);
 		}

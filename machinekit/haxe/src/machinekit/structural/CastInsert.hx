@@ -11,14 +11,14 @@ class CastInsert extends MachineComponent {
 
 	public static function parameters():Array<ComponentParameter>
 		return [
-			P.text("holes", '{"version":1,"holes":[]}'),
+			P.text("holes", '{"version":2,"holes":[]}'),
 			P.length("width", 35),
 			P.length("depth", 400),
 			P.length("height", 20),
 			P.length("positionTolerance", 0.01),
 			P.requiredChoice("role", materia.casting.InsertSpec.InsertRoles.tokens()),
 			P.text("label", "rail seat"),
-			P.choice("finish", ["ground-after-casting","machined-after-casting","replicated-after-casting","as-cast"], "ground-after-casting")
+			P.choice("finish", materia.casting.InsertSpec.InsertFinishes.tokens(), materia.casting.InsertSpec.InsertFinish.GroundAfterCasting)
 		];
 
 	public static function recipeType():ComponentType {
@@ -38,7 +38,7 @@ class CastInsert extends MachineComponent {
 		if (v.get("material") != null && v.token("material") != "steel")
 			throw "Cast insert requires steel";
 		super("CAST-IN-INSERT", "Cast-in steel " + v.token("label") + ", " + v.token("finish"), "steel", false, v);
-		addFacet(InsertHoles.facet(InsertHoles.records(v.token("holes"),v.number("height")),v.number("width"),v.number("depth"),v.number("height")));
+		addFacet(InsertHoles.facet(InsertHoles.records(v.token("holes")),v.number("width"),v.number("depth"),v.number("height")));
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Mount, Solids.axial(0, 0, parameterNumber("height")));
 	}
@@ -51,8 +51,12 @@ class CastInsert extends MachineComponent {
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Solids.named(Part.box(parameterNumber("width"), parameterNumber("depth"), parameterNumber("height")), "insert");
-		var tools=machinekit.design.DesignInterfaces.of(this).drillingTools();
-		return tools.length==0?body:Solids.cut(body,tools);
+		return Solids.building([body], owned -> {
+			var tools = machinekit.design.DesignInterfaces.of(this).drillingTools();
+			for (tool in tools)
+				owned.push(tool);
+			return tools.length == 0 ? body : Solids.cut(body, tools);
+		});
 	}
 
 	override public function setMaterial(spec:String):Void {

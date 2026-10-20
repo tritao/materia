@@ -2,7 +2,7 @@ package materia.tooling.panel;
 
 import materia.tooling.ToolingEnums.MachiningSide;
 import materia.tooling.ToolingEnums.ContactFace;
-import materia.tooling.ToolingPrism.ToolingPoint2;
+import materia.casting.CastingPrism.CastingPoint2;
 
 enum abstract PanelCurveKind(String) to String {
 	var Line = "line";
@@ -22,9 +22,9 @@ enum abstract PanelOperationKind(String) to String {
  */
 typedef PanelSegment = {
 	var kind:PanelCurveKind;
-	var start:ToolingPoint2;
-	var end:ToolingPoint2;
-	var center:Null<ToolingPoint2>;
+	var start:CastingPoint2;
+	var end:CastingPoint2;
+	var center:Null<CastingPoint2>;
 	var sweep:Float;
 }
 

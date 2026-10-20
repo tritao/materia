@@ -13,11 +13,6 @@ enum abstract CoreWireAxis(String) to String {
 }
 
 typedef ToolingHardware = {
-	var insertBoreDiameter:Float;
-	var insertClearanceDiameter:Float;
-	var insertScrewDiameter:Float;
-	var insertThreadSpec:String;
-	var insertEngagement:Float;
 	var plugDepth:Float;
 	var plugMaterial:String;
 	var sealMargin:Float;
@@ -49,6 +44,7 @@ typedef CastingReviewLimits = {
 }
 
 typedef ToolingRecipe = {
+	var featureRules:Array<materia.tooling.casting.CastingStrategies.CastingStrategyRule>;
 	var designReview:CastingReviewLimits;
 	var id:String;
 	var revision:Int;

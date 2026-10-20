@@ -97,9 +97,11 @@ class AssemblyDesignChecks {
 		if(h.thread!=null) {
 			var t=h.thread;
 			if(Math.abs(t.tapDrill/2-h.radius)>1e-6) out.error("design.tap-size",id,"Tap drill does not match thread designation");
-			DesignChecks.minimum(out,id+" tap runout",t.cylindricalDepth-t.usableDepth,0.5);
-			DesignChecks.minimum(out,id+" drill back wall",t.stock-h.depth,t.minBack);
-			material(out,id+" actual back wall "+t.minBack,{id:id,frame:h.frame,volume:CylinderVolume(h.radius,h.depth,h.depth+t.minBack)},host);
+			if (h.through != true) {
+				DesignChecks.minimum(out,id+" tap runout",t.cylindricalDepth-t.usableDepth,0.5);
+				DesignChecks.minimum(out,id+" drill back wall",t.stock-h.depth,t.minBack);
+				material(out,id+" actual back wall "+t.minBack,{id:id,frame:h.frame,volume:CylinderVolume(h.radius,h.depth,h.depth+t.minBack)},host);
+			}
 		}
 		if(h.approach!=null) clear(out,id+" drill/tap approach",{id:id,frame:h.frame,volume:CylinderVolume(h.approach.radius,-h.approach.length,0)},host);
 	}
@@ -116,7 +118,10 @@ class AssemblyDesignChecks {
 		if(shaft.x*into.x+shaft.y*into.y+shaft.z*into.z<0.999999)out.error("design.fastener-direction",id,"Screw points away from tapped hole");
 		var grip=(tap.x-head.x)*shaft.x+(tap.y-head.y)*shaft.y+(tap.z-head.z)*shaft.z;
 		if(grip<=0)throw "Fastener has no positive grip stack";
-		DesignChecks.blindFastener(out,id,screw.shankLength(),grip,t.usableDepth,t.cylindricalDepth,t.point,t.stock,t.minEngagement,t.minTipGap,t.minBack);
+		if (h.through == true)
+			DesignChecks.minimum(out,id+" thread engagement",Math.min(screw.shankLength()-grip,t.usableDepth),t.minEngagement);
+		else
+			DesignChecks.blindFastener(out,id,screw.shankLength(),grip,t.usableDepth,t.cylindricalDepth,t.point,t.stock,t.minEngagement,t.minTipGap,t.minBack);
 		if(screw.shankLength()-screw.threadedLength()>grip+1e-6)out.error("design.unthreaded-shank",id,"Unthreaded shank enters tapped hole");
 		var intervals:Array<{start:Float,end:Float}> = [];
 		for(ref in through) {

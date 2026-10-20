@@ -19,6 +19,14 @@ enum abstract InsertFinish(String) to String {
 	var SourceAsCast = "as-cast";
 }
 
+class InsertFinishes {
+	public static function values():Array<InsertFinish>
+		return [InsertFinish.GroundAfterCasting, InsertFinish.MachinedAfterCasting, InsertFinish.ReplicatedAfterCasting, InsertFinish.SourceAsCast];
+
+	public static function tokens():Array<String>
+		return [for (finish in values()) (finish : String)];
+}
+
 /** Typed role vocabulary shared by source schemas and neutral validation. */
 class InsertRoles {
 	public static function values():Array<InsertRole>

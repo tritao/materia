@@ -14,12 +14,14 @@ import materia.casting.BoxAlgebra;
 
 /** Source design cuts and openings; finished cavities have one neutral derivation. */
 class MineralCasting extends MachineComponent {
+	public final collisionHullQualification:CastingCollisionQualification;
     final features:Array<CastingFeature>;
+	final envelope:Array<CastingPrism>;
     static var recipe:Null<ComponentType>;
     public static function parameters():Array<ComponentParameter> return [
         P.length("width",650),P.length("depth",550),P.length("height",120),
         P.length("footWidth",0),P.length("footHeight",0),P.length("footShoulder",0),P.length("cornerChamfer",0),
-        P.text("features",'{"version":1,"features":[]}')];
+        P.text("features",'{"version":2,"features":[]}')];
     public static function recipeType():ComponentType {
         if(recipe==null)recipe=new ComponentType("machinekit.structural.mineral-casting",parameters(),v->new MineralCasting(v),false,false,null,false);
         return recipe;
@@ -34,11 +36,18 @@ class MineralCasting extends MachineComponent {
         if(v.number("footWidth")!=0&&(v.number("footWidth")<=v.number("width")||v.number("footShoulder")<=0||v.number("footHeight")<=v.number("footShoulder")||v.number("footHeight")>=v.number("height")))throw "Invalid flared casting foot";
         super("MINERAL-CASTING","Mineral casting (purchase by casting mass, kg)","mineral cast",false,v);
         features=cuts;
+		envelope = CastingEnvelope.build(v.number("width"), v.number("depth"), v.number("height"), v.number("cornerChamfer"),
+			v.number("footWidth"), v.number("footHeight"), v.number("footShoulder"));
         var cavities=finishedCavities();
         if(parameterNumber("cornerChamfer")==0&&parameterNumber("footWidth")==0) {
             var material=BoxAlgebra.material(castingEnvelope(),features);
             addFacet(CollisionHullFacet.fromBoxes([for(b in BoxAlgebra.compact(material))BoxAlgebra.limits(b)]));
+			collisionHullQualification = new CastingCollisionQualification(Supported, "Exact disjoint-box material hulls");
+		} else {
+			collisionHullQualification = new CastingCollisionQualification(Unsupported,
+				"Flared or chamfered envelopes require non-box material decomposition");
         }
+		addFacet(collisionHullQualification);
         addConnector("mount",Mount,Solids.axial(0,0,0));addConnector("top",Mount,Solids.axial(0,0,v.number("height")));
     }
     override public function componentType():Null<ComponentType> return recipeType();
@@ -61,7 +70,12 @@ class MineralCasting extends MachineComponent {
     }
     public function castingFeatures():Array<CastingFeature> return materia.casting.CastingFeatureCodec.snapshot(features);
     public function castingEnvelope():Array<CastingPrism>
-        return CastingEnvelope.build(parameterNumber("width"),parameterNumber("depth"),parameterNumber("height"),parameterNumber("cornerChamfer"),parameterNumber("footWidth"),parameterNumber("footHeight"),parameterNumber("footShoulder"));
+		return [for (prism in envelope) {
+			id: prism.id,
+			profile: [for (point in prism.profile) {x: point.x, y: point.y}],
+			height: prism.height,
+			pose: materia.casting.CastingRecordCodec.frame(prism.pose)
+		}];
     public function finishedCavities():Array<materia.casting.CastingCavities.FinishedCastingCavity> return CastingCavities.derive(castingEnvelope(),features);
     public function minimumSectionIy(x0:Float,x1:Float):Float {
         return BoxAlgebra.minimumIy(BoxAlgebra.material(castingEnvelope(),features),x0,x1);

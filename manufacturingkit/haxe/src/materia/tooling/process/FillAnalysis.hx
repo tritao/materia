@@ -55,6 +55,8 @@ typedef FillReport = {
  * Positive-area faces connect cells; edge/point contacts never vent a pocket.
  */
 class FillAnalysis {
+	public static function sourceSupport(input:materia.tooling.casting.CastingToolingInput):Array<ToolingValidation>
+		return materia.tooling.casting.CastingBoxSupport.check(input, "process.fill.geometry");
 	static inline var EPS = 1e-7;
 
 	public static function check(rule:String, ids:Array<String>, status:ToolingCheckStatus, message:String, evidence:Array<String>):ToolingValidation

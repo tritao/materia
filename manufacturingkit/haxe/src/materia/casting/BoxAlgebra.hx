@@ -186,18 +186,20 @@ class BoxAlgebra {
 
 	public static function material(body:Array<CastingPrism>, features:Array<CastingFeature>):Array<Box3> {
 		var cavities = CastingCavities.derive(body, features);
+		// Validate cavities before the envelope, preserving the source feature in diagnostics.
+		var cuts = [for (c in cavities) for (b in CastingCavities.boxes(c)) b];
 		var region = [
 			for (p in body) for (b in CastingCavities.boxes({featureId: p.id, parentId: p.id, pieces: [p]})) b
 		];
-		return coalesce(subtract(region, [for (c in cavities) for (b in CastingCavities.boxes(c)) b]));
+		return coalesce(subtract(region, cuts));
 	}
 
 	/** Stable fragment IDs depend on exact geometry, never traversal/array order. */
 	public static function retain(features:Array<CastingFeature>, supports:Array<Box3>):Array<CastingFeature> {
 		var result:Array<CastingFeature> = [];
 		for (f in features) {
-			var cells = coalesce(subtract([CastingBounds.box(f.geometry)], supports));
-			if (cells.length == 1 && compare(cells[0], CastingBounds.box(f.geometry)) == 0) {
+			var cells = coalesce(subtract([CastingBounds.feature(f)], supports));
+			if (cells.length == 1 && compare(cells[0], CastingBounds.feature(f)) == 0) {
 				result.push(f);
 				continue;
 			}
@@ -223,7 +225,7 @@ class BoxAlgebra {
 					pose: materia.assembly.AssemblyFrames.translation(b.x + b.width / 2, b.y + b.depth / 2, b.z)
 				};
 				// A retained support may close a formerly open face. Keep only openings that survive.
-				var before = CastingBounds.box(f.geometry),
+				var before = CastingBounds.feature(f),
 					old = limits(before),
 					now = limits(b);
 				fragment.openings = fragment.openings.filter(o -> {

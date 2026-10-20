@@ -16,7 +16,7 @@ class ThermalFaces {
 
 	public static function kind(face:ThicknessFace, document:Null<ToolingDocument>, spec:CastingProcessSpec, fill:Float):ThermalBoundaryKind {
 		if (document != null
-			&& face.sourceIds.filter(owner -> document.setup.features.filter(v -> v.featureId == owner
+			&& face.sourceIds.filter(owner -> materia.tooling.casting.CastingStrategies.resolve(document).filter(v -> v.featureId == owner
 				&& v.strategy == materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS)
 				.length > 0)
 				.length > 0)

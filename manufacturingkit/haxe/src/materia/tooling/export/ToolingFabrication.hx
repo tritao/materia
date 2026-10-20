@@ -163,11 +163,11 @@ class ToolingFabrication {
 				"Three-dimensional former blanking, setups and fixture access require a manufacturing route; panel CAM does not cover these solids.", []));
 		for (f in p.fixtures)
 			checks.push(ToolingLoads.check("fabrication.fixture-machining." + f.datum.id, [f.datum.id], Pending,
-				"Steel support machining/threading and bore-mask release require qualified shop setups.", []));
+				"Datum support machining and bore-mask release require qualified shop setups.", []));
 		var coupon = PanelCoupon.make(p.document.recipe.panel, s.couponClearancesMm, p.document.recipe.routerDiameter);
 		var hardware = p.document.recipe.hardware;
 		var locator = PanelJoints.pinBolt("locator-coupon", p.document.recipe.panel, hardware.fixturePinDiameter, p.document.recipe.jointClearance,
-			hardware.secondaryPinTravel, hardware.insertClearanceDiameter, hardware.fixtureSlotToolDiameter, p.document.recipe.minimumLigament);
+			hardware.secondaryPinTravel, hardware.supportClearanceDiameter, hardware.fixtureSlotToolDiameter, p.document.recipe.minimumLigament);
 		var panels = [for (m in p.panels.members.concat(p.supportPanels)) m.panel].concat([coupon.receiver, coupon.plug, locator.fixed, locator.moving]);
 		var ids = new Map<String, Bool>();
 		for (panel in panels) {

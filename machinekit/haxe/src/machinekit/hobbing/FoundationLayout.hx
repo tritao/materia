@@ -7,7 +7,7 @@ import machinekit.structural.CastInsert;
 import machinekit.structural.CastingFeatures;
 import machinekit.structural.MineralFoundation.CastInsertPlacement;
 
-typedef InsertLocation={id:String,role:String,width:Float,depth:Float,height:Float,pose:AssemblyFrame,?clampHeight:Float};
+typedef InsertLocation={id:String,role:String,width:Float,depth:Float,height:Float,pose:AssemblyFrame,openings:Array<materia.casting.CastingFeature.CastingOpening>,?clampHeight:Float};
 
 /** Design-specific insert layout, not a casting process model. Coordinates relative to casting body. */
 class FoundationLayout {
@@ -51,7 +51,7 @@ class FoundationLayout {
   public static function enclosureSeats():Array<InsertLocation> {
     var out:Array<InsertLocation> = [];
     for(x in [-1,1])for(y in [-1,1])out.push({id:'enclosureSeat${x+1}${y+1}',
-      role:"enclosure frame dry-side mounting pad",width:80,depth:80,height:20,
+      openings:[materia.casting.CastingPatterns.face(y<0?"body.y-min":"body.y-max")],role:"enclosure frame dry-side mounting pad",width:80,depth:80,height:20,
       pose:F.fromRotationMatrix(x*(HobberXLayout.front().bedLength/2-100),y*380,720,
         [1,0,0,0,0,y,0,-y,0])});
     return out;
@@ -67,7 +67,7 @@ class FoundationLayout {
   public static function trayClampSeats():Array<InsertLocation> {
     var out:Array<InsertLocation> = [],d=dimensions("bed");
     function add(x:Float,y:Float,height:Float=11):Void out.push({id:"trayClampSeat"+out.length,role:"M6 tray clamp nominal threaded insert envelope",
-      width:20,depth:20,height:20,pose:F.translation(x,y,d[2]-20),clampHeight:height});
+      width:20,depth:20,height:20,openings:[materia.casting.CastingPatterns.face("body.z-max")],pose:F.translation(x,y,d[2]-20),clampHeight:height});
     for(side in [-1,1])for(x in [-1,0,1])add(x*(d[0]/2-100),side*(d[1]/2-35));
     for(side in [-1,1])for(y in [-150.0,150.0])add(side*(d[0]/2-35),y);
     // Two taller toes positively retain the raised rear service cover.
@@ -120,46 +120,46 @@ class FoundationLayout {
       .setToken("features",CastingFeatures.encodeForBody(cores,d[0],d[1],d[2]));
   }
   public static function placements(kind:String):Array<CastInsertPlacement> return
-    [for(row in inserts(kind)) {id:row.id,part:insert(row),pose:row.pose}];
+    [for(row in inserts(kind)) {id:row.id,part:insert(row),pose:row.pose,openings:row.openings}];
   public static function inserts(kind:String,legacy:Bool=false):Array<InsertLocation>{
     dimensions(kind,legacy);
     var out:Array<InsertLocation> = [];
-    function add(id:String,role:String,w:Float,d:Float,h:Float,x:Float,y:Float,z:Float):Void
-      out.push({id:id,role:role,width:w,depth:d,height:h,pose:F.translation(x,y,z)});
+    function add(id:String,role:String,w:Float,d:Float,h:Float,x:Float,y:Float,z:Float,openings:Array<String>):Void
+      out.push({id:id,role:role,width:w,depth:d,height:h,pose:F.translation(x,y,z),openings:[for(face in openings) materia.casting.CastingPatterns.face(face)]});
     if(!legacy){
       if(kind=="bed"){
         var centre=HobberXLayout.front().bedCentre;
         for(seat in enclosureSeats())out.push(seat);
         for(seat in trayClampSeats())out.push(seat);
-        add("tablePlate","table seat",280,280,20,-centre,0,TABLE_SEAT-20+UPPER_OFFSET);
+        add("tablePlate","table seat",280,280,20,-centre,0,TABLE_SEAT-20+UPPER_OFFSET,[]);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"preloaded column guide seat",width:BED_RAIL_SEAT_WIDTH,depth:HobberXLayout.front().railLength,height:20,
-          pose:F.fromRotationMatrix(HobberXLayout.front().railStart+HobberXLayout.front().railLength/2-centre,side*BED_RAIL_CENTRE,200+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1])});
-        out.push({id:"driveSeat",role:"central X screw channel seat",width:100,depth:HobberXLayout.front().motorFace-HobberXLayout.front().deckStart,height:20,pose:F.fromRotationMatrix((HobberXLayout.front().motorFace+HobberXLayout.front().deckStart)/2-centre,0,120+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1])});
-        for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,-150-centre,side*310,180+UPPER_OFFSET);
+          pose:F.fromRotationMatrix(HobberXLayout.front().railStart+HobberXLayout.front().railLength/2-centre,side*BED_RAIL_CENTRE,200+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1]),openings:[materia.casting.CastingPatterns.face("body.z-max")]});
+        out.push({id:"driveSeat",role:"central X screw channel seat",width:100,depth:HobberXLayout.front().motorFace-HobberXLayout.front().deckStart,height:20,pose:F.fromRotationMatrix((HobberXLayout.front().motorFace+HobberXLayout.front().deckStart)/2-centre,0,120+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1]),openings:[]});
+        for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,-150-centre,side*310,180+UPPER_OFFSET,["body.z-max"]);
       }else{
-        add("basePlate","column carriage sole",380,100,20,0,-40,-10);
+        add("basePlate","column carriage sole",380,100,20,0,-40,-10,["body.z-min"]);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"Z rail seat",width:35,depth:480,height:20,
-          pose:F.fromRotationMatrix(side*145,90,245,[1.0,0,0,0,0,1,0,-1,0])});
+          pose:F.fromRotationMatrix(side*145,90,245,[1.0,0,0,0,0,1,0,-1,0]),openings:[materia.casting.CastingPatterns.face("body.y-max")]});
         out.push({id:"driveSeat",role:"central Z drive back seat",width:100,depth:460,height:20,
-          pose:F.fromRotationMatrix(0,HobberZLayout.SEAT_COLUMN_Y,250,[-1.0,0,0,0,0,1,0,1,0])});
-        for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",25,25,20,side*160,-40,490);
+          pose:F.fromRotationMatrix(0,HobberZLayout.SEAT_COLUMN_Y,250,[-1.0,0,0,0,0,1,0,1,0]),openings:[]});
+        for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",25,25,20,side*160,-40,490,["body.z-max"]);
       }
       return out;
     }
     if(kind=="bed"){
-      add("tablePlate","table plate",180,180,20,0,-160,110);
-      add("columnPlate","column plate",220,180,20,0,legacy?180:280,110);
-      for(side in [-1,1])add(side<0?"railLeft":"railRight","rail seat",35,400,20,side*200,0,110);
-      for(x in [-1,1])for(y in [-1,1])add('bush${x<0?"L":"R"}${y<0?"F":"B"}',"threaded bush",20,20,20,x*275,y*210,110);
-      for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,side*275,0,100);
+      add("tablePlate","table plate",180,180,20,0,-160,110,["body.z-max"]);
+      add("columnPlate","column plate",220,180,20,0,legacy?180:280,110,["body.z-max"]);
+      for(side in [-1,1])add(side<0?"railLeft":"railRight","rail seat",35,400,20,side*200,0,110,["body.z-max"]);
+      for(x in [-1,1])for(y in [-1,1])add('bush${x<0?"L":"R"}${y<0?"F":"B"}',"threaded bush",20,20,20,x*275,y*210,110,["body.z-max"]);
+      for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",30,30,30,side*275,0,100,["body.z-max"]);
     }else{
-      add("basePlate","column plate",150,130,20,0,0,-10);
+      add("basePlate","column plate",150,130,20,0,0,-10,["body.z-min"]);
       if(!legacy)out.push({id:"driveSeat",role:"Z drive support seat",width:80,depth:800,height:20,
-        pose:F.fromRotationMatrix(-90,0,425,[0.0,0,-1,1,0,0,0,-1,0])});
+        pose:F.fromRotationMatrix(-90,0,425,[0.0,0,-1,1,0,0,0,-1,0]),openings:[materia.casting.CastingPatterns.face("body.x-min")]});
       for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"rail seat",width:35,depth:legacy?550:800,height:20,
-        pose:F.fromRotationMatrix(side*55,-80,legacy?300:425,[1.0,0,0,0,0,-1,0,1,0])});
-      for(x in [-1,1])for(y in [-1,1])add('bush${x<0?"L":"R"}${y<0?"F":"B"}',"threaded bush",20,20,20,x*85,y*75,-10);
-      for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",25,25,20,side*70,0,legacy?590:840);
+        pose:F.fromRotationMatrix(side*55,-80,legacy?300:425,[1.0,0,0,0,0,-1,0,1,0]),openings:[materia.casting.CastingPatterns.face("body.y-min")]});
+      for(x in [-1,1])for(y in [-1,1])add('bush${x<0?"L":"R"}${y<0?"F":"B"}',"threaded bush",20,20,20,x*85,y*75,-10,["body.z-min"]);
+      for(side in [-1,1])add(side<0?"liftLeft":"liftRight","lifting point",25,25,20,side*70,0,legacy?590:840,["body.z-max"]);
     }
     return out;
   }
@@ -172,5 +172,5 @@ class FoundationLayout {
     default: GenericMount;
   };
   public static function insert(row:InsertLocation):CastInsert return new CastInsert(new ComponentValues().setNumber("width",row.width)
-    .setNumber("depth",row.depth).setNumber("height",row.height).setToken("holes",machinekit.structural.InsertHoles.through(row.id=="tablePlate"?40:StringTools.startsWith(row.id,"trayClampSeat")?6:0)).setToken("role",insertRole(row.role)).setToken("label",row.role));
+    .setNumber("depth",row.depth).setNumber("height",row.height).setToken("holes",machinekit.structural.InsertHoles.through(row.id=="tablePlate"?40:StringTools.startsWith(row.id,"trayClampSeat")?6:0,row.height)).setToken("role",insertRole(row.role)).setToken("label",row.role));
 }

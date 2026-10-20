@@ -61,6 +61,14 @@ typedef CastingMoldCore = {
 	var bridgeBondAreaMm2:Float;
 }
 
+/** One source core intent, with all foam pieces created around retained supports. */
+typedef CastingCoreUnit = {
+	var id:String;
+	var parentFeatureId:String;
+	var featureIds:Array<String>;
+	var coreIds:Array<String>;
+}
+
 typedef MoldFormer = {
 	var volume:MoldVolume;
 	var featureIds:Array<String>;
@@ -135,6 +143,7 @@ enum abstract DesignChangeKind(String) to String {
 	var LiftingPoints = "lifting-points";
 	var ReleaseAlternative = "release-alternative";
 	var InterfaceAllowance = "interface-allowance";
+	var InsertFixtureHole = "insert-fixture-hole";
 }
 
 typedef DesignChangeRequest = {
@@ -191,6 +200,22 @@ typedef CastingMoldOptions = {
 	var liftingEvidence:Array<LiftingQualification>;
 }
 
+typedef BoreMaskProtection = {
+	var sourceHoleId:String;
+	var hardwareId:String;
+	var withdrawal:{x:Float, y:Float, z:Float};
+}
+
+typedef InsertFixtureFixing = {
+	var sourceHoleId:String;
+	var hardwareId:String;
+	var panelId:String;
+	var operationId:String;
+	var entry:AssemblyFrame;
+	var engagement:Float;
+	var threadSpec:String;
+}
+
 typedef MoldInsertFixture = {
 	var insertId:String;
 	var datums:materia.tooling.casting.MoldPlan.InsertDatums;
@@ -199,12 +224,10 @@ typedef MoldInsertFixture = {
 	var withdrawal:{x:Float, y:Float, z:Float};
 	var attachmentEvidence:Array<String>;
 	var lateralLocation:{primaryId:String, secondaryId:String, baselineMm:Float};
-	var receiverThreadSpec:String;
-	var fixingId:String;
+	var fixings:Array<InsertFixtureFixing>;
 	var penetrations:Array<materia.tooling.casting.MoldPlan.PenetrationPlan>;
-	var boreMask:Null<SupportHardware>;
+	var boreMasks:Array<BoreMaskProtection>;
 	var assemblyClearance:{x:Float, y:Float, z:Float};
-	var boreMaskWithdrawal:Null<{x:Float, y:Float, z:Float}>;
 }
 
 typedef CastingMoldPlan = {
@@ -218,6 +241,7 @@ typedef CastingMoldPlan = {
 	var panels:PanelAssemblyRecord;
 	var supportPanels:Array<PanelPlacement>;
 	var cores:Array<CastingMoldCore>;
+	var coreUnits:Array<CastingCoreUnit>;
 	var formers:Array<MoldFormer>;
 	var fixtures:Array<MoldInsertFixture>;
 	var features:Array<FeatureTooling>;

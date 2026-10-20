@@ -156,9 +156,19 @@ class CastingMoldCad {
 		return result;
 	}
 
-	static function maskId(f:MoldInsertFixture):Null<String> {
-		var mask = f.boreMask;
-		return mask == null ? null : mask.id;
+	static function boreMaskRecord(p:CastingMoldPlan, id:String):{
+		protection:BoreMaskProtection, hole:materia.casting.InsertHole
+	} {
+		for (fixture in p.fixtures)
+			for (protection in fixture.boreMasks)
+				if (protection.hardwareId == id) {
+					var insert = p.document.input.inserts.filter(source -> source.id == fixture.insertId)[0];
+					var holes = insert.holes.filter(hole -> hole.id == protection.sourceHoleId);
+					if (holes.length != 1)
+						throw "Bore mask has no unique source hole: " + id;
+					return {protection: protection, hole: holes[0]};
+				}
+		throw "Unknown bore mask: " + id;
 	}
 
 	static function insertBox(p:CastingMoldPlan, id:String):MoldBox {
@@ -248,12 +258,18 @@ class CastingMoldCad {
 		}
 		if (!exploded) {
 			for (h in p.hardware) {
-				if (h.kind == SupportHardwareKind.LocatingPin
-					|| h.kind == SupportHardwareKind.BoreMask
+				if (h.kind == SupportHardwareKind.BoreMask)
+					a.addComponent(h.id, ToolingPin.boreMask(boreMaskRecord(p, h.id).hole), h.pose);
+				else if (h.kind == SupportHardwareKind.LocatingPin
 					|| h.kind == SupportHardwareKind.FixturePin)
 					a.addComponent(h.id, new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length)), h.pose);
-				else if (h.kind == SupportHardwareKind.FixtureScrew)
-					ToolingHardwareCad.fixtureScrew(a, h.id, h.diameter, h.length, h.pose);
+				else if (h.kind == SupportHardwareKind.FixtureScrew) {
+					var fixings = [for (fixture in p.fixtures) for (fixing in fixture.fixings)
+						if (fixing.hardwareId == h.id) fixing];
+					if (fixings.length != 1)
+						throw "Fixture screw has no unique source thread: " + h.id;
+					ToolingHardwareCad.fixtureScrew(a, h.id, fixings[0].threadSpec, h.length, h.pose);
+				}
 				else {
 					ToolingHardwareCad.throughBolt(a, h.id, h.diameter, h.length, h.pose);
 				}
@@ -462,7 +478,9 @@ class CastingMoldCad {
 			}
 			for (h in p.hardware)
 				if (h.kind == SupportHardwareKind.FixturePin || h.kind == SupportHardwareKind.BoreMask) {
-					var local = new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length)).geometry();
+					var component = h.kind == SupportHardwareKind.BoreMask ? ToolingPin.boreMask(boreMaskRecord(p, h.id).hole)
+						: new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length));
+					var local = component.geometry();
 					parts.push(local);
 					var shape = PosedParts.moved(local, h.pose);
 					parts.push(shape);
@@ -470,10 +488,7 @@ class CastingMoldCad {
 					local.close();
 					var direction = new Vector(0, 0, -1);
 					if (h.kind == SupportHardwareKind.BoreMask) {
-						var fixture = p.fixtures.filter(f -> maskId(f) == h.id)[0],
-							v = fixture.boreMaskWithdrawal;
-						if (v == null)
-							throw "Missing bore-mask removal direction";
+						var v = boreMaskRecord(p, h.id).protection.withdrawal;
 						direction = new Vector(v.x, v.y, v.z);
 					}
 					members.push({id: h.id, part: shape, direction: direction});

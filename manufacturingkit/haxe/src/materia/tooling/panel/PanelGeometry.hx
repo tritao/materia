@@ -1,6 +1,6 @@
 package materia.tooling.panel;
 
-import materia.tooling.ToolingPrism.ToolingPoint2;
+import materia.casting.CastingPrism.CastingPoint2;
 import materia.tooling.panel.PanelPlan.PanelSegment;
 import materia.tooling.panel.PanelPlan.PanelCurveKind;
 
@@ -16,7 +16,7 @@ class PanelGeometry {
 		return v < 0 ? v + 2 * Math.PI : v;
 	}
 
-	public static function on(s:PanelSegment, p:ToolingPoint2):Bool {
+	public static function on(s:PanelSegment, p:CastingPoint2):Bool {
 		var c = s.center;
 		if (c == null) {
 			var dx = s.end.x - s.start.x, dy = s.end.y - s.start.y;
@@ -33,8 +33,8 @@ class PanelGeometry {
 		return angle(s.sweep > 0 ? b - a : a - b) <= Math.abs(s.sweep) + 1e-9 || PanelContours.distance(p, s.start) < TOL;
 	}
 
-	public static function intersections(a:PanelSegment, b:PanelSegment):Array<ToolingPoint2> {
-		var candidates:Array<ToolingPoint2> = [], ca = a.center, cb = b.center;
+	public static function intersections(a:PanelSegment, b:PanelSegment):Array<CastingPoint2> {
+		var candidates:Array<CastingPoint2> = [], ca = a.center, cb = b.center;
 		if (ca == null && cb == null) {
 			var ax = a.end.x - a.start.x,
 				ay = a.end.y - a.start.y,
@@ -90,7 +90,7 @@ class PanelGeometry {
 					candidates.push({x: ca.x + x * ux - sign * h * uy, y: ca.y + x * uy + sign * h * ux});
 			}
 		}
-		var result:Array<ToolingPoint2> = [];
+		var result:Array<CastingPoint2> = [];
 		for (p in candidates)
 			if (on(a, p) && on(b, p) && result.filter(q -> PanelContours.distance(p, q) < TOL).length == 0)
 				result.push(p);
@@ -102,7 +102,7 @@ class PanelGeometry {
 		if (inside(a, b[0].start.x, b[0].start.y) || inside(b, a[0].start.x, a[0].start.y))
 			return 0;
 		var minimum = 1e100;
-		function pointDistance(p:ToolingPoint2, s:PanelSegment):Float {
+		function pointDistance(p:CastingPoint2, s:PanelSegment):Float {
 			var c = s.center;
 			var best = Math.min(PanelContours.distance(p, s.start), PanelContours.distance(p, s.end));
 			if (c == null) {
@@ -207,7 +207,7 @@ class PanelGeometry {
 		return total;
 	}
 
-	public static function extrema(s:PanelSegment):Array<ToolingPoint2> {
+	public static function extrema(s:PanelSegment):Array<CastingPoint2> {
 		var result = [s.start, s.end], c = s.center;
 		if (c != null)
 			for (i in 0...4) {

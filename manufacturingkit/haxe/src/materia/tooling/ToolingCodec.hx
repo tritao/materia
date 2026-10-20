@@ -9,7 +9,8 @@ import materia.casting.InsertSpec.InsertFinish;
 import haxe.crypto.Sha256;
 import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
-import materia.tooling.ToolingPrism.ToolingPoint2;
+import materia.casting.CastingPrism;
+import materia.casting.CastingPrism.CastingPoint2;
 import materia.tooling.casting.CastingToolingInput;
 import materia.casting.CastingFeature;
 import materia.tooling.casting.CastingToolingInput.CastingToolingInsert;
@@ -24,7 +25,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 6;
+	public static inline var VERSION = 7;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -50,11 +51,13 @@ class ToolingCodec {
 	static function readDocument(raw:Dynamic):ToolingDocument {
 		object(raw, ["input", "setup", "recipe"], "document");
 		var input = readInput(Reflect.field(raw, "input"));
-		return {
+		var document:ToolingDocument = {
 			input: input,
 			setup: readSetup(Reflect.field(raw, "setup"), input),
 			recipe: readRecipe(Reflect.field(raw, "recipe"))
 		};
+		materia.tooling.casting.CastingStrategies.resolve(document);
+		return document;
 	}
 
 	public static function inputFingerprint(input:CastingToolingInput):String
@@ -73,7 +76,7 @@ class ToolingCodec {
 		object(raw, ["id", "revision", "lengthUnit", "envelope", "features", "inserts"], "input");
 		if (string(raw, "lengthUnit") != "mm")
 			throw "Tooling input requires explicit mm units";
-		var envelope:Array<ToolingPrism> = [for (p in array(raw, "envelope")) readPrism(p)];
+		var envelope:Array<CastingPrism> = [for (p in array(raw, "envelope")) readPrism(p)];
 		if (envelope.length == 0)
 			throw "Tooling input needs an envelope";
 		var features = materia.casting.CastingFeatureCodec.snapshot(array(raw,"features"));
@@ -99,6 +102,7 @@ class ToolingCodec {
 		for (i in inserts)
 			if (!referenced.exists(i.id))
 				throw 'Missing recess for insert ${i.id}';
+		materia.casting.CastingCavities.derive(envelope, features);
 		return {
 			id: string(raw, "id"),
 			revision: revision(raw),
@@ -109,9 +113,9 @@ class ToolingCodec {
 		};
 	}
 
-	static function readPrism(raw:Dynamic):ToolingPrism {
+	static function readPrism(raw:Dynamic):CastingPrism {
 		object(raw, ["id", "profile", "height", "pose"], "prism");
-		var profile:Array<ToolingPoint2> = [
+		var profile:Array<CastingPoint2> = [
 			for (p in array(raw, "profile", 64)) {
 				object(p, ["x", "y"], "profile point");
 				{
@@ -141,9 +145,6 @@ class ToolingCodec {
 			pose: frame(raw, "pose")
 		};
 	}
-
-	static function readFeature(raw:Dynamic):CastingFeature
-		return materia.casting.CastingFeatureCodec.snapshot([raw])[0];
 
 	static function readInsert(raw:Dynamic):CastingToolingInsert {
 		object(raw, [
@@ -191,12 +192,15 @@ class ToolingCodec {
 			throw "Stale tooling setup: source fingerprint does not match";
 		var byId = new Map<String, CastingFeature>();
 		for (f in input.features)
-			if (f.kind != InsertRecess)
+			if (f.kind != InsertRecess) {
 				byId.set(f.id, f);
+				if (f.derivedFrom != null)
+					byId.set(f.derivedFrom, f);
+			}
 		var used = new Map<String, Bool>();
 		var features:Array<CastingFeatureStrategy> = [];
 		for (f in array(raw, "features")) {
-			object(f, ["featureId", "strategy", "withdrawal", "draftDegrees", "priority"], "feature strategy");
+			object(f, ["featureId", "strategy", "withdrawal", "priority"], "feature strategy");
 			var id = string(f, "featureId");
 			if (!byId.exists(id) || used.exists(id))
 				throw 'Unknown, duplicate or insert-recess strategy $id';
@@ -226,21 +230,14 @@ class ToolingCodec {
 			}
 			if (strategy == ReusableFormer && direction == null)
 				throw "Reusable former needs a withdrawal direction";
-			var draft = nonnegative(f, "draftDegrees"),
-				priority = integer(f, "priority");
-			if (draft >= 90)
-				throw "Draft must be below 90 degrees";
+			var priority = integer(f, "priority");
 			features.push({
 				featureId: id,
 				strategy: strategy,
 				withdrawal: direction,
-				draftDegrees: draft,
 				priority: priority
 			});
 		}
-		for (id in byId.keys())
-			if (!used.exists(id))
-				throw 'Missing core strategy for $id';
 		features.sort((a, b) -> Reflect.compare(a.featureId, b.featureId));
 		return {
 			id: string(raw, "id"),
@@ -258,6 +255,7 @@ class ToolingCodec {
 
 	static function readRecipe(raw:Dynamic):ToolingRecipe {
 		object(raw, [
+			"featureRules",
 			"id",
 			"revision",
 			"panel",
@@ -297,11 +295,6 @@ class ToolingCodec {
 		var p = Reflect.field(raw, "panel"), c = Reflect.field(raw, "core");
 		var hw = Reflect.field(raw, "hardware");
 		object(hw, [
-			"insertBoreDiameter",
-			"insertClearanceDiameter",
-			"insertScrewDiameter",
-			"insertThreadSpec",
-			"insertEngagement",
 			"plugDepth",
 			"plugMaterial",
 			"sealMargin",
@@ -323,11 +316,6 @@ class ToolingCodec {
 			"fixtureSlotToolDiameter"
 		], "tooling hardware");
 		var hardware:materia.tooling.ToolingRecipe.ToolingHardware = {
-			insertBoreDiameter: positive(hw, "insertBoreDiameter"),
-			insertClearanceDiameter: positive(hw, "insertClearanceDiameter"),
-			insertScrewDiameter: positive(hw, "insertScrewDiameter"),
-			insertThreadSpec: string(hw, "insertThreadSpec"),
-			insertEngagement: positive(hw, "insertEngagement"),
 			plugDepth: positive(hw, "plugDepth"),
 			plugMaterial: string(hw, "plugMaterial"),
 			sealMargin: nonnegative(hw, "sealMargin"),
@@ -348,8 +336,7 @@ class ToolingCodec {
 			fixturePinSpacing: positive(hw, "fixturePinSpacing"),
 			fixtureSlotToolDiameter: positive(hw, "fixtureSlotToolDiameter")
 		};
-		if (hardware.insertClearanceDiameter <= hardware.insertScrewDiameter
-			|| hardware.supportClearanceDiameter <= hardware.supportScrewDiameter)
+			if (hardware.supportClearanceDiameter <= hardware.supportScrewDiameter)
 			throw "Hardware clearance must exceed screw diameter";
 		object(p, [
 			"materialSpec",
@@ -373,9 +360,6 @@ class ToolingCodec {
 			"maximumTemperatureC",
 			"evidence"
 		], "core stock");
-		if (hardware.insertThreadSpec != "M" + Std.string(hardware.insertScrewDiameter)
-			|| hardware.insertBoreDiameter >= hardware.insertScrewDiameter)
-			throw "Insert thread selection disagrees with screw/bore diameters";
 		var thickness = positive(p, "measuredThickness"),
 			variation = nonnegative(p, "thicknessVariation");
 		if (variation >= thickness)
@@ -401,6 +385,7 @@ class ToolingCodec {
 		if ((strength == null) != (strain == null) || (strain != null && strain >= 1))
 			throw "Compression strength requires a strain fraction between zero and one";
 		return {
+			featureRules: materia.tooling.casting.CastingStrategies.snapshotRules(Reflect.field(raw, "featureRules")),
 			id: string(raw, "id"),
 			revision: revision(raw),
 			panel: {
@@ -492,14 +477,12 @@ class ToolingCodec {
 		throw "Invalid insert role";
 	}
 
-	public static function insertFinish(value:String):InsertFinish
-		return switch value {
-			case "ground-after-casting": InsertFinish.GroundAfterCasting;
-			case "machined-after-casting": InsertFinish.MachinedAfterCasting;
-			case "replicated-after-casting": InsertFinish.ReplicatedAfterCasting;
-			case "as-cast": InsertFinish.SourceAsCast;
-			default: throw "Invalid insert finish";
-		};
+	public static function insertFinish(value:String):InsertFinish {
+		for (finish in materia.casting.InsertSpec.InsertFinishes.values())
+			if ((finish : String) == value)
+				return finish;
+		throw "Invalid insert finish";
+	}
 
 	static function object(raw:Dynamic, fields:Array<String>, label:String):Void {
 		if (raw == null || !Reflect.isObject(raw) || Std.isOfType(raw, Array) || Std.isOfType(raw, String))

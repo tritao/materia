@@ -18,11 +18,12 @@ class SinglePocketSetup {
 			[
 				{
 					id: "seat",
+					openings: [CastingPatterns.face("body.z-max")],
 					part: new CastInsert(new ComponentValues().setToken("role", "guide-seat")
 						.setNumber("width", 40)
 						.setNumber("depth", 35)
 						.setNumber("height", 15)
-						.setToken("holes",machinekit.structural.InsertHoles.through(5))),
+						.setToken("holes",machinekit.structural.InsertHoles.tappedThrough(machinekit.structural.InsertHoles.metricThread("M6"),15))),
 					pose: F.translation(80, 0, 85)
 				}
 			]);
@@ -44,13 +45,13 @@ class SinglePocketSetup {
 					{
 						featureId: "pocket",
 						strategy: SacrificialEPS,
-						draftDegrees: 0,
 						priority: 0,
 						withdrawal: null
 					}
 				]
 			},
 			recipe: {
+				featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
 				id: "box-mold-study",
 				revision: 1,
 				panel: stock,
@@ -73,11 +74,6 @@ class SinglePocketSetup {
 				steelDensityKgM3: 7850,
 				handlingLoadFactor: 1.5,
 				hardware: {
-					insertBoreDiameter: 5,
-					insertClearanceDiameter: 7,
-					insertScrewDiameter: 6,
-					insertThreadSpec: "M6",
-					insertEngagement: 8,
 					plugDepth: 2,
 					plugMaterial: "steel",
 					sealMargin: 3,

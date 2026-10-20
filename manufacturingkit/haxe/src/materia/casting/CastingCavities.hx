@@ -12,12 +12,21 @@ typedef CastingFace3 = {var id:String; var points:Array<{x:Float, y:Float, z:Flo
  * extruded along a coordinate axis (box, chamfered body, flared foot).
  */
 class CastingCavities {
+	public static function bodyFaceNormal(body:Array<CastingPrism>, id:String):{x:Float, y:Float, z:Float} {
+		var faces = boundary(body).filter(face -> face.id == id);
+		if (faces.length == 0)
+			throw "Unknown casting body face: " + id;
+		var plane = planeOf(faces[0].points);
+		return {x: plane.x, y: plane.y, z: plane.z};
+	}
 	public static function derive(body:Array<CastingPrism>, features:Array<CastingFeature>):Array<FinishedCastingCavity> {
 		var records = CastingFeatureCodec.snapshot(features),
 			faces = boundary(body),
 			result:Array<FinishedCastingCavity> = [];
 		for (f in records) {
-			var b = CastingBounds.box(f.geometry),
+			if (f.draft.degrees != 0 || f.cornerRadius != 0)
+				throw "Unsupported drafted or rounded casting feature: " + f.id;
+			var b = CastingBounds.feature(f),
 				pieces:Array<CastingPrism> = [];
 			for (prism in body) {
 				try
@@ -67,8 +76,8 @@ class CastingCavities {
 				if (o.kind == BodyFace && reached.indexOf(o.target) < 0)
 					throw "Unreached declared opening: " + f.id + " " + o.target;
 				if (o.kind == Feature) {
-					var other = records.filter(v -> v.id == o.target)[0];
-					if (!boxesMeet(b, CastingBounds.box(other.geometry)))
+					var others = CastingFeatureCodec.openingTargets(records, o.target);
+					if (others.filter(other -> boxesMeet(b, CastingBounds.box(other.geometry))).length == 0)
 						throw "Unreached feature opening: " + f.id + " " + o.target;
 				}
 			}
@@ -83,16 +92,12 @@ class CastingCavities {
 	public static function boxes(cavity:FinishedCastingCavity):Array<Box3> {
 		var result:Array<Box3> = [];
 		for (p in cavity.pieces) {
+			if (!isBoxPrism(p))
+				throw "Unsupported non-box finished cavity: " + cavity.featureId;
 			var xs = [for (v in p.profile) v.x],
 				ys = [for (v in p.profile) v.y];
 			xs.sort(Reflect.compare);
 			ys.sort(Reflect.compare);
-			if (p.profile.length != 4)
-				throw "Unsupported non-box finished cavity: " + cavity.featureId;
-			for (v in p.profile)
-				if ((Math.abs(v.x - xs[0]) > 1e-8 && Math.abs(v.x - xs[3]) > 1e-8)
-					|| (Math.abs(v.y - ys[0]) > 1e-8 && Math.abs(v.y - ys[3]) > 1e-8))
-					throw "Unsupported non-box finished cavity: " + cavity.featureId;
 			result.push(CastingBounds.box({
 				kind: Box,
 				width: xs[3] - xs[0],
@@ -104,6 +109,25 @@ class CastingCavities {
 		return BoxAlgebra.coalesce(result);
 	}
 
+	public static function supportsBoxes(cavity:FinishedCastingCavity):Bool
+		return cavity.pieces.length > 0 && cavity.pieces.filter(piece -> !isBoxPrism(piece)).length == 0;
+
+	static function isBoxPrism(p:CastingPrism):Bool {
+		if (p.profile.length != 4)
+			return false;
+		var xs = [for (point in p.profile) point.x], ys = [for (point in p.profile) point.y];
+		xs.sort(Reflect.compare);
+		ys.sort(Reflect.compare);
+		for (point in p.profile)
+			if ((Math.abs(point.x - xs[0]) > 1e-8 && Math.abs(point.x - xs[3]) > 1e-8)
+				|| (Math.abs(point.y - ys[0]) > 1e-8 && Math.abs(point.y - ys[3]) > 1e-8))
+				return false;
+		for (axis in [F.transformVector(p.pose, 1, 0, 0), F.transformVector(p.pose, 0, 1, 0), F.transformVector(p.pose, 0, 0, 1)])
+			if (CastingBounds.axis(axis) == null)
+				return false;
+		return true;
+	}
+
 	public static function reachedOpenings(body:Array<CastingPrism>, geometry:CastingGeometry):Array<CastingOpening> {
 		var b = CastingBounds.box(geometry), ids:Array<String> = [];
 		for (face in boundary(body))
@@ -113,10 +137,17 @@ class CastingCavities {
 		return [for (id in ids) {kind: BodyFace, target: id}];
 	}
 
-	static function boxesMeet(a:Box3, b:Box3):Bool
-		return Math.min(a.x + a.width, b.x + b.width) >= Math.max(a.x, b.x) - 1e-8
-			&& Math.min(a.y + a.depth, b.y + b.depth) >= Math.max(a.y, b.y) - 1e-8
-			&& Math.min(a.z + a.height, b.z + b.height) >= Math.max(a.z, b.z) - 1e-8;
+	static function boxesMeet(a:Box3, b:Box3):Bool {
+		var overlaps = [
+			Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x),
+			Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y),
+			Math.min(a.z + a.height, b.z + b.height) - Math.max(a.z, b.z)
+		];
+		if (overlaps.filter(length -> length < -1e-9).length > 0)
+			return false;
+		overlaps.sort((a, b) -> Reflect.compare(b, a));
+		return overlaps[0] * overlaps[1] > 1e-9;
+	}
 
 	static function faceMeetsBox(face:CastingFace3, box:Box3):Bool {
 		var points = face.points;
@@ -197,8 +228,8 @@ class CastingCavities {
 				names = ["x", "y", "z"];
 			var named = false;
 			for (axis in 0...3)
-				if (Math.abs(components[axis]) > 1 - 1e-8) {
-					face.id = "body." + names[axis] + (components[axis] < 0 ? "-min" : "-max");
+				if (CastingBounds.axis({x: plane.x, y: plane.y, z: plane.z}) == axis) {
+					face.id = prism.id + "." + names[axis] + (components[axis] < 0 ? "-min" : "-max");
 					named = true;
 				}
 			if (!named && face.id == "")

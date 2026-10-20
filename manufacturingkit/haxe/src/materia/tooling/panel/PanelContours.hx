@@ -1,6 +1,6 @@
 package materia.tooling.panel;
 
-import materia.tooling.ToolingPrism.ToolingPoint2;
+import materia.casting.CastingPrism.CastingPoint2;
 import materia.tooling.panel.PanelPlan.PanelSegment;
 import materia.tooling.panel.PanelPlan.PanelCurveKind;
 import materia.tooling.panel.PanelPlan.PanelOperation;
@@ -34,7 +34,7 @@ class PanelContours {
 		return operation(found[0]);
 	}
 
-	public static function line(a:ToolingPoint2, b:ToolingPoint2):PanelSegment
+	public static function line(a:CastingPoint2, b:CastingPoint2):PanelSegment
 		return {
 			kind: Line,
 			start: {x: a.x, y: a.y},
@@ -64,7 +64,7 @@ class PanelContours {
 		};
 	}
 
-	public static function point(s:PanelSegment, t:Float):ToolingPoint2 {
+	public static function point(s:PanelSegment, t:Float):CastingPoint2 {
 		var c = s.center;
 		if (c == null)
 			return {x: s.start.x + (s.end.x - s.start.x) * t, y: s.start.y + (s.end.y - s.start.y) * t};
@@ -73,10 +73,10 @@ class PanelContours {
 		return {x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a)};
 	}
 
-	public static function distance(a:ToolingPoint2, b:ToolingPoint2):Float
+	public static function distance(a:CastingPoint2, b:CastingPoint2):Float
 		return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
 
-	public static function polygon(points:Array<ToolingPoint2>):Array<PanelSegment>
+	public static function polygon(points:Array<CastingPoint2>):Array<PanelSegment>
 		return [
 			for (i in 0...points.length)
 				line(points[i], points[(i + 1) % points.length])
@@ -124,7 +124,7 @@ class PanelContours {
 	/** Rigid 2D placement preserves exact arcs, including their signed sweep. */
 	public static function placed(contour:Array<PanelSegment>, radians:Float, x:Float, y:Float):Array<PanelSegment> {
 		var c = Math.cos(radians), s = Math.sin(radians);
-		function move(p:ToolingPoint2):ToolingPoint2
+		function move(p:CastingPoint2):CastingPoint2
 			return {x: x + c * p.x - s * p.y, y: y + s * p.x + c * p.y};
 		return [
 			for (seg in contour) {
@@ -158,9 +158,9 @@ class PanelContours {
 	}
 
 	/** Integrate circular overcuts at concave right-angle roots into the outside loop. */
-	public static function relievedPolygon(p:Array<ToolingPoint2>, r:Float, roundConvex:Bool = false):Array<PanelSegment> {
-		var starts:Array<ToolingPoint2> = [],
-			ends:Array<ToolingPoint2> = [],
+	public static function relievedPolygon(p:Array<CastingPoint2>, r:Float, roundConvex:Bool = false):Array<PanelSegment> {
+		var starts:Array<CastingPoint2> = [],
+			ends:Array<CastingPoint2> = [],
 			corners:Array<Null<PanelSegment>> = [];
 		for (i in 0...p.length) {
 			var a = p[(i + p.length - 1) % p.length], v = p[i], b = p[(i + 1) % p.length];

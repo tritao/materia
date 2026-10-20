@@ -77,11 +77,19 @@ class CastingLevelOne {
 				"Source-only box screening cannot represent this envelope: " + Std.string(error), []));
 			return {validation: checks, proposals: proposals, metrics: metrics};
 		}
+		var radiusByParent = new Map<String, Float>();
 		for (feature in d.input.features)
-			if (feature.kind != InsertRecess)
-				finding("process.level1.corner-radius." + feature.id, feature.id, 0, limits.minimumCornerRadiusMm,
-					"Source box cuts have zero corner radius; declare the minimum and revise source geometry if a fillet is required.", null,
-					limits.minimumCornerRadiusMm);
+			if (feature.kind != InsertRecess) {
+				var parent = feature.derivedFrom == null ? feature.id : feature.derivedFrom;
+				var previous = radiusByParent.get(parent);
+				radiusByParent.set(parent, previous == null ? feature.cornerRadius : Math.min(previous, feature.cornerRadius));
+			}
+		var parents = [for (parent in radiusByParent.keys()) parent];
+		parents.sort(Reflect.compare);
+		for (parent in parents)
+			finding("process.level1.corner-radius." + parent, parent, radiusByParent.get(parent), limits.minimumCornerRadiusMm,
+				"Source corner radius needs the declared minimum; any change requires design acceptance and replanning.", null,
+				limits.minimumCornerRadiusMm);
 		for (insert in d.input.inserts) {
 			var box = BoxMoldPlanner.box(insert.width, insert.depth, insert.height, F.compose(d.setup.sourceToMold, insert.pose));
 			var edge = Math.min(Math.min(box.x - envelope.x, envelope.x + envelope.width - box.x - box.width),
@@ -93,15 +101,30 @@ class CastingLevelOne {
 			var proposed:Null<Float> = limits.minimumInsertEdgeMm == null ? null : insert.width - 2 * Math.max(0, limits.minimumInsertEdgeMm - edge);
 			// Only propose a width change when it actually improves the limiting edge.
 			if (proposed != null) {
-				if (proposed <= materia.casting.InsertHoleGeometry.diameter(insert.holes) + 2 * d.recipe.minimumLigament)
-					proposed = null;
-				else {
+				var candidateWidth:Float = cast proposed;
+				for (hole in insert.holes)
+					if (materia.casting.InsertHoleGeometry.radialWall(candidateWidth, insert.depth, insert.height, hole)
+						< Math.max(d.recipe.minimumLigament, hole.limits.minWall))
+						proposed = null;
+				if (proposed != null) {
 					var smaller = BoxMoldPlanner.box(proposed, insert.depth, insert.height, F.compose(d.setup.sourceToMold, insert.pose));
 					var improved = Math.min(Math.min(smaller.x - envelope.x, envelope.x + envelope.width - smaller.x - smaller.width),
 						Math.min(smaller.y - envelope.y, envelope.y + envelope.depth - smaller.y - smaller.depth));
 					var requiredEdge:Float = cast limits.minimumInsertEdgeMm;
 					if (improved < requiredEdge - 1e-7)
 						proposed = null;
+				}
+			}
+			if (proposed != null) {
+				var features = materia.casting.CastingFeatureCodec.snapshot(d.input.features);
+				var recesses = features.filter(feature -> feature.owner == insert.id);
+				if (recesses.length == 0 || recesses.filter(feature -> feature.adjustable.indexOf(materia.casting.CastingFeature.CastingDimension.Width) < 0).length > 0)
+					proposed = null;
+				else {
+					for (feature in recesses)
+						feature.geometry.width = proposed;
+					try materia.casting.CastingCavities.derive(d.input.envelope, features)
+					catch (error:Dynamic) proposed = null;
 				}
 			}
 			finding("process.level1.insert-edge."
@@ -116,16 +139,18 @@ class CastingLevelOne {
 				"input.inserts."
 				+ insert.id
 				+ ".height", null);
-			if (materia.casting.InsertHoleGeometry.diameter(insert.holes) > 0) {
-				var land = (Math.min(insert.width, insert.depth) - materia.casting.InsertHoleGeometry.diameter(insert.holes)) / 2;
+			if (insert.holes.length > 0) {
+				var lands = [for (hole in insert.holes) materia.casting.InsertHoleGeometry.radialWall(insert.width, insert.depth, insert.height, hole)];
+				lands.sort(Reflect.compare);
+				var land = lands[0];
 				metrics.minimumFixingAccessLandMm = metrics.minimumFixingAccessLandMm == null ? land : Math.min(metrics.minimumFixingAccessLandMm, land);
 				finding("process.level1.fixing-access."
-					+ insert.id, insert.id, (Math.min(insert.width, insert.depth) - materia.casting.InsertHoleGeometry.diameter(insert.holes)) / 2,
+					+ insert.id, insert.id, land,
 					limits.minimumFixingAccessMm,
 					"Declared bore-to-edge access land compared with recipe minimum; tool/fixture accessibility remains a separate check.",
 					"input.inserts."
 					+ insert.id
-					+ ".boreDiameter", null);
+					+ ".holes", null);
 			} else
 				checks.push(FillAnalysis.check("process.level1.fixing-access." + insert.id, [insert.id], Pending,
 					"No source bore specifies fixing access; qualify an external attachment or revise the source interface.", []));
@@ -134,7 +159,7 @@ class CastingLevelOne {
 		finding("process.level1.lifting-points", d.input.id, liftCount, limits.minimumLiftingPoints == null ? null : 1.0 * limits.minimumLiftingPoints,
 			"Typed lifting-point count versus recipe requirement; load capacity, CoM and a qualified cradle remain separate evidence.", null, null);
 		var resin = BoxAlgebra.subtract([envelope], [for (feature in d.input.features) CastingMoldPlanner.featureBox(d, feature)]);
-		for (strategy in d.setup.features) {
+		for (strategy in materia.tooling.casting.CastingStrategies.resolve(d)) {
 			var rule = "process.level1.removal-direction." + strategy.featureId;
 			if (strategy.strategy != ReusableFormer || strategy.withdrawal == null || limits.removalClearanceMm == null) {
 				checks.push(FillAnalysis.check(rule, [strategy.featureId], Pending,
@@ -201,9 +226,9 @@ class CastingLevelOne {
 		for (feature in d.input.features)
 			if (feature.owner == insert.id) {
 				feature.geometry.width = insert.width;
-                feature.openings=materia.casting.CastingCavities.reachedOpenings(d.input.envelope,feature.geometry);
             }
 		d.input.revision++;
+		materia.casting.CastingCavities.derive(d.input.envelope, d.input.features);
 		d.setup.revision++;
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
 		return ToolingCodec.snapshot(d);

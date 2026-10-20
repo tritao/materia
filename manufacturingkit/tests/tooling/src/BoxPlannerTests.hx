@@ -32,9 +32,37 @@ class BoxPlannerTests {
 		d.recipe.minimumLigament = 2;
 		d.input.inserts[0].height = 10;
 		d.input.inserts[0].holes = materia.casting.InsertHoleGeometry.through(5,d.input.inserts[0].height);
+		var hole = d.input.inserts[0].holes[0];
+		hole.thread = {designation: "M6", majorDiameter: 6, pitch: 1, starts: 1, hand: Right,
+			internal: true, toleranceClass: "6H", profile: Metric};
+		hole.tapDrill = 5;
+		hole.limits = {policyId: "steel-threaded-hole-v1", minEngagement: 6, minTipGap: 1,
+			minBack: 1.5, minWall: 3, minClearance: 0.6, overrides: []};
 		var recess = d.input.features.filter(f -> f.kind == "insert-recess")[0];
 		recess.geometry.height = 10;
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
+		var pattern = ToolingCodec.snapshot(d);
+		var second = materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
+		pattern.input.inserts[0].holes[0].frame.x = -8;
+		second.id = "second";
+		second.frame.x = 8;
+		pattern.input.inserts[0].holes.push(second);
+		pattern.setup.sourceFingerprint = ToolingCodec.inputFingerprint(pattern.input);
+		var patterned = BoxMoldPlanner.plan(pattern);
+		check(patterned.fixtures[0].fixings.length == 2, "both source threads produce independent fixings");
+		check(patterned.penetrations.filter(p -> p.insertId == "seat" && p.sourceHoleId != null).length == 2,
+			"each insert penetration traces to its source hole");
+		check(BoxMoldCodec.encode(BoxMoldCodec.decode(BoxMoldCodec.encode(patterned))) == BoxMoldCodec.encode(patterned),
+			"multi-hole fixing regeneration");
+		patterned.fixtures[0].fixings[0].engagement = 0.001;
+		rejects(() -> BoxMoldPlanner.validate(patterned), "engagement must match the numeric source policy");
+		var noThread = ToolingCodec.snapshot(d);
+		noThread.input.inserts[0].holes[0].thread = null;
+		noThread.input.inserts[0].holes[0].tapDrill = null;
+		noThread.setup.sourceFingerprint = ToolingCodec.inputFingerprint(noThread.input);
+		var blocked = BoxMoldPlanner.plan(noThread);
+		check(blocked.fixtures[0].fixings.length == 0 && blocked.changeRequests.filter(r -> r.kind == "insert-fixture-hole").length == 1
+			&& !blocked.fabrication.ready, "plain bore never becomes an invented thread");
 		var p = BoxMoldPlanner.plan(d), encoded = BoxMoldCodec.encode(p);
 		check(BoxMoldCodec.encode(BoxMoldCodec.decode(encoded)) == encoded, "mold canonical persistence");
 		check(p.panels.members.length == 5 && p.penetrations.length == 9, "all sockets/lands and fixing hole classified");

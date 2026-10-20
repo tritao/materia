@@ -7,7 +7,7 @@ import materia.tooling.ToolingEnums.CoatedFace;
 import materia.tooling.ToolingEnums.StockDirection;
 import materia.tooling.ToolingEnums.MachiningSide;
 import materia.tooling.ToolingEnums.ContactFace;
-import materia.tooling.ToolingPrism.ToolingPoint2;
+import materia.casting.CastingPrism.CastingPoint2;
 import materia.tooling.panel.PanelPlan.PanelOperation;
 import materia.tooling.panel.PanelPlan.PanelOperationKind;
 import materia.tooling.panel.PanelPlan.PanelSegment;
@@ -232,7 +232,7 @@ class PanelCodec {
 							dx = Math.max(0, Math.max(a.x - q.x - q.width, q.x - a.x - a.width));
 						var dy = Math.max(0, Math.max(a.y - q.y - q.height, q.y - a.y - a.height));
 						if (Math.sqrt(dx * dx + dy * dy) < m && PanelGeometry.distanceBetween(op.contour, other.contour) < m - 1e-7)
-							throw "Insufficient ligament between cuts";
+							throw "Insufficient ligament between cuts: " + p.id + "/" + other.id + ", " + op.id;
 					}
 			}
 		if (p.contactFace != ContactFace.None && (p.contactFace : String) == (p.labelSide : String))
@@ -252,7 +252,7 @@ class PanelCodec {
 	 * Rebate corners on/outside the blank are open approach boundaries.
 	 */
 	static function cutterFit(op:PanelOperation, outline:Array<PanelSegment>):Void {
-		function tangent(seg:PanelSegment, atEnd:Bool):ToolingPoint2 {
+		function tangent(seg:PanelSegment, atEnd:Bool):CastingPoint2 {
 			var c = seg.center;
 			if (c == null)
 				return {x: seg.end.x - seg.start.x, y: seg.end.y - seg.start.y};
@@ -370,7 +370,7 @@ class PanelCodec {
 		return result;
 	}
 
-	static function point(v:Dynamic):ToolingPoint2 {
+	static function point(v:Dynamic):CastingPoint2 {
 		obj(v, ["x", "y"]);
 		return {x: n(v, "x"), y: n(v, "y")};
 	}

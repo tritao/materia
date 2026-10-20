@@ -57,15 +57,24 @@ class ReviewContractTests {
 		check(raw.indexOf('"label"') >= 0 && raw.indexOf('"sourceRole"') < 0, "source labels are separate from required typed roles");
 		var changed = ToolingCodec.snapshot(p.document);
 		changed.recipe.designReview.minimumInsertEdgeMm = 5;
+		var constrained = CastingLevelOne.analyze(changed).proposals.filter(v -> v.rule == "process.level1.insert-edge.seat");
+		check(constrained.length == 1 && constrained[0].proposedValue == null,
+			"width proposals preserve explicitly declared body openings");
+		// An independently authored inset seat permits width changes without changing openings.
+		changed.input.inserts[0].pose.x = 78;
+		var recess = changed.input.features.filter(feature -> feature.owner == "seat")[0];
+		recess.geometry.pose.x = 78;
+		recess.openings = recess.openings.filter(opening -> opening.target != "body.x-max");
+		changed.setup.sourceFingerprint = ToolingCodec.inputFingerprint(changed.input);
 		var review = CastingLevelOne.analyze(changed);
 		var proposals = review.proposals.filter(v -> v.rule == "process.level1.insert-edge.seat");
-		check(proposals.length == 1 && proposals[0].sourceParameterId == "input.inserts.seat.width" && proposals[0].proposedValue == 30,
+		check(proposals.length == 1 && proposals[0].sourceParameterId == "input.inserts.seat.width" && proposals[0].proposedValue == 34,
 			"source-only edge review supplies a mapped width/value proposal");
-		check(review.metrics.minimumInsertEdgeMm == 0
+		check(review.metrics.minimumInsertEdgeMm == 2
 			&& review.metrics.minimumCornerRadiusMm == 0, "level-1 metrics retain actual source geometry");
 		var accepted = CastingLevelOne.apply(changed, proposals[0]);
 		var replanned = CastingMoldPlanner.plan(accepted, p.options);
-		check(replanned.document.input.inserts[0].width == 30 && replanned.sourceFingerprint != p.sourceFingerprint,
+		check(replanned.document.input.inserts[0].width == 34 && replanned.sourceFingerprint != p.sourceFingerprint,
 			"accepted source proposal updates linked recess and successfully replans");
 		check(CastingLevelOne.analyze(accepted).validation.filter(v -> v.rule == "process.level1.insert-edge.seat"
 			&& v.status == "pass").length == 1,

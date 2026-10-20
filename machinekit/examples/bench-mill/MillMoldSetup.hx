@@ -35,9 +35,14 @@ class MillMoldSetup {
 				fillHeightMm: height,
 				freeboardMm: 0,
 				sourceToMold: F.fromRotationMatrix(0, 0, height, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
-				features: [for (f in input.features) if (f.kind != "insert-recess") strategy(f.id)]
+				features: [for (id in ["front-y-bearing-seat", "rear-y-drive-seat"])
+					if (input.features.filter(feature -> feature.id == id).length == 1) {
+					featureId: id, strategy: materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
+					withdrawal: {x: 0, y: 0, z: -1}, priority: 10
+				}]
 			},
 			recipe: {
+				featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
 				id: "mill-base-panel-eps-review",
 				revision: 1,
 				panel: stock,
@@ -60,11 +65,6 @@ class MillMoldSetup {
 				steelDensityKgM3: 7850,
 				handlingLoadFactor: 1.5,
 				hardware: {
-					insertBoreDiameter: 5,
-					insertClearanceDiameter: 7,
-					insertScrewDiameter: 6,
-					insertThreadSpec: "M6",
-					insertEngagement: 8,
 					plugDepth: 2,
 					plugMaterial: "steel",
 					sealMargin: 3,
@@ -102,43 +102,6 @@ class MillMoldSetup {
 					removalClearanceMm: null
 				}
 			}
-		};
-	}
-
-	public static function strategy(id:String):materia.tooling.casting.CastingSetup.CastingFeatureStrategy {
-		var strategy:materia.tooling.casting.CastingSetup.CoreStrategy;
-		var direction:Null<{x:Float, y:Float, z:Float}>;
-		var priority = switch id {
-			case "foot-access-LeftFront", "foot-access-LeftRear", "foot-access-RightFront", "foot-access-RightRear": 30;
-			case "foot-stem-LeftFront", "foot-stem-LeftRear", "foot-stem-RightFront", "foot-stem-RightRear": 20;
-			case "front-y-bearing-seat", "rear-y-drive-seat": 10;
-			default: 0;
-		};
-		switch id {
-			case "underside-0-0", "underside-0-1", "underside-1-0", "underside-1-1", "underside-2-0", "underside-2-1":
-				strategy = SacrificialEPS;
-				direction = null;
-			case "foot-access-LeftFront", "foot-access-LeftRear":
-				strategy = ReusableFormer;
-				direction = {x: -1, y: 0, z: 0};
-			case "foot-access-RightFront", "foot-access-RightRear":
-				strategy = ReusableFormer;
-				direction = {x: 1, y: 0, z: 0};
-			case "foot-stem-LeftFront", "foot-stem-LeftRear", "foot-stem-RightFront", "foot-stem-RightRear":
-				strategy = ReusableFormer;
-				direction = {x: 0, y: 0, z: 1};
-			case "guide-shoulder-outside--1", "guide-shoulder-outside-1", "between-y-shoulders", "front-y-bearing-seat", "rear-y-drive-seat":
-				strategy = ReusableFormer;
-				direction = {x: 0, y: 0, z: -1};
-			default:
-				throw "No mill tooling strategy for feature: " + id;
-		}
-		return {
-			featureId: id,
-			strategy: strategy,
-			withdrawal: direction,
-			draftDegrees: 0,
-			priority: priority
 		};
 	}
 

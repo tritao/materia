@@ -5,7 +5,7 @@ import materia.assembly.AssemblyCodec;
 
 /** Strict source schema; no old box-list encoding is accepted. */
 class CastingFeatureCodec {
-	public static inline var VERSION = 1;
+	public static inline var VERSION = 2;
 
 	public static function encode(features:Array<CastingFeature>):String {
 		var copy = snapshot(features);
@@ -50,7 +50,7 @@ class CastingFeatureCodec {
 				fields(o, ["kind", "target"]);
 				openings.push({kind: cast CastingRecordCodec.string(o, "kind"), target: CastingRecordCodec.string(o, "target")});
 			}
-			var adjustable:Array<String> = [];
+			var adjustable:Array<CastingDimension> = [];
 			for (value in CastingRecordCodec.array(row, "adjustable")) {
 				if (!Std.isOfType(value, String))
 					throw "Invalid adjustable dimension";
@@ -139,11 +139,15 @@ class CastingFeatureCodec {
 		}
 		for (f in copy)
 			for (o in f.openings)
-				if (o.kind == Feature && (!ids.exists(o.target) || o.target == f.id))
+				if (o.kind == Feature && (openingTargets(copy, o.target).length == 0 || o.target == f.id || o.target == f.derivedFrom))
 					throw "Unknown feature opening: " + f.id;
 		copy.sort((a, b) -> Reflect.compare(a.id, b.id));
 		return copy;
 	}
+
+	/** Openings may name an authored parent after retained supports fragment its cut. */
+	public static function openingTargets(features:Array<CastingFeature>, id:String):Array<CastingFeature>
+		return features.filter(feature -> feature.id == id || feature.derivedFrom == id);
 
 	public static function fields(raw:Dynamic, names:Array<String>):Void {
 		if (raw == null || Std.isOfType(raw, Array) || Std.isOfType(raw, String))

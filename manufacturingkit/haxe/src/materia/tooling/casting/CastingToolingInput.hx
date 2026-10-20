@@ -1,7 +1,7 @@
 package materia.tooling.casting;
 
 import materia.assembly.AssemblyRecord.AssemblyFrame;
-import materia.tooling.ToolingPrism;
+import materia.casting.CastingPrism;
 import materia.tooling.ToolingEnums.ToolingLengthUnit;
 import materia.casting.InsertSpec.InsertRole;
 import materia.casting.InsertSpec.InsertFinish;
@@ -36,7 +36,7 @@ typedef CastingToolingInput = {
 	var id:String;
 	var revision:Int;
 	var lengthUnit:ToolingLengthUnit;
-	var envelope:Array<ToolingPrism>;
+	var envelope:Array<CastingPrism>;
 	var features:Array<CastingFeature>;
 	var inserts:Array<CastingToolingInsert>;
 }

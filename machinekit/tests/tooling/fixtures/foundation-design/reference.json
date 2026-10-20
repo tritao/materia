@@ -5,13 +5,26 @@
       "id": "mill-base",
       "stepSha256": "f913e1c74a1c797b2df95940446be8a6f29ed52356ff5c587d918d04de65c920",
       "stepBytes": 478167,
-      "compressedBytes": 76034
+      "compressedBytes": 76046
     },
     {
       "id": "mill-column",
       "stepSha256": "ff1170b7c2b89a05e1c3067d4f98902e7283d05552ccdaf0f12dd0397767309b",
       "stepBytes": 355416,
-      "compressedBytes": 58051
+      "compressedBytes": 58063
+    },
+    {
+      "id": "hobber-bed",
+      "stepSha256": "4a3bfc882f60114325d1e04bae2e8547097a920a0074cef2cd653924ed05b191",
+      "stepBytes": 1626272,
+      "compressedBytes": 258551
+    },
+    {
+      "id": "hobber-column",
+      "stepSha256": "a1504188f04daff36e153fece13911cfa43639a89f88f2958226e6b2032b6f69",
+      "stepBytes": 229849,
+      "compressedBytes": 38712
     }
-  ]
+  ],
+  "compression": "gzip; decode with the native gzip executable; STEP hashes are unchanged"
 }

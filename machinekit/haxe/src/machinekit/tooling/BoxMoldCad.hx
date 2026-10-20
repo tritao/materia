@@ -151,19 +151,25 @@ class BoxMoldCad {
 			var fixture = p.fixtures[0],
 				f = fixture.mountingFace,
 				t = p.document.recipe.panel.measuredThickness;
-			var nominal = fixture.fixingDiameter;
-			var thread = fixture.threadSpec;
-			var washer = FlatWasher.metric(thread),
-				length = 5 * Math.ceil((t + washer.thickness + p.document.recipe.hardware.insertEngagement) / 5);
-			var boltPose = F.fromRotationMatrix(f.x, f.y, b.z - t - washer.thickness, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
-			a.addComponent("insert-fixing-screw", SocketHeadCapScrew.metric(thread, length), boltPose);
-			a.addComponent("insert-fixing-washer", washer, F.translation(f.x, f.y, b.z - t - washer.thickness));
-			var penetration = p.penetrations.filter(v -> v.insertId == fixture.insertId && v.plug != null)[0];
-			var plug = penetration.plug;
-			if (plug == null || plug.materialSpec != "steel")
-				throw "Unsupported nominal bore plug material";
-			a.addComponent("resin-side-bore-plug",
-				new ToolingPin(new ComponentValues().setNumber("diameter", plug.diameter).setNumber("length", plug.length)), pose);
+			for (fixing in fixture.fixings) {
+				var hole = i.holes.filter(h -> h.id == fixing.sourceHoleId)[0];
+				var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
+				ToolingHardwareCad.fixtureScrew(a, fixing.hardwareId, fixing.threadSpec, t + fixing.engagement,
+					F.fromRotationMatrix(fixing.entry.x, fixing.entry.y, b.z - t, [1, 0, 0, 0, -1, 0, 0, 0, -1]));
+				var penetration = p.penetrations.filter(v -> v.sourceHoleId == hole.id && v.insertId == i.id)[0];
+				var plug = penetration.plug;
+				if (plug != null) {
+					if (plug.materialSpec != "steel")
+						throw "Unsupported nominal bore plug material";
+					a.addComponent(materia.tooling.ToolingIds.derive("resin-plug-", hole.id),
+						new ToolingPin(new ComponentValues().setNumber("diameter", plug.diameter).setNumber("length", plug.length)),
+						F.compose(fixing.entry, F.translation(0, 0, hole.depth - plug.length)));
+				}
+			}
+			for (mask in fixture.boreMasks) {
+				var hole = i.holes.filter(h -> h.id == mask.sourceHoleId)[0];
+				a.addComponent(mask.hardwareId, ToolingPin.boreMask(hole), F.compose(pose, hole.frame));
+			}
 
 			var poses = a.solvedPoses(), bedPose = poses.get("bed");
 			for (row in a.components())

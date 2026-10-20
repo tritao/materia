@@ -9,7 +9,7 @@ import materia.tooling.ToolingEnums.ContactFace;
 import materia.tooling.panel.PanelPlan.PanelOperation;
 import materia.tooling.panel.PanelPlan.PanelOperationKind;
 import materia.tooling.panel.PanelPlan.PanelSegment;
-import materia.tooling.ToolingPrism.ToolingPoint2;
+import materia.casting.CastingPrism.CastingPoint2;
 
 enum abstract PanelJointKind(String) to String {
 	var TabSlot = "tab-slot";
@@ -103,9 +103,9 @@ typedef TabJointSpec = {
 typedef PinBoltLayout = {
 	var width:Float;
 	var height:Float;
-	var primary:ToolingPoint2;
-	var secondary:ToolingPoint2;
-	var bolt:ToolingPoint2;
+	var primary:CastingPoint2;
+	var secondary:CastingPoint2;
+	var bolt:CastingPoint2;
 }
 
 /** One constructor owns both finished mating geometries and their assembly datums. */

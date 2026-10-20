@@ -99,7 +99,14 @@ class CastingTests {
 			.setNumber("height", 20)
 			.setToken("role", "generic-mount")
 			.setToken("label", "test mount"));
-		var placements:Array<CastInsertPlacement> = [{id: "seat", part: insert, pose: F.translation(80, 0, 90)}];
+		var placements:Array<CastInsertPlacement> = [{id: "seat", part: insert,
+			openings: [CastingPatterns.face("body.z-max"), CastingPatterns.face("body.x-max")], pose: F.translation(80, 0, 90)}];
+		var breakout = "";
+		try new MineralFoundation(v, [{id: "seat", part: insert,
+			openings: [CastingPatterns.face("body.z-max")], pose: F.translation(80, 0, 90)}])
+		catch (error:Dynamic) breakout = Std.string(error);
+		check(breakout.indexOf("Undeclared casting breakout: insert-seat body.x-max") >= 0,
+			"source insert recess openings are declared by the caller");
 		var foundation = new MineralFoundation(v, placements);
 		var poses = foundation.solvedPoses(),
 			body = foundation.body.geometry();
@@ -148,12 +155,12 @@ class CastingTests {
 			.setNumber("width", 40)
 			.setNumber("depth", 40)
 			.setNumber("height", 20)
-			.setToken("holes",machinekit.structural.InsertHoles.through(18)));
+			.setToken("holes",machinekit.structural.InsertHoles.through(18,20)));
 		var boredShape = bored.geometry();
 		check(boredShape.valid() && boredShape.solidCount() == 1, "bored foot seat remains one solid");
 		near(boredShape.volume(), 40 * 40 * 20 - Math.PI * 9 * 9 * 20, 1e-6, "foot bore removes steel volume");
 		boredShape.close();
-		rejects(() -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setToken("holes",machinekit.structural.InsertHoles.through(40))),
+		rejects(() -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setToken("holes",machinekit.structural.InsertHoles.through(40,20))),
 			"reject insert bore consuming seat");
 		Sys.println('CastingTests: $assertions assertions passed');
 		if (Sys.args().indexOf("--recipes") >= 0) {

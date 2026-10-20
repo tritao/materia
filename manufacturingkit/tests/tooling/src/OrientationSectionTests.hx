@@ -1,3 +1,4 @@
+import materia.casting.CastingFeature.CastingDimension;
 import materia.tooling.ToolingCodec;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
@@ -201,12 +202,11 @@ class OrientationSectionTests {
 		var revised = ToolingCodec.snapshot(p.document), e = p.envelope;
 		revised.input.revision++;
 		revised.input.features.push({id:"extra-pocket",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:10,depth:10,height:8,pose:materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(revised.setup.sourceToMold),
-				materia.assembly.AssemblyFrames.translation(e.x + 20, e.y + 20, e.z + e.height - 8))},openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:["width","depth","height"],derivedFrom:null});
+				materia.assembly.AssemblyFrames.translation(e.x + 20, e.y + 20, e.z + e.height - 8))},openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null});
 		revised.setup.features.push({
 			featureId: "extra-pocket",
 			strategy: materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
 			withdrawal: {x: 0, y: 0, z: 1},
-			draftDegrees: 0,
 			priority: 0
 		});
 		revised.setup.sourceFingerprint = ToolingCodec.inputFingerprint(revised.input);

@@ -85,12 +85,8 @@ class BoxMoldTests {
 					check(report.validation.length > 0 && !report.fabrication.ready, "physical qualification pending");
 				}
 		var metric = SinglePocketSetup.document();
-		metric.input.inserts[0].holes = materia.casting.InsertHoleGeometry.through(6.8,metric.input.inserts[0].height);
+		metric.input.inserts[0].holes = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.tappedThrough(machinekit.structural.InsertHoles.metricThread("M8"), metric.input.inserts[0].height));
 		metric.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(metric.input);
-		metric.recipe.hardware.insertBoreDiameter = 6.8;
-		metric.recipe.hardware.insertScrewDiameter = 8;
-		metric.recipe.hardware.insertClearanceDiameter = 9;
-		metric.recipe.hardware.insertThreadSpec = "M8";
 		metric.recipe.hardware.supportScrewDiameter = 8;
 		metric.recipe.hardware.supportClearanceDiameter = 9;
 		var selected = BoxMoldPlanner.plan(metric);
@@ -104,10 +100,10 @@ class BoxMoldTests {
 			}
 		check(screws == 3, "insert screw and both bridge screws use selected diameter");
 		var p = BoxMoldPlanner.plan(SinglePocketSetup.document());
-		p.penetrations = p.penetrations.filter(x -> x.operationId != "insert-fixing");
+		p.penetrations = p.penetrations.filter(x -> x.operationId != "insert-fixing-fixing");
 		rejects(() -> BoxMoldCad.penetrations(p), "unclassified hole fails");
 		p = BoxMoldPlanner.plan(SinglePocketSetup.document());
-		p.penetrations.filter(x -> x.operationId == "insert-fixing")[0].sealMargin = 19;
+		p.penetrations.filter(x -> x.operationId == "insert-fixing-fixing")[0].sealMargin = 19;
 		rejects(() -> BoxMoldCad.penetrations(p), "seal margin fails");
 		p = BoxMoldPlanner.plan(SinglePocketSetup.document());
 		p.panels.members.filter(m -> m.panel.id == "south")[0].withdrawal = {x: 0, y: 1, z: 0};

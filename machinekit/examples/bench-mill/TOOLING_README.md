@@ -39,14 +39,21 @@ source ID in `feature-inventory.json`. The kit includes:
 - Twelve nominal steel datum supports at the actual insert heights. Bed-facing
   supports seat in blind board sockets; elevated foot supports have external
   columns and withdraw sideways. Each has round/slot locating receivers and a
-  recipe-selected tool-only threaded fixing. Bed cuts carry insert-sealed
-  penetration records. These bed-registered supports do not establish final
-  insert alignment: insert XY clamps, reference accuracy, thread engagement and
-  release/access qualification are tooling validation work, not casting changes.
-- Every ordinary feature has an explicit strategy, priority and draft value.
-  Unknown mill IDs fail. Zero-draft rigid features request draft/split/sacrificial
-  decisions; unsupported strategies remain in the inventory and block readiness.
+  clearance-only path for screws entering declared steel insert threads.
+  Screw lengths include the bed, datum and the source hole policy's engagement.
+  Fixing holes carry screws; other source holes carry framed bore masks.
+  Missing usable source threads raise design change requests. Existing threads
+  obstructed by the current support/locator layout raise tooling validation work.
+  Both block readiness. These supports do not establish final insert alignment;
+  fixture constraint, accuracy and release/access qualification remain pending.
+- Recipe rules choose ordinary feature strategies from typed kind and declared
+  openings; setup overrides name only specific features. Draft belongs to the
+  source feature. Unknown kinds or override IDs fail. Zero-draft rigid features
+  need a release alternative; unsupported strategies block readiness.
   Positive draft cannot silently taper the current box-only source geometry.
+- Retained beams and backing split authored features through the shared box
+  algebra. Stable fragments retain their parent through `derivedFrom`;
+  `core-units.json` groups the foam pieces by their authored core intent.
 
 
 The inverted setup puts rail faces toward the bed, underside cavities toward the
@@ -332,8 +339,8 @@ cutting force, safety factor and evidence; a reference string cannot qualify it.
 Missing fixture geometry, measured lengths or a qualified machine-coordinate work
 origin keeps the per-panel CAM check pending. Each single-tool G49 file says to
 touch off Z with that tool, and comments its nominal/measured diameter and shape
-after M6. The bed needs four loads: T3 pockets, T2 pins, T5 fixing holes, T3 outline.
-Three would violate declared access dependencies or outside-last.
+after M6. Loads follow the regenerated operation records, preserving declared
+access dependencies and the final outside profile.
 
 Study tool reach is explicitly 25 mm flute length / 30 mm stick-out, awaiting
 measurement. Cuts beyond reach fail. Drilling deeper than three diameters pecks

@@ -124,7 +124,7 @@ class MillMoldChecks {
 		profiled.volume.profiles[0].depth += 1;
 		rejects(() -> CastingMoldPlanner.validate(mismatched), "former sealing profile must match panel operation");
 		check(p.changeRequests.filter(c -> c.kind == "release-alternative")
-			.length == p.document.setup.features.filter(f -> f.strategy == "reusable-former")
+			.length == materia.tooling.casting.CastingStrategies.resolve(p.document).filter(f -> f.strategy == "reusable-former")
 			.length
 				+ p.formers.filter(f -> f.featureIds.length == 0)
 					.length,
@@ -138,9 +138,9 @@ class MillMoldChecks {
 			var datum = ToolingVolume.geometryOf(f.datum);
 			check(datum.valid() && datum.solidCount() == 1, "bored datum support remains one valid connected solid");
 			datum.close();
-			check(f.lateralLocation.baselineMm == p.document.recipe.hardware.fixturePinSpacing && f.datum.cuts.length == 3,
-				"fixture has pin/slot and recipe thread cuts");
-			check(f.penetrations.length == 3, "fixture bed cuts have explicit sealing face records");
+			check(f.lateralLocation.baselineMm == p.document.recipe.hardware.fixturePinSpacing && f.datum.cuts.length >= 2,
+				"fixture has pin/slot and clearance-only fixing cuts");
+			check(f.penetrations.length == 2 + f.fixings.length, "fixture bed cuts have explicit sealing face records");
 		}
 		for (f in p.fixtures) {
 			for (id in [f.lateralLocation.primaryId, f.lateralLocation.secondaryId]) {
@@ -157,37 +157,40 @@ class MillMoldChecks {
 		check(restoredAssembly.encode() == savedAssembly, "full hardware assembly round-trips within connector limits");
 		var unknown = "";
 		try {
-			MillMoldSetup.strategy("future-feature");
+			var invalid = materia.tooling.ToolingCodec.inputSnapshot(p.document.input);
+			invalid.features[0].kind = cast "future-feature";
+			materia.tooling.ToolingCodec.inputSnapshot(invalid);
 		} catch (e:Dynamic) {
 			unknown = Std.string(e);
 		}
-		check(unknown.indexOf("No mill tooling strategy") >= 0, "unknown mill feature cannot inherit a strategy");
-		var permuted = materia.tooling.ToolingCodec.snapshot(p.document);
-		permuted.input.features.reverse();
-		permuted.setup.features.reverse();
-		var stable = CastingMoldPlanner.plan(permuted, p.options);
-		check(CastingMoldCodec.encode(stable) == CastingMoldCodec.encode(p), "feature array permutation preserves identical IDs and plans");
+		check(unknown.indexOf("Unknown casting feature kind") >= 0, "unknown feature kinds cannot inherit a strategy");
+		var permuted = p.document.input.features.copy();
+		permuted.reverse();
+		var strategies = materia.tooling.casting.CastingStrategies.resolve(p.document);
+		check(materia.tooling.ToolingCodec.canonical(CastingMoldPlanner.ownershipOrder(permuted, strategies))
+			== materia.tooling.ToolingCodec.canonical(CastingMoldPlanner.ownershipOrder(p.document.input.features, strategies)),
+			"raw feature permutation preserves the actual ownership ordering before codec sorting");
 		var unsupported = materia.tooling.ToolingCodec.snapshot(p.document);
 		unsupported.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.Unsupported;
 		var partial = CastingMoldPlanner.plan(unsupported, p.options),
 			assessment = CastingMoldCad.assess(partial);
 		check(assessment.geometry == null && assessment.diagnostics.hasErrors() && !partial.fabrication.ready,
 			"unsupported feature reports through shared Diagnostics without CAD fabrication claims");
-		for (i in p.document.input.inserts)
-			if (materia.casting.InsertHoleGeometry.diameter(i.holes) > 0) {
-				var steel = CastingMoldCad.steel(p, i.id),
-					mask = p.fixtures.filter(f -> f.insertId == i.id)[0].boreMask;
-				if (mask == null)
-					throw "Missing source bore mask";
-				var local = cadkit.modeling.Part.cylinderSpan(materia.casting.InsertHoleGeometry.diameter(i.holes) / 2, 0, i.height),
-					world = PosedParts.moved(local, mask.pose);
+		for (i in p.document.input.inserts) {
+			var steel = CastingMoldCad.steel(p, i.id);
+			for (protection in p.fixtures.filter(f -> f.insertId == i.id)[0].boreMasks) {
+				var hole = i.holes.filter(h -> h.id == protection.sourceHoleId)[0];
+				var hardware = p.hardware.filter(h -> h.id == protection.hardwareId)[0];
+				var local = machinekit.tooling.ToolingPin.boreMask(hole).geometry();
+				var world = PosedParts.moved(local, hardware.pose);
 				local.close();
 				var overlap = steel.intersect(world);
-				check(overlap.volume() < 1e-5, "steel bore is a real hole, not a protected solid envelope");
+				check(overlap.volume() < 1e-5, "each bore mask follows its actual source hole and frame");
 				overlap.close();
 				world.close();
-				steel.close();
 			}
+			steel.close();
+		}
 		var changed = CastingMoldPlanner.plan(MillMoldSetup.document(frame, 17.8), MillMoldSetup.options(frame));
 		check(CastingMoldCodec.fingerprint(changed) != CastingMoldCodec.fingerprint(p), "measured stock invalidates package");
 		equivalent(frame, changed);

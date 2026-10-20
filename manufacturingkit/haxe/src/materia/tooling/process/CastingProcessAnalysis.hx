@@ -90,6 +90,8 @@ class CastingProcessAnalysis {
 			"Cure reference must name the same resin as the fabrication solvent record.",
 			fabrication == null ? [] : [fabrication.resinReference, spec.cure.reference]));
 		var sections = OrthogonalSections.analyze(p.document.input.id, sourceFingerprint, resin, boundaries);
+		fill.validation = fill.validation.concat(FillAnalysis.sourceSupport(p.document.input));
+		sections.validation = sections.validation.concat(OrthogonalSections.sourceSupport(p.document.input));
 		for (contact in spec.faceContacts)
 			if (sections.junction.faces.filter(face -> ThermalFaces.id(face) == contact.faceId).length != 1)
 				throw "Unknown thermal face contact: " + contact.faceId;

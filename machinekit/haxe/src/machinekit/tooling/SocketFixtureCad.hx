@@ -43,7 +43,7 @@ class SocketFixtureCad {
     for(s in p.sites) {
       add(a,root,s.id,socket(p.socket),s.mouth);
       // Explicit standard length; helper's length excludes its washer thickness.
-      ToolingHardwareCad.fixtureScrew(a,s.id+"-positioning",6,s.screwLength-p.washerThickness,
+      ToolingHardwareCad.fixtureScrew(a,s.id+"-positioning","M6",s.screwLength-p.washerThickness,
         F.fromRotationMatrix(s.x,s.y,t,[1,0,0,0,-1,0,0,0,-1]));
     }
     // Separate review-only walls. External clamps/seal system are intentionally pending, not invented.

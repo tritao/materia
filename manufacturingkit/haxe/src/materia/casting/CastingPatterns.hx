@@ -6,7 +6,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Shared design patterns. Cuts carry design intent; openings are explicit. */
 class CastingPatterns {
 	public static function box(id:String, kind:CastingFeatureKind, openings:Array<CastingOpening>, width:Float, depth:Float, height:Float, x:Float = 0,
-			y:Float = 0, z:Float = 0, ?owner:String, ?adjustable:Array<String>):CastingFeature
+			y:Float = 0, z:Float = 0, ?owner:String, ?adjustable:Array<CastingDimension>):CastingFeature
 		return {
 			id: id,
 			kind: kind,
@@ -57,7 +57,7 @@ class CastingPatterns {
 						-depth / 2
 						+ wall
 						+ d / 2
-						+ y * (d + rib), sole, null, ["width", "depth", "height"])
+						+ y * (d + rib), sole, null, [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height])
 		];
 	}
 }

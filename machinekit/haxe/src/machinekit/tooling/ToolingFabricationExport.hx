@@ -1,5 +1,6 @@
 package machinekit.tooling;
 
+import materia.tooling.ToolingCodec;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingFabrication.FabricationPlan;
 import materia.tooling.export.FabricationSpecCodec;
@@ -47,7 +48,8 @@ class ToolingFabricationExport {
 			return {classification: SupportedHardware, lengthMm: nut.height, diameterMm: null};
 		}
 		if (Std.isOfType(component, ToolingPin))
-			return {classification: SupportedHardware, lengthMm: component.parameterNumber("length"), diameterMm: component.parameterNumber("diameter")};
+			return {classification: SupportedHardware, lengthMm: component.parameterNumber("length"),
+				diameterMm: Math.max(component.parameterNumber("diameter"), component.parameterNumber("headDiameter"))};
 		return {classification: UnsupportedHardware, lengthMm: null, diameterMm: null};
 	}
 
@@ -285,6 +287,7 @@ class ToolingFabricationExport {
 		}
 		text(dir, "hardware.csv", ToolingFabrication.csv(hardwareRows));
 		data(dir, "planned-hardware.json", p.hardware);
+		data(dir, "core-units.json", p.coreUnits);
 		data(dir, "hardware-unsupported.json", unknown);
 		data(dir, "hardware-validation.json", classificationChecks);
 		var lines = bill.lines();
@@ -308,7 +311,7 @@ class ToolingFabricationExport {
 				"width_mm",
 				"depth_mm",
 				"height_mm",
-				"bore_mm",
+				"holes_json",
 				"quantity",
 				"consumption"
 			]
@@ -321,7 +324,7 @@ class ToolingFabricationExport {
 				Std.string(i.width),
 				Std.string(i.depth),
 				Std.string(i.height),
-				Std.string(materia.casting.InsertHoleGeometry.diameter(i.holes)),
+				ToolingCodec.canonical(i.holes),
 				"1",
 				"per-casting"
 			]);

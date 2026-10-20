@@ -16,6 +16,7 @@ typedef BlindThreadInterface = {
 }
 typedef CounterboreInterface = {var radius:Float; var depth:Float; var bearingDepth:Float;}
 typedef HoleInterface = {
+	@:optional var insertLimits:materia.casting.InsertHole.InsertHoleLimits;
 	var id:String; var frame:AssemblyFrame; var radius:Float; var depth:Float;
 	@:optional var through:Bool;
 	var minWall:Float; var minClearance:Float;
@@ -69,7 +70,7 @@ class DesignInterfaces implements ComponentFacet {
 	public function drillingTools():Array<Part> {
 		var tools:Array<Part> = [];
 		try for(h in holes) {
-			var local=Part.cylinderSpan(h.radius,-1,h.depth+(h.thread==null?1:0));
+			var local=Part.cylinderSpan(h.radius,-1,h.depth+(h.through==true?1:0));
 			tools.push(PosedParts.moved(local,h.frame));local.close();
 			if(h.counterbore!=null) {
 				var cb=Part.cylinderSpan(h.counterbore.radius,-1,h.counterbore.depth);

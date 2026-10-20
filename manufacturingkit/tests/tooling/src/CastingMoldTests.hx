@@ -1,3 +1,4 @@
+import materia.casting.CastingFeature.CastingDimension;
 import materia.tooling.ToolingDocument;
 import materia.tooling.ToolingCodec;
 import materia.tooling.casting.CastingMoldPlan;
@@ -72,6 +73,38 @@ class CastingMoldTests {
 			p = CastingMoldPlanner.plan(d, o),
 			s = CastingMoldCodec.encode(p);
 		FabricationTests.run(p);
+		var sourceThreads = ToolingCodec.snapshot(d);
+		sourceThreads.recipe.hardware.fixturePinSpacing = 24;
+		var threads = materia.casting.InsertHoleGeometry.through(5, sourceThreads.input.inserts[0].height);
+		threads[0].thread = {designation: "M6", majorDiameter: 6, pitch: 1, starts: 1, hand: Right,
+			internal: true, toleranceClass: "6H", profile: Metric};
+		threads[0].tapDrill = 5;
+		threads[0].limits = {policyId: "steel-threaded-hole-v1", minEngagement: 6, minTipGap: 1,
+			minBack: 1.5, minWall: 3, minClearance: 0.6, overrides: []};
+		threads[0].frame.y = -5;
+		var second = materia.casting.InsertHole.InsertHoleCodec.snapshot(threads)[0];
+		second.id = "second";
+		second.frame.y = 5;
+		threads.push(second);
+		var unused = materia.casting.InsertHoleGeometry.through(3, sourceThreads.input.inserts[0].height)[0];
+		unused.id = "unused";
+		unused.frame.x = 10;
+		threads.push(unused);
+		sourceThreads.input.inserts[0].holes = threads;
+		sourceThreads.setup.sourceFingerprint = ToolingCodec.inputFingerprint(sourceThreads.input);
+		var fixed = CastingMoldPlanner.plan(sourceThreads, options(sourceThreads));
+		check(fixed.fixtures[0].fixings.length == 2, "datum selects both accessible source steel threads");
+		check(fixed.fixtures[0].boreMasks.length == 1 && fixed.fixtures[0].boreMasks[0].sourceHoleId == "unused",
+			"only the non-fixing hole receives a bore mask");
+		for (fixing in fixed.fixtures[0].fixings) {
+			var screw = fixed.hardware.filter(h -> h.id == fixing.hardwareId)[0];
+			check(Math.abs(screw.length - (fixing.entry.z - screw.pose.z + 6)) < 1e-7,
+				"screw clamps the bed and datum with policy thread engagement");
+		}
+		fixed.hardware.filter(h -> h.id == fixed.fixtures[0].fixings[0].hardwareId)[0].length += 1;
+		rejects(() -> CastingMoldPlanner.validate(fixed), "altered fixing stack rejected");
+		check(p.fixtures[0].fixings.length == 0 && p.changeRequests.filter(r -> r.kind == "insert-fixture-hole").length == 1,
+			"an insert without a usable steel thread blocks its fixture with a source change request");
 		var handlingOptions = options(d);
 		handlingOptions.serviceOrientation = materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0,
 			[0, -1, 0, 1, 0, 0, 0, 0, 1]), d.setup.sourceToMold);
@@ -102,6 +135,21 @@ class CastingMoldTests {
 		rejects(() -> CastingMoldPlanner.validate(intersecting), "datum/resin intersection rejected before CAD");
 		check(CastingMoldCodec.encode(CastingMoldCodec.decode(s)) == s, "multi-core canonical regeneration");
 		check(p.features.length == d.input.features.length && p.cores.length == 1, "complete source ownership");
+		var fragmented = ToolingCodec.snapshot(d);
+		var authored = fragmented.input.features.filter(feature -> feature.kind != materia.casting.CastingFeature.CastingFeatureKind.InsertRecess)[0];
+		var cut = materia.casting.CastingBounds.feature(authored);
+		var children = BoxAlgebra.retain([authored], [{
+			x: cut.x + cut.width / 2 - 5, y: cut.y, z: cut.z, width: 10, depth: cut.depth, height: cut.height
+		}]);
+		fragmented.input.features = fragmented.input.features.filter(feature -> feature.id != authored.id).concat(children);
+		fragmented.setup.features = [{featureId: authored.id, strategy: SacrificialEPS, priority: 0, withdrawal: null}];
+		fragmented.setup.sourceFingerprint = ToolingCodec.inputFingerprint(fragmented.input);
+		var grouped = CastingMoldPlanner.plan(fragmented, options(fragmented));
+		check(grouped.cores.length == 2 && grouped.coreUnits.length == 1
+			&& grouped.coreUnits[0].parentFeatureId == authored.id && grouped.coreUnits[0].featureIds.length == 2,
+			"retained source fragments share one core unit and accept an explicit parent override");
+		fragmented.setup.features.push({featureId: children[0].id, strategy: ReusableFormer, priority: 10, withdrawal: {x: 0, y: 0, z: 1}});
+		rejects(() -> ToolingCodec.snapshot(fragmented), "one authored core unit cannot mix incompatible tooling strategies");
 		var cuts = [for (f in d.input.features) CastingMoldPlanner.featureBox(d, f)],
 			negative = [p.cores[0].cavity];
 		for (f in p.formers)
@@ -195,6 +243,7 @@ class CastingMoldTests {
 		overlap.input.inserts[0].pose.z = 40;
 		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].geometry.pose.x = 30;
 		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].geometry.pose.z = 40;
+		overlap.input.features.filter(f -> f.kind == "insert-recess")[0].openings = [];
 		overlap.setup.sourceFingerprint = ToolingCodec.inputFingerprint(overlap.input);
 		rejects(() -> CastingMoldPlanner.plan(overlap, options(overlap)), "EPS/insert overlap cannot silently allocate away either body");
 		var rotated = ToolingCodec.snapshot(d);
@@ -275,12 +324,11 @@ class CastingMoldTests {
 		});
 		rejects(() -> MoldVolumeCodec.encode(volume), "overlapping mold box pieces rejected");
 		var assigned = ToolingCodec.snapshot(rigid);
-		assigned.input.features.push({id:"overlap-detail",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:40,depth:40,height:30,pose:materia.assembly.AssemblyFrames.translation(0, 0, 20)},openings:[],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:["width","depth","height"],derivedFrom:null});
+		assigned.input.features.push({id:"overlap-detail",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{kind:materia.casting.CastingFeature.CastingGeometryKind.Box,width:40,depth:40,height:30,pose:materia.assembly.AssemblyFrames.translation(0, 0, 20)},openings:[],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null});
 		assigned.setup.features.push({
 			featureId: "overlap-detail",
 			strategy: materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
 			withdrawal: {x: 0, y: 0, z: 1},
-			draftDegrees: 0,
 			priority: 10
 		});
 		assigned.setup.sourceFingerprint = ToolingCodec.inputFingerprint(assigned.input);

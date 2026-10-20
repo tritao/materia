@@ -14,6 +14,14 @@ enum abstract CastingGeometryKind(String) to String {
 	var Box = "box";
 }
 
+enum abstract CastingDimension(String) to String {
+	var Width = "width";
+	var Depth = "depth";
+	var Height = "height";
+	var Draft = "draft";
+	var CornerRadius = "cornerRadius";
+}
+
 enum abstract CastingOpeningKind(String) to String {
 	var BodyFace = "body-face";
 	var Feature = "feature";
@@ -41,6 +49,6 @@ typedef CastingFeature = {
 	var draft:CastingDraft;
 	var cornerRadius:Float;
 	var owner:Null<String>;
-	var adjustable:Array<String>;
+	var adjustable:Array<CastingDimension>;
 	var derivedFrom:Null<String>;
 }

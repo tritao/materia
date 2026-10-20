@@ -72,13 +72,13 @@ class FoundationToolingTests {
 						if (f.kind != "insert-recess") {
 							featureId: f.id,
 							strategy: SacrificialEPS,
-							draftDegrees: 0,
 							priority: 0,
 							withdrawal: null
 						}
 				]
 			},
 			recipe: {
+				featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
 				id: "test-only-recipe",
 				revision: 1,
 				panel: {
@@ -111,11 +111,6 @@ class FoundationToolingTests {
 				steelDensityKgM3: 7850,
 				handlingLoadFactor: 1.5,
 				hardware: {
-					insertBoreDiameter: 5,
-					insertClearanceDiameter: 7,
-					insertScrewDiameter: 6,
-					insertThreadSpec: "M6",
-					insertEngagement: 8,
 					plugDepth: 2,
 					plugMaterial: "steel",
 					sealMargin: 3,
@@ -207,11 +202,12 @@ class FoundationToolingTests {
 			.setNumber("width", 40)
 			.setNumber("depth", 30)
 			.setNumber("height", 20)
-			.setToken("holes",machinekit.structural.InsertHoles.through(8)));
+			.setToken("holes",machinekit.structural.InsertHoles.through(8,20)));
 		var placements:Array<CastInsertPlacement> = [
-			{id: "topSeat", part: seat, pose: F.translation(80, 0, 170)},
+			{id: "topSeat", part: seat, openings: [CastingPatterns.face("body.z-max")], pose: F.translation(80, 0, 170)},
 			{
 				id: "sideSeat",
+				openings: [CastingPatterns.face("body.y-min")],
 				part: seat,
 				pose: F.fromRotationMatrix(0, -90, 80, [1, 0, 0, 0, 0, -1, 0, 1, 0])
 			}
@@ -221,7 +217,7 @@ class FoundationToolingTests {
 		check(input.features.length == 4, "ordinary voids and insert recesses all retained");
 		check(input.features.filter(f -> f.id == "underside")[0].geometry.pose.z == -1, "external cut extension retained");
 		var side = input.inserts.filter(i -> i.id == "sideSeat")[0];
-		check(materia.casting.InsertHoleGeometry.diameter(side.holes) == 8 && side.positionTolerance == 0.01, "bore and precision tolerance retained");
+		check(side.holes[0].diameter == 8 && side.positionTolerance == 0.01, "bore and precision tolerance retained");
 		var normal = F.transformVector(side.pose, 0, 0, 1);
 		near(normal.y, -1, "side insert mounting normal retained");
 		var before = ToolingCodec.inputFingerprint(input);
@@ -241,9 +237,10 @@ class FoundationToolingTests {
 		check(chamferedInput.envelope[0].profile.length == 8, "chamfer represented by actual profile");
 		var flared = values.copy();
 		flared.setNumber("footWidth", 320).setNumber("footHeight", 100).setNumber("footShoulder", 50);
-		var flaredInput = equivalent(new MineralFoundation(declareFixtureOpenings(flared), placements), "flared-foundation");
+		var flaredPlacements:Array<CastInsertPlacement> = [placements[0], {id: placements[1].id, part: placements[1].part, pose: placements[1].pose, openings: [CastingPatterns.face("foot.y-min")]}];
+		var flaredInput = equivalent(new MineralFoundation(declareFixtureOpenings(flared), flaredPlacements), "flared-foundation");
 		check(flaredInput.envelope.length == 2 && flaredInput.envelope[1].id == "foot", "flared foot is an additive oriented prism");
-		equivalent(new MineralFoundation(declareFixtureOpenings(flared.setNumber("cornerChamfer", 12)), placements), "flared-chamfered-foundation");
+		equivalent(new MineralFoundation(declareFixtureOpenings(flared.setNumber("cornerChamfer", 12)), flaredPlacements), "flared-chamfered-foundation");
 
 		// Existing independent machine family exercises the same adapter unchanged.
 		var hobber = FoundationToolingAdapter.snapshot(new machinekit.hobbing.MineralCastBed(), "typed-hobber", 1);
@@ -277,7 +274,7 @@ class FoundationToolingTests {
 		equivalent(new machinekit.hobbing.MineralCastBed(), "hobber-bed");
 		equivalent(new machinekit.hobbing.MineralCastColumn(), "hobber-column");
 		var finished = new CastInsert(new ComponentValues().setToken("role", "generic-mount").setToken("finish", "replicated-after-casting"));
-		var finishFoundation = new MineralFoundation(values, [{id: "finished", part: finished, pose: F.identity()}]);
+		var finishFoundation = new MineralFoundation(values, [{id: "finished", part: finished, openings: [CastingPatterns.face("body.z-min"), CastingPatterns.face("body.y-min"), CastingPatterns.face("body.y-max")], pose: F.identity()}]);
 		check(FoundationToolingAdapter.snapshot(finishFoundation, "finish-contract", 1)
 			.inserts[0].finish == materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting,
 			"typed source finishing route survives adapter");

@@ -3,6 +3,7 @@ package machinekit.structural;
 import materia.casting.InsertHole;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.design.DesignInterfaces;
+import machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
 
 /** Recipe patterns regenerate the authoritative DesignInterfaces facet. */
 class InsertHoles {
@@ -39,43 +40,43 @@ class InsertHoles {
 			});
 	}
 
-	public static function tappedThrough(size:String):String {
+	public static function metricThread(size:String):ThreadedHoleChoice {
 		var screw = machinekit.standard.SocketHeadCapScrew.metric(size, 35);
-		return through(screw.spec.tapDrill, screw.thread.mating());
+		return {thread: screw.thread.mating(), tapDrill: screw.spec.tapDrill, clearanceDiameter: screw.spec.clearanceFine};
 	}
 
-	public static function through(diameter:Float, ?thread:cadkit.threads.ThreadSpec):String {
+	public static function tappedThrough(choice:ThreadedHoleChoice, depth:Float):String
+		return through(choice.tapDrill, depth, choice.thread);
+
+	public static function through(diameter:Float, depth:Float, ?thread:cadkit.threads.ThreadSpec):String {
 		return haxe.Json.stringify({
-			version: 1,
+			version: 2,
 			holes: diameter == 0 ? [] : [
 				{
 					id: "fixing",
-					frame: F.identity(),
+					frame: F.fromRotationMatrix(0, 0, depth, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
 					diameter: diameter,
-					depth: null,
+					depth: depth,
 					extent: "through",
 					thread: thread == null ? null : threadRecord(thread),
 					tapDrill: thread == null ? null : diameter,
-					counterbore: null
+					counterbore: null,
+					limits: thread == null ? machinekit.design.ThreadedHolePolicy.clearance(diameter)
+						: machinekit.design.ThreadedHolePolicy.neutral(machinekit.design.ThreadedHolePolicy.resolve(thread, Steel))
 				}
 			]
 		});
 	}
 
 	public static function fromNeutral(holes:Array<InsertHole>):String
-		return haxe.Json.stringify({version: 1, holes: InsertHoleCodec.snapshot(holes)});
+		return haxe.Json.stringify({version: 2, holes: InsertHoleCodec.snapshot(holes)});
 
-	public static function records(text:String, height:Float):Array<InsertHole> {
+	public static function records(text:String):Array<InsertHole> {
 		var raw:Dynamic = haxe.Json.parse(text);
 		materia.casting.CastingFeatureCodec.fields(raw, ["version", "holes"]);
-		if (raw.version != 1 || !Std.isOfType(raw.holes, Array))
+		if (raw.version != 2 || !Std.isOfType(raw.holes, Array))
 			throw "Unsupported insert hole recipe";
 		var holes:Array<Dynamic> = cast raw.holes;
-		for (h in holes)
-			if (h.extent == "through" && h.depth == null) {
-				h.depth = height;
-				h.frame = F.fromRotationMatrix(0, 0, height, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
-			}
 		return InsertHoleCodec.snapshot(cast holes);
 	}
 
@@ -85,6 +86,7 @@ class InsertHoles {
 			if (h.diameter >= Math.min(width, depth))
 				throw "Insert hole consumes its seat: " + h.id;
 			var thread:Null<BlindThreadInterface> = null;
+			var limits = h.limits;
 			if (h.thread != null) {
 				var tap = h.tapDrill;
 				if (tap == null)
@@ -96,18 +98,19 @@ class InsertHoles {
 					cylindricalDepth: h.depth,
 					point: 0,
 					stock: height,
-					minEngagement: 0.001,
-					minTipGap: 0.001,
-					minBack: 0.001
+					minEngagement: limits.minEngagement,
+					minTipGap: limits.minTipGap,
+					minBack: limits.minBack
 				};
 			}
 			rows.push({
+				insertLimits: limits,
 				id: h.id,
 				frame: h.frame,
 				radius: h.diameter / 2,
 				depth: h.depth,
-				minWall: 0.001,
-				minClearance: 0.001,
+				minWall: limits.minWall,
+				minClearance: limits.minClearance,
 				through: h.extent == Through,
 				thread: thread,
 				counterbore: h.counterbore == null ? null : {
@@ -126,6 +129,7 @@ class InsertHoles {
 			for (h in facet.holes)
 				{
 					id: h.id,
+					limits: h.insertLimits,
 					frame: h.frame,
 					diameter: 2 * h.radius,
 					depth: h.depth,

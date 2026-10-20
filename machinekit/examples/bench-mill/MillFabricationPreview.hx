@@ -5,6 +5,7 @@ import materia.tooling.export.ToolingLoads;
 import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.ToolingCodec;
+import materia.tooling.panel.PanelPlan.PanelOperationKind;
 import machinekit.tooling.CastingMoldCad;
 import machinekit.tooling.CastingMoldExport;
 import machinekit.tooling.ToolingFabricationExport;
@@ -133,8 +134,18 @@ class MillFabricationPreview {
 		for (panel in panels) {
 			try {
 				var setups = CamToolingPanels.build(panel, settings);
-				if (panel.id == "bed" && Sys.args().indexOf("--checks") >= 0 && setups.length != 4)
-					throw "Bed requires exactly four precedence-constrained tool loads";
+				if (Sys.args().indexOf("--checks") >= 0) {
+					var actual = [for (setup in setups) for (id in setup.operationIds) id];
+					var expected = [for (operation in panel.operations) operation.id];
+					var ordered = actual.copy();
+					actual.sort(Reflect.compare);
+					expected.sort(Reflect.compare);
+					if (ToolingCodec.canonical(actual) != ToolingCodec.canonical(expected))
+						throw "Panel CAM must preserve every source operation exactly once";
+					var outside = panel.operations.filter(operation -> operation.kind == OutsideProfile);
+					if (outside.length != 1 || ordered[ordered.length - 1] != outside[0].id)
+						throw "Panel outside profile must be the final operation";
+				}
 				var pending = [for (setup in setups) for (reason in setup.readinessPending) reason];
 				for (setup in setups) {
 					var name = setup.id + ".ngc",

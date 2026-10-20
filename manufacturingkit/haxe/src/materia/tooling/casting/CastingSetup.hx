@@ -13,9 +13,6 @@ typedef CastingFeatureStrategy = {
 	var featureId:String;
 	var strategy:CoreStrategy;
 
-	/** Actual source draft; box sources with positive draft require a source revision. */
-	var draftDegrees:Float;
-
 	/** Higher priority owns overlap first; IDs resolve equal priorities. */
 	var priority:Int;
 
@@ -41,6 +38,6 @@ typedef CastingSetup = {
 
 	var freeboardMm:Float;
 
-	/** Exactly one strategy per ordinary void; insert recesses are handled by fixtures. */
+	/** Explicit per-feature overrides of recipe rules; insert recesses use fixtures. */
 	var features:Array<CastingFeatureStrategy>;
 }

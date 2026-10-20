@@ -19,6 +19,8 @@ import materia.tooling.ToolingEnums.MachiningSide;
  * All casting dimensions come from the source document. It never adds design cuts.
  */
 class CastingMoldPlanner {
+	public static function sourceSupport(input:CastingToolingInput):Array<materia.tooling.ToolingValidation>
+		return CastingBoxSupport.check(input, "tooling.feature.box-geometry");
 	public static function envelope(d:ToolingDocument):MoldBox {
 		var rows = d.input.envelope;
 		if (rows.length != 1 || rows[0].profile.length != 4)
@@ -42,7 +44,12 @@ class CastingMoldPlanner {
 	}
 
 	public static function plan(document:ToolingDocument, authored:CastingMoldOptions):CastingMoldPlan {
-		var d = ToolingCodec.snapshot(document), o = CastingMoldOptionsCodec.snapshot(authored), e = envelope(d), r = d.recipe, t = r.panel.measuredThickness,
+		var d = ToolingCodec.snapshot(document);
+		var geometryChecks = sourceSupport(d.input);
+		var unsupported = geometryChecks.filter(check -> check.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported);
+		if (unsupported.length > 0)
+			throw [for (check in unsupported) check.message].join("\n");
+		var o = CastingMoldOptionsCodec.snapshot(authored), e = envelope(d), r = d.recipe, t = r.panel.measuredThickness,
 			l = r.minimumLigament;
 		if (o.precision.length != d.input.inserts.length || o.anchorage.length != d.input.inserts.length)
 			throw "Every insert needs precision and anchorage records";
@@ -50,7 +57,8 @@ class CastingMoldPlanner {
 			for (id in j.insertIds)
 				if (d.input.inserts.filter(i -> i.id == id).length != 1)
 					throw "Unknown grouted interface insert";
-		var reusable = d.setup.features.filter(v -> v.strategy == CoreStrategy.ReusableFormer);
+		var strategies = CastingStrategies.resolve(d);
+		var reusable = strategies.filter(v -> v.strategy == CoreStrategy.ReusableFormer);
 		for (index in 0...reusable.length)
 			for (other in index + 1...reusable.length) {
 				var a = reusable[index], b = reusable[other];
@@ -99,13 +107,14 @@ class CastingMoldPlanner {
 			panels: panels,
 			supportPanels: [],
 			cores: [],
+			coreUnits: [],
 			formers: [],
 			fixtures: [],
 			features: [],
 			openings: openings,
 			hardware: [],
 			changeRequests: [],
-			validation: [],
+			validation: geometryChecks,
 			fabrication: {
 				ready: false,
 				blockingRules: []
@@ -120,7 +129,7 @@ class CastingMoldPlanner {
 		}
 		for (f in d.input.features)
 			if (f.kind != CastingFeatureKind.InsertRecess) {
-				var s = d.setup.features.filter(s -> s.featureId == f.id)[0],
+				var s = strategies.filter(s -> s.featureId == f.id)[0],
 					cb = featureBox(d, f);
 				if (cb == null)
 					throw "Feature misses envelope: " + f.id;
@@ -176,24 +185,18 @@ class CastingMoldPlanner {
 					});
 					result.features.push({featureId: f.id, kind: EPSFeature, memberIds: [id]});
 					epsBoxes.push(cb);
-				} else if (s.strategy == CoreStrategy.Unsupported || s.draftDegrees > 0) {
+				} else if (s.strategy == CoreStrategy.Unsupported || f.draft.degrees > 0) {
 					result.features.push({featureId: f.id, kind: UnsupportedFeature, memberIds: []});
 					request(result, "unsupported-" + f.id, ReleaseAlternative, [f.id],
 						"This planner supports only orthogonal zero-draft rigid formers or fill-open EPS. Drafted/split formers are unsupported; choose supported EPS or revise the source to a supported geometry.",
 						"tooling.feature.unsupported." + f.id, true);
 				}
 			}
+		result.coreUnits = coreUnits(d.input, result.cores);
 		CoreSupports.sharedBridges(result.cavity, r, result.cores, result.supportPanels, result.hardware);
 		// Priority is explicit: inserts, EPS and datum supports are reserved first;
 		// rigid formers then resolve by descending authored priority and sorted IDs.
-		var ordered = d.input.features.copy();
-		ordered.sort((a, b) -> {
-			var aa = d.setup.features.filter(v -> v.featureId == a.id),
-				bb = d.setup.features.filter(v -> v.featureId == b.id);
-			var ap = aa.length == 0 ? 0 : aa[0].priority,
-				bp = bb.length == 0 ? 0 : bb[0].priority;
-			return ap == bp ? Reflect.compare(a.id, b.id) : Reflect.compare(bp, ap);
-		});
+		var ordered = ownershipOrder(d.input.features, strategies);
 		// Datum fixtures occupy negative space only; neutral validation checks their resin clearance.
 		for (i in d.input.inserts) {
 			var pose = F.compose(d.setup.sourceToMold, i.pose),
@@ -219,13 +222,13 @@ class CastingMoldPlanner {
 				z: -1.0
 			};
 			var access = ordered.filter(f -> f.kind != CastingFeatureKind.InsertRecess
-				&& d.setup.features.filter(s -> s.featureId == f.id
+				&& strategies.filter(s -> s.featureId == f.id
 					&& s.strategy == CoreStrategy.ReusableFormer
 					&& s.withdrawal != null
 					&& Math.abs(s.withdrawal.x) > 0.9)
 					.length == 1 && BoxAlgebra.intersection(featureBox(d, f), pad) != null);
 			if (access.length > 0) {
-				var dir = d.setup.features.filter(s -> s.featureId == access[0].id)[0].withdrawal;
+				var dir = strategies.filter(s -> s.featureId == access[0].id)[0].withdrawal;
 				if (dir == null)
 					throw "Missing side fixture direction";
 				withdrawal = {x: dir.x, y: dir.y, z: dir.z};
@@ -315,7 +318,7 @@ class CastingMoldPlanner {
 				memberIds: [materia.tooling.ToolingIds.derive("insert-", i.id), datum.id]
 			});
 			result.validation.push(materia.tooling.ToolingValidation.ToolingReadiness.pending("tooling.fixture.attachment." + i.id, [i.id],
-				"Bed pins register the nominal support only. Qualify insert XY location/clamping, tooling threads, datum accuracy and bore-mask release; no casting hole/thread is assumed."));
+				"Bed pins register the nominal support only. Qualify insert XY location/clamping, datum accuracy and release. Screws use declared source threads only."));
 		}
 		var fixtures:Array<MoldBox> = [];
 		for (f in result.fixtures)
@@ -345,8 +348,8 @@ class CastingMoldPlanner {
 		}
 		for (f in ordered)
 			if (f.kind != CastingFeatureKind.InsertRecess) {
-				var s = d.setup.features.filter(s -> s.featureId == f.id)[0];
-				if (s.strategy != CoreStrategy.ReusableFormer || s.draftDegrees > 0)
+				var s = strategies.filter(s -> s.featureId == f.id)[0];
+				if (s.strategy != CoreStrategy.ReusableFormer || f.draft.degrees > 0)
 					continue;
 				var cb = featureBox(d, f);
 				if (cb == null)
@@ -417,7 +420,7 @@ class CastingMoldPlanner {
 							profiles: profiles,
 							pieces: groups[index]
 						},
-						draftDegrees: s.draftDegrees,
+						draftDegrees: f.draft.degrees,
 						featureIds: [f.id],
 						withdrawal: {
 							x: direction.x,
@@ -476,8 +479,8 @@ class CastingMoldPlanner {
 						"Feature has no supported physical tooling owner; choose an explicit alternative.", "tooling.feature.unsupported." + source.id, true);
 				}
 			}
-		for (strategy in d.setup.features)
-			if (strategy.strategy == CoreStrategy.ReusableFormer && strategy.draftDegrees == 0)
+		for (strategy in strategies)
+			if (strategy.strategy == CoreStrategy.ReusableFormer && d.input.features.filter(feature -> feature.id == strategy.featureId)[0].draft.degrees == 0)
 				request(result, "draft-" + strategy.featureId, ReleaseAlternative, [strategy.featureId],
 					"Zero-draft rigid former has no qualified physical release. Only supported EPS or a source change to supported release geometry clears this rule; drafted/split formers are not implemented.",
 					"tooling.former.draft." + strategy.featureId);
@@ -528,6 +531,20 @@ class CastingMoldPlanner {
 		return result;
 	}
 
+	/** Ownership ordering accepts raw caller order, before codec canonicalisation. */
+	public static function ownershipOrder(features:Array<materia.casting.CastingFeature>,
+			strategies:Array<materia.tooling.casting.CastingSetup.CastingFeatureStrategy>):Array<materia.casting.CastingFeature> {
+		var ordered = features.copy();
+		ordered.sort((a, b) -> {
+			var aa = strategies.filter(v -> v.featureId == a.id),
+				bb = strategies.filter(v -> v.featureId == b.id);
+			var ap = aa.length == 0 ? 0 : aa[0].priority,
+				bp = bb.length == 0 ? 0 : bb[0].priority;
+			return ap == bp ? Reflect.compare(a.id, b.id) : Reflect.compare(bp, ap);
+		});
+		return ordered;
+	}
+
 	public static function sourceRoute(finish:materia.casting.InsertSpec.InsertFinish):PrecisionRoute
 		return switch finish {
 			case GroundAfterCasting, MachinedAfterCasting: PrecisionRoute.Machined;
@@ -535,6 +552,30 @@ class CastingMoldPlanner {
 			case SourceAsCast: PrecisionRoute.AsCast;
 			default: throw "Unsupported source precision finish";
 		};
+
+	public static function coreUnits(input:CastingToolingInput, cores:Array<CastingMoldCore>):Array<CastingCoreUnit> {
+		var groups = new Map<String, CastingCoreUnit>();
+		for (core in cores) {
+			var sources = input.features.filter(feature -> feature.id == core.featureId);
+			if (sources.length != 1)
+				throw "Core has no unique source feature: " + core.id;
+			var source = sources[0], parent = source.derivedFrom == null ? source.id : source.derivedFrom;
+			var group = groups.get(parent);
+			if (group == null) {
+				group = {id: materia.tooling.ToolingIds.derive("core-unit-", parent), parentFeatureId: parent, featureIds: [], coreIds: []};
+				groups.set(parent, group);
+			}
+			group.featureIds.push(source.id);
+			group.coreIds.push(core.id);
+		}
+		var result = [for (group in groups) group];
+		for (group in result) {
+			group.featureIds.sort(Reflect.compare);
+			group.coreIds.sort(Reflect.compare);
+		}
+		result.sort((a, b) -> Reflect.compare(a.id, b.id));
+		return result;
+	}
 
 	static function request(p:CastingMoldPlan, id:String, kind:DesignChangeKind, ids:Array<String>, message:String, rule:String,
 			unsupported:Bool = false):Void {
@@ -591,6 +632,8 @@ class CastingMoldPlanner {
 			if (c.foamLayers.length == 0 || c.foamLayers.length > 32)
 				throw "Invalid EPS layers";
 		}
+		if (ToolingCodec.canonical(p.coreUnits) != ToolingCodec.canonical(coreUnits(p.document.input, p.cores)))
+			throw "Core units disagree with source feature lineage";
 		for (f in p.formers)
 			member(f.volume.id);
 		for (f in p.fixtures)
@@ -598,9 +641,9 @@ class CastingMoldPlanner {
 		for (i in p.document.input.inserts)
 			member(materia.tooling.ToolingIds.derive("insert-", i.id));
 		var ruleIds = [for (v in p.validation) v.rule];
-		for (strategy in p.document.setup.features)
+		for (strategy in CastingStrategies.resolve(p.document))
 			if (strategy.strategy == CoreStrategy.ReusableFormer
-				&& strategy.draftDegrees == 0
+				&& p.document.input.features.filter(feature -> feature.id == strategy.featureId)[0].draft.degrees == 0
 				&& ruleIds.indexOf("tooling.former.draft." + strategy.featureId) < 0)
 				throw "Zero-draft former needs a release validation";
 		for (former in p.formers)

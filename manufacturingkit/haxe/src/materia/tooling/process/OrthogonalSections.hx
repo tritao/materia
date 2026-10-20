@@ -49,6 +49,8 @@ typedef OrthogonalSectionReport = {
  * physical faces. Boolean partition sizes are never mistaken for wall thickness.
  */
 class OrthogonalSections {
+	public static function sourceSupport(input:materia.tooling.casting.CastingToolingInput):Array<ToolingValidation>
+		return materia.tooling.casting.CastingBoxSupport.check(input, "process.sections.geometry");
 	static inline var EPS = 1e-7;
 
 	static function lo(b:MoldBox, a:Int):Float

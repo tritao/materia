@@ -22,6 +22,15 @@ enum abstract InsertThreadProfile(String) to String {
 
 typedef InsertThread = {var designation:String; var majorDiameter:Float; var pitch:Float; var starts:Int; var hand:InsertThreadHand; var internal:Bool; var toleranceClass:String; var profile:InsertThreadProfile;}
 typedef InsertCounterbore = {var diameter:Float; var depth:Float;}
+typedef InsertHoleLimits = {
+	var policyId:String;
+	var minEngagement:Float;
+	var minTipGap:Float;
+	var minBack:Float;
+	var minWall:Float;
+	var minClearance:Float;
+	var overrides:Array<{name:String, value:Float}>;
+}
 
 typedef InsertHole = {
 	var id:String;
@@ -32,6 +41,7 @@ typedef InsertHole = {
 	var thread:Null<InsertThread>;
 	var tapDrill:Null<Float>;
 	var counterbore:Null<InsertCounterbore>;
+	var limits:InsertHoleLimits;
 }
 
 class InsertHoleCodec {
@@ -52,7 +62,7 @@ class InsertHoleCodec {
 				"extent",
 				"thread",
 				"tapDrill",
-				"counterbore"
+				"counterbore", "limits"
 			]);
 			var t:Dynamic = Reflect.field(row, "thread"),
 				cb:Dynamic = Reflect.field(row, "counterbore");
@@ -108,7 +118,8 @@ class InsertHoleCodec {
 				extent: cast CastingRecordCodec.string(row, "extent"),
 				thread: thread,
 				tapDrill: Reflect.field(row, "tapDrill") == null ? null : CastingRecordCodec.number(row, "tapDrill"),
-				counterbore: counterbore
+				counterbore: counterbore,
+				limits: limits(Reflect.field(row, "limits"))
 			});
 		}
 		for (h in result) {
@@ -120,7 +131,7 @@ class InsertHoleCodec {
 				"extent",
 				"thread",
 				"tapDrill",
-				"counterbore"
+				"counterbore", "limits"
 			]);
 			CastingFeatureCodec.identifier(h.id);
 			if (ids.exists(h.id))
@@ -151,6 +162,39 @@ class InsertHoleCodec {
 			}
 		}
 		result.sort((a, b) -> Reflect.compare(a.id, b.id));
+		return result;
+	}
+
+	static function limits(raw:Dynamic):InsertHoleLimits {
+		CastingFeatureCodec.fields(raw, ["policyId", "minEngagement", "minTipGap", "minBack", "minWall", "minClearance", "overrides"]);
+		var result:InsertHoleLimits = {
+			policyId: CastingRecordCodec.string(raw, "policyId"),
+			minEngagement: CastingRecordCodec.number(raw, "minEngagement"),
+			minTipGap: CastingRecordCodec.number(raw, "minTipGap"),
+			minBack: CastingRecordCodec.number(raw, "minBack"),
+			minWall: CastingRecordCodec.number(raw, "minWall"),
+			minClearance: CastingRecordCodec.number(raw, "minClearance"),
+			overrides: []
+		};
+		CastingFeatureCodec.identifier(result.policyId);
+		for (name in ["minEngagement", "minTipGap", "minBack", "minWall", "minClearance"]) {
+			var value:Float = Reflect.field(result, name);
+			if (!Math.isFinite(value) || value <= 0)
+				throw "Invalid insert hole limit: " + name;
+		}
+		if (!Std.isOfType(raw.overrides, Array))
+			throw "Invalid insert hole limit overrides";
+		var rows:Array<Dynamic> = cast raw.overrides, seen = new Map<String, Bool>();
+		for (row in rows) {
+			CastingFeatureCodec.fields(row, ["name", "value"]);
+			var name = CastingRecordCodec.string(row, "name"), value = CastingRecordCodec.number(row, "value");
+			if (["minEngagement", "minTipGap", "minBack", "minWall", "minClearance"].indexOf(name) < 0
+				|| seen.exists(name) || value != Reflect.field(result, name))
+				throw "Inconsistent insert hole limit override: " + name;
+			seen.set(name, true);
+			result.overrides.push({name: name, value: value});
+		}
+		result.overrides.sort((a, b) -> Reflect.compare(a.name, b.name));
 		return result;
 	}
 }
