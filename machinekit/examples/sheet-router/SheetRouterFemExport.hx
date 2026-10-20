@@ -24,7 +24,7 @@ class SheetRouterFemExport {
         var state=new AssemblyState(machine.definition());
         var spec=machine.routerSpec;
         state.setJoint("x",spec.workX/2);state.setJoint("y",spec.workY/2);state.setJoint("z",spec.travelZ);state.forwardKinematics();
-        var selected=["beam","beamFootLeft","beamFootRight","xCarriage","zColumn","zCarriage","spindleMount"];
+        var selected=["beam","beamFootLeft","beamFootRight","xCarriage","zCarriage","spindleMount"];
         var exported=AssemblyFemExport.bodies(machine,state,folder,id->selected.indexOf(id)>=0);
         var beams:Array<Dynamic> = [],plates:Array<Dynamic> = [];
         for(member in machine.components()) {
@@ -49,11 +49,26 @@ class SheetRouterFemExport {
             beams.push({id:"base/"+member.name,startMm:vector(member.start),endMm:vector(member.end),sectionX:vector(side),
                 widthMm:profile.width,heightMm:profile.height,wallMm:profile.wall,youngsMPa:210000.0,densityKgPerMm3:7850.0/1e9});
         }
+        function blocks():Array<Dynamic> {
+            var result:Array<Dynamic> = [];
+            for(member in machine.components())if(Std.isOfType(member.component,machinekit.motion.LinearRailBlock)) {
+                var axis=StringTools.startsWith(member.id,"blockX")?"x":StringTools.startsWith(member.id,"blockY")?"y":"z";
+                result.push({id:member.id,axis:axis,railPointMm:vector(state.worldConnector(member.id,"rail")),
+                    mountPointMm:vector(state.worldConnector(member.id,"top")),
+                    radialNPerMm:axis=="y"?539000.0:460000.0,lateralNPerMm:100000.0,
+                    basis:"HIWIN HG20C/HG25C ZA radial rigidity, table 3.5; lateral 100 N/um remains assumed; no local rotational spring"});
+            }
+            return result;
+        }
+        function drives():Array<Dynamic> return [for(id in ["pinionX","pinionYLeft","pinionYRight","screwZNut"])
+            {id:id,pointMm:vector(state.worldPose(id))}];
         var poses:Array<Dynamic> = [];
         for(x in [0.0,spec.workX/2,spec.workX])for(y in [0.0,spec.workY/2,spec.workY]) {
             state.setJoint("x",x);state.setJoint("y",y);state.forwardKinematics();
             poses.push({x:x,y:y,z:spec.travelZ,toolTipMm:vector(state.worldConnector("longestTool","tip")),
-                blockXMm:vector(state.worldPose("blockX")),blockZMm:vector(state.worldPose("blockZ"))});
+                blockXMm:vector(state.worldPose("blockX")),blockZMm:vector(state.worldPose("blockZ")),blocks:blocks(),drives:drives(),
+                spindleMountsMm:[for(x in [-50.0,50.0])for(z in [110.0,230.0])
+                    vector(F.transformPoint(state.worldPose("spindleMount"),x,machine.spindle.n("diameter")/2+18,z))]});
         }
         var supports:Array<Dynamic> = [];
         for(side in 0...2)for(end in 0...3) {
@@ -62,12 +77,13 @@ class SheetRouterFemExport {
         var axes:Array<Dynamic> = [];
         for(axis in ["x","y","z"])axes.push(SheetRouterSizing.report(machine,axis));
         var result={schemaVersion:1,study:"sheet-router-sr5",status:"reduced structural screening; assumed interfaces",
+            guideLayout:machine.spec.frontGuides,yBlockSpacing:machine.spec.yBlockSpacing,
             units:{length:"mm",force:"N",mass:"kg",youngsModulus:"MPa"},workY:spec.workY,parts:exported.parts,
             materials:exported.materials,totalMassKg:exported.totalMassKg,selectedBodies:selected,beams:beams,plates:plates,
             poses:poses,supports:supports,axes:axes,loadCases:{cuttingPerAxisN:300,accelerationMPerS2:3,gravityMPerS2:9.80665},
             interfaces:{guideTranslationNPerMm:100000.0,guideRotationNmmPerRad:10000000.0,
                 boltTranslationNPerMm:1000000.0,boltRotationNmmPerRad:1000000000.0,footVerticalNPerMm:50000.0,
-                note:"Assumed individual block rotation and joint stiffness; not supplier data. Y pitch/yaw also use 140 mm block separation. Rack stiffness from SR4."},
+                note:"Spaced blocks use translational springs at exported rail/top connectors; no guessed block rotational stiffness. Radial source: HIWIN table 3.5 ZA. Lateral and bolted joints remain assumed."},
             limitations:["Missing catalogue modulus uses assumed steel 210 GPa or aluminium 69 GPa; all Poisson ratios assumed 0.3",
                 "Beam and plate strip idealisations exclude wall distortion, holes, weld/bolt stress and contact separation",
                 "Spindle mount, tool, spindle bearings, vacuum bed and workpiece are rigid in the reduced load loop",
@@ -75,7 +91,7 @@ class SheetRouterFemExport {
         File.saveContent(path,haxe.Json.stringify(result,null,"  ")+"\n");return result;
     }
     public static function main():Void {
-        var root=Sys.getEnv("SHEET_ROUTER_FEM_OUTPUT");if(root==null)root="build/sheet-router-sr5";
+        var root=Sys.getEnv("SHEET_ROUTER_FEM_OUTPUT");if(root==null)root="build/sheet-router-sr6";
         if(!FileSystem.exists(root))FileSystem.createDirectory(root);
         for(length in [2600.0,3150.0]) {
             var result=packet(new SheetRouter(new SheetRouterSpec(length)),root+"/y"+Std.int(length));

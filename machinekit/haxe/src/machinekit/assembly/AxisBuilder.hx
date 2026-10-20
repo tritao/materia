@@ -211,6 +211,27 @@ class AxisBuilder extends MachineAssembly {
 				assumptions: spec.rackingTolerance == null ? null : [{quantity: "racking tolerance", label: "stated axis design assumption"}]});
 	}
 
+    /** Moving rail on stationary blocks. Travel is checked at both ends for every block. */
+    public function slideRail(spec:AxisSpec,parent:String,id:String,rail:LinearRail,pose:AssemblyFrame,
+            axis:{x:Float,y:Float,z:Float},blockPoses:Array<AssemblyFrame>):Void {
+        if(blockPoses.length==0)throw "A moving rail needs fixed block positions";
+        var norm=Math.sqrt(axis.x*axis.x+axis.y*axis.y+axis.z*axis.z);
+        var local=AssemblyFrames.transformVector(AssemblyFrames.inverse(pose),axis.x,axis.y,axis.z);
+        if(!Math.isFinite(norm)||Math.abs(norm-1)>1e-8||Math.abs(local.x)+Math.abs(local.y)>1e-8)
+            throw "Moving rail axis must be a unit vector along its rail";
+        var inverse=AssemblyFrames.inverse(pose),reach=rail.spec.railEndMargin+rail.spec.blockLength/2;
+        var room=Math.POSITIVE_INFINITY;
+        for(block in blockPoses)for(q in [spec.lower,spec.upper]) {
+            var at=AssemblyFrames.transformPoint(inverse,block.x-axis.x*q,block.y-axis.y*q,block.z-axis.z*q).z;
+            room=Math.min(room,Math.min(at-reach,rail.length-reach-at));
+        }
+        if(room<0)throw 'Axis ${spec.id} runs a moving rail off its fixed blocks by $room mm';
+        overtravel.set(spec.id,room);axisDirections.set(spec.id,[axis.x,axis.y,axis.z]);
+        hang(id,rail,pose,parent);
+        addMateOnAxis(spec.id,"prismatic",parent,'to-$id',id,'attach-$id',axis,spec.initial,
+            {lower:spec.lower,upper:spec.upper,velocity:null,effort:null,overtravel:room,rackingTolerance:null});
+    }
+
 	/**
 	 * Connectors meeting at the child's origin with world-aligned axes, so joint axes are world
 	 * directions. Names carry the member ids, so members that share geometry can share one

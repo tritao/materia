@@ -79,17 +79,19 @@ class SheetRouterSizingChecks {
         var expectedRotor=(0.00012+0.00002)+row.rotatingOutputInertiaKgM2/25;
         near(loads[0].motors[0].rotorInertia,expectedRotor,"PlanCheck reflects joint armature to motor once");
         near(loads[0].motors[0].ratio,5*selected.couplings[0].ratio,"rack/reducer speed Jacobian");
-        var result=checker.checkSegments(new SizingAcceleration(),4,0.3);
-        for(diagnostic in result.diagnostics)check(diagnostic.kind!=ServoPeakTorque&&diagnostic.kind!=ServoRatedTorque,"selected Y passes PlanCheck torque screen at 3 m/s²");
-        var weak=new PlanCheck(model(machine,row,true),["y"],options).checkSegments(new SizingAcceleration(),4,0.3),named=0;
+        var result=checker.checkSegments(new SizingCycle(),4,0.3);
+        for(diagnostic in result.diagnostics)check(diagnostic.kind!=ServoPeakTorque&&diagnostic.kind!=ServoRatedTorque,"selected Y passes PlanCheck full-cycle torque screen at 3 m/s²");
+        options.cuttingForce=600; // Explicit overload: reject both weak motors by name.
+        var weak=new PlanCheck(model(machine,row,true),["y"],options).checkSegments(new SizingCycle(),4,0.3),named=0;
         for(diagnostic in weak.diagnostics)if(diagnostic.kind==ServoRatedTorque&&diagnostic.subject.indexOf("400W")>=0)named++;
-        check(named==2,"both 400 W Y alternatives are rejected by name at 3 m/s²");
+        check(named==2,"both 400 W Y motors are rejected by name for the 600 N overloaded duty");
+        options.cuttingForce=SheetRouterSizing.CUTTING_N;
         // A follower's drag is torque at that shaft, and must be divided by its motor reduction.
         selected.couplings[0].drag=0.02;
         var withDrag=DriveLoads.forAxis(selected,"y");if(withDrag==null)throw "Missing Y drive load";
         near(withDrag.motors[0].drag,0.02/(5*0.95),"output drag reflected to the motor");
         options.tolerance=1e-6;
-        var inaccurate=new PlanCheck(selected,["y"],options).checkSegments(new SizingAcceleration(),4,0.3),accuracy=false,assumed=false;
+        var inaccurate=new PlanCheck(selected,["y"],options).checkSegments(new SizingCycle(),4,0.3),accuracy=false,assumed=false;
         for(diagnostic in inaccurate.diagnostics)if(diagnostic.kind==Accuracy) {
             accuracy=true;for(label in diagnostic.assumed)if(label.indexOf("hinge")>=0)assumed=true;
         }
@@ -114,7 +116,7 @@ class SheetRouterSizingChecks {
                     near(input.metresPerRadian,radius/(axis=="x"?7.5:5),"selected axis ratio");
                 } else {
                     check(row.screw.criticalRpm>=row.demand.motorRpm,"selected Z rapid below fixed/free critical speed");
-                    check(row.screw.alternative20CriticalRpm<row.screw.requested15MMinRpm,"20 mm alone also cannot reach original 15 m/min target");
+                    check(row.screw.alternative20CriticalRpm>row.screw.criticalRpm,"larger root increases critical speed at the same support span");
                 }
             }
             var x=rows[0],y=rows[1],z=rows[2];
@@ -149,13 +151,24 @@ class SheetRouterSizingChecks {
     public static function main():Void {run();if(Sys.args().indexOf("--checks-only")<0)SheetRouterSizing.main();}
 }
 
-/** A short cutting-acceleration chunk used by the live PlanCheck too. */
-private class SizingAcceleration implements StreamSegments {
+/** Loaded 100 mm out-and-back at 3 m/s² / 0.5 m/s, followed by a 1 s dwell.
+ * Thermal RMS must include the declared duty, rather than treating a single
+ * acceleration chunk as the entire repeating cycle. */
+private class SizingCycle implements StreamSegments {
+    final durations:Array<Float> = [1/6,1/30,1/6,1/6,1/30,1/6,1];
+    final positions:Array<Float> = [0,1/24,7/120,0.1,7/120,1/24,0];
+    final velocities:Array<Float> = [0,0.5,0.5,0,-0.5,-0.5,0];
+    final accelerations:Array<Float> = [3,0,-3,-3,0,3,0];
     public function new() {}
-    public function count():Int return 1;
+    public function count():Int return durations.length;
     public function jointCount():Int return 1;
-    public function startNs(index:Int):Int64 return Int64.ofInt(0);
-    public function durationNs(index:Int):Int64 return Int64.ofInt(100000000);
+    public function startNs(index:Int):Int64 {
+        var seconds=0.0;for(i in 0...index)seconds+=durations[i];
+        return Int64.fromFloat(Math.round(seconds*1e9));
+    }
+    public function durationNs(index:Int):Int64 return Int64.fromFloat(Math.round(durations[index]*1e9));
     public function degree(index:Int):Int return 2;
-    public function coefficient(index:Int,joint:Int,power:Int):Float return power==2?1.5:0.0;
+    public function coefficient(index:Int,joint:Int,power:Int):Float return switch(power) {
+        case 0:positions[index];case 1:velocities[index];case 2:accelerations[index]/2;default:0;
+    };
 }

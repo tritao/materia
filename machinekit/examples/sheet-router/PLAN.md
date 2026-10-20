@@ -247,9 +247,9 @@ procedure, the electrical schematic and wire list, the commissioning procedure.
   stiffness grow with it. The length only adds frame, rack, rail, table and cable chain, so Y is a
   `SheetRouterSpec` parameter: 2600 by default, 3150 for 3050 × 1525 sheets. Every check runs at
   both.
-- Y travel = work area + the tool-rack zone at the rear (SR-D5), about 2800 mm by default.
-- Z: 250 mm travel, 150 mm clearance from the gantry to the spoilboard top. Assumed; SR3 confirms
-  it against the longest tool plus the rack height.
+- Y travel = work area + the tool-rack zone at the rear (SR-D5), 2900 mm by default (3450 mm for the long bed).
+- Z: 200 mm travel, with approximately 149 mm moving-plate clearance above the spoilboard
+  at full Z. The eight rack poses fit; the real tool-length range remains provisional.
 - **Rejected:**
   - a 1300 mm span (4 × 8 only): it cannot take 1525-wide sheets;
   - a moving table: it doubles the footprint at this size.
@@ -295,8 +295,8 @@ machined.**
 - Rack: helical normal module 1.5, helix 19°31′42″, 20 pinion teeth: exactly
   100 mm per pinion turn. Y has 5:1 reduction (20 mm/motor turn); X has 7.5:1
   (13.333 mm/motor turn), selected by the SR4 torque screen.
-- Y uses two 750 W servos, X one 400 W servo. Z uses a braked 400 W servo and
-  the 16 x 5 ball screw. Catalogue ratings and all bought-part dimensions remain assumed.
+- Y uses two 750 W servos, X one 750 W servo. Z uses a braked 750 W servo and
+  the 1610 ball screw. Bought-part ratings/dimensions require supplier qualification.
 - Planetaries have an assumed 3 arcmin backlash, 12,000 N m/rad output stiffness,
   95% efficiency, 80/160 N m rated/peak output torque and 1500/2000 N axial/radial
   bearing limits. The rack's separate 95% efficiency gives 90.25% through XY.
@@ -310,10 +310,9 @@ machined.**
 - The screen uses 3 m/s², 300 N cutting allowance, 30 N guide/seal drag and **1.5
   torque reserve**, with a 100 mm loaded out-and-back and one second powered dwell.
   It separately checks sustained cutting. SR13 replaces the cutting allowance.
-- XY retains 40 m/min: 2000 motor rpm in Y and 3000 in X. **Z rapid is 5 m/min**
-  (1000 rpm). Its 608.25 mm fixed/free screw has a conservative operating critical-speed
-  bound near 1191 rpm; neither 16 mm nor a same-span 20 mm screw meets the earlier
-  15 m/min proposal. A faster Z needs a revised physical support/layout study.
+- XY retains 40 m/min: 2000 motor rpm in Y and 3000 in X. Z rapid is 10 m/min
+  at 1000 rpm with the 1610 screw and 390 mm fixed/free shaft. The revised SR4
+  checks critical speed, torque, brake demand and the actual screw lead.
 - The matched belt-reduction proposal has 300 mm free spans and assumed EA=100 kN.
   It has more elastic compliance than the planetary and requires 159/239 mm driven
   pitch diameters in place of the 80 mm housing. Its mount, tooth capacity and supplier
@@ -520,22 +519,22 @@ only as sources in docs. Standards (ISO30 / ISO 7388, ER collets, EN 60204-1, IS
 | Quantity | Value | Source |
 |---|---|---|
 | Work area Y × X | 2600 × 1600 mm (Y 3150 option) | decided (SR-D1) |
-| Travel Y / X / Z | 2900 (3450 option) / 1600 / 250 mm, including 300 mm rack zone | SR3 layout |
-| Gantry clearance to spoilboard | 150 mm | assumed |
-| Rapid XY / Z | 40 / 5 m/min | SR4 screen; earlier 15 m/min Z rejected |
+| Travel Y / X / Z | 2900 (3450 option) / 1600 / 200 mm, including 300 mm rack zone | SR3 layout |
+| Beam underside / moving Z plate clearance to spoilboard | ≈ 328 / 149 mm at full Z | current CAD envelope |
+| Rapid XY / Z | 40 / 10 m/min | revised SR4 screen |
 | Cutting feed | up to 20 m/min | assumed |
 | Acceleration XY / Z | 3 / 3 m/s² | assumed |
-| Gantry moving mass | 149.170 kg (149.287 kg long bed), whole moving chain allowance included | SR4 CAD mass, assumed geometry/density |
-| X / Z moving mass | 47.119 / 23.018 kg | SR4 CAD mass, assumed geometry/density |
-| Rails | HGR25 on Y (2 blocks per side), HGR20 on X and Z | assumed |
+| Gantry moving mass | 175.743 kg (175.860 kg long bed), whole moving chain allowance included | revised SR4 CAD mass, assumed geometry/density |
+| X / Z moving mass | 53.355 / 25.696 kg | revised SR4 CAD mass, assumed geometry/density |
+| Rails | Y HGR25 blocks 280 mm apart; X/Z each two HGR20 rails/four blocks | guide-first candidate |
 | Rack and pinion | helical mn 1.5, β 19°31′42″, 20 T → 100 mm/rev | derived |
 | Reducers | Y 5:1; X 7.5:1; 3 arcmin planetary | SR4 selection, assumed ratings |
-| Servos | Y 2 × 750 W, X 400 W, Z 400 W + brake | assumed |
+| Servos | Y 2 × 750 W, X 750 W, Z 750 W + brake | revised SR4; catalogue-class assumptions |
 | Pulse resolution | 5000 pulses/rev: Y 4 µm / 167 kHz; X 2.667 µm / 250 kHz at 40 m/min | derived; board rate qualification pending |
-| Z screw | Ø16 × 5 mm, 13 mm race root, direct drive, fixed/free | SR4 selection at 5 m/min; assumed dimensions |
+| Z screw | Ø16 × 10 mm, 13 mm assumed race root, 390 mm fixed/free shaft | revised SR4 selection at 10 m/min |
 | Beam | RHS 200 × 100 × 6.3 steel retained as baseline | SR5; carriage/guide redesign required |
-| Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | target; current SR5 screen ≈ 0.0061 X / 0.00585 Y |
-| First gantry mode | ≥ 40 Hz | target; current SR5 screen ≈ 2.73 Hz |
+| Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | target; revised screen ≈ 1.00 X / 0.480 Y, still fails |
+| First gantry mode | ≥ 40 Hz | target; revised gantry-dominant screen min 27.25 Hz; global frame min 5.18 Hz |
 | Spindle | ISO30 ATC, ≈ 6 kW S1, 18–24k rpm, 400 V 3~, air-cooled | assumed |
 | VFD | 7.5 kW 400 V with braking resistor and STO | assumed |
 | Tool rack | 8 forks, pneumatic cover, rear rack zone | assumed |
@@ -667,19 +666,54 @@ mesh comparison changes static compliance by at most 0.61% and the first six mod
 Analytical beam and rotational-spring checks, energy/force balance, reciprocity, foundation
 compression and the existing mill regressions pass.
 
-Decisions: retain steel RHS 200 × 100 × 6.3 as the beam baseline; use a closed X bridge and
-spaced X rails/blocks, and replace the single Z block with spaced guides. Reject 12 mm aluminium
-beam feet for final design; 20 mm steel is the next candidate, with packaging and changed mass
-to be checked. Keep tubes empty: even perfectly bonded fill cannot resolve the carriage/guide
-limits and adds substantial mass; no damping benefit is quantified.
+**Guide-first revision (2026-10-20), superseding the initial SR5 recommendations.**
+Retain the steel RHS 200 × 100 × 6.3 beam with 200 mm vertical. Use two X rails
+150 mm apart and four blocks spaced 300 mm along X. Start with a flat 25 mm aluminium
+X carriage, not a closed bridge. Z uses two rails on its moving 20 mm plate, four blocks
+fixed to the X carriage, 160 mm rail spacing and 200 mm vertical block spacing.
+Y blocks are now 280 mm apart per side. The guide-only trial identified the beam feet
+as another limit; the candidate uses 20 mm steel feet. A direct two-level spindle saddle
+replaces the long horizontal flange shelf. Keep the tubes empty.
 
-Eccentric Y loading supersedes SR4's equal-share assumption: the reserved worst branch force
-is 827.65 N. Servo torque, reducer loads and preload still pass, but the existing 20 mm engaged
-rack/pinion face reaches 706.06 MPa against the assumed 700 MPa contact limit. A 25 mm engaged
-face on **both** rack and pinion passes the tooth screen; its fit is not yet qualified.
+The revised screen places each guide block's translational springs at its actual CAD
+connector; tipping resistance follows from their spacing. Published radial rigidity is
+used for the specified guide/preload class; lateral rigidity remains an explicit assumption.
+No individual guide rotational spring is used. The model also distributes the table support
+across six bed-stock seats and excludes independently floor-supported cabinet/blower mass.
 
-SR6 starts with this structural redesign and reruns SR4/SR5 before releasing fabrication
-files. The candidates above have not been substituted into CAD or claimed to meet SR-D3.
+The old 706.06 versus assumed 700 MPa rack result does not justify upsizing. Use the
+manufacturer's permissible feed force for the specified hardened module-1.5 family,
+with mounting derating and actual preload-flank demand. Standard nominal rack width is
+19 mm; the CAD retains its conservative 20 mm envelope pending an exact supplier drawing.
+No 25 mm rack is selected. Module 2 / 15 teeth remains a valid 100 mm/revolution fallback.
+See [SOURCING.md](SOURCING.md) for the supplier basis and qualification conditions.
+
+Z now uses a 1610 screw, 390 mm fixed/free shaft, 200 mm stroke and 10 m/min rapid.
+The screw's actual lead drives the sizing calculations. X and braked Z servos are 750 W
+to retain the duty reserve with the revised geometry; Y remains dual 750 W.
+The eight rack pickup/approach poses fit the reduced stroke. The 200 mm selection remains
+provisional for the authored 120 mm tool envelope; shorter-tool reach and a real tool-length
+range must be qualified with the tool table before release. SR6 fabrication remains gated
+by the revised assembly, eccentric-drive and structural results, recorded in `fem/README.md`.
+
+The revised SR4 full-cycle planner/sizing gate passes 82 assertions. Nominal longer-bed
+moving Y mass is 175.86 kg, with combined drive stiffness 17.065 MN/m. Its ideal
+drive-only frequency is 49.58 Hz; halving hinge stiffness gives 38.61 Hz and adding
+10% mass gives 47.27 Hz. The hinge contributes 64.9% of series drive compliance.
+These estimates exclude frame, plate and guide compliance; they do not establish the
+40 Hz whole-gantry target. The spindle gauge was lowered 60 mm from the first
+close-coupled trial to clear moving rail/plate ends past the tool-rack forks.
+
+The settled candidate passes 426 assembly/clearance assertions and all 36 structural
+solves pass force, energy, reciprocity, support-compression and mesh checks. Nevertheless,
+worst X/Y stiffness is only 1.005 / 0.480 N/µm; the lowest classified gantry-dominant
+mode is 27.249 Hz, with global frame modes down to 5.177 Hz. SR-D3 remains unmet.
+Z plate/rail compliance leads the worst Y case (about 56%); frame compliance leads X.
+The X plate contributes about 13% of worst Y compliance. Investigate the Z load path
+and frame supports/bracing next; no closed X box is selected and no fabrication files
+are released. The worst reserved eccentric Y branch is 874.60 N and both drives pass
+the supplier-based rack, reducer, preload and torque checks. See the FEM report for
+classification limits, sourcing conditions and the evidence directory.
 
 **SR6. Frame, fabrication drawings and alignment procedures (SR-D2, SR-D11).**
 - Weldment: tube layout, weld seams and sequence, jig layout (frame points as jig stops), cut
@@ -951,13 +985,13 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 
 | Step | State | Commits |
 |---|---|---|
-| SR0 | started: reference survey recorded; gate blocked by disk headroom and toolchain setup; workshop facts pending | see SR0 notes |
+| SR0 | reference survey and toolchain/disk gates exercised; workshop facts pending | see SR0 notes |
 | SR1 | done: 25 assumed part recipes, HGR20/25 rows; focused gate 292 assertions | this commit |
 | SR2 | done: shared servo/reducer/steel builders; 59 focused assertions, existing gantry/router checks, 292 catalogue assertions | this commit |
 | SR3 | complete: both beds, project load/hold/homing and focused regressions pass | see SR3 notes |
-| SR4 | complete: two-bed sizing and rack compliance; focused, planner, assembly and app gates pass | see SR4 notes |
-| SR5 | planned | |
-| SR6 | planned | |
+| SR4 | revised two-bed drive/rack/screw screen complete; 82 sizing/planner assertions pass | see guide-first revision |
+| SR5 | reduced screening complete; revised structural targets still fail | see guide-first revision and FEM report |
+| SR6 | guide-first CAD and clearance checks complete; fabrication gated by SR-D3 | see guide-first revision |
 | SR7 | planned | |
 | SR8 | planned | |
 | SR9 | planned | |
@@ -1176,6 +1210,8 @@ Root free space at closing was 3.6 GiB.
 
 ## SR3 — full-sheet reference assembly
 
+Historical SR3 snapshot; the guide-first revision above supersedes its guide, Z and motor selections.
+
 `SheetRouterSpec` keeps a 1600 mm X work area and a parameterised Y work length
 (2600 or 3150 mm in the checks). The rear rack zone adds 300 mm, giving 2900 or
 3450 mm Y travel; Z travel remains 250 mm. This replaces the preliminary
@@ -1302,6 +1338,8 @@ hardware dimensions/ratings and electrical/safety acceptance remain open.
 
 
 ## SR4 — drive sizing and compliance
+
+Historical first sizing snapshot; the guide-first revision above supersedes its masses, Z and motor selections.
 
 `SheetRouterSizing` derives X/Y/Z translating masses from the actual mate-tree
 subtrees and component `massProperties()`. A whole routed chain is added when

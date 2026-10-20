@@ -25,6 +25,9 @@ class SheetRouterFemChecks {
         Sys.println("Sheet router SR5: "+assertions+" exporter/centreline assertions passed");
     }
     public static function main():Void {
+        if(Sys.args().indexOf("--export-only")>=0) {SheetRouterFemExport.main();return;}
+        if(Sys.args().indexOf("--baseline")>=0) {SheetRouterAxesTests.main();return;}
+        if(Sys.args().indexOf("--layout")>=0) {SheetRouterGuideChecks.main();return;}
         if(Sys.args().indexOf("--name")>=0) {MillFemExport.main();return;}
         if(Sys.args().indexOf("--y-loads")>=0) {SheetRouterFemYLoads.main();return;}
         checks();

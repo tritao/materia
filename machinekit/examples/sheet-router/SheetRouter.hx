@@ -30,11 +30,11 @@ class SheetRouter extends Gantry {
         homeAfter("y",["z","x"]);
         bindMotorBrake("motorZ","motorZ","sheet-router/z-brake.release","sheet-router/z-brake.released",250,100);
         // The spindle stands upright, ahead of the slide; gauge is below its body.
-        gaugeZero=F.translation(flangeZero.x,flangeZero.y-140,flangeZero.z-180);
         spindle=new AtcSpindle();
-        attach("spindle",spindle,gaugeZero,"flange");
-        attach("spindleMount",new SheetSpindleMount(spindle.n("diameter"),140,cast component("flange")),
-            F.translation(flangeZero.x,flangeZero.y,flangeZero.z),"flange");
+        var reach=spindle.n("diameter")/2+18;
+        gaugeZero=F.translation(flangeZero.x,flangeZero.y-reach,flangeZero.z-240);
+        attach("spindleMount",new SheetSpindleSaddle(spindle.n("diameter"),reach),gaugeZero,"zCarriage");
+        attach("spindle",spindle,gaugeZero,"spindleMount");
         attach("spindleRelease",spindle.releaseCylinder(),F.compose(gaugeZero,F.translation(0,0,spindle.n("length"))),"spindle");
         exposeConnector("spindleGauge","spindle","gauge");
         var holder=new ToolHolder();attach("holder",holder,gaugeZero,"spindle");
@@ -88,11 +88,12 @@ class SheetRouter extends Gantry {
         attach("airSupply",new AirSupply(),F.translation(right+300,front,100),"base");
         attach("airManifold",new PneumaticManifold(2),F.translation(right+300,front,230),"base");
         connectPorts("airFeed","airSupply","air","airManifold","input");
-        shoe=new DustShoe();
-        var shoeZero=F.compose(gaugeZero,F.translation(0,0,60));
+        shoe=new DustShoe(new ComponentValues().setNumber("diameter",150).setNumber("brushLength",40).setNumber("hoseRise",20).setNumber("hoseOffset",120).setNumber("hoseAngle",3*Math.PI/2));
+        var shoeZero=F.compose(gaugeZero,F.translation(0,0,40));
         lift("shoeLift","shoe",shoe,shoeZero,"spindle",shoe.liftCylinder(),shoe.n("liftStroke"),0);
+        var coverZ=Math.max(rackPose.z+rack.n("forkHeight")+60,zeroPose("frameBack").z+spec.frameSection().height/2+5);
         var cover=new GantryPlate("rack cover",rack.parameterCount("pockets")*rack.n("pitch")+20,300,8);
-        lift("rackCoverLift","rackCover",cover,F.translation(rackPose.x,rackPose.y-20+rack.n("coverStroke"),rackPose.z+rack.n("forkHeight")+60),
+        lift("rackCoverLift","rackCover",cover,F.translation(rackPose.x,rackPose.y-20+rack.n("coverStroke"),coverZ),
             "toolRack",rack.coverCylinder(),rack.n("coverStroke"),0);
         var cabinetPose=F.translation(right+600,front+600,0);
         attach("vfd",new machinekit.power.Vfd(),F.compose(cabinetPose,F.translation(-180,0,200)),"base");
@@ -134,7 +135,7 @@ class SheetRouter extends Gantry {
         attach(joint+"Bracket",new GantryPlate("lift rod bracket",80,20,anchorZ),
             F.translation(pose.x+anchorX,pose.y,pose.z),id);
         attach(joint+"Rod",cylinder.movingRod(),AxisBuilder.orient(pose.x+anchorX,pose.y,pose.z+anchorZ,up,along),id);
-        attach(v,new SolenoidValve(),F.translation(pose.x+220,pose.y,pose.z+200),parent);
+        attach(v,new SolenoidValve(),F.translation(pose.x+(joint=="shoeLift"?-220:220),pose.y,pose.z+200),parent);
         connectPorts(joint+"Air","airManifold",joint=="shoeLift"?"out1":"out2",v,"P");
         connectPorts(joint+"A",v,"A",c,"A");connectPorts(joint+"B",v,"B",c,"B");
         addCylinder(joint+"Drive",joint,c,v);
@@ -162,13 +163,15 @@ class SheetRouter extends Gantry {
                     box(post-20,fixed.y-20,fixed.z-27.5,fixed.x+25,fixed.y+20,fixed.z-15.5)
                 ],fixed);
             } else {
+                var plate:machinekit.gantry.GantryParts.GantryPlate=cast component("xCarriage");
+                var carriageTop=carriage.z+plate.depth/2;
                 support("chainXMovingBracket","xCarriage",[
-                    box(carriage.x-40,carriage.y-40,carriage.z+12,carriage.x+40,carriage.y+40,carriage.z+24),
-                    box(carriage.x-35,carriage.y-15,carriage.z+24,carriage.x-5,carriage.y+15,end.z-15.5),
+                    box(carriage.x-40,carriage.y-40,carriageTop-12,carriage.x+40,carriage.y+40,carriageTop),
+                    box(carriage.x-35,carriage.y-15,carriageTop,carriage.x-5,carriage.y+15,end.z-15.5),
                     box(end.x-40,carriage.y-20,end.z-27.5,end.x,end.y+25,end.z-15.5),
                     box(end.x-10,end.y-25,end.z-17.5,end.x,end.y+25,end.z+17.5)
                 ],end,[box(end.x-11,end.y-20,end.z-12.5,end.x+1,end.y+20,end.z+12.5)]);
-                var post=beam.y+350;
+                var post=beam.y+420;
                 support("chainXFixedBracket","beam",[
                     box(fixed.x-20,beam.y+50,beam.z,fixed.x+20,post+20,beam.z+12),
                     box(fixed.x-20,post-20,beam.z+12,fixed.x+20,post+20,fixed.z-15.5),
@@ -219,18 +222,30 @@ class SheetRouterTool extends MachineComponent {
     override public function geometry(detail:ComponentDetail=Preview):Part return Part.cylinderSpan(6,-length,0);
 }
 
-/** Backplate and ring clamp; spindle axis lies ahead of the slide mounting plane. */
-class SheetSpindleMount extends MachineComponent {
-    final diameter:Float;final reach:Float;final flange:machinekit.robotics.RobotFlange;
-    public function new(diameter:Float,reach:Float,flange:machinekit.robotics.RobotFlange) {super('SHEET-SPINDLE-MOUNT-$diameter-$reach','Spindle saddle and ring clamp','aluminium 6061',true);this.diameter=diameter;this.reach=reach;this.flange=flange;}
+/** Two spaced clamps react spindle moments into a vertical plate through a bolt couple. */
+class SheetSpindleSaddle extends MachineComponent {
+    public final diameter:Float;
+    public final reach:Float;
+    public function new(diameter:Float,reach:Float) {
+        super('SHEET-SPINDLE-SADDLE-$diameter-$reach',"Two-level spindle clamp saddle","aluminium 6061",true);
+        this.diameter=diameter;this.reach=reach;
+        for(x in [-50.0,50.0])for(z in [110.0,230.0])addConnector('mount$x-$z',Mount,F.translation(x,reach,z));
+    }
     override public function hasGeometry():Bool return true;
     override public function geometry(detail:ComponentDetail=Preview):Part return Solids.building([],parts->{
-        var back=Part.box(100,80,40);var backPlate=back.translated(new Vector(0,0,-40));back.close();parts.push(backPlate);
-        var blank=Part.box(diameter+30,reach,20);var bridge=blank.translated(new Vector(0,-reach/2,-40));blank.close();parts.push(bridge);
-        var ring=Solids.cut(Part.cylinderSpan(diameter/2+15,-50,-10,0,-reach),[Part.cylinderSpan(diameter/2+0.2,-51,-9,0,-reach)]);parts.push(ring);
-        var tool=flange.mountingCutout(40);
-        var mounted=tool.placed(new cadkit.modeling.Location(new cadkit.modeling.Plane(new Vector(0,0,0),new Vector(-1,0,0),new Vector(0,0,-1))));tool.close();
-        return Solids.cut(Solids.union(parts),[Part.cylinderSpan(diameter/2+0.2,-51,-9,0,-reach),mounted]);
+        var blank=Part.box(160,16,160),back=blank.translated(new Vector(0,reach-8,90));blank.close();parts.push(back);
+        for(z in [100.0,220.0]) {
+            var ring=Part.cylinderSpan(diameter/2+20,z,z+20);parts.push(ring);
+            var web=Part.box(120,reach,20),placed=web.translated(new Vector(0,reach/2,z));web.close();parts.push(placed);
+        }
+        var body=Solids.union(parts),tools:Array<Part> = [Part.cylinderSpan(diameter/2+0.2,89,251)];
+        for(z in [100.0,220.0]) {
+            var blank=Part.box(2,diameter+40,22),slit=blank.translated(new Vector(0,-(diameter+40)/2,z-1));blank.close();tools.push(slit);
+        }
+        for(x in [-50.0,50.0])for(z in [110.0,230.0])tools.push(Part.cylinderAlong(3.3,new Vector(x,reach+1,z),new Vector(0,-1,0),18));
+        // Trim the ring flats to the actual plate mounting plane.
+        var cutter=Part.box(diameter+100,100,200),rear=cutter.translated(new Vector(0,reach+50,80));cutter.close();tools.push(rear);
+        return Solids.cut(body,tools);
     });
 }
 

@@ -17,16 +17,19 @@ class DustShoe extends AssumedCatalogComponent {
     P.length("brushLength", 60),
     P.length("hoseDiameter", 100),
     P.length("hoseOffset", 130),
+    P.length("hoseRise", 40),
+    P.quantity("hoseAngle", 0, "rad"),
     P.length("liftStroke", 120),
     P.length("liftBore", 25)
   ];
   public function new(?v:ComponentValues) {
     super("dust-shoe", "lifting dust shoe", "aluminium 6061", inputs(), v);
-    positive(["diameter", "spindleClearance", "height", "brushLength", "hoseDiameter", "hoseOffset", "liftStroke", "liftBore"]);
+    positive(["diameter", "spindleClearance", "height", "brushLength", "hoseDiameter", "hoseOffset", "hoseRise", "liftStroke", "liftBore"]);
     require(n("hoseDiameter") > 6, "hose wall consumes bore");
     require(n("spindleClearance") < n("diameter"), "spindle opening exceeds shoe");
     addConnector("mount", Mount, Solids.axial(0, 0, n("height")));
-    addConnector("hose", Mount, Solids.axial(n("hoseOffset"), 0, n("height") + 40));
+    require(Math.isFinite(n("hoseAngle")), "hose angle must be finite");
+    addConnector("hose", Mount, Solids.axial(n("hoseOffset")*Math.cos(n("hoseAngle")), n("hoseOffset")*Math.sin(n("hoseAngle")), n("height") + n("hoseRise")));
     addConnector("lift", Axis, Solids.axial(0, 0, n("height")));
     require(n("hoseOffset")-n("hoseDiameter")/2>=n("spindleClearance")/2+3 && n("hoseOffset")<n("diameter")/2+n("hoseDiameter")/2, "hose must clear spindle and overlap shoe ring");
     liftCylinder();
@@ -62,8 +65,9 @@ class DustShoe extends AssumedCatalogComponent {
         Part.cylinderSpan(
           n("hoseDiameter") / 2,
           n("height") / 2,
-          n("height") + 40,
-          n("hoseOffset")
+          n("height") + n("hoseRise"),
+          n("hoseOffset")*Math.cos(n("hoseAngle")),
+          n("hoseOffset")*Math.sin(n("hoseAngle"))
         ),
         "hose-neck"
       ),
@@ -71,8 +75,9 @@ class DustShoe extends AssumedCatalogComponent {
         Part.cylinderSpan(
           n("hoseDiameter") / 2 - 3,
           n("height") / 2 - 1,
-          n("height") + 41,
-          n("hoseOffset")
+          n("height") + n("hoseRise") + 1,
+          n("hoseOffset")*Math.cos(n("hoseAngle")),
+          n("hoseOffset")*Math.sin(n("hoseAngle"))
         ),
         "hose-bore"
       )]

@@ -39,7 +39,7 @@ class SheetRouterChecks {
             var definition=machine.definition(),state=new AssemblyState(definition);
             var start=state.worldConnector('spindle','gauge');
             var samples:Array<Array<Float>> = [];
-            for(x in [0.0,800.0,1600.0])for(y in [0.0,length/2,length,length+300])for(z in [0.0,125.0,250.0]) {
+            for(x in [0.0,800.0,1600.0])for(y in [0.0,length/2,length,length+300])for(z in [0.0,machine.routerSpec.travelZ/2,machine.routerSpec.travelZ]) {
                 state.setJoint('x',x);state.setJoint('y',y);state.setJoint('z',z);state.forwardKinematics();
                 var gauge=state.worldConnector('spindle','gauge');
                 near(gauge.x-start.x,x,'corner X');near(gauge.y-start.y,y,'corner Y');near(gauge.z-start.z,-z,'corner Z');
@@ -54,7 +54,7 @@ class SheetRouterChecks {
                 var shoe=state.worldPose('shoe');
                 check(shoe.z-machine.shoe.n('brushLength')>pocket.z,'raised shoe clears fork');
                 samples.push(q);
-                check(q[0]>=0&&q[0]<=1600&&q[1]>=0&&q[1]<=length+300&&q[2]>=0&&q[2]<=250,'rack pocket reachable '+i);
+                check(q[0]>=0&&q[0]<=1600&&q[1]>=0&&q[1]<=length+300&&q[2]>=0&&q[2]<=machine.routerSpec.travelZ,'rack pocket reachable '+i);
                 var approach=F.compose(machine.zeroPose('fork${i+1}'),machine.component('fork${i+1}').connector('approach').frame);
                 near(approach.x,pocket.x,'fork opens along Y');check(approach.y<pocket.y&&approach.y>machine.workOrigin.y+length+20,'fork approach stays beyond the full sheet');
                 var entry=machine.gaugeCoordinates(F.translation(approach.x,approach.y,gauge.z));

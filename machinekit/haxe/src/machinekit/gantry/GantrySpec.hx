@@ -23,7 +23,20 @@ enum GantryStructure {
     Aluminium;
     Steel(frame:machinekit.structural.RectTube,beam:machinekit.structural.RectTube);
 }
+/** Front-face four-block X carriage with fixed Z blocks and moving Z rails. */
+typedef FrontGuideLayout = {
+    var xRailSpacing:Float;
+    var xBlockSpacing:Float;
+    var zRailSpacing:Float;
+    var zBlockSpacing:Float;
+    var carriageThickness:Float;
+    var movingThickness:Float;
+}
+
 typedef GantryOptions = {
+    @:optional var frontGuides:FrontGuideLayout;
+    @:optional var beamFootThickness:Null<Float>;
+    @:optional var beamFootMaterial:String;
     @:optional var railProfileY:String;
     @:optional var yBlockSpacing:Null<Float>;
     @:optional var railPadHeight:Null<Float>;
@@ -61,6 +74,9 @@ class GantrySpec {
 	public final dualY:Bool;
 	public final railProfile:String;
 	public final motorFrame:Int;
+    public final frontGuides:Null<FrontGuideLayout>;
+    public final beamFootThickness:Float;
+    public final beamFootMaterial:Null<String>;
     public final railProfileY:String;
     public final yBlockSpacing:Float;
     public final railPadHeight:Float;
@@ -111,6 +127,13 @@ class GantrySpec {
 		if (!Math.isFinite(sideExtension) || sideExtension < 0) throw "Gantry side extension must be finite and non-negative";
 		if (!Math.isFinite(frameLift) || frameLift < 0) throw "Gantry frame lift must be finite and non-negative";
         var selected:GantryOptions=options==null?{motor:null}:options;
+        beamFootThickness=selected.beamFootThickness==null?12:selected.beamFootThickness;
+        beamFootMaterial=selected.beamFootMaterial;
+        if(!Math.isFinite(beamFootThickness)||beamFootThickness<=0)throw "Invalid beam foot thickness";
+        frontGuides=selected.frontGuides;
+        if(frontGuides!=null)for(value in [frontGuides.xRailSpacing,frontGuides.xBlockSpacing,frontGuides.zRailSpacing,
+                frontGuides.zBlockSpacing,frontGuides.carriageThickness,frontGuides.movingThickness])
+            if(!Math.isFinite(value)||value<=0)throw "Front guide dimensions must be finite and positive";
         railProfileY=selected.railProfileY==null?railProfile:selected.railProfileY;
         yBlockSpacing=selected.yBlockSpacing==null?0:selected.yBlockSpacing;
         railPadHeight=selected.railPadHeight==null?0:selected.railPadHeight;

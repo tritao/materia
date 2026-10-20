@@ -1,5 +1,91 @@
 # SR5 structural screen
 
+## Guide-first candidate (SR6, 2026-10-20)
+
+The current CAD implements the guide-first revision in [SOURCING.md](../SOURCING.md).
+The initial SR5 results below describe the superseded single-block assembly.
+The new candidate uses two X rails/four blocks, moving Z rails/four fixed blocks,
+280 mm Y block spacing, flat 25/20 mm X/Z plates, 20 mm steel feet and a direct
+two-level spindle saddle. It retains the original steel beam and nominal rack size.
+Z is 1610, 200 mm travel and 10 m/min; X and braked Z are 750 W.
+
+New exports default to `build/sheet-router-sr6`. Set `SHEET_ROUTER_FEM_OUTPUT`
+to place packets on another volume; pass that same path to `study.py`, `report.py`
+and the eccentric-load checker. `SHEET_ROUTER_FEM_BINARY`, `SHEET_ROUTER_BINARY`
+and `SHEET_ROUTER_SIZING_BINARY` relocate compiler outputs independently.
+This run uses `/media/joao/DATA1/materia-router-sr6/final` for packets
+and `/media/joao/DATA1/materia-router-sr6/logs` for checks, because root is nearly full.
+
+The updated model uses per-block radial/lateral translation springs at actual CAD
+connectors and zero guide rotational springs. X/Z plate grillages span the contact
+locations. Moving Z rails receive a conservative 60% gross rectangular-section
+reinforcement proxy; mounting stiffness remains assumed. The spindle saddle is
+a rigid body supported by four translational mounting springs; clamp, bearing
+and tool flexibility are excluded. Lateral guide stiffness and plate Poisson
+coupling still require qualification.
+
+The table reacts through six actual bed-stock seats rather than one nearest stock.
+Floor-standing blower and cabinet devices do not contribute to frame mass. Other
+fixed masses attach to nearest stock on a fixed 50 mm analysis grid. Twenty modes
+are reported, including global frame modes. Gantry-dominant modes use a declared
+50% moving-mass kinetic-energy criterion; this is a screening classification,
+not a validated separation of frame and gantry dynamics. Static and first-six-mode
+convergence gates remain 3% and 5%. Per-case raw field files are gzip-compressed
+with integrity verification; decks, tables, logs and source snapshots remain.
+
+The settled CAD passes 426 assembly/clearance assertions for both beds, 292
+component assertions, 82 revised SR4 sizing/planner assertions, and the guide/reach
+gate. All five legacy gantry hashes and 59 axis assertions remain unchanged.
+The shared exporter/centreline fixtures pass (33 mill plus seven router checks),
+as do the independent beam/spring native fixture, mill packet/STEP comparison
+and 37 mill Python regressions. These checks do not establish the structural
+targets. The current candidate remains a screening design, with no fabrication release. The shoe envelope is 150 mm diameter with a 40 mm brush
+and a front-directed short hose neck; its lift and rack clearances are checked
+with the same assembly poses.
+
+### Settled candidate results
+
+All 36 solves (two meshes, nine full-Z poses, two beds) pass the numerical gates.
+Static compliance changes by at most 1.092%; all twenty frequencies by 0.875%.
+Maximum force-balance error is 0.0292%, energy error 0.0108%, reciprocity error
+0.000031%, and artificial rigid-member compliance 0.0752%. Every support retains
+positive compression under the combined envelope.
+
+| Bed Y | Worst X stiffness | Worst Y stiffness | Global first-mode range | Lowest classified gantry-dominant mode |
+|---|---:|---:|---:|---:|
+| 2600 mm | 1.154 N/µm | 0.481 N/µm | 5.727–6.027 Hz | 27.249 Hz |
+| 3150 mm | 1.005 N/µm | 0.480 N/µm | 5.177–5.468 Hz | 30.760 Hz |
+
+The 2 N/µm X/Y and 40 Hz gantry targets still fail. The modal classification is
+only the declared ≥50% moving-mass energy screen: mixed frame/gantry modes below
+that threshold remain relevant and the global frame modes are not dismissed.
+The lower spindle datum necessary for rack clearance leaves approximately 428 mm
+from beam centre to longest-tool tip at full Z. Shorter-tool reach remains open.
+
+In the worst Y cut, the Z plate plus its moving-rail reinforcement account for
+about 56% of compliance; the X plate contributes about 13% and the gantry beam
+about 9%. The worst X case is led by the base/frame contribution. Investigate the
+Z load path and frame bracing/supports before selecting a box X carriage. These
+are model-based priorities, not fabrication approval.
+
+Worst reserved eccentric Y branch demand is 874.60 N. Both drives pass torque,
+reducer, preload and conditional manufacturer rack checks; the mounting-derated
+rack limit is 3000 N, versus 935.77 N after including preload-flank demand.
+The 715.08 MPa Hertz diagnostic remains visible without
+using the old assumed 700 MPa limit to resize the rack. The specified hardened
+family, mounting and application factors still require qualification.
+
+The long-bed Y drive-only estimate is 49.58 Hz at 175.86 kg. Halving hinge
+stiffness gives 38.61 Hz; 10% extra mass gives 47.27 Hz. Hinge compliance is 64.9%
+of the series drive compliance. These estimates do not replace the full structure.
+
+`summary.json`, `results.json`, `eccentric-drives.json`, posed STEP files, native
+decks/tables, compressed field files and solve-time source snapshots remain in
+the external packet directory named above. `summary.json` records the actual
+postprocessor SHA separately from the solve-time source snapshot.
+
+## Initial SR5 baseline (historical)
+
 The current SR3/SR4 assembly is rejected for fabrication. The structural screen is
 complete; the SR-D3 targets are not met. A redesigned carriage/guide layout must
 be studied before SR6 releases drawings.
@@ -11,7 +97,10 @@ use it. Fresh mill exports before and after extraction match in all 220 componen
 records and every byte of the 36 STEP bodies; source/build provenance is excluded
 from that comparison because the exporter source changed.
 
-## Reproduce
+## Reproduce the current candidate
+
+Use the preceding SR6 model description for current runs. The model description
+and baseline results below this command section are historical.
 
 Run from the repository root. Reuse the pinned mill Gmsh 4.12.2 environment and
 CalculiX 2.21 installation; no native build or new Python environment is needed.
@@ -24,14 +113,18 @@ fem_python=machinekit/examples/bench-mill/build/fem/venv/bin/python
 fem_ccx="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/bin/ccx"
 export LD_LIBRARY_PATH="$PWD/machinekit/examples/bench-mill/build/fem/tools/calculix/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-"$heavy_run" --mem 10G --need 1G --label sr5-export -- machinekit/scripts/test-sheet-router-fem
-"$fem_python" machinekit/examples/sheet-router/fem/verify.py --ccx "$fem_ccx" --output build/sheet-router-sr5/verification
-"$heavy_run" --mem 10G --need 1G --label sr5-study -- "$fem_python" machinekit/examples/sheet-router/fem/study.py --packets build/sheet-router-sr5 --ccx "$fem_ccx"
-"$fem_python" machinekit/examples/sheet-router/fem/report.py build/sheet-router-sr5
-"$heavy_run" --mem 10G --need 1G --label sr5-eccentric -- machinekit/scripts/test-sheet-router-fem --y-loads
+"$heavy_run" --mem 10G --need 1G --label sr6-export -- machinekit/scripts/test-sheet-router-fem
+"$fem_python" machinekit/examples/sheet-router/fem/verify.py --ccx "$fem_ccx" --output build/sheet-router-sr6/verification
+"$heavy_run" --mem 10G --need 1G --label sr6-study -- "$fem_python" machinekit/examples/sheet-router/fem/study.py --packets build/sheet-router-sr6 --ccx "$fem_ccx"
+"$fem_python" machinekit/examples/sheet-router/fem/report.py build/sheet-router-sr6
+"$heavy_run" --mem 10G --need 1G --label sr6-eccentric -- machinekit/scripts/test-sheet-router-fem --y-loads
 ```
 
-`--checks-only` runs the Haxe checks without exporting. The optional verifier
+`--checks-only` runs the Haxe checks without exporting. `--export-only`
+exports a geometry iteration without repeating the unchanged exporter fixtures;
+run those fixtures separately before completing a study. `--layout` checks the
+new guides, moving-rail reach and selected drives; `--baseline` checks legacy
+gantry hashes and axis behavior. The optional verifier
 arguments `--mill-before <folder> --mill-after <folder>` compare fresh legacy mill
 packets. `study.py --one` is a diagnostic centre-pose run; it writes partial output
 and cannot produce a completed study. The full study publishes `results.json`

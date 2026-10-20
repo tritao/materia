@@ -63,7 +63,7 @@ class SheetRouterSizing {
         var rack:HelicalRack=vertical?null:cast machine.component("rack"+suffix);
         var preload:PreloadedPinionMount=vertical?null:cast machine.component("pinion"+suffix+"Preload");
         var ratio=vertical?1:reducer.n("ratio");
-        var radius=vertical?0.005/(2*Math.PI):pinion.pitchDiameter()/2000;
+        var radius=vertical?cast(machine.component("screwZ"),LeadScrew).thread.lead/1000/(2*Math.PI):pinion.pitchDiameter()/2000;
         var rotating=rotary(machine,vertical?["screwZ","screwZCoupling"]:["pinion"+suffix,"pinion"+suffix+"OutputShaft"]);
         var input:LinearDriveInput={massKg:mass.kg,motors:axis=="y"?2:1,metresPerRadian:radius/ratio,
             efficiency:vertical?0.9:rack.n("efficiency")*reducer.n("efficiency"),
@@ -72,11 +72,12 @@ class SheetRouterSizing {
             cuttingForceN:CUTTING_N,dragForceN:DRAG_N,gravityForceN:vertical?mass.kg*9.80665:0,
             rotaryDragNm:vertical?cast(machine.component("screwZNut"),LeadScrewNut).drag():0,reserve:RESERVE};
         var demand=LinearDriveSizing.demand(input,rating),failures=demand.failures.copy();
-        var toothReport:Dynamic=null,compliance:Dynamic=null,reducerLoads:Dynamic=null,belt:Dynamic=null,screwReport:Dynamic=null,accuracy:Dynamic=null;
+        var catalogueRack:Dynamic=null,toothReport:Dynamic=null,compliance:Dynamic=null,reducerLoads:Dynamic=null,belt:Dynamic=null,screwReport:Dynamic=null,accuracy:Dynamic=null;
         if(!vertical) {
             var tooth=RackDriveSizing.strength(pinion,demand.peakForcePerMotorN*RESERVE,1.5,preload.preload());
             toothReport=tooth;
-            for(failure in tooth.failures)failures.push(failure);
+            catalogueRack=SheetRouterRackRating.check(pinion,rack,demand.peakForcePerMotorN*RESERVE,tooth.flankNormalN);
+            if(!(cast catalogueRack.passes:Bool))failures.push("rack: manufacturer feed-force rating including preload and mounting derating");
             var outputTorque=demand.peakForcePerMotorN*radius/rack.n("efficiency")+rotating*ACCELERATION/radius;
             var continuousOutput=(CUTTING_N+DRAG_N)/input.motors*radius/rack.n("efficiency");
             var bearingRadial=tooth.radialBearingN+preload.preload()*RESERVE;
@@ -92,7 +93,11 @@ class SheetRouterSizing {
             var cuttingError=(CUTTING_N+DRAG_N)/axisStiffness+rackCompliance.backlashM;
             var acceleratingError=demand.peakForcePerMotorN*RESERVE/rackCompliance.stiffnessNPerM+rackCompliance.backlashM;
             accuracy={axisStiffnessNPerM:axisStiffness,cuttingAndReversalM:cuttingError,reservedAccelerationAndReversalM:acceleratingError,
-                cuttingDriveBudgetM:0.0001,accelerationDriveBudgetM:0.0002};
+                cuttingDriveBudgetM:0.0001,accelerationDriveBudgetM:0.0002,
+                idealDriveOnlyHz:Math.sqrt(axisStiffness/mass.kg)/(2*Math.PI),
+                hingeComplianceFraction:rackCompliance.hingeMPerN/(1/rackCompliance.stiffnessNPerM),
+                halfHingeStiffnessHz:Math.sqrt(input.motors/(1/rackCompliance.stiffnessNPerM+rackCompliance.hingeMPerN)/mass.kg)/(2*Math.PI),
+                tenPercentHeavierHz:Math.sqrt(axisStiffness/(1.1*mass.kg))/(2*Math.PI)};
             if(cuttingError>0.0001)failures.push("rack drive: 0.1 mm cutting/reversal budget");
             if(acceleratingError>0.0002)failures.push("rack drive: 0.2 mm reserved acceleration/reversal budget");
             // HTD proposal: 20 T input, ratio-matched output, 5 mm pitch, 300 mm spans.
@@ -117,7 +122,7 @@ class SheetRouterSizing {
                 criticalRpm:critical,bucklingN:buckling,stiffnessNPerM:screw.supportedStiffness(nut)*1000,
                 backlashM:nut.backlash()/1000,
                 alternative20CriticalRpm:critical*17/13,alternative20BucklingN:buckling*Math.pow(17.0/13,4),
-                requested15MMinRpm:3000,selectedRapidMmPerMinute:machine.routerSpec.rapidZMmPerMinute,brakeHoldingNm:brake==null?0:brake.holdingTorque(),
+                requested15MMinRpm:15000/screw.thread.lead,selectedRapidMmPerMinute:machine.routerSpec.rapidZMmPerMinute,brakeHoldingNm:brake==null?0:brake.holdingTorque(),
                 requiredBrakeNm:input.gravityForceN*radius*RESERVE};
         }
         var alternatives:Array<Dynamic> = [];
@@ -126,12 +131,12 @@ class SheetRouterSizing {
         if(axis=="x") {
             var original:LinearDriveInput=cast Reflect.copy(input);original.metresPerRadian=radius/5;
             original.rotaryInertiaKgM2=rotating/25+reducer.n("inputInertia");
-            alternatives.push({selection:"original 400 W X at 5:1",demand:LinearDriveSizing.demand(original,rating)});
+            alternatives.push({selection:"original 400 W X at 5:1",demand:LinearDriveSizing.demand(original,ServoMotor.model("GENERIC-HV-SERVO-400W").rating)});
         }
         return {axis:axis,movingMassKg:mass.kg,movingMembers:mass.members,motor:rating.designation,input:input,
             motorRatings:{ratedNm:rating.ratedTorque,peakNm:rating.peakTorque,ratedRpm:rating.ratedSpeed*60/(2*Math.PI),maxRpm:rating.maxSpeed*60/(2*Math.PI),rotorInertiaKgM2:rating.rotorInertia},
             rotatingOutputInertiaKgM2:rotating,demand:demand,alternatives:alternatives,
-            torqueUtilizationWithReserve:{peak:demand.peakNm*RESERVE/rating.peakTorque,rms:demand.rmsNm*RESERVE/rating.ratedTorque,sustained:demand.sustainedNm*RESERVE/rating.ratedTorque},driveAccuracy:accuracy,tooth:toothReport,reducer:reducerLoads,compliance:compliance,beltAlternative:belt,screw:screwReport,failures:failures};
+            torqueUtilizationWithReserve:{peak:demand.peakNm*RESERVE/rating.peakTorque,rms:demand.rmsNm*RESERVE/rating.ratedTorque,sustained:demand.sustainedNm*RESERVE/rating.ratedTorque},driveAccuracy:accuracy,catalogueRack:catalogueRack,tooth:toothReport,reducer:reducerLoads,compliance:compliance,beltAlternative:belt,screw:screwReport,failures:failures};
     }
     public static function main():Void {
         var reports:Array<Dynamic> = [];
@@ -147,7 +152,7 @@ class SheetRouterSizing {
             loadSharing:"equal nominal Y motor shares; eccentric guide reactions/yaw loads remain SR5",
             duty:"100 mm loaded out-and-back, triangular/trapezoidal ramps, 1 s powered dwell; conservative magnitudes for acceleration and deceleration",
             exclusions:["Structural/rail/bolted-joint compliance and eccentric Y-side reactions (SR5)","Actual servo following error and tuning", "Gear fillet, fatigue life, lubrication, heat treatment and misalignment factors", "Screw supplier DN/life and support/coupling load ratings", "Belt tooth capacity and packaging"],
-            choices:{reduction:"planetary: higher elastic stiffness than the specified EA=100 kN belt proposal; existing 80 mm housing vs 159/239 mm belt output pulleys",z:"16x5 retained at 5 m/min; both fixed/free 16 and 20 mm screws miss 15 m/min"},
+            choices:{reduction:"planetary: higher elastic stiffness than the specified EA=100 kN belt proposal; existing 80 mm housing vs 159/239 mm belt output pulleys",z:"1610 with 200 mm travel, 390 mm fixed/free shaft and 750 W braked servo at 10 m/min"},
             reserve:RESERVE,cuttingN:CUTTING_N,acceleration:ACCELERATION,variants:reports},null,"  "));
     }
 }

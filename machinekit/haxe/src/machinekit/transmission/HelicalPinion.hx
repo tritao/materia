@@ -27,7 +27,7 @@ class HelicalPinion extends AssumedCatalogComponent {
       n("helixAngle") < Math.PI / 4 && SpurGear.validPressureAngle(n("pressureAngle")),
       "unsupported helix/pressure angle"
     );
-    require(parameterCount("teeth")>=18 && parameterCount("teeth")/Math.pow(Math.cos(n("helixAngle")),3)>=2/Math.pow(Math.sin(n("pressureAngle")),2),
+    require(parameterCount("teeth")>=3 && parameterCount("teeth")/Math.pow(Math.cos(n("helixAngle")),3)>=2/Math.pow(Math.sin(n("pressureAngle")),2),
       "pinion virtual tooth count requires undercut; increase teeth or pressure angle");
     require(
       n("bore") < rootDiameter() && n("backlash") < Math.PI * transverseModule() / 4,

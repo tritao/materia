@@ -1,5 +1,7 @@
 """SR5 linear beam/grillage screen, mm/N/tonne/s. No contact or stress qualification."""
 import argparse
+import gzip
+import shutil
 from collections import defaultdict
 import hashlib
 import json
@@ -38,18 +40,20 @@ class Model:
         if abs(dot(d,normal))>.99:normal=(0,1,0) if abs(d[1])<.9 else (1,0,0)
         self.lines.append(dict(a=tuple(a),b=tuple(b),sec=sec,normal=normal,material=material,group=group,space=space))
     def rigid(self,a,b,space):
-        self.beam(a,b,('RECT',100,100),material=(210000000,0),space=space)
+        self.beam(a,b,('RECT',100,100),material=(2100000000,0),space=space)
     def root(self,name,p,space):
+        for existing,root in self.roots.items():
+            if root['space']==space and norm(sub(p,root['p']))<1e-6:return existing
         if name not in self.roots:
             self.roots[name]=dict(p=tuple(p),space=space)
             # Two non-collinear arms make the beam end's rotation observable.
             for d in [(10,10,0),(-10,10,10)]:
-                self.beam(p,add(p,d),('RECT',100,100),normal=(0,1,0),material=(210000000,0),group='coupling',space=space)
+                self.beam(p,add(p,d),('RECT',100,100),normal=(0,1,0),material=(2100000000,0),group='coupling',space=space)
         return name
     def spring(self,a,b,k,group): self.springs.append((a,b,tuple(k),group))
     def mesh(self):
         gmsh.initialize();gmsh.option.setNumber('General.Terminal',0);gmsh.model.add('router')
-        tags={};curves=[]
+        tags={};curves=[];segments={}
         def ptag(p,space):
             key=(space,tuple(round(x,6) for x in p))
             if key not in tags:tags[key]=gmsh.model.geo.addPoint(*p)
@@ -67,6 +71,12 @@ class Model:
             cuts=sorted(cuts)
             for t,u in zip(cuts,cuts[1:]):
                 start=add(a,mul(d,t));end=add(a,mul(d,u))
+                key=(row['space'],tuple(sorted((tuple(round(x,6) for x in start),tuple(round(x,6) for x in end)))))
+                if key in segments:
+                    previous=segments[key]
+                    if row['group']!=previous['group'] or row['sec']!=previous['sec']:raise ValueError(f'Overlapping analysis members: {key}: {row["group"]}/{previous["group"]}')
+                    continue
+                segments[key]=row
                 c=gmsh.model.geo.addLine(ptag(start,row['space']),ptag(end,row['space']))
                 curves.append((c,row));gmsh.model.geo.mesh.setTransfiniteCurve(c,max(2,math.ceil(norm(sub(end,start))/(self.h/4 if row['group'] in ('Xplate','Zplate','feetplates') else self.h))+1))
         gmsh.model.geo.synchronize();gmsh.model.mesh.generate(1);gmsh.model.mesh.setOrder(2)
@@ -144,7 +154,7 @@ class Model:
                 self.mass_loads.append((n,m,moving))
         after+=equation_lines(equations)
         for group,ids in self.groups.items():after += ['*ELSET,ELSET=G'+group]+[','.join(map(str,ids[i:i+12])) for i in range(0,len(ids),12)]
-        selected=list(self.query_nodes.values())
+        selected=list(self.nodes)
         for root in self.roots.values():selected += [root['ref'],root['rot']]
         selected += [n for n,_,_,_,_ in self.spring_elements]+[m for _,m,_,_,_ in self.spring_elements]
         after+=nset_lines('OBS',set(selected))+['*BOUNDARY']+[f'{n},{a},{b}' for n,a,b in self.boundary]
@@ -164,7 +174,7 @@ class Model:
             after += ['*NODE PRINT,NSET=OBS','U','*NODE PRINT,NSET=OBS','RF']
             for group in self.groups:after += [f'*EL PRINT,ELSET=G{group},TOTALS=ONLY','ELSE']
             after += ['*END STEP']
-        if modal:after += ['*STEP','*FREQUENCY','6','*NODE PRINT,NSET=OBS','U','*END STEP']
+        if modal:after += ['*STEP','*FREQUENCY','20','*NODE PRINT,NSET=OBS','U','*END STEP']
         return '\n'.join(lines+node_lines(self.nodes)+after)+'\n'
 
 
@@ -183,6 +193,7 @@ def make_model(packet,pose,h):
                 if row is other:continue
                 q=project(p,other['a'],other['b']);distance=norm(sub(p,q))
                 if 1e-5<distance<=50.0001:
+                    if any(norm(sub(p,project(p,r['a'],r['b'])))<1e-5 and norm(sub(q,project(q,r['a'],r['b'])))<1e-5 for r in original):continue
                     key=tuple(sorted((tuple(p),tuple(q))))
                     if key not in links:model.rigid(p,q,'frame');links.add(key)
     def nearest(p,rows=original):
@@ -196,48 +207,87 @@ def make_model(packet,pose,h):
     g=packet['interfaces'];guidek=g['guideTranslationNPerMm'];rotk=g['guideRotationNmmPerRad'];bolt=g['boltRotationNmmPerRad']
     ydrive=axes['y']['compliance']['stiffnessNPerM']/1000
     for side in ['Left','Right']:
-        foot=parts['beamFoot'+side];fp=point(foot['poseMm']);fp=add(fp,(0,dy,6))
+        foot=parts['beamFoot'+side];fp=point(foot['poseMm']);fp=add(fp,(0,dy,next(p['thicknessMm'] for p in packet['plates'] if p['id']=='beamFoot'+side)/2))
         plate=next(p for p in packet['plates'] if p['id']=='beamFoot'+side)
         # Full-width strip spanning the actual 140 mm between the two guide blocks.
-        for offset,label in [(-70,'Front'),(70,'Rear')]:
+        for offset,label in [(-packet.get('yBlockSpacing',140)/2,'Front'),(packet.get('yBlockSpacing',140)/2,'Rear')]:
             end=add(fp,(0,offset,0));model.beam(fp,end,('RECT',plate['widthMm'],plate['thicknessMm']),(1,0,0),(plate['youngsMPa'],0),'feetplates','foot'+side)
-            moving=model.root('y'+side+label,end,'foot'+side)
-            fixed=model.root('f'+side+label,end,'frame');q=nearest(end);model.rigid(q,end,'frame')
-            model.spring(moving,fixed,[guidek,ydrive/2,guidek,rotk,rotk,rotk],'Yguides_drive')
+            contact=tuple(next(r['railPointMm'] for r in pose['blocks'] if r['id']=='blockY'+side+('Rear' if label=='Rear' else ''))) if packet.get('guideLayout') else end
+            model.rigid(end,contact,'foot'+side)
+            moving=model.root('y'+side+label,contact,'foot'+side)
+            fixed=model.root('f'+side+label,contact,'frame');q=nearest(contact);model.rigid(q,contact,'frame')
+            model.spring(moving,fixed,[100000,0,539000,0,0,0] if packet.get('guideLayout') else [guidek,ydrive/2,guidek,rotk,rotk,rotk],'Yblocks' if packet.get('guideLayout') else 'Yguides_drive')
         attachment=(fp[0],a[1],a[2]);model.rigid(fp,attachment,'foot'+side)
         r1=model.root('beam'+side,attachment,'gantry');r2=model.root('plate'+side,attachment,'foot'+side)
         model.spring(r1,r2,[g['boltTranslationNPerMm']]*3+[bolt]*3,'bolts')
-    bp=pose['blockXMm'];beamload=project(bp,a,b);model.rigid(beamload,bp,'gantry')
-    fixed=model.root('Xfixed',bp,'gantry');moving=model.root('Xmoving',bp,'x')
-    model.spring(moving,fixed,[axes['x']['compliance']['stiffnessNPerM']/1000,guidek,guidek,rotk,rotk,rotk],'Xguide_drive')
-    xp=next(p for p in packet['plates'] if p['id']=='xCarriage');zcol=next(b for b in beams if b['id']=='zColumn')
-    za=add(zcol['startMm'],(dx,dy,0));zb=add(zcol['endMm'],(dx,dy,0))
-    platez=xp['poseMm']['z']+xp['thicknessMm']/2
-    start=(bp[0],bp[1],platez);end=(zb[0],zb[1],platez)
-    model.rigid(bp,start,'x');model.beam(start,end,('RECT',xp['widthMm'],xp['thicknessMm']),(1,0,0),(xp['youngsMPa'],0),'Xplate','x')
-    model.rigid(end,zb,'x');xroot=model.root('Xmass',end,'x')
-    ztop=model.root('Ztop',zb,'column');xtop=model.root('Xtop',zb,'x')
-    model.spring(ztop,xtop,[g['boltTranslationNPerMm']]*3+[bolt]*3,'bolts')
-    model.beam(za,zb,section(zcol),zcol['sectionX'],(zcol['youngsMPa'],zcol['densityKgPerMm3']),'column','column')
-    zp=pose['blockZMm'];q=project(zp,za,zb);model.rigid(q,zp,'column')
-    zf=model.root('Zfixed',zp,'column');zm=model.root('Zmoving',zp,'z')
-    model.spring(zm,zf,[guidek,guidek,axes['z']['screw']['stiffnessNPerM']/1000,rotk,rotk,rotk],'Zguide_screw')
-    zplate=next(p for p in packet['plates'] if p['id']=='zCarriage');tip=pose['toolTipMm']
-    end=(zp[0],tip[1],zp[2]);model.beam(zp,end,('RECT',zplate['widthMm'],zplate['thicknessMm']),(1,0,0),(zplate['youngsMPa'],0),'Zplate','z')
-    model.rigid(end,tip,'z');zroot=model.root('Zmass',end,'z')
-    # Rigid bed/workpiece distributes cutting reaction to the nearest authored bed member.
-    bed=tuple(tip);q=nearest(bed);model.rigid(q,bed,'frame');model.queries={'tip':(tip,'z'),'bed':(bed,'frame')}
+    if packet.get('guideLayout'):
+        for side in ['Left','Right']:
+            d=next(d for d in pose['drives'] if d['id']=='pinionY'+side);q=tuple(d['pointMm'])
+            model.rigid(nearest(q),q,'frame');fp=add(point(parts['beamFoot'+side]['poseMm']),(0,dy,next(p['thicknessMm'] for p in packet['plates'] if p['id']=='beamFoot'+side)/2));model.rigid(fp,q,'foot'+side)
+            fixed=model.root('YdriveFixed'+side,q,'frame');moving=model.root('YdriveMoving'+side,q,'foot'+side)
+            model.spring(moving,fixed,[0,ydrive,0,0,0,0],'Ydrive')
+        from front_guides import front_carriage
+        xroot,zroot=front_carriage(model,packet,pose,a,b,axes)
+        tip=tuple(pose['toolTipMm'])
+    else:
+        bp=pose['blockXMm'];beamload=project(bp,a,b);model.rigid(beamload,bp,'gantry')
+        fixed=model.root('Xfixed',bp,'gantry');moving=model.root('Xmoving',bp,'x')
+        model.spring(moving,fixed,[axes['x']['compliance']['stiffnessNPerM']/1000,guidek,guidek,rotk,rotk,rotk],'Xguide_drive')
+        xp=next(p for p in packet['plates'] if p['id']=='xCarriage');zcol=next(b for b in beams if b['id']=='zColumn')
+        za=add(zcol['startMm'],(dx,dy,0));zb=add(zcol['endMm'],(dx,dy,0))
+        platez=xp['poseMm']['z']+xp['thicknessMm']/2
+        start=(bp[0],bp[1],platez);end=(zb[0],zb[1],platez)
+        model.rigid(bp,start,'x');model.beam(start,end,('RECT',xp['widthMm'],xp['thicknessMm']),(1,0,0),(xp['youngsMPa'],0),'Xplate','x')
+        model.rigid(end,zb,'x');xroot=model.root('Xmass',end,'x')
+        ztop=model.root('Ztop',zb,'column');xtop=model.root('Xtop',zb,'x')
+        model.spring(ztop,xtop,[g['boltTranslationNPerMm']]*3+[bolt]*3,'bolts')
+        model.beam(za,zb,section(zcol),zcol['sectionX'],(zcol['youngsMPa'],zcol['densityKgPerMm3']),'column','column')
+        zp=pose['blockZMm'];q=project(zp,za,zb);model.rigid(q,zp,'column')
+        zf=model.root('Zfixed',zp,'column');zm=model.root('Zmoving',zp,'z')
+        model.spring(zm,zf,[guidek,guidek,axes['z']['screw']['stiffnessNPerM']/1000,rotk,rotk,rotk],'Zguide_screw')
+        zplate=next(p for p in packet['plates'] if p['id']=='zCarriage');tip=pose['toolTipMm']
+        end=(zp[0],tip[1],zp[2]);model.beam(zp,end,('RECT',zplate['widthMm'],zplate['thicknessMm']),(1,0,0),(zplate['youngsMPa'],0),'Zplate','z')
+        model.rigid(end,tip,'z');zroot=model.root('Zmass',end,'z')
+    # Rigid table body on six spatial, finite translational mounting interfaces.
+    # Avoid cantilevering its entire mass and inertia from a single floor foot.
+    bed=tuple(tip)
+    if packet.get('guideLayout'):
+        table=parts['vacuumTable'];bedcentre=point(table['centreOfMassMm'])
+        bedroot=model.root('bedMass',bedcentre,'bed')
+        for i,stock in enumerate(r for r in frame if r['id'] in ('base/tableCross0','base/tableCross3','base/tableCross6')):
+            for j,key in enumerate(('startMm','endMm')):
+                q=tuple(stock[key]);seat=add(q,(0,0,stock['heightMm']/2))
+                model.rigid(q,seat,'frame');model.rigid(bedcentre,seat,'bed')
+                fixed=model.root('bedFrame'+str(i)+str(j),seat,'frame');moving=model.root('bedTable'+str(i)+str(j),seat,'bed')
+                model.spring(moving,fixed,[g['boltTranslationNPerMm']]*3+[0]*3,'bedMounts')
+        model.rigid(bedcentre,bed,'bed');model.queries={'tip':(tip,getattr(model,'tip_space','z')),'bed':(bed,'bed')}
+    else:
+        q=nearest(bed);model.rigid(q,bed,'frame');model.queries={'tip':(tip,getattr(model,'tip_space','z')),'bed':(bed,'frame')}
     for name,p in [('lf',original[0]['a']),('lr',original[0]['b']),('rf',original[1]['a']),('rr',original[1]['b'])]:model.queries[name]=(p,'frame')
     yroot=model.root('Ymass',project((800,pose['y'],a[2]),a,b),'gantry')
     native={b['id'] for b in beams};native.add('base')
     zids={p['id'].split(' (whole chain upper bound)')[0] for p in axes['z']['movingMembers']};xids={p['id'].split(' (whole chain upper bound)')[0] for p in axes['x']['movingMembers']};yids={p['id'].split(' (whole chain upper bound)')[0] for p in axes['y']['movingMembers']}
+    model.independent_floor_mass=0.0
+    floor_members={'vacuumBlower','cabinet','vfd','brakeResistor','mainBreaker','mainContactor','safetyRelay','emergencyStop'} if packet.get('guideLayout') else set()
     # All real components not already represented by stock beam density retain CAD mass and inertia.
     for p in packet['parts']:
         if p['id'] in native:continue
+        if p['id'] in floor_members:
+            model.independent_floor_mass+=p['massKg'];continue
         category='z' if p['id'] in zids else 'x' if p['id'] in xids else 'y' if p['id'] in yids else 'frame'
         centre=point(p['centreOfMassMm']);delta=(dx,dy,0) if category in ('z','x') else (0,dy,0) if category=='y' else (0,0,0)
         centre=add(centre,delta)
-        root=zroot if category=='z' else xroot if category=='x' else yroot if category=='y' else min(('foot'+str(i) for i in range(6)),key=lambda r:norm(sub(centre,model.roots[r]['p'])))
+        if packet.get('guideLayout') and category=='frame':
+            if p['id'] in ('vacuumTable','spoilboard'):
+                root=bedroot;category='bed'
+            else:
+                row=min(original,key=lambda r:norm(sub(centre,project(centre,r['a'],r['b']))))
+                direction=sub(row['b'],row['a']);length=norm(direction);at=project(centre,row['a'],row['b'])
+                distance=min(length,max(0,round(norm(sub(at,row['a']))/50)*50))
+                anchor=add(row['a'],mul(direction,distance/length))
+                root=model.root('fixedMass'+str(len(model.masses)),anchor,'frame')
+        else:root=zroot if category=='z' else xroot if category=='x' else yroot if category=='y' else min(('foot'+str(i) for i in range(6)),key=lambda r:norm(sub(centre,model.roots[r]['p'])))
+        if category=='z' and hasattr(model,'spindle_root') and p['id'] in ('spindle','holder','collet','longestTool','spindleRelease','shoe','shoeLiftRod'):root=model.spindle_root
         t=p['centroidalInertiaKgMm2World'];inertia=[[t['xx'],t['xy'],t['xz']],[t['xy'],t['yy'],t['yz']],[t['xz'],t['yz'],t['zz']]]
         model.masses.append((root,p['massKg'],centre,inertia,category))
     model.mesh();return model
@@ -288,7 +338,7 @@ def solve(packet,pose,h,ccx,folder):
         if name.startswith('cut'):
             force_error=norm(net)/300
         elif name=='weight':
-            force_error=norm(sub(net,(0,0,packet['totalMassKg']*9.80665)))/(packet['totalMassKg']*9.80665)
+            force_error=norm(sub(net,(0,0,(packet['totalMassKg']-model.independent_floor_mass)*9.80665)))/((packet['totalMassKg']-model.independent_floor_mass)*9.80665)
         else:
             axis=0 if name=='accelX' else 1
             target=[0.,0.,0.];target[axis]=next(a['movingMassKg'] for a in packet['axes'] if a['axis']==name[-1].lower())*3
@@ -297,12 +347,42 @@ def solve(packet,pose,h,ccx,folder):
         cases.append(dict(name=name,supportForceRelativeError=force_error,toolRelativeMm=relative,complianceUmPerN=[x/300*1000 for x in relative] if name.startswith('cut') else None,
             budgetUmPerN=budget if name.startswith('cut') else None,energyRelativeError=energy_error,supportReactionsN=reactions,
             frameTwistMm=(u[model.query_nodes['lf']][2]-u[model.query_nodes['lr']][2]-u[model.query_nodes['rf']][2]+u[model.query_nodes['rr']][2])))
-    return dict(pose=pose,meshMm=h,nodes=len(model.nodes),beamElements=len(model.elements),firstModesHz=frequencies(text),cases=cases)
+    for suffix in ('.frd','.12d'):
+        artifact=folder/('frame'+suffix)
+        if artifact.exists():
+            raw=artifact.read_bytes();packed=gzip.compress(raw,compresslevel=3,mtime=0)
+            artifact.with_suffix(artifact.suffix+'.gz').write_bytes(packed)
+            if gzip.decompress(packed)!=raw:raise ValueError('Solver archive integrity failed')
+            artifact.unlink()
+    mode_rows=[]
+    for block in re.split(r'displacements \(vx,vy,vz\)[^\n]*\n',text)[7:]:
+        u={}
+        for line in block.splitlines():
+            columns=line.split()
+            if len(columns)==4 and columns[0].isdigit():u[int(columns[0])]=tuple(float(x.replace('D','E')) for x in columns[1:])
+            elif u:break
+        if not u:continue
+        kinetic=defaultdict(float)
+        for n,m,category in model.mass_loads:kinetic[category]+=m*dot(u[n],u[n])
+        for _,conn,row in model.elements:
+            e,rho=row['material']
+            if not rho:continue
+            _,w,t,*walls=row['sec'];area=w*t-(w-2*walls[0])*(t-2*walls[0])
+            mass=area*norm(sub(model.nodes[conn[0]],model.nodes[conn[2]]))*rho
+            kinetic['y' if row['group']=='gantry' else 'frame']+=mass*sum(weight*dot(u[n],u[n]) for n,weight in zip(conn,(1/6,4/6,1/6)))
+        total=sum(kinetic.values());fractions={key:value/total for key,value in kinetic.items()}
+        mode_rows.append(dict(fractions=fractions,gantryFraction=sum(fractions.get(key,0) for key in ('x','y','z')),
+            relativeToolToBed=norm(sub(u[tip],u[bed]))))
+    return dict(modalParticipation=mode_rows,independentFloorMassKg=model.independent_floor_mass,pose=pose,meshMm=h,nodes=len(model.nodes),beamElements=len(model.elements),firstModesHz=frequencies(text),cases=cases)
 
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--packets',type=Path,required=True);parser.add_argument('--ccx',type=Path,required=True);parser.add_argument('--one',action='store_true');args=parser.parse_args()
     reports=[]
+    snapshot=args.packets/'source';snapshot.mkdir(exist_ok=True)
+    for source in Path(__file__).parent.glob('*.py'):shutil.copy2(source,snapshot/source.name)
+    shared=snapshot/'mill-fem';shared.mkdir(exist_ok=True)
+    for source in MILL.glob('*.py'):shutil.copy2(source,shared/source.name)
     (args.packets/'results.json').unlink(missing_ok=True)
     hashes={}
     for length in [2600,3150]:
@@ -312,7 +392,7 @@ def main():
         if packet['units']!={'length':'mm','force':'N','mass':'kg','youngsModulus':'MPa'}:raise ValueError('Unsupported packet units')
         for part in packet['parts']:
             if part['stepFile'] and hashlib.sha256((manifest.parent/part['stepFile']).read_bytes()).hexdigest()!=part['stepSha256']:raise ValueError('STEP integrity failed: '+part['id'])
-    identity=dict(packetSha256=hashes,studySha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    identity=dict(frontGuideSha256=hashlib.sha256(Path(__file__).with_name('front_guides.py').read_bytes()).hexdigest(),packetSha256=hashes,studySha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         gmshVersion=gmsh.__version__,ccxSha256=hashlib.sha256(args.ccx.read_bytes()).hexdigest())
     for length in [2600,3150]:
         packet=json.loads((args.packets/f'y{length}'/'manifest.json').read_text())
@@ -320,6 +400,7 @@ def main():
         for i,pose in enumerate(poses):
             for h in ([200] if args.one else [100,50]):
                 folder=args.packets/f'solve-y{length}-p{i}-h{h}'
+                if shutil.disk_usage(args.packets).free<128*1024*1024:raise ValueError('Less than 128 MiB free; preserving partial results before another solve')
                 result=solve(packet,pose,h,args.ccx.resolve(),folder);reports.append(dict(workY=length,**result))
                 print(f'SR5 Y={length} pose={i} h={h}: f1={result["firstModesHz"][0]:.3f} Hz',flush=True)
                 (args.packets/'results.partial.json').write_text(json.dumps(dict(status='in progress',identity=identity,results=reports),indent=2)+'\n')
@@ -331,10 +412,10 @@ def main():
         for rows in grouped.values():
             a,b=rows[100],rows[50]
             static=max(abs(a['cases'][i]['complianceUmPerN'][i]/b['cases'][i]['complianceUmPerN'][i]-1) for i in range(3))
-            modal=max(abs(x/y-1) for x,y in zip(a['firstModesHz'],b['firstModesHz']))
+            modal=max(abs(x/y-1) for x,y in zip(a['firstModesHz'][:6],b['firstModesHz'][:6]))
             if static>.03 or modal>.05:raise ValueError(f'Mesh convergence failed: static={static}, modal={modal}')
             errors.append(dict(workY=b['workY'],pose=b['pose'],staticRelativeChange=static,modalRelativeChange=modal))
-        (args.packets/'results.json').write_text(json.dumps(dict(status='complete reduced screening; targets require redesign',identity=identity,
+        (args.packets/'results.json').write_text(json.dumps(dict(status='complete reduced screening; see summary.json for target assessment',identity=identity,
             meshConvergence=errors,results=reports),indent=2)+'\n')
 
 if __name__=='__main__':main()

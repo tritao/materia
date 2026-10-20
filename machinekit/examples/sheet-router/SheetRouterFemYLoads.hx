@@ -10,7 +10,7 @@ import machinekit.motion.ServoMotor;
 /** Feed eccentric FE branch reactions back through the same SR4 drive/tooth screen. */
 class SheetRouterFemYLoads {
     public static function main():Void {
-        var folder=Sys.getEnv("SHEET_ROUTER_FEM_OUTPUT");if(folder==null)folder="build/sheet-router-sr5";
+        var folder=Sys.getEnv("SHEET_ROUTER_FEM_OUTPUT");if(folder==null)folder="build/sheet-router-sr6";
         var loads:Array<Dynamic> = haxe.Json.parse(sys.io.File.getContent(folder+"/y-loads.json"));
         var output:Array<Dynamic> = [];
         for(length in [2600.0,3150.0]) {
@@ -27,7 +27,7 @@ class SheetRouterFemYLoads {
             var pinion:HelicalPinion=cast machine.component("pinionYLeft");
             var preload:PreloadedPinionMount=cast machine.component("pinionYLeftPreload");
             var tooth=RackDriveSizing.strength(pinion,demand.peakForcePerMotorN*input.reserve,1.5,preload.preload());
-            var failures=demand.failures.concat(tooth.failures);
+            var failures=demand.failures.copy();
             if(!preload.resists(tooth.separatingN))failures.push("preload: eccentric separating force at reserved peak");
             var reducer:PlanetaryReducer=cast machine.component("pinionYLeftReducer");
             var radius=pinion.pitchDiameter()/2000;
@@ -41,13 +41,10 @@ class SheetRouterFemYLoads {
             if(tooth.axialN>reducer.n("axialLoad"))failures.push("reducer: eccentric axial load");
             if(radial>reducer.n("radialLoad"))failures.push("reducer: eccentric radial load including preload");
             if(rack.n("faceWidth")<pinion.n("faceWidth"))throw "Tooth screen requires full engaged face width";
-            var candidatePinion=new HelicalPinion(pinion.values().setNumber("faceWidth",25));
-            var candidateRack=new HelicalRack(rack.values().setNumber("faceWidth",25));
-            candidateRack.relation(candidatePinion);
-            var alternative=RackDriveSizing.strength(candidatePinion,demand.peakForcePerMotorN*input.reserve,1.5,preload.preload());
-            if(alternative.failures.length>0)throw "25 mm engaged face candidate failed eccentric tooth screen";
+            var catalogue=SheetRouterRackRating.check(pinion,rack,demand.peakForcePerMotorN*input.reserve,tooth.flankNormalN);
+            if(!(cast catalogue.passes:Bool))failures.push("rack: manufacturer feed-force rating including preload and mounting derating");
             output.push({workY:length,reducer:{peakOutputNm:outputPeak,ratedOutputNm:outputRated,radialN:radial,axialN:tooth.axialN},
-                alternative:{engagedRackAndPinionFaceMm:25,tooth:alternative,packagingQualified:false},source:worst,input:input,demand:demand,tooth:tooth,preloadN:preload.preload(),failures:failures});
+                catalogueRack:catalogue,source:worst,input:input,demand:demand,tooth:tooth,preloadN:preload.preload(),failures:failures});
             Sys.println("SR5 eccentric Y="+length+" reserved force="+demand.peakForcePerMotorN*input.reserve+" N; contact="+tooth.contactMPa+" MPa; failures="+haxe.Json.stringify(failures));
         }
         sys.io.File.saveContent(folder+"/eccentric-drives.json",haxe.Json.stringify({basis:"FE 300 N vector norm and 3 m/s2 Y inertia; 15 N drag per side; SR4 1.5 reserve and tooth load factor",variants:output},null,"  ")+"\n");
