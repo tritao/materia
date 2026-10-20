@@ -353,3 +353,187 @@ access and save/reopen. Repeated static posed pairs are checked once; moving
 pairs retain their individual poses. The generated `build/enclosure/tray-cut-list.csv`
 lists the six rectangular blanks in millimetres. These are nominal design sizes,
 not a fabrication release.
+
+## T-FIXX reference and placement review
+
+The candidate is T-FIXX M10 × 50 A4. The DXF supplied through Cast-in Portugal
+is a 2D side-view library, version 1.20 dated 2014-01-30, labelled with legacy
+identifier 0020.270-00101. `inspect-tfixx-reference.py` checks the original
+millimetre units, candidate labels, 50 mm metal-body length and 13.5 mm sleeve
+diameter. These main dimensions agree with the manufacturer's March 2026
+Demu-Fix 25-EN catalogue, current candidate order 1000200636. The drawing clip
+projects 1.5 mm; the current catalogue specifies a 2 mm identification clip.
+Supplier confirmation of part equivalence and seating is still required. This
+is not a thread model or a supplied 3D solid. The original library is kept
+unmodified outside project history.
+
+Regenerate the reference record and placement study:
+
+```sh
+python machinekit/examples/flexspline-hobber/inspect-tfixx-reference.py /path/to/T-FIXX.dxf
+./haxeon/scripts/haxeon build --compiler-only --project=machinekit/examples/flexspline-hobber/haxeon.tray-anchor.json --output=/tmp/hobber-tfixx-study.hl
+# Run the resulting HashLink module with the usual native-library environment.
+```
+
+The authoritative product source is the [March 2026 manufacturer catalogue](https://www.halfen.com/cdn/Medien%20I%20Media/Druckschriften%20-%20Printed%20materials/Technische%20Produktinformationen/PB_Halfen_Demu-Fix_25_v03-2026_EN.pdf),
+printed pages 14–15. The [original DXF archive](https://www.halfen.com/Softwaredaten/Downloads/Software-CAD/CAD-Bibliotheken-AutoCAD/Verankerungstechnik/demu_cad_tfixx_dxf.zip)
+can be inspected without converting the DWG.
+
+The current 25 mm ledge and individual M6 clamp seats do not accept this anchor
+as a direct replacement. `HobberTrayAnchorStudy` screens ten candidate axes
+55 mm from the outside casting edges, local 60 × 80 mm seat extensions, and
+70 × 70 × 70 mm solid backing reservations. It excludes the old tray-clamp
+inserts because those would be replaced, while retaining all precision,
+lifting and enclosure-frame inserts. Anchor envelopes must clear service
+voids and retained inserts after reserving the backing. Local rebate extensions
+must also clear those inserts. The screening uses a conservative 24 × 24 × 50 mm
+anchor envelope, not a fabricated detailed solid.
+
+The manufacturer's concrete layout minima are 50 mm to an edge and 100 mm
+between axes. These are screening references; they do not establish capacities
+in epoxy mineral casting. The continuous 80 mm front rebate reaches the work well; the screened local
+tabs avoid that interruption. The current rear insert geometry actually clears
+an 80 mm rebate, correcting the earlier assumption about X-rail overlap.
+The one-piece tray needs local tongues
+and a matching gasket path instead. Flush M10 screw seating (or a specified
+thread adapter), panel bearing thickness, rear-cover retention and actual anchor
+qualification remain integration work. The existing working tray scene is
+unchanged by this study. Outputs are `build/tfixx-anchor/cad-check.json`,
+`placement.json` and `placement.svg`.
+
+Placement acceptance: ten candidate positions; minimum outside-edge and
+service-opening axis distances both 55 mm; minimum axis spacing 123.49 mm.
+The conservative anchor volumes, proposed local rebates and backing reservations
+clear all retained insert envelopes. No service void intersects the candidate
+anchor envelopes after reserving the proposed backing. This is a placement
+study, not a full moving-machine or structural qualification.
+
+## M6 tray-anchor sourcing shortlist
+
+Supplier candidates and enquiry leads are saved in [tray-anchor-sourcing.json](tray-anchor-sourcing.json).
+Its `offers` use the existing `SupplierOffer` fields for later loading into
+`SourcingPlan`; no selection is made and the candidate requirement is not yet
+an installed engineering BOM item. Prices and final quantity are unknown.
+Stock is unverified, not confirmed unavailable. PFEIFER M6 × 40 stainless
+05.250.064.040 and COM Maleniec M6 × 40 galvanised k1110zn are documented
+candidates; PCT and Cast-in Portugal remain enquiry leads without confirmed SKUs.
+
+M6 is the preferred tray-fastener direction; the earlier T-FIXX M10 study
+remains reference work rather than the selected design. Smaller threads do not
+automatically permit smaller casting edge distances. Next, obtain a current
+M6 drawing and check the direct-fastening layout before replacing the existing
+clamps. Target one removable tray sheet, a continuous supported gasket, and
+socket mouths flush with the proposed mounting surface. Bolt the sockets through the
+mould during casting. Final screw seats, compression control and rear-service
+access still need detailing; validate anchorage and tightening in a representative
+mineral-cast sample before fabrication release.
+
+## Rectangular direct-M6 tray proposal (current)
+
+The current proposal supersedes the earlier tongue/tab and rear-notch drawing.
+[tray-mounting-proposal.svg](tray-mounting-proposal.svg) and
+[tray-mounting-proposal.json](tray-mounting-proposal.json) describe a single
+approximately 1099.17 × 969.17 × 13 mm compact-laminate blank with a **905 × 580 mm
+rectangular cutout**. There are no inward tabs, stepped cutouts or motor notch.
+All ten M6 positions lie along the two long sides, at casting-local X
+−380/−190/0/190/380 and Y ±315 mm. Minimum outside casting-edge distance is
+85 mm. The rectangular opening extends to the rear casting edge to clear the
+motor region without a separate notch in the sheet.
+
+The proposed seat is now at the casting top (Z=0), replacing the earlier
+4 mm recess. A 2 mm installed gasket puts the tray underside at +2 and top at
++15 mm; this clears the existing lifting-insert tops at Z=0. The proposed
+casting mould needs flat support here instead of the old perimeter recess.
+The rear inner gasket return lies just beyond the casting and still needs
+continuous support tied into the independently supported frame. This detail
+is not represented as completed hardware. The accepted working enclosure
+scene still has its earlier tray construction; this review artifact is separate.
+
+Use two simple rectangular gasket loops: 15 × 3 mm single-sided adhesive
+closed-cell tape, nominally compressed to 2 mm. Net proposed route length is
+7.07 m; **9 m** includes a provisional 15% cutting allowance, rounded up.
+Coolant/oil compatibility, adhesive and compression force remain unselected.
+Use sealed butt/scarf joints or fabricated corners; no overlapping tape layers.
+The adhesive locates the gasket; the screws supply compression.
+
+Direct screw seats remain provisional Ø16 × 7 mm counterbores, Ø10.5 mm
+sleeve holes, M6 × 25 screws, 1 mm washers and removable Ø10/Ø6.6 × 8 mm
+sleeves. This leaves 6 mm laminate beneath the recess. Socket mouths are
+flush with the casting top, not protruding. Each screw counterbore clears the
+inner gasket band by 2 mm. A single ring sheet should be installed before the
+upper machine assembly; removal over the assembled machine is unverified.
+
+### Cast-in socket model
+
+`machinekit.structural.CastInFixingSocket` replaces the box-only review
+representation with a cylindrical socket, blind cavity, semantic M6 × 1 thread
+and closed, flattened/waved crimped tail. Its portable component recipe and
+mouth/tail connectors keep it reusable for subsequent assembly integration.
+It references [PFEIFER 05.250.064.040](https://www.pfeifer.info/out/assets/PFEIFER_SOCKET-CRIMPED-END_PPEN.PDF):
+M6 × 40 mm, insertion dimension **a=25** and thread dimension **e=6 mm**.
+The earlier text claiming 16 mm threaded engagement was incorrect: the screw
+inserts 16 mm; the source does not establish 16 mm of thread engagement.
+
+Outside diameter 8 mm, tail width 11 mm, thickness 2.2 mm and wave 1.4 mm are
+explicit nominal modeling assumptions. The supplier document does not dimension
+them; this is not manufacturer CAD or a qualified anchorage design. Material
+rendering uses the existing generic stainless planning material, not a claimed
+certification of a particular grade. The source PDF SHA and dimensional basis
+are saved with the supplier record in `tray-anchor-sourcing.json`.
+
+The model checks a single solid, clear blind insertion cavity, closed tail and
+preserved recipe dimensions. Native Materia scene encode/decode retains all
+23 parts. Component recipe registration is included for future integration.
+
+Regenerate the proposal with:
+
+```sh
+python machinekit/examples/flexspline-hobber/plan-tray-mounting.py
+```
+
+Compile/run `haxeon.tray-proposal.json` to create
+`build/tray-mounting/tray-proposal.mtrg` and `anchor-detail.mtrg`.
+The tray review is exploded: sheet/sleeves lifted 40 mm and gaskets lifted
+15 mm; sockets stay at their proposed installed level. The anchor detail
+scene shows one socket at its actual nominal size for close inspection.
+
+`HobberTrayMountingStudy` / `haxeon.tray-mounting.json` screen conservative
+24 × 24 × 40 mm anchor envelopes with 50 × 50 × 65 mm backing reservations
+against service voids and retained inserts; output is `tray-mounting-screen.json`.
+`HobberTrayClearanceStudy` / `haxeon.tray-clearance.json` separately screen
+the rectangular sheet against the existing machine at travel endpoints; output
+is `tray-clearance-screen.json`. Neither is a continuous swept clearance,
+complete enclosure acceptance, leak test or mineral-cast strength qualification.
+
+Current revision validation: rectangular sheet clears the existing machine in
+24 X/Y/Z endpoint and three-A-position samples, with 14 unique exact posed
+pairs checked. The ten conservative anchor envelopes clear retained inserts
+and service voids with the proposed solid backing. Socket cavity/closed-tail,
+portable recipe and 23-part scene round trips pass. These samples are not a
+continuous sweep or full enclosure acceptance.
+
+### Tray proposal BOM and sourcing exports
+
+[tray-bom.json](tray-bom.json) is the full known tray-proposal requirement list,
+regenerated with the geometry proposal so quantities stay aligned. It contains
+one sheet, ten sockets, ten M6 × 25 screws, ten washers, ten compression spacers
+and nine metres of gasket tape (7.07 m net plus allowance, rounded up).
+Quantities are engineering requirements, not supplier pack counts.
+
+`HobberTrayBom` loads these requirements through the existing `Bom` and
+`SourcingPlan` classes. Compile/run `haxeon.tray-bom.json` to export
+`build/tray-mounting/tray-bom.csv` and `tray-bom-sourced.json` with units,
+review status, candidate SKUs, URLs and supplier notes. It checks unique item
+identities, hardware quantities, gasket quantity and supplier-to-BOM mappings.
+The sourced JSON also preserves supplier enquiry leads and items still needing
+design or quantities: rear gasket support/fasteners, joint/edge treatment and
+mould-positioning hardware. No artificial zero-quantity purchased lines are
+used for these unresolved requirements.
+
+The spacer candidate is Ettinger **007.66.089**, stainless AISI 303,
+Ø10 outside / Ø6.4 bore / length 8 mm. The model still uses nominal Ø6.6 bore;
+compatibility and length tolerance must be reviewed before selection. Its
+manufacturer datasheet is saved as a supplier reference. Screws, washers and
+gasket grade still need actual supplier selections. No supplier is selected
+and prices/stock are unverified. This replacement-design BOM stays separate
+from the accepted six-piece enclosure BOM to avoid counting both designs.

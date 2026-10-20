@@ -1,0 +1,261 @@
+{
+  "status": "rectangular design proposal; separate from accepted scene; not fabrication release",
+  "revision": "rectangular-long-side-fixings-v2",
+  "inputLayoutSha256": "a45a35e59a986cee5795dc9b19327fa53d1b5f34e4b8cce12d037b0e9e897dd0",
+  "coordinateFrame": "Casting-local XY, mm; heights relative to casting top",
+  "tray": {
+    "pieces": 1,
+    "construction": "compact-laminate-13, coolant/edge treatment unqualified",
+    "blankMm": [
+      1099.174134527183,
+      969.1741345271829,
+      13
+    ],
+    "openingBoundsMm": [
+      -440.0,
+      -290.0,
+      465.0,
+      290.0
+    ],
+    "openingSizeMm": [
+      905,
+      580
+    ],
+    "outlineLoopsMm": [
+      [
+        [
+          -549.5870672635915,
+          -484.58706726359145
+        ],
+        [
+          549.5870672635915,
+          -484.58706726359145
+        ],
+        [
+          549.5870672635915,
+          484.58706726359145
+        ],
+        [
+          -549.5870672635915,
+          484.58706726359145
+        ]
+      ],
+      [
+        [
+          -440.0,
+          290.0
+        ],
+        [
+          465.0,
+          290.0
+        ],
+        [
+          465.0,
+          -290.0
+        ],
+        [
+          -440.0,
+          -290.0
+        ]
+      ]
+    ],
+    "installation": "Install before upper machine assembly; assembled-machine removal unverified.",
+    "rearMotorCover": "No notch or separate cover in this proposal. Rectangular opening extends to casting rear edge; complete-machine clearance still to check."
+  },
+  "sockets": {
+    "count": 10,
+    "thread": "M6",
+    "candidateLengthMm": 40,
+    "mouthZMm": 0,
+    "positionsMm": [
+      [
+        -380.0,
+        -315.0
+      ],
+      [
+        -190.0,
+        -315.0
+      ],
+      [
+        0.0,
+        -315.0
+      ],
+      [
+        190.0,
+        -315.0
+      ],
+      [
+        380.0,
+        -315.0
+      ],
+      [
+        -380.0,
+        315.0
+      ],
+      [
+        -190.0,
+        315.0
+      ],
+      [
+        0.0,
+        315.0
+      ],
+      [
+        190.0,
+        315.0
+      ],
+      [
+        380.0,
+        315.0
+      ]
+    ],
+    "minimumOutsideEdgeMm": 85.00000000000006,
+    "supplierSelection": null,
+    "reference": "PFEIFER 05.250.064.040; M6 x 40; insertion dimension a=25, thread dimension e=6 mm",
+    "retentionGeometry": "Nominal cylindrical socket and crimped/waved tail; outside diameter and tail dimensions assumed, not vendor CAD.",
+    "spacingAndInternalEdgeQualification": false
+  },
+  "casting": {
+    "localRebatesXYMm": [],
+    "rebateDepthMm": 0,
+    "backing": "Reserve solid casting around anchors; current 4 mm ledges are superseded by top-level support in this proposal.",
+    "seatChange": "Seat at casting top, rather than a recessed floor. Tray underside +2 clears existing lifting-insert tops at 0.",
+    "rearSealSupportRequired": true
+  },
+  "screwSeatProposal": {
+    "screw": "ISO 4762 M6 x 25; head diameter 10, height 6 mm nominal",
+    "counterboreDiameterMm": 16,
+    "counterboreDepthMm": 7,
+    "remainingLaminateMm": 6,
+    "sleeveClearanceHoleMm": 10.5,
+    "sleeve": {
+      "outerDiameterMm": 10,
+      "innerDiameterMm": 6.6,
+      "lengthMm": 8
+    },
+    "washer": {
+      "outerDiameterMm": 14,
+      "innerDiameterMm": 6.6,
+      "thicknessMm": 1,
+      "note": "Material and sealing detail unselected"
+    },
+    "nominalSocketInsertionMm": 16,
+    "catalogueThreadDimensionMm": 6,
+    "catalogueInsertionDimensionMm": 25,
+    "compressionLoadPath": "Head -> washer -> removable sleeve -> flush socket face; supported gasket carries sheet",
+    "minimumHeadRecessToSealBandMm": 2.0,
+    "note": "Insertion depth is not guaranteed threaded engagement. Supplier thread and screw compatibility still to confirm."
+  },
+  "gasket": {
+    "partNumber": "HOBBER-TRAY-GASKET-TAPE-CANDIDATE",
+    "type": "Single-sided adhesive closed-cell rubber gasket tape",
+    "widthMm": 15,
+    "freeThicknessMm": 3,
+    "installedThicknessMm": 2,
+    "nominalCompressionPercent": 33.33,
+    "materialGrade": null,
+    "supplierSku": null,
+    "status": "unselected; verify grade compression force, recovery, coolant/oil and adhesive compatibility",
+    "installation": "Adhesive on tray underside; screws provide compression. Continuous loop with sealed butt/scarf joint, no overlap. Screw holes outside wet seal where geometry permits.",
+    "quantity": 9,
+    "compressionControl": "Separate removable sleeves or stops, sized for installed stack after grade selection; no protruding cast-in sockets.",
+    "unit": "m",
+    "quantityBasis": "Rectangular proposal v2: 7.0667 m net, plus 15% cutting allowance rounded up to 9 m.",
+    "innerCentrelineMm": [
+      [
+        -447.5,
+        297.5
+      ],
+      [
+        472.5,
+        297.5
+      ],
+      [
+        472.5,
+        -297.5
+      ],
+      [
+        -447.5,
+        -297.5
+      ]
+    ],
+    "outerCentrelineMm": [
+      [
+        -537.0870672635915,
+        -472.08706726359145
+      ],
+      [
+        537.0870672635915,
+        -472.08706726359145
+      ],
+      [
+        537.0870672635915,
+        472.08706726359145
+      ],
+      [
+        -537.0870672635915,
+        472.08706726359145
+      ]
+    ],
+    "netLengthMm": 7066.696538108732,
+    "suggestedPurchaseLengthM": 9,
+    "rearTransitionSupported": false,
+    "note": "Two rectangular loops. Rear inner return lies beyond casting and requires an underside support tied to frame; no raised-cover transition."
+  },
+  "stackZMm": {
+    "castingTop": 0,
+    "socketMouthAndSeat": 0,
+    "trayUnderside": 2,
+    "trayTop": 15,
+    "sleeveTopAndWasherUnderside": 8,
+    "screwHeadUnderside": 9,
+    "screwTip": -16
+  },
+  "checks": {
+    "singleConnectedSheet": true,
+    "oneRectangularOpening": true,
+    "drySideMainScrewSeats": true,
+    "minimumSocketAxisToOpeningMm": 25.0,
+    "fullMachineTravel": false,
+    "trayRemoval": false,
+    "leakTightness": false
+  },
+  "bomCandidates": [
+    {
+      "partNumber": "HOBBER-TRAY-SHEET-RECT-V2",
+      "quantity": 1,
+      "unit": "piece",
+      "status": "design proposal; machining and coolant qualification pending"
+    },
+    {
+      "partNumber": "HOBBER-TRAY-CAST-IN-SOCKET-M6-CANDIDATE",
+      "quantity": 10,
+      "unit": "piece",
+      "status": "unselected candidate"
+    },
+    {
+      "partNumber": "HOBBER-TRAY-SCREW-ISO4762-M6X25",
+      "quantity": 10,
+      "unit": "piece",
+      "status": "size proposed; grade and supplier unselected"
+    },
+    {
+      "partNumber": "HOBBER-TRAY-WASHER-14X6.6X1",
+      "quantity": 10,
+      "unit": "piece",
+      "status": "provisional dimensions; stiffness and sealing review pending"
+    },
+    {
+      "partNumber": "HOBBER-TRAY-COMPRESSION-SLEEVE-PROPOSAL",
+      "quantity": 10,
+      "unit": "piece",
+      "status": "Ettinger candidate, not yet selected"
+    },
+    {
+      "partNumber": "HOBBER-TRAY-GASKET-TAPE-CANDIDATE",
+      "quantity": 9,
+      "unit": "m",
+      "status": "rubber grade/adhesive/supplier unselected"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "actualSupplierRetentionGeometry": false,
+  "anchorCount": 10,
+  "conflicts": [],
+  "epoxyAnchorageQualified": false,
+  "fullMachineTravel": false,
+  "note": "Old tray-clamp seats excluded because replacement is proposed. Only general lightening cells are trimmed around proposed backing; service voids remain unchanged.",
+  "rearCoverFastening": false,
+  "reservedBackingMm": [
+    50,
+    50,
+    65
+  ],
+  "revision": "rectangular-long-side-fixings-v2",
+  "screeningEnvelopeMm": [
+    24,
+    24,
+    40
+  ],
+  "socketFaceCastingLocalZMm": 800,
+  "status": "Proposed envelopes and rebates clear; full integration pending"
+}

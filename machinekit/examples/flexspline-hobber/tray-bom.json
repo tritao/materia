@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "scope": "Complete known tray-proposal BOM only; replacement design, not additive to the accepted enclosure BOM.",
+  "revision": "rectangular-long-side-fixings-v2",
+  "status": "design proposal; not purchasing release",
+  "items": [
+    {
+      "partNumber": "HOBBER-TRAY-SHEET-RECT-V2",
+      "description": "One-piece routed compact-laminate tray, rectangular opening, 13 mm",
+      "quantity": 1,
+      "material": "compact laminate"
+    },
+    {
+      "partNumber": "HOBBER-TRAY-CAST-IN-SOCKET-M6-CANDIDATE",
+      "description": "M6 x 40 cast-in fixing socket, retained end; supplier selection pending",
+      "quantity": 10,
+      "material": "metal; grade depends on selected socket"
+    },
+    {
+      "partNumber": "HOBBER-TRAY-SCREW-ISO4762-M6X25",
+      "description": "ISO 4762 M6 x 25 socket head screw; material class unselected",
+      "quantity": 10,
+      "material": "stainless steel, class unselected"
+    },
+    {
+      "partNumber": "HOBBER-TRAY-WASHER-14X6.6X1",
+      "description": "Load-spreading washer OD14 / ID6.6 / thickness1 mm, provisional",
+      "quantity": 10,
+      "material": "metal; grade unselected"
+    },
+    {
+      "partNumber": "HOBBER-TRAY-COMPRESSION-SLEEVE-PROPOSAL",
+      "description": "Unthreaded M6 compression spacer OD10 x length8 mm; bore/tolerance review pending",
+      "quantity": 10,
+      "material": "stainless steel"
+    },
+    {
+      "partNumber": "HOBBER-TRAY-GASKET-TAPE-CANDIDATE",
+      "description": "Single-sided adhesive closed-cell tape 15 x 3 mm; quantity in metres",
+      "quantity": 9,
+      "material": null
+    }
+  ],
+  "lineNotes": {
+    "HOBBER-TRAY-SHEET-RECT-V2": {
+      "unit": "piece",
+      "blankMm": [
+        1099.174134527183,
+        969.1741345271829,
+        13
+      ],
+      "cutoutMm": [
+        905,
+        580
+      ],
+      "status": "design proposal; machining and coolant qualification pending"
+    },
+    "HOBBER-TRAY-CAST-IN-SOCKET-M6-CANDIDATE": {
+      "unit": "piece",
+      "status": "unselected candidate",
+      "note": "10 required, not 10 supplier packs. Concrete rating not a mineral-cast rating."
+    },
+    "HOBBER-TRAY-SCREW-ISO4762-M6X25": {
+      "unit": "piece",
+      "status": "size proposed; grade and supplier unselected",
+      "note": "25 mm under-head length. 16 mm insertion is not a claim of 16 mm threaded engagement."
+    },
+    "HOBBER-TRAY-WASHER-14X6.6X1": {
+      "unit": "piece",
+      "status": "provisional dimensions; stiffness and sealing review pending",
+      "note": "No standard washer SKU claimed for these dimensions."
+    },
+    "HOBBER-TRAY-COMPRESSION-SLEEVE-PROPOSAL": {
+      "unit": "piece",
+      "status": "Ettinger candidate, not yet selected",
+      "modelBoreMm": 6.6,
+      "candidateBoreMm": 6.4,
+      "lengthToleranceMm": null
+    },
+    "HOBBER-TRAY-GASKET-TAPE-CANDIDATE": {
+      "unit": "m",
+      "status": "rubber grade/adhesive/supplier unselected",
+      "netLengthM": 7.066696538108732,
+      "purchaseAllowanceFraction": 0.15,
+      "note": "Rounded purchase length, not metres plus a second allowance. Roll lengths/minimum order unknown."
+    }
+  },
+  "sourcingFile": "tray-anchor-sourcing.json",
+  "openItems": [
+    {
+      "description": "Rear inner-gasket support and its fasteners",
+      "quantity": null,
+      "status": "required; geometry/quantity not yet designed"
+    },
+    {
+      "description": "Gasket corner/joint sealant and cut-edge treatment",
+      "quantity": null,
+      "status": "material and amount depend on selected gasket/coolant"
+    },
+    {
+      "description": "Temporary M6 socket-positioning bolts and washers for mould",
+      "quantity": null,
+      "status": "tooling, not permanent installed BOM; length depends on mould thickness; may reuse compatible hardware"
+    }
+  ],
+  "excluded": "Existing six-piece tray, old clamps and frame hardware are not added here. Independent frame-support BOM remains with the accepted enclosure."
+}

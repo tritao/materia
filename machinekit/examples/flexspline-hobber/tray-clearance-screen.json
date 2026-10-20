@@ -1,0 +1,7 @@
+{
+  "revision": "rectangular-long-side-fixings-v2",
+  "samples": 24,
+  "exactPairs": 14,
+  "conflicts": [],
+  "scope": "Rectangular sheet vs existing machine at X/Y/Z endpoints and three A positions. No continuous sweep, gasket, frame, supports or sleeve/anchor assembly acceptance."
+}

@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "status": "research_candidates",
+  "scope": "Supplier research overlay for the standalone tray proposal BOM. No supplier selected; accepted machine/enclosure BOM remains separate until integration.",
+  "requirement": {
+    "partNumber": "HOBBER-TRAY-CAST-IN-SOCKET-M6-CANDIDATE",
+    "thread": "M6",
+    "preferredLengthMm": 40,
+    "quantity": 10,
+    "quantityBasis": "Ten M6 sockets along the two long sides of rectangular proposal v2; actual supplier selection pending.",
+    "mounting": "Mouth flush with casting top at proposed seat Z=0; temporary bolts through mould.",
+    "substrate": "Epoxy mineral casting; concrete catalogue capacities are not transferable."
+  },
+  "offers": [
+    {
+      "id": "pfeifer:05.250.064.040",
+      "partNumber": "HOBBER-TRAY-CAST-IN-SOCKET-M6-CANDIDATE",
+      "supplierId": "pfeifer",
+      "supplierSku": "05.250.064.040",
+      "productUrl": "https://www.pfeifer.info/out/assets/PFEIFER_SOCKET-CRIMPED-END_PPEN.PDF",
+      "observedAt": "2026-10-20T00:00:00Z",
+      "currency": "EUR",
+      "unitPriceMinor": null,
+      "currencyMinorUnit": 2,
+      "taxBasis": "unspecified",
+      "inStock": false,
+      "compatibilityVerified": false
+    },
+    {
+      "id": "com-maleniec:k1110zn",
+      "partNumber": "HOBBER-TRAY-CAST-IN-SOCKET-M6-CANDIDATE",
+      "supplierId": "com-maleniec",
+      "supplierSku": "k1110zn",
+      "productUrl": "https://com-maleniec.com.pl/lib/vp63uf/Nowy-katalog-angielski-jpcfxcck.pdf",
+      "observedAt": "2026-10-20T00:00:00Z",
+      "currency": "EUR",
+      "unitPriceMinor": null,
+      "currencyMinorUnit": 2,
+      "taxBasis": "unspecified",
+      "inStock": false,
+      "compatibilityVerified": false
+    },
+    {
+      "id": "ettinger:007.66.089",
+      "partNumber": "HOBBER-TRAY-COMPRESSION-SLEEVE-PROPOSAL",
+      "supplierId": "ettinger",
+      "supplierSku": "007.66.089",
+      "productUrl": "https://www.ettinger.de/en/product-datasheet/a4bd11edf398b19152e88b3acba7f700/create",
+      "observedAt": "2026-10-20T00:00:00Z",
+      "currency": "EUR",
+      "unitPriceMinor": null,
+      "currencyMinorUnit": 2,
+      "taxBasis": "unspecified",
+      "inStock": false,
+      "compatibilityVerified": false
+    }
+  ],
+  "offerNotes": {
+    "pfeifer:05.250.064.040": {
+      "description": "M6 x 40 stainless steel socket, crimped end",
+      "catalogueDate": "2014-02",
+      "cataloguePackQuantity": 200,
+      "minimumOrderQuantity": null,
+      "edgeDistanceReferenceMm": {
+        "tension": 60,
+        "shear": 80
+      },
+      "note": "Concrete installation reference only; confirm current availability, drawing, purchase pack and mineral-cast retention.",
+      "catalogueInsertionDimensionMm": 25,
+      "catalogueThreadDimensionMm": 6,
+      "sourcePdfSha256": "8cc485b6908661ee4b21f9079ec052cff06361a94b47bb6994a5d57ba6cd1e98",
+      "modelingBasis": "M6 x 40, a=25 and e=6 from supplier drawing. OD8, tail width11, thickness2.2 and wave1.4 mm are nominal assumptions.",
+      "engagementCorrection": "Previous proposal described 16 mm threaded engagement incorrectly. It is nominal screw insertion; catalogue e is 6 mm."
+    },
+    "com-maleniec:k1110zn": {
+      "description": "M6 x 40 crimped-end socket, galvanised steel",
+      "catalogueDesignation": "k1110bk/zn: bk plain steel, zn galvanised variant",
+      "country": "Poland",
+      "contactUrl": "https://com-maleniec.com.pl/",
+      "note": "Confirm exact finish/order code, small quantity, current drawing and shipping to Portugal."
+    },
+    "ettinger:007.66.089": {
+      "description": "Unthreaded M6 round spacer, stainless AISI 303 / X8CrNiS18-9",
+      "outsideDiameterMm": 10,
+      "insideDiameterMm": 6.4,
+      "lengthMm": 8,
+      "country": "Germany",
+      "lengthToleranceMm": null,
+      "note": "Manufacturer catalogue candidate. Model currently uses 6.6 mm bore; 6.4 mm candidate requires fit/tolerance review. Confirm compression length tolerance, current price, pack size and delivery to Portugal."
+    }
+  },
+  "supplierLeads": [
+    {
+      "supplierId": "pct",
+      "country": "United Kingdom",
+      "url": "https://www.pct.uk.com/product-guide/threaded-socket-system/fixing-sockets",
+      "status": "enquiry_only",
+      "note": "Range starts at M6; zinc-plated and stainless options. Exact M6 length, retention shape and SKU unconfirmed."
+    },
+    {
+      "supplierId": "cast-in-portugal",
+      "country": "Portugal",
+      "url": "https://cast-in.pt/portfolio-items/casquilhos-de-fixacao-vemo-demu/",
+      "status": "enquiry_only",
+      "note": "Ask about smaller M6 VEMO sockets; exact current SKU and supply unconfirmed."
+    }
+  ],
+  "availabilityPolicy": "inStock=false means no positive stock verification for these research offers; it is not a supplier out-of-stock statement.",
+  "selections": [],
+  "nextSteps": [
+    "Select socket and confirm current drawing, mineral-cast retention and tightening.",
+    "Review Ettinger spacer length/bore tolerances before selecting; model uses nominal 6.6 mm bore.",
+    "Select washer, screw material grade and gasket grade; request pricing and purchase-pack quantities.",
+    "Detail rear gasket support and complete enclosure integration before releasing this proposal BOM."
+  ],
+  "gasketRequirement": {
+    "partNumber": "HOBBER-TRAY-GASKET-TAPE-CANDIDATE",
+    "type": "Single-sided adhesive closed-cell rubber gasket tape",
+    "widthMm": 15,
+    "freeThicknessMm": 3,
+    "installedThicknessMm": 2,
+    "nominalCompressionPercent": 33.33,
+    "materialGrade": null,
+    "supplierSku": null,
+    "status": "unselected; verify grade compression force, recovery, coolant/oil and adhesive compatibility",
+    "installation": "Adhesive on tray underside; screws provide compression. Continuous loop with sealed butt/scarf joint, no overlap. Screw holes outside wet seal where geometry permits.",
+    "quantity": 9,
+    "compressionControl": "Separate removable sleeves or stops, sized for installed stack after grade selection; no protruding cast-in sockets.",
+    "unit": "m",
+    "quantityBasis": "Rectangular proposal v2: 7.0667 m net, plus 15% cutting allowance rounded up to 9 m."
+  }
+}

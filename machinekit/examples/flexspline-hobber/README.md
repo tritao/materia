@@ -104,3 +104,9 @@ remain open; a completed numerical budget does not establish ISO certification.
 
 Z now uses a centered, recessed 420 mm ball screw between the guides, with its
 fixed bearing and motor at the top. See [Z_DRIVE_SECTION.svg](Z_DRIVE_SECTION.svg).
+
+The replacement rectangular-tray proposal has its own [BOM](tray-bom.json) and
+[supplier records](tray-anchor-sourcing.json); see [enclosure notes](ENCLOSURE.md#tray-proposal-bom-and-sourcing-exports).
+Run the proposal generator and `haxeon.tray-bom.json` to refresh its sourced JSON
+and CSV exports in `build/tray-mounting/`. It remains separate from the installed
+enclosure BOM until the replacement is integrated.

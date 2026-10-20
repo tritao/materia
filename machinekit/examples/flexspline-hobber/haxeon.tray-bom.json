@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "entry": "HobberTrayBom",
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/tray-bom-run"
+}

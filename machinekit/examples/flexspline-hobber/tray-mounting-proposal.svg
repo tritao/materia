@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1350" viewBox="0 0 1280 1350">
+<rect width="1280" height="1350" fill="#fafbfc"/><style>text{font-family:sans-serif;fill:#243746}.note{font-size:18px}</style>
+<text x="50" y="45" font-size="28">Rectangular tray / rectangular opening / direct M6 mounting</text>
+<text x="50" y="78" class="note">Proposal v2 — independent of the accepted enclosure scene.</text>
+<g transform="translate(640,600) scale(1,-1)">
+<path d="M -549.587,-484.587 L 549.587,-484.587 L 549.587,484.587 L -549.587,484.587 Z M -440.000,290.000 L 465.000,290.000 L 465.000,-290.000 L -440.000,-290.000 Z" fill="#dee8ee" fill-rule="evenodd" stroke="#38556a" stroke-width="2"/>
+<path d="M -447.500,297.500 L 472.500,297.500 L 472.500,-297.500 L -447.500,-297.500 Z" fill="none" stroke="#449e79" stroke-width="15" opacity="0.7"/>
+<path d="M -537.087,-472.087 L 537.087,-472.087 L 537.087,472.087 L -537.087,472.087 Z" fill="none" stroke="#449e79" stroke-width="15" opacity="0.7"/>
+<circle cx="-380.0" cy="-315.0" r="8" fill="#fff" stroke="#324c60"/><circle cx="-380.0" cy="-315.0" r="5.25" fill="#536d82"/>
+<circle cx="-190.0" cy="-315.0" r="8" fill="#fff" stroke="#324c60"/><circle cx="-190.0" cy="-315.0" r="5.25" fill="#536d82"/>
+<circle cx="0.0" cy="-315.0" r="8" fill="#fff" stroke="#324c60"/><circle cx="0.0" cy="-315.0" r="5.25" fill="#536d82"/>
+<circle cx="190.0" cy="-315.0" r="8" fill="#fff" stroke="#324c60"/><circle cx="190.0" cy="-315.0" r="5.25" fill="#536d82"/>
+<circle cx="380.0" cy="-315.0" r="8" fill="#fff" stroke="#324c60"/><circle cx="380.0" cy="-315.0" r="5.25" fill="#536d82"/>
+<circle cx="-380.0" cy="315.0" r="8" fill="#fff" stroke="#324c60"/><circle cx="-380.0" cy="315.0" r="5.25" fill="#536d82"/>
+<circle cx="-190.0" cy="315.0" r="8" fill="#fff" stroke="#324c60"/><circle cx="-190.0" cy="315.0" r="5.25" fill="#536d82"/>
+<circle cx="0.0" cy="315.0" r="8" fill="#fff" stroke="#324c60"/><circle cx="0.0" cy="315.0" r="5.25" fill="#536d82"/>
+<circle cx="190.0" cy="315.0" r="8" fill="#fff" stroke="#324c60"/><circle cx="190.0" cy="315.0" r="5.25" fill="#536d82"/>
+<circle cx="380.0" cy="315.0" r="8" fill="#fff" stroke="#324c60"/><circle cx="380.0" cy="315.0" r="5.25" fill="#536d82"/>
+</g>
+<text x="50" y="1130" class="note">Blank 1099.17 × 969.17 × 13 mm · opening 905 × 580 mm · 10 M6 fixings</text>
+<text x="50" y="1160" class="note">Green: two rectangular 15 × 3 mm tape loops, installed at 2 mm · net 7.07 m</text>
+<text x="50" y="1190" class="note">Seat at casting top 0 / tray underside +2 / tray top +15 mm. No inward tabs or motor notch.</text>
+<text x="50" y="1220" class="note">Socket: M6 × 40, reference a=25 / e=6 mm. Outside diameter and crimp shape remain nominal.</text>
+<text x="50" y="1250" class="note">OPEN: rear gasket support; complete-machine clearance; anchor geometry and retention qualification.</text>
+<text x="50" y="1280" class="note">M6 × 25 insertion is 16 mm; this does not imply 16 mm of threaded engagement.</text>
+<text x="50" y="1310" class="note">Design proposal only: actual coolant grade, bearing and seal compression still to verify.</text></svg>
