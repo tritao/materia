@@ -7,7 +7,7 @@ import machinekit.structural.CastInsert;
 import machinekit.structural.CastingFeatures;
 import machinekit.structural.MineralFoundation.CastInsertPlacement;
 
-typedef InsertLocation={id:String,role:String,width:Float,depth:Float,height:Float,pose:AssemblyFrame};
+typedef InsertLocation={id:String,role:String,width:Float,depth:Float,height:Float,pose:AssemblyFrame,?clampHeight:Float};
 
 /** Design-specific insert layout, not a casting process model. Coordinates relative to casting body. */
 class FoundationLayout {
@@ -47,6 +47,33 @@ class FoundationLayout {
     for(station in [l.floatingCentre,l.screwStart])supports.push([station-l.bedCentre-15,-275.0,0.0,station-l.bedCentre+15,275.0,720.0]);
     return supports;
   }
+  /** Dry-side enclosure seats. Local +Z of each insert points out of the casting. */
+  public static function enclosureSeats():Array<InsertLocation> {
+    var out:Array<InsertLocation> = [];
+    for(x in [-1,1])for(y in [-1,1])out.push({id:'enclosureSeat${x+1}${y+1}',
+      role:"enclosure frame dry-side mounting pad",width:80,depth:80,height:20,
+      pose:F.fromRotationMatrix(x*(HobberXLayout.front().bedLength/2-100),y*380,720,
+        [1,0,0,0,0,y,0,-y,0])});
+    return out;
+  }
+  /** Shallow perimeter rebate; the rear service bridge has its own deeper bearing pockets. */
+  public static function trayLedges(depth:Float=machinekit.enclosure.TraySeat.DEPTH):Array<machinekit.structural.CastingFeatures.CastingBox> {
+    var d=dimensions("bed"),w=d[0],l=d[1],a=machinekit.enclosure.TraySeat.WIDTH;
+    return [CastingFeatures.box("tray-front-ledge",a,l,depth,-w/2+a/2,0,d[2]-depth),
+      CastingFeatures.box("tray-rear-ledge",a,l,depth,w/2-a/2,0,d[2]-depth),
+      CastingFeatures.box("tray-left-ledge",w-2*a,a,depth,0,-l/2+a/2,d[2]-depth),
+      CastingFeatures.box("tray-right-ledge",w-2*a,a,depth,0,l/2-a/2,d[2]-depth)];
+  }
+  public static function trayClampSeats():Array<InsertLocation> {
+    var out:Array<InsertLocation> = [],d=dimensions("bed");
+    function add(x:Float,y:Float,height:Float=11):Void out.push({id:"trayClampSeat"+out.length,role:"M6 tray clamp nominal threaded insert envelope",
+      width:20,depth:20,height:20,pose:F.translation(x,y,d[2]-20),clampHeight:height});
+    for(side in [-1,1])for(x in [-1,0,1])add(x*(d[0]/2-100),side*(d[1]/2-35));
+    for(side in [-1,1])for(y in [-150.0,150.0])add(side*(d[0]/2-35),y);
+    // Two taller toes positively retain the raised rear service cover.
+    for(y in [-75.0,75.0])add(d[0]/2-35,y,17);
+    return out;
+  }
   /** Three support centres in casting-local coordinates, kept fixed through X travel. */
   public static function feet():Array<{x:Float,y:Float}> return [for(i in 0...3)
     {x:(i<2?-1:1)*(HobberXLayout.front().bedLength/2-120),y:i==0?-330.0:i==1?330.0:0.0}];
@@ -63,6 +90,11 @@ class FoundationLayout {
         var centre=HobberXLayout.front().bedCentre;
         cores=machinekit.structural.CastingCells.outsideColumns(bedCores(cores),[[-140.0-centre,-140,140-centre,140]]);
         cores=machinekit.structural.CastingCells.outsideBoxes(cores,driveSupports());
+        // Solid bosses behind the side pads: do not anchor in a hollow 25 mm skin.
+        cores=machinekit.structural.CastingCells.outsideBoxes(cores,[for(seat in enclosureSeats())
+          [seat.pose.x-60,seat.pose.y<0?-400.0:330.0,660.0,seat.pose.x+60,seat.pose.y<0?-330.0:400.0,780.0]]);
+        cores=machinekit.structural.CastingCells.outsideBoxes(cores,[for(seat in trayClampSeats())
+          [seat.pose.x-20,seat.pose.y-20,740.0,seat.pose.x+20,seat.pose.y+20,800.0]]);
         for(p in feet())cores=machinekit.structural.CastingFootPocket.reserve(cores,p.x,p.y);
         var feet=feet();for(i in 0...feet.length){var p=feet[i];
           var edge=i<2?(p.y<0?-401.0:401.0):d[0]/2+1;
@@ -75,6 +107,8 @@ class FoundationLayout {
         cores.push(CastingFeatures.box("coolant-front-access",40,240,320,-285-centre,0,140));
         cores.push(CastingFeatures.box("chip-downcomer",80,100,TABLE_WELL_FLOOR+390,-200-centre,0,200));
         cores.push(CastingFeatures.box("rotary-union-access",40,40,TABLE_SEAT+UPPER_OFFSET+1,-centre,0,0));
+        for(ledge in trayLedges())cores.push(ledge);
+        cores.push(CastingFeatures.box("tray-rear-bridge-seat",25,150,10,d[0]/2-12.5,0,d[2]-10));
         cores.push(CastingFeatures.box("cable-route",HobberXLayout.front().bedLength-200,30,40,0,300,500));
       }else {
         cores.push(CastingFeatures.box("head-recess",240,100,502,0,60,-1));
@@ -95,6 +129,8 @@ class FoundationLayout {
     if(!legacy){
       if(kind=="bed"){
         var centre=HobberXLayout.front().bedCentre;
+        for(seat in enclosureSeats())out.push(seat);
+        for(seat in trayClampSeats())out.push(seat);
         add("tablePlate","table seat",280,280,20,-centre,0,TABLE_SEAT-20+UPPER_OFFSET);
         for(side in [-1,1])out.push({id:side<0?"railLeft":"railRight",role:"preloaded column guide seat",width:BED_RAIL_SEAT_WIDTH,depth:HobberXLayout.front().railLength,height:20,
           pose:F.fromRotationMatrix(HobberXLayout.front().railStart+HobberXLayout.front().railLength/2-centre,side*BED_RAIL_CENTRE,200+UPPER_OFFSET,[0.0,1,0,-1,0,0,0,0,1])});
@@ -128,5 +164,5 @@ class FoundationLayout {
     return out;
   }
   public static function insert(row:InsertLocation):CastInsert return new CastInsert(new ComponentValues().setNumber("width",row.width)
-    .setNumber("depth",row.depth).setNumber("height",row.height).setNumber("boreDiameter",row.id=="tablePlate"?40:0).setToken("role",row.role));
+    .setNumber("depth",row.depth).setNumber("height",row.height).setNumber("boreDiameter",row.id=="tablePlate"?40:StringTools.startsWith(row.id,"trayClampSeat")?6:0).setToken("role",row.role));
 }

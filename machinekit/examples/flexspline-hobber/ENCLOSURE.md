@@ -231,11 +231,10 @@ channel, requiring a removable sealed service bridge. The reported 21 / 10 mm
 clearances to the general-core roof datum are conservative datum comparisons,
 not remaining wall thicknesses or strength calculations.
 
-The raised inner edge requires a sealed collar/drainage transition so coolant
-cannot collect against it. Moving-machine clearance, panel supports/deflection,
-local insert bosses and clamp loads, gasket compression stops and dedicated
-frame mounting pads remain to design. The casting and current steel enclosure
-tray are unchanged by this study.
+The study itself only compares sections. The raised case is now integrated in
+the scene as described below. Drainage at the raised inner edge, panel
+deflection, clamp loads, gasket compression stops and actual material/seal
+qualification remain engineering work.
 
 Generate the checked comparison and section drawing from the worktree root:
 
@@ -292,3 +291,65 @@ mandrel. The enclosure is hidden only in this camera, leaving the main view and
 guard controller unchanged. **Picture in picture** uses the same camera inside
 the main viewport; **Dock** returns it to a pane. Presets are scene metadata in
 `HobberInspectionViews`, with world-aligned offsets in metres.
+
+The enclosure frame now mounts independently of the tray. Four dry-side steel
+outrigger envelopes bear against the underside of the lower side extrusions.
+Each is fixed to its own 80 × 80 × 20 mm cast-in side pad, with a reserved solid
+120 × 70 × 120 mm boss behind the pad rather than an anchor in the hollow skin.
+The frame has one tree attachment and three closure constraints, so all four
+supports are explicit in the saved assembly. The tray is absent from this load
+path and the mounting envelopes remain below the wet floor. Four separate
+6 mm angle envelopes on the inner lower-frame faces support the current tray
+from beneath; their 25 mm shelves support its compressed gasket.
+
+These are design envelopes, not fabrication-ready brackets: bolt bores, slots,
+fastener sizing, insert anchorage, levelling and expansion allowance still need
+detailing. CAD acceptance checks all four extrusion contacts, mount/shell
+interference, the full machine envelope, loading/service access and save/reopen.
+The scene now uses the 13 mm laminate tray and recessed casting ledge. The
+13 mm raised case remains the selected baseline; the flush case is a comparison.
+
+Mount/support acceptance: four frame contacts and four tray support contacts,
+48 machine/door states with 1,008 exact near-pair checks, 21 door travel samples,
+loading/service access and save/reopen passed. The raised/flush laminate study
+also still passes with the new side inserts and reserved bosses.
+
+
+## Integrated removable laminate tray
+
+The tray uses six rectangular router-cut blanks in four regions: two full-depth
+side strips, a front strip, and three rear blanks around the X motor. Their
+outer edges have 2 mm clearance to the frame. The 2 mm joints between blanks
+sit over backing strips and compressed gasket envelopes; removable wet-rated
+joint sealant is still required. No bolts pass through the laminate. The
+material remains generic compact laminate, not a qualified commercial grade.
+
+The casting now has the 25 mm-wide, 4 mm-deep perimeter rebate. A 2 mm
+compressed gasket under the 13 mm panels gives a top surface 11 mm above the
+casting. Separate outer support angles and joint backing strips carry the
+outside edges. Ten stepped clamps bear on the tray surface. Their M6 × 30 bolts
+seat in separate 20 mm-deep steel insert envelopes with nominal M6 bores and
+reserved solid backing. Thread helices, anchor retention and tightening loads
+are not qualified by these nominal CAD bores.
+
+The rear motor prevents a flat bridge at the ledge level. A removable stepped
+steel cover spans the interrupted rebate instead: 150 × 30 mm roof, 6 mm feet,
+and a roof underside 13 mm above the casting. Two taller toe clamps with M6 × 35
+bolts retain this cover independently. The feet sit in 10 mm-deep pockets either
+side of the drive opening. Separate compressed gasket envelopes follow the
+cover flange and rear blank edges. Remove the two cover clamps and cover, then
+the tray clamps and joint sealant before lifting the blanks. The enclosure
+frame stays on its own casting mounts throughout.
+
+These are nominal construction details for review. The tray is flat: drainage
+falls, the inner collar transition, coolant/cleaner and chip-heat compatibility,
+compression stops, bolt torque, insert anchorage and leak/strength testing
+remain required before fabrication release.
+
+Integrated tray acceptance passes: six 13 mm blanks at the -2 / +11 mm stack,
+12 clamp toe contacts, all tray-part interference checks, 25 mm sampled lift-out
+clearance with the clamps/cover removed, 48 machine/door states, service/loading
+access and save/reopen. Repeated static posed pairs are checked once; moving
+pairs retain their individual poses. The generated `build/enclosure/tray-cut-list.csv`
+lists the six rectangular blanks in millimetres. These are nominal design sizes,
+not a fabrication release.

@@ -54,8 +54,9 @@ class HobberEnclosurePreview {
       var loading:PartBox={minX:origin.x-r-25,maxX:origin.x+r+25,
         minY:Math.min(origin.y-machinekit.hobbing.HobberXLayout.FRONT_APPROACH-r-80,swept.minY-225),maxY:origin.y+15,
         minZ:origin.z-60,maxZ:origin.z+80+machinekit.hobbing.HobberXLayout.FRONT_LIFT};
-      // Conservative plinth cutout, with a 10 mm gasket/trim reservation around the casting footprint.
-      var opening:PartBox={minX:plinth.minX-10,minY:plinth.minY-10,minZ:plinth.minZ,maxX:plinth.maxX+10,maxY:plinth.maxY+10,maxZ:plinth.maxZ};
+      // Tray overlaps the casting perimeter by the rebate width.
+      var a=machinekit.enclosure.TraySeat.WIDTH;
+      var opening:PartBox={minX:plinth.minX+a,minY:plinth.minY+a,minZ:plinth.minZ,maxX:plinth.maxX-a,maxY:plinth.maxY-a,maxZ:plinth.maxZ};
       var floor=plinth.maxZ;
       var result={layout:new EnclosureLayout({swept:swept,loading:loading,plinth:opening,floorZ:floor,margin:75,openingWidth:400,opposedDoors:true}),
         samples:samples,paddingMm:padding,excluded:[for(m in members)if(external(m.id))m.id]};
@@ -65,6 +66,8 @@ class HobberEnclosurePreview {
   public static function assembled(?source:FlexsplineHobber):{assembly:MachineAssembly,shell:GeneratedEnclosure,machine:FlexsplineHobber,report:Dynamic} {
     var machine=source==null?new FlexsplineHobber():source,fit=fitted(machine),shell=new GeneratedEnclosure(fit.layout),assembly=new MachineAssembly();
     assembly.include("machine",machine);assembly.include("enclosure",shell);
+    HobberEnclosureMounts.install(assembly,shell);
+    HobberTrayMounts.install(assembly,shell);
     for(name in machine.portNames()){var port=machine.port(name,"machine");assembly.exposePort(name,port.instanceId,port.portName);}
     var uses:Array<PanelUse> = [];
     for(m in shell.components())if(Std.isOfType(m.component,machinekit.enclosure.EnclosurePanel)){
@@ -77,6 +80,8 @@ class HobberEnclosurePreview {
     return {assembly:assembly,shell:shell,machine:machine,report:{samples:fit.samples,angularPaddingMm:fit.paddingMm,excludedElectricalRack:fit.excluded,
       input:fit.layout.input,dimensionsMm:[fit.layout.width(),fit.layout.depth(),fit.layout.height()],doorStrokeMm:fit.layout.stroke,doorLeaves:2,doorDrive:"Proposed bought rod-style electric actuator, at least 210 mm usable stroke, plus passive opposite-run belt; ideal coupling only, hardware not sized",
       doorGuide:{track:"Captured steel roller channel, nominal assumed envelope",trackWidthMm:44,slotWidthMm:8,rollerDiameterMm:22,rollersPerLeaf:4,hangersPerLeaf:2,lowerGuide:"Two stationary UHMW shoes per side with overlapping channel engagement",cover:"Removable steel splash hood",wheelSpinModeled:false,mountingDetail:"Bracket bores, fasteners, axle retention and frame attachments remain fabrication work"},
+      baseMounts:{count:4,loadPath:"Frame and doors -> dry-side outriggers -> steel side inserts -> solid casting bosses",trayIndependent:true,traySupports:"Four separate 25 mm shelf / 6 mm angle envelopes inside the lower frame",detail:"Geometric mounting envelopes; bracket bores, bolts, adjustment and insert retention remain unsized"},
+      tray:{construction:machinekit.enclosure.TraySeat.CONSTRUCTION,pieces:6,thicknessMm:13,ledgeDepthMm:4,compressedGasketMm:2,topAboveCastingMm:11,clamps:12,fasteners:"Ten M6 x 30 plus two M6 x 35 for the cover; nominal threads, torque and retention unqualified",rearBridge:"Removable raised motor-clearance cover: 150 x 30 mm roof, 6 mm feet on 10 mm-deep pockets",seams:"2 mm panel joints on gasketed backing; removable wet sealant required",materialQualification:false},
       servicePanels:shell.servicePanelIds,serviceOpenings:shell.serviceAccess,seams:shell.seamMethod,qualificationIssues:qualificationIssues,
       evidence:"X/Y/Z endpoints, A one-degree grid with radius*half-step padding; B/C descendants bounded by rotation-centred spheres",
       assumptions:"75 mm clearance; 400 mm opening; opposed belt-coupled leaves; OD140 side-jaw reservation; 100 mm mist opening; 60 C process and oil-mist rule assessment assumed. Robot, seals, retention and flow not qualified."}};
@@ -99,7 +104,7 @@ class HobberEnclosurePreview {
       timeoutSeconds:10,lockTravelSeconds:0.05,linearStandstillTolerance:1e-5,rotaryStandstillTolerance:1e-4,standstillConfirmationSeconds:0.25};
     var guard:materia.project.SceneArtifact.SceneArtifactEnclosureGuard=scene.machineMotion.enclosureGuard;
     var definition=scene.assemblyDefinition;if(definition==null)throw "Unified scene needs its assembly";
-    guard.enclosureParts=[for(o in definition.occurrences)if(StringTools.startsWith(o.id,"enclosure/"))o.id];
+    guard.enclosureParts=[for(o in definition.occurrences)if(StringTools.startsWith(o.id,"enclosure"))o.id];
     if(scenarios) {
       var config:materia.project.SceneArtifact.SceneArtifactHobbing=scene.machineMotion.hobbing;
       config.scenario="cutting";

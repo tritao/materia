@@ -15,6 +15,7 @@ class MachineKitComponents {
 		machinekit.milling.MillingComponents.register(registry);
 		registry.register(machinekit.enclosure.EnclosurePanel.recipeType());
 		registry.register(machinekit.enclosure.EnclosureCutPanel.cutRecipeType());
+		registry.register(machinekit.enclosure.TrayClamp.recipeType());
 		machinekit.hobbing.HobbingComponents.register(registry);
 		machinekit.pressbrake.PressBrakeComponents.register(registry);
 		machinekit.printing.PrintingComponents.register(registry);

@@ -16,10 +16,10 @@ private typedef SeatingCase = {
 
 /** Casting-local interface study. Does not alter the machine or release fabrication dimensions. */
 class HobberBaseInterfaceStudy {
-  static inline final CONSTRUCTION="compact-laminate-13";
-  static inline final LEDGE=25.0;
-  static inline final SHALLOW_DEPTH=4.0;
-  static inline final GASKET=2.0; // Assumed compressed thickness, not a selected gasket's free thickness.
+  static inline final CONSTRUCTION=machinekit.enclosure.TraySeat.CONSTRUCTION;
+  static inline final LEDGE=machinekit.enclosure.TraySeat.WIDTH;
+  static inline final SHALLOW_DEPTH=machinekit.enclosure.TraySeat.DEPTH;
+  static inline final GASKET=machinekit.enclosure.TraySeat.GASKET; // Assumed compressed thickness, not a selected gasket's free thickness.
   static inline final GASKET_WIDTH=12.0;
   static function bounds(b:CastingBox):Array<Float> {
     var p:Array<Array<Float>> = [];
@@ -64,6 +64,8 @@ class HobberBaseInterfaceStudy {
     if(sheet!=13||Std.string(panel.fabrication)!="RouterCut"||panel.qualifications.coolantRecord!=null||panel.qualifications.heatLimitC!=null)
       throw "Review the preliminary 13 mm router-cut material policy";
     var d=FoundationLayout.dimensions("bed"),cores=CastingFeatures.decode(FoundationLayout.bodyValues("bed").token("voids"));
+    // Compare the seats with the pre-rebate machine voids, excluding the now-authored tray features.
+    cores=[for(core in cores)if(!StringTools.startsWith(core.id,"tray-"))core];
     var raised=seating("raised",SHALLOW_DEPTH,sheet,d,cores),flush=seating("flush",sheet+GASKET,sheet,d,cores);
     if(raised.panelTopAboveCastingMm!=11||flush.panelTopAboveCastingMm!=0||raised.depthMm>=flush.depthMm)
       throw "Seat stack does not match the intended raised/flush comparison";
