@@ -1440,6 +1440,14 @@ Phase 7 step 1 continues from here. First restore main: the MachineKit tooling
 suite fails at `FoundationToolingTests.hx:278` ("Array index out of bounds")
 after the hobber merge, most likely in the hobber bed/column equivalence checks.
 
+- [x] Stage 0: restore the MachineKit tooling suite after the hobber merge.
+  Root cause: the test still indexed the removed static bed `columnPlate`;
+  the merged moving-column design instead declares carriage guide seats and a
+  column `basePlate`. The test now verifies those exact replacement interfaces
+  and roles, with no adapter or casting-geometry changes. Prebuilt OCCT and the
+  shared heavy runner: FoundationToolingTests **62**, PanelNativeTests **132**,
+  BoxMoldTests **153**, ProcessNativeTests **34** assertions pass.
+
 - [ ] Source contracts 1–7: callers declare openings, and `reachedOpenings` is
   diagnostic only; unique body-face IDs per prism and face; flared or chamfered
   bodies report collision hull Unsupported, and material residue names the

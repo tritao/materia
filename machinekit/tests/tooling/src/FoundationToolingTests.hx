@@ -249,8 +249,17 @@ class FoundationToolingTests {
 		var hobber = FoundationToolingAdapter.snapshot(new machinekit.hobbing.MineralCastBed(), "typed-hobber", 1);
 		check(hobber.inserts.filter(i -> i.id == "tablePlate")[0].role == materia.casting.InsertSpec.InsertRole.TableMount,
 			"hobber table plate role explicit");
-		check(hobber.inserts.filter(i -> i.id == "columnPlate")[0].role == materia.casting.InsertSpec.InsertRole.ColumnMount,
-			"hobber column plate role explicit");
+		check(hobber.inserts.filter(i -> i.id == "columnPlate").length == 0,
+			"moving-column hobber has no static bed column plate");
+		for (id in ["railLeft", "railRight"]) {
+			var seats = hobber.inserts.filter(i -> i.id == id);
+			check(seats.length == 1, "hobber bed declares column carriage guide " + id);
+			check(seats[0].role == materia.casting.InsertSpec.InsertRole.GuideSeat, "column carriage guide role explicit");
+		}
+		var column = FoundationToolingAdapter.snapshot(new machinekit.hobbing.MineralCastColumn(), "typed-hobber-column", 1);
+		var sole = column.inserts.filter(i -> i.id == "basePlate");
+		check(sole.length == 1, "hobber moving column declares its carriage sole");
+		check(sole[0].role == materia.casting.InsertSpec.InsertRole.ColumnMount, "hobber carriage sole role explicit");
 		var missingRole = false;
 		try
 			new CastInsert()
