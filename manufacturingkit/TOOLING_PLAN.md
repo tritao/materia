@@ -504,6 +504,16 @@ packages are regenerated.
   inserts; it uses CadKit thread specifications, so it remains in MachineKit.
 - `FoundationToolingAdapter` becomes a copy: neutral records, plus hole interfaces
   converted to neutral hole records, fingerprinted. It infers nothing.
+- One exact disjoint-box algebra lives in `materia.casting`. It replaces both
+  ManufacturingKit's `BoxVolumes` (fill analysis) and the hobber branch's
+  `machinekit.structural.CastingCells` (collision hulls, section stiffness), so
+  collision, stiffness screening and fill analysis share one implementation.
+
+This is the single casting tooling plan. The `flexspline-hobber` branch's
+`machinekit/CASTING_TOOLING_PLAN.md` (CT0–CT10, unimplemented) is superseded; its
+replication-relationship, fixture-constraint, batch and printed-piece decisions
+are folded in here (interface requirements, insert fixtures, fill analysis and
+deferred scope).
 
 ### Typed casting features
 
@@ -519,6 +529,13 @@ pose stored in a JSON text parameter.
 | `draft`, `cornerRadius` | Wall draft along a declared withdrawal axis and internal corner radius; zero is explicit |
 | `owner` | The interface or insert the feature serves, or null |
 | `adjustable` | Dimensions the design allows proposals to change (lightening cores yes, interface recesses no) |
+| `derivedFrom` | The design feature this one was split from when retained webs, backing or bosses are subtracted from it, or null |
+
+- Retained material (support webs, backing under precision seats, foot bosses) is
+  subtracted from a design feature by the shared box algebra. Each resulting
+  fragment keeps a stable ID and `derivedFrom`, so tooling can group the
+  fragments of one bay into one core unit and castability can report against the
+  design feature that the designer edits.
 
 - Feature geometry is the finished cavity. CAD realization extends its cutting
   tools past declared openings internally for robust booleans; nothing outside
@@ -562,11 +579,33 @@ pose stored in a JSON text parameter.
 
 Precision intent belongs to the design. Each precision insert or foundation
 interface carries an `InterfaceRequirement`: route (as cast, machined, ground,
-replicated), allowance (machining stock or replication/grout gap), flatness and
-parallelism, datum reference and position tolerance. The casting geometry
-includes the allowance. The mold options' `PrecisionInterface` keeps only process
-choices: master reference, release, hole protection and evidence. A route that
-the geometry cannot achieve is a design change request.
+replicated), allowance (machining stock or replication/grout gap), the finishes
+the interface permits, and position tolerance. The casting geometry includes the
+allowance. A route that the geometry cannot achieve is a design change request.
+
+Accuracy requirements are **relationships**, not single faces, and they come from
+the machine design rather than the casting:
+
+- `InterfaceRelationship`: coplanar, parallel, perpendicular or a distance between
+  datums, with a tolerance. Members are interface IDs or **machine axes** (for
+  example, the hobber column's Z-rail seats parallel to the C axis and its table
+  seat square to it). The machine assembly declares them; each insert's
+  requirement references the relationships it takes part in.
+- A replicated relationship is produced by a **replication jig**: release-coated
+  masters (ground bars, plates, granite squares, or an axis master such as a
+  ground arbor on the C-axis line) held in the design relationship on one rigid
+  reference frame, each on three-point jack supports with locks. Simpler finishes
+  stay available where the interface allows them: the real rail as master,
+  self-levelling (one gravity plane only) or face-down replication on a surface
+  plate. The jig planner chooses only among permitted finishes.
+- Each relationship names its metrology: instrument and method (electronic level,
+  indicators against the axis master, autocollimator or laser) and the stated
+  uncertainty. The measurement chain must fit inside the tolerance, or the
+  relationship stays pending.
+- The mold options' `PrecisionInterface` keeps only process choices: master and
+  jig references, release, hole protection and evidence. Replication masters,
+  jigs and their metrology are fabrication-package items; nothing is shimmed
+  later.
 
 ### Foundation-level declarations
 
@@ -581,12 +620,27 @@ the geometry cannot achieve is a design change request.
 
 ### Layout parameters
 
-`MillFrame` and the hobber's `FoundationLayout` build features from named layout
-parameters instead of inline numbers (shoulder clearance 12, recess depth 21, foot
-access 90 × 100 at 40, stem 20 × 20 × 42, seat width 106, bores 10.2 and 18). Tap
-drills derive from thread specifications. Shared feature patterns (open underside
-pocket grids, foot access with stem, recesses beside guide seats) live in one
-builder that both machines use.
+`MillFrame` builds features from named layout parameters instead of inline numbers
+(shoulder clearance 12, recess depth 21, foot access 90 × 100 at 40, stem
+20 × 20 × 42, seat width 106, bores 10.2 and 18). Tap drills derive from thread
+specifications. Shared feature patterns (open underside pocket grids, foot access
+with stem, recesses beside guide seats, retained webs and backing) live in one
+builder in `machinekit.structural`.
+
+- The foot pattern starts from the hobber branch's `CastingFootPocket`
+  (side-access pocket, removable plate bearing up against a registered roof,
+  stem clearance, reserved boss) with its constants as parameters, reconciled
+  with the mill's foot access and stem. The plate register is an
+  `InterfaceRecess` owned by the removable plate.
+- One levelling-foot component family replaces the overlapping `LevellingFoot`,
+  `MillLevelingFoot` and the branch's `LevelingFoot`/`LevelingSeat`, with variants
+  for screw, pad, removable plate and nuts.
+- On main, phase 7 converts the mill. Main's `machinekit.hobbing.FoundationLayout`
+  is the superseded HB5 layout; the `flexspline-hobber` branch has rewritten it,
+  so the hobber foundations convert when that branch rebases onto phase 7, not
+  twice. That rebase also deletes `LegacyFoundationRecipes`, the
+  `hobbing.MineralFoundation` compatibility adapter and the `legacy` layout flags,
+  and adopts typed roles and labels.
 
 ## Generation pipeline
 
@@ -690,6 +744,13 @@ and physical insert anchorage as explicit inputs or pending decisions. Existing
 box-shaped inserts alone do not establish an anchorage design; anchorage is an
 `InsertAnchorage` record per insert, and its geometry joins the void and overlap
 checks once supplied.
+
+Every insert fixture is checked for full constraint: its pins, slots, faces and
+clamps must remove all six degrees of freedom of the insert, with no redundant
+locator fighting another. The check reports the free or over-constrained
+directions per insert. The fixture's stated accuracy budget is the insert
+tolerance minus its finishing allowance; fixtures must not block the pour where
+the mix must flow, and each must come off after cure.
 
 Precision inserts are normally fixed by bolting through the bed or a datum bar
 into their own threaded holes. Those holes penetrate a contact panel but are
@@ -934,6 +995,10 @@ solid in mold coordinates, already checked against the source.
   the end of the fill.
 - A vent becomes a `PenetrationPlan` of class fill/vent through tooling, or a
   `DesignChangeRequest` when it has to pass through the casting design.
+- **Pour plan.** From the resin mass and the recipe's mix (binder and aggregate
+  fractions by weight), report material quantities, the batch count for the
+  declared mixer capacity and working time, and the pour sequence with each
+  batch's level range. Undeclared mixer or working-time data leave it pending.
 
 The flat free surface is an idealisation: a vibrated paste traps at least these
 pockets, and may trap more under broad flat ceilings. The air-escape-width rule
@@ -1092,24 +1157,30 @@ air and cure margin.
 Implement `materia.casting` and the source model described under foundation
 design model, in three steps:
 
-1. **Records.** Typed features with openings, finished extents, owners and
-   adjustable dimensions; shared vocabulary moved; insert holes through
-   `DesignInterfaces`; typed finish; named mill and hobber layout parameters and
-   the shared feature builder; the adapter reduced to a copy. Geometry stays
-   box-only.
+1. **Records.** Typed features with openings, finished extents, owners,
+   adjustable dimensions and `derivedFrom`; shared vocabulary and the one box
+   algebra in `materia.casting`; insert holes through `DesignInterfaces`; typed
+   finish; named mill layout parameters, the shared feature builder and one
+   levelling-foot family; the adapter reduced to a copy. Geometry stays box-only.
 2. **Requirements.** Interface requirements with the allowance in the casting
-   geometry, the datum scheme, lifting inserts and the base–column joint.
+   geometry; interface relationships with axis members, replication jigs and
+   metrology; insert-fixture constraint checks; the datum scheme, lifting inserts
+   and the base–column joint.
 3. **Geometry.** Draft, corner radius and prism features through CAD, planner,
    drawings, CAM and the phase 6 analyses.
 
-Acceptance: after step 1 the mill base, column and hobber foundations rebuild with
-zero symmetric difference against their previous CAD. `MillMoldSetup` has no
+Acceptance: after step 1 the mill base and column rebuild with zero symmetric
+difference against their previous CAD; fill, collision hulls and section
+stiffness give identical results through the shared box algebra, and fragments
+group by `derivedFrom`. `MillMoldSetup` has no
 feature-ID strategy table, and an override names its feature explicitly. No code
 outside CAD realization clips or extends design cuts; an opening that is not on a
 body face, or an undeclared breakout, is rejected. Every penetration record traces
 to a `HoleInterface`, and no insert label carries hardware data. A replicated
 seat's allowance appears in the casting geometry and clears its allowance request,
-while master and release stay pending evidence. The lifting-point and column-joint
+while master and release stay pending evidence. A relationship whose metrology
+uncertainty exceeds its tolerance stays pending; an under- or over-constrained
+fixture reports the affected directions. The lifting-point and column-joint
 requests clear when the design declares them and return when removed. A drafted
 former fixture passes release and clears its release request; a prism feature with
 a corner radius below the router radius fails with its ID. Fill analysis agrees
@@ -1119,9 +1190,11 @@ unchanged. Castability proposals change only adjustable dimensions.
 ### 8. Column and independent structure
 
 Add the column setup, stepped/flared envelope support, intersecting channels and
-side-removal details on the phase 7 model. Add a small mineral-cast pedestal
-example with different dimensions, insert layout and opening direction using the
-shared planner.
+side-removal details on the phase 7 model. Add an independent structure using
+the shared planner with different dimensions, insert layout and opening direction.
+If the `flexspline-hobber` branch has landed on the phase 7 model, that is the
+hobber's monolithic plinth (930 × 800 × 800 mm) and column, including the C-axis
+replication relationships; otherwise a small mineral-cast pedestal example.
 
 Acceptance: both selected mill foundations generate complete review packages;
 the pedestal uses shared records/joints/planner with configuration only. Changing
@@ -1199,7 +1272,9 @@ assembly, wiring core cutting definitions into `FoamJob` (after foam-cutter land
 on main), CNC posts beyond CamKit's LinuxCNC writer,
 general arc-native CAM IR, rotational removal paths, automatic hardware optimization, automatic application
 of design-change proposals, parting-surface search beyond listed orientations,
-the 3D cure tier unless a section needs it, the items under "Not modelled", mold
+the 3D cure tier unless a section needs it, printed mold pieces (a former
+strategy for shapes panels and foam cannot make, segmented to the printer's build
+volume and emitted as `Slicer` jobs), sand-cast metals, the items under "Not modelled", mold
 FEM beyond what closed-form checks cannot cover, full structural qualification and app
 editing UI are follow-on work. Preserve extension points for them without implementing
 placeholder subsystems. The initial release succeeds when the shared libraries
