@@ -18,13 +18,11 @@ remain separate for their normals, but their positions form shared mesh boundari
 With `detailed=false`, physical properties still use the conservative CAD envelope;
 select `detailed=true` when detailed mass/inertia or CAD export is needed.
 
-Open `hob.project.json` for the isolated fine reference display, or
-`detailed.project.json` for the reference machine with displayed teeth. Use
-`hob-cad.project.json` for the actual detailed B-rep and its physical properties.
-The normal `materia.project.json` remains the fast cutting demonstration. Detailed
-views now generate the fused solid rather than an overlapping display approximation;
-initial generation takes longer. Generated scene artifacts are cached by Materia.
-The isolated keyed example uses the same `HobDesign` as the reference machine.
+Open `hobber.scene.json` (or `materia.project.json`) for the unified machine
+with displayed hob teeth. Use the Tool contact inspection camera for a close view.
+Detailed views generate the fused solid; generated scene artifacts are cached by
+Materia. For isolated reference-tool diagnostics, use `./check-hob.sh reference`
+with the optional inspection export described below instead of a separate project.
 The installed machine uses a plain bore; a matching physical key is not added.
 
 ## Construction
@@ -55,7 +53,7 @@ The supplied design assumptions are:
 | CAD cutting-profile chord tolerance | 0.0005 mm (0.5 µm) |
 | Backing-surface angular sampling target | 0.01 mm |
 | Bore | 16 mm |
-| Keyway | Disabled by default; isolated example assumes width 5 mm, radial depth 2.3 mm |
+| Keyway | Disabled by default; keyed tests exercise optional keyway geometry |
 
 The 0.5 µm bound applies to simplification of the recovered polygon, not to the
 manufacturing accuracy of a hob. The smooth backing loft is interpolated through
@@ -99,10 +97,11 @@ short, keyed, two-start tools. These checks retain 0.01 mm mesh deflection and
 
 ## Installed reference inspection
 
-`detailed.project.json` opens the complete reference machine at CAM's full-depth
-centre distance, zero hob shift, negative hob lead-angle tilt, mid-face height and
-planned table phase. The installed tool has the plain bore used by the arbor;
-the isolated sample's assumed keyway is not copied into the machine.
+The unified scene opens the cutting demonstration; its inspection camera follows
+the installed tool. The layout checks use a separate nominal reference setup at
+CAM's full-depth centre distance, zero hob shift, negative hob lead-angle tilt,
+mid-face height and planned table phase. The installed tool has the plain bore
+used by the arbor; keyed diagnostic tools do not change that interface.
 
 `./check-layout.sh all` checks nominal coaxiality, the 40–80 mm arbor seat, bearing
 journal coverage, cutter/work transforms and generating-edge reach into the toothed

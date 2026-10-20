@@ -1,27 +1,9 @@
-import haxe.io.Bytes;
-import machinekit.assembly.AssemblyPreview;
-import materia.project.SceneArtifact;
-
 class FlexsplineHobberPreview {
   /** Scene defaults apply to direct artifact/project opens as well as saved view wrappers. */
   public static function mechanicalView(data:materia.project.SceneArtifact.SceneArtifactData):materia.project.SceneArtifact.SceneArtifactData {
     if(data.assemblyDefinition!=null)for(occurrence in data.assemblyDefinition.occurrences)
       if(occurrence.id=="electricalPanel"||occurrence.id=="powerSupply"||StringTools.endsWith(occurrence.id,"-driver"))occurrence.visible=false;
     return data;
-  }
-  /** Full reference tool, isolated for close inspection; physical properties use the blank envelope. */
-  public static function hobTool():Bytes {
-    var machine=new FlexsplineHobber();
-    var tool=machinekit.hobbing.Hob.fromDesign(machine.hob.design,machine.spec,40,16,false,true);
-    var hob=new machinekit.hobbing.Hob(tool.values().copy().setNumber("keywayWidth",5));
-    var assembly=new machinekit.assembly.MachineAssembly();assembly.addComponent("hob",hob);
-    return SceneArtifact.encode(AssemblyPreview.scene(assembly,"hob-inspection"));
-  }
-  public static function hobCad():Bytes {
-    var machine=new FlexsplineHobber();
-    var hob=machinekit.hobbing.Hob.fromDesign(machine.hob.design,machine.spec,40,16,true);
-    var rendered=AssemblyPreview.part("hob","Reference hob CAD",hob.geometry(machinekit.component.ComponentDetail.Preview),hob.materialId,0.01);
-    return SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:[rendered]});
   }
   /** Nominal full-depth reference setup, at the middle of the toothed face. */
   public static function inspectionState(machine:FlexsplineHobber):cadkit.modeling.AssemblyState {
