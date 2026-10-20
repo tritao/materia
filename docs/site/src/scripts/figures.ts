@@ -9,6 +9,20 @@ const renderers: Record<string, Renderer> = {
 	"paths-vs-trajectories": pathsVsTrajectories,
 };
 
+/**
+ * Mermaid records a diagram's natural width only as an inline `max-width`. Copy it to `--natural-width`, which
+ * diagrams.css uses on narrow screens to show the diagram at its natural size and scroll it sideways.
+ */
+export function keepDiagramsReadable(): void {
+	const mark = () => {
+		for (const svg of document.querySelectorAll<SVGSVGElement>("pre.mermaid svg"))
+			if (svg.style.maxWidth && !svg.style.getPropertyValue("--natural-width"))
+				svg.style.setProperty("--natural-width", svg.style.maxWidth);
+	};
+	new MutationObserver(mark).observe(document.body, { childList: true, subtree: true });
+	mark();
+}
+
 export function renderFigures(): void {
 	for (const figure of document.querySelectorAll<HTMLElement>("figure.materia-figure[data-figure]")) {
 		const name = figure.dataset.figure!;

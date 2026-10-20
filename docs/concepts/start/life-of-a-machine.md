@@ -20,19 +20,23 @@ does not exercise a stage, the step says so and names the example that does.
 flowchart TB
   subgraph model [Model it]
     direction LR
-    geometry[Geometry] --> components[Components] --> assembly[Assembly] --> artifact[Scene artifact] --> editor[Editor]
+    geometry[Geometry] --> components[Components] --> assembly[Assembly]
+  end
+  subgraph load [Load it]
+    direction LR
+    artifact[Scene artifact] --> editor[Editor]
   end
   subgraph plan [Plan it]
     direction LR
     kinematics[Kinematics] --> limits[Derived limits] --> motion[Motion plan]
-    mission["Mission (pick, place)"] --> motion
+    mission[Mission] --> motion
   end
   subgraph run [Run it]
     direction LR
     runtime[Runtime] --> simulation[Simulated world]
-    runtime --> device[Device / controller]
+    runtime --> device[Controller]
   end
-  model --> plan --> run
+  model --> load --> plan --> run
 ```
 
 <!-- figure: one persistent 3D view of the picker that changes with each step

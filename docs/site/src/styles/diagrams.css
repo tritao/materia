@@ -58,3 +58,15 @@ pre.mermaid svg .transition { stroke: var(--sl-color-gray-3) !important; }
 pre.mermaid svg .state-start,
 pre.mermaid svg .state-end,
 pre.mermaid svg circle.state-start { fill: var(--sl-color-white) !important; stroke: var(--sl-color-white) !important; }
+
+/* On narrow screens, keep diagrams at their natural size (readable text) and scroll sideways rather than
+   shrinking them to the column. */
+@media (max-width: 40rem) {
+	/* The plugin centres diagrams in a flex box: start-align so an overflowing diagram scrolls from its left edge. */
+	pre.mermaid { overflow-x: auto; justify-content: flex-start !important; }
+	pre.mermaid svg[style*="--natural-width"] {
+		flex-shrink: 0;
+		max-width: none !important;
+		width: var(--natural-width) !important;
+	}
+}

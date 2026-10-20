@@ -9,6 +9,7 @@ import "../styles/diagrams.css";
 <Default><slot /></Default>
 
 <script>
-	import { renderFigures } from "../scripts/figures";
+	import { keepDiagramsReadable, renderFigures } from "../scripts/figures";
 	renderFigures();
+	keepDiagramsReadable();
 </script>
