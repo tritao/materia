@@ -533,9 +533,9 @@ only as sources in docs. Standards (ISO30 / ISO 7388, ER collets, EN 60204-1, IS
 | Servos | Y 2 × 750 W, X 400 W, Z 400 W + brake | assumed |
 | Pulse resolution | 5000 pulses/rev: Y 4 µm / 167 kHz; X 2.667 µm / 250 kHz at 40 m/min | derived; board rate qualification pending |
 | Z screw | Ø16 × 5 mm, 13 mm race root, direct drive, fixed/free | SR4 selection at 5 m/min; assumed dimensions |
-| Beam | RHS 200 × 100 × 6.3 steel, ≈ 11 µm at 300 N mid-span | estimate |
-| Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | target |
-| First gantry mode | ≥ 40 Hz | target |
+| Beam | RHS 200 × 100 × 6.3 steel retained as baseline | SR5; carriage/guide redesign required |
+| Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | target; current SR5 screen ≈ 0.0061 X / 0.00585 Y |
+| First gantry mode | ≥ 40 Hz | target; current SR5 screen ≈ 2.73 Hz |
 | Spindle | ISO30 ATC, ≈ 6 kW S1, 18–24k rpm, 400 V 3~, air-cooled | assumed |
 | VFD | 7.5 kW 400 V with braking resistor and STO | assumed |
 | Tool rack | 8 forks, pneumatic cover, rear rack zone | assumed |
@@ -647,6 +647,39 @@ and the vacuum pump, and records the cost.
 - Tests: the exporter reproduces the mill's reference packet; the router packet's analytic
   checks (beam bending against the formula, within a stated tolerance); targets met or the step
   names what limits them.
+
+**SR5 result (2026-10-20): screening complete; current structure rejected.**
+The shared assembly exporter reproduces all 220 mill component records and 36 STEP bodies
+byte-for-byte, excluding changed source/build provenance. The router study runs both bed lengths
+at nine full-Z poses each, with X/Y/Z cutting, gravity, X/Y acceleration and six modes. See
+[`fem/README.md`](fem/README.md) for assumptions, commands, limits and evidence locations.
+
+| Bed Y | Worst X stiffness | Worst Y stiffness | First mode | Maximum gravity frame twist |
+|---|---:|---:|---:|---:|
+| 2600 mm | 0.006106 N/µm | 0.005849 N/µm | 2.732 Hz | 0.00825 mm |
+| 3150 mm | 0.006100 N/µm | 0.005849 N/µm | 2.732 Hz | 0.00902 mm |
+
+These are rejection-screen results from a linear beam/plate-strip model with assumed finite
+interfaces, not predictions of real cutting accuracy. The dominant limits are the open 12 mm X
+carriage plate and the single X/Z guide blocks. The plate contribution alone misses SR-D3 even
+with much stiffer guides. The first mode has substantial relative tool/bed motion. The 100/50 mm
+mesh comparison changes static compliance by at most 0.61% and the first six modes by 0.31%.
+Analytical beam and rotational-spring checks, energy/force balance, reciprocity, foundation
+compression and the existing mill regressions pass.
+
+Decisions: retain steel RHS 200 × 100 × 6.3 as the beam baseline; use a closed X bridge and
+spaced X rails/blocks, and replace the single Z block with spaced guides. Reject 12 mm aluminium
+beam feet for final design; 20 mm steel is the next candidate, with packaging and changed mass
+to be checked. Keep tubes empty: even perfectly bonded fill cannot resolve the carriage/guide
+limits and adds substantial mass; no damping benefit is quantified.
+
+Eccentric Y loading supersedes SR4's equal-share assumption: the reserved worst branch force
+is 827.65 N. Servo torque, reducer loads and preload still pass, but the existing 20 mm engaged
+rack/pinion face reaches 706.06 MPa against the assumed 700 MPa contact limit. A 25 mm engaged
+face on **both** rack and pinion passes the tooth screen; its fit is not yet qualified.
+
+SR6 starts with this structural redesign and reruns SR4/SR5 before releasing fabrication
+files. The candidates above have not been substituted into CAD or claimed to meet SR-D3.
 
 **SR6. Frame, fabrication drawings and alignment procedures (SR-D2, SR-D11).**
 - Weldment: tube layout, weld seams and sequence, jig layout (frame points as jig stops), cut

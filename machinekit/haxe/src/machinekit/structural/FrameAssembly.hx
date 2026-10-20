@@ -100,6 +100,20 @@ class FrameAssembly {
 			startCut: resolvedStartCut, endCut: resolvedEndCut});
 	}
 
+    /** Copies of authored centreline data; does not expose mutable frame internals. */
+    public function analysisMembers():Array<{name:String,start:Vector,end:Vector,reference:Vector,profile:StructuralProfile}> {
+        var result:Array<{name:String,start:Vector,end:Vector,reference:Vector,profile:StructuralProfile}> = [];
+        for(m in members) {
+            var a:Vector=points.get(m.start);
+            var b:Vector=points.get(m.end);
+            var direction:Vector=b.subtract(a).normalized();
+            var ref:Vector=m.reference==null ? (Math.abs(direction.z)<0.9?new Vector(0,0,1):new Vector(0,1,0)) : m.reference;
+            result.push({name:m.name,start:new Vector(a.x,a.y,a.z),end:new Vector(b.x,b.y,b.z),
+                reference:new Vector(ref.x,ref.y,ref.z),profile:m.profile});
+        }
+        return result;
+    }
+
 	/** Straight-line distance between the frame nodes on a member's centreline. */
 	public function length(name:String):Float {
 		var m = find(name);
