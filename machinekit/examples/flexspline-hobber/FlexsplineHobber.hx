@@ -44,12 +44,12 @@ class FlexsplineHobber extends MachineAssembly {
     var footCentres=FoundationLayout.feet();
     for(i in 0...footCentres.length){
       var p=footCentres[i],x=p.x+HobberXLayout.front().bedCentre,y=p.y;
-      var roof=-590+machinekit.structural.CastingFootPocket.ROOF,plateBottom=roof-machinekit.structural.CastingFootPocket.PLATE_THICKNESS;
+      var roof=-590+FoundationLayout.FOOT_ROOF,plateBottom=roof-FoundationLayout.FOOT_PLATE_THICKNESS;
       fixAt("footSeat"+i,new machinekit.structural.LevelingSeat(),F.translation(x,y,plateBottom),"bed/casting",F.alongY(x,y,roof,0,0,1));
       var nutValues=new ComponentValues().setToken("variant","nut");
       fixAt("footNut"+i,new machinekit.structural.LevelingSeat(nutValues),F.translation(x,y,plateBottom-19),"footSeat"+i,F.alongY(x,y,plateBottom,0,0,1));
       fixAt("footLocknut"+i,new machinekit.structural.LevelingSeat(nutValues),F.translation(x,y,plateBottom-38),"footNut"+i,F.alongY(x,y,plateBottom-19,0,0,1));
-      fixAt("foot"+i,new machinekit.structural.LevelingFoot(new ComponentValues().setNumber("recessDepth",machinekit.structural.CastingFootPocket.ROOF)),F.translation(x,y,-637),"footNut"+i);
+      fixAt("foot"+i,new machinekit.structural.LevelingFoot(new ComponentValues().setNumber("recessDepth",FoundationLayout.FOOT_ROOF)),F.translation(x,y,-637),"footNut"+i);
     }
     var installed:machinekit.motion.PrecisionRotaryAxis=rotaryAxis==null?new machinekit.motion.PurchasedRotaryTable():rotaryAxis;
     table=installed.assembly();tableSpec=installed.specification();
@@ -142,7 +142,7 @@ class FlexsplineHobber extends MachineAssembly {
     addEncoder("table-feedback",C,"table/"+tableSpec.encoderPart,"table-drive");
     addEncoder("hob-master",B,"spindle/encoder","hob-drive");
     bindMotorBrake("swivel-drive","swivel/clamp","swivel.clampRelease","swivel.clampReleased",1000,30);
-    FoundationIntegrity.check(bed).throwIfErrors();FoundationIntegrity.check(column).throwIfErrors();FoundationIntegrity.checkMounts(this,precisionMounts).throwIfErrors();
+    machinekit.structural.FoundationIntegrity.check(bed).throwIfErrors();machinekit.structural.FoundationIntegrity.check(column).throwIfErrors();machinekit.structural.FoundationIntegrity.checkMounts(this,precisionMounts,[for(mount in precisionMounts) mount.name=>mount.name]).throwIfErrors();
     exposeConnector("work","mandrel","work");exposeConnector("hobCentre","hob","centre");
   }
   function includeAt(id:String,a:MachineAssembly,pose:AssemblyFrame):Void {

@@ -254,6 +254,10 @@ class BoxAlgebra {
 		cuts.sort(Reflect.compare);
 		var minimum = Math.POSITIVE_INFINITY;
 		for (i in 0...cuts.length - 1) {
+			// Use the same coincident-plane resolution as the Boolean algebra.
+			// Clipping a rotated source can leave adjacent bounds one ULP apart.
+			if (cuts[i + 1] - cuts[i] <= PLANE_EPSILON)
+				continue;
 			var x = (cuts[i] + cuts[i + 1]) / 2, area = 0.0, first = 0.0, second = 0.0;
 			for (b in material)
 				if (x > b.x && x < b.x + b.width) {
@@ -266,6 +270,8 @@ class BoxAlgebra {
 				throw "Casting has no continuous beam section";
 			minimum = Math.min(minimum, second - first * first / area);
 		}
+		if (!Math.isFinite(minimum))
+			throw "Section interval below casting plane resolution";
 		return minimum;
 	}
 

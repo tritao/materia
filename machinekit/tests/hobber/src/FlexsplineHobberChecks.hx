@@ -1,3 +1,5 @@
+import machinekit.structural.FoundationIntegrity;
+import machinekit.structural.MineralFoundation;
 import cadkit.modeling.AssemblyModel;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.assembly.PosedParts;
@@ -94,7 +96,7 @@ class FlexsplineHobberChecks {
       var definition=model.definition("hobber");
       check(definition.couplings.filter(k->k.source==FlexsplineHobber.B||k.target==FlexsplineHobber.C).length==0,"B/C have no mechanical gear coupling");
       for(axis in ["X","Y","Z"]){var j=joint.filter(k->k.id==axis)[0];check(j.limits.lower!=null&&j.limits.upper!=null,"bounded linear travel");}
-      check(!FoundationIntegrity.checkMounts(machine,machine.precisionMounts).hasErrors(),"foundation precision mounts all land on inserts");
+      check(!FoundationIntegrity.checkMounts(machine,machine.precisionMounts,[for(mount in machine.precisionMounts) mount.name=>mount.name]).hasErrors(),"foundation precision mounts all land on inserts");
       for(axis in ["X","Y","Z"]){
         var coupling=definition.couplings.filter(k->k.id==axis+"lead")[0];
         near(Math.abs(coupling.ratio),2*Math.PI/5,1e-12,"ball screw derives rad/mm coupling");

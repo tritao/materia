@@ -1,7 +1,8 @@
 import machinekit.hobbing.FoundationLayout;
 import materia.assembly.AssemblyFrames as F;
-import machinekit.structural.CastingCells;
-import machinekit.structural.CastingFeatures;
+import materia.casting.BoxAlgebra;
+import materia.casting.Box3;
+import materia.casting.CastingRecordCodec as R;
 import machinekit.hobbing.HobberXLayout;
 
 /** Preliminary assumed-stiffness evidence, not FEA or a structural certification. */
@@ -12,17 +13,24 @@ class FlexsplineHobberBaseReport {
       [force*a*(l-x)*(l*l-a*a-(l-x)*(l-x))/(6*l*ei),-force*a*(l*l-a*a-3*(l-x)*(l-x))/(6*l*ei)];
   }
   public static function measure(machine:FlexsplineHobber):Dynamic {
-    var raw:Dynamic=haxe.Json.parse(sys.io.File.getContent("machinekit/examples/flexspline-hobber/BASELINE_FOUNDATIONS.json"));
+    var root=Sys.getCwd();
+    while(!sys.FileSystem.exists(root+"/machinekit/examples/flexspline-hobber/BASELINE_FOUNDATIONS.json")) {
+      var parent=haxe.io.Path.directory(root);if(parent==root||parent.length==0)throw "Cannot find typed foundation baseline";root=parent;
+    }
+    var raw:Dynamic=haxe.Json.parse(sys.io.File.getContent(root+"/machinekit/examples/flexspline-hobber/BASELINE_FOUNDATIONS.json"));
+    if(raw.format!="machinekit.foundation-baseline"||raw.version!=2)throw "Unsupported foundation baseline format/version";
     function number(row:Dynamic,key:String):Float {var value:Dynamic=Reflect.field(row,key);return cast value;}
-    var oldRaw:Dynamic=Reflect.field(raw,"base"),old={massKg:number(oldRaw,"massKg"),width:number(oldRaw,"width"),depth:number(oldRaw,"depth"),height:number(oldRaw,"height"),voids:Std.string(Reflect.field(oldRaw,"voids"))};
+    var oldRaw:Dynamic=Reflect.field(raw,"base"),old={massKg:number(oldRaw,"massKg"),width:number(oldRaw,"width"),depth:number(oldRaw,"depth"),height:number(oldRaw,"height")};
     var oldMoving=number(raw,"movingXKg"),oldColumn=number(Reflect.field(raw,"column"),"massKg"),oldInserts=number(raw,"columnInsertMassKg");
     var body=machine.bed.body;
-    var cells=CastingCells.material(body.parameterNumber("width"),body.parameterNumber("depth"),body.parameterNumber("height"),CastingFeatures.decode(body.values().token("features")));
-    var oldCells=CastingCells.material(old.width,old.depth,old.height,CastingFeatures.decodeLegacyBaseline(old.voids));
+    var cells=body.materialBoxes();
+    var rows:Array<Dynamic> = cast oldRaw.cells;
+    var oldCells:Array<Box3> = [for(row in rows) {x:R.number(row,"x"),y:R.number(row,"y"),z:R.number(row,"z"),
+      width:R.number(row,"width"),depth:R.number(row,"depth"),height:R.number(row,"height")}];
     var nativeBody=body.geometry();var nativeVolume=nativeBody.volume();nativeBody.close();
-    if(Math.abs(CastingCells.volume(cells)-nativeVolume)>nativeVolume*1e-9)throw "Casting collision/beam cells disagree with exact CAD volume";
+    if(Math.abs(BoxAlgebra.volume(cells)-nativeVolume)>nativeVolume*1e-9)throw "Casting collision/beam cells disagree with exact CAD volume";
     var span=HobberXLayout.front().footSpan,half=span/2;
-    var oldI=CastingCells.minimumIy(oldCells,-430,430),newI=CastingCells.minimumIy(cells,-half,half),e=35000.0;
+    var oldI=BoxAlgebra.minimumIy(oldCells,-430,430),newI=BoxAlgebra.minimumIy(cells,-half,half),e=35000.0;
     var baseKg=0.0,columnKg=0.0,total=0.0;for(m in machine.components()){var mass=m.component.massProperties().mass;total+=mass;
       if(StringTools.startsWith(m.id,"bed/"))baseKg+=mass;if(StringTools.startsWith(m.id,"column/"))columnKg+=mass;}
     var def=machine.definition();

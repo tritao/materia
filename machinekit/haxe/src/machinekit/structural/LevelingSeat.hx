@@ -7,6 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
  * Nut dimensions are assumed envelopes; threads are semantic, not helical solids.
  */
 class LevelingSeat extends MachineComponent {
+  public static inline final PLATE_WIDTH=110.0;
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter>return [P.choice("variant",["plate","nut"],"plate")];
   public static function recipeType():ComponentType {if(recipe==null)recipe=new ComponentType("machinekit.structural.leveling-seat",parameters(),v->new LevelingSeat(v));return recipe;}
@@ -18,7 +19,7 @@ class LevelingSeat extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail=Preview):Part {
     var plate=parameterToken("variant")=="plate",h=plate?15.0:19.0;
-    return Solids.cut(plate?Part.box(CastingFootPocket.PLATE_WIDTH,CastingFootPocket.PLATE_WIDTH,h):Part.prism(Polygon.regular(6,36),0,h),
+    return Solids.cut(plate?Part.box(PLATE_WIDTH,PLATE_WIDTH,h):Part.prism(Polygon.regular(6,36),0,h),
       [Part.cylinderSpan(plate?13:12,-1,h+1)]);
   }
 }

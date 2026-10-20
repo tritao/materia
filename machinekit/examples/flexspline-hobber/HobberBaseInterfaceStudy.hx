@@ -1,6 +1,8 @@
+import FoundationStudyGeometry.FoundationStudyRegion;
+import FoundationStudyGeometry as Geometry;
+import materia.casting.BoxAlgebra;
+import materia.casting.CastingFeature.CastingFeatureKind;
 import machinekit.hobbing.FoundationLayout;
-import machinekit.structural.CastingFeatures;
-import machinekit.structural.CastingFeatures.CastingBox;
 import machinekit.enclosure.PanelCatalogue;
 import materia.assembly.AssemblyFrames as F;
 
@@ -9,52 +11,45 @@ private typedef SeatingCase = {
   var depthMm:Float;
   var panelTopAboveCastingMm:Float;
   var generalCoreRoofDatumClearanceMm:Float;
-  var ledges:Array<CastingBox>;
+  var ledges:Array<FoundationStudyRegion>;
   var serviceInterruptions:Array<{ledge:String,feature:String,boundsMm:Array<Float>}>;
   var existingMountInsertConflicts:Array<String>;
 }
 
 /** Casting-local interface study. Does not alter the machine or release fabrication dimensions. */
 class HobberBaseInterfaceStudy {
+
   static inline final CONSTRUCTION=machinekit.enclosure.TraySeat.CONSTRUCTION;
   static inline final LEDGE=machinekit.enclosure.TraySeat.WIDTH;
   static inline final SHALLOW_DEPTH=machinekit.enclosure.TraySeat.DEPTH;
   static inline final GASKET=machinekit.enclosure.TraySeat.GASKET; // Assumed compressed thickness, not a selected gasket's free thickness.
   static inline final GASKET_WIDTH=12.0;
-  static function bounds(b:CastingBox):Array<Float> {
-    var p:Array<Array<Float>> = [];
-    for(x in [-b.width/2,b.width/2])for(y in [-b.depth/2,b.depth/2])for(z in [0.0,b.height]) {
-      var q=F.transformPoint(b.pose,x,y,z);p.push([q.x,q.y,q.z]);
-    }
-    return [for(axis in 0...3){var lo=Math.POSITIVE_INFINITY;for(q in p)lo=Math.min(lo,q[axis]);lo;}].concat(
-      [for(axis in 0...3){var hi=Math.NEGATIVE_INFINITY;for(q in p)hi=Math.max(hi,q[axis]);hi;}]);
-  }
-  static function overlap(a:CastingBox,b:CastingBox):Null<Array<Float>> {
-    var x=bounds(a),y=bounds(b),lo=[for(i in 0...3)Math.max(x[i],y[i])],hi=[for(i in 0...3)Math.min(x[i+3],y[i+3])];
+  static function overlap(a:FoundationStudyRegion,b:FoundationStudyRegion):Null<Array<Float>> {
+    var x=Geometry.bounds(a),y=Geometry.bounds(b),lo=[for(i in 0...3)Math.max(x[i],y[i])],hi=[for(i in 0...3)Math.min(x[i+3],y[i+3])];
     for(i in 0...3)if(hi[i]-lo[i]<=1e-7)return null;
     return lo.concat(hi);
   }
-  static function seating(id:String,depth:Float,sheet:Float,d:Array<Float>,cores:Array<CastingBox>):SeatingCase {
+  static function seating(id:String,depth:Float,sheet:Float,d:Array<Float>,cores:Array<FoundationStudyRegion>):SeatingCase {
     var w=d[0],l=d[1],h=d[2];
     if(depth<=0||depth>=h||LEDGE<=GASKET_WIDTH||2*LEDGE>=Math.min(w,l))throw "Invalid interface study stack";
     var ledges=[
-      CastingFeatures.box("front-ledge",LEDGE,l,depth,-w/2+LEDGE/2,0,h-depth),
-      CastingFeatures.box("rear-ledge",LEDGE,l,depth,w/2-LEDGE/2,0,h-depth),
-      CastingFeatures.box("left-ledge",w-2*LEDGE,LEDGE,depth,0,-l/2+LEDGE/2,h-depth),
-      CastingFeatures.box("right-ledge",w-2*LEDGE,LEDGE,depth,0,l/2-LEDGE/2,h-depth)
+      Geometry.region("front-ledge",LEDGE,l,depth,-w/2+LEDGE/2,0,h-depth),
+      Geometry.region("rear-ledge",LEDGE,l,depth,w/2-LEDGE/2,0,h-depth),
+      Geometry.region("left-ledge",w-2*LEDGE,LEDGE,depth,0,-l/2+LEDGE/2,h-depth),
+      Geometry.region("right-ledge",w-2*LEDGE,LEDGE,depth,0,l/2-LEDGE/2,h-depth)
     ];
     var interruptions:Array<{ledge:String,feature:String,boundsMm:Array<Float>}> = [];
     for(ledge in ledges)for(core in cores){var common=overlap(ledge,core);if(common!=null)interruptions.push({ledge:ledge.id,feature:core.id,boundsMm:common});}
     var conflicts:Array<String> = [];
     for(row in FoundationLayout.inserts("bed")) {
-      var insert:CastingBox={id:row.id,width:row.width,depth:row.depth,height:row.height,pose:row.pose};
+      var insert:FoundationStudyRegion=Geometry.insertRegion(row);
       for(ledge in ledges)if(overlap(ledge,insert)!=null)conflicts.push(ledge.id+" / "+row.id);
     }
     if(conflicts.length>0)throw "Proposed ledge crosses existing mounting inserts: "+conflicts.join(", ");
     if(interruptions.length!=1||interruptions[0].feature!="X-drive-channel"||interruptions[0].ledge!="rear-ledge")
       throw "Casting service openings changed: review the perimeter seal route";
     var roof=Math.POSITIVE_INFINITY;
-    for(core in cores)if(StringTools.startsWith(core.id,"core-"))roof=Math.min(roof,h-bounds(core)[5]-depth);
+    for(core in cores)if(core.kind==Lightening)roof=Math.min(roof,h-Geometry.bounds(core)[5]-depth);
     if(roof<=0)throw "Seat level reaches the general lightening-core roof datum";
     return {id:id,depthMm:depth,panelTopAboveCastingMm:sheet+GASKET-depth,generalCoreRoofDatumClearanceMm:roof,
       ledges:ledges,serviceInterruptions:interruptions,existingMountInsertConflicts:conflicts};
@@ -63,7 +58,7 @@ class HobberBaseInterfaceStudy {
     var panel=PanelCatalogue.require(CONSTRUCTION),sheet=panel.thicknessMm();panel.validate();
     if(sheet!=13||Std.string(panel.fabrication)!="RouterCut"||panel.qualifications.coolantRecord!=null||panel.qualifications.heatLimitC!=null)
       throw "Review the preliminary 13 mm router-cut material policy";
-    var d=FoundationLayout.dimensions("bed"),cores=CastingFeatures.decode(FoundationLayout.bodyValues("bed").token("features"));
+    var d=FoundationLayout.dimensions("bed"),cores=Geometry.designRegions();
     // Compare the seats with the pre-rebate machine voids, excluding the now-authored tray features.
     cores=[for(core in cores)if(!StringTools.startsWith(core.id,"tray-"))core];
     var raised=seating("raised",SHALLOW_DEPTH,sheet,d,cores),flush=seating("flush",sheet+GASKET,sheet,d,cores);
@@ -96,7 +91,7 @@ class HobberBaseInterfaceStudy {
     sys.io.File.saveContent(out+"/interface.svg",drawing(d,sheet,cores,raised,flush));
     Sys.println('Base interface study passed: ${sheet} mm laminate; raised seat ${raised.depthMm} mm / panel +${raised.panelTopAboveCastingMm} mm; flush seat ${flush.depthMm} mm. Both clear existing inserts; rear drive opening requires a sealed bridge.');
   }
-  static function drawing(d:Array<Float>,sheet:Float,cores:Array<CastingBox>,raised:SeatingCase,flush:SeatingCase):String {
+  static function drawing(d:Array<Float>,sheet:Float,cores:Array<FoundationStudyRegion>,raised:SeatingCase,flush:SeatingCase):String {
     var w=d[0],l=d[1],h=d[2],s=Math.min(610/w,400/l),ox=65.0,oy=150.0;
     function px(x:Float):Float return ox+(x+w/2)*s;
     function py(y:Float):Float return oy+(y+l/2)*s;
@@ -107,8 +102,8 @@ class HobberBaseInterfaceStudy {
       '<text x="55" y="80" class="note">DESIGN STUDY · assumed dimensions · casting and enclosure CAD remain unchanged</text>',
       '<text x="65" y="122" class="label">CASTING PLAN / PROPOSED PERIMETER SEAT</text>',
       '<rect x="$ox" y="$oy" width="${w*s}" height="${l*s}" fill="#e2e7eb" stroke="#617384" stroke-width="2"/>'];
-    for(ledge in raised.ledges){var b=bounds(ledge);svg.push('<rect x="${px(b[0])}" y="${py(b[1])}" width="${(b[3]-b[0])*s}" height="${(b[4]-b[1])*s}" fill="#f7d99a" stroke="#b97c20"/>');}
-    for(core in cores){var b=bounds(core);if(b[5]>h-raised.depthMm&&b[2]<h){
+    for(ledge in raised.ledges){var b=Geometry.bounds(ledge);svg.push('<rect x="${px(b[0])}" y="${py(b[1])}" width="${(b[3]-b[0])*s}" height="${(b[4]-b[1])*s}" fill="#f7d99a" stroke="#b97c20"/>');}
+    for(core in cores){var b=Geometry.bounds(core);if(b[5]>h-raised.depthMm&&b[2]<h){
       var x0=Math.max(-w/2,b[0]),x1=Math.min(w/2,b[3]),y0=Math.max(-l/2,b[1]),y1=Math.min(l/2,b[4]);
       svg.push('<rect x="${px(x0)}" y="${py(y0)}" width="${(x1-x0)*s}" height="${(y1-y0)*s}" fill="#c7dfed" stroke="#51768c"/>');
     }}

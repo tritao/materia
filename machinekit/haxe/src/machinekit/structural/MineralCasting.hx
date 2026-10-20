@@ -40,7 +40,7 @@ class MineralCasting extends MachineComponent {
 			v.number("footWidth"), v.number("footHeight"), v.number("footShoulder"));
         var cavities=finishedCavities();
         if(parameterNumber("cornerChamfer")==0&&parameterNumber("footWidth")==0) {
-            var material=BoxAlgebra.material(castingEnvelope(),features);
+            var material=materialBoxes();
             addFacet(CollisionHullFacet.fromBoxes([for(b in BoxAlgebra.compact(material))BoxAlgebra.limits(b)]));
 			collisionHullQualification = new CastingCollisionQualification(Supported, "Exact disjoint-box material hulls");
 		} else {
@@ -77,8 +77,10 @@ class MineralCasting extends MachineComponent {
 			pose: materia.casting.CastingRecordCodec.frame(prism.pose)
 		}];
     public function finishedCavities():Array<materia.casting.CastingCavities.FinishedCastingCavity> return CastingCavities.derive(castingEnvelope(),features);
+    public function materialBoxes():Array<materia.casting.Box3>
+        return BoxAlgebra.material(castingEnvelope(), features);
     public function minimumSectionIy(x0:Float,x1:Float):Float {
-        return BoxAlgebra.minimumIy(BoxAlgebra.material(castingEnvelope(),features),x0,x1);
+        return BoxAlgebra.minimumIy(materialBoxes(),x0,x1);
     }
     public function castingByWeight():{material:String,kg:Float} return {material:materialSpec(),kg:massProperties().mass};
 }

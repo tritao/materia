@@ -1,6 +1,7 @@
 package machinekit.hobbing;
 
-/** Hobber layout using the shared structural foundation. */
-class MineralCastColumn extends MineralFoundation {
-  public function new() super("column");
+/** Hobber layout on the shared typed foundation model. */
+class MineralCastColumn extends machinekit.structural.MineralFoundation {
+	public function new()
+		super(FoundationLayout.bodyValues("column"), FoundationLayout.placements("column"), "basePlate");
 }

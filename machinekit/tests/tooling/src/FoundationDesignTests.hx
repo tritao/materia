@@ -204,6 +204,10 @@ class FoundationDesignTests {
 			{id: "hobber-bed", part: new machinekit.hobbing.MineralCastBed()},
 			{id: "hobber-column", part: new machinekit.hobbing.MineralCastColumn()}
 		];
+		var baseline:Dynamic = haxe.Json.parse(sys.io.File.getContent(root + "/../../../../examples/flexspline-hobber/BASELINE_FOUNDATIONS.json"));
+		if (baseline.format != "machinekit.foundation-baseline" || baseline.version != 2)
+			throw "Unsupported foundation migration baseline";
+		var frozenRows:Array<Dynamic> = cast baseline.currentBeforeMigration;
 		for (row in foundations) {
 			var process = sys.io.Process.run("gzip", ["-dc", root + "/" + row.id + ".step.gz"]);
 			var text = process.readStdout(), status = process.exitCode();
@@ -221,6 +225,42 @@ class FoundationDesignTests {
 			same(previous, actual, row.id);
 			previous.close();
 			actual.close();
+			if (StringTools.startsWith(row.id, "hobber-")) {
+				var kind = row.id.substr(7), frozen = frozenRows.filter(before -> before.id == kind)[0];
+				var boxes:Array<Dynamic> = cast frozen.cells;
+				var previousCells:Array<materia.casting.Box3> = [for (box in boxes) {
+					x: materia.casting.CastingRecordCodec.number(box, "x"), y: materia.casting.CastingRecordCodec.number(box, "y"),
+					z: materia.casting.CastingRecordCodec.number(box, "z"), width: materia.casting.CastingRecordCodec.number(box, "width"),
+					depth: materia.casting.CastingRecordCodec.number(box, "depth"), height: materia.casting.CastingRecordCodec.number(box, "height")
+				}];
+				var cells = row.part.body.materialBoxes();
+				var difference = materia.casting.BoxAlgebra.volume(materia.casting.BoxAlgebra.subtract(cells, previousCells))
+					+ materia.casting.BoxAlgebra.volume(materia.casting.BoxAlgebra.subtract(previousCells, cells));
+				assertions++;
+				if (difference > 1e-6)
+					throw "Shared algebra changes frozen hobber material: " + row.id;
+				assertions++;
+				if (Math.abs(materia.casting.BoxAlgebra.volume(cells) - frozen.volume) > 1e-6)
+					throw "Shared algebra changes frozen hobber volume: " + row.id;
+				var half:Float = frozen.halfSpan, expected:Float = frozen.minimumIy;
+				var iy = row.part.body.minimumSectionIy(-half, half);
+				assertions++;
+				if (Math.abs(iy - expected) > expected * 1e-10)
+					throw "Shared algebra changes frozen hobber minimum section Iy: " + row.id + ": " + iy + " vs " + expected;
+				var features = row.part.body.castingFeatures();
+				assertions++;
+				if (features.filter(feature -> feature.derivedFrom != null).length == 0)
+					throw "Hobber retained supports must preserve authored parent IDs";
+				if (kind == "bed") {
+					assertions++;
+					if (features.filter(feature -> feature.kind == InterfaceRecess && feature.owner != null
+						&& StringTools.startsWith(feature.owner, "footSeat")).length != 3)
+						throw "Removable foot plate registers must name their owners";
+				}
+				assertions++;
+				if (row.part.insertLocations().filter(insert -> insert.id == "driveSeat")[0].part.parameterToken("role") != "drive-mount")
+					throw "Hobber drive seats require their explicit source role";
+			}
 		}
 		slopedFoot();
 		Sys.println("FoundationDesignTests: " + assertions + " assertions passed");

@@ -1,9 +1,12 @@
+import FoundationStudyGeometry.FoundationStudyRegion;
+import FoundationStudyGeometry as Geometry;
+import materia.casting.BoxAlgebra;
+import materia.casting.CastingFeature.CastingFeatureKind;
 import machinekit.hobbing.FoundationLayout;
-import machinekit.structural.CastingFeatures as C;
-import machinekit.structural.CastingCells;
 
 /** Independent M6 tray proposal: placement screening, no supplier geometry or strength claim. */
 class HobberTrayMountingStudy {
+
   static function intersects(a:Array<Float>,b:Array<Float>):Bool {
     for(i in 0...3)if(Math.min(a[i+3],b[i+3])-Math.max(a[i],b[i])<1e-6)return false;
     return true;
@@ -17,20 +20,20 @@ class HobberTrayMountingStudy {
     var proposal:Dynamic=haxe.Json.parse(sys.io.File.getContent(path));
     var points:Array<Array<Float>> = proposal.sockets.positionsMm,tabs:Array<Array<Float>> = proposal.casting.localRebatesXYMm;
     var z=FoundationLayout.dimensions("bed")[2]+proposal.sockets.mouthZMm;
-    var cores=C.decode(FoundationLayout.bodyValues("bed").token("features"));
+    var cores=Geometry.designRegions();
     var bosses=[for(p in points)[p[0]-25,p[1]-25,z-65,p[0]+25,p[1]+25,z]];
-    var lightening=[for(c in cores)if(StringTools.startsWith(c.id,"core-"))c];
-    var service=[for(c in cores)if(!StringTools.startsWith(c.id,"core-"))c];
-    var remaining=CastingCells.outsideBoxes(lightening,bosses).concat(service);
+    var lightening=[for(c in cores)if(c.kind==Lightening)c];
+    var service=[for(c in cores)if(c.kind!=Lightening)c];
+    var remaining=[for(c in lightening) for(b in BoxAlgebra.subtract([c.box],[for(boss in bosses)BoxAlgebra.fromLimits(boss)])) {id:c.id,kind:c.kind,box:b}].concat(service);
     var conflicts:Array<String> = [];
     for(i in 0...points.length) {
       var p=points[i];
       // 24 mm square deliberately bounds an unknown M6 retention detail; not nominal vendor CAD.
       var envelope=[p[0]-12,p[1]-12,z-40,p[0]+12,p[1]+12,z];
-      for(c in remaining)if(intersects(envelope,CastingCells.bounds(c)))conflicts.push('Anchor $i / void ${c.id}');
+      for(c in remaining)if(intersects(envelope,Geometry.bounds(c)))conflicts.push('Anchor $i / void ${c.id}');
 
       for(r in FoundationLayout.inserts("bed"))if(!StringTools.startsWith(r.id,"trayClampSeat")) {
-        var insert=CastingCells.bounds({id:r.id,width:r.width,depth:r.depth,height:r.height,pose:r.pose});
+        var insert=Geometry.bounds(Geometry.insertRegion(r));
         if(intersects(envelope,insert))conflicts.push('Anchor $i / retained insert ${r.id}');
         for(t in tabs)if(intersects([t[0],t[1],z,t[2],t[3],z+4],insert))conflicts.push('Rebate / retained insert ${r.id}');
       }

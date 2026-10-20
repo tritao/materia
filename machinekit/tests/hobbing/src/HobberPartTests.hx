@@ -1,3 +1,5 @@
+import machinekit.structural.FoundationIntegrity;
+import machinekit.structural.MineralFoundation;
 import machinekit.motion.*;
 import machinekit.hobbing.*;
 import machinekit.component.*;
@@ -35,20 +37,11 @@ class HobberPartTests {
         check(errors==null&&copyErrors==null,"structural parts have no motion error assumptions");
       else check(errors!=null&&copyErrors!=null&&errors.describe()==copyErrors.describe(),'error bounds roundtrip ${p.designation}');
     }
-    var oldInsert=registry.byId("machinekit.hobbing.cast-in-steel-insert").create();
-    check(Std.isOfType(oldInsert,CastInsert)&&oldInsert.componentType()==CastInsert.recipeType(),"legacy insert migrates to shared recipe");
-    var oldCasting=registry.byId("machinekit.hobbing.mineral-casting-body").create();
-    check(Std.isOfType(oldCasting,MineralCasting)&&oldCasting.componentType()==MineralCasting.recipeType(),"legacy casting migrates to shared recipe");
-    near(oldCasting.massProperties().mass,49.992,1e-8,"legacy HB5 bed keeps its original recessed casting mass");
-    near(oldCasting.parameterNumber("depth"),550,0,"legacy bed retains original footprint");
     near(new MineralCastBed().body.parameterNumber("depth"),800,0,"current bed uses moving-column footprint");
     near(new MineralCastBed().body.parameterNumber("width"),machinekit.hobbing.HobberXLayout.front().bedLength,0,"bed radial length covers loading retract");
     near(new MineralCastColumn().body.parameterNumber("height"),500,0,"moving column height");
     var largeBearing=new CrossedRollerBearing(new ComponentValues().setNumber("outside",180).setNumber("bore",150));
     check(largeBearing.bom.partNumber!=new CrossedRollerBearing().bom.partNumber,"compact swivel bearing has a distinct BOM size");
-    var oldColumn=registry.byId("machinekit.hobbing.mineral-casting-body").create(new ComponentValues().setToken("kind","column").setNumber("width",200).setNumber("depth",180).setNumber("height",600));
-    near(oldColumn.parameterNumber("height"),600,0,"legacy column retains original height");
-    check(oldColumn.values().token("features").indexOf("driveSeat")<0,"legacy column does not acquire a new drive insert recess");
     for(p in parts){var metadata=EngineeringMetadata.of(p);
       check((metadata==null)==(Std.isOfType(p,MineralCasting)||Std.isOfType(p,CastInsert)),"engineering provenance optional on structural parts and present on rated motion parts");
       if(metadata!=null){var rebuilt=p.componentType().create(p.values());
@@ -141,19 +134,15 @@ class HobberPartTests {
       var fixture=new MachineAssembly();fixture.include("foundation",foundation);
       fixture.addComponent("rail",LinearRail.metric("HGR15",200));
       fixture.addMate("rail mount","fixed","foundation/railLeft","top","rail","base");
-      check(!FoundationIntegrity.checkMounts(fixture,[{name:"rail mount",parent:"foundation/railLeft"}]).hasErrors(),"precision rail mount actually lands on steel");
+      check(!FoundationIntegrity.checkMounts(fixture,[{name:"rail mount",parent:"foundation/railLeft"}],["rail mount"=>"rail mount"]).hasErrors(),"precision rail mount actually lands on steel");
+      check(FoundationIntegrity.checkMounts(fixture,[{name:"rail mount",parent:"foundation/railLeft"}],
+        ["rail mount"=>"missing joint"]).hasErrors(),"declared steel support does not excuse a missing physical connection");
       fixture.addComponent("rogueRail",LinearRail.metric("HGR15",200));
       fixture.addMate("rogue rail mount","fixed","foundation/casting","top","rogueRail","base");
       check(FoundationIntegrity.checkMounts(fixture,[]).items.filter(i->i.subject=="rogue rail mount").length==1,"unlisted precision mount on casting is detected");
       var poses=foundation.solvedPoses(),pose=poses.get("railLeft");if(pose==null)throw "missing rail insert";
       poses.set("railLeft",materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.translation(0,0,0.03),pose));
       check(FoundationIntegrity.check(foundation,poses).hasErrors(),"insert out of position tolerance rejected");
-      var pair=foundation.solvedPoses(),left=pair.get("railLeft"),right=pair.get("railRight");
-      if(left==null||right==null)throw "missing paired inserts";
-      var normal=materia.assembly.AssemblyFrames.transformVector(left,0,0,1);
-      pair.set("railLeft",materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.translation(0.009*normal.x,0.009*normal.y,0.009*normal.z),left));
-      pair.set("railRight",materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.translation(-0.009*normal.x,-0.009*normal.y,-0.009*normal.z),right));
-      check(FoundationIntegrity.check(foundation,pair).items.filter(i->i.code=="foundation.insert-coplanarity").length==1,"pair coplanarity checked even when each insert is individually within tolerance");
       var rebuilt=MachineAssembly.decode(foundation.encode(),registry);
       check(rebuilt.components().length==foundation.components().length,"foundation child parts saved separately");
     }

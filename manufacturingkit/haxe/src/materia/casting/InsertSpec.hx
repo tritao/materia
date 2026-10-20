@@ -10,6 +10,8 @@ enum abstract InsertRole(String) to String {
 	var ColumnMount = "column-mount";
 	var LevelingSeat = "leveling-seat";
 	var HatchMount = "hatch-mount";
+	var DriveMount = "drive-mount";
+	var EnclosureMount = "enclosure-mount";
 }
 
 enum abstract InsertFinish(String) to String {
@@ -39,7 +41,9 @@ class InsertRoles {
 			InsertRole.BearingSeat,
 			InsertRole.ColumnMount,
 			InsertRole.LevelingSeat,
-			InsertRole.HatchMount
+			InsertRole.HatchMount,
+			InsertRole.DriveMount,
+			InsertRole.EnclosureMount
 		];
 
 	public static function tokens():Array<String>

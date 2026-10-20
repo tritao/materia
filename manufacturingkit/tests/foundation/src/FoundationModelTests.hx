@@ -172,6 +172,18 @@ class FoundationModelTests {
 		check(holes[0].diameter == 6, "hole snapshots are detached");
 		holes[0].limits.minWall = 0;
 		rejects(() -> materia.casting.InsertHole.InsertHoleCodec.snapshot(holes), "Invalid insert hole limit: minWall");
+		var near = 20.000000000000057;
+		var sections:Array<materia.casting.Box3> = [
+			{x: 0, y: 0, z: 0, width: 40, depth: 10, height: 10},
+			{x: 0, y: 0, z: 10, width: 20, depth: 10, height: 10},
+			{x: near, y: 0, z: 10, width: 40 - near, depth: 10, height: 10}
+		];
+		check(Math.abs(BoxAlgebra.minimumIy(sections, 0, 40) - 10 * 20 * 20 * 20 / 12) < 1e-6,
+			"coincident clipping planes do not invent a weak section one ULP wide");
+		sections[2].x = 20.000001;
+		sections[2].width = 40 - sections[2].x;
+		check(Math.abs(BoxAlgebra.minimumIy(sections, 0, 40) - 10 * 10 * 10 * 10 / 12) < 1e-6,
+			"a resolved narrow gap still controls the minimum section stiffness");
 		Sys.println("FoundationModelTests: " + assertions + " assertions passed");
 	}
 }

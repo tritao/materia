@@ -55,13 +55,22 @@ class FoundationIntegrity {
 		};
 	}
 
-	/** Explicit precision mount list. All foundation-side endpoints must be steel inserts. */
-	public static function checkMounts(assembly:MachineAssembly, mounts:Array<{name:String, parent:String}>):Diagnostics {
-		var out = new Diagnostics(), members = assembly.components();
+	/** Named steel supports; a supplied connection map also checks the actual assembly mates. */
+	public static function checkMounts(assembly:MachineAssembly, mounts:Array<{name:String, parent:String}>,
+			?jointIds:Map<String, String>):Diagnostics {
+		var out = new Diagnostics(), members = assembly.components(), joints = assembly.definition().joints;
 		for (m in mounts) {
-			var found = members.filter(p -> p.id == m.parent);
-			if (found.length != 1 || !Std.isOfType(found[0].component, CastInsert))
+			var found = members.filter(p -> p.id == m.parent), connections = jointIds == null ? [] : joints.filter(j -> j.id == jointIds.get(m.name));
+			if (found.length != 1 || !Std.isOfType(found[0].component, CastInsert)
+				|| (jointIds != null && (connections.length != 1 || connections[0].parent != m.parent)))
 				out.error("foundation.precision-mount", m.name, 'Precision mount "${m.name}" must land on a cast-in steel insert, got "${m.parent}"');
+		}
+		for (joint in joints) {
+			var parents = members.filter(part -> part.id == joint.parent), children = members.filter(part -> part.id == joint.child);
+			if (parents.length == 1 && children.length == 1 && Std.isOfType(parents[0].component, MineralCasting)
+				&& (Std.isOfType(children[0].component, machinekit.motion.LinearRail)
+					|| Std.isOfType(children[0].component, machinekit.hobbing.TableHousing)))
+				out.error("foundation.precision-mount", joint.id, "Precision mount attaches directly to the casting body");
 		}
 		return out;
 	}

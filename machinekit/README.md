@@ -32,7 +32,8 @@ This support imposes no geometry, connector layout, accuracy or rating assumptio
 Mineral-cast foundations use shared components in `machinekit.structural`:
 
 - `MineralCasting`: a recipe-backed body with corner chamfers and named box voids.
-- `CastingFeatures`: typed core/recess layouts, including a regular cross-ribbed grid.
+- `materia.casting.CastingFeature`: typed design cuts, declared openings, ownership and adjustable dimensions.
+- `CastingFeaturePatterns`: shared grids, foot access/registers and retained supports; one neutral box algebra serves fill, collision hulls and section stiffness.
 - `CastInsert`: a steel insert envelope with a finished mounting plane and position tolerance.
 - `MineralFoundation`: separately itemised casting and steel, subtracting each insert's
   recess from the casting so their masses do not overlap.
@@ -52,7 +53,9 @@ a saved assembly rebuilds with the standard component registry. Casting purchasi
 mass comes from actual CAD volume and the common `mineral-cast` material. Its
 2400 kg/m³ density and bulk elastic, thermal and damping inputs are explicitly assumed.
 
-The hobber keeps its layout adapters and stricter paired-plane/mount checks.
+The hobber supplies typed layouts directly to the structural foundation classes.
+Insert position and actual steel mount connections use the shared integrity checks;
+rail coplanarity will be an explicit interface relationship in phase 7 step 2.
 Motion and hobbing parts extend `MachineComponent` directly, using its recipe-input
 storage and typed parameter accessors. `ComponentRecipeSupport.resolve` validates
 constructor inputs; `ComponentEnvelopes` supplies block/annular geometry only.
@@ -60,10 +63,10 @@ Optional `EngineeringMetadata` and `PrecisionErrors` facets carry provenance and
 error bounds independently of geometry. Shared structural parts do not inherit
 motion-specific engineering assumptions.
 
-Saved HB5 casting/insert recipe IDs remain readable through
-`hobbing.LegacyFoundationRecipes`. It translates old inputs into shared structural
-parts; newly saved assemblies use the structural IDs. There is one casting/insert
-implementation and one mineral-cast material entry.
+Historical HB5 recipe IDs and old feature encodings are rejected. Saved assemblies
+use the current structural recipes; there is one casting/insert implementation
+and one mineral-cast material entry. Casting/tooling work follows
+[the shared tooling plan](../manufacturingkit/TOOLING_PLAN.md).
 
 Run the foundation, serialization and new component geometry checks with:
 

@@ -1868,10 +1868,11 @@ batch after saving that case. Do not start a second batch beside the live one.
   generating hob geometry and physical mounting frames remain unchanged.
 - Removed `motion.PrecisionPart` and the duplicate hobbing `MineralCasting` and
   `CastInsert` implementations. Bed/column layouts use the shared structural parts
-  and the single mineral-cast material definition. `LegacyFoundationRecipes`
-  reads saved HB5 IDs and translates their cores/recesses into structural recipe
-  inputs; subsequent saves use the shared IDs. The hobber retains its paired-face
-  and actual precision-mount attachment checks.
+  and the single mineral-cast material definition. The phase-7 conversion now
+  rejects HB5 IDs and removes its legacy readers and wrappers. Typed features
+  and the shared box algebra are covered by the casting tooling plan; actual
+  steel attachment checks are shared. Rail coplanarity becomes an explicit
+  phase-7 step-2 interface relationship.
 - Validation: **986 parts/persistence assertions**, **60 geometry assertions**,
   **264 hobber integration assertions**. The headless app coarse cut completes
   **922 windows**, **zero collisions**, **5.545250 s** total simulated cycle

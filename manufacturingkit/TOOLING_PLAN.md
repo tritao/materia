@@ -1560,9 +1560,28 @@ after the hobber merge, most likely in the hobber bed/column equivalence checks.
   from `feature.cornerRadius`; compare kinds as `InsertRecess`, not strings; typed
   adjustable dimensions; retained webs and backing subtracted through the algebra
   with fragments grouped by `derivedFrom` in cores and castability.
-- [ ] Hobber conversion 16–19: as under layout parameters above; regenerate
-  `BASELINE_FOUNDATIONS.json`; delete `machinekit/CASTING_TOOLING_PLAN.md`; fix
-  `machinekit/README.md` (CastingFeatures description, legacy read path).
+- [x] Hobber conversion 16–19: typed features and declared openings use the shared
+  patterns, retained-support algebra and insert records. Drive/enclosure seats
+  have explicit roles. Removed the legacy feature/cell/foot readers, HB5 recipe
+  registrations, hobber foundation/integrity wrappers and superseded casting plan.
+  Regenerated `BASELINE_FOUNDATIONS.json` as strict format **2**, preserving the
+  historical stiffness comparison and adding the frozen pre-conversion material
+  cells, volume and minimum section I. Four frozen CAD symmetric differences and
+  the foot-crossing cut/body difference are **zero**; the hobber material sets,
+  volume and minimum section I match the frozen capture. Coincident section planes
+  use the algebra's existing **1e-9 mm** arithmetic tolerance; a regression still
+  detects a real **1e-6 mm** gap. Rail coplanarity remains a step-2 relationship.
+  FoundationModelTests **38**, FoundationDesignTests **36**, HobberPartTests
+  **1,038**, FlexsplineHobberChecks **1,131**, Z-drive **37**, drive-support
+  **29,164**, foot **102** assertions pass. Base-interface, M6 tray and T-FIXX
+  candidate studies regenerate successfully; their anchorage capacity remains
+  unqualified. Shared suites also pass: neutral tooling **1,731**; native
+  FoundationTooling **62**, PanelNative **132**, BoxMold **153**, ProcessNative
+  **34**; Casting **50**; MillMoldChecks **248**. Regenerated base mold, records-only and
+  full fabrication packages (**789** hashed artifacts, **39** review programs);
+  integrity/tamper checks pass and the review archive manifest is identical.
+  Readiness remains **false**: **17 Pass, 262 Pending, 15 Unsupported**, with
+  no physical coupon evidence.
 - [x] Tests 20–22: verify the frozen STEP SHA from `reference.json` and decompress
   natively, without python3; run the sloped-foot cavity through each box-only
   consumer (fill, sections, planner) and assert Unsupported by feature ID; fragment

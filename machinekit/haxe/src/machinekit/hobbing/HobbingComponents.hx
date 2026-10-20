@@ -5,7 +5,6 @@ import machinekit.component.ComponentRegistry;
 class HobbingComponents {
   public static function register(registry:ComponentRegistry):Void {
     registry.register(FloatingRadialBearing.recipeType());
-    LegacyFoundationRecipes.register(registry);
     registry.register(HobberBracket.recipeType());
     registry.register(HobberSaddle.recipeType());
     registry.register(FlexsplineCupBlank.recipeType());registry.register(MandrelSleeve.recipeType());registry.register(HobArbor.recipeType());registry.register(OutboardSupport.recipeType());

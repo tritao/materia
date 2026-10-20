@@ -1,11 +1,13 @@
+import FoundationStudyGeometry.FoundationStudyRegion;
+import FoundationStudyGeometry as Geometry;
+import materia.casting.BoxAlgebra;
+import materia.casting.CastingFeature.CastingFeatureKind;
 import machinekit.hobbing.FoundationLayout;
-import machinekit.structural.CastingFeatures as C;
-import machinekit.structural.CastingFeatures.CastingBox;
-import machinekit.structural.CastingCells;
 import materia.assembly.AssemblyFrames as F;
 
 /** Candidate placement, not an anchor qualification or an alteration to the working machine. */
 class HobberTrayAnchorStudy {
+
   static function intersects(a:Array<Float>,b:Array<Float>):Bool {
     for(i in 0...3)if(Math.min(a[i+3],b[i+3])-Math.max(a[i],b[i])<1e-6)return false;
     return true;
@@ -29,43 +31,43 @@ class HobberTrayAnchorStudy {
     // The front work well requires these positions to move sideways as well as inward.
     for(y in [-230.0,230.0])add(-d[0]/2+55,y);
     for(y in [-150.0,150.0])add(d[0]/2-55,y);
-    var bosses:Array<CastingBox> = [],tabs:Array<CastingBox> = [];
+    var bosses:Array<FoundationStudyRegion> = [],tabs:Array<FoundationStudyRegion> = [];
     for(p in points) {
-      bosses.push(C.box(p.id+"-backing",70,70,70,p.x,p.y,z-70));
+      bosses.push(Geometry.region(p.id+"-backing",70,70,70,p.x,p.y,z-70));
       // Local extensions of the 25 mm rebate; do not cut the rail seats with a wider continuous rebate.
-      if(Math.abs(p.y)>300)tabs.push(C.box(p.id+"-seat",60,80,4,p.x,p.y<0?-d[1]/2+40:d[1]/2-40,z));
-      else tabs.push(C.box(p.id+"-seat",80,60,4,p.x<0?-d[0]/2+40:d[0]/2-40,p.y,z));
+      if(Math.abs(p.y)>300)tabs.push(Geometry.region(p.id+"-seat",60,80,4,p.x,p.y<0?-d[1]/2+40:d[1]/2-40,z));
+      else tabs.push(Geometry.region(p.id+"-seat",80,60,4,p.x<0?-d[0]/2+40:d[0]/2-40,p.y,z));
     }
-    var cores=C.decode(FoundationLayout.bodyValues("bed").token("features"));
-    var lightening=[for(c in cores)if(StringTools.startsWith(c.id,"core-"))c];
-    var service=[for(c in cores)if(!StringTools.startsWith(c.id,"core-"))c];
-    var remaining=CastingCells.outsideBoxes(lightening,[for(b in bosses)CastingCells.bounds(b)]).concat(service);
-    var inserts:Array<CastingBox> = [for(r in FoundationLayout.inserts("bed"))if(!StringTools.startsWith(r.id,"trayClampSeat"))
-      {id:r.id,width:r.width,depth:r.depth,height:r.height,pose:r.pose}];
+    var cores=Geometry.designRegions();
+    var lightening=[for(c in cores)if(c.kind==Lightening)c];
+    var service=[for(c in cores)if(c.kind!=Lightening)c];
+    var remaining=[for(c in lightening) for(b in BoxAlgebra.subtract([c.box],[for(boss in bosses)boss.box])) {id:c.id,kind:c.kind,box:b}].concat(service);
+    var inserts:Array<FoundationStudyRegion> = [for(r in FoundationLayout.inserts("bed"))if(!StringTools.startsWith(r.id,"trayClampSeat"))
+      Geometry.insertRegion(r)];
     var minEdge=1e30,minSpacing=1e30,minServiceEdge=1e30;
     for(i in 0...points.length) {
       var p=points[i];minEdge=Math.min(minEdge,p.edgeMm);
       // Conservative 24 mm square envelope includes the source drawing's wide clip projection.
-      var anchor=C.box(p.id,24,24,50,p.x,p.y,z-50),ab=CastingCells.bounds(anchor);
-      for(c in remaining)if(intersects(ab,CastingCells.bounds(c)))throw 'Candidate ${p.id} intersects void ${c.id}';
+      var anchor=Geometry.region(p.id,24,24,50,p.x,p.y,z-50),ab=Geometry.bounds(anchor);
+      for(c in remaining)if(intersects(ab,Geometry.bounds(c)))throw 'Candidate ${p.id} intersects void ${c.id}';
       for(c in service) {
-        var b=CastingCells.bounds(c);
+        var b=Geometry.bounds(c);
         if(Math.min(ab[5],b[5])-Math.max(ab[2],b[2])<1e-6)continue;
         var dx=Math.max(0,Math.max(b[0]-p.x,p.x-b[3])),dy=Math.max(0,Math.max(b[1]-p.y,p.y-b[4]));
         minServiceEdge=Math.min(minServiceEdge,Math.sqrt(dx*dx+dy*dy));
       }
-      for(r in inserts)if(intersects(ab,CastingCells.bounds(r)))throw 'Candidate ${p.id} intersects existing insert ${r.id}';
-      for(r in inserts)if(intersects(CastingCells.bounds(tabs[i]),CastingCells.bounds(r)))throw 'Local seat ${p.id} cuts insert ${r.id}';
-      for(r in inserts)if(intersects(CastingCells.bounds(bosses[i]),CastingCells.bounds(r)))throw 'Backing ${p.id} conflicts with insert ${r.id}';
+      for(r in inserts)if(intersects(ab,Geometry.bounds(r)))throw 'Candidate ${p.id} intersects existing insert ${r.id}';
+      for(r in inserts)if(intersects(Geometry.bounds(tabs[i]),Geometry.bounds(r)))throw 'Local seat ${p.id} cuts insert ${r.id}';
+      for(r in inserts)if(intersects(Geometry.bounds(bosses[i]),Geometry.bounds(r)))throw 'Backing ${p.id} conflicts with insert ${r.id}';
       for(j in i+1...points.length)minSpacing=Math.min(minSpacing,Math.sqrt(Math.pow(p.x-points[j].x,2)+Math.pow(p.y-points[j].y,2)));
     }
     if(minEdge<50||minSpacing<100||minServiceEdge<50)throw "Candidate fails catalogue layout screening";
     var wideRebateConflicts:Array<String> = [];
-    var wideFront=C.box("wide-front-ledge",80,d[1],4,-d[0]/2+40,0,z);
-    for(c in service)if(c.id=="work-well"&&intersects(CastingCells.bounds(wideFront),CastingCells.bounds(c)))wideRebateConflicts.push(c.id);
+    var wideFront=Geometry.region("wide-front-ledge",80,d[1],4,-d[0]/2+40,0,z);
+    for(c in service)if(c.id=="work-well"&&intersects(Geometry.bounds(wideFront),Geometry.bounds(c)))wideRebateConflicts.push(c.id);
     if(wideRebateConflicts.indexOf("work-well")<0)throw "Expected front work-well interruption changed";
-    var wideRear=C.box("wide-rear-ledge",80,d[1],4,d[0]/2-40,0,z),rearInsertConflicts=[];
-    for(r in inserts)if(intersects(CastingCells.bounds(wideRear),CastingCells.bounds(r)))rearInsertConflicts.push(r.id);
+    var wideRear=Geometry.region("wide-rear-ledge",80,d[1],4,d[0]/2-40,0,z),rearInsertConflicts=[];
+    for(r in inserts)if(intersects(Geometry.bounds(wideRear),Geometry.bounds(r)))rearInsertConflicts.push(r.id);
     var oldPositions=[for(r in FoundationLayout.trayClampSeats()) {id:r.id,x:r.pose.x,y:r.pose.y,edgeMm:edge(r.pose.x,r.pose.y,d)}];
     var report={status:"Candidate placement screened; not integrated or released",coordinateFrame:"Casting-local XY, Z from casting sole, mm",
       reference:reference,castingSizeMm:d,anchors:points,count:points.length,socketFaceZMm:z,
@@ -83,18 +85,18 @@ class HobberTrayAnchorStudy {
     sys.io.File.saveContent(out+"/placement.svg",drawing(d,points,tabs,bosses,inserts,service));
     Sys.println('T-FIXX placement passed: ${points.length} candidate positions, minimum edge $minEdge mm, minimum spacing $minSpacing mm; local tabs clear retained inserts and reserved anchors clear voids. Uniform front rebate intersects the work well; use local tabs.');
   }
-  static function drawing(d:Array<Float>,points:Array<{id:String,x:Float,y:Float,edgeMm:Float}>,tabs:Array<CastingBox>,bosses:Array<CastingBox>,inserts:Array<CastingBox>,voids:Array<CastingBox>):String {
+  static function drawing(d:Array<Float>,points:Array<{id:String,x:Float,y:Float,edgeMm:Float}>,tabs:Array<FoundationStudyRegion>,bosses:Array<FoundationStudyRegion>,inserts:Array<FoundationStudyRegion>,voids:Array<FoundationStudyRegion>):String {
     var s=['<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1250" viewBox="0 0 1200 1250"><rect width="1200" height="1250" fill="#fafbfc"/><style>text{font-family:sans-serif;fill:#263746}.small{font-size:17px}.label{font-size:22px}</style>',
       '<text x="70" y="50" font-size="28">T-FIXX M10 × 50 A4 — candidate placement</text>',
       '<text x="70" y="83" class="small">Casting-local plan. Geometric screening only; epoxy anchorage is unqualified.</text>',
       '<g transform="translate(600,535) scale(1,-1)">'];
     function rect(b:Array<Float>,fill:String,stroke:String,opacity:Float=1):Void s.push('<rect x="${b[0]}" y="${b[1]}" width="${b[3]-b[0]}" height="${b[4]-b[1]}" fill="$fill" stroke="$stroke" opacity="$opacity"/>');
     rect([-d[0]/2,-d[1]/2,0,d[0]/2,d[1]/2,1],"#dce3e8","#455d70");
-    for(c in voids)if(c.id=="work-well"||c.id=="X-drive-channel")rect(CastingCells.bounds(c),"#acb9c3","#8b9daa");
-    for(r in inserts)if(r.id=="railLeft"||r.id=="railRight"||StringTools.startsWith(r.id,"lift"))rect(CastingCells.bounds(r),"#7296b9","#355c81");
-    for(c in FoundationLayout.trayLedges())rect(CastingCells.bounds(c),"#f5dfaf","#c4a46d",0.8);
-    for(b in bosses)rect(CastingCells.bounds(b),"none","#489b68");
-    for(t in tabs)rect(CastingCells.bounds(t),"#eab36b","#b67a2f",0.65);
+    for(c in voids)if(c.id=="work-well"||c.id=="X-drive-channel")rect(Geometry.bounds(c),"#acb9c3","#8b9daa");
+    for(r in inserts)if(r.id=="railLeft"||r.id=="railRight"||StringTools.startsWith(r.id,"lift"))rect(Geometry.bounds(r),"#7296b9","#355c81");
+    for(c in voids)if(StringTools.startsWith(c.id,"tray-")&&c.id!="tray-rear-bridge-seat")rect(Geometry.bounds(c),"#f5dfaf","#c4a46d",0.8);
+    for(b in bosses)rect(Geometry.bounds(b),"none","#489b68");
+    for(t in tabs)rect(Geometry.bounds(t),"#eab36b","#b67a2f",0.65);
     for(p in points)s.push('<circle cx="${p.x}" cy="${p.y}" r="12" fill="#f7fff9" stroke="#196239" stroke-width="2"/><circle cx="${p.x}" cy="${p.y}" r="5" fill="#257447"/>');
     s.push('</g><text x="70" y="985" class="label">10 positions · 55 mm minimum exterior edge distance · ≥100 mm spacing</text>');
     s.push('<text x="70" y="1020" class="small">Green: anchor screening envelopes / reserved backing · orange: required local tray-seat tabs</text>');
