@@ -69,7 +69,17 @@ separately.
 - Spindles: `milling/SpindleCartridge.hx` (ER20), `Bt30Cartridge.hx`, `SpindleMotor.hx` (1.1 kW,
   Assumed), `Bt30SpindleMotor.hx` (2.2 kW). All milling cartridges; no lathe nose or through-bore.
 - Workholding: `milling/PneumaticVise.hx` only. No chuck, collet, mandrel, tailstock or turret.
-- Motion: `BallScrew` (SFU1605), `BallNut`, `ScrewSupportUnit`, `LinearRail` (HGR15 only),
+- Axis drives (added on main 2026-10-20, used by the mill's Y and Z):
+  - `assembly/HzMotionCatalog` + `HzMotionComponent`: HZMotion motor brackets and screw supports
+    from the supplier PDFs (`tools/suppliers/hzmotion-reference.json`, 135-entry coverage
+    matrix). STEP-verified: `M60D-BK12-C`, `M80E-BK15-C`, `BF12`, `BF15`
+    (`tools/suppliers/hzmotion-cad.json`). The reference file already lists the lathe as
+    "planned; loads and screw selection pending";
+  - `motion/HzMotionDrawingScrew`, `SfuDrawingScrew` + `SfuFamilyData` (SFU1605 … SFU2510,
+    with BK15 end profiles for SFU2005/2010); `assembly/SupportedSfu20Axis` (HGR20 rails);
+  - `motion/LeadshineServo` (e.g. `ELM2H-0750LA80E`, 750 W with internal holding brake, on the
+    mill's Z axes); `examples/bench-mill/MOTOR_MOUNTS.md` records the mill's mount screen.
+- Motion: `BallScrew` (SFU1605), `BallNut`, `ScrewSupportUnit`, `LinearRail` (HGR15),
   `ServoMotor`, `MotorDriver`, `ShaftEncoder` / `LinearScale` (`EncoderPart`, no index pulse),
   `Gearbox`, `ShaftCoupling`. Transmission: `TimingBelt`, `TimingPulley`, `BeltElasticity`.
 - Bearings: `standard/DeepGrooveBearing.hx` only.
@@ -399,6 +409,31 @@ through-bore.**
   - Designing none: live tooling, C and the tailstock are the most valuable extensions, and
     without provisions each would mean a new turret, spindle drive or bed.
 
+**TL-D14. X and Z are driven through HZMotion integrated motor mounts.**
+- Each axis: Leadshine `ELM2H-0750LA80E` (750 W, internal holding brake) → HZMotion
+  `M80E-BK15-C` (integrated motor housing and fixed bearing, 7002A DF pair, catalogue maximum
+  axial load 279 kgf ≈ 2.7 kN) → SFU2010 screw with the HZMotion BK15 end machining → `BF15`
+  floating support. This is the mill's Z stack with a 10 mm lead, so its STEP-verified
+  interfaces, screw-end requirement and motor fit carry over.
+- The drive is coaxial and direct: no fabricated motor plates or separate fixed supports on X or
+  Z. The bed and slide layout leave room for the motor body, connectors and service access at
+  each screw's fixed end; where that is not possible, the layout changes, not the mount.
+- The brake is required on X, which carries the turret slide on the 45° slope; Z uses the same
+  motor for one spare part.
+- SFU2010: 20 m/min rapid at 2000 motor rpm. Checks (TL5, TL10): axial load from cutting feed
+  and passive forces, the X gravity component and acceleration, against the 279 kgf rating with
+  a stated margin; screw critical speed; motor torque with the brake and the slope.
+- If loads or stiffness call for 25 mm screws, the candidates are the C-family `80E-AK20` or
+  `90X-BK25`. They are coverage-matrix entries only, so they are first added to
+  `HzMotionCatalog` with drawing data and a verified STEP, as `M80E-BK15-C` was. No invented
+  geometry.
+- Not HZMotion: the spindle drive (a fabricated belt carrier, like the mill's spindle), the
+  turret index drive (inside the turret unit), chuck and door (pneumatic).
+- TL5 updates the lathe entry in `hzmotion-reference.json` `machineSuitability` to the chosen
+  models.
+- **Rejected:** fabricated motor plates with separate BK/BF supports (more parts, alignment by
+  hand); family A brackets with a separate FK support (not integrated, more parts).
+
 ## Test parts
 
 - **Coarse demo shaft:** 1045 steel, from Ø45 × 100 bar stock: faces, Ø40 / Ø30 / Ø24 steps,
@@ -442,7 +477,9 @@ through-bore.**
 | Clamp need, soft roughing | ≈ 13 kN (Fc 1.25 kN at r 35 mm, μ 0.2, safety 2) | derived |
 | Turret | 8 stations, 20 mm shanks, boring bars ≤ Ø25, index 0.3 s adjacent | assumed |
 | Turret index repeatability | ± 1.5″ (≈ 0.7 µm at 100 mm tool radius) | assumed, curvic coupling |
-| Axes | size-25 rails, Ø25 × 10 ball screws, 750 W servos, 20 m/min rapid | assumed |
+| Axis drives X/Z | Leadshine ELM2H-0750LA80E + HZMotion M80E-BK15-C + SFU2010 + BF15; 20 m/min rapid at 2000 rpm | catalog parts (TL-D14); loads to check |
+| Axis drive axial rating | 279 kgf ≈ 2.7 kN (M80E-BK15-C, 7002A DF) | HZMotion catalogue |
+| Rails | size-25 rails and blocks | assumed (rows new; HGR20 exists) |
 | Position loop / gear rate | 4 kHz, latency one loop period | as hobber HB7 |
 | Bed length for the tailstock provision | turning length + ≈ 300 mm (tailstock body and quill stroke) | assumed |
 | Control cabinet | 7 axes, I/O for probe, setter, chuck, door, tailstock | assumed (TL-D13) |
@@ -545,6 +582,15 @@ Y, fewer stations, a smaller envelope, similar precision targets.
     scale faces, bar-feeder clearance, cabinet slots.
 - `machinekit.motion`: size-25 rail rows; bearing rows as needed (shared with the hobber's
   `AngularContactBearing` once on main).
+- X and Z drive stacks from catalogue parts (TL-D14): `HzMotionComponent("M80E-BK15-C")`,
+  `LeadshineServo.model("ELM2H-0750LA80E")`, an SFU2010 `HzMotionDrawingScrew` with the BK15
+  end, `HzMotionComponent("BF15")`. `HzMotionDrawingScrew` today hard-codes the SFU2005 thread
+  for BK15; TL5 makes it take the screw model (SFU2005 or SFU2010, same end). `SfuDrawingScrew`'s
+  generic BK15 end (60 mm fixed end) does not fit the HZMotion mount, which needs 64 mm.
+  Update the lathe's `machineSuitability` entry.
+- Tests (drives): motor pilot and PCD match the mount; screw end matches the HZMotion BK15
+  requirement; worst-case axial load (roughing forces + X slope + acceleration) below 279 kgf
+  with the stated margin; critical speed at full rapid; X holds on the slope with the brake.
 - Catalogue rows are marked Catalog or Assumed. Error-source fields default to the reference
   numbers.
 - Tests: part geometry valid; BOM rows; clamp force from pressure; chuck speed limit from jaw
@@ -561,6 +607,8 @@ Y, fewer stations, a smaller envelope, similar precision targets.
   - the indexing envelope clears chuck, jaws and door from the safe index position;
   - the probe reaches the target diameters and faces; the setter arm clears the chuck when
     stowed;
+  - each HZMotion drive stack has clearance for motor body, connectors and removal, and does
+    not cross the chip path or the tailstock provision;
   - every TL-D13 provision exists as an interface, and a stand-in option (tailstock envelope,
     live drive envelope, scale, spindle brake) attaches without interference or a change to a
     base part;
