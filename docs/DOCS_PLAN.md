@@ -128,3 +128,8 @@ place.
   workspace member (`docs-figures`), shares the workspace's native builds, and
   fails as a test when a committed figure is stale. The first figure (paths vs.
   trajectories) is live on its concept page.
+- D7 under way. Drafted beyond D2: the overview (*Materia in one page*),
+  Toolpaths, Machine components, Transmissions, Mechanical truth, Stock and
+  material removal, Manufacturing outputs, Diagnostics, The robot runtime,
+  Simulation worlds, Facilities and fleets, and the gantry-picker tutorial.
+  Every diagram is laid out to read at the column's width.

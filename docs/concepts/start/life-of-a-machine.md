@@ -245,8 +245,8 @@ The picker's bill of materials exists in the model (every component's BOM
 line), and tests check it. The picker does not yet produce fabrication output.
 
 The sheet router shows the full path: from the same kind of model it produces a
-shop packet with cut lists, nesting layouts, weld joints, sequences and
-stitches, and a gated shop release (`machinekit/examples/sheet-router/fabrication/`).
+shop packet for its welded frame: cut lists and stock totals, a frame and jig
+layout, weld joints, sequences and stitches, and a gated shop release (`machinekit/examples/sheet-router/fabrication/`).
 
 **Concepts:** [Machine components](../modelling/machine-components.md),
 [Manufacturing outputs](../process/manufacturing-outputs.md)
