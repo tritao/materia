@@ -110,7 +110,7 @@ is slowed or held.
 | The plan in Haxe (native-backed, read in place) | `motionkit.trajectory.ExecutionPlan` |
 | Program compiler: TOPP-RA for paths, Ruckig for free moves, events, barriers | `motionkit.robot.ProgramCompiler`, `PlanCertification` |
 | Drive feasibility | `motionkit.robot.PlanCheck`, `PlanCheckOptions` (`rejects`), findings on `ExecutionPlan.checked` |
-| Streaming to the runtime | `robotkit.execution.PlanExecutor`, `ExecutionPlanSubmission`, `SegmentArrays` |
+| Streaming to the runtime | `motionkit.robot.PlanExecutor`; `robotkit.execution.ExecutionPlanSubmission`, `SegmentArrays` |
 | Submission checks and per-tick evaluation | `RobotRuntime` (`robotkit/runtime`) |
 | Lowering for a controller | `compile_device_segments6` (see [The controller boundary](../execution/controller-boundary.md)) |
 | Decisions | `motionkit/plans/CONTRACTS.md`, `robotkit/RESTRUCTURE_PLAN.md` |

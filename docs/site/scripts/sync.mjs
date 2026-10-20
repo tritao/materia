@@ -80,6 +80,11 @@ for (const file of markdownFiles(docs)) {
 	const heading = /^\s*# (.+)\n/.exec(body);
 	if (heading) body = body.slice(heading.index + heading[0].length);
 	const lines = front ? front.split("\n") : [];
+	for (const line of lines) {
+		const field = /^(\w+): (.*)$/.exec(line);
+		if (field && !/^["'[{|>]/.test(field[2]) && field[2].includes(": "))
+			throw new Error(`${path}: quote the front-matter ${field[1]}; YAML reads its ": " as a nested mapping`);
+	}
 	if (!lines.some((line) => line.startsWith("title:"))) {
 		if (!heading) throw new Error(`${path}: needs a title in front matter or a leading H1`);
 		lines.unshift(`title: ${JSON.stringify(heading[1])}`);
