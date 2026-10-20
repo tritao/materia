@@ -954,6 +954,11 @@ without changing the frozen frame.
   - closing a zone over an empty area raises the vacuum level for the rest.
 
 **SR9. Sheet-scale stock and program artifacts (SR-D9).**
+Implementation and reproducible checks: [sheet-scale/README.md](sheet-scale/README.md).
+Both full-sheet backend peaks pass the 300 MB assumed budget (184/214 MB RSS);
+this budget does not qualify whole-editor/GPU memory. External hashed program files,
+G55–G59, configurable pitch and placed per-part targets feed the CNC preview.
+
 - StockKit uniform tiles (stored once, dense on first cut) in the core, with snapshots and
   bit-identical results across thread counts.
 - Per-part targets; per-tile contours on the preview worker.
@@ -1193,7 +1198,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR6 | reaction qualification passes 132/132 weld groups per bed at 100 million reversals; geometry/service checks pass and metrology method is documented; fabrication release blocked on the named WPS, material/relief, epoxy and whole-unit machining acceptances | [fabrication packet](fabrication/README.md) |
 | SR7 | native checks pass: 42 policy assertions, 83 static poses/bed, four complete exchanges and focused SR-D3 recheck; app/SR16 dispatch and purchased hardware acceptance remain gated | [ATC packet](atc/README.md) |
 | SR8 | planning screen passes: 16 core + 30 router assertions; measured vacuum/friction, actual forces/web strength and physical overcut datum remain cutting-acceptance gates | [vacuum packet](vacuum/README.md) |
-| SR9 | planned | |
+| SR9 | complete | Compact/dense equivalence; both 0.5 mm full-sheet backends under 300 MB; 20 MB sidecar; 388 ProjectKit + 8 worker + 5 artifact/app assertions. [Evidence](sheet-scale/README.md). |
 | SR10 | planned | |
 | SR11 | planned | |
 | SR12 | planned | |

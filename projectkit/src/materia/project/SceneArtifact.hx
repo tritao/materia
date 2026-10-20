@@ -793,7 +793,15 @@ typedef SceneArtifactMachining = {
 	@:optional var mission:SceneArtifactMachiningMission;
 	@:optional var powerUpOffsets:Array<SceneArtifactPowerUpOffset>;
 	@:optional var powerUpSideOffsets:Array<SceneArtifactPowerUpSideOffset>;
-	var program:String;
+	@:optional var program:String;
+	/** Relative to the source project or prebuilt artifact; exactly one program source. */
+	@:optional var programFile:String;
+	@:optional var programSha256:String;
+	@:optional var workOffsets:Array<{number:Int, offset:Array<Float>}>;
+	/** Stock sampling pitch in metres; defaults to 0.5 mm. */
+	@:optional var stockSpacing:Float;
+	/** Finished meshes in the named stock's local SI frame. */
+	@:optional var targets:Array<{id:String, part:String, stock:String, position:Array<Float>, angle:Float}>;
 	var axes:Array<String>;
 	var spindle:String;
 	/** Process-channel namespace, explicitly selected by the machine generator. */
@@ -3084,7 +3092,7 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
     }
 		validatePowerUpOffsets(machining.powerUpOffsets, definition);
 		validatePowerUpSideOffsets(machining.powerUpSideOffsets, definition);
-		if (machining.program == null) fail("has no program");
+		SceneArtifactProgram.validate(machining);
 		if (machining.channelScope == null) fail("has no process-channel scope");
 		if (machining.channelScope.length > 0) for (part in machining.channelScope.split("/"))
 			if (StringTools.trim(part) != part || part.length == 0 || part == "." || part == "..")
@@ -3127,6 +3135,26 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 		if (machining.workOffset == null || machining.workOffset.length != 3 ||
 				!finite(machining.workOffset[0]) || !finite(machining.workOffset[1]) || !finite(machining.workOffset[2]))
 			fail("needs a finite work offset");
+		var offsets = new Map<Int,Bool>(); offsets.set(54,true);
+		if (machining.workOffsets != null) for (entry in machining.workOffsets) {
+			if (entry.number < 55 || entry.number > 59 || offsets.exists(entry.number) || entry.offset == null || entry.offset.length != 3)
+				fail("has an invalid or duplicate additional work offset");
+			for (value in entry.offset) if (!finite(value)) fail("has a non-finite work offset");
+			offsets.set(entry.number,true);
+		}
+		if (machining.stockSpacing != null && (!finite(machining.stockSpacing) || machining.stockSpacing <= 0))
+			fail("needs positive finite stock spacing");
+		var targetIds = new Map<String,Bool>();
+		if (machining.targets != null) {
+			if (machining.target != null) fail("cannot combine legacy target and per-part targets");
+			for (entry in machining.targets) {
+				if (entry.id == null || StringTools.trim(entry.id).length == 0 || targetIds.exists(entry.id) ||
+					!parts.exists(entry.part) || !stockIds.exists(entry.stock) || entry.position == null || entry.position.length != 3 || !finite(entry.angle))
+					fail("has an invalid per-part target");
+				for (value in entry.position) if (!finite(value)) fail("has a non-finite target position");
+				targetIds.set(entry.id,true);
+			}
+		}
 		if (machining.tools == null || machining.tools.length == 0) fail("needs a tool table");
 		var numbers = new Map<Int, Bool>();
 		for (tool in machining.tools) {
@@ -3161,13 +3189,29 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 			{number: (toolNumber:Int), length: number(Reflect.field(tool, "length")),
 				profile: [for (row in list(Reflect.field(tool, "profile"))) [for (value in list(row)) number(value)]]};
 		}];
-		var machining:SceneArtifactMachining = {program: text(Reflect.field(decoded, "program")),
+		var machining:SceneArtifactMachining = {
 			axes: [for (axis in list(Reflect.field(decoded, "axes"))) text(axis)],
 			spindle: text(Reflect.field(decoded, "spindle")),
 			channelScope: text(Reflect.field(decoded, "channelScope")),
 			workOffset: [for (value in list(Reflect.field(decoded, "workOffset"))) number(value)],
 			tools: tools,
 			stocks: [for (stock in list(Reflect.field(decoded, "stocks"))) text(stock)]};
+		for (field in ["program","programFile","programSha256"]) {
+			var value = Reflect.field(decoded,field);
+			if (value != null) Reflect.setField(machining,field,text(value));
+		}
+		var spacing:Dynamic = Reflect.field(decoded,"stockSpacing");
+		if (spacing != null) machining.stockSpacing = number(spacing);
+		var workOffsets:Dynamic = Reflect.field(decoded,"workOffsets");
+		if (workOffsets != null) machining.workOffsets = [for (entry in list(workOffsets)) {
+			var id:Dynamic = Reflect.field(entry,"number");
+			if (!Std.isOfType(id,Int)) fail();
+			{number:(id:Int),offset:[for (value in list(Reflect.field(entry,"offset"))) number(value)]};
+		}];
+		var targets:Dynamic = Reflect.field(decoded,"targets");
+		if (targets != null) machining.targets = [for (entry in list(targets)) {
+			id:text(Reflect.field(entry,"id")),part:text(Reflect.field(entry,"part")),stock:text(Reflect.field(entry,"stock")),
+			position:[for (value in list(Reflect.field(entry,"position"))) number(value)],angle:number(Reflect.field(entry,"angle"))}];
     var setupJoints:Dynamic=Reflect.field(decoded,"setupJoints");
     if(setupJoints!=null)machining.setupJoints=[for(condition in list(setupJoints)) {
       joint:text(Reflect.field(condition,"joint")),position:number(Reflect.field(condition,"position")),

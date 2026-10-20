@@ -245,6 +245,17 @@ private:
         std::vector<double> lo, hi;
         std::vector<float> lo_normal, hi_normal; // xyz per interval
         std::vector<uint32_t> lo_source, hi_source;
+        // Uniform rays share one interval list. A mask, when present, marks
+        // empty rays; it also keeps mesh construction compact before a cut.
+        bool uniform = true;
+        std::vector<uint8_t> present;
+        uint32_t ray_count(uint32_t local) const { return uniform ? (present.empty() || present[local] ? used : 0) : count[local]; }
+        uint32_t ray_first(uint32_t local) const { return uniform ? 0 : first[local]; }
+        bool matches(const Interval *intervals, uint32_t n) const;
+        bool write_uniform(uint32_t local, const Interval *intervals, uint32_t n);
+        void assign_uniform(const Interval *intervals, uint32_t n);
+        void materialise();
+        void compress();
         uint32_t used = 0;
         uint64_t live = 0;
         double top = -std::numeric_limits<double>::infinity();
@@ -265,10 +276,11 @@ private:
         CutWorker &worker, double &added_volume);
     double touch_tile(const Tile &tile, const SweptVolume &sweep, const RayRange &range, CutWorker &worker) const;
     /** The tile for writing: a private copy if a snapshot still shares it; bumps its revision. */
-    Tile &mutable_tile(uint32_t index);
+    Tile &mutable_tile(uint32_t index, bool dense = true);
     uint32_t tile_index(uint32_t i, uint32_t j, uint32_t &local) const;
     void write_local(Tile &tile, uint32_t local, const Interval *intervals, uint32_t n);
 
+    bool uniform_storage_ = true;
     Grid grid_;
     uint32_t tiles_i_ = 0, tiles_j_ = 0;
     std::vector<std::shared_ptr<Tile>> tiles_;

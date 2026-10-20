@@ -16,6 +16,7 @@ class ProjectLoadJob {
   var failure:Null<String> = null;
 
   #if wasm
+  var programReader:Null<String->haxe.io.Bytes>;
   var workerId:Int = 0;
   var artifactBytes:Null<haxe.io.Bytes>;
   var workerPhase:String = "";
@@ -35,7 +36,8 @@ class ProjectLoadJob {
       control.phase("Starting preparation worker");
       var bytes = sys.io.File.getBytes(projectPath);
       artifactBytes = bytes;
-      var cachedScene = new ProjectArtifactLoader(PreparedSceneCaches.current()).tryLoadCached(bytes, control);
+      programReader = ProjectSourceLoader.programReader(projectPath);
+      var cachedScene = new ProjectArtifactLoader(PreparedSceneCaches.current(),programReader).tryLoadCached(bytes, control);
       if (cachedScene != null) {
         result = cachedScene;
         artifactBytes = null;
@@ -102,7 +104,7 @@ class ProjectLoadJob {
       control.throwIfCancelled();
       var bytes = artifactBytes;
       if (bytes == null) throw "Missing artifact input";
-      result = new ProjectArtifactLoader(PreparedSceneCaches.current()).load(bytes, control, response.data, true);
+      result = new ProjectArtifactLoader(PreparedSceneCaches.current(),programReader).load(bytes, control, response.data, true);
     } catch (error:Dynamic) failure = Std.string(error);
     MateriaWebFiles.materia_worker_cancel(workerId);
     artifactBytes = null;

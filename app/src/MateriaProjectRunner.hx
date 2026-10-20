@@ -129,10 +129,10 @@ class MateriaProjectRunner {
 
   static function loadGeneratedProject(projectPath:String, ?recipeDocument:String,
       ?control:ProjectLoadControl, ?variantId:String):GeneratedAssemblyScene {
-    return previewRecords(generateArtifact(projectPath, recipeDocument, control, variantId), control);
+    return previewRecords(generateArtifact(projectPath, recipeDocument, control, variantId), control, ProjectSourceLoader.programReader(projectPath));
   }
 
-  /** Produces immutable portable bytes; publishing needs no native scene handles. */
+  /** Produces geometry bytes; external program paths remain relative to the source project. */
   public static function generateArtifact(projectPath:String, ?recipeDocument:String,
       ?control:ProjectLoadControl, ?variantId:String):Bytes {
     var manifestPath = FileSystem.fullPath(projectPath);
@@ -250,7 +250,36 @@ class MateriaProjectRunner {
     artifact.project = SceneArtifact.decodeProject({variant:selected==null||selected.kind=="job"?null:selected.id,
       job: selected == null || selected.kind!="job" ? null : selected.id,
       dynamicParts: parts, motions: tracks});
+    if (artifact.machining != null && artifact.machining.programFile != null)
+      throw "Use exportArtifactBundle for a project with an external machining program";
     return SceneArtifact.encode(artifact);
+  }
+
+  /** The artifact remains small; preserve the program's relative path when writing these files. */
+  public static function exportArtifactBundle(projectPath:String, ?variantId:String):Map<String,Bytes> {
+    var path = FileSystem.fullPath(projectPath);
+    var bytes = generateArtifact(path,null,null,variantId);
+    var artifact = SceneArtifact.decodeView(bytes);
+    var files = new Map<String,Bytes>();
+    if (artifact.machining != null && artifact.machining.programFile != null) {
+      var job = artifact.machining;
+      var program = ProjectSourceLoader.programReader(path)(job.programFile);
+      materia.project.SceneArtifactProgram.resolve(job,_ -> program);
+      // Reserved top-level artifact name must never overwrite a dependency.
+      if (job.programFile == "preview.mtrg") throw "Program path conflicts with the bundle artifact";
+      files.set(job.programFile,program);
+      var manifest:Dynamic = Json.parse(File.getContent(path));
+      var selected = ProjectVariants.selected(manifest,variantId);
+      var motion:Dynamic = motionDocument(path);
+      var dynamicParts:Dynamic = Reflect.field(manifest,"dynamicParts");
+      var parts:Array<Dynamic> = dynamicParts == null ? [] : cast dynamicParts;
+      var tracks:Array<Dynamic> = motion == null ? [] : cast Reflect.field(motion,"tracks");
+      artifact.project = SceneArtifact.decodeProject({variant:selected==null||selected.kind=="job"?null:selected.id,
+        job:selected==null||selected.kind!="job"?null:selected.id,
+        dynamicParts:parts,motions:tracks});
+      files.set("preview.mtrg",SceneArtifact.encode(artifact));
+    } else files.set("preview.mtrg",exportArtifact(path,variantId));
+    return files;
   }
 
   static function buildCachePrefix(entry:Dynamic, projectRoot:String, manifestPath:String,
@@ -493,8 +522,8 @@ class MateriaProjectRunner {
     return 'exit $status';
   }
 
-  static function previewRecords(snapshot:Bytes, ?control:ProjectLoadControl):GeneratedAssemblyScene
-    return new ProjectArtifactLoader(PreparedSceneCaches.current()).load(snapshot, control);
+  static function previewRecords(snapshot:Bytes, ?control:ProjectLoadControl, ?programReader:String->Bytes):GeneratedAssemblyScene
+    return new ProjectArtifactLoader(PreparedSceneCaches.current(),programReader).load(snapshot, control);
 
   /** Re-evaluate generated occurrence placements for a project-owned configuration. */
   public static function evaluateAssemblyState(generated:GeneratedAssemblyScene,

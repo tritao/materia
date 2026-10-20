@@ -22,7 +22,10 @@ private typedef ArtifactIndexedMesh = {positions:Array<Float>, indices:Array<Int
 /** Materializes immutable artifact bytes without knowing how they were produced or stored. */
 class ProjectArtifactLoader {
   final cache:Null<PreparedSceneCaches.PreparedSceneCacheContext>;
-  public function new(?cache:PreparedSceneCaches.PreparedSceneCacheContext) this.cache = cache;
+  final programReader:Null<String->Bytes>;
+  public function new(?cache:PreparedSceneCaches.PreparedSceneCacheContext, ?programReader:String->Bytes) {
+    this.cache = cache; this.programReader = programReader;
+  }
 
   public function load(snapshot:Bytes, ?control:ProjectLoadControl, ?preparedBytes:Bytes,
       persistPrepared:Bool = false):GeneratedAssemblyScene {
@@ -68,8 +71,7 @@ class ProjectArtifactLoader {
     var localCentersByDefinition:Map<String, Array<Float>> = new Map();
     var faceDescriptorsByDefinition:Map<String, String> = new Map();
     var physicalParts:Array<AssemblyPhysicalPart> = [];
-    var machiningTarget = artifact.machining == null ? null : artifact.machining.target;
-    var components = [for (part in artifact.parts) if (part.id != machiningTarget) part];
+    var components = ProjectScenePreparation.components(artifact);
     if (control != null) control.phase("Identifying prepared data");
     var preparedCache = new PreparedProjectCache(artifactHash, cache);
     if (control != null) control.phase("Reading prepared geometry and physics");
@@ -148,7 +150,7 @@ class ProjectArtifactLoader {
       localCentersByDefinition: localCentersByDefinition, faceDescriptorsByDefinition: faceDescriptorsByDefinition,
       metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts},
       recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics,
-      cncJob: machiningJob(artifact, records, scale), mobileBase: artifact.mobileBase, missions: artifact.missions,
+      cncJob: machiningJob(artifact, records, scale, programReader), mobileBase: artifact.mobileBase, missions: artifact.missions,
       robotTools: artifact.robotTools, robotSensors: artifact.robotSensors, machineMotion: artifact.machineMotion,
       controllers: artifact.controllers, signals: artifact.signals, printJob: artifact.printing};
   }
@@ -159,7 +161,7 @@ class ProjectArtifactLoader {
    * the job sacrifices) do not collide: the stock simulation cuts and reports what touches them,
    * where physical contact would only stop the tool going in.
    */
-  static function machiningJob(artifact:SceneArtifactData, records:Array<SceneObjectData>, scale:Float):Null<CncJob> {
+  static function machiningJob(artifact:SceneArtifactData, records:Array<SceneObjectData>, scale:Float, programReader:Null<String->Bytes>):Null<CncJob> {
     var machining = artifact.machining;
     if (machining == null) return null;
     function partMesh(id:String):ArtifactIndexedMesh {
@@ -193,8 +195,17 @@ class ProjectArtifactLoader {
     for (stock in machining.stocks) entered.push(stock);
     for (id in entered) for (record in records) if (record.id == "project:" + id) record.collisionEnabled = false;
     var target = machining.target;
-    return {setupJoints:machining.setupJoints,kinematicPreview:machining.kinematicPreview,mission:machining.mission, source: machining.program, axes: machining.axes, spindle: machining.spindle,
-      channelScope: machining.channelScope, workOffset: machining.workOffset, loop: machining.loop == true,
+    return {setupJoints:machining.setupJoints,kinematicPreview:machining.kinematicPreview,mission:machining.mission, source: materia.project.SceneArtifactProgram.resolve(machining,programReader), axes: machining.axes, spindle: machining.spindle,
+      channelScope: machining.channelScope, workOffset: machining.workOffset, workOffsets: machining.workOffsets, stockSpacing: machining.stockSpacing, targets: machining.targets == null ? null : [for (entry in machining.targets) {
+        var mesh=partMesh(entry.part), c=Math.cos(entry.angle), s=Math.sin(entry.angle);
+        var positions:Array<Float> = [];
+        for(i in 0...Std.int(mesh.positions.length/3)) {
+          var x=mesh.positions[i*3], y=mesh.positions[i*3+1];
+          positions.push(c*x-s*y+entry.position[0]); positions.push(s*x+c*y+entry.position[1]);
+          positions.push(mesh.positions[i*3+2]+entry.position[2]);
+        }
+        {id:entry.id,stock:entry.stock,positions:positions,indices:mesh.indices};
+      }], loop: machining.loop == true,
       tools: [for (tool in machining.tools) Tool.shaped(tool.number, tool.length, CutterProfile.decode(tool.profile))],
       stocks: machining.stocks.copy(), stockSources: stockSources, target: target == null ? null : partMesh(target),
       toolPart: machining.toolPart, loadedTool: machining.loadedTool, controller: machining.controller,

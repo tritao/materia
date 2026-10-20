@@ -7,6 +7,16 @@ import cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart;
 
 /** Portable render and physics preparation; owns no files or native geometry handles. */
 class ProjectScenePreparation {
+  /** Target meshes are comparison data, not physical bodies; used on host and browser worker. */
+  public static function components(artifact:materia.project.SceneArtifact.SceneArtifactData):Array<SceneArtifactPart> {
+    var targets = new Map<String,Bool>();
+    if (artifact.machining != null) {
+      if (artifact.machining.target != null) targets.set(artifact.machining.target,true);
+      if (artifact.machining.targets != null) for (entry in artifact.machining.targets) targets.set(entry.part,true);
+    }
+    return [for (part in artifact.parts) if (!targets.exists(part.id)) part];
+  }
+
   public static function prepare(components:Array<SceneArtifactPart>, scale:Float,
       ?control:ProjectLoadControl):Array<PreparedProjectPart> {
     var prepared:Array<PreparedProjectPart> = [];

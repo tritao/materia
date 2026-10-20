@@ -82,6 +82,9 @@ typedef CncJob = {
 	var channelScope:String;
 	/** G54 in machine coordinates. */
 	var workOffset:Array<Float>;
+	@:optional var workOffsets:Array<{number:Int,offset:Array<Float>}>;
+	@:optional var stockSpacing:Float;
+	@:optional var targets:Array<{id:String,stock:String,positions:Array<Float>,indices:Array<Int>}>;
 	/** The tool table; G43 H numbers are tool numbers. */
 	var tools:Array<Tool>;
 	var loop:Bool;
@@ -318,6 +321,8 @@ class CncProgramPlayer extends ToolpathPlayer {
 			toolsByNumber.set(tool.number, tool);
 		}
 		controller.setWorkOffset(54, job.workOffset[0], job.workOffset[1], job.workOffset[2]);
+		if (job.workOffsets != null) for (entry in job.workOffsets)
+			controller.setWorkOffset(entry.number,entry.offset[0],entry.offset[1],entry.offset[2]);
 		// A program runs from wherever the machine is, so each pass compiles it from there.
 		compileFrom = position -> {
 			var compiled = CncCompiler.compileDetailed(job.source, controller, position, machine.travel);
@@ -712,13 +717,25 @@ class CncProgramPlayer extends ToolpathPlayer {
 		return selected;
 	}
 
+	/** Keep target identities in the job; compare the union for this blank without extra full-sheet grids. */
+	function targetForStock(occurrence:String):Null<{positions:Array<Float>,indices:Array<Int>}> {
+		if (job.targets == null) return job.target;
+		var positions:Array<Float> = [], indices:Array<Int> = [];
+		for (target in job.targets) if (target.stock == occurrence) {
+			var base=Std.int(positions.length/3);
+			for (value in target.positions) positions.push(value);
+			for (index in target.indices) indices.push(base+index);
+		}
+		return indices.length == 0 ? null : {positions:positions,indices:indices};
+	}
+
 	function activateStock(occurrence:String):Void {
 		if (activeStock != null) throw 'CNC stock "${activeStockOccurrence}" is still active at the next cycle start';
 		var selected = stockSources.get(occurrence);
 		if (selected == null) throw 'CNC job selected undeclared stock "$occurrence"';
 		var source = selected.source;
-		var cut = new MachiningStock(source.minimum, source.maximum, source.center, STOCK_SPACING,
-			selected.part, spindlePart, job.target, source.mesh);
+		var cut = new MachiningStock(source.minimum, source.maximum, source.center, job.stockSpacing == null ? STOCK_SPACING : job.stockSpacing,
+			selected.part, spindlePart, targetForStock(occurrence), source.mesh);
 		if (loadedTool >= 0) cut.load(toolsByNumber.get(loadedTool));
 		stock = cut;
 		activeStock = cut;

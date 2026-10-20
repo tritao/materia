@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-21",
+  "step": "SR9",
+  "status": "pass",
+  "memory_budget_bytes": 300000000,
+  "memory_scope": "native stock backend, retained snapshots and import/cut/one tile-contour scratch; excludes editor/render/GPU storage",
+  "beds": [
+    {
+      "y": 2600,
+      "spacing": 0.5,
+      "moves": 48,
+      "initial_bytes": 31442608,
+      "cut_bytes": 150129280,
+      "peak_rss": 184385536,
+      "removed_mm3": 2070915.0
+    },
+    {
+      "y": 3150,
+      "spacing": 0.5,
+      "moves": 64,
+      "initial_bytes": 37492720,
+      "cut_bytes": 175620880,
+      "peak_rss": 213581824,
+      "removed_mm3": 2629704.0
+    }
+  ],
+  "fixture_digests": [
+    "fixture box threads=1 digest=d59364abe695549b",
+    "fixture box threads=4 digest=d59364abe695549b",
+    "fixture mesh threads=1 digest=dda59198b1ab2b1b",
+    "fixture mesh threads=4 digest=dda59198b1ab2b1b"
+  ],
+  "native_suites": "three existing suites pass in compact and dense modes",
+  "projectkit_assertions": 388,
+  "preview_assertions": 8,
+  "artifact_app_assertions": 5,
+  "full_host_app_compile": "pass; 2947 sources; browser preparation source shares physical-component filter, browser runtime not exercised",
+  "source_sha256": {
+    "stockkit/core/CMakeLists.txt": "0091f72f8397dc90d3052d78498fa8084fbcdefd2326d78a2060a88ecd56bc33",
+    "stockkit/core/src/stock.hpp": "9b834b81f90cb0b2e5d810b92db4a48482604de5d68ec1a056a04fa57dc9cdae",
+    "stockkit/core/src/stock.cpp": "c37fba25aa0b65a25a738a7a3e03e64c556b67cc818eacaecd26bd6a88fb9825",
+    "stockkit/core/src/mesh.cpp": "85cf5e7473623127c8ba3c542326d0f3d5f0f7ac3042ea7f4489dc96d781e1d0",
+    "stockkit/core/tests/sheet_tests.cpp": "6bb187ef1074d5930c845955290f0ccb346d94e06c41e1059fb40f8c3ed1a357",
+    "projectkit/src/materia/project/SceneArtifact.hx": "df2580339d3cd790258db1cbbef1f36c6e9d58f22edd8af51dfbc811547d3018",
+    "projectkit/src/materia/project/SceneArtifactProgram.hx": "ce0024f334137e3fff8e5c23b3d188a6a722c668373de27f0511beb38d17fa4d",
+    "projectkit/tests/src/ProjectKitTests.hx": "84a76b3941c44a120801b54d8cc48aa99de442bc06e568624f240805dc3e07a9",
+    "app/src/CncProgramPlayer.hx": "26f0bb21e8bb9f83907b298a34937f899657c5f3290e96ef595b4e0e21ff41c3",
+    "app/src/MateriaProjectRunner.hx": "21bec152a7729465e27752487f919b0a9b8c8eeecd13d85c91a1f9ff95f0f20b",
+    "app/src/PreparationWorkerMain.hx": "cd49b4e4bfb7f2f99f570737ff531f85335afa795ce3e2243053d49857696ff5",
+    "app/src/ProjectArtifactLoader.hx": "611a80a50d1475ae405bff9f169dfd895beac157a8187baa760c36a48cb35804",
+    "app/src/ProjectLoadJob.hx": "8eac6c05fc4f1742414ac7603f94d20c15b7813bbf26b5c06d3a666a2a03537b",
+    "app/src/ProjectScenePreparation.hx": "73ff8485ae41553df5a76ad3947aeabf471b210c7a80840f526565381c8bd729",
+    "app/src/ProjectSourceLoader.hx": "e215214916646d079adb7f1c48080dd4546d45a70f9396b5e9b8cb58c1ea3e81",
+    "stockkit/tests/sheet-scale/haxeon.json": "683320788d93958ca856eb55e5c0b521e2d9a31726265a6cf9e50873a077b7cb",
+    "stockkit/tests/sheet-scale/src/SheetPreviewChecks.hx": "7d4f7d7c7c05743a80d34f0c99ac4c5dda84644b61df2af565ddf64762871b4b",
+    "app/tests/sheet-machining/haxeon.json": "e3622d10c83f4555e12f1575e471ad00bac8c6595e8e48749a7298d72d86b6f9",
+    "app/tests/sheet-machining/SheetMachiningTests.hx": "c6efbaefbc891f5516ea6c8f2bbc6e806746c44ac659ad40a020cd34ed9cb242"
+  }
+}

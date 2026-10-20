@@ -11,8 +11,7 @@ class PreparationWorkerMain {
       var input = MateriaPreparation.materia_prepare_input();
       if (input.status != 0 || input.data.length > 150000000) throw "Invalid worker input";
       var artifact = SceneArtifact.decodeView(input.data);
-      var target = artifact.machining == null ? null : artifact.machining.target;
-      var components = [for (part in artifact.parts) if (part.id != target) part];
+      var components = ProjectScenePreparation.components(artifact);
       MateriaPreparation.materia_prepare_phase("Preparing geometry and physics");
       var parts = ProjectScenePreparation.prepare(components, artifact.metresPerUnit);
       var bytes = PreparedSceneCodec.encode(parts);

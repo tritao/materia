@@ -1,0 +1,9 @@
+{
+  "version":1,
+  "package":{"name":"sheet-machining-tests"},
+  "entry":"SheetMachiningTests",
+  "sourceRoots":["."],
+  "dependencies":{"app":{"path":"../.."}},
+  "target":"host",
+  "outputDir":"../../../build/sheet-router-work/sr9/artifact-app"
+}

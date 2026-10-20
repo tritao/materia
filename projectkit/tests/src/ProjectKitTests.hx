@@ -1225,7 +1225,31 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "machining job starting with a tool it lacks");
     job.loadedTool = 1; job.target = "absent";
     rejects(function() SceneArtifact.encode(data), "machining target outside the scene");
-    job.target = null; data.assemblyDefinition = null;
+    job.target = null;
+    job.workOffsets = [{number:55,offset:[0.2,0.3,0.4]}];
+    job.stockSpacing = 0.001;
+    job.targets = [{id:"door-1",part:"finished",stock:"bed",position:[0.1,0.2,0.0],angle:1.5707963267948966}];
+    var sheet:materia.project.SceneArtifact.SceneArtifactMachining = cast SceneArtifact.decode(SceneArtifact.encode(data)).machining;
+    check(sheet.workOffsets[0].number==55 && sheet.workOffsets[0].offset[2]==0.4 && sheet.stockSpacing==0.001 &&
+      sheet.targets[0].id=="door-1" && sheet.targets[0].position[0]==0.1,"sheet machining metadata round trip");
+    job.workOffsets.push(job.workOffsets[0]); rejects(function() SceneArtifact.encode(data),"duplicate work offsets"); job.workOffsets.pop();
+    job.stockSpacing=0; rejects(function() SceneArtifact.encode(data),"zero stock spacing"); job.stockSpacing=0.0005;
+    job.targets[0].stock="absent"; rejects(function() SceneArtifact.encode(data),"target outside declared blanks"); job.targets[0].stock="bed";
+    job.program=null; job.programFile="programs/cabinet.nc";
+    var program=Bytes.alloc(20000000);
+    for(i in 0...program.length) program.set(i,i%10==9?10:32);
+    job.programSha256=materia.project.SceneArtifactProgram.digest(program);
+    var packet=SceneArtifact.encode(data);
+    check(packet.length<100000,"large program is outside the metadata section");
+    sheet=cast SceneArtifact.decode(packet).machining;
+    check(materia.project.SceneArtifactProgram.resolve(sheet,p->program).length==20000000,"20 MB program loads by checked sidecar");
+    rejects(function() materia.project.SceneArtifactProgram.resolve(sheet,p->Bytes.ofString("changed")),"changed program digest");
+    rejects(function() materia.project.SceneArtifactProgram.resolve(sheet),"missing program reader");
+    job.programFile="../cabinet.nc"; rejects(function() SceneArtifact.encode(data),"program path traversal");
+    job.programFile="programs/cabinet.nc"; job.program="M2";
+    rejects(function() SceneArtifact.encode(data),"ambiguous program source");
+    job.programFile=null; job.programSha256=null;
+    data.assemblyDefinition = null;
     rejects(function() SceneArtifact.encode(data), "machining job without its machine");
   }
 

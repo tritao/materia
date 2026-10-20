@@ -2,10 +2,16 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+
+#ifndef SK_UNIFORM_TILES
+#define SK_UNIFORM_TILES 1
+#endif
 
 namespace stockkit {
 
 DexelGrid::DexelGrid(const Grid &grid) : grid_(grid) {
+    uniform_storage_ = SK_UNIFORM_TILES != 0;
     if (grid_.tile == 0) grid_.tile = 16;
     tiles_i_ = (grid_.count[0] + grid_.tile - 1) / grid_.tile;
     tiles_j_ = (grid_.count[1] + grid_.tile - 1) / grid_.tile;
@@ -20,10 +26,7 @@ DexelGrid::DexelGrid(const Grid &grid) : grid_(grid) {
             tile.j0 = tj * grid_.tile;
             tile.ni = std::min(grid_.tile, grid_.count[0] - tile.i0);
             tile.nj = std::min(grid_.tile, grid_.count[1] - tile.j0);
-            size_t rays = static_cast<size_t>(tile.ni) * tile.nj;
-            tile.first.assign(rays, 0);
-            tile.count.assign(rays, 0);
-            tile.capacity.assign(rays, 0);
+            if (!uniform_storage_) tile.materialise();
         }
 }
 
@@ -35,10 +38,11 @@ uint32_t DexelGrid::tile_index(uint32_t i, uint32_t j, uint32_t &local) const {
     return index;
 }
 
-DexelGrid::Tile &DexelGrid::mutable_tile(uint32_t index) {
+DexelGrid::Tile &DexelGrid::mutable_tile(uint32_t index, bool dense) {
     std::shared_ptr<Tile> &slot = tiles_[index];
     if (slot.use_count() > 1) slot = std::make_shared<Tile>(*slot);
     ++revisions_[index];
+    if (dense) slot->materialise();
     return *slot;
 }
 
@@ -64,6 +68,105 @@ bool DexelGrid::restore(const Snapshot &snapshot, std::vector<uint8_t> *changed)
     return true;
 }
 
+bool DexelGrid::Tile::matches(const Interval *values, uint32_t n) const {
+    if (!uniform || n != used) return false;
+    for (uint32_t k = 0; k < n; ++k)
+        if (std::memcmp(&lo[k], &values[k].lo, sizeof(double)) || std::memcmp(&hi[k], &values[k].hi, sizeof(double)) ||
+            std::memcmp(&lo_normal[3 * size_t(k)], values[k].lo_normal, 3 * sizeof(float)) ||
+            std::memcmp(&hi_normal[3 * size_t(k)], values[k].hi_normal, 3 * sizeof(float)) ||
+            lo_source[k] != values[k].lo_source || hi_source[k] != values[k].hi_source) return false;
+    return true;
+}
+
+void DexelGrid::Tile::assign_uniform(const Interval *values, uint32_t n) {
+    uniform = true;
+    std::vector<uint32_t>().swap(first); std::vector<uint32_t>().swap(count); std::vector<uint32_t>().swap(capacity);
+    std::vector<uint8_t>().swap(present);
+    used = 0; grow(n); used = n;
+    for (uint32_t k = 0; k < n; ++k) {
+        lo[k] = values[k].lo; hi[k] = values[k].hi;
+        std::copy_n(values[k].lo_normal, 3, &lo_normal[3 * size_t(k)]);
+        std::copy_n(values[k].hi_normal, 3, &hi_normal[3 * size_t(k)]);
+        lo_source[k] = values[k].lo_source; hi_source[k] = values[k].hi_source;
+    }
+    lo.shrink_to_fit(); hi.shrink_to_fit(); lo_normal.shrink_to_fit(); hi_normal.shrink_to_fit();
+    lo_source.shrink_to_fit(); hi_source.shrink_to_fit();
+    live = uint64_t(ni) * nj * n;
+    refresh_bounds();
+}
+
+bool DexelGrid::Tile::write_uniform(uint32_t local, const Interval *values, uint32_t n) {
+    if (!uniform) return false;
+    const uint32_t rays = ni * nj;
+    if (!used && n) {
+        assign_uniform(values, n);
+        if (rays > 1) { present.assign(rays, 0); present[local] = 1; live = n; }
+        return true;
+    }
+    if (!n) {
+        if (!used || !ray_count(local)) return true;
+        if (present.empty()) present.assign(rays, 1);
+        present[local] = 0; live -= used;
+        if (!live) assign_uniform(nullptr, 0);
+        return true;
+    }
+    if (!matches(values, n)) return false;
+    if (!present.empty() && !present[local]) {
+        present[local] = 1; live += n;
+        if (live == uint64_t(rays) * n) std::vector<uint8_t>().swap(present);
+    }
+    return true;
+}
+
+void DexelGrid::Tile::materialise() {
+    if (!uniform) return;
+    const Tile original = *this;
+    const uint32_t rays = ni * nj;
+    uniform = false; first.resize(rays); count.resize(rays); capacity.resize(rays);
+    used = 0; grow(static_cast<uint32_t>(live));
+    for (uint32_t r = 0; r < rays; ++r) {
+        const uint32_t n = original.ray_count(r);
+        first[r] = used; count[r] = capacity[r] = n;
+        for (uint32_t k = 0; k < n; ++k) {
+            lo[used + k] = original.lo[k]; hi[used + k] = original.hi[k];
+            std::copy_n(&original.lo_normal[3 * size_t(k)], 3, &lo_normal[3 * size_t(used + k)]);
+            std::copy_n(&original.hi_normal[3 * size_t(k)], 3, &hi_normal[3 * size_t(used + k)]);
+            lo_source[used + k] = original.lo_source[k]; hi_source[used + k] = original.hi_source[k];
+        }
+        used += n;
+    }
+    std::vector<uint8_t>().swap(present);
+}
+
+void DexelGrid::Tile::compress() {
+    if (uniform) return;
+    const uint32_t rays = ni * nj;
+    uint32_t seed = 0; while (seed < rays && !count[seed]) ++seed;
+    if (seed == rays) { assign_uniform(nullptr, 0); return; }
+    const uint32_t n = count[seed], start = first[seed];
+    std::vector<uint8_t> mask(rays, 0); uint32_t occupied = 0;
+    for (uint32_t r = 0; r < rays; ++r) {
+        if (!count[r]) continue;
+        if (count[r] != n) return;
+        const uint32_t at = first[r];
+        if (std::memcmp(&lo[start], &lo[at], n * sizeof(double)) || std::memcmp(&hi[start], &hi[at], n * sizeof(double)) ||
+            std::memcmp(&lo_normal[3 * size_t(start)], &lo_normal[3 * size_t(at)], 3 * n * sizeof(float)) ||
+            std::memcmp(&hi_normal[3 * size_t(start)], &hi_normal[3 * size_t(at)], 3 * n * sizeof(float)) ||
+            std::memcmp(&lo_source[start], &lo_source[at], n * sizeof(uint32_t)) ||
+            std::memcmp(&hi_source[start], &hi_source[at], n * sizeof(uint32_t))) return;
+        mask[r] = 1; ++occupied;
+    }
+    std::vector<Interval> values(n);
+    for (uint32_t k = 0; k < n; ++k) {
+        values[k].lo = lo[start + k]; values[k].hi = hi[start + k];
+        std::copy_n(&lo_normal[3 * size_t(start + k)], 3, values[k].lo_normal);
+        std::copy_n(&hi_normal[3 * size_t(start + k)], 3, values[k].hi_normal);
+        values[k].lo_source = lo_source[start + k]; values[k].hi_source = hi_source[start + k];
+    }
+    assign_uniform(values.data(), n);
+    if (occupied != rays) { present = std::move(mask); live = uint64_t(occupied) * n; }
+}
+
 void DexelGrid::Tile::grow(uint32_t slots) {
     size_t size = static_cast<size_t>(used) + slots;
     lo.resize(size);
@@ -76,6 +179,7 @@ void DexelGrid::Tile::grow(uint32_t slots) {
 
 /** Packs every ray's intervals to the front, dropping abandoned slots. */
 void DexelGrid::Tile::compact() {
+    if (uniform) return;
     Tile packed;
     packed.first.resize(first.size());
     packed.capacity.resize(first.size());
@@ -109,6 +213,10 @@ void DexelGrid::Tile::compact() {
 void DexelGrid::Tile::refresh_bounds() {
     top = -std::numeric_limits<double>::infinity();
     bottom = std::numeric_limits<double>::infinity();
+    if (uniform) {
+        if (live) { bottom = lo[0]; top = hi[used - 1]; }
+        return;
+    }
     for (size_t r = 0; r < count.size(); ++r) {
         if (count[r] == 0) continue;
         bottom = std::min(bottom, lo[first[r]]);
@@ -118,15 +226,15 @@ void DexelGrid::Tile::refresh_bounds() {
 
 uint32_t DexelGrid::count(uint32_t i, uint32_t j) const {
     uint32_t local;
-    return tiles_[tile_index(i, j, local)]->count[local];
+    return tiles_[tile_index(i, j, local)]->ray_count(local);
 }
 
 void DexelGrid::read(uint32_t i, uint32_t j, std::vector<Interval> &out) const {
     uint32_t local;
     const Tile &tile = *tiles_[tile_index(i, j, local)];
-    out.resize(tile.count[local]);
-    for (uint32_t k = 0; k < tile.count[local]; ++k) {
-        uint32_t at = tile.first[local] + k;
+    out.resize(tile.ray_count(local));
+    for (uint32_t k = 0; k < tile.ray_count(local); ++k) {
+        uint32_t at = tile.ray_first(local) + k;
         Interval &v = out[k];
         v.lo = tile.lo[at];
         v.hi = tile.hi[at];
@@ -141,9 +249,9 @@ RayView DexelGrid::view(uint32_t i, uint32_t j) const {
     uint32_t local;
     const Tile &tile = *tiles_[tile_index(i, j, local)];
     RayView view;
-    view.count = tile.count[local];
+    view.count = tile.ray_count(local);
     if (view.count == 0) return view;
-    const uint32_t at = tile.first[local];
+    const uint32_t at = tile.ray_first(local);
     view.lo = &tile.lo[at];
     view.hi = &tile.hi[at];
     view.lo_normal = &tile.lo_normal[3 * size_t(at)];
@@ -154,17 +262,17 @@ RayView DexelGrid::view(uint32_t i, uint32_t j) const {
 }
 
 void DexelGrid::write_local(Tile &tile, uint32_t local, const Interval *intervals, uint32_t n) {
-    tile.live -= tile.count[local];
+    tile.live -= tile.ray_count(local);
     tile.live += n;
     if (n > tile.capacity[local]) {
         // Abandon the old slots; compact once half of the tile is abandoned.
-        if (tile.used - tile.live > tile.live + 64) tile.compact();
+        if (tile.used > tile.live && tile.used - tile.live > tile.live + 64) tile.compact();
         tile.first[local] = tile.used;
         tile.capacity[local] = n + 1;
         tile.grow(n + 1);
         tile.used += n + 1;
     }
-    uint32_t at = tile.first[local];
+    uint32_t at = tile.ray_first(local);
     for (uint32_t k = 0; k < n; ++k, ++at) {
         tile.lo[at] = intervals[k].lo;
         tile.hi[at] = intervals[k].hi;
@@ -178,8 +286,11 @@ void DexelGrid::write_local(Tile &tile, uint32_t local, const Interval *interval
 
 void DexelGrid::write(uint32_t i, uint32_t j, const std::vector<Interval> &intervals) {
     uint32_t local;
-    Tile &tile = mutable_tile(tile_index(i, j, local));
-    write_local(tile, local, intervals.data(), static_cast<uint32_t>(intervals.size()));
+    Tile &tile = mutable_tile(tile_index(i, j, local), false);
+    const uint32_t n = static_cast<uint32_t>(intervals.size());
+    if (uniform_storage_ && tile.write_uniform(local, intervals.data(), n)) return;
+    tile.materialise();
+    write_local(tile, local, intervals.data(), n);
 }
 
 MoveSweep::MoveSweep(const Tool &tool, const Motion &motion, uint32_t source)
@@ -276,9 +387,9 @@ bool DexelGrid::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRang
     for (uint32_t j = ja; j <= jb; ++j)
         for (uint32_t i = ia; i <= ib; ++i) {
             uint32_t local = (j - view->j0) * view->ni + (i - view->i0);
-            uint32_t n = view->count[local];
+            uint32_t n = view->ray_count(local);
             if (n == 0) continue;
-            uint32_t first = view->first[local];
+            uint32_t first = view->ray_first(local);
             if (!(view->hi[first + n - 1] > sweep_low) || !(view->lo[first] < sweep_high)) continue;
             ++stats.rays_tested;
             if (axis == 2 && !(view->hi[first + n - 1] > sweep.floor_bound(ray_u(i), ray_v(j)))) continue;
@@ -331,7 +442,7 @@ bool DexelGrid::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRang
             ++stats.rays_changed;
             changed = true;
         }
-    if (changed) writable->refresh_bounds();
+    if (changed) { if (uniform_storage_) writable->compact(); writable->refresh_bounds(); if (uniform_storage_) writable->compress(); }
     if (changed && axis != 2 && !worker.marks.dirty.empty()) worker.marks.mark(axis, view->i0, tile_lo, tile_hi);
     return changed;
 }
@@ -355,8 +466,8 @@ bool DexelGrid::add_tile(uint32_t index, const SweptVolume &sweep, const RayRang
     for (uint32_t j = ja; j <= jb; ++j)
         for (uint32_t i = ia; i <= ib; ++i) {
             const uint32_t local = (j - view->j0) * view->ni + (i - view->i0);
-            const uint32_t n = view->count[local];
-            const uint32_t first = view->first[local];
+            const uint32_t n = view->ray_count(local);
+            const uint32_t first = view->ray_first(local);
             ++stats.rays_tested;
             sweep.intersect(axis, ray_u(i), ray_v(j), spans);
             if (spans.empty()) continue;
@@ -423,7 +534,7 @@ bool DexelGrid::add_tile(uint32_t index, const SweptVolume &sweep, const RayRang
             ++stats.rays_changed;
             changed = true;
         }
-    if (changed) writable->refresh_bounds();
+    if (changed) { if (uniform_storage_) writable->compact(); writable->refresh_bounds(); if (uniform_storage_) writable->compress(); }
     if (changed && axis != 2 && !worker.marks.dirty.empty()) worker.marks.mark(axis, view->i0, tile_lo, tile_hi);
     return changed;
 }
@@ -444,9 +555,9 @@ double DexelGrid::touch_tile(const Tile &tile, const SweptVolume &sweep, const R
     for (uint32_t j = ja; j <= jb; ++j)
         for (uint32_t i = ia; i <= ib; ++i) {
             uint32_t local = (j - tile.j0) * tile.ni + (i - tile.i0);
-            uint32_t n = tile.count[local];
+            uint32_t n = tile.ray_count(local);
             if (n == 0) continue;
-            uint32_t first = tile.first[local];
+            uint32_t first = tile.ray_first(local);
             if (!(tile.hi[first + n - 1] > sweep_low) || !(tile.lo[first] < sweep_high)) continue;
             if (axis == 2 && !(tile.hi[first + n - 1] > sweep.floor_bound(ray_u(i), ray_v(j)))) continue;
             sweep.intersect(axis, ray_u(i), ray_v(j), spans);
@@ -488,8 +599,9 @@ RayComparison compare_ray(const std::vector<Interval> &stock, const std::vector<
 
 void DexelGrid::pack() {
     for (uint32_t k = 0; k < tiles_.size(); ++k) {
-        Tile &tile = mutable_tile(k);
+        Tile &tile = mutable_tile(k, false);
         tile.compact();
+        if (uniform_storage_) tile.compress();
         tile.refresh_bounds();
     }
 }
@@ -504,18 +616,20 @@ double DexelGrid::volume() const {
     double total = 0;
     for (const auto &slot : tiles_) {
         const Tile &tile = *slot;
-        for (size_t r = 0; r < tile.count.size(); ++r)
-            for (uint32_t k = 0; k < tile.count[r]; ++k)
-                total += tile.hi[tile.first[r] + k] - tile.lo[tile.first[r] + k];
+        // Keep the dense accumulation order, including its floating rounding.
+        for (uint32_t r = 0; r < tile.ni * tile.nj; ++r)
+            for (uint32_t k = 0; k < tile.ray_count(r); ++k)
+                total += tile.hi[tile.ray_first(r) + k] - tile.lo[tile.ray_first(r) + k];
     }
     return total * grid_.spacing * grid_.spacing;
 }
 
 uint64_t DexelGrid::bytes() const {
     // Tiles shared with snapshots are counted in full here too.
-    uint64_t total = sizeof(Stock) + tiles_.capacity() * (sizeof(Tile) + sizeof(std::shared_ptr<Tile>));
+    uint64_t total = sizeof(*this) + revisions_.capacity() * sizeof(uint64_t) + tiles_.capacity() * (sizeof(Tile) + sizeof(std::shared_ptr<Tile>));
     for (const auto &slot : tiles_) {
         const Tile &tile = *slot;
+        total += tile.present.capacity();
         total += (tile.first.capacity() + tile.count.capacity() + tile.capacity.capacity()) * 4;
         total += (tile.lo.capacity() + tile.hi.capacity()) * 8;
         total += (tile.lo_normal.capacity() + tile.hi_normal.capacity()) * 4;

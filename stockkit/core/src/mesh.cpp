@@ -113,80 +113,85 @@ bool cast_mesh(DexelGrid &stock, const double *world_positions, uint32_t positio
     const double *positions = permuted.data();
     const uint32_t *indices = reordered.data();
     const double s = grid.spacing;
-    std::vector<std::vector<Hit>> hits(static_cast<size_t>(grid.count[0]) * grid.count[1]);
-    for (uint32_t t = 0; t < index_count; t += 3) {
-        const double *p[3] = {positions + 3 * size_t(indices[t]), positions + 3 * size_t(indices[t + 1]),
-            positions + 3 * size_t(indices[t + 2])};
-        int facing = orient(p[0][0], p[0][1], p[1][0], p[1][1], p[2][0], p[2][1]);
-        if (facing == 0) continue; // vertical: seen edge-on by every ray
-        // Walk the projection counter-clockwise; down-facing triangles are reversed.
-        if (facing < 0) std::swap(p[1], p[2]);
-        double ux = p[1][0] - p[0][0], uy = p[1][1] - p[0][1], uz = p[1][2] - p[0][2];
-        double vx = p[2][0] - p[0][0], vy = p[2][1] - p[0][1], vz = p[2][2] - p[0][2];
-        double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-        double length = std::sqrt(nx * nx + ny * ny + nz * nz);
-        // After reordering the normal points up; the mesh's own normal is flipped for down-facing faces.
-        float local[3] = {float(facing * nx / length), float(facing * ny / length), float(facing * nz / length)};
-        float normal[3];
-        for (int c = 0; c < 3; ++c) normal[axes[c]] = local[c];
-        double xmin = std::min({p[0][0], p[1][0], p[2][0]}), xmax = std::max({p[0][0], p[1][0], p[2][0]});
-        double ymin = std::min({p[0][1], p[1][1], p[2][1]}), ymax = std::max({p[0][1], p[1][1], p[2][1]});
-        int64_t i0 = std::max<int64_t>(0, int64_t(std::ceil((xmin - grid.origin[0]) / s)) - 1);
-        int64_t i1 = std::min<int64_t>(int64_t(grid.count[0]) - 1, int64_t(std::floor((xmax - grid.origin[0]) / s)) + 1);
-        int64_t j0 = std::max<int64_t>(0, int64_t(std::ceil((ymin - grid.origin[1]) / s)) - 1);
-        int64_t j1 = std::min<int64_t>(int64_t(grid.count[1]) - 1, int64_t(std::floor((ymax - grid.origin[1]) / s)) + 1);
-        for (int64_t j = j0; j <= j1; ++j)
-            for (int64_t i = i0; i <= i1; ++i) {
-                double x = stock.ray_u(uint32_t(i)), y = stock.ray_v(uint32_t(j));
-                bool inside = true;
-                for (int e = 0; e < 3 && inside; ++e) {
-                    const double *a = p[e], *b = p[(e + 1) % 3];
-                    int side = orient(a[0], a[1], b[0], b[1], x, y);
-                    inside = side > 0 || (side == 0 && owns(b[0] - a[0], b[1] - a[1]));
+    // Bound intersection scratch to one tile-row strip, including mesh input
+    // for a full sheet. Triangle/ray order within each strip is unchanged.
+    for (uint32_t row0 = 0; row0 < grid.count[1]; row0 += grid.tile) {
+        const uint32_t rows = std::min(grid.tile, grid.count[1] - row0);
+        std::vector<std::vector<Hit>> hits(static_cast<size_t>(grid.count[0]) * rows);
+        for (uint32_t t = 0; t < index_count; t += 3) {
+            const double *p[3] = {positions + 3 * size_t(indices[t]), positions + 3 * size_t(indices[t + 1]),
+                positions + 3 * size_t(indices[t + 2])};
+            int facing = orient(p[0][0], p[0][1], p[1][0], p[1][1], p[2][0], p[2][1]);
+            if (facing == 0) continue; // vertical: seen edge-on by every ray
+            // Walk the projection counter-clockwise; down-facing triangles are reversed.
+            if (facing < 0) std::swap(p[1], p[2]);
+            double ux = p[1][0] - p[0][0], uy = p[1][1] - p[0][1], uz = p[1][2] - p[0][2];
+            double vx = p[2][0] - p[0][0], vy = p[2][1] - p[0][1], vz = p[2][2] - p[0][2];
+            double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+            double length = std::sqrt(nx * nx + ny * ny + nz * nz);
+            // After reordering the normal points up; the mesh's own normal is flipped for down-facing faces.
+            float local[3] = {float(facing * nx / length), float(facing * ny / length), float(facing * nz / length)};
+            float normal[3];
+            for (int c = 0; c < 3; ++c) normal[axes[c]] = local[c];
+            double xmin = std::min({p[0][0], p[1][0], p[2][0]}), xmax = std::max({p[0][0], p[1][0], p[2][0]});
+            double ymin = std::min({p[0][1], p[1][1], p[2][1]}), ymax = std::max({p[0][1], p[1][1], p[2][1]});
+            int64_t i0 = std::max<int64_t>(0, int64_t(std::ceil((xmin - grid.origin[0]) / s)) - 1);
+            int64_t i1 = std::min<int64_t>(int64_t(grid.count[0]) - 1, int64_t(std::floor((xmax - grid.origin[0]) / s)) + 1);
+            int64_t j0 = std::max<int64_t>(row0, int64_t(std::ceil((ymin - grid.origin[1]) / s)) - 1);
+            int64_t j1 = std::min<int64_t>(int64_t(row0 + rows) - 1, int64_t(std::floor((ymax - grid.origin[1]) / s)) + 1);
+            for (int64_t j = j0; j <= j1; ++j)
+                for (int64_t i = i0; i <= i1; ++i) {
+                    double x = stock.ray_u(uint32_t(i)), y = stock.ray_v(uint32_t(j));
+                    bool inside = true;
+                    for (int e = 0; e < 3 && inside; ++e) {
+                        const double *a = p[e], *b = p[(e + 1) % 3];
+                        int side = orient(a[0], a[1], b[0], b[1], x, y);
+                        inside = side > 0 || (side == 0 && owns(b[0] - a[0], b[1] - a[1]));
+                    }
+                    if (!inside) continue;
+                    // Height on the triangle's plane.
+                    // nz can round to zero only for slivers the exact test barely
+                    // accepts; any height on the sliver is then as good as another.
+                    double z = nz > 0 ? p[0][2] - (nx * (x - p[0][0]) + ny * (y - p[0][1])) / nz
+                                      : (p[0][2] + p[1][2] + p[2][2]) / 3;
+                    Hit hit{z, facing > 0 ? -1 : 1, {normal[0], normal[1], normal[2]}};
+                    hits[size_t(j - row0) * grid.count[0] + size_t(i)].push_back(hit);
                 }
-                if (!inside) continue;
-                // Height on the triangle's plane.
-                // nz can round to zero only for slivers the exact test barely
-                // accepts; any height on the sliver is then as good as another.
-                double z = nz > 0 ? p[0][2] - (nx * (x - p[0][0]) + ny * (y - p[0][1])) / nz
-                                  : (p[0][2] + p[1][2] + p[2][2]) / 3;
-                Hit hit{z, facing > 0 ? -1 : 1, {normal[0], normal[1], normal[2]}};
-                hits[size_t(j) * grid.count[0] + size_t(i)].push_back(hit);
-            }
-    }
-    std::vector<Interval> intervals;
-    for (uint32_t j = 0; j < grid.count[1]; ++j)
-        for (uint32_t i = 0; i < grid.count[0]; ++i) {
-            std::vector<Hit> &ray = hits[size_t(j) * grid.count[0] + i];
-            if (ray.empty()) continue;
-            // Entries before exits at equal height, so touching solids merge.
-            std::sort(ray.begin(), ray.end(), [](const Hit &a, const Hit &b) {
-                return a.z < b.z || (a.z == b.z && a.winding > b.winding);
-            });
-            intervals.clear();
-            int winding = 0;
-            Interval open{};
-            for (const Hit &hit : ray) {
-                int before = winding;
-                winding += hit.winding;
-                if (before <= 0 && winding > 0) {
-                    open.lo = hit.z;
-                    std::copy_n(hit.normal, 3, open.lo_normal);
-                    open.lo_source = kSourceStock;
-                } else if (before > 0 && winding <= 0) {
-                    open.hi = hit.z;
-                    std::copy_n(hit.normal, 3, open.hi_normal);
-                    open.hi_source = kSourceStock;
-                    if (open.hi > open.lo) intervals.push_back(open);
-                }
-            }
-            if (winding != 0) {
-                error = "mesh is not closed along the ray at (" + std::to_string(stock.ray_u(i)) + ", " +
-                    std::to_string(stock.ray_v(j)) + ")";
-                return false;
-            }
-            stock.write(i, j, intervals);
         }
+        std::vector<Interval> intervals;
+        for (uint32_t j = row0; j < row0 + rows; ++j)
+            for (uint32_t i = 0; i < grid.count[0]; ++i) {
+                std::vector<Hit> &ray = hits[size_t(j - row0) * grid.count[0] + i];
+                if (ray.empty()) continue;
+                // Entries before exits at equal height, so touching solids merge.
+                std::sort(ray.begin(), ray.end(), [](const Hit &a, const Hit &b) {
+                    return a.z < b.z || (a.z == b.z && a.winding > b.winding);
+                });
+                intervals.clear();
+                int winding = 0;
+                Interval open{};
+                for (const Hit &hit : ray) {
+                    int before = winding;
+                    winding += hit.winding;
+                    if (before <= 0 && winding > 0) {
+                        open.lo = hit.z;
+                        std::copy_n(hit.normal, 3, open.lo_normal);
+                        open.lo_source = kSourceStock;
+                    } else if (before > 0 && winding <= 0) {
+                        open.hi = hit.z;
+                        std::copy_n(hit.normal, 3, open.hi_normal);
+                        open.hi_source = kSourceStock;
+                        if (open.hi > open.lo) intervals.push_back(open);
+                    }
+                }
+                if (winding != 0) {
+                    error = "mesh is not closed along the ray at (" + std::to_string(stock.ray_u(i)) + ", " +
+                        std::to_string(stock.ray_v(j)) + ")";
+                    return false;
+                }
+                stock.write(i, j, intervals);
+            }
+    } // tile-row strip
     return true;
 }
 

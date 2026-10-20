@@ -1,0 +1,9 @@
+{
+  "version":1,
+  "package":{"name":"sheet-preview-checks"},
+  "entry":"SheetPreviewChecks",
+  "sourceRoots":["src"],
+  "dependencies":{"stockkit":{"path":"../.."}},
+  "target":"host",
+  "outputDir":"../../../build/sheet-router-work/sr9/preview"
+}
