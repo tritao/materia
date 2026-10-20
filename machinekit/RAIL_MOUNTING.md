@@ -83,6 +83,26 @@ Status: planned 2026-10-20. Nothing below is implemented.
   found (2026-10-20); a Chinese compound may be trialled only beside Moglice in the coupon. Rail seats
   are static, so a sliding (MoS2) grade is not required; ask Diamant for their static load-bearing
   replication grade.
+- **RM-D9. Rail bolt holes come from the rail.** The rail owns its hole pattern (`LinearRail`
+  `holePositions` and its `mount1…mountN` connectors, from pitch and end margin). The rail mount
+  derives the seat insert's tapped holes from the placed rail: each hole frame is the rail's mount
+  connector expressed in insert coordinates, with the thread from `railMountScrew` and depth and
+  limits from `ThreadedHolePolicy`. The side bar's push-screw holes derive from the same positions.
+  No hole position is entered by hand, and an assembly check requires every rail screw to be coaxial
+  with a seat hole. On the insert drawing the holes are dimensioned from the insert's own datum edge
+  and end face, the faces its mold fixture locates on.
+- **RM-D10. Drill before casting only when the clearance budget closes.** Under RM-D1 the rail is
+  moved laterally at assembly, so its aligned line departs from the line of its seat holes by the
+  insert's in-plane placement error over the rail length (rotation and offset relative to the master
+  rail or the other axis), its bow from cure distortion, and the hole machining tolerance. Along the
+  rail only pitch accumulation counts, since the rail slides to the holes. If that departure fits
+  inside the rail's bolt clearance with margin, the holes are drilled and tapped before casting and
+  protected by bore masks during the pour and replication. Otherwise the hole route is **transfer
+  drilling after alignment**: align and clamp the rail with the bolts out, drill through the rail's
+  own counterbored holes with a guide bushing, tap with a tap guide, and protect the casting and
+  compound from swarf; the operation sheet lists bushing, tap guide and protection. A tighter insert
+  fixture is the other remedy. The model computes the budget per hole and chooses only routes the
+  interface requirement permits; when none closes, it raises a design change request.
 
 ## Accuracy budgets (inputs)
 
@@ -139,7 +159,8 @@ Acceptance: budgets recorded in this file; compound datasheet values recorded wi
 ### RM1 — Rail specification
 
 `LinearRailProfileSpec` gains: reference side, permitted pair parallelism and height difference per
-preload class, rail and block screw torques, and block thread depth. Values are labelled as catalogue
+preload class, rail and block screw torques, block thread depth, the rail's bolt-hole and counterbore
+diameters (the clearance RM-D10 budgets against), and its hole pitch tolerance. Values are labelled as catalogue
 data with source or as assumptions.
 
 Acceptance: every profile in `LinearRailSystem` either carries sourced values or is labelled
@@ -150,12 +171,16 @@ assumed; the bench mill's 16 M4 × 16 block screws are checked against the recor
 A rail mount built once and used by every machine: a seat insert with a replication allowance
 (derived from compound minimum layer + fixture height error + cure distortion), a steel side bar on
 the non-reference side, and an edge clamp chosen from push screws, tapered gib or replicated edge.
-Rail and side-bar holes go through `InsertHoles`/`DesignInterfaces`. The mount declares its
-`InterfaceRequirement` and the relationships it takes part in.
+Rail and side-bar holes go through `InsertHoles`/`DesignInterfaces`, derived from the rail's mount
+connectors (RM-D9), with the drilling route chosen by the clearance budget (RM-D10). The mount
+declares its `InterfaceRequirement` and the relationships it takes part in.
 
 Acceptance: a pair of rails on a test foundation builds with seats, side bars and clamps; the
 allowance appears in the casting geometry; clamp screws engage steel only; a missing side bar or a
-clamp bearing on casting is rejected.
+clamp bearing on casting is rejected. Changing rail length, pitch or end margin moves the seat and
+push-screw holes with no other edit; a seat hole offset from its rail screw fails the coaxial check;
+a placement tolerance that exceeds the bolt clearance switches the route to transfer drilling, and
+with transfer drilling not permitted it raises a design change request.
 
 ### RM3 — Bench mill adoption
 

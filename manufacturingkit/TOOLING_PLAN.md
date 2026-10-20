@@ -635,6 +635,17 @@ pose stored in a JSON text parameter.
   decides. Flatness and hole positions are inspected before the insert enters the
   mold. The package gets insert drawings through `cadkit.drawing`, an operation
   sheet, and `Make(process)` BOM lines in the `BOM_PLAN.md` vocabulary.
+- Holes that bolt a bought part to an insert (rail screws, bearing housings)
+  derive from that part's mount connectors, never from hand-entered positions;
+  `machinekit/RAIL_MOUNTING.md` RM-D9 and RM-D10 apply this to rails. Each such
+  hole's route is chosen by a clearance budget: the mating part's bolt clearance
+  against the insert's placement tolerance, the adjustment the part needs at
+  assembly, cure distortion and machining tolerance. When the budget closes the
+  hole is drilled and tapped before casting and masked during the pour; when it
+  does not, the route is transfer drilling through the aligned part after
+  casting, with its guide bushing, tap guide and swarf protection on the
+  operation sheet; when no permitted route closes, a design change request. Insert
+  drawings dimension these holes from the insert datums its fixture locates on.
 - `finish` becomes typed tokens; `label` is display text only.
 
 ### Interface requirements
@@ -1280,7 +1291,8 @@ in the BOM and the overlap checks, and whose capacity stays pending; an anchor
 too close to the mounting face, another hole or the casting surface fails with
 the insert ID. Every insert has a drawing, an operation sheet and a pre-cast
 inspection list, and an insert finished after casting carries its stock in its
-own geometry. The lifting-point and column-joint
+own geometry. Mill rail-seat holes derive from the placed rails, every rail screw is
+coaxial with a seat hole, and each hole reports its clearance budget and route. The lifting-point and column-joint
 requests clear when the design declares them and return when removed. A drafted
 former fixture passes release and clears its release request; a prism feature with
 a corner radius below the router radius fails with its ID. Fill analysis agrees
