@@ -144,8 +144,9 @@ place.
   (none stable yet). The labels live there rather than in
   `materia.workspace.json`, whose entries are test projects, not kits. The
   eight delete candidates were removed with the maintainer's approval.
-- D9 drafted: [product/](product/README.md) has features, the example gallery
-  and licensing. The roadmap and release notes wait on release decisions.
+- D9 drafted: [product/](product/README.md) has features, the example gallery,
+  licensing and a draft roadmap built from the plans for the maintainer to
+  edit. Release notes start with the first release.
 - D6 done: `docs/runtime` compiles CncKit, ToolpathKit and RobotKit's robot
   model to Wasm GC (1.4 MB, 320 KB gzipped). Toolpaths has a live G-code
   widget (moves and positioned diagnostics); Transmissions has a belt-axis

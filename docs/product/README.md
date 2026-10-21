@@ -22,10 +22,12 @@ the repository today. For how the pieces fit together, read
 
 ## Pending
 
-A roadmap and release notes will be added here once the maintainer has
-decided the release plan and the first version number. Until then, the
-[Features](features.md) page lists what is built and what is planned, and the
-commit history is the record of changes.
+- [Roadmap](roadmap.md): what is being built now, what is planned next, and
+  what is planned later (draft).
+
+Release notes will be added here once the maintainer has decided the release
+plan and the first version number. Until then, the commit history is the
+record of changes.
 
 <!--
 Sources: docs/DOCS_PLAN.md (D9), docs/OPEN_CORE.md.
