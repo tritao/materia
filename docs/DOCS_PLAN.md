@@ -146,13 +146,13 @@ place.
   eight delete candidates are listed for the maintainer, not removed.
 - D9 drafted: [product/](product/README.md) has features, the example gallery
   and licensing. The roadmap and release notes wait on release decisions.
-- D6 half done: `docs/runtime` compiles CncKit and ToolpathKit to Wasm GC
-  (690 KB, 234 KB gzipped) and the Toolpaths page has a live G-code widget:
-  edit a program, see its moves and its positioned diagnostics. The runtime is
-  committed with a hash of its inputs, which CI checks, and runs under Node in
-  CI. The transmissions widget is not done: MachineKit depends on CadKit's
-  native core, so it needs either a pure-Haxe slice of the transmission
-  resolver or CadKit in the browser host.
+- D6 done: `docs/runtime` compiles CncKit, ToolpathKit and RobotKit's robot
+  model to Wasm GC (1.4 MB, 320 KB gzipped). Toolpaths has a live G-code
+  widget (moves and positioned diagnostics); Transmissions has a belt-axis
+  widget whose speed and acceleration come from `RobotModel.coupledLimits`.
+  The runtime is committed with a hash of its inputs, which CI checks, and runs
+  under Node in CI. MachineKit itself stays out: it depends on CadKit's native
+  core, so the widget builds the robot model directly.
 - D4 mostly done: the gantry-picker tutorial (snippets checked against the
   code) and the web editor's `?example=ID` deep link behind its "Open in
   Materia" link (tested by `app/web/test.sh --launch`). The link stays hidden

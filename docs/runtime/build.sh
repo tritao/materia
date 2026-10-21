@@ -14,12 +14,15 @@ if [[ ! -f "$compiler" ]] || [[ -n $(find "$haxeon/src" -name '*.hx' -newer "$co
 	"$haxeon/.tools/haxe/haxe" --cwd "$haxeon" -cp src -hl "$compiler" -main compiler.tools.HaxeonCompiler
 fi
 kits=("$repo/cnckit/haxe" "$repo/toolpathkit/haxe")
+# RobotKit's model is reached through its imports alone; its runtime needs the native core, which the docs
+# runtime does not link.
+libraries=("$repo/robotkit/core/haxe" "$repo/projectkit/src" "$repo/trajectorykit/haxe" "$repo/collisionkit/haxe")
 sources=("$here/src/DocsRuntime.hx")
 for kit in "${kits[@]}"; do
 	while IFS= read -r file; do sources+=("$file"); done < <(find "$kit" -name '*.hx' | sort)
 done
 roots=(--root="$here/src")
-for kit in "${kits[@]}"; do roots+=(--root="$kit"); done
+for kit in "${kits[@]}" "${libraries[@]}"; do roots+=(--root="$kit"); done
 rm -f "$out/docs-runtime.wasm"
 (cd "$haxeon" && LD_LIBRARY_PATH="$haxeon/out:$haxeon/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
 	HAXEON_WASM_LEGACY_EXCEPTIONS=1 \

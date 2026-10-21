@@ -8,7 +8,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-ROOTS = ["docs/runtime/src", "cnckit/haxe", "toolpathkit/haxe"]
+ROOTS = ["docs/runtime/src", "cnckit/haxe", "toolpathkit/haxe", "robotkit/core/haxe", "projectkit/src", "trajectorykit/haxe",
+         "collisionkit/haxe"]
 
 
 def digest():

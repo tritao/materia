@@ -19,8 +19,17 @@ export interface GcodeMove {
 	points: [number, number, number][];
 }
 
+export interface BeltRow {
+	teeth: number;
+	/** Derived limits of the carriage: m/s and m/s². */
+	velocity: number;
+	acceleration: number;
+}
+
 export interface DocsRuntime {
 	gcode(source: string): { diagnostics: GcodeDiagnostic[]; moves: GcodeMove[] };
+	/** RobotKit's derived limits for a belt axis, for pulleys of 12 to 60 teeth. */
+	belt(mass: number, holdingTorque: number, cornerSpeed: number): { rows: BeltRow[] };
 }
 
 export async function loadRuntime(source: BufferSource | Response | Promise<Response>): Promise<DocsRuntime> {
@@ -59,14 +68,17 @@ export async function loadRuntime(source: BufferSource | Response | Promise<Resp
 	memory = exports.memory;
 	exports.main();
 
-	function call(operation: string, text: string): any {
+	function call(operation: string, text: string, ...numbers: number[]): any {
 		printed = "";
 		for (const character of text) exports["DocsRuntime.char"](character.codePointAt(0));
-		exports[operation]();
+		exports[operation](...numbers);
 		const line = printed.trim().split("\n").at(-1);
 		if (!line) throw new Error(`docs runtime: ${operation} printed nothing`);
 		return JSON.parse(line);
 	}
 
-	return { gcode: (text) => call("DocsRuntime.gcode", text) };
+	return {
+		gcode: (text) => call("DocsRuntime.gcode", text),
+		belt: (mass, holding, corner) => call("DocsRuntime.belt", "", mass, holding, corner),
+	};
 }

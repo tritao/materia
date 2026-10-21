@@ -8,6 +8,7 @@ type Widget = (figure: HTMLElement, runtime: DocsRuntime) => void;
 
 const widgets: Record<string, Widget> = {
 	gcode: gcodeWidget,
+	belt: beltWidget,
 };
 
 let runtime: Promise<DocsRuntime> | undefined;
@@ -118,6 +119,63 @@ function gcodeWidget(figure: HTMLElement, runtime: DocsRuntime): void {
 		clearTimeout(pending);
 		pending = window.setTimeout(draw, 150);
 	});
+	new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+	draw();
+}
+
+const MOTORS = [
+	{ label: "NEMA 17, 0.45 N·m", holding: 0.45, corner: 60 },
+	{ label: "NEMA 23, 1.26 N·m", holding: 1.26, corner: 68.6 },
+];
+
+/**
+ * A belt-driven axis: the reader picks the carriage mass, the motor and the pulley, and RobotKit derives the
+ * axis's speed and acceleration limits from them. The two charts show the trade a pulley makes across 12 to 60
+ * teeth, with the chosen pulley marked.
+ */
+function beltWidget(figure: HTMLElement, runtime: DocsRuntime): void {
+	const caption = figure.querySelector("figcaption");
+	figure.replaceChildren();
+	const controls = element("div", { class: "figure-controls" });
+	const mass = element("input", { type: "range", min: "0.5", max: "20", step: "0.5", value: "2", "aria-label": "Carriage mass" }) as HTMLInputElement;
+	const teeth = element("input", { type: "range", min: "12", max: "60", step: "2", value: "20", "aria-label": "Pulley teeth" }) as HTMLInputElement;
+	const motor = element("select", { "aria-label": "Motor" }) as HTMLSelectElement;
+	for (const [index, choice] of MOTORS.entries()) motor.append(element("option", { value: String(index) }, choice.label));
+	const massLabel = element("span", { class: "figure-time" }), teethLabel = element("span", { class: "figure-time" });
+	controls.append(element("span", {}, "Carriage"), mass, massLabel, element("span", {}, "Pulley"), teeth, teethLabel, motor);
+	const readout = element("p", { class: "widget-report", "aria-live": "polite" });
+	const grid = element("div", { class: "figure-grid widget-gcode" });
+	const speed = element("div"), acceleration = element("div");
+	grid.append(speed, acceleration);
+	figure.append(controls, readout, grid);
+	if (caption) figure.append(caption);
+
+	const draw = () => {
+		const choice = MOTORS[Number(motor.value)];
+		const rows = runtime.belt(Number(mass.value), choice.holding, choice.corner).rows;
+		const chosen = rows.find((row) => row.teeth === Number(teeth.value))!;
+		massLabel.textContent = `${Number(mass.value).toFixed(1)} kg`;
+		teethLabel.textContent = `${teeth.value} teeth`;
+		readout.textContent = `${teeth.value}-tooth GT2 pulley (${Number(teeth.value) * 2} mm per turn): ` +
+			`up to ${chosen.velocity.toFixed(2)} m/s and ${chosen.acceleration.toFixed(1)} m/s².`;
+		const series = token(figure, "--series-1"), ink = token(figure, "--figure-ink");
+		const chart = (key: "velocity" | "acceleration", label: string) =>
+			Plot.plot({
+				width: 320,
+				height: 200,
+				style: { color: ink, background: "transparent", fontSize: "12px" },
+				x: { label: "Pulley teeth", grid: true },
+				y: { label, grid: true, zero: true, nice: true },
+				marks: [
+					Plot.line(rows, { x: "teeth", y: key, stroke: series, strokeWidth: 2 }),
+					Plot.dot([chosen], { x: "teeth", y: key, fill: series, r: 5, stroke: "var(--sl-color-bg)", strokeWidth: 2 }),
+					Plot.tip(rows, Plot.pointerX({ x: "teeth", y: key, title: (row) => `${row.teeth} teeth: ${row[key].toFixed(2)}` })),
+				],
+			});
+		speed.replaceChildren(chart("velocity", "Top speed (m/s)"));
+		acceleration.replaceChildren(chart("acceleration", "Acceleration (m/s²)"));
+	};
+	for (const control of [mass, teeth, motor]) control.addEventListener("input", draw);
 	new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 	draw();
 }

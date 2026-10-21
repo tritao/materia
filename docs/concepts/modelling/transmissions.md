@@ -96,6 +96,21 @@ From all of this, Materia derives each axis's limits (`RobotModel.coupledLimits`
   efficiency) less steady loads such as rail friction and weight, divided by
   the carried mass plus every turning part's inertia seen through its ratio.
 
+Try it on a belt-driven axis. The limits below are computed in your browser by
+RobotKit's `coupledLimits`, from a robot model of a carriage, a GT2 belt, a
+pulley and a stepper. A bigger pulley moves the carriage further per turn, so
+the axis gets faster but the motor's torque pushes less hard: the ratio trades
+acceleration for speed. A heavier carriage only costs acceleration.
+
+<figure class="materia-figure materia-widget" data-widget="belt">
+
+| Pulley | Carriage | Motor | Speed | Acceleration |
+|---|---|---|---|---|
+| 20 teeth | 2 kg | NEMA 17, 0.45 N·m | 1.53 m/s | 31.4 m/s² |
+
+<figcaption>Derived limits of a belt-driven axis, computed live by RobotKit. The motor's torque holds to its corner speed and falls as 1 / speed beyond it. Without WebAssembly GC, the table shows one case.</figcaption>
+</figure>
+
 ### Checking a plan against the drives
 
 Limits keep plans reasonable; a **plan check** confirms them. For every sample
