@@ -289,18 +289,8 @@ class CastingMoldPlanner {
 					};
 				pieces = [pad];
 			} else {
-				var baseZ = Math.min(face.z - dt, b.z - dt),
-					height = face.z - dt - baseZ;
-				if (height > 1e-8)
-					pieces.push({
-						x: face.x - pw / 2,
-						y: face.y - pw / 2,
-						z: baseZ,
-						width: pw,
-						depth: pw,
-						height: height
-					});
-				if (face.z <= b.z + 1e-7) {
+				var padEntersBed=pad.z<b.z-1e-7;
+				if (padEntersBed) {
 					var inset = r.routerDiameter / 2 + r.minimumLigament;
 					pad = {
 						x: body.x + inset,
@@ -312,9 +302,18 @@ class CastingMoldPlanner {
 					};
 					if (pad.width <= r.routerDiameter || pad.depth <= r.routerDiameter)
 						throw "Insert too small for sealed relieved datum socket: " + i.id;
-					pieces = [pad];
 				}
-				var socket:MoldBox = face.z <= b.z + 1e-7 ? {
+				pieces=[pad];
+				var baseZ=Math.min(pad.z,b.z-dt),height=pad.z-baseZ;
+				if (height>1e-8) pieces.push({
+					x:padEntersBed ? pad.x : face.x-pw/2,
+					y:padEntersBed ? pad.y : face.y-pw/2,
+					z:baseZ,width:padEntersBed ? pad.width : pw,
+					depth:padEntersBed ? pad.depth : pw,height:height
+				});
+				// A pad less than one datum thickness above the bed crosses its
+				// surface. Its full section, including locator support, needs a socket.
+				var socket:MoldBox = padEntersBed ? {
 					x: pad.x,
 					y: pad.y,
 					z: b.z - dt,
@@ -529,9 +528,17 @@ class CastingMoldPlanner {
 				request(result, "draft-" + former.volume.id, ReleaseAlternative, [former.volume.id],
 					"Bed-backing zero-draft rigid former needs a source/release change; drafted and split formers are unsupported.",
 					"tooling.former.draft." + former.volume.id);
-		if (result.handling.requiresFlip && !CastHandling.qualified(d, o, result.handling))
-			request(result, "handling-lift-and-flip", LiftingPoints, [d.input.id],
-				"Provide verified lifting/flip equipment and source lifting points or a qualified external cradle.", "tooling.handling.flip");
+		var handlingQualified=CastHandling.qualified(d,o,result.handling);
+		if (result.handling.requiresFlip && !CastHandling.sourceDeclared(d) && !handlingQualified)
+			request(result,"handling-source-points",LiftingPoints,[d.input.id],
+				"Declare lifting inserts with unoccupied pre-cast threads, or a qualified external cradle.",
+				"tooling.handling.lifting-points");
+		else result.validation.push(materia.tooling.process.FillAnalysis.check("tooling.handling.lifting-points",
+			[d.input.id].concat(CastHandling.liftingIds(d)),Pass,
+			"Source lifting connections are declared, a cradle is qualified, or this setup needs no flip.",[]));
+		result.validation.push(materia.tooling.process.FillAnalysis.check("tooling.handling.flip",[d.input.id],
+			!result.handling.requiresFlip || handlingQualified ? Pass : Pending,
+			"Equipment capacity, measured mass/CoM and the flip procedure require separate handling evidence.",[]));
 		for (seat in o.precision) {
 			var source = d.input.inserts.filter(i -> i.id == seat.insertId)[0];
 			var stock=InterfaceQualification.finishingStock(d.input,source);

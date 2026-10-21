@@ -20,6 +20,7 @@ enum abstract CastabilityAction(String) to String {
 	var QualifyBreakout = "qualify-breakout";
 	var AnalyzeJunction = "analyze-junction";
 	var DeclareLimit = "declare-process-limit";
+	var DeclareLiftingPoint = "declare-lifting-point";
 }
 
 enum abstract ProposalOwner(String) to String {

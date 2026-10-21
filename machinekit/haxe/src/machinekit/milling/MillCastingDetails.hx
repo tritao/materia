@@ -50,8 +50,19 @@ class MillCastingDetails {
 		materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting,
 		materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting
 	];
+	/** Source lifting connections; thread capacity and rigging remain unqualified. */
+	public var liftingPlateWidthMm:Float = 40;
+	public var liftingPlateDepthMm:Float = 50;
+	public var liftingPlateThicknessMm:Float = 30;
+	public var liftingThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
 	public var columnAnchorThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
 	public var hatchAnchorThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
+
+	/** A centred clearance bore retains the full policy wall on both sides. */
+	public function minimumClearancePadSide(diameterMm:Float):Float {
+		var limits=machinekit.design.ThreadedHolePolicy.clearance(diameterMm);
+		return diameterMm+2*limits.minWall;
+	}
 
 	/** Joint-pad minimum derived from access, policy edge wall, washer and cover. */
 	public function minimumColumnPadDepth(thicknessMm:Float):Float
@@ -60,6 +71,7 @@ class MillCastingDetails {
 	public function new() {
 		levelingFoot = Foot(70, 20, machinekit.standard.FastenerThreads.metric(16, 2),
 			20, 115, 90, Nominal, RoundCollar(28, 10, 90));
+		liftingThread = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(12).mating());
 		columnAnchorThread = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(12).mating());
 		hatchAnchorThread = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(4).mating());
 	}

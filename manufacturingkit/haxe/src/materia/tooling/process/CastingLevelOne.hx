@@ -43,7 +43,7 @@ class CastingLevelOne {
 			minimumInsertEdgeMm: null,
 			minimumEmbeddedDepthMm: null,
 			minimumFixingAccessLandMm: null,
-			liftingPointCount: d.input.inserts.filter(i -> i.role == materia.casting.InsertSpec.InsertRole.LiftingMount).length,
+			liftingPointCount: materia.tooling.casting.CastHandling.liftingIds(d).length,
 			checkedRemovalDirections: 0,
 			blockedRemovalDirections: 0
 		};
@@ -178,9 +178,11 @@ class CastingLevelOne {
 				checks.push(FillAnalysis.check("process.level1.fixing-access." + insert.id, [insert.id], Pending,
 					"No source bore specifies fixing access; qualify an external attachment or revise the source interface.", []));
 		}
-		var liftCount = d.input.inserts.filter(i -> i.role == materia.casting.InsertSpec.InsertRole.LiftingMount).length;
+		var liftCount = materia.tooling.casting.CastHandling.liftingIds(d).length;
 		finding("process.level1.lifting-points", d.input.id, liftCount, limits.minimumLiftingPoints == null ? null : 1.0 * limits.minimumLiftingPoints,
 			"Typed lifting-point count versus recipe requirement; load capacity, CoM and a qualified cradle remain separate evidence.", null, null);
+		if (limits.minimumLiftingPoints!=null && liftCount<limits.minimumLiftingPoints)
+			proposals=proposals.concat(liftingCandidates(d,envelope,limits.minimumLiftingPoints));
 		var resin = BoxAlgebra.subtract([envelope], [for (feature in d.input.features) CastingMoldPlanner.featureBox(d, feature)]);
 		for (strategy in materia.tooling.casting.CastingStrategies.resolve(d)) {
 			var rule = "process.level1.removal-direction." + strategy.featureId;
@@ -229,6 +231,37 @@ class CastingLevelOne {
 		checks.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		proposals.sort((a, b) -> Reflect.compare(a.id, b.id));
 		return {validation: checks, proposals: proposals, metrics: metrics};
+	}
+
+	/** Review locations only: creating a source insert is not a scalar edit.
+	 * Supported box geometry uses handling's existing density-weighted moments.
+	 * Source authoring must verify material, access and actual anchor occupancy. */
+	static function liftingCandidates(d:ToolingDocument,envelope:MoldBox,count:Int):Array<CastabilityProposal> {
+		if (count>ToolingCodec.MAX_RECORDS) return []; // The source cannot contain more insert records.
+		var moments=materia.tooling.casting.CastHandling.moments(d,envelope);
+		var inverse=F.inverse(d.setup.sourceToMold),mold=moments.centerOfMassMoldMm;
+		var center=F.transformPoint(inverse,mold.x,mold.y,mold.z);
+		var source=BoxMoldPlanner.box(envelope.width,envelope.depth,envelope.height,
+			F.compose(inverse,F.translation(envelope.x+envelope.width/2,envelope.y+envelope.depth/2,envelope.z)));
+		var rx=Math.min(center.x-source.x,source.x+source.width-center.x)/2;
+		var ry=Math.min(center.y-source.y,source.y+source.depth-center.y)/2;
+		if (rx<=0 || ry<=0) return [];
+		var result:Array<CastabilityProposal> = [];
+		for (index in 0...count) {
+			var angle=2*Math.PI*(index+0.5)/count;
+			var x=center.x+(count==1 ? 0 : rx*Math.cos(angle));
+			var y=center.y+(count==1 ? 0 : ry*Math.sin(angle));
+			var point=F.transformPoint(d.setup.sourceToMold,x,y,source.z+source.height);
+			var proposal:CastabilityProposal={id:"proposal",rule:"process.level1.lifting-points",sourceIds:[d.input.id],
+				action:DeclareLiftingPoint,owner:DesignReview,measuredMm:null,targetMm:null,axis:null,region:null,point:point,
+				instruction:"Review a source lifting connection at source XYZ="+x+","+y+","+(source.z+source.height)
+					+" for nominal casting mass "+moments.massKg+" kg. The candidate pattern surrounds the projected CoM; "
+					+"verify solid material, access, policy-compliant source threads, bolted anchorage and rigging capacity on replan.",
+				sourceParameterId:null,proposedValue:null};
+			proposal.id="proposal-"+haxe.crypto.Sha256.encode(ToolingCodec.canonical(proposal)).substr(0,24);
+			result.push(proposal);
+		}
+		return result;
 	}
 
 	/** Explicitly accepted mapped edit, returned as a detached source revision.

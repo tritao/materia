@@ -100,8 +100,8 @@ class MillMoldChecks {
 	}
 
 	public static function run(frame:MillFrame, p:CastingMoldPlan, report:machinekit.tooling.CastingMoldCad.CastingMoldReview):Void {
-		check(p.cores.length == 6 && p.fixtures.length == 12, "actual mill pocket and insert inventory");
-		check(p.features.length == p.document.input.features.length && p.features.length == 31, "every full-frame feature classified");
+		check(p.cores.length == 6 && p.fixtures.length == 16, "actual mill pocket and insert inventory");
+		check(p.features.length == p.document.input.features.length && p.features.length == 35, "every full-frame feature classified");
 		for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
 			check(report.validation.filter(v -> v.rule == "tooling.cad." + name && v.status == "pass").length == 1,
 				"CAD review owns its " + name + " evidence");
@@ -122,7 +122,10 @@ class MillMoldChecks {
 		check(report.assemblyGroups.length==rowGroups.length+anchored.length,
 			"each anchored insert has its own rigid insertion group alongside the core rows");
 		check(report.assembly.assemblyOrder[0] == "bed", "bed installed first");
-		check(p.changeRequests.filter(c -> c.kind == "lifting-points").length == 1, "handling lift/flip request");
+		check(p.changeRequests.filter(c -> c.kind == "lifting-points").length == 0,
+			"source lifting connections clear their design request");
+		check(p.validation.filter(check -> check.rule=="tooling.handling.flip" && check.status=="pending").length==1,
+			"rigging and flip evidence remain pending independently");
 		check(p.options.precision.length==p.document.input.inserts.length && p.options.foundationJointProcesses.length==0,
 			"process choices cover source inserts without inventing the undeclared source joint");
 		var jointRequests=p.changeRequests.filter(request -> request.kind==materia.tooling.casting.CastingMoldPlan.DesignChangeKind.FoundationJointDefinition);
@@ -156,7 +159,7 @@ class MillMoldChecks {
 				+ p.formers.filter(f -> f.featureIds.length == 0)
 					.length,
 			"every zero-draft rigid feature has a release decision");
-		check(p.validation.filter(v -> StringTools.startsWith(v.rule, "tooling.fixture.attachment.")).length == 12,
+		check(p.validation.filter(v -> StringTools.startsWith(v.rule, "tooling.fixture.attachment.")).length == 16,
 			"fixture attachments are tooling pending records");
 		check(p.changeRequests.filter(c -> c.kind == "fixture-attachment").length == 0, "tool-only fixture attachments are not casting changes");
 		check(report.handling.castingMassKg > 0 && report.demoldingSteps[report.demoldingSteps.length - 1].kind == "flip-to-service",
@@ -168,7 +171,7 @@ class MillMoldChecks {
 		}
 
 		var sourceFixings = [for (fixture in p.fixtures) for (fixing in fixture.fixings) fixing];
-		check(sourceFixings.length == 4, "the four mill column anchors get source-thread fixture screws");
+		check(sourceFixings.length == 8, "column anchors and lifting connections get source-thread fixture screws");
 		for (fixture in p.fixtures) for (fixing in fixture.fixings) {
 			var insert = p.document.input.inserts.filter(i -> i.id == fixture.insertId)[0];
 			var hole = insert.holes.filter(h -> h.id == fixing.sourceHoleId)[0];

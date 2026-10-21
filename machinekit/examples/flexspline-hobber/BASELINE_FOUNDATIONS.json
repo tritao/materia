@@ -9769,23 +9769,23 @@
   "currentDesign": [
     {
       "id": "mill-base",
-      "sourceFingerprint": "536deafa93775abba20c5019a3d29e52a92b66fcd9e43bfe807a375651bcfe86",
+      "sourceFingerprint": "b672145dad27078588771f16debdd77b08a4e0ed3418191550446588550714d9",
       "sourceCodecVersion": 14,
-      "volumeMm3": 69970334.53177235,
-      "massKg": 167.92880287625363,
+      "volumeMm3": 69619331.09226151,
+      "massKg": 167.08639462142762,
       "boxStatus": "unsupported",
-      "boxReason": "Non-box anchor occupancy for inserts: columnLeftFront, columnLeftRear, columnRightFront, columnRightRear, driveYFixed, driveYFloating, footLeftFront, footLeftRear, footRightFront, footRightRear, railYLeft, railYRight",
+      "boxReason": "Non-box anchor occupancy for inserts: columnLeftFront, columnLeftRear, columnRightFront, columnRightRear, driveYFixed, driveYFloating, footLeftFront, footLeftRear, footRightFront, footRightRear, liftLeftFront, liftLeftRear, liftRightFront, liftRightRear, railYLeft, railYRight",
       "unsupportedFeatures": [],
       "minimumIyMm4": null
     },
     {
       "id": "mill-column",
-      "sourceFingerprint": "a02ad16685d6ba4fc6a769a9645f300d0bcb953ad36c16063197a14880bfa6b7",
+      "sourceFingerprint": "300c126d8e2ba729cbefc0f399e0001fdb4c8ea1a79083d84ec89e08533fbe1f",
       "sourceCodecVersion": 14,
-      "volumeMm3": 41892937.68146703,
-      "massKg": 100.54305043552087,
+      "volumeMm3": 41648030.241955966,
+      "massKg": 99.95527258069433,
       "boxStatus": "unsupported",
-      "boxReason": "Non-box anchor occupancy for inserts: footLeftFront, footLeftRear, footRightFront, footRightRear, hatchRearLeftLower, hatchRearLeftUpper, hatchRearRightLower, hatchRearRightUpper, railZLeft, railZRight",
+      "boxReason": "Non-box anchor occupancy for inserts: footLeftFront, footLeftRear, footRightFront, footRightRear, hatchRearLeftLower, hatchRearLeftUpper, hatchRearRightLower, hatchRearRightUpper, liftLeftFront, liftLeftRear, liftRightFront, liftRightRear, railZLeft, railZRight",
       "unsupportedFeatures": [],
       "minimumIyMm4": null
     },

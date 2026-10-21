@@ -67,21 +67,31 @@ class FoundationDesignTests {
 	}
 
 	/** Approved production-anchor correction against the independent pre-anchor STEP.
-	 * Restore the historical 60 mm joint-pad voids, cut the widened pads, then
-	 * subtract actual standard anchor hardware. Other frozen geometry stays fixed. */
+	 * Restore the historical 40 x 60 mm joint and 40 x 40 mm foot-seat voids,
+	 * cut the policy-sized pads, then
+	 * subtract the declared lifting seats and actual standard anchor hardware.
+	 * Other frozen geometry stays fixed. */
 	static function anchorDesignChange(previous:Part,foundation:machinekit.structural.MineralFoundation):Part {
 		return Solids.building([new Part(previous.shape.cloneShape())], parts -> {
 			var restored:Array<Part> =[parts[0]];
 			for (row in foundation.insertLocations())
 				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.ColumnMount) {
 					var box=materia.casting.InsertSpec.InsertBodyCodec.box(row.part.insertSpec().body,row.id);
-					var old=Part.box(box.width,60,box.height);parts.push(old);
+					var old=Part.box(40,60,box.height);parts.push(old);
+					var placed=PosedParts.moved(old,row.pose);parts.push(placed);restored.push(placed);
+				}
+			for (row in foundation.insertLocations())
+				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LevelingSeat) {
+					var box=materia.casting.InsertSpec.InsertBodyCodec.box(row.part.insertSpec().body,row.id);
+					var old=Part.box(40,40,box.height);parts.push(old);
 					var placed=PosedParts.moved(old,row.pose);parts.push(placed);restored.push(placed);
 				}
 			var bulk=Solids.union(restored);parts.push(bulk);
 			var cuts:Array<Part> =[];
 			for (row in foundation.insertLocations()) {
-				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.ColumnMount) {
+				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.ColumnMount
+					|| row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LiftingMount
+					|| row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LevelingSeat) {
 					var box=materia.casting.InsertSpec.InsertBodyCodec.box(row.part.insertSpec().body,row.id);
 					var local=Part.box(box.width,box.depth,box.height);parts.push(local);
 					var placed=PosedParts.moved(local,row.pose);parts.push(placed);cuts.push(placed);
@@ -429,7 +439,7 @@ class FoundationDesignTests {
 				corrected.close();
 			} else if (StringTools.startsWith(row.id,"mill-")) {
 				var corrected=anchorDesignChange(previous,row.part);
-				try same(corrected,actual,row.id+" approved 68 mm pads and production anchors")
+				try same(corrected,actual,row.id+" declared pad, lifting and anchor corrections")
 				catch (error:Dynamic) {corrected.close();previous.close();actual.close();throw error;}
 				corrected.close();
 			} else same(previous,actual,row.id);

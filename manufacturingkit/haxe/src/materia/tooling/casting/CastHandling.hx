@@ -10,7 +10,10 @@ import materia.tooling.casting.MoldPlan.MoldBox;
 
 /** Exact orthogonal resin moments and analytic through-bore steel moments, in mm/kg. */
 class CastHandling {
-	public static function plan(d:ToolingDocument, o:CastingMoldOptions, envelope:MoldBox):HandlingPlan {
+	/** Existing source mass calculation shared by handling and lifting proposals. */
+	public static function moments(d:ToolingDocument,envelope:MoldBox):{
+		massKg:Float,centerOfMassMoldMm:{x:Float,y:Float,z:Float}
+	} {
 		var resin = BoxAlgebra.subtract([envelope], [for (f in d.input.features) CastingMoldPlanner.featureBox(d, f)]);
 		var mass = 0.0, mx = 0.0, my = 0.0, mz = 0.0;
 		for (b in resin) {
@@ -39,14 +42,33 @@ class CastHandling {
 		}
 		if (!Math.isFinite(mass) || !Math.isFinite(mx) || !Math.isFinite(my) || !Math.isFinite(mz) || mass <= 0)
 			throw "Casting handling requires positive mass";
-		var relative = F.compose(o.serviceOrientation, F.inverse(d.setup.sourceToMold));
-		var vertical = F.transformVector(relative, 0, 0, 1);
-		return {
-			requiresFlip: vertical.z < 1 - 1e-8,
-			moldToService: relative,
-			castingMassKg: mass,
-			centerOfMassMoldMm: {x: mx / mass, y: my / mass, z: mz / mass}
-		};
+		return {massKg:mass,centerOfMassMoldMm:{x:mx/mass,y:my/mass,z:mz/mass}};
+	}
+
+	public static function plan(d:ToolingDocument,o:CastingMoldOptions,envelope:MoldBox):HandlingPlan {
+		var source=moments(d,envelope);
+		var relative=F.compose(o.serviceOrientation,F.inverse(d.setup.sourceToMold));
+		var vertical=F.transformVector(relative,0,0,1);
+		return {requiresFlip:vertical.z<1-1e-8,moldToService:relative,
+			castingMassKg:source.massKg,centerOfMassMoldMm:source.centerOfMassMoldMm};
+	}
+
+	/** Source attachment declarations are distinct from equipment qualification.
+	 * Anchor holes are occupied and post-cast holes do not yet exist at the lift. */
+	public static function liftingIds(d:ToolingDocument):Array<String> {
+		var ids:Array<String> = [];
+		for (insert in d.input.inserts) if (insert.role==materia.casting.InsertSpec.InsertRole.LiftingMount) {
+			var occupied=materia.casting.InsertAnchorage.InsertAnchorageCodec.occupiedHoleIds(insert.anchorage);
+			if (InsertFixturePlanner.holes(insert).filter(hole -> hole.thread!=null && occupied.indexOf(hole.id)<0).length>0)
+				ids.push(insert.id);
+		}
+		ids.sort(Reflect.compare);
+		return ids;
+	}
+
+	public static function sourceDeclared(d:ToolingDocument):Bool {
+		var minimum=d.recipe.designReview.minimumLiftingPoints;
+		return liftingIds(d).length>=(minimum==null || minimum<1 ? 1 : minimum);
 	}
 
 	public static function qualified(d:ToolingDocument, o:CastingMoldOptions, p:HandlingPlan):Bool {
@@ -67,8 +89,7 @@ class CastHandling {
 					valid = false;
 				seen.set(id, true);
 				if (q.method == CastInPoints) {
-					if (d.input.inserts.filter(i -> i.id == id
-						&& i.role == materia.casting.InsertSpec.InsertRole.LiftingMount).length != 1)
+					if (liftingIds(d).indexOf(id)<0)
 						valid = false;
 				} else if (d.input.envelope.filter(e -> e.id == id).length != 1)
 					valid = false;

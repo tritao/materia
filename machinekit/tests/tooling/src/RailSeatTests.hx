@@ -62,10 +62,7 @@ class RailSeatTests {
 		var declarations=assembly.designRequirements().filter(requirement -> switch requirement {case Coaxial(_,_,_,_):true;default:false;});
 		check(declarations.length==2*count,"every screw has rail-axis and source-seat coaxial requirements");
 		var diagnostics=AssemblyDesignChecks.check(assembly);
-		var axisFailures=diagnostics.items.filter(item -> item.code=="design.fastener-axis");
-		check(axisFailures.length==0,"actual rail and steel axes: "+axisFailures.map(item -> item.message).join("; "));
-		for (finding in diagnostics.items) if (finding.code!="design.fastener-axis")
-			Sys.println("Other source diagnostic: "+finding.code+" "+finding.subject+" "+finding.message);
+		check(!diagnostics.hasErrors(),"actual rail and source interfaces: "+diagnostics.items.map(item -> item.message).join("; "));
 		var restored=MachineAssembly.decode(assembly.encode());
 		check(restored.encode()==assembly.encode(),"coaxial requirements and source routing round trip in assembly schema 23");
 

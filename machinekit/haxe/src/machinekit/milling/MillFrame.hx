@@ -108,7 +108,8 @@ class MillFrame extends MachineAssembly {
 
 		// Four independent steel pairs provide a broad column mounting interface.
 		var flared = l.columnFootWidth > l.columnWidth;
-		var footWidth = l.wall, footDepth = Math.max(l.roof, details.minimumColumnPadDepth(l.insertThickness));
+		var footWidth = flared ? Math.max(l.wall,details.minimumClearancePadSide(details.columnAnchorThread.clearanceDiameter)) : l.wall,
+			footDepth = Math.max(l.roof, details.minimumColumnPadDepth(l.insertThickness));
 		for (sx in [-1, 1])
 			for (sy in [-1, 1]) {
 				var id = corner(sx, sy),
@@ -135,7 +136,8 @@ class MillFrame extends MachineAssembly {
 					baseInserts.push({
 						id: 'foot$id',
 						openings: [CastingPatterns.feature('foot-access-$id'), CastingPatterns.feature('foot-stem-$id')],
-						part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(l.wall, l.wall, l.insertThickness),
+						part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(Math.max(l.wall,details.minimumClearancePadSide(details.levelingClearanceDiameter)),
+							Math.max(l.wall,details.minimumClearancePadSide(details.levelingClearanceDiameter)),l.insertThickness),
 							InsertHoles.through(details.levelingClearanceDiameter, l.insertThickness))
 							.setToken("role", InsertRole.LevelingSeat)
 							.setToken("label", "leveling screw seat")),
@@ -147,6 +149,7 @@ class MillFrame extends MachineAssembly {
 			}
 		if (xyAxis!=null) baseInserts=mountRails(baseInserts,MillRailPlacement.y(xyAxis.guided()),
 			F.translation(0,l.baseCentreY,0),"xyStage",details);
+		baseInserts=baseInserts.concat(MillLiftingPattern.placements(body(l.baseWidth,l.baseDepth,l.baseHeight,baseVoids),baseInserts,details));
 		baseInserts = anchorInserts(baseInserts, details.anchorRule, body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids));
 		base = new MineralFoundation(body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids), baseInserts);
 		include("base", base, F.translation(0, l.baseCentreY, 0));
@@ -277,6 +280,7 @@ class MillFrame extends MachineAssembly {
 				.setNumber("footShoulder", MillFrameLayout.COLUMN_FOOT_SHOULDER);
 		if (zAxis!=null) columnInserts=mountRails(columnInserts,MillRailPlacement.z(zAxis),
 			F.translation(0,l.columnCentreY,l.railPlane),"zAxis",details);
+		columnInserts=columnInserts.concat(MillLiftingPattern.placements(columnValues,columnInserts,details));
 		columnInserts = anchorInserts(columnInserts, details.anchorRule, columnValues);
 		column = new MineralFoundation(columnValues, columnInserts, "footLeftFront");
 		for (side in ["Left", "Right"]) {

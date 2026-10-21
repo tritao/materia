@@ -41,6 +41,21 @@ class InsertAnchorPattern {
 		throw "No standard blind anchor thread fits the source stock thickness";
 	}
 
+	/** Extra resin land beyond a steel plate edge for its outermost anchor. */
+	public static function minimumOuterLand(thicknessMm:Float,material:materia.casting.InsertMaterial,
+		rule:InsertAnchorPatternRule):Float {
+		validateRule(rule);
+		for (size in availableSizes()) {
+			var hole:materia.casting.InsertHole;
+			try hole=holeForStock(size,thicknessMm,material) catch (_:Dynamic) continue;
+			var diameter=SocketHeadCapScrew.catalog().get(size).diameter;
+			var radius=FlatWasher.catalog().get(size).outerDiameter/2;
+			var edge=Math.max(hole.limits.minWall+diameter/2,radius);
+			return Math.max(0,radius+rule.coverDiameters*diameter-edge);
+		}
+		throw "No standard blind anchor thread fits the lifting plate stock";
+	}
+
 	static function availableSizes():Array<String> {
 		var catalog=SocketHeadCapScrew.catalog();
 		var sizes=catalog.designations().filter(size -> FlatWasher.catalog().exists(size));

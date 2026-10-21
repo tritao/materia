@@ -110,7 +110,7 @@ class MillMoldSetup {
 					minimumInsertCoverMm: null,
 					minimumInsertEdgeMm: null,
 					minimumFixingAccessMm: null,
-					minimumLiftingPoints: null,
+					minimumLiftingPoints: 4,
 					removalClearanceMm: null
 				}
 			}

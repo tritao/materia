@@ -42,7 +42,38 @@ class CastabilityTests {
 		return rows[0].status;
 	}
 
+	static function liftingLocations():Void {
+		var d=ToolingTests.fixture();d.recipe.designReview.minimumLiftingPoints=4;
+		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
+		var report=materia.tooling.process.CastingLevelOne.analyze(d);
+		var locations=report.proposals.filter(proposal -> proposal.action==DeclareLiftingPoint);
+		check(locations.length==4,"missing lifting connections get a complete CoM-based review pattern");
+		var envelope=materia.tooling.casting.CastingMoldPlanner.envelope(d);
+		var moments=materia.tooling.casting.CastHandling.moments(d,envelope),x=0.0,y=0.0;
+		for (location in locations) {
+			if (location.point==null) throw "Missing lifting candidate point";
+			var point:{x:Float,y:Float,z:Float}=cast location.point;
+			check(Math.isFinite(point.x+point.y+point.z)
+				&& location.instruction.indexOf("nominal casting mass")>=0,"each candidate names its source position and nominal mass basis");
+			x+=point.x;y+=point.y;
+		}
+		check(Math.abs(x/locations.length-moments.centerOfMassMoldMm.x)<1e-8
+			&& Math.abs(y/locations.length-moments.centerOfMassMoldMm.y)<1e-8,
+			"candidate pattern surrounds the density-weighted casting CoM");
+		var original=x/locations.length;d.recipe.steelDensityKgM3*=2;
+		var shifted=materia.tooling.process.CastingLevelOne.analyze(d).proposals.filter(proposal -> proposal.action==DeclareLiftingPoint);
+		var moved=0.0;
+		for (location in shifted) {
+			if (location.point==null) throw "Missing shifted lifting candidate";
+			var point:{x:Float,y:Float,z:Float}=cast location.point;
+			moved+=point.x;
+		}
+		check(Math.abs(moved/shifted.length-original)>1e-3,"a changed steel mass shifts the lifting pattern, not just its label");
+		rejects(() -> materia.tooling.process.CastingLevelOne.apply(d,shifted[0]),"Unmapped or stale source proposal");
+	}
+
 	public static function run(p:CastingMoldPlan, raw:CastingProcessSpec):Void {
+		liftingLocations();
 		var d = ToolingCodec.snapshot(p.document),
 			s = ProcessSpecCodec.snapshot(raw);
 		s.recipeFingerprint = ToolingCodec.recipeFingerprint(d.recipe);

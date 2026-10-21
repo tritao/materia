@@ -130,7 +130,67 @@ class CastingMoldTests {
 			"fixture feasibility changes neither the source stage nor its single hole frame");
 	}
 
+	static function liftingSourceDeclaration():Void {
+		var d=ToolingTests.fixture();d.recipe.minimumLigament=2;
+		var insert=d.input.inserts[0],hole=insert.holes[0];
+		insert.role=materia.casting.InsertSpec.InsertRole.LiftingMount;
+		hole.extent=Blind;hole.diameter=5;hole.depth=12;hole.tapDrill=5;hole.threadDepth=10;
+		hole.thread={designation:"M6",majorDiameter:6,pitch:1,starts:1,hand:Right,
+			internal:true,toleranceClass:"6H",profile:Metric};
+		hole.clearanceDiameter=6.6;hole.limits.threaded={minEngagement:7.8,minTipGap:1};
+		d.recipe.designReview.minimumLiftingPoints=1;
+		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
+		var p=CastingMoldPlanner.plan(d,options(d));
+		check(p.changeRequests.filter(change -> change.kind==LiftingPoints).length==0,
+			"source lifting inserts clear the source design request independently of equipment");
+		check(p.validation.filter(check -> check.rule=="tooling.handling.flip" && check.status=="pending").length==1,
+			"source declarations do not qualify rigging, capacity or the flip procedure");
+		var manufacturing=switch insert.origin {case Fabricated(plan):plan;default:throw "Fabricated lifting insert required";};
+		manufacturing.holeRoutes=[{holeId:hole.id,route:materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting}];
+		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
+		check(CastingMoldPlanner.plan(d,options(d)).changeRequests.filter(change -> change.kind==LiftingPoints).length==1,
+			"a future post-cast thread cannot clear the initial lifting request");
+		manufacturing.holeRoutes=[{holeId:hole.id,route:materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting}];
+		insert.role=materia.casting.InsertSpec.InsertRole.GuideSeat;
+		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
+		var missing=CastingMoldPlanner.plan(d,options(d));
+		check(missing.changeRequests.filter(change -> change.kind==LiftingPoints
+			&& change.blockingChecks.indexOf("tooling.handling.lifting-points")>=0).length==1,
+			"removing the source lifting declaration restores its design request");
+		d.recipe.designReview.minimumLiftingPoints=0;
+		check(CastingMoldPlanner.plan(d,options(d)).changeRequests.filter(change -> change.kind==LiftingPoints).length==1,
+			"a zero count limit cannot stand in for declared lifting connections or a qualified cradle");
+	}
+
+	static function straddlingDatum():Void {
+		var d=ToolingTests.fixture();d.recipe.minimumLigament=2;
+		var extra=ToolingCodec.snapshot(d).input.inserts[0];
+		extra.id="raised-seat";extra.pose=F.translation(-70,0,86);
+		d.input.inserts.push(extra);
+		d.input.features.push({id:"insert-raised-seat",kind:InsertRecess,owner:extra.id,
+			geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(extra.body),pose:extra.pose},
+			openings:[materia.casting.CastingPatterns.face("body.z-max")],draft:{degrees:0,axis:{x:0,y:0,z:1}},
+			cornerRadius:0,adjustable:[],derivedFrom:null});
+		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
+		var p=CastingMoldPlanner.plan(d,options(d));
+		var fixture=p.fixtures.filter(fixture -> fixture.insertId==extra.id)[0];
+		var bed=p.panels.members.filter(member -> member.panel.id=="bed")[0];
+		var socket=bed.panel.operations.filter(operation -> operation.id==fixture.datum.id)[0];
+		var top=bed.pose.z+bed.panel.stock.measuredThickness,below=0;
+		for (piece in fixture.datum.pieces) if (piece.z<top-1e-7) {
+			below++;
+			var contactTolerance=1e-6;
+			check(materia.tooling.panel.PanelGeometry.containsRect(socket.contour,piece.x-bed.pose.x+contactTolerance,
+				piece.y-bed.pose.y+contactTolerance,piece.width-2*contactTolerance,piece.depth-2*contactTolerance),
+				"datum interior fits its bed socket; boundary contact is permitted");
+		}
+		check(below>0 && fixture.datum.pieces.filter(piece -> piece.z+piece.height>top+1e-7).length>0,
+			"raised datum fixture actually straddles the bed surface");
+	}
+
 	public static function run(d:ToolingDocument):Void {
+		straddlingDatum();
+		liftingSourceDeclaration();
 		mountingRouteRequest();
 		unrealizedGeometry();
 		replicationReservation(d);

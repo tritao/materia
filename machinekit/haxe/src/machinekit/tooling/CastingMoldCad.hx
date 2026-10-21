@@ -116,8 +116,12 @@ class CastingMoldCad {
 				parts.push(box(c.cavity));
 			for (f in p.formers)
 				parts.push(ToolingVolume.geometryOf(f.volume));
+			// Fixture receivers are enclosed by the bed and sealed insert faces.
+			// They remain real clearance holes in the tooling, but are not pour
+			// space. The planner validates these full occupied volumes against resin.
 			for (f in p.fixtures)
-				parts.push(ToolingVolume.geometryOf(f.datum));
+				for (piece in f.datum.pieces)
+					parts.push(box(piece));
 			// Full envelopes include bores protected during pouring. Their actual
 			// masks are separate members in the assembly and demolding graphs.
 			for (i in p.document.input.inserts)

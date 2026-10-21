@@ -1456,7 +1456,6 @@ directories; commit source setups, small test fixtures and documentation.
 
 ## Deferred scope
 
-- Mill levelling-foot and column-sole hole radial-wall diagnostics exceed the existing pad stock; resolve the source pad layout separately (rail-seat native checks exposed these pre-existing failures).
 
 - Generic catalogue recipe solid-count qualification: the bought Vallder BK12 assembly has 32 solids; the broad recipe test assumes one, outside casting phases 6–8.
 
@@ -2061,6 +2060,49 @@ structures and phase 9 physical calibration remain open.
   mutation and independent artifact hashes pass; readiness remains **false**.
   Lifting and the policy-size correction for the existing foot pads follow in
   the next source slice; this does not declare step 2 complete.
+
+- [x] Lifting source slice: four
+  blind-threaded source lifting inserts per mill foundation enclose its nominal
+  as-cast centre of mass. Their M12 service holes are pre-cast source interfaces;
+  all inserts use the same production anchor rule. Source lifting declarations
+  clear the source request without qualifying rigging, capacity or flip equipment;
+  removing them, or moving their holes after casting, restores the request.
+  Level-1 suggestions use source mass/CoM and remain review-only until a source
+  insertion is declared. Process format **8** rejects format 7.
+  Policy radial-wall checks size existing foot seats to **54 mm** and column
+  soles to **40.5 mm**, with their axes unchanged. Independent frozen STEP
+  controls are retained; equivalence applies these explicit pad, lifting and
+  anchor corrections. Partially buried datum pads receive matching bed pockets;
+  their enclosed clearance receivers remain real tooling holes and are excluded
+  from pour space. Production compound/layer, RM0 allocations, joint gap/jacking,
+  workshop equipment and physical evidence remain user inputs.
+
+  Validation: foundation **404**, neutral tooling **1,872**, design **32**,
+  native tooling **678**, casting **54**, frozen foundation CAD **60**, process
+  **34**, rail seats **116**, lifting source **457**, socket fixture **110**, full
+  mill mold **313**, production anchored mold **672**. All **74 base / 64 column**
+  derived anchors pass source geometry checks; exact mold reconstruction and
+  swept graphs pass. Regenerated records-only kit: **168 artifacts / 40 programs /
+  844 Pass / 398 Pending / 140 Unsupported**, readiness **false**. Manifest
+  integrity/omission checks and independent hashes/byte lengths pass for all
+  **4,481,183** artifact bytes; all four lifting inserts have SVG/DXF drawings
+  and enter the manufacturing jobs, inspection list, operation sheet and Make BOM.
+
+- [x] **Phase 7 step 2 is code complete.** Its source/contract acceptance below
+  is covered by the passing suites. The deliberately open production inputs do
+  not block this milestone. Step 3 adds exact non-box geometry and fill; this
+  milestone does not declare the mold fabrication-ready.
+
+Step-2 acceptance mapping: allowance geometry is covered by `InterfaceStockTests`
+and `FoundationRequirementTests`; relationship uncertainty by
+`ReplicationRelationshipTests`; free/over-constrained directions by
+`FixtureConstraintTests`; source joint declaration/removal by
+`FoundationJointTests` and `FoundationJointDesignTests`; manufacturing routes,
+stock, drawings and inspection by `InsertManufacturingTests` and
+`InsertStageTests`; production anchor hardware/clearance by `InsertAnchorTests`
+and `ProductionAnchorTests`; connector-derived holes and screws by
+`RailSeatTests`; source lifting declaration/removal and sealed fixture geometry
+by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
 
 ### Phase 7 records: shared levelling-foot family
 
