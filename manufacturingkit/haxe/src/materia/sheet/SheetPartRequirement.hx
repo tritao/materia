@@ -21,4 +21,8 @@ typedef SheetPartRequirement = {
 	var allowedRotations:Array<Int>;
 	/** `free` permits either axis; `width-aligned` keeps the part's width on stock X. */
 	var directionConstraint:String;
+	/** Optional polygonal material outline (outer then holes), in lengthUnit. */
+	@:optional var shape:materia.sheet.SheetPolygon.SheetShape;
+	/** Free-form angles in degrees; legacy rectangular rotations remain 0/90. */
+	@:optional var allowedAngles:Array<Float>;
 }

@@ -36,9 +36,26 @@ class CamSheetProfiles {
     return {outer:contour(part.outer.segments),holes:[for(hole in part.holes)contour(hole.segments)]};
   }
 
+  /** Free-form layout polygons are already placed in global plan mm; retain holes for inside-first CAM. */
+  public static function freePart(plan:SheetCutPlan,placementId:String,surfaceZMetres:Float=0.0):{outer:CamContour,holes:Array<CamContour>} {
+    if(plan==null||plan.schemaVersion!=2||plan.freePlacements==null||plan.lengthUnit!="mm")throw "Expected a free-form mm layout";
+    for(p in plan.freePlacements)if(p.id==placementId) {
+      var contours:Array<CamContour> = [];
+      for(loop in p.loops) {
+        var points=[for(v in loop)new Point3(v.x*0.001,v.y*0.001,surfaceZMetres)],contour=new CamContour(points);
+        contour.exactBoundary=[for(i in 0...loop.length)cadkit.sheetmetal.Segment.line(
+          new cadkit.sheetmetal.Point2(points[i].x,points[i].y),new cadkit.sheetmetal.Point2(points[(i+1)%points.length].x,points[(i+1)%points.length].y))];
+        contours.push(contour);
+      }
+      return {outer:contours[0],holes:[for(i in 1...contours.length)contours[i]]};
+    }
+    throw 'Unknown free-form placement "$placementId"';
+  }
+
   public static function fromPlan(plan:SheetCutPlan, placementId:String,
       ?surfaceZMetres:Float = 0.0):CamContour {
     if (plan == null) throw "CAM needs a sheet cut plan";
+    if(plan.schemaVersion==2)return freePart(plan,placementId,surfaceZMetres).outer;
     for (item in plan.placements)
       if (item.id == placementId)
         return placement(item, plan.lengthUnit, surfaceZMetres);

@@ -1,0 +1,1064 @@
+{
+  "date": "2026-10-21",
+  "step": "SR12",
+  "status": "pass",
+  "nesting_assertions": 37,
+  "legacy_assertions": 54,
+  "coordinate_grid_mm": 0.001,
+  "clearance_tolerance_mm": 1e-07,
+  "legacy_golden_fingerprint": "eafdd1f2dbaa647e64bbe1eb72dddb78b484a629265a51509137c84ebed5c7fc",
+  "native_rebuild": false,
+  "native_provider_sha256": {
+    "machinekit/tests/build/host/native/cadkit/libcadkit-core.so": "95c2755b80f800b4f5579880010255abb6b1e4a0e6e61ad63d5a895826995769"
+  },
+  "results": {
+    "assertions": 37,
+    "cabinet": [
+      {
+        "workY": 2600,
+        "partCount": 12,
+        "sheets": 1,
+        "guillotineSheets": 1,
+        "utilisation": 0.7608173076923077,
+        "seconds": 0.04072904586791992,
+        "engine": "no-fit",
+        "stats": {
+          "candidates": 15084,
+          "decompositions": 0,
+          "pairs": 264
+        },
+        "plans": [
+          {
+            "batchId": "nest-31",
+            "cuts": [],
+            "edgeMargin": 10,
+            "freePlacements": [
+              {
+                "angle": 0,
+                "id": "panel-1",
+                "loops": [
+                  [
+                    {
+                      "x": 10,
+                      "y": 10
+                    },
+                    {
+                      "x": 710,
+                      "y": 10
+                    },
+                    {
+                      "x": 710,
+                      "y": 760
+                    },
+                    {
+                      "x": 10,
+                      "y": 760
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 10,
+                "y": 10
+              },
+              {
+                "angle": 0,
+                "id": "panel-2",
+                "loops": [
+                  [
+                    {
+                      "x": 717,
+                      "y": 10
+                    },
+                    {
+                      "x": 1417,
+                      "y": 10
+                    },
+                    {
+                      "x": 1417,
+                      "y": 760
+                    },
+                    {
+                      "x": 717,
+                      "y": 760
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 717,
+                "y": 10
+              },
+              {
+                "angle": 0,
+                "id": "panel-3",
+                "loops": [
+                  [
+                    {
+                      "x": 10,
+                      "y": 767
+                    },
+                    {
+                      "x": 710,
+                      "y": 767
+                    },
+                    {
+                      "x": 710,
+                      "y": 1517
+                    },
+                    {
+                      "x": 10,
+                      "y": 1517
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 10,
+                "y": 767
+              },
+              {
+                "angle": 0,
+                "id": "panel-4",
+                "loops": [
+                  [
+                    {
+                      "x": 717,
+                      "y": 767
+                    },
+                    {
+                      "x": 1417,
+                      "y": 767
+                    },
+                    {
+                      "x": 1417,
+                      "y": 1517
+                    },
+                    {
+                      "x": 717,
+                      "y": 1517
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 717,
+                "y": 767
+              },
+              {
+                "angle": 0,
+                "id": "panel-5",
+                "loops": [
+                  [
+                    {
+                      "x": 10,
+                      "y": 1524
+                    },
+                    {
+                      "x": 710,
+                      "y": 1524
+                    },
+                    {
+                      "x": 710,
+                      "y": 2274
+                    },
+                    {
+                      "x": 10,
+                      "y": 2274
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 10,
+                "y": 1524
+              },
+              {
+                "angle": 0,
+                "id": "panel-6",
+                "loops": [
+                  [
+                    {
+                      "x": 717,
+                      "y": 1524
+                    },
+                    {
+                      "x": 1417,
+                      "y": 1524
+                    },
+                    {
+                      "x": 1417,
+                      "y": 2274
+                    },
+                    {
+                      "x": 717,
+                      "y": 2274
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 717,
+                "y": 1524
+              },
+              {
+                "angle": 0,
+                "id": "small-1",
+                "loops": [
+                  [
+                    {
+                      "x": 1424,
+                      "y": 10
+                    },
+                    {
+                      "x": 1474,
+                      "y": 10
+                    },
+                    {
+                      "x": 1474,
+                      "y": 60
+                    },
+                    {
+                      "x": 1424,
+                      "y": 60
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1424,
+                "y": 10
+              },
+              {
+                "angle": 0,
+                "id": "small-2",
+                "loops": [
+                  [
+                    {
+                      "x": 1481,
+                      "y": 10
+                    },
+                    {
+                      "x": 1531,
+                      "y": 10
+                    },
+                    {
+                      "x": 1531,
+                      "y": 60
+                    },
+                    {
+                      "x": 1481,
+                      "y": 60
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1481,
+                "y": 10
+              },
+              {
+                "angle": 0,
+                "id": "small-3",
+                "loops": [
+                  [
+                    {
+                      "x": 1538,
+                      "y": 10
+                    },
+                    {
+                      "x": 1588,
+                      "y": 10
+                    },
+                    {
+                      "x": 1588,
+                      "y": 60
+                    },
+                    {
+                      "x": 1538,
+                      "y": 60
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1538,
+                "y": 10
+              },
+              {
+                "angle": 0,
+                "id": "small-4",
+                "loops": [
+                  [
+                    {
+                      "x": 1424,
+                      "y": 67
+                    },
+                    {
+                      "x": 1474,
+                      "y": 67
+                    },
+                    {
+                      "x": 1474,
+                      "y": 117
+                    },
+                    {
+                      "x": 1424,
+                      "y": 117
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1424,
+                "y": 67
+              },
+              {
+                "angle": 0,
+                "id": "small-5",
+                "loops": [
+                  [
+                    {
+                      "x": 1481,
+                      "y": 67
+                    },
+                    {
+                      "x": 1531,
+                      "y": 67
+                    },
+                    {
+                      "x": 1531,
+                      "y": 117
+                    },
+                    {
+                      "x": 1481,
+                      "y": 117
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1481,
+                "y": 67
+              },
+              {
+                "angle": 0,
+                "id": "small-6",
+                "loops": [
+                  [
+                    {
+                      "x": 1538,
+                      "y": 67
+                    },
+                    {
+                      "x": 1588,
+                      "y": 67
+                    },
+                    {
+                      "x": 1588,
+                      "y": 117
+                    },
+                    {
+                      "x": 1538,
+                      "y": 117
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1538,
+                "y": 67
+              }
+            ],
+            "id": "nest-31-sheet-1",
+            "kerf": 6,
+            "layout": "freeform",
+            "lengthUnit": "mm",
+            "nestGap": 1,
+            "placements": [],
+            "remnants": [
+              {
+                "height": 2157,
+                "id": "remnant-0-1",
+                "width": 176,
+                "x": 1424,
+                "y": 124
+              },
+              {
+                "height": 319,
+                "id": "remnant-0-2",
+                "width": 1600,
+                "x": 0,
+                "y": 2281
+              }
+            ],
+            "requirements": [
+              {
+                "fingerprint": "38793d14d3ca939351b0a424a7bfa27f7bd867bb0687730ede7b81d2954d7ff1",
+                "id": "panel",
+                "revision": 1
+              },
+              {
+                "fingerprint": "a708c2b008173ba5bcae306dce547d46403b4091312ac2837033555f9b61500a",
+                "id": "small",
+                "revision": 1
+              }
+            ],
+            "retainedRegionIds": [],
+            "revision": 1,
+            "schemaVersion": 2,
+            "sheetIndex": 0,
+            "stockSpecFingerprint": "ba675d7b3a8bc036a2bdae9a1e64f9ce90223d85ca1d49d983e5b4db35685431",
+            "stockSpecId": "stock-1600-2600",
+            "stockSpecRevision": 1
+          }
+        ],
+        "requirements": [
+          {
+            "allowedAngles": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "allowedRotations": [
+              0,
+              90
+            ],
+            "blankHeight": 750,
+            "blankWidth": 700,
+            "directionConstraint": "free",
+            "heightToleranceMinus": 0,
+            "heightTolerancePlus": 0,
+            "id": "panel",
+            "lengthUnit": "mm",
+            "materialId": "mdf",
+            "partId": "panel",
+            "partRevision": 1,
+            "quantity": 6,
+            "revision": 1,
+            "shape": [
+              [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 700,
+                  "y": 0
+                },
+                {
+                  "x": 700,
+                  "y": 750
+                },
+                {
+                  "x": 0,
+                  "y": 750
+                }
+              ]
+            ],
+            "thickness": 18,
+            "thicknessToleranceMinus": 0.5,
+            "thicknessTolerancePlus": 0.5,
+            "widthToleranceMinus": 0,
+            "widthTolerancePlus": 0
+          },
+          {
+            "allowedAngles": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "allowedRotations": [
+              0,
+              90
+            ],
+            "blankHeight": 50,
+            "blankWidth": 50,
+            "directionConstraint": "free",
+            "heightToleranceMinus": 0,
+            "heightTolerancePlus": 0,
+            "id": "small",
+            "lengthUnit": "mm",
+            "materialId": "mdf",
+            "partId": "small",
+            "partRevision": 1,
+            "quantity": 6,
+            "revision": 1,
+            "shape": [
+              [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 50,
+                  "y": 0
+                },
+                {
+                  "x": 50,
+                  "y": 50
+                },
+                {
+                  "x": 0,
+                  "y": 50
+                }
+              ]
+            ],
+            "thickness": 18,
+            "thicknessToleranceMinus": 0.5,
+            "thicknessTolerancePlus": 0.5,
+            "widthToleranceMinus": 0,
+            "widthTolerancePlus": 0
+          }
+        ]
+      },
+      {
+        "workY": 3150,
+        "partCount": 14,
+        "sheets": 1,
+        "guillotineSheets": 1,
+        "utilisation": 0.8363095238095238,
+        "seconds": 0.05353403091430664,
+        "engine": "no-fit",
+        "stats": {
+          "candidates": 20954,
+          "decompositions": 0,
+          "pairs": 364
+        },
+        "plans": [
+          {
+            "batchId": "nest-31",
+            "cuts": [],
+            "edgeMargin": 10,
+            "freePlacements": [
+              {
+                "angle": 0,
+                "id": "panel-1",
+                "loops": [
+                  [
+                    {
+                      "x": 10,
+                      "y": 10
+                    },
+                    {
+                      "x": 710,
+                      "y": 10
+                    },
+                    {
+                      "x": 710,
+                      "y": 760
+                    },
+                    {
+                      "x": 10,
+                      "y": 760
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 10,
+                "y": 10
+              },
+              {
+                "angle": 0,
+                "id": "panel-2",
+                "loops": [
+                  [
+                    {
+                      "x": 717,
+                      "y": 10
+                    },
+                    {
+                      "x": 1417,
+                      "y": 10
+                    },
+                    {
+                      "x": 1417,
+                      "y": 760
+                    },
+                    {
+                      "x": 717,
+                      "y": 760
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 717,
+                "y": 10
+              },
+              {
+                "angle": 0,
+                "id": "panel-3",
+                "loops": [
+                  [
+                    {
+                      "x": 10,
+                      "y": 767
+                    },
+                    {
+                      "x": 710,
+                      "y": 767
+                    },
+                    {
+                      "x": 710,
+                      "y": 1517
+                    },
+                    {
+                      "x": 10,
+                      "y": 1517
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 10,
+                "y": 767
+              },
+              {
+                "angle": 0,
+                "id": "panel-4",
+                "loops": [
+                  [
+                    {
+                      "x": 717,
+                      "y": 767
+                    },
+                    {
+                      "x": 1417,
+                      "y": 767
+                    },
+                    {
+                      "x": 1417,
+                      "y": 1517
+                    },
+                    {
+                      "x": 717,
+                      "y": 1517
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 717,
+                "y": 767
+              },
+              {
+                "angle": 0,
+                "id": "panel-5",
+                "loops": [
+                  [
+                    {
+                      "x": 10,
+                      "y": 1524
+                    },
+                    {
+                      "x": 710,
+                      "y": 1524
+                    },
+                    {
+                      "x": 710,
+                      "y": 2274
+                    },
+                    {
+                      "x": 10,
+                      "y": 2274
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 10,
+                "y": 1524
+              },
+              {
+                "angle": 0,
+                "id": "panel-6",
+                "loops": [
+                  [
+                    {
+                      "x": 717,
+                      "y": 1524
+                    },
+                    {
+                      "x": 1417,
+                      "y": 1524
+                    },
+                    {
+                      "x": 1417,
+                      "y": 2274
+                    },
+                    {
+                      "x": 717,
+                      "y": 2274
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 717,
+                "y": 1524
+              },
+              {
+                "angle": 0,
+                "id": "panel-7",
+                "loops": [
+                  [
+                    {
+                      "x": 10,
+                      "y": 2281
+                    },
+                    {
+                      "x": 710,
+                      "y": 2281
+                    },
+                    {
+                      "x": 710,
+                      "y": 3031
+                    },
+                    {
+                      "x": 10,
+                      "y": 3031
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 10,
+                "y": 2281
+              },
+              {
+                "angle": 0,
+                "id": "panel-8",
+                "loops": [
+                  [
+                    {
+                      "x": 717,
+                      "y": 2281
+                    },
+                    {
+                      "x": 1417,
+                      "y": 2281
+                    },
+                    {
+                      "x": 1417,
+                      "y": 3031
+                    },
+                    {
+                      "x": 717,
+                      "y": 3031
+                    }
+                  ]
+                ],
+                "requirementId": "panel",
+                "x": 717,
+                "y": 2281
+              },
+              {
+                "angle": 0,
+                "id": "small-1",
+                "loops": [
+                  [
+                    {
+                      "x": 1424,
+                      "y": 10
+                    },
+                    {
+                      "x": 1474,
+                      "y": 10
+                    },
+                    {
+                      "x": 1474,
+                      "y": 60
+                    },
+                    {
+                      "x": 1424,
+                      "y": 60
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1424,
+                "y": 10
+              },
+              {
+                "angle": 0,
+                "id": "small-2",
+                "loops": [
+                  [
+                    {
+                      "x": 1481,
+                      "y": 10
+                    },
+                    {
+                      "x": 1531,
+                      "y": 10
+                    },
+                    {
+                      "x": 1531,
+                      "y": 60
+                    },
+                    {
+                      "x": 1481,
+                      "y": 60
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1481,
+                "y": 10
+              },
+              {
+                "angle": 0,
+                "id": "small-3",
+                "loops": [
+                  [
+                    {
+                      "x": 1538,
+                      "y": 10
+                    },
+                    {
+                      "x": 1588,
+                      "y": 10
+                    },
+                    {
+                      "x": 1588,
+                      "y": 60
+                    },
+                    {
+                      "x": 1538,
+                      "y": 60
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1538,
+                "y": 10
+              },
+              {
+                "angle": 0,
+                "id": "small-4",
+                "loops": [
+                  [
+                    {
+                      "x": 1424,
+                      "y": 67
+                    },
+                    {
+                      "x": 1474,
+                      "y": 67
+                    },
+                    {
+                      "x": 1474,
+                      "y": 117
+                    },
+                    {
+                      "x": 1424,
+                      "y": 117
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1424,
+                "y": 67
+              },
+              {
+                "angle": 0,
+                "id": "small-5",
+                "loops": [
+                  [
+                    {
+                      "x": 1481,
+                      "y": 67
+                    },
+                    {
+                      "x": 1531,
+                      "y": 67
+                    },
+                    {
+                      "x": 1531,
+                      "y": 117
+                    },
+                    {
+                      "x": 1481,
+                      "y": 117
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1481,
+                "y": 67
+              },
+              {
+                "angle": 0,
+                "id": "small-6",
+                "loops": [
+                  [
+                    {
+                      "x": 1538,
+                      "y": 67
+                    },
+                    {
+                      "x": 1588,
+                      "y": 67
+                    },
+                    {
+                      "x": 1588,
+                      "y": 117
+                    },
+                    {
+                      "x": 1538,
+                      "y": 117
+                    }
+                  ]
+                ],
+                "requirementId": "small",
+                "x": 1538,
+                "y": 67
+              }
+            ],
+            "id": "nest-31-sheet-1",
+            "kerf": 6,
+            "layout": "freeform",
+            "lengthUnit": "mm",
+            "nestGap": 1,
+            "placements": [],
+            "remnants": [
+              {
+                "height": 2914,
+                "id": "remnant-0-1",
+                "width": 176,
+                "x": 1424,
+                "y": 124
+              },
+              {
+                "height": 112,
+                "id": "remnant-0-2",
+                "width": 1600,
+                "x": 0,
+                "y": 3038
+              }
+            ],
+            "requirements": [
+              {
+                "fingerprint": "b370566ee26addbfdf848efa21fdae7e255638bc01f4e27e2d6462ac51b90648",
+                "id": "panel",
+                "revision": 1
+              },
+              {
+                "fingerprint": "a708c2b008173ba5bcae306dce547d46403b4091312ac2837033555f9b61500a",
+                "id": "small",
+                "revision": 1
+              }
+            ],
+            "retainedRegionIds": [],
+            "revision": 1,
+            "schemaVersion": 2,
+            "sheetIndex": 0,
+            "stockSpecFingerprint": "7ae8bd8eb3d3fdddfc5f91809924c10ba2c06b5d0f6351c7d7a826e5f7e1cc02",
+            "stockSpecId": "stock-1600-3150",
+            "stockSpecRevision": 1
+          }
+        ],
+        "requirements": [
+          {
+            "allowedAngles": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "allowedRotations": [
+              0,
+              90
+            ],
+            "blankHeight": 750,
+            "blankWidth": 700,
+            "directionConstraint": "free",
+            "heightToleranceMinus": 0,
+            "heightTolerancePlus": 0,
+            "id": "panel",
+            "lengthUnit": "mm",
+            "materialId": "mdf",
+            "partId": "panel",
+            "partRevision": 1,
+            "quantity": 8,
+            "revision": 1,
+            "shape": [
+              [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 700,
+                  "y": 0
+                },
+                {
+                  "x": 700,
+                  "y": 750
+                },
+                {
+                  "x": 0,
+                  "y": 750
+                }
+              ]
+            ],
+            "thickness": 18,
+            "thicknessToleranceMinus": 0.5,
+            "thicknessTolerancePlus": 0.5,
+            "widthToleranceMinus": 0,
+            "widthTolerancePlus": 0
+          },
+          {
+            "allowedAngles": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "allowedRotations": [
+              0,
+              90
+            ],
+            "blankHeight": 50,
+            "blankWidth": 50,
+            "directionConstraint": "free",
+            "heightToleranceMinus": 0,
+            "heightTolerancePlus": 0,
+            "id": "small",
+            "lengthUnit": "mm",
+            "materialId": "mdf",
+            "partId": "small",
+            "partRevision": 1,
+            "quantity": 6,
+            "revision": 1,
+            "shape": [
+              [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 50,
+                  "y": 0
+                },
+                {
+                  "x": 50,
+                  "y": 50
+                },
+                {
+                  "x": 0,
+                  "y": 50
+                }
+              ]
+            ],
+            "thickness": 18,
+            "thicknessToleranceMinus": 0.5,
+            "thicknessTolerancePlus": 0.5,
+            "widthToleranceMinus": 0,
+            "widthTolerancePlus": 0
+          }
+        ]
+      }
+    ]
+  },
+  "source_sha256": {
+    "camkit/haxe/camkit/CamSheetProfiles.hx": "46ca25cad84101370bd9eef449ae5424ddcf1fd1783f76b79bdb3a3e4c51d496",
+    "camkit/haxe/camkit/CamSheetNfp.hx": "7b9335f63cc6a0ca16a212818b327100bfae656ff53710d98510bc84b4b8f065",
+    "camkit/haxe/camkit/CamSheetNester.hx": "bf4cd9abb2c2cf2235d2e7ed8ada53ba321a5668c9cbf7f1442d570dfcdd8e4a",
+    "manufacturingkit/haxe/src/materia/sheet/SheetCutPlan.hx": "3105b6376546d2084dfb84b280eb5ea1ae42a261088c5de77cc40d4c8d0c15e4",
+    "manufacturingkit/haxe/src/materia/sheet/SheetInventory.hx": "7690b0c6bb2e22af0f0061c8133a4a7d5c9daba3bc6cdb3c7308370b5290a5dc",
+    "manufacturingkit/haxe/src/materia/sheet/SheetPartRequirement.hx": "51dabef9153670f8e11c728332c7196a8ae8dbf9c00d58eb743e87ad4fa6686b",
+    "manufacturingkit/haxe/src/materia/sheet/SheetPlanExporter.hx": "bfa64269842c4b1761af7147e67464ced522a7f3b68f40bf423c8b6f458547ac",
+    "manufacturingkit/haxe/src/materia/sheet/SheetPlanValidator.hx": "d909969e451bc08e1b1b9359ac294e9567af1104eb75bab94bcd2cc4627f6994",
+    "manufacturingkit/haxe/src/materia/sheet/SheetProjectCodec.hx": "c1187cce1eafc63763dd90304d1f05ba5c7f6d0c2db5f6edc176547bbc6e06e0",
+    "manufacturingkit/haxe/src/materia/sheet/SheetFreeLayout.hx": "ad888537e4d263908b2973121c21fc340da943f77e3e8c3ddd0cfb76a9543b3e",
+    "manufacturingkit/haxe/src/materia/sheet/SheetPolygon.hx": "2ab8874c8e72218bfa9ab04a0d51c2d2130073c869d1f7ebc7ffdce0fe042434",
+    "camkit/tests/nesting/haxeon.json": "4fb0c9e482e1fbb9cd6985b099d513238b1b01c41e49d65f2269889f843fd2f7",
+    "camkit/tests/nesting/SheetNestingChecks.hx": "baebe7ba30bc8d8949b1b81cd1c70d3bd2ab5af3a25ecd4cb304703ef9fe600a"
+  }
+}

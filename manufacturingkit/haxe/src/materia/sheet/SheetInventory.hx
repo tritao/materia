@@ -144,6 +144,7 @@ class SheetInventory {
 		if (executionId == null || StringTools.trim(executionId).length == 0)
 			throw "Cut execution needs a unique ID";
 		var targetPlan = plan(planId), source = piece(pieceId);
+		if(targetPlan.schemaVersion==2)throw "Free-form nesting is a layout; confirmed inventory execution needs its qualified CNC cut sequence";
 		var validation = preview(planId, pieceId);
 		var currentRequirements = [for (reference in targetPlan.requirements) requirement(reference.id)];
 		var fingerprint = executionFingerprint(targetPlan, source, currentRequirements);

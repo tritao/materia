@@ -30,7 +30,7 @@ class SheetPlanValidator {
 
 	public static function requirementFingerprint(requirement:SheetPartRequirement):String {
 		if (requirement == null) return "";
-		return Sha256.encode(Json.stringify({id: requirement.id, revision: requirement.revision,
+		var payload:Dynamic = {id: requirement.id, revision: requirement.revision,
 			partId: requirement.partId, partRevision: requirement.partRevision,
 			quantity: requirement.quantity, materialId: requirement.materialId,
 			lengthUnit: requirement.lengthUnit, thickness: requirement.thickness,
@@ -42,7 +42,10 @@ class SheetPlanValidator {
 			heightToleranceMinus: requirement.heightToleranceMinus,
 			heightTolerancePlus: requirement.heightTolerancePlus,
 			allowedRotations: requirement.allowedRotations,
-			directionConstraint: requirement.directionConstraint}));
+			directionConstraint: requirement.directionConstraint};
+		if (requirement.shape != null) Reflect.setField(payload,"shape",requirement.shape);
+		if (requirement.allowedAngles != null) Reflect.setField(payload,"allowedAngles",requirement.allowedAngles);
+		return Sha256.encode(Json.stringify(payload));
 	}
 
 	public static function captureRequirements(items:Array<SheetPartRequirement>):Array<SheetRequirementReference> {
@@ -53,6 +56,7 @@ class SheetPlanValidator {
 	public static function validate(plan:SheetCutPlan, stock:SheetStockSpec,
 			requirements:Array<SheetPartRequirement>, ?source:StockPiece,
 			?customMaterials:Array<MaterialDef>):SheetPlanValidation {
+		if (plan != null && plan.schemaVersion == 2) return SheetFreeLayout.validate(plan,stock,requirements,source,customMaterials);
 		var messages:Array<String> = [], regions:Array<SheetCutRegion> = [], cutLines:Array<SheetCutLine> = [];
 		var output:SheetPlanValidation = {valid: false, messages: messages, regions: regions,
 			cutLines: cutLines,

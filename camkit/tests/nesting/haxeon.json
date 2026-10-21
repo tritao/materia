@@ -1,0 +1,4 @@
+{
+ "version":1,"package":{"name":"cam-nesting-checks"},"entry":"SheetNestingChecks","sourceRoots":["."],
+ "dependencies":{"camkit":{"path":"../.."}},"target":"host","outputDir":"../../../build/sheet-router-work/sr12/core"
+}

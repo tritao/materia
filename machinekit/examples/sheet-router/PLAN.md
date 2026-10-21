@@ -1006,6 +1006,11 @@ explicit SR13/commissioning gates.
   - removed volume matches stock minus targets.
 
 **SR12. Nesting.**
+Implemented polygon no-fit nesting with holes, independent geometry validation and version-2 free-form
+`SheetCutPlan` output: [nesting/README.md](nesting/README.md). 37 nesting + 54 legacy assertions pass.
+Both cabinet sets fit one sheet (76.08%/83.63% material utilisation, about 41/54 ms on this host).
+This is layout acceptance; actual retained-link cutting, inventory execution and SR13/SR16 remain gated.
+
 - True-shape nesting with no-fit polygons over part outlines with holes:
   - rotation steps (0/90/180/270 by default, free angle optional) and grain locks;
   - spacing from tool diameter plus a gap; an edge margin;
@@ -1209,7 +1214,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR9 | complete | Compact/dense equivalence; both 0.5 mm full-sheet backends under 300 MB; 20 MB sidecar; 388 ProjectKit + 8 worker + 5 artifact/app assertions. [Evidence](sheet-scale/README.md). |
 | SR10 | complete | Exact arcs/bulges, units/layers, INSERT and bounded spline sampling; 42 import + 653 writer assertions. [Evidence](dxf/README.md). |
 | SR11 | complete | Tabs/onion/skin, leads/ramps/direction, operation RPM, pecks/surfacing and SR8 admission ordering; 349 assertions. [Evidence](sheet-operations/README.md). |
-| SR12 | planned | |
+| SR12 | complete | True-shape no-fit unions, holes/rotations/grain, multiple sheets/remnants, free-form plans; 91 assertions. [Evidence](nesting/README.md). |
 | SR13 | planned | |
 | SR14 | planned | |
 | SR15 | planned | |

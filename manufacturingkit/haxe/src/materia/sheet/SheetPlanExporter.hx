@@ -6,6 +6,7 @@ class SheetPlanExporter {
 			requirements:Array<SheetPartRequirement>, validation:SheetPlanValidation,
 			?source:StockPiece):String {
 		ensureValid(validation);
+		if(plan.schemaVersion==2)return SheetFreeLayout.csv(plan);
 		var byId = new Map<String, SheetPartRequirement>();
 		for (item in requirements) byId.set(item.id, item);
 		var lines:Array<String> = ["record_type,sequence,id,part_id,part_revision,material,thickness_mm,width_mm,height_mm,rotation_deg,x_mm,y_mm,cut_axis,source_piece_id"];
@@ -41,6 +42,9 @@ class SheetPlanExporter {
 			requirements:Array<SheetPartRequirement>, validation:SheetPlanValidation,
 			?source:StockPiece):String {
 		ensureValid(validation);
+		if(plan.schemaVersion==2)return SheetFreeLayout.svg(plan,
+			SheetPlanValidator.millimetres(source==null?stock.width:source.width,source==null?stock.lengthUnit:source.lengthUnit),
+			SheetPlanValidator.millimetres(source==null?stock.height:source.height,source==null?stock.lengthUnit:source.lengthUnit));
 		var scale = source == null ? SheetPlanValidator.millimetres(1, stock.lengthUnit)
 			: SheetPlanValidator.millimetres(1, source.lengthUnit);
 		var width = source == null ? stock.width * scale : source.width * scale;

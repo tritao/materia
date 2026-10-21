@@ -51,7 +51,7 @@ class SheetProjectCodec {
 	}
 
 	static function decodeRequirement(value:Dynamic):SheetPartRequirement {
-		return {id: textField(value, "id"), revision: intField(value, "revision"),
+		var result:SheetPartRequirement = {id: textField(value, "id"), revision: intField(value, "revision"),
 			partId: textField(value, "partId"), partRevision: intField(value, "partRevision"),
 			quantity: intField(value, "quantity"), materialId: textField(value, "materialId"),
 			lengthUnit: textField(value, "lengthUnit"), thickness: numberField(value, "thickness"),
@@ -64,10 +64,14 @@ class SheetProjectCodec {
 			heightTolerancePlus: numberField(value, "heightTolerancePlus"),
 			allowedRotations: [for (item in arrayField(value, "allowedRotations")) integerValue(item, "allowedRotations")],
 			directionConstraint: textField(value, "directionConstraint")};
+		var rawShape:Dynamic=Reflect.field(value,"shape"),angles:Dynamic=Reflect.field(value,"allowedAngles");
+		if(rawShape!=null)result.shape=decodeShape(rawShape);
+		if(angles!=null)result.allowedAngles=floatArray(angles);
+		return result;
 	}
 
 	static function decodePlan(value:Dynamic):SheetCutPlan {
-		return {schemaVersion: intField(value, "schemaVersion"), id: textField(value, "id"),
+		var result:SheetCutPlan = {schemaVersion: intField(value, "schemaVersion"), id: textField(value, "id"),
 			revision: intField(value, "revision"), stockSpecId: textField(value, "stockSpecId"),
 			stockSpecRevision: intField(value, "stockSpecRevision"),
 			stockSpecFingerprint: textField(value, "stockSpecFingerprint"),
@@ -86,6 +90,22 @@ class SheetProjectCodec {
 					firstRegionId: textField(item, "firstRegionId"),
 					secondRegionId: textField(item, "secondRegionId")}],
 			retainedRegionIds: [for (item in arrayField(value, "retainedRegionIds")) textValue(item, "retainedRegionIds")]};
+		if(result.schemaVersion==2) {
+			result.layout=textField(value,"layout");result.batchId=textField(value,"batchId");
+			result.sheetIndex=intField(value,"sheetIndex");result.nestGap=numberField(value,"nestGap");
+			result.freePlacements=[for(p in arrayField(value,"freePlacements")) {
+				id:textField(p,"id"),requirementId:textField(p,"requirementId"),x:numberField(p,"x"),y:numberField(p,"y"),
+				angle:numberField(p,"angle"),loops:decodeShape(field(p,"loops"))}];
+			result.remnants=[for(r in arrayField(value,"remnants")) {
+				id:textField(r,"id"),x:numberField(r,"x"),y:numberField(r,"y"),width:numberField(r,"width"),height:numberField(r,"height")}];
+		} else if(Reflect.field(value,"freePlacements")!=null||Reflect.field(value,"layout")!=null)
+			throw "Legacy sheet plan cannot contain free-form geometry";
+		return result;
+	}
+
+	static function decodeShape(value:Dynamic):materia.sheet.SheetPolygon.SheetShape {
+		function array(raw:Dynamic):Array<Dynamic> {if(!Std.isOfType(raw,Array))throw "Sheet shape loops must be arrays";return cast raw;}
+		return [for(loop in array(value))[for(p in array(loop)){x:numberField(p,"x"),y:numberField(p,"y")}]];
 	}
 
 	static function decodePiece(value:Dynamic):StockPiece {
@@ -170,11 +190,20 @@ class SheetProjectCodec {
 				throw "Sheet project has an unsupported allowed rotation";
 			if (item.directionConstraint != "free" && item.directionConstraint != "width-aligned")
 				throw "Sheet project has an unsupported direction constraint";
+			if(item.shape!=null) {
+				var scale=LengthUnit.metresPerUnit(item.lengthUnit)*1000;
+				SheetPolygon.validate([for(loop in item.shape)[for(p in loop)SheetPolygon.point(p.x*scale,p.y*scale)]]);
+			}
+			if(item.allowedAngles!=null) {
+				if(item.allowedAngles.length==0||item.allowedAngles.length>360)throw "Invalid free-form angles";
+				var seen:Array<Float> = [];
+				for(angle in item.allowedAngles){if(!Math.isFinite(angle)||angle<0||angle>=360||seen.indexOf(angle)>=0)throw "Invalid free-form angle";seen.push(angle);}
+			}
 			requirements.set(item.id, item);
 		}
 		var plans:Map<String, SheetCutPlan> = new Map();
 		for (plan in record.plans) {
-			if (plan == null || plan.schemaVersion != SheetPlanValidator.VERSION || !validText(plan.id) ||
+			if (plan == null || (plan.schemaVersion != SheetPlanValidator.VERSION && plan.schemaVersion != 2) || !validText(plan.id) ||
 				plan.revision < 1 || plan.stockSpecRevision < 1 || !validText(plan.stockSpecFingerprint) ||
 				plans.exists(plan.id) || !specs.exists(plan.stockSpecId) ||
 				plan.requirements == null || plan.placements == null || plan.cuts == null ||
@@ -186,6 +215,8 @@ class SheetProjectCodec {
 				!validText(reference.fingerprint) || reference.revision < 1 || planReferences.exists(reference.id))
 				throw "Cut plan has an invalid requirement reference";
 			else planReferences.set(reference.id, true);
+			if(plan.schemaVersion==2)SheetFreeLayout.checkData(plan);
+			else if(plan.freePlacements!=null||plan.layout!=null)throw "Legacy plan contains free-form geometry";
 			plans.set(plan.id, plan);
 		}
 		var pieces:Map<String, StockPiece> = new Map();
