@@ -1,0 +1,986 @@
+{
+  "mcu": "STM32G474RE",
+  "package": "LQFP64",
+  "source": "ST DS12288 Rev 6, tables 12/13, printed pp 57\u201375; RM0440 DMAMUX request table",
+  "datasheet": "https://www.st.com.cn/resource/en/datasheet/stm32g474re.pdf",
+  "referenceManual": "https://www.st.com/resource/en/reference_manual/dm00355726-stm32g4-series-advanced-arm-based-32-bit-mcus-stmicroelectronics.pdf",
+  "pins": [
+    {
+      "signal": "driveX.step",
+      "pin": "PA2",
+      "function": "TIM15_CH1",
+      "af": 9
+    },
+    {
+      "signal": "driveX.dir",
+      "pin": "PC8",
+      "function": "GPIO_OUT",
+      "af": null
+    },
+    {
+      "signal": "driveX.encoderA",
+      "pin": "PA0",
+      "function": "TIM2_CH1",
+      "af": 1
+    },
+    {
+      "signal": "driveX.encoderB",
+      "pin": "PA1",
+      "function": "TIM2_CH2",
+      "af": 1
+    },
+    {
+      "signal": "driveYLeft.step",
+      "pin": "PA6",
+      "function": "TIM16_CH1",
+      "af": 1
+    },
+    {
+      "signal": "driveYLeft.dir",
+      "pin": "PC9",
+      "function": "GPIO_OUT",
+      "af": null
+    },
+    {
+      "signal": "driveYLeft.encoderA",
+      "pin": "PB4",
+      "function": "TIM3_CH1",
+      "af": 2
+    },
+    {
+      "signal": "driveYLeft.encoderB",
+      "pin": "PB5",
+      "function": "TIM3_CH2",
+      "af": 2
+    },
+    {
+      "signal": "driveYRight.step",
+      "pin": "PA7",
+      "function": "TIM17_CH1",
+      "af": 1
+    },
+    {
+      "signal": "driveYRight.dir",
+      "pin": "PC10",
+      "function": "GPIO_OUT",
+      "af": null
+    },
+    {
+      "signal": "driveYRight.encoderA",
+      "pin": "PA11",
+      "function": "TIM4_CH1",
+      "af": 10
+    },
+    {
+      "signal": "driveYRight.encoderB",
+      "pin": "PA12",
+      "function": "TIM4_CH2",
+      "af": 10
+    },
+    {
+      "signal": "driveZ.step",
+      "pin": "PB2",
+      "function": "TIM20_CH1",
+      "af": 3
+    },
+    {
+      "signal": "driveZ.dir",
+      "pin": "PC11",
+      "function": "GPIO_OUT",
+      "af": null
+    },
+    {
+      "signal": "driveZ.encoderA",
+      "pin": "PC6",
+      "function": "TIM8_CH1",
+      "af": 4
+    },
+    {
+      "signal": "driveZ.encoderB",
+      "pin": "PC7",
+      "function": "TIM8_CH2",
+      "af": 4
+    },
+    {
+      "signal": "driveSpare.step",
+      "pin": "PC12",
+      "function": "TIM5_CH2",
+      "af": 1
+    },
+    {
+      "signal": "driveSpare.dir",
+      "pin": "PB0",
+      "function": "GPIO_OUT",
+      "af": null
+    },
+    {
+      "signal": "driveSpare.encoderA",
+      "pin": "PA8",
+      "function": "TIM1_CH1",
+      "af": 6
+    },
+    {
+      "signal": "driveSpare.encoderB",
+      "pin": "PA9",
+      "function": "TIM1_CH2",
+      "af": 6
+    },
+    {
+      "signal": "setter.trigger",
+      "pin": "PC0",
+      "function": "EXTI0",
+      "af": null
+    },
+    {
+      "signal": "switchXhome",
+      "pin": "PC1",
+      "function": "EXTI1",
+      "af": null
+    },
+    {
+      "signal": "switchXnegativeLimit",
+      "pin": "PC2",
+      "function": "EXTI2",
+      "af": null
+    },
+    {
+      "signal": "switchXpositiveLimit",
+      "pin": "PC3",
+      "function": "EXTI3",
+      "af": null
+    },
+    {
+      "signal": "switchYLefthome",
+      "pin": "PA5",
+      "function": "EXTI5",
+      "af": null
+    },
+    {
+      "signal": "switchYLeftnegativeLimit",
+      "pin": "PB6",
+      "function": "EXTI6",
+      "af": null
+    },
+    {
+      "signal": "switchYLeftpositiveLimit",
+      "pin": "PB7",
+      "function": "EXTI7",
+      "af": null
+    },
+    {
+      "signal": "switchYRighthome",
+      "pin": "PB8",
+      "function": "EXTI8",
+      "af": null
+    },
+    {
+      "signal": "switchYRightnegativeLimit",
+      "pin": "PB9",
+      "function": "EXTI9",
+      "af": null
+    },
+    {
+      "signal": "switchYRightpositiveLimit",
+      "pin": "PB10",
+      "function": "EXTI10",
+      "af": null
+    },
+    {
+      "signal": "switchZhome",
+      "pin": "PB11",
+      "function": "EXTI11",
+      "af": null
+    },
+    {
+      "signal": "switchZnegativeLimit",
+      "pin": "PB12",
+      "function": "EXTI12",
+      "af": null
+    },
+    {
+      "signal": "switchZpositiveLimit",
+      "pin": "PC14",
+      "function": "EXTI14",
+      "af": null
+    },
+    {
+      "signal": "probe.trigger",
+      "pin": "PC15",
+      "function": "EXTI15",
+      "af": null
+    },
+    {
+      "signal": "serial.tx",
+      "pin": "PC4",
+      "function": "USART1_TX",
+      "af": 7
+    },
+    {
+      "signal": "serial.rx",
+      "pin": "PC5",
+      "function": "USART1_RX",
+      "af": 7
+    },
+    {
+      "signal": "expander.sck",
+      "pin": "PB13",
+      "function": "SPI2_SCK",
+      "af": 5
+    },
+    {
+      "signal": "expander.miso",
+      "pin": "PB14",
+      "function": "SPI2_MISO",
+      "af": 5
+    },
+    {
+      "signal": "expander.mosi",
+      "pin": "PB15",
+      "function": "SPI2_MOSI",
+      "af": 5
+    },
+    {
+      "signal": "expander.cs",
+      "pin": "PA3",
+      "function": "GPIO_OUT",
+      "af": null
+    },
+    {
+      "signal": "spindle.speed",
+      "pin": "PA4",
+      "function": "DAC1_OUT1",
+      "af": null
+    },
+    {
+      "signal": "watchdog.heartbeat",
+      "pin": "PB1",
+      "function": "GPIO_OUT",
+      "af": null
+    },
+    {
+      "signal": "outputs.permission",
+      "pin": "PB3",
+      "function": "GPIO_OUT",
+      "af": null
+    },
+    {
+      "signal": "debug.swdio",
+      "pin": "PA13",
+      "function": "SWDIO",
+      "af": 0
+    },
+    {
+      "signal": "debug.swclk",
+      "pin": "PA14",
+      "function": "SWCLK",
+      "af": 0
+    }
+  ],
+  "dma": [
+    {
+      "signal": "TIM15_CH1",
+      "controller": "DMA1",
+      "channel": 1,
+      "request": 77
+    },
+    {
+      "signal": "TIM16_CH1",
+      "controller": "DMA1",
+      "channel": 2,
+      "request": 82
+    },
+    {
+      "signal": "TIM17_CH1",
+      "controller": "DMA1",
+      "channel": 3,
+      "request": 84
+    },
+    {
+      "signal": "TIM20_CH1",
+      "controller": "DMA1",
+      "channel": 4,
+      "request": 86
+    },
+    {
+      "signal": "TIM5_CH2",
+      "controller": "DMA1",
+      "channel": 5,
+      "request": 73
+    },
+    {
+      "signal": "USART1_RX",
+      "controller": "DMA2",
+      "channel": 1,
+      "request": 24
+    },
+    {
+      "signal": "USART1_TX",
+      "controller": "DMA2",
+      "channel": 2,
+      "request": 25
+    },
+    {
+      "signal": "SPI2_RX",
+      "controller": "DMA2",
+      "channel": 3,
+      "request": 12
+    },
+    {
+      "signal": "SPI2_TX",
+      "controller": "DMA2",
+      "channel": 4,
+      "request": 13
+    }
+  ],
+  "channels": [
+    {
+      "channel": "mainContactor.coil",
+      "terminal": "XIO:1",
+      "carrierPin": "J-OUTPUT:1",
+      "devicePin": "UOUT1.GP0"
+    },
+    {
+      "channel": "mainContactor.feedback",
+      "terminal": "XIO:2",
+      "carrierPin": "J-INPUT:1",
+      "devicePin": "UIN1.GP0"
+    },
+    {
+      "channel": "safetyRelay.healthy",
+      "terminal": "XIO:3",
+      "carrierPin": "J-INPUT:2",
+      "devicePin": "UIN1.GP1"
+    },
+    {
+      "channel": "setter.air_blast",
+      "terminal": "XIO:4",
+      "carrierPin": "J-OUTPUT:2",
+      "devicePin": "UOUT1.GP1"
+    },
+    {
+      "channel": "setter.trigger",
+      "terminal": "XIO:5",
+      "carrierPin": "J-FAST-INPUT:1",
+      "devicePin": "PC0"
+    },
+    {
+      "channel": "shoe.lift",
+      "terminal": "XIO:6",
+      "carrierPin": "J-OUTPUT:3",
+      "devicePin": "UOUT1.GP2"
+    },
+    {
+      "channel": "shoe.lowered",
+      "terminal": "XIO:7",
+      "carrierPin": "J-INPUT:3",
+      "devicePin": "UIN1.GP2"
+    },
+    {
+      "channel": "shoe.raised",
+      "terminal": "XIO:8",
+      "carrierPin": "J-INPUT:4",
+      "devicePin": "UIN1.GP3"
+    },
+    {
+      "channel": "spindle.clamped",
+      "terminal": "XIO:9",
+      "carrierPin": "J-INPUT:5",
+      "devicePin": "UIN1.GP4"
+    },
+    {
+      "channel": "spindle.purge",
+      "terminal": "XIO:10",
+      "carrierPin": "J-OUTPUT:4",
+      "devicePin": "UOUT1.GP3"
+    },
+    {
+      "channel": "spindle.release",
+      "terminal": "XIO:11",
+      "carrierPin": "J-OUTPUT:5",
+      "devicePin": "UOUT1.GP4"
+    },
+    {
+      "channel": "spindle.released",
+      "terminal": "XIO:12",
+      "carrierPin": "J-INPUT:6",
+      "devicePin": "UIN1.GP5"
+    },
+    {
+      "channel": "spindle.tool_present",
+      "terminal": "XIO:13",
+      "carrierPin": "J-INPUT:7",
+      "devicePin": "UIN1.GP6"
+    },
+    {
+      "channel": "switchXhome",
+      "terminal": "XIO:14",
+      "carrierPin": "J-FAST-INPUT:2",
+      "devicePin": "PC1"
+    },
+    {
+      "channel": "switchXnegativeLimit",
+      "terminal": "XIO:15",
+      "carrierPin": "J-FAST-INPUT:3",
+      "devicePin": "PC2"
+    },
+    {
+      "channel": "switchXpositiveLimit",
+      "terminal": "XIO:16",
+      "carrierPin": "J-FAST-INPUT:4",
+      "devicePin": "PC3"
+    },
+    {
+      "channel": "switchYLefthome",
+      "terminal": "XIO:17",
+      "carrierPin": "J-FAST-INPUT:5",
+      "devicePin": "PA5"
+    },
+    {
+      "channel": "switchYLeftnegativeLimit",
+      "terminal": "XIO:18",
+      "carrierPin": "J-FAST-INPUT:6",
+      "devicePin": "PB6"
+    },
+    {
+      "channel": "switchYLeftpositiveLimit",
+      "terminal": "XIO:19",
+      "carrierPin": "J-FAST-INPUT:7",
+      "devicePin": "PB7"
+    },
+    {
+      "channel": "switchYRighthome",
+      "terminal": "XIO:20",
+      "carrierPin": "J-FAST-INPUT:8",
+      "devicePin": "PB8"
+    },
+    {
+      "channel": "switchYRightnegativeLimit",
+      "terminal": "XIO:21",
+      "carrierPin": "J-FAST-INPUT:9",
+      "devicePin": "PB9"
+    },
+    {
+      "channel": "switchYRightpositiveLimit",
+      "terminal": "XIO:22",
+      "carrierPin": "J-FAST-INPUT:10",
+      "devicePin": "PB10"
+    },
+    {
+      "channel": "switchZhome",
+      "terminal": "XIO:23",
+      "carrierPin": "J-FAST-INPUT:11",
+      "devicePin": "PB11"
+    },
+    {
+      "channel": "switchZnegativeLimit",
+      "terminal": "XIO:24",
+      "carrierPin": "J-FAST-INPUT:12",
+      "devicePin": "PB12"
+    },
+    {
+      "channel": "switchZpositiveLimit",
+      "terminal": "XIO:25",
+      "carrierPin": "J-FAST-INPUT:13",
+      "devicePin": "PC14"
+    },
+    {
+      "channel": "toolRack.cover",
+      "terminal": "XIO:26",
+      "carrierPin": "J-OUTPUT:6",
+      "devicePin": "UOUT1.GP5"
+    },
+    {
+      "channel": "toolRack.cover_closed",
+      "terminal": "XIO:27",
+      "carrierPin": "J-INPUT:8",
+      "devicePin": "UIN1.GP7"
+    },
+    {
+      "channel": "toolRack.cover_open",
+      "terminal": "XIO:28",
+      "carrierPin": "J-INPUT:9",
+      "devicePin": "UIN1.GP8"
+    },
+    {
+      "channel": "toolRack.pocket1_occupied",
+      "terminal": "XIO:29",
+      "carrierPin": "J-INPUT:10",
+      "devicePin": "UIN1.GP9"
+    },
+    {
+      "channel": "toolRack.pocket2_occupied",
+      "terminal": "XIO:30",
+      "carrierPin": "J-INPUT:11",
+      "devicePin": "UIN1.GP10"
+    },
+    {
+      "channel": "toolRack.pocket3_occupied",
+      "terminal": "XIO:31",
+      "carrierPin": "J-INPUT:12",
+      "devicePin": "UIN1.GP11"
+    },
+    {
+      "channel": "toolRack.pocket4_occupied",
+      "terminal": "XIO:32",
+      "carrierPin": "J-INPUT:13",
+      "devicePin": "UIN1.GP12"
+    },
+    {
+      "channel": "toolRack.pocket5_occupied",
+      "terminal": "XIO:33",
+      "carrierPin": "J-INPUT:14",
+      "devicePin": "UIN1.GP13"
+    },
+    {
+      "channel": "toolRack.pocket6_occupied",
+      "terminal": "XIO:34",
+      "carrierPin": "J-INPUT:15",
+      "devicePin": "UIN1.GP14"
+    },
+    {
+      "channel": "toolRack.pocket7_occupied",
+      "terminal": "XIO:35",
+      "carrierPin": "J-INPUT:16",
+      "devicePin": "UIN1.GP15"
+    },
+    {
+      "channel": "toolRack.pocket8_occupied",
+      "terminal": "XIO:36",
+      "carrierPin": "J-INPUT:17",
+      "devicePin": "UIN2.GP0"
+    },
+    {
+      "channel": "vacuumBlower.overload",
+      "terminal": "XIO:37",
+      "carrierPin": "J-INPUT:18",
+      "devicePin": "UIN2.GP1"
+    },
+    {
+      "channel": "vacuumBlower.ready",
+      "terminal": "XIO:38",
+      "carrierPin": "J-INPUT:19",
+      "devicePin": "UIN2.GP2"
+    },
+    {
+      "channel": "vacuumBlower.run",
+      "terminal": "XIO:39",
+      "carrierPin": "J-OUTPUT:7",
+      "devicePin": "UOUT1.GP6"
+    },
+    {
+      "channel": "vacuumTable.zone1_pressure_ok",
+      "terminal": "XIO:40",
+      "carrierPin": "J-INPUT:20",
+      "devicePin": "UIN2.GP3"
+    },
+    {
+      "channel": "vacuumTable.zone2_pressure_ok",
+      "terminal": "XIO:41",
+      "carrierPin": "J-INPUT:21",
+      "devicePin": "UIN2.GP4"
+    },
+    {
+      "channel": "vacuumTable.zone3_pressure_ok",
+      "terminal": "XIO:42",
+      "carrierPin": "J-INPUT:22",
+      "devicePin": "UIN2.GP5"
+    },
+    {
+      "channel": "vacuumTable.zone4_pressure_ok",
+      "terminal": "XIO:43",
+      "carrierPin": "J-INPUT:23",
+      "devicePin": "UIN2.GP6"
+    },
+    {
+      "channel": "vacuumTable.zone5_pressure_ok",
+      "terminal": "XIO:44",
+      "carrierPin": "J-INPUT:24",
+      "devicePin": "UIN2.GP7"
+    },
+    {
+      "channel": "vacuumTable.zone6_pressure_ok",
+      "terminal": "XIO:45",
+      "carrierPin": "J-INPUT:25",
+      "devicePin": "UIN2.GP8"
+    },
+    {
+      "channel": "vfd.alarm",
+      "terminal": "XIO:46",
+      "carrierPin": "J-INPUT:26",
+      "devicePin": "UIN2.GP9"
+    },
+    {
+      "channel": "vfd.at_speed",
+      "terminal": "XIO:47",
+      "carrierPin": "J-INPUT:27",
+      "devicePin": "UIN2.GP10"
+    },
+    {
+      "channel": "vfd.reset",
+      "terminal": "XIO:48",
+      "carrierPin": "J-OUTPUT:8",
+      "devicePin": "UOUT1.GP7"
+    },
+    {
+      "channel": "vfd.run",
+      "terminal": "XIO:49",
+      "carrierPin": "J-OUTPUT:9",
+      "devicePin": "UOUT1.GP8"
+    },
+    {
+      "channel": "vfd.speed",
+      "terminal": "XIO:50",
+      "carrierPin": "J-ANALOG:1",
+      "devicePin": "PA4"
+    },
+    {
+      "channel": "vfd.zero_speed",
+      "terminal": "XIO:51",
+      "carrierPin": "J-INPUT:28",
+      "devicePin": "UIN2.GP11"
+    },
+    {
+      "channel": "zoneValve1.open",
+      "terminal": "XIO:52",
+      "carrierPin": "J-OUTPUT:10",
+      "devicePin": "UOUT1.GP9"
+    },
+    {
+      "channel": "zoneValve2.open",
+      "terminal": "XIO:53",
+      "carrierPin": "J-OUTPUT:11",
+      "devicePin": "UOUT1.GP10"
+    },
+    {
+      "channel": "zoneValve3.open",
+      "terminal": "XIO:54",
+      "carrierPin": "J-OUTPUT:12",
+      "devicePin": "UOUT1.GP11"
+    },
+    {
+      "channel": "zoneValve4.open",
+      "terminal": "XIO:55",
+      "carrierPin": "J-OUTPUT:13",
+      "devicePin": "UOUT1.GP12"
+    },
+    {
+      "channel": "zoneValve5.open",
+      "terminal": "XIO:56",
+      "carrierPin": "J-OUTPUT:14",
+      "devicePin": "UOUT1.GP13"
+    },
+    {
+      "channel": "zoneValve6.open",
+      "terminal": "XIO:57",
+      "carrierPin": "J-OUTPUT:15",
+      "devicePin": "UOUT1.GP14"
+    },
+    {
+      "channel": "driveX.step",
+      "terminal": "XIO:58",
+      "carrierPin": "J-STEP:1",
+      "devicePin": "PA2"
+    },
+    {
+      "channel": "driveX.dir",
+      "terminal": "XIO:59",
+      "carrierPin": "J-DIRECTION:1",
+      "devicePin": "PC8"
+    },
+    {
+      "channel": "driveX.encoderA",
+      "terminal": "XIO:60",
+      "carrierPin": "J-ENCODER:1",
+      "devicePin": "PA0"
+    },
+    {
+      "channel": "driveX.encoderB",
+      "terminal": "XIO:61",
+      "carrierPin": "J-ENCODER:2",
+      "devicePin": "PA1"
+    },
+    {
+      "channel": "driveX.enable",
+      "terminal": "XIO:62",
+      "carrierPin": "J-OUTPUT:16",
+      "devicePin": "UOUT1.GP15"
+    },
+    {
+      "channel": "driveX.reset",
+      "terminal": "XIO:63",
+      "carrierPin": "J-OUTPUT:17",
+      "devicePin": "UOUT2.GP0"
+    },
+    {
+      "channel": "driveX.alarm",
+      "terminal": "XIO:64",
+      "carrierPin": "J-INPUT:29",
+      "devicePin": "UIN2.GP12"
+    },
+    {
+      "channel": "driveX.ready",
+      "terminal": "XIO:65",
+      "carrierPin": "J-INPUT:30",
+      "devicePin": "UIN2.GP13"
+    },
+    {
+      "channel": "driveYLeft.step",
+      "terminal": "XIO:66",
+      "carrierPin": "J-STEP:2",
+      "devicePin": "PA6"
+    },
+    {
+      "channel": "driveYLeft.dir",
+      "terminal": "XIO:67",
+      "carrierPin": "J-DIRECTION:2",
+      "devicePin": "PC9"
+    },
+    {
+      "channel": "driveYLeft.encoderA",
+      "terminal": "XIO:68",
+      "carrierPin": "J-ENCODER:3",
+      "devicePin": "PB4"
+    },
+    {
+      "channel": "driveYLeft.encoderB",
+      "terminal": "XIO:69",
+      "carrierPin": "J-ENCODER:4",
+      "devicePin": "PB5"
+    },
+    {
+      "channel": "driveYLeft.enable",
+      "terminal": "XIO:70",
+      "carrierPin": "J-OUTPUT:18",
+      "devicePin": "UOUT2.GP1"
+    },
+    {
+      "channel": "driveYLeft.reset",
+      "terminal": "XIO:71",
+      "carrierPin": "J-OUTPUT:19",
+      "devicePin": "UOUT2.GP2"
+    },
+    {
+      "channel": "driveYLeft.alarm",
+      "terminal": "XIO:72",
+      "carrierPin": "J-INPUT:31",
+      "devicePin": "UIN2.GP14"
+    },
+    {
+      "channel": "driveYLeft.ready",
+      "terminal": "XIO:73",
+      "carrierPin": "J-INPUT:32",
+      "devicePin": "UIN2.GP15"
+    },
+    {
+      "channel": "driveYRight.step",
+      "terminal": "XIO:74",
+      "carrierPin": "J-STEP:3",
+      "devicePin": "PA7"
+    },
+    {
+      "channel": "driveYRight.dir",
+      "terminal": "XIO:75",
+      "carrierPin": "J-DIRECTION:3",
+      "devicePin": "PC10"
+    },
+    {
+      "channel": "driveYRight.encoderA",
+      "terminal": "XIO:76",
+      "carrierPin": "J-ENCODER:5",
+      "devicePin": "PA11"
+    },
+    {
+      "channel": "driveYRight.encoderB",
+      "terminal": "XIO:77",
+      "carrierPin": "J-ENCODER:6",
+      "devicePin": "PA12"
+    },
+    {
+      "channel": "driveYRight.enable",
+      "terminal": "XIO:78",
+      "carrierPin": "J-OUTPUT:20",
+      "devicePin": "UOUT2.GP3"
+    },
+    {
+      "channel": "driveYRight.reset",
+      "terminal": "XIO:79",
+      "carrierPin": "J-OUTPUT:21",
+      "devicePin": "UOUT2.GP4"
+    },
+    {
+      "channel": "driveYRight.alarm",
+      "terminal": "XIO:80",
+      "carrierPin": "J-INPUT:33",
+      "devicePin": "UIN3.GP0"
+    },
+    {
+      "channel": "driveYRight.ready",
+      "terminal": "XIO:81",
+      "carrierPin": "J-INPUT:34",
+      "devicePin": "UIN3.GP1"
+    },
+    {
+      "channel": "driveZ.step",
+      "terminal": "XIO:82",
+      "carrierPin": "J-STEP:4",
+      "devicePin": "PB2"
+    },
+    {
+      "channel": "driveZ.dir",
+      "terminal": "XIO:83",
+      "carrierPin": "J-DIRECTION:4",
+      "devicePin": "PC11"
+    },
+    {
+      "channel": "driveZ.encoderA",
+      "terminal": "XIO:84",
+      "carrierPin": "J-ENCODER:7",
+      "devicePin": "PC6"
+    },
+    {
+      "channel": "driveZ.encoderB",
+      "terminal": "XIO:85",
+      "carrierPin": "J-ENCODER:8",
+      "devicePin": "PC7"
+    },
+    {
+      "channel": "driveZ.enable",
+      "terminal": "XIO:86",
+      "carrierPin": "J-OUTPUT:22",
+      "devicePin": "UOUT2.GP5"
+    },
+    {
+      "channel": "driveZ.reset",
+      "terminal": "XIO:87",
+      "carrierPin": "J-OUTPUT:23",
+      "devicePin": "UOUT2.GP6"
+    },
+    {
+      "channel": "driveZ.alarm",
+      "terminal": "XIO:88",
+      "carrierPin": "J-INPUT:35",
+      "devicePin": "UIN3.GP2"
+    },
+    {
+      "channel": "driveZ.ready",
+      "terminal": "XIO:89",
+      "carrierPin": "J-INPUT:36",
+      "devicePin": "UIN3.GP3"
+    },
+    {
+      "channel": "driveSpare.step",
+      "terminal": "XIO:90",
+      "carrierPin": "J-STEP:5",
+      "devicePin": "PC12"
+    },
+    {
+      "channel": "driveSpare.dir",
+      "terminal": "XIO:91",
+      "carrierPin": "J-DIRECTION:5",
+      "devicePin": "PB0"
+    },
+    {
+      "channel": "driveSpare.encoderA",
+      "terminal": "XIO:92",
+      "carrierPin": "J-ENCODER:9",
+      "devicePin": "PA8"
+    },
+    {
+      "channel": "driveSpare.encoderB",
+      "terminal": "XIO:93",
+      "carrierPin": "J-ENCODER:10",
+      "devicePin": "PA9"
+    },
+    {
+      "channel": "driveSpare.enable",
+      "terminal": "XIO:94",
+      "carrierPin": "J-OUTPUT:24",
+      "devicePin": "UOUT2.GP7"
+    },
+    {
+      "channel": "driveSpare.reset",
+      "terminal": "XIO:95",
+      "carrierPin": "J-OUTPUT:25",
+      "devicePin": "UOUT2.GP8"
+    },
+    {
+      "channel": "driveSpare.alarm",
+      "terminal": "XIO:96",
+      "carrierPin": "J-INPUT:37",
+      "devicePin": "UIN3.GP4"
+    },
+    {
+      "channel": "driveSpare.ready",
+      "terminal": "XIO:97",
+      "carrierPin": "J-INPUT:38",
+      "devicePin": "UIN3.GP5"
+    },
+    {
+      "channel": "air.pressure_ok",
+      "terminal": "XIO:98",
+      "carrierPin": "J-INPUT:39",
+      "devicePin": "UIN3.GP6"
+    },
+    {
+      "channel": "spindle.stopped",
+      "terminal": "XIO:99",
+      "carrierPin": "J-INPUT:40",
+      "devicePin": "UIN3.GP7"
+    },
+    {
+      "channel": "probe.trigger",
+      "terminal": "XIO:100",
+      "carrierPin": "J-FAST-INPUT:14",
+      "devicePin": "PC15"
+    },
+    {
+      "channel": "vacuum.pressure",
+      "terminal": "XIO:101",
+      "carrierPin": "J-INPUT:41",
+      "devicePin": "UIN3.GP8"
+    },
+    {
+      "channel": "safety.reset",
+      "terminal": "XIO:102",
+      "carrierPin": "J-INPUT:42",
+      "devicePin": "UIN3.GP9"
+    },
+    {
+      "channel": "safety.edm",
+      "terminal": "XIO:103",
+      "carrierPin": "J-INPUT:43",
+      "devicePin": "UIN3.GP10"
+    },
+    {
+      "channel": "extractor.run",
+      "terminal": "XIO:104",
+      "carrierPin": "J-OUTPUT:26",
+      "devicePin": "UOUT2.GP9"
+    },
+    {
+      "channel": "extractor.overload",
+      "terminal": "XIO:105",
+      "carrierPin": "J-INPUT:44",
+      "devicePin": "UIN3.GP11"
+    },
+    {
+      "channel": "zBrake.release",
+      "terminal": "XIO:106",
+      "carrierPin": "J-OUTPUT:27",
+      "devicePin": "UOUT2.GP10"
+    }
+  ],
+  "timerClockHz": 170000000,
+  "prescaler": 16,
+  "counterHz": 10000000,
+  "maxStepHzPerAxis": 200000,
+  "iwdg": {
+    "prescaler": 4,
+    "reload": 159,
+    "lsiMinHz": 29500,
+    "lsiMaxHz": 34000,
+    "nominalTimeoutUs": 20000
+  },
+  "fallback": "If Nucleo board routing or measured timing cannot meet this map: second MCU for isolated slow I/O; retain step/encoder timing on G474. If pulse/DMA deadline still fails, dedicated pulse/encoder coprocessor and requalify SR18; do not silently lower the rate.",
+  "hardwareStatus": "not activated; SR18 register/DMA/edge timing and carrier routing qualification required"
+}

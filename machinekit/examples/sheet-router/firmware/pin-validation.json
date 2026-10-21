@@ -1,0 +1,10 @@
+{
+  "pinAssignments": 45,
+  "fastExtiInputs": 14,
+  "dmaChannels": 9,
+  "channelMappings": 106,
+  "iwdgMinUs": 18823.529411764706,
+  "iwdgMaxUs": 21694.915254237287,
+  "status": "PASS",
+  "negativeFixtures": 6
+}

@@ -3,6 +3,10 @@
 
 mod heater_profile;
 mod welder_profile;
+#[allow(dead_code)]
+mod router_profile;
+#[allow(dead_code)]
+mod router_hal;
 
 use cortex_m::peripheral::DWT;
 use cortex_m_rt::entry;

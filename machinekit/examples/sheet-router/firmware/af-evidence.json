@@ -1,0 +1,21 @@
+{
+ "source":"ST DS12288 Rev 6 tables 12 and 13, printed pp 57–75; Table 7 timers; Table 45 LSI",
+ "reviewedOn":"2026-10-21",
+ "alternateFunctions":{
+  "PA2":{"9":"TIM15_CH1"},"PA6":{"1":"TIM16_CH1"},"PA7":{"1":"TIM17_CH1"},
+  "PB2":{"3":"TIM20_CH1"},"PC12":{"1":"TIM5_CH2"},
+  "PA0":{"1":"TIM2_CH1"},"PA1":{"1":"TIM2_CH2"},
+  "PB4":{"2":"TIM3_CH1"},"PB5":{"2":"TIM3_CH2"},
+  "PA11":{"10":"TIM4_CH1"},"PA12":{"10":"TIM4_CH2"},
+  "PC6":{"4":"TIM8_CH1"},"PC7":{"4":"TIM8_CH2"},
+  "PA8":{"6":"TIM1_CH1"},"PA9":{"6":"TIM1_CH2"},
+  "PC4":{"7":"USART1_TX"},"PC5":{"7":"USART1_RX"},
+  "PB13":{"5":"SPI2_SCK"},"PB14":{"5":"SPI2_MISO"},"PB15":{"5":"SPI2_MOSI"},
+  "PA13":{"0":"SWDIO"},"PA14":{"0":"SWCLK"}
+ },
+ "analog":{"PA4":"DAC1_OUT1"},
+ "encoderTimers":["TIM1","TIM2","TIM3","TIM4","TIM8"],
+ "dmaRequests":{"TIM15_CH1":77,"TIM16_CH1":82,"TIM17_CH1":84,"TIM20_CH1":86,"TIM5_CH2":73,"USART1_RX":24,"USART1_TX":25,"SPI2_RX":12,"SPI2_TX":13},
+ "dmaBasis":"RM0440 DMAMUX assignment table; cross-checked with stm32g4xx-hal 0.1.0 dma/mux.rs",
+ "lsiHz":[29500,34000]
+}

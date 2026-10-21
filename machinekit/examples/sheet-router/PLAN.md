@@ -1057,6 +1057,16 @@ This is layout acceptance; actual retained-link cutting, inventory execution and
 ### Phase D: control hardware (bench)
 
 **SR15. Board firmware: timers, encoders, I/O, watchdog.**
+- Non-hardware scope checked: [firmware packet](firmware/README.md), five independent
+  step timers plus five encoder timers, 14 distinct EXTI lines, nine DMA channels,
+  DAC/USART/SPI and all 106 SR17 connector-to-device mappings. G474 LQFP64 allocation
+  fits; stock Nucleo routing/oscillator/VCP/LED links remain SR18 checks. A second
+  I/O MCU is the recorded fallback if board routing or measured deadlines do not fit.
+- Shared no_std pulse timing, encoder extension and latched watchdog/following-error/
+  alarm stops pass focused host tests; the real ARM bench target cross-checks.
+  The minimal bench firmware still uses virtual motor outputs. Hardware DMA/EXTI
+  bring-up, pulse/jitter/counts, watchdog gates and carrier qualification remain SR18;
+  State6 encoder/fault wire integration remains SR16, with no wire changes here.
 - On the G474 (`boards/nucleo-g474re` grows into the router board):
   - hardware-timer step and direction for 5 axes, with direction setup and hold times and a stated
     maximum rate;
@@ -1237,7 +1247,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR12 | complete | True-shape no-fit unions, holes/rotations/grain, multiple sheets/remnants, free-form plans; 91 assertions. [Evidence](nesting/README.md). |
 | SR13 | non-motion implemented; jerk-limited cutting acceptance held for OM-R1 + SR6-C | cutting/README.md |
 | SR14 | planned | |
-| SR15 | planned | |
+| SR15 | non-hardware timing/resource/stop checks pass; hardware checks SR18 | firmware/README.md |
 | SR16 | planned | |
 | SR17 | schematic data/graph checks pass; supply/component/hardware release pending | electronics/README.md |
 | SR18 | planned | |

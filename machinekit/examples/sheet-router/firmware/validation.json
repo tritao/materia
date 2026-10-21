@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "hostTests": 16,
+  "armTarget": "thumbv7em-none-eabihf",
+  "armCheck": "PASS",
+  "pinMap": {
+    "pinAssignments": 45,
+    "fastExtiInputs": 14,
+    "dmaChannels": 9,
+    "channelMappings": 106,
+    "iwdgMinUs": 18823.529411764706,
+    "iwdgMaxUs": 21694.915254237287,
+    "status": "PASS",
+    "negativeFixtures": 6
+  },
+  "sourceSha256": {
+    "robotkit/device_protocol/boards/router.rs": "7c40eaaeb8f23f99708719b3bece0495b50d170058588b5f61526134b76af9b6",
+    "robotkit/device_protocol/boards/nucleo-g474re/src/router_profile.rs": "8c9ae31b2bea1e7862e5507016237fbe6d092e9a09e54fad28d6cb39de177e6e",
+    "robotkit/device_protocol/boards/nucleo-g474re/src/router_hal.rs": "2d71af42a65e8c7a50ca03bf6ea261a05db096e01f724b71f75c2aad6956345e"
+  },
+  "hardwareStatus": "SR18 pending; physical outputs remain virtual in bench image",
+  "unfilteredIntegrationSuite": "Not claimed: pre-existing f32/f64 mismatches in tests/step_generator.rs and tests/virtual_board.rs"
+}

@@ -33,3 +33,6 @@ pub mod heater;
 pub mod weld_contract;
 #[path = "../../../processkit/schema/screwdriver_contract.rs"]
 pub mod screwdriver_contract;
+
+#[path = "../boards/router.rs"]
+pub mod router;
