@@ -302,9 +302,50 @@ onto views and procedures. Remove any leftover ad-hoc presentation fields from
 *Accept:* `grep` finds no inspection-camera, `initialView`, `hiddenPrefixes` or
 `exploded` presentation paths outside `materia.presentation`.
 
+### AP8 — Filled section caps (renderer)
+Today a section plane only discards fragments (`scene_fragment.glsl`, up to 32
+planes). Since back faces are rejected for single-sided materials, a cut solid
+reads as a hollow shell. Caps make **See inside** views legible.
+
+Approach: **back-face caps in the scene shaders.** While any section is active, a
+back face of a capped part that survives clipping is not rejected. It is shaded
+as cap surface instead:
+- The cap plane is the active plane whose intersection with the view ray lies in
+  the kept region and is nearest the eye behind the fragment. Fragment depth
+  is written at that ray–plane point, so depth, edges, AO and picking see the cut
+  face where it really is.
+- The shading normal is the plane normal facing the eye. The colour is the part's
+  material, darkened, with a hatch in the plane's own 2D coordinates and a spacing
+  fixed in metres, so the hatch does not swim when the camera moves.
+- One pass covers any number of planes. No stencil passes, no per-part draws,
+  and no CPU or CAD recomputation while a plane is dragged.
+
+Rules:
+- Only **closed, single-sided** parts get caps. Double-sided sheets and
+  transparent or hidden parts get none. CadKit solids are closed by
+  construction. Other producers declare closure explicitly, backed by the
+  winding/closure check introduced for the socket fixture mesh. An open mesh
+  must never grow fake caps, and an undeclared part is uncapped.
+- A pick on a cap returns the occurrence plus `cap(plane index)`, never a B-rep
+  face id. Face mates, measurement and face hover must not resolve to the hidden
+  back face behind a cap.
+- The renderer owns caps, just as it owns clipping. `SectionPlane` and the
+  presentation model are unchanged. Add a per-view cap style only when a real
+  view needs one.
+- Exact B-rep sections (CadKit plane ∩ solid) remain a separate future feature
+  for drawings and measurement. They are not how the viewer draws caps.
+
+*Accept:* renderer pixel tests for one plane, two intersecting planes, a hollow
+core (cavity walls stay uncapped, so the void reads as empty) and an open mesh
+(no cap). Also: a cap pick returns the occurrence with no face id, depth and edges
+at a cap boundary match the plane, MSAA shows no cap leakage at silhouettes, and a
+mirrored instance caps correctly. Recapture socket fixture **See inside** and
+gripper **Jaw detail**, review them, and record them in their READMEs. Update
+`scenekit/scene_render/shaders/README.md`.
+
 ## Ordering and dependencies
 
-AP0 → AP1 → AP2 → AP3 → AP4 → AP5 → AP6 → AP7. AP5 comes before AP6 on purpose,
+AP0 → AP1 → AP2 → AP3 → AP4 → AP5 → AP6 → AP7 → AP8. AP5 comes before AP6 on purpose,
 so the format is proven general before the mould planner shapes it. AP6 depends on
 the casting tooling slices that own `SweptRemoval` and `SocketFixturePlanner`
 (`manufacturingkit/TOOLING_PLAN.md`), and only reads their output.
