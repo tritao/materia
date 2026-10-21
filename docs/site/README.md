@@ -119,7 +119,10 @@ with the tool at its end. The site's accent colour is the logo's blue (`src/styl
 program (`docs/components/`) builds every recipe at its defaults and writes
 `docs/components/data/components.json` (parameters, catalogue rows and their provenance,
 connectors, mass, BOM line) and a GLB per part into `public/components/`, with its feature edges
-as lines (CadKit's `MeshFeatureEdges`, the editor's rule). It also writes the lighting from the
+as lines (CadKit's `MeshFeatureEdges`, the editor's rule), turned to the component's presentation
+view (MachineKit's `ComponentView`). Threaded faces carry the editor's cosmetic thread texture
+(CadKit's `ThreadSurface` and `ThreadTexture`), with one normal and shade texture per thread form in
+`public/components/threads/`. It also writes the lighting from the
 editor's Studio look (`haxeon.editor.ViewportLook`): one environment map per catalogue camera angle
 in `public/components/environment/`, the exposure and tone mapping, and the look's roughness floor
 on the exported materials, so a part reads as it does in the editor

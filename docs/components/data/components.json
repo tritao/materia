@@ -27183,7 +27183,7 @@
    },
    "material": "aluminium",
    "mass": {
-    "kg": 0.001518,
+    "kg": 0.001528,
     "source": "Computed(Preview)"
    },
    "model": "transmission-custom-timing-pulley.glb",
@@ -27305,7 +27305,7 @@
    },
    "material": "machined-steel",
    "mass": {
-    "kg": 0.044026,
+    "kg": 0.04422,
     "source": "Computed(Preview)"
    },
    "model": "transmission-generic-sprocket.glb",
@@ -27446,7 +27446,7 @@
    },
    "material": "machined-steel",
    "mass": {
-    "kg": 0.097735,
+    "kg": 0.097989,
     "source": "Computed(Preview)"
    },
    "model": "transmission-helical-pinion.glb",
@@ -28040,7 +28040,7 @@
     }
    ],
    "mass": {
-    "kg": 0.045145,
+    "kg": 0.045346,
     "source": "Computed(Preview)"
    },
    "model": "transmission-sprocket.glb",
@@ -28174,7 +28174,7 @@
    },
    "material": "machined-steel",
    "mass": {
-    "kg": 0.096095,
+    "kg": 0.096242,
     "source": "Computed(Preview)"
    },
    "model": "transmission-spur-gear.glb",
@@ -28425,7 +28425,7 @@
    },
    "material": "aluminium",
    "mass": {
-    "kg": 0.001518,
+    "kg": 0.001528,
     "source": "Computed(Preview)"
    },
    "model": "transmission-timing-pulley.glb",

@@ -1,5 +1,10 @@
 import haxe.Json;
 import cadkit.MeshFeatureEdges;
+import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
+import cadkit.threads.ThreadSurface;
+import cadkit.threads.ThreadTexture;
+import cadkit.threads.Threads;
 import haxe.io.Bytes;
 import haxeon.editor.ViewportLook;
 import machinekit.catalog.CatalogMetadata;
@@ -27,6 +32,10 @@ class DocsComponents {
 	static inline var DATA = "data/components.json";
 	static inline var MODELS = "../site/public/components";
 	static inline var ENVIRONMENTS = "../site/public/components/environment";
+	static inline var THREADS = "../site/public/components/threads";
+
+	/** Cosmetic thread textures, by file below MODELS, shared by every model with that thread form. */
+	static final threadTextures:Map<String, Bytes> = [];
 
 	/** The catalogue's views: one turn about the vertical, and the angles down from it a part can get (see `view`). */
 	static inline var THETA = 35.0;
@@ -59,6 +68,8 @@ class DocsComponents {
 					kind: registry.kind(type.id), error: Std.string(error)});
 			}
 		}
+		for (file => bytes in threadTextures)
+			models.set(file, bytes);
 		for (phi in PHIS)
 			models.set('environment/${environmentName(phi)}', StudioEnvironment.hdr(look(), THETA, phi));
 		// The viewers' display mapping, from the same look (docs/site/src/model-view.json has the rest).
@@ -76,8 +87,9 @@ class DocsComponents {
 			} else {
 				FileSystem.createDirectory(MODELS);
 			}
-			if (!FileSystem.exists(ENVIRONMENTS))
-				FileSystem.createDirectory(ENVIRONMENTS);
+			for (directory in [ENVIRONMENTS, THREADS])
+				if (!FileSystem.exists(directory))
+					FileSystem.createDirectory(directory);
 			for (name => bytes in models)
 				File.saveBytes('$MODELS/$name', bytes);
 		} else {
@@ -125,8 +137,8 @@ class DocsComponents {
 		} catch (_:Dynamic) {}
 		var model:Null<Bytes> = null;
 		if (component.hasGeometry()) {
-			var exported = glb(component);
-			model = exported.bytes;
+			var exported = glb(component, threadTextures);
+			model = exported.bytes();
 			entry.model = modelName(type.id);
 			entry.view = view(exported);
 		}
@@ -210,35 +222,98 @@ class DocsComponents {
 	static function modelName(id:String):String
 		return id.split(".").slice(1).join("-") + ".glb";
 
-	/** The default part at preview detail as a binary glTF, in metres, coloured by its material, with its feature edges. */
-	static function glb(component:MachineComponent):Glb {
+	/**
+	 * The default part at preview detail as a binary glTF, in metres, coloured by its material, with its feature
+	 * edges, turned to its presentation view. Threaded faces carry the editor's cosmetic thread texture: each is
+	 * replaced by CadKit's ThreadSurface over its own triangles (textured inside the thread's span, plain outside),
+	 * and the textures are written once per thread form into `threadTextures`.
+	 */
+	static function glb(component:MachineComponent, threadTextures:Map<String, Bytes>):Glb {
 		var part = component.geometry(ComponentDetail.Preview);
 		var mesh = part.shape.tessellateRelative();
+		var threads = Threads.renderData(part.shape);
+		part.close();
 		var features = MeshFeatureEdges.ofMesh(mesh), edges:Array<Float> = [];
 		for (segment in 0...features.length)
 			if (features[segment])
 				for (value in 0...6)
 					edges.push(mesh.edgeSegments.getDouble(segment * 48 + value * 8));
+		var points:Array<Float> = [], normals:Array<Float> = [];
+		for (index in 0...mesh.vertexCount * 3) {
+			points.push(mesh.vertices.getDouble(index * 8));
+			normals.push(mesh.normals.getDouble(index * 8));
+		}
 		// The part turned to its presentation view: declared by the component, or chosen from its bounds.
 		var minimum = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
 		var maximum = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-		for (vertex in 0...mesh.vertexCount)
-			for (axis in 0...3) {
-				var value = mesh.vertices.getDouble(vertex * 24 + axis * 8);
-				if (value < minimum[axis]) minimum[axis] = value;
-				if (value > maximum[axis]) maximum[axis] = value;
-			}
+		for (index in 0...points.length) {
+			var axis = index % 3;
+			if (points[index] < minimum[axis]) minimum[axis] = points[index];
+			if (points[index] > maximum[axis]) maximum[axis] = points[index];
+		}
 		var view = component.presentationView();
 		if (view == null) view = ComponentView.derive(minimum, maximum);
 		var u = view.up, f = view.front;
+		// Rows: the local directions that become glTF's +X, +Y (up) and +Z (towards the viewer); millimetres to metres.
 		var axes = [[u[1] * f[2] - u[2] * f[1], u[2] * f[0] - u[0] * f[2], u[0] * f[1] - u[1] * f[0]], u, f];
-		var material = MaterialLibrary.require(component.materialId).visual;
+		function turn(values:Array<Float>, scale:Float):Array<Float>
+			return [
+				for (index in 0...values.length) {
+					var base = index - index % 3, row = axes[index % 3];
+					(row[0] * values[base] + row[1] * values[base + 1] + row[2] * values[base + 2]) * scale;
+				}
+			];
+		var visual = MaterialLibrary.require(component.materialId).visual;
 		// Material colours are sRGB, as the editor's shader reads them; glTF factors are linear. The editor's
 		// display roughness floor applies too, so highlights spread the same way.
-		return Glb.write(mesh.vertices, mesh.normals, mesh.indices, mesh.vertexCount, mesh.indexCount, edges, axes, 0.001,
-			[for (channel in material.baseColor) srgbToLinear(channel)], material.metallic,
-			Math.max(material.roughness, look().roughnessFloor));
+		var color = [for (channel in visual.baseColor) srgbToLinear(channel)];
+		var roughness = Math.max(visual.roughness, look().roughnessFloor);
+		var model = new Glb();
+		var surface = model.material(color, visual.metallic, roughness);
+		var threaded:Map<Int, Bool> = [];
+		for (thread in threads)
+			threaded.set(thread.faceIndex, true);
+		var baseIndices:Array<Int> = [], outsidePoints:Array<Float> = [], outsideNormals:Array<Float> = [];
+		for (range in mesh.faceRanges)
+			if (!threaded.exists(range.faceIndex))
+				for (index in range.firstIndex...range.firstIndex + range.indexCount)
+					baseIndices.push(mesh.indices.getInt32(index * 4));
+		for (thread in threads) {
+			var faceTriangles:Array<Int> = [];
+			for (range in mesh.faceRanges)
+				if (range.faceIndex == thread.faceIndex)
+					for (index in range.firstIndex...range.firstIndex + range.indexCount)
+						faceTriangles.push(mesh.indices.getInt32(index * 4));
+			var frame = new Plane(new Vector(thread.origin[0], thread.origin[1], thread.origin[2]),
+				new Vector(thread.xDirection[0], thread.xDirection[1], thread.xDirection[2]),
+				new Vector(thread.direction[0], thread.direction[1], thread.direction[2]));
+			var unwrapped = ThreadSurface.unwrap(thread.faceName, thread.spec, frame, thread.length, thread.spec.pitch,
+				thread.ringAtStart, thread.ringAtEnd, points, normals, faceTriangles);
+			outsidePoints = outsidePoints.concat(unwrapped.outsidePositions);
+			outsideNormals = outsideNormals.concat(unwrapped.outsideNormals);
+			for (value in unwrapped.rings) edges.push(value);
+			var name = threadTextureName(thread.spec);
+			for (normal in [false, true]) {
+				var file = 'threads/$name-${normal ? "normal" : "shade"}.png';
+				if (!threadTextures.exists(file))
+					threadTextures.set(file, Png.rgba(ThreadTexture.SIZE, ThreadTexture.SIZE,
+						ThreadTexture.pixels(thread.spec, normal).sub(0, ThreadTexture.SIZE * ThreadTexture.SIZE * 4)));
+			}
+			var material = model.material(color, visual.metallic, roughness, 'threads/$name-shade.png', 'threads/$name-normal.png');
+			model.triangles(turn(unwrapped.positions, 0.001), turn(unwrapped.normals, 1), unwrapped.uvs, unwrapped.triangles, material);
+		}
+		model.triangles(turn(points, 0.001), turn(normals, 1), null, baseIndices, surface);
+		model.triangles(turn(outsidePoints, 0.001), turn(outsideNormals, 1), null, [for (index in 0...Std.int(outsidePoints.length / 3)) index],
+			surface);
+		// Edges contrast with the part, as in the editor: dark on light surfaces, light on dark ones.
+		var edge = [for (channel in ViewportLook.edgeColor(visual.baseColor)) srgbToLinear(channel)];
+		model.lines(turn(edges, 0.001), model.unlitMaterial([edge[0], edge[1], edge[2], 1.0]));
+		return model;
 	}
+
+	/** One texture pair per thread form: profile, size, pitch, starts and hand. */
+	static function threadTextureName(spec:materia.project.ThreadSpecData):String
+		return ('${spec.profile}-${spec.majorDiameter}-${spec.pitch}-${spec.starts}-${spec.hand}').toLowerCase().split(".").join("_");
 
 	static function srgbToLinear(value:Float):Float {
 		return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
