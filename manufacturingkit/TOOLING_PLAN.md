@@ -2,6 +2,24 @@
 
 Status: phases 1–5 and the phase 6 process-analysis foundation are implemented as review tooling. The fabrication package reports unresolved process, structural, fixture and finishing requirements; physical qualification remains pending.
 
+## Scope freeze and definition of done (2026-10-21)
+
+- **Scope is frozen.** Phases 6–8 contain what this plan states today and
+  nothing more. A new requirement found in review or implementation goes under
+  "Deferred scope" with a one-line reason, unless it is a defect in work already
+  planned. Reviews fix defects; they do not add features.
+- **Code complete** means phases 6–8 produce complete, reproducible and honestly
+  validated mold kits for the mill base, the mill column and the hobber plinth.
+  Readiness remaining Pending on inputs that software cannot supply does not
+  block code completion. Those inputs are accuracy budgets (RM0), production
+  compound and layer, the base–column joint gap and jacking, workshop equipment
+  and phase 9 evidence. Phase 9 is the physical release gate.
+- **Delivery.** Land work on main in slices that build and pass their suites,
+  each with at most one format version bump per affected codec. Do not hold
+  long-lived isolated changes. While iterating, run the focused suites only.
+  Before each commit, run the full native suites and regenerate the
+  packages once.
+
 ## Implementation progress
 
 - [x] Phase 1: neutral input/setup/stock records, strict versioned codec, stable
