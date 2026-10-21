@@ -41,7 +41,8 @@ class BoxMoldTests {
 			"plug carries the mating source thread, rather than a smooth tap-drill pin");
 		var shape = plug.geometry();
 		check(shape.shape.threadedFaces().length == 1, "plug CAD retains its external thread attribute");
-		var end = cadkit.modeling.Part.cylinderSpan(1, plug.length - plug.thread.pitch / 2, plug.length);
+		// The flat point, at z = -length in the screw's frame (socket at the origin), must stay solid.
+		var end = cadkit.modeling.Part.cylinderSpan(1, -plug.length, -plug.length + plug.thread.pitch / 2);
 		var leak = end.subtract(shape);
 		var leakVolume = leak.volume();
 		leak.close(); end.close(); shape.close();

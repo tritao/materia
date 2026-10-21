@@ -254,8 +254,10 @@ class CastingMoldCad {
 			a.addComponent(materia.tooling.ToolingIds.derive("insert-", i.id), part, pose);
 		}
 		for (h in p.hardware) {
-			if (h.kind == SupportHardwareKind.BoreMask)
-				a.addComponent(h.id, ToolingPin.boreMask(boreMaskRecord(p, h.id).hole, boreMaskRecord(p, h.id).protection.plugLength), h.pose);
+			if (h.kind == SupportHardwareKind.BoreMask) {
+				var mask = ToolingPin.boreMask(boreMaskRecord(p, h.id).hole, boreMaskRecord(p, h.id).protection.plugLength);
+				a.addComponent(h.id, mask, F.compose(h.pose, ToolingPin.boreSeat(mask)));
+			}
 			else if (h.kind == SupportHardwareKind.BorePlug) {
 				var protections = [for (fixture in p.fixtures) for (pen in fixture.penetrations)
 					if (pen.sourceHoleId != null && materia.tooling.ToolingIds.derive("resin-plug-", fixture.insertId + "-" + pen.sourceHoleId) == h.id)
@@ -268,7 +270,8 @@ class CastingMoldCad {
 				var source = p.document.input.inserts.filter(i -> i.id == protections[0].insertId)[0];
 				var hole = materia.tooling.casting.InsertFixturePlanner.holes(source).filter(hole -> hole.id == protections[0].holeId)[0];
 				a.addComponent(h.id, machinekit.standard.SocketSetScrew.forThread(
-					machinekit.structural.InsertHoles.threadSpec(hole.thread).mating(), h.length), h.pose);
+					machinekit.structural.InsertHoles.threadSpec(hole.thread).mating(), h.length),
+					F.compose(h.pose, machinekit.standard.SocketSetScrew.boreSeat()));
 			}
 			else if (h.kind == SupportHardwareKind.LocatingPin
 				|| h.kind == SupportHardwareKind.FixturePin)

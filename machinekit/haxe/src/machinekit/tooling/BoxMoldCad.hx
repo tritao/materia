@@ -146,15 +146,18 @@ class BoxMoldCad {
 					throw "Unsupported nominal bore plug material";
 				a.addComponent(materia.tooling.ToolingIds.derive("resin-plug-", hole.id),
 					machinekit.standard.SocketSetScrew.forThread(machinekit.structural.InsertHoles.threadSpec(thread).mating(), plug.length),
-					F.compose(fixing.entry, F.translation(0, 0, hole.depth - plug.length)));
+					F.compose(F.compose(fixing.entry, F.translation(0, 0, hole.depth - plug.length)), machinekit.standard.SocketSetScrew.boreSeat()));
 			}
 		}
 		for (mask in fixture.boreMasks) {
 			var hole = materia.tooling.casting.InsertFixturePlanner.holes(i).filter(h -> h.id == mask.sourceHoleId)[0];
-			a.addComponent(mask.hardwareId, ToolingPin.boreMask(hole, mask.plugLength), F.compose(pose, hole.frame));
-			if (mask.farEndId != null)
-				a.addComponent(mask.farEndId, ToolingPin.boreMask(hole, mask.plugLength),
-					F.compose(F.compose(pose, hole.frame), F.translation(0, 0, hole.depth - (cast mask.plugLength : Float))));
+			var near = ToolingPin.boreMask(hole, mask.plugLength);
+			a.addComponent(mask.hardwareId, near, F.compose(F.compose(pose, hole.frame), ToolingPin.boreSeat(near)));
+			if (mask.farEndId != null) {
+				var far = ToolingPin.boreMask(hole, mask.plugLength);
+				a.addComponent(mask.farEndId, far, F.compose(F.compose(F.compose(pose, hole.frame),
+					F.translation(0, 0, hole.depth - (cast mask.plugLength : Float))), ToolingPin.boreSeat(far)));
+			}
 		}
 		var poses = a.solvedPoses(), bedPose = poses.get("bed");
 		for (row in a.components())

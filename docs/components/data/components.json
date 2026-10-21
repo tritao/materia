@@ -25944,8 +25944,12 @@
    ],
    "connectors": [
     {
-     "name": "mount",
-     "role": "Mount"
+     "name": "drive",
+     "role": "Face"
+    },
+    {
+     "name": "tip",
+     "role": "Face"
     }
    ],
    "bom": {

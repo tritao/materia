@@ -168,17 +168,20 @@ class InsertFixtureCad {
 				var plug = site.plug;
 				add(assembly,root,ToolingIds.derive("",site.id,"-far-end"),
 					machinekit.standard.SocketSetScrew.forThread(machinekit.structural.InsertHoles.threadSpec(site.thread).mating(),plug.length),
-					F.compose(site.entry,F.translation(0,0,hole.depth-plug.length)));
+					F.compose(F.compose(site.entry,F.translation(0,0,hole.depth-plug.length)),machinekit.standard.SocketSetScrew.boreSeat()));
 			}
 		}
 		for (mask in plan.masks) {
 			var insert = plan.document.input.inserts.filter(row -> row.id == mask.insertId)[0];
 			var hole = insert.holes.filter(row -> row.id == mask.protection.sourceHoleId)[0];
 			var entry = F.compose(plan.document.setup.sourceToMold,F.compose(insert.pose,hole.frame));
-			add(assembly,root,mask.protection.hardwareId,ToolingPin.boreMask(hole,mask.protection.plugLength),entry);
-			if (mask.protection.farEndId != null)
-				add(assembly,root,mask.protection.farEndId,ToolingPin.boreMask(hole,mask.protection.plugLength),
-					F.compose(entry,F.translation(0,0,hole.depth-(cast mask.protection.plugLength:Float))));
+			var near = ToolingPin.boreMask(hole,mask.protection.plugLength);
+			add(assembly,root,mask.protection.hardwareId,near,F.compose(entry,ToolingPin.boreSeat(near)));
+			if (mask.protection.farEndId != null) {
+				var far = ToolingPin.boreMask(hole,mask.protection.plugLength);
+				add(assembly,root,mask.protection.farEndId,far,
+					F.compose(F.compose(entry,F.translation(0,0,hole.depth-(cast mask.protection.plugLength:Float))),ToolingPin.boreSeat(far)));
+			}
 		}
 		if (cured)
 			add(assembly,root,"cured-casting",ToolingSourceCasting.fromInput(plan.document.input),plan.document.setup.sourceToMold);

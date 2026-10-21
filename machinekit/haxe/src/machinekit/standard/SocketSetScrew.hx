@@ -9,6 +9,8 @@ import machinekit.component.ComponentRecipeSupport as P;
 import materia.assembly.AssemblyFrames as F;
 
 /** ISO 4026 flat-point set screw, nominal dimensions, no helical collision solid.
+ * Like the other fasteners its frame is at the drive end: the hex socket opens towards +z and the threaded body
+ * runs to the flat point at z = -length. Seat it in a bore with `boreSeat`.
  * Length/supplier qualification remains a fabrication input. Socket dimensions:
  * https://www.accu.co.uk/flat-point-set-screws/4547-SSF-M6-5-A2
  * https://cdn.mscdirect.com/global/images/ProductDataSheet/pds_sku_254996_productbrochure_manual%20data%20sheet.pdf
@@ -55,8 +57,16 @@ class SocketSetScrew extends MachineComponent {
 		if (!Math.isFinite(length) || length <= thread.pitch || socketDepth <= 0)
 			throw "Threaded plug needs a blind socket and a solid end";
 		super('ISO4026-${thread.designation}x${Dimension.format(length)}', "Flat-point socket set screw; nominal supplier selection", "steel", false, values);
-		addConnector("mount", Mount, F.identity());
+		addConnector("drive", Face, Solids.axial(0, 0, 0));
+		addConnector("tip", Face, Solids.axial(0, 0, -length));
 	}
+
+	/**
+	 * The screw's frame relative to a bore frame whose z = 0 is where the socket faces out and whose +z runs into
+	 * the bore: half a turn about x, so the body fills the bore and the socket stays at the open end.
+	 */
+	public static function boreSeat():materia.assembly.AssemblyRecord.AssemblyFrame
+		return F.fromRotationMatrix(0, 0, 0, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
 
 	override public function componentType():Null<ComponentType> return recipeType();
 	override public function hasGeometry():Bool return true;
@@ -64,13 +74,13 @@ class SocketSetScrew extends MachineComponent {
 		// Envelope is the free thread root after unscrewing; it is used only by
 		// removal checks after the explicit fastener-release step.
 		var radius = (detail == Envelope ? thread.externalMinorDiameter() : thread.majorDiameter) / 2;
-		var shaft = Part.cylinder(radius, length);
+		var shaft = Part.cylinderSpan(radius, -length, 0);
 		var tagged:Part;
 		try tagged = new Part(Threads.attach(shaft.shape, "cyl.side", thread, AxisMinimum, length))
 		catch (error:Dynamic) {shaft.close(); throw error;}
 		shaft.close();
 		if (detail == Envelope)
 			return tagged;
-		return Solids.cut(tagged, [Part.prism(cadkit.modeling.Polygon.regular(6, socketSize), -thread.pitch, socketDepth)]);
+		return Solids.cut(tagged, [Part.prism(cadkit.modeling.Polygon.regular(6, socketSize), -socketDepth, thread.pitch)]);
 	}
 }

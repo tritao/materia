@@ -34,6 +34,11 @@ class ToolingPin extends MachineComponent {
     override public function componentType():Null<ComponentType> return recipeType();
     override public function hasGeometry():Bool return true;
     override public function setMaterial(spec:String):Void {if(spec!="steel")throw "Tooling pin requires steel";super.setMaterial(spec);}
+    /** A bore mask's frame in its hole's frame (z = 0 at the entry, +z into the bore): a pin already runs along
+     *  +z; a threaded mask is a set screw, which is turned so its socket stays at the entry. */
+    public static function boreSeat(mask:MachineComponent):materia.assembly.AssemblyRecord.AssemblyFrame
+        return Std.isOfType(mask, machinekit.standard.SocketSetScrew) ? machinekit.standard.SocketSetScrew.boreSeat() : F.identity();
+
     public static function boreMask(hole:materia.casting.InsertHole, ?plugLength:Float):MachineComponent {
         if (hole.thread != null) {
             if (plugLength == null)
