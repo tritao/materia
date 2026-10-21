@@ -1877,6 +1877,11 @@ structures and phase 9 physical calibration remain open.
   Missing workshop mix/equipment data remain Pending; a multi-batch proposal
   does not qualify the uniform full-casting cure model. Focused foundation
   validation: **229 assertions**, including **57** pour-planning assertions.
+  Implementation landed in **4f9a7a78b**. Validation: neutral tooling **1,794**;
+  native tooling **430**, casting **54**, foundation CAD **60**, standalone
+  native process **34**, full mill **249**. Regenerated records-only kit:
+  **122 artifacts / 40 programs / 15 Pass / 263 Pending / 15 Unsupported**;
+  manifest integrity/tamper and all artifact hashes pass; readiness is **false**.
 
 ### Phase 7 records: shared levelling-foot family
 
