@@ -7,7 +7,7 @@ import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.ToolingDiagnostic.ToolingSeverity;
 import materia.tooling.export.FabricationSpec;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import materia.assembly.AssemblyFrames as F;
 
 enum abstract LoadEstimateKind(String) to String {
@@ -119,7 +119,7 @@ class ToolingLoads {
 				(p.document.recipe.mixDensityKgM3 * s.gravityMps2 * volume * 1e-9 + extra * c.cavity.width * c.cavity.depth * 1e-6) * s.loadFactor);
 		}
 		for (m in p.panels.members.concat(p.supportPanels)) {
-			var b = PanelGeometry.bounds(PanelContours.outside(m.panel));
+			var b = CastingProfileGeometry.bounds(PanelContours.outside(m.panel));
 			var zmin = 1e30, zmax = -1e30;
 			for (x in [b.x, b.x + b.width])
 				for (y in [b.y, b.y + b.height]) {

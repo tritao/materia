@@ -4,7 +4,7 @@ import cadkit.drawing.Svg;
 import cadkit.drawing.Drawing2D;
 import cadkit.drawing.DrawingEntity;
 import cadkit.sheetmetal.Point2;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import cadkit.drawing.Dxf;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.AssemblyPreview;
@@ -35,7 +35,7 @@ class PanelToolingPreview {
         if(clearances!=null) {
             var entities=drawing.entities();
             for(i in 0...clearances.length) {
-                var op=p.operations.filter(o->o.id=='fit-$i')[0],bounds=PanelGeometry.bounds(op.contour);
+                var op=p.operations.filter(o->o.id=='fit-$i')[0],bounds=CastingProfileGeometry.bounds(op.contour);
                 entities.push(Label(Text,new Point2(bounds.x+bounds.width/2-12,bounds.y-8),2.8,"C="+clearances[i]+" mm"));
             }
             drawing=new Drawing2D(entities);

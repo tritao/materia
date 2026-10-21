@@ -206,7 +206,7 @@ class CamToolingPanelTests {
 		check(area(conventionalPrograms[1].program, p.operations[0].id) > 0 && area(conventionalPrograms[1].program, "inside") < 0,
 			"conventional cutting reverses both material sides");
 		var extended = CamToolingPanels.openRebate(p.operations.filter(op -> op.id == "edge-rebate")[0], PanelContours.outside(p), 1);
-		check(materia.tooling.panel.PanelGeometry.bounds(extended.contour).x == -1,
+		check(materia.casting.CastingProfileGeometry.bounds(extended.contour).x == -1,
 			"square rebate's open side extends one cutter radius outside finished outline");
 		for (op in setups[1].program.ops)
 			switch (op) {

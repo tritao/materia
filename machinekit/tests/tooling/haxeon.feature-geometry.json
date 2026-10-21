@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-feature-geometry-tests"
+  },
+  "entry": "FeatureGeometryTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/feature-geometry"
+}

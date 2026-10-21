@@ -1,7 +1,7 @@
 import materia.tooling.panel.PanelJoints;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import materia.tooling.panel.PanelCoupon;
 import materia.tooling.panel.PanelAssemblyPlan;
 import materia.tooling.ToolingEnums.ContactFace;
@@ -30,11 +30,11 @@ class PanelTests {
 
 	public static function run():Void {
 		var uprightSlot = PanelContours.obround(12, 20, 3.2, 5.2);
-		PanelGeometry.validate(uprightSlot);
-		var uprightBounds = PanelGeometry.bounds(uprightSlot);
+		CastingProfileGeometry.validate(uprightSlot);
+		var uprightBounds = CastingProfileGeometry.bounds(uprightSlot);
 		check(Math.abs(uprightBounds.width - 3.2) + Math.abs(uprightBounds.height - 5.2) < 1e-7,
 			"vertical locator slot retains exact extents");
-		check(Math.abs(PanelGeometry.area(uprightSlot) - (3.2 * 2 + Math.PI * 1.6 * 1.6)) < 1e-7,
+		check(Math.abs(CastingProfileGeometry.area(uprightSlot) - (3.2 * 2 + Math.PI * 1.6 * 1.6)) < 1e-7,
 			"vertical locator slot retains exact line/arc area");
 		for (t in [17.6, 18.0, 18.3]) {
 			var stock = PanelJoints.stock(t);
@@ -68,7 +68,7 @@ class PanelTests {
 				check(PanelContours.outside(p).length > 0, "exact outside operation");
 			}
 			var slot = pair.fixed.operations.filter(o -> o.id == "slot-0")[0],
-				bounds = PanelGeometry.bounds(PanelContours.operation(slot));
+				bounds = CastingProfileGeometry.bounds(PanelContours.operation(slot));
 			check(Math.abs(bounds.height - (t + 0.2 + 6)) < 1e-6, "measured stock controls slot and corner overcut");
 			check(pair.moving.operations[0].contour.filter(s -> s.kind == "arc").length == 4, "root relief arcs in exact outside contour");
 		}
@@ -84,12 +84,12 @@ class PanelTests {
 		bad.operations[0].kind = cast "inferred";
 		rejects(() -> PanelCodec.snapshot(bad), "Unsupported panel operation kind");
 		var circle = PanelContours.circle(20, 20, 10);
-		PanelGeometry.validate(circle);
-		check(Math.abs(PanelGeometry.area(circle) - Math.PI * 100) < 1e-7, "exact arc area");
-		check(PanelGeometry.inside(circle, 20, 20) && !PanelGeometry.inside(circle, 40, 20), "exact circle containment");
+		CastingProfileGeometry.validate(circle);
+		check(Math.abs(CastingProfileGeometry.area(circle) - Math.PI * 100) < 1e-7, "exact arc area");
+		check(CastingProfileGeometry.inside(circle, 20, 20) && !CastingProfileGeometry.inside(circle, 40, 20), "exact circle containment");
 		var relief = PanelContours.relievedRectangle(50, 50, 30, 20, 3);
-		PanelGeometry.validate(relief);
-		check(Math.abs(PanelGeometry.area(relief) - (600 + 3 * Math.PI * 9)) < 1e-6, "single relieved contour equals rectangle and exterior corner sectors");
+		CastingProfileGeometry.validate(relief);
+		check(Math.abs(CastingProfileGeometry.area(relief) - (600 + 3 * Math.PI * 9)) < 1e-6, "single relieved contour equals rectangle and exterior corner sectors");
 		var mismatch = PanelJoints.pinBolt("wrong", stock),
 			plan = PanelAssemblyPlan.pair(mismatch);
 		plan.members[1].pose.x += 1;
@@ -119,16 +119,16 @@ class PanelTests {
 		rejects(() -> PanelCodec.encode(wrongTool), "Relief cutter must match operation tool");
 		var arc = PanelCodec.snapshot(coupon.plug);
 		var broken = arc.operations[0].contour.filter(s -> s.kind == "arc")[0];
-		// Replace the point: adjacent segments can share the original endpoint.
-		broken.end = {x: broken.end.x + 1, y: broken.end.y};
-		rejects(() -> PanelCodec.encode(arc), "Invalid panel arc");
+		// Keep all endpoints and neighboring segments valid; break only the arc.
+		broken.sweep += 0.1;
+		rejects(() -> PanelCodec.encode(arc), "Invalid profile arc");
 		var pocket = PanelJoints.blank("pocket", 100, 100, stock);
 		pocket.operations.push(PanelJoints.operation("pocket", Pocket, PanelContours.circle(30, 30, 10), 4, 6, MachiningSide.NegativeZ, false));
 		check(PanelCodec.decode(PanelCodec.encode(pocket)).operations.length == 2, "explicit back-side pocket and setup");
 		pocket.operations[1].setupId = "front";
 		rejects(() -> PanelCodec.encode(pocket), "Setup contains opposite machining faces");
 		rejects(() -> PanelJoints.rebate("thin", PanelJoints.stock(8)), "Rebate leaves insufficient shelf");
-		rejects(() -> PanelGeometry.validate(PanelContours.rectangle(0, 0, 1e200, 1e200)), "Panel contour must have finite positive CCW area");
+		rejects(() -> CastingProfileGeometry.validate(PanelContours.rectangle(0, 0, 1e200, 1e200)), "Profile contour must have finite positive CCW area");
 		var diagonal = PanelJoints.pinBolt("diagonal", stock, 8, 0.2, 2, 7, 6, 6, {
 			width: 220,
 			height: 160,

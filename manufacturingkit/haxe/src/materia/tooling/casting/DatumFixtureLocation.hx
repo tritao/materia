@@ -49,7 +49,7 @@ class DatumFixtureLocation {
 		for (i in 0...9) if (Math.abs(rotation[i]-(i==0 || i==4 || i==8 ? 1 : 0))>EPS)
 			throw "Box fixture bed contact requires an XY panel: "+bed.panel.id;
 		var outlines=bed.panel.operations.filter(op -> op.kind==materia.tooling.panel.PanelPlan.PanelOperationKind.OutsideProfile);
-		if (outlines.length!=1 || !materia.tooling.panel.PanelGeometry.containsRect(outlines[0].contour,
+		if (outlines.length!=1 || !materia.casting.CastingProfileGeometry.containsRect(outlines[0].contour,
 			cavity.x-bed.pose.x,cavity.y-bed.pose.y,cavity.width,cavity.depth))
 			throw "Box fixture contact rectangle is outside its bed: "+bed.panel.id;
 		var thickness=bed.panel.stock.measuredThickness;
@@ -99,7 +99,7 @@ class DatumFixtureLocation {
 						width:Math.abs(entry.x-end.x)+2*(rx+EPS),depth:Math.abs(entry.y-end.y)+2*(ry+EPS),height:1});
 			}
 			for (cut in cuts) {
-				var b=materia.tooling.panel.PanelGeometry.bounds(cut.operation.contour);
+				var b=materia.casting.CastingProfileGeometry.bounds(cut.operation.contour);
 				var xs:Array<Float> = [],ys:Array<Float> = [],zs:Array<Float> = [];
 				for (x in [b.x,b.x+b.width]) for (y in [b.y,b.y+b.height]) for (z in [0.0,cut.operation.depth]) {
 					var point=F.transformPoint(cut.pose,x,y,z);

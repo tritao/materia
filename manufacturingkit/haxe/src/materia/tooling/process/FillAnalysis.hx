@@ -13,12 +13,47 @@ typedef FillCore = {var id:String; var boxes:Array<MoldBox>;}
 typedef FillPanel = {var id:String; var bottomMm:Float;}
 typedef FillCeiling = {var sourceIds:Array<String>; var box:MoldBox;}
 
+/** Native references are reproducible from the report's bound source plan.
+ * The component key selects the exact connected solid above the sealing plane;
+ * a native region never supplies an invented array of boxes.
+ */
+enum FillPocketGeometry {
+	Rectilinear(boxes:Array<MoldBox>, ceilings:Array<FillCeiling>);
+	CadAirAbove(heightMm:Float, componentKey:String);
+}
+
+enum FillOpeningGeometry {
+	RectilinearOpening(footprints:Array<MoldBox>);
+	CadOpening(heightMm:Float, blockerIds:Array<String>);
+}
+
+class FillGeometryRecords {
+	public static function pocket(value:FillPocketGeometry):Dynamic return switch value {
+		case Rectilinear(boxes,ceilings): {kind:"rectilinear",boxes:boxes,ceilingFaces:ceilings};
+		case CadAirAbove(height,key):
+			if (!Math.isFinite(height)) throw "Invalid CAD air-region height";
+			ToolingIds.validate(key);
+			{kind:"cad-air-above",heightMm:height,componentKey:key};
+	};
+	public static function opening(value:FillOpeningGeometry):Dynamic return switch value {
+		case RectilinearOpening(boxes): {kind:"rectilinear",footprints:boxes};
+		case CadOpening(height,ids):
+			if (!Math.isFinite(height)) throw "Invalid CAD opening height";
+			var seen=new Map<String,Bool>();
+			for (id in ids) {
+				ToolingIds.validate(id);
+				if (seen.exists(id)) throw "Duplicate CAD opening blocker ID";
+				seen.set(id,true);
+			}
+			{kind:"cad-opening",heightMm:height,blockerIds:ids};
+	};
+}
+
 typedef AirPocket = {
 	var id:String;
 	var sealedAtMm:Float;
 	var volumeMm3:Float;
-	var boxes:Array<MoldBox>;
-	var ceilingFaces:Array<FillCeiling>;
+	var geometry:FillPocketGeometry;
 	var sourceIds:Array<String>;
 
 	/** Candidate only: routing/sealing a vent is separate tooling/design work. */
@@ -35,15 +70,20 @@ typedef FillLevel = {
 	var cores:Array<{id:String, submergedVolumeMm3:Float, grossUpliftN:Float}>;
 }
 
+enum abstract FillModel(String) to String {
+	var Orthogonal = "exact-orthogonal-flat-free-surface";
+	var Brep = "exact-brep-flat-free-surface";
+}
+
 typedef FillReport = {
 	var sourceFingerprint:String;
 	var processFingerprint:String;
-	var model:String;
+	var model:FillModel;
 	var criticalHeightsMm:Array<Float>;
 	var totalMixVolumeMm3:Float;
 	var geometricResinVolumeMm3:Float;
 	var openFillAreaMm2:Float;
-	var openFillFootprints:Array<MoldBox>;
+	var openFillGeometry:FillOpeningGeometry;
 	var levels:Array<FillLevel>;
 	var trappedPockets:Array<AirPocket>;
 	var validation:Array<ToolingValidation>;
@@ -287,8 +327,7 @@ class FillAnalysis {
 					id: ToolingIds.derive("air-", hash, ""),
 					sealedAtMm: h,
 					volumeMm3: BoxAlgebra.volume(component),
-					boxes: sorted(component),
-					ceilingFaces: faces,
+					geometry:Rectilinear(sorted(component),faces),
 					sourceIds: ids,
 					proposedVentPoint: {
 						x: highest.box.x + highest.box.width / 2,
@@ -411,12 +450,12 @@ class FillAnalysis {
 		return {
 			sourceFingerprint: sourceFingerprint,
 			processFingerprint: processFingerprint,
-			model: "exact-orthogonal-flat-free-surface",
+			model: Orthogonal,
 			criticalHeightsMm: critical,
 			totalMixVolumeMm3: BoxAlgebra.volume(boxes) - BoxAlgebra.volume(trapped),
 			geometricResinVolumeMm3: BoxAlgebra.volume(boxes),
 			openFillAreaMm2: openArea,
-			openFillFootprints: sorted(open),
+			openFillGeometry:RectilinearOpening(sorted(open)),
 			levels: levels,
 			trappedPockets: pockets,
 			validation: checks

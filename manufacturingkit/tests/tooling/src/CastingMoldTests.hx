@@ -180,7 +180,7 @@ class CastingMoldTests {
 		for (piece in fixture.datum.pieces) if (piece.z<top-1e-7) {
 			below++;
 			var contactTolerance=1e-6;
-			check(materia.tooling.panel.PanelGeometry.containsRect(socket.contour,piece.x-bed.pose.x+contactTolerance,
+			check(materia.casting.CastingProfileGeometry.containsRect(socket.contour,piece.x-bed.pose.x+contactTolerance,
 				piece.y-bed.pose.y+contactTolerance,piece.width-2*contactTolerance,piece.depth-2*contactTolerance),
 				"datum interior fits its bed socket; boundary contact is permitted");
 		}
@@ -337,7 +337,7 @@ class CastingMoldTests {
 		bridgePlan.cores.push(extraCore);
 		var bridgePanels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement> = [];
 		materia.tooling.casting.CoreSupports.sharedBridges(bridgePlan.cavity, bridgePlan.document.recipe, bridgePlan.cores, bridgePanels, []);
-		var bridgeBounds = materia.tooling.panel.PanelGeometry.bounds(materia.tooling.panel.PanelContours.outside(bridgePanels.filter(v ->
+		var bridgeBounds = materia.casting.CastingProfileGeometry.bounds(materia.tooling.panel.PanelContours.outside(bridgePanels.filter(v ->
 			v.panel.id == "core-bridge-0")[0].panel));
 		check(Math.abs(bridgeBounds.height - extraCore.cavity.depth / 2) < 1e-8, "row bridge uses the largest depth including a later core");
 		var narrowBridge = ToolingCodec.snapshot(d);

@@ -29,10 +29,17 @@ class CastingCavityCad {
 	}
 
 	static function cut(feature:CastingFeature):Part {
-		if (feature.draft.degrees != 0 || feature.cornerRadius != 0)
+		if (feature.draft.degrees != 0)
 			throw "Unsupported casting cavity geometry: " + feature.id;
 		return Scope.run(scope -> {
-			var local = scope.own(switch feature.geometry.solid {case Cut(solid): CastingSolids.part(solid); case Insert(body): InsertBodies.part(body);});
+			var local = scope.own(switch feature.geometry.solid {
+				case Insert(body):
+					if (feature.cornerRadius!=0) throw "Insert recess cannot modify its source exterior: "+feature.id;
+					InsertBodies.part(body);
+				default:
+					CastingProfileCad.prism(materia.casting.CastingFeatureContours.contour(feature),0,
+						CastingFeature.CastingGeometrySolids.height(feature.geometry.solid));
+			});
 			return scope.own(PosedParts.moved(local, feature.geometry.pose));
 		});
 	}

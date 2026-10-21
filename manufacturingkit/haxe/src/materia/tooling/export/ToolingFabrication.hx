@@ -10,7 +10,7 @@ import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.panel.PanelPlan;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import materia.tooling.panel.PanelCoupon;
 import materia.tooling.panel.PanelJoints;
 import materia.sheet.SheetPartRequirement;
@@ -59,7 +59,7 @@ class ToolingFabrication {
 		p = PanelCodec.snapshot(p);
 		if (!Math.isFinite(marginMm) || marginMm < 0)
 			throw "Invalid panel blank margin";
-		var b = PanelGeometry.bounds(PanelContours.outside(p)), s = p.stock;
+		var b = CastingProfileGeometry.bounds(PanelContours.outside(p)), s = p.stock;
 		return {
 			id: p.id,
 			revision: p.revision,

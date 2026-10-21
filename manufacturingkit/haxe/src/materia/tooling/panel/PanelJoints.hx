@@ -8,7 +8,7 @@ import materia.tooling.ToolingEnums.MachiningSide;
 import materia.tooling.ToolingEnums.ContactFace;
 import materia.tooling.panel.PanelPlan.PanelOperation;
 import materia.tooling.panel.PanelPlan.PanelOperationKind;
-import materia.tooling.panel.PanelPlan.PanelSegment;
+import materia.casting.CastingProfile.CastingSegment;
 import materia.casting.CastingPrism.CastingPoint2;
 
 enum abstract PanelJointKind(String) to String {
@@ -123,7 +123,7 @@ class PanelJoints {
 			directionConstraint: StockDirection.Free
 		};
 
-	public static function operation(id:String, kind:PanelOperationKind, contour:Array<PanelSegment>, depth:Float, tool:Float,
+	public static function operation(id:String, kind:PanelOperationKind, contour:Array<CastingSegment>, depth:Float, tool:Float,
 			side:MachiningSide = MachiningSide.PositiveZ, through:Bool = true, ?relief:Float):PanelOperation
 		return {
 			id: id,

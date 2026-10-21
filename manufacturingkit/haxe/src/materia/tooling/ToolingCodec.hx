@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 14;
+	public static inline var VERSION = 15;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -726,6 +726,10 @@ class ToolingCodec {
 
 	/** Sort object keys as well as named records so field construction order is irrelevant. */
 	public static function canonical(value:Dynamic):String {
+		if (Std.isOfType(value,materia.tooling.process.FillAnalysis.FillPocketGeometry))
+			return canonical(materia.tooling.process.FillAnalysis.FillGeometryRecords.pocket(cast value));
+		if (Std.isOfType(value,materia.tooling.process.FillAnalysis.FillOpeningGeometry))
+			return canonical(materia.tooling.process.FillAnalysis.FillGeometryRecords.opening(cast value));
 		if (Std.isOfType(value,materia.casting.InsertManufacturing.InsertBlank))
 			return canonical(materia.casting.InsertManufacturing.InsertManufacturingCodec.blankRecord(cast value));
 		if (Std.isOfType(value,materia.casting.InsertManufacturing.InsertInspection))

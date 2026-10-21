@@ -1,13 +1,9 @@
 package materia.tooling.panel;
 
+import materia.casting.CastingProfile.CastingSegment;
+
 import materia.tooling.ToolingEnums.MachiningSide;
 import materia.tooling.ToolingEnums.ContactFace;
-import materia.casting.CastingPrism.CastingPoint2;
-
-enum abstract PanelCurveKind(String) to String {
-	var Line = "line";
-	var Arc = "arc";
-}
 
 enum abstract PanelOperationKind(String) to String {
 	var OutsideProfile = "outside-profile";
@@ -17,24 +13,13 @@ enum abstract PanelOperationKind(String) to String {
 	var Drill = "drill";
 }
 
-/** Directed exact curve. Arcs have a center and signed sweep; lines have null/zero.
- * A closed circle uses two half arcs, so each arc has distinct endpoints.
- */
-typedef PanelSegment = {
-	var kind:PanelCurveKind;
-	var start:CastingPoint2;
-	var end:CastingPoint2;
-	var center:Null<CastingPoint2>;
-	var sweep:Float;
-}
-
 /** One CAM operation, with finished geometry and an explicit setup/tool. No compensation.
  * Rebate is a pocket with an open side. Drill contours are exact circles.
  */
 typedef PanelOperation = {
 	var id:String;
 	var kind:PanelOperationKind;
-	var contour:Array<PanelSegment>;
+	var contour:Array<CastingSegment>;
 	var side:MachiningSide;
 	var setupId:String;
 	var depth:Float;

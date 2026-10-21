@@ -601,6 +601,9 @@ pose stored in a JSON text parameter.
 
 ### Feature geometry beyond boxes
 
+- Draft preserves the authored section dimensions at the declared withdrawal
+  opening and tapers inward. The withdrawal axis is expressed in source
+  coordinates. This is the confirmed nominal-section convention.
 - Draft and corner radius are realized in CAD, in the planner (formers get drafted
   walls; EPS cores ignore draft unless declared), in drawings and in CAM, where a
   corner radius below the router radius fails with the feature ID.
@@ -2103,6 +2106,49 @@ stock, drawings and inspection by `InsertManufacturingTests` and
 and `ProductionAnchorTests`; connector-derived holes and screws by
 `RailSeatTests`; source lifting declaration/removal and sealed fixture geometry
 by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
+
+### Phase 7 step 3: geometry work in progress
+
+- [x] Source and panel geometry share the same neutral line/arc record,
+  predicates and primitive contour builders. Typed straight prism cuts have
+  strict feature schema **4**; source/tooling **15**, box mold **14** and general
+  mold **15** reject their previous versions. The old panel-only geometry
+  implementation and type aliases are removed.
+- [x] Parametric polygon corner radii produce the exact arcs consumed by source
+  CAD; explicit arc profiles retain their authored geometry. Radius overlap is
+  an error, and opening/breakout checks use the exact cut/body expression.
+  Foundation contracts **424** (including profile **20**), neutral tooling
+  **1,877**, native source geometry **23** and CAD equivalence **60** pass. The
+  mill base/column, hobber bed/column and sloped-foot intersection all retain
+  zero symmetric difference against their declared CAD controls.
+- [x] Native critical-level fill uses exact clipping, planar sections and
+  positive-area air connectivity. Sloped-ceiling analytic/dense level curves,
+  circular extrema, zero-volume event contacts, tooling coverage, member-order
+  determinism and large-coordinate identities pass **67** native assertions.
+  Fill pockets and openings distinguish exact box regions from reproducible CAD
+  expressions, with no empty-box substitute. Process **9** and manifest **9**
+  reject their previous versions.
+- [x] The native backend feeds the shared process, pour, cure and orientation
+  pipeline; orthogonal sections/junctions and non-box thermal coverage stay
+  explicitly Unsupported. Export retains available fill/pour data and compares
+  actual foundation CAD even without a graph review. Gross core displacement
+  includes its liner/adhesive. Native anchor/process/export **73**, full native
+  **690**, casting **54**, design **32**, CamKit **12,386** (panel CAM **293**),
+  mill **313**, rail seats **116**, lifting **457** and socket fixture **110** pass.
+- [x] Production anchored mold **672** passes, including exact reconstruction
+  and complete swept graphs for **91** members. Regenerated records kit:
+  **168** independently hash-verified artifacts, **40** review programs;
+  **847 Pass / 402 Pending / 123 Unsupported / 74 Fail**, readiness **false**.
+  The native fill region has zero symmetric difference against the actual
+  foundation CAD. Its **74** trapped-air pockets remain explicit failures;
+  no non-box section or thermal qualification is credited. Process CAD export
+  independently captures assembly context and rejects omitted/stale context.
+- [ ] Profile-capable mold planning, drafted former walls and source/former
+  drawings/CAM remain unfinished. This slice does not complete step 3.
+- [x] Draft source convention confirmed: authored dimensions belong to the
+  withdrawal opening; walls taper inward along the declared source-coordinate
+  withdrawal axis. Finishing stock and process error budgets remain separate.
+  Draft realization and its release fixture remain in the next geometry slice.
 
 ### Phase 7 records: shared levelling-foot family
 

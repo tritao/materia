@@ -1,5 +1,7 @@
 package materia.tooling.panel;
 
+import materia.casting.CastingProfileGeometry;
+
 import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -92,7 +94,7 @@ class PanelAssemblyPlan {
 				var operations = a.panel.operations.filter(o -> o.id == fit.fixedOperationId);
 				if (operations.length != 1)
 					throw "Unknown joint mating operation";
-				var bounds = PanelGeometry.bounds(operations[0].contour);
+				var bounds = CastingProfileGeometry.bounds(operations[0].contour);
 				if (Math.abs(bounds.width - fit.reliefDiameter - fit.slotWidth) > 1e-7
 					|| Math.abs(bounds.height - fit.reliefDiameter - fit.slotThickness) > 1e-7
 					|| Math.abs(fit.tabThickness - b.panel.stock.measuredThickness) > 1e-7
@@ -106,7 +108,7 @@ class PanelAssemblyPlan {
 				});
 				var hits:Array<Float> = [];
 				for (edge in outline)
-					for (hit in PanelGeometry.intersections(section, edge))
+					for (hit in CastingProfileGeometry.intersections(section, edge))
 						if (hits.filter(x -> Math.abs(x - hit.x) < 1e-7).length == 0)
 							hits.push(hit.x);
 				hits.sort(Reflect.compare);
@@ -120,10 +122,10 @@ class PanelAssemblyPlan {
 				var operations = a.panel.operations.filter(o -> o.id == seat.operationId);
 				if (operations.length != 1)
 					throw "Unknown joint seat operation";
-				var bounds = PanelGeometry.bounds(operations[0].contour);
+				var bounds = CastingProfileGeometry.bounds(operations[0].contour);
 				var width = seat.acrossX ? bounds.width : bounds.height;
 				var length = seat.acrossX ? bounds.height : bounds.width;
-				var movingBounds = PanelGeometry.bounds(PanelContours.outside(b.panel));
+				var movingBounds = CastingProfileGeometry.bounds(PanelContours.outside(b.panel));
 				if ((seat.thicknessFraction != 0.5 && seat.thicknessFraction != 1)
 					|| Math.abs(width - seat.reliefDiameter - seat.openingWidth) > 1e-7
 					|| Math.abs(length - seat.reliefDiameter - seat.openingLength) > 1e-7
@@ -141,7 +143,7 @@ class PanelAssemblyPlan {
 				var movingOps = b.panel.operations.filter(o -> o.id == pin.operationId);
 				if (fixedOps.length != 1 || movingOps.length != 1)
 					throw "Unknown joint pin operation";
-				var bounds = PanelGeometry.bounds(fixedOps[0].contour);
+				var bounds = CastingProfileGeometry.bounds(fixedOps[0].contour);
 				var cx = bounds.x + bounds.width / 2,
 					cy = bounds.y + bounds.height / 2;
 				var expectedFixed = PanelContours.circle(cx, cy, pin.openingDiameter / 2);

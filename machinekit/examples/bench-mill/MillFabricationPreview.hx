@@ -57,7 +57,7 @@ class MillFabricationPreview {
 			p = CastingMoldPlanner.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
 		var process = processSpec(p.document.recipe);
 		var fabricationSpec = MillFabricationSetup.spec();
-		var processReport = materia.tooling.process.CastingProcessAnalysis.analyze(p, process, fabricationSpec.gravityMps2, fabricationSpec);
+		var processReport = materia.tooling.process.CastingProcessAnalysis.analyze(p, process, fabricationSpec.gravityMps2, fabricationSpec,machinekit.tooling.CastingFillAnalysis.fromPlan);
 		var f = ToolingFabrication.plan(p, fabricationSpec, processReport.cure);
 		if (process.recipeFingerprint != ToolingCodec.recipeFingerprint(p.document.recipe))
 			throw "Stale process recipe fingerprint";
@@ -198,7 +198,7 @@ class MillFabricationPreview {
 		data(dir, "cam-programs.json", programs);
 		sys.io.File.saveContent(dir + "/machining-instructions.md",
 			"# Panel machining review\n\nPrograms are LinuxCNC review outputs in mm. Settings originate in metres and m/s. Do not substitute relief cutters without regenerating the plan.\n\nEach program uses G54 with Z0 at the face being machined. XY starts at the raw blank lower left; the finished bounding profile is offset by the declared blank margin. Negative-Z setups reflect X about the finished profile midline: flip about local Y and re-establish the origin. Operation order clears named access pockets first and releases the outside profile last, after other faces. CAM checks supplied stock, fixtures and travel; an empty fixture list does not qualify workholding.\n\nRetain the part for the final contour with a qualified fixture/spoilboard or tabs specified by a revised operation plan. Through cuts include the declared breakthrough allowance into the declared spoilboard. Execute split single-tool programs in the cam-programs.json order, preserving access pockets and outside-last. Final outside cuts use the declared onion skin followed by its separate removal pass, or an evidenced vacuum area/holding-force assessment. G49 single-tool programs require touching off Z with that tool; no length offset applies. Fit-coupon programs and locator-coupon programs use the same settings. Resolve every blocking fabrication-validation.json record before fabrication release.\n");
-		checks = checks.concat(machinekit.tooling.ToolingProcessExport.write(p, process, f.spec.gravityMps2, dir, geometricReview, f.spec, frame.base));
+		checks = checks.concat(machinekit.tooling.ToolingProcessExport.write(p, process, f.spec.gravityMps2, dir, geometricReview, f.spec, frame.base,processReport,MillMoldSetup.input(frame).interfaceContext));
 		MillMoldStudy.write(MillMoldStudy.study(frame, geometricReview, !recordsOnly, process), dir);
 		ToolingPackageManifest.write(dir, f, checks);
 		ToolingPackageManifest.verify(dir);

@@ -16,7 +16,7 @@ enum abstract MoldPartMaterial(String) to String {
 typedef MoldVolumeProfile = {
 	var panelId:String;
 	var operationId:String;
-	var contour:Array<materia.tooling.panel.PanelPlan.PanelSegment>;
+	var contour:Array<materia.casting.CastingProfile.CastingSegment>;
 	var pose:materia.assembly.AssemblyRecord.AssemblyFrame;
 	var depth:Float;
 	var subtract:Array<MoldBox>;

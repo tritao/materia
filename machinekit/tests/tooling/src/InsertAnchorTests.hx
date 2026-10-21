@@ -43,7 +43,8 @@ class InsertAnchorTests {
 		var spec=source.insertSpec(),anchors=bolts(spec),bill=foundation.billOfMaterials();
 		check(bill.quantity(anchors[0].screw.partNumber)==2 && bill.quantity(anchors[0].washer.partNumber)==2,
 			"foundation BOM includes real anchor screws and washers once each");
-		var input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,"anchored-foundation",1);
+		var context=machinekit.tooling.FoundationAssemblyContext.snapshot(foundation,"casting",[{id:"seat",member:"seat"}]);
+		var input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,"anchored-foundation",1,context);
 		check(input.inserts.length==1
 			&& materia.tooling.ToolingCodec.canonical(input.inserts[0].anchorage)==materia.tooling.ToolingCodec.canonical(spec.anchorage),"adapter copies anchor source, not extra dummy inserts");
 		var native=machinekit.tooling.InsertAnchorGeometry.review(input);
@@ -75,7 +76,7 @@ class InsertAnchorTests {
 			compaction:{method:materia.tooling.casting.CastingMoldPlan.CompactionMethod.Undeclared,bedInterfaceReference:null,
 				frequencyHz:null,amplitudeMm:null,durationSeconds:null,evidence:[]},
 			serviceOrientation:F.identity(),overlapRule:materia.tooling.casting.CastingMoldPlan.OverlapRule.ReservedThenPriority,liftingEvidence:[]};
-		var sourceReview=machinekit.structural.FoundationIntegrity.castingReview(foundation,document);
+		var sourceReview=machinekit.structural.FoundationIntegrity.castingReview(foundation,document,context);
 		check(sourceReview.validation.filter(record -> record.rule.indexOf(".cad.")>=0 && record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==6,
 			"native anchor source geometry reaches foundation design diagnostics");
 		var assessment=materia.tooling.casting.CastingMoldPlanner.assess(document,options);
@@ -92,6 +93,52 @@ class InsertAnchorTests {
 		check(process.validation.filter(record -> record.rule=="process.cure.section-coverage"
 			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length==1,
 			"non-box section coverage cannot become a thermal pass");
+		var nativeProcess=materia.tooling.process.CastingProcessAnalysis.analyze(cast assessment.plan,processSpec,9.80665,null,
+			machinekit.tooling.CastingFillAnalysis.fromPlan);
+		check(nativeProcess.fill!=null && nativeProcess.pour!=null && nativeProcess.sections==null,
+			"native fill enters the shared process and pour pipeline while orthogonal sections remain unsupported");
+		check(nativeProcess.validation.filter(record -> record.rule=="process.fill.geometry"
+			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
+			"native source geometry replaces the unavailable fill projection");
+		check(nativeProcess.cure.validation.filter(record -> record.rule=="process.cure.section-coverage"
+			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length==1,
+			"exact fill cannot clear unsupported thermal coverage");
+		var processDirectory=Sys.getCwd()+"/build/tooling/anchor-process-"+nativeProcess.sourceFingerprint.substr(0,12);
+		machinekit.tooling.ToolingFiles.directory(processDirectory);
+		var exportChecks=machinekit.tooling.ToolingProcessExport.write(cast assessment.plan,processSpec,9.80665,
+			processDirectory,null,null,foundation,nativeProcess,context);
+		check(exportChecks.filter(record -> record.rule=="process.fill.cad-volume-agreement"
+			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
+			"exact fill export checks the actual foundation CAD independently of a swept-graph review");
+		var exportedFill:Dynamic=haxe.Json.parse(sys.io.File.getContent(processDirectory+"/fill-analysis.json"));
+		check(exportedFill!=null && exportedFill.model=="exact-brep-flat-free-surface",
+			"export retains the available native fill report when section geometry is unsupported");
+		check(haxe.Json.parse(sys.io.File.getContent(processDirectory+"/pour-plan.json"))!=null,
+			"export retains native fill quantities and pending mixer planning");
+		check(haxe.Json.parse(sys.io.File.getContent(processDirectory+"/section-geometry.json"))==null,
+			"unimplemented non-box orthogonal sections remain explicitly unavailable");
+		var changedSpec=materia.tooling.process.ProcessSpecCodec.snapshot(processSpec);
+		changedSpec.pourRateMm3PerSecond=12345;
+		rejects(() -> machinekit.tooling.ToolingProcessExport.write(cast assessment.plan,changedSpec,9.80665,
+			processDirectory,null,null,foundation,nativeProcess,context),"Stale process export report");
+		rejects(() -> machinekit.tooling.ToolingProcessExport.write(cast assessment.plan,processSpec,9.80665,
+			processDirectory,null,null,foundation,nativeProcess),"Process CAD foundation differs from source revision");
+		var layeredDocument=SinglePocketSetup.document();layeredDocument.recipe.core.height=15;
+		// This synthetic bridge fits the 80 mm pocket; the library minimum is not weakened.
+		layeredDocument.recipe.hardware.minimumBridgeWidth=40;
+		var layered=materia.tooling.casting.CastingMoldPlanner.plan(layeredDocument,options),core=layered.cores[0];
+		check(core.foamLayers.length>1 && materia.casting.BoxAlgebra.volume(core.foamLayers)
+			< materia.casting.BoxAlgebra.volume([core.cavity]),"uplift fixture really has lined and glued stock layers");
+		var layeredSettings:materia.tooling.process.FillAnalysis.FillSourceSettings={
+			sourceFingerprint:materia.tooling.casting.CastingMoldCodec.fingerprint(layered),processFingerprint:"layered-core",
+			cores:[],densityKgM3:2400,gravityMps2:9.80665,pourRateMm3PerSecond:null,maximumAirEscapeWidthMm:null,
+			extraLevels:[],fillObstructions:[],panels:[]};
+		var layeredFill=machinekit.tooling.CastingFillAnalysis.fromPlan(layered,layeredSettings).report;
+		check(layeredFill!=null,"layered core fill has an exact native report");
+		var layeredReport:materia.tooling.process.FillAnalysis.FillReport=cast layeredFill;
+		var finalLevel=layeredReport.levels[layeredReport.levels.length-1],coreLift=finalLevel.cores.filter(row -> row.id==core.id)[0];
+		check(Math.abs(coreLift.submergedVolumeMm3-materia.casting.BoxAlgebra.volume([core.cavity]))<1e-5,
+			"native gross uplift includes lining and adhesive instead of only the separated foam stock");
 		var restored=machinekit.assembly.MachineAssembly.decode(foundation.encode());
 		check(restored.billOfMaterials().quantity(anchors[0].screw.partNumber)==2,"source assembly round trip preserves actual anchor hardware");
 		var owned:Array<cadkit.modeling.Part> = [];

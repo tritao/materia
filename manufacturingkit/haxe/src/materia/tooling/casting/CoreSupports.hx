@@ -168,7 +168,7 @@ class CoreSupports {
 					foot.depth
 					+ o.fitClearance, tool / 2),
 				o.embedDepth, tool, MachiningSide.PositiveZ, false, tool);
-			var bounds = materia.tooling.panel.PanelGeometry.bounds(op.contour), cb = c.cavity;
+			var bounds = materia.casting.CastingProfileGeometry.bounds(op.contour), cb = c.cavity;
 			if (bounds.x + bed.pose.x < cb.x + l
 				|| bounds.y + bed.pose.y < cb.y + l
 				|| bounds.x + bounds.width + bed.pose.x > cb.x + cb.width - l

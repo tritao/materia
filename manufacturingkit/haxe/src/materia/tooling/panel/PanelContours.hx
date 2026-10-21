@@ -1,15 +1,16 @@
 package materia.tooling.panel;
 
+import materia.casting.CastingProfileGeometry;
+
 import materia.casting.CastingPrism.CastingPoint2;
-import materia.tooling.panel.PanelPlan.PanelSegment;
-import materia.tooling.panel.PanelPlan.PanelCurveKind;
+import materia.casting.CastingProfile.CastingSegment;
 import materia.tooling.panel.PanelPlan.PanelOperation;
 import materia.tooling.panel.PanelPlan.PanelOperationKind;
 
 /** Single exact-contour boundary used by CAD, drawings and the future CAM bridge. */
 class PanelContours {
-	public static function operation(op:PanelOperation):Array<PanelSegment> {
-		PanelGeometry.validate(op.contour);
+	public static function operation(op:PanelOperation):Array<CastingSegment> {
+		CastingProfileGeometry.validate(op.contour);
 		return [
 			for (s in op.contour) {
 				var c = s.center;
@@ -27,129 +28,36 @@ class PanelContours {
 		];
 	}
 
-	public static function outside(panel:PanelPlan):Array<PanelSegment> {
+	public static function outside(panel:PanelPlan):Array<CastingSegment> {
 		var found = panel.operations.filter(o -> o.kind == OutsideProfile);
 		if (found.length != 1)
 			throw "Panel needs exactly one outside-profile operation";
 		return operation(found[0]);
 	}
 
-	public static function line(a:CastingPoint2, b:CastingPoint2):PanelSegment
-		return {
-			kind: Line,
-			start: {x: a.x, y: a.y},
-			end: {
-				x: b.x,
-				y: b.y
-			},
-			center: null,
-			sweep: 0
-		};
-
-	public static function arc(x:Float, y:Float, r:Float, start:Float, sweep:Float):PanelSegment {
-		if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(r) || r <= 0 || !Math.isFinite(start) || !Math.isFinite(sweep))
-			throw "Invalid arc parameters";
-		return {
-			kind: Arc,
-			start: {x: x + r * Math.cos(start), y: y + r * Math.sin(start)},
-			end: {
-				x: x + r * Math.cos(start + sweep),
-				y: y + r * Math.sin(start + sweep)
-			},
-			center: {
-				x: x,
-				y: y
-			},
-			sweep: sweep
-		};
-	}
-
-	public static function point(s:PanelSegment, t:Float):CastingPoint2 {
-		var c = s.center;
-		if (c == null)
-			return {x: s.start.x + (s.end.x - s.start.x) * t, y: s.start.y + (s.end.y - s.start.y) * t};
-		var r = distance(c, s.start),
-			a = Math.atan2(s.start.y - c.y, s.start.x - c.x) + s.sweep * t;
-		return {x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a)};
-	}
-
-	public static function distance(a:CastingPoint2, b:CastingPoint2):Float
-		return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
-
-	public static function polygon(points:Array<CastingPoint2>):Array<PanelSegment>
-		return [
-			for (i in 0...points.length)
-				line(points[i], points[(i + 1) % points.length])
-		];
-
-	public static function rectangle(x:Float, y:Float, w:Float, h:Float):Array<PanelSegment> {
-		if (!Math.isFinite(w) || !Math.isFinite(h) || w <= 0 || h <= 0)
-			throw "Invalid rectangle dimensions";
-		return polygon([{x: x, y: y}, {x: x + w, y: y}, {x: x + w, y: y + h}, {x: x, y: y + h}]);
-	}
-
-	public static function circle(x:Float, y:Float, r:Float):Array<PanelSegment>
-		return [arc(x, y, r, 0, Math.PI), arc(x, y, r, Math.PI, Math.PI)];
-
-	public static function obround(x:Float, y:Float, w:Float, h:Float):Array<PanelSegment> {
-		if (!Math.isFinite(w + h) || w <= 0 || h <= 0)
-			throw "Invalid obround";
-		if (w < h)
-			return [for (segment in obround(y, -x, h, w)) {
-				kind: segment.kind,
-				start: {x: -segment.start.y, y: segment.start.x},
-				end: {x: -segment.end.y, y: segment.end.x},
-				center: segment.center == null ? null : {x: -segment.center.y, y: segment.center.x},
-				sweep: segment.sweep
-			}];
-		if (w == h)
-			return circle(x, y, h / 2);
-		var a = (w - h) / 2, r = h / 2;
-		return [
-			line({x: x - a, y: y - r}, {x: x + a, y: y - r}),
-			arc(x + a, y, r, -Math.PI / 2, Math.PI),
-			line({x: x + a, y: y + r}, {x: x - a, y: y + r}),
-			arc(x - a, y, r, Math.PI / 2, Math.PI)
-		];
-	}
-
-	public static function roundedRectangle(x:Float, y:Float, w:Float, h:Float, r:Float):Array<PanelSegment> {
-		if (r <= 0 || w <= 2 * r || h <= 2 * r)
-			throw "Corner radius does not fit rectangle";
-		var right = x + w, top = y + h;
-		return [
-			line({x: x + r, y: y}, {x: right - r, y: y}),
-			arc(right - r, y + r, r, -Math.PI / 2, Math.PI / 2),
-			line({x: right, y: y + r}, {x: right, y: top - r}),
-			arc(right - r, top - r, r, 0, Math.PI / 2),
-			line({x: right - r, y: top}, {x: x + r, y: top}),
-			arc(x + r, top - r, r, Math.PI / 2, Math.PI / 2),
-			line({x: x, y: top - r}, {x: x, y: y + r}),
-			arc(x + r, y + r, r, Math.PI, Math.PI / 2)
-		];
-	}
-
-	/** Rigid 2D placement preserves exact arcs, including their signed sweep. */
-	public static function placed(contour:Array<PanelSegment>, radians:Float, x:Float, y:Float):Array<PanelSegment> {
-		var c = Math.cos(radians), s = Math.sin(radians);
-		function move(p:CastingPoint2):CastingPoint2
-			return {x: x + c * p.x - s * p.y, y: y + s * p.x + c * p.y};
-		return [
-			for (seg in contour) {
-				var center = seg.center;
-				{
-					kind: seg.kind,
-					start: move(seg.start),
-					end: move(seg.end),
-					center: center == null ? null : move(center),
-					sweep: seg.sweep
-				};
-			}
-		];
-	}
+	public static function line(a:CastingPoint2, b:CastingPoint2):CastingSegment
+		return materia.casting.CastingProfiles.line(a,b);
+	public static function arc(x:Float,y:Float,r:Float,start:Float,sweep:Float):CastingSegment
+		return materia.casting.CastingProfiles.arc(x,y,r,start,sweep);
+	public static function point(s:CastingSegment,t:Float):CastingPoint2
+		return materia.casting.CastingProfiles.point(s,t);
+	public static function distance(a:CastingPoint2,b:CastingPoint2):Float
+		return materia.casting.CastingProfiles.distance(a,b);
+	public static function polygon(points:Array<CastingPoint2>):Array<CastingSegment>
+		return materia.casting.CastingProfiles.polygon(points);
+	public static function rectangle(x:Float,y:Float,w:Float,h:Float):Array<CastingSegment>
+		return materia.casting.CastingProfiles.rectangle(x,y,w,h);
+	public static function circle(x:Float,y:Float,r:Float):Array<CastingSegment>
+		return materia.casting.CastingProfiles.circle(x,y,r);
+	public static function obround(x:Float,y:Float,w:Float,h:Float):Array<CastingSegment>
+		return materia.casting.CastingProfiles.obround(x,y,w,h);
+	public static function roundedRectangle(x:Float,y:Float,w:Float,h:Float,r:Float):Array<CastingSegment>
+		return materia.casting.CastingProfiles.roundedRectangle(x,y,w,h,r);
+	public static function placed(contour:Array<CastingSegment>,radians:Float,x:Float,y:Float):Array<CastingSegment>
+		return materia.casting.CastingProfiles.placed(contour,radians,x,y);
 
 	/** Exact boundary of a rectangle union four corner circles; no overlapping loops. */
-	public static function relievedRectangle(x:Float, y:Float, w:Float, h:Float, r:Float):Array<PanelSegment> {
+	public static function relievedRectangle(x:Float, y:Float, w:Float, h:Float, r:Float):Array<CastingSegment> {
 		if (r <= 0 || w <= 2 * r || h <= 2 * r)
 			throw "Relief tool does not fit rectangle";
 		var l = x - w / 2, b = y - h / 2, rr = x + w / 2, t = y + h / 2;
@@ -166,10 +74,10 @@ class PanelContours {
 	}
 
 	/** Integrate circular overcuts at concave right-angle roots into the outside loop. */
-	public static function relievedPolygon(p:Array<CastingPoint2>, r:Float, roundConvex:Bool = false):Array<PanelSegment> {
+	public static function relievedPolygon(p:Array<CastingPoint2>, r:Float, roundConvex:Bool = false):Array<CastingSegment> {
 		var starts:Array<CastingPoint2> = [],
 			ends:Array<CastingPoint2> = [],
-			corners:Array<Null<PanelSegment>> = [];
+			corners:Array<Null<CastingSegment>> = [];
 		for (i in 0...p.length) {
 			var a = p[(i + p.length - 1) % p.length], v = p[i], b = p[(i + 1) % p.length];
 			var da = distance(a, v),
@@ -201,7 +109,7 @@ class PanelContours {
 				corners.push(null);
 			}
 		}
-		var result:Array<PanelSegment> = [];
+		var result:Array<CastingSegment> = [];
 		for (i in 0...p.length) {
 			var corner = corners[i];
 			if (corner != null)

@@ -204,21 +204,28 @@ class FoundationDesignTests {
 			throw "Box consumer lost feature ID";
 	}
 
-	static function unrealizedSource():Void {
-		for (rounded in [false, true]) {
-			var feature = CastingPatterns.box("unrealized", materia.casting.CastingFeature.CastingFeatureKind.Lightening,
-				[CastingPatterns.face("body.z-min")], 20, 20, 20);
-			if (rounded) feature.cornerRadius = 3; else feature.draft.degrees = 3;
-			var source = new MineralCasting(new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 120)
-				.setToken("features", CastingPatterns.encode([feature])));
+	static function sourceGeometrySupport():Void {
+		for (rounded in [false,true]) {
+			var feature=CastingPatterns.box(rounded ? "rounded-source" : "drafted-source",
+				materia.casting.CastingFeature.CastingFeatureKind.Lightening,[CastingPatterns.face("body.z-min")],20,20,20);
+			if (rounded) feature.cornerRadius=3; else feature.draft.degrees=3;
+			var source=new MineralCasting(new ComponentValues().setNumber("width",100).setNumber("depth",80).setNumber("height",120)
+				.setToken("features",CastingPatterns.encode([feature])));
 			assertions++;
-			if (source.collisionHullQualification.status != machinekit.structural.CastingCollisionQualification.CastingCollisionStatus.Unsupported)
-				throw "Unrealized source intent must not publish an approximate collision hull";
-			var failed = false;
-			try { var body = source.geometry(); body.close(); }
-			catch (error:Dynamic) failed = Std.string(error).indexOf("Unsupported casting cavity geometry: unrealized") >= 0;
-			assertions++;
-			if (!failed) throw "CAD must not silently omit the unrealized design feature";
+			if (source.collisionHullQualification.status!=machinekit.structural.CastingCollisionQualification.CastingCollisionStatus.Unsupported)
+				throw "A box-only hull must not approximate rounded or drafted source intent";
+			if (rounded) {
+				var body=source.geometry(),volume=body.volume();body.close();
+				var expected=100*80*120-(400-(4-Math.PI)*9)*20;
+				assertions++;
+				if (Math.abs(volume-expected)>1e-5) throw "Rounded source CAD differs from the analytic cavity volume";
+			} else {
+				var failed=false;
+				try {var body=source.geometry();body.close();}
+				catch (error:Dynamic) failed=Std.string(error).indexOf("Unsupported casting cavity geometry: drafted-source")>=0;
+				assertions++;
+				if (!failed) throw "CAD must not silently omit an unrealized draft";
+			}
 		}
 	}
 
@@ -268,7 +275,7 @@ class FoundationDesignTests {
 	}
 
 	public static function main():Void {
-		unrealizedSource();
+		sourceGeometrySupport();
 		buriedThreadExit();
 		var flat = new machinekit.assembly.Diagnostics();
 		machinekit.design.DesignChecks.blindFastener(flat, "flat-bottom anchor", 40, 20, 23.5, 27, 0, 30, 15.6, 1.75, 3);

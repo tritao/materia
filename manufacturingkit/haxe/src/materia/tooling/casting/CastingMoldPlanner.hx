@@ -14,7 +14,7 @@ import materia.casting.CastingFeature.CastingFeatureKind;
 import materia.tooling.panel.PanelJoints;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import materia.tooling.ToolingEnums.MachiningSide;
 
 /** Source assessment can decline geometry without manufacturing a box stand-in. */

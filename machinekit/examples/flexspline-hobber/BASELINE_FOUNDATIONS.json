@@ -9770,7 +9770,7 @@
     {
       "id": "mill-base",
       "sourceFingerprint": "b672145dad27078588771f16debdd77b08a4e0ed3418191550446588550714d9",
-      "sourceCodecVersion": 14,
+      "sourceCodecVersion": 15,
       "volumeMm3": 69619331.09226151,
       "massKg": 167.08639462142762,
       "boxStatus": "unsupported",
@@ -9781,7 +9781,7 @@
     {
       "id": "mill-column",
       "sourceFingerprint": "300c126d8e2ba729cbefc0f399e0001fdb4c8ea1a79083d84ec89e08533fbe1f",
-      "sourceCodecVersion": 14,
+      "sourceCodecVersion": 15,
       "volumeMm3": 41648030.241955966,
       "massKg": 99.95527258069433,
       "boxStatus": "unsupported",
@@ -9792,7 +9792,7 @@
     {
       "id": "hobber-bed",
       "sourceFingerprint": "83a9eef8451cf41e12534ea6bf0079fc0ddeb38741af804966a5dcab668e3e32",
-      "sourceCodecVersion": 14,
+      "sourceCodecVersion": 15,
       "volumeMm3": 350008859.82848215,
       "massKg": 840.0212635883572,
       "boxStatus": "unsupported",
@@ -9816,7 +9816,7 @@
     {
       "id": "hobber-column",
       "sourceFingerprint": "b675d5f64cec0e52b8348c936b751d8c13af5c1ec23bc8e7d9d7c37f8fce812e",
-      "sourceCodecVersion": 14,
+      "sourceCodecVersion": 15,
       "volumeMm3": 18059500.00000001,
       "massKg": 43.34280000000003,
       "boxStatus": "pass",

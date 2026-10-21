@@ -10,7 +10,7 @@ import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.panel.PanelPlan;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import cadkit.drawing.Drawing2D;
 import cadkit.drawing.DrawingEntity;
 import cadkit.drawing.Svg;
@@ -294,7 +294,7 @@ class ToolingFabricationExport {
 		];
 		for (panel in panels(p, f)) {
 			var requirement = f.panelRequirements.filter(r -> r.partId == panel.id)[0];
-			var b = PanelGeometry.bounds(PanelContours.outside(panel));
+			var b = CastingProfileGeometry.bounds(PanelContours.outside(panel));
 			blankRows.push([
 				panel.id,
 				Std.string(panel.revision),

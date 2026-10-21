@@ -1,9 +1,11 @@
 package camkit;
 
 import materia.tooling.panel.PanelPlan;
+import materia.casting.CastingProfile.CastingSegment;
+import materia.casting.CastingProfile.CastingCurveKind;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import materia.tooling.ToolingEnums.MachiningSide;
 import toolpathkit.path.Point3;
 import toolpathkit.path.ToolpathProgram;
@@ -123,13 +125,13 @@ class CamToolingPanels {
 	}
 
 	/** Extend only outside the finished panel; neutral operation geometry is untouched. */
-	public static function openRebate(op:PanelOperation, outline:Array<PanelSegment>, radiusMm:Float):PanelOperation {
-		var segments:Array<PanelSegment> = [];
+	public static function openRebate(op:PanelOperation, outline:Array<CastingSegment>, radiusMm:Float):PanelOperation {
+		var segments:Array<CastingSegment> = [];
 		for (segment in op.contour) {
 			var shared = outline.filter(edge -> edge.center == null
 				&& segment.center == null
-				&& PanelGeometry.on(edge, segment.start)
-				&& PanelGeometry.on(edge, segment.end));
+				&& CastingProfileGeometry.on(edge, segment.start)
+				&& CastingProfileGeometry.on(edge, segment.end));
 			if (shared.length == 0) {
 				segments.push(segment);
 				continue;
@@ -143,21 +145,21 @@ class CamToolingPanels {
 			var a = {x: segment.start.x + nx, y: segment.start.y + ny},
 				b = {x: segment.end.x + nx, y: segment.end.y + ny};
 			segments.push({
-				kind: Line,
+				kind: CastingCurveKind.Line,
 				start: segment.start,
 				end: a,
 				center: null,
 				sweep: 0
 			});
 			segments.push({
-				kind: Line,
+				kind: CastingCurveKind.Line,
 				start: a,
 				end: b,
 				center: null,
 				sweep: 0
 			});
 			segments.push({
-				kind: Line,
+				kind: CastingCurveKind.Line,
 				start: b,
 				end: segment.end,
 				center: null,
@@ -259,7 +261,7 @@ class CamToolingPanels {
 				|| vacuum.holdingForceN < vacuum.cuttingForceN * vacuum.safetyFactor)
 				throw "Vacuum holding force is inadequate for declared cutting force";
 		}
-		var bounds = PanelGeometry.bounds(PanelContours.outside(p));
+		var bounds = CastingProfileGeometry.bounds(PanelContours.outside(p));
 		var groups = new Map<String, Array<PanelOperation>>();
 		for (op in p.operations) {
 			var key = op.side + "-" + op.setupId;
@@ -334,7 +336,7 @@ class CamToolingPanels {
 						case Pocket, Rebate:
 							job.pocket(c, tool, depth, settings.feed, tool.diameter * settings.stepOverFraction, settings.stepDown, settings.plungeFeed, op.id);
 						case Drill:
-							var b = PanelGeometry.bounds(PanelContours.operation(op));
+							var b = CastingProfileGeometry.bounds(PanelContours.operation(op));
 							var x = b.x + b.width / 2 - bounds.x;
 							job.drill([
 								new Point3((mirrored ? bounds.width - x : x) * 0.001 + settings.blankMargin,

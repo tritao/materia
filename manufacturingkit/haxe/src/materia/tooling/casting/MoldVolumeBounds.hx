@@ -3,7 +3,7 @@ import materia.casting.BoxAlgebra;
 
 import materia.tooling.casting.CastingMoldPlan.MoldVolume;
 import materia.tooling.casting.MoldPlan.MoldBox;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import materia.assembly.AssemblyFrames as F;
 
 /** Conservative occupied boxes for loads/broad-phase checks. Curved profiles use
@@ -14,7 +14,7 @@ class MoldVolumeBounds {
 	public static function pieces(volume:MoldVolume):Array<MoldBox> {
 		var boxes = [for (box in volume.pieces) BoxAlgebra.copy(box)];
 		for (profile in volume.profiles) {
-			var bounds = PanelGeometry.bounds(profile.contour);
+			var bounds = CastingProfileGeometry.bounds(profile.contour);
 			var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
 			var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
 			for (x in [bounds.x, bounds.x + bounds.width])

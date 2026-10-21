@@ -5,7 +5,7 @@ import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import materia.tooling.casting.CoreSupports;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.MachineAssembly;

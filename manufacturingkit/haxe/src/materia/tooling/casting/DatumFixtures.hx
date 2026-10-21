@@ -150,7 +150,7 @@ class DatumFixtures {
 			clearance.through = true;
 			clearance.accessVia = pocketId;
 			var conflicts = bed.panel.operations.filter(other -> other.kind != OutsideProfile && other.id != pocketId
-				&& materia.tooling.panel.PanelGeometry.distanceBetween(clearance.contour, other.contour) < r.minimumLigament - 1e-7);
+				&& materia.casting.CastingProfileGeometry.distanceBetween(clearance.contour, other.contour) < r.minimumLigament - 1e-7);
 			if (conflicts.length > 0)
 				continue;
 			bed.panel.operations.push(clearance);
@@ -246,7 +246,7 @@ class DatumFixtures {
 				var operations = panel[0].panel.operations.filter(o -> o.id == pen.operationId);
 				if (operations.length != 1)
 					throw "Missing fixture penetration operation";
-				var b = materia.tooling.panel.PanelGeometry.bounds(operations[0].contour);
+				var b = materia.casting.CastingProfileGeometry.bounds(operations[0].contour);
 				var center = F.transformPoint(panel[0].pose, b.x + b.width / 2, b.y + b.height / 2, panel[0].panel.stock.measuredThickness);
 				if (Math.abs(center.x - face.x) + Math.abs(center.y - face.y) > 1e-7)
 					throw "Fixture seal face misses penetration";

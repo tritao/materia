@@ -37,7 +37,7 @@ class MillMoldStudy {
 	public static function study(frame:machinekit.milling.MillFrame, ?existing:machinekit.tooling.CastingMoldCad.CastingMoldReview, geometry:Bool = true,
 			?process:materia.tooling.process.CastingProcessSpec):MoldOrientationReport {
 		if (!geometry)
-			return MoldOrientationStudy.run(candidates(frame, process), MillFabricationSetup.spec());
+			return MoldOrientationStudy.run(candidates(frame, process), MillFabricationSetup.spec(),null,machinekit.tooling.CastingFillAnalysis.fromPlan);
 		return MoldOrientationStudy.run(candidates(frame, process), MillFabricationSetup.spec(), p -> {
 			var hash = materia.tooling.casting.CastingMoldCodec.fingerprint(p);
 			var review = existing != null && existing.fingerprint == hash ? existing : CastingMoldCad.review(p);
@@ -49,7 +49,7 @@ class MillMoldStudy {
 				demoldingBlockingEdges: review.demolding.blocking.length,
 				validation: review.validation
 			};
-		});
+		},machinekit.tooling.CastingFillAnalysis.fromPlan);
 	}
 
 	public static function write(report:MoldOrientationReport, dir:String):Void {

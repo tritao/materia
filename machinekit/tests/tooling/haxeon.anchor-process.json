@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-anchor-process-tests"
+  },
+  "entry": "InsertAnchorFocused",
+  "sourceRoots": [
+    "src",
+    "../../examples/box-mold",
+    "../../../manufacturingkit/tests/tooling/src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/anchor-process",
+  "sources": [
+    "src/InsertAnchorFocused.hx",
+    "../../examples/box-mold/SinglePocketSetup.hx",
+    "../../../manufacturingkit/tests/tooling/src/ProcessTests.hx"
+  ]
+}

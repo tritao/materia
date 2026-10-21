@@ -38,12 +38,16 @@ class CastingCavities {
 			for (opening in f.openings)
 				if (opening.kind == BodyFace && faces.filter(face -> face.id == opening.target).length == 0)
 					throw "Unknown casting body face: " + opening.target;
-			if (f.draft.degrees != 0 || f.cornerRadius != 0) {
+			if (f.draft.degrees != 0) {
 				result.push({featureId: f.id, parentId: f.derivedFrom == null ? f.id : f.derivedFrom,
-					geometry: UnsupportedGeometry("Drafted or rounded feature realization is not implemented")});
+					geometry: UnsupportedGeometry("Drafted feature realization is not implemented")});
 				continue;
 			}
-			if (!CastingFeature.CastingGeometrySolids.isBox(f.geometry.solid)) {
+			var connectedNonBox=f.openings.filter(opening -> opening.kind==Feature
+				&& CastingFeatureCodec.openingTargets(records,opening.target).filter(other ->
+					!CastingFeature.CastingGeometrySolids.isBox(other.geometry.solid)
+					|| other.draft.degrees!=0 || other.cornerRadius!=0).length>0).length>0;
+			if (!CastingFeature.CastingGeometrySolids.isBox(f.geometry.solid) || f.cornerRadius!=0 || connectedNonBox) {
 					var envelope = [for (prism in body) {
 						id: prism.id, profile: [for (point in prism.profile) {x: point.x, y: point.y}],
 						height: prism.height, pose: CastingRecordCodec.frame(prism.pose)

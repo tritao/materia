@@ -8,7 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 import materia.tooling.panel.PanelAssemblyPlan;
 import materia.tooling.panel.PanelAssemblyPlan.PanelAssemblyRecord;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import machinekit.tooling.SweptRemoval.RemovalReport;
 import machinekit.tooling.SweptRemoval.RemovalMember;
 
@@ -17,7 +17,7 @@ class PanelKit {
 		PanelAssemblyPlan.validate(plan);
 		var low=new Vector(1e30,1e30,1e30),high=new Vector(-1e30,-1e30,-1e30);
 		for(m in plan.members) {
-			var b=PanelGeometry.bounds(PanelContours.outside(m.panel));
+			var b=CastingProfileGeometry.bounds(PanelContours.outside(m.panel));
 			for(x in [b.x,b.x+b.width])for(y in [b.y,b.y+b.height])for(z in [0.0,m.panel.stock.measuredThickness]) {
 				var p=F.transformPoint(m.pose,x,y,z);
 				low=new Vector(Math.min(low.x,p.x),Math.min(low.y,p.y),Math.min(low.z,p.z));

@@ -7,8 +7,8 @@ import materia.casting.BoxAlgebra;
 import materia.tooling.casting.BoxMoldPlanner;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
-import materia.tooling.panel.PanelPlan.PanelSegment;
+import materia.casting.CastingProfileGeometry;
+import materia.casting.CastingProfile.CastingSegment;
 import materia.assembly.AssemblyFrames as F;
 
 /** Orthogonal material projection. Curved openings are never credited without
@@ -37,7 +37,7 @@ class FillTooling {
 			blockers.push(clip);
 			return true;
 		}
-		function prism(contour:Array<PanelSegment>, depth:Float, pose:materia.assembly.AssemblyRecord.AssemblyFrame):Array<MoldBox> {
+		function prism(contour:Array<CastingSegment>, depth:Float, pose:materia.assembly.AssemblyRecord.AssemblyFrame):Array<MoldBox> {
 			var xs = [for (edge in contour) edge.start.x],
 				ys = [for (edge in contour) edge.start.y];
 			xs.sort(Reflect.compare);
@@ -47,19 +47,19 @@ class FillTooling {
 				for (j in 0...ys.length - 1)
 					if (xs[i + 1] - xs[i] > 1e-7
 						&& ys[j + 1] - ys[j] > 1e-7
-						&& PanelGeometry.inside(contour, (xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2))
+						&& CastingProfileGeometry.inside(contour, (xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2))
 						boxes.push(BoxMoldPlanner.box(xs[i + 1] - xs[i], ys[j + 1] - ys[j], depth,
 							F.compose(pose, F.translation((xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2, 0))));
 			return boxes;
 		}
-		function orthogonal(contour:Array<PanelSegment>):Bool
+		function orthogonal(contour:Array<CastingSegment>):Bool
 			return contour.filter(edge -> edge.center != null
 				|| (Math.abs(edge.end.x - edge.start.x) > 1e-7 && Math.abs(edge.end.y - edge.start.y) > 1e-7))
 				.length == 0;
 		for (member in p.panels.members.concat(p.supportPanels)) {
 			var outline = PanelContours.outside(member.panel),
 				thickness = member.panel.stock.measuredThickness;
-			var bounds = PanelGeometry.bounds(outline);
+			var bounds = CastingProfileGeometry.bounds(outline);
 			var broad = BoxMoldPlanner.box(bounds.width, bounds.height, thickness,
 				F.compose(member.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0)));
 			var old = blockers.length;
@@ -79,7 +79,7 @@ class FillTooling {
 					if (orthogonal(op.contour))
 						material = BoxAlgebra.subtract(material, prism(op.contour, op.depth, pose));
 					else {
-						var cutBounds = PanelGeometry.bounds(op.contour);
+						var cutBounds = CastingProfileGeometry.bounds(op.contour);
 						var cut = BoxMoldPlanner.box(cutBounds.width, cutBounds.height, op.depth,
 							F.compose(pose, F.translation(cutBounds.x + cutBounds.width / 2, cutBounds.y + cutBounds.height / 2, 0)));
 						var before = blockers.length;
@@ -98,7 +98,7 @@ class FillTooling {
 				if (orthogonal(cut.operation.contour))
 					material = BoxAlgebra.subtract(material, prism(cut.operation.contour, cut.operation.depth, cut.pose));
 				else {
-					var bounds = PanelGeometry.bounds(cut.operation.contour);
+					var bounds = CastingProfileGeometry.bounds(cut.operation.contour);
 					var before = blockers.length;
 					if (add(BoxMoldPlanner.box(bounds.width, bounds.height, cut.operation.depth,
 						F.compose(cut.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0))))) {
@@ -114,7 +114,7 @@ class FillTooling {
 					for (box in BoxAlgebra.subtract(prism(profile.contour, profile.depth, profile.pose), profile.subtract))
 						add(box);
 				else {
-					var bounds = PanelGeometry.bounds(profile.contour);
+					var bounds = CastingProfileGeometry.bounds(profile.contour);
 					if (add(BoxMoldPlanner.box(bounds.width, bounds.height, profile.depth,
 						F.compose(profile.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0)))))
 						unsupportedIds.push(volume.id);

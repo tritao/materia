@@ -5,7 +5,7 @@ import materia.assembly.AssemblyCodec;
 
 /** Strict source schema; no old box-list encoding is accepted. */
 class CastingFeatureCodec {
-	public static inline var VERSION = 3;
+	public static inline var VERSION = 4;
 
 	public static function encode(features:Array<CastingFeature>):String {
 		var records:Array<Dynamic> = [];
@@ -105,13 +105,20 @@ class CastingFeatureCodec {
 				case Cut(solid):
 					if (f.kind == InsertRecess) throw "Insert recess requires source insert geometry: " + f.id;
 					CastingSolid.CastingSolidCodec.validate(solid);
+				case Prism(profile,height):
+					if (f.kind==InsertRecess) throw "Insert recess requires source insert geometry: "+f.id;
+					CastingProfileGeometry.validate(profile);
+					if (!Math.isFinite(height) || height<=0) throw "Invalid casting prism height: "+f.id;
 				case Insert(body):
 					if (f.kind != InsertRecess) throw "Design cut cannot use insert retention geometry: " + f.id;
 					InsertSpec.InsertBodyCodec.validate(body);
 			}
-			var radiusLimit = switch CastingFeature.CastingGeometrySolids.mouth(g.solid) {
-				case Box(width, depth, _): Math.min(width, depth) / 2;
-				case Cylinder(diameter, _): diameter / 2;
+			var radiusLimit = switch g.solid {
+				case Prism(_,_): Math.POSITIVE_INFINITY;
+				default: switch CastingFeature.CastingGeometrySolids.mouth(g.solid) {
+					case Box(width, depth, _): Math.min(width, depth) / 2;
+					case Cylinder(diameter, _): diameter / 2;
+				};
 			};
 			AssemblyCodec.validateFrame(g.pose);
 			fields(f.draft, ["degrees", "axis"]);

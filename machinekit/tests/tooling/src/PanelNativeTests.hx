@@ -15,7 +15,7 @@ import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingEnums.MachiningSide;
 import materia.tooling.panel.PanelJoints;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import materia.tooling.panel.PanelAssemblyPlan;
 import materia.tooling.panel.PanelCoupon;
 import materia.tooling.panel.PanelCodec;
@@ -97,7 +97,7 @@ class PanelNativeTests {
 				check(solid.valid() && solid.solidCount() == 1, "connected valid panel solid");
 				var expected = 0.0;
 				for (op in p.operations)
-					expected += (op.kind == OutsideProfile ? 1 : -1) * PanelGeometry.area(PanelContours.operation(op)) * op.depth;
+					expected += (op.kind == OutsideProfile ? 1 : -1) * CastingProfileGeometry.area(PanelContours.operation(op)) * op.depth;
 				near(solid.volume(), expected, "CAD uses exact operation areas and depths");
 				solid.close();
 				var drawing = PanelDrawing.drawing(p), curveCount = 0;
@@ -175,7 +175,7 @@ class PanelNativeTests {
 		floor.operations.push(fixing);
 		var floorSolid = ToolingPanel.fromPlan(floor).geometry();
 		near(floorSolid.volume(),
-			120 * 120 * stock.measuredThickness - PanelGeometry.area(seat.contour) * 8 - Math.PI * 3.5 * 3.5 * (stock.measuredThickness - 8),
+			120 * 120 * stock.measuredThickness - CastingProfileGeometry.area(seat.contour) * 8 - Math.PI * 3.5 * 3.5 * (stock.measuredThickness - 8),
 			"drill through pocket floor removes shared air once");
 		floorSolid.close();
 		fixing.accessVia = "missing";

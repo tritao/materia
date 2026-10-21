@@ -7,13 +7,13 @@ import cadkit.sheetmetal.Point2;
 import materia.tooling.panel.PanelPlan;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 
 /** Rendering stays in MachineKit; existing CadKit SVG/DXF writers consume Drawing2D. */
 class PanelDrawing {
     public static function drawing(source:PanelPlan):Drawing2D {
         var p=PanelCodec.snapshot(source),entities:Array<DrawingEntity> = [];
-        var bounds=PanelGeometry.bounds(PanelContours.outside(p)),row=0;
+        var bounds=CastingProfileGeometry.bounds(PanelContours.outside(p)),row=0;
         entities.push(Label(Text,new Point2(0,bounds.height+5),2.5,
             p.id+" thickness="+p.stock.measuredThickness+" mm label-side="+p.labelSide));
         for(op in p.operations) {

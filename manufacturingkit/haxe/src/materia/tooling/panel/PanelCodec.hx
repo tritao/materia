@@ -1,5 +1,8 @@
 package materia.tooling.panel;
 
+import materia.casting.CastingProfileGeometry;
+import materia.casting.CastingProfile.CastingCurveKind;
+
 import haxe.Json;
 import haxe.crypto.Sha256;
 import materia.tooling.ToolingCodec;
@@ -10,8 +13,7 @@ import materia.tooling.ToolingEnums.ContactFace;
 import materia.casting.CastingPrism.CastingPoint2;
 import materia.tooling.panel.PanelPlan.PanelOperation;
 import materia.tooling.panel.PanelPlan.PanelOperationKind;
-import materia.tooling.panel.PanelPlan.PanelSegment;
-import materia.tooling.panel.PanelPlan.PanelCurveKind;
+import materia.casting.CastingProfile.CastingSegment;
 
 /** Strict exact local-part recipe, separate from occurrence placement and qualification. */
 class PanelCodec {
@@ -191,12 +193,12 @@ class PanelCodec {
 				if (parents.length != 1)
 					throw "Unknown operation access pocket";
 				var parent = parents[0],
-					bounds = PanelGeometry.bounds(op.contour);
+					bounds = CastingProfileGeometry.bounds(op.contour);
 				if ((parent.kind != Pocket && parent.kind != Rebate)
 					|| parent.through
 					|| parent.side != op.side
 					|| op.depth <= parent.depth
-					|| !PanelGeometry.containsRect(parent.contour, bounds.x, bounds.y, bounds.width, bounds.height))
+					|| !CastingProfileGeometry.containsRect(parent.contour, bounds.x, bounds.y, bounds.width, bounds.height))
 					throw "Invalid operation access pocket";
 			}
 		for (id in openings)
@@ -204,7 +206,7 @@ class PanelCodec {
 				throw "Unknown contact opening";
 		p.operations.sort((a, b) -> Reflect.compare(a.id, b.id));
 		var outline = PanelContours.outside(p),
-			b = PanelGeometry.bounds(outline);
+			b = CastingProfileGeometry.bounds(outline);
 		if (Math.abs(b.x) > 1e-7 || Math.abs(b.y) > 1e-7)
 			throw "Panel blank origin must be lower-left";
 		if (!((b.width <= p.stock.width && b.height <= p.stock.height && rotations.indexOf(0) >= 0)
@@ -212,7 +214,7 @@ class PanelCodec {
 			throw "Panel exceeds stock";
 		for (op in p.operations)
 			if (op.kind != OutsideProfile) {
-				var q = PanelGeometry.bounds(op.contour),
+				var q = CastingProfileGeometry.bounds(op.contour),
 					m = p.minimumLigament;
 				if (op.kind == InsideProfile || op.kind == Pocket || op.kind == Rebate)
 					cutterFit(op, outline);
@@ -220,28 +222,28 @@ class PanelCodec {
 					var meets = false;
 					for (a in outline)
 						for (c in op.contour)
-							if (PanelGeometry.intersections(a, c).length > 0)
+							if (CastingProfileGeometry.intersections(a, c).length > 0)
 								meets = true;
 					if (!meets)
 						throw "Rebate must have an open side";
-				} else if (!PanelGeometry.containsRect(outline, q.x - m, q.y - m, q.width + 2 * m, q.height + 2 * m))
+				} else if (!CastingProfileGeometry.containsRect(outline, q.x - m, q.y - m, q.width + 2 * m, q.height + 2 * m))
 					throw "Insufficient panel edge ligament";
 				for (other in p.operations)
 					if (other.id < op.id && other.kind != OutsideProfile && op.accessVia != other.id && other.accessVia != op.id) {
-						var a = PanelGeometry.bounds(other.contour),
+						var a = CastingProfileGeometry.bounds(other.contour),
 							dx = Math.max(0, Math.max(a.x - q.x - q.width, q.x - a.x - a.width));
 						var dy = Math.max(0, Math.max(a.y - q.y - q.height, q.y - a.y - a.height));
-						if (Math.sqrt(dx * dx + dy * dy) < m && PanelGeometry.distanceBetween(op.contour, other.contour) < m - 1e-7)
+						if (Math.sqrt(dx * dx + dy * dy) < m && CastingProfileGeometry.distanceBetween(op.contour, other.contour) < m - 1e-7)
 							throw "Insufficient ligament between cuts: " + p.id + "/" + other.id + ", " + op.id;
 					}
 			}
 		if (p.contactFace != ContactFace.None && (p.contactFace : String) == (p.labelSide : String))
 			throw "Label zone on contact face";
-		if (!PanelGeometry.containsRect(outline, p.labelX - 15, p.labelY - 4, 30, 8))
+		if (!CastingProfileGeometry.containsRect(outline, p.labelX - 15, p.labelY - 4, 30, 8))
 			throw "Label zone outside panel";
 		for (op in p.operations)
 			if (op.kind != OutsideProfile) {
-				var q = PanelGeometry.bounds(op.contour);
+				var q = CastingProfileGeometry.bounds(op.contour);
 				if (q.x < p.labelX + 15 && q.x + q.width > p.labelX - 15 && q.y < p.labelY + 4 && q.y + q.height > p.labelY - 4)
 					throw "Label zone intersects cut";
 			}
@@ -251,8 +253,8 @@ class PanelCodec {
 	/** Positive curvature is an internal stock corner for a CCW removed region.
 	 * Rebate corners on/outside the blank are open approach boundaries.
 	 */
-	static function cutterFit(op:PanelOperation, outline:Array<PanelSegment>):Void {
-		function tangent(seg:PanelSegment, atEnd:Bool):CastingPoint2 {
+	static function cutterFit(op:PanelOperation, outline:Array<CastingSegment>):Void {
+		function tangent(seg:CastingSegment, atEnd:Bool):CastingPoint2 {
 			var c = seg.center;
 			if (c == null)
 				return {x: seg.end.x - seg.start.x, y: seg.end.y - seg.start.y};
@@ -260,7 +262,7 @@ class PanelCodec {
 				sign = seg.sweep > 0 ? 1.0 : -1.0;
 			return {x: -(p.y - c.y) * sign, y: (p.x - c.x) * sign};
 		}
-		var bounds = PanelGeometry.bounds(op.contour);
+		var bounds = CastingProfileGeometry.bounds(op.contour);
 		if (Math.min(bounds.width, bounds.height) + 1e-7 < op.toolDiameter)
 			throw "Cutter does not fit slot: " + op.id;
 		for (i in 0...op.contour.length) {
@@ -274,9 +276,9 @@ class PanelCodec {
 			var open = false;
 			if (op.kind == Rebate) {
 				for (edge in outline)
-					if (PanelGeometry.on(edge, seg.end))
+					if (CastingProfileGeometry.on(edge, seg.end))
 						open = true;
-				if (!PanelGeometry.inside(outline, seg.end.x, seg.end.y))
+				if (!CastingProfileGeometry.inside(outline, seg.end.x, seg.end.y))
 					open = true;
 			}
 			if (!open)
@@ -343,18 +345,18 @@ class PanelCodec {
 					throw "Drill needs an exact circle";
 			}
 			if (Math.abs(op.toolDiameter - diameter) > 1e-7
-				|| Math.abs(PanelGeometry.area(contour) - Math.PI * diameter * diameter / 4) > 1e-6)
+				|| Math.abs(CastingProfileGeometry.area(contour) - Math.PI * diameter * diameter / 4) > 1e-6)
 				throw "Drill tool does not match circle";
 		}
 	}
 
-	public static function contourSnapshot(raw:Dynamic):Array<PanelSegment> {
-		var result:Array<PanelSegment> = [];
+	public static function contourSnapshot(raw:Dynamic):Array<CastingSegment> {
+		var result:Array<CastingSegment> = [];
 		for (seg in arr({contour: raw}, "contour", 512)) {
 			obj(seg, ["kind", "start", "end", "center", "sweep"]);
-			var curve:PanelCurveKind = switch s(seg, "kind") {
-				case "line": Line;
-				case "arc": Arc;
+			var curve:CastingCurveKind = switch s(seg, "kind") {
+				case "line": CastingCurveKind.Line;
+				case "arc": CastingCurveKind.Arc;
 				default: throw "Unsupported panel curve kind";
 			};
 			var c = Reflect.field(seg, "center");
@@ -366,7 +368,7 @@ class PanelCodec {
 				sweep: n(seg, "sweep")
 			});
 		}
-		PanelGeometry.validate(result);
+		CastingProfileGeometry.validate(result);
 		return result;
 	}
 

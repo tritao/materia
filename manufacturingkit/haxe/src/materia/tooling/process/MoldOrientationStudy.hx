@@ -13,7 +13,7 @@ import materia.tooling.export.FabricationSpec;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingFabrication.FabricationPlan;
 import materia.tooling.panel.PanelContours;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.CastingProcessAnalysis.CastingProcessReport;
 import materia.tooling.process.FillAnalysis;
@@ -206,7 +206,8 @@ class MoldOrientationStudy {
 	}
 
 	public static function run(candidates:Array<MoldOrientationCandidate>, fabrication:FabricationSpec,
-			?geometry:CastingMoldPlan->OrientationGeometryAssessment):MoldOrientationReport {
+			?geometry:CastingMoldPlan->OrientationGeometryAssessment,
+			?exactFill:materia.tooling.process.CastingProcessAnalysis.ExactFillBackend):MoldOrientationReport {
 		if (candidates.length == 0 || candidates.length > 24)
 			throw "Invalid orientation candidate count";
 		var results:Array<MoldOrientationResult> = [],
@@ -237,7 +238,7 @@ class MoldOrientationStudy {
 				processFailure:Null<String> = null;
 			if (plan != null)
 				try
-					shared = CastingProcessAnalysis.analyze(plan, spec, fabrication.gravityMps2, fabrication)
+					shared = CastingProcessAnalysis.analyze(plan, spec, fabrication.gravityMps2, fabrication,exactFill)
 				catch (error:Dynamic)
 					processFailure = Std.string(error);
 			var fill = shared == null ? null : shared.fill;

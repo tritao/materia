@@ -13,7 +13,7 @@ import materia.tooling.panel.PanelPlan;
 import materia.tooling.panel.PanelPlan.PanelOperationKind;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelJoints;
-import materia.tooling.panel.PanelGeometry;
+import materia.casting.CastingProfileGeometry;
 
 /** Rebuildable exact panel; material is an explicit CAD/BOM material selection. */
 class ToolingPanel extends MachineComponent {
@@ -36,7 +36,7 @@ class ToolingPanel extends MachineComponent {
         addConnector("mount",Mount,F.identity());
         addConnector("top",Mount,Solids.axial(0,0,p.stock.measuredThickness));
         for(op in p.operations)if(op.kind!=OutsideProfile) {
-            var b=PanelGeometry.bounds(op.contour),positive=op.side==MachiningSide.PositiveZ;
+            var b=CastingProfileGeometry.bounds(op.contour),positive=op.side==MachiningSide.PositiveZ;
             addConnector("cut-"+op.id,Mount,F.alongY(b.x+b.width/2,b.y+b.height/2,positive?p.stock.measuredThickness:0,0,0,positive?1:-1));
         }
     }

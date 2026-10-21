@@ -343,7 +343,7 @@ class BoxMoldPlanner {
 				};
 			}
 		];
-		var bounds = materia.tooling.panel.PanelGeometry.bounds(transformed);
+		var bounds = materia.casting.CastingProfileGeometry.bounds(transformed);
 		if (bounds.x < -dimensions.width / 2 + margin
 			|| bounds.y < -dimensions.depth / 2 + margin
 			|| bounds.x + bounds.width > dimensions.width / 2 - margin
@@ -405,8 +405,8 @@ class BoxMoldPlanner {
 				var carrier = plan.supportPanels.filter(m -> m.panel.id == materia.tooling.ToolingIds.derive("", c.id, "-carrier"))[0];
 				for (pad in plan.supportPanels)
 					if (StringTools.endsWith(pad.panel.id, "-pad")) {
-						var a = materia.tooling.panel.PanelGeometry.bounds(materia.tooling.panel.PanelContours.outside(carrier.panel));
-						var b = materia.tooling.panel.PanelGeometry.bounds(materia.tooling.panel.PanelContours.outside(pad.panel));
+						var a = materia.casting.CastingProfileGeometry.bounds(materia.tooling.panel.PanelContours.outside(carrier.panel));
+						var b = materia.casting.CastingProfileGeometry.bounds(materia.tooling.panel.PanelContours.outside(pad.panel));
 						if (Math.min(carrier.pose.x + a.x + a.width, pad.pose.x + b.x + b.width) > Math.max(carrier.pose.x + a.x, pad.pose.x + b.x) + 1e-7
 							&& Math.min(carrier.pose.y + a.y + a.height, pad.pose.y + b.y + b.height) > Math.max(carrier.pose.y + a.y, pad.pose.y + b.y) + 1e-7)
 							throw "Core carrier overlaps bridge pad: " + carrier.panel.id + "/" + pad.panel.id;

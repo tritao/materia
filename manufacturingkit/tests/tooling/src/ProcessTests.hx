@@ -178,6 +178,18 @@ class ProcessTests {
 	}
 
 	public static function run(p:CastingMoldPlan):Void {
+		var airRecord=materia.tooling.ToolingCodec.canonical(materia.tooling.process.FillAnalysis.FillPocketGeometry.CadAirAbove(2,"region-example"));
+		check(airRecord.indexOf("cad-air-above")>=0 && airRecord.indexOf("boxes")<0,
+			"native air references never masquerade as box regions");
+		rejects(() -> materia.tooling.ToolingCodec.canonical(materia.tooling.process.FillAnalysis.FillPocketGeometry.CadAirAbove(Math.NaN,"region-example")),
+			"Invalid CAD air-region height");
+		rejects(() -> materia.tooling.ToolingCodec.canonical(materia.tooling.process.FillAnalysis.FillPocketGeometry.CadAirAbove(2,"region invalid")),
+			"Invalid tooling identifier");
+		rejects(() -> materia.tooling.ToolingCodec.canonical(materia.tooling.process.FillAnalysis.FillOpeningGeometry.CadOpening(Math.POSITIVE_INFINITY,[])),
+			"Invalid CAD opening height");
+		rejects(() -> materia.tooling.ToolingCodec.canonical(materia.tooling.process.FillAnalysis.FillOpeningGeometry.CadOpening(2,["cover","cover"])),
+			"Duplicate CAD opening blocker ID");
+
 		var region = [box(0, 0, 2, 10), box(2, 0, 2, 2), box(4, 0, 4, 6)];
 		var boundaries = [{id: "ceiling-feature", box: box(4, 6, 4, 4)}];
 		var cores = [{id: "foam", boxes: [box(10, 1, 2, 3)]}];
@@ -204,7 +216,7 @@ class ProcessTests {
 		near(multiple.trappedPockets[0].volumeMm3 + multiple.trappedPockets[1].volumeMm3, 72, 1e-9, "multiple pocket volumes counted once");
 		var nested = fill(region.concat([box(8, 0, 2, 8)]));
 		check(nested.trappedPockets.length == 1
-			&& nested.trappedPockets[0].ceilingFaces.length >= 2, "one trapped component retains nested ceiling levels");
+			&& switch nested.trappedPockets[0].geometry {case Rectilinear(_,faces):faces.length>=2;default:false;}, "one trapped component retains nested ceiling levels");
 		near(nested.trappedPockets[0].volumeMm3, 56, 1e-9, "nested ceiling limiting volume");
 		near(sampledTraps(region, 0.01), 32, 0.1, "dense independent face graph approaches side-neck limiting volume");
 		near(sampledTraps(region.concat([box(-6, 0, 4, 8), box(-2, 0, 2, 3)]), 0.01), 72, 0.1, "dense independent graph agrees on multiple pockets");
@@ -304,7 +316,7 @@ class ProcessTests {
 		raw.version = 1;
 		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported casting process");
 		raw = haxe.Json.parse(encoded);
-		raw.version = 7;
+		raw.version = 8;
 		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported casting process");
 		raw = haxe.Json.parse(encoded);
 		Reflect.deleteField(raw.spec, "mixer");
