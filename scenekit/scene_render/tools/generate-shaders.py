@@ -30,7 +30,7 @@ BLOCKS = {
                                  "vec4 ao_params; vec4 ao_viewport"),
         (2, "clip_params", "vec4 clip_planes[32]; vec4 clip_plane_count")),
     ("stroke", "vertex"): ((1, "view_params", "mat4 view_projection"),
-                             (3, "stroke_view_params", "vec4 stroke_view[2]")),
+                             (3, "stroke_view_params", "vec4 stroke_view[5]")),
     ("stroke", "fragment"): ((0, "stroke_color_params", "vec4 stroke_color"),
                                (2, "clip_params", "vec4 clip_planes[32]; vec4 clip_plane_count")),
     ("workplane", "fragment"): ((0, "grid_params", "vec4 grid_eye_spacing; vec4 grid_forward; "

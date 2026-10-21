@@ -106,6 +106,13 @@ if(NK_BUILD_TESTS)
             add_test(NAME scene_render_sections COMMAND ${NKSRENDER_XVFB_RUN} -a $<TARGET_FILE:nativekit_scene_render_section_tests>)
             set_tests_properties(scene_render_sections PROPERTIES LABELS "scene;render;graphics;gpu" TIMEOUT 60 ENVIRONMENT "LIBGL_ALWAYS_SOFTWARE=1")
 
+            add_executable(nativekit_scene_render_contour_tests tests/section_contours.cpp)
+            target_compile_features(nativekit_scene_render_contour_tests PRIVATE cxx_std_20)
+            target_include_directories(nativekit_scene_render_contour_tests PRIVATE src "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src")
+            target_link_libraries(nativekit_scene_render_contour_tests PRIVATE NativeKit::scene_render NativeKit::scene NativeKit::gpu NativeKit::nativekit)
+            add_test(NAME scene_render_contours COMMAND ${NKSRENDER_XVFB_RUN} -a $<TARGET_FILE:nativekit_scene_render_contour_tests>)
+            set_tests_properties(scene_render_contours PROPERTIES LABELS "scene;render;graphics;gpu" TIMEOUT 60 ENVIRONMENT "LIBGL_ALWAYS_SOFTWARE=1")
+
             add_executable(nativekit_scene_render_specular_tests tests/specular_aa.cpp)
             target_compile_features(nativekit_scene_render_specular_tests PRIVATE cxx_std_20)
             target_include_directories(nativekit_scene_render_specular_tests PRIVATE src "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src")

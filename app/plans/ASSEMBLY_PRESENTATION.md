@@ -377,6 +377,26 @@ gripper **Jaw detail**, review them, and record them in their READMEs. Update
 `scenekit/scene_render/shaders/README.md`.
 
 ### AP9 — Section outlines (renderer)
+Implementation status: local render-triangle/plane intersections now supply
+geometric contour strokes for every eligible cap. The per-occurrence/plane cache
+retains local segments and GPU buffers, reusing them across camera/material
+changes and tangential motion. Relative plane motion and mesh edits invalidate
+only the affected cut. Contours use their own four-depth-unit cap tie precedence;
+ordinary surface edges keep their one-unit bias and section retreat. Expanded
+ribbons stay on their source cutting plane and clip against the other planes.
+There are no screen-space ID edges, CAD recomputations or presentation changes.
+
+Validation: all nine renderer suites pass, including the new contour suite's
+same-material contact, two-plane clipping, open/uncapped exclusions, perspective
+and mirrored instances, degeneracies, cache reuse, explode, parent-joint and
+plane-drag regressions. The earlier surface-edge leak and specular AA regressions
+also pass. Shader regeneration is reproducible. See inside and Jaw detail were
+recaptured at 4× MSAA and reviewed in their READMEs. Both real editor views pass
+a 60-rendered-frame ±2 mm section drag: mean frame times 28.6/24.2 ms and p95
+45.6/37.1 ms (socket/gripper) on the shared desktop. Mean renderer CPU preparation
+is 0.57/0.21 ms, with zero geometry preparation or mesh repacking during either
+sweep. The capture harness restores the original section and saves no view edits.
+
 Caps carry no boundary line. Edge remnants near caps are deliberately suppressed
 (`01113c6eb`). Touching cut parts of similar material, such as a screw in a tapped
 hole, an insert in a casting or a shaft in a bore, merge into one hatched area,

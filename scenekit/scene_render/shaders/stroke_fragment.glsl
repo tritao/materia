@@ -21,7 +21,10 @@ void main() {
         // This removes clipped surface-edge remnants, not a synthetic cap outline.
         float footprint = (line_half_width + 1.0) * fwidth(distance_to_plane)
                         + abs(dot(clip_planes[index].xyz, world_depth_bias));
-        if (distance_to_plane <= footprint) discard;
+        if (clip_plane_count.y > 0.5) {
+            // Contours omit their source plane and clip exactly to the others.
+            if (distance_to_plane < 0.0) discard;
+        } else if (distance_to_plane <= footprint) discard;
     }
     vec2 line_coordinate = line_coordinate_homogeneous.xy / line_coordinate_homogeneous.z;
     vec2 nearest = vec2(clamp(line_coordinate.x, 0.0, line_length), 0.0);

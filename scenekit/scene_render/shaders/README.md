@@ -98,6 +98,61 @@ one-plane caps, hollow cores, overlapping instances, mirrored transforms,
 transparent/double-sided/open exclusions, plane-depth picks, AO, and hidden edges
 and silhouette coverage with MSAA. Exact B-rep drawing sections remain separate.
 
+## Geometric section outlines
+
+Every eligible cap also draws a contour from its source **render triangles**.
+`section_contours.hpp` pulls the world plane into the occurrence's local frame
+with `Mᵀ * plane`, intersects indexed or sequential triangles in double precision,
+and emits local segments. Shared-edge interpolation is deterministic; duplicate
+segments are removed, coplanar triangles add no diagonals, and on-plane mesh
+edges contribute once when their incident triangles cross to opposite sides.
+Tangent vertices/edges without cut area add no outline.
+
+The executor caches each occurrence/plane slot's local equation, mesh payload and
+revision, CPU segments and reusable dynamic GPU stroke buffer. Camera moves,
+material edits and transforms parallel to the plane reuse the intersections.
+Plane movement, joint rotation or an explode move through the plane changes its
+local equation and rebuilds that cut only; geometry edits also invalidate it.
+Other active planes clip at draw time, so moving one does not rebuild the others'
+contours. Buffer capacity grows as needed and is reused while dragging. Deleted
+occurrences release their cache entries. Only the parts selected by the cap pass
+are considered: uncut, undeclared/open, transparent, double-sided and masked
+parts receive no section outlines.
+
+Contours reuse the body/round-end stroke geometry and the material's edge contrast
+policy, with an explicit **section-contour** pipeline. Its four-depth-unit tie
+precedence is separate from the one-unit surface-edge bias. Expanded contour
+ribbons are projected back onto their cutting plane, so both sides have cap depth
+at their actual pixels; perspective-correct plane positions also clip the ribbon
+against every other active plane. The source plane is omitted. Contours use the
+exact clipping predicate, not the surface-edge retreat that suppresses leftover
+B-rep edges. They are drawn after all surfaces and ordinary edges with depth
+testing, no depth writes, and per-sample MSAA. There is no screen-space ID-edge
+filter, synthetic B-rep face, or change to the presentation schema. Pick/AO passes
+keep the filled-cap geometry and ownership; cosmetic contour strokes add no pick
+subelements. A future exact B-rep section source can feed the same stroke path.
+
+`scene_render_contours` checks touching same-material parts, cap picks, two-plane
+clipping, perspective and reflected instances, eligibility exclusions, coplanar
+and vertex degeneracies, and indexed/sequential meshes. It checks cache hits and
+rebuilds across camera/material changes, an independently moved second plane,
+explode transforms, parent joint motion, plane dragging and mesh replacement.
+`scene_render_sections` retains the surface-edge leak regression independently of
+these intentional section strokes.
+
+The real editor capture harness accepts `--section-drag=60` alongside a sectioned
+`--view`. It sweeps the first plane by ±2 assembly units, measures 60 **rendered**
+frames after eight warm-up frames, restores the original section and prints
+`section-drag` mean/p95/max frame times. It does not save the modified view. Use a
+capture duration long enough for the full sweep, for example
+`--capture-seconds=20`. See inside and Jaw detail are recaptured in their example
+READMEs with their geometric cut boundaries visible (4× MSAA, 1800×900 window).
+On the shared desktop, the 60-frame drag checks averaged 28.6 ms/frame for the
+socket fixture and 24.2 ms/frame for the gripper (p95 45.6/37.1 ms). Renderer CPU
+preparation averaged 0.57/0.21 ms (p95 0.73/0.29 ms); the geometry preparation and
+mesh-packing counters stayed zero throughout the drag. These are measured local
+frame times, not a hardware-independent performance guarantee.
+
 ## Specular antialiasing
 
 Before GGX and `studio_panels`, the fragment shader filters squared microfacet

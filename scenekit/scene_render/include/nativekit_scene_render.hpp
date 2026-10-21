@@ -438,6 +438,9 @@ struct GpuExecutionStats {
     std::size_t batch_instances_inspected = 0;
     /** Number of command records patched by an incremental layout update. */
     std::size_t commands_patched = 0;
+    /** Local mesh/plane intersections rebuilt, independent of camera or material changes. */
+    std::size_t section_contours_rebuilt = 0;
+    std::size_t section_contour_cache_hits = 0;
 };
 
 /* ------------------------------------------------------------------------- */

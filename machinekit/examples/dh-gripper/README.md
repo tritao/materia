@@ -403,7 +403,10 @@ The custom-finger artifact opens assembled. **Jaw detail** frames the left jaw,
 finger and its two mounting screws beside the sectioned housing guide. The blank,
 cable, cable-end connector and opposite jaw/finger are hidden in this view so they
 do not obscure the detail. Closed solid cuts are filled with material-coloured
-hatch at the plane; guide cavities and screw holes remain empty.
+hatch at the plane; guide cavities and screw holes remain empty. The AP9 recapture
+also shows geometric section contours along the finger, jaw and guide cuts. These
+follow the cut tessellation and move with the jaw, without exposing clipped
+surface-edge remnants.
 Finger service gives an unobstructed close-up. The Explode slider removes screws
 in stage 1 and fingers in stage 2. Change left finger opens the jaws with
 `SetJoints`, then removes the two screws and finger, installs the replacement,
@@ -419,7 +422,7 @@ Reproduce the Jaw detail capture through the editor (the preset supplies the fra
 
 ```sh
 ./haxeon/scripts/haxeon run --project=app/tests/haxeon.presentation-capture.json -- \
-  --view=jaw-detail \
+  --view=jaw-detail --msaa=4 \
   --project="$PWD/machinekit/examples/dh-gripper/build/pgc-custom-fingers.mtrg" \
   --capture-dir=/tmp/gripper-jaw-detail --capture-seconds=2 \
   --reset-workspace --perspective --width=1800 --height=900

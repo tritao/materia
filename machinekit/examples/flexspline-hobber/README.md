@@ -131,6 +131,9 @@ The broad, unhatched orange face is the **uncut inner north wall at Y=290 mm**
 (the wall extends to Y=308 mm), behind the section. Its top edge and the retained
 side-wall lengths show that depth separation. The east and west wall ends cross
 the section and are hatched, as are the socket cuts; socket bores remain empty.
+AP9 adds geometric contour strokes around these cuts, including the socket and
+mounting hardware boundaries. They are triangle/plane intersections, separate
+from ordinary surface edges; the cap interiors stay free of clipped edge ticks.
 There is no missing cap on the north wall: the plane never intersects it.
 The casting and fixture plates are transparent so they cannot obscure the sockets;
 transparent parts receive no caps. These are display changes only.
@@ -140,7 +143,7 @@ Reproduce a named view from the repository root with:
 
 ```sh
 ./haxeon/scripts/haxeon run --project=app/tests/haxeon.presentation-capture.json -- \
-  --view=see-inside \
+  --view=see-inside --msaa=4 \
   --project="$PWD/machinekit/examples/flexspline-hobber/build/socket-fixture/socket-fixture-assembled.mtrg" \
   --capture-dir=/tmp/socket-fixture-see-inside --capture-seconds=2 \
   --reset-workspace --perspective --width=1800 --height=900

@@ -9,7 +9,7 @@ layout(location=4) in vec4 transform1;
 layout(location=5) in vec4 transform2;
 layout(location=6) in vec4 transform3;
 uniform mat4 view_projection;
-uniform vec4 stroke_view[2];
+uniform vec4 stroke_view[5];
 out vec3 line_coordinate_homogeneous;
 out float line_length;
 out float line_half_width;
@@ -57,7 +57,29 @@ void main() {
     // Caps may continue the depth ramp away from the eye, but must never
     // extrapolate towards it and peek through a foreground surface.
     float cap_depth = (cap_extension / length_px) * (b.z / b.w - a.z / a.w);
-    clip.z += max(cap_depth, 0.0) * clip.w;
+    if (stroke_view[0].w > 0.5) {
+        // Expand contour ribbons in their cutting plane. Their depth must match
+        // that plane at the expanded pixel, not at the unexpanded centerline;
+        // otherwise one side sinks into the cap and the other floats above it.
+        vec2 displacement = pixel_offset * (2.0 / stroke_view[0].xy) * clip.w;
+        vec4 h = vec4(world_position, 1.0) + stroke_view[2] * displacement.x + stroke_view[3] * displacement.y;
+        float denominator = dot(stroke_view[4], stroke_view[1]);
+        if (abs(denominator) > 1.0e-20) {
+            float dz_plane = -dot(stroke_view[4], h) / denominator;
+            h += stroke_view[1] * dz_plane;
+            clip.z += dz_plane;
+            if (abs(h.w) > 1.0e-20) {
+                world_position = h.xyz / h.w;
+                // Preserve perspective-correct interpolation of the expanded
+                // plane positions as well as their NDC depth.
+                clip /= h.w;
+            } else {
+                clip = vec4(2.0, 2.0, 2.0, 1.0);
+            }
+        }
+    } else {
+        clip.z += max(cap_depth, 0.0) * clip.w;
+    }
     gl_Position = clip;
     // Convert the constant depth-unit tie-break to a world-space displacement.
     // Differentiate homogeneous unprojection rather than subtracting nearly

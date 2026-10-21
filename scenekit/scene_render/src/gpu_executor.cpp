@@ -2,6 +2,7 @@
 #include "scene_shader_sources.hpp"
 #include "capture_profiler.hpp"
 #include "render_internal.hpp"
+#include "section_contours.hpp"
 
 #include <algorithm>
 #include <array>
@@ -54,6 +55,9 @@ static_assert(sizeof(StrokeVertex) == sizeof(float) * 8);
 struct StrokeUniformData {
     std::array<float, 4> viewport_width_height_half_width{};
     std::array<float, 4> depth_unprojection{};
+    std::array<float, 4> x_unprojection{};
+    std::array<float, 4> y_unprojection{};
+    std::array<float, 4> contour_plane{};
 };
 
 struct InstanceData {
@@ -63,6 +67,14 @@ struct InstanceData {
 };
 
 static_assert(sizeof(InstanceData) == instance_stride);
+
+constexpr std::array<std::array<float, 2>, 18> stroke_corners{{
+        {{0.0f, -1.0f}}, {{0.0f, 1.0f}}, {{1.0f, 1.0f}},
+        {{0.0f, -1.0f}}, {{1.0f, 1.0f}}, {{1.0f, -1.0f}},
+        {{-1.0f, -1.0f}}, {{-1.0f, 1.0f}}, {{0.0f, 1.0f}},
+        {{-1.0f, -1.0f}}, {{0.0f, 1.0f}}, {{0.0f, -1.0f}},
+        {{1.0f, -1.0f}}, {{1.0f, 1.0f}}, {{2.0f, 1.0f}},
+        {{1.0f, -1.0f}}, {{2.0f, 1.0f}}, {{2.0f, -1.0f}}}};
 
 struct ClipUniformData {
     std::array<std::array<float, 4>, RenderPlan::max_clip_planes> planes{};
@@ -440,6 +452,7 @@ struct NativeKitGpuExecutor::State {
         nkgpu_pipeline blend{};
         nkgpu_pipeline indexed_blend{};
         nkgpu_pipeline stroke{};
+        nkgpu_pipeline contour{};
         nkgpu_pipeline workplane{};
         std::array<nkgpu_pipeline, 3> caps{};
         nkgpu_pipeline indexed_parity{};
@@ -457,6 +470,13 @@ struct NativeKitGpuExecutor::State {
     std::array<std::array<nkgpu_pipeline,3>,2> pick_caps{};
     struct CapDraw { std::size_t batch, instance, plane; std::array<int,4> scissor; };
     std::vector<CapDraw> caps;
+    struct ContourGpu {
+        render_internal::SectionContour section;
+        nkgpu_buffer buffer{};
+        std::uint32_t capacity=0,count=0;
+        bool uploaded=false;
+    };
+    std::map<std::pair<std::uint64_t,std::size_t>,ContourGpu> contours;
     nkgpu_buffer cap_vertices{}, cap_pick_vertices{}, cap_instances{};
     nkgpu_shader postprocess_shader{};
     nkgpu_pipeline postprocess_pipeline{};
@@ -524,7 +544,7 @@ struct NativeKitGpuExecutor::State {
     ~State() { release_gpu(); }
 
     void destroy_pass_pipelines(PassPipelines &set) noexcept {
-        for (auto *pipeline : {&set.surface, &set.indexed, &set.blend, &set.indexed_blend, &set.stroke,
+        for (auto *pipeline : {&set.surface, &set.indexed, &set.blend, &set.indexed_blend, &set.stroke, &set.contour,
                                &set.workplane, &set.caps[0], &set.caps[1], &set.caps[2], &set.indexed_parity}) {
             if (renderer.id && pipeline->id)
                 (void)nkgpu_pipeline_destroy(renderer, *pipeline);
@@ -538,6 +558,9 @@ struct NativeKitGpuExecutor::State {
             for(auto &set:pick_caps)for(auto pipeline:set)if(pipeline.id)(void)nkgpu_pipeline_destroy(renderer,pipeline);
         }
         cap_vertices={};cap_pick_vertices={};cap_instances={};pick_caps={};caps.clear();
+        for(auto &[key,entry]:contours)if(renderer.id&&entry.buffer.id)
+            (void)nkgpu_buffer_destroy(renderer,entry.buffer);
+        contours.clear();
         if (capture_profiler) capture_profiler->release();
         for (auto &[id, resource] : geometry_resources) {
             (void)id;
@@ -881,8 +904,9 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool
 }
 
 template <class StateT>
-bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32_t samples) {
-    auto &pipeline = state.pipelines[pipeline_slot(samples)].stroke;
+bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32_t samples, bool contour = false) {
+    auto &set = state.pipelines[pipeline_slot(samples)];
+    auto &pipeline = contour ? set.contour : set.stroke;
     if (pipeline.id)
         return true;
     nkgpu_result result = NKGPU_OK;
@@ -913,7 +937,7 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
             (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_VERTEX,
                                                  sizeof(StrokeUniformData))) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 3, 0, "stroke_view_params",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 2)) != NKGPU_OK ||
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 5)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(float) * 4)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 0, 0, "stroke_color_params",
@@ -963,7 +987,9 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
     depth.write_enabled = 0;
     // Only resolve coplanar ties. Slope bias can pull hidden ribbons through
     // thin foreground surfaces; the shader preserves the centerline slope.
-    depth.bias = -1.0f;
+    // Section contours explicitly win ties against both their own and adjacent
+    // caps. Surface-edge bias/clipping keeps its separate, smaller tie budget.
+    depth.bias = contour ? -4.0f : -1.0f;
     nkgpu_blend_state blend{};
     blend.enabled = 1;
     blend.src_rgb = NKGPU_BLENDFACTOR_ONE;
@@ -999,6 +1025,21 @@ bool material_is_invisible(const MaterialState &state) {
     return material_is_blended(state) && state.base_color[3] * state.opacity <= 0.0f;
 }
 
+std::array<float,4> stroke_color_for(const RenderPlan &plan,const MaterialResource *material) {
+    const auto &studio=plan.studio_lighting();
+    const auto &light = studio.edges_on_light, &dark = studio.edges_on_dark;
+    if (studio.edge_contrast_luminance > 0.0f && material) {
+        const auto linear = [](float value) {
+            return value <= 0.04045f ? value / 12.92f : std::pow((value + 0.055f) / 1.055f, 2.4f);
+        };
+        const auto &base = material->state->base_color;
+        const auto luminance = 0.2126f * linear(base[0]) + 0.7152f * linear(base[1]) + 0.0722f * linear(base[2]);
+        if (luminance < studio.edge_contrast_luminance)
+            return std::array<float, 4>{dark[0], dark[1], dark[2], 1.0f};
+    }
+    return std::array<float, 4>{light[0], light[1], light[2], 1.0f};
+}
+
 template <class StateT>
 bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnapshot &snapshot,
                          std::uint32_t samples, GpuExecutionStats &stats) {
@@ -1023,21 +1064,6 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
             for (unsigned row = 0; row < 4; ++row)
                 viewport.depth_unprojection[row] = inverse[8 + row];
     }
-    // CAD edges contrast with their part: light on dark surfaces, dark on light ones (StudioLighting).
-    const auto &studio = plan.studio_lighting();
-    const auto edge_color = [&studio](const MaterialResource *material) {
-        const auto &light = studio.edges_on_light, &dark = studio.edges_on_dark;
-        if (studio.edge_contrast_luminance > 0.0f && material) {
-            const auto linear = [](float value) {
-                return value <= 0.04045f ? value / 12.92f : std::pow((value + 0.055f) / 1.055f, 2.4f);
-            };
-            const auto &base = material->state->base_color;
-            const auto luminance = 0.2126f * linear(base[0]) + 0.7152f * linear(base[1]) + 0.0722f * linear(base[2]);
-            if (luminance < studio.edge_contrast_luminance)
-                return std::array<float, 4>{dark[0], dark[1], dark[2], 1.0f};
-        }
-        return std::array<float, 4>{light[0], light[1], light[2], 1.0f};
-    };
     const auto clip_data = clip_uniform_data(plan);
     for (const auto &batch : state.batches) {
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
@@ -1048,7 +1074,7 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
         const auto *material = snapshot.find_material(batch.key.material);
         if (material && material_is_invisible(*material->state))
             continue;
-        const auto color = edge_color(material);
+        const auto color = stroke_color_for(plan,material);
         auto result = nkgpu_apply_pipeline(state.renderer, stroke_pipeline);
         if (result == NKGPU_OK)
             result = nkgpu_apply_uniform_data(state.renderer, 1,
@@ -1324,6 +1350,7 @@ bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool position
 }
 
 #include "section_caps.hpp"
+#include "section_contour_gpu.hpp"
 
 template <class StateT>
 bool ensure_pick_targets(StateT &state, std::uint32_t width, std::uint32_t height,
@@ -1791,13 +1818,6 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
     stroke_vertices.reserve(resource.payload->stroke_segments.size() * 18);
     // Body and two caps have separate quads so cap extension cannot flatten
     // the body's depth slope. Coordinates outside [0,1] identify the caps.
-    constexpr std::array<std::array<float, 2>, 18> stroke_corners{{
-        {{0.0f, -1.0f}}, {{0.0f, 1.0f}}, {{1.0f, 1.0f}},
-        {{0.0f, -1.0f}}, {{1.0f, 1.0f}}, {{1.0f, -1.0f}},
-        {{-1.0f, -1.0f}}, {{-1.0f, 1.0f}}, {{0.0f, 1.0f}},
-        {{-1.0f, -1.0f}}, {{0.0f, 1.0f}}, {{0.0f, -1.0f}},
-        {{1.0f, -1.0f}}, {{1.0f, 1.0f}}, {{2.0f, 1.0f}},
-        {{1.0f, -1.0f}}, {{2.0f, 1.0f}}, {{2.0f, -1.0f}}}};
     for (const auto &segment : resource.payload->stroke_segments) {
         for (const auto &corner : stroke_corners)
             stroke_vertices.push_back({segment.start, segment.end, corner});
@@ -2982,6 +3002,8 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
     if (!ensure_surface_pipelines(*state_, snapshot, 1, stats))
         return stats;
 
+    if(!prepare_caps(*state_,plan,snapshot,state_->viewport_width,state_->viewport_height,1,false,false,stats) ||
+       !prepare_contours(*state_,plan,snapshot,1,stats))return stats;
     auto result = nkgpu_begin_frame(state_->renderer);
     if (result != NKGPU_OK) {
         set_failure(*state_, stats, result);
@@ -2999,6 +3021,9 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
     if (!draw_stroke_batches(*state_, plan, snapshot, 1, stats)) {
         (void)nkgpu_end_frame(state_->renderer);
         return stats;
+    }
+    if(!draw_contours(*state_,plan,snapshot,1,stats)) {
+        (void)nkgpu_end_frame(state_->renderer);return stats;
     }
     result = nkgpu_end_frame(state_->renderer);
     if (result != NKGPU_OK)
@@ -3059,7 +3084,8 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     const bool use_ao = plan.studio_lighting().enabled && detail[0] > 0.0f && detail[1] > 0.0f;
     if (use_ao && render_pick_pass(*state_, plan, snapshot, width, height, stats, true) != NKGPU_OK)
         return state_->last_result;
-    if(!prepare_caps(*state_,plan,snapshot,width,height,samples,false,false,stats))return state_->last_result;
+    if(!prepare_caps(*state_,plan,snapshot,width,height,samples,false,false,stats) ||
+       !prepare_contours(*state_,plan,snapshot,samples,stats))return state_->last_result;
     if (profiler) profiler->prepared(timing);
     auto result = nkgpu_frame_begin(state_->renderer);
     if (result != NKGPU_OK) {
@@ -3127,6 +3153,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         return fail_frame(result);
     if (!draw_stroke_batches(*state_, plan, snapshot, samples, stats))
         return fail_frame(stats.result);
+    if(!draw_contours(*state_,plan,snapshot,samples,stats))return fail_frame(stats.result);
     if (profiler) profiler->end(timing);
     if ((result = nkgpu_end_pass(state_->renderer)) != NKGPU_OK) {
         pass_active = false;
