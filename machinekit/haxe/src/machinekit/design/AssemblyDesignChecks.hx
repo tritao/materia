@@ -59,6 +59,7 @@ class AssemblyDesignChecks {
 			var id=DesignRequirements.id(r);
 			try switch(r) {
 				case InterfaceAlignment(_,relationship): interfaceAlignment(out,id,relationship,members,definition);
+				case FoundationConnection(_,joint): FoundationJointDesignChecks.check(out,id,joint,members,initial);
 				case FastenerJoint(_,screw,target,through): fastener(out,id,screw,target,through,members,initial,cache);
 				case AccessPath(_,anchor,envelopes,pose,selection):
 					var state=new AssemblyState(definition);

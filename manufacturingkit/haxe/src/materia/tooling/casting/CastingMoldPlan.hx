@@ -137,6 +137,7 @@ enum abstract DesignChangeKind(String) to String {
 	var ReleaseAlternative = "release-alternative";
 	var InterfaceAllowance = "interface-allowance";
 	var InsertFixtureHole = "insert-fixture-hole";
+	var FoundationJointDefinition = "foundation-joint";
 }
 
 typedef DesignChangeRequest = {
@@ -147,13 +148,11 @@ typedef DesignChangeRequest = {
 	var blockingChecks:Array<String>;
 }
 
-typedef GroutedJoint = {
-	var id:String;
-	var insertIds:Array<String>;
-	var gapMm:Null<Float>;
-	var jackingReference:Null<String>;
-	var boltSleeveReference:Null<String>;
-	var cureBeforeTorqueEvidence:Array<String>;
+/** Process choices do not override the source assembly joint geometry. */
+typedef FoundationJointProcess = {
+	var jointId:String;
+	var materialReference:Null<String>;
+	var cureEvidence:Array<String>;
 }
 
 enum abstract OverlapRule(String) to String {
@@ -184,7 +183,7 @@ typedef HandlingPlan = {
 }
 
 typedef CastingMoldOptions = {
-	var groutedJoints:Array<GroutedJoint>;
+	var foundationJointProcesses:Array<FoundationJointProcess>;
 	var replicationJigs:Array<ReplicationJig>;
 	var precision:Array<PrecisionInterface>;
 	var compaction:CompactionSpec;

@@ -121,16 +121,7 @@ class MillMoldSetup {
 		var input = input(frame);
 		return {
 			replicationJigs: [],
-			groutedJoints: [
-				{
-					id: "column-base",
-					insertIds: [for (i in input.inserts) if (i.role == "column-mount") i.id],
-					gapMm: null,
-					jackingReference: null,
-					boltSleeveReference: null,
-					cureBeforeTorqueEvidence: []
-				}
-			],
+			foundationJointProcesses: [],
 			precision: [
 				for (i in input.inserts)
 					{

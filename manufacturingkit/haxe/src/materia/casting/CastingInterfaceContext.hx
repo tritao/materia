@@ -15,6 +15,8 @@ typedef CastingInterfaceContext = {
 	var inserts:Array<{id:String,member:String}>;
 	var relationships:Array<{id:String,relationship:InterfaceRelationship}>;
 	var sources:Array<InterfaceContextSource>;
+	var foundationJoints:Array<FoundationJointSources.FoundationJointOccurrence>;
+	var jointSources:FoundationJointSources;
 }
 
 enum InterfaceContextSource {
@@ -24,10 +26,15 @@ enum InterfaceContextSource {
 
 class CastingInterfaceContexts {
 	public static function snapshot(raw:Dynamic):CastingInterfaceContext {
-		CastingFeatureCodec.fields(raw,["bodyMember","inserts","relationships","sources"]);
+		CastingFeatureCodec.fields(raw,["bodyMember","inserts","relationships","sources","foundationJoints","jointSources"]);
 		var body=CastingRecordCodec.string(raw,"bodyMember");
 		CastingRecordCodec.referencePath(body);
-		var result:CastingInterfaceContext={bodyMember:body,inserts:[],relationships:[],sources:[]};
+		var result:CastingInterfaceContext={bodyMember:body,inserts:[],relationships:[],sources:[],
+			foundationJoints:FoundationJointSources.FoundationJointSourceCodec.occurrences(Reflect.field(raw,"foundationJoints")),
+			jointSources:FoundationJointSources.FoundationJointSourceCodec.snapshot(Reflect.field(raw,"jointSources"))};
+		FoundationJointAnalysis.validate(result.jointSources,result.foundationJoints);
+		for (instance in result.foundationJoints) if (instance.joint.lowerBody!=body && instance.joint.upperBody!=body)
+			throw "Foundation joint does not concern this casting: "+instance.id;
 		var ids:Map<String,Bool> = [],members:Map<String,Bool> = [body=>true];
 		for (row in bounded(raw,"inserts")) {
 			CastingFeatureCodec.fields(row,["id","member"]);
@@ -87,7 +94,8 @@ class CastingInterfaceContexts {
 
 	public static function record(context:CastingInterfaceContext):Dynamic {
 		var c=snapshot(context);
-		return {bodyMember:c.bodyMember,inserts:c.inserts,
+		return {bodyMember:c.bodyMember,inserts:c.inserts,foundationJoints:c.foundationJoints,
+			jointSources:FoundationJointSources.FoundationJointSourceCodec.record(c.jointSources),
 			relationships:[for (instance in c.relationships) {id:instance.id,relationship:InterfaceRelationships.records([instance.relationship])[0]}],
 			sources:[for (source in c.sources) sourceRecord(source)]};
 	}

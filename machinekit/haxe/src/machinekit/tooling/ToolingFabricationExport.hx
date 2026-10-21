@@ -117,6 +117,40 @@ class ToolingFabricationExport {
 		return checks;
 	}
 
+	public static function foundationJointReport(p:CastingMoldPlan,sourceFingerprint:String):Dynamic {
+		var checks=materia.tooling.casting.FoundationJointQualification.analyze(p.document.input,p.options.foundationJointProcesses)
+			.concat(FoundationJointCad.review(p.document.input));
+		var missing=materia.tooling.casting.FoundationJointQualification.missingSource(p.document.input);
+		if (missing!=null) checks.push(missing);
+		checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));
+		return {format:"materia.tooling.foundation-joints",version:1,sourceFingerprint:sourceFingerprint,
+			inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),processes:p.options.foundationJointProcesses,validation:checks};
+	}
+	static function foundationJoints(p:CastingMoldPlan,f:FabricationPlan,dir:String):Void {
+		data(dir,"foundation-joints.json",foundationJointReport(p,f.sourceFingerprint));
+		var rows:Array<Array<String>> = [["instance_id","design_id","lower_body","upper_body","route","gap_mm","gap_tolerance_mm","cure_order","qualification"]];
+		var hardware:Array<Array<String>> = [["member","part_number","kind","thread","diameter_mm","pitch_mm","length_mm","threaded_length_mm","qualification"]];
+		var sequence:Array<Array<String>> = [["instance_id","step","operation","qualification"]];
+		var context=p.document.input.interfaceContext;
+		if (context!=null) {
+			for (instance in context.foundationJoints) {
+				var joint=instance.joint;
+				rows.push([instance.id,joint.id,joint.lowerBody,joint.upperBody,(joint.route:String),Std.string(joint.gapMm),
+					Std.string(joint.gapToleranceMm),"cure-before-final-torque","pending"]);
+				var operations=["Locate the source seats and install the declared anchors without final torque.",
+					"Set the declared gap with the source jacking screws and verify the joint relationship.",
+					"Apply the qualified grout or replication compound using the approved process.",
+					"Record the required cure evidence before releasing final torque.","Apply and inspect the approved final torque after cure release."];
+				for (i in 0...operations.length) sequence.push([instance.id,Std.string(i+1),operations[i],"pending"]);
+			}
+			for (screw in context.jointSources.screws) hardware.push([screw.member,screw.partNumber,(screw.kind:String),screw.thread.designation,
+				Std.string(screw.thread.majorDiameter),Std.string(screw.thread.pitch),Std.string(screw.shankLength),Std.string(screw.threadedLength),"pending"]);
+		}
+		text(dir,"foundation-joints.csv",ToolingFabrication.csv(rows));
+		text(dir,"foundation-joint-hardware.csv",ToolingFabrication.csv(hardware));
+		text(dir,"foundation-joint-sequence.csv",ToolingFabrication.csv(sequence));
+	}
+
 	public static function replicationReport(p:CastingMoldPlan,sourceFingerprint:String):Dynamic {
 		var jigs=p.options.replicationJigs;
 		return {format:"materia.tooling.replication-jigs",version:1,sourceFingerprint:sourceFingerprint,
@@ -171,7 +205,9 @@ class ToolingFabricationExport {
 		if (f.sourceFingerprint != materia.tooling.casting.CastingMoldCodec.fingerprint(p))
 			throw "Stale fabrication plan";
 		sys.FileSystem.createDirectory(dir);
-		classificationChecks=classificationChecks.concat(insertManufacturing(p,f,dir)).concat(replication(p,f,dir));
+		classificationChecks=classificationChecks.concat(insertManufacturing(p,f,dir)).concat(replication(p,f,dir))
+			.concat(FoundationJointCad.review(p.document.input));
+		foundationJoints(p,f,dir);
 		data(dir, "fabrication-plan.json", f);
 		text(dir, "fabrication-spec.json", FabricationSpecCodec.encode(f.spec));
 		data(dir, "load-estimates.json", f.loads);

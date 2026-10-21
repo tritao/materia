@@ -107,8 +107,14 @@ class MillMoldChecks {
 		check(report.assemblyGroups.length == 2 && report.permanentGroups.length == 2, "two shared row fixtures");
 		check(report.assembly.assemblyOrder[0] == "bed", "bed installed first");
 		check(p.changeRequests.filter(c -> c.kind == "lifting-points").length == 1, "handling lift/flip request");
-		check(p.options.precision.length==p.document.input.inserts.length && p.options.groutedJoints.length==1,
-			"process choices cover source inserts without duplicating finishing routes");
+		check(p.options.precision.length==p.document.input.inserts.length && p.options.foundationJointProcesses.length==0,
+			"process choices cover source inserts without inventing the undeclared source joint");
+		var jointRequests=p.changeRequests.filter(request -> request.kind==materia.tooling.casting.CastingMoldPlan.DesignChangeKind.FoundationJointDefinition);
+		check(jointRequests.length==1 && jointRequests[0].sourceIds.length==4
+			&& jointRequests[0].blockingChecks.length==1 && p.validation.filter(record -> record.rule==jointRequests[0].blockingChecks[0]
+				&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending).length==1,
+			"the mill's four column anchors retain a source joint request while production gap and jacking remain undeclared");
+
 		equivalent(frame, p);
 		junctionGeometry(frame, p);
 		for (c in p.cores) {

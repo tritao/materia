@@ -176,7 +176,7 @@ class BoxPlannerTests {
 		check(p.panels.members.length == 5 && p.penetrations.length == 9, "all sockets/lands and fixing hole classified");
 		check(p.documentFingerprint == ToolingCodec.documentFingerprint(d), "mold provenance");
 		var raw:Dynamic = Json.parse(encoded);
-		Reflect.setField(raw, "version", 9);
+		Reflect.setField(raw, "version", 10);
 		rejects(() -> BoxMoldCodec.decode(Json.stringify(raw)), "previous mold schema rejected");
 		raw = Json.parse(encoded);
 		Reflect.setField(raw, "version", 99);

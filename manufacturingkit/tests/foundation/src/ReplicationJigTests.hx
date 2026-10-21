@@ -26,7 +26,7 @@ class ReplicationJigTests {
 		var relationship:InterfaceRelationship={id:"rail-planes",kind:Coplanar,
 			members:[ComponentInterface("casting","a"),ComponentInterface("casting","b")],tolerance:Linear(0.01),
 			metrology:{method:MetrologyMethod.IndicatorReversal,instrumentReference:null,uncertaintyMm:null}};
-		var context:CastingInterfaceContext={bodyMember:"casting",inserts:[],relationships:[{id:"rail-planes",relationship:relationship}],
+		var context:CastingInterfaceContext={foundationJoints:new Array<materia.casting.FoundationJointSources.FoundationJointOccurrence>(),jointSources:materia.casting.FoundationJointSources.FoundationJointSourceCodec.empty(),bodyMember:"casting",inserts:[],relationships:[{id:"rail-planes",relationship:relationship}],
 			sources:[Precision("casting",a,F.identity()),Precision("casting",b,F.identity())]};
 		return {id:"jig-fixture",revision:1,lengthUnit:materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			datumScheme:null,interfaceContext:CastingInterfaceContexts.snapshot(context),interfaces:[a,b],
@@ -134,7 +134,7 @@ class ReplicationJigTests {
 		var relation:InterfaceRelationship={id:"rail-planes",kind:Coplanar,
 			members:[ComponentInterface("left","a"),ComponentInterface("right","b")],tolerance:Linear(0.01),
 			metrology:{method:MetrologyMethod.IndicatorReversal,instrumentReference:null,uncertaintyMm:null}};
-		source.interfaceContext=CastingInterfaceContexts.snapshot({bodyMember:"casting",inserts:[{id:"a",member:"left"},{id:"b",member:"right"}],
+		source.interfaceContext=CastingInterfaceContexts.snapshot({foundationJoints:new Array<materia.casting.FoundationJointSources.FoundationJointOccurrence>(),jointSources:materia.casting.FoundationJointSources.FoundationJointSourceCodec.empty(),bodyMember:"casting",inserts:[{id:"a",member:"left"},{id:"b",member:"right"}],
 			relationships:[{id:"rail-planes",relationship:relation}],sources:[Precision("left",a,F.identity()),Precision("right",b,F.identity())]});
 		var common=jig();common.masters[0].members=relation.members.copy();
 		var independent=Codec.snapshot([common])[0];independent.id="other-frame";

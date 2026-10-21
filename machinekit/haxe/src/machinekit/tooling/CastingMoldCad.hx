@@ -608,7 +608,7 @@ class CastingMoldCad {
 						+ name
 						+ " check passed.",
 						[materia.tooling.casting.CastingMoldCodec.fingerprint(p)])
-			]).concat(ReplicationContactCad.review(p.document.input,p.options.replicationJigs));
+			]).concat(ReplicationContactCad.review(p.document.input,p.options.replicationJigs)).concat(FoundationJointCad.review(p.document.input));
 			return {
 				fingerprint: materia.tooling.casting.CastingMoldCodec.fingerprint(p),
 				handling: p.handling,

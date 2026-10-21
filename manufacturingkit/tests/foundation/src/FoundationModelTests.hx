@@ -40,6 +40,7 @@ class FoundationModelTests {
 		InsertManufacturingTests.run();
 		ReplicationJigTests.run();
 		ReplicationRelationshipTests.run();
+		FoundationJointTests.run();
 		insertBodies();
 		threadRelief();
 		solidFeatures();

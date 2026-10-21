@@ -20,7 +20,7 @@ class ReplicationRelationshipTests {
 		var a=requirement("a",0),b=requirement("b",50);
 		var r:InterfaceRelationship={id:"pair",kind:Coplanar,members:[ComponentInterface("casting","a"),ComponentInterface("casting","b")],
 			tolerance:Linear(0.01),metrology:{method:MetrologyMethod.IndicatorReversal,instrumentReference:null,uncertaintyMm:null}};
-		var context:CastingInterfaceContext={bodyMember:"casting",inserts:[],relationships:[{id:"instance",relationship:r}],
+		var context:CastingInterfaceContext={foundationJoints:new Array<materia.casting.FoundationJointSources.FoundationJointOccurrence>(),jointSources:materia.casting.FoundationJointSources.FoundationJointSourceCodec.empty(),bodyMember:"casting",inserts:[],relationships:[{id:"instance",relationship:r}],
 			sources:[Precision("casting",a,F.identity()),Precision("casting",b,F.identity())]};
 		var j:ReplicationJig={id:"frame",datumSchemeId:"datums",frameReference:"synthetic-frame",pose:F.identity(),masters:[master("a",0),master("b",50)]};
 		function evaluate():materia.tooling.ToolingValidation return ReplicationRelationships.check(j,"instance",r,context);

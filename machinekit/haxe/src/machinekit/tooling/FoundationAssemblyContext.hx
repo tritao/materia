@@ -45,7 +45,10 @@ class FoundationAssemblyContext {
 			}
 		}
 		var relationships:Array<{id:String,relationship:materia.casting.InterfaceRelationship}> = [];
+		var joints:Array<materia.casting.FoundationJointSources.FoundationJointOccurrence> = [];
 		for (requirement in assembly.designRequirements()) switch requirement {
+			case FoundationConnection(id,joint):
+				if (joint.lowerBody==bodyMember || joint.upperBody==bodyMember) joints.push({id:id,joint:joint});
 			case InterfaceAlignment(id,relationship):
 				var relevant=false;
 				for (member in relationship.members) switch member {
@@ -69,7 +72,9 @@ class FoundationAssemblyContext {
 				}
 			default:
 		}
+		var jointSources=machinekit.design.FoundationJointSourceSupport.capture(joints,parts,state,worldToFoundation);
 		return CastingInterfaceContexts.snapshot({bodyMember:bodyMember,inserts:inserts,relationships:relationships,
+			foundationJoints:joints,jointSources:jointSources,
 			sources:[for (source in sources) source]});
 	}
 }

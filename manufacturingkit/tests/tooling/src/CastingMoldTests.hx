@@ -31,7 +31,7 @@ class CastingMoldTests {
 	static function options(d:ToolingDocument):CastingMoldOptions
 		return {
 			replicationJigs: [],
-			groutedJoints: [],
+			foundationJointProcesses: [],
 			precision: [
 				for (i in d.input.inserts)
 					{
@@ -316,7 +316,7 @@ class CastingMoldTests {
 		o.anchorage.pop();
 		rejects(() -> CastingMoldPlanner.plan(d, o), "missing anchorage not silently qualified");
 		var raw:Dynamic = haxe.Json.parse(s);
-		Reflect.setField(raw, "version", 10);
+		Reflect.setField(raw, "version", 11);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
 		raw = haxe.Json.parse(s);
 		Reflect.setField(raw, "version", 99);
@@ -437,16 +437,9 @@ class CastingMoldTests {
 		check(CastingMoldPlanner.plan(d, qualified).changeRequests.filter(c -> c.kind == LiftingPoints).length == 1,
 			"insufficient typed lifting capacity stays blocking");
 		var grout = options(d);
-		var joint:materia.tooling.casting.CastingMoldPlan.GroutedJoint = {
-			id: "duplicate",
-			insertIds: [d.input.inserts[0].id],
-			gapMm: null,
-			jackingReference: null,
-			boltSleeveReference: null,
-			cureBeforeTorqueEvidence: []
-		};
-		grout.groutedJoints = [joint, joint];
-		rejects(() -> CastingMoldOptionsCodec.snapshot(grout), "duplicate grout IDs rejected");
+		var joint:materia.tooling.casting.CastingMoldPlan.FoundationJointProcess={jointId:"duplicate",materialReference:null,cureEvidence:[]};
+		grout.foundationJointProcesses=[joint,joint];
+		rejects(() -> CastingMoldOptionsCodec.snapshot(grout),"duplicate foundation joint process IDs rejected");
 		volume.pieces.push({
 			x: 10,
 			y: 0,

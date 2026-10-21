@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 11;
+	public static inline var VERSION = 12;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -133,6 +133,7 @@ class ToolingCodec {
 			: materia.casting.CastingInterfaceContext.CastingInterfaceContexts.snapshot(Reflect.field(raw,"interfaceContext"));
 		if (context!=null) {
 			validateInterfaceBindings(context,interfaces,inserts);
+			validateJointBindings(context,interfaces,inserts);
 		}
 		return {
 			id: string(raw, "id"),
@@ -145,6 +146,34 @@ class ToolingCodec {
 			features: features,
 			inserts: inserts
 		};
+	}
+
+	static function validateJointBindings(context:materia.casting.CastingInterfaceContext,
+		interfaces:Array<materia.casting.InterfaceRequirement>,inserts:Array<CastingToolingInsert>):Void {
+		var sources=context.jointSources;
+		for (body in sources.bodies) if (body.member==context.bodyMember) {
+			var owners=[for (binding in context.inserts) binding.member];owners.sort(Reflect.compare);
+			if (!sameFrame(body.pose,materia.assembly.AssemblyFrames.identity()) || canonical(owners)!=canonical(body.insertMembers)
+				|| canonical(body.interfaces)!=canonical(interfaces)) throw "Joint context differs from source casting interfaces or ownership";
+		}
+		for (source in sources.inserts) {
+			var bindings=context.inserts.filter(binding -> binding.member==source.member);
+			if (bindings.length==0) continue;
+			var input=inserts.filter(insert -> insert.id==bindings[0].id)[0];
+			var expected:materia.casting.InsertSpec={body:input.body,holes:input.holes,origin:input.origin,interfaces:input.interfaces};
+			if (!sameFrame(source.pose,input.pose) || canonical(source.spec)!=canonical(expected))
+				throw "Joint context differs from source insert or pose: "+source.member;
+		}
+		for (fact in context.sources) switch fact {
+			case Precision(member,requirement,pose):
+				var body=sources.bodies.filter(body -> body.member==member),insert=sources.inserts.filter(insert -> insert.member==member);
+				if (body.length+insert.length==0) continue;
+				var available=body.length==1 ? body[0].interfaces : insert[0].spec.interfaces;
+				var expected=available.filter(r -> r.id==requirement.id),actualPose=body.length==1 ? body[0].pose : insert[0].pose;
+				if (expected.length!=1 || canonical(expected[0])!=canonical(requirement) || !sameFrame(actualPose,pose))
+					throw "Joint context differs from shared precision source: "+member+"/"+requirement.id;
+			case Axis(_,_,_):
+		}
 	}
 
 	static function validateInterfaceBindings(context:materia.casting.CastingInterfaceContext,

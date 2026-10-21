@@ -1962,6 +1962,29 @@ structures and phase 9 physical calibration remain open.
   27 Pass / 336 Pending / 15 Unsupported**; integrity/tamper and artifact hashes
   pass; readiness is **false**. Source foundation joints remain the next slice.
 
+- [x] Source foundation joints replace mold-owned grout-gap records. Assembly
+  `FoundationConnection` declares the two casting bodies, source precision seats,
+  jacks, anchor screw/hole references and cure-before-final-torque. Shared neutral
+  checks resolve ownership, gap and source thread/clearance limits; native checks
+  verify the actual jack-tip bearing footprint. Captured joint facts are bound
+  back to the independent casting/insert source, fingerprinted and rechecked.
+  Joint geometry, actual standard hardware and the cure/torque sequence enter
+  the package; the manifest restores omitted checks and rejects altered reports.
+  Assembly schema **21**, source/tooling **12**, box mold **11**, general mold
+  **12** and manifest **6** reject previous versions. The mill's production gap
+  and jacking layout remain undeclared: a source `FoundationJointDefinition`
+  request references its actual Pending rule and all four column anchors. No
+  production gap, compound or accuracy budget is chosen by the tooling.
+  Validation: foundation **382** (joint contract **23**), neutral tooling
+  **1,845**, generic design **32**, native tooling **603** (source joint **64**),
+  casting **54**, foundation CAD **60**, standalone native process **34**, full
+  mill **251**. Declaring/removing the synthetic source joint clears/restores its
+  request; frozen foundation symmetric differences remain zero. Regenerated
+  records-only kit: **157 artifacts / 40 programs / 27 Pass / 336 Pending /
+  15 Unsupported**; integrity/tamper and artifact hashes pass; readiness is
+  **false**. Remaining step-2 slices include bolted insert anchorage,
+  rail-derived seat holes and lifting inserts.
+
 ### Phase 7 records: shared levelling-foot family
 
 - [x] One `structural.LevelingFoot` recipe with strict `LevelingFootSpec` schema

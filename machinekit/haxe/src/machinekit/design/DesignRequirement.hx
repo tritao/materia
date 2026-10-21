@@ -14,10 +14,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 	@:id(2) var frame:AssemblyFrame;
 	@:id(3) var volume:DesignVolume;
 }
-@:wire typedef DesignReference = {
-	@:id(1) var member:String;
-	@:id(2) var feature:String;
-}
+typedef DesignReference = materia.assembly.AssemblyFeatureReference;
 typedef DesignJointValue = materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
 /** InstalledMembers describes a bench/assembly phase. WholeAssembly includes
  * surrounding parts added by the containing machine, without hardcoded lists.
@@ -33,4 +30,5 @@ typedef DesignJointValue = materia.assembly.AssemblyDefinition.AssemblyJointCoor
 	 * design relationship referenced by the source interfaces, across occurrences.
 	 */
 	@:id(3) InterfaceAlignment(id:String,relationship:materia.casting.InterfaceRelationship);
+	@:id(4) FoundationConnection(id:String,joint:materia.casting.FoundationJoint);
 }

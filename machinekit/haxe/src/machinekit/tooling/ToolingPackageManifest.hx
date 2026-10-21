@@ -52,6 +52,13 @@ class ToolingPackageManifest {
 			throw "Replication report differs from source";
 		var replicationChecks:Array<ToolingValidation> =cast replication.validation;
 		checks=checks.concat(replicationChecks);
+		var jointReport=ToolingFabricationExport.foundationJointReport(plan,sourceFingerprint);
+		path=dir+"/foundation-joints.json";
+		if (!sys.FileSystem.exists(path)
+			|| ToolingCodec.canonical(haxe.Json.parse(sys.io.File.getContent(path)))!=ToolingCodec.canonical(jointReport))
+			throw "Foundation joint source or process validation omitted or changed";
+		var jointChecks:Array<ToolingValidation> =cast jointReport.validation;
+		checks=checks.concat(jointChecks);
 		return checks;
 	}
 
@@ -113,7 +120,7 @@ class ToolingPackageManifest {
 		records.sort((a, b) -> Reflect.compare(a.path, b.path));
 		var manifest:ToolingManifest = {
 			format: "materia.tooling-manifest",
-			version: 5,
+			version: 6,
 			phase: 5,
 			lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			sourceFingerprint: f.sourceFingerprint,
@@ -185,7 +192,7 @@ class ToolingPackageManifest {
 		for (key in keys)
 			if (!Reflect.hasField(manifest, key))
 				throw "Missing tooling manifest field";
-		if (manifest.format != "materia.tooling-manifest" || manifest.version != 5)
+		if (manifest.format != "materia.tooling-manifest" || manifest.version != 6)
 			throw "Unsupported tooling manifest";
 		if (!Std.isOfType(manifest.files, Array))
 			throw "Invalid tooling manifest files";

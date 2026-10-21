@@ -247,7 +247,8 @@ class BoxMoldPlanner {
 			}
 		};
 		result.validation.push(DatumFixtureLocation.validation(insert.id,location));
-		result.validation = result.validation.concat(InterfaceQualification.source(d.input));
+		result.validation = result.validation.concat(InterfaceQualification.source(d.input))
+			.concat(FoundationJointQualification.source(d.input));
 		if (fixings.length == 0) {
 			var decision=InsertFixturePlanner.missingFixing(insert,ip,face,r.hardware),change=decision.change;
 			if (change!=null) result.changeRequests.push(change);
@@ -350,6 +351,7 @@ class BoxMoldPlanner {
 
 	public static function validate(plan:MoldPlan):Void {
 		InterfaceQualification.validate(plan.document.input,plan.validation);
+		FoundationJointQualification.validate(plan.document.input,[],plan.validation);
 		InsertQualifications.validateManufacturing(plan.document.input.inserts,plan.validation);
 		for (source in plan.document.input.inserts) {
 			var stock=InterfaceQualification.finishingStock(plan.document.input,source);

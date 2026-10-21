@@ -249,7 +249,7 @@ class MillFabricationPreview {
 				records[0].status = "pass";
 				records[0].severity = "error";
 			}, "severity/status consistency");
-			rejectsManifest(m -> m.version = 4, "Unsupported tooling manifest");
+			rejectsManifest(m -> m.version = 5, "Unsupported tooling manifest");
 			ToolingPackageManifest.verify(dir);
 			var unknown = new machinekit.tooling.ToolingBlock();
 			if (ToolingFabricationExport.classify(unknown).classification != UnsupportedHardware)

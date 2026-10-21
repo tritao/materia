@@ -69,7 +69,8 @@ class CastingMoldPlanner {
 				blockingChecks: [check.rule]
 			}];
 			checks=checks.concat(InterfaceQualification.source(d.input)).concat(InsertQualifications.manufacturing(d.input.inserts))
-				.concat(ReplicationJigs.analyze(d.input,options.replicationJigs,options.precision));
+				.concat(ReplicationJigs.analyze(d.input,options.replicationJigs,options.precision))
+				.concat(FoundationJointQualification.analyze(d.input,options.foundationJointProcesses));
 			return {sourceFingerprint: ToolingCodec.documentFingerprint(d), plan: null, validation: checks,
 				changeRequests: changes, fabrication: materia.tooling.ToolingValidation.ToolingReadiness.evaluate(checks)};
 		}
@@ -89,10 +90,6 @@ class CastingMoldPlanner {
 		var e = envelope(d), r = d.recipe, t = r.panel.measuredThickness, l = r.minimumLigament;
 		if (o.precision.length != d.input.inserts.length || o.anchorage.length != d.input.inserts.length)
 			throw "Every insert needs precision and anchorage records";
-		for (j in o.groutedJoints)
-			for (id in j.insertIds)
-				if (d.input.inserts.filter(i -> i.id == id).length != 1)
-					throw "Unknown grouted interface insert";
 		var strategies = CastingStrategies.resolve(d);
 		var reusable = strategies.filter(v -> v.strategy == CoreStrategy.ReusableFormer);
 		for (index in 0...reusable.length)
@@ -152,7 +149,8 @@ class CastingMoldPlanner {
 			hardware: [],
 			changeRequests: [],
 			validation: geometryChecks.concat(InterfaceQualification.source(d.input)).concat(InsertQualifications.manufacturing(d.input.inserts))
-				.concat(ReplicationJigs.analyze(d.input,o.replicationJigs,o.precision)),
+				.concat(ReplicationJigs.analyze(d.input,o.replicationJigs,o.precision))
+				.concat(FoundationJointQualification.analyze(d.input,o.foundationJointProcesses)),
 			fabrication: {
 				ready: false,
 				blockingRules: []
@@ -539,10 +537,8 @@ class CastingMoldPlanner {
 			var replication=InterfaceQualification.replicationRequirement(source,seat);
 			if (replication!=null) result.validation.push(replication);
 		}
-		for (j in o.groutedJoints)
-			if (j.gapMm == null)
-				request(result, "grout-" + j.id, InterfaceAllowance, j.insertIds,
-					"Define grout gap, jacking, sleeves and cure-before-torque; obtain source changes if needed.", "tooling.grouted-joint." + j.id);
+		var missingJoint=FoundationJointQualification.missingSource(d.input);
+		if (missingJoint!=null) requestDecision(result,"foundation-joint-source",DesignChangeKind.FoundationJointDefinition,missingJoint);
 
 		result.validation = result.validation.concat([
 			materia.tooling.ToolingValidation.ToolingReadiness.pending("closure-loads", [d.input.id],
@@ -621,6 +617,7 @@ class CastingMoldPlanner {
 	}
 
 	public static function validate(p:CastingMoldPlan):Void {
+		FoundationJointQualification.validate(p.document.input,p.options.foundationJointProcesses,p.validation);
 		ReplicationJigs.validate(p.document.input,p.options.replicationJigs,p.options.precision,p.validation);
 		InterfaceQualification.validate(p.document.input,p.validation);
 		InsertQualifications.validateManufacturing(p.document.input.inserts,p.validation);

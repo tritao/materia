@@ -17,7 +17,7 @@ class CastingMoldOptionsCodec {
 
 	public static function read(o:Dynamic):CastingMoldOptions {
 		obj(o, [
-			"groutedJoints",
+			"foundationJointProcesses",
 			"replicationJigs",
 			"precision",
 			"compaction",
@@ -26,24 +26,10 @@ class CastingMoldOptionsCodec {
 			"overlapRule",
 			"liftingEvidence"
 		]);
-		var joints:Array<GroutedJoint> = [];
-		for (j in arr(o, "groutedJoints")) {
-			obj(j, [
-				"id",
-				"insertIds",
-				"gapMm",
-				"jackingReference",
-				"boltSleeveReference",
-				"cureBeforeTorqueEvidence"
-			]);
-			joints.push({
-				id: text(j, "id"),
-				insertIds: strings(j, "insertIds"),
-				gapMm: nullableNumber(j, "gapMm"),
-				jackingReference: nullableText(j, "jackingReference"),
-				boltSleeveReference: nullableText(j, "boltSleeveReference"),
-				cureBeforeTorqueEvidence: strings(j, "cureBeforeTorqueEvidence")
-			});
+		var joints:Array<FoundationJointProcess> = [];
+		for (j in arr(o,"foundationJointProcesses")) {
+			obj(j,["jointId","materialReference","cureEvidence"]);
+			joints.push({jointId:text(j,"jointId"),materialReference:nullableText(j,"materialReference"),cureEvidence:strings(j,"cureEvidence")});
 		}
 		var precision:Array<PrecisionInterface> = [];
 		for (p in arr(o, "precision")) {
@@ -105,14 +91,13 @@ class CastingMoldOptionsCodec {
 				evidence: strings(a, "evidence")
 			});
 		}
-		var jointIds = new Map<String, Bool>();
+		var jointIds=new Map<String,Bool>();
 		for (j in joints) {
-			materia.tooling.ToolingIds.validate(j.id);
-			if (jointIds.exists(j.id))
-				throw "Duplicate grouted joint ID";
-			jointIds.set(j.id, true);
+			materia.casting.CastingRecordCodec.referencePath(j.jointId);
+			if (jointIds.exists(j.jointId)) throw "Duplicate foundation joint process ID";
+			jointIds.set(j.jointId,true);
 		}
-		joints.sort((a, b) -> Reflect.compare(a.id, b.id));
+		joints.sort((a,b) -> Reflect.compare(a.jointId,b.jointId));
 		if (text(o, "overlapRule") != "inserts-eps-datums-then-priority-id")
 			throw "Unsupported overlap ownership rule";
 		var pose = Reflect.field(o, "serviceOrientation");
@@ -168,7 +153,7 @@ class CastingMoldOptionsCodec {
 		precision.sort((a, b) -> Reflect.compare(a.insertId, b.insertId));
 		anchorage.sort((a, b) -> Reflect.compare(a.insertId, b.insertId));
 		return {
-			groutedJoints: joints,
+			foundationJointProcesses:joints,
 			replicationJigs:ReplicationJig.ReplicationJigCodec.snapshot(Reflect.field(o,"replicationJigs")),
 			precision: precision,
 			compaction: {
