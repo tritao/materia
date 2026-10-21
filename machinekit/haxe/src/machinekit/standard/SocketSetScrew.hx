@@ -70,6 +70,10 @@ class SocketSetScrew extends MachineComponent {
 
 	override public function componentType():Null<ComponentType> return recipeType();
 	override public function hasGeometry():Bool return true;
+	/** Dimensioned from the standard and datasheets cited above. */
+	override public function geometryFidelity():machinekit.component.GeometryFidelity
+		return machinekit.component.GeometryFidelity.Datasheet;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		// Envelope is the free thread root after unscrewing; it is used only by
 		// removal checks after the explicit fastener-release step.

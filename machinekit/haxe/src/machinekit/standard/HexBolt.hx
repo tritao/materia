@@ -125,6 +125,10 @@ class HexBolt extends MachineComponent implements ScrewFastener {
 		super.setMaterial(spec);
 	}
 
+	/** Dimensioned from the standard and datasheets cited above. */
+	override public function geometryFidelity():machinekit.component.GeometryFidelity
+		return machinekit.component.GeometryFidelity.Datasheet;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var shank = Solids.named(Part.cylinderSpan(diameter / 2, -length, 0), "shank");
 		var head = detail == Envelope

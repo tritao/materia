@@ -74,6 +74,10 @@ class RetainingRing extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
+	/** Dimensioned from the standard and datasheets cited above. */
+	override public function geometryFidelity():machinekit.component.GeometryFidelity
+		return machinekit.component.GeometryFidelity.Datasheet;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var id = spec.grooveDiameter / 2, od = spec.outerDiameter / 2;
 		var angle = detail == Envelope ? Math.PI * 2 : Math.PI * 2 - GAP;

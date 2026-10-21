@@ -146,6 +146,23 @@ class MachineComponent {
 	}
 
 	/**
+	 * How faithful the preview is. Derived where the geometry shows it: a preview that is one primitive solid (six
+	 * faces or fewer: a box, a cylinder, a ring or a tube) is a placeholder of the part's size, `Envelope`; any other
+	 * is `Nominal`. Parts dimensioned from a cited standard or datasheet declare `Datasheet`, imports of supplier CAD
+	 * `Supplier`.
+	 */
+	public function geometryFidelity():GeometryFidelity {
+		var preview:Part;
+		try
+			preview = geometry(Preview)
+		catch (_:NoGeometry)
+			return GeometryFidelity.Envelope;
+		var faces = preview.shape.subshapeCount(CadKit.ShapeKind.Face);
+		preview.close();
+		return faces <= 6 ? GeometryFidelity.Envelope : GeometryFidelity.Nominal;
+	}
+
+	/**
 	 * A purchased part whose housing is mostly air and electronics, not solid material, returns its product
 	 * class's assumed effective density (kg/m³, `EffectiveDensities`): its mass is then its envelope's volume at
 	 * that density, independent of the drawn preview and of its housing material. Null computes mass from the

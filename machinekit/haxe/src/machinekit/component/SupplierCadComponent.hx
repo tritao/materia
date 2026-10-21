@@ -26,6 +26,9 @@ class SupplierCadComponent extends MachineComponent {
     }
 
     override public function hasGeometry():Bool return !closed;
+    override public function geometryFidelity():GeometryFidelity
+      return GeometryFidelity.Supplier;
+
     override public function geometry(detail:ComponentDetail = Preview):Part {
         if (closed) throw "Supplier CAD component is closed";
         return new Part(source.cloneShape());

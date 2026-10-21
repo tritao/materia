@@ -77,6 +77,10 @@ class HexNut extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
+	/** Dimensioned from the standard and datasheets cited above. */
+	override public function geometryFidelity():machinekit.component.GeometryFidelity
+		return machinekit.component.GeometryFidelity.Datasheet;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.prism(cadkit.modeling.Polygon.regular(6, spec.acrossFlats), 0, spec.height);
 		if (detail == Envelope) return body;

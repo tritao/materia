@@ -68,6 +68,10 @@ class FlatWasher extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
+	/** Dimensioned from the standard and datasheets cited above. */
+	override public function geometryFidelity():machinekit.component.GeometryFidelity
+		return machinekit.component.GeometryFidelity.Datasheet;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.cut(Solids.named(Part.cylinderSpan(outerDiameter / 2, 0, thickness), "body"),
 			[Solids.named(Part.cylinderSpan(innerDiameter / 2, -0.1, thickness + 0.1), "bore")]);

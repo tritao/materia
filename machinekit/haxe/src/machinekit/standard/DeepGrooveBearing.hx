@@ -106,6 +106,10 @@ class DeepGrooveBearing extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
+	/** Dimensioned from the standard and datasheets cited above. */
+	override public function geometryFidelity():machinekit.component.GeometryFidelity
+		return machinekit.component.GeometryFidelity.Datasheet;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var ri = bore / 2, ro = outside / 2, b = width;
 		if (detail == Envelope)
