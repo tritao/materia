@@ -30,6 +30,8 @@ contains `: `.
 
 ## Hosting
 
+The site is live at <https://materia-docs.joao-9f7.workers.dev>.
+
 The site is served by Cloudflare Workers (static assets) and deployed by
 Workers Builds from the GitHub repository on every push to `main`:
 

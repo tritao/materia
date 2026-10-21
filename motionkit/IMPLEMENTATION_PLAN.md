@@ -5,7 +5,7 @@ the first increments of the target motion architecture. It fixes four
 architectural decisions up front, then lists self-contained work items. Each
 item states the problem, where the code is, what to change, and how to prove it.
 
-`robotkit/MOTION_ARCHITECTURE_GAP_MAP.md` records what exists today and why
+`robotkit/MOTION_ARCHITECTURE_GAP_MAP.md` (removed; last at e91d3930e) recorded what exists today and why
 each item is needed. Read it first. It refers to the architecture proposal by
 section number. That proposal is background only: this file is the contract,
 and where they differ, this file wins.
@@ -14,7 +14,7 @@ and where they differ, this file wins.
 
 ## 0. Read before writing code
 
-1. `robotkit/MOTION_ARCHITECTURE_GAP_MAP.md` (current state).
+1. `robotkit/MOTION_ARCHITECTURE_GAP_MAP.md` (historical state; removed, last at e91d3930e).
 2. `motionkit/README.md`, then all of `motionkit/haxe/motionkit/` (about 2.5k
    lines). `MotionSystem.hx` is the heart: hold and resume by re-timing,
    chunk streaming, splices, jogs.

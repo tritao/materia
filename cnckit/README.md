@@ -47,6 +47,6 @@ Run CncKit tests with:
 ./haxeon/scripts/haxeon run --project=cnckit/tests/haxeon.json
 ```
 
-See [PLAN.md](PLAN.md) for the historical CNC roadmap and
+The historical CNC roadmap (`PLAN.md`, all phases done) was removed; it is in git history at b93aaf210. See
 [ToolpathKit's ADR](../toolpathkit/docs/ADR-001-toolpath-ir.md) for the shared
 format decision.

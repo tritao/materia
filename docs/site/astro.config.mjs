@@ -24,6 +24,8 @@ function conceptGroups() {
 }
 
 export default defineConfig({
+	// The deployed site (Cloudflare Workers Builds, see README.md); Starlight builds the sitemap from it.
+	site: "https://materia-docs.joao-9f7.workers.dev",
 	integrations: [
 		// Renders ```mermaid blocks in the browser, following the light/dark theme. Must precede Starlight.
 		mermaid({ theme: "neutral", autoTheme: true }),

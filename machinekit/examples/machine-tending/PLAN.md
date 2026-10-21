@@ -1104,7 +1104,7 @@ Done. What was built and decided:
 - At 10 ms the bare/enclosed mill remains 51.77/52.49 s with X/Y/Z peaks 0.077237/0.051505/0.053502 mm. Rapids remain 15.0955/25/22.8666 m/min. Door and seated-blank clamp remain 1.50/1.79 s and 0.08 s at 482.55 N.
 - Cobot cycles remain 2.06 s. Reach500/850/900/1300 peaks change to 0.004640/0.005987/0.011236/0.016598 mrad because feedforward now includes the complete articulated inertia. Other MT6/R2 motion baselines remain unchanged.
 - Historical checkpoint (superseded by MT12/MT12b): Reach stays Reach850, 600 mm riser, 15 poses and 16.2399% minimum joint margin. R2's separate spindle motor increases the cell from 15 to 16 disjoint joints.
-- The physical brake, remaining environment/limit checks and support geometry are still open in [REVIEW_FIXES.md](REVIEW_FIXES.md). This checkpoint does not finish those review groups.
+- The physical brake, remaining environment/limit checks and support geometry are still open in `REVIEW_FIXES.md` (removed; last at 173cae566). This checkpoint does not finish those review groups.
 
 ## Progress
 
@@ -1117,8 +1117,8 @@ Done. What was built and decided:
 | MT4 | done | c945a0dc8, f518b0dff |
 | MT5 | done | 453d890ad, 5f06c32e5, a397b187a, a6230c46e, 1484b924d |
 | MT5b | done: review regressions | 04d3d092d |
-| MT5b follow-up | done: review fixes and complete closing gate | 4ff013c90; full history in [REVIEW_FIXES.md](REVIEW_FIXES.md) |
-| MT5b second review | done: verified and approved compiler pin recorded | 3c5eef1dd, 3ff303c2d; Haxeon 8be7ca0e; see [REVIEW_FIXES.md](REVIEW_FIXES.md) |
+| MT5b follow-up | done: review fixes and complete closing gate | 4ff013c90; full history in `REVIEW_FIXES.md` (removed; last at 173cae566) |
+| MT5b second review | done: verified and approved compiler pin recorded | 3c5eef1dd, 3ff303c2d; Haxeon 8be7ca0e; see `REVIEW_FIXES.md` (removed; last at 173cae566) |
 | MT6 | done, baseline attribution rechecked after integration | 4c9e6ebec, daf20e12d, 3c5eef1dd, 6240e8b5c |
 | MT7 | done | 1780b60fa |
 | MT8 | done | 371070b1d |
@@ -1181,7 +1181,7 @@ Second-review closing work (validated):
 - Joint plans require conservative continuous hull-motion certificates instead of fixed angular samples. Guide blocks carry transverse loads and residual moments while the screw carries axial force at its assembled line of action.
 - MT6 validates sensor and program ownership, retains single-cabinet identities and animates each controller's belts independently. Shared mounted geometry has an explicit transient contact group; unrelated robots and loose objects retain contact. Environment CAD uses the existing bounded hull generator.
 - Presence sensing tests every supported loose-object shape against its volume. CNC process scope is explicit in SceneArtifact v18; MT8 adds saved gripper limits as v19, with migrated producers and no old-format reader. Unpowered spindles coast; asymmetric belt tests distinguish coordinate direction from power direction.
-- The sequential `review-final` gate and its focused retries covered the completed implementation at that checkpoint. Compiler corrections, regression evidence, final measurements and commits are recorded in [REVIEW_FIXES.md](REVIEW_FIXES.md). MT7 and later had not started yet.
+- The sequential `review-final` gate and its focused retries covered the completed implementation at that checkpoint. Compiler corrections, regression evidence, final measurements and commits are recorded in `REVIEW_FIXES.md` (removed; last at 173cae566). MT7 and later had not started yet.
 
 Done. What was built and decided (second-review validation):
 

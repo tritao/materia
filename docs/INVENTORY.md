@@ -19,6 +19,7 @@ code, plus `haxeon/README.md` and `haxeon/docs/*`). Untracked trees
 | **merge** | Its reader-facing content belongs in a site page under `docs/`, named in the notes. A kit README tagged merge stays as a short README (what the kit is, how to build and test it) after the move. |
 | **internal** | A plan, TODO, handoff, research note, review, measurement log or ADR. It stays for contributors and is never linked from the site (Principle 5). |
 | **delete** | Stale or superseded. The notes say by what. |
+| **deleted** | Removed on 2026-10-21 with the maintainer's approval; git history keeps it. |
 
 Targets under `docs/concepts/` exist today. Targets under `docs/guides/`,
 `docs/manual/`, `docs/reference/`, `docs/contributing/` and `docs/machines/`
@@ -30,7 +31,7 @@ are proposed pages; the [site map](#site-map) lists them.
 |---|---|---|
 | CONTRIBUTING.md | keep | DCO, licences, submodule rule. GitHub convention; links to `docs/contributing/` once it exists. |
 | README.md | keep | **Stale.** Pitches "a native application stack for 3D, CAD, simulation and editor software", which does not match `docs/README.md` ("design, simulate, plan and run machines"). Layout table lists 11 of 23 kits (no MachineKit, MotionKit siblings, CncKit, CamKit, StockKit, ...). Run/watch/live-reload section → `docs/guides/build-from-source.md`. |
-| TODO.md | delete | Item 1 done; item 2 (queued-trajectory pause) is restated in `motionkit/README.md:115`. Move it to a MotionKit TODO. |
+| TODO.md | deleted | Item 1 done; item 2 (queued-trajectory pause) is restated in `motionkit/README.md:115`. Move it to a MotionKit TODO. |
 
 ## app
 
@@ -92,7 +93,7 @@ are proposed pages; the [site map](#site-map) lists them.
 
 | File | Tag | Notes |
 |---|---|---|
-| PLAN.md | delete | Self-described "historical CNC roadmap"; every phase checked. Superseded by `cnckit/README.md` and `toolpathkit/docs/ADR-001-toolpath-ir.md`. |
+| PLAN.md | deleted | Self-described "historical CNC roadmap"; every phase checked. Superseded by `cnckit/README.md` and `toolpathkit/docs/ADR-001-toolpath-ir.md`. |
 | README.md | merge | G-code import/export → `docs/guides/gcode.md`; printer dialect → `docs/guides/printer-gcode.md`. |
 | tests/fixtures/README.md | internal | Fixture provenance. |
 
@@ -191,7 +192,7 @@ section; it does not copy them.
 | docs/HASHLINK_MODULE_RECLAMATION.md | internal | Runtime design record. |
 | docs/HLB_DEBUG_SECTIONS.md | internal | Bytecode format detail. |
 | docs/HLD3_DEBUG_PROTOCOL.md | keep | Debugger protocol reference. |
-| docs/IMPLEMENTATION_BASELINE.md | delete | 2026-09-05 baseline recorded "before step 1" of the reload work, which has landed (module reclamation, patch transactions). Git history keeps it. |
+| docs/IMPLEMENTATION_BASELINE.md | deleted | 2026-09-05 baseline recorded "before step 1" of the reload work, which has landed (module reclamation, patch transactions). Git history keeps it. |
 | docs/INLINING_AND_VALUE_TYPES.md | internal | Stage 1 shipped (`HAXEON_INLINE`); stages 2–4 design. |
 | docs/IR_OPPORTUNITY_CENSUS.md | internal | Measurement. |
 | docs/JIT_ALLOCATION_INITIALIZATION.md | internal | Dropped experiment. |
@@ -210,7 +211,7 @@ section; it does not copy them.
 | docs/METADATA_OWNERSHIP.md | internal | Runtime ownership rules. |
 | docs/NATIVE_MEMORY.md | keep | |
 | docs/OBJECT_ALLOCATION_PROFILE.md | internal | Measurement. |
-| docs/OPTIMIZATION_NEXT_PLAN.md | delete | Executed; outcome in OPTIMIZATION_NEXT_RESULTS.md, and its own banner marks its hypothesis superseded. |
+| docs/OPTIMIZATION_NEXT_PLAN.md | deleted | Executed; outcome in OPTIMIZATION_NEXT_RESULTS.md, and its own banner marks its hypothesis superseded. |
 | docs/OPTIMIZATION_NEXT_RESULTS.md | internal | Results. |
 | docs/PATCH_TRANSACTIONS.md | internal | Runtime design. |
 | docs/PRAGTICAL_CONVERSION_PLAN.md | internal | Plan (2026-09-05); fixtures still in tests. |
@@ -302,7 +303,7 @@ section; it does not copy them.
 | examples/linear-rail-reference/README.md | keep | Supplier reference example. |
 | examples/machine-tending/PLAN.md | internal | Plan (MT0–MT14). |
 | examples/machine-tending/README.md | keep | Example entry. **No H1 title**; 692 lines open mid-topic on the electric wrist. |
-| examples/machine-tending/REVIEW_FIXES.md | delete | Self-described historical MT1–MT6 checkpoints, "not current"; superseded by PLAN.md. |
+| examples/machine-tending/REVIEW_FIXES.md | deleted | Self-described historical MT1–MT6 checkpoints, "not current"; superseded by PLAN.md. |
 | examples/mobile-base/PLAN.md | internal | Plan. |
 | examples/mobile-base/README.md | keep | Example entry. |
 | examples/overhead-arm/README.md | keep | Example entry. |
@@ -319,7 +320,7 @@ section; it does not copy them.
 | examples/robot-arm/README.md | keep | Example entry. |
 | examples/robot-screwdriver/PLAN.md | internal | 4,168-line plan (SD0–SD15 done). |
 | examples/robot-screwdriver/README.md | keep | Example entry. |
-| examples/robot-welder/HANDOFF-W4-W6.md | delete | Handoff for W4–W6; W6 landed (8a209d9ff "complete W6 validation and phase-one landing record"). PLAN.md is the record. |
+| examples/robot-welder/HANDOFF-W4-W6.md | deleted | Handoff for W4–W6; W6 landed (8a209d9ff "complete W6 validation and phase-one landing record"). PLAN.md is the record. |
 | examples/robot-welder/PLAN.md | internal | Plan. |
 | examples/robot-welder/README.md | keep | Example entry. |
 | examples/sheet-router/PLAN.md | internal | Plan (SR0–SR24). |
@@ -338,7 +339,7 @@ section; it does not copy them.
 | examples/tool-service/FAIRINO-ADAPTERS.md | keep | Component note. |
 | examples/tool-service/README.md | keep | Example entry. |
 | examples/zeroerr-arm/ARM-BENCH-PLAN.md | internal | Plan. Cites MODULE-MASS-AUDIT as "the current register". |
-| examples/zeroerr-arm/ARM-OPTIONS.md | delete | Banner: "Historical experiment / superseded load interpretation"; superseded by REFERENCE-RECONCILIATION.md, listed in EXPERIMENTS-ARCHIVED.md. |
+| examples/zeroerr-arm/ARM-OPTIONS.md | deleted | Banner: "Historical experiment / superseded load interpretation"; superseded by REFERENCE-RECONCILIATION.md, listed in EXPERIMENTS-ARCHIVED.md. |
 | examples/zeroerr-arm/CLEARANCE.md | internal | Review of an archived experiment. |
 | examples/zeroerr-arm/EXPERIMENTS-ARCHIVED.md | internal | Archive index. |
 | examples/zeroerr-arm/FROZEN-REFERENCE-STATUS.md | internal | Status. |
@@ -397,7 +398,7 @@ section; it does not copy them.
 | ARCHITECTURE.md | merge | 1,889 lines; object model and frame conventions → `concepts/execution/robot-runtime.md`, `concepts/foundations/conventions.md`; the rest stays as a contributor document (internal). |
 | CONSTRUCTION_ROADMAP.md | internal | Done roadmap (M0–M12). |
 | FOLLOWUP_PLAN.md | internal | Follow-ups to the roadmap. |
-| MOTION_ARCHITECTURE_GAP_MAP.md | delete | Self-described "historical snapshot from before Lane A"; superseded by `runtime/DEVICE_PROTOCOL.md` and the completed IMPLEMENTATION_PLAN. Drop the reference in `motionkit/IMPLEMENTATION_PLAN.md`. |
+| MOTION_ARCHITECTURE_GAP_MAP.md | deleted | Self-described "historical snapshot from before Lane A"; superseded by `runtime/DEVICE_PROTOCOL.md` and the completed IMPLEMENTATION_PLAN. Drop the reference in `motionkit/IMPLEMENTATION_PLAN.md`. |
 | README.md | merge | 557 lines; package table stays; control snapshots/streams → `concepts/execution/robot-runtime.md`. |
 | RESTRUCTURE_PLAN.md | internal | Plan (R0–R6 done). |
 | TODO.md | internal | |

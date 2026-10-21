@@ -119,7 +119,7 @@ place.
   them to `status: reviewed`.
 - Open-core licensing accepted: Apache-2.0, CC BY 4.0 for docs, DCO
   ([OPEN_CORE.md](OPEN_CORE.md)).
-- D1 done except hosting: the Starlight site in `docs/site/` builds every page
+- D1 done; the site is live at <https://materia-docs.joao-9f7.workers.dev>. The Starlight site in `docs/site/` builds every page
   under `docs/`, fails on invalid front matter or broken internal links, and
   runs in CI (`.github/workflows/docs.yml`, uploads the built site). Choosing
   hosting is Cloudflare Workers static assets deployed by Workers Builds
@@ -143,7 +143,7 @@ place.
   (114 keep, 43 merge, 159 internal, 8 delete) and labels each kit's stability
   (none stable yet). The labels live there rather than in
   `materia.workspace.json`, whose entries are test projects, not kits. The
-  eight delete candidates are listed for the maintainer, not removed.
+  eight delete candidates were removed with the maintainer's approval.
 - D9 drafted: [product/](product/README.md) has features, the example gallery
   and licensing. The roadmap and release notes wait on release decisions.
 - D6 done: `docs/runtime` compiles CncKit, ToolpathKit and RobotKit's robot
@@ -153,9 +153,9 @@ place.
   The runtime is committed with a hash of its inputs, which CI checks, and runs
   under Node in CI. MachineKit itself stays out: it depends on CadKit's native
   core, so the widget builds the robot model directly.
-- D4 mostly done: the gantry-picker tutorial (snippets checked against the
+- D4 done: the gantry-picker tutorial (snippets checked against the
   code) and the web editor's `?example=ID` deep link behind its "Open in
   Materia" link (tested by `app/web/test.sh --launch`). The link stays hidden
-  until the editor is hosted and `PUBLIC_MATERIA_EDITOR_URL` is set; a
-  fresh-clone walk through the tutorial is still to do.
+  until the editor is hosted and `PUBLIC_MATERIA_EDITOR_URL` is set. The
+  maintainer chose to skip the fresh-clone walk through the tutorial for now.
 - D8 waits on the sheet router being built and commissioned.

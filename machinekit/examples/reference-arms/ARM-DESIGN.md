@@ -15,7 +15,7 @@ benchmarks. A reference model is not a substitute for a calibrated delivered rob
 The [module and mass audit](../zeroerr-arm/MODULE-MASS-AUDIT.md) records the
 documented mass conflicts, part material corrections and standalone payload
 sensitivity. Exact drive codes and moving-side mass data remain unconfirmed.
-The [actuator option comparison](../zeroerr-arm/ARM-OPTIONS.md) evaluates retaining
+The actuator option comparison (`zeroerr-arm/ARM-OPTIONS.md`, removed; last at a36e119e2) evaluated retaining
 the original modules versus a separately sized shoulder and selected wrists,
 including added mass, speed compromises and mounting changes.
 

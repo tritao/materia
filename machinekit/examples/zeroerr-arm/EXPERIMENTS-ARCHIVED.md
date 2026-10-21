@@ -10,7 +10,7 @@ These experiments remain in version control for historical reproducibility only:
 | --- | --- | --- |
 | 80T wrist conversion | `revised-layout.json`, `revised-engineering-config.json`, `prepare-revised.py` | Existing revised build and earlier engineering reports |
 | Straight tube / adapter / cover variants | `straight-link-config.json`, `straight-engineering-overrides.json`, `prepare-straight.py`, straight review scripts | Existing straight build / historical comparison |
-| 142T / 170I resize concepts | `arm-options-config.json`, `arm-options-study.py`, `ARM-OPTIONS.md` | `c98a5f524` |
+| 142T / 170I resize concepts | `arm-options-config.json`, `arm-options-study.py`, `ARM-OPTIONS.md` (removed) | `c98a5f524` |
 
 The larger-module and restricted-payload recommendations in those reports are
 superseded. Their shell-distributed mass assumptions and universal rated-torque
