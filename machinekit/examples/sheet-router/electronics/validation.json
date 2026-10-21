@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "graphChecks": 80,
+  "negativeFixtures": 10,
+  "channels": 106,
+  "assemblyChannels": 57,
+  "achievedPL": null
+}

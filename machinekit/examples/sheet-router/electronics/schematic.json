@@ -1,0 +1,1708 @@
+{
+  "demandPolicy": {
+    "spindleProcessCapW": 1200,
+    "controlsCurrentA": 0.5,
+    "connectedRatingExceeds25A": true,
+    "unrestrictedOperationAdmitted": false,
+    "qualification": "SR18 measured phase currents and SR0 supply facts"
+  },
+  "componentReliability": {
+    "assumed": true,
+    "MTTFdYears": 30,
+    "diagnosticCoverage": 0.9,
+    "CCFPoints": 65,
+    "status": "placeholders only; no achieved PL claimed"
+  },
+  "schema": 1,
+  "assumed": true,
+  "supply": {
+    "voltageLL": 400,
+    "phases": 3,
+    "currentA": 25,
+    "status": "awaiting SR0 workshop facts",
+    "neutralRequired": false,
+    "earthing": "awaiting SR0; PE mandatory; no invented N-PE bond"
+  },
+  "channels": [
+    {
+      "id": "mainContactor.coil",
+      "kind": "output",
+      "terminal": "XIO:1",
+      "boardPin": "J-OUTPUT:1",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "mainContactor.feedback",
+      "kind": "input",
+      "terminal": "XIO:2",
+      "boardPin": "J-INPUT:1",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "safetyRelay.healthy",
+      "kind": "input",
+      "terminal": "XIO:3",
+      "boardPin": "J-INPUT:2",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "setter.air_blast",
+      "kind": "output",
+      "terminal": "XIO:4",
+      "boardPin": "J-OUTPUT:2",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "setter.trigger",
+      "kind": "fast-input",
+      "terminal": "XIO:5",
+      "boardPin": "J-FAST-INPUT:1",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "shoe.lift",
+      "kind": "output",
+      "terminal": "XIO:6",
+      "boardPin": "J-OUTPUT:3",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "shoe.lowered",
+      "kind": "input",
+      "terminal": "XIO:7",
+      "boardPin": "J-INPUT:3",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "shoe.raised",
+      "kind": "input",
+      "terminal": "XIO:8",
+      "boardPin": "J-INPUT:4",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "spindle.clamped",
+      "kind": "input",
+      "terminal": "XIO:9",
+      "boardPin": "J-INPUT:5",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "spindle.purge",
+      "kind": "output",
+      "terminal": "XIO:10",
+      "boardPin": "J-OUTPUT:4",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "spindle.release",
+      "kind": "output",
+      "terminal": "XIO:11",
+      "boardPin": "J-OUTPUT:5",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "spindle.released",
+      "kind": "input",
+      "terminal": "XIO:12",
+      "boardPin": "J-INPUT:6",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "spindle.tool_present",
+      "kind": "input",
+      "terminal": "XIO:13",
+      "boardPin": "J-INPUT:7",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchXhome",
+      "kind": "fast-input",
+      "terminal": "XIO:14",
+      "boardPin": "J-FAST-INPUT:2",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchXnegativeLimit",
+      "kind": "fast-input",
+      "terminal": "XIO:15",
+      "boardPin": "J-FAST-INPUT:3",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchXpositiveLimit",
+      "kind": "fast-input",
+      "terminal": "XIO:16",
+      "boardPin": "J-FAST-INPUT:4",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchYLefthome",
+      "kind": "fast-input",
+      "terminal": "XIO:17",
+      "boardPin": "J-FAST-INPUT:5",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchYLeftnegativeLimit",
+      "kind": "fast-input",
+      "terminal": "XIO:18",
+      "boardPin": "J-FAST-INPUT:6",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchYLeftpositiveLimit",
+      "kind": "fast-input",
+      "terminal": "XIO:19",
+      "boardPin": "J-FAST-INPUT:7",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchYRighthome",
+      "kind": "fast-input",
+      "terminal": "XIO:20",
+      "boardPin": "J-FAST-INPUT:8",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchYRightnegativeLimit",
+      "kind": "fast-input",
+      "terminal": "XIO:21",
+      "boardPin": "J-FAST-INPUT:9",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchYRightpositiveLimit",
+      "kind": "fast-input",
+      "terminal": "XIO:22",
+      "boardPin": "J-FAST-INPUT:10",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchZhome",
+      "kind": "fast-input",
+      "terminal": "XIO:23",
+      "boardPin": "J-FAST-INPUT:11",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchZnegativeLimit",
+      "kind": "fast-input",
+      "terminal": "XIO:24",
+      "boardPin": "J-FAST-INPUT:12",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "switchZpositiveLimit",
+      "kind": "fast-input",
+      "terminal": "XIO:25",
+      "boardPin": "J-FAST-INPUT:13",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.cover",
+      "kind": "output",
+      "terminal": "XIO:26",
+      "boardPin": "J-OUTPUT:6",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.cover_closed",
+      "kind": "input",
+      "terminal": "XIO:27",
+      "boardPin": "J-INPUT:8",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.cover_open",
+      "kind": "input",
+      "terminal": "XIO:28",
+      "boardPin": "J-INPUT:9",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.pocket1_occupied",
+      "kind": "input",
+      "terminal": "XIO:29",
+      "boardPin": "J-INPUT:10",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.pocket2_occupied",
+      "kind": "input",
+      "terminal": "XIO:30",
+      "boardPin": "J-INPUT:11",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.pocket3_occupied",
+      "kind": "input",
+      "terminal": "XIO:31",
+      "boardPin": "J-INPUT:12",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.pocket4_occupied",
+      "kind": "input",
+      "terminal": "XIO:32",
+      "boardPin": "J-INPUT:13",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.pocket5_occupied",
+      "kind": "input",
+      "terminal": "XIO:33",
+      "boardPin": "J-INPUT:14",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.pocket6_occupied",
+      "kind": "input",
+      "terminal": "XIO:34",
+      "boardPin": "J-INPUT:15",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.pocket7_occupied",
+      "kind": "input",
+      "terminal": "XIO:35",
+      "boardPin": "J-INPUT:16",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "toolRack.pocket8_occupied",
+      "kind": "input",
+      "terminal": "XIO:36",
+      "boardPin": "J-INPUT:17",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vacuumBlower.overload",
+      "kind": "input",
+      "terminal": "XIO:37",
+      "boardPin": "J-INPUT:18",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vacuumBlower.ready",
+      "kind": "input",
+      "terminal": "XIO:38",
+      "boardPin": "J-INPUT:19",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vacuumBlower.run",
+      "kind": "output",
+      "terminal": "XIO:39",
+      "boardPin": "J-OUTPUT:7",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vacuumTable.zone1_pressure_ok",
+      "kind": "input",
+      "terminal": "XIO:40",
+      "boardPin": "J-INPUT:20",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vacuumTable.zone2_pressure_ok",
+      "kind": "input",
+      "terminal": "XIO:41",
+      "boardPin": "J-INPUT:21",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vacuumTable.zone3_pressure_ok",
+      "kind": "input",
+      "terminal": "XIO:42",
+      "boardPin": "J-INPUT:22",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vacuumTable.zone4_pressure_ok",
+      "kind": "input",
+      "terminal": "XIO:43",
+      "boardPin": "J-INPUT:23",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vacuumTable.zone5_pressure_ok",
+      "kind": "input",
+      "terminal": "XIO:44",
+      "boardPin": "J-INPUT:24",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vacuumTable.zone6_pressure_ok",
+      "kind": "input",
+      "terminal": "XIO:45",
+      "boardPin": "J-INPUT:25",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vfd.alarm",
+      "kind": "input",
+      "terminal": "XIO:46",
+      "boardPin": "J-INPUT:26",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vfd.at_speed",
+      "kind": "input",
+      "terminal": "XIO:47",
+      "boardPin": "J-INPUT:27",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vfd.reset",
+      "kind": "output",
+      "terminal": "XIO:48",
+      "boardPin": "J-OUTPUT:8",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vfd.run",
+      "kind": "output",
+      "terminal": "XIO:49",
+      "boardPin": "J-OUTPUT:9",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vfd.speed",
+      "kind": "analog",
+      "terminal": "XIO:50",
+      "boardPin": "J-ANALOG:1",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "vfd.zero_speed",
+      "kind": "input",
+      "terminal": "XIO:51",
+      "boardPin": "J-INPUT:28",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "zoneValve1.open",
+      "kind": "output",
+      "terminal": "XIO:52",
+      "boardPin": "J-OUTPUT:10",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "zoneValve2.open",
+      "kind": "output",
+      "terminal": "XIO:53",
+      "boardPin": "J-OUTPUT:11",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "zoneValve3.open",
+      "kind": "output",
+      "terminal": "XIO:54",
+      "boardPin": "J-OUTPUT:12",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "zoneValve4.open",
+      "kind": "output",
+      "terminal": "XIO:55",
+      "boardPin": "J-OUTPUT:13",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "zoneValve5.open",
+      "kind": "output",
+      "terminal": "XIO:56",
+      "boardPin": "J-OUTPUT:14",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "zoneValve6.open",
+      "kind": "output",
+      "terminal": "XIO:57",
+      "boardPin": "J-OUTPUT:15",
+      "origin": "assembly",
+      "safeValue": 0
+    },
+    {
+      "id": "driveX.step",
+      "kind": "step",
+      "terminal": "XIO:58",
+      "boardPin": "J-STEP:1",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveX.dir",
+      "kind": "direction",
+      "terminal": "XIO:59",
+      "boardPin": "J-DIRECTION:1",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveX.encoderA",
+      "kind": "encoder",
+      "terminal": "XIO:60",
+      "boardPin": "J-ENCODER:1",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveX.encoderB",
+      "kind": "encoder",
+      "terminal": "XIO:61",
+      "boardPin": "J-ENCODER:2",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveX.enable",
+      "kind": "output",
+      "terminal": "XIO:62",
+      "boardPin": "J-OUTPUT:16",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveX.reset",
+      "kind": "output",
+      "terminal": "XIO:63",
+      "boardPin": "J-OUTPUT:17",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveX.alarm",
+      "kind": "input",
+      "terminal": "XIO:64",
+      "boardPin": "J-INPUT:29",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveX.ready",
+      "kind": "input",
+      "terminal": "XIO:65",
+      "boardPin": "J-INPUT:30",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYLeft.step",
+      "kind": "step",
+      "terminal": "XIO:66",
+      "boardPin": "J-STEP:2",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYLeft.dir",
+      "kind": "direction",
+      "terminal": "XIO:67",
+      "boardPin": "J-DIRECTION:2",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYLeft.encoderA",
+      "kind": "encoder",
+      "terminal": "XIO:68",
+      "boardPin": "J-ENCODER:3",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYLeft.encoderB",
+      "kind": "encoder",
+      "terminal": "XIO:69",
+      "boardPin": "J-ENCODER:4",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYLeft.enable",
+      "kind": "output",
+      "terminal": "XIO:70",
+      "boardPin": "J-OUTPUT:18",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYLeft.reset",
+      "kind": "output",
+      "terminal": "XIO:71",
+      "boardPin": "J-OUTPUT:19",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYLeft.alarm",
+      "kind": "input",
+      "terminal": "XIO:72",
+      "boardPin": "J-INPUT:31",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYLeft.ready",
+      "kind": "input",
+      "terminal": "XIO:73",
+      "boardPin": "J-INPUT:32",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYRight.step",
+      "kind": "step",
+      "terminal": "XIO:74",
+      "boardPin": "J-STEP:3",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYRight.dir",
+      "kind": "direction",
+      "terminal": "XIO:75",
+      "boardPin": "J-DIRECTION:3",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYRight.encoderA",
+      "kind": "encoder",
+      "terminal": "XIO:76",
+      "boardPin": "J-ENCODER:5",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYRight.encoderB",
+      "kind": "encoder",
+      "terminal": "XIO:77",
+      "boardPin": "J-ENCODER:6",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYRight.enable",
+      "kind": "output",
+      "terminal": "XIO:78",
+      "boardPin": "J-OUTPUT:20",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYRight.reset",
+      "kind": "output",
+      "terminal": "XIO:79",
+      "boardPin": "J-OUTPUT:21",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYRight.alarm",
+      "kind": "input",
+      "terminal": "XIO:80",
+      "boardPin": "J-INPUT:33",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveYRight.ready",
+      "kind": "input",
+      "terminal": "XIO:81",
+      "boardPin": "J-INPUT:34",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveZ.step",
+      "kind": "step",
+      "terminal": "XIO:82",
+      "boardPin": "J-STEP:4",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveZ.dir",
+      "kind": "direction",
+      "terminal": "XIO:83",
+      "boardPin": "J-DIRECTION:4",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveZ.encoderA",
+      "kind": "encoder",
+      "terminal": "XIO:84",
+      "boardPin": "J-ENCODER:7",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveZ.encoderB",
+      "kind": "encoder",
+      "terminal": "XIO:85",
+      "boardPin": "J-ENCODER:8",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveZ.enable",
+      "kind": "output",
+      "terminal": "XIO:86",
+      "boardPin": "J-OUTPUT:22",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveZ.reset",
+      "kind": "output",
+      "terminal": "XIO:87",
+      "boardPin": "J-OUTPUT:23",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveZ.alarm",
+      "kind": "input",
+      "terminal": "XIO:88",
+      "boardPin": "J-INPUT:35",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveZ.ready",
+      "kind": "input",
+      "terminal": "XIO:89",
+      "boardPin": "J-INPUT:36",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveSpare.step",
+      "kind": "step",
+      "terminal": "XIO:90",
+      "boardPin": "J-STEP:5",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveSpare.dir",
+      "kind": "direction",
+      "terminal": "XIO:91",
+      "boardPin": "J-DIRECTION:5",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveSpare.encoderA",
+      "kind": "encoder",
+      "terminal": "XIO:92",
+      "boardPin": "J-ENCODER:9",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveSpare.encoderB",
+      "kind": "encoder",
+      "terminal": "XIO:93",
+      "boardPin": "J-ENCODER:10",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveSpare.enable",
+      "kind": "output",
+      "terminal": "XIO:94",
+      "boardPin": "J-OUTPUT:24",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveSpare.reset",
+      "kind": "output",
+      "terminal": "XIO:95",
+      "boardPin": "J-OUTPUT:25",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveSpare.alarm",
+      "kind": "input",
+      "terminal": "XIO:96",
+      "boardPin": "J-INPUT:37",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "driveSpare.ready",
+      "kind": "input",
+      "terminal": "XIO:97",
+      "boardPin": "J-INPUT:38",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "air.pressure_ok",
+      "kind": "input",
+      "terminal": "XIO:98",
+      "boardPin": "J-INPUT:39",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "spindle.stopped",
+      "kind": "input",
+      "terminal": "XIO:99",
+      "boardPin": "J-INPUT:40",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "probe.trigger",
+      "kind": "fast-input",
+      "terminal": "XIO:100",
+      "boardPin": "J-FAST-INPUT:14",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "vacuum.pressure",
+      "kind": "input",
+      "terminal": "XIO:101",
+      "boardPin": "J-INPUT:41",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "safety.reset",
+      "kind": "input",
+      "terminal": "XIO:102",
+      "boardPin": "J-INPUT:42",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "safety.edm",
+      "kind": "input",
+      "terminal": "XIO:103",
+      "boardPin": "J-INPUT:43",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "extractor.run",
+      "kind": "output",
+      "terminal": "XIO:104",
+      "boardPin": "J-OUTPUT:26",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "extractor.overload",
+      "kind": "input",
+      "terminal": "XIO:105",
+      "boardPin": "J-INPUT:44",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    },
+    {
+      "id": "zBrake.release",
+      "kind": "output",
+      "terminal": "XIO:106",
+      "boardPin": "J-OUTPUT:27",
+      "origin": "SR17 extension",
+      "safeValue": 0
+    }
+  ],
+  "model": {
+    "beds": [
+      {
+        "bed": 2600,
+        "channels": [
+          {
+            "id": "mainContactor.coil",
+            "kind": "output"
+          },
+          {
+            "id": "mainContactor.feedback",
+            "kind": "input"
+          },
+          {
+            "id": "safetyRelay.healthy",
+            "kind": "input"
+          },
+          {
+            "id": "setter.air_blast",
+            "kind": "output"
+          },
+          {
+            "id": "setter.trigger",
+            "kind": "fast-input"
+          },
+          {
+            "id": "shoe.lift",
+            "kind": "output"
+          },
+          {
+            "id": "shoe.lowered",
+            "kind": "input"
+          },
+          {
+            "id": "shoe.raised",
+            "kind": "input"
+          },
+          {
+            "id": "spindle.clamped",
+            "kind": "input"
+          },
+          {
+            "id": "spindle.purge",
+            "kind": "output"
+          },
+          {
+            "id": "spindle.release",
+            "kind": "output"
+          },
+          {
+            "id": "spindle.released",
+            "kind": "input"
+          },
+          {
+            "id": "spindle.tool_present",
+            "kind": "input"
+          },
+          {
+            "id": "switchXhome",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchXnegativeLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchXpositiveLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYLefthome",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYLeftnegativeLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYLeftpositiveLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYRighthome",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYRightnegativeLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYRightpositiveLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchZhome",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchZnegativeLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchZpositiveLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "toolRack.cover",
+            "kind": "output"
+          },
+          {
+            "id": "toolRack.cover_closed",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.cover_open",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket1_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket2_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket3_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket4_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket5_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket6_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket7_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket8_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumBlower.overload",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumBlower.ready",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumBlower.run",
+            "kind": "output"
+          },
+          {
+            "id": "vacuumTable.zone1_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumTable.zone2_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumTable.zone3_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumTable.zone4_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumTable.zone5_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumTable.zone6_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vfd.alarm",
+            "kind": "input"
+          },
+          {
+            "id": "vfd.at_speed",
+            "kind": "input"
+          },
+          {
+            "id": "vfd.reset",
+            "kind": "output"
+          },
+          {
+            "id": "vfd.run",
+            "kind": "output"
+          },
+          {
+            "id": "vfd.speed",
+            "kind": "analog"
+          },
+          {
+            "id": "vfd.zero_speed",
+            "kind": "input"
+          },
+          {
+            "id": "zoneValve1.open",
+            "kind": "output"
+          },
+          {
+            "id": "zoneValve2.open",
+            "kind": "output"
+          },
+          {
+            "id": "zoneValve3.open",
+            "kind": "output"
+          },
+          {
+            "id": "zoneValve4.open",
+            "kind": "output"
+          },
+          {
+            "id": "zoneValve5.open",
+            "kind": "output"
+          },
+          {
+            "id": "zoneValve6.open",
+            "kind": "output"
+          }
+        ]
+      },
+      {
+        "bed": 3150,
+        "channels": [
+          {
+            "id": "mainContactor.coil",
+            "kind": "output"
+          },
+          {
+            "id": "mainContactor.feedback",
+            "kind": "input"
+          },
+          {
+            "id": "safetyRelay.healthy",
+            "kind": "input"
+          },
+          {
+            "id": "setter.air_blast",
+            "kind": "output"
+          },
+          {
+            "id": "setter.trigger",
+            "kind": "fast-input"
+          },
+          {
+            "id": "shoe.lift",
+            "kind": "output"
+          },
+          {
+            "id": "shoe.lowered",
+            "kind": "input"
+          },
+          {
+            "id": "shoe.raised",
+            "kind": "input"
+          },
+          {
+            "id": "spindle.clamped",
+            "kind": "input"
+          },
+          {
+            "id": "spindle.purge",
+            "kind": "output"
+          },
+          {
+            "id": "spindle.release",
+            "kind": "output"
+          },
+          {
+            "id": "spindle.released",
+            "kind": "input"
+          },
+          {
+            "id": "spindle.tool_present",
+            "kind": "input"
+          },
+          {
+            "id": "switchXhome",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchXnegativeLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchXpositiveLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYLefthome",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYLeftnegativeLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYLeftpositiveLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYRighthome",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYRightnegativeLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchYRightpositiveLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchZhome",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchZnegativeLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "switchZpositiveLimit",
+            "kind": "fast-input"
+          },
+          {
+            "id": "toolRack.cover",
+            "kind": "output"
+          },
+          {
+            "id": "toolRack.cover_closed",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.cover_open",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket1_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket2_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket3_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket4_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket5_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket6_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket7_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "toolRack.pocket8_occupied",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumBlower.overload",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumBlower.ready",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumBlower.run",
+            "kind": "output"
+          },
+          {
+            "id": "vacuumTable.zone1_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumTable.zone2_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumTable.zone3_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumTable.zone4_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumTable.zone5_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vacuumTable.zone6_pressure_ok",
+            "kind": "input"
+          },
+          {
+            "id": "vfd.alarm",
+            "kind": "input"
+          },
+          {
+            "id": "vfd.at_speed",
+            "kind": "input"
+          },
+          {
+            "id": "vfd.reset",
+            "kind": "output"
+          },
+          {
+            "id": "vfd.run",
+            "kind": "output"
+          },
+          {
+            "id": "vfd.speed",
+            "kind": "analog"
+          },
+          {
+            "id": "vfd.zero_speed",
+            "kind": "input"
+          },
+          {
+            "id": "zoneValve1.open",
+            "kind": "output"
+          },
+          {
+            "id": "zoneValve2.open",
+            "kind": "output"
+          },
+          {
+            "id": "zoneValve3.open",
+            "kind": "output"
+          },
+          {
+            "id": "zoneValve4.open",
+            "kind": "output"
+          },
+          {
+            "id": "zoneValve5.open",
+            "kind": "output"
+          },
+          {
+            "id": "zoneValve6.open",
+            "kind": "output"
+          }
+        ]
+      }
+    ]
+  },
+  "safetyEdges": [
+    {
+      "from": "24V.safetyA",
+      "to": "cabinet.NCA",
+      "kind": "wire"
+    },
+    {
+      "from": "cabinet.NCA",
+      "to": "pendant.NCA",
+      "kind": "wire"
+    },
+    {
+      "from": "pendant.NCA",
+      "to": "rack.NCA",
+      "kind": "wire"
+    },
+    {
+      "from": "rack.NCA",
+      "to": "tripLeft.NCA",
+      "kind": "wire"
+    },
+    {
+      "from": "tripLeft.NCA",
+      "to": "tripRight.NCA",
+      "kind": "wire"
+    },
+    {
+      "from": "tripRight.NCA",
+      "to": "SR.inputA",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.inputA",
+      "to": "SR.delayA",
+      "kind": "delayed-safety-output"
+    },
+    {
+      "from": "SR.delayA",
+      "to": "X.STOA",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.delayA",
+      "to": "YLeft.STOA",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.delayA",
+      "to": "YRight.STOA",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.delayA",
+      "to": "Z.STOA",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.delayA",
+      "to": "VFD.STOA",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.inputA",
+      "to": "SS1.requestA",
+      "kind": "immediate-safety-output"
+    },
+    {
+      "from": "SS1.requestA",
+      "to": "X.controlledStopA",
+      "kind": "wire"
+    },
+    {
+      "from": "SS1.requestA",
+      "to": "YLeft.controlledStopA",
+      "kind": "wire"
+    },
+    {
+      "from": "SS1.requestA",
+      "to": "YRight.controlledStopA",
+      "kind": "wire"
+    },
+    {
+      "from": "SS1.requestA",
+      "to": "Z.controlledStopA",
+      "kind": "wire"
+    },
+    {
+      "from": "SS1.requestA",
+      "to": "VFD.controlledStopA",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.delayA",
+      "to": "K1.coil",
+      "kind": "wire"
+    },
+    {
+      "from": "24V.safetyB",
+      "to": "cabinet.NCB",
+      "kind": "wire"
+    },
+    {
+      "from": "cabinet.NCB",
+      "to": "pendant.NCB",
+      "kind": "wire"
+    },
+    {
+      "from": "pendant.NCB",
+      "to": "rack.NCB",
+      "kind": "wire"
+    },
+    {
+      "from": "rack.NCB",
+      "to": "tripLeft.NCB",
+      "kind": "wire"
+    },
+    {
+      "from": "tripLeft.NCB",
+      "to": "tripRight.NCB",
+      "kind": "wire"
+    },
+    {
+      "from": "tripRight.NCB",
+      "to": "SR.inputB",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.inputB",
+      "to": "SR.delayB",
+      "kind": "delayed-safety-output"
+    },
+    {
+      "from": "SR.delayB",
+      "to": "X.STOB",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.delayB",
+      "to": "YLeft.STOB",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.delayB",
+      "to": "YRight.STOB",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.delayB",
+      "to": "Z.STOB",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.delayB",
+      "to": "VFD.STOB",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.inputB",
+      "to": "SS1.requestB",
+      "kind": "immediate-safety-output"
+    },
+    {
+      "from": "SS1.requestB",
+      "to": "X.controlledStopB",
+      "kind": "wire"
+    },
+    {
+      "from": "SS1.requestB",
+      "to": "YLeft.controlledStopB",
+      "kind": "wire"
+    },
+    {
+      "from": "SS1.requestB",
+      "to": "YRight.controlledStopB",
+      "kind": "wire"
+    },
+    {
+      "from": "SS1.requestB",
+      "to": "Z.controlledStopB",
+      "kind": "wire"
+    },
+    {
+      "from": "SS1.requestB",
+      "to": "VFD.controlledStopB",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.delayB",
+      "to": "K2.coil",
+      "kind": "wire"
+    },
+    {
+      "from": "24V.valves",
+      "to": "Fvalve",
+      "kind": "wire"
+    },
+    {
+      "from": "Fvalve",
+      "to": "SR.instant",
+      "kind": "wire"
+    },
+    {
+      "from": "SR.instant",
+      "to": "VFD.zeroSpeed",
+      "kind": "wire"
+    },
+    {
+      "from": "VFD.zeroSpeed",
+      "to": "spindle.stoppedContact",
+      "kind": "wire"
+    },
+    {
+      "from": "spindle.stoppedContact",
+      "to": "CPU.release",
+      "kind": "wire"
+    },
+    {
+      "from": "CPU.release",
+      "to": "releaseValve",
+      "kind": "wire"
+    },
+    {
+      "from": "releaseValve",
+      "to": "0V",
+      "kind": "wire"
+    }
+  ],
+  "drives": [
+    "X",
+    "YLeft",
+    "YRight",
+    "Z",
+    "VFD"
+  ],
+  "stops": [
+    "cabinet",
+    "pendant",
+    "rack",
+    "tripLeft",
+    "tripRight"
+  ],
+  "powerComponents": [
+    {
+      "id": "Q0",
+      "kind": "lockable isolator",
+      "poles": 3,
+      "ratedA": 40
+    },
+    {
+      "id": "QF0",
+      "kind": "incoming breaker",
+      "ratedA": 25
+    },
+    {
+      "id": "K1",
+      "kind": "monitored contactor",
+      "ratedA": 40
+    },
+    {
+      "id": "K2",
+      "kind": "monitored contactor",
+      "ratedA": 40
+    },
+    {
+      "id": "PS1",
+      "kind": "24 V isolated PSU",
+      "ratedA": 10
+    },
+    {
+      "id": "Fvalve",
+      "kind": "24 V fuse",
+      "ratedA": 2
+    }
+  ],
+  "powerBranches": [
+    {
+      "id": "spindle",
+      "mechanicalW": 6000,
+      "efficiency": 0.9,
+      "powerFactor": 0.9,
+      "breakerA": 16
+    },
+    {
+      "id": "blower",
+      "mechanicalW": 5500,
+      "efficiency": 0.88,
+      "powerFactor": 0.85,
+      "breakerA": 16
+    },
+    {
+      "id": "servos",
+      "mechanicalW": 3000,
+      "efficiency": 0.9,
+      "powerFactor": 0.9,
+      "breakerA": 10
+    },
+    {
+      "id": "extractor",
+      "mechanicalW": 2200,
+      "efficiency": 0.85,
+      "powerFactor": 0.85,
+      "breakerA": 10
+    }
+  ],
+  "powerNets": [
+    [
+      "L1/L2/L3",
+      "Q0",
+      "QF0",
+      "K1",
+      "K2",
+      "drive branch breakers",
+      "drives/VFD/blower/extractor"
+    ],
+    [
+      "QF0",
+      "PS1",
+      "fused 24V controls/safety"
+    ],
+    [
+      "PE",
+      "cabinet/star bar",
+      "frame/gantry/motor/VFD/chassis/shields"
+    ]
+  ],
+  "safety": {
+    "targetPL": "d",
+    "achievedPL": null,
+    "architecture": "assumed category 3; requires certified components/calculation and fault tests",
+    "delaySeconds": 3,
+    "brakeApplySeconds": 2.9,
+    "manualMonitoredReset": true,
+    "edm": [
+      "K1.mirrorNC",
+      "K2.mirrorNC"
+    ],
+    "relayFault": "immediate STO and contactor drop; category 0",
+    "startup": "outputs disabled, manual reset, no automatic restart",
+    "release": "series hardware zero-speed AND independent spindle-stopped AND instantaneous safety contact; CPU cannot bypass"
+  },
+  "functions": [
+    {
+      "id": "SF1",
+      "function": "e-stop/trip controlled stop then dual STO",
+      "targetPL": "d"
+    },
+    {
+      "id": "SF2",
+      "function": "prevent release with rotating spindle",
+      "targetPL": "d"
+    },
+    {
+      "id": "SF3",
+      "function": "prevent unexpected restart using reset/EDM",
+      "targetPL": "d"
+    },
+    {
+      "id": "SF4",
+      "function": "retain Z under gravity with brake",
+      "targetPL": "d"
+    }
+  ]
+}

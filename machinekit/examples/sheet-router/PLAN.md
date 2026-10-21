@@ -1088,6 +1088,17 @@ This is layout acceptance; actual retained-link cutting, inventory execution and
   and Haxe suites pass.
 
 **SR17. Electrical design and safety chain (SR-D8).**
+- Schematic-data design and focused graph checks complete; see
+  [electrical packet](electronics/README.md). Both beds export 57 assembly channels;
+  49 explicitly labelled carrier/drive extensions give 106 unique terminal/pin mappings.
+  Dual-lane STO dependencies and release-power cut vertices pass, including fault injections.
+- 400 V three-phase / about 25 A is assumed, awaiting SR0 workshop facts. Connected
+  nameplates exceed it (~31 A before controls); unrestricted simultaneous rated operation
+  is refused. The provisional 1.2 kW spindle process cap gives ~23 A including controls.
+  Bought-part currents/inrush and supply protection remain hardware release checks.
+- PL d/category 3 is the target, not achieved certification: component reliability,
+  stopping delay, Z brake and zero-speed hardware remain assumed until supplier data
+  and SR18/SR21 fault validation.
 - Schematic and wire list:
   - supply, main switch, breakers, contactor;
   - safety relay with category 1 delay, STO to all drives and the VFD;
@@ -1228,7 +1239,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR14 | planned | |
 | SR15 | planned | |
 | SR16 | planned | |
-| SR17 | planned | |
+| SR17 | schematic data/graph checks pass; supply/component/hardware release pending | electronics/README.md |
 | SR18 | planned | |
 | SR19 | planned | |
 | SR20 | planned | |

@@ -1,0 +1,107 @@
+id,kind,terminal,boardPin,origin,safeValue
+mainContactor.coil,output,XIO:1,J-OUTPUT:1,assembly,0
+mainContactor.feedback,input,XIO:2,J-INPUT:1,assembly,0
+safetyRelay.healthy,input,XIO:3,J-INPUT:2,assembly,0
+setter.air_blast,output,XIO:4,J-OUTPUT:2,assembly,0
+setter.trigger,fast-input,XIO:5,J-FAST-INPUT:1,assembly,0
+shoe.lift,output,XIO:6,J-OUTPUT:3,assembly,0
+shoe.lowered,input,XIO:7,J-INPUT:3,assembly,0
+shoe.raised,input,XIO:8,J-INPUT:4,assembly,0
+spindle.clamped,input,XIO:9,J-INPUT:5,assembly,0
+spindle.purge,output,XIO:10,J-OUTPUT:4,assembly,0
+spindle.release,output,XIO:11,J-OUTPUT:5,assembly,0
+spindle.released,input,XIO:12,J-INPUT:6,assembly,0
+spindle.tool_present,input,XIO:13,J-INPUT:7,assembly,0
+switchXhome,fast-input,XIO:14,J-FAST-INPUT:2,assembly,0
+switchXnegativeLimit,fast-input,XIO:15,J-FAST-INPUT:3,assembly,0
+switchXpositiveLimit,fast-input,XIO:16,J-FAST-INPUT:4,assembly,0
+switchYLefthome,fast-input,XIO:17,J-FAST-INPUT:5,assembly,0
+switchYLeftnegativeLimit,fast-input,XIO:18,J-FAST-INPUT:6,assembly,0
+switchYLeftpositiveLimit,fast-input,XIO:19,J-FAST-INPUT:7,assembly,0
+switchYRighthome,fast-input,XIO:20,J-FAST-INPUT:8,assembly,0
+switchYRightnegativeLimit,fast-input,XIO:21,J-FAST-INPUT:9,assembly,0
+switchYRightpositiveLimit,fast-input,XIO:22,J-FAST-INPUT:10,assembly,0
+switchZhome,fast-input,XIO:23,J-FAST-INPUT:11,assembly,0
+switchZnegativeLimit,fast-input,XIO:24,J-FAST-INPUT:12,assembly,0
+switchZpositiveLimit,fast-input,XIO:25,J-FAST-INPUT:13,assembly,0
+toolRack.cover,output,XIO:26,J-OUTPUT:6,assembly,0
+toolRack.cover_closed,input,XIO:27,J-INPUT:8,assembly,0
+toolRack.cover_open,input,XIO:28,J-INPUT:9,assembly,0
+toolRack.pocket1_occupied,input,XIO:29,J-INPUT:10,assembly,0
+toolRack.pocket2_occupied,input,XIO:30,J-INPUT:11,assembly,0
+toolRack.pocket3_occupied,input,XIO:31,J-INPUT:12,assembly,0
+toolRack.pocket4_occupied,input,XIO:32,J-INPUT:13,assembly,0
+toolRack.pocket5_occupied,input,XIO:33,J-INPUT:14,assembly,0
+toolRack.pocket6_occupied,input,XIO:34,J-INPUT:15,assembly,0
+toolRack.pocket7_occupied,input,XIO:35,J-INPUT:16,assembly,0
+toolRack.pocket8_occupied,input,XIO:36,J-INPUT:17,assembly,0
+vacuumBlower.overload,input,XIO:37,J-INPUT:18,assembly,0
+vacuumBlower.ready,input,XIO:38,J-INPUT:19,assembly,0
+vacuumBlower.run,output,XIO:39,J-OUTPUT:7,assembly,0
+vacuumTable.zone1_pressure_ok,input,XIO:40,J-INPUT:20,assembly,0
+vacuumTable.zone2_pressure_ok,input,XIO:41,J-INPUT:21,assembly,0
+vacuumTable.zone3_pressure_ok,input,XIO:42,J-INPUT:22,assembly,0
+vacuumTable.zone4_pressure_ok,input,XIO:43,J-INPUT:23,assembly,0
+vacuumTable.zone5_pressure_ok,input,XIO:44,J-INPUT:24,assembly,0
+vacuumTable.zone6_pressure_ok,input,XIO:45,J-INPUT:25,assembly,0
+vfd.alarm,input,XIO:46,J-INPUT:26,assembly,0
+vfd.at_speed,input,XIO:47,J-INPUT:27,assembly,0
+vfd.reset,output,XIO:48,J-OUTPUT:8,assembly,0
+vfd.run,output,XIO:49,J-OUTPUT:9,assembly,0
+vfd.speed,analog,XIO:50,J-ANALOG:1,assembly,0
+vfd.zero_speed,input,XIO:51,J-INPUT:28,assembly,0
+zoneValve1.open,output,XIO:52,J-OUTPUT:10,assembly,0
+zoneValve2.open,output,XIO:53,J-OUTPUT:11,assembly,0
+zoneValve3.open,output,XIO:54,J-OUTPUT:12,assembly,0
+zoneValve4.open,output,XIO:55,J-OUTPUT:13,assembly,0
+zoneValve5.open,output,XIO:56,J-OUTPUT:14,assembly,0
+zoneValve6.open,output,XIO:57,J-OUTPUT:15,assembly,0
+driveX.step,step,XIO:58,J-STEP:1,SR17 extension,0
+driveX.dir,direction,XIO:59,J-DIRECTION:1,SR17 extension,0
+driveX.encoderA,encoder,XIO:60,J-ENCODER:1,SR17 extension,0
+driveX.encoderB,encoder,XIO:61,J-ENCODER:2,SR17 extension,0
+driveX.enable,output,XIO:62,J-OUTPUT:16,SR17 extension,0
+driveX.reset,output,XIO:63,J-OUTPUT:17,SR17 extension,0
+driveX.alarm,input,XIO:64,J-INPUT:29,SR17 extension,0
+driveX.ready,input,XIO:65,J-INPUT:30,SR17 extension,0
+driveYLeft.step,step,XIO:66,J-STEP:2,SR17 extension,0
+driveYLeft.dir,direction,XIO:67,J-DIRECTION:2,SR17 extension,0
+driveYLeft.encoderA,encoder,XIO:68,J-ENCODER:3,SR17 extension,0
+driveYLeft.encoderB,encoder,XIO:69,J-ENCODER:4,SR17 extension,0
+driveYLeft.enable,output,XIO:70,J-OUTPUT:18,SR17 extension,0
+driveYLeft.reset,output,XIO:71,J-OUTPUT:19,SR17 extension,0
+driveYLeft.alarm,input,XIO:72,J-INPUT:31,SR17 extension,0
+driveYLeft.ready,input,XIO:73,J-INPUT:32,SR17 extension,0
+driveYRight.step,step,XIO:74,J-STEP:3,SR17 extension,0
+driveYRight.dir,direction,XIO:75,J-DIRECTION:3,SR17 extension,0
+driveYRight.encoderA,encoder,XIO:76,J-ENCODER:5,SR17 extension,0
+driveYRight.encoderB,encoder,XIO:77,J-ENCODER:6,SR17 extension,0
+driveYRight.enable,output,XIO:78,J-OUTPUT:20,SR17 extension,0
+driveYRight.reset,output,XIO:79,J-OUTPUT:21,SR17 extension,0
+driveYRight.alarm,input,XIO:80,J-INPUT:33,SR17 extension,0
+driveYRight.ready,input,XIO:81,J-INPUT:34,SR17 extension,0
+driveZ.step,step,XIO:82,J-STEP:4,SR17 extension,0
+driveZ.dir,direction,XIO:83,J-DIRECTION:4,SR17 extension,0
+driveZ.encoderA,encoder,XIO:84,J-ENCODER:7,SR17 extension,0
+driveZ.encoderB,encoder,XIO:85,J-ENCODER:8,SR17 extension,0
+driveZ.enable,output,XIO:86,J-OUTPUT:22,SR17 extension,0
+driveZ.reset,output,XIO:87,J-OUTPUT:23,SR17 extension,0
+driveZ.alarm,input,XIO:88,J-INPUT:35,SR17 extension,0
+driveZ.ready,input,XIO:89,J-INPUT:36,SR17 extension,0
+driveSpare.step,step,XIO:90,J-STEP:5,SR17 extension,0
+driveSpare.dir,direction,XIO:91,J-DIRECTION:5,SR17 extension,0
+driveSpare.encoderA,encoder,XIO:92,J-ENCODER:9,SR17 extension,0
+driveSpare.encoderB,encoder,XIO:93,J-ENCODER:10,SR17 extension,0
+driveSpare.enable,output,XIO:94,J-OUTPUT:24,SR17 extension,0
+driveSpare.reset,output,XIO:95,J-OUTPUT:25,SR17 extension,0
+driveSpare.alarm,input,XIO:96,J-INPUT:37,SR17 extension,0
+driveSpare.ready,input,XIO:97,J-INPUT:38,SR17 extension,0
+air.pressure_ok,input,XIO:98,J-INPUT:39,SR17 extension,0
+spindle.stopped,input,XIO:99,J-INPUT:40,SR17 extension,0
+probe.trigger,fast-input,XIO:100,J-FAST-INPUT:14,SR17 extension,0
+vacuum.pressure,input,XIO:101,J-INPUT:41,SR17 extension,0
+safety.reset,input,XIO:102,J-INPUT:42,SR17 extension,0
+safety.edm,input,XIO:103,J-INPUT:43,SR17 extension,0
+extractor.run,output,XIO:104,J-OUTPUT:26,SR17 extension,0
+extractor.overload,input,XIO:105,J-INPUT:44,SR17 extension,0
+zBrake.release,output,XIO:106,J-OUTPUT:27,SR17 extension,0
