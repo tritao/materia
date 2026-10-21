@@ -153,3 +153,9 @@ place.
   CI. The transmissions widget is not done: MachineKit depends on CadKit's
   native core, so it needs either a pure-Haxe slice of the transmission
   resolver or CadKit in the browser host.
+- D4 mostly done: the gantry-picker tutorial (snippets checked against the
+  code) and the web editor's `?example=ID` deep link behind its "Open in
+  Materia" link (tested by `app/web/test.sh --launch`). The link stays hidden
+  until the editor is hosted and `PUBLIC_MATERIA_EDITOR_URL` is set; a
+  fresh-clone walk through the tutorial is still to do.
+- D8 waits on the sheet router being built and commissioned.
