@@ -13,9 +13,13 @@ the build package and the Chinese parts list.
 
 **Reference job.** The aluminium T housing of an eRob70T-class joint (Ø73 × 99 mm
 drum with a perpendicular stem), about 1,000–2,000 a year, so about 9 a day.
-Made from a 6061-T651 block of about 80 × 105 × 140 mm in two operations:
-- **Op 1, 4th axis:** front bore stack, stem, rear, back and saddle blend in one clamping.
-- **Op 2, vise:** remove the holding tab and finish that side.
+Made from 90 × 90 mm 6061 square bar in two operations, both on the 4th axis:
+- **Op 1, A across both axes:** the bar is held by its ends (chuck and tailstock).
+  Front bore stack, rear cavity, link socket and most of the outside are cut in one
+  clamping.
+- **Op 2, A along the stem:** the drum is held by its front register. The 14 radial
+  link-screw holes are cut at their index angles, and the two bar-end tabs are
+  removed.
 
 The supplier geometry is ZeroErr's `eRob70H××T.STEP`, pinned by the cobot-arm and
 zeroerr-arm examples (`zeroerr-arm/reference-layout.json`).
@@ -41,7 +45,7 @@ is the benchmark it is measured against.
 | Tool changer | drawbar and release study only | **about 21 tools** (DT-D4) |
 | Axis drives | Z SFU2005 + ELM2H-0750, XY unfitted | 16–20 mm lead ground screws, 30 m/min rapids, about 5 m/s² to start |
 | 4th axis | none | bought Ø170 class rotary with brake, air union, tailstock |
-| Workholding | AR155-I on manual TS96-155, 60 mm jaw preset | AR96-155 pneumatic plates, 80 mm block jaws, register fixtures, seat sensing |
+| Workholding | AR155-I on manual TS96-155, 60 mm jaw preset | 4th-axis chuck and tailstock (Op 1), front-register bracket (Op 2), AR96 pneumatic plates for other parts, seat sensing |
 | Accuracy | not qualified | ±0.005 mm positioning, ±0.003 mm repeatability after pitch compensation; bores H7/K6, about 0.01 mm coaxial |
 | Services | motor hoods, written requirements | enclosure, automatic door, way covers, coolant (DT-D5), lubrication, chips |
 | Measurement | none | spindle probe, tool setter |
@@ -74,13 +78,17 @@ drive for:
 The cost is head height. An ATC electrospindle (18–24k rpm, inverter with encoder
 feedback) is the alternative if orientation and tapping prove workable with it.
 
-**DT-D3. 4th axis, not 5.** The housing is designed with **axial holes only**,
-parallel to the drum or the stem:
-- harmonic unit and covers on axial bolt circles;
-- the link on an axial flange at the stem end, not radial collar screws.
+**DT-D3. 4th axis, not 5 (revised 2026-10-21).** An indexed rotary reaches every
+direction perpendicular to its axis.
+- **Op 1:** A lies across both the drum and the stem axis, so front, rear and the
+  link socket are cut in one clamping. That holds the 39 ± 0.05 socket position
+  and the socket-to-drum squareness.
+- **Op 2:** A lies along the stem, so all of ZeroErr's radial link screws (11
+  counterbored, 3 countersunk) are reachable by indexing.
 
-An indexed rotary perpendicular to both axes then reaches front, stem, rear and
-back in one clamping. 5-axis returns only if radial features can't be designed out.
+The harmonic unit and rear cover use axial bolt circles. ZeroErr's link socket is
+kept unchanged so the housing stays interchangeable (owner, 2026-10-21). 5-axis
+returns only if a later housing needs compound angles.
 
 **DT-D4. 21-tool drill-tap turret (decided 2026-10-21).** It's the fastest changer
 and the one this machine class uses. It exchanges with Z motion above the working
@@ -166,19 +174,104 @@ and Compact VMC outputs must not change unless a phase says so.
   supplier eRob70T exterior for envelope and interfaces, and redesigned for
   machining:
   - bores stepping down front to rear;
-  - axial holes only (DT-D3);
+  - radial holes only around the stem (DT-D3);
   - standard corner radii.
+- The inside is **representative**: a size-14 harmonic stack sized from catalogue
+  data and labelled assumptions (owner, 2026-10-21). It is a machining reference,
+  not an actuator design; a real actuator gets its own plan.
 - Setup plan for Op 1 / Op 2:
   - holding tab;
   - stock;
   - the tool list (roughly: face mill, roughing and finishing end mills, ball,
     chamfer, spot, drills, taps or thread mill, O-ring slot cutter, back-chamfer,
     fine-boring tools, probe).
-- Update `spindle-drive-study/requirements.json` to 12–15k rpm, 3–4 kW continuous,
-  direct drive, and rerun its screen.
+- The spindle target (12–15k rpm, 3–4 kW continuous, direct drive) lives in
+  `drill-tap/requirements.json`. `spindle-drive-study` keeps screening the belt
+  head of the Small and Compact configurations; DT4 adds a drill-tap section to it.
 
 **Acceptance:** the housing solid and the setup plan exist; the reachability of
 every feature is listed per setup and per index angle.
+
+**Findings (2026-10-21), supplier `eRob70H××T.STEP`.** The file has 22 solids in one
+flattened product. The housing is solid 8: 275,750 mm³, bounds 73 × 85 × 85 mm.
+Axes in the supplier frame:
+- **Drum:** axis z, Ø73. Output flange (solid 10) at z 37.5–47; rear cover (solid 21)
+  down to z −52, which gives the 99 mm length.
+- **Stem:** axis −y, Ø73 with flat sides at x ±36.5.
+  - Link socket face at y −39 (the drawing's 39 ± 0.05).
+  - Socket Ø58, 9.5 deep, to y −48.5.
+  - Radial holes at y −43: 11 × Ø3.3 counterbored Ø5.8, 3 × Ø3.4 at 45°.
+
+The rear cavity (z −45 to −23, boards and brake) is modelled hollow. Everything from
+z −23 to the output is a **filled placeholder** with only the Ø18 through bore. There
+is no stator bore, gear register or bearing seat to read, so the internal bores have
+to come from an internal stack we choose: size-14 strain-wave gear (ratios 50–120),
+frameless torque motor, two encoders, friction brake, driver.
+
+**Status (2026-10-21): reference housing and setup sheet done.**
+- `ReferenceHousing.hx` holds the part. Each feature has its entry point, tool
+  approach, cutter section, tolerance and source (drawing, STEP, catalogue or
+  assumed).
+- `drill-tap/requirements.json` holds the targets.
+- `haxeon.housing.json` runs `ReferenceHousingChecks`, which prints the setup
+  sheet. 150 assertions pass:
+  - the envelope matches supplier solid 8, within 0.01 mm;
+  - the link pattern is ZeroErr's: 11 counterbored and 3 countersunk;
+  - every feature lies in its setup's rotary plane and has a clear tool path;
+  - walls are at least 3 mm around bores and pockets, and at least 1.5 mm around
+    tapped holes.
+- **Part:** 195 cm³, about 527 g in 6061.
+
+The inside sizes:
+
+| Feature | Size | Source |
+|---|---|---|
+| Gear register | Ø66 H7 × 10 | Assumed. Harmonic Drive's CSF-14-2XH unit is Ø73 overall, so a size-14 gear set with its output bearing fits inside the drum. |
+| Gear screws | 12 × M3 on Ø58 | Assumed |
+| Stator bore | Ø50 H7 × 36.5 | Assumed |
+| Rotor bearing seat | Ø42 K6 (6806) | Standard bearing size |
+| Rear cavity | Ø56 × 25 | Assumed |
+| Cover screws | 6 × M3 on Ø63.5 | Assumed |
+| Stem pocket | Ø32 × 8 | Assumed |
+| Cable hole to the rear cavity | Ø10 | Assumed |
+
+The rear cavity is smaller than ZeroErr's (their boards are about Ø68), because
+the cover screws need walls.
+
+**Op 1** holds the bar by its ends: chuck on one, tailstock centre on the other,
+with Ø30 tabs. It uses three index positions:
+- **0°, front:** facing, the drum OD contour and the bore stack. The deepest reach
+  is the bearing shoulder at 62.5 mm from the stock face; the Ø42 seat is at 59.5 mm.
+- **90°, socket:** the socket face, Ø58 G7 socket, stem pocket, cable hole and stem
+  contour.
+- **180°, rear:** the rear face, cavity, pilot, cover screws and drum OD contour.
+
+**Op 2** holds the drum on the angle bracket, with A along the stem. It uses 14
+index positions: 0, 30, 60, 90, 120, 150, 180, 210, 225, 240, 270, 300, 315 and
+330°. These cut the link holes and remove the tabs at 0° and 180°.
+
+**Stock:** 90 × 90 × 155 bar, 1,256 cm³. 84 % of it becomes chips (1,060 cm³). DT9
+should price this against a near-net sawn blank or a 3D-printed sand mould.
+
+**Tools:**
+- Ø50 face mill;
+- Ø16 roughing and finishing end mills with 50 mm reach, which the 45 mm OD
+  contours need;
+- Ø8 finishing end mill;
+- Ø6 ball;
+- Ø6 90° spot/chamfer tool;
+- Ø2.8 and Ø3.3 drills, and a Ø3.4 drill with a countersink;
+- Ø5.8 counterbore;
+- M3 form tap;
+- fine-boring head for Ø42–66, 65 mm reach;
+- spindle probe.
+
+That is 12 tools, which fits the 21-tool turret with sister tools.
+
+**DT0 leftovers for later phases:**
+- DT6/DT7 check the Op 2 bracket's clearance to the hole tools at 90°.
+- DT9 turns the contour and face entries into toolpaths.
+- A real actuator would replace the assumed inside sizes.
 
 ### DT1 — Refactor: selections become layout inputs
 Make these layout inputs, defaulting to today's values:
@@ -262,10 +355,13 @@ head, door and table travel.
 ### DT7 — Workholding and table layout
 - AR96 pneumatic plates.
 - AR155 jaw setup for the block.
-- The Op 2 register fixture (spigot or expanding mandrel plus pull-down) with TS96
-  studs.
+- The Op 1 bar holding: rotary chuck on one bar end, tailstock centre in the other.
+- The Op 2 fixture: an angle bracket on the faceplate with a spigot into the front
+  register and a draw bolt through the drum, stem along A. Check the clearance to
+  the hole tools at 90°, and add a bell centre on the socket if needed.
 - Seat-sensing and blow-off ports.
-- Table layout: 4th axis + vise station.
+- Table layout: the 4th axis carries both operations. A vise station stays as an
+  option for other parts.
 - Send the ZPP questions:
   - fail-safe on air loss;
   - AP96 studs;
@@ -273,8 +369,8 @@ head, door and table travel.
   - AR96 height and holes;
   - jaw lead time.
 
-**Acceptance:** the WORKHOLDING-style Z-stack audit passes for both stations; the
-fixture locates on the Op 1 register.
+**Acceptance:** the WORKHOLDING-style Z-stack audit passes for both setups; the
+Op 2 fixture locates on the Op 1 register.
 
 ### DT8 — Enclosure and services
 - Decide DT-D5.
@@ -344,6 +440,5 @@ independent once DT2 fixes the envelope.
 
 ## Open questions for the owner
 
-1. The reference housing changes (DT0) are awaiting the owner's approval. DT-D3 may
-   change with them: keeping ZeroErr's radial link screws moves Op 2 onto the 4th
-   axis instead of the vise.
+None at the moment. The housing changes and the representative inside were
+approved on 2026-10-21.

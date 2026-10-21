@@ -1,0 +1,46 @@
+{
+  "format": "materia.drill-tap.requirements",
+  "version": 1,
+  "plan": "../DRILL_TAP_PLAN.md",
+  "status": "DT0 targets. Every value is assumed until a phase measures or qualifies it; 'source' says where it comes from.",
+  "job": {
+    "part": "ReferenceHousing (../ReferenceHousing.hx), eRob70T-class aluminium T housing",
+    "annual_volume": { "value": [1000, 2000], "unit": "parts/year", "status": "assumed", "source": "owner, 2026-10-21" },
+    "material": { "value": "6061-T6 square bar 90 x 90", "status": "assumed", "source": "DT0 stock choice" },
+    "operations": { "value": 2, "status": "derived", "source": "ReferenceHousingChecks setup sheet" },
+    "op1_index_angles_deg": { "value": [0, 90, 180], "status": "derived", "source": "ReferenceHousingChecks" },
+    "op2_index_angles_deg": { "value": [0, 30, 60, 90, 120, 150, 180, 210, 225, 240, 270, 300, 315, 330], "status": "derived", "source": "ReferenceHousingChecks" }
+  },
+  "tolerances": {
+    "precision_bores": { "value": "H7 / K6 / G7", "status": "assumed", "source": "size-14 stack fits; link socket G7 from ZeroErr drawing" },
+    "bore_coaxiality_mm": { "value": 0.01, "status": "assumed", "source": "strain-wave gear and rotor bearing alignment" },
+    "socket_position_mm": { "value": 0.05, "status": "supplier", "source": "ZeroErr 70T drawing, 39 ± 0.05" }
+  },
+  "machine": {
+    "travel_xyz_mm": { "value": [400, 300, 380], "status": "existing", "source": "CAPACITY_STUDY.md, Compact VMC" },
+    "gauge_to_table_max_mm": { "value": 550, "status": "assumed", "source": "set in DT2 from 4th axis and tool lengths" },
+    "fixture_stack_max_mm": { "value": 300, "status": "assumed", "source": "set in DT2" },
+    "spindle": {
+      "taper": { "value": "BT30", "status": "decided", "source": "DT-D2" },
+      "drive": { "value": "direct", "status": "decided", "source": "DT-D2" },
+      "maximum_rpm": { "value": [12000, 15000], "status": "assumed", "source": "aluminium surface speed 300-1000 m/min on 6-16 mm tools" },
+      "continuous_power_kw": { "value": [3, 4], "status": "assumed", "source": "30-taper structure limit; aluminium 0.5-1 J/mm3" },
+      "orientation_and_rigid_tapping": { "value": true, "status": "required", "source": "form-tapped M3 in the housing" }
+    },
+    "tool_changer": { "value": "21-tool drill-tap turret", "status": "decided", "source": "DT-D4" },
+    "axis_drives": {
+      "screw_lead_mm": { "value": [16, 20], "status": "assumed", "source": "DT3" },
+      "rapid_m_per_min": { "value": 30, "status": "assumed", "source": "drill-tap machine class" },
+      "acceleration_m_per_s2": { "value": 5, "status": "assumed", "source": "starting point, DT3" }
+    },
+    "fourth_axis": { "value": "Ø170-class rotary with brake, air union and tailstock", "status": "assumed", "source": "DT-D3, DT6" },
+    "accuracy": {
+      "positioning_mm": { "value": 0.005, "status": "assumed", "source": "after pitch compensation" },
+      "repeatability_mm": { "value": 0.003, "status": "assumed", "source": "after pitch compensation" }
+    },
+    "coolant": { "value": "MQL + air blast, enclosure designed for flood", "status": "decided", "source": "DT-D5" },
+    "control": { "value": "CncKit/MotionKit/RobotKit + EtherCAT servos, LinuxCNC fallback", "status": "decided", "source": "DT-D6" },
+    "measurement": { "value": ["spindle probe", "tool setter"], "status": "required", "source": "unattended production" },
+    "automation": { "value": "automatic door and MT-D2 robot interface", "status": "required", "source": "machine-tending PLAN.md" }
+  }
+}
