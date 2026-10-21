@@ -68,8 +68,9 @@ class FoldedZRouterCheck {
 		Sys.println('router mass: direct ${new CncRouter().massProperties().mass}, folded ${folded.massProperties().mass}');
 		// The home switches sit on the shared switch brackets (AxisBuilder.addHomeSwitch), 1.02 g lighter than the router's own
 		// mounting plates were.
-		CncRouterChecks.near(new CncRouter().massProperties().mass, 37.012573386290356, "direct router mass baseline", 1e-6);
-		CncRouterChecks.near(folded.massProperties().mass, 37.15501690969244, "folded router mass baseline", 1e-6);
+		// Its power supply and controller weigh as housings at sourced effective densities, no longer as solid blocks.
+		CncRouterChecks.near(new CncRouter().massProperties().mass, 36.125557060454454, "direct router mass baseline", 1e-6);
+		CncRouterChecks.near(folded.massProperties().mass, 36.26802265203573, "folded router mass baseline", 1e-6);
 		if (CncRouter.FoldedZMotorPlate.TENSION_TRAVEL < 4.0)
 			throw "Folded Z motor plate needs at least 4 mm of slot adjustment";
 		var centre = belt.wraps()[1].x - belt.wraps()[0].x;

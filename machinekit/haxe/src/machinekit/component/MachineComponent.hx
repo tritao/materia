@@ -145,11 +145,22 @@ class MachineComponent {
 		return recipe == null ? "instance|" + instanceId + "|" + suffix : recipe.id + "|" + recipe.key(values()) + "|" + suffix;
 	}
 
+	/**
+	 * A purchased part whose housing is mostly air and electronics, not solid material, returns its product
+	 * class's assumed effective density (kg/m³, `EffectiveDensities`): its mass is then its envelope's volume at
+	 * that density, independent of the drawn preview and of its housing material. Null computes mass from the
+	 * preview shape and the material's density.
+	 */
+	function effectiveDensity():Null<Float>
+		return null;
+
 	/** The preview shape supplies volume and centroid; its density is kg/m³. */
 	public function massProperties():MassProperties {
 		if (declaredMass != null) return declaredMass;
 		if (cachedMass != null && cachedMassMaterialId == materialId) return cachedMass;
-		var recipe = type, shareKey = recipe == null ? null : geometryKey(Preview);
+		var effective = effectiveDensity();
+		var basis:ComponentDetail = effective == null ? Preview : Envelope;
+		var recipe = type, shareKey = recipe == null ? null : geometryKey(basis);
 		if (shareKey != null) {
 			var known = recipe.knownMass(shareKey);
 			if (known != null) {
@@ -159,13 +170,13 @@ class MachineComponent {
 			}
 		}
 		var part:Part;
-		try part = geometry(Preview) catch (_:NoGeometry)
+		try part = geometry(basis) catch (_:NoGeometry)
 			throw 'Component "$designation" has no geometry or declared mass';
 		try {
 			var physical = part.massProperties();
-			var density = MaterialLibrary.require(materialId).physical.density;
+			var density = effective == null ? MaterialLibrary.require(materialId).physical.density : effective;
 			var mass = physical.volume * 1e-9 * density;
-			cachedMass = new MassProperties(mass, physical.centerOfMass, Computed(Preview),
+			cachedMass = new MassProperties(mass, physical.centerOfMass, effective == null ? Computed(Preview) : EffectiveDensity(effective),
 				physical.inertiaAtDensity(density * 1e-9));
 			cachedMassMaterialId = materialId;
 		} catch (error:Dynamic) {

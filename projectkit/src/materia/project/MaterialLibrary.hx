@@ -37,6 +37,10 @@ class MaterialLibrary {
     // Nominal planning density; print-lot properties must be supplied for production validation.
     material("pa12-nylon", "PA12 nylon (nominal)", [0.68, 0.69, 0.71], 0.0, 0.85, 1000, "PA12 nylon"),
     material("plastic", "Engineering plastic", [0.28, 0.30, 0.32], 0.0, 0.55, 1200, "plastic"),
+    // Housings of purchased electrical devices (DIN-rail modules, drives, controller cabinets): what is seen and what
+    // the BOM names. Their mass comes from an assumed effective density, not this density (machinekit EffectiveDensities).
+    material("device-housing", "Device housing, light grey", [0.80, 0.80, 0.78], 0.0, 0.55, 1200, "device housing"),
+    material("device-housing-dark", "Device housing, dark grey", [0.20, 0.21, 0.22], 0.0, 0.50, 1200, "device housing dark"),
     polycarbonate(),
     material("polyurethane", "Polyurethane", [0.26, 0.34, 0.37], 0.0, 0.65, 1200, "polyurethane PU"),
     routerMaterial("plywood-birch", "Birch plywood", 680, 0.12, 0.08, 0.15, 0.25),

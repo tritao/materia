@@ -21,7 +21,7 @@ class Vfd extends AssumedCatalogComponent {
     P.flag("sto", true)
   ];
   public function new(?v:ComponentValues) {
-    super("vfd", "three-phase spindle VFD with STO terminals", "aluminium 6061", inputs(), v);
+    super("vfd", "three-phase spindle VFD with STO terminals", "device housing dark", inputs(), v);
     positive(["power", "inputVoltage", "outputCurrent", "maxFrequency", "width", "depth", "height"]);
     addConnector("mount", Mount, F.translation(0, 0, 0));
     addPort({name: "mains", kind: ElectricalPower, role: Consumer, iface: Plug("3-phase-PE", 4), required: true}
@@ -44,6 +44,10 @@ class Vfd extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /** A housing, not a solid block: mass from the envelope at an assumed effective density. */
+  override function effectiveDensity():Null<Float>
+    return machinekit.component.EffectiveDensities.Drive;
+
   override public function geometry(detail:ComponentDetail = Preview):Part {
     return Solids.named(Part.box(n("width"), n("depth"), n("height")), "vfd-envelope");
   }

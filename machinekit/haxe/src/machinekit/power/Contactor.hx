@@ -20,7 +20,7 @@ class Contactor extends AssumedCatalogComponent {
     P.length("height", 90)
   ];
   public function new(?v:ComponentValues) {
-    super("contactor", "power contactor with auxiliary feedback", "steel", inputs(), v);
+    super("contactor", "power contactor with auxiliary feedback", "device housing", inputs(), v);
     positive(["ratedCurrent", "ratedVoltage", "coilVoltage", "width", "depth", "height"]);
     require(parameterCount("poles") > 0, "contactor needs poles");
     addConnector("din", Mount, F.translation(0, 0, 0));
@@ -43,6 +43,10 @@ class Contactor extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /** A housing, not a solid block: mass from the envelope at an assumed effective density. */
+  override function effectiveDensity():Null<Float>
+    return machinekit.component.EffectiveDensities.DinRailSwitchgear;
+
   override public function geometry(detail:ComponentDetail = Preview):Part {
     return Solids.named(Part.box(n("width"), n("depth"), n("height")), "contactor-envelope");
   }

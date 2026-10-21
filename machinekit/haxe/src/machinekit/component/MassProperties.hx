@@ -7,6 +7,12 @@ import cadkit.InertiaTensor;
 enum MassSource {
 	Computed(detail:ComponentDetail);
 	Declared;
+
+	/**
+	 * A purchased part's mass: its envelope's volume at an assumed effective density (kg/m³) for its product class
+	 * (`EffectiveDensities`), not its drawn housing. An authored value, like `Declared`.
+	 */
+	EffectiveDensity(kgPerCubicMetre:Float);
 }
 
 /** Mass in kg, centre in mm, and centroidal inertia in kg mm² in the component frame. */

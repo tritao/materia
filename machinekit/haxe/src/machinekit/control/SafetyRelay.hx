@@ -20,7 +20,7 @@ class SafetyRelay extends AssumedCatalogComponent {
     P.length("height", 100)
   ];
   public function new(?v:ComponentValues) {
-    super("safety-relay", "dual-channel safety relay with delayed contacts", "steel", inputs(), v);
+    super("safety-relay", "dual-channel safety relay with delayed contacts", "device housing", inputs(), v);
     positive(["supplyVoltage", "stopDelay", "width", "depth", "height"]);
     require(
       parameterCount("immediateContacts") > 0 && parameterCount("delayedContacts") > 0,
@@ -66,6 +66,10 @@ class SafetyRelay extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /** A housing, not a solid block: mass from the envelope at an assumed effective density. */
+  override function effectiveDensity():Null<Float>
+    return machinekit.component.EffectiveDensities.DinRailElectronics;
+
   override public function geometry(detail:ComponentDetail = Preview):Part {
     return Solids.named(Part.box(n("width"), n("depth"), n("height")), "relay-envelope");
   }

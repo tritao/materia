@@ -17,7 +17,7 @@ class ControllerCabinet extends MachineComponent {
 		if (axes < 0 || axes > 16 || inputs < 0 || inputs > 64 || outputs < 0 || outputs > 64 ||
 			valves < 0 || valves > 32) throw "Controller I/O counts are out of range";
 		super("CONTROLLER-" + kind.toUpperCase() + '-$axes-$inputs-$outputs-$valves',
-			'$kind controller cabinet', "aluminium 6061");
+			'$kind controller cabinet', "device housing");
 		this.kind = kind;
 		this.axes = axes;
 		this.inputs = inputs;
@@ -35,6 +35,10 @@ class ControllerCabinet extends MachineComponent {
 	}
 
 	override public function hasGeometry():Bool return true;
+	/** A housing, not a solid block: mass from the envelope at an assumed effective density. */
+	override function effectiveDensity():Null<Float>
+		return machinekit.component.EffectiveDensities.ControlCabinet;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.named(Part.box(180, 180, 280), "controller-module");
 }

@@ -34,6 +34,10 @@ class BrakeResistor extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /** A housing, not a solid block: mass from the envelope at an assumed effective density. */
+  override function effectiveDensity():Null<Float>
+    return machinekit.component.EffectiveDensities.BrakeResistor;
+
   override public function geometry(detail:ComponentDetail = Preview):Part {
     return Solids.named(Part.box(n("width"), n("length"), n("height")), "resistor-envelope");
   }

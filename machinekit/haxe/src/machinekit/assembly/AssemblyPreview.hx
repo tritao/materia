@@ -44,7 +44,7 @@ class AssemblyPreview {
 			var inertia = mass.inertia;
 			var inertiaKey:Null<Array<Float>> = inertia == null ? null :
 				[inertia.xx, inertia.xy, inertia.xz, inertia.yy, inertia.yz, inertia.zz];
-			var declared = switch mass.source { case Declared: true; case Computed(_): false; };
+			var declared = switch mass.source { case Declared: true; case EffectiveDensity(_): true; case Computed(_): false; };
 			var massKey = haxe.Json.stringify({mass: mass.mass,
 				centre: [mass.centreOfMass.x, mass.centreOfMass.y, mass.centreOfMass.z],
 				inertia: inertiaKey, declared: declared});
@@ -215,6 +215,7 @@ class AssemblyPreview {
 				physicalMassKg: mass,
 				physicalMassDeclared: massProperties != null && switch massProperties.source {
 					case Declared: true;
+					case EffectiveDensity(_): true;
 					case Computed(_): false;
 				},
 				physicalInertiaKgM2: [tensor.xx, tensor.xy, tensor.xz, tensor.xy, tensor.yy, tensor.yz,

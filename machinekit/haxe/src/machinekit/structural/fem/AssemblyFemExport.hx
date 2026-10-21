@@ -73,7 +73,7 @@ class AssemblyFemExport {
 					if(solid)solidMass += mass.mass;
 				}
 				totalMass += mass.mass;
-                var massSource = switch(mass.source) {case Computed(_):"Computed"; case Declared:"Declared";};
+                var massSource = switch(mass.source) {case Computed(_):"Computed"; case Declared:"Declared"; case EffectiveDensity(_):"EffectiveDensity";};
 				parts.push({id:id, parentId:parents.get(id), materialId:material.id, representation:solid?"solid":"mass-only",
 					poseMm:pose, massKg:mass.mass, massSource:massSource, centreOfMassMm:centre, volumeMm3:volume,
                     centroidalInertiaKgMm2World:inertia, inertiaSource:inertiaSource,

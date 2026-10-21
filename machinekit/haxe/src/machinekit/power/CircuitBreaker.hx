@@ -20,7 +20,7 @@ class CircuitBreaker extends AssumedCatalogComponent {
     P.length("height", 90)
   ];
   public function new(?v:ComponentValues) {
-    super("circuit-breaker", "three-pole circuit breaker", "steel", inputs(), v);
+    super("circuit-breaker", "three-pole circuit breaker", "device housing", inputs(), v);
     positive(["ratedCurrent", "ratedVoltage", "breakingCapacity", "poleWidth", "depth", "height"]);
     require(parameterCount("poles") > 0, "breaker needs poles");
     addConnector("din", Mount, F.translation(0, 0, 0));
@@ -45,6 +45,10 @@ class CircuitBreaker extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /** A housing, not a solid block: mass from the envelope at an assumed effective density. */
+  override function effectiveDensity():Null<Float>
+    return machinekit.component.EffectiveDensities.DinRailSwitchgear;
+
   override public function geometry(detail:ComponentDetail = Preview):Part {
     return Solids.named(Part.box(n("poleWidth") * parameterCount("poles"),
       n("depth"), n("height")), "breaker-envelope");

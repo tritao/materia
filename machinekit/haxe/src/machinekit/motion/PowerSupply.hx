@@ -71,6 +71,10 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
 		.setNumber("voltage", voltage.volts()).setNumber("current", current.amps()).setInteger("outlets", outlets).setNumber("width", width)
 		.setNumber("height", height).setNumber("depth", depth).setNumber("regenerativePower", regenerativePower).setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
+	/** A housing, not a solid block: mass from the envelope at an assumed effective density. */
+	override function effectiveDensity():Null<Float>
+		return machinekit.component.EffectiveDensities.PowerSupply;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.named(Part.box(width, height, depth), "body");
 }
