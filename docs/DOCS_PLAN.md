@@ -102,7 +102,7 @@ changed test.
 | **D5** | API reference generator for every kit | Reference pages built from code, linked from concept pages |
 | **D6** | Docs runtime spike: MachineKit + CncKit in wasm-gc, size measured; transmissions and G-code widgets | Widgets live on their concept pages |
 | **D7** | The remaining concept pages; the user manual for the editor | No stubs left in `concepts/` |
-| **D8** | First open machine build guide (sheet router) | BOM, fabrication packet, assembly, commissioning published |
+| **D8** | First open machine build guide (sheet router) | Deferred until the router is built and commissioned (maintainer, 2026-10-21) |
 | **D9** | Product pages: landing, features, gallery, roadmap, release notes, licensing | Site ready to announce |
 | **Later** | Commercial product manuals, structured for the Machinery Regulation | Per product |
 
@@ -159,4 +159,7 @@ place.
   Materia" link (tested by `app/web/test.sh --launch`). The link stays hidden
   until the editor is hosted and `PUBLIC_MATERIA_EDITOR_URL` is set. The
   maintainer chose to skip the fresh-clone walk through the tutorial for now.
-- D8 waits on the sheet router being built and commissioned.
+- D8 deferred by the maintainer until the sheet router is built and
+  commissioned; it is outside this plan's finished scope.
+- Plan finished on 2026-10-21. Every page written so far is a draft; the
+  maintainer reviews them and moves each to `status: reviewed`.
