@@ -62,7 +62,7 @@ class CadPreviewGeometry {
     if (edgeIds != null && edgeIds.length != 0 &&
         (edges == null || edgeIds.length != Std.int(edges.length / 48) * 4))
       throw "CAD mesh has invalid edge IDs";
-    var featureEdges=CadFeatureEdges.classify(part);
+    var featureEdges=cadkit.MeshFeatureEdges.classify(part.vertices,part.normals,part.indices,part.vertexCount,part.indexCount,edges,edgeIds);
     if (edges != null) for (index in 0...Std.int(edges.length / 48)) {
       var offset = index * 48;
       for (axis in 0...6) if (!finite(edges.getDouble(offset + axis * 8)))

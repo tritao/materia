@@ -439,19 +439,19 @@ class EditorPerspectiveViewport implements View {
           camera.studioDirection(scale * aspect(), 0.0, 0.0),
           camera.studioDirection(0.0, scale, 0.0), gridStep, camera.distance);
       }
-      var directions:Array<Float> = [];
-      // Coin directions point from each light into the scene; the shader needs the reverse.
-      var intensities = EditorViewportLighting.intensities(lightingPreset);
-      var coinDirections = EditorViewportLighting.directions();
-      for (index in 0...3) {
-        var light = coinDirections[index];
-        var direction = camera.studioDirection(-light[0], -light[1], -light[2]);
+      var look = ViewportLook.preset(lightingPreset);
+      var directions:Array<Float> = [], colors:Array<Float> = [];
+      for (light in look.lights) {
+        // Look directions point from each light into the scene; the shader needs the reverse.
+        var direction = camera.studioDirection(-light.direction[0], -light.direction[1], -light.direction[2]);
         directions.push(direction[0]); directions.push(direction[1]);
-        directions.push(direction[2]); directions.push(intensities[index]);
+        directions.push(direction[2]); directions.push(light.intensity);
+        for (channel in light.color) colors.push(channel);
+        colors.push(0.0);
       }
-      view.setStudioLighting(directions, EditorViewportLighting.sky(lightingPreset), EditorViewportLighting.ground(lightingPreset));
-      var detail = EditorViewportLighting.detail(lightingPreset);
-      view.setStudioDetail(detail[0],detail[1],detail[2],detail[3]);
+      view.setStudioLighting(directions, look.sky, look.ground, colors);
+      view.setStudioEnvironment([for (light in look.lights) light.radius], look.reflection, look.exposure);
+      view.setStudioDetail(look.occlusionRadius, look.occlusionStrength, look.occlusionBias, look.roughnessFloor);
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
       if (sampleCountApplied != sampleCountRequested) {

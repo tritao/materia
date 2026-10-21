@@ -1,6 +1,5 @@
 package tests;
 
-import app.CadFeatureEdges;
 import app.CadGeometryData;
 import app.CadSceneGeometry;
 import app.CadEdgeMode;
@@ -26,10 +25,12 @@ class CadFeatureEdgeTests {
     return {id:"sample",name:"sample",red:1,green:1,blue:1,vertexCount:6,indexCount:open ? 3 : 6,
       vertices:vertices,normals:normals,indices:indices,edgeSegments:edges,edgeIds:ids,faceRanges:[]};
   }
+  static function classify(part:SceneArtifactPart):Array<Bool>
+    return cadkit.MeshFeatureEdges.classify(part.vertices,part.normals,part.indices,part.vertexCount,part.indexCount,part.edgeSegments,part.edgeIds);
   public static function main():Void {
-    check(!CadFeatureEdges.classify(sample())[0],"Coplanar face split is hidden");
-    check(CadFeatureEdges.classify(sample(true))[0],"Sharp crease stays visible");
-    check(CadFeatureEdges.classify(sample(false,true))[0],"Open boundary stays visible");
+    check(!classify(sample())[0],"Coplanar face split is hidden");
+    check(classify(sample(true))[0],"Sharp crease stays visible");
+    check(classify(sample(false,true))[0],"Open boundary stays visible");
     var cylinder=Part.cylinder(10,30);
     var mesh=cylinder.shape.tessellate();
     var data:CadGeometryData=cast CadSceneGeometry.fromMesh(mesh,cylinder.shape);
