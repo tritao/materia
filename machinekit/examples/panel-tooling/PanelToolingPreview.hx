@@ -72,10 +72,21 @@ class PanelToolingPreview {
             movingWidth:280,bodyHeight:100,offsetX:20,slotY:150,tabs:[{center:55.0,width:30.0},{center:210.0,width:44.0}],
             clearance:0.2,routerDiameter:6,minimumLigament:6},true);
         var pairs=[keyed,PanelJoints.rebate("rebate",stock),PanelJoints.pinBolt("pins",stock)];
-        var assembled=new MachineAssembly(),exploded=new MachineAssembly(),reports:Array<Dynamic> = [];
+        var assembled=new MachineAssembly(),reports:Array<Dynamic> = [];
+        var offsets=new Map<String,materia.assembly.AssemblyDefinition.AssemblyVector>();
         for(i in 0...pairs.length) {
             var pair=pairs[i],base=F.translation(i*450,0,0),plan=PanelAssemblyPlan.pair(pair,base),report=PanelKit.check(plan);
-            var kit=PanelKit.assembly(plan),apart=PanelKit.assembly(plan,true);
+            var kit=PanelKit.assembly(plan);
+            var local=AssemblyPreview.scene(kit,pair.joint.id);
+            var record=PanelKit.presentation(plan,local.assemblyDefinition);
+            var cursor=materia.presentation.PresentationEvaluator.reset(record);cursor.explode=1;
+            var poses=kit.solvedPoses();
+            var frame=materia.presentation.PresentationEvaluator.evaluate(local.assemblyDefinition,poses,record,cursor,"");
+            for(offset in record.explode) {
+                var id=offset.select.occurrence,a=poses.get(id),b=frame.poses.get(id);
+                if(a==null||b==null)throw "Missing panel display pose";
+                offsets.set(pair.joint.id+"/"+id,{x:b.x-a.x,y:b.y-a.y,z:b.z-a.z});
+            }
             if(pair.joint.id=="pins") {
                 addPinHardware(kit,pair,base);
                 var driver=Part.cylinderSpan(5,2*t+10,2*t+70,90,65),wrench=Part.cylinderSpan(8,-80,-10,90,65);
@@ -84,7 +95,7 @@ class PanelToolingPreview {
                 catch(e:Dynamic){worldDriver.close();worldWrench.close();throw e;}
                 worldDriver.close();worldWrench.close();
             }
-            assembled.include(pair.joint.id,kit);exploded.include(pair.joint.id,apart);
+            assembled.include(pair.joint.id,kit);
             writePanel(dir,pair.fixed);writePanel(dir,pair.moving);
             reports.push({id:pair.joint.id,report:report,closure:pair.joint.closure,
                 panelFingerprints:[{id:pair.fixed.id,sha256:PanelCodec.fingerprint(pair.fixed)},{id:pair.moving.id,sha256:PanelCodec.fingerprint(pair.moving)}],
@@ -92,8 +103,9 @@ class PanelToolingPreview {
         }
         var coupon=PanelCoupon.make(stock,[0.1,0.2,0.3,0.4]);
         writePanel(dir,coupon.receiver,coupon.clearances);writePanel(dir,coupon.plug);
-        sys.io.File.saveBytes(dir+"/panel-joinery.mtrg",SceneArtifact.encode(AssemblyPreview.scene(assembled,"panel-joinery")));
-        sys.io.File.saveBytes(dir+"/panel-joinery-exploded.mtrg",SceneArtifact.encode(AssemblyPreview.scene(exploded,"panel-joinery-exploded")));
+        var scene=AssemblyPreview.scene(assembled,"panel-joinery");
+        scene.presentation=machinekit.tooling.ToolingExplode.presentation(scene.assemblyDefinition,"panel-tooling",offsets);
+        sys.io.File.saveBytes(dir+"/panel-joinery.mtrg",SceneArtifact.encode(scene));
         var saved=assembled.encode();MachineAssembly.decode(saved).validate();
         sys.io.File.saveContent(dir+"/panel-joinery.assembly.json",saved);
         sys.io.File.saveContent(dir+"/review.json",Json.stringify({phase:2,stock:stock,panels:reports,couponClearances:coupon.clearances,

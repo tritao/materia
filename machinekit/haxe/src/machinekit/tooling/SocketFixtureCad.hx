@@ -68,11 +68,24 @@ class SocketFixtureCad {
 		}
 		result.views.push({id:"socket-mounting",label:"Socket mounting",camera:Frame(mounting,0.6,-0.65,2),
 			visibility:[{select:plates[0],mode:Hidden}],sections:[],explode:0,source:Generated("socket-fixture")});
+		var offsets=new Map<String,materia.assembly.AssemblyDefinition.AssemblyVector>(),c=cavity(plan);
+		var flat=materia.assembly.AssemblyDefinitionFlattener.flattenView(definition);
+		for(row in flat.occurrences)offsets.set(row.id,
+			if(row.id==plan.assembly.members[0].panel.id){x:0.0,y:0.0,z:-75.0}
+			else if(row.id==plan.assembly.members[1].panel.id){x:0.0,y:0.0,z:-35.0}
+			else if(row.id=="cured-casting"){x:c.width+150,y:0.0,z:80.0}
+			else if(row.id=="south-wall"){x:0.0,y:-100.0,z:0.0}
+			else if(row.id=="north-wall"){x:0.0,y:100.0,z:0.0}
+			else if(row.id=="west-wall"){x:-100.0,y:0.0,z:0.0}
+			else if(row.id=="east-wall"){x:100.0,y:0.0,z:0.0}
+			else if(inserts.filter(insert->row.id==materia.tooling.ToolingIds.derive("insert-",insert.id)).length==1){x:0.0,y:0.0,z:60.0}
+			else {x:0.0,y:0.0,z:-70.0});
+		result.explode=ToolingExplode.presentation(definition,"socket-fixture",offsets).explode;
 		materia.presentation.PresentationCodec.validate(definition,result);
 		return result;
 	}
 
-	public static function assembly(plan:InsertPlatePlan,cured:Bool = false,exploded:Bool = false):MachineAssembly {
+	public static function assembly(plan:InsertPlatePlan,cured:Bool = false):MachineAssembly {
 		var assembly = InsertFixtureCad.assembly(plan,cured), root = plan.assembly.members[0].panel.id;
 		var c = cavity(plan), t = plan.document.recipe.panel.measuredThickness, stock = plan.document.recipe.panel;
 		var walls = [
@@ -84,21 +97,6 @@ class SocketFixtureCad {
 		for (wall in walls)
 			add(assembly,root,wall.id,ToolingPanel.fromPlan(PanelJoints.blank(wall.id,wall.width,wall.height,stock,
 				plan.document.recipe.routerDiameter,plan.document.recipe.minimumLigament)),wall.pose);
-		if (!exploded) return assembly;
-		var out = new MachineAssembly(), poses = assembly.solvedPoses();
-		for (row in assembly.components()) {
-			var pose = F.compose(F.identity(),poses.get(row.id));
-			if (row.id == plan.assembly.members[0].panel.id) pose.z -= 75;
-			else if (row.id == plan.assembly.members[1].panel.id) pose.z -= 35;
-			else if (row.id == "cured-casting") {pose.x += c.width+150; pose.z += 80;}
-			else if (row.id == "south-wall") pose.y -= 100;
-			else if (row.id == "north-wall") pose.y += 100;
-			else if (row.id == "west-wall") pose.x -= 100;
-			else if (row.id == "east-wall") pose.x += 100;
-			else if (plan.document.input.inserts.filter(insert -> row.id == materia.tooling.ToolingIds.derive("insert-",insert.id)).length == 1) pose.z += 60;
-			else pose.z -= 70;
-			out.addComponent(row.id,row.component,pose);
-		}
-		return out;
+		return assembly;
 	}
 }

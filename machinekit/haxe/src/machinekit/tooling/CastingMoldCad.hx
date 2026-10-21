@@ -205,36 +205,33 @@ class CastingMoldCad {
 		}
 	}
 
-	public static function assembly(p:CastingMoldPlan, exploded:Bool = false):MachineAssembly {
+	public static function presentation(p:CastingMoldPlan,definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation {
+		var b=p.cavity,offsets=new Map<String,materia.assembly.AssemblyDefinition.AssemblyVector>();
+		for(m in p.panels.members)offsets.set(m.panel.id,switch m.panel.id {
+			case "bed": {x:0.0,y:0.0,z:-b.height*0.7};
+			case "east": {x:b.width,y:0.0,z:0.0};
+			case "west": {x:-b.width,y:0.0,z:0.0};
+			case "north": {x:0.0,y:b.depth*0.4,z:0.0};
+			case "south": {x:0.0,y:-b.depth*0.4,z:0.0};
+			case _: {x:0.0,y:0.0,z:0.0};
+		});
+		for(i in 0...p.supportPanels.length)offsets.set(p.supportPanels[i].panel.id,{x:0,y:0,z:b.height*(0.5+i*0.15)});
+		for(i in 0...p.cores.length)offsets.set(p.cores[i].id,{x:0,y:0,z:b.height*(0.8+i*0.12)});
+		for(f in p.formers)offsets.set(f.volume.id,{x:f.withdrawal.x*b.width*0.7,y:f.withdrawal.y*b.depth*0.4,z:f.withdrawal.z*b.height*0.7});
+		for(f in p.fixtures)offsets.set(f.datum.id,{x:f.withdrawal.x*b.width,y:0,z:f.withdrawal.z*b.height*1.4});
+		for(i in p.document.input.inserts)offsets.set(materia.tooling.ToolingIds.derive("insert-",i.id),{x:b.width*1.8,y:0,z:0});
+		return ToolingExplode.presentation(definition,"casting-mold",offsets);
+	}
+
+	public static function assembly(p:CastingMoldPlan):MachineAssembly {
 		CastingMoldPlanner.validate(p);
-		var a = exploded ? new MachineAssembly() : PanelKit.assembly(p.panels, false, "coated particleboard"), b = p.cavity;
-		if (exploded)
-			for (m in p.panels.members) {
-				var pose = F.compose(F.identity(), m.pose);
-				switch m.panel.id {
-					case "bed":
-						pose.z -= b.height * 0.7;
-					case "east":
-						pose.x += b.width;
-					case "west":
-						pose.x -= b.width;
-					case "north":
-						pose.y += b.depth * 0.4;
-					case "south":
-						pose.y -= b.depth * 0.4;
-				}
-				a.addComponent(m.panel.id, ToolingPanel.fromPlan(m.panel, "coated particleboard"), pose);
-			}
+		var a = PanelKit.assembly(p.panels, "coated particleboard"), b = p.cavity;
 		for (i in 0...p.supportPanels.length) {
 			var m = p.supportPanels[i], pose = F.compose(F.identity(), m.pose);
-			if (exploded)
-				pose.z += b.height * (0.5 + i * 0.15);
 			a.addComponent(m.panel.id, ToolingPanel.fromPlan(m.panel), pose);
 		}
 		for (i in 0...p.cores.length) {
 			var c = p.cores[i], pose = F.identity();
-			if (exploded)
-				pose.z += b.height * (0.8 + i * 0.12);
 			a.addComponent(c.id, ToolingVolume.fromVolume({
 				id: c.id,
 				material: EPSStock,
@@ -245,71 +242,58 @@ class CastingMoldCad {
 		}
 		for (f in p.formers) {
 			var pose = F.identity();
-			if (exploded) {
-				pose.x += f.withdrawal.x * b.width * 0.7;
-				pose.y += f.withdrawal.y * b.depth * 0.4;
-				pose.z += f.withdrawal.z * b.height * 0.7;
-			}
 			a.addComponent(f.volume.id, ToolingVolume.fromVolume(f.volume), pose);
 		}
 		for (f in p.fixtures) {
 			var pose = F.identity();
-			if (exploded) {
-				pose.x += f.withdrawal.x * b.width;
-				pose.z += f.withdrawal.z * b.height * 1.4;
-			}
 			a.addComponent(f.datum.id, ToolingVolume.fromVolume(f.datum), pose);
 		}
 		for (i in p.document.input.inserts) {
 			var pose = F.compose(p.document.setup.sourceToMold, i.pose);
-			if (exploded)
-				pose.x += b.width * 1.8;
 			var part = ToolingInsertCad.component(i);
 			a.addComponent(materia.tooling.ToolingIds.derive("insert-", i.id), part, pose);
 		}
-		if (!exploded) {
-			for (h in p.hardware) {
-				if (h.kind == SupportHardwareKind.BoreMask)
-					a.addComponent(h.id, ToolingPin.boreMask(boreMaskRecord(p, h.id).hole, boreMaskRecord(p, h.id).protection.plugLength), h.pose);
-				else if (h.kind == SupportHardwareKind.BorePlug) {
-					var protections = [for (fixture in p.fixtures) for (pen in fixture.penetrations)
-						if (pen.sourceHoleId != null && materia.tooling.ToolingIds.derive("resin-plug-", fixture.insertId + "-" + pen.sourceHoleId) == h.id)
-						{insertId: fixture.insertId, holeId: pen.sourceHoleId}];
-					for (fixture in p.fixtures) for (mask in fixture.boreMasks)
-						if (mask.farEndId == h.id)
-							protections.push({insertId: fixture.insertId, holeId: mask.sourceHoleId});
-					if (protections.length != 1)
-						throw "Resin-side plug has no unique source hole: " + h.id;
-					var source = p.document.input.inserts.filter(i -> i.id == protections[0].insertId)[0];
-					var hole = materia.tooling.casting.InsertFixturePlanner.holes(source).filter(hole -> hole.id == protections[0].holeId)[0];
-					a.addComponent(h.id, machinekit.standard.SocketSetScrew.forThread(
-						machinekit.structural.InsertHoles.threadSpec(hole.thread).mating(), h.length), h.pose);
-				}
-				else if (h.kind == SupportHardwareKind.LocatingPin
-					|| h.kind == SupportHardwareKind.FixturePin)
-					a.addComponent(h.id, new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length)), h.pose);
-				else if (h.kind == SupportHardwareKind.FixtureScrew) {
-					var fixings = [for (fixture in p.fixtures) for (fixing in fixture.fixings)
-						if (fixing.hardwareId == h.id) {sourceId:fixture.insertId,fixing:fixing}];
-					if (fixings.length != 1)
-						throw "Fixture screw has no unique source thread: " + h.id;
-					var source=p.document.input.inserts.filter(insert -> insert.id==fixings[0].sourceId)[0];
-					var fixing=fixings[0].fixing;
-					var hole=materia.tooling.casting.InsertFixturePlanner.holes(source).filter(hole -> hole.id==fixing.sourceHoleId)[0];
-					ToolingHardwareCad.fixtureScrew(a,h.id,hole,h.length,h.pose,fixing.entry);
-				}
-				else {
-					ToolingHardwareCad.throughBolt(a, h.id, h.diameter, h.length, h.pose);
-				}
+		for (h in p.hardware) {
+			if (h.kind == SupportHardwareKind.BoreMask)
+				a.addComponent(h.id, ToolingPin.boreMask(boreMaskRecord(p, h.id).hole, boreMaskRecord(p, h.id).protection.plugLength), h.pose);
+			else if (h.kind == SupportHardwareKind.BorePlug) {
+				var protections = [for (fixture in p.fixtures) for (pen in fixture.penetrations)
+					if (pen.sourceHoleId != null && materia.tooling.ToolingIds.derive("resin-plug-", fixture.insertId + "-" + pen.sourceHoleId) == h.id)
+					{insertId: fixture.insertId, holeId: pen.sourceHoleId}];
+				for (fixture in p.fixtures) for (mask in fixture.boreMasks)
+					if (mask.farEndId == h.id)
+						protections.push({insertId: fixture.insertId, holeId: mask.sourceHoleId});
+				if (protections.length != 1)
+					throw "Resin-side plug has no unique source hole: " + h.id;
+				var source = p.document.input.inserts.filter(i -> i.id == protections[0].insertId)[0];
+				var hole = materia.tooling.casting.InsertFixturePlanner.holes(source).filter(hole -> hole.id == protections[0].holeId)[0];
+				a.addComponent(h.id, machinekit.standard.SocketSetScrew.forThread(
+					machinekit.structural.InsertHoles.threadSpec(hole.thread).mating(), h.length), h.pose);
 			}
-			var poses = a.solvedPoses(), inverse = F.inverse(poses.get("bed"));
-			a.addMemberConnector("bed", "tooling-origin", F.identity());
-			for (row in a.components())
-				if (p.panels.members.filter(m -> m.panel.id == row.id).length == 0) {
-					a.addMemberConnector(row.id, "tooling-datum", F.inverse(F.compose(inverse, poses.get(row.id))));
-					a.addMate(materia.tooling.ToolingIds.derive("", row.id, "-positioned"), "fixed", "bed", "tooling-origin", row.id, "tooling-datum");
-				}
+			else if (h.kind == SupportHardwareKind.LocatingPin
+				|| h.kind == SupportHardwareKind.FixturePin)
+				a.addComponent(h.id, new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length)), h.pose);
+			else if (h.kind == SupportHardwareKind.FixtureScrew) {
+				var fixings = [for (fixture in p.fixtures) for (fixing in fixture.fixings)
+					if (fixing.hardwareId == h.id) {sourceId:fixture.insertId,fixing:fixing}];
+				if (fixings.length != 1)
+					throw "Fixture screw has no unique source thread: " + h.id;
+				var source=p.document.input.inserts.filter(insert -> insert.id==fixings[0].sourceId)[0];
+				var fixing=fixings[0].fixing;
+				var hole=materia.tooling.casting.InsertFixturePlanner.holes(source).filter(hole -> hole.id==fixing.sourceHoleId)[0];
+				ToolingHardwareCad.fixtureScrew(a,h.id,hole,h.length,h.pose,fixing.entry);
+			}
+			else {
+				ToolingHardwareCad.throughBolt(a, h.id, h.diameter, h.length, h.pose);
+			}
 		}
+		var poses = a.solvedPoses(), inverse = F.inverse(poses.get("bed"));
+		a.addMemberConnector("bed", "tooling-origin", F.identity());
+		for (row in a.components())
+			if (p.panels.members.filter(m -> m.panel.id == row.id).length == 0) {
+				a.addMemberConnector(row.id, "tooling-datum", F.inverse(F.compose(inverse, poses.get(row.id))));
+				a.addMate(materia.tooling.ToolingIds.derive("", row.id, "-positioned"), "fixed", "bed", "tooling-origin", row.id, "tooling-datum");
+			}
 		return a;
 	}
 

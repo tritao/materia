@@ -30,9 +30,9 @@ def refine(triangles, limit=35.0):
 root = Path(__file__).resolve().parent / "build/tooling/base"
 light = np.array([.3, -.5, .8]); light /= np.linalg.norm(light)
 for cutaway in (False, True):
-    fig = plt.figure(figsize=(15, 8))
-    for index, name in enumerate(("mold", "mold-exploded"), 1):
-        ax = fig.add_subplot(1, 2, index, projection="3d")
+    fig = plt.figure(figsize=(10, 8))
+    for index, name in enumerate(("mold",), 1):
+        ax = fig.add_subplot(1, 1, index, projection="3d")
         points, all_triangles, all_colors = [], [], []
         for row in json.loads((root / f"{name}-meshes.json").read_text()):
             member = row["id"].removeprefix(name + "-")
@@ -49,14 +49,12 @@ for cutaway in (False, True):
             normals /= np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
             colors = np.asarray(row["color"])[None, :] * (.5 + .5 * np.abs(normals @ light))[:, None]
             all_triangles.append(triangles); all_colors.append(colors)
-            if name == "mold-exploded" and member in ("bed", "north", "east", "south", "west"):
-                ax.text(*vertices.mean(axis=0), member, fontsize=7)
         ax.add_collection3d(Poly3DCollection(np.concatenate(all_triangles), facecolors=np.concatenate(all_colors), edgecolors="none", rasterized=True))
         points = np.concatenate(points); low, high = points.min(axis=0), points.max(axis=0)
         for axis, lo, hi in zip((ax.set_xlim, ax.set_ylim, ax.set_zlim), low, high):
             axis(lo - 15, hi + 15)
         ax.set_box_aspect(high - low + 30); ax.view_init(elev=32, azim=-55)
-        ax.set_title("Assembled" + (" — south/west walls hidden" if cutaway and index == 1 else "") if index == 1 else "Exploded review")
+        ax.set_title("Assembled" + (" — south/west walls hidden" if cutaway else ""))
         ax.set(xlabel="X (mm)", ylabel="Y (mm)", zlabel="Z (mm)")
     fig.suptitle("Bench-mill base mold — six EPS cores, detail formers and nominal bed-referenced insert supports")
     fig.text(.5, .02, "REVIEW ONLY: fixture attachments, replication/grout allowances, anchorage, compaction, loads and handling remain pending.", ha="center", fontsize=9)

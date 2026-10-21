@@ -119,7 +119,7 @@ explicit pocket-floor drill operations reference their access pocket. CamKit
 owns cutter compensation.
 
 
-The package contains assembled/exploded scenes, portable assembly recipes,
+The package contains a single mold scene with an Explode slider, portable assembly recipes,
 STEP solids, panel SVG/DXF and operation records, local EPS layer STEP/SVG/DXF
 with ruled cutting definitions, normalized source/plan/options, a geometric
 review, typed diagnostics, handling/demolding-step records, change requests and

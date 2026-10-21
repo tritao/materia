@@ -25,8 +25,7 @@ the cutter used to make its reliefs. Drill operations declare their own diameter
 
 Outputs under `build/review/`:
 
-- `panel-joinery.mtrg`: assembled three-joint fixture with the pin fixture hardware.
-- `panel-joinery-exploded.mtrg`: separated panels after removing loose hardware.
+- `panel-joinery.mtrg`: three-joint fixture with the pin fixture hardware. The Explode slider separates the panels without changing their engineering placements.
 - `panel-joinery.assembly.json`: rebuildable assembly with registered component
   recipes and mating connectors.
 - Per-panel `.panel.json`, `.step`, `.svg` and `.dxf`: the same exact finished
@@ -37,7 +36,7 @@ Outputs under `build/review/`:
 - `review.json`: stock inputs, geometric blocking edges, assembly/removal orders,
   contact volume tolerance and coupon clearances.
 
-Inspect the assembled or exploded scene in Materia:
+Open the scene in Materia and use the Explode slider:
 
 ```sh
 ./app/run-built.sh --project="$PWD/machinekit/examples/panel-tooling/build/review/panel-joinery.mtrg" --perspective

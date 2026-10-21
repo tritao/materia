@@ -157,8 +157,9 @@ plus the determinism invariant.
 Implementation status: the controller, shared viewport controls, typed render/pick
 frames, persisted authored sections, hobber views and camera-field removal are in
 place. Supplier axis defaults moved with the field removal. The presentation native
-suite passes 20 checks and the ported enclosure runtime passes 10,551 checks.
-Acceptance is still pending the explicit BOM/STEP export isolation checks. The
+suite passes 24 checks and the ported enclosure runtime passes 10,551 checks.
+The native fixture also checks the exported engineering BOM. Acceptance is still
+pending explicit STEP export isolation checks. The
 broader viewport-coordinate suite also fails its retained toolbar/status subtree
 identity assertion even though both application revision keys are unchanged; that
 failure remains unresolved and is not suppressed in that suite.
@@ -173,7 +174,7 @@ engineering-isolation and Reset invariants are in the app test suite, and
 
 ### AP2 — Socket fixture views (first example)
 Implementation status: producer views are implemented and the fixture generator
-passes 80 assertions. All three views were captured through the real editor and
+passes 104 assertions. All three views were captured through the real editor and
 reviewed; the screenshots and reproduction command are in the hobber README.
 
 `SocketFixtureCad` emits views: `assembled` (default), `see-inside` (plates
@@ -183,6 +184,15 @@ hidden, camera on the screw/washer stack from below).
 recorded in the example's README.
 
 ### AP3 — Explode offsets replace exploded builders
+Implementation status: the shared slider drives the existing staged evaluator and
+is disabled during simulation. The four builders now create only engineering
+assemblies; their review displacements are generated presentation offsets in the
+correct parent frame. Box, casting, panel and socket exports use one scene.
+Socket endpoint/BOM checks pass (104 assertions), native display/pick/isolation
+checks pass (24 checks), and the panel and box suites pass 144 and 157 assertions.
+Rotated joint-parent and nested-scope conversion checks pass. The mill exporter
+compiles. Visual endpoint review and the outstanding AP1 STEP check remain.
+
 The slider, staged composition, and display offsets in picking. Producers emit
 `ExplodeOffset`s. **Delete** `exploded:Bool` from `PanelKit`, `BoxMoldCad`,
 `CastingMoldCad` and `SocketFixtureCad`, plus `socket-fixture-exploded.mtrg` and

@@ -13,41 +13,37 @@ import machinekit.tooling.SweptRemoval.RemovalReport;
 import machinekit.tooling.SweptRemoval.RemovalMember;
 
 class PanelKit {
-	public static function assembly(plan:PanelAssemblyRecord, exploded:Bool = false, material:String = "birch plywood"):MachineAssembly {
+	public static function presentation(plan:PanelAssemblyRecord,definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation {
+		PanelAssemblyPlan.validate(plan);
+		var low=new Vector(1e30,1e30,1e30),high=new Vector(-1e30,-1e30,-1e30);
+		for(m in plan.members) {
+			var b=PanelGeometry.bounds(PanelContours.outside(m.panel));
+			for(x in [b.x,b.x+b.width])for(y in [b.y,b.y+b.height])for(z in [0.0,m.panel.stock.measuredThickness]) {
+				var p=F.transformPoint(m.pose,x,y,z);
+				low=new Vector(Math.min(low.x,p.x),Math.min(low.y,p.y),Math.min(low.z,p.z));
+				high=new Vector(Math.max(high.x,p.x),Math.max(high.y,p.y),Math.max(high.z,p.z));
+			}
+		}
+		var separation=high.subtract(low).length()+1;
+		var offsets=new Map<String,materia.assembly.AssemblyDefinition.AssemblyVector>();
+		for(i in 0...plan.members.length) {
+			var m=plan.members[i],d=(i+1)*separation;
+			offsets.set(m.panel.id,{x:m.withdrawal.x*d,y:m.withdrawal.y*d,z:m.withdrawal.z*d});
+		}
+		return ToolingExplode.presentation(definition,"panel-tooling",offsets);
+	}
+
+	public static function assembly(plan:PanelAssemblyRecord, material:String = "birch plywood"):MachineAssembly {
 		PanelAssemblyPlan.validate(plan);
 		var assembly = new MachineAssembly();
-		var separation = 0.0;
-		if (exploded) {
-			var low = new Vector(1e30, 1e30, 1e30),
-				high = new Vector(-1e30, -1e30, -1e30);
-			for (m in plan.members) {
-				var b = PanelGeometry.bounds(PanelContours.outside(m.panel));
-				for (x in [b.x, b.x + b.width])
-					for (y in [b.y, b.y + b.height])
-						for (z in [0.0, m.panel.stock.measuredThickness]) {
-							var p = F.transformPoint(m.pose, x, y, z);
-							low = new Vector(Math.min(low.x, p.x), Math.min(low.y, p.y), Math.min(low.z, p.z));
-							high = new Vector(Math.max(high.x, p.x), Math.max(high.y, p.y), Math.max(high.z, p.z));
-						}
-			}
-			separation = high.subtract(low).length() + 1;
+		for (m in plan.members)
+			assembly.addComponent(m.panel.id, ToolingPanel.fromPlan(m.panel, material), m.pose);
+		for (j in plan.joints) {
+			assembly.addMemberConnector(j.fixedId, materia.tooling.ToolingIds.derive("", j.id, "-fixed"), j.fixedFrame);
+			assembly.addMemberConnector(j.movingId, materia.tooling.ToolingIds.derive("", j.id, "-moving"), j.movingFrame);
+			assembly.addMate(j.id, "fixed", j.fixedId, materia.tooling.ToolingIds.derive("", j.id, "-fixed"), j.movingId,
+				materia.tooling.ToolingIds.derive("", j.id, "-moving"));
 		}
-		for (i in 0...plan.members.length) {
-			var m = plan.members[i], pose = F.compose(F.identity(), m.pose);
-			if (exploded) {
-				pose.x += m.withdrawal.x * (i + 1) * separation;
-				pose.y += m.withdrawal.y * (i + 1) * separation;
-				pose.z += m.withdrawal.z * (i + 1) * separation;
-			}
-			assembly.addComponent(m.panel.id, ToolingPanel.fromPlan(m.panel, material), pose);
-		}
-		if (!exploded)
-			for (j in plan.joints) {
-				assembly.addMemberConnector(j.fixedId, materia.tooling.ToolingIds.derive("", j.id, "-fixed"), j.fixedFrame);
-				assembly.addMemberConnector(j.movingId, materia.tooling.ToolingIds.derive("", j.id, "-moving"), j.movingFrame);
-				assembly.addMate(j.id, "fixed", j.fixedId, materia.tooling.ToolingIds.derive("", j.id, "-fixed"), j.movingId,
-					materia.tooling.ToolingIds.derive("", j.id, "-moving"));
-			}
 		return assembly;
 	}
 

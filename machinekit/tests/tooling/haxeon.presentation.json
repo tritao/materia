@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "tooling-presentation-tests"},
+  "entry": "ToolingPresentationTests",
+  "sourceRoots": ["src", "../../examples/box-mold"],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/presentation"
+}

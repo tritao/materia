@@ -31,21 +31,18 @@ class PresentationRuntimeTests {
     catch(error:Dynamic){Sys.println('Presentation runtime failed: $error');Sys.println(haxe.CallStack.toString(haxe.CallStack.exceptionStack()));return 1;}
   }
   public static function run():Void {
-    var vertices=Bytes.alloc(96),normals=Bytes.alloc(96),indices=Bytes.alloc(48);
-    vertices.setDouble(24,10);vertices.setDouble(56,10);vertices.setDouble(88,10);
-    var corners=[0,2,1,0,1,3,0,3,2,1,2,3];for(i in 0...corners.length)indices.setInt32(i*4,corners[i]);
-    var definition:AssemblyDefinition={schemaVersion:AssemblyDefinitionCodec.VERSION,id:"presentation-test",lengthUnit:"mm",
-      definitions:[{id:"part",connectors:[]}],occurrences:[
-        {id:"base",definition:"part",initialPose:AssemblyFrames.identity()},
-        {id:"cover",definition:"part",initialPose:AssemblyFrames.translation(30,0,0)}],joints:[]};
+    var assembly=new machinekit.assembly.MachineAssembly();
+    var block=machinekit.tooling.ToolingBlock.fromBox({x:0,y:0,z:0,width:10,depth:10,height:10},"steel");
+    assembly.addComponent("base",block,AssemblyFrames.identity());
+    assembly.addComponent("cover",block,AssemblyFrames.translation(30,0,0));
+    var artifact=machinekit.assembly.AssemblyPreview.scene(assembly,"presentation-test");
+    var definition=artifact.assemblyDefinition;if(definition==null)throw "Missing assembly definition";
     var record=materia.presentation.Presentations.assembled(definition);
     record.views.push({id:"inside",label:"See inside",camera:record.views[0].camera,visibility:[
       {select:{occurrence:"cover",subtree:false},mode:Transparent}],sections:[
       {occurrence:null,point:{x:5,y:5,z:5},normal:{x:1,y:1,z:1}}],explode:0,source:Generated("test")});
     record.explode=[{select:{occurrence:"cover",subtree:false},direction:{x:0,y:0,z:1},distance:50,stage:1}];
-    var artifact:SceneArtifactData={metresPerUnit:0.001,lengthUnit:"mm",assemblyDefinition:definition,presentation:record,
-      parts:[{id:"part",name:"Part",red:0.5,green:0.5,blue:0.5,vertexCount:4,indexCount:12,
-        vertices:vertices,normals:normals,indices:indices,faceRanges:[]}]};
+    artifact.presentation=record;
     var dir=app.editor.WorkerAssetPath.resolve("build/presentation-"+Std.random(100000000));FileSystem.createDirectory(dir);
     var source=FileSystem.fullPath(dir)+"/assembly.mtrg";File.saveBytes(source,SceneArtifact.encode(artifact));
     var session=new ProjectDocumentSession(null,false);
@@ -65,6 +62,7 @@ class PresentationRuntimeTests {
     var originalPairs=collision.query(session.scene,session,0.01);
     var originalCollisionKey=@:privateAccess app.SceneCollision.keyOf(session.scene,session);
     var originalArtifact=SceneArtifact.encode(artifact);
+    var originalBom=Json.stringify(assembly.billOfMaterials().lines());
     var controller=viewport.presentation;if(controller==null)throw "Missing controller";
     var fresh=viewport.presentationFrame();if(fresh==null)throw "Missing frame";
     var expected=signature(fresh);
@@ -77,6 +75,18 @@ class PresentationRuntimeTests {
     var moved=viewport.presentationFrame();if(moved==null)throw "Missing exploded frame";
     var cover=moved.poses.get("cover");if(cover==null)throw "Missing cover";
     check(cover.z==50,"Display transforms derive from the cursor");
+    viewport.selectPresentationView("assembled");
+    viewport.setPresentationExplode(1);
+    viewport.updateViewportSize(800,600);
+    viewport.camera.frame(0.03,0,0.05,0.03,0.02,0.02,800/600);
+    var target=viewport.camera.project(0.032,0.002,0.052,800,600);
+    if(target==null)throw "Exploded pick target is behind the camera";
+    check(viewport.pick(target.x,target.y)=="project:cover","Picking uses the exploded display transform");
+    viewport.setSimulationState(true,[],1);
+    check(!viewport.presentationControlsEnabled(),"Simulation disables presentation controls");
+    viewport.setPresentationExplode(0.25);
+    check(controller.cursor.explode==1,"Disabled explode edits cannot change the cursor");
+    viewport.setSimulationState(false,[],2);
     viewport.resetPresentation();var reset=viewport.presentationFrame();if(reset==null)throw "Missing reset frame";
     check(signature(reset)==expected,"Reset yields the fresh-open frame after view and explode changes");
     check(AssemblyDefinitionCodec.encode(definition)==originalDefinition&&AssemblyDefinitionCodec.encodeState(definition,state)==originalState,
@@ -86,6 +96,7 @@ class PresentationRuntimeTests {
       "View changes preserve engineering scene records, collision inputs and source artifact");
     check((@:privateAccess app.SceneCollision.keyOf(session.scene,session))==originalCollisionKey&&collision.query(session.scene,session,0.01)==originalPairs,
       "Presentation preserves collision broadphase input and cached engineering query");
+    check(Json.stringify(assembly.billOfMaterials().lines())==originalBom,"Presentation preserves the exported engineering BOM");
     check(session.document.history.undoCount==0,"Cursor changes create no document edits");
     viewport.selectPresentationView("inside");
     var authored=viewport.capturePresentationView("authored-section","Saved section");

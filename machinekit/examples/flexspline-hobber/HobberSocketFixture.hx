@@ -160,17 +160,36 @@ class HobberSocketFixture {
 			sys.io.File.saveContent(out+"/"+member.panel.id+".svg",cadkit.drawing.Svg.write(drawing));
 			sys.io.File.saveContent(out+"/"+member.panel.id+".dxf",cadkit.drawing.Dxf.write(drawing));
 		}
-		for (mode in ["assembled","exploded"]) {
-			var scene = AssemblyPreview.scene(SocketFixtureCad.assembly(plan,true,mode == "exploded"),"blind-socket-fixture-"+mode);
-			if(mode=="assembled") {
-				var views=SocketFixtureCad.presentation(plan,scene.assemblyDefinition);scene.presentation=views;
-				check(views.defaultView=="assembled"&&views.views.length==3,"Fixture exposes the assembled default and two inspection views");
-			}
-			scene.recipeDiagnostics = ["REVIEW ONLY: nominal catalogue exterior; fixture accuracy, sealing, wall closure and casting process unqualified."];
-			var bytes = SceneArtifact.encode(scene);
-			check(SceneArtifact.decode(bytes).parts.length == scene.parts.length,"Scene save/reopen");
-			sys.io.File.saveBytes(out+"/socket-fixture-"+mode+".mtrg",bytes);
+		var scene = AssemblyPreview.scene(assembly,"blind-socket-fixture");
+		var views=SocketFixtureCad.presentation(plan,scene.assemblyDefinition);scene.presentation=views;
+		check(views.defaultView=="assembled"&&views.views.length==3,"Fixture exposes the assembled default and two inspection views");
+		check(views.explode.length==assembly.components().length,"All fixture parts have presentation offsets");
+		var engineering=assembly.encode(),bom=haxe.Json.stringify(assembly.billOfMaterials().lines());
+		var cursor=materia.presentation.PresentationEvaluator.reset(views);cursor.explode=1;
+		var shown=materia.presentation.PresentationEvaluator.evaluate(scene.assemblyDefinition,assembly.solvedPoses(),views,cursor,"");
+		for(member in assembly.components()) {
+			var actual=shown.poses.get(member.id),source=assembly.solvedPoses().get(member.id);
+			if(actual==null||source==null)throw "Missing fixture display pose";
+			var dx=0.0,dy=0.0,dz=0.0;
+			if(member.id==plan.assembly.members[0].panel.id)dz=-75;
+			else if(member.id==plan.assembly.members[1].panel.id)dz=-35;
+			else if(member.id=="cured-casting"){dx=SocketFixtureCad.cavity(plan).width+150;dz=80;}
+			else if(member.id=="south-wall")dy=-100;
+			else if(member.id=="north-wall")dy=100;
+			else if(member.id=="west-wall")dx=-100;
+			else if(member.id=="east-wall")dx=100;
+			else if(plan.document.input.inserts.filter(i->member.id==materia.tooling.ToolingIds.derive("insert-",i.id)).length==1)dz=60;
+			else dz=-70;
+			check(Math.abs(actual.x-source.x-dx)<1e-8&&Math.abs(actual.y-source.y-dy)<1e-8&&Math.abs(actual.z-source.z-dz)<1e-8,
+				"Slider endpoint preserves the former review displacement: "+member.id);
 		}
+		check(assembly.encode()==engineering&&haxe.Json.stringify(assembly.billOfMaterials().lines())==bom,
+			"Explode evaluation leaves the engineering recipe and exported BOM unchanged");
+		scene.recipeDiagnostics = ["REVIEW ONLY: nominal catalogue exterior; fixture accuracy, sealing, wall closure and casting process unqualified."];
+		var bytes = SceneArtifact.encode(scene);
+		check(SceneArtifact.decode(bytes).parts.length == scene.parts.length,"Scene save/reopen");
+		sys.io.File.saveBytes(out+"/socket-fixture-assembled.mtrg",bytes);
+
 		sys.io.File.saveContent(out+"/review.json",haxe.Json.stringify({status:"Geometry review; not fabrication release",assertions:assertions,
 			initialExactPairs:exactPairs,nominalMixMassKg:mix,releaseBeforeWithdrawalProved:true,validation:validation,
 			fabrication:ToolingReadiness.evaluate(validation),blocking:removal.removal.blocking},null,"  "));

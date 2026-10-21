@@ -44,7 +44,7 @@ with the usual MachineKit native libraries. Example build from the worktree root
 
 Outputs in `build/socket-fixture/`:
 
-- `socket-fixture-assembled.mtrg` and `socket-fixture-exploded.mtrg` for Materia.
+- `socket-fixture-assembled.mtrg` for Materia, with views and an Explode slider.
 - `fixture-plan.json`, portable `fixture.assembly.json`, and `review.json`.
 - `demolding-steps.json`, with screw release before plate withdrawal.
 - DXF, SVG and panel-operation JSON for both locating/bed plates.

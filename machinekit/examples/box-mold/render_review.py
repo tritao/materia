@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the exported CAD triangles in assembled and exploded poses (mm)."""
+"""Render the exported CAD triangles in assembled poses (mm)."""
 import json
 import argparse
 from pathlib import Path
@@ -13,9 +13,9 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--bed-core", action="store_true")
 args = parser.parse_args()
 root = Path(__file__).resolve().parent / ("build/review-bed" if args.bed_core else "build/review")
-fig = plt.figure(figsize=(14, 7))
-for index, name in enumerate(("assembled", "exploded"), 1):
-    ax = fig.add_subplot(1, 2, index, projection="3d")
+fig = plt.figure(figsize=(9, 7))
+for index, name in enumerate(("assembled",), 1):
+    ax = fig.add_subplot(1, 1, index, projection="3d")
     points = []
     for row in json.loads((root / f"{name}-meshes.json").read_text()):
         vertices = np.fromfile(root / (row["id"] + ".vertices"), dtype="<f8").reshape(-1, 3)

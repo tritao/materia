@@ -116,14 +116,13 @@ class BoxMoldPreview {
 		casting.shape.exportStep(dir + "/reconstructed-casting.step");
 		casting.close();
 		var assembled = BoxMoldCad.assembly(p),
-			exploded = BoxMoldCad.assembly(p, true),
 			saved = assembled.encode();
 		MachineAssembly.decode(saved).validate();
 		meshes(assembled, dir, "assembled");
-		meshes(exploded, dir, "exploded");
 		sys.io.File.saveContent(dir + "/mold.assembly.json", saved);
-		sys.io.File.saveBytes(dir + "/mold.mtrg", SceneArtifact.encode(AssemblyPreview.scene(assembled, "box-mold")));
-		sys.io.File.saveBytes(dir + "/mold-exploded.mtrg", SceneArtifact.encode(AssemblyPreview.scene(exploded, "box-mold-exploded")));
+		var scene=AssemblyPreview.scene(assembled,"box-mold");
+		scene.presentation=BoxMoldCad.presentation(p,scene.assemblyDefinition);
+		sys.io.File.saveBytes(dir+"/mold.mtrg",SceneArtifact.encode(scene));
 		sys.io.File.saveContent(dir
 			+ "/procedure.md",
 			"# Box mold geometry review\n\nREVIEW ONLY. Physical qualification remains pending.\n\n"

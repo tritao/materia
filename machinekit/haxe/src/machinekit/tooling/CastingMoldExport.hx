@@ -117,15 +117,13 @@ class CastingMoldExport {
 		var casting = CastingMoldCad.reconstructed(p);
 		step(dir + "/reconstructed-casting.step", casting);
 		var assembled = CastingMoldCad.assembly(p),
-			exploded = CastingMoldCad.assembly(p, true),
 			saved = assembled.encode();
 		var restored = MachineAssembly.decode(saved);
 		restored.validate();
 		if (restored.encode() != saved)
 			throw "Assembly recipe did not restore exactly";
 		text(dir + "/mold.assembly.json", saved);
-		scene(dir, "mold", assembled);
-		scene(dir, "mold-exploded", exploded);
+		scene(dir, "mold", assembled, p);
 		var coreList = [
 			for (c in p.cores)
 				c.id + ": " + c.foamLayers.length + " layers, carrier " + c.carrierId + ", shared " + c.bridgeId
@@ -156,8 +154,10 @@ class CastingMoldExport {
 			"7. Lift/flip only with qualified points/equipment. Replicate the designated rail/bearing seats against qualified masters; grout the column joint using its approved gap, jacking and cure-before-torque process. These allowances and processes are pending, and source geometry was not altered.\n");
 	}
 
-	static function scene(dir:String, id:String, a:MachineAssembly):Void {
-		sys.io.File.saveBytes(dir + "/" + id + ".mtrg", SceneArtifact.encode(AssemblyPreview.scene(a, id)));
+	static function scene(dir:String, id:String, a:MachineAssembly, plan:CastingMoldPlan):Void {
+		var data=AssemblyPreview.scene(a,id);
+		data.presentation=CastingMoldCad.presentation(plan,data.assemblyDefinition);
+		sys.io.File.saveBytes(dir+"/"+id+".mtrg",SceneArtifact.encode(data));
 		var rows:Array<Dynamic> = [], poses = a.solvedPoses();
 		for (row in a.components()) {
 			var mesh = AssemblyPreview.part(row.id, row.id, row.component.geometry(), row.component.materialId),

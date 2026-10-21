@@ -116,6 +116,11 @@ class EditorPerspectiveViewport implements View {
     controller.reset();presentationCameraDirty=true;presentationTarget=null;inspectionZoom=1;orbitPivot=null;
     clearHover();lightingRevision++;host.requestFrame();
   }
+  public function presentationControlsEnabled():Bool return !simulationActive;
+  public function setPresentationExplode(value:Float):Void {
+    if(presentation==null||simulationActive)return;
+    presentation.setExplode(value);clearHover();host.requestFrame();
+  }
   public function presentationZoom():Float return inspectionZoom;
   public function setPresentationZoom(zoom:Float):Void {
     var next=Math.max(0.2,Math.min(8,zoom));

@@ -156,6 +156,16 @@ class PanelNativeTests {
 			if (restoredPose == null)
 				throw "Missing restored pose";
 			near(restoredPose.z, plan.members[1].pose.z, "assembly placement survives reconstruction");
+			var definition=machinekit.assembly.AssemblyPreview.scene(restored,"panel-presentation").assemblyDefinition;
+			var presentation=PanelKit.presentation(plan,definition);
+			var cursor=materia.presentation.PresentationEvaluator.reset(presentation);cursor.explode=1;
+			var shown=materia.presentation.PresentationEvaluator.evaluate(definition,restored.solvedPoses(),presentation,cursor,"");
+			check(presentation.explode.length==2,"Both panels have explode offsets");
+			check(restored.encode()==saved,"Presentation evaluation preserves the jointed engineering recipe");
+			var first=shown.poses.get(pair.fixed.id),second=shown.poses.get(pair.moving.id);
+			if(first==null||second==null)throw "Missing exploded panel poses";
+			check(Math.abs(first.x-plan.members[0].pose.x)+Math.abs(first.y-plan.members[0].pose.y)+Math.abs(first.z-plan.members[0].pose.z)>1,
+				"Explode displaces the fixed panel for review without deleting its joint");
 		}
 		var floor = PanelJoints.blank("fixture-floor", 120, 120, stock);
 		var seat = PanelJoints.operation("seat", Pocket, PanelContours.relievedRectangle(50, 50, 40, 40, 3), 8, 6, MachiningSide.PositiveZ, false, 6);

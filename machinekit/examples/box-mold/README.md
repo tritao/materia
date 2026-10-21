@@ -12,7 +12,7 @@ python3 machinekit/examples/box-mold/render_review.py
 python3 machinekit/examples/box-mold/render_review.py --bed-core
 ```
 
-Outputs are under `build/review/` or `build/review-bed/` (ignored): assembled/exploded `.mtrg`, portable
+Outputs are under `build/review/` or `build/review-bed/` (ignored): a single `mold.mtrg` with an Explode slider, portable
 assembly recipes, the versioned mold record and geometric review, local panel
 STEP/SVG/DXF/operation records, local EPS STEP/ruled cutting definition/drawings,
 reconstructed casting STEP and an ordered procedure. The optional PNG renderer

@@ -82,102 +82,88 @@ class BoxMoldCad {
 	static function insert(p:MoldPlan):CastInsert
 		return ToolingInsertCad.component(p.document.input.inserts[0]);
 
-	public static function assembly(p:MoldPlan, exploded:Bool = false):MachineAssembly {
+	public static function presentation(p:MoldPlan,definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation {
+		var b=p.cavity,offsets=new Map<String,materia.assembly.AssemblyDefinition.AssemblyVector>();
+		for(m in p.panels.members)offsets.set(m.panel.id,switch m.panel.id {
+			case "bed": {x:0.0,y:0.0,z:-b.height*0.6};
+			case "south": {x:0.0,y:-b.depth*0.9,z:0.0};
+			case "north": {x:0.0,y:b.depth*0.9,z:0.0};
+			case "east": {x:b.width*0.9,y:0.0,z:0.0};
+			case "west": {x:-b.width*0.9,y:0.0,z:0.0};
+			case _: throw "Unknown box template panel";
+		});
+		for(i in 0...p.supportPanels.length)offsets.set(p.supportPanels[i].panel.id,{x:0,y:0,z:(i+1)*b.height*0.5});
+		for(c in p.cores) {
+			offsets.set(c.id,{x:0,y:0,z:b.height*1.3});
+			if(c.support.foot!=null)offsets.set(materia.tooling.ToolingIds.derive("",c.id,"-foot"),{x:0,y:0,z:-b.height});
+		}
+		offsets.set(p.document.input.inserts[0].id,{x:b.width*1.4,y:-b.depth*1.4,z:0});
+		return ToolingExplode.presentation(definition,"box-mold",offsets);
+	}
+
+	public static function assembly(p:MoldPlan):MachineAssembly {
 		BoxMoldPlanner.validate(p);
-		var b = p.cavity, a = exploded ? new MachineAssembly() : PanelKit.assembly(p.panels, false, "coated particleboard");
-		if (exploded)
-			for (m in p.panels.members) {
-				var pose = F.compose(F.identity(), m.pose);
-				switch m.panel.id {
-					case "bed":
-						pose.z -= b.height * 0.6;
-					case "south":
-						pose.y -= b.depth * 0.9;
-					case "north":
-						pose.y += b.depth * 0.9;
-					case "east":
-						pose.x += b.width * 0.9;
-					case "west":
-						pose.x -= b.width * 0.9;
-					default:
-						throw "Unknown box template panel";
-				}
-				a.addComponent(m.panel.id, ToolingPanel.fromPlan(m.panel, "coated particleboard"), pose);
-			}
+		var b = p.cavity, a = PanelKit.assembly(p.panels, "coated particleboard");
 		for (index in 0...p.supportPanels.length) {
 			var m = p.supportPanels[index],
 				pose = F.compose(F.identity(), m.pose);
-			if (exploded)
-				pose.z += (index + 1) * b.height * 0.5;
 			a.addComponent(m.panel.id, ToolingPanel.fromPlan(m.panel), pose);
 		}
 		for (c in p.cores) {
 			var block = c.cutting.block,
 				pose = F.compose(F.identity(), c.cutting.stockToMold);
-			if (exploded)
-				pose.z += b.height * 1.3;
 			var foot = c.support.foot;
 			if (foot != null) {
 				var fb = foot.cutting.block,
 					fp = F.compose(F.identity(), foot.cutting.stockToMold);
-				if (exploded)
-					fp.z -= b.height;
 				a.addComponent(materia.tooling.ToolingIds.derive("", c.id, "-foot"), ToolingBlock.fromBox(fb, "EPS tooling"), fp);
 			}
-			if (!exploded)
-				for (h in c.support.hardware) {
-					if (h.kind == SupportHardwareKind.LocatingPin) {
-						a.addComponent(h.id, new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length)), h.pose);
-					} else {
-						ToolingHardwareCad.throughBolt(a, h.id, h.diameter, h.length, h.pose);
-					}
+			for (h in c.support.hardware) {
+				if (h.kind == SupportHardwareKind.LocatingPin) {
+					a.addComponent(h.id, new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length)), h.pose);
+				} else {
+					ToolingHardwareCad.throughBolt(a, h.id, h.diameter, h.length, h.pose);
 				}
+			}
 			a.addComponent(c.id, ToolingBlock.fromBox(block, "EPS tooling"), pose);
 		}
 		var i = p.document.input.inserts[0],
 			pose = F.compose(p.document.setup.sourceToMold, i.pose);
-		if (exploded) {
-			pose.x += b.width * 1.4;
-			pose.y -= b.depth * 1.4;
-		}
 		a.addComponent(i.id, insert(p), pose);
-		if (!exploded) {
-			var fixture = p.fixtures[0],
-				f = fixture.mountingFace,
-				t = p.document.recipe.panel.measuredThickness;
-			for (fixing in fixture.fixings) {
-				var hole = materia.tooling.casting.InsertFixturePlanner.holes(i).filter(h -> h.id == fixing.sourceHoleId)[0];
-				var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
-				ToolingHardwareCad.fixtureScrew(a, fixing.hardwareId, hole, t + materia.tooling.casting.InsertFixturePlanner.minimumInsertion(hole),
-					F.fromRotationMatrix(fixing.entry.x, fixing.entry.y, b.z - t, [1, 0, 0, 0, -1, 0, 0, 0, -1]),fixing.entry);
-				var penetration = p.penetrations.filter(v -> v.sourceHoleId == hole.id && v.insertId == i.id)[0];
-				var plug = penetration.plug;
-				if (plug != null) {
-					if (plug.materialSpec != "steel")
-						throw "Unsupported nominal bore plug material";
-					a.addComponent(materia.tooling.ToolingIds.derive("resin-plug-", hole.id),
-						machinekit.standard.SocketSetScrew.forThread(machinekit.structural.InsertHoles.threadSpec(thread).mating(), plug.length),
-						F.compose(fixing.entry, F.translation(0, 0, hole.depth - plug.length)));
-				}
+		var fixture = p.fixtures[0],
+			f = fixture.mountingFace,
+			t = p.document.recipe.panel.measuredThickness;
+		for (fixing in fixture.fixings) {
+			var hole = materia.tooling.casting.InsertFixturePlanner.holes(i).filter(h -> h.id == fixing.sourceHoleId)[0];
+			var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
+			ToolingHardwareCad.fixtureScrew(a, fixing.hardwareId, hole, t + materia.tooling.casting.InsertFixturePlanner.minimumInsertion(hole),
+				F.fromRotationMatrix(fixing.entry.x, fixing.entry.y, b.z - t, [1, 0, 0, 0, -1, 0, 0, 0, -1]),fixing.entry);
+			var penetration = p.penetrations.filter(v -> v.sourceHoleId == hole.id && v.insertId == i.id)[0];
+			var plug = penetration.plug;
+			if (plug != null) {
+				if (plug.materialSpec != "steel")
+					throw "Unsupported nominal bore plug material";
+				a.addComponent(materia.tooling.ToolingIds.derive("resin-plug-", hole.id),
+					machinekit.standard.SocketSetScrew.forThread(machinekit.structural.InsertHoles.threadSpec(thread).mating(), plug.length),
+					F.compose(fixing.entry, F.translation(0, 0, hole.depth - plug.length)));
 			}
-			for (mask in fixture.boreMasks) {
-				var hole = materia.tooling.casting.InsertFixturePlanner.holes(i).filter(h -> h.id == mask.sourceHoleId)[0];
-				a.addComponent(mask.hardwareId, ToolingPin.boreMask(hole, mask.plugLength), F.compose(pose, hole.frame));
-				if (mask.farEndId != null)
-					a.addComponent(mask.farEndId, ToolingPin.boreMask(hole, mask.plugLength),
-						F.compose(F.compose(pose, hole.frame), F.translation(0, 0, hole.depth - (cast mask.plugLength : Float))));
-			}
-
-			var poses = a.solvedPoses(), bedPose = poses.get("bed");
-			for (row in a.components())
-				if (p.panels.members.filter(m -> m.panel.id == row.id).length == 0) {
-					var local = F.compose(F.inverse(bedPose), poses.get(row.id));
-					a.addMemberConnector("bed", materia.tooling.ToolingIds.derive("", row.id, "-datum"), local);
-					a.addMemberConnector(row.id, "tooling-datum", F.identity());
-					a.addMate(materia.tooling.ToolingIds.derive("", row.id, "-positioned"), "fixed", "bed",
-						materia.tooling.ToolingIds.derive("", row.id, "-datum"), row.id, "tooling-datum");
-				}
 		}
+		for (mask in fixture.boreMasks) {
+			var hole = materia.tooling.casting.InsertFixturePlanner.holes(i).filter(h -> h.id == mask.sourceHoleId)[0];
+			a.addComponent(mask.hardwareId, ToolingPin.boreMask(hole, mask.plugLength), F.compose(pose, hole.frame));
+			if (mask.farEndId != null)
+				a.addComponent(mask.farEndId, ToolingPin.boreMask(hole, mask.plugLength),
+					F.compose(F.compose(pose, hole.frame), F.translation(0, 0, hole.depth - (cast mask.plugLength : Float))));
+		}
+		var poses = a.solvedPoses(), bedPose = poses.get("bed");
+		for (row in a.components())
+			if (p.panels.members.filter(m -> m.panel.id == row.id).length == 0) {
+				var local = F.compose(F.inverse(bedPose), poses.get(row.id));
+				a.addMemberConnector("bed", materia.tooling.ToolingIds.derive("", row.id, "-datum"), local);
+				a.addMemberConnector(row.id, "tooling-datum", F.identity());
+				a.addMate(materia.tooling.ToolingIds.derive("", row.id, "-positioned"), "fixed", "bed",
+					materia.tooling.ToolingIds.derive("", row.id, "-datum"), row.id, "tooling-datum");
+			}
 		return a;
 	}
 
