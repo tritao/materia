@@ -53,6 +53,7 @@ static_assert(sizeof(StrokeVertex) == sizeof(float) * 8);
 
 struct StrokeUniformData {
     std::array<float, 4> viewport_width_height_half_width{};
+    std::array<float, 4> depth_unprojection{};
 };
 
 struct InstanceData {
@@ -912,7 +913,7 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
             (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_VERTEX,
                                                  sizeof(StrokeUniformData))) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 3, 0, "stroke_view_params",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 2)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(float) * 4)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 0, 0, "stroke_color_params",
@@ -1014,8 +1015,14 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
     const auto &stroke_pipeline = state.pipelines[pipeline_slot(samples)].stroke;
     const auto width = std::max(state.viewport_width, 1u);
     const auto height = std::max(state.viewport_height, 1u);
-    const StrokeUniformData viewport{{static_cast<float>(width), static_cast<float>(height),
-                                       0.85f, 0.0f}};
+    StrokeUniformData viewport{{static_cast<float>(width), static_cast<float>(height),
+                                 0.85f, 0.0f}};
+    if (!plan.clip_planes().empty()) {
+        std::array<float, 16> inverse{};
+        if (invert_matrix(plan.view_projection(), inverse))
+            for (unsigned row = 0; row < 4; ++row)
+                viewport.depth_unprojection[row] = inverse[8 + row];
+    }
     const std::array<float, 4> color{0.035f, 0.045f, 0.055f, 1.0f};
     const auto clip_data = clip_uniform_data(plan);
     for (const auto &batch : state.batches) {

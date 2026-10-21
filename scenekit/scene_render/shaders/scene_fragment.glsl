@@ -123,8 +123,13 @@ void main() {
     vec4 texture_color = cap_surface ? vec4(1.0) : texture(base_color_texture, vertex_texcoord);
     vec3 N = normalize(vertex_normal);
     if ((gl_FrontFacing ? 1.0 : -1.0) * face_orientation < 0.0) N = -N;
+    float map_variance = 0.0;
     if (!cap_surface && texture_flags.x > 0.5) {
         vec3 mapped = texture(normal_texture, vertex_texcoord).xyz * 2.0 - 1.0;
+        // Mips retain the mean unit normal. Its lost length measures unresolved
+        // normal-map curvature (Toksvig); normalizing each mip would erase it.
+        float mean_length = clamp(length(mapped), 0.001, 1.0);
+        map_variance = max(0.0, (1.0 - mean_length) / mean_length - 0.005);
         vec3 dp1 = dFdx(world_position), dp2 = dFdy(world_position);
         vec2 duv1 = dFdx(vertex_texcoord), duv2 = dFdy(vertex_texcoord);
         vec3 T = cross(dp2, N) * duv1.x + cross(N, dp1) * duv2.x;
@@ -161,6 +166,12 @@ void main() {
     float metallic = clamp(material_params.x * metal_rough.b, 0.0, 1.0);
     float roughness = clamp(material_params.y * metal_rough.g, 0.045, 1.0);
     if (lighting_mode.x > 0.5) roughness = max(roughness, ao_params.w);
+    // Isotropic normal filtering (Tokuyoshi/Kaplanyan). Filter alpha^2, not
+    // perceptual roughness, and share the result with GGX and studio reflections.
+    vec3 normal_dx = dFdx(N), normal_dy = dFdy(N);
+    float normal_variance = 0.25 * (dot(normal_dx, normal_dx) + dot(normal_dy, normal_dy));
+    float kernel_alpha2 = min(2.0 * (normal_variance + map_variance), 0.25);
+    roughness = sqrt(sqrt(min(1.0, pow(roughness, 4.0) + kernel_alpha2)));
     float alpha_ggx = roughness * roughness;
     float alpha2 = alpha_ggx * alpha_ggx;
     vec3 V = camera_position.w > 0.5

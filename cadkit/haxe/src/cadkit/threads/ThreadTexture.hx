@@ -7,7 +7,7 @@ import materia.project.ThreadSpecData.ThreadProfile;
 /**
  * A cosmetic thread texture for `ThreadSurface` coordinates: analytic flanks and root shading for the thread's
  * profile, as a tangent-space normal map or a colour (shade) map, RGBA8 with explicit mip levels whose normals
- * are renormalized. One period of the texture is one turn per start along u and one pitch along v.
+ * retain their mean length for specular antialiasing. One period of the texture is one turn per start along u and one pitch along v.
  */
 class ThreadTexture {
 	public static inline var SIZE:Int = 128;
@@ -68,9 +68,11 @@ class ThreadTexture {
 						}
 					var offset = next + (y * side + x) * 4;
 					if (normal) {
-						var length = Math.sqrt(value[0] * value[0] + value[1] * value[1] + value[2] * value[2]);
+						// Preserve the mean vector, including variance accumulated at finer
+						// levels. The shader normalizes its direction and filters roughness
+						// from its length; renormalizing here loses subpixel flank detail.
 						for (axis in 0...3)
-							result.set(offset + axis, channel(value[axis] / length));
+							result.set(offset + axis, channel(value[axis] / 4));
 					} else
 						for (axis in 0...3)
 							result.set(offset + axis, Std.int(Math.round(value[axis] / 4)));

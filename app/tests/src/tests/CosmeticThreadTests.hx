@@ -108,10 +108,23 @@ class CosmeticThreadTests {
     for (pixel in 0...Std.int(normal.length / 4)) {
       var offset = pixel * 4;
       var x = normal.get(offset) / 127.5 - 1, y = normal.get(offset + 1) / 127.5 - 1, z = normal.get(offset + 2) / 127.5 - 1;
-      if (Math.abs(x * x + y * y + z * z - 1) >= 0.02) normalized = false;
+      if (pixel < 128*128 && Math.abs(x * x + y * y + z * z - 1) >= 0.02) normalized = false;
       minimum = Std.int(Math.min(minimum, color.get(offset))); maximum = Std.int(Math.max(maximum, color.get(offset)));
     }
-    check(normalized, "each mip normal stays normalized");
+    check(normalized, "base level normals stay normalized");
+    var tail=normal.length-4;
+    var meanZ=normal.get(tail+2)/127.5-1;
+    check(meanZ>0.5&&meanZ<0.9,"last thread mip retains unresolved flank variance");
+    // Every mip stores the vector average of its four children, never their normalized direction.
+    var previous=0,next=128*128*4,side=64;
+    while(side>0) {
+      for(y in 0...side)for(x in 0...side)for(axis in 0...3) {
+        var sum=0;for(dy in 0...2)for(dx in 0...2)
+          sum+=normal.get(previous+((y*2+dy)*side*2+x*2+dx)*4+axis);
+        check(Math.abs(normal.get(next+(y*side+x)*4+axis)-sum/4)<=0.51,"mip retains mean normal and inherited variance");
+      }
+      previous=next;next+=side*side*4;side=Std.int(side/2);
+    }
     check(minimum == 245 && maximum == 255, "roots are slightly darker than the part colour");
     check(!sameBytes(CosmeticThreadTexture.pixels(new ThreadSpec("TR6x1", 6, 1, 1, RightHand, false, null, Trapezoidal).data(), true), normal), "trapezoidal flanks differ from metric flanks");
   }
@@ -161,7 +174,7 @@ class CosmeticThreadTests {
     check(!sameBytes(normal,CosmeticThreadTexture.pixels(new ThreadSpec("M16x5",16,5).data(),true)), "rounded groove differs from metric flanks");
     for (pixel in 0...Std.int(normal.length/4)) {
       var offset = pixel*4, x = normal.get(offset)/127.5-1, y = normal.get(offset+1)/127.5-1, z = normal.get(offset+2)/127.5-1;
-      check(Math.abs(x*x+y*y+z*z-1)<0.02,"ball race mip normals normalized");
+      check(pixel<128*128 ? Math.abs(x*x+y*y+z*z-1)<0.02 : x*x+y*y+z*z<=1.02,"ball race base normals unit; mips retain mean length");
     }
   }
 

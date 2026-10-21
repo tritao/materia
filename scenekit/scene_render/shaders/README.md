@@ -29,7 +29,17 @@ extend depth only away from the eye, so their round coverage cannot pull a
 hidden edge through an occluding face. Keep depth interpolation in rasterization
 for per-sample MSAA depth tests; a fragment-depth override evaluates at the
 fragment center and can leak under closely spaced sloping surfaces. The stroke
-pipeline uses only a constant depth-unit bias to resolve coplanar ties.
+pipeline uses only a constant depth-unit bias to resolve coplanar ties. At a
+section, its clipping predicate retreats into the kept half-space by the ribbon
+and antialiasing footprint (`half_width + 1` pixels), plus the depth tie budget.
+The plane-distance derivatives convert that footprint to plane units; the inverse
+view-projection's depth column, computed once on the CPU, converts two D24 depth
+units to a conservative world displacement. This also covers a nearly coplanar
+edge parallel to the plane, where plane-distance derivatives vanish. Both terms
+scale with the plane equation, so no world-unit epsilon or section displacement
+is needed. This prevents expanded, depth-biased B-rep edge remnants from reaching
+an adjacent cap. Ordinary coplanar edge/face ties away from cuts keep the original
+bias. Synthetic section outlines would require their own boundary strokes.
 
 Ambient occlusion samples world-space surface positions from an on-demand RGBA32F
 prepass target. Its alpha channel marks valid samples. This avoids reconstructing
@@ -87,3 +97,47 @@ The presentation schema is unchanged.
 one-plane caps, hollow cores, overlapping instances, mirrored transforms,
 transparent/double-sided/open exclusions, plane-depth picks, AO, and hidden edges
 and silhouette coverage with MSAA. Exact B-rep drawing sections remain separate.
+
+## Specular antialiasing
+
+Before GGX and `studio_panels`, the fragment shader filters squared microfacet
+roughness (`alpha² = perceptual_roughness⁴`) using screen-space derivatives of the
+final shading normal. Following [Tokuyoshi and Kaplanyan's normal-based geometric
+filter](https://yusuketokuyoshi.com/papers/2019/ImprovedGeometricSpecularAA.pdf),
+normal variance is `0.25 * (|dN/dx|² + |dN/dy|²)`; the added kernel is twice the
+variance, clamped to 0.25. The filtered perceptual roughness is the fourth root
+of `min(1, alpha² + kernel)`. Both point-light GGX and studio panel/room reflections
+use that same value. Constant normals add zero geometric roughness.
+
+Cosmetic `ThreadTexture` mips retain the **mean unit-normal vector**, rather than
+renormalizing each mip. Its shortened length preserves unresolved flank variance
+through every level, including the final 1×1 mip. The shader adds a Toksvig-style
+`(1 - length) / length` variance term before filtering; a 0.005 dead band absorbs
+RGBA8 unit-normal quantization. It normalizes the mapped shading direction as
+usual. No additional texture or material field is required, and colour/shade mip
+filtering stays unchanged.
+
+`scene_render_specular_aa` renders a geometric threaded nut and a small fillet at
+three distances through seven small camera moves, with 1× and 4× MSAA. It bounds
+mean brightness changes, the fraction of large thread-crest changes and individual
+far-fillet jumps. Silhouette pixels are excluded; changing visibility at thread
+crests remains in the measurement. A flat face checks stable highlights, and a
+constant-normal map with shortened mean length checks that mip variance reaches
+studio reflection roughness. Removing filtering fails that normal-map regression
+and increases the far-fillet jumps beyond their bound. The before/after flat-face
+captures were pixel-identical at all three distances. `CosmeticThreadTests` checks
+that each mip preserves its children's vector mean and inherited variance.
+
+`scene_render_sections` also checks `TouchingFacetsCapStrokeTie`: a faceted blue
+insert touches an orange shell and both are cut by one plane. Toggling feature
+strokes must change no cap pixels in orthographic or perspective views at 1×/4×
+MSAA, including a retained edge parallel and nearly coplanar with the cut.
+`OrdinaryCoplanarEdgeTie` confirms that an unsectioned face's edge still wins.
+
+The review close-up below uses the actual renderer, a geometric helical nut bore,
+steel roughness 0.34 and the editor's Studio panels (the motion regressions use
+roughness 0.06 and narrower panels as a stress case). Reproduce the capture by
+running `nativekit_scene_render_specular_tests <existing-or-new-output-directory>`;
+it writes `threaded-nut-closeup.ppm` alongside the distance frames.
+
+![Thread close-up with specular antialiasing](../tests/images/specular-aa-threaded-nut.png)

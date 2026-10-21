@@ -164,6 +164,54 @@ void open_mesh_is_uncapped(nkgpu_renderer renderer) {
     std::puts("section caps: UndeclaredOpenMeshIsUncapped passed");
 }
 
+// Touching orange shell / faceted blue insert, cut across longitudinal B-rep edges.
+// Switching only stroke_segments is the renderer equivalent of Feature edges off/on.
+void touching_facets_do_not_stroke_caps(nkgpu_renderer renderer) {
+    Fixture f;f.box(.85f,-.8f,.8f);
+    auto prism=[&](bool inward) {
+        for(int i=0;i<12;++i) {
+            float a=i*6.2831853f/12,b=(i+1)*6.2831853f/12;
+            P p{.45f*std::cos(a),.45f*std::sin(a),-.8f},q{.45f*std::cos(b),.45f*std::sin(b),-.8f};
+            P r=q,t=p;r[2]=t[2]=.8f;
+            if(inward)f.quad(t,r,q,p);else f.quad(p,q,r,t);
+            P low{0,0,-.8f},high{0,0,.8f};
+            if(inward){f.quad(low,p,q,low);f.quad(high,r,t,high);}
+            else {f.quad(low,q,p,low);f.quad(high,t,r,high);}
+        }
+    };
+    prism(true);
+    auto insert=f.scene->reserve_geometry_id();f.scene->geometry_store().create(insert).edit_payload().closed=true;
+    f.geometry=insert;prism(false);auto &mesh=*f.scene->geometry_store().find(insert);
+    mesh.bounds={{{-.45f,-.45f,-.8f}},{{.45f,.45f,.8f}},true};
+    auto blue=f.scene->reserve_material_id();MaterialState color;color.base_color={.2f,.4f,.8f,1};f.scene->material_store().create(blue).edit_state()=color;
+    auto node=f.scene->reserve_node_id();ChangeSet changes;Transaction create(f.scene);create.add_create(node);assert(f.scene->commit(create,changes)==NKS_OK);create.close();
+    Transaction configure(f.scene);configure.add_geometry(node,insert);configure.add_material(node,blue);assert(f.scene->commit(configure,changes)==NKS_OK);configure.close();
+    f.view.camera.view_projection={1,0,-.25f,0,0,1,0,0,.5f,0,-.5f,0,0,0,0,1};
+    f.view.clip_planes={{{{0,0,-1}},0,true}};NativeKitGpuExecutor gpu(renderer);
+    for(bool perspective:{false,true})for(unsigned samples:{1u,4u}) {
+        f.view.camera.view_projection[11]=perspective?-.25f:0;
+        gpu.set_sample_count(samples);std::vector<std::uint8_t> plain,edged;
+        mesh.edit_payload().stroke_segments.clear();auto plan=f.plan();
+        assert(gpu.capture_rgba8(plan,f.scene->snapshot(),192,192,{0,0,0,0},plain)==NKGPU_OK);
+        // A retained edge parallel and almost coplanar with the cut exercises
+        // constant depth bias even when the plane-distance derivatives are zero.
+        mesh.edit_payload().stroke_segments.push_back({{-.2f,0,-1e-8f},{.2f,0,-1e-8f},0});
+        for(int i=0;i<12;++i){float a=i*6.2831853f/12;mesh.edit_payload().stroke_segments.push_back({{.45f*std::cos(a),.45f*std::sin(a),-.8f},{.45f*std::cos(a),.45f*std::sin(a),.8f},0});}
+        plan=f.plan();assert(gpu.capture_rgba8(plan,f.scene->snapshot(),192,192,{0,0,0,0},edged)==NKGPU_OK);
+        int changed=0;for(size_t i=0;i<plain.size();++i)changed+=plain[i]!=edged[i];
+        std::printf("TouchingFacetsCapStrokeTie perspective=%d samples=%u changed channels=%d\n",perspective,samples,changed);std::fflush(stdout);
+        for(size_t i=0;i<plain.size();i+=4)if(!std::equal(plain.begin()+i,plain.begin()+i+4,edged.begin()+i))
+            std::printf("changed (%zu,%zu) plain=%d,%d,%d,%d edged=%d,%d,%d,%d\n",i/4%192,i/4/192,plain[i],plain[i+1],plain[i+2],plain[i+3],edged[i],edged[i+1],edged[i+2],edged[i+3]);
+        std::fflush(stdout);assert(plain==edged);
+    }
+    // Outside caps, an ordinary coplanar surface edge must retain its tie-break.
+    f.view.clip_planes.clear();mesh.edit_payload().stroke_segments.clear();auto plan=f.plan();std::vector<std::uint8_t> plain,edged;
+    assert(gpu.capture_rgba8(plan,f.scene->snapshot(),192,192,{0,0,0,0},plain)==NKGPU_OK);
+    mesh.edit_payload().stroke_segments.push_back({{-.2f,0,.8f},{.2f,0,.8f},0});plan=f.plan();
+    assert(gpu.capture_rgba8(plan,f.scene->snapshot(),192,192,{0,0,0,0},edged)==NKGPU_OK);assert(plain!=edged);
+    std::puts("section caps: TouchingFacetsCapStrokeTie and OrdinaryCoplanarEdgeTie passed");
+}
+
 int main() {
     nk_init_options init{};init.struct_size=sizeof(init);init.api_version=NK_API_VERSION;assert(nk_init(&init)==NK_OK);
     nk_window_options options{};options.struct_size=sizeof(options);options.width=96;options.height=96;options.title="Section caps";
@@ -171,6 +219,6 @@ int main() {
     assert(nkgpu_surface_create(window,96,96,&surface)==NKGPU_OK);bool ready=false;
     for(int i=0;i<500&&!ready;++i){nk_event event{};event.struct_size=sizeof(event);assert(nk_poll_event(&event)==NK_OK);ready=event.kind==NK_EVENT_SURFACE_READY&&event.source==surface;nk_event_release(&event);std::this_thread::sleep_for(std::chrono::milliseconds(1));}
     assert(ready&&nkgpu_renderer_create(surface,&renderer)==NKGPU_OK);
-    one_plane_and_picking(renderer);two_plane_corner_both_surface_hits_clipped(renderer);cavity_in_front_of_back_surface(renderer);hollow_core(renderer);occluded_crossings_and_material_exclusions(renderer);overlapping_instances_keep_independent_parity(renderer);open_mesh_is_uncapped(renderer);
+    touching_facets_do_not_stroke_caps(renderer);one_plane_and_picking(renderer);two_plane_corner_both_surface_hits_clipped(renderer);cavity_in_front_of_back_surface(renderer);hollow_core(renderer);occluded_crossings_and_material_exclusions(renderer);overlapping_instances_keep_independent_parity(renderer);open_mesh_is_uncapped(renderer);
     assert(nkgpu_renderer_destroy(renderer)==NKGPU_OK);assert(nkgpu_surface_destroy(surface)==NKGPU_OK);assert(nk_window_destroy(window)==NK_OK);nk_shutdown();
 }
