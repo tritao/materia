@@ -199,7 +199,9 @@ class EditorPerspectiveViewport implements View {
   public var solvePresentationJoints:Null<Map<String,Float>->Map<String,AssemblyFrame>> = null;
   public function selectPresentationProcedure(id:Null<String>):Void {
     if(presentation==null||simulationActive)return;
-    presentation.selectProcedure(id);presentationProcedureChanged();
+    presentation.selectProcedure(id);
+    if(id!=null)presentationControlsExpanded=true;
+    presentationProcedureChanged();
   }
   public function nextPresentationStep():Void {
     if(presentation==null||simulationActive)return;
@@ -221,6 +223,8 @@ class EditorPerspectiveViewport implements View {
     var step=controller.cursor.step,changed=controller.advance(seconds);
     if(changed){if(controller.cursor.step!=step)presentationCameraDirty=true;clearHover();host.requestFrame();}return changed;
   }
+  /** Session-only disclosure; keep the default viewport clear for inspecting the assembly. */
+  public var presentationControlsExpanded:Bool = false;
   public function presentationControlsEnabled():Bool return !simulationActive;
   public function setPresentationExplode(value:Float):Void {
     if(presentation==null||simulationActive)return;

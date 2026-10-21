@@ -29,6 +29,16 @@ class PresentationControls {
       select.accessibilityLabel="Assembly view";
       rows.push(new KeyedView("views",select));
       select.enabled=viewport.presentationControlsEnabled();
+      var expanded=viewport.presentationControlsExpanded||viewport.presentationOffsetEditing();
+      var disclosure=new Button(expanded?"Hide controls":"Explode & procedures",null,()->{
+        viewport.presentationControlsExpanded=!expanded;changed();
+      },key+"-disclosure");
+      disclosure.enabled=!viewport.presentationOffsetEditing();
+      rows.push(new KeyedView("disclosure",disclosure));
+      if(!expanded) {
+        var compactStyle=new LayoutStyle();compactStyle.width=LayoutAxis.grow();compactStyle.childGap=4;
+        return new Column(key,rows,compactStyle);
+      }
       if(controller.record.explode.length>0) {
         rows.push(new KeyedView("explode-label",new Text("Explode · "+Std.int(controller.cursor.explode*100)+"%")));
         var slider=new Slider(key+"-explode","Explode",controller.cursor.explode,0,1,0.01,
