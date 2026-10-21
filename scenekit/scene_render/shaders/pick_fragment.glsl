@@ -3,6 +3,7 @@
 
 in vec4 vertex_pick_color;
 in vec3 world_position;
+flat in float face_orientation;
 flat in float vertex_face_id;
 uniform vec4 clip_planes[32];
 uniform vec4 clip_plane_count;
@@ -12,6 +13,8 @@ layout(location=2) out vec4 fragment_depth;
 uniform vec4 pick_output;
 
 void main() {
+    // Honour material sidedness, including mirrored instances in the same batch.
+    if (pick_output.y < 0.5 && (gl_FrontFacing ? 1.0 : -1.0) * face_orientation < 0.0) discard;
     for (int index = 0; index < 32; ++index) {
         if (index >= int(clip_plane_count.x))
             break;

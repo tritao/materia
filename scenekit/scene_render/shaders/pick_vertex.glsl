@@ -11,12 +11,14 @@ layout(location=5) in vec4 pick_color;
 uniform mat4 view_projection;
 out vec4 vertex_pick_color;
 out vec3 world_position;
+flat out float face_orientation;
 flat out float vertex_face_id;
 
 void main() {
     mat4 transform = mat4(transform0, transform1, transform2, transform3);
     vertex_pick_color = pick_color;
     vertex_face_id = face_id;
+    face_orientation = sign(dot(transform0.xyz, cross(transform1.xyz, transform2.xyz)));
     world_position = (transform * vec4(position, 1.0)).xyz;
     gl_Position = view_projection * vec4(world_position, 1.0);
 }

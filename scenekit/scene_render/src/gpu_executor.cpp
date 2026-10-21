@@ -71,7 +71,7 @@ struct MaterialUniformData {
     std::array<float, 4> base_color{};
     std::array<float, 4> surface_params{};
     std::array<float, 4> emissive{};
-    std::array<float, 4> texture_flags{}; // x = normal map, y/z = sRGB base/emissive maps
+    std::array<float, 4> texture_flags{}; // x = normal map, y/z = sRGB base/emissive maps, w = double-sided
 };
 
 static_assert(sizeof(MaterialUniformData) == sizeof(float) * 16);
@@ -825,7 +825,8 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool
             NKGPU_OK ||
         (indexed && (result = nkgpu_pipeline_index_type(pipeline_builder,
                                                         NKGPU_INDEXTYPE_UINT32)) != NKGPU_OK) ||
-        (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 1)) != NKGPU_OK)
+        (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 1)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_cull_mode(pipeline_builder, NKGPU_CULLMODE_NONE, NKGPU_FACEWINDING_CCW)) != NKGPU_OK)
         return set_failure(state, stats, result);
     if (blended) {
         nkgpu_depth_state depth{};
@@ -1089,6 +1090,7 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
         const auto material_gpu = state.material_resources.find(batch.key.material);
         if (material_gpu == state.material_resources.end())
             return NKGPU_ERROR_INVALID_HANDLE;
+        material_data.texture_flags[3] = material && has_material_flag(material->state->flags, MaterialFlags::DoubleSided) ? 1.0f : 0.0f;
         material_data.texture_flags[0] = material_gpu->second.has_normal_map ? 1.0f : 0.0f;
         material_data.texture_flags[1] = material_gpu->second.base_color_srgb ? 1.0f : 0.0f;
         material_data.texture_flags[2] = material_gpu->second.emissive_srgb ? 1.0f : 0.0f;
@@ -1253,6 +1255,7 @@ bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool position
         (result = nkgpu_pipeline_primitive_type(pipeline_builder, NKGPU_PRIMITIVETYPE_TRIANGLES)) !=
             NKGPU_OK ||
         (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 1)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_cull_mode(pipeline_builder, NKGPU_CULLMODE_NONE, NKGPU_FACEWINDING_CCW)) != NKGPU_OK ||
         (result = nkgpu_pipeline_color_target(pipeline_builder, 0, NKGPU_IMAGEFORMAT_RGBA8,
                                               NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
         (result = nkgpu_pipeline_color_target(pipeline_builder, 1, NKGPU_IMAGEFORMAT_RGBA8,
@@ -2551,9 +2554,10 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
         return fail_frame(result);
 
     const auto clip_data = clip_uniform_data(plan);
-    const std::array<float, 4> pick_output{for_ao ? 1.0f : 0.0f, 0, 0, 0};
     for (const auto &batch : state.batches) {
         const auto *material = snapshot.find_material(batch.key.material);
+        const std::array<float, 4> pick_output{for_ao ? 1.0f : 0.0f,
+            material && has_material_flag(material->state->flags, MaterialFlags::DoubleSided) ? 1.0f : 0.0f, 0, 0};
         if (for_ao && material && (material_is_invisible(*material->state) ||
             material_is_blended(*material->state) || material->state->alpha_mode == AlphaMode::Mask)) continue;
         const auto geometry = state.geometry_resources.find(batch.key.geometry);

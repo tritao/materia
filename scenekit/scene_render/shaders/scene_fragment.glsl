@@ -23,6 +23,7 @@ uniform sampler2D occlusion_texture;
 uniform sampler2D emissive_texture;
 uniform sampler2D ao_position_texture;
 in vec3 world_position;
+flat in float face_orientation;
 in vec3 vertex_normal;
 in vec2 vertex_texcoord;
 in vec4 vertex_color;
@@ -108,6 +109,8 @@ float screen_occlusion(vec3 N) {
 }
 
 void main() {
+    // Honour material sidedness, including mirrored instances in the same batch.
+    if (texture_flags.w < 0.5 && (gl_FrontFacing ? 1.0 : -1.0) * face_orientation < 0.0) discard;
     for (int index = 0; index < 32; ++index) {
         if (index >= int(clip_plane_count.x))
             break;
@@ -116,6 +119,7 @@ void main() {
     }
     vec4 texture_color = texture(base_color_texture, vertex_texcoord);
     vec3 N = normalize(vertex_normal);
+    if ((gl_FrontFacing ? 1.0 : -1.0) * face_orientation < 0.0) N = -N;
     if (texture_flags.x > 0.5) {
         vec3 mapped = texture(normal_texture, vertex_texcoord).xyz * 2.0 - 1.0;
         vec3 dp1 = dFdx(world_position), dp2 = dFdy(world_position);

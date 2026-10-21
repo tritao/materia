@@ -164,6 +164,19 @@ class HobberSocketFixture {
 		}
 		var scene = AssemblyPreview.scene(assembly,"blind-socket-fixture");
 		var views=SocketFixtureCad.presentation(plan,scene.assemblyDefinition);scene.presentation=views;
+		// CAD face winding must agree with its outward normals before the renderer culls back faces.
+		for(part in scene.parts)for(triangle in 0...Std.int(part.indexCount/3)) {
+			var ids=[for(corner in 0...3)part.indices.getInt32((triangle*3+corner)*4)];
+			var a=[for(axis in 0...3)part.vertices.getDouble(ids[0]*24+axis*8)];
+			var b=[for(axis in 0...3)part.vertices.getDouble(ids[1]*24+axis*8)-a[axis]];
+			var c=[for(axis in 0...3)part.vertices.getDouble(ids[2]*24+axis*8)-a[axis]];
+			var normal=[b[1]*c[2]-b[2]*c[1],b[2]*c[0]-b[0]*c[2],b[0]*c[1]-b[1]*c[0]];
+			for(id in ids) {
+				var agreement=0.0;for(axis in 0...3)agreement+=normal[axis]*part.normals.getDouble(id*24+axis*8);
+				if(agreement < -1e-12)throw "CAD triangle winding disagrees with its normal: "+part.id;
+			}
+		}
+		check(true,"Fixture triangle winding agrees with outward shading normals");
 		check(views.defaultView=="assembled"&&views.views.length==3,"Fixture exposes the assembled default and two inspection views");
 		check(views.explode.length==assembly.components().length,"All fixture parts have presentation offsets");
 		var engineering=assembly.encode(),bom=haxe.Json.stringify(assembly.billOfMaterials().lines());

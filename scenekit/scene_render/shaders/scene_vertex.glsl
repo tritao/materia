@@ -12,6 +12,7 @@ layout(location=7) in vec4 color0;
 layout(location=8) in vec4 highlight_tint;
 uniform mat4 view_projection;
 out vec3 world_position;
+flat out float face_orientation;
 out vec3 vertex_normal;
 out vec2 vertex_texcoord;
 out vec4 vertex_color;
@@ -19,6 +20,7 @@ out vec4 surface_highlight;
 
 void main() {
     mat4 transform = mat4(transform0, transform1, transform2, transform3);
+    face_orientation = sign(dot(transform0.xyz, cross(transform1.xyz, transform2.xyz)));
     world_position = (transform * vec4(position, 1.0)).xyz;
     vec3 c0 = transform0.xyz, c1 = transform1.xyz, c2 = transform2.xyz;
     vec3 corrected = normal.x * cross(c1, c2) + normal.y * cross(c2, c0) +

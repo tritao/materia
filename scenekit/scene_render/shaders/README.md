@@ -36,3 +36,12 @@ prepass target. Its alpha channel marks valid samples. This avoids reconstructin
 positions from nonlinear device depth, which loses precision with very small near
 planes and can stripe an otherwise flat surface. Picking continues to write R32F
 device depth for its readback and unprojection.
+
+Surface sidedness follows `MaterialFlags::DoubleSided`. Other materials reject back
+faces in the shaded, picking and AO position shaders; view-aware CPU face picking
+uses the same rule. Winding is explicitly counterclockwise, and a flat per-instance
+transform parity corrects reflected instances without splitting their batches.
+Double-sided sheets retain both sides and orient their shading normals towards the
+visible side. Selection and hover tint the source material and retain its sidedness.
+Section planes continue to clip these passes consistently; clipping does not yet
+create filled section caps.

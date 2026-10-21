@@ -128,6 +128,96 @@ void highlight_alpha_regression(nkgpu_renderer renderer) {
     assert(std::abs(pixel()[3] - 64) <= 2);
 }
 
+// Touching opposite faces must resolve by sidedness, not submission order or depth bias.
+// Mirrored transforms and explicit two-sided sheets use the same rules for color and picking.
+void sidedness_regression(nkgpu_renderer renderer) {
+    auto scene = std::make_shared<Scene>();
+    const auto geometry = scene->reserve_geometry_id();
+    auto &mesh = scene->geometry_store().create(geometry);
+    mesh.edit_payload().vertices = {
+        {{{-0.8f, -0.8f, 0}}}, {{{0.8f, -0.8f, 0}}}, {{{0, 0.8f, 0}}}};
+    mesh.bounds.valid = true;
+    mesh.bounds.minimum = {-0.8f,-0.8f,0}; mesh.bounds.maximum = {0.8f,0.8f,0};
+    mesh.edit_payload().indices = {0, 1, 2};
+    const auto material = scene->reserve_material_id();
+    auto &surface = scene->material_store().create(material);
+    surface.edit_state().base_color = {0.2f, 0.7f, 0.3f, 1};
+    const auto node = scene->reserve_node_id();
+    Transaction create(scene); create.add_create(node); ChangeSet changes;
+    assert(scene->commit(create, changes) == NKS_OK); create.close();
+    Transaction configure(scene); configure.add_geometry(node, geometry); configure.add_material(node, material);
+    assert(scene->commit(configure, changes) == NKS_OK); configure.close();
+    nkscene::SceneView view;
+    auto plan = nkscene::compile(scene->snapshot(), view);
+    nkscene::NativeKitGpuExecutor executor(renderer);
+    auto verify = [&](bool visible, int alpha) {
+        scene->publish(); nkscene::refresh(plan, scene->snapshot(), view);
+        for (auto samples : {1u, 4u}) {
+            executor.set_sample_count(samples);
+            std::vector<std::uint8_t> pixels;
+            assert(executor.capture_rgba8(plan, scene->snapshot(), 64, 64, {0,0,0,0}, pixels) == NKGPU_OK);
+            assert(std::abs(int(pixels[(32*64+32)*4+3]) - alpha) <= 2);
+        }
+        nkscene::PickResult pick;
+        assert(executor.pick_pixel(plan, scene->snapshot(), 64,64,32,32,&pick) == NKGPU_OK);
+        assert((pick.node == node) == visible);
+        nkscene::SceneSpatialIndex spatial(scene->snapshot(), &view);
+        const auto cpu_pick=spatial.pick_ray({{0,0,1},{0,0,-1}});
+        assert((cpu_pick.node == node) == visible);
+    };
+    verify(true,255);
+    mesh.edit_payload().indices = {0,2,1}; verify(false,0);
+    surface.edit_state().flags |= static_cast<std::uint32_t>(nkscene::MaterialFlags::DoubleSided);
+    verify(true,255);
+    surface.edit_state().flags = 0;
+    surface.edit_state().alpha_mode = nkscene::AlphaMode::Blend;
+    surface.edit_state().base_color[3] = 0.4f;
+    verify(false,0);
+    surface.edit_state().flags = static_cast<std::uint32_t>(nkscene::MaterialFlags::DoubleSided);
+    verify(true,102);
+    surface.edit_state().flags = 0;
+    mesh.edit_payload().indices = {0,1,2};
+    nkscene::LocalTransform mirrored; mirrored.matrix[0] = -1;
+    Transaction mirror(scene); mirror.add_transform(node,mirrored);
+    assert(scene->commit(mirror,changes)==NKS_OK); mirror.close();
+    verify(true,102);
+    mesh.edit_payload().indices = {0,2,1}; verify(false,0);
+    // An exact shared contact plane: only the front face contributes.
+    const auto front = scene->reserve_geometry_id();
+    auto &front_mesh = scene->geometry_store().create(front);
+    front_mesh.edit_payload().vertices = mesh.edit_payload().vertices;
+    front_mesh.edit_payload().indices = {0,1,2};
+    front_mesh.bounds = mesh.bounds;
+    const auto front_node = scene->reserve_node_id();
+    Transaction contact(scene);contact.add_create(front_node);contact.add_geometry(front_node,front);
+    contact.add_material(front_node,material);assert(scene->commit(contact,changes)==NKS_OK);contact.close();
+    // Restore the rear instance to identity, with its opposite winding.
+    Transaction identity(scene); identity.add_transform(node, nkscene::LocalTransform{});
+    assert(scene->commit(identity,changes)==NKS_OK);identity.close();
+    scene->publish();nkscene::refresh(plan,scene->snapshot(),view);
+    std::vector<std::uint8_t> pixels;
+    assert(executor.capture_rgba8(plan,scene->snapshot(),64,64,{0,0,0,0},pixels)==NKGPU_OK);
+    assert(std::abs(int(pixels[(32*64+32)*4+3])-102)<=2);
+    nkscene::PickResult pick;
+    assert(executor.pick_pixel(plan,scene->snapshot(),64,64,32,32,&pick)==NKGPU_OK);
+    assert(pick.node==front_node);
+    // Compare every pixel against the front face alone, including shared-plane edges.
+    view.set_visibility_override(node,false);
+    nkscene::refresh(plan,scene->snapshot(),view);
+    std::vector<std::uint8_t> front_only;
+    assert(executor.capture_rgba8(plan,scene->snapshot(),64,64,{0,0,0,0},front_only)==NKGPU_OK);
+    assert(pixels==front_only);
+    // A section plane clips both rendering and the two picking paths.
+    view.clip_planes.push_back({{{1,0,0}},-0.1f,true});
+    nkscene::refresh(plan,scene->snapshot(),view);
+    assert(executor.capture_rgba8(plan,scene->snapshot(),64,64,{0,0,0,0},pixels)==NKGPU_OK);
+    assert(pixels[(32*64+32)*4+3]==0);
+    assert(executor.pick_pixel(plan,scene->snapshot(),64,64,32,32,&pick)==NKGPU_OK);
+    assert(!pick.node.valid());
+    nkscene::SceneSpatialIndex spatial(scene->snapshot(),&view);
+    assert(!spatial.pick_ray({{0,0,1},{0,0,-1}}).node.valid());
+}
+
 } // namespace
 
 int main() {
@@ -165,6 +255,7 @@ int main() {
     }
 
     highlight_alpha_regression(renderer);
+    sidedness_regression(renderer);
 
     {
         auto scene = std::make_shared<Scene>();

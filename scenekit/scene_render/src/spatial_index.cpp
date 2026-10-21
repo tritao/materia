@@ -217,9 +217,11 @@ std::uint32_t vertex_index(const GeometryPayload &payload, std::size_t index) no
 void intersect_triangles(const Ray &ray, const SceneNode &node,
                          const GeometryResource &geometry, const LocalTransform &transform,
                          float &best_distance, PickResult &result,
-                         std::span<const ClipPlane> clip_planes = {}) noexcept {
+                         std::span<const ClipPlane> clip_planes = {}, bool double_sided = true) noexcept {
     if (geometry.payload->primitive_type != PrimitiveType::Triangles)
         return;
+    const auto &m = transform.matrix;
+    const auto orientation = dot({m[0],m[1],m[2]}, cross({m[4],m[5],m[6]}, {m[8],m[9],m[10]})) < 0 ? -1.0f : 1.0f;
     const auto primitive_count = geometry.payload->element_count() / 3;
     for (std::size_t primitive = 0; primitive < primitive_count; ++primitive) {
         const auto first_index =
@@ -232,12 +234,13 @@ void intersect_triangles(const Ray &ray, const SceneNode &node,
             second_index >= geometry.payload->vertices.size() ||
             third_index >= geometry.payload->vertices.size())
             continue;
+        const auto a = transform_point(transform, geometry.payload->vertices[first_index]);
+        const auto b = transform_point(transform, geometry.payload->vertices[second_index]);
+        const auto c = transform_point(transform, geometry.payload->vertices[third_index]);
+        if (!double_sided && dot(ray.direction, cross(subtract(b, a), subtract(c, a))) * orientation >= 0)
+            continue;
         float distance = 0.0f;
-        if (!ray_hits_triangle(ray,
-                               transform_point(transform, geometry.payload->vertices[first_index]),
-                               transform_point(transform, geometry.payload->vertices[second_index]),
-                               transform_point(transform, geometry.payload->vertices[third_index]),
-                               distance) || distance >= best_distance)
+        if (!ray_hits_triangle(ray, a, b, c, distance) || distance >= best_distance)
             continue;
         const auto point = scale_add(ray.origin, ray.direction, distance);
         std::size_t enabled_planes = 0;
@@ -640,8 +643,11 @@ PickResult SceneSpatialIndex::pick_ray_with_edges(const Ray &ray, const SceneVie
         if (!geometry || !state_->snapshot.find_material(node->material))
             return;
         const auto &transform = pose ? *pose : node->world_transform.transform;
+        const auto material_override = visibility.material.find(node_id);
+        const auto *material = state_->snapshot.find_material(material_override == visibility.material.end()
+            ? node->material : material_override->second);
         intersect_triangles(normalized, *node, *geometry, transform, best_distance, result,
-                            view.clip_planes);
+                            view.clip_planes, material && has_material_flag(material->state->flags, MaterialFlags::DoubleSided));
     };
 
     // Authored bounds stay in the retained BVH. Posed nodes use their presentation bounds
