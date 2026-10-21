@@ -13,6 +13,10 @@ import "../styles/diagrams.css";
 	import { renderWidgets } from "../scripts/widgets";
 	renderFigures();
 	renderWidgets();
+	// The component catalogue: search and family filters, and the 3D viewer only on pages that show models.
+	import { filterComponents } from "../scripts/catalogue";
+	filterComponents();
+	if (document.querySelector("model-viewer")) import("@google/model-viewer");
 	keepDiagramsReadable();
 	linkEditorExamples();
 </script>

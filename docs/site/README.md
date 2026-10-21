@@ -112,3 +112,19 @@ docs/screens/capture.py --site SITE --editor gantry-picker gantry-picker robot-a
 
 The logo is `src/assets/materia-mark.svg` (also `public/favicon.svg`): an M drawn as one toolpath,
 with the tool at its end. The site's accent colour is the logo's blue (`src/styles/brand.css`).
+
+## Component catalogue
+
+`/components/` is generated from MachineKit's component registry. The `docs-components` workspace
+program (`docs/components/`) builds every recipe at its defaults and writes
+`docs/components/data/components.json` (parameters, catalogue rows and their provenance,
+connectors, mass, BOM line) and a GLB per part into `public/components/`. `docs/screens/components.py`
+renders the thumbnails from those GLBs with the same `<model-viewer>` the pages use. Regenerate
+after changing a component, then rerender:
+
+```sh
+DOCS_COMPONENTS_WRITE=1 ./haxeon/scripts/haxeon workspace test --workspace materia.workspace.json --only docs-components --no-test-cache
+docs/screens/components.py
+```
+
+Without `DOCS_COMPONENTS_WRITE` the workspace test fails when the committed data or models are stale.

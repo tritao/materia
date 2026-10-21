@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@astrojs/starlight": "0.42.5",
+    "@google/model-viewer": "4.3.1",
     "@observablehq/plot": "0.6.17",
     "astro": "7.3.6",
     "astro-mermaid": "2.1.0",
+    "github-slugger": "2.0.0",
     "mermaid": "11.17.2",
     "sharp": "0.34.4",
     "starlight-links-validator": "0.26.0"

@@ -9,6 +9,7 @@ import { dirname, join, relative, resolve, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { slugOf, routeOf } from "./routes.mjs";
 import { loadReference, writeReference, linkTypes } from "./reference.mjs";
+import { loadComponents, writeComponents } from "./components.mjs";
 
 const site = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const docs = resolve(site, "..");
@@ -112,9 +113,12 @@ for (const name of readdirSync(figures).filter((name) => name.endsWith(".json"))
 	writeFileSync(join(publicFigures, name), readFileSync(join(figures, name)));
 
 const referencePages = writeReference(reference, out);
+// The component catalogue, exported by docs/components (the docs-components workspace program).
+const catalogue = loadComponents(join(docs, "components/data/components.json"));
+const componentPages = catalogue ? writeComponents(catalogue, out) : 0;
 // The live widgets' runtime, built by docs/runtime/build.sh and committed there.
 const publicRuntime = join(site, "public/runtime");
 mkdirSync(publicRuntime, { recursive: true });
 writeFileSync(join(publicRuntime, "docs-runtime.wasm"), readFileSync(join(docs, "runtime/docs-runtime.wasm")));
 
-console.log(`synced ${count} pages and ${referencePages} reference pages into ${posix.join(...relative(site, out).split("/"))}`);
+console.log(`synced ${count} pages, ${referencePages} reference pages and ${componentPages} component pages into ${posix.join(...relative(site, out).split("/"))}`);

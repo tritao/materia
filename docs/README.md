@@ -105,7 +105,7 @@ are taken from the browser build of the editor.
 <a href="/product/gallery/#mobile-base"><img src="/screens/mobile-base.webp" width="640" height="400" alt="Mobile base" loading="lazy"><span>Mobile base</span></a>
 </div>
 
-[All examples](product/gallery.md)
+[All examples](product/gallery.md) · [Every component, in 3D](/components/)
 
 ## Where to start
 

@@ -37,7 +37,7 @@ export default defineConfig({
 				{ tag: "meta", attrs: { property: "og:image", content: "https://materia-docs.joao-9f7.workers.dev/screens/social.png" } },
 				{ tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
 			],
-			customCss: ["./src/styles/brand.css", "./src/styles/landing.css"],
+			customCss: ["./src/styles/brand.css", "./src/styles/landing.css", "./src/styles/components.css"],
 			description: "Design, simulate, plan and run machines, from CAD to the controller.",
 			social: [{ icon: "github", label: "GitHub", href: "https://github.com/tritao/materia" }],
 			plugins: [starlightLinksValidator()],
@@ -49,6 +49,7 @@ export default defineConfig({
 				},
 				{ label: "Concepts", items: [{ label: "Overview", slug: "concepts" }, ...conceptGroups()] },
 				{ label: "Editor manual", collapsed: true, items: [{ autogenerate: { directory: "manual" } }] },
+				{ label: "Components", link: "/components/" },
 				{ label: "API reference", link: "/reference/" },
 				{ label: "About Materia", collapsed: true, items: [{ autogenerate: { directory: "product" } }] },
 				{
