@@ -13,15 +13,12 @@ ROOTS = ["docs/runtime/src", "cnckit/haxe", "toolpathkit/haxe", "robotkit/core/h
 
 
 def digest():
+    """The committed tree ids of the runtime's sources and of the compiler's, so uncommitted work in a shared
+    checkout does not count, and any committed change to an input does."""
     hash = hashlib.sha256()
     for root in ROOTS:
-        for parent, _, files in sorted(os.walk(os.path.join(REPO, root))):
-            for name in sorted(files):
-                if name.endswith(".hx"):
-                    path = os.path.join(parent, name)
-                    hash.update(os.path.relpath(path, REPO).encode() + b"\0")
-                    with open(path, "rb") as handle:
-                        hash.update(handle.read() + b"\0")
+        tree = subprocess.run(["git", "-C", REPO, "rev-parse", f"HEAD:{root}"], capture_output=True, text=True, check=True)
+        hash.update(f"{root} {tree.stdout.strip()}".encode())
     # The compiler is Haxeon's src and stdlib at the pinned commit; its docs and tests do not change the output.
     pin = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD:haxeon"], capture_output=True, text=True, check=True).stdout.strip()
     for tree in ("src", "stdlib"):

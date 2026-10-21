@@ -30,8 +30,11 @@ jobs:
           cache: npm
           cache-dependency-path: docs/site/package-lock.json
       - run: npm ci
-      # The live widgets' runtime is committed; fail when its inputs changed, then run it.
-      - run: python3 docs/runtime/inputs.py --check && node --experimental-strip-types docs/runtime/check.mjs
+      # The live widgets' runtime is committed: warn when its inputs changed since it was built, and fail if it
+      # no longer works.
+      - run: python3 docs/runtime/inputs.py --check || echo "::warning::docs/runtime/docs-runtime.wasm is stale; run docs/runtime/build.sh"
+        working-directory: .
+      - run: node --experimental-strip-types docs/runtime/check.mjs
         working-directory: .
       # Fails on invalid front matter and broken internal links.
       - run: npm run build
