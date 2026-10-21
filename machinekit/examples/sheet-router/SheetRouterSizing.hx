@@ -9,7 +9,7 @@ import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 /** Reproducible preliminary sizing from the authored moving member masses, not the SR0 estimates. */
 class SheetRouterSizing {
     public static final ACCELERATION=3.0;
-    public static final CUTTING_N=300.0;
+    public static final CUTTING_N=SheetRouterCutting.forceEnvelopeN();
     public static final DRAG_N=30.0;
     public static final RESERVE=1.5;
     public static function moving(machine:SheetRouter,axis:String):{kg:Float,members:Array<{id:String,kg:Float}>} {

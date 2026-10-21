@@ -25,7 +25,7 @@ class SheetRouterSheetChecks {
       var refused=false;
       try CamSheetOrder.order([unsafe],op->{
         var program=new CamJob(0.025,12000,new Point3(0,0,0.025)).sheetProfile(small,tool,-0.001,0.05,{stepDown:0.006}).finish();
-        stock.cut(CutMoves.fromProgram(program));unsafeReport=vacuum.analyze(stock,300,null,coverage);
+        stock.cut(CutMoves.fromProgram(program));unsafeReport=vacuum.analyze(stock,SheetRouterCutting.forceEnvelopeN(),null,coverage);
         var accepted=true;for(warning in unsafeReport.warnings)if(warning.code=="freed_part_slipping")accepted=false;
         if(!accepted)stock.restore(original);
         return accepted;
@@ -47,7 +47,7 @@ class SheetRouterSheetChecks {
         if(op.kind=="drill")job.drill([new Point3(1.555,0.075,0.018)],tool,0.010,0.020,0.005,op.id,0.003);
         else job.sheetProfile(contour,tool,-0.001,0.05,{stepDown:0.006,autoTabs:4,tabLength:0.008,
           tabThickness:0.004,cornerClearance:0.003,onionSkin:0.0015,skinPass:true,spindleRpm:18000,featureRef:op.id});
-        var before=stock.volume(),cut=stock.cut(CutMoves.fromProgram(job.finish())),report=vacuum.analyze(stock,300,null,coverage);
+        var before=stock.volume(),cut=stock.cut(CutMoves.fromProgram(job.finish())),report=vacuum.analyze(stock,SheetRouterCutting.forceEnvelopeN(),null,coverage);
         var ok=true;for(part in report.components)if(!part.passes)ok=false;
         if(!ok){stock.restore(checkpoint);checkpoint.dispose();return false;}
         for(part in report.components)minimum=Math.min(minimum,part.margin);
@@ -57,9 +57,9 @@ class SheetRouterSheetChecks {
       });
       check(ordered.operations[0].id=="small-hole"&&ordered.operations[1].id=="small-profile","hole precedes retained small profile; small precedes large");
       check(accepted.length==operations.length&&minimum>=1,"all native cabinet checkpoints pass SR8's connected-component holding screen");
-      var finalReport=vacuum.analyze(stock,300,null,coverage);
+      var finalReport=vacuum.analyze(stock,SheetRouterCutting.forceEnvelopeN(),null,coverage);
       check(finalReport.components.length==1&&finalReport.retainedWebNeedsForceQualification,"tabs retain every part; web strength remains a commissioning/tooling gate");
-      reports.push({workY:bed,spacingMm:1,forcePerPartN:300,safetyFactor:2,unsafe:unsafeReport,
+      reports.push({workY:bed,spacingMm:1,forcePerPartN:SheetRouterCutting.forceEnvelopeN(),safetyFactor:2,unsafe:unsafeReport,
         sequence:accepted,minimumHoldingMargin:minimum,finalReport:finalReport,axes:"Z rays for component/holding check; tri-dexel geometry checked in core fixture"});
       original.dispose();stock.dispose();
     }

@@ -1024,6 +1024,15 @@ This is layout acceptance; actual retained-link cutting, inventory execution and
   - utilisation and time on the cabinet set recorded.
 
 **SR13. Router tooling, feeds and forces.**
+- Non-motion implementation: router bit/holder profiles, assumed material chip-load/energy
+  data, feed clamps, named spindle power/torque and process-force admission. See
+  [cutting inputs and checks](cutting/README.md). The qualified planning recipe is
+  6 mm axial passes, not an 18 mm full-depth acrylic slot: the latter failed SR4
+  (687.549 N assumed envelope). The admitted worst envelope is 229.183 N and feeds
+  the SR4 sizing and SR8/SR11 hold-down checks; the frozen 300 N structural screen bounds it.
+- Only jerk-limited cutting acceptance is held for OM-R1 and SR6-C. That acceptance
+  includes measured tool/H/overcut reach, spindle curve and retained-link strength,
+  replacing the planning assumptions; no virtual separation test approves physical cutting.
 - Depends on required MotionKit OM-R1 jerk-limited path timing (optional ZV/ZVD),
   and SR6-C measured modal commissioning before cutting acceptance.
 - `toolpathkit/tool`: router bits with flutes, helix sense, cutting length, collet and holder.
@@ -1215,7 +1224,7 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR10 | complete | Exact arcs/bulges, units/layers, INSERT and bounded spline sampling; 42 import + 653 writer assertions. [Evidence](dxf/README.md). |
 | SR11 | complete | Tabs/onion/skin, leads/ramps/direction, operation RPM, pecks/surfacing and SR8 admission ordering; 349 assertions. [Evidence](sheet-operations/README.md). |
 | SR12 | complete | True-shape no-fit unions, holes/rotations/grain, multiple sheets/remnants, free-form plans; 91 assertions. [Evidence](nesting/README.md). |
-| SR13 | planned | |
+| SR13 | non-motion implemented; jerk-limited cutting acceptance held for OM-R1 + SR6-C | cutting/README.md |
 | SR14 | planned | |
 | SR15 | planned | |
 | SR16 | planned | |

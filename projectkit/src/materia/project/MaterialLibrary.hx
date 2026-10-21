@@ -32,9 +32,10 @@ class MaterialLibrary {
     material("plastic", "Engineering plastic", [0.28, 0.30, 0.32], 0.0, 0.55, 1200, "plastic"),
     polycarbonate(),
     material("polyurethane", "Polyurethane", [0.26, 0.34, 0.37], 0.0, 0.65, 1200, "polyurethane PU"),
-    material("plywood-birch", "Birch plywood", [0.70, 0.55, 0.34], 0.0, 0.72, 680, "birch plywood"),
+    routerMaterial("plywood-birch", "Birch plywood", 680, 0.12, 0.08, 0.15, 0.25),
     // Assumed layout density; lot-specific permeability is supplied by the spoilboard recipe.
-    material("mdf", "MDF (nominal)", [0.66, 0.51, 0.34], 0.0, 0.85, 750, "MDF"),
+    routerMaterial("mdf", "MDF (nominal)", 750, 0.10, 0.08, 0.15, 0.25),
+    routerMaterial("acrylic", "PMMA acrylic (assumed)", 1180, 0.30, 0.05, 0.10, 0.18),
     toolingEPS(),
     toolingBoard(),
     mineralCast(),
@@ -55,6 +56,15 @@ class MaterialLibrary {
     enclosureMaterial("stainless-sheet", "Stainless sheet", 7900),
     enclosureMaterial("panel-adhesive", "Panel adhesive", 1200)
   ];
+
+  static function routerMaterial(id:String,name:String,density:Float,energy:Float,low:Float,nominal:Float,high:Float):MaterialDef {
+    var spec=id=="mdf"?"MDF":id=="plywood-birch"?"birch plywood":"PMMA acrylic";
+    var result=material(id,name,[0.70,0.55,0.34],0,0.72,density,spec);
+    result.routerCutting={assumed:true,specificEnergyJPerMm3:energy,chipLoads:[
+      {minDiameterMm:3,maxDiameterMm:6,minChipMm:low,nominalChipMm:nominal,maxChipMm:high},
+      {minDiameterMm:6.000001,maxDiameterMm:12,minChipMm:low*1.5,nominalChipMm:nominal*1.5,maxChipMm:high*1.5}]};
+    return result;
+  }
 
   /** Clear viewing sheet; visual opacity does not change physical material properties. */
   static function polycarbonate():MaterialDef {

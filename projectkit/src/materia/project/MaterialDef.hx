@@ -8,6 +8,7 @@ package materia.project;
   @:id(4) var physical:MaterialPhysical;
   @:id(5) @:optional var mechanical:Null<MaterialMechanical>;
   @:id(6) @:optional var sheet:Null<MaterialSheet>;
+  @:id(7) @:optional var routerCutting:Null<MaterialRouterCutting>;
 }
 
 @:wire typedef MaterialVisual = {
@@ -48,4 +49,18 @@ package materia.project;
 @:wire typedef MaterialKFactorRow = {
   @:id(1) var ratio:Float;
   @:id(2) var k:Float;
+}
+
+/** Assumed router ranges for stated diameter bands, not supplier recommendations. */
+@:wire typedef MaterialRouterCutting = {
+ @:id(1) var assumed:Bool;
+ @:id(2) var specificEnergyJPerMm3:Float;
+ @:id(3) var chipLoads:Array<MaterialRouterChipLoad>;
+}
+@:wire typedef MaterialRouterChipLoad = {
+ @:id(1) var minDiameterMm:Float;
+ @:id(2) var maxDiameterMm:Float;
+ @:id(3) var minChipMm:Float;
+ @:id(4) var nominalChipMm:Float;
+ @:id(5) var maxChipMm:Float;
 }

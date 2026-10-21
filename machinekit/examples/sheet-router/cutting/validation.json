@@ -1,0 +1,4456 @@
+{
+  "status": "PASS",
+  "assertions": 128,
+  "cutting": {
+    "checks": 6,
+    "cut": {
+      "aboveChipRange": false,
+      "assumed": true,
+      "chipMm": 0.15,
+      "feedMPerMinute": 5.4,
+      "forceEnvelopeN": 137.5098708313976,
+      "meanForceN": 68.7549354156988,
+      "meltingRisk": false,
+      "operation": "plywood-birch profile",
+      "powerW": 388.80000000000007,
+      "requestedFeedMPerMinute": 5.4,
+      "rpm": 18000,
+      "torqueNm": 0.20626480624709637
+    },
+    "forceEnvelopeN": 229.1831180523292,
+    "acrylic": {
+      "aboveChipRange": false,
+      "assumed": true,
+      "chipMm": 0.01,
+      "feedMPerMinute": 0.36,
+      "forceEnvelopeN": 68.75493541569878,
+      "meanForceN": 34.37746770784939,
+      "meltingRisk": true,
+      "operation": "acrylic profile",
+      "powerW": 194.4,
+      "requestedFeedMPerMinute": 0.36,
+      "rpm": 18000,
+      "torqueNm": 0.10313240312354817
+    }
+  },
+  "sizing": {
+    "basis": "assumed preliminary screening, not supplier qualification",
+    "loadSharing": "equal nominal Y motor shares; eccentric guide reactions/yaw loads remain SR5",
+    "duty": "100 mm loaded out-and-back, triangular/trapezoidal ramps, 1 s powered dwell; conservative magnitudes for acceleration and deceleration",
+    "exclusions": [
+      "Structural/rail/bolted-joint compliance and eccentric Y-side reactions (SR5)",
+      "Actual servo following error and tuning",
+      "Gear fillet, fatigue life, lubrication, heat treatment and misalignment factors",
+      "Screw supplier DN/life and support/coupling load ratings",
+      "Belt tooth capacity and packaging"
+    ],
+    "choices": {
+      "reduction": "planetary: higher elastic stiffness than the specified EA=100 kN belt proposal; existing 80 mm housing vs 159/239 mm belt output pulleys",
+      "z": "1610 with 200 mm travel, 390 mm fixed/free shaft and 750 W braked servo at 10 m/min"
+    },
+    "reserve": 1.5,
+    "cuttingN": 229.1831180523292,
+    "acceleration": 3,
+    "variants": [
+      {
+        "workY": 2600,
+        "axes": [
+          {
+            "axis": "z",
+            "movingMassKg": 31.222524257982933,
+            "movingMembers": [
+              {
+                "id": "railZ",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "zCarriage",
+                "kg": 12.029958
+              },
+              {
+                "id": "railZRight",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "screwZNut",
+                "kg": 0.09187692016299448
+              },
+              {
+                "id": "screwZNutSupport",
+                "kg": 0.0299376
+              },
+              {
+                "id": "screwZNutMount",
+                "kg": 0.045586585398714144
+              },
+              {
+                "id": "switchTriggerZ",
+                "kg": 0.01884
+              },
+              {
+                "id": "spindleMount",
+                "kg": 1.9412098100172634
+              },
+              {
+                "id": "spindle",
+                "kg": 10.540966177227977
+              },
+              {
+                "id": "spindleRelease",
+                "kg": 0.942865718936021
+              },
+              {
+                "id": "holder",
+                "kg": 0.546067642892657
+              },
+              {
+                "id": "collet",
+                "kg": 0.23305119702492488
+              },
+              {
+                "id": "longestTool",
+                "kg": 0.053268845034268535
+              },
+              {
+                "id": "shoe",
+                "kg": 0.9141716725625528
+              },
+              {
+                "id": "shoeLiftCylinder",
+                "kg": 0.23400901835952204
+              },
+              {
+                "id": "shoeLiftBracket",
+                "kg": 0.29202
+              },
+              {
+                "id": "shoeLiftRod",
+                "kg": 0.08323257036604459
+              },
+              {
+                "id": "shoeLiftValve",
+                "kg": 0.162
+              }
+            ],
+            "motor": "GENERIC-HV-SERVO-750W",
+            "input": {
+              "acceleration": 3,
+              "cuttingForceN": 229.1831180523292,
+              "dragForceN": 30,
+              "efficiency": 0.9,
+              "gravityForceN": 306.1883675145483,
+              "massKg": 31.222524257982933,
+              "metresPerRadian": 0.0015915494309189536,
+              "motors": 1,
+              "reserve": 1.5,
+              "rotaryDragNm": 0.005,
+              "rotaryInertiaKgM2": 3.70951963318653e-05,
+              "strokeM": 0.1,
+              "velocity": 0.16666666666666666
+            },
+            "motorRatings": {
+              "maxRpm": 5000,
+              "peakNm": 7.1619724391352895,
+              "ratedNm": 2.38732414637843,
+              "ratedRpm": 3000,
+              "rotorInertiaKgM2": 0.00012
+            },
+            "rotatingOutputInertiaKgM2": 3.70951963318653e-05,
+            "demand": {
+              "cycleSeconds": 2.3111111111111113,
+              "externalInertiaKgM2": 0.00011618277418487618,
+              "failures": [],
+              "inertiaRatio": 0.9681897848739681,
+              "motorRpm": 999.9999999999998,
+              "peakForcePerMotorN": 659.0390583408263,
+              "peakNm": 1.4743235999734656,
+              "phases": [
+                {
+                  "name": "outbound acceleration",
+                  "seconds": 0.05555555555555555,
+                  "torqueNm": 1.4743235999734656
+                },
+                {
+                  "name": "outbound cruise",
+                  "seconds": 0.5444444444444445,
+                  "torqueNm": 1.0047962956797414
+                },
+                {
+                  "name": "outbound deceleration upper bound",
+                  "seconds": 0.05555555555555555,
+                  "torqueNm": 1.4743235999734656
+                },
+                {
+                  "name": "return acceleration",
+                  "seconds": 0.05555555555555555,
+                  "torqueNm": 1.4743235999734656
+                },
+                {
+                  "name": "return cruise",
+                  "seconds": 0.5444444444444445,
+                  "torqueNm": 1.0047962956797414
+                },
+                {
+                  "name": "return deceleration upper bound",
+                  "seconds": 0.05555555555555555,
+                  "torqueNm": 1.4743235999734656
+                },
+                {
+                  "name": "powered dwell",
+                  "seconds": 1,
+                  "torqueNm": 0.541459913413092
+                }
+              ],
+              "reflectedLinearInertiaKgM2": 7.908757785301088e-05,
+              "rmsNm": 0.9008570314282195,
+              "sustainedNm": 1.0047962956797414
+            },
+            "alternatives": [],
+            "torqueUtilizationWithReserve": {
+              "peak": 0.30878161271271315,
+              "rms": 0.5660251663739209,
+              "sustained": 0.6313321321723427
+            },
+            "driveAccuracy": null,
+            "catalogueRack": null,
+            "tooth": null,
+            "reducer": null,
+            "compliance": null,
+            "beltAlternative": null,
+            "screw": {
+              "nominalMm": 16,
+              "rootMm": 13,
+              "lengthMm": 390,
+              "criticalRpm": 2896.9862765441585,
+              "bucklingN": 4776.097045936806,
+              "stiffnessNPerM": 33679983.98904847,
+              "backlashM": 1e-05,
+              "alternative20CriticalRpm": 3788.3666693269765,
+              "alternative20BucklingN": 13966.751912527154,
+              "requested15MMinRpm": 1500,
+              "selectedRapidMmPerMinute": 10000,
+              "brakeHoldingNm": 2.5,
+              "requiredBrakeNm": 0.7309708831076741
+            },
+            "failures": []
+          },
+          {
+            "axis": "x",
+            "movingMassKg": 67.81906783827726,
+            "movingMembers": [
+              {
+                "id": "blockX",
+                "kg": 0.33460625
+              },
+              {
+                "id": "xCarriage",
+                "kg": 20.057557499999998
+              },
+              {
+                "id": "blockX01",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockX10",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockX11",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ01",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ10",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ11",
+                "kg": 0.33460625
+              },
+              {
+                "id": "railZ",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "zCarriage",
+                "kg": 12.029958
+              },
+              {
+                "id": "railZRight",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "motorXSupport",
+                "kg": 0.9168870410778241
+              },
+              {
+                "id": "motorXPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorX",
+                "kg": 2.007144800493696
+              },
+              {
+                "id": "pinionXReducer",
+                "kg": 1.2806152673644413
+              },
+              {
+                "id": "pinionX",
+                "kg": 0.07738928758070747
+              },
+              {
+                "id": "pinionXOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "pinionXPreload",
+                "kg": 1.6068837148169777
+              },
+              {
+                "id": "motorZSupport",
+                "kg": 0.08372159999999994
+              },
+              {
+                "id": "motorZPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorZ",
+                "kg": 2.4821536097164723
+              },
+              {
+                "id": "screwZCoupling",
+                "kg": 0.09430966290965079
+              },
+              {
+                "id": "screwZ",
+                "kg": 0.6155510981737696
+              },
+              {
+                "id": "screwZNut",
+                "kg": 0.09187692016299448
+              },
+              {
+                "id": "screwZOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "screwZFixedBracket",
+                "kg": 0.07776000000000001
+              },
+              {
+                "id": "screwZFixed",
+                "kg": 0.45082737169259635
+              },
+              {
+                "id": "screwZNutSupport",
+                "kg": 0.0299376
+              },
+              {
+                "id": "screwZNutMount",
+                "kg": 0.045586585398714144
+              },
+              {
+                "id": "switchTriggerX",
+                "kg": 0.5063721
+              },
+              {
+                "id": "switchTriggerZ",
+                "kg": 0.01884
+              },
+              {
+                "id": "switchZhomeMount",
+                "kg": 0.06765946143930288
+              },
+              {
+                "id": "switchZhome",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchZnegativeLimitMount",
+                "kg": 0.06377146143930287
+              },
+              {
+                "id": "switchZnegativeLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchZpositiveLimitMount",
+                "kg": 0.1555282614393029
+              },
+              {
+                "id": "switchZpositiveLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "spindleMount",
+                "kg": 1.9412098100172634
+              },
+              {
+                "id": "spindle",
+                "kg": 10.540966177227977
+              },
+              {
+                "id": "spindleRelease",
+                "kg": 0.942865718936021
+              },
+              {
+                "id": "holder",
+                "kg": 0.546067642892657
+              },
+              {
+                "id": "collet",
+                "kg": 0.23305119702492488
+              },
+              {
+                "id": "longestTool",
+                "kg": 0.053268845034268535
+              },
+              {
+                "id": "chainXMovingBracket",
+                "kg": 2.5988406250000002
+              },
+              {
+                "id": "shoe",
+                "kg": 0.9141716725625528
+              },
+              {
+                "id": "shoeLiftCylinder",
+                "kg": 0.23400901835952204
+              },
+              {
+                "id": "shoeLiftBracket",
+                "kg": 0.29202
+              },
+              {
+                "id": "shoeLiftRod",
+                "kg": 0.08323257036604459
+              },
+              {
+                "id": "shoeLiftValve",
+                "kg": 0.162
+              },
+              {
+                "id": "cableChainX (whole chain upper bound)",
+                "kg": 0.4410127242729428
+              }
+            ],
+            "motor": "GENERIC-HV-SERVO-750W",
+            "input": {
+              "acceleration": 3,
+              "cuttingForceN": 229.1831180523292,
+              "dragForceN": 30,
+              "efficiency": 0.9025,
+              "gravityForceN": 0,
+              "massKg": 67.81906783827726,
+              "metresPerRadian": 0.0021220659078919376,
+              "motors": 1,
+              "reserve": 1.5,
+              "rotaryDragNm": 0,
+              "rotaryInertiaKgM2": 2.0303253308884853e-05,
+              "strokeM": 0.1,
+              "velocity": 0.6666666666666666
+            },
+            "motorRatings": {
+              "maxRpm": 5000,
+              "peakNm": 7.1619724391352895,
+              "ratedNm": 2.38732414637843,
+              "ratedRpm": 3000,
+              "rotorInertiaKgM2": 0.00012
+            },
+            "rotatingOutputInertiaKgM2": 1.7057998624772792e-05,
+            "demand": {
+              "cycleSeconds": 1.7302967433402214,
+              "externalInertiaKgM2": 0.00032570361894862943,
+              "failures": [],
+              "inertiaRatio": 2.714196824571912,
+              "motorRpm": 3000,
+              "peakForcePerMotorN": 462.640321567161,
+              "peakNm": 1.2892651746638872,
+              "phases": [
+                {
+                  "name": "outbound acceleration",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.2892651746638872
+                },
+                {
+                  "name": "outbound deceleration upper bound",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.2892651746638872
+                },
+                {
+                  "name": "return acceleration",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.2892651746638872
+                },
+                {
+                  "name": "return deceleration upper bound",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.2892651746638872
+                },
+                {
+                  "name": "powered dwell",
+                  "seconds": 1,
+                  "torqueNm": 0
+                }
+              ],
+              "reflectedLinearInertiaKgM2": 0.00030540036563974455,
+              "rmsNm": 0.8375902987442666,
+              "sustainedNm": 0.6094223365318329
+            },
+            "alternatives": [
+              {
+                "selection": "original 400 W X at 5:1",
+                "demand": {
+                  "cycleSeconds": 1.7302967433402214,
+                  "externalInertiaKgM2": 0.0007078331426344163,
+                  "failures": [
+                    "GENERIC-HV-SERVO-400W: duty RMS torque with reserve",
+                    "GENERIC-HV-SERVO-400W: sustained cutting torque with reserve"
+                  ],
+                  "inertiaRatio": 14.156662852688324,
+                  "motorRpm": 1999.9999999999998,
+                  "peakForcePerMotorN": 462.640321567161,
+                  "peakNm": 1.7004452286850285,
+                  "phases": [
+                    {
+                      "name": "outbound acceleration",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.7004452286850285
+                    },
+                    {
+                      "name": "outbound deceleration upper bound",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.7004452286850285
+                    },
+                    {
+                      "name": "return acceleration",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.7004452286850285
+                    },
+                    {
+                      "name": "return deceleration upper bound",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.7004452286850285
+                    },
+                    {
+                      "name": "powered dwell",
+                      "seconds": 1,
+                      "torqueNm": 0
+                    }
+                  ],
+                  "reflectedLinearInertiaKgM2": 0.0006871508226894254,
+                  "rmsNm": 1.1047195372075926,
+                  "sustainedNm": 0.9141335047977494
+                }
+              }
+            ],
+            "torqueUtilizationWithReserve": {
+              "peak": 0.27002306675021537,
+              "rms": 0.5262735058506136,
+              "sustained": 0.3829113470763866
+            },
+            "driveAccuracy": {
+              "axisStiffnessNPerM": 8532452.278900722,
+              "cuttingAndReversalM": 8.426504683040404e-05,
+              "reservedAccelerationAndReversalM": 0.00013522078031555243,
+              "cuttingDriveBudgetM": 0.0001,
+              "accelerationDriveBudgetM": 0.0002,
+              "idealDriveOnlyHz": 56.45223718366438,
+              "hingeComplianceFraction": 0.6492430035324056,
+              "halfHingeStiffnessHz": 43.95809187267431,
+              "tenPercentHeavierHz": 53.825096233842935
+            },
+            "catalogueRack": {
+              "permissibleFeedN": 6000,
+              "mountingDeratedFeedN": 3000,
+              "demandN": 845.4467603124203,
+              "utilization": 0.28181558677080676,
+              "passes": true,
+              "source": "https://www.atlantadrives.com/pdf/ads_rackratings-h.pdf",
+              "catalogue": "Module 1.5, 20 teeth, HPR quality 6; case-hardened 16MnCr5 pinion, hardened rack",
+              "standardRackWidthMm": 19,
+              "selectedEnvelopeWidthMm": 20,
+              "sourceBasis": "Manufacturer maximum feed force; grease lubrication, speed 1.5 m/s, uniform tooth loading, SB=1",
+              "qualification": "Candidate sourcing requirement only. Actual heat treatment, part drawing, face engagement, duty factors and mounting bolts must match before purchase."
+            },
+            "tooth": {
+              "axialN": 246.1270821228858,
+              "bendingMPa": 116.1726287112347,
+              "contactMPa": 679.6979339083471,
+              "failures": [],
+              "flankNormalN": 961.6151695117826,
+              "radialBearingN": 743.9108775528483,
+              "separatingN": 267.9967213922123
+            },
+            "reducer": {
+              "peakOutputNm": 7.753898941309627,
+              "ratedOutputNm": 4.342134147789309,
+              "axialN": 246.1270821228858,
+              "radialN": 1321.4108775528484,
+              "preloadN": 385,
+              "requiredPreloadN": 267.9967213922123
+            },
+            "compliance": {
+              "backlashM": 5.3888888888888896e-05,
+              "beltMPerN": 0,
+              "hingeMPerN": 7.609102076525775e-08,
+              "meshMPerN": 2e-08,
+              "reducerMPerN": 2.1108579925487037e-08,
+              "stiffnessNPerM": 8532452.278900722
+            },
+            "beltAlternative": {
+              "series": {
+                "backlashM": 4.666666666666667e-05,
+                "beltMPerN": 2.666666666666667e-08,
+                "hingeMPerN": 7.609102076525775e-08,
+                "meshMPerN": 2e-08,
+                "reducerMPerN": 0,
+                "stiffnessNPerM": 8146129.345704338
+              },
+              "axialRigidityN": 100000,
+              "freeSpanM": 0.3,
+              "inputTeeth": 20,
+              "outputTeeth": 150,
+              "drivenPitchDiameterMm": 238.732414637843,
+              "toothCapacityQualified": false,
+              "packagingQualified": false
+            },
+            "screw": null,
+            "failures": []
+          },
+          {
+            "axis": "y",
+            "movingMassKg": 196.5328259196255,
+            "movingMembers": [
+              {
+                "id": "blockYLeft",
+                "kg": 0.5697216
+              },
+              {
+                "id": "beamFootLeft",
+                "kg": 7.886424
+              },
+              {
+                "id": "beam",
+                "kg": 72.50238506699993
+              },
+              {
+                "id": "beamFootRight",
+                "kg": 7.886424
+              },
+              {
+                "id": "blockYRight",
+                "kg": 0.5697216
+              },
+              {
+                "id": "blockYLeftRear",
+                "kg": 0.5697216
+              },
+              {
+                "id": "blockYRightRear",
+                "kg": 0.5697216
+              },
+              {
+                "id": "railX",
+                "kg": 5.857670000000001
+              },
+              {
+                "id": "railXLower",
+                "kg": 5.857670000000001
+              },
+              {
+                "id": "blockX",
+                "kg": 0.33460625
+              },
+              {
+                "id": "xCarriage",
+                "kg": 20.057557499999998
+              },
+              {
+                "id": "blockX01",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockX10",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockX11",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ01",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ10",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ11",
+                "kg": 0.33460625
+              },
+              {
+                "id": "railZ",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "zCarriage",
+                "kg": 12.029958
+              },
+              {
+                "id": "railZRight",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "motorYLeftSupport",
+                "kg": 0.15791986864219015
+              },
+              {
+                "id": "motorYLeftPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorYLeft",
+                "kg": 2.007144800493696
+              },
+              {
+                "id": "pinionYLeftReducer",
+                "kg": 1.2806152673644413
+              },
+              {
+                "id": "pinionYLeft",
+                "kg": 0.07738928758070747
+              },
+              {
+                "id": "pinionYLeftOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "pinionYLeftPreload",
+                "kg": 1.6068837148169777
+              },
+              {
+                "id": "motorYRightSupport",
+                "kg": 0.06378823905081839
+              },
+              {
+                "id": "motorYRightPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorYRight",
+                "kg": 2.007144800493696
+              },
+              {
+                "id": "pinionYRightReducer",
+                "kg": 1.2806152673644413
+              },
+              {
+                "id": "pinionYRight",
+                "kg": 0.07738928758070747
+              },
+              {
+                "id": "pinionYRightOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "pinionYRightPreload",
+                "kg": 1.6068837148169777
+              },
+              {
+                "id": "motorXSupport",
+                "kg": 0.9168870410778241
+              },
+              {
+                "id": "motorXPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorX",
+                "kg": 2.007144800493696
+              },
+              {
+                "id": "pinionXReducer",
+                "kg": 1.2806152673644413
+              },
+              {
+                "id": "rackX",
+                "kg": 4.432438680357503
+              },
+              {
+                "id": "pinionX",
+                "kg": 0.07738928758070747
+              },
+              {
+                "id": "pinionXOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "pinionXPreload",
+                "kg": 1.6068837148169777
+              },
+              {
+                "id": "motorZSupport",
+                "kg": 0.08372159999999994
+              },
+              {
+                "id": "motorZPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorZ",
+                "kg": 2.4821536097164723
+              },
+              {
+                "id": "screwZCoupling",
+                "kg": 0.09430966290965079
+              },
+              {
+                "id": "screwZ",
+                "kg": 0.6155510981737696
+              },
+              {
+                "id": "screwZNut",
+                "kg": 0.09187692016299448
+              },
+              {
+                "id": "screwZOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "screwZFixedBracket",
+                "kg": 0.07776000000000001
+              },
+              {
+                "id": "screwZFixed",
+                "kg": 0.45082737169259635
+              },
+              {
+                "id": "screwZNutSupport",
+                "kg": 0.0299376
+              },
+              {
+                "id": "screwZNutMount",
+                "kg": 0.045586585398714144
+              },
+              {
+                "id": "switchTriggerYLeft",
+                "kg": 0.34854
+              },
+              {
+                "id": "switchTriggerYRight",
+                "kg": 0.34854
+              },
+              {
+                "id": "switchTriggerX",
+                "kg": 0.5063721
+              },
+              {
+                "id": "switchXhomeMount",
+                "kg": 0.6482433228786054
+              },
+              {
+                "id": "switchXhome",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchXnegativeLimitMount",
+                "kg": 0.6482433228786054
+              },
+              {
+                "id": "switchXnegativeLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchXpositiveLimitMount",
+                "kg": 0.6482433228786054
+              },
+              {
+                "id": "switchXpositiveLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchTriggerZ",
+                "kg": 0.01884
+              },
+              {
+                "id": "switchZhomeMount",
+                "kg": 0.06765946143930288
+              },
+              {
+                "id": "switchZhome",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchZnegativeLimitMount",
+                "kg": 0.06377146143930287
+              },
+              {
+                "id": "switchZnegativeLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchZpositiveLimitMount",
+                "kg": 0.1555282614393029
+              },
+              {
+                "id": "switchZpositiveLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "cableChainX",
+                "kg": 0.4410127242729428
+              },
+              {
+                "id": "spindleMount",
+                "kg": 1.9412098100172634
+              },
+              {
+                "id": "spindle",
+                "kg": 10.540966177227977
+              },
+              {
+                "id": "spindleRelease",
+                "kg": 0.942865718936021
+              },
+              {
+                "id": "holder",
+                "kg": 0.546067642892657
+              },
+              {
+                "id": "collet",
+                "kg": 0.23305119702492488
+              },
+              {
+                "id": "longestTool",
+                "kg": 0.053268845034268535
+              },
+              {
+                "id": "chainYMovingBracket",
+                "kg": 1.4703050000000004
+              },
+              {
+                "id": "chainXMovingBracket",
+                "kg": 2.5988406250000002
+              },
+              {
+                "id": "chainXFixedBracket",
+                "kg": 6.680350000000001
+              },
+              {
+                "id": "shoe",
+                "kg": 0.9141716725625528
+              },
+              {
+                "id": "shoeLiftCylinder",
+                "kg": 0.23400901835952204
+              },
+              {
+                "id": "shoeLiftBracket",
+                "kg": 0.29202
+              },
+              {
+                "id": "shoeLiftRod",
+                "kg": 0.08323257036604459
+              },
+              {
+                "id": "shoeLiftValve",
+                "kg": 0.162
+              },
+              {
+                "id": "cableChainY (whole chain upper bound)",
+                "kg": 0.7179127242729432
+              }
+            ],
+            "motor": "GENERIC-HV-SERVO-750W",
+            "input": {
+              "acceleration": 3,
+              "cuttingForceN": 229.1831180523292,
+              "dragForceN": 30,
+              "efficiency": 0.9025,
+              "gravityForceN": 0,
+              "massKg": 196.5328259196255,
+              "metresPerRadian": 0.0031830988618379067,
+              "motors": 2,
+              "reserve": 1.5,
+              "rotaryDragNm": 0,
+              "rotaryInertiaKgM2": 2.0682319944990914e-05,
+              "strokeM": 0.1,
+              "velocity": 0.6666666666666666
+            },
+            "motorRatings": {
+              "maxRpm": 5000,
+              "peakNm": 7.1619724391352895,
+              "ratedNm": 2.38732414637843,
+              "ratedRpm": 3000,
+              "rotorInertiaKgM2": 0.00012
+            },
+            "rotatingOutputInertiaKgM2": 1.7057998624772792e-05,
+            "demand": {
+              "cycleSeconds": 1.7302967433402214,
+              "externalInertiaKgM2": 0.00101632924728249,
+              "failures": [],
+              "inertiaRatio": 8.469410394020748,
+              "motorRpm": 1999.9999999999998,
+              "peakForcePerMotorN": 424.3907979056028,
+              "peakNm": 1.631513394373907,
+              "phases": [
+                {
+                  "name": "outbound acceleration",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.631513394373907
+                },
+                {
+                  "name": "outbound deceleration upper bound",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.631513394373907
+                },
+                {
+                  "name": "return acceleration",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.631513394373907
+                },
+                {
+                  "name": "return deceleration upper bound",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.631513394373907
+                },
+                {
+                  "name": "powered dwell",
+                  "seconds": 1,
+                  "torqueNm": 0
+                }
+              ],
+              "reflectedLinearInertiaKgM2": 0.0009956469273374989,
+              "rmsNm": 1.059936945675409,
+              "sustainedNm": 0.4570667523988747
+            },
+            "alternatives": [
+              {
+                "selection": "dual 400 W Y, unchanged mechanical load",
+                "mountingQualified": false,
+                "demand": {
+                  "cycleSeconds": 1.7302967433402214,
+                  "externalInertiaKgM2": 0.00101632924728249,
+                  "failures": [
+                    "GENERIC-HV-SERVO-400W: duty RMS torque with reserve"
+                  ],
+                  "inertiaRatio": 20.326584945649795,
+                  "motorRpm": 1999.9999999999998,
+                  "peakForcePerMotorN": 424.3907979056028,
+                  "peakNm": 1.5655399486485213,
+                  "phases": [
+                    {
+                      "name": "outbound acceleration",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.5655399486485213
+                    },
+                    {
+                      "name": "outbound deceleration upper bound",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.5655399486485213
+                    },
+                    {
+                      "name": "return acceleration",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.5655399486485213
+                    },
+                    {
+                      "name": "return deceleration upper bound",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.5655399486485213
+                    },
+                    {
+                      "name": "powered dwell",
+                      "seconds": 1,
+                      "torqueNm": 0
+                    }
+                  ],
+                  "reflectedLinearInertiaKgM2": 0.0009956469273374989,
+                  "rmsNm": 1.0170763152944475,
+                  "sustainedNm": 0.4570667523988747
+                }
+              }
+            ],
+            "torqueUtilizationWithReserve": {
+              "peak": 0.34170336626656095,
+              "rms": 0.6659780243604538,
+              "sustained": 0.28718351030728995
+            },
+            "driveAccuracy": {
+              "axisStiffnessNPerM": 17064904.557801444,
+              "cuttingAndReversalM": 6.907696785964647e-05,
+              "reservedAccelerationAndReversalM": 0.0001284965369659337,
+              "cuttingDriveBudgetM": 0.0001,
+              "accelerationDriveBudgetM": 0.0002,
+              "idealDriveOnlyHz": 46.89802070554396,
+              "hingeComplianceFraction": 0.6492430035324056,
+              "halfHingeStiffnessHz": 36.51843763275046,
+              "tenPercentHeavierHz": 44.71550825240135
+            },
+            "catalogueRack": {
+              "permissibleFeedN": 6000,
+              "mountingDeratedFeedN": 3000,
+              "demandN": 816.7596175662517,
+              "utilization": 0.27225320585541724,
+              "passes": true,
+              "source": "https://www.atlantadrives.com/pdf/ads_rackratings-h.pdf",
+              "catalogue": "Module 1.5, 20 teeth, HPR quality 6; case-hardened 16MnCr5 pinion, hardened rack",
+              "standardRackWidthMm": 19,
+              "selectedEnvelopeWidthMm": 20,
+              "sourceBasis": "Manufacturer maximum feed force; grease lubrication, speed 1.5 m/s, uniform tooth loading, SB=1",
+              "qualification": "Candidate sourcing requirement only. Actual heat treatment, part drawing, face engagement, duty factors and mounting bolts must match before purchase."
+            },
+            "tooth": {
+              "axialN": 225.77813454408528,
+              "bendingMPa": 112.23073557321462,
+              "contactMPa": 668.0668868332533,
+              "failures": [],
+              "flankNormalN": 928.9862768012922,
+              "radialBearingN": 682.4068637724206,
+              "separatingN": 245.839666638775
+            },
+            "reducer": {
+              "peakOutputNm": 7.1130988611362165,
+              "ratedOutputNm": 2.1710670738946547,
+              "axialN": 225.77813454408528,
+              "radialN": 1259.9068637724206,
+              "preloadN": 385,
+              "requiredPreloadN": 245.839666638775
+            },
+            "compliance": {
+              "backlashM": 5.3888888888888896e-05,
+              "beltMPerN": 0,
+              "hingeMPerN": 7.609102076525775e-08,
+              "meshMPerN": 2e-08,
+              "reducerMPerN": 2.1108579925487037e-08,
+              "stiffnessNPerM": 8532452.278900722
+            },
+            "beltAlternative": {
+              "series": {
+                "backlashM": 5e-05,
+                "beltMPerN": 6e-08,
+                "hingeMPerN": 7.609102076525775e-08,
+                "meshMPerN": 2e-08,
+                "reducerMPerN": 0,
+                "stiffnessNPerM": 6406518.421734717
+              },
+              "axialRigidityN": 100000,
+              "freeSpanM": 0.3,
+              "inputTeeth": 20,
+              "outputTeeth": 100,
+              "drivenPitchDiameterMm": 159.15494309189535,
+              "toothCapacityQualified": false,
+              "packagingQualified": false
+            },
+            "screw": null,
+            "failures": []
+          }
+        ]
+      },
+      {
+        "workY": 3150,
+        "axes": [
+          {
+            "axis": "z",
+            "movingMassKg": 31.222524257982933,
+            "movingMembers": [
+              {
+                "id": "railZ",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "zCarriage",
+                "kg": 12.029958
+              },
+              {
+                "id": "railZRight",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "screwZNut",
+                "kg": 0.09187692016299448
+              },
+              {
+                "id": "screwZNutSupport",
+                "kg": 0.0299376
+              },
+              {
+                "id": "screwZNutMount",
+                "kg": 0.045586585398714144
+              },
+              {
+                "id": "switchTriggerZ",
+                "kg": 0.01884
+              },
+              {
+                "id": "spindleMount",
+                "kg": 1.9412098100172634
+              },
+              {
+                "id": "spindle",
+                "kg": 10.540966177227977
+              },
+              {
+                "id": "spindleRelease",
+                "kg": 0.942865718936021
+              },
+              {
+                "id": "holder",
+                "kg": 0.546067642892657
+              },
+              {
+                "id": "collet",
+                "kg": 0.23305119702492488
+              },
+              {
+                "id": "longestTool",
+                "kg": 0.053268845034268535
+              },
+              {
+                "id": "shoe",
+                "kg": 0.9141716725625528
+              },
+              {
+                "id": "shoeLiftCylinder",
+                "kg": 0.23400901835952204
+              },
+              {
+                "id": "shoeLiftBracket",
+                "kg": 0.29202
+              },
+              {
+                "id": "shoeLiftRod",
+                "kg": 0.08323257036604459
+              },
+              {
+                "id": "shoeLiftValve",
+                "kg": 0.162
+              }
+            ],
+            "motor": "GENERIC-HV-SERVO-750W",
+            "input": {
+              "acceleration": 3,
+              "cuttingForceN": 229.1831180523292,
+              "dragForceN": 30,
+              "efficiency": 0.9,
+              "gravityForceN": 306.1883675145483,
+              "massKg": 31.222524257982933,
+              "metresPerRadian": 0.0015915494309189536,
+              "motors": 1,
+              "reserve": 1.5,
+              "rotaryDragNm": 0.005,
+              "rotaryInertiaKgM2": 3.70951963318653e-05,
+              "strokeM": 0.1,
+              "velocity": 0.16666666666666666
+            },
+            "motorRatings": {
+              "maxRpm": 5000,
+              "peakNm": 7.1619724391352895,
+              "ratedNm": 2.38732414637843,
+              "ratedRpm": 3000,
+              "rotorInertiaKgM2": 0.00012
+            },
+            "rotatingOutputInertiaKgM2": 3.70951963318653e-05,
+            "demand": {
+              "cycleSeconds": 2.3111111111111113,
+              "externalInertiaKgM2": 0.00011618277418487618,
+              "failures": [],
+              "inertiaRatio": 0.9681897848739681,
+              "motorRpm": 999.9999999999998,
+              "peakForcePerMotorN": 659.0390583408263,
+              "peakNm": 1.4743235999734656,
+              "phases": [
+                {
+                  "name": "outbound acceleration",
+                  "seconds": 0.05555555555555555,
+                  "torqueNm": 1.4743235999734656
+                },
+                {
+                  "name": "outbound cruise",
+                  "seconds": 0.5444444444444445,
+                  "torqueNm": 1.0047962956797414
+                },
+                {
+                  "name": "outbound deceleration upper bound",
+                  "seconds": 0.05555555555555555,
+                  "torqueNm": 1.4743235999734656
+                },
+                {
+                  "name": "return acceleration",
+                  "seconds": 0.05555555555555555,
+                  "torqueNm": 1.4743235999734656
+                },
+                {
+                  "name": "return cruise",
+                  "seconds": 0.5444444444444445,
+                  "torqueNm": 1.0047962956797414
+                },
+                {
+                  "name": "return deceleration upper bound",
+                  "seconds": 0.05555555555555555,
+                  "torqueNm": 1.4743235999734656
+                },
+                {
+                  "name": "powered dwell",
+                  "seconds": 1,
+                  "torqueNm": 0.541459913413092
+                }
+              ],
+              "reflectedLinearInertiaKgM2": 7.908757785301088e-05,
+              "rmsNm": 0.9008570314282195,
+              "sustainedNm": 1.0047962956797414
+            },
+            "alternatives": [],
+            "torqueUtilizationWithReserve": {
+              "peak": 0.30878161271271315,
+              "rms": 0.5660251663739209,
+              "sustained": 0.6313321321723427
+            },
+            "driveAccuracy": null,
+            "catalogueRack": null,
+            "tooth": null,
+            "reducer": null,
+            "compliance": null,
+            "beltAlternative": null,
+            "screw": {
+              "nominalMm": 16,
+              "rootMm": 13,
+              "lengthMm": 390,
+              "criticalRpm": 2896.9862765441585,
+              "bucklingN": 4776.097045936806,
+              "stiffnessNPerM": 33679983.98904847,
+              "backlashM": 1e-05,
+              "alternative20CriticalRpm": 3788.3666693269765,
+              "alternative20BucklingN": 13966.751912527154,
+              "requested15MMinRpm": 1500,
+              "selectedRapidMmPerMinute": 10000,
+              "brakeHoldingNm": 2.5,
+              "requiredBrakeNm": 0.7309708831076741
+            },
+            "failures": []
+          },
+          {
+            "axis": "x",
+            "movingMassKg": 67.81906783827726,
+            "movingMembers": [
+              {
+                "id": "blockX",
+                "kg": 0.33460625
+              },
+              {
+                "id": "xCarriage",
+                "kg": 20.057557499999998
+              },
+              {
+                "id": "blockX01",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockX10",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockX11",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ01",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ10",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ11",
+                "kg": 0.33460625
+              },
+              {
+                "id": "railZ",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "zCarriage",
+                "kg": 12.029958
+              },
+              {
+                "id": "railZRight",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "motorXSupport",
+                "kg": 0.9168870410778241
+              },
+              {
+                "id": "motorXPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorX",
+                "kg": 2.007144800493696
+              },
+              {
+                "id": "pinionXReducer",
+                "kg": 1.2806152673644413
+              },
+              {
+                "id": "pinionX",
+                "kg": 0.07738928758070747
+              },
+              {
+                "id": "pinionXOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "pinionXPreload",
+                "kg": 1.6068837148169777
+              },
+              {
+                "id": "motorZSupport",
+                "kg": 0.08372159999999994
+              },
+              {
+                "id": "motorZPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorZ",
+                "kg": 2.4821536097164723
+              },
+              {
+                "id": "screwZCoupling",
+                "kg": 0.09430966290965079
+              },
+              {
+                "id": "screwZ",
+                "kg": 0.6155510981737696
+              },
+              {
+                "id": "screwZNut",
+                "kg": 0.09187692016299448
+              },
+              {
+                "id": "screwZOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "screwZFixedBracket",
+                "kg": 0.07776000000000001
+              },
+              {
+                "id": "screwZFixed",
+                "kg": 0.45082737169259635
+              },
+              {
+                "id": "screwZNutSupport",
+                "kg": 0.0299376
+              },
+              {
+                "id": "screwZNutMount",
+                "kg": 0.045586585398714144
+              },
+              {
+                "id": "switchTriggerX",
+                "kg": 0.5063721
+              },
+              {
+                "id": "switchTriggerZ",
+                "kg": 0.01884
+              },
+              {
+                "id": "switchZhomeMount",
+                "kg": 0.06765946143930288
+              },
+              {
+                "id": "switchZhome",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchZnegativeLimitMount",
+                "kg": 0.06377146143930287
+              },
+              {
+                "id": "switchZnegativeLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchZpositiveLimitMount",
+                "kg": 0.1555282614393029
+              },
+              {
+                "id": "switchZpositiveLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "spindleMount",
+                "kg": 1.9412098100172634
+              },
+              {
+                "id": "spindle",
+                "kg": 10.540966177227977
+              },
+              {
+                "id": "spindleRelease",
+                "kg": 0.942865718936021
+              },
+              {
+                "id": "holder",
+                "kg": 0.546067642892657
+              },
+              {
+                "id": "collet",
+                "kg": 0.23305119702492488
+              },
+              {
+                "id": "longestTool",
+                "kg": 0.053268845034268535
+              },
+              {
+                "id": "chainXMovingBracket",
+                "kg": 2.5988406250000002
+              },
+              {
+                "id": "shoe",
+                "kg": 0.9141716725625528
+              },
+              {
+                "id": "shoeLiftCylinder",
+                "kg": 0.23400901835952204
+              },
+              {
+                "id": "shoeLiftBracket",
+                "kg": 0.29202
+              },
+              {
+                "id": "shoeLiftRod",
+                "kg": 0.08323257036604459
+              },
+              {
+                "id": "shoeLiftValve",
+                "kg": 0.162
+              },
+              {
+                "id": "cableChainX (whole chain upper bound)",
+                "kg": 0.4410127242729428
+              }
+            ],
+            "motor": "GENERIC-HV-SERVO-750W",
+            "input": {
+              "acceleration": 3,
+              "cuttingForceN": 229.1831180523292,
+              "dragForceN": 30,
+              "efficiency": 0.9025,
+              "gravityForceN": 0,
+              "massKg": 67.81906783827726,
+              "metresPerRadian": 0.0021220659078919376,
+              "motors": 1,
+              "reserve": 1.5,
+              "rotaryDragNm": 0,
+              "rotaryInertiaKgM2": 2.0303253308884853e-05,
+              "strokeM": 0.1,
+              "velocity": 0.6666666666666666
+            },
+            "motorRatings": {
+              "maxRpm": 5000,
+              "peakNm": 7.1619724391352895,
+              "ratedNm": 2.38732414637843,
+              "ratedRpm": 3000,
+              "rotorInertiaKgM2": 0.00012
+            },
+            "rotatingOutputInertiaKgM2": 1.7057998624772792e-05,
+            "demand": {
+              "cycleSeconds": 1.7302967433402214,
+              "externalInertiaKgM2": 0.00032570361894862943,
+              "failures": [],
+              "inertiaRatio": 2.714196824571912,
+              "motorRpm": 3000,
+              "peakForcePerMotorN": 462.640321567161,
+              "peakNm": 1.2892651746638872,
+              "phases": [
+                {
+                  "name": "outbound acceleration",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.2892651746638872
+                },
+                {
+                  "name": "outbound deceleration upper bound",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.2892651746638872
+                },
+                {
+                  "name": "return acceleration",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.2892651746638872
+                },
+                {
+                  "name": "return deceleration upper bound",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.2892651746638872
+                },
+                {
+                  "name": "powered dwell",
+                  "seconds": 1,
+                  "torqueNm": 0
+                }
+              ],
+              "reflectedLinearInertiaKgM2": 0.00030540036563974455,
+              "rmsNm": 0.8375902987442666,
+              "sustainedNm": 0.6094223365318329
+            },
+            "alternatives": [
+              {
+                "selection": "original 400 W X at 5:1",
+                "demand": {
+                  "cycleSeconds": 1.7302967433402214,
+                  "externalInertiaKgM2": 0.0007078331426344163,
+                  "failures": [
+                    "GENERIC-HV-SERVO-400W: duty RMS torque with reserve",
+                    "GENERIC-HV-SERVO-400W: sustained cutting torque with reserve"
+                  ],
+                  "inertiaRatio": 14.156662852688324,
+                  "motorRpm": 1999.9999999999998,
+                  "peakForcePerMotorN": 462.640321567161,
+                  "peakNm": 1.7004452286850285,
+                  "phases": [
+                    {
+                      "name": "outbound acceleration",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.7004452286850285
+                    },
+                    {
+                      "name": "outbound deceleration upper bound",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.7004452286850285
+                    },
+                    {
+                      "name": "return acceleration",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.7004452286850285
+                    },
+                    {
+                      "name": "return deceleration upper bound",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.7004452286850285
+                    },
+                    {
+                      "name": "powered dwell",
+                      "seconds": 1,
+                      "torqueNm": 0
+                    }
+                  ],
+                  "reflectedLinearInertiaKgM2": 0.0006871508226894254,
+                  "rmsNm": 1.1047195372075926,
+                  "sustainedNm": 0.9141335047977494
+                }
+              }
+            ],
+            "torqueUtilizationWithReserve": {
+              "peak": 0.27002306675021537,
+              "rms": 0.5262735058506136,
+              "sustained": 0.3829113470763866
+            },
+            "driveAccuracy": {
+              "axisStiffnessNPerM": 8532452.278900722,
+              "cuttingAndReversalM": 8.426504683040404e-05,
+              "reservedAccelerationAndReversalM": 0.00013522078031555243,
+              "cuttingDriveBudgetM": 0.0001,
+              "accelerationDriveBudgetM": 0.0002,
+              "idealDriveOnlyHz": 56.45223718366438,
+              "hingeComplianceFraction": 0.6492430035324056,
+              "halfHingeStiffnessHz": 43.95809187267431,
+              "tenPercentHeavierHz": 53.825096233842935
+            },
+            "catalogueRack": {
+              "permissibleFeedN": 6000,
+              "mountingDeratedFeedN": 3000,
+              "demandN": 845.4467603124203,
+              "utilization": 0.28181558677080676,
+              "passes": true,
+              "source": "https://www.atlantadrives.com/pdf/ads_rackratings-h.pdf",
+              "catalogue": "Module 1.5, 20 teeth, HPR quality 6; case-hardened 16MnCr5 pinion, hardened rack",
+              "standardRackWidthMm": 19,
+              "selectedEnvelopeWidthMm": 20,
+              "sourceBasis": "Manufacturer maximum feed force; grease lubrication, speed 1.5 m/s, uniform tooth loading, SB=1",
+              "qualification": "Candidate sourcing requirement only. Actual heat treatment, part drawing, face engagement, duty factors and mounting bolts must match before purchase."
+            },
+            "tooth": {
+              "axialN": 246.1270821228858,
+              "bendingMPa": 116.1726287112347,
+              "contactMPa": 679.6979339083471,
+              "failures": [],
+              "flankNormalN": 961.6151695117826,
+              "radialBearingN": 743.9108775528483,
+              "separatingN": 267.9967213922123
+            },
+            "reducer": {
+              "peakOutputNm": 7.753898941309627,
+              "ratedOutputNm": 4.342134147789309,
+              "axialN": 246.1270821228858,
+              "radialN": 1321.4108775528484,
+              "preloadN": 385,
+              "requiredPreloadN": 267.9967213922123
+            },
+            "compliance": {
+              "backlashM": 5.3888888888888896e-05,
+              "beltMPerN": 0,
+              "hingeMPerN": 7.609102076525775e-08,
+              "meshMPerN": 2e-08,
+              "reducerMPerN": 2.1108579925487037e-08,
+              "stiffnessNPerM": 8532452.278900722
+            },
+            "beltAlternative": {
+              "series": {
+                "backlashM": 4.666666666666667e-05,
+                "beltMPerN": 2.666666666666667e-08,
+                "hingeMPerN": 7.609102076525775e-08,
+                "meshMPerN": 2e-08,
+                "reducerMPerN": 0,
+                "stiffnessNPerM": 8146129.345704338
+              },
+              "axialRigidityN": 100000,
+              "freeSpanM": 0.3,
+              "inputTeeth": 20,
+              "outputTeeth": 150,
+              "drivenPitchDiameterMm": 238.732414637843,
+              "toothCapacityQualified": false,
+              "packagingQualified": false
+            },
+            "screw": null,
+            "failures": []
+          },
+          {
+            "axis": "y",
+            "movingMassKg": 196.64997591962552,
+            "movingMembers": [
+              {
+                "id": "blockYLeft",
+                "kg": 0.5697216
+              },
+              {
+                "id": "beamFootLeft",
+                "kg": 7.886424
+              },
+              {
+                "id": "beam",
+                "kg": 72.50238506699993
+              },
+              {
+                "id": "beamFootRight",
+                "kg": 7.886424
+              },
+              {
+                "id": "blockYRight",
+                "kg": 0.5697216
+              },
+              {
+                "id": "blockYLeftRear",
+                "kg": 0.5697216
+              },
+              {
+                "id": "blockYRightRear",
+                "kg": 0.5697216
+              },
+              {
+                "id": "railX",
+                "kg": 5.857670000000001
+              },
+              {
+                "id": "railXLower",
+                "kg": 5.857670000000001
+              },
+              {
+                "id": "blockX",
+                "kg": 0.33460625
+              },
+              {
+                "id": "xCarriage",
+                "kg": 20.057557499999998
+              },
+              {
+                "id": "blockX01",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockX10",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockX11",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ01",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ10",
+                "kg": 0.33460625
+              },
+              {
+                "id": "blockZ11",
+                "kg": 0.33460625
+              },
+              {
+                "id": "railZ",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "zCarriage",
+                "kg": 12.029958
+              },
+              {
+                "id": "railZRight",
+                "kg": 1.5317312500000002
+              },
+              {
+                "id": "motorYLeftSupport",
+                "kg": 0.15791986864219015
+              },
+              {
+                "id": "motorYLeftPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorYLeft",
+                "kg": 2.007144800493696
+              },
+              {
+                "id": "pinionYLeftReducer",
+                "kg": 1.2806152673644413
+              },
+              {
+                "id": "pinionYLeft",
+                "kg": 0.07738928758070747
+              },
+              {
+                "id": "pinionYLeftOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "pinionYLeftPreload",
+                "kg": 1.6068837148169777
+              },
+              {
+                "id": "motorYRightSupport",
+                "kg": 0.06378823905081839
+              },
+              {
+                "id": "motorYRightPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorYRight",
+                "kg": 2.007144800493696
+              },
+              {
+                "id": "pinionYRightReducer",
+                "kg": 1.2806152673644413
+              },
+              {
+                "id": "pinionYRight",
+                "kg": 0.07738928758070747
+              },
+              {
+                "id": "pinionYRightOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "pinionYRightPreload",
+                "kg": 1.6068837148169777
+              },
+              {
+                "id": "motorXSupport",
+                "kg": 0.9168870410778241
+              },
+              {
+                "id": "motorXPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorX",
+                "kg": 2.007144800493696
+              },
+              {
+                "id": "pinionXReducer",
+                "kg": 1.2806152673644413
+              },
+              {
+                "id": "rackX",
+                "kg": 4.432438680357503
+              },
+              {
+                "id": "pinionX",
+                "kg": 0.07738928758070747
+              },
+              {
+                "id": "pinionXOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "pinionXPreload",
+                "kg": 1.6068837148169777
+              },
+              {
+                "id": "motorZSupport",
+                "kg": 0.08372159999999994
+              },
+              {
+                "id": "motorZPlate",
+                "kg": 0.07219819427353959
+              },
+              {
+                "id": "motorZ",
+                "kg": 2.4821536097164723
+              },
+              {
+                "id": "screwZCoupling",
+                "kg": 0.09430966290965079
+              },
+              {
+                "id": "screwZ",
+                "kg": 0.6155510981737696
+              },
+              {
+                "id": "screwZNut",
+                "kg": 0.09187692016299448
+              },
+              {
+                "id": "screwZOutputShaft",
+                "kg": 0.07789952048703508
+              },
+              {
+                "id": "screwZFixedBracket",
+                "kg": 0.07776000000000001
+              },
+              {
+                "id": "screwZFixed",
+                "kg": 0.45082737169259635
+              },
+              {
+                "id": "screwZNutSupport",
+                "kg": 0.0299376
+              },
+              {
+                "id": "screwZNutMount",
+                "kg": 0.045586585398714144
+              },
+              {
+                "id": "switchTriggerYLeft",
+                "kg": 0.34854
+              },
+              {
+                "id": "switchTriggerYRight",
+                "kg": 0.34854
+              },
+              {
+                "id": "switchTriggerX",
+                "kg": 0.5063721
+              },
+              {
+                "id": "switchXhomeMount",
+                "kg": 0.6482433228786054
+              },
+              {
+                "id": "switchXhome",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchXnegativeLimitMount",
+                "kg": 0.6482433228786054
+              },
+              {
+                "id": "switchXnegativeLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchXpositiveLimitMount",
+                "kg": 0.6482433228786054
+              },
+              {
+                "id": "switchXpositiveLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchTriggerZ",
+                "kg": 0.01884
+              },
+              {
+                "id": "switchZhomeMount",
+                "kg": 0.06765946143930288
+              },
+              {
+                "id": "switchZhome",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchZnegativeLimitMount",
+                "kg": 0.06377146143930287
+              },
+              {
+                "id": "switchZnegativeLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "switchZpositiveLimitMount",
+                "kg": 0.1555282614393029
+              },
+              {
+                "id": "switchZpositiveLimit",
+                "kg": 0.01183752111872634
+              },
+              {
+                "id": "cableChainX",
+                "kg": 0.4410127242729428
+              },
+              {
+                "id": "spindleMount",
+                "kg": 1.9412098100172634
+              },
+              {
+                "id": "spindle",
+                "kg": 10.540966177227977
+              },
+              {
+                "id": "spindleRelease",
+                "kg": 0.942865718936021
+              },
+              {
+                "id": "holder",
+                "kg": 0.546067642892657
+              },
+              {
+                "id": "collet",
+                "kg": 0.23305119702492488
+              },
+              {
+                "id": "longestTool",
+                "kg": 0.053268845034268535
+              },
+              {
+                "id": "chainYMovingBracket",
+                "kg": 1.4703050000000004
+              },
+              {
+                "id": "chainXMovingBracket",
+                "kg": 2.5988406250000002
+              },
+              {
+                "id": "chainXFixedBracket",
+                "kg": 6.680350000000001
+              },
+              {
+                "id": "shoe",
+                "kg": 0.9141716725625528
+              },
+              {
+                "id": "shoeLiftCylinder",
+                "kg": 0.23400901835952204
+              },
+              {
+                "id": "shoeLiftBracket",
+                "kg": 0.29202
+              },
+              {
+                "id": "shoeLiftRod",
+                "kg": 0.08323257036604459
+              },
+              {
+                "id": "shoeLiftValve",
+                "kg": 0.162
+              },
+              {
+                "id": "cableChainY (whole chain upper bound)",
+                "kg": 0.835062724272944
+              }
+            ],
+            "motor": "GENERIC-HV-SERVO-750W",
+            "input": {
+              "acceleration": 3,
+              "cuttingForceN": 229.1831180523292,
+              "dragForceN": 30,
+              "efficiency": 0.9025,
+              "gravityForceN": 0,
+              "massKg": 196.64997591962552,
+              "metresPerRadian": 0.0031830988618379067,
+              "motors": 2,
+              "reserve": 1.5,
+              "rotaryDragNm": 0,
+              "rotaryInertiaKgM2": 2.0682319944990914e-05,
+              "strokeM": 0.1,
+              "velocity": 0.6666666666666666
+            },
+            "motorRatings": {
+              "maxRpm": 5000,
+              "peakNm": 7.1619724391352895,
+              "ratedNm": 2.38732414637843,
+              "ratedRpm": 3000,
+              "rotorInertiaKgM2": 0.00012
+            },
+            "rotatingOutputInertiaKgM2": 1.7057998624772792e-05,
+            "demand": {
+              "cycleSeconds": 1.7302967433402214,
+              "externalInertiaKgM2": 0.0010169227361156749,
+              "failures": [],
+              "inertiaRatio": 8.47435613429729,
+              "motorRpm": 1999.9999999999998,
+              "peakForcePerMotorN": 424.5665229056029,
+              "peakNm": 1.6321331728198867,
+              "phases": [
+                {
+                  "name": "outbound acceleration",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.6321331728198867
+                },
+                {
+                  "name": "outbound deceleration upper bound",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.6321331728198867
+                },
+                {
+                  "name": "return acceleration",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.6321331728198867
+                },
+                {
+                  "name": "return deceleration upper bound",
+                  "seconds": 0.18257418583505539,
+                  "torqueNm": 1.6321331728198867
+                },
+                {
+                  "name": "powered dwell",
+                  "seconds": 1,
+                  "torqueNm": 0
+                }
+              ],
+              "reflectedLinearInertiaKgM2": 0.0009962404161706839,
+              "rmsNm": 1.0603395939621423,
+              "sustainedNm": 0.4570667523988747
+            },
+            "alternatives": [
+              {
+                "selection": "dual 400 W Y, unchanged mechanical load",
+                "mountingQualified": false,
+                "demand": {
+                  "cycleSeconds": 1.7302967433402214,
+                  "externalInertiaKgM2": 0.0010169227361156749,
+                  "failures": [
+                    "GENERIC-HV-SERVO-400W: duty RMS torque with reserve"
+                  ],
+                  "inertiaRatio": 20.338454722313497,
+                  "motorRpm": 1999.9999999999998,
+                  "peakForcePerMotorN": 424.5665229056029,
+                  "peakNm": 1.566159727094501,
+                  "phases": [
+                    {
+                      "name": "outbound acceleration",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.566159727094501
+                    },
+                    {
+                      "name": "outbound deceleration upper bound",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.566159727094501
+                    },
+                    {
+                      "name": "return acceleration",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.566159727094501
+                    },
+                    {
+                      "name": "return deceleration upper bound",
+                      "seconds": 0.18257418583505539,
+                      "torqueNm": 1.566159727094501
+                    },
+                    {
+                      "name": "powered dwell",
+                      "seconds": 1,
+                      "torqueNm": 0
+                    }
+                  ],
+                  "reflectedLinearInertiaKgM2": 0.0009962404161706839,
+                  "rmsNm": 1.017478963581181,
+                  "sustainedNm": 0.4570667523988747
+                }
+              }
+            ],
+            "torqueUtilizationWithReserve": {
+              "peak": 0.3418331723607438,
+              "rms": 0.6662310157403701,
+              "sustained": 0.28718351030728995
+            },
+            "driveAccuracy": {
+              "axisStiffnessNPerM": 17064904.557801444,
+              "cuttingAndReversalM": 6.907696785964647e-05,
+              "reservedAccelerationAndReversalM": 0.0001285274293156808,
+              "cuttingDriveBudgetM": 0.0001,
+              "accelerationDriveBudgetM": 0.0002,
+              "idealDriveOnlyHz": 46.884049380115975,
+              "hingeComplianceFraction": 0.6492430035324056,
+              "halfHingeStiffnessHz": 36.507558474768665,
+              "tenPercentHeavierHz": 44.70218711628358
+            },
+            "catalogueRack": {
+              "permissibleFeedN": 6000,
+              "mountingDeratedFeedN": 3000,
+              "demandN": 816.8914113162518,
+              "utilization": 0.27229713710541725,
+              "passes": true,
+              "source": "https://www.atlantadrives.com/pdf/ads_rackratings-h.pdf",
+              "catalogue": "Module 1.5, 20 teeth, HPR quality 6; case-hardened 16MnCr5 pinion, hardened rack",
+              "standardRackWidthMm": 19,
+              "selectedEnvelopeWidthMm": 20,
+              "sourceBasis": "Manufacturer maximum feed force; grease lubrication, speed 1.5 m/s, uniform tooth loading, SB=1",
+              "qualification": "Candidate sourcing requirement only. Actual heat treatment, part drawing, face engagement, duty factors and mounting bolts must match before purchase."
+            },
+            "tooth": {
+              "axialN": 225.87162116747243,
+              "bendingMPa": 112.2488453195688,
+              "contactMPa": 668.1207848754702,
+              "failures": [],
+              "flankNormalN": 929.1361796398814,
+              "radialBearingN": 682.6894239662992,
+              "separatingN": 245.9414600226874
+            },
+            "reducer": {
+              "peakOutputNm": 7.116042808754621,
+              "ratedOutputNm": 2.1710670738946547,
+              "axialN": 225.87162116747243,
+              "radialN": 1260.1894239662993,
+              "preloadN": 385,
+              "requiredPreloadN": 245.9414600226874
+            },
+            "compliance": {
+              "backlashM": 5.3888888888888896e-05,
+              "beltMPerN": 0,
+              "hingeMPerN": 7.609102076525775e-08,
+              "meshMPerN": 2e-08,
+              "reducerMPerN": 2.1108579925487037e-08,
+              "stiffnessNPerM": 8532452.278900722
+            },
+            "beltAlternative": {
+              "series": {
+                "backlashM": 5e-05,
+                "beltMPerN": 6e-08,
+                "hingeMPerN": 7.609102076525775e-08,
+                "meshMPerN": 2e-08,
+                "reducerMPerN": 0,
+                "stiffnessNPerM": 6406518.421734717
+              },
+              "axialRigidityN": 100000,
+              "freeSpanM": 0.3,
+              "inputTeeth": 20,
+              "outputTeeth": 100,
+              "drivenPitchDiameterMm": 159.15494309189535,
+              "toothCapacityQualified": false,
+              "packagingQualified": false
+            },
+            "screw": null,
+            "failures": []
+          }
+        ]
+      }
+    ]
+  },
+  "vacuum": {
+    "status": "PASS",
+    "assertions": 30,
+    "reports": [
+      {
+        "newSpoilThicknessMm": 25,
+        "hydraulicSensitivityThicknessMm": 18,
+        "wornSpoilboard": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 948.6083365587515,
+              "margin": 2.0695423481020896,
+              "normalForceN": 1897.216673117503,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.15616,
+              "supportByZoneM2": [
+                0.15616,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "boundsMaxM": [
+                0.1,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                0.05,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 15.186480797879604,
+              "margin": 0.03313176146423683,
+              "normalForceN": 30.372961595759207,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0.0025,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.8950720164604024e-06,
+            2.1399176954732512e-06,
+            2.1399176954732512e-06,
+            2.1399176954732512e-06,
+            2.1399176954732512e-06,
+            2.1399176954732512e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.15866,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0.22333333333333463,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 16366.157563427534,
+            "headerPressurePa": 15934.108167434457,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 103.60610923886956,
+            "zoneFlowM3PerHour": [
+              103.60610923886956,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              15186.480797879602,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0.0013400000000000079,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 43
+            }
+          ]
+        },
+        "tabbed": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 1083.4561021149016,
+              "margin": 2.363734535341117,
+              "normalForceN": 2166.912204229803,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.158736,
+              "supportByZoneM2": [
+                0.158736,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.393079345391804e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.158736,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0.2106666666666692,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 17868.62943427303,
+            "headerPressurePa": 17573.86765240384,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 85.57644678872369,
+            "zoneFlowM3PerHour": [
+              85.57644678872369,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              17063.8056602614,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": true,
+          "throughKerfAreaM2": 0.0012640000000000151,
+          "warnings": []
+        },
+        "workY": 2600,
+        "initial": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 1092.3958746132803,
+              "margin": 2.3832380934006108,
+              "normalForceN": 2184.7917492265606,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.16,
+              "supportByZoneM2": [
+                0.16,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.3919035314383145e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.16,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 17872.61089561154,
+            "headerPressurePa": 17578.178154288136,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 85.52866925266149,
+            "zoneFlowM3PerHour": [
+              85.52866925266149,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              17068.685540832503,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 0,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0,
+          "warnings": []
+        },
+        "allZonesOpen": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 399.7480186937321,
+              "margin": 0.8721148880661836,
+              "normalForceN": 799.4960373874642,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.16,
+              "supportByZoneM2": [
+                0.16,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.3919035314383145e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.16,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 7991.078951304831,
+            "headerPressurePa": 6314.288873649155,
+            "open": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "totalFlowM3PerHour": 204.10705258434209,
+            "zoneFlowM3PerHour": [
+              31.298100688421716,
+              34.56179037918407,
+              34.56179037918407,
+              34.56179037918407,
+              34.56179037918407,
+              34.56179037918407
+            ],
+            "zonePressurePa": [
+              6246.062792089563,
+              6231.092015477897,
+              6231.092015477897,
+              6231.092015477897,
+              6231.092015477897,
+              6231.092015477897
+            ]
+          },
+          "programLine": 0,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0,
+          "warnings": [
+            {
+              "code": "stock_hold_insufficient",
+              "component": 0,
+              "line": 0
+            }
+          ]
+        },
+        "through": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 1065.855234061041,
+              "margin": 2.325335397997498,
+              "normalForceN": 2131.710468122082,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.15616,
+              "supportByZoneM2": [
+                0.15616,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "boundsMaxM": [
+                0.1,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                0.05,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 17.063512328077632,
+              "margin": 0.03722680900994971,
+              "normalForceN": 34.127024656155264,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0.0025,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.3931500430662225e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.15866,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0.22333333333333463,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 17868.39011958329,
+            "headerPressurePa": 17573.608554137485,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 85.57931856500053,
+            "zoneFlowM3PerHour": [
+              85.57931856500053,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              17063.51232807763,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0.0013400000000000079,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 43
+            }
+          ]
+        },
+        "onion": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 1092.0802934169672,
+              "margin": 2.38254960203398,
+              "normalForceN": 2184.1605868339343,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.16,
+              "supportByZoneM2": [
+                0.16,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.3930916552666576e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.16,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0,
+          "minimumSupportThicknessMm": 0.5,
+          "point": {
+            "blowerPressurePa": 17868.587764185904,
+            "headerPressurePa": 17573.822537597385,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 85.57694682976911,
+            "zoneFlowM3PerHour": [
+              85.57694682976911,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              17063.75458464011,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": true,
+          "throughKerfAreaM2": 0,
+          "warnings": []
+        },
+        "lowFriction": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 532.9276170305205,
+              "margin": 1.162667698998749,
+              "normalForceN": 2131.710468122082,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.15616,
+              "supportByZoneM2": [
+                0.15616,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "boundsMaxM": [
+                0.1,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                0.05,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 8.531756164038816,
+              "margin": 0.018613404504974854,
+              "normalForceN": 34.127024656155264,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0.0025,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.3931500430662225e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06,
+            1.5407407407407406e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.15866,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 17868.39011958329,
+            "headerPressurePa": 17573.608554137485,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 85.57931856500053,
+            "zoneFlowM3PerHour": [
+              85.57931856500053,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              17063.51232807763,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 43
+            }
+          ]
+        },
+        "higherPermeability": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 808.8600655469309,
+              "margin": 1.764658916461387,
+              "normalForceN": 1617.7201310938617,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.15616,
+              "supportByZoneM2": [
+                0.15616,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "boundsMaxM": [
+                0.1,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                0.05,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 12.949219799355326,
+              "margin": 0.028250815132898753,
+              "normalForceN": 25.898439598710652,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0.0025,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            2.665324104432726e-06,
+            3.081481481481481e-06,
+            3.081481481481481e-06,
+            3.081481481481481e-06,
+            3.081481481481481e-06,
+            3.081481481481481e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.15866,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 14645.839700554225,
+            "headerPressurePa": 14024.46304471889,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 124.24992359334931,
+            "zoneFlowM3PerHour": [
+              124.24992359334931,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              12949.219799355324,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 43
+            }
+          ]
+        }
+      },
+      {
+        "newSpoilThicknessMm": 25,
+        "hydraulicSensitivityThicknessMm": 18,
+        "wornSpoilboard": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 861.5242125850464,
+              "margin": 1.8795542619075791,
+              "normalForceN": 1723.0484251700927,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.15616,
+              "supportByZoneM2": [
+                0.15616,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "boundsMaxM": [
+                0.1,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                0.05,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 13.7923317844686,
+              "margin": 0.030090200145805258,
+              "normalForceN": 27.5846635689372,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0.0025,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            2.347746913579744e-06,
+            2.5925925925925925e-06,
+            2.5925925925925925e-06,
+            2.5925925925925925e-06,
+            2.5925925925925925e-06,
+            2.5925925925925925e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.15866,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0.22333333333333463,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 15285.728686583812,
+            "headerPressurePa": 14738.781210478253,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 116.57125576099422,
+            "zoneFlowM3PerHour": [
+              116.57125576099422,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              13792.331784468597,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0.0013400000000000079,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 43
+            }
+          ]
+        },
+        "tabbed": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 1003.2595090064087,
+              "margin": 2.188772710512943,
+              "normalForceN": 2006.5190180128175,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.158736,
+              "supportByZoneM2": [
+                0.158736,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.7190052713177296e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.158736,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0.2106666666666692,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 16851.52524719509,
+            "headerPressurePa": 16466.687367308914,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 97.78169703365894,
+            "zoneFlowM3PerHour": [
+              97.78169703365894,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              15800.755799037535,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": true,
+          "throughKerfAreaM2": 0.0012640000000000151,
+          "warnings": []
+        },
+        "workY": 3150,
+        "initial": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 1011.5205966440444,
+              "margin": 2.2067956078970106,
+              "normalForceN": 2023.0411932880888,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.16,
+              "supportByZoneM2": [
+                0.16,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.7178294573642404e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.16,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 16854.906823535355,
+            "headerPressurePa": 16470.388288969683,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 97.74111811757577,
+            "zoneFlowM3PerHour": [
+              97.74111811757577,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              15805.009322563194,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 0,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0,
+          "warnings": []
+        },
+        "allZonesOpen": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 343.14389199650236,
+              "margin": 0.7486238404308484,
+              "normalForceN": 686.2877839930047,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.16,
+              "supportByZoneM2": [
+                0.16,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.7178294573642404e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.16,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 7261.847543149339,
+            "headerPressurePa": 5438.195693697393,
+            "open": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "totalFlowM3PerHour": 212.8578294822079,
+            "zoneFlowM3PerHour": [
+              33.15727607547404,
+              35.94011068134677,
+              35.94011068134677,
+              35.94011068134677,
+              35.94011068134677,
+              35.94011068134677
+            ],
+            "zonePressurePa": [
+              5361.623312445348,
+              5348.230756152795,
+              5348.230756152795,
+              5348.230756152795,
+              5348.230756152795,
+              5348.230756152795
+            ]
+          },
+          "programLine": 0,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0,
+          "warnings": [
+            {
+              "code": "stock_hold_insufficient",
+              "component": 0,
+              "line": 0
+            }
+          ]
+        },
+        "through": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 986.9624391944199,
+              "margin": 2.1532180196821207,
+              "normalForceN": 1973.9248783888397,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.15616,
+              "supportByZoneM2": [
+                0.15616,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "boundsMaxM": [
+                0.1,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                0.05,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 15.800500115177062,
+              "margin": 0.03447134380894789,
+              "normalForceN": 31.601000230354124,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0.0025,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.7190759689921484e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.15866,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0.22333333333333463,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 16851.321986182433,
+            "headerPressurePa": 16466.46490674906,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 97.7841361658108,
+            "zoneFlowM3PerHour": [
+              97.7841361658108,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              15800.500115177061,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0.0013400000000000079,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 43
+            }
+          ]
+        },
+        "onion": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 1011.2455218458272,
+              "margin": 2.206195487782242,
+              "normalForceN": 2022.4910436916543,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.16,
+              "supportByZoneM2": [
+                0.16,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.7190175811925834e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.16,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0,
+          "minimumSupportThicknessMm": 0.5,
+          "point": {
+            "blowerPressurePa": 16851.48985489729,
+            "headerPressurePa": 16466.64863197408,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 97.78212174123257,
+            "zoneFlowM3PerHour": [
+              97.78212174123257,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              15800.71127884105,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": true,
+          "throughKerfAreaM2": 0,
+          "warnings": []
+        },
+        "lowFriction": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 493.48121959720993,
+              "margin": 1.0766090098410603,
+              "normalForceN": 1973.9248783888397,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.15616,
+              "supportByZoneM2": [
+                0.15616,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "boundsMaxM": [
+                0.1,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                0.05,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 7.900250057588531,
+              "margin": 0.017235671904473945,
+              "normalForceN": 31.601000230354124,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0.0025,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.7190759689921484e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06,
+            1.8666666666666664e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.15866,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 16851.321986182433,
+            "headerPressurePa": 16466.46490674906,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 97.7841361658108,
+            "zoneFlowM3PerHour": [
+              97.7841361658108,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              15800.500115177061,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 43
+            }
+          ]
+        },
+        "higherPermeability": {
+          "components": [
+            {
+              "boundsMaxM": [
+                0.4,
+                0.4,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 717.8871441419237,
+              "margin": 1.566186790376962,
+              "normalForceN": 1435.7742882838475,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.15616,
+              "supportByZoneM2": [
+                0.15616,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "boundsMaxM": [
+                0.1,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                0.05,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 11.492814167231106,
+              "margin": 0.025073430942254133,
+              "normalForceN": 22.985628334462213,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0.0025,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            3.317175956284578e-06,
+            3.733333333333333e-06,
+            3.733333333333333e-06,
+            3.733333333333333e-06,
+            3.733333333333333e-06,
+            3.733333333333333e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.15866,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equivalentThroughKerfLengthM": 0,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 13562.893952324263,
+            "headerPressurePa": 12804.739899513399,
+            "open": [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "totalFlowM3PerHour": 137.24527257210883,
+            "zoneFlowM3PerHour": [
+              137.24527257210883,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "zonePressurePa": [
+              11492.814167231105,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "programLine": 43,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 43
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "sheet": {
+    "assertions": 10,
+    "reports": [
+      {
+        "workY": 2600,
+        "spacingMm": 1,
+        "forcePerPartN": 229.1831180523292,
+        "safetyFactor": 2,
+        "unsafe": {
+          "components": [
+            {
+              "boundsMaxM": [
+                1.6,
+                2.6,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 15078.654631881494,
+              "margin": 32.89652126217821,
+              "normalForceN": 30157.30926376299,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 4.156188,
+              "supportByZoneM2": [
+                0.6936,
+                0.689788,
+                0.6928,
+                0.6928,
+                0.6936,
+                0.6936
+              ]
+            },
+            {
+              "boundsMaxM": [
+                1.58,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                1.5300000000000002,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 9.069917921939414,
+              "margin": 0.01978749132793561,
+              "normalForceN": 18.139835843878828,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0,
+                0.0025,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            8.957795004436831e-07,
+            8.967519035444295e-07,
+            8.962756244746751e-07,
+            8.962756244746751e-07,
+            8.957795004436831e-07,
+            8.957795004436831e-07
+          ],
+          "coveredAreaByZoneM2": [
+            0.6936,
+            0.6922879999999999,
+            0.6928,
+            0.6928,
+            0.6936,
+            0.6936
+          ],
+          "equivalentThroughKerfLengthM": 0.2186666666666818,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 10370.153798454612,
+            "headerPressurePa": 9129.631183369409,
+            "open": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "totalFlowM3PerHour": 175.5581544185446,
+            "zoneFlowM3PerHour": [
+              29.24913954055546,
+              29.28047818136726,
+              29.26512880775548,
+              29.26512880775548,
+              29.24913954055546,
+              29.24913954055546
+            ],
+            "zonePressurePa": [
+              9070.045674703877,
+              9069.917921939414,
+              9069.980511144026,
+              9069.980511144026,
+              9070.045674703877,
+              9070.045674703877
+            ]
+          },
+          "programLine": 1,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0.0013120000000000909,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 1
+            }
+          ]
+        },
+        "sequence": [
+          {
+            "operation": "small-hole",
+            "components": 1,
+            "holdingMargin": 32.93055712903227,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 2.5599999994851963e-07
+          },
+          {
+            "operation": "small-profile",
+            "components": 1,
+            "holdingMargin": 32.918115804465664,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 2.2991999995378154e-05
+          },
+          {
+            "operation": "panel-0-0-profile",
+            "components": 1,
+            "holdingMargin": 32.71522787587096,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003181799999361634
+          },
+          {
+            "operation": "panel-0-1-profile",
+            "components": 1,
+            "holdingMargin": 32.51214986042158,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00031817999993613566
+          },
+          {
+            "operation": "panel-1-0-profile",
+            "components": 1,
+            "holdingMargin": 32.3097471264462,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00031819199993637914
+          },
+          {
+            "operation": "panel-1-1-profile",
+            "components": 1,
+            "holdingMargin": 32.10812629444106,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003181919999364069
+          },
+          {
+            "operation": "panel-2-0-profile",
+            "components": 1,
+            "holdingMargin": 31.908357938062146,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003181799999367463
+          },
+          {
+            "operation": "panel-2-1-profile",
+            "components": 1,
+            "holdingMargin": 31.709344248502582,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00031817999993676016
+          }
+        ],
+        "minimumHoldingMargin": 31.709344248502582,
+        "finalReport": {
+          "components": [
+            {
+              "boundsMaxM": [
+                1.6,
+                2.6,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 14534.492772533027,
+              "margin": 31.709344248502582,
+              "normalForceN": 29068.985545066054,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 4.053928,
+              "supportByZoneM2": [
+                0.667275,
+                0.675321,
+                0.670021,
+                0.679607,
+                0.676578,
+                0.685126
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            9.202523686600581e-07,
+            9.127660932819042e-07,
+            9.177976178295561e-07,
+            9.086589245850723e-07,
+            9.114821361021554e-07,
+            9.034529888155597e-07
+          ],
+          "coveredAreaByZoneM2": [
+            0.667275,
+            0.675321,
+            0.670021,
+            0.679607,
+            0.676578,
+            0.685126
+          ],
+          "equivalentThroughKerfLengthM": 17.678666666666675,
+          "minimumSupportThicknessMm": 3,
+          "point": {
+            "blowerPressurePa": 10279.521693534218,
+            "headerPressurePa": 9023.581358998243,
+            "open": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "totalFlowM3PerHour": 176.6457396775893,
+            "zoneFlowM3PerHour": [
+              29.69089054083529,
+              29.452580141887694,
+              29.612757118543566,
+              29.32180372344063,
+              29.41170014971275,
+              29.156008003169394
+            ],
+            "zonePressurePa": [
+              8962.182413814673,
+              8963.164080974157,
+              8962.505138894037,
+              8963.699423799524,
+              8963.331682166823,
+              8964.374696030687
+            ]
+          },
+          "programLine": 1,
+          "retainedWebNeedsForceQualification": true,
+          "throughKerfAreaM2": 0.10607200000000006,
+          "warnings": []
+        },
+        "axes": "Z rays for component/holding check; tri-dexel geometry checked in core fixture"
+      },
+      {
+        "workY": 3150,
+        "spacingMm": 1,
+        "forcePerPartN": 229.1831180523292,
+        "safetyFactor": 2,
+        "unsafe": {
+          "components": [
+            {
+              "boundsMaxM": [
+                1.6,
+                3.15,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": true,
+              "lateralCapacityN": 16046.115662490345,
+              "margin": 35.007193808285976,
+              "normalForceN": 32092.23132498069,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 5.036187999999999,
+              "supportByZoneM2": [
+                0.84,
+                0.8361879999999999,
+                0.84,
+                0.84,
+                0.84,
+                0.84
+              ]
+            },
+            {
+              "boundsMaxM": [
+                1.58,
+                0.1,
+                0.018
+              ],
+              "boundsMinM": [
+                1.5300000000000002,
+                0.05,
+                0
+              ],
+              "component": 1,
+              "independent": true,
+              "lateralCapacityN": 7.965282914784453,
+              "margin": 0.01737755158947996,
+              "normalForceN": 15.930565829568906,
+              "passes": false,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 0.0025,
+              "supportByZoneM2": [
+                0,
+                0.0025,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.0852713178462613e-06,
+            1.0864917829625068e-06,
+            1.0852713178462613e-06,
+            1.0852713178462613e-06,
+            1.0852713178462613e-06,
+            1.0852713178462613e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.84,
+            0.8386879999999999,
+            0.84,
+            0.84,
+            0.84,
+            0.84
+          ],
+          "equivalentThroughKerfLengthM": 0.2186666666666818,
+          "minimumSupportThicknessMm": 18,
+          "point": {
+            "blowerPressurePa": 9436.753046445332,
+            "headerPressurePa": 8032.8872844650305,
+            "open": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "totalFlowM3PerHour": 186.75896344265595,
+            "zoneFlowM3PerHour": [
+              31.120758294694028,
+              31.155171969185826,
+              31.120758294694028,
+              31.120758294694028,
+              31.120758294694028,
+              31.120758294694028
+            ],
+            "zonePressurePa": [
+              7965.432182447162,
+              7965.282914784452,
+              7965.432182447162,
+              7965.432182447162,
+              7965.432182447162,
+              7965.432182447162
+            ]
+          },
+          "programLine": 1,
+          "retainedWebNeedsForceQualification": false,
+          "throughKerfAreaM2": 0.0013120000000000909,
+          "warnings": [
+            {
+              "code": "freed_part_slipping",
+              "component": 1,
+              "line": 1
+            }
+          ]
+        },
+        "sequence": [
+          {
+            "operation": "small-hole",
+            "components": 1,
+            "holdingMargin": 35.03824569725878,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 2.5599999994851963e-07
+          },
+          {
+            "operation": "small-profile",
+            "components": 1,
+            "holdingMargin": 35.02616783137973,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 2.2991999995364276e-05
+          },
+          {
+            "operation": "panel-0-0-profile",
+            "components": 1,
+            "holdingMargin": 34.85154337634819,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003037439999390573
+          },
+          {
+            "operation": "panel-0-1-profile",
+            "components": 1,
+            "holdingMargin": 34.677498741566644,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00030374399993902956
+          },
+          {
+            "operation": "panel-1-0-profile",
+            "components": 1,
+            "holdingMargin": 34.50403570337702,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00030374399993929324
+          },
+          {
+            "operation": "panel-1-1-profile",
+            "components": 1,
+            "holdingMargin": 34.33112885276803,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003037439999393071
+          },
+          {
+            "operation": "panel-2-0-profile",
+            "components": 1,
+            "holdingMargin": 34.15878906508548,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00030374399993965406
+          },
+          {
+            "operation": "panel-2-1-profile",
+            "components": 1,
+            "holdingMargin": 33.98700123762565,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.00030374399993965406
+          },
+          {
+            "operation": "panel-3-0-profile",
+            "components": 1,
+            "holdingMargin": 33.815791034637655,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003037439999396402
+          },
+          {
+            "operation": "panel-3-1-profile",
+            "components": 1,
+            "holdingMargin": 33.6451338002271,
+            "retainedWebNeedsForceQualification": true,
+            "removedM3": 0.0003037439999396402
+          }
+        ],
+        "minimumHoldingMargin": 33.6451338002271,
+        "finalReport": {
+          "components": [
+            {
+              "boundsMaxM": [
+                1.6,
+                3.15,
+                0.018
+              ],
+              "boundsMinM": [
+                0,
+                0,
+                0
+              ],
+              "component": 0,
+              "independent": false,
+              "lateralCapacityN": 15421.793343247717,
+              "margin": 33.6451338002271,
+              "normalForceN": 30843.586686495433,
+              "passes": true,
+              "requiredLateralN": 458.3662361046584,
+              "supportAreaM2": 4.905391999999999,
+              "supportByZoneM2": [
+                0.8104399999999999,
+                0.820792,
+                0.813712,
+                0.825712,
+                0.812352,
+                0.822384
+              ]
+            }
+          ],
+          "conductanceByZoneM3PerSPa": [
+            1.113040310093549e-06,
+            1.103486437816232e-06,
+            1.1099190697835542e-06,
+            1.0986787597063498e-06,
+            1.1113392248222907e-06,
+            1.1017745736597596e-06
+          ],
+          "coveredAreaByZoneM2": [
+            0.8104399999999999,
+            0.820792,
+            0.813712,
+            0.825712,
+            0.812352,
+            0.822384
+          ],
+          "equivalentThroughKerfLengthM": 22.434666666666658,
+          "minimumSupportThicknessMm": 3,
+          "point": {
+            "blowerPressurePa": 9347.819472049587,
+            "headerPressurePa": 7927.863556121703,
+            "open": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "totalFlowM3PerHour": 187.82616633540493,
+            "zoneFlowM3PerHour": [
+              31.489777283022775,
+              31.224092355396106,
+              31.402991164548958,
+              31.090350837699596,
+              31.44248014230026,
+              31.176474552437213
+            ],
+            "zonePressurePa": [
+              7858.799251987589,
+              7859.9597515438045,
+              7859.179411130117,
+              7860.540207709044,
+              7859.0065631370935,
+              7860.16670484156
+            ]
+          },
+          "programLine": 1,
+          "retainedWebNeedsForceQualification": true,
+          "throughKerfAreaM2": 0.13460799999999995,
+          "warnings": []
+        },
+        "axes": "Z rays for component/holding check; tri-dexel geometry checked in core fixture"
+      }
+    ]
+  }
+}

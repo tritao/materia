@@ -73,6 +73,15 @@ class PlanCheckOptions {
  * `jointIds[i]` is plan joint `i`; axes the plan does not move are not checked.
  */
 class PlanCheck {
+  /** Process-only spindle rating check. Call for every cutting operation before admitting its plan.
+      Ratings must be available mechanical power/torque at the commanded rpm, not input kVA. */
+  public static function spindle(operation:String,powerW:Float,torqueNm:Float,availableW:Float,availableNm:Float):Void {
+    for(v in [powerW,torqueNm,availableW,availableNm])
+      if(!Math.isFinite(v)||v<0)throw operation+": invalid spindle rating/load";
+    if(powerW>availableW||torqueNm>availableNm)
+      throw operation+": spindle power/torque exceeded ("+powerW+" W, "+torqueNm+" Nm)";
+  }
+
   public final options:PlanCheckOptions;
   final gears:GearCheckState;
   final loads:Array<AxisLoad> = [];
