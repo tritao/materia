@@ -23,11 +23,11 @@ class PresentationRuntimeTests {
   static function signature(frame:materia.presentation.PresentationEvaluator.PresentationFrame):String {
     var ids=[for(id in frame.poses.keys())id];ids.sort(Reflect.compare);
     return [for(id in ids){var pose=frame.poses.get(id);if(pose==null)throw "Missing display pose";
-      id+":"+JsonWire.encode(pose)+":"+Std.string(frame.visibility.get(id));}].join("|")+":"+JsonWire.encode(frame.sections);
+      id+":"+JsonWire.encode(pose)+":"+Std.string(frame.visibility.get(id));}].join("|")+":"+JsonWire.encode(frame.sections)+":"+frame.highlight.join(",")+":"+frame.evidence+":"+(frame.activeStep==null?"":frame.activeStep.id)+":"+JsonWire.encode(frame.camera)+":"+frame.view;
   }
   static function rejected(action:Void->Void):Bool {try action() catch(_:Dynamic)return true;return false;}
   public static function main():Int {
-    try {run();Sys.println('Presentation runtime: $checks checks passed');return 0;}
+    try {run();for(path in Sys.args())PresentationArtifactInvariantTests.run(path);Sys.println('Presentation runtime: $checks checks passed');return 0;}
     catch(error:Dynamic){Sys.println('Presentation runtime failed: $error');Sys.println(haxe.CallStack.toString(haxe.CallStack.exceptionStack()));return 1;}
   }
   public static function run():Void {
@@ -35,6 +35,8 @@ class PresentationRuntimeTests {
     var block=machinekit.tooling.ToolingBlock.fromBox({x:0,y:0,z:0,width:10,depth:10,height:10},"steel");
     assembly.addComponent("base",block,AssemblyFrames.identity());
     assembly.addComponent("cover",block,AssemblyFrames.translation(30,0,0));
+    assembly.addMemberConnector("base","guide",AssemblyFrames.translation(30,0,0));
+    assembly.addMate("open","prismatic","base","guide","cover","mount");
     var artifact=machinekit.assembly.AssemblyPreview.scene(assembly,"presentation-test");
     var definition=artifact.assemblyDefinition;if(definition==null)throw "Missing assembly definition";
     var record=materia.presentation.Presentations.assembled(definition);
@@ -42,6 +44,12 @@ class PresentationRuntimeTests {
       {select:{occurrence:"cover",subtree:false},mode:Transparent}],sections:[
       {occurrence:null,point:{x:5,y:5,z:5},normal:{x:1,y:1,z:1}}],explode:0,source:Generated("test")});
     record.explode=[{select:{occurrence:"cover",subtree:false},direction:{x:0,y:0,z:1},distance:50,stage:1}];
+    var select:PartSelector={occurrence:"cover",subtree:false};
+    var motion:PresentationMotion={path:[{x:0,y:0,z:0},{x:0,y:0,z:50}],evidence:Illustrative};
+    record.procedures=[{id:"service",label:"Cover service",kind:Service,start:Assembled,source:Generated("test"),steps:[
+      {id:"open",title:"Open guide",instruction:"Open the guide.",highlight:[select],action:SetJoints([{joint:"open",value:5}])},
+      {id:"remove",title:"Remove cover",instruction:"Withdraw the cover.",view:"inside",highlight:[select],action:Remove(select,motion)},
+      {id:"install",title:"Install cover",instruction:"Install the cover.",highlight:[select],action:Install(select,motion)}]}];
     artifact.presentation=record;
     var dir=app.editor.WorkerAssetPath.resolve("build/presentation-"+Std.random(100000000));FileSystem.createDirectory(dir);
     var source=FileSystem.fullPath(dir)+"/assembly.mtrg";File.saveBytes(source,SceneArtifact.encode(artifact));
@@ -50,8 +58,10 @@ class PresentationRuntimeTests {
     var host=new haxeon.ui.host.UiHostContext(null,new haxeon.platform.NativeKitEvents(),()->{},()->{});
     var viewport=new EditorPerspectiveViewport("presentation-test",session.scene,host);
     var dock=new EditorPerspectiveViewport("presentation-dock-test",session.scene,host);
-    function bind(view:EditorPerspectiveViewport,readOnly:Bool=false):Void
+    function bind(view:EditorPerspectiveViewport,readOnly:Bool=false):Void {
       view.setPresentation(session.presentation,session.projectAssemblyDefinition,session.presentationCenters(),session.assemblyUnitMetres(),readOnly);
+      view.solvePresentationJoints=session.presentationJointPoses;
+    }
     bind(viewport);bind(dock,true);
     var originalDefinition=AssemblyDefinitionCodec.encode(definition);
     var state=session.projectAssemblyState;if(state==null)throw "Missing engineering state";
@@ -87,6 +97,25 @@ class PresentationRuntimeTests {
     viewport.setPresentationExplode(0.25);
     check(controller.cursor.explode==1,"Disabled explode edits cannot change the cursor");
     viewport.setSimulationState(false,[],2);
+    viewport.selectPresentationProcedure("service");
+    controller.next(false);
+    var opened=viewport.presentationFrame();if(opened==null)throw "Missing procedure frame";
+    var jaw=opened.poses.get("cover");if(jaw==null)throw "Missing procedure cover pose";
+    check(jaw.y==5,"SetJoints evaluates an independent display kinematic state");
+    var stepOne=signature(opened),highlightView=new nativekit.scene.SceneView();viewport.sectionView(highlightView);
+    check(highlightView.diagnosticTintValues().length>0&&opened.evidence=="Illustrative"&&opened.view=="inside","Active movement uses its referenced view, highlights its part and reports its evidence");
+    controller.next(false);controller.next(false);controller.previous();controller.previous();
+    var previous=viewport.presentationFrame();if(previous==null)throw "Missing Previous frame";
+    check(signature(previous)==stepOne,"Next twice then Previous twice reproduces the same procedure frame");
+    controller.restart();controller.next(false);
+    var restarted=viewport.presentationFrame();if(restarted==null)throw "Missing Restart frame";
+    check(signature(restarted)==stepOne,"Restart and Next reproduce the same step");
+    viewport.nextPresentationStep();viewport.advancePresentation(0.3);
+    var halfway=viewport.presentationFrame();if(halfway==null)throw "Missing animated frame";
+    var traveling=halfway.poses.get("cover");if(traveling==null)throw "Missing traveling cover";
+    check(controller.animating&&Math.abs(traveling.z-25)<1e-8,"Next animates along the stored movement path");
+    viewport.advancePresentation(0.3);
+    check(!controller.animating&&controller.cursor.step==2,"Animation completes into the folded next step");
     viewport.resetPresentation();var reset=viewport.presentationFrame();if(reset==null)throw "Missing reset frame";
     check(signature(reset)==expected,"Reset yields the fresh-open frame after view and explode changes");
     check(AssemblyDefinitionCodec.encode(definition)==originalDefinition&&AssemblyDefinitionCodec.encodeState(definition,state)==originalState,
@@ -98,19 +127,29 @@ class PresentationRuntimeTests {
       "Presentation preserves collision broadphase input and cached engineering query");
     check(Json.stringify(assembly.billOfMaterials().lines())==originalBom,"Presentation preserves the exported engineering BOM");
     check(session.document.history.undoCount==0,"Cursor changes create no document edits");
+    PresentationExportInvariantTests.run(session,assembly,viewport,dir);
     viewport.selectPresentationView("inside");
     var authored=viewport.capturePresentationView("authored-section","Saved section");
     session.savePresentationView(authored);bind(viewport);viewport.selectPresentationView(authored.id);
     check(session.document.history.undoCount==1,"Saving a view creates one undoable document edit");
     session.document.undo();var undone=session.presentation;check(undone!=null&&undone.views.length==2,"Undo removes the authored view");
     session.document.redo();
+    var authoredProcedure:Procedure=JsonWire.decode(JsonWire.encode(record.procedures[0]));
+    authoredProcedure.id="authored-service";authoredProcedure.source=Authored;
+    session.savePresentationProcedure(authoredProcedure);
+    check(session.document.history.undoCount==2,"Saving a procedure creates one undoable document edit");
+    var bad:Procedure=JsonWire.decode(JsonWire.encode(authoredProcedure));
+    bad.steps[1].action=Remove(select,{path:motion.path,evidence:Checked("invented",Passed,"geometry","claim")});
+    check(rejected(()->session.savePresentationProcedure(bad)),"Authored procedures cannot claim checked evidence");
     var saved=dir+"/saved.materia";session.save(saved);
     var savedProject=app.SceneCodec.decodeProject(File.getContent(saved));if(savedProject==null||savedProject.presentation==null)throw "Missing saved authored entries";
     var edits=PresentationEdits.decode(savedProject.presentation);
     check(edits.views.length==1&&edits.views[0].source==Authored,"Only authored entries are saved");
+    check(edits.procedures.length==1&&edits.procedures[0].source==Authored,"Authored procedure survives document encoding");
     var first=PresentationEdits.encode(edits),firstDocument=File.getContent(saved);
     session.open(saved);bind(viewport);
     var reopened=session.presentation;if(reopened==null)throw "Missing reopened presentation";
+    check(reopened.procedures.length==2,"Generated and authored procedures survive save and reopen");
     check(reopened.views.length==3&&reopened.views[2].sections.length==1,"Authored section survives save and reopen");
     var reopenedController=viewport.presentation;if(reopenedController==null)throw "Missing reopened controller";
     check(reopenedController.cursor.view=="assembled"&&reopenedController.cursor.procedure==null,"Reopen resets the session cursor");

@@ -22,6 +22,7 @@ class InspectionCameraPanel {
   public function new() {}
   public function showDocked():Void overlay=false;
   public function presentationKey():String return overlay+":"+generation+":"+zoom+":"+(viewport==null?"":viewport.presentationKey());
+  public function advancePresentation(seconds:Float):Bool return viewport!=null&&viewport.advancePresentation(seconds);
   public function dispose():Void {if(viewport!=null)viewport.dispose();viewport=null;}
   public function build(app:ReferenceEditorApp,inOverlay:Bool=false):View {
     if(generation!=app.session.generation){dispose();generation=app.session.generation;zoom=1;}
@@ -35,6 +36,9 @@ class InspectionCameraPanel {
     if(app.hostContext==null)return new Text("Inspection rendering requires the desktop GPU host.");
     if(viewport==null){viewport=new EditorPerspectiveViewport("inspection-camera-view",app.scene,app.hostContext);viewport.setPlacementOptions(false,0,false);viewport.setSimulationOverlays(false);viewport.setCosmeticThreads(false);}
     viewport.setPresentation(app.session.presentation,app.session.projectAssemblyDefinition,app.session.presentationCenters(),app.session.assemblyUnitMetres(),true);
+    viewport.solvePresentationJoints=app.session.presentationJointPoses;
+    var frame=app.framePresentation;
+    viewport.setSimulationState(app.simulation.isActive(),frame==null?[]:frame.environment,frame==null?0:frame.revision);
     rows.push(new KeyedView("views",PresentationControls.build(viewport,()->app.invalidateView(),"inspection-views")));
     var tools:Array<KeyedView> = [];
     function action(id:String,label:String,fn:Void->Void):Void tools.push(new KeyedView(id,new Button(label,null,fn,"inspection-"+id)));
@@ -46,8 +50,6 @@ class InspectionCameraPanel {
     rows.push(new KeyedView("tools",new Row("inspection-tools",tools)));
     viewport.onInspectionZoom=next->{zoom=next;app.invalidateView();};
     viewport.setSampleCount(app.antialiasing);viewport.setLightingPreset(app.lightingPreset);
-    var frame=app.framePresentation;
-    viewport.setSimulationState(app.simulation.isActive(),frame==null?[]:frame.environment,frame==null?0:frame.revision);
     rows.push(new KeyedView("camera",new SizedBox("inspection-image",viewport,LayoutAxis.grow(),LayoutAxis.grow())));
     rows.push(new KeyedView("caption",new Text("Orbit / pan / wheel zoom · independent view")));
     return new Column("inspection-camera",rows,style);

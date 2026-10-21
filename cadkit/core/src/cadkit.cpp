@@ -74,6 +74,16 @@
 #include <DESTEP_Provider.hxx>
 #include <IFSelect_ReturnStatus.hxx>
 #include <STEPControl_Reader.hxx>
+#include <STEPControl_Writer.hxx>
+#include <APIHeaderSection_MakeHeader.hxx>
+#include <StepData_StepModel.hxx>
+#include <StepBasic_Product.hxx>
+#include <StepRepr_NextAssemblyUsageOccurrence.hxx>
+#include <TCollection_HAsciiString.hxx>
+#include <XSControl_WorkSession.hxx>
+#include <cerrno>
+#include <cstdlib>
+#include <ctime>
 #include <gp_Ax1.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Mat.hxx>
@@ -406,9 +416,59 @@ cad_result export_step_shape(cad_shape handle, const char* path) {
     }
 
     try {
+        // Reproducible exports use the same public build timestamp convention as other artifacts.
+        // Without SOURCE_DATE_EPOCH, preserve OCCT's normal creation-time header.
+        char timestamp[32] = {};
+        const char* epoch_text = std::getenv("SOURCE_DATE_EPOCH");
+        if (epoch_text != nullptr && epoch_text[0] != '\0') {
+            char* end = nullptr;
+            errno = 0;
+            const auto seconds = std::strtoll(epoch_text, &end, 10);
+            const auto epoch = static_cast<std::time_t>(seconds);
+            if (errno != 0 || end == epoch_text || *end != '\0' || seconds < 0 ||
+                static_cast<long long>(epoch) != seconds) {
+                return fail(CAD_ERROR_INVALID_ARGUMENT, "Invalid SOURCE_DATE_EPOCH for STEP export");
+            }
+            std::tm utc = {};
+#ifdef _WIN32
+            const bool valid_time = gmtime_s(&utc, &epoch) == 0;
+#else
+            const bool valid_time = gmtime_r(&epoch, &utc) != nullptr;
+#endif
+            if (!valid_time || std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S", &utc) == 0) {
+                return fail(CAD_ERROR_INVALID_ARGUMENT, "SOURCE_DATE_EPOCH is outside STEP timestamp range");
+            }
+        }
         DESTEP_Provider provider(new DESTEP_ConfigurationNode());
-        if (!provider.Write(TCollection_AsciiString(path), source)) {
+        Handle(XSControl_WorkSession) session;
+        if (!provider.Write(TCollection_AsciiString(path), source, session)) {
             return fail(CAD_ERROR_OPERATION_FAILED, "STEP export failed");
+        }
+        if (timestamp[0] != '\0') {
+            // Retain the provider's units, transfer settings and model. OCCT also uses
+            // process-global counters for generated product/usage ids; number these per file.
+            STEPControl_Writer writer(session, false);
+            const auto model = writer.Model();
+            int product_id = 0, occurrence_id = 0;
+            for (int index = 1; index <= model->NbEntities(); ++index) {
+                const auto entity = model->Value(index);
+                const auto product = occ::down_cast<StepBasic_Product>(entity);
+                if (!product.IsNull()) {
+                    const auto name = new TCollection_HAsciiString(("Product " + std::to_string(++product_id)).c_str());
+                    product->SetId(name);
+                    product->SetName(name);
+                }
+                const auto occurrence = occ::down_cast<StepRepr_NextAssemblyUsageOccurrence>(entity);
+                if (!occurrence.IsNull()) {
+                    occurrence->SetId(new TCollection_HAsciiString(std::to_string(++occurrence_id).c_str()));
+                }
+            }
+            APIHeaderSection_MakeHeader header(model);
+            header.SetTimeStamp(new TCollection_HAsciiString(timestamp));
+            header.Apply(writer.Model());
+            if (writer.Write(path) != IFSelect_RetDone) {
+                return fail(CAD_ERROR_OPERATION_FAILED, "Reproducible STEP export failed");
+            }
         }
         return CAD_OK;
     } catch (const Standard_Failure& error) {

@@ -157,9 +157,9 @@ plus the determinism invariant.
 Implementation status: the controller, shared viewport controls, typed render/pick
 frames, persisted authored sections, hobber views and camera-field removal are in
 place. Supplier axis defaults moved with the field removal. The presentation native
-suite passes 24 checks and the ported enclosure runtime passes 10,551 checks.
-The native fixture also checks the exported engineering BOM. Acceptance is still
-pending explicit STEP export isolation checks. The
+suite passes 34 checks and the ported enclosure runtime passes 10,551 checks.
+The native fixture also passes 19 complete STEP/BOM export checks, with fixed
+export metadata and no output-byte normalization. The
 broader viewport-coordinate suite also fails its retained toolbar/status subtree
 identity assertion even though both application revision keys are unchanged; that
 failure remains unresolved and is not suppressed in that suite.
@@ -192,7 +192,8 @@ Socket endpoint/BOM checks pass (104 assertions), native display/pick/isolation
 checks pass (24 checks), and the panel and box suites pass 144 and 157 assertions.
 Rotated joint-parent and nested-scope conversion checks pass. The mill exporter
 compiles. Socket, box and panel slider endpoints were captured and reviewed;
-the socket matches the former scene. The outstanding AP1 STEP check remains.
+the socket matches the former scene. STEP/BOM isolation is covered by the native
+export suite.
 
 The slider, staged composition, and display offsets in picking. Producers emit
 `ExplodeOffset`s. **Delete** `exploded:Bool` from `PanelKit`, `BoxMoldCad`,
@@ -202,6 +203,14 @@ the other `*-exploded` outputs. Box-mold and panel-tooling previews move to the 
 invariant holds at t=1, and you can pick parts while exploded.
 
 ### AP4 — Procedures
+Implementation status: shared transport, active instructions/evidence, referenced
+views, highlighting and timed movement are implemented. Joint steps use an
+independent kinematic state. Add step creates or duplicates an authored procedure
+from the selected occurrence; authored movements only accept Illustrative evidence.
+The native suite passes 34 checks, including navigation determinism, animation,
+Reset, undoable authoring and byte-identical document save/reopen. Generic artifact
+invariants also pass on the socket and custom-finger gripper.
+
 The `Procedure` fold in the viewer: Previous / Next / Restart, step text,
 highlight, the referenced view and animated motion, plus evidence badges. Editor
 "Add step" authoring stores `Authored` entries with `Illustrative` evidence only.

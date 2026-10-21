@@ -38,3 +38,8 @@ cadkit/scripts/build-occt-prefix.sh
 Every checkout and worktree next to that cache then finds it automatically. If it is missing, configuring fails with
 that instruction. To compile OCCT as part of one build instead, pass `-DCADKIT_BUILD_OCCT_FROM_SOURCE=ON` (or set the
 environment variable of the same name). A changed OCCT pin changes the revision, so the old prefix is not reused.
+
+STEP export honors `SOURCE_DATE_EPOCH` (nonnegative Unix seconds, UTC) when set.
+This fixes the creation timestamp and numbers generated product/occurrence
+identifiers per file for reproducible exports. Normal exports keep the current
+creation time and OCCT identifiers. Invalid timestamps are rejected before writing.

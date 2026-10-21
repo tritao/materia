@@ -15,6 +15,7 @@ typedef PresentationCursor = {
   var progress:Float;
 }
 typedef PresentationFrame = {
+  var view:String;
   var poses:Map<String, AssemblyFrame>;
   var visibility:Map<String, VisibilityMode>;
   var highlight:Array<String>;
@@ -58,7 +59,7 @@ class PresentationEvaluator {
         if (name != null) view = findView(name);
       }
     }
-    var result:PresentationFrame = {poses:new Map(), visibility:new Map(), highlight:[], jointOverrides:new Map(),
+    var result:PresentationFrame = {view:view.id,poses:new Map(), visibility:new Map(), highlight:[], jointOverrides:new Map(),
       sections:[], camera:view.camera, activeStep:null, evidence:null};
     for (part in flat.occurrences) {
       var pose = solved.get(part.id);

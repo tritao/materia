@@ -858,6 +858,31 @@ class ProjectDocumentSession {
 
   public function assemblyJointIsDependent(jointId:String):Bool return assemblyDependentJoints.exists(jointId);
 
+  /** A separate kinematic state for procedure display; the live runtime is never edited. */
+  public function presentationJointPoses(overrides:Map<String,Float>):Map<String,materia.assembly.AssemblyRecord.AssemblyFrame> {
+    var runtime=assemblyRuntime;if(runtime==null)throw "Procedure requires an assembly runtime";
+    var display=AssemblyState.fromModel(runtime.model,runtime.record());
+    for(id in overrides.keys())display.setJoint(id,overrides.get(id));
+    var poses=new Map<String,materia.assembly.AssemblyRecord.AssemblyFrame>();
+    for(part in display.definition.occurrences)poses.set(part.id,display.worldPose(part.id));
+    return poses;
+  }
+
+  /** Authored procedures cannot claim planner evidence. Generated originals remain read-only. */
+  public function savePresentationProcedure(procedure:materia.presentation.AssemblyPresentation.Procedure):Void {
+    var definition=projectAssemblyDefinition;if(definition==null)throw "Procedure authoring requires an assembly";
+    var prior=authoredPresentation;
+    var next:AuthoredPresentation=prior==null?PresentationEdits.empty(definition.id):PresentationEdits.decode(PresentationEdits.encode(prior));
+    var copy:materia.presentation.AssemblyPresentation.Procedure=JsonWire.decode(JsonWire.encode(procedure));copy.source=Authored;
+    var found=false;
+    for(index in 0...next.procedures.length)if(next.procedures[index].id==copy.id){next.procedures[index]=copy;found=true;}
+    if(!found)next.procedures.push(copy);
+    var merged=PresentationEdits.merge(definition,generatedPresentation,next),previous=presentation;
+    document.apply(new EditOperation("Save procedure "+copy.label,
+      function(){authoredPresentation=next;presentation=merged;},
+      function(){authoredPresentation=prior;presentation=previous;}));
+  }
+
   /** Save or update an authored view as one undoable display-only edit. */
   public function savePresentationView(view:PresentationView):Void {
     var definition=projectAssemblyDefinition;if(definition==null)throw "View authoring requires a generated assembly";

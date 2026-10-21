@@ -230,6 +230,7 @@ class EditorScene {
   var renderNeedsRefresh(get, set):Bool;
   function get_renderNeedsRefresh():Bool return presentation.renderNeedsRefresh;
   function set_renderNeedsRefresh(value:Bool):Bool return presentation.renderNeedsRefresh = value;
+  public function presentationHighlightMaterial():Material return selectionMaterial;
   var selectionMaterial(get, set):Material;
   function get_selectionMaterial():Material return presentation.selectionMaterial;
   function set_selectionMaterial(value:Material):Material return presentation.selectionMaterial = value;

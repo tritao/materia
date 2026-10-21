@@ -116,6 +116,31 @@ class EditorPerspectiveViewport implements View {
     controller.reset();presentationCameraDirty=true;presentationTarget=null;inspectionZoom=1;orbitPivot=null;
     clearHover();lightingRevision++;host.requestFrame();
   }
+  public var solvePresentationJoints:Null<Map<String,Float>->Map<String,AssemblyFrame>> = null;
+  public function selectPresentationProcedure(id:Null<String>):Void {
+    if(presentation==null||simulationActive)return;
+    presentation.selectProcedure(id);presentationProcedureChanged();
+  }
+  public function nextPresentationStep():Void {
+    if(presentation==null||simulationActive)return;
+    presentation.next();presentationProcedureChanged();
+  }
+  public function previousPresentationStep():Void {
+    if(presentation==null||simulationActive)return;
+    presentation.previous();presentationProcedureChanged();
+  }
+  public function restartPresentationProcedure():Void {
+    if(presentation==null||simulationActive)return;
+    presentation.restart();presentationProcedureChanged();
+  }
+  function presentationProcedureChanged():Void {
+    presentationCameraDirty=true;clearHover();host.requestFrame();
+  }
+  public function advancePresentation(seconds:Float):Bool {
+    var controller=presentation;if(controller==null||simulationActive)return false;
+    var step=controller.cursor.step,changed=controller.advance(seconds);
+    if(changed){if(controller.cursor.step!=step)presentationCameraDirty=true;clearHover();host.requestFrame();}return changed;
+  }
   public function presentationControlsEnabled():Bool return !simulationActive;
   public function setPresentationExplode(value:Float):Void {
     if(presentation==null||simulationActive)return;
@@ -169,6 +194,10 @@ class EditorPerspectiveViewport implements View {
     }
     // Until a geometry owner supplies a fingerprint, cached checks must remain stale.
     var result=controller.evaluate(solved,"",simulationActive);
+    if(result.jointOverrides.keys().hasNext()) {
+      var solve=solvePresentationJoints;if(solve==null)throw "Procedure joint motions require an engineering pose provider";
+      result=controller.evaluate(solve(result.jointOverrides),"",simulationActive);
+    }
     presentationResult=result;presentationPoses=[];
     presentationPoseById.clear();
     for(part in flat.occurrences) {
@@ -196,6 +225,11 @@ class EditorPerspectiveViewport implements View {
   function applyPresentation(view:SceneView):Void {
     updatePresentation();var frame=presentationResult;if(frame==null)return;
     if(readOnly){view.clearSelectionOverrides();view.clearHoverOverrides();}
+    for(id in frame.highlight) {
+      var item=scene.object("project:"+id);if(item==null)item=scene.object(id);if(item==null)continue;
+      for(node in [scene.info(item.id).node()].concat(scene.runtimePartNodes(item.id)))
+        view.setDiagnosticTint(node,scene.presentationHighlightMaterial());
+    }
     for(item in scene.items()) {
       var mode=frame.visibility.get(occurrenceId(item.id));
       if(mode==null||mode==Shown)continue;

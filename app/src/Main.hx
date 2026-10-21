@@ -1035,7 +1035,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Convenience entry point for a NativeKit host's layout phase. */
   public function submit(frame:LayoutFrame):RenderNode {
-    if (perspectiveViewport != null) perspectiveViewport.advanceNavigation(frame.deltaSeconds);
+    if (perspectiveViewport != null) {
+      perspectiveViewport.advanceNavigation(frame.deltaSeconds);
+      if(perspectiveViewport.advancePresentation(frame.deltaSeconds))invalidateView();
+    }
+    if(inspectionCamera.advancePresentation(frame.deltaSeconds))invalidateView();
     var selectionKey = scene.treeSelectionKey();
     if (selectionKey != lastRecordedSelection) {
       lastRecordedSelection = selectionKey;
@@ -2121,7 +2125,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var sceneControls:Array<KeyedView> = [];
     if(perspectiveViewport!=null&&perspectiveViewport.presentation!=null)
       sceneControls.push(new KeyedView("presentation",app.editor.PresentationControls.build(perspectiveViewport,
-        ()->invalidateView(),"main-presentation",()->saveViewportView(perspectiveViewport))));
+        ()->invalidateView(),"main-presentation",()->saveViewportView(perspectiveViewport),()->addPresentationStep(perspectiveViewport))));
     if(variantState.variants.length>0||variantState.error!=null)
       sceneControls.push(new KeyedView("project",app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"viewport-project")));
     if(missionState.hasWork)
@@ -2220,6 +2224,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function configurePresentationViewport():Void {
     var viewport=perspectiveViewport;if(viewport==null)return;
     viewport.setPresentation(session.presentation,session.projectAssemblyDefinition,session.presentationCenters(),session.assemblyUnitMetres());
+    viewport.solvePresentationJoints=session.presentationJointPoses;
     viewport.onSectionEdit=planes->saveViewportView(viewport,planes);
   }
   function saveViewportView(viewport:EditorPerspectiveViewport,?sections:Array<materia.presentation.AssemblyPresentation.SectionPlane>):Void {
@@ -2232,6 +2237,38 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var view=viewport.capturePresentationView(id,sections==null?"Saved view "+id:"Section view");
     if(sections!=null)view.sections=sections;
     session.savePresentationView(view);configurePresentationViewport();viewport.selectPresentationView(id);
+    commands.refresh();invalidateView();
+  }
+
+  function addPresentationStep(viewport:EditorPerspectiveViewport):Void {
+    var controller=viewport.presentation,item=scene.object(scene.selectedId);
+    if(controller==null||item==null||!StringTools.startsWith(item.id,"project:")) {
+      log("Select an assembly part before adding a procedure step.");return;
+    }
+    var select:materia.presentation.AssemblyPresentation.PartSelector={occurrence:item.id.substr(8),subtree:false};
+    var selected=controller.selectedProcedure();
+    var procedure:materia.presentation.AssemblyPresentation.Procedure=selected==null
+      ? {id:"",label:"Service procedure",kind:Service,start:Assembled,steps:[],source:Authored}
+      : haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(selected));
+    if(procedure.source!=Authored||procedure.id=="") {
+      var index=1;while(controller.record.procedures.filter(p->p.id=="procedure-"+index).length>0)index++;
+      procedure.id="procedure-"+index;procedure.source=Authored;
+      for(step in procedure.steps)switch step.action {
+        case Remove(_,motion)|Install(_,motion):motion.evidence=Illustrative;
+        case _:
+      }
+    }
+    var direction={x:0.0,y:0.0,z:1.0},distance=Math.max(item.width,Math.max(item.height,item.depth))*2/session.assemblyUnitMetres();
+    for(offset in controller.record.explode)if(offset.select.occurrence==select.occurrence) {
+      direction=offset.direction;distance=offset.distance;break;
+    }
+    var index=1;while(procedure.steps.filter(s->s.id=="step-"+index).length>0)index++;
+    procedure.steps.push({id:"step-"+index,title:"Remove "+item.label,instruction:"Withdraw "+item.label+" along the illustrated path.",
+      view:controller.cursor.view,highlight:[select],action:Remove(select,{path:[{x:0,y:0,z:0},
+        {x:direction.x*distance,y:direction.y*distance,z:direction.z*distance}],evidence:Illustrative})});
+    session.savePresentationProcedure(procedure);configurePresentationViewport();
+    viewport.selectPresentationProcedure(procedure.id);
+    var current=viewport.presentation;if(current!=null)for(_ in 0...procedure.steps.length-1)current.next(false);
     commands.refresh();invalidateView();
   }
 
