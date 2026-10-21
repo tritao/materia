@@ -307,18 +307,31 @@ Today a section plane only discards fragments (`scene_fragment.glsl`, up to 32
 planes). Since back faces are rejected for single-sided materials, a cut solid
 reads as a hollow shell. Caps make **See inside** views legible.
 
-Approach: **back-face caps in the scene shaders.** While any section is active, a
-back face of a capped part that survives clipping is not rejected. It is shaded
-as cap surface instead:
-- The cap plane is the active plane whose intersection with the view ray lies in
-  the kept region and is nearest the eye behind the fragment. Fragment depth
-  is written at that ray–plane point, so depth, edges, AO and picking see the cut
-  face where it really is.
-- The shading normal is the plane normal facing the eye. The colour is the part's
-  material, darkened, with a hatch in the plane's own 2D coordinates and a spacing
-  fixed in metres, so the hatch does not swim when the camera moves.
-- One pass covers any number of planes. No stencil passes, no per-part draws,
-  and no CPU or CAD recomputation while a plane is dragged.
+Approach: **per-plane stencil parity caps** (the method of OCCT's
+`OpenGl_CappingAlgo`, read for reference only). A single-pass back-face shader was
+rejected 2026-10-21. With two planes, a view ray can cross retained solid while
+both of the solid's own surface hits along it are clipped away, so there is no
+fragment to shade. Moving back-face depth onto the plane also lets a surface
+behind a cavity occlude the cavity's visible interior.
+
+For each active plane *i*, and for each capped part whose world bounds straddle
+plane *i* inside the region kept by the other planes:
+1. Clear stencil in the part's projected screen bounds (scissored). Draw the
+   part's triangles (both faces, colour and depth writes off, depth test **off** so occluded crossings still count)
+   with clipping by plane *i* only, and invert the stencil. Odd parity at a
+   pixel means the point on plane *i* there lies inside the solid.
+2. Draw plane *i*'s cap quad where the stencil is set. Clip the quad by every
+   *other* active plane, depth test and depth write on, so edges, AO and picking
+   see the cut face where it really is. The colour is the part's material,
+   darkened, with a hatch in plane-space coordinates and a spacing fixed in
+   metres, so the hatch does not swim when the camera moves.
+
+The parity test is exact for multi-plane corners, cavities and nested or
+overlapping parts. Cost appears only while sections are active, scales with the
+number of parts the plane actually cuts and is bounded by scissoring. MSAA
+needs a per-sample stencil. The pick pipeline runs the same cap pass and writes
+the occurrence id and cap flag. No CAD or CPU recomputation happens while a
+plane is dragged.
 
 Rules:
 - Only **closed, single-sided** parts get caps. Double-sided sheets and
@@ -335,8 +348,9 @@ Rules:
 - Exact B-rep sections (CadKit plane ∩ solid) remain a separate future feature
   for drawings and measurement. They are not how the viewer draws caps.
 
-*Accept:* renderer pixel tests for one plane, two intersecting planes, a hollow
-core (cavity walls stay uncapped, so the void reads as empty) and an open mesh
+*Accept:* renderer pixel tests for one plane, two intersecting planes
+(including a ray that crosses the kept corner with both surface hits clipped), a
+hollow core and a cavity in front of a back surface (cavity walls stay uncapped, so the void reads as empty) and an open mesh
 (no cap). Also: a cap pick returns the occurrence with no face id, depth and edges
 at a cap boundary match the plane, MSAA shows no cap leakage at silhouettes, and a
 mirrored instance caps correctly. Recapture socket fixture **See inside** and
