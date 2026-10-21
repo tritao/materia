@@ -376,9 +376,35 @@ mirrored instance caps correctly. Recapture socket fixture **See inside** and
 gripper **Jaw detail**, review them, and record them in their READMEs. Update
 `scenekit/scene_render/shaders/README.md`.
 
+### AP9 — Section outlines (renderer)
+Caps carry no boundary line. Edge remnants near caps are deliberately suppressed
+(`01113c6eb`). Touching cut parts of similar material, such as a screw in a tapped
+hole, an insert in a casting or a shaft in a bore, merge into one hatched area,
+because plane-space hatches line up across neighbours.
+
+Approach: **geometric section contours drawn as strokes.** For each capped
+part cut by plane *i*, intersect its render triangles with the plane, in the
+part's local frame, to get contour segments. Draw them with the existing stroke
+pipeline, clipped by every other active plane. Contours come from the same
+tessellation as the caps, so they match exactly. Recompute only when a plane's
+pose relative to the part changes (plane drag, joint motion or explode offset), and
+only for parts the plane cuts. Cache per (part, plane). Contour strokes win depth
+ties against their own and neighbouring caps. That precedence is explicit and
+separate from the surface-edge bias. Screen-space id-edge outlines were rejected:
+their width depends on resolution and they are not geometry. When exact B-rep
+sections arrive, they replace the mesh cut as the contour source without changing
+the drawing path.
+
+*Accept:* two touching same-material parts cut by one plane show their shared
+boundary. Two intersecting planes clip outlines correctly, uncut parts get no
+outline, and outlines follow explode offsets and joint motion. Non-closed or
+uncapped parts get no outline. Dragging a plane stays interactive on the socket
+fixture and the gripper. Recapture See inside and Jaw detail and update
+`scenekit/scene_render/shaders/README.md`.
+
 ## Ordering and dependencies
 
-AP0 → AP1 → AP2 → AP3 → AP4 → AP5 → AP6 → AP7 → AP8. AP5 comes before AP6 on purpose,
+AP0 → AP1 → AP2 → AP3 → AP4 → AP5 → AP6 → AP7 → AP8 → AP9. AP5 comes before AP6 on purpose,
 so the format is proven general before the mould planner shapes it. AP6 depends on
 the casting tooling slices that own `SweptRemoval` and `SocketFixturePlanner`
 (`manufacturingkit/TOOLING_PLAN.md`), and only reads their output.
