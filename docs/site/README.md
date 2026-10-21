@@ -79,6 +79,14 @@ API; CI runs `docs/api/generate.py --check` and fails when it is stale:
 docs/api/generate.py
 ```
 
+In a checkout with other uncommitted work, generate from a clean checkout of `HEAD` so the data
+matches what CI sees:
+
+```sh
+w=$(mktemp -d)/src && git worktree add --detach "$w" HEAD && rmdir "$w/haxeon" && ln -s "$PWD/haxeon" "$w/haxeon"
+MATERIA_API_SOURCE="$w" docs/api/generate.py; rm "$w/haxeon"; git worktree remove --force "$w"
+```
+
 ## Live widgets
 
 `<figure class="materia-figure materia-widget" data-widget="NAME">` runs real kit code in the reader's

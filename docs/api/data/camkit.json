@@ -161,6 +161,24 @@
        "doc": "`safeZ` is the lowest height for rapid traverses over the work. `initial`\nis where the spindle starts, before any tool length applies; it must be\nclear of the work, since the first tool is loaded there."
       },
       {
+       "name": "withSpindleSpeed",
+       "kind": "method",
+       "signature": "(rpm:Float):CamJob",
+       "doc": "Modal operation RPM; the next operation emits a speed change even when the tool stays loaded."
+      },
+      {
+       "name": "sheetProfile",
+       "kind": "method",
+       "signature": "(contour:CamContour, tool:Tool, bottom:Float, feed:Float, settings:camkit.CamSheetProfile.CamSheetProfileSettings):CamJob",
+       "doc": "Sheet profile with explicit tabs, optional onion/skin pass, tangent leads and profile ramps."
+      },
+      {
+       "name": "surface",
+       "kind": "method",
+       "signature": "(low:Point3, high:Point3, tool:Tool, depth:Float, feed:Float, stepOver:Float, ?stepDown:Float, ?plungeFeed:Float, ?featureRef:String):CamJob",
+       "doc": "Bidirectional raster surfacing of the declared rectangle; cutter centres reach every edge."
+      },
+      {
        "name": "profile",
        "kind": "method",
        "signature": "(contour:CamContour, tool:Tool, depth:Float, feed:Float, ?side:String, ?stepDown:Float, ?plungeFeed:Null<Float>, ?featureRef:String, ?startDepth:Float):CamJob",
@@ -194,6 +212,202 @@
        "name": "finish",
        "kind": "method",
        "signature": "(?setup:Setup):ToolpathProgram"
+      }
+     ]
+    },
+    {
+     "name": "CamNestOptions",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetNester.hx",
+     "fields": [
+      {
+       "name": "toolDiameter",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "gap",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "edgeMargin",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "seed",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "rotationStepDegrees",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "minimumRemnantSide",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "batchId",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "CamNestPlaced",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetNfp.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "requirementId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "variant",
+       "kind": "var",
+       "signature": ":CamNestVariant"
+      },
+      {
+       "name": "shape",
+       "kind": "var",
+       "signature": ":SheetShape"
+      },
+      {
+       "name": "pieces",
+       "kind": "var",
+       "signature": ":Array<Array<SheetPoint>>"
+      }
+     ]
+    },
+    {
+     "name": "CamNestResult",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetNester.hx",
+     "fields": [
+      {
+       "name": "plans",
+       "kind": "var",
+       "signature": ":Array<SheetCutPlan>"
+      },
+      {
+       "name": "requirements",
+       "kind": "var",
+       "signature": ":Array<SheetPartRequirement>"
+      },
+      {
+       "name": "utilisation",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "elapsedSeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "engine",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "guillotineSheets",
+       "kind": "var",
+       "signature": ":Null<Int>"
+      },
+      {
+       "name": "stats",
+       "kind": "var",
+       "signature": ":CamNfpStats"
+      },
+      {
+       "name": "seed",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ]
+    },
+    {
+     "name": "CamNestStock",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetNester.hx",
+     "fields": [
+      {
+       "name": "stock",
+       "kind": "var",
+       "signature": ":SheetStockSpec"
+      },
+      {
+       "name": "quantity",
+       "kind": "var",
+       "signature": ":Int"
+      }
+     ]
+    },
+    {
+     "name": "CamNestVariant",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetNfp.hx",
+     "fields": [
+      {
+       "name": "angle",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "shape",
+       "kind": "var",
+       "signature": ":SheetShape"
+      },
+      {
+       "name": "pieces",
+       "kind": "var",
+       "signature": ":Array<Array<SheetPoint>>"
+      }
+     ]
+    },
+    {
+     "name": "CamNfpStats",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetNfp.hx",
+     "fields": [
+      {
+       "name": "pairs",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "candidates",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "decompositions",
+       "kind": "var",
+       "signature": ":Int"
       }
      ]
     },
@@ -248,11 +462,364 @@
      ]
     },
     {
+     "name": "CamProfileTab",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetProfile.hx",
+     "fields": [
+      {
+       "name": "centre",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "end",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "thickness",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "CamSheetNester",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamSheetNester.hx",
+     "doc": "Deterministic bottom-left no-fit nesting over material polygons, including holes and concavity. Dimensions are mm.",
+     "fields": [
+      {
+       "name": "nest",
+       "kind": "method",
+       "signature": "(requirements:Array<SheetPartRequirement>, stock:Array<CamNestStock>, options:CamNestOptions):CamNestResult",
+       "static": true
+      },
+      {
+       "name": "validateBatch",
+       "kind": "method",
+       "signature": "(result:CamNestResult, stock:Array<SheetStockSpec>):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CamSheetNfp",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamSheetNfp.hx",
+     "doc": "Configuration obstacles are unions of convex Minkowski sums, with exact rounded clearance offsets.",
+     "fields": [
+      {
+       "name": "hull",
+       "kind": "method",
+       "signature": "(points:Array<SheetPoint>):Array<SheetPoint>",
+       "static": true
+      },
+      {
+       "name": "convex",
+       "kind": "method",
+       "signature": "(shape:SheetShape):Bool",
+       "static": true
+      },
+      {
+       "name": "decompose",
+       "kind": "method",
+       "signature": "(shape:SheetShape, stats:CamNfpStats):Array<Array<SheetPoint>>",
+       "static": true
+      },
+      {
+       "name": "obstacles",
+       "kind": "method",
+       "signature": "(placed:Array<CamNestPlaced>, moving:CamNestVariant, spacing:Float, stats:CamNfpStats):Array<Segment>",
+       "static": true
+      },
+      {
+       "name": "candidates",
+       "kind": "method",
+       "signature": "(placed:Array<CamNestPlaced>, variant:CamNestVariant, width:Float, height:Float, margin:Float, spacing:Float, stats:CamNfpStats):Array<SheetPoint>",
+       "static": true
+      },
+      {
+       "name": "place",
+       "kind": "method",
+       "signature": "(id:String, requirementId:String, variant:CamNestVariant, p:SheetPoint):CamNestPlaced",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CamSheetOperation",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetOrder.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "part",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "area",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "requires",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "releases",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ],
+     "doc": "Operation precedence is explicit; final releases additionally depend on every operation on that part."
+    },
+    {
+     "name": "CamSheetOrder",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamSheetOrder.hx",
+     "fields": [
+      {
+       "name": "order",
+       "kind": "method",
+       "signature": "(operations:Array<CamSheetOperation>, ?admit:(CamSheetOperation) -> Bool):CamSheetOrderResult",
+       "static": true,
+       "doc": "`admit` tentatively simulates the candidate and must roll it back on refusal.\nA successful candidate advances that simulation's state. This keeps StockKit\nand vacuum assumptions in the caller rather than duplicating them in CamKit."
+      }
+     ]
+    },
+    {
+     "name": "CamSheetOrderResult",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetOrder.hx",
+     "fields": [
+      {
+       "name": "operations",
+       "kind": "var",
+       "signature": ":Array<CamSheetOperation>"
+      },
+      {
+       "name": "deferred",
+       "kind": "var",
+       "signature": ":Array<String>"
+      }
+     ]
+    },
+    {
+     "name": "CamSheetProfile",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamSheetProfile.hx",
+     "doc": "Exact compensated paths with explicit retained webs. All dimensions are SI.",
+     "fields": [
+      {
+       "name": "reverse",
+       "kind": "method",
+       "signature": "(g:PathGeometry):PathGeometry",
+       "static": true
+      },
+      {
+       "name": "slice",
+       "kind": "method",
+       "signature": "(g:PathGeometry, from:Float, to:Float, z0:Float, z1:Float):PathGeometry",
+       "static": true
+      },
+      {
+       "name": "orient",
+       "kind": "method",
+       "signature": "(path:Array<PathGeometry>, outside:Bool, direction:CamCutDirection):Array<PathGeometry>",
+       "static": true
+      },
+      {
+       "name": "plan",
+       "kind": "method",
+       "signature": "(contour:CamContour, tool:toolpathkit.tool.Tool, settings:CamSheetProfileSettings):CamSheetProfilePlan",
+       "static": true
+      },
+      {
+       "name": "pass",
+       "kind": "method",
+       "signature": "(plan:CamSheetProfilePlan, level:Float, prior:Float, bottom:Float, ramp:Bool):Array<PathGeometry>",
+       "static": true
+      },
+      {
+       "name": "lead",
+       "kind": "method",
+       "signature": "(plan:CamSheetProfilePlan, z:Float, direction:CamCutDirection, out:Bool):PathGeometry",
+       "static": true,
+       "doc": "Quarter-circle lead, on the waste side and tangent to the finished loop."
+      }
+     ]
+    },
+    {
+     "name": "CamSheetProfilePlan",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetProfile.hx",
+     "fields": [
+      {
+       "name": "path",
+       "kind": "var",
+       "signature": ":Array<PathGeometry>"
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "tabs",
+       "kind": "var",
+       "signature": ":Array<CamProfileTab>"
+      },
+      {
+       "name": "leadRadius",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "rampLength",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "CamSheetProfileSettings",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamSheetProfile.hx",
+     "fields": [
+      {
+       "name": "side",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "direction",
+       "kind": "var",
+       "signature": ":CamCutDirection",
+       "optional": true
+      },
+      {
+       "name": "stepDown",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "plungeFeed",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "spindleRpm",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "onionSkin",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "skinPass",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
+       "name": "tabCentres",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "optional": true
+      },
+      {
+       "name": "autoTabs",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "tabLength",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "tabThickness",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "cornerClearance",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "leadRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "rampLength",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "featureRef",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      }
+     ]
+    },
+    {
      "name": "CamSheetProfiles",
      "kind": "class",
      "file": "camkit/haxe/camkit/CamSheetProfiles.hx",
      "doc": "Rectangular MachineKit sheet blanks as CNC profile inputs.",
      "fields": [
+      {
+       "name": "fromDxf",
+       "kind": "method",
+       "signature": "(part:cadkit.drawing.DxfContours.DxfPart, ?surfaceZMetres:Float, ?chordToleranceMetres:Float):{outer:CamContour, holes:Array<CamContour>}",
+       "static": true,
+       "doc": "SR10 exact part boundaries are mm; CAM placement and cutting coordinates are metres."
+      },
+      {
+       "name": "freePart",
+       "kind": "method",
+       "signature": "(plan:SheetCutPlan, placementId:String, ?surfaceZMetres:Float):{outer:CamContour, holes:Array<CamContour>}",
+       "static": true,
+       "doc": "Free-form layout polygons are already placed in global plan mm; retain holes for inside-first CAM."
+      },
       {
        "name": "fromPlan",
        "kind": "method",

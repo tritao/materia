@@ -1703,6 +1703,33 @@
      ]
     },
     {
+     "name": "SheetBounds2",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/sheet/SheetPolygon.hx",
+     "fields": [
+      {
+       "name": "minX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "minY",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxY",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
      "name": "SheetCut",
      "kind": "typedef",
      "file": "manufacturingkit/haxe/src/materia/sheet/SheetCut.hx",
@@ -1914,6 +1941,42 @@
        "name": "retainedRegionIds",
        "kind": "var",
        "signature": ":Array<String>"
+      },
+      {
+       "name": "layout",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "batchId",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "sheetIndex",
+       "kind": "var",
+       "signature": ":Int",
+       "optional": true
+      },
+      {
+       "name": "nestGap",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "freePlacements",
+       "kind": "var",
+       "signature": ":Array<materia.sheet.SheetPolygon.SheetShapePlacement>",
+       "optional": true
+      },
+      {
+       "name": "remnants",
+       "kind": "var",
+       "signature": ":Array<materia.sheet.SheetPolygon.SheetRemnant>",
+       "optional": true
       }
      ],
      "doc": "Authored cutting layout, separate from physical inventory and execution history."
@@ -1958,6 +2021,44 @@
        "kind": "var",
        "signature": ":String",
        "optional": true
+      }
+     ]
+    },
+    {
+     "name": "SheetFreeLayout",
+     "kind": "class",
+     "file": "manufacturingkit/haxe/src/materia/sheet/SheetFreeLayout.hx",
+     "doc": "Independent polygon validation for version-2 free-form layouts; no nesting heuristic is trusted here.",
+     "fields": [
+      {
+       "name": "placements",
+       "kind": "method",
+       "signature": "(plan:SheetCutPlan):Array<SheetShapePlacement>",
+       "static": true
+      },
+      {
+       "name": "remnants",
+       "kind": "method",
+       "signature": "(plan:SheetCutPlan):Array<SheetRemnant>",
+       "static": true
+      },
+      {
+       "name": "checkData",
+       "kind": "method",
+       "signature": "(plan:SheetCutPlan):Void",
+       "static": true
+      },
+      {
+       "name": "csv",
+       "kind": "method",
+       "signature": "(plan:SheetCutPlan):String",
+       "static": true
+      },
+      {
+       "name": "svg",
+       "kind": "method",
+       "signature": "(plan:SheetCutPlan, width:Float, height:Float):String",
+       "static": true
       }
      ]
     },
@@ -2203,6 +2304,18 @@
        "name": "directionConstraint",
        "kind": "var",
        "signature": ":String"
+      },
+      {
+       "name": "shape",
+       "kind": "var",
+       "signature": ":materia.sheet.SheetPolygon.SheetShape",
+       "optional": true
+      },
+      {
+       "name": "allowedAngles",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "optional": true
       }
      ],
      "doc": "A designed part's rectangular cutting blank and acceptable stock."
@@ -2296,6 +2409,29 @@
      "doc": "Pure rectangular sheet-plan validation and guillotine-cut geometry. All result dimensions\nare normalized to millimetres. Plan coordinates use a lower-left origin on the full sheet.\nThe numerical acceptance tolerance is 1e-7 mm for coordinates and max(1e-6 mm²,\nsourceArea × 1e-9) for area balance."
     },
     {
+     "name": "SheetPoint",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/sheet/SheetPolygon.hx",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "SheetPolygon",
+     "kind": "class",
+     "file": "manufacturingkit/haxe/src/materia/sheet/SheetPolygon.hx",
+     "doc": "Polygonal layouts in mm on a 1 µm grid. Predicates use exact integer products within the bounded domain."
+    },
+    {
      "name": "SheetProjectCodec",
      "kind": "class",
      "file": "manufacturingkit/haxe/src/materia/sheet/SheetProjectCodec.hx",
@@ -2384,6 +2520,38 @@
      "doc": "Versioned manufacturing project. Plans are design records; pieces and executions are inventory."
     },
     {
+     "name": "SheetRemnant",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/sheet/SheetPolygon.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
      "name": "SheetRequirementReference",
      "kind": "typedef",
      "file": "manufacturingkit/haxe/src/materia/sheet/SheetRequirementReference.hx",
@@ -2402,6 +2570,49 @@
        "name": "fingerprint",
        "kind": "var",
        "signature": ":String"
+      }
+     ]
+    },
+    {
+     "name": "SheetShape",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/sheet/SheetPolygon.hx",
+     "alias": "Array<Array<SheetPoint>>"
+    },
+    {
+     "name": "SheetShapePlacement",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/sheet/SheetPolygon.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "requirementId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "angle",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "loops",
+       "kind": "var",
+       "signature": ":SheetShape"
       }
      ]
     },

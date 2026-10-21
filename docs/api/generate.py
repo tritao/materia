@@ -9,6 +9,9 @@ dox-compatible XML writer; this script turns that XML into compact JSON for the 
 
     docs/api/generate.py          rewrite docs/api/data/
     docs/api/generate.py --check  fail if docs/api/data/ is stale
+
+Set MATERIA_API_SOURCE to a clean checkout (git worktree add --detach DIR HEAD) to generate from
+committed sources only.
 """
 
 import json
@@ -22,6 +25,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 DATA = os.path.join(HERE, "data")
 HAXE = os.environ.get("HAXE", os.path.join(REPO, "haxeon/.tools/haxe/haxe"))
+# The kit sources to read; defaults to this checkout. Point it at a clean checkout of a commit to generate
+# exactly what CI sees when the working tree holds uncommitted changes.
+SOURCE = os.path.abspath(os.environ.get("MATERIA_API_SOURCE", REPO))
 
 # Packages the editor depends on that are not a public API.
 EXCLUDED = {"app"}
@@ -32,7 +38,7 @@ def packages():
     found = {}
 
     def visit(directory):
-        directory = os.path.realpath(directory)
+        directory = os.path.normpath(directory)
         if directory in found:
             return
         with open(os.path.join(directory, "haxeon.json"), encoding="utf-8") as handle:
@@ -42,12 +48,12 @@ def packages():
             if "path" in dependency:
                 visit(os.path.join(directory, dependency["path"]))
 
-    visit(os.path.join(REPO, "app"))
+    visit(os.path.join(SOURCE, "app"))
     return found
 
 
 def kit_of(directory, manifest):
-    relative = os.path.relpath(directory, REPO).split(os.sep)
+    relative = os.path.relpath(directory, SOURCE).split(os.sep)
     if relative[0] == "haxeon":
         return manifest["package"]["name"]
     return relative[0]
@@ -149,7 +155,7 @@ def convert(xml_text, kit):
         entry = {"name": name, "kind": kind}
         if node.get("params"):
             entry["params"] = node.get("params").split(":")
-        entry["file"] = os.path.relpath(node.get("file"), REPO) if os.path.isabs(node.get("file", "")) else node.get("file")
+        entry["file"] = os.path.relpath(node.get("file"), SOURCE) if os.path.isabs(node.get("file", "")) else node.get("file")
         for relation in ("extends", "implements"):
             related = [render(child[0]) for child in node.findall(relation) if len(child)]
             if related:
@@ -193,7 +199,7 @@ def generate():
         for kit, roots in sorted(kits().items()):
             xml_path = os.path.join(scratch, kit + ".xml")
             subprocess.run([HAXE, "-cp", os.path.join(HERE, "src"), "-cp", os.path.join(REPO, "haxeon/src"),
-                            "--run", "ApiXml", xml_path, *roots], check=True, cwd=REPO, stdout=subprocess.DEVNULL)
+                            "--run", "ApiXml", xml_path, *roots], check=True, cwd=SOURCE, stdout=subprocess.DEVNULL)
             with open(xml_path, encoding="utf-8") as handle:
                 data = convert(handle.read(), kit)
             outputs[kit + ".json"] = json.dumps(data, indent=1, ensure_ascii=False, sort_keys=False) + "\n"
