@@ -113,3 +113,26 @@ enclosure BOM until the replacement is integrated.
 
 The [two-socket mould fixture](SOCKET_FIXTURE.md) demonstrates the cast-in socket
 positioning method with its own Materia scenes, tooling BOM and panel drawings.
+
+## Socket fixture presentation
+
+The [socket fixture coupon](SOCKET_FIXTURE.md) opens in **Assembled**. The viewport
+view picker also offers **See inside**, with transparent plates and a section
+through both socket axes, and **Socket mounting**, with the bed hidden and an
+underside close-up of one screw-and-washer stack. Reset view returns to Assembled.
+These views change display state without changing the fixture assembly.
+
+| Assembled | See inside | Socket mounting |
+| --- | --- | --- |
+| ![Assembled socket fixture](images/socket-fixture-assembled.png) | ![Section through both sockets](images/socket-fixture-see-inside.png) | ![Socket mounting screw and washer from below](images/socket-fixture-socket-mounting.png) |
+
+The captures above use the generated `build/socket-fixture/socket-fixture-assembled.mtrg`.
+Reproduce a named view from the repository root with:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/tests/haxeon.presentation-capture.json -- \
+  --view=see-inside \
+  --project="$PWD/machinekit/examples/flexspline-hobber/build/socket-fixture/socket-fixture-assembled.mtrg" \
+  --capture-dir=/tmp/socket-fixture-see-inside --capture-seconds=2 \
+  --reset-workspace --perspective --width=1400 --height=900
+```

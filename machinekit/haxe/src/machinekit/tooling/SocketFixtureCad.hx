@@ -9,6 +9,9 @@ import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.panel.PanelAssemblyPlan.PanelAssemblyRecord;
 import materia.tooling.panel.PanelJoints;
 import materia.casting.BoxAlgebra;
+import materia.assembly.AssemblyDefinition;
+import materia.presentation.AssemblyPresentation;
+import materia.presentation.Presentations;
 
 /** Coupon review walls around the common source-insert fixture; no socket specification is duplicated here. */
 class SocketFixtureCad {
@@ -39,6 +42,34 @@ class SocketFixtureCad {
 			{id:"west-wall",direction:new cadkit.modeling.Vector(-1,0,0)},
 			{id:"east-wall",direction:new cadkit.modeling.Vector(1,0,0)}
 		]);
+	}
+
+	/** Views refer to the single engineering assembly, in its length unit. */
+	public static function presentation(plan:InsertPlatePlan,definition:AssemblyDefinition):AssemblyPresentation {
+		var result=Presentations.assembled(definition,-1.1,0.35,"socket-fixture");
+		var plates=[for(member in plan.assembly.members){occurrence:member.panel.id,subtree:false}];
+		var inserts=plan.document.input.inserts;
+		if(inserts.length<2)throw "Socket fixture section needs two socket axes";
+		var first=F.compose(plan.document.setup.sourceToMold,inserts[0].pose);
+		var second=F.compose(plan.document.setup.sourceToMold,inserts[1].pose);
+		var axis=F.transformVector(first,0,0,1),dx=second.x-first.x,dy=second.y-first.y,dz=second.z-first.z;
+		var normal={x:dy*axis.z-dz*axis.y,y:dz*axis.x-dx*axis.z,z:dx*axis.y-dy*axis.x};
+		var length=Math.sqrt(normal.x*normal.x+normal.y*normal.y+normal.z*normal.z);
+		if(length<1e-9)throw "Socket axes must be distinct for the section view";
+		normal={x:normal.x/length,y:normal.y/length,z:normal.z/length};
+		var sockets:Array<PartSelector> = [for(insert in inserts){occurrence:materia.tooling.ToolingIds.derive("insert-",insert.id),subtree:false}];
+		result.views.push({id:"see-inside",label:"See inside",camera:Frame(sockets,-Math.PI/2,0.25,1.6),
+			visibility:[for(select in plates){select:select,mode:Transparent}],
+			sections:[{occurrence:null,point:{x:first.x,y:first.y,z:first.z},normal:normal}],explode:0,source:Generated("socket-fixture")});
+		var mounting:Array<PartSelector> = [];
+		for(site in plan.sites.slice(0,1)) {
+			mounting.push({occurrence:site.id,subtree:false});
+			mounting.push({occurrence:materia.tooling.ToolingIds.derive("",site.id,"-washer"),subtree:false});
+		}
+		result.views.push({id:"socket-mounting",label:"Socket mounting",camera:Frame(mounting,0.6,-0.65,2),
+			visibility:[{select:plates[0],mode:Hidden}],sections:[],explode:0,source:Generated("socket-fixture")});
+		materia.presentation.PresentationCodec.validate(definition,result);
+		return result;
 	}
 
 	public static function assembly(plan:InsertPlatePlan,cured:Bool = false,exploded:Bool = false):MachineAssembly {

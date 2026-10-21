@@ -162,6 +162,10 @@ class HobberSocketFixture {
 		}
 		for (mode in ["assembled","exploded"]) {
 			var scene = AssemblyPreview.scene(SocketFixtureCad.assembly(plan,true,mode == "exploded"),"blind-socket-fixture-"+mode);
+			if(mode=="assembled") {
+				var views=SocketFixtureCad.presentation(plan,scene.assemblyDefinition);scene.presentation=views;
+				check(views.defaultView=="assembled"&&views.views.length==3,"Fixture exposes the assembled default and two inspection views");
+			}
 			scene.recipeDiagnostics = ["REVIEW ONLY: nominal catalogue exterior; fixture accuracy, sealing, wall closure and casting process unqualified."];
 			var bytes = SceneArtifact.encode(scene);
 			check(SceneArtifact.decode(bytes).parts.length == scene.parts.length,"Scene save/reopen");

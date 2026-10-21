@@ -172,6 +172,10 @@ engineering-isolation and Reset invariants are in the app test suite, and
 `EnclosureRuntimeTests` are ported.
 
 ### AP2 — Socket fixture views (first example)
+Implementation status: producer views are implemented and the fixture generator
+passes 80 assertions. All three views were captured through the real editor and
+reviewed; the screenshots and reproduction command are in the hobber README.
+
 `SocketFixtureCad` emits views: `assembled` (default), `see-inside` (plates
 transparent, section through both socket axes) and `socket-mounting` (bed
 hidden, camera on the screw/washer stack from below).

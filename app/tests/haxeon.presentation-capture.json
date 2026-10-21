@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "presentation-capture"
+  },
+  "entry": "tests.PresentationCapture",
+  "sourceRoots": [
+    "src"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "presentation-capture/build"
+}
