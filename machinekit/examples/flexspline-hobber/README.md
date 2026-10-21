@@ -126,11 +126,14 @@ These views change display state without changing the fixture assembly.
 | --- | --- | --- |
 | ![Assembled socket fixture](images/socket-fixture-assembled.png) | ![Section through both sockets](images/socket-fixture-see-inside.png) | ![Socket mounting screw and washer from below](images/socket-fixture-socket-mounting.png) |
 
-The See inside capture was reviewed again for AP8's filled sections. The opaque
-socket cuts are filled and hatched at the section plane; their bores remain empty.
-The casting is transparent in this inspection view so its new cap cannot obscure
-the embedded sockets. Transparent parts receive no caps. This changes the view
-preset, without changing the casting or fixture geometry.
+The See inside capture looks down obliquely onto the section at **Y=170 mm**.
+The broad, unhatched orange face is the **uncut inner north wall at Y=290 mm**
+(the wall extends to Y=308 mm), behind the section. Its top edge and the retained
+side-wall lengths show that depth separation. The east and west wall ends cross
+the section and are hatched, as are the socket cuts; socket bores remain empty.
+There is no missing cap on the north wall: the plane never intersects it.
+The casting and fixture plates are transparent so they cannot obscure the sockets;
+transparent parts receive no caps. These are display changes only.
 
 The captures above use the generated `build/socket-fixture/socket-fixture-assembled.mtrg`.
 Reproduce a named view from the repository root with:
@@ -140,7 +143,7 @@ Reproduce a named view from the repository root with:
   --view=see-inside \
   --project="$PWD/machinekit/examples/flexspline-hobber/build/socket-fixture/socket-fixture-assembled.mtrg" \
   --capture-dir=/tmp/socket-fixture-see-inside --capture-seconds=2 \
-  --reset-workspace --perspective --width=1400 --height=900
+  --reset-workspace --perspective --width=1800 --height=900
 ```
 
 The Explode slider at 100% (captured through the editor):

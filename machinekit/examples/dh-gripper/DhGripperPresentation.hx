@@ -10,7 +10,14 @@ class DhGripperPresentation {
     var focus:Array<PartSelector> =[for(part in definition.occurrences)if(part.id!="blank-60") {occurrence:part.id,subtree:false}];
     result.views[0].camera=Frame(focus,-1.1,0.35,1.15);
     var detail:Array<PartSelector> =[{occurrence:"jaw-left",subtree:false},{occurrence:"finger-left",subtree:false}];
-    result.views.push({id:"jaw-detail",label:"Jaw detail",camera:Frame(detail,2.0,0.45,1.8),visibility:[],
+    // Frame service hardware, rather than the workpiece or the routed cable.
+    var jawFocus=detail.concat([
+      {occurrence:"finger-left-screw-0",subtree:false},{occurrence:"finger-left-screw-1",subtree:false}]);
+    var detailVisibility = [for(part in definition.occurrences)
+      if(part.id=="blank-60"||part.id=="electrical-cable"||part.id=="cable-end-connector"
+        ||part.id=="jaw-right"||part.id=="finger-right"||StringTools.startsWith(part.id,"finger-right-screw-"))
+        {select:{occurrence:part.id,subtree:false},mode:Hidden}];
+    result.views.push({id:"jaw-detail",label:"Jaw detail",camera:Frame(jawFocus,2.0,0.65,1.5),visibility:detailVisibility,
       sections:[{occurrence:null,point:guide,normal:{x:0,y:0,z:-1}}],explode:0,source:Generated("dh-gripper")});
     result.views.push({id:"finger-service",label:"Finger service",camera:Frame(detail,2.0,0.45,1.8),visibility:[],
       sections:[],explode:0,source:Generated("dh-gripper")});

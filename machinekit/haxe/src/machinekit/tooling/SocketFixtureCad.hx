@@ -58,7 +58,8 @@ class SocketFixtureCad {
 		if(length<1e-9)throw "Socket axes must be distinct for the section view";
 		normal={x:normal.x/length,y:normal.y/length,z:normal.z/length};
 		var sockets:Array<PartSelector> = [for(insert in inserts){occurrence:materia.tooling.ToolingIds.derive("insert-",insert.id),subtree:false}];
-		result.views.push({id:"see-inside",label:"See inside",camera:Frame(sockets,-Math.PI/2,0.25,1.6),
+		// Oblique elevation separates the hatched side-wall ends from the uncut north wall.
+		result.views.push({id:"see-inside",label:"See inside",camera:Frame(sockets,-1.25,0.65,2.0),
 			visibility:[for(select in plates){select:select,mode:Transparent}].concat(
                 definition.occurrences.filter(part->part.id=="cured-casting").map(part->({select:{occurrence:part.id,subtree:false},mode:Transparent}))),
 			sections:[{occurrence:null,point:{x:first.x,y:first.y,z:first.z},normal:normal}],explode:0,source:Generated("socket-fixture")});
