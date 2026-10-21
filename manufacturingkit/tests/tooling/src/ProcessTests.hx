@@ -60,6 +60,8 @@ class ProcessTests {
 			temperatureMarginC: 5,
 			pourRateMm3PerSecond: null,
 			maximumAirEscapeWidthMm: null,
+			mixComposition: null,
+			mixer: null,
 			faceContacts: [],
 			openFaceContact: null,
 			castability: {
@@ -302,6 +304,12 @@ class ProcessTests {
 		raw.version = 1;
 		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported casting process");
 		raw = haxe.Json.parse(encoded);
+		raw.version = 5;
+		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported casting process");
+		raw = haxe.Json.parse(encoded);
+		Reflect.deleteField(raw.spec, "mixer");
+		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Missing casting process field: mixer");
+		raw = haxe.Json.parse(encoded);
 		Reflect.setField(raw.spec, "typo", 1);
 		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Unknown casting process field: typo");
 		raw = haxe.Json.parse(encoded);
@@ -431,6 +439,46 @@ class ProcessTests {
 		s.recipeFingerprint = ToolingCodec.recipeFingerprint(p.document.recipe);
 		s.sections = [];
 		var integrated = CastingProcessAnalysis.analyze(p, s, 9.80665);
+		check(integrated.pour.sourceFingerprint == integrated.sourceFingerprint
+			&& integrated.pour.fillProcessFingerprint == integrated.processFingerprint,
+			"pour plan consumes the same fingerprinted fill analysis");
+		check(integrated.validation.filter(v -> v.rule == "process.pour.batch-schedule" && v.status == "pending").length == 1,
+			"missing mixer data reaches aggregate readiness");
+		var batchSpec = ProcessSpecCodec.snapshot(s);
+		batchSpec.pourRateMm3PerSecond = 1e9;
+		batchSpec.mixComposition = {reference: "synthetic mix", cureReference: batchSpec.cure.reference,
+			cureMassIngredientIds: ["resin"], ingredients: [
+				{id: "resin", kind: materia.tooling.process.PourPlanning.MixIngredientKind.Resin, materialReference: "synthetic resin", massFraction: 0.1},
+				{id: "hardener", kind: materia.tooling.process.PourPlanning.MixIngredientKind.Hardener, materialReference: "synthetic hardener", massFraction: 0.05},
+				{id: "aggregate", kind: materia.tooling.process.PourPlanning.MixIngredientKind.Aggregate, materialReference: "synthetic aggregate", massFraction: 0.85}
+			]};
+		batchSpec.mixer = {reference: "synthetic equipment", capacityKg: integrated.pour.totalMixMassKg / 3,
+			mixingSeconds: 0.001, transferSeconds: 0.001, workingTimeSeconds: 1000, workingTimeReference: "synthetic timing"};
+		var batchEncoded = ProcessSpecCodec.encode(batchSpec);
+		check(ProcessSpecCodec.encode(ProcessSpecCodec.decode(batchEncoded)) == batchEncoded,
+			"mix ingredients, heat denominator and mixer survive strict codec roundtrip");
+		var batched = CastingProcessAnalysis.analyze(p, batchSpec, 9.80665);
+		var batchPlan = batched.pour.schedule;
+		check(batchPlan != null && batchPlan.batches.length == 3, "real process pipeline includes the declared batch schedule");
+		check(batched.validation.filter(v -> v.rule == "process.pour.cure-mass-basis" && v.status == "pass").length == 1,
+			"weighed resin and cure heat denominator agree explicitly");
+		check(batched.validation.filter(v -> v.rule == "process.pour.cure-sequence" && v.status == "pending").length == 1,
+			"a uniform cure model cannot silently qualify a new multi-batch history");
+		for (row in batched.pour.validation)
+			check(batched.validation.filter(v -> v.rule == row.rule && ToolingCodec.canonical(v) == ToolingCodec.canonical(row)).length == 1,
+				"aggregate report retains pour rule " + row.rule);
+		batchSpec.cure.resinMassFraction = 0.2;
+		var wrongBasis = CastingProcessAnalysis.analyze(p, batchSpec, 9.80665);
+		check(wrongBasis.validation.filter(v -> v.rule == "process.pour.cure-mass-basis"
+			&& v.status == "fail").length == 1, "inconsistent weighing and thermal models fail in the real pipeline");
+		check(wrongBasis.cure.validation.filter(v -> v.rule == "process.pour.cure-mass-basis" && v.status == "fail").length == 1,
+			"cure report retains its weighed-mass failure for downstream fabrication");
+		var basisFabrication = FabricationTests.spec();
+		basisFabrication.adhesiveContainsEPS = true;
+		basisFabrication.resinReference = batchSpec.cure.reference;
+		check(materia.tooling.export.ToolingFabrication.plan(p, basisFabrication, wrongBasis.cure).validation.filter(v ->
+			v.rule == "fabrication.materials.cure" && v.status == "fail").length == 1,
+			"fabrication cannot pass cure qualification with the wrong heat denominator");
 		var resinMismatch = FabricationTests.spec();
 		resinMismatch.resinReference = "another resin";
 		check(CastingProcessAnalysis.analyze(p, s, 9.80665, resinMismatch)
@@ -462,7 +510,7 @@ class ProcessTests {
 		safeSpec.sections = [];
 		var safeReport = CastingProcessAnalysis.analyze(safePlan, safeSpec, 9.80665);
 		check(safeReport.cure.validation.filter(v -> v.rule == "process.cure.lumped-estimate" && v.status == "pass").length == 1,
-			"safe adiabatic bound does not require a cooling-model geometry proof");
+			"inert lumped screening does not require a cooling-model geometry proof");
 		check(safeReport.validation.filter(v -> v.rule == "process.cure.geometric-coverage"
 			|| v.rule == "process.cure.junction-model").length > 0,
 			"lumped screening never drops geometric coverage or junction model blockers");
@@ -481,7 +529,7 @@ class ProcessTests {
 		check(CastingProcessAnalysis.analyze(safePlan, safeSpec, 9.80665)
 			.validation.filter(v -> v.rule == "process.cure.binding.stale-bound-section" && v.status == "fail")
 			.length == 1,
-			"safe adiabatic tier never hides an invalid authored geometry binding");
+			"lumped screening never hides an invalid authored geometry binding");
 		s.recipeFingerprint = haxe.crypto.Sha256.encode("stale");
 		rejects(() -> CastingProcessAnalysis.analyze(p, s, 9.80665), "Stale process recipe");
 		JunctionThermalTests.run(spec());

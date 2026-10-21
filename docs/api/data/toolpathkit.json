@@ -2150,6 +2150,142 @@
      ]
     },
     {
+     "name": "RouterBit",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/tool/RouterBit.hx",
+     "doc": "Router tooling dimensions in metres; the holder envelope includes the collet/nut.\nGauge length is spindle gauge plane to tip, independent of exposed cutting length.",
+     "fields": [
+      {
+       "name": "tool",
+       "kind": "var",
+       "signature": ":Tool",
+       "final": true
+      },
+      {
+       "name": "flutes",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "helix",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "collet",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "holder",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "holderDiameter",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "holderLength",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(number:Int, diameter:Float, cuttingLength:Float, stickOut:Float, gaugeLength:Float, flutes:Int, helix:String, collet:String, holder:String, holderDiameter:Float, holderLength:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "RouterCut",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/tool/RouterCut.hx",
+     "doc": "Explicit planning inputs: chip loads in mm/tooth; energy in J/mm3.\nValues are assumptions until qualified for the actual bit/material lot.",
+     "fields": [
+      {
+       "name": "evaluate",
+       "kind": "method",
+       "signature": "(operation:String, bit:RouterBit, rpm:Float, chipMm:Float, minChipMm:Float, maxChipMm:Float, energyJPerMm3:Float, depthMm:Float, widthMm:Float, maxFeedMPerMinute:Float, maxRpm:Float):RouterCutResult",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "RouterCutResult",
+     "kind": "typedef",
+     "file": "toolpathkit/haxe/toolpathkit/tool/RouterCut.hx",
+     "fields": [
+      {
+       "name": "operation",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "rpm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "requestedFeedMPerMinute",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "feedMPerMinute",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "chipMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "meltingRisk",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "aboveChipRange",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "powerW",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "torqueNm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "meanForceN",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "forceEnvelopeN",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "assumed",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ]
+    },
+    {
      "name": "Tool",
      "kind": "class",
      "file": "toolpathkit/haxe/toolpathkit/tool/Tool.hx",

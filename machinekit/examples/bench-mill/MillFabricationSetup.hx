@@ -40,6 +40,8 @@ class MillFabricationSetup {
 			temperatureMarginC: null,
 			pourRateMm3PerSecond: null,
 			maximumAirEscapeWidthMm: null,
+			mixComposition: null,
+			mixer: null,
 			faceContacts: [],
 			openFaceContact: null,
 			castability: {

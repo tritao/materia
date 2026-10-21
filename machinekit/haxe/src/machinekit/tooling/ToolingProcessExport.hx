@@ -60,6 +60,7 @@ class ToolingProcessExport {
 		}
 		sys.io.File.saveContent(dir + "/casting-process-spec.json", materia.tooling.process.ProcessSpecCodec.encode(report.spec));
 		sys.io.File.saveContent(dir + "/fill-analysis.json", ToolingCodec.canonical(report.fill) + "\n");
+		writePour(report, dir);
 		sys.io.File.saveContent(dir + "/cure-analysis.json", ToolingCodec.canonical(report.cure) + "\n");
 		sys.io.File.saveContent(dir + "/castability-analysis.json", ToolingCodec.canonical(report.castability) + "\n");
 		var text = [
@@ -98,5 +99,40 @@ class ToolingProcessExport {
 		sys.io.File.saveContent(dir + "/section-geometry.json", ToolingCodec.canonical(report.sections) + "\n");
 		sys.io.File.saveContent(dir + "/process-diagnostics.json", ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items) + "\n");
 		return checks;
+	}
+
+	static function writePour(report:materia.tooling.process.CastingProcessAnalysis.CastingProcessReport, dir:String):Void {
+		var pour = report.pour;
+		sys.io.File.saveContent(dir + "/pour-plan.json", ToolingCodec.canonical(pour) + "\n");
+		var quantities:Array<Array<String>> = [["ingredient_id", "material_reference", "mass_kg"]];
+		for (q in pour.quantities) quantities.push([q.ingredientId, q.materialReference, Std.string(q.massKg)]);
+		sys.io.File.saveContent(dir + "/pour-quantities.csv", materia.tooling.export.ToolingFabrication.csv(quantities));
+		var batches:Array<Array<String>> = [["batch", "mass_kg", "from_level_mm", "to_level_mm",
+			"mixing_start_s", "pour_start_s", "pour_end_s"]];
+		var batchQuantities:Array<Array<String>> = [["batch", "ingredient_id", "material_reference", "mass_kg"]];
+		var text = ["# Pour plan", "", "Review calculation; process and physical release checks remain in process-diagnostics.json.",
+			"", "Total wet mix: " + pour.totalMixMassKg + " kg.", ""];
+		if (report.spec.mixComposition == null)
+			text.push("Weighed material quantities are pending the declared mix fractions.");
+		else text.push("Weighing quantities: pour-quantities.csv. The cure heat-denominator mass is " + pour.cureBasisMassKg + " kg.");
+		var schedule = pour.schedule;
+		if (schedule == null)
+			text.push("Batch schedule is unresolved; see the validation records below.");
+		else {
+			for (batch in schedule.batches) {
+				batches.push([Std.string(batch.index), Std.string(batch.massKg), Std.string(batch.lowerHeightMm), Std.string(batch.upperHeightMm),
+					Std.string(batch.mixingStartSeconds), Std.string(batch.pourStartSeconds), Std.string(batch.pourEndSeconds)]);
+				for (q in batch.quantities)
+					batchQuantities.push([Std.string(batch.index), q.ingredientId, q.materialReference, Std.string(q.massKg)]);
+			}
+			text.push("Batch sequence: pour-batches.csv. " + schedule.batches.length + " batches; elapsed "
+				+ schedule.totalElapsedSeconds + " s; minimum declared working-time margin " + schedule.minimumWorkingTimeMarginSeconds + " s.");
+			text.push("Individual batch weighings: pour-batch-quantities.csv.");
+		}
+		text.push("");
+		for (check in pour.validation) text.push("- `" + check.rule + "` (" + check.status + "): " + check.message);
+		sys.io.File.saveContent(dir + "/pour-batches.csv", materia.tooling.export.ToolingFabrication.csv(batches));
+		sys.io.File.saveContent(dir + "/pour-batch-quantities.csv", materia.tooling.export.ToolingFabrication.csv(batchQuantities));
+		sys.io.File.saveContent(dir + "/pour-plan.md", text.join("\n") + "\n");
 	}
 }

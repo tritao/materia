@@ -2362,6 +2362,12 @@
        "kind": "var",
        "signature": ":Null<MaterialSheet>",
        "optional": true
+      },
+      {
+       "name": "routerCutting",
+       "kind": "var",
+       "signature": ":Null<MaterialRouterCutting>",
+       "optional": true
       }
      ],
      "doc": "Visual and bulk properties; density is kg/m3, mechanical properties are MPa."
@@ -2516,6 +2522,61 @@
        "optional": true
       }
      ]
+    },
+    {
+     "name": "MaterialRouterChipLoad",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/MaterialDef.hx",
+     "fields": [
+      {
+       "name": "minDiameterMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxDiameterMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "minChipMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "nominalChipMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxChipMm",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "MaterialRouterCutting",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/MaterialDef.hx",
+     "fields": [
+      {
+       "name": "assumed",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "specificEnergyJPerMm3",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "chipLoads",
+       "kind": "var",
+       "signature": ":Array<MaterialRouterChipLoad>"
+      }
+     ],
+     "doc": "Assumed router ranges for stated diameter bands, not supplier recommendations."
     },
     {
      "name": "MaterialSheet",

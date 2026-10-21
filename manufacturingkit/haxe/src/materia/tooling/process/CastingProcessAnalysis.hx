@@ -14,6 +14,7 @@ typedef CastingProcessReport = {
 	var processFingerprint:String;
 	var spec:CastingProcessSpec;
 	var fill:FillReport;
+	var pour:PourPlanning.PourAssessment;
 	var cure:CureReport;
 	var sections:OrthogonalSections.OrthogonalSectionReport;
 	var castability:CastabilityAnalysis.CastabilityReport;
@@ -80,11 +81,23 @@ class CastingProcessAnalysis {
 			fill.validation.push(FillAnalysis.check("process.fill.tooling-projection", projection.unsupportedIds,
 				materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,
 				"Curved tooling openings intersect the fill footprint. They are conservatively blocked; exact curved projection is not implemented.", []));
+		var pour = PourPlanning.analyze(p.document.input.id, fill, spec.mixComposition, spec.mixer);
+		pour.validation.push(PourPlanning.cureConsistency(p.document.input.id, spec.mixComposition,
+			spec.cure.reference, spec.cure.resinMassFraction));
+		var schedule = pour.schedule;
+		if (schedule != null && schedule.batches.length > 1)
+			pour.validation.push(FillAnalysis.check("process.pour.cure-sequence", [p.document.input.id],
+				materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending,
+				"The uniform full-casting cure model does not cover this batch arrival history; thermal/gel behaviour requires sequence-bound qualification.",
+				[pour.mixingFingerprint]));
 		validateSectionSources(p.document, spec);
 		var cure = CureAnalysis.analyze(p.document.input.id, sourceFingerprint, fingerprint, spec, p.document.recipe.mixDensityKgM3,
 			p.document.recipe.core.maximumTemperatureC, p.cores.length > 0
 			|| fabrication == null
 			|| fabrication.adhesiveContainsEPS != false);
+		for (check in pour.validation)
+			if (check.rule == "process.pour.cure-mass-basis" || check.rule == "process.pour.cure-sequence")
+				cure.validation.push(check);
 		cure.validation.push(FillAnalysis.check("process.cure.resin-identity", [p.document.recipe.id],
 			fabrication == null ? materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending : fabrication.resinReference != spec.cure.reference ? materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail : materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass,
 			"Cure reference must name the same resin as the fabrication solvent record.",
@@ -105,16 +118,23 @@ class CastingProcessAnalysis {
 			geometric.evidence));
 		cure.validation = cure.validation.concat(coverageChecks);
 		var validation = p.validation.concat(cure.validation).concat(sectionChecks);
+		for (check in pour.validation) {
+			var existing = validation.filter(v -> v.rule == check.rule);
+			if (existing.length == 0) validation.push(check);
+			else if (existing.length != 1 || ToolingCodec.canonical(existing[0]) != ToolingCodec.canonical(check))
+				throw "Inconsistent cure/pour validation: " + check.rule;
+		}
 		for (check in castability.validation)
 			if (validation.filter(v -> v.rule == check.rule).length == 0)
 				validation.push(check);
 		validation.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		return {
-			version: 5,
+			version: ProcessSpecCodec.VERSION,
 			sourceFingerprint: sourceFingerprint,
 			processFingerprint: fingerprint,
 			spec: spec,
 			fill: fill,
+			pour: pour,
 			cure: cure,
 			sections: sections,
 			castability: castability,

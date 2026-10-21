@@ -35,6 +35,7 @@ class FoundationModelTests {
 
 	public static function main():Void {
 		FoundationRequirementTests.main();
+		PourPlanningTests.run();
 		insertBodies();
 		threadRelief();
 		solidFeatures();

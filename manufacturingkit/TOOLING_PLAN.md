@@ -1870,6 +1870,14 @@ structures and phase 9 physical calibration remain open.
   **117 artifacts / 40 programs / 15 Pass / 260 Pending / 15 Unsupported**;
   manifest integrity/tamper checks pass and readiness remains **false**.
 
+- [x] Pour planning and exports, process format **6** with no old-version reader.
+  Weighed ingredients, resin heat-denominator consistency, mixer capacity and
+  working-time limits determine batch masses, timing and exact fill-level ranges.
+  JSON, quantity/batch CSVs and the operation description enter the hashed kit.
+  Missing workshop mix/equipment data remain Pending; a multi-batch proposal
+  does not qualify the uniform full-casting cure model. Focused foundation
+  validation: **229 assertions**, including **57** pour-planning assertions.
+
 ### Phase 7 records: shared levelling-foot family
 
 - [x] One `structural.LevelingFoot` recipe with strict `LevelingFootSpec` schema

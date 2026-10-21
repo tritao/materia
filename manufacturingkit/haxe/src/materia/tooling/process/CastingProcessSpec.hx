@@ -93,6 +93,8 @@ typedef CastingProcessSpec = {
 	var temperatureMarginC:Null<Float>;
 	var pourRateMm3PerSecond:Null<Float>;
 	var maximumAirEscapeWidthMm:Null<Float>;
+	var mixComposition:Null<PourPlanning.MixComposition>;
+	var mixer:Null<PourPlanning.PourMixerSpec>;
 	var castability:CastabilityLimits;
 	var cure:ResinCureSpec;
 	var sections:Array<CureSection>;

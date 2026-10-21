@@ -4,8 +4,9 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
 import materia.tooling.process.CastingProcessSpec;
 
-/** Strict independent v5 format. Reconstructs typed records after validation. */
+/** Strict process format; old encodings are rejected, never filled with new defaults. */
 class ProcessSpecCodec {
+	public static inline final VERSION = 6;
 	static function object(v:Dynamic, keys:Array<String>):Void {
 		if (v == null || !Reflect.isObject(v) || Std.isOfType(v, Array) || Std.isOfType(v, String))
 			throw "Invalid casting process object";
@@ -95,6 +96,8 @@ class ProcessSpecCodec {
 			"temperatureMarginC",
 			"pourRateMm3PerSecond",
 			"maximumAirEscapeWidthMm",
+			"mixComposition",
+			"mixer",
 			"castability",
 			"cure",
 			"sections",
@@ -251,6 +254,8 @@ class ProcessSpecCodec {
 			temperatureMarginC: optional(v.temperatureMarginC, 0, 2000),
 			pourRateMm3PerSecond: optional(v.pourRateMm3PerSecond, 1e-12, 1e15),
 			maximumAirEscapeWidthMm: optional(v.maximumAirEscapeWidthMm, 1e-9, 1e6),
+			mixComposition: v.mixComposition == null ? null : PourPlanning.copyComposition(v.mixComposition),
+			mixer: v.mixer == null ? null : PourPlanning.copyMixer(v.mixer),
 			castability: castability,
 			cure: {
 				reference: text(c.reference),
@@ -271,7 +276,7 @@ class ProcessSpecCodec {
 	}
 
 	public static function encode(v:CastingProcessSpec):String {
-		var text = ToolingCodec.canonical({format: "materia.casting-process", version: 5, spec: snapshot(v)}) + "\n";
+		var text = ToolingCodec.canonical({format: "materia.casting-process", version: VERSION, spec: snapshot(v)}) + "\n";
 		if (haxe.io.Bytes.ofString(text).length > 2097152)
 			throw "Casting process size limit";
 		return text;
@@ -289,7 +294,7 @@ class ProcessSpecCodec {
 			throw error;
 		}
 		object(v, ["format", "version", "spec"]);
-		if (v.format != "materia.casting-process" || v.version != 5)
+		if (v.format != "materia.casting-process" || v.version != VERSION)
 			throw "Unsupported casting process format/version";
 		return snapshot(v.spec);
 	}

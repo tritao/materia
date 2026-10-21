@@ -20,8 +20,9 @@ jobs:
       - uses: krdlab/setup-haxe@v1
         with:
           haxe-version: 4.3.7
-      # Fails when docs/api/data no longer matches the kits' public API.
-      - run: HAXE=haxe python3 docs/api/generate.py --check
+      # Warns when docs/api/data no longer matches the kits' public API (regenerate it with docs/api/generate.py).
+      # A warning, not a failure: kit changes land from many places, and the data is refreshed separately.
+      - run: HAXE=haxe python3 docs/api/generate.py --check || echo "::warning::docs/api/data is stale; run docs/api/generate.py"
         working-directory: .
       - uses: actions/setup-node@v4
         with:

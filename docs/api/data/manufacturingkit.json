@@ -692,6 +692,13 @@
      "file": "manufacturingkit/haxe/src/materia/casting/CastingRecordCodec.hx",
      "fields": [
       {
+       "name": "referencePath",
+       "kind": "method",
+       "signature": "(value:String):Void",
+       "static": true,
+       "doc": "Assembly instance paths qualify local IDs without allowing empty or parent segments."
+      },
+      {
        "name": "number",
        "kind": "method",
        "signature": "(raw:Dynamic, name:String):Float",
@@ -719,6 +726,12 @@
        "name": "array",
        "kind": "method",
        "signature": "(raw:Dynamic, name:String):Array<Dynamic>",
+       "static": true
+      },
+      {
+       "name": "identifiers",
+       "kind": "method",
+       "signature": "(row:Dynamic, field:String, ?maximum:Int):Array<String>",
        "static": true
       },
       {
@@ -846,6 +859,33 @@
      ]
     },
     {
+     "name": "DatumReference",
+     "kind": "enum",
+     "file": "manufacturingkit/haxe/src/materia/casting/FoundationDatumScheme.hx",
+     "fields": [
+      {
+       "name": "BodyFace",
+       "kind": "case",
+       "signature": "(faceId:String)"
+      },
+      {
+       "name": "FeatureFace",
+       "kind": "case",
+       "signature": "(featureId:String, faceId:String)"
+      },
+      {
+       "name": "InsertInterface",
+       "kind": "case",
+       "signature": "(insertId:String, interfaceId:String)"
+      },
+      {
+       "name": "InsertHole",
+       "kind": "case",
+       "signature": "(insertId:String, holeId:String)"
+      }
+     ]
+    },
+    {
      "name": "FinishedCastingCavity",
      "kind": "typedef",
      "file": "manufacturingkit/haxe/src/materia/casting/CastingCavities.hx",
@@ -887,6 +927,373 @@
        "name": "UnsupportedGeometry",
        "kind": "case",
        "signature": "(reason:String)"
+      }
+     ]
+    },
+    {
+     "name": "FixtureConstraint",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/FixtureConstraints.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "sourceId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "role",
+       "kind": "var",
+       "signature": ":FixtureConstraintRole"
+      },
+      {
+       "name": "point",
+       "kind": "var",
+       "signature": ":FixtureVector"
+      },
+      {
+       "name": "normal",
+       "kind": "var",
+       "signature": ":FixtureVector"
+      }
+     ],
+     "doc": "One contact direction in the insert's common fixture frame. Source IDs trace\nto the planned pads, pin/hole or slot contacts; a clamp is preload, not a datum."
+    },
+    {
+     "name": "FixtureConstraintReport",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/FixtureConstraints.hx",
+     "fields": [
+      {
+       "name": "rank",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "freeMotions",
+       "kind": "var",
+       "signature": ":Array<FixtureMotion>"
+      },
+      {
+       "name": "redundantLocations",
+       "kind": "var",
+       "signature": ":Array<FixtureDependency>"
+      },
+      {
+       "name": "preloadIds",
+       "kind": "var",
+       "signature": ":Array<String>"
+      }
+     ]
+    },
+    {
+     "name": "FixtureConstraintRole",
+     "kind": "abstract",
+     "file": "manufacturingkit/haxe/src/materia/casting/FixtureConstraints.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "Location",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Preload",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "FixtureConstraints",
+     "kind": "class",
+     "file": "manufacturingkit/haxe/src/materia/casting/FixtureConstraints.hx",
+     "doc": "Infinitesimal six-DOF location check. Rows are n·(t + rotation × lever).\nRotation coordinates are scaled by the declared reference length before\nelimination; output converts them back to radians. This is a location/rank\ncheck, not proof of preload, strength, pour access or post-cure removal."
+    },
+    {
+     "name": "FixtureCoordinate",
+     "kind": "abstract",
+     "file": "manufacturingkit/haxe/src/materia/casting/FixtureConstraints.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "Tx",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Ty",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Tz",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Rx",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Ry",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Rz",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "FixtureDependency",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/FixtureConstraints.hx",
+     "fields": [
+      {
+       "name": "constraintIds",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "coefficients",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      },
+      {
+       "name": "affectedCoordinates",
+       "kind": "var",
+       "signature": ":Array<FixtureCoordinate>"
+      }
+     ]
+    },
+    {
+     "name": "FixtureMotion",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/FixtureConstraints.hx",
+     "fields": [
+      {
+       "name": "translationMm",
+       "kind": "var",
+       "signature": ":FixtureVector"
+      },
+      {
+       "name": "rotationRad",
+       "kind": "var",
+       "signature": ":FixtureVector"
+      },
+      {
+       "name": "affectedCoordinates",
+       "kind": "var",
+       "signature": ":Array<FixtureCoordinate>"
+      }
+     ]
+    },
+    {
+     "name": "FixtureVector",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/FixtureConstraints.hx",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "FoundationDatum",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/FoundationDatumScheme.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "reference",
+       "kind": "var",
+       "signature": ":DatumReference"
+      },
+      {
+       "name": "frame",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      }
+     ]
+    },
+    {
+     "name": "FoundationDatumGeometry",
+     "kind": "class",
+     "file": "manufacturingkit/haxe/src/materia/casting/FoundationDatumGeometry.hx",
+     "doc": "Nominal reference-frame consistency, in source coordinates. These numerical\ntolerances are identity checks, not manufacturing tolerances or proof that a\nphysical contact patch is available after cutting, lining or finishing."
+    },
+    {
+     "name": "FoundationDatumInsert",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/FoundationDatumScheme.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      },
+      {
+       "name": "holes",
+       "kind": "var",
+       "signature": ":Array<InsertHole>"
+      },
+      {
+       "name": "interfaces",
+       "kind": "var",
+       "signature": ":Array<InterfaceRequirement>"
+      }
+     ]
+    },
+    {
+     "name": "FoundationDatumScheme",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/FoundationDatumScheme.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "foundationId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "primary",
+       "kind": "var",
+       "signature": ":FoundationDatum"
+      },
+      {
+       "name": "secondary",
+       "kind": "var",
+       "signature": ":FoundationDatum"
+      },
+      {
+       "name": "tertiary",
+       "kind": "var",
+       "signature": ":FoundationDatum"
+      }
+     ]
+    },
+    {
+     "name": "FoundationDatumSources",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/FoundationDatumScheme.hx",
+     "fields": [
+      {
+       "name": "bodyFaces",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "featureFaces",
+       "kind": "var",
+       "signature": ":Map<String, Array<String>>"
+      },
+      {
+       "name": "insertInterfaces",
+       "kind": "var",
+       "signature": ":Map<String, Array<String>>"
+      },
+      {
+       "name": "insertHoles",
+       "kind": "var",
+       "signature": ":Map<String, Array<String>>"
+      },
+      {
+       "name": "unsupportedFeatures",
+       "kind": "var",
+       "signature": ":Map<String, String>"
+      }
+     ],
+     "doc": "Source-provided reference inventory, not a second geometry representation."
+    },
+    {
+     "name": "FoundationDatums",
+     "kind": "class",
+     "file": "manufacturingkit/haxe/src/materia/casting/FoundationDatumScheme.hx",
+     "fields": [
+      {
+       "name": "snapshot",
+       "kind": "method",
+       "signature": "(raw:Dynamic):FoundationDatumScheme",
+       "static": true
+      },
+      {
+       "name": "record",
+       "kind": "method",
+       "signature": "(scheme:FoundationDatumScheme):Dynamic",
+       "static": true
+      },
+      {
+       "name": "ordered",
+       "kind": "method",
+       "signature": "(s:FoundationDatumScheme):Array<FoundationDatum>",
+       "static": true,
+       "doc": "Datum order is semantic and never sorted alphabetically."
+      },
+      {
+       "name": "sourceInventory",
+       "kind": "method",
+       "signature": "(envelope:Array<CastingPrism>, features:Array<CastingFeature>, inserts:Array<FoundationDatumInsert>):FoundationDatumSources",
+       "static": true,
+       "doc": "Resolve IDs against the source's exact supported boundary records. This does\nnot qualify the availability or accuracy of a physical datum contact patch.\nNon-prismatic feature boundaries stay explicitly unresolved, never boxified."
+      },
+      {
+       "name": "validateReferences",
+       "kind": "method",
+       "signature": "(scheme:FoundationDatumScheme, sources:FoundationDatumSources, requirements:Array<InterfaceRequirement>):Array<UnresolvedFoundationDatum>",
+       "static": true
+      },
+      {
+       "name": "validateSource",
+       "kind": "method",
+       "signature": "(scheme:FoundationDatumScheme, envelope:Array<CastingPrism>, features:Array<CastingFeature>, inserts:Array<FoundationDatumInsert>, interfaces:Array<InterfaceRequirement>):Array<UnresolvedFoundationDatum>",
+       "static": true
+      },
+      {
+       "name": "referenceRecord",
+       "kind": "method",
+       "signature": "(reference:DatumReference):Dynamic",
+       "static": true
       }
      ]
     },
@@ -1632,6 +2039,558 @@
        "kind": "var",
        "signature": ":String",
        "static": true
+      }
+     ]
+    },
+    {
+     "name": "InterfaceFinish",
+     "kind": "abstract",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRequirement.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "AsSupplied",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "AsCast",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Machined",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Ground",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "JigMaster",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "RailMaster",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "SelfLevelled",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "SurfacePlateMaster",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "PushScrews",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "TaperedGib",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ReplicatedEdge",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "InterfaceMember",
+     "kind": "enum",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRelationship.hx",
+     "doc": "Component paths name the part owning the interface; machine axes name joints.\nBoth can be qualified when an assembly is nested, without interpreting labels.",
+     "fields": [
+      {
+       "name": "ComponentInterface",
+       "kind": "case",
+       "signature": "(memberId:String, interfaceId:String)"
+      },
+      {
+       "name": "MachineAxis",
+       "kind": "case",
+       "signature": "(axisId:String)"
+      }
+     ]
+    },
+    {
+     "name": "InterfaceMetrology",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRelationship.hx",
+     "fields": [
+      {
+       "name": "method",
+       "kind": "var",
+       "signature": ":MetrologyMethod"
+      },
+      {
+       "name": "instrumentReference",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "uncertaintyMm",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      }
+     ]
+    },
+    {
+     "name": "InterfaceRelationship",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRelationship.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":InterfaceRelationshipKind"
+      },
+      {
+       "name": "members",
+       "kind": "var",
+       "signature": ":Array<InterfaceMember>"
+      },
+      {
+       "name": "tolerance",
+       "kind": "var",
+       "signature": ":RelationshipTolerance"
+      },
+      {
+       "name": "metrology",
+       "kind": "var",
+       "signature": ":InterfaceMetrology"
+      }
+     ]
+    },
+    {
+     "name": "InterfaceRelationshipKind",
+     "kind": "enum",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRelationship.hx",
+     "doc": "Geometric relations use the member's actual kind: plane-line parallelism\nmeans a perpendicular plane normal and line direction; plane-line squareness\nmeans parallel normal and direction. Normals are not substituted for planes.",
+     "fields": [
+      {
+       "name": "Coplanar",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Parallel",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Perpendicular",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Distance",
+       "kind": "case",
+       "signature": "(separationMm:Float)"
+      },
+      {
+       "name": "Straightness",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "InPlaneParallelism",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "InPlaneSquareness",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "InterfaceRelationships",
+     "kind": "class",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRelationship.hx",
+     "fields": [
+      {
+       "name": "validateReferences",
+       "kind": "method",
+       "signature": "(relationships:Array<InterfaceRelationship>, interfaces:Array<ScopedInterfaceRequirement>, axisIds:Array<String>):Void",
+       "static": true,
+       "doc": "Resolve both directions of the source/assembly contract. A relationship must\nname existing interfaces and each participating interface must reference it.\nThis checks declarations only, never measured alignment or uncertainty."
+      },
+      {
+       "name": "snapshot",
+       "kind": "method",
+       "signature": "(raw:Dynamic):Array<InterfaceRelationship>",
+       "static": true
+      },
+      {
+       "name": "records",
+       "kind": "method",
+       "signature": "(relationships:Array<InterfaceRelationship>):Array<Dynamic>",
+       "static": true
+      },
+      {
+       "name": "remapMembers",
+       "kind": "method",
+       "signature": "(relationship:InterfaceRelationship, map:(String) -> String):InterfaceRelationship",
+       "static": true,
+       "doc": "Definition ID remains stable in source requirements; only physical member paths move."
+      },
+      {
+       "name": "maxDeviation",
+       "kind": "method",
+       "signature": "(t:RelationshipTolerance):Float",
+       "static": true
+      },
+      {
+       "name": "uncertaintyMargin",
+       "kind": "method",
+       "signature": "(r:InterfaceRelationship):Null<Float>",
+       "static": true,
+       "doc": "Null is missing physical evidence; a negative value cannot qualify the relationship."
+      },
+      {
+       "name": "memberKey",
+       "kind": "method",
+       "signature": "(member:InterfaceMember):String",
+       "static": true
+      },
+      {
+       "name": "readMember",
+       "kind": "method",
+       "signature": "(raw:Dynamic):InterfaceMember",
+       "static": true
+      },
+      {
+       "name": "memberRecord",
+       "kind": "method",
+       "signature": "(m:InterfaceMember):Dynamic",
+       "static": true
+      },
+      {
+       "name": "kindRecord",
+       "kind": "method",
+       "signature": "(kind:InterfaceRelationshipKind):Dynamic",
+       "static": true
+      },
+      {
+       "name": "toleranceRecord",
+       "kind": "method",
+       "signature": "(t:RelationshipTolerance):Dynamic",
+       "static": true
+      },
+      {
+       "name": "readMethod",
+       "kind": "method",
+       "signature": "(token:String):MetrologyMethod",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "InterfaceRequirement",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRequirement.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "geometry",
+       "kind": "var",
+       "signature": ":PrecisionGeometry"
+      },
+      {
+       "name": "route",
+       "kind": "var",
+       "signature": ":InterfaceRoute"
+      },
+      {
+       "name": "allowanceMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "finishingProcessErrorMm",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "permittedFinishes",
+       "kind": "var",
+       "signature": ":Array<InterfaceFinish>"
+      },
+      {
+       "name": "positionToleranceMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "datumReference",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "relationshipIds",
+       "kind": "var",
+       "signature": ":Array<String>"
+      }
+     ]
+    },
+    {
+     "name": "InterfaceRequirements",
+     "kind": "class",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRequirement.hx",
+     "doc": "Defensive source records, with no CAD handles or process evidence. The owning\ncasting document versions these embedded records together with its source geometry.",
+     "fields": [
+      {
+       "name": "snapshot",
+       "kind": "method",
+       "signature": "(raw:Dynamic):Array<InterfaceRequirement>",
+       "static": true
+      },
+      {
+       "name": "records",
+       "kind": "method",
+       "signature": "(requirements:Array<InterfaceRequirement>):Array<Dynamic>",
+       "static": true
+      },
+      {
+       "name": "fixtureBudgetMm",
+       "kind": "method",
+       "signature": "(r:InterfaceRequirement):Null<Float>",
+       "static": true,
+       "doc": "Remaining combined fixture/casting/metrology budget; no geometric use."
+      },
+      {
+       "name": "lacksDeclaredAllowance",
+       "kind": "method",
+       "signature": "(r:InterfaceRequirement):Bool",
+       "static": true
+      },
+      {
+       "name": "geometryFrame",
+       "kind": "method",
+       "signature": "(g:PrecisionGeometry):AssemblyFrame",
+       "static": true
+      },
+      {
+       "name": "geometryRecord",
+       "kind": "method",
+       "signature": "(g:PrecisionGeometry):Dynamic",
+       "static": true
+      },
+      {
+       "name": "readRoute",
+       "kind": "method",
+       "signature": "(token:String):InterfaceRoute",
+       "static": true
+      },
+      {
+       "name": "readFinish",
+       "kind": "method",
+       "signature": "(token:String):InterfaceFinish",
+       "static": true
+      },
+      {
+       "name": "permits",
+       "kind": "method",
+       "signature": "(route:InterfaceRoute, finish:InterfaceFinish):Bool",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "InterfaceRoute",
+     "kind": "abstract",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRequirement.hx",
+     "underlying": "String",
+     "doc": "The design owns the route; tooling chooses only one of its permitted finishes.",
+     "fields": [
+      {
+       "name": "AsSupplied",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "AsCast",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Machined",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Ground",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Replicated",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "AdjustedAtAssembly",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "MetrologyMethod",
+     "kind": "abstract",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRelationship.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "IndicatorReversal",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ElectronicLevel",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "AxisMasterIndicator",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "GraniteSquareIndicator",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "AutocollimatorReversal",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "LaserStraightness",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "PrecisionGeometry",
+     "kind": "enum",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRequirement.hx",
+     "doc": "A plane uses frame +Z as normal; a straight reference edge uses frame +X.\nFrames describe the finished design interface, in the owning part's coordinates.",
+     "fields": [
+      {
+       "name": "Plane",
+       "kind": "case",
+       "signature": "(frame:AssemblyFrame)"
+      },
+      {
+       "name": "Line",
+       "kind": "case",
+       "signature": "(frame:AssemblyFrame)"
+      }
+     ]
+    },
+    {
+     "name": "RelationshipTolerance",
+     "kind": "enum",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRelationship.hx",
+     "doc": "Angular budgets retain their declared measurement length rather than silently\ninterpreting micrometres per 300 mm as an absolute position tolerance.",
+     "fields": [
+      {
+       "name": "Linear",
+       "kind": "case",
+       "signature": "(maxDeviationMm:Float)"
+      },
+      {
+       "name": "PerLength",
+       "kind": "case",
+       "signature": "(maxDeviationMm:Float, spanMm:Float)",
+       "doc": "Lateral rise over a gage span measured along the ideal reference direction;\nits angular slope is maxDeviationMm/spanMm (tan of the allowed angle)."
+      }
+     ]
+    },
+    {
+     "name": "ScopedInterfaceRequirement",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/InterfaceRelationship.hx",
+     "fields": [
+      {
+       "name": "member",
+       "kind": "var",
+       "signature": ":InterfaceMember"
+      },
+      {
+       "name": "requirement",
+       "kind": "var",
+       "signature": ":InterfaceRequirement"
+      }
+     ],
+     "doc": "The assembly supplies ownership; interface names are local to their source."
+    },
+    {
+     "name": "UnresolvedFoundationDatum",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/FoundationDatumScheme.hx",
+     "fields": [
+      {
+       "name": "datumId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "featureId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "reason",
+       "kind": "var",
+       "signature": ":String"
       }
      ]
     }
