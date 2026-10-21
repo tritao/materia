@@ -886,6 +886,20 @@ class ProjectDocumentSession {
       function(){authoredPresentation=prior;presentation=previous;}));
   }
 
+  /** Replace an occurrence's generated offset with an undoable authored display offset. */
+  public function savePresentationOffset(offset:materia.presentation.AssemblyPresentation.ExplodeOffset):Void {
+    var definition=projectAssemblyDefinition;if(definition==null)throw "Offset authoring requires an assembly";
+    var prior=authoredPresentation;
+    var next=prior==null?PresentationEdits.empty(definition.id):PresentationEdits.decode(PresentationEdits.encode(prior));
+    var copy:materia.presentation.AssemblyPresentation.ExplodeOffset=JsonWire.decode(JsonWire.encode(offset));copy.source=Authored;
+    next.explode=[for(item in next.explode)if(item.select.occurrence!=copy.select.occurrence||item.select.subtree!=copy.select.subtree)item];
+    next.explode.push(copy);
+    var merged=PresentationEdits.merge(definition,generatedPresentation,next),previous=presentation;
+    document.apply(new EditOperation("Edit explode offset "+copy.select.occurrence,
+      function(){authoredPresentation=next;presentation=merged;},
+      function(){authoredPresentation=prior;presentation=previous;}));
+  }
+
   /** Save or update an authored view as one undoable display-only edit. */
   public function savePresentationView(view:PresentationView):Void {
     var definition=projectAssemblyDefinition;if(definition==null)throw "View authoring requires a generated assembly";

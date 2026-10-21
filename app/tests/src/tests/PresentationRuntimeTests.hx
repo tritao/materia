@@ -161,9 +161,31 @@ class PresentationRuntimeTests {
     check(rejected(()->PresentationEdits.merge(definition,record,edits)),"Renamed occurrence fails authored validation");
     check(rejected(()->SceneArtifact.decodeProject(Json.parse('{"dynamicParts":[],"motions":[],"initialView":{"yaw":0,"pitch":0}}'))),"Old project camera fields are rejected");
     check(rejected(()->SceneArtifact.decodeProject(Json.parse('{"dynamicParts":[],"motions":[],"inspectionCameras":[]}'))),"Old camera arrays are rejected");
+    bind(viewport);
+    var offsetHistory=session.document.history.undoCount,offsetState=AssemblyDefinitionCodec.encodeState(definition,session.projectAssemblyState);
+    check(viewport.beginPresentationOffsetEdit("project:cover",offset->session.savePresentationOffset(offset)),"Offset gizmo starts on an assembly occurrence");
+    @:privateAccess viewport.previewPresentationOffset(75);
+    check(session.document.history.undoCount==offsetHistory&&AssemblyDefinitionCodec.encodeState(definition,session.projectAssemblyState)==offsetState,"Offset preview preserves engineering state and history");
+    bind(viewport);check(viewport.presentationOffsetEditing(),"An ordinary editor rebind preserves the active offset preview");
+    viewport.cancelPresentationOffsetEdit();
+    check(session.document.history.undoCount==offsetHistory,"Cancelling the gizmo records no edit");
+    viewport.beginPresentationOffsetEdit("project:cover",offset->session.savePresentationOffset(offset));
+    viewport.setSimulationState(true,[],1);
+    check(!viewport.presentationOffsetEditing()&&session.document.history.undoCount==offsetHistory,"Simulation cancels an offset preview without recording it");
+    check(!viewport.beginPresentationOffsetEdit("project:cover",offset->session.savePresentationOffset(offset)),"Simulation disables offset authoring");
+    viewport.setSimulationState(false,[],2);
+    viewport.beginPresentationOffsetEdit("project:cover",offset->session.savePresentationOffset(offset));
+    @:privateAccess viewport.previewPresentationOffset(75);
+    @:privateAccess viewport.finishPresentationOffsetEdit(true);
+    var edited=session.presentation;if(edited==null)throw "Missing authored offset";
+    check(session.document.history.undoCount==offsetHistory+1&&edited.explode.filter(offset->offset.select.occurrence=="cover").length==1,"Offset commit replaces the generated offset as one undoable edit");
+    check(edited.explode.filter(offset->offset.select.occurrence=="cover")[0].distance==75&&record.explode[0].distance!=75,"Authored offset leaves generated data unchanged");
+    session.document.undo();check(session.presentation==reopened,"Undo restores the original presentation");
+    session.document.redo();session.save(saved);session.open(saved);
+    var restored=session.presentation;if(restored==null)throw "Missing reopened offset";
+    check(restored.explode.filter(offset->offset.select.occurrence=="cover")[0].distance==75,"Authored offset survives save and reopen");
     collision.dispose();dock.dispose();viewport.dispose();session.dispose();
-    @:privateAccess tests.ViewportCoordinatesTests.sectionInspection();
-    @:privateAccess tests.SceneEditingTests.perspectiveHoverInput();
+    tests.ViewportCoordinatesTests.main();
     noPresentationPicking(host);
   }
   static function noPresentationPicking(host:haxeon.ui.host.UiHostContext):Void {

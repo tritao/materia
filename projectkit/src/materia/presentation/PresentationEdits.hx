@@ -39,7 +39,11 @@ class PresentationEdits {
     if(authored!=null) {
       if(authored.definition!=definition.id)throw "Authored presentation belongs to another assembly";
       decode(encode(authored));
-      result.views=result.views.concat(authored.views);result.explode=result.explode.concat(authored.explode);
+      result.views=result.views.concat(authored.views);
+      for(offset in authored.explode) {
+        result.explode=[for(item in result.explode)if(item.select.occurrence!=offset.select.occurrence||item.select.subtree!=offset.select.subtree)item];
+        result.explode.push(offset);
+      }
       result.procedures=result.procedures.concat(authored.procedures);
     }
     PresentationCodec.validate(definition,result);return result;

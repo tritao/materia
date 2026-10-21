@@ -16,7 +16,7 @@ import haxeon.ui.widgets.text.Text;
 /** Shared controls for the main viewport, dock and picture-in-picture. */
 class PresentationControls {
   public static function build(viewport:EditorPerspectiveViewport,changed:Void->Void,key:String,
-      ?save:Void->Void,?addStep:Void->Void):View {
+      ?save:Void->Void,?addStep:Void->Void,?editOffset:Void->Void):View {
     var controller=viewport.presentation;
     var cells:Array<KeyedView> = [];
     var rows:Array<KeyedView> = [];
@@ -64,6 +64,11 @@ class PresentationControls {
             frame.evidence=="Failed"?haxeon.ui.Color.fromBytes(180,35,24):frame.evidence=="Stale"?haxeon.ui.Color.fromBytes(148,98,0):null)));
         } else rows.push(new KeyedView("complete",new Text("Procedure complete")));
       }
+    }
+    if(editOffset!=null) {
+      var button=new Button(viewport.presentationOffsetEditing()?"Cancel offset edit":"Edit explode offset",null,editOffset,key+"-edit-offset");
+      button.enabled=viewport.presentationControlsEnabled();rows.push(new KeyedView("edit-offset",button));
+      if(viewport.presentationOffsetEditing())rows.push(new KeyedView("offset-instruction",new Text("Drag the orange handle along the offset direction. Escape cancels.")));
     }
     if(addStep!=null) {
       var button=new Button("Add step",null,addStep,key+"-add-step");

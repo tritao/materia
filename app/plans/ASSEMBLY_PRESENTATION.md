@@ -157,7 +157,7 @@ plus the determinism invariant.
 Implementation status: the controller, shared viewport controls, typed render/pick
 frames, persisted authored sections, hobber views and camera-field removal are in
 place. Supplier axis defaults moved with the field removal. The presentation native
-suite passes 34 checks and the ported enclosure runtime passes 10,551 checks.
+suite passes 44 checks and the ported enclosure runtime passes 10,551 checks.
 The native fixture also passes 19 complete STEP/BOM export checks, with fixed
 export metadata and no output-byte normalization. The broader viewport-coordinate
 suite passes all 208 assertions, including the retained toolbar/status identity
@@ -201,6 +201,16 @@ The slider, staged composition, and display offsets in picking. Producers emit
 the other `*-exploded` outputs. Box-mold and panel-tooling previews move to the slider.
 *Accept:* the old exploded scenes are visually matched at t=1, the isolation
 invariant holds at t=1, and you can pick parts while exploded.
+
+The editor also supplies an orange viewport handle for **Edit explode offset**.
+Dragging previews a parent-direction offset on an isolated presentation record;
+release stores one authored replacement through `document.apply`. Cancel and
+simulation activation discard the preview. Undo/redo and save/reopen preserve the
+replacement without changing the generated record or engineering state. Native
+coverage includes these authoring invariants and the complete viewport-coordinate
+regression suite. Reviewed captures show the
+[offset handle](../../machinekit/examples/dh-gripper/images/presentation-offset-handle.png)
+and the [failed withdrawal](../../machinekit/examples/flexspline-hobber/images/socket-fixture-failed.png).
 
 ### AP4 — Procedures
 Implementation status: shared transport, active instructions/evidence, referenced
@@ -279,8 +289,9 @@ camera-preset data.
 
 The tending package compiles and its real end-effector service view validates.
 The full cell review check is blocked at the existing reach-certificate gate:
-current cell inputs no longer match its stored fingerprint. The gate is preserved;
-no reach evidence was rewritten to bypass it. Press review views validate against
+current cell inputs no longer match its stored fingerprint. Revalidation rejected the saved layout and fell back to a full physical layout
+search; that broader search was stopped without changing the certificate. The gate
+is preserved and no reach evidence was rewritten to bypass it. Press review views validate against
 both real axis configurations, round trip and leave their engineering definitions
 unchanged.
 

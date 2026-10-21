@@ -806,8 +806,13 @@ picture in picture share these controls, each with its own session cursor.
 **Reset view** restores the generated default. The **Explode** slider and procedure
 **Previous / Next / Restart** controls change display poses only. Movements show
 Checked, Illustrative, Stale or Failed evidence; a failed withdrawal stays visible.
-Simulation disables presentation motion. Authored views and procedures are saved
+Simulation disables presentation motion. Authored views, offsets and procedures are saved
 in the document; navigation and procedure progress are session state.
+
+Select an assembly part and choose **Edit explode offset**, then drag the orange
+handle along its offset direction. Release to save one undoable edit; **Cancel
+offset edit** or Escape discards the preview. The handle follows the stored
+direction, or the parent Z direction for a new offset. Simulation disables editing.
 
 
 ## Unified hobber scene

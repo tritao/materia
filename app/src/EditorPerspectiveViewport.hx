@@ -92,8 +92,85 @@ class EditorPerspectiveViewport implements View {
   /** Section edits go through the document owner so a general plane can survive save/reopen. */
   public var onSectionEdit:Null<Array<SectionPlane>->Void> = null;
 
+  var offsetOriginal:Null<PresentationController>;
+  var offsetDraft:Null<ExplodeOffset>;
+  var offsetSaved:Null<ExplodeOffset->Void>;
+  var offsetAxis:Array<Float> = [];
+  var offsetDragAxis:Array<Float> = [];
+  var offsetDragDistance=0.0;
+  var offsetHandleLength=0.0;
+
+  /** Drag an occurrence along its existing parent-frame direction; new offsets start along parent Z. */
+  public function beginPresentationOffsetEdit(id:Null<String>,save:ExplodeOffset->Void):Bool {
+    cancelPresentationOffsetEdit();
+    var controller=presentation;
+    if(!editingEnabled()||controller==null||id==null||!StringTools.startsWith(id,"project:"))return false;
+    var item=scene.object(id);if(item==null)return false;
+    var occurrence=id.substr(8);
+    var draft:ExplodeOffset={select:{occurrence:occurrence,subtree:false},direction:{x:0,y:0,z:1},
+      distance:Math.max(item.width,Math.max(item.height,item.depth))*2/presentationScale,stage:1,source:Authored};
+    for(offset in controller.record.explode)if(offset.select.occurrence==occurrence&&!offset.select.subtree)
+      draft=haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(offset));
+    draft.source=Authored;offsetOriginal=controller;offsetDraft=draft;offsetSaved=save;
+    previewPresentationOffset(draft.distance);
+    var initial=presentationFrame();if(initial==null){cancelPresentationOffsetEdit();return false;}
+    var first=initial.poses.get(occurrence);
+    if(first==null){cancelPresentationOffsetEdit();return false;}
+    var before=[first.x,first.y,first.z],distance=draft.distance;
+    previewPresentationOffset(distance+1);
+    var extended=presentationFrame();if(extended==null){cancelPresentationOffsetEdit();return false;}
+    var second=extended.poses.get(occurrence);
+    if(second==null){cancelPresentationOffsetEdit();return false;}
+    offsetAxis=[second.x-before[0],second.y-before[1],second.z-before[2]];
+    previewPresentationOffset(distance);
+    offsetHandleLength=Math.max(camera.distance*0.12,Math.max(item.width,Math.max(item.height,item.depth)));
+    host.requestFrame();return true;
+  }
+  function previewPresentationOffset(distance:Float):Void {
+    var original=offsetOriginal,draft=offsetDraft;if(original==null||draft==null)return;
+    draft.distance=distance;
+    var record:AssemblyPresentation=haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(original.record));
+    record.explode=[for(offset in record.explode)if(offset.select.occurrence!=draft.select.occurrence||offset.select.subtree!=draft.select.subtree)offset];
+    record.explode.push(haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(draft)));
+    var next=new PresentationController(original.definition,record);next.retainCursor(original);
+    next.selectProcedure(null);next.setExplode(1);presentation=next;presentationRevision="";presentationResult=null;
+    lightingRevision++;host.requestFrame();
+  }
+  public function presentationOffsetEditing():Bool return offsetOriginal!=null;
+  public function cancelPresentationOffsetEdit():Void {
+    if(offsetOriginal!=null)presentation=offsetOriginal;
+    offsetOriginal=null;offsetDraft=null;offsetSaved=null;offsetAxis=[];
+    presentationRevision="";presentationResult=null;lightingRevision++;host.requestFrame();
+  }
+  function finishPresentationOffsetEdit(keep:Bool):Void {
+    var draft=offsetDraft,save=offsetSaved;
+    cancelPresentationOffsetEdit();
+    if(keep&&draft!=null&&save!=null) {
+      if(presentation!=null){presentation.selectProcedure(null);presentation.setExplode(1);}
+      save(draft);
+    }
+  }
+  function offsetHandle(width:Float,height:Float):Null<Array<Float>> {
+    var draft=offsetDraft;if(draft==null||offsetAxis.length!=3)return null;
+    updatePresentation();var item=scene.object("project:"+draft.select.occurrence);if(item==null)return null;
+    var pose=presentationPoseById.get(item.id),at=pose==null?[item.x,item.y,item.z]:pose.position;
+    var start=camera.project(at[0],at[1],at[2],width,height);
+    var end=camera.project(at[0]+offsetAxis[0]*offsetHandleLength,at[1]+offsetAxis[1]*offsetHandleLength,at[2]+offsetAxis[2]*offsetHandleLength,width,height);
+    return start==null||end==null?null:[start.x,start.y,end.x,end.y];
+  }
+  function paintPresentationOffset(canvas:Canvas,width:Float,height:Float):Void {
+    if(!editingEnabled())return;
+    var handle=offsetHandle(width,height);if(handle==null)return;
+    var path=new PathBuilder();path.moveTo(handle[0],handle[1]).lineTo(handle[2],handle[3]);
+    var color=Color.rgba(1,0.55,0.1,1);canvas.strokeTransient(path.build(),color,3);
+    canvas.fillRect(new Rect(handle[2]-6,handle[3]-6,12,12),color);
+  }
+
   public function setPresentation(record:Null<AssemblyPresentation>,definition:Null<AssemblyDefinition>,
       centers:Null<Map<String,Array<Float>>>,scale:Float,readOnly:Bool=false):Void {
+    // Ordinary editor refreshes rebind the same generated record while the preview owns a temporary controller.
+    if(offsetOriginal!=null&&record==offsetOriginal.record&&definition==offsetOriginal.definition&&!readOnly)return;
+    if(offsetOriginal!=null)cancelPresentationOffsetEdit();
     this.readOnly=readOnly;
     var current=presentation;
     if(current==null&&(record==null||definition==null))return;
@@ -106,11 +183,13 @@ class EditorPerspectiveViewport implements View {
     lightingRevision++;host.requestFrame();
   }
   public function selectPresentationView(id:String):Void {
+    if(offsetOriginal!=null)cancelPresentationOffsetEdit();
     var controller=presentation;if(controller==null)return;
     controller.selectView(id);presentationCameraDirty=true;presentationTarget=null;inspectionZoom=1;
     clearHover();lightingRevision++;host.requestFrame();
   }
   public function resetPresentation():Void {
+    if(offsetOriginal!=null)cancelPresentationOffsetEdit();
     var controller=presentation;
     if(controller==null){resetView();return;}
     controller.reset();presentationCameraDirty=true;presentationTarget=null;inspectionZoom=1;orbitPivot=null;
@@ -495,6 +574,7 @@ class EditorPerspectiveViewport implements View {
     if(simulationActive)missionOverlay.paint(canvas,camera,geometry.width,geometry.height);
     paintCollisions(canvas, geometry.width, geometry.height);
     paintAssemblyDrag(canvas, geometry.width, geometry.height);
+    paintPresentationOffset(canvas,geometry.width,geometry.height);
     paintSketchDraft(canvas, geometry.width, geometry.height);
     paintSheetBends(canvas, geometry.width, geometry.height);
     paintOrbitPivot(canvas, geometry.width, geometry.height);
@@ -663,6 +743,7 @@ class EditorPerspectiveViewport implements View {
   }
   public function setSimulationState(active:Bool,poses:Array<SimulationPoseVisual>,revision:Int,
       ?robots:Array<SimulationRobotVisual>):Void {
+    if(active&&offsetOriginal!=null)cancelPresentationOffsetEdit();
     simulationActive=active;simulationPoses=poses==null?[]:poses.copy();runtimeRevision=revision;
     simulationPoseById.clear();
     simulationTransforms.clear();
@@ -718,7 +799,7 @@ class EditorPerspectiveViewport implements View {
   public function editingEnabled():Bool return !readOnly&&!simulationActive;
 
   public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null || assemblyDrag != null ||
-    matePick != null || sketchPointDragging;
+    matePick != null || sketchPointDragging || offsetOriginal!=null;
 
   /** Starts picking two faces for a mate: the next clicks on faces go to `tool` until it finishes or is cancelled. */
   public function beginMatePick(tool:MatePickTool):Void {
@@ -765,6 +846,7 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function cancelDrag():Null<PerspectivePointer> {
+    if(offsetOriginal!=null){finishPresentationOffsetEdit(false);return navigationPointer==null?null:releaseNavigation();}
     if (sketchPointDragging) {
       endSketchPointDrag(false);
       return releaseNavigation();
@@ -1293,6 +1375,11 @@ class EditorPerspectiveViewport implements View {
   }
 
   function installNavigation(node:RenderNode):Void {
+    node.on(UiEventKind.KeyDown,function(event) {
+      if(event.key==UiKey.Escape&&offsetOriginal!=null) {
+        cancelDrag();event.releasePointer();event.preventDefault();event.stopPropagation();
+      }
+    });
     node.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (navigationPointer != null) return;
       if (event.button == 1) {
@@ -1319,6 +1406,20 @@ class EditorPerspectiveViewport implements View {
         return;
       }
       if(readOnly){event.preventDefault();event.stopPropagation();return;}
+      var handle=offsetHandle(viewportWidth,viewportHeight);
+      if(event.button==0&&offsetOriginal!=null&&editingEnabled()) {
+        if(handle==null||offsetDraft==null){event.preventDefault();event.stopPropagation();return;}
+        var dx=event.localX-handle[2],dy=event.localY-handle[3];
+        var ax=handle[2]-handle[0],ay=handle[3]-handle[1];
+        if(dx*dx+dy*dy<=144&&ax*ax+ay*ay>4) {
+          offsetDragAxis=[ax,ay];offsetDragDistance=offsetDraft.distance;
+          navigationPointer=event.pointerId;navigationMode=9;
+          pointerStartX=event.x;pointerStartY=event.y;
+          event.capturePointer();event.preventDefault();event.stopPropagation();return;
+        }
+        // Offset editing never falls through into engineering dragging.
+        event.preventDefault();event.stopPropagation();return;
+      }
       updateHover(event.localX, event.localY);
       if (event.button == 0 && matePick != null) {
         pickMateFace(hoveredObjectId, hoveredFaceIndex);
@@ -1364,6 +1465,13 @@ class EditorPerspectiveViewport implements View {
         return;
       }
       if (event.pointerId != navigationPointer) return;
+      if(navigationMode==9) {
+        if(!editingEnabled()){finishPresentationOffsetEdit(false);navigationPointer=null;navigationMode=0;event.releasePointer();return;}
+        var ax=offsetDragAxis[0],ay=offsetDragAxis[1];
+        var distance=offsetDragDistance+((event.x-pointerStartX)*ax+(event.y-pointerStartY)*ay)/(ax*ax+ay*ay)*offsetHandleLength/presentationScale;
+        previewPresentationOffset(Math.max(0,Math.min(1e9,distance)));
+        event.preventDefault();event.stopPropagation();return;
+      }
       var deltaX = event.x - pointerX, deltaY = event.y - pointerY;
       pointerX = event.x; pointerY = event.y;
       if (Math.abs(event.x - pointerStartX) >= 3.0 || Math.abs(event.y - pointerStartY) >= 3.0)
@@ -1421,7 +1529,8 @@ class EditorPerspectiveViewport implements View {
       if (navigationPointer == null || event.pointerId != navigationPointer) return;
       var wasOrbiting = orbiting();
       var sketchDrag = sketchRectangleDrag;
-      if (navigationMode == 3 && objectDrag != null) {
+      if(navigationMode==9)finishPresentationOffsetEdit(event.kind==UiEventKind.PointerUp);
+      else if (navigationMode == 3 && objectDrag != null) {
         if (event.kind == UiEventKind.PointerUp) objectDrag.commit(); else objectDrag.cancel();
         objectDrag = null;
       } else if (navigationMode == 6 && sketchPointDragging) {

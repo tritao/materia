@@ -2125,7 +2125,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var sceneControls:Array<KeyedView> = [];
     if(perspectiveViewport!=null&&perspectiveViewport.presentation!=null)
       sceneControls.push(new KeyedView("presentation",app.editor.PresentationControls.build(perspectiveViewport,
-        ()->invalidateView(),"main-presentation",()->saveViewportView(perspectiveViewport),()->addPresentationStep(perspectiveViewport))));
+        ()->invalidateView(),"main-presentation",()->saveViewportView(perspectiveViewport),()->addPresentationStep(perspectiveViewport),()->editPresentationOffset(perspectiveViewport))));
     if(variantState.variants.length>0||variantState.error!=null)
       sceneControls.push(new KeyedView("project",app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"viewport-project")));
     if(missionState.hasWork)
@@ -2227,6 +2227,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     viewport.solvePresentationJoints=session.presentationJointPoses;
     viewport.presentationGeometryFingerprint=session.presentationGeometryFingerprint;
     viewport.onSectionEdit=planes->saveViewportView(viewport,planes);
+  }
+  function editPresentationOffset(viewport:EditorPerspectiveViewport):Void {
+    if(viewport.presentationOffsetEditing()){viewport.cancelPresentationOffsetEdit();invalidateView();return;}
+    var selected=scene.selectedId;
+    if(!viewport.beginPresentationOffsetEdit(selected,offset->{
+      session.savePresentationOffset(offset);configurePresentationViewport();invalidateView();
+    }))log("Select an assembly part, then drag its orange offset handle. Orbit if the direction points into the camera.");
+    invalidateView();
   }
   function saveViewportView(viewport:EditorPerspectiveViewport,?sections:Array<materia.presentation.AssemblyPresentation.SectionPlane>):Void {
     var controller=viewport.presentation;if(controller==null)return;
