@@ -249,7 +249,7 @@ class MillFabricationPreview {
 				records[0].status = "pass";
 				records[0].severity = "error";
 			}, "severity/status consistency");
-			rejectsManifest(m -> m.version = 1, "Unsupported tooling manifest");
+			rejectsManifest(m -> m.version = 4, "Unsupported tooling manifest");
 			ToolingPackageManifest.verify(dir);
 			var unknown = new machinekit.tooling.ToolingBlock();
 			if (ToolingFabricationExport.classify(unknown).classification != UnsupportedHardware)
@@ -278,6 +278,16 @@ class MillFabricationPreview {
 			sys.io.File.saveContent(manufacturingPath,savedManufacturing);
 			if (manufacturingError.indexOf("Insert manufacturing report differs from source")<0)
 				throw "Writer accepted a manufacturing report inconsistent with source: "+manufacturingError;
+			var replicationPath=dir+"/replication-jigs.json";
+			var savedReplication=sys.io.File.getContent(replicationPath);
+			var alteredReplication:Dynamic=haxe.Json.parse(savedReplication);
+			alteredReplication.sourceFingerprint="altered";
+			sys.io.File.saveContent(replicationPath,ToolingCodec.canonical(alteredReplication));
+			var replicationError="";
+			try ToolingPackageManifest.write(dir,f,checks) catch (error:Dynamic) replicationError=Std.string(error);
+			sys.io.File.saveContent(replicationPath,savedReplication);
+			if (replicationError.indexOf("Replication report differs from source")<0)
+				throw "Writer accepted a replication report inconsistent with source: "+replicationError;
 			var omittedChecks=checks.filter(check -> check.rule.indexOf("fabrication.insert.")!=0);
 			var omittedFabrication=f.validation;
 			f.validation=f.validation.filter(check -> check.rule.indexOf("fabrication.insert.")!=0);

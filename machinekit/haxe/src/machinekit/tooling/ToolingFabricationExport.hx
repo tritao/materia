@@ -117,13 +117,61 @@ class ToolingFabricationExport {
 		return checks;
 	}
 
+	public static function replicationReport(p:CastingMoldPlan,sourceFingerprint:String):Dynamic {
+		var jigs=p.options.replicationJigs;
+		return {format:"materia.tooling.replication-jigs",version:1,sourceFingerprint:sourceFingerprint,
+			inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),
+			jigs:materia.tooling.casting.ReplicationJig.ReplicationJigCodec.records(jigs),
+			validation:materia.tooling.casting.ReplicationJigs.analyze(p.document.input,jigs,p.options.precision)
+				.concat(ReplicationContactCad.review(p.document.input,jigs))};
+	}
+
+	static function replication(p:CastingMoldPlan,f:FabricationPlan,dir:String):Array<materia.tooling.ToolingValidation> {
+		var jigs=p.options.replicationJigs,context=p.document.input.interfaceContext;
+		var report=replicationReport(p,f.sourceFingerprint);
+		var reportChecks:Array<materia.tooling.ToolingValidation> =cast report.validation;
+		var cadChecks=reportChecks.filter(check -> StringTools.startsWith(check.rule,"tooling.replication.cad."));
+		var jigChecks=reportChecks.filter(check -> !StringTools.startsWith(check.rule,"tooling.replication.cad."));
+		data(dir,"replication-jigs.json",report);
+		var inventory:Array<Array<String>> = [["jig_id","master_id","item_kind","item_id","reference","quantity_per_jig","qualification"]];
+		for (jig in jigs) {
+			inventory.push([jig.id,"","rigid-frame",jig.id,jig.frameReference,"1","pending"]);
+			for (master in jig.masters) {
+				inventory.push([jig.id,master.id,(master.kind:String),master.id,
+					master.inspectionReference==null ? "" : master.inspectionReference,"1","pending"]);
+				for (jack in master.jacks) {
+					inventory.push([jig.id,master.id,"jack",jack.id,"","1","pending"]);
+					inventory.push([jig.id,master.id,"jack-lock",jack.id,jack.lockReference==null ? "" : jack.lockReference,"1","pending"]);
+				}
+			}
+		}
+		var geometryRows:Array<Array<String>> = [["jig_id","relationship_instance","definition_id","rule","status","nominal_bound","physical_qualification"]];
+		for (jig in jigs) {
+			var instruments:Map<String,Bool> = [];
+			if (context!=null) for (instance in context.relationships) {
+				var rule=materia.tooling.casting.ReplicationRelationships.ruleId(instance.id,jig.id);
+				var checks=jigChecks.filter(check -> check.rule==rule);
+				if (checks.length!=1) continue;
+				geometryRows.push([jig.id,instance.id,instance.relationship.id,rule,(checks[0].status:String),checks[0].message,"pending"]);
+				var instrument=instance.relationship.metrology.instrumentReference;
+				if (instrument!=null && !instruments.exists(instrument)) {
+					instruments.set(instrument,true);
+					inventory.push([jig.id,"","metrology-instrument","instrument-"+haxe.crypto.Sha256.encode(instrument),instrument,"1","pending"]);
+				}
+			}
+		}
+		text(dir,"replication-relationships.csv",ToolingFabrication.csv(geometryRows));
+		text(dir,"replication-items.csv",ToolingFabrication.csv(inventory));
+		return cadChecks;
+	}
+
 	public static function write(p:CastingMoldPlan, f:FabricationPlan, dir:String):Array<materia.tooling.ToolingValidation> {
 		var classificationChecks:Array<materia.tooling.ToolingValidation> = [];
 		var unknown:Array<{memberId:String, typeId:Null<String>}> = [];
 		if (f.sourceFingerprint != materia.tooling.casting.CastingMoldCodec.fingerprint(p))
 			throw "Stale fabrication plan";
 		sys.FileSystem.createDirectory(dir);
-		classificationChecks=classificationChecks.concat(insertManufacturing(p,f,dir));
+		classificationChecks=classificationChecks.concat(insertManufacturing(p,f,dir)).concat(replication(p,f,dir));
 		data(dir, "fabrication-plan.json", f);
 		text(dir, "fabrication-spec.json", FabricationSpecCodec.encode(f.spec));
 		data(dir, "load-estimates.json", f.loads);

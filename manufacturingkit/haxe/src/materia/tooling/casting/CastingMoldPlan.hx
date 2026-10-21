@@ -185,6 +185,7 @@ typedef HandlingPlan = {
 
 typedef CastingMoldOptions = {
 	var groutedJoints:Array<GroutedJoint>;
+	var replicationJigs:Array<ReplicationJig>;
 	var precision:Array<PrecisionInterface>;
 	var compaction:CompactionSpec;
 	var anchorage:Array<InsertAnchorage>;

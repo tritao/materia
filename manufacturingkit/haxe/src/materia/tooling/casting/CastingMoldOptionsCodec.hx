@@ -8,9 +8,17 @@ class CastingMoldOptionsCodec {
 	public static function snapshot(o:CastingMoldOptions):CastingMoldOptions
 		return read(o);
 
+	public static function record(authored:CastingMoldOptions):Dynamic {
+		var options=snapshot(authored),result:Dynamic={};
+		for (key in Reflect.fields(options)) Reflect.setField(result,key,Reflect.field(options,key));
+		Reflect.setField(result,"replicationJigs",ReplicationJig.ReplicationJigCodec.records(options.replicationJigs));
+		return result;
+	}
+
 	public static function read(o:Dynamic):CastingMoldOptions {
 		obj(o, [
 			"groutedJoints",
+			"replicationJigs",
 			"precision",
 			"compaction",
 			"anchorage",
@@ -161,6 +169,7 @@ class CastingMoldOptionsCodec {
 		anchorage.sort((a, b) -> Reflect.compare(a.insertId, b.insertId));
 		return {
 			groutedJoints: joints,
+			replicationJigs:ReplicationJig.ReplicationJigCodec.snapshot(Reflect.field(o,"replicationJigs")),
 			precision: precision,
 			compaction: {
 				method: method,

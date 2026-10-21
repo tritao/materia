@@ -600,6 +600,15 @@ class CastingMoldCad {
 			for (part in parts)
 				if (!part.shape.isClosed())
 					part.close();
+			var validation = p.validation.concat([
+				for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
+					materia.tooling.export.ToolingLoads.check("tooling.cad."
+						+ name, [p.document.input.id],
+						materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass, "Exact CAD "
+						+ name
+						+ " check passed.",
+						[materia.tooling.casting.CastingMoldCodec.fingerprint(p)])
+			]).concat(ReplicationContactCad.review(p.document.input,p.options.replicationJigs));
 			return {
 				fingerprint: materia.tooling.casting.CastingMoldCodec.fingerprint(p),
 				handling: p.handling,
@@ -611,16 +620,8 @@ class CastingMoldCad {
 				demolding: demolding,
 				permanentGroups: permanent,
 				assemblyGroups: groups,
-				validation: p.validation.concat([
-					for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
-						materia.tooling.export.ToolingLoads.check("tooling.cad."
-							+ name, [p.document.input.id],
-							materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass, "Exact CAD "
-							+ name
-							+ " check passed.",
-							[materia.tooling.casting.CastingMoldCodec.fingerprint(p)])
-				]),
-				fabrication: p.fabrication,
+				validation: validation,
+				fabrication: materia.tooling.ToolingValidation.ToolingReadiness.evaluate(validation),
 				assemblyMotions: assemblyMotions,
 				demoldingMotions: demoldingMotions
 			};

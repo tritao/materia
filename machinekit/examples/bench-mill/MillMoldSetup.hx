@@ -120,6 +120,7 @@ class MillMoldSetup {
 	public static function options(frame:MillFrame):CastingMoldOptions {
 		var input = input(frame);
 		return {
+			replicationJigs: [],
 			groutedJoints: [
 				{
 					id: "column-base",

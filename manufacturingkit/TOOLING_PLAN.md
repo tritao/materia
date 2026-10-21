@@ -1944,6 +1944,24 @@ structures and phase 9 physical calibration remain open.
   **false**. Jigs/joint, bolted anchorage, rail-derived holes and lifting remain
   subsequent step-2 slices.
 
+- [x] Replication jigs: authored common frames, physical master stock and reference
+  frames, three-point jack contacts and locks, permitted source finishes,
+  relationship geometry, datum references and metrology prerequisites. Exact
+  native finite-face coverage checks the realized source steel or replication
+  layer; holes awaiting a protection definition remain unqualified. Jig/master,
+  jack/lock and metrology inventory and relationship CSVs enter the hashed kit.
+  General mold format **11** has one explicit primitive/member encoding for
+  nonempty jig inventories; source/tooling **11**, box mold **10** and assembly
+  **20** are unchanged. Manifest **5** requires the source-derived replication
+  report and rejects its alteration; omitted jig/contact checks are restored
+  from source. Missing hardware qualification and workshop evidence stay honest.
+  Validation: foundation **359** (jig **55**, relationship **23**), neutral
+  tooling **1,845**, native tooling **539** (finite contact **30**), casting
+  **54**, foundation CAD **60**, standalone native process **34**, full mill
+  **250**. Regenerated records-only kit: **153 artifacts / 40 programs /
+  27 Pass / 336 Pending / 15 Unsupported**; integrity/tamper and artifact hashes
+  pass; readiness is **false**. Source foundation joints remain the next slice.
+
 ### Phase 7 records: shared levelling-foot family
 
 - [x] One `structural.LevelingFoot` recipe with strict `LevelingFootSpec` schema

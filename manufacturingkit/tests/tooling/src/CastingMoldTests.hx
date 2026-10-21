@@ -30,6 +30,7 @@ class CastingMoldTests {
 
 	static function options(d:ToolingDocument):CastingMoldOptions
 		return {
+			replicationJigs: [],
 			groutedJoints: [],
 			precision: [
 				for (i in d.input.inserts)
@@ -256,6 +257,22 @@ class CastingMoldTests {
 		intersecting.fixtures[0].datum.pieces = [resinPieces[0]];
 		rejects(() -> CastingMoldPlanner.validate(intersecting), "datum/resin intersection rejected before CAD");
 		check(CastingMoldCodec.encode(CastingMoldCodec.decode(s)) == s, "multi-core canonical regeneration");
+		var jigOptions=options(d);
+		jigOptions.replicationJigs=[{id:"synthetic-jig",datumSchemeId:"synthetic-datums",frameReference:"synthetic-frame",
+			pose:materia.assembly.AssemblyFrames.identity(),masters:[{id:"synthetic-bar",
+				kind:materia.tooling.casting.ReplicationJig.ReplicationMasterKind.GroundBar,
+				body:materia.casting.CastingSolid.Box(60,20,10),pose:materia.assembly.AssemblyFrames.identity(),
+				reference:materia.assembly.AssemblyFrames.identity(),
+				members:[materia.casting.InterfaceRelationship.InterfaceMember.ComponentInterface("synthetic-member","synthetic-plane")],
+				finish:materia.casting.InterfaceRequirement.InterfaceFinish.JigMaster,jacks:[],releaseSpec:null,
+				flatnessMm:null,inspectionReference:null}]}];
+		var jigPlan=CastingMoldPlanner.plan(d,jigOptions),jigEncoded=CastingMoldCodec.encode(jigPlan);
+		check(CastingMoldCodec.encode(CastingMoldCodec.decode(jigEncoded))==jigEncoded,
+			"nonempty jig inventory and primitive master stock have one canonical mold encoding");
+		jigPlan.validation=jigPlan.validation.filter(check -> !StringTools.startsWith(check.rule,"tooling.replication."));
+		jigPlan.fabrication=materia.tooling.ToolingValidation.ToolingReadiness.evaluate(jigPlan.validation);
+		rejects(() -> CastingMoldPlanner.validate(jigPlan),"Replication jig validation differs from source and authored jig inventory");
+
 		check(p.features.length == d.input.features.length && p.cores.length == 1, "complete source ownership");
 		var fragmented = ToolingCodec.snapshot(d);
 		var authored = fragmented.input.features.filter(feature -> feature.kind != materia.casting.CastingFeature.CastingFeatureKind.InsertRecess)[0];
@@ -299,7 +316,7 @@ class CastingMoldTests {
 		o.anchorage.pop();
 		rejects(() -> CastingMoldPlanner.plan(d, o), "missing anchorage not silently qualified");
 		var raw:Dynamic = haxe.Json.parse(s);
-		Reflect.setField(raw, "version", 9);
+		Reflect.setField(raw, "version", 10);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
 		raw = haxe.Json.parse(s);
 		Reflect.setField(raw, "version", 99);

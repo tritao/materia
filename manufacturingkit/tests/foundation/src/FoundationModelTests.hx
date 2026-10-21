@@ -38,6 +38,8 @@ class FoundationModelTests {
 		PourPlanningTests.run();
 		InterfaceStockTests.run();
 		InsertManufacturingTests.run();
+		ReplicationJigTests.run();
+		ReplicationRelationshipTests.run();
 		insertBodies();
 		threadRelief();
 		solidFeatures();

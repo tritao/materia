@@ -437,6 +437,7 @@ class FoundationToolingTests {
 		FoundationContextTests.run();
 		InsertStageTests.run();
 		ToolingFastenerFitTests.run();
+		ReplicationContactTests.run();
 		if (Sys.args().indexOf("socket-carrier") >= 0) {
 			sourcedSocket();
 			Sys.println('SocketCarrierChecks: $assertions assertions passed');
