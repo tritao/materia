@@ -31,6 +31,13 @@ export default defineConfig({
 		mermaid({ theme: "neutral", autoTheme: true }),
 		starlight({
 			title: "Materia",
+			logo: { src: "./src/assets/materia-mark.svg" },
+			favicon: "/favicon.svg",
+			head: [
+				{ tag: "meta", attrs: { property: "og:image", content: "https://materia-docs.joao-9f7.workers.dev/screens/social.png" } },
+				{ tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+			],
+			customCss: ["./src/styles/brand.css", "./src/styles/landing.css"],
 			description: "Design, simulate, plan and run machines, from CAD to the controller.",
 			social: [{ icon: "github", label: "GitHub", href: "https://github.com/tritao/materia" }],
 			plugins: [starlightLinksValidator()],

@@ -96,3 +96,19 @@ browser through the docs runtime, `docs/runtime` (CncKit and ToolpathKit compile
 `docs/runtime/build.sh`). The figure's Markdown stays the fallback until the runtime loads, which
 happens only when the widget scrolls near the viewport. The runtime is committed with a hash of its
 inputs; CI fails when they change and runs `docs/runtime/check.mjs` against it.
+
+## Screenshots and logo
+
+The main page's images in `public/screens/` come from the editor itself: `docs/screens/capture.py`
+opens each example in the browser build (`?example=ID`, headless Chrome), frames it, and writes the
+whole editor for the hero, a social preview, and a thumbnail cropped to the machine. Publish the
+examples into a web build first, then capture:
+
+```sh
+app/web/build-examples.sh DIR gantry-picker,robot-arm,sheet-router,cnc-router,printer,robot-welder,press-brake,mobile-base
+# serve app/build/web/site with DIR as its examples/ (symlinks are enough), then:
+docs/screens/capture.py --site SITE --editor gantry-picker gantry-picker robot-arm sheet-router cnc-router printer robot-welder press-brake mobile-base
+```
+
+The logo is `src/assets/materia-mark.svg` (also `public/favicon.svg`): an M drawn as one toolpath,
+with the tool at its end. The site's accent colour is the logo's blue (`src/styles/brand.css`).

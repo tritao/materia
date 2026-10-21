@@ -1,0 +1,61 @@
+/* The main page (docs/README.md): hero screenshot, feature cards, the machine strip. */
+.landing-shot {
+	width: 100%;
+	height: auto;
+	border-radius: 0.75rem;
+	border: 1px solid var(--sl-color-hairline);
+	box-shadow: 0 1.5rem 3rem -1.5rem rgb(0 0 0 / 0.35);
+	margin-bottom: 1rem;
+}
+.landing-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+	gap: 1rem;
+	margin: 2rem 0;
+}
+.landing-cards > section {
+	margin: 0;
+	padding: 1.25rem;
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0.75rem;
+	background: var(--sl-color-bg-nav);
+}
+.landing-cards > section > :first-child { margin-top: 0; }
+.landing-cards .landing-card-title { font-size: var(--sl-text-h4); font-weight: 600; color: var(--sl-color-white); }
+.landing-cards .landing-card-title::before {
+	content: "";
+	display: inline-block;
+	width: 0.55em;
+	height: 0.55em;
+	margin-right: 0.45em;
+	border-radius: 50%;
+	background: var(--materia-tool);
+	vertical-align: 0.1em;
+}
+.landing-cards p { font-size: var(--sl-text-sm); }
+.landing-machines {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+	gap: 1rem;
+	margin: 1.5rem 0 1rem;
+}
+.landing-machines a {
+	display: block;
+	margin: 0;
+	text-decoration: none;
+	color: var(--sl-color-white);
+	font-size: var(--sl-text-sm);
+	font-weight: 600;
+}
+.landing-machines img {
+	display: block;
+	width: 100%;
+	height: auto;
+	aspect-ratio: 16 / 10;
+	object-fit: cover;
+	border-radius: 0.5rem;
+	border: 1px solid var(--sl-color-hairline);
+	transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.landing-machines a:hover img { transform: translateY(-2px); border-color: var(--sl-color-accent); }
+.landing-machines span { display: block; margin-top: 0.4rem; }

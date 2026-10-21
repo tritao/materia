@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Materia">
+  <title>Materia</title>
+  <!-- An M drawn as one toolpath: a plunge, two cuts and a retract, with the tool at its end. -->
+  <rect width="64" height="64" rx="14" fill="#2450d8"/>
+  <path d="M15 47V19.5L32 37.5L49 19.5V40" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="49" cy="47.5" r="4.25" fill="#ffb347"/>
+</svg>

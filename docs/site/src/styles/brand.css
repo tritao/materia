@@ -1,0 +1,13 @@
+/* Brand colours: the accent is the logo's blue (src/assets/materia-mark.svg), stepped for each theme. */
+:root {
+	--sl-color-accent-low: #121f4d;
+	--sl-color-accent: #4d7cff;
+	--sl-color-accent-high: #c9d7ff;
+	--materia-tool: #ffb347;
+}
+:root[data-theme="light"] {
+	--sl-color-accent-low: #d3defe;
+	--sl-color-accent: #2450d8;
+	--sl-color-accent-high: #0f2a7a;
+	--materia-tool: #e08a00;
+}
