@@ -20,8 +20,12 @@ class PickResult {
 	public function sourceValue():haxe.Int64
 		return picked.get_source().get_value();
 
+	/** Face/edge id, or a negative cap tag. Use capPlane() to identify a cap. */
 	public function subelement():Int
 		return picked.get_subelement();
+
+	/** Zero-based renderer section plane, or -1 for a real surface/edge. Caps have no face id. */
+	public function capPlane():Int { var id=picked.get_subelement();return (id & 0x80000000)!=0 ? id & 31 : -1; }
 
 	public function worldX():Float
 		return picked.get_world_position(0);

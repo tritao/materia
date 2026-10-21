@@ -31,6 +31,10 @@ class PresentationRuntimeTests {
     catch(error:Dynamic){Sys.println('Presentation runtime failed: $error');Sys.println(haxe.CallStack.toString(haxe.CallStack.exceptionStack()));return 1;}
   }
   public static function run():Void {
+    var rawCap=new NativeKitSceneRender.nkscene_render_pick_result();rawCap.set_subelement(0x80000003);
+    var capHit=@:privateAccess new nativekit.scene.PickResult(rawCap);
+    check(capHit.capPlane()==3&&capHit.subelement()<0&&(capHit.subelement()&0x40000000)==0,
+      "A cap pick carries its plane and cannot be mistaken for a face or CAD edge");
     var assembly=new machinekit.assembly.MachineAssembly();
     var block=machinekit.tooling.ToolingBlock.fromBox({x:0,y:0,z:0,width:10,depth:10,height:10},"steel");
     assembly.addComponent("base",block,AssemblyFrames.identity());

@@ -195,6 +195,7 @@ struct GeometryPayload {
     /** Optional uint32 triangle indices. Empty means sequential triangles. */
     std::vector<std::uint32_t> indices;
     PrimitiveType primitive_type = PrimitiveType::Triangles;
+    bool closed = false; // Explicit solid boundary declaration; undeclared triangle meshes are open.
 
     std::size_t element_count() const noexcept {
         return indices.empty() ? vertices.size() : indices.size();

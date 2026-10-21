@@ -177,6 +177,8 @@ typedef struct nkscene_geometry_data {
     uint32_t stream_count;
     const nkscene_stroke_segment *stroke_segments NK_BORROWED_ARRAY(stroke_segment_count);
     uint32_t stroke_segment_count;
+    uint32_t closed; /**< Explicit closed solid boundary; zero leaves sections uncapped. */
+    uint32_t reserved; /**< Must be zero; extends struct_size beyond older descriptor padding. */
 } nkscene_geometry_data;
 
 enum { NKS_MATERIAL_OPAQUE = 1u << 0, NKS_MATERIAL_DOUBLE_SIDED = 1u << 1 };

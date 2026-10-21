@@ -1,6 +1,7 @@
 #include "nativekit_scene_render.hpp"
 #include "scene_shader_sources.hpp"
 #include "capture_profiler.hpp"
+#include "render_internal.hpp"
 
 #include <algorithm>
 #include <array>
@@ -71,7 +72,7 @@ struct MaterialUniformData {
     std::array<float, 4> base_color{};
     std::array<float, 4> surface_params{};
     std::array<float, 4> emissive{};
-    std::array<float, 4> texture_flags{}; // x = normal map, y/z = sRGB base/emissive maps, w = double-sided
+    std::array<float, 4> texture_flags{}; // x = normal map, y/z = sRGB base/emissive maps; w = 0 single, 1 double, 2 cap, 3 stencil-only
 };
 
 static_assert(sizeof(MaterialUniformData) == sizeof(float) * 16);
@@ -439,6 +440,8 @@ struct NativeKitGpuExecutor::State {
         nkgpu_pipeline indexed_blend{};
         nkgpu_pipeline stroke{};
         nkgpu_pipeline workplane{};
+        std::array<nkgpu_pipeline, 3> caps{};
+        nkgpu_pipeline indexed_parity{};
     };
 
     nkgpu_renderer renderer{};
@@ -450,6 +453,10 @@ struct NativeKitGpuExecutor::State {
     nkgpu_shader pick_shader{};
     nkgpu_pipeline pick_pipeline{};
     nkgpu_pipeline ao_position_pipeline{};
+    std::array<std::array<nkgpu_pipeline,3>,2> pick_caps{};
+    struct CapDraw { std::size_t batch, instance, plane; std::array<int,4> scissor; };
+    std::vector<CapDraw> caps;
+    nkgpu_buffer cap_vertices{}, cap_pick_vertices{}, cap_instances{};
     nkgpu_shader postprocess_shader{};
     nkgpu_pipeline postprocess_pipeline{};
     nkgpu_buffer postprocess_vertex_buffer{};
@@ -517,7 +524,7 @@ struct NativeKitGpuExecutor::State {
 
     void destroy_pass_pipelines(PassPipelines &set) noexcept {
         for (auto *pipeline : {&set.surface, &set.indexed, &set.blend, &set.indexed_blend, &set.stroke,
-                               &set.workplane}) {
+                               &set.workplane, &set.caps[0], &set.caps[1], &set.caps[2], &set.indexed_parity}) {
             if (renderer.id && pipeline->id)
                 (void)nkgpu_pipeline_destroy(renderer, *pipeline);
             *pipeline = {};
@@ -525,6 +532,11 @@ struct NativeKitGpuExecutor::State {
     }
 
     void release_gpu() noexcept {
+        if(renderer.id) {
+            for(auto buffer:{cap_vertices,cap_pick_vertices,cap_instances})if(buffer.id)(void)nkgpu_buffer_destroy(renderer,buffer);
+            for(auto &set:pick_caps)for(auto pipeline:set)if(pipeline.id)(void)nkgpu_pipeline_destroy(renderer,pipeline);
+        }
+        cap_vertices={};cap_pick_vertices={};cap_instances={};pick_caps={};caps.clear();
         if (capture_profiler) capture_profiler->release();
         for (auto &[id, resource] : geometry_resources) {
             (void)id;
@@ -723,12 +735,24 @@ bool set_failure(StateT &state, GpuExecutionStats &stats, nkgpu_result result) {
 /* Single-sample passes share one set of pipelines; every multisampled pass shares the other. */
 inline std::size_t pipeline_slot(std::uint32_t samples) { return samples > 1 ? 1 : 0; }
 
+// Clear, parity and cap stages share the attachment's per-sample stencil.
+// A scissored fullscreen clear draw avoids ending/restarting a multisample pass.
+nkgpu_result cap_pipeline_state(nkgpu_pipeline_builder builder,int mode) {
+    nkgpu_stencil_state stencil{};stencil.enabled=1;stencil.read_mask=1;stencil.write_mask=mode==3?0:1;stencil.reference=1;
+    auto op=mode==1?NKGPU_STENCILOP_ZERO:mode==2?NKGPU_STENCILOP_INVERT:NKGPU_STENCILOP_KEEP;
+    stencil.front=stencil.back={mode==3?NKGPU_COMPAREFUNC_EQUAL:NKGPU_COMPAREFUNC_ALWAYS,NKGPU_STENCILOP_KEEP,op,op};
+    auto result=nkgpu_pipeline_stencil(builder,&stencil);if(result!=NKGPU_OK)return result;
+    nkgpu_depth_state depth{};depth.enabled=1;depth.write_enabled=mode==3;
+    depth.compare=mode==3?NKGPU_COMPAREFUNC_LESS_EQUAL:NKGPU_COMPAREFUNC_ALWAYS;
+    return nkgpu_pipeline_depth(builder,&depth);
+}
+
 template <class StateT>
 bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool blended,
-                     std::uint32_t samples) {
+                     std::uint32_t samples, int cap_mode = 0) {
     auto &set = state.pipelines[pipeline_slot(samples)];
-    auto &pipeline = blended ? (indexed ? set.indexed_blend : set.blend)
-                             : (indexed ? set.indexed : set.surface);
+    auto &pipeline = cap_mode ? (cap_mode == 2 && indexed ? set.indexed_parity : set.caps[cap_mode-1])
+                             : blended ? (indexed ? set.indexed_blend : set.blend) : (indexed ? set.indexed : set.surface);
     if (pipeline.id)
         return true;
 
@@ -845,6 +869,9 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool
             (result = nkgpu_pipeline_blend(pipeline_builder, &blend)) != NKGPU_OK)
             return set_failure(state, stats, result);
     }
+    if(cap_mode && ((result=cap_pipeline_state(pipeline_builder,cap_mode))!=NKGPU_OK ||
+        (cap_mode!=3 && (result=nkgpu_pipeline_color_write_mask(pipeline_builder,NKGPU_COLORMASK_NONE))!=NKGPU_OK)))
+        return set_failure(state,stats,result);
     if (samples > 1 && (result = nkgpu_pipeline_multisample(pipeline_builder, samples, 0)) != NKGPU_OK)
         return set_failure(state, stats, result);
     if ((result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
@@ -1052,6 +1079,9 @@ bool ensure_surface_pipelines(StateT &state, const SceneSnapshot &snapshot, std:
     return true;
 }
 
+template<class StateT>
+nkgpu_result draw_caps(StateT &,const RenderPlan &,const SceneSnapshot &,const LightingUniformData &,unsigned,bool,bool,GpuExecutionStats &);
+
 /*
  * Draws every surface: opaque batches first, then blended instances from far
  * to near. Instances of a blended batch are drawn one at a time, because two
@@ -1173,6 +1203,7 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
             blended.push_back({index, instance, clip_w != 0.0f ? clip_z / clip_w : clip_z});
         }
     }
+    if(auto result=draw_caps(state,plan,snapshot,lighting_data,samples,false,false,stats);result!=NKGPU_OK)return result;
     std::stable_sort(blended.begin(), blended.end(),
                      [](const BlendedInstance &left, const BlendedInstance &right) {
                          return left.depth > right.depth;
@@ -1186,8 +1217,8 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
 }
 
 template <class StateT>
-bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool position_output = false) {
-    auto &pipeline = position_output ? state.ao_position_pipeline : state.pick_pipeline;
+bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool position_output = false, int cap_mode = 0) {
+    auto &pipeline = cap_mode ? state.pick_caps[position_output?1:0][cap_mode-1] : position_output ? state.ao_position_pipeline : state.pick_pipeline;
     if (pipeline.id)
         return true;
 
@@ -1263,10 +1294,14 @@ bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool position
         (result = nkgpu_pipeline_color_target(pipeline_builder, 2,
                                               position_output ? NKGPU_IMAGEFORMAT_RGBA32F : NKGPU_IMAGEFORMAT_R32F,
                                               position_output ? NKGPU_COLORMASK_RGBA : NKGPU_COLORMASK_R, nullptr)) != NKGPU_OK ||
+        (cap_mode && (result=cap_pipeline_state(pipeline_builder,cap_mode))!=NKGPU_OK) ||
+        (cap_mode && cap_mode!=3 && (result=nkgpu_pipeline_color_write_mask(pipeline_builder,NKGPU_COLORMASK_NONE))!=NKGPU_OK) ||
         (result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
         return set_failure(state, stats, result);
     return true;
 }
+
+#include "section_caps.hpp"
 
 template <class StateT>
 bool ensure_pick_targets(StateT &state, std::uint32_t width, std::uint32_t height,
@@ -2511,6 +2546,7 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
             return state.last_result;
     }
 
+    if(!prepare_caps(state,plan,snapshot,width,height,1,true,for_ao,stats))return state.last_result;
     auto result = nkgpu_frame_begin(state.renderer);
     if (result != NKGPU_OK) {
         state.last_result = result;
@@ -2583,6 +2619,7 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
                                  static_cast<std::uint32_t>(batch.instances.size()))) != NKGPU_OK)
             return fail_frame(result);
     }
+    if((result=draw_caps(state,plan,snapshot,LightingUniformData{},1,true,for_ao,stats))!=NKGPU_OK)return fail_frame(result);
     if ((result = nkgpu_end_pass(state.renderer)) != NKGPU_OK) {
         pass_active = false;
         (void)nkgpu_end_frame(state.renderer);
@@ -2743,6 +2780,7 @@ void resolve_pick_result(const RenderPlan &plan, const SceneSnapshot &snapshot,
     out_result = nkscene::pick(plan, snapshot, pick_id - 1, {}, 0.0f);
     out_result.depth = depth;
     (void)unproject_pick_pixel(plan, x, y, width, height, depth, out_result.worldPosition);
+    if (subelement_id & cap_subelement_tag) { out_result.subelement={subelement_id}; return; }
     if (subelement_id == 0)
         return;
     const auto &item = plan.items()[pick_id - 1];
@@ -2999,6 +3037,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     const bool use_ao = plan.studio_lighting().enabled && detail[0] > 0.0f && detail[1] > 0.0f;
     if (use_ao && render_pick_pass(*state_, plan, snapshot, width, height, stats, true) != NKGPU_OK)
         return state_->last_result;
+    if(!prepare_caps(*state_,plan,snapshot,width,height,samples,false,false,stats))return state_->last_result;
     if (profiler) profiler->prepared(timing);
     auto result = nkgpu_frame_begin(state_->renderer);
     if (result != NKGPU_OK) {
@@ -3387,7 +3426,7 @@ std::uint32_t NativeKitGpuExecutor::poll_pick_pixel(GpuPickRequest &request,
     request_state.subelement_readback = {};
     request_state.depth_readback = {};
     resolve_pick_result(current_plan, current_snapshot, decode_pick_id(pixel),
-                        decode_pick_id(subelement_pixel), request_state.x, request_state.y,
+                        (subelement_pixel[3]>0 && subelement_pixel[3]<255 ? cap_subelement_tag | (subelement_pixel[3]-1) : decode_pick_id(subelement_pixel)), request_state.x, request_state.y,
                         request_state.width, request_state.height, depth, request_state.result);
     request_state.state = NKS_RENDER_PICK_READY;
     *out_result = request_state.result;

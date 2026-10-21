@@ -14,18 +14,20 @@ uniform vec4 pick_output;
 
 void main() {
     // Honour material sidedness, including mirrored instances in the same batch.
-    if (pick_output.y < 0.5 && (gl_FrontFacing ? 1.0 : -1.0) * face_orientation < 0.0) discard;
+    if (pick_output.z < 0.5 && pick_output.y < 0.5 && (gl_FrontFacing ? 1.0 : -1.0) * face_orientation < 0.0) discard;
     for (int index = 0; index < 32; ++index) {
         if (index >= int(clip_plane_count.x))
             break;
         if (dot(clip_planes[index].xyz, world_position) + clip_planes[index].w < 0.0)
             discard;
     }
-    uint id = uint(vertex_face_id);
+    bool cap_surface = pick_output.z > 1.5;
+    uint id = cap_surface ? 0u : uint(vertex_face_id);
     fragment_color = vertex_pick_color;
     fragment_subelement = vec4(float(id & 0xffu) / 255.0,
                                float((id >> 8u) & 0xffu) / 255.0,
-                               float((id >> 16u) & 0xffu) / 255.0, 1.0);
+                               float((id >> 16u) & 0xffu) / 255.0,
+                               cap_surface ? (pick_output.w + 1.0) / 255.0 : 1.0);
     // Picking retains device depth; AO consumes positions with an explicit validity bit.
     fragment_depth = pick_output.x > 0.0 ? vec4(world_position, 1.0)
                                        : vec4(gl_FragCoord.z, 0.0, 0.0, 0.0);

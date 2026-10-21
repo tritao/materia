@@ -32,6 +32,7 @@ class CadPreviewGeometry {
     var centerY = centered ? (minimum[1] + maximum[1]) * 0.5 : 0.0;
     var centerZ = centered ? (minimum[2] + maximum[2]) * 0.5 : 0.0;
     var geometry = new CadGeometryData(part.threads, [centerX, centerY, centerZ], scale);
+    geometry.setClosed(part.closed==true);
     if (includeTopology) for (index in 0...part.vertexCount) {
       var source = index * 24;
       geometry.addVertex((part.vertices.getDouble(source) - centerX) * scale,

@@ -335,6 +335,8 @@ struct Vec3 {
     float z = 0.0f;
 };
 
+inline constexpr std::uint32_t cap_subelement_tag = 0x80000000u;
+
 struct SubelementId {
     std::uint32_t value = 0;
     constexpr bool valid() const noexcept { return value != 0; }
@@ -346,6 +348,7 @@ struct PickResult {
     SubelementId subelement;
     Vec3 worldPosition;
     float depth = 0.0f;
+    int cap_plane() const noexcept { return (subelement.value & cap_subelement_tag) ? static_cast<int>(subelement.value & 31u) : -1; }
 };
 
 class NKSRENDER_API GpuPickRequest {

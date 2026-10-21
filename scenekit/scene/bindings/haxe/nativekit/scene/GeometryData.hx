@@ -62,6 +62,9 @@ class GeometryData {
 		return this;
 	}
 
+	/** Only declare a checked closed solid boundary; open or unknown meshes stay uncapped. */
+	public function setClosed(closed:Bool):GeometryData { value.set_closed(closed?1:0); return this; }
+
 	public function setPrimitiveType(primitiveType:Int):GeometryData {
 		value.set_primitive_type(primitiveType);
 		return this;

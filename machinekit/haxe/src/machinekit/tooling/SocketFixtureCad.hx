@@ -59,7 +59,8 @@ class SocketFixtureCad {
 		normal={x:normal.x/length,y:normal.y/length,z:normal.z/length};
 		var sockets:Array<PartSelector> = [for(insert in inserts){occurrence:materia.tooling.ToolingIds.derive("insert-",insert.id),subtree:false}];
 		result.views.push({id:"see-inside",label:"See inside",camera:Frame(sockets,-Math.PI/2,0.25,1.6),
-			visibility:[for(select in plates){select:select,mode:Transparent}],
+			visibility:[for(select in plates){select:select,mode:Transparent}].concat(
+                definition.occurrences.filter(part->part.id=="cured-casting").map(part->({select:{occurrence:part.id,subtree:false},mode:Transparent}))),
 			sections:[{occurrence:null,point:{x:first.x,y:first.y,z:first.z},normal:normal}],explode:0,source:Generated("socket-fixture")});
 		var mounting:Array<PartSelector> = [];
 		for(site in plan.sites.slice(0,1)) {

@@ -303,6 +303,25 @@ onto views and procedures. Remove any leftover ad-hoc presentation fields from
 `exploded` presentation paths outside `materia.presentation`.
 
 ### AP8 — Filled section caps (renderer)
+Implementation status: per-occurrence, per-plane scissored stencil parity caps
+are implemented in the shaded, AO position and pick passes. Pixel regressions
+include both rejected-method counterexamples, hollow cores, overlapping and
+mirrored instances, open/double-sided/transparent exclusions, cap depth and hidden
+edges with MSAA. CPU and GPU picks return a tagged cap plane instead of a face id.
+Scene artifact version 43 carries an explicit closed-boundary declaration; the
+presentation model and engineering geometry remain unchanged. CadKit solid-only
+boundaries declare closure, and non-CAD producers have a welded edge/winding proof.
+The socket fixture's actual output passes that proof. See inside and Jaw detail
+were recaptured and reviewed in their READMEs; See inside also makes the casting
+transparent so its filled cut does not conceal the embedded sockets.
+Validation: five renderer suites pass (including the named GPU cap regressions),
+58 pure presentation checks and 388 ProjectKit assertions pass, and the editor
+passes 45 presentation checks, 208 viewport assertions and 19 complete STEP/BOM
+export checks. Socket and gripper artifact invariants pass 155 and 32 checks;
+the socket generator passes 110 assertions and 46 exact initial pairs. Shader
+regeneration is reproducible, and both native ABI audits pass Linux, Windows,
+Intel macOS and ARM macOS targets.
+
 Today a section plane only discards fragments (`scene_fragment.glsl`, up to 32
 planes). Since back faces are rejected for single-sided materials, a cut solid
 reads as a hollow shell. Caps make **See inside** views legible.

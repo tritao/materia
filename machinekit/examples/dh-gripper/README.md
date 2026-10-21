@@ -400,6 +400,9 @@ joint configurations are saved in the focused source report.
 ## Assembly views and finger service
 
 The custom-finger artifact opens assembled. Jaw detail sections the jaw guide;
+The Jaw detail capture was reviewed again for AP8: closed solid cuts are filled
+with material-coloured hatch at the plane, and guide/cavity openings stay empty.
+The supplier's open connector faces stay uncapped.
 Finger service gives an unobstructed close-up. The Explode slider removes screws
 in stage 1 and fingers in stage 2. Change left finger opens the jaws with
 `SetJoints`, then removes the two screws and finger, installs the replacement,

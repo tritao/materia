@@ -108,6 +108,19 @@ class Shape {
 		return CadKit.shapeKindGetChecked(native.borrow());
 	}
 
+	/** All tessellated faces belong to solids; a mixed solid/sheet compound is not a solid boundary. */
+	public function hasSolidBoundary():Bool {
+		if(kind()==CadKit.ShapeKind.Solid)return true;
+		var count=subshapeCount(CadKit.ShapeKind.Solid);if(count==0)return false;
+		var faces=0;
+		for(index in 0...count) {
+			var solid=subshape(CadKit.ShapeKind.Solid,index);
+			try faces+=solid.subshapeCount(CadKit.ShapeKind.Face) catch(error:Dynamic){solid.close();throw error;}
+			solid.close();
+		}
+		return faces==subshapeCount(CadKit.ShapeKind.Face);
+	}
+
 	public function subshapeCount(kind:CadKit.ShapeKind):Int {
 		return CadKit.shapeSubshapeCountChecked(native.borrow(), kind);
 	}

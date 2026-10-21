@@ -177,6 +177,8 @@ class HobberSocketFixture {
 			}
 		}
 		check(true,"Fixture triangle winding agrees with outward shading normals");
+		for(part in scene.parts)materia.project.MeshClosure.validate(part);
+		check(true,"Fixture declared solids have closed consistently wound mesh boundaries");
 		check(views.defaultView=="assembled"&&views.views.length==3,"Fixture exposes the assembled default and two inspection views");
 		check(views.explode.length==assembly.components().length,"All fixture parts have presentation offsets");
 		var engineering=assembly.encode(),bom=haxe.Json.stringify(assembly.billOfMaterials().lines());

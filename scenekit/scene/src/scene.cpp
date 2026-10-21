@@ -498,6 +498,7 @@ nkscene_result prepare_box_geometry(const nkscene_geometry_data *data,
         for (const auto y : {y0, y1})
             payload.stroke_segments.push_back({{x, y, z0}, {x, y, z1}});
     payload.primitive_type = PrimitiveType::Triangles;
+    payload.closed = true; // Built-in box.
     return NKS_OK;
 }
 
@@ -509,7 +510,7 @@ nkscene_result prepare_geometry_data(const nkscene_geometry_data *data,
         offsetof(nkscene_geometry_data, subelement_count) + sizeof(data->subelement_count);
     if (!data || data->struct_size < minimum_size)
         return NKS_ERROR_INVALID_ARGUMENT;
-    const auto has_stream_fields = data->struct_size >= sizeof(nkscene_geometry_data);
+    const auto has_stream_fields = data->struct_size >= offsetof(nkscene_geometry_data, stream_count) + sizeof(data->stream_count);
     const auto stream_count = has_stream_fields ? data->stream_count : 0;
     auto primitive = NKS_PRIMITIVE_TRIANGLES;
     if (has_stream_fields && data->primitive_type != 0)
@@ -630,6 +631,7 @@ nkscene_result prepare_geometry_data(const nkscene_geometry_data *data,
         prepared.payload.stroke_segments.push_back(copied);
     }
     prepared.payload.primitive_type = static_cast<PrimitiveType>(primitive);
+    prepared.payload.closed = data->struct_size >= sizeof(nkscene_geometry_data) && data->closed != 0;
     prepared.bounds.valid = data->bounds.valid != 0;
     std::copy(std::begin(data->bounds.minimum), std::end(data->bounds.minimum),
               prepared.bounds.minimum.begin());
@@ -2447,6 +2449,7 @@ nkscene_result NKS_CALL nkscene_geometry_set_data(nkscene_scene scene, nkscene_g
     payload.streams = std::move(streams);
     payload.stroke_segments = std::move(stroke_segments);
     payload.primitive_type = static_cast<nkscene::PrimitiveType>(primitive);
+    payload.closed = data->struct_size >= sizeof(nkscene_geometry_data) && data->closed != 0;
     if (data->index_count != 0)
         payload.indices.assign(indices, indices + data->index_count);
     nkscene::Bounds bounds;

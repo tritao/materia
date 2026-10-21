@@ -117,10 +117,13 @@ void main() {
         if (dot(clip_planes[index].xyz, world_position) + clip_planes[index].w < 0.0)
             discard;
     }
-    vec4 texture_color = texture(base_color_texture, vertex_texcoord);
+    // Stencil clear/parity stages need only the clipping predicate.
+    if (texture_flags.w > 2.5) { fragment_color = vec4(0.0); return; }
+    bool cap_surface = texture_flags.w > 1.5;
+    vec4 texture_color = cap_surface ? vec4(1.0) : texture(base_color_texture, vertex_texcoord);
     vec3 N = normalize(vertex_normal);
     if ((gl_FrontFacing ? 1.0 : -1.0) * face_orientation < 0.0) N = -N;
-    if (texture_flags.x > 0.5) {
+    if (!cap_surface && texture_flags.x > 0.5) {
         vec3 mapped = texture(normal_texture, vertex_texcoord).xyz * 2.0 - 1.0;
         vec3 dp1 = dFdx(world_position), dp2 = dFdy(world_position);
         vec2 duv1 = dFdx(vertex_texcoord), duv2 = dFdy(vertex_texcoord);
@@ -138,13 +141,23 @@ void main() {
             N = normalize(T * (mapped.x * scale) + B * (mapped.y * scale) + N * mapped.z);
         }
     }
-    vec4 metal_rough = texture(metallic_roughness_texture, vertex_texcoord);
+    vec4 metal_rough = cap_surface ? vec4(1.0) : texture(metallic_roughness_texture, vertex_texcoord);
     float hemisphere = 0.5 + 0.5 * dot(N, vec3(0.0, 0.0, 1.0));
     vec3 base_texel = texture_flags.y > 0.5
                           ? srgb_to_linear(texture_color.rgb) : texture_color.rgb;
     vec3 albedo = srgb_to_linear(base_color.rgb) * base_texel *
                   srgb_to_linear(vertex_color.rgb);
     albedo = mix(albedo, srgb_to_linear(surface_highlight.rgb), surface_highlight.a);
+    if (cap_surface) {
+        vec3 plane_N = normalize(vertex_normal);
+        vec3 axis = abs(plane_N.z) < 0.9 ? vec3(0,0,1) : vec3(0,1,0);
+        vec3 U = normalize(cross(axis, plane_N)), W = cross(plane_N, U);
+        float coordinate = dot(world_position, (U + W) * 0.7071067812) / 0.003;
+        float distance_to_line = abs(fract(coordinate + 0.5) - 0.5);
+        float width = max(fwidth(coordinate), 0.001);
+        float hatch = 1.0 - smoothstep(0.08, 0.08 + width, distance_to_line);
+        albedo = mix(srgb_to_linear(base_color.rgb), srgb_to_linear(surface_highlight.rgb), surface_highlight.a) * mix(0.65, 0.32, hatch);
+    }
     float metallic = clamp(material_params.x * metal_rough.b, 0.0, 1.0);
     float roughness = clamp(material_params.y * metal_rough.g, 0.045, 1.0);
     if (lighting_mode.x > 0.5) roughness = max(roughness, ao_params.w);
@@ -157,7 +170,7 @@ void main() {
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
     vec3 ambient = mix(ambient_ground.rgb, ambient_sky.rgb, hemisphere) *
                    albedo * (1.0 - metallic) *
-                   texture(occlusion_texture, vertex_texcoord).r;
+                   (cap_surface ? 1.0 : texture(occlusion_texture, vertex_texcoord).r);
     vec3 direct = vec3(0.0);
     bool studio = lighting_mode.x > 0.5;
     // light_cones[0].w marks a studio environment: soft panels, a sky/ground room and display mapping.
@@ -179,7 +192,7 @@ void main() {
         vec3 grazing = max(F0, vec3(1.0 - roughness));
         vec3 env_fresnel = F0 + (grazing - F0) * pow(1.0 - NdotV, 5.0);
         ambient += reflected * env_fresnel *
-                   texture(occlusion_texture, vertex_texcoord).r;
+                   (cap_surface ? 1.0 : texture(occlusion_texture, vertex_texcoord).r);
     }
     for (int index = 0; index < 32; ++index) {
         if (index >= int(lighting_mode.y)) break;

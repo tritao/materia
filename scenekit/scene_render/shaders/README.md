@@ -43,5 +43,47 @@ uses the same rule. Winding is explicitly counterclockwise, and a flat per-insta
 transform parity corrects reflected instances without splitting their batches.
 Double-sided sheets retain both sides and orient their shading normals towards the
 visible side. Selection and hover tint the source material and retain its sidedness.
-Section planes continue to clip these passes consistently; clipping does not yet
-create filled section caps.
+Section planes clip these passes consistently. Declared closed, single-sided,
+opaque meshes also receive filled cuts. Unknown/open boundaries, double-sided
+sheets, blended/transparent materials and alpha masks receive no caps.
+
+For each plane and cut occurrence, the executor bounds the work by the projected
+world bounds. A scissored fullscreen draw zeros stencil without touching colour
+or depth. The occurrence is then drawn with only that plane enabled, both faces,
+no colour/depth writes and an always-pass depth comparison: **occluded crossings
+must still invert stencil**. Finally a unit quad transformed onto the plane draws
+where parity is odd, clipped by every other plane. Stencil is independent for each
+occurrence, including instances sharing a batch. It is per sample in an MSAA
+attachment. The normal shaded pipeline is restored before transparency and edges.
+
+Cap quads use ordinary rasterized depth, never a fragment-depth override. Their
+normal faces the eye, and their darkened material colour has a plane-space hatch
+at 3 mm spacing in world metres, anchored independently of the camera. Source UV
+textures and normal maps do not apply to the synthetic cut. AO runs the same cap
+passes into its world-position target, so both depth and obscurance see the plane.
+The unit quad is static; plane/bounds transforms and scissoring use the ordinary
+renderer data. There is no CAD intersection, mesh retriangulation or stencil
+readback while dragging a section.
+
+Picking executes the same parity and quad passes. The subelement attachment's
+alpha byte encodes `plane + 1` for caps (ordinary faces use 255), preserving all
+24 bits of ordinary primitive IDs. Readback returns `NKS_RENDER_CAP_SUBELEMENT_TAG`
+plus the zero-based plane index. A tagged cap has no B-rep face or CAD edge id.
+Haxe callers use `PickResult.capPlane()`; its negative subelement tag is excluded
+from face/edge hover and mate picking. View-aware CPU ray picking performs the
+same kept-boundary parity query and returns the same tag.
+
+Closure is an explicit `GeometryPayload.closed` / `GeometryData.setClosed`
+declaration, default false. Native boxes declare it by construction. CadKit solid
+producers declare it only when all tessellated faces belong to solids; open
+supplier connector faces stay undeclared. Portable scene artifact version 43
+carries this per-part flag. Non-CAD producers can use `MeshClosure.declare`, which
+checks welded boundary edges, winding against normals and positive enclosed
+volume. The socket fixture generator runs that proof on its actual output meshes.
+The presentation schema is unchanged.
+
+`scene_render_sections` includes named pixel regressions
+`TwoPlaneCornerBothSurfaceHitsClipped` and `CavityInFrontOfBackSurface`, as well as
+one-plane caps, hollow cores, overlapping instances, mirrored transforms,
+transparent/double-sided/open exclusions, plane-depth picks, AO, and hidden edges
+and silhouette coverage with MSAA. Exact B-rep drawing sections remain separate.

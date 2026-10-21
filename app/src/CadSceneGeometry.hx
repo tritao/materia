@@ -43,6 +43,7 @@ class CadSceneGeometry {
     }
     var part:materia.project.SceneArtifact.SceneArtifactPart = {
       threads: source == null ? [] : Threads.renderData(source),
+      closed:source!=null&&source.hasSolidBoundary(),
       id: "cad", name: "cad", red: 0.7, green: 0.7, blue: 0.7,
       vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
       vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,

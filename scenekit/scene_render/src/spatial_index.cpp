@@ -267,6 +267,52 @@ void intersect_triangles(const Ray &ray, const SceneNode &node,
     }
 }
 
+// View-aware CPU picking mirrors the cap pass: parity of the boundary kept by one
+// plane, followed by testing the candidate cap point against all other planes.
+void intersect_caps(const Ray &ray,const SceneNode &node,const GeometryResource &geometry,
+                    const LocalTransform &transform,const MaterialState &material,
+                    std::span<const ClipPlane> planes,float &best_distance,PickResult &result) {
+    if(!geometry.payload->closed||geometry.payload->primitive_type!=PrimitiveType::Triangles||
+       has_material_flag(material.flags,MaterialFlags::DoubleSided)||material.alpha_mode==AlphaMode::Blend||
+       material.alpha_mode==AlphaMode::Mask||material.base_color[3]*material.opacity<1.0f)return;
+    struct Crossing {float t;float sign;};std::vector<Crossing> crossings;
+    for(std::size_t primitive=0;primitive<geometry.payload->element_count()/3;++primitive) {
+        const auto a=transform_point(transform,geometry.payload->vertices[vertex_index(*geometry.payload,primitive*3)]);
+        const auto b=transform_point(transform,geometry.payload->vertices[vertex_index(*geometry.payload,primitive*3+1)]);
+        const auto c=transform_point(transform,geometry.payload->vertices[vertex_index(*geometry.payload,primitive*3+2)]);
+        float t=0;if(ray_hits_triangle(ray,a,b,c,t))crossings.push_back({t,dot(ray.direction,cross(subtract(b,a),subtract(c,a)))});
+    }
+    std::sort(crossings.begin(),crossings.end(),[](const auto &a,const auto &b){return a.t<b.t;});
+    std::size_t index=0;
+    for(const auto &plane:planes) {
+        if(!plane.enabled)continue;
+        if(index>=RenderPlan::max_clip_planes)break;
+        auto plane_index=index++;
+        Vec3 normal{plane.normal[0],plane.normal[1],plane.normal[2]};
+        auto denominator=dot(normal,ray.direction);if(std::abs(denominator)<1e-8f)continue;
+        auto t=-(dot(normal,ray.origin)+plane.distance)/denominator;if(t<0||t>=best_distance)continue;
+        auto point=scale_add(ray.origin,ray.direction,t);bool outside=false;
+        std::size_t count=0;for(const auto &other:planes)if(other.enabled&&count++<RenderPlan::max_clip_planes)
+            if(dot({other.normal[0],other.normal[1],other.normal[2]},point)+other.distance < -1e-5f){outside=true;break;}
+        if(outside)continue;
+        unsigned parity=0;
+        for(std::size_t c=0;c<crossings.size();) {
+            auto hit=crossings[c].t;float positive=0,negative=0;std::size_t end=c;
+            while(end<crossings.size()&&std::abs(crossings[end].t-hit)<1e-6f*std::max(1.f,hit)) {
+                if(crossings[end].sign>1e-9f)positive=1;
+                if(crossings[end].sign<-1e-9f)negative=1;
+                ++end;
+            }
+            auto at=scale_add(ray.origin,ray.direction,hit);
+            if(positive!=negative&&dot(normal,at)+plane.distance>=0)parity^=1;
+            c=end;
+        }
+        if(parity) {best_distance=t;result.node=node.node;result.source=node.source;
+            result.subelement={cap_subelement_tag|static_cast<std::uint32_t>(plane_index)};
+            result.worldPosition=point;result.depth=t;}
+    }
+}
+
 template <class Visitor>
 void visit_bounds(const std::vector<BvhNode> &nodes, const std::vector<Entry> &entries,
                   std::uint32_t node_index, const Bounds &query, Visitor &&visitor) {
@@ -648,6 +694,7 @@ PickResult SceneSpatialIndex::pick_ray_with_edges(const Ray &ray, const SceneVie
             ? node->material : material_override->second);
         intersect_triangles(normalized, *node, *geometry, transform, best_distance, result,
                             view.clip_planes, material && has_material_flag(material->state->flags, MaterialFlags::DoubleSided));
+        if(material&&!view.clip_planes.empty())intersect_caps(normalized,*node,*geometry,transform,*material->state,view.clip_planes,best_distance,result);
     };
 
     // Authored bounds stay in the retained BVH. Posed nodes use their presentation bounds

@@ -117,7 +117,7 @@ positioning method with its own Materia scenes, tooling BOM and panel drawings.
 ## Socket fixture presentation
 
 The [socket fixture coupon](SOCKET_FIXTURE.md) opens in **Assembled**. The viewport
-view picker also offers **See inside**, with transparent plates and a section
+view picker also offers **See inside**, with transparent plates and casting and a section
 through both socket axes, and **Socket mounting**, with the bed hidden and an
 underside close-up of one screw-and-washer stack. Reset view returns to Assembled.
 These views change display state without changing the fixture assembly.
@@ -125,6 +125,12 @@ These views change display state without changing the fixture assembly.
 | Assembled | See inside | Socket mounting |
 | --- | --- | --- |
 | ![Assembled socket fixture](images/socket-fixture-assembled.png) | ![Section through both sockets](images/socket-fixture-see-inside.png) | ![Socket mounting screw and washer from below](images/socket-fixture-socket-mounting.png) |
+
+The See inside capture was reviewed again for AP8's filled sections. The opaque
+socket cuts are filled and hatched at the section plane; their bores remain empty.
+The casting is transparent in this inspection view so its new cap cannot obscure
+the embedded sockets. Transparent parts receive no caps. This changes the view
+preset, without changing the casting or fixture geometry.
 
 The captures above use the generated `build/socket-fixture/socket-fixture-assembled.mtrg`.
 Reproduce a named view from the repository root with:

@@ -25,6 +25,8 @@ typedef SceneArtifactFaceRange = {
 typedef SceneArtifactPart = {
 	var id:String;
 	var name:String;
+	/** Explicit closed solid boundary; undeclared meshes never receive section caps. */
+	@:optional var closed:Bool;
 	var red:Float;
 	var green:Float;
 	var blue:Float;
@@ -909,7 +911,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 42;
+	public static inline var VERSION:Int = 43;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -991,7 +993,7 @@ class SceneArtifact {
 				physicalMass: physicalMass,
 				physicalMassDeclared: part.physicalMassDeclared == null ? part.physicalMassKg != null : part.physicalMassDeclared,
 				physicalInertia: physicalInertia});
-			length += 249 + finish.length + materialId.length + materialSpec.length + id.length + name.length + part.vertices.length + part.normals.length
+			length += 250 + finish.length + materialId.length + materialSpec.length + id.length + name.length + part.vertices.length + part.normals.length
 				+ part.indices.length + (part.edgeSegments == null ? 0 : part.edgeSegments.length)
 				+ (part.edgeIds == null ? 0 : part.edgeIds.length)
 				+ part.faceRanges.length * 12 + 4 + faces.length + 4 + threads.length;
@@ -1029,6 +1031,7 @@ class SceneArtifact {
 			result.setDouble(offset, text.physicalMass); offset += 8;
 			result.set(offset++, text.physicalMassDeclared ? 1 : 0);
 			for (component in text.physicalInertia) { result.setDouble(offset, component); offset += 8; }
+			result.set(offset++,part.closed==true?1:0);
 			offset = putInt(result, offset, part.vertexCount);
 			offset = putInt(result, offset, part.indexCount);
 			offset = putInt(result, offset, part.faceRanges.length);
@@ -3327,6 +3330,7 @@ private class SceneArtifactReader {
 			if (physicalMassDeclared != 0 && physicalMassDeclared != 1)
 				throw 'Scene artifact part "$id" has invalid physical mass provenance';
 			var physicalInertiaKgM2 = [for (_ in 0...9) readDouble()];
+			var closed=readByte();if(closed!=0&&closed!=1)throw "Invalid closed mesh declaration";
 			var vertexCount = readInt(), indexCount = readInt(), rangeCount = readInt();
 			var edgeByteCount = readInt();
 			if (vertexCount <= 0 || vertexCount > 2000000 || indexCount <= 0 ||
@@ -3342,7 +3346,7 @@ private class SceneArtifactReader {
 			var faceDescriptors = readOpaqueText(16000000, 'part "$id" face descriptors');
 			var threadText = readOpaqueText(16000000, 'part "$id" threads');
 			var threads:Array<ThreadRenderData> = threadText.length == 0 ? [] : JsonWire.decode(SceneWireJson.preserveNumbers(threadText));
-			var part:SceneArtifactPart = {threads: threads, id: id, name: name, red: red, green: green, blue: blue,
+			var part:SceneArtifactPart = {closed:closed==1, threads: threads, id: id, name: name, red: red, green: green, blue: blue,
 				appearance: appearance, materialId: materialId, materialDensity: density, materialSpec: materialSpec,
 				volume: volume, centerOfMass: center, inertia: inertia,
 				physicalMassKg: physicalMassKg, physicalMassDeclared: physicalMassDeclared == 1,

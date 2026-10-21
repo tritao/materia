@@ -173,6 +173,9 @@ typedef struct nkscene_render_update {
 /* Spatial queries and picking                                               */
 /* ------------------------------------------------------------------------- */
 
+/** Section picks set the cap tag and a zero-based plane index; they never name a B-rep face. */
+enum { NKS_RENDER_CAP_SUBELEMENT_TAG = 0x80000000u, NKS_RENDER_CAP_PLANE_MASK = 31u };
+
 typedef struct nkscene_render_pick_result {
     nkscene_node_id node;
     nkscene_entity_id source;

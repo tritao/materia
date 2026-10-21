@@ -34,7 +34,7 @@ class DhGripperPreview {
   }
   public static function render(id:String, name:String, shape:Shape, color:Array<Float>):SceneArtifactPart {
     var mesh = shape.tessellate(0.15);
-    return {id:id, name:name, red:color[0], green:color[1], blue:color[2],
+    return {id:id, name:name, closed:shape.hasSolidBoundary(), red:color[0], green:color[1], blue:color[2],
       physicalMassKg:0, physicalMassDeclared:true,
       vertexCount:mesh.vertexCount, indexCount:mesh.indexCount,
       vertices:mesh.vertices, normals:mesh.normals, indices:mesh.indices,

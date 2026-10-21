@@ -154,7 +154,7 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	struct nkscene_entity_id @layout(8, 8) {
 		value: u64 @offset(0);
 	}
-	struct nkscene_geometry_data @layout(112, 8) {
+	struct nkscene_geometry_data @layout(120, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		vertices: ptr<const<nkscene_geometry_vertex>> @offset(8) @borrowed @length_field("vertex_count");
 		vertex_count: u32 @offset(16);
@@ -171,6 +171,14 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 		stream_count: u32 @offset(88);
 		stroke_segments: ptr<const<nkscene_stroke_segment>> @offset(96) @borrowed @length_field("stroke_segment_count");
 		stroke_segment_count: u32 @offset(104);
+		/**
+		 * < Explicit closed solid boundary; zero leaves sections uncapped.
+		 */
+		closed: u32 @offset(108);
+		/**
+		 * < Must be zero; extends struct_size beyond older descriptor padding.
+		 */
+		reserved: u32 @offset(112);
 	}
 	struct nkscene_geometry_id @layout(8, 8) {
 		value: u64 @offset(0);
@@ -270,6 +278,9 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	struct nkscene_stroke_segment @layout(28, 4) {
 		start: array<f32, 3> @offset(0);
 		end: array<f32, 3> @offset(12);
+		/**
+		 * Zero for an anonymous stroke; tagged BRep edge ID for CAD strokes.
+		 */
 		subelement: u32 @offset(24);
 	}
 	struct nkscene_subelement_range @layout(12, 4) {

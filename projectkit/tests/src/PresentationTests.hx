@@ -77,6 +77,15 @@ class PresentationTests {
     var engineering = AssemblyDefinitionCodec.encode(definition);
     var scene = @:privateAccess ProjectKitTests.sceneData();
     scene.assemblyDefinition = definition; scene.presentation = value;
+    var candidate=scene.parts[0];
+    materia.project.MeshClosure.declare(candidate);
+    check(candidate.closed==true,"A checked closed mesh can explicitly declare caps");
+    var savedCount=candidate.indexCount;candidate.indexCount-=3;
+    rejects(()->materia.project.MeshClosure.validate(candidate));candidate.indexCount=savedCount;
+    var corner=candidate.indices.getInt32(0),other=candidate.indices.getInt32(4);
+    candidate.indices.setInt32(0,other);candidate.indices.setInt32(4,corner);
+    rejects(()->materia.project.MeshClosure.validate(candidate));
+    candidate.indices.setInt32(0,corner);candidate.indices.setInt32(4,other);
     var fingerprint=materia.presentation.PresentationGeometry.fingerprint(scene);
     value.explode[0].distance++;
     check(materia.presentation.PresentationGeometry.fingerprint(scene)==fingerprint,"Presentation edits do not change the geometry fingerprint");
@@ -89,6 +98,7 @@ class PresentationTests {
     var decodedPresentation = decodedScene.presentation;
     if (decodedPresentation == null) throw "Scene lost presentation";
     check(PresentationCodec.encode(definition,decodedPresentation) == PresentationCodec.encode(definition,value),"Scene presentation round trip");
+    check(decodedScene.parts[0].closed==true,"Closed boundary declaration survives the scene artifact");
     check(materia.project.SceneArtifact.encode(decodedScene).compare(bytes) == 0,"Scene re-encodes identically");
     scene.assemblyDefinition = null; rejects(()->materia.project.SceneArtifact.encode(scene));
     var encoded = PresentationCodec.encode(definition,value);

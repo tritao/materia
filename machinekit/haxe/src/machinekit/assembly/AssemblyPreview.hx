@@ -204,7 +204,7 @@ class AssemblyPreview {
 				? physical.inertia.scaled(mass / physical.volume * Math.pow(LengthUnit.metresPerUnit("mm"), 2))
 				: massProperties.inertia.scaled(Math.pow(LengthUnit.metresPerUnit("mm"), 2));
 			var result:SceneArtifactPart = {
-				id: id, name: name, red: color[0], green: color[1], blue: color[2],
+				id: id, name: name, closed:part.shape.hasSolidBoundary(), red: color[0], green: color[1], blue: color[2],
 				appearance: MaterialLibrary.appearance(materialId), materialId: materialId,
 				materialDensity: material.physical.density, materialSpec: material.physical.spec,
 				vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
