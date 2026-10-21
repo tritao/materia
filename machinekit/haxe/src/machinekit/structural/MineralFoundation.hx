@@ -57,6 +57,14 @@ class MineralFoundation extends MachineAssembly {
 		}
 		if (rootInsert != null && (rootInsert == "casting" || !ids.exists(rootInsert)))
 			throw "Unknown foundation root insert";
+		var embedded:Array<materia.casting.EmbeddedAnchors.EmbeddedInsertAnchors> = [];
+		for (row in inserts) {
+			var spec=row.part.insertSpec();
+			switch spec.anchorage {case Bolted(_,_):embedded.push({owner:row.id,pose:row.pose,spec:spec});default:}
+		}
+		if (materia.casting.EmbeddedAnchors.snapshot(haxe.Json.parse(v.token("embeddedAnchors"))).length>0)
+			throw "Foundation anchor occupancy is derived from its source inserts, not authored twice";
+		v.setToken("embeddedAnchors",haxe.Json.stringify(materia.casting.EmbeddedAnchors.records(embedded)));
 		v.setToken("features", CastingPatterns.encode(features));
 		body = new MineralCasting(v);
 		validateDatums();
@@ -70,6 +78,17 @@ class MineralFoundation extends MachineAssembly {
 			} else {
 				addMemberConnector("casting", row.id + "Seat", F.compose(row.pose, row.part.connector("mount").frame));
 				addMate(row.id + "-cast-in", "fixed", "casting", row.id + "Seat", row.id, "mount");
+			}
+			var anchors:Array<InsertAnchorHardware.InsertAnchorComponent>;
+			try anchors=InsertAnchorHardware.parts(row.part.insertSpec())
+			catch (error:Dynamic) throw "Insert "+row.id+": "+Std.string(error);
+			for (hardware in anchors) {
+				var id="anchor-"+haxe.crypto.Sha256.encode(row.id+"/"+hardware.anchorId).substr(0,20)+"-"+hardware.kind;
+				if (ids.exists(id)) throw "Duplicate foundation anchor member: "+id;ids.set(id,true);
+				addComponent(id,hardware.part,F.compose(row.pose,hardware.pose));
+				addMemberConnector(row.id,id+"Seat",hardware.pose);
+				addMemberConnector(id,"castAnchorSeat",F.identity());
+				addMate(id+"-cast-in","fixed",row.id,id+"Seat",id,"castAnchorSeat");
 			}
 			exposeConnector(row.id, row.id, "top");
 		}

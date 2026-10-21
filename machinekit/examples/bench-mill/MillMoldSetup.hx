@@ -142,17 +142,7 @@ class MillMoldSetup {
 				durationSeconds: null,
 				evidence: []
 			},
-			anchorage: [
-				for (i in input.inserts)
-					{
-						insertId: i.id,
-						kind: Pending,
-						geometry: [],
-						pulloutN: null,
-						shearN: null,
-						evidence: []
-					}
-			],
+
 			serviceOrientation: materia.assembly.AssemblyFrames.identity(),
 			overlapRule: ReservedThenPriority,
 			liftingEvidence: []

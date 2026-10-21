@@ -1,30 +1,39 @@
 package materia.casting;
 
-/** Exterior and source hole records share one contract for rectangular and round inserts. */
+/** One source contract for rectangular and round inserts. `body` is the
+ * pre-cast steel envelope, including declared finishing stock. Hole frames and
+ * usable depths describe the finished steel in the same authored coordinates.
+ * InsertFinishing and InsertStages derive physical states; neither is stored as
+ * a second source design. Replicated layers are separate from steel material.
+ */
 typedef InsertSpec = {
 	var body:InsertBody;
 	var holes:Array<InsertHole>;
 	var origin:InsertOrigin;
+	var anchorage:InsertAnchorage;
 	var interfaces:Array<InterfaceRequirement>;
 }
 
 /** Source and tooling use the same body and holes; document codecs own versions. */
 class InsertSpecCodec {
 	public static function snapshot(raw:Dynamic):InsertSpec {
-		CastingFeatureCodec.fields(raw, ["body", "holes", "origin", "interfaces"]);
+		CastingFeatureCodec.fields(raw, ["body", "holes", "origin", "interfaces", "anchorage"]);
 		var body = InsertBodyCodec.snapshot(Reflect.field(raw, "body"));
 		var holes = InsertHole.InsertHoleCodec.snapshot(Reflect.field(raw, "holes"));
-		var origin=InsertOrigin.InsertOriginCodec.snapshot(Reflect.field(raw,"origin"),body,holes);
 		var interfaces=InterfaceRequirement.InterfaceRequirements.snapshot(Reflect.field(raw,"interfaces"));
+		var origin=InsertOrigin.InsertOriginCodec.snapshot(Reflect.field(raw,"origin"),body,holes);
+		var anchorage=InsertAnchorage.InsertAnchorageCodec.snapshot(Reflect.field(raw,"anchorage"));
+		InsertAnchorage.InsertAnchorageCodec.references(anchorage,body,holes,origin,interfaces);
 		switch origin {
 			case Fabricated(manufacturing):InsertManufacturing.InsertManufacturingCodec.references(manufacturing,holes,interfaces);
 			case Catalogue(_):
 		}
 		return {
 			body: body,
-			interfaces: interfaces,
 			holes: holes,
-			origin: origin
+			origin:origin,
+			anchorage:anchorage,
+			interfaces:interfaces
 		};
 	}
 
@@ -33,9 +42,10 @@ class InsertSpecCodec {
 			throw "Missing insert specification";
 		return {
 			body: InsertBodyCodec.record(spec.body),
-			interfaces: InterfaceRequirement.InterfaceRequirements.records(spec.interfaces),
+			anchorage: InsertAnchorage.InsertAnchorageCodec.record(spec.anchorage),
 			holes: InsertHole.InsertHoleCodec.snapshot(spec.holes),
-			origin: InsertOrigin.InsertOriginCodec.record(InsertOrigin.InsertOriginCodec.snapshot(spec.origin, spec.body, spec.holes))
+			origin: InsertOrigin.InsertOriginCodec.record(InsertOrigin.InsertOriginCodec.snapshot(spec.origin, spec.body, spec.holes)),
+			interfaces: InterfaceRequirement.InterfaceRequirements.records(spec.interfaces)
 		};
 	}
 }

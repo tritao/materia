@@ -173,7 +173,7 @@ class OrientationSectionTests {
 		var rejected = MoldOrientationStudy.run([failed, a], FabricationTests.spec());
 		check(rejected.rankedCandidates[0].id == "a", "complete plan ranks ahead of failed/unsupported candidate");
 		var brokenOptions = materia.tooling.casting.CastingMoldOptionsCodec.snapshot(p.options);
-		brokenOptions.anchorage = [];
+		brokenOptions.precision = [];
 		var broken:MoldOrientationCandidate = {
 			id: "planner-fails",
 			document: p.document,

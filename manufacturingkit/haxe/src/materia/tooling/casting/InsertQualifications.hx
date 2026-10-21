@@ -9,6 +9,7 @@ class InsertQualifications {
 	public static function check(inserts:Array<CastingToolingInsert>):Array<ToolingValidation> {
 		var result:Array<ToolingValidation> = [];
 		for (insert in inserts) {
+			result=result.concat(InsertAnchorageChecks.check(insert));
 			var origin = switch insert.origin {case Fabricated(_):continue;case Catalogue(product):product;};
 			var rule = "tooling.insert.geometry." + insert.id;
 			if (origin.geometryBasis == NominalStudy)
@@ -21,6 +22,15 @@ class InsertQualifications {
 					evidence: [for (evidence in origin.evidence) evidence.reference + " sha256:" + evidence.sha256]});
 		}
 		return result;
+	}
+
+	public static function validateAnchorage(inserts:Array<CastingToolingInsert>,validation:Array<ToolingValidation>):Void {
+		var expected:Array<ToolingValidation> = [];
+		for (insert in inserts) expected=expected.concat(InsertAnchorageChecks.check(insert));
+		var actual=validation.filter(check -> StringTools.startsWith(check.rule,"tooling.insert.anchorage."));
+		expected.sort((a,b) -> Reflect.compare(a.rule,b.rule));actual.sort((a,b) -> Reflect.compare(a.rule,b.rule));
+		if (materia.tooling.ToolingCodec.canonical(expected)!=materia.tooling.ToolingCodec.canonical(actual))
+			throw "Insert anchorage validation differs from source";
 	}
 
 	public static function manufacturing(inserts:Array<CastingToolingInsert>):Array<ToolingValidation> {

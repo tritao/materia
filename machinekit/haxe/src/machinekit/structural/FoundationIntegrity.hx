@@ -52,6 +52,7 @@ class FoundationIntegrity {
 		if (materia.tooling.ToolingCodec.inputFingerprint(input) != materia.tooling.ToolingCodec.inputFingerprint(document.input))
 			throw "Foundation casting review source differs from document";
 		var review = materia.tooling.process.CastingLevelOne.analyze(document);
+		review.validation=review.validation.concat(machinekit.tooling.InsertAnchorGeometry.review(input));
 		if (foundation.body.collisionHullQualification.status == Unsupported)
 			review.validation.push(materia.tooling.process.FillAnalysis.check("casting.collision-hull.unsupported." + input.id,
 				[input.id], materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,

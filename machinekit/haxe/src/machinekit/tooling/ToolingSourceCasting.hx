@@ -21,7 +21,7 @@ class ToolingSourceCasting extends MachineComponent {
 			recipe = new ComponentType("machinekit.tooling.source-casting",parameters(),v -> new ToolingSourceCasting(v),false,false,null,false,
 				new ComponentValues().setToken("source",ToolingCodec.encodeInput({
 					id:"recipe-unit-sample",revision:1,lengthUnit:materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
-					datumScheme:null, interfaces:[], interfaceContext:null,
+					datumScheme:null,interfaces:[],interfaceContext:null,
 					envelope:[{id:"body",height:1,pose:F.identity(),profile:[{x:-0.5,y:-0.5},{x:0.5,y:-0.5},{x:0.5,y:0.5},{x:-0.5,y:0.5}]}],
 					features:[],inserts:[]
 				})));
@@ -57,6 +57,13 @@ class ToolingSourceCasting extends MachineComponent {
 			return Solids.building([body], shapes -> {
 				for (cavity in CastingCavities.derive(source.envelope,source.features))
 					shapes.push(CastingCavityCad.part(cavity));
+				var embedded:Array<materia.casting.EmbeddedAnchors.EmbeddedInsertAnchors> = [];
+				for (insert in source.inserts) switch insert.anchorage {
+					case Bolted(_,_):embedded.push({owner:insert.id,pose:insert.pose,
+						spec:{body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces}});
+					default:
+				}
+				for (part in machinekit.structural.EmbeddedAnchorCad.parts(embedded)) shapes.push(part);
 				return Solids.cut(shapes[0],shapes.slice(1));
 			});
 		});

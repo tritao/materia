@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 12;
+	public static inline var VERSION = 13;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -160,7 +160,7 @@ class ToolingCodec {
 			var bindings=context.inserts.filter(binding -> binding.member==source.member);
 			if (bindings.length==0) continue;
 			var input=inserts.filter(insert -> insert.id==bindings[0].id)[0];
-			var expected:materia.casting.InsertSpec={body:input.body,holes:input.holes,origin:input.origin,interfaces:input.interfaces};
+			var expected:materia.casting.InsertSpec={body:input.body,holes:input.holes,origin:input.origin,anchorage:input.anchorage,interfaces:input.interfaces};
 			if (!sameFrame(source.pose,input.pose) || canonical(source.spec)!=canonical(expected))
 				throw "Joint context differs from source insert or pose: "+source.member;
 		}
@@ -241,16 +241,17 @@ class ToolingCodec {
 			"id",
 			"body",
 			"holes",
-			"origin", "interfaces",
+			"origin", "anchorage", "interfaces",
 			"pose",
 			"role",
 			"label",
 			"positionTolerance", "material",
 			"finish"
 		], "insert");
-		var source = materia.casting.InsertSpec.InsertSpecCodec.snapshot({
-			body: Reflect.field(raw, "body"), holes: Reflect.field(raw, "holes"), origin: Reflect.field(raw, "origin"), interfaces: Reflect.field(raw,"interfaces")
-		});
+		var source:materia.casting.InsertSpec;
+		try source = materia.casting.InsertSpec.InsertSpecCodec.snapshot({
+			body: Reflect.field(raw, "body"), holes: Reflect.field(raw, "holes"), origin: Reflect.field(raw, "origin"), anchorage:Reflect.field(raw,"anchorage"), interfaces: Reflect.field(raw,"interfaces")
+		}) catch (error:Dynamic) throw "Invalid insert "+string(raw,"id")+": "+Std.string(error);
 		var body = source.body;
 		var material=materia.casting.InsertMaterial.InsertMaterials.snapshot(Reflect.field(raw,"material"));
 		switch source.origin {
@@ -273,6 +274,7 @@ class ToolingCodec {
 			body: body,
 			holes: holes,
 			origin: source.origin,
+			anchorage:source.anchorage,
 			interfaces: source.interfaces,
 			pose: frame(raw, "pose"),
 			role: insertRole(string(raw, "role")),
@@ -744,6 +746,8 @@ class ToolingCodec {
 			return canonical(materia.casting.InsertSpec.InsertBodyCodec.record(cast value));
 		if (Std.isOfType(value, materia.casting.CastingFeature.CastingGeometrySolid))
 			return canonical(materia.casting.CastingFeature.CastingGeometrySolids.record(cast value));
+		if (Std.isOfType(value,materia.casting.InsertAnchorage))
+			return canonical(materia.casting.InsertAnchorage.InsertAnchorageCodec.record(cast value));
 		if (Std.isOfType(value, materia.casting.InsertOrigin))
 			return canonical(materia.casting.InsertOrigin.InsertOriginCodec.record(cast value));
 		if (Std.isOfType(value, CastingSolid))

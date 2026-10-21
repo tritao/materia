@@ -116,22 +116,6 @@ typedef CompactionSpec = {
 	var evidence:Array<String>;
 }
 
-enum abstract AnchorageKind(String) to String {
-	var Pending = "pending";
-	var Studs = "studs";
-	var Undercut = "undercut";
-	var BondedKeys = "bonded-keys";
-}
-
-typedef InsertAnchorage = {
-	var insertId:String;
-	var kind:AnchorageKind;
-	var geometry:Array<MoldBox>;
-	var pulloutN:Null<Float>;
-	var shearN:Null<Float>;
-	var evidence:Array<String>;
-}
-
 enum abstract DesignChangeKind(String) to String {
 	var LiftingPoints = "lifting-points";
 	var ReleaseAlternative = "release-alternative";
@@ -187,7 +171,6 @@ typedef CastingMoldOptions = {
 	var replicationJigs:Array<ReplicationJig>;
 	var precision:Array<PrecisionInterface>;
 	var compaction:CompactionSpec;
-	var anchorage:Array<InsertAnchorage>;
 	var serviceOrientation:AssemblyFrame;
 	var overlapRule:OverlapRule;
 	var liftingEvidence:Array<LiftingQualification>;

@@ -98,7 +98,7 @@ class ToolingFabricationExport {
 					var stage=operation.stage==materia.tooling.casting.InsertManufacturingPlan.InsertOperationStage.BeforeCasting
 						? materia.casting.InsertStages.InsertStage.BeforeCasting : materia.casting.InsertStages.InsertStage.Service;
 					var machiningHoles=materia.casting.InsertStages.holes(
-						{body:insert.body,holes:insert.holes,origin:insert.origin,interfaces:insert.interfaces},stage)
+						{body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces},stage)
 						.filter(hole -> operation.sourceIds.indexOf(hole.id)>=0);
 					operationRows.push([insert.id,Std.string(index+1),operation.id,operation.stage,operation.kind,
 						operation.sourceIds.join(";"),job.specification.processReference==null ? "" : job.specification.processReference,
@@ -109,12 +109,24 @@ class ToolingFabricationExport {
 						inspection.toleranceMm==null ? "" : Std.string(inspection.toleranceMm),"pending"]);
 				}
 		}
-		data(dir,"insert-manufacturing.json",{format:"materia.tooling.insert-manufacturing",version:1,
+		data(dir,"insert-manufacturing.json",{format:"materia.tooling.insert-manufacturing",version:2,
 			sourceFingerprint:f.sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),jobs:jobs});
 		text(dir,"insert-operations.csv",ToolingFabrication.csv(operationRows));
 		text(dir,"insert-inspections.csv",ToolingFabrication.csv(inspectionRows));
 		text(dir,"insert-make-bom.csv",ToolingFabrication.csv(bomRows));
 		return checks;
+	}
+
+	public static function insertAnchorageReport(p:CastingMoldPlan,sourceFingerprint:String):Dynamic {
+		var checks:Array<materia.tooling.ToolingValidation> = [];
+		for (insert in p.document.input.inserts) checks=checks.concat(materia.tooling.casting.InsertAnchorageChecks.check(insert));
+		checks=checks.concat(InsertAnchorGeometry.review(p.document.input));
+		checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));
+		return {format:"materia.tooling.insert-anchorage",version:1,sourceFingerprint:sourceFingerprint,
+			inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),
+			inserts:[for (insert in p.document.input.inserts) {id:insert.id,pose:insert.pose,
+				spec:materia.casting.InsertSpec.InsertSpecCodec.record({body:insert.body,holes:insert.holes,
+					origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces})}],validation:checks};
 	}
 
 	public static function foundationJointReport(p:CastingMoldPlan,sourceFingerprint:String):Dynamic {
@@ -208,6 +220,7 @@ class ToolingFabricationExport {
 		classificationChecks=classificationChecks.concat(insertManufacturing(p,f,dir)).concat(replication(p,f,dir))
 			.concat(FoundationJointCad.review(p.document.input));
 		foundationJoints(p,f,dir);
+		data(dir,"insert-anchorage.json",insertAnchorageReport(p,f.sourceFingerprint));
 		data(dir, "fabrication-plan.json", f);
 		text(dir, "fabrication-spec.json", FabricationSpecCodec.encode(f.spec));
 		data(dir, "load-estimates.json", f.loads);

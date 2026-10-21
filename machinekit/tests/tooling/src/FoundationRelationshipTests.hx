@@ -89,7 +89,7 @@ class FoundationRelationshipTests {
 		diagnostics=AssemblyDesignChecks.check(fixed);
 		check(diagnostics.hasErrors() && diagnostics.items.filter(item -> item.message.indexOf("single directed joint")>=0).length==1,
 			"fixed connections do not become machine axes");
-		var version=source.describe();version.schemaVersion=20;
+		var version=source.describe();version.schemaVersion=21;
 		var rejected=false;
 		try MachineAssembly.fromDescription(version) catch(error:Dynamic) rejected=Std.string(error).indexOf("unsupported")>=0;
 		check(rejected,"assembly schema rejects previous version without a compatibility reader");

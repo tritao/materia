@@ -19,6 +19,7 @@ class ToolingInsertCad {
 		return new CastInsert(new ComponentValues().setToken("buildStage",stage).setToken("body",InsertBodyCodec.encode(insert.body))
 			.setToken("interfaces",haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records(insert.interfaces)))
 			.setToken("origin",haxe.Json.stringify(InsertOriginCodec.record(insert.origin)))
+			.setToken("anchorage",haxe.Json.stringify(materia.casting.InsertAnchorage.InsertAnchorageCodec.record(insert.anchorage)))
 			.setToken("holes",InsertHoles.fromNeutral(insert.holes)).setToken("stockMaterial",insert.material.grade)
 			.setToken("role",insert.role).setToken("label",insert.label).setToken("finish",insert.finish)
 			.setNumber("positionTolerance",insert.positionTolerance));

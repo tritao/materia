@@ -19,6 +19,7 @@ class CastInsert extends MachineComponent {
 			P.choice("stockMaterial", materia.casting.InsertMaterial.InsertMaterials.tokens(), materia.casting.InsertMaterial.C45Bright),
 			P.text("holes", InsertHoles.fromNeutral([])),
 			P.text("interfaces", "[]"),
+			P.text("anchorage", haxe.Json.stringify(materia.casting.InsertAnchorage.InsertAnchorageCodec.record(Undeclared))),
 			P.text("body", InsertBodyCodec.encode(Primitive(Box(35, 400, 20)))),
 			P.text("origin", haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(Fabricated(
 				materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(
@@ -53,6 +54,10 @@ class CastInsert extends MachineComponent {
 			case Catalogue(_):
 		}
 		v.setToken("origin", haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(origin)));
+		var anchorage=materia.casting.InsertAnchorage.InsertAnchorageCodec.snapshot(haxe.Json.parse(v.token("anchorage")));
+		materia.casting.InsertAnchorage.InsertAnchorageCodec.references(anchorage,body,holes,origin,
+			materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(haxe.Json.parse(v.token("interfaces"))));
+		v.setToken("anchorage",haxe.Json.stringify(materia.casting.InsertAnchorage.InsertAnchorageCodec.record(anchorage)));
 		if (v.number("positionTolerance") <= 0)
 			throw "Insert tolerance must be positive";
 		if (StringTools.trim(v.token("label")).length == 0)
@@ -82,7 +87,7 @@ class CastInsert extends MachineComponent {
 		else {
 			sourceDesign.check(this);
 			var selected=materia.casting.InsertStages.holes(
-				{body:body,holes:holes,origin:origin,interfaces:sourceDesign.precisionRequirements()},buildStage());
+				{body:body,holes:holes,origin:origin,anchorage:anchorage,interfaces:sourceDesign.precisionRequirements()},buildStage());
 			var physical=InsertHoles.facet(selected,stock.width,stock.depth,stock.height);
 			addFacet(physical);
 		}
@@ -140,6 +145,7 @@ class CastInsert extends MachineComponent {
 		var body = bodySpec(), holes = InsertHoles.copy(sourceDesign);
 		return {
 			body: body,
+			anchorage:materia.casting.InsertAnchorage.InsertAnchorageCodec.snapshot(haxe.Json.parse(parameterToken("anchorage"))),
 			holes: holes,
 			origin: materia.casting.InsertOrigin.InsertOriginCodec.snapshot(haxe.Json.parse(parameterToken("origin")), body, holes),
 			interfaces:sourceDesign.precisionRequirements()

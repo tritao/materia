@@ -55,7 +55,7 @@ class InsertDrawing {
 		note("Local datum: XY centred on body; Z=0 at back face. Circles show pre-cast entries, including hidden entries.");
 		note("Raw views exclude post-cast or undecided holes; the schedule includes the complete service hole pattern.");
 		var precastHoles=materia.casting.InsertStages.holes(
-			{body:insert.body,holes:insert.holes,origin:insert.origin,interfaces:insert.interfaces},
+			{body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces},
 			materia.casting.InsertStages.InsertStage.BeforeCasting);
 		var unsupported:Array<String> = [];
 		var manufacturing=switch insert.origin {

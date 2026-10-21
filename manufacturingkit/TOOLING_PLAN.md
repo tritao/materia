@@ -1985,6 +1985,33 @@ structures and phase 9 physical calibration remain open.
   **false**. Remaining step-2 slices include bolted insert anchorage,
   rail-derived seat holes and lifting inserts.
 
+- [x] Bolted anchorage source-contract/hardware slice: source `InsertAnchorage` owns blind back-face
+  holes, standard class-8.8 screws and washers, locking choices and numeric
+  design limits. The source authoring helper preserves mounting-hole routes;
+  exact native hole-envelope clearance checks identify both affected holes.
+  Real hardware enters the assembly/BOM and is subtracted from nominal resin;
+  occupied anchor holes cannot receive duplicate fixture screws or masks.
+  Native source checks cover exposed casting cover and actual washer bearing
+  area. Source capacity and locking evidence remain Pending. The hashed
+  `insert-anchorage.json` report is recomputed by manifest verification, which
+  rejects altered source records and restores omitted checks.
+  Assembly **22**, source/tooling **13**, box mold **12**, general mold **13**,
+  manifest **7** and insert-manufacturing report **2** reject their prior formats.
+  This slice does not complete anchorage: production mill anchor patterns,
+  embedment/tooling-interference qualification and exact non-box fill remain
+  required; box consumers report Unsupported with the insert owner rather than
+  approximate the hardware. Validation: foundation **382**, neutral tooling
+  **1,850**, generic design **32**, native tooling **673** (anchors **56**,
+  joints **64**, contact **30**), casting **54**, foundation CAD **60**,
+  standalone process **34**, mill **251**, socket fixture **108**.
+  Catalogue provenance is copied exactly; nominal geometry and retention
+  capacity have independent Pending records. Frozen mill base and column
+  symmetric differences remain zero. Regenerated records-only kit: **158
+  artifacts / 40 programs / 27 Pass / 348 Pending / 15 Unsupported**;
+  source-report omission, integrity/tamper and artifact hashes pass, with
+  readiness **false**. A local scene-record name introduced on main was renamed
+  to avoid shadowing the export writer; package export compiles again.
+
 ### Phase 7 records: shared levelling-foot family
 
 - [x] One `structural.LevelingFoot` recipe with strict `LevelingFootSpec` schema

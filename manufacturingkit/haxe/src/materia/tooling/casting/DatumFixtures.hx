@@ -39,7 +39,7 @@ class DatumFixtures {
 	public static function add(p:CastingMoldPlan, i:CastingToolingInsert, face:materia.assembly.AssemblyRecord.AssemblyFrame, datum:MoldVolume,
 			withdrawal:{x:Float, y:Float, z:Float}, bed:PanelPlacement, pocketId:Null<String>):Void {
 		var dimensions = InsertBodies.box(i.body, i.id);
-		var precastHoles=InsertFixturePlanner.holes(i);
+		var precastHoles=InsertFixturePlanner.availableHoles(i);
 		p.validation = p.validation.concat(InsertFixturePlanner.protectionValidation(i));
 		var r = p.document.recipe,
 			h = r.hardware,
@@ -262,7 +262,7 @@ class DatumFixtures {
 					throw "Fixture sealing footprint does not cover bed penetration";
 			}
 			var source = p.document.input.inserts.filter(i -> i.id == f.insertId)[0];
-			var precastHoles=InsertFixturePlanner.holes(source);
+			var precastHoles=InsertFixturePlanner.availableHoles(source);
 			var location=DatumFixtureLocation.plan(source,p.document.setup.sourceToMold,
 				{mountingFace:f.mountingFace,datum:f.datum,fixings:f.fixings});
 			if (ToolingCodec.canonical(location)!=ToolingCodec.canonical(f.location))

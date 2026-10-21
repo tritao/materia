@@ -21,7 +21,6 @@ class CastingMoldOptionsCodec {
 			"replicationJigs",
 			"precision",
 			"compaction",
-			"anchorage",
 			"serviceOrientation",
 			"overlapRule",
 			"liftingEvidence"
@@ -69,28 +68,6 @@ class CastingMoldOptionsCodec {
 			case "none": NoCompaction;
 			default: throw "Invalid compaction method";
 		};
-		var anchorage:Array<InsertAnchorage> = [];
-		for (a in arr(o, "anchorage")) {
-			obj(a, ["insertId", "kind", "geometry", "pulloutN", "shearN", "evidence"]);
-			var kind:AnchorageKind = switch text(a, "kind") {
-				case "pending": Pending;
-				case "studs": Studs;
-				case "undercut": Undercut;
-				case "bonded-keys": BondedKeys;
-				default: throw "Invalid anchorage kind";
-			};
-			var geometry = boxes(a, "geometry");
-			if (geometry.length > 0)
-				throw "Anchorage geometry needs a corresponding source adapter revision before this template can consume it";
-			anchorage.push({
-				insertId: text(a, "insertId"),
-				kind: kind,
-				geometry: geometry,
-				pulloutN: nullableNumber(a, "pulloutN"),
-				shearN: nullableNumber(a, "shearN"),
-				evidence: strings(a, "evidence")
-			});
-		}
 		var jointIds=new Map<String,Bool>();
 		for (j in joints) {
 			materia.casting.CastingRecordCodec.referencePath(j.jointId);
@@ -151,7 +128,6 @@ class CastingMoldOptionsCodec {
 			});
 		}
 		precision.sort((a, b) -> Reflect.compare(a.insertId, b.insertId));
-		anchorage.sort((a, b) -> Reflect.compare(a.insertId, b.insertId));
 		return {
 			foundationJointProcesses:joints,
 			replicationJigs:ReplicationJig.ReplicationJigCodec.snapshot(Reflect.field(o,"replicationJigs")),
@@ -164,7 +140,6 @@ class CastingMoldOptionsCodec {
 				durationSeconds: nullableNumber(c, "durationSeconds"),
 				evidence: strings(c, "evidence")
 			},
-			anchorage: anchorage,
 			serviceOrientation: orientation,
 			overlapRule: ReservedThenPriority,
 			liftingEvidence: lifting

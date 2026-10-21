@@ -51,7 +51,7 @@ class InsertManufacturingTests {
 		draft.processReference="synthetic-shop-process";
 		var holes=TestInsertHoles.through(5,20);
 		var insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert={id:"synthetic-seat",body:body,holes:holes,
-			origin:materia.casting.InsertOrigin.Fabricated(draft),interfaces:[],material:material,pose:F.identity(),
+			anchorage:materia.casting.InsertAnchorage.Undeclared,origin:materia.casting.InsertOrigin.Fabricated(draft),interfaces:[],material:material,pose:F.identity(),
 			role:materia.casting.InsertSpec.InsertRole.GenericMount,label:"synthetic inspection fixture",positionTolerance:0.01,
 			finish:materia.casting.InsertSpec.InsertFinish.AsSupplied};
 		var pending=InsertManufacturingPlan.build(insert);
@@ -73,9 +73,9 @@ class InsertManufacturingTests {
 		draft.holeRoutes[0].route=InsertHoleRoute.TransferAfterCasting;
 		var after=InsertManufacturingPlan.build(insert);
 		check(materia.casting.InsertStages.holes(
-			{body:insert.body,holes:insert.holes,origin:insert.origin,interfaces:insert.interfaces},materia.casting.InsertStages.InsertStage.BeforeCasting).length==0
+			{body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces},materia.casting.InsertStages.InsertStage.BeforeCasting).length==0
 			&& materia.casting.InsertStages.holes(
-			{body:insert.body,holes:insert.holes,origin:insert.origin,interfaces:insert.interfaces},materia.casting.InsertStages.InsertStage.Service).length==1,
+			{body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces},materia.casting.InsertStages.InsertStage.Service).length==1,
 			"one source pattern produces the correct pre-cast and service hole sets");
 		check(after.operations.filter(op -> op.kind==TransferDrill && op.stage==InsertOperationStage.AfterCasting).length==1,
 			"transfer route moves the hole operation after casting");

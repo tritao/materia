@@ -105,7 +105,7 @@ class FoundationDesignTests {
 		document.setup.fillHeightMm = 120;
 		document.setup.features = [];
 		document.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(input);
-		options.precision = []; options.anchorage = []; options.foundationJointProcesses = [];
+		options.precision = []; options.foundationJointProcesses = [];
 		var settings:materia.tooling.process.FillAnalysis.FillSourceSettings = {
 			sourceFingerprint: materia.tooling.ToolingCodec.documentFingerprint(document), processFingerprint: "source-screen",
 			cores: [], densityKgM3: 2200, gravityMps2: 9.81, pourRateMm3PerSecond: null,

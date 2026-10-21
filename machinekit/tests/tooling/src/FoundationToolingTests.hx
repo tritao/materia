@@ -137,8 +137,14 @@ class FoundationToolingTests {
 			[{id: "socket", part: socket, pose: F.translation(0, 0, 60), openings: [CastingPatterns.face("body.z-max")]}]);
 		var input = FoundationToolingAdapter.snapshot(foundation, "socket-source", 1);
 		var qualification = materia.tooling.casting.InsertQualifications.check(input.inserts);
-		check(qualification.length == 1 && qualification[0].status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending,
+		check(materia.tooling.ToolingCodec.canonical(input.inserts[0].origin)
+			== materia.tooling.ToolingCodec.canonical(spec.origin), "adapter preserves catalogue geometry provenance exactly");
+		var geometryChecks = qualification.filter(record -> record.rule == "tooling.insert.geometry.socket");
+		check(geometryChecks.length == 1 && geometryChecks[0].status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending,
 			"nominal product geometry survives the adapter and blocks readiness");
+		var capacityChecks = qualification.filter(record -> record.rule == "tooling.insert.anchorage.socket.capacity");
+		check(capacityChecks.length == 1 && capacityChecks[0].status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending,
+			"catalogue retention capacity remains independently pending");
 		var sourceToMold = F.fromRotationMatrix(0, 0, 100, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
 		var selected = materia.tooling.casting.InsertFixturePlanner.select(input.inserts[0].holes[0],
 			F.compose(sourceToMold, input.inserts[0].pose), F.identity(), SinglePocketSetup.document().recipe.hardware);
@@ -439,6 +445,7 @@ class FoundationToolingTests {
 		ToolingFastenerFitTests.run();
 		ReplicationContactTests.run();
 		FoundationJointDesignTests.run();
+		InsertAnchorTests.run();
 		if (Sys.args().indexOf("socket-carrier") >= 0) {
 			sourcedSocket();
 			Sys.println('SocketCarrierChecks: $assertions assertions passed');

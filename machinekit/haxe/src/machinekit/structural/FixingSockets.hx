@@ -64,6 +64,7 @@ class FixingSockets {
 			geometryBasis: NominalStudy, geometryFingerprint: null, evidence: []});
 		return new CastInsert(new ComponentValues().setToken("body", InsertBodyCodec.encode(body))
 			.setToken("holes", InsertHoles.fromNeutral([hole])).setToken("origin", haxe.Json.stringify(InsertOrigin.InsertOriginCodec.record(origin)))
+			.setToken("anchorage",haxe.Json.stringify(materia.casting.InsertAnchorage.InsertAnchorageCodec.record(CatalogueRetention)))
 			.setToken("stockMaterial", Stainless14571).setToken("role", ThreadedAnchor).setToken("finish", AsSupplied)
 			.setToken("label", "catalogue fixing socket").setNumber("positionTolerance", positionToleranceMm));
 	}

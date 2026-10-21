@@ -82,7 +82,7 @@ class InterfaceStockTests {
 		manufacturing.holeRoutes=[{holeId:"fixing",route:materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting}];
 		var holes=TestInsertHoles.through(5,20);
 		var spec:materia.casting.InsertSpec={body:raw,holes:holes,
-			origin:materia.casting.InsertOrigin.Fabricated(manufacturing),interfaces:[ground]};
+			anchorage:materia.casting.InsertAnchorage.Undeclared,origin:materia.casting.InsertOrigin.Fabricated(manufacturing),interfaces:[ground]};
 		var before=materia.casting.InsertStages.holes(spec,materia.casting.InsertStages.InsertStage.BeforeCasting);
 		check(before.length==1 && before[0].frame.z==21 && before[0].depth==21,
 			"pre-cast drilling extends through disposable finishing stock");

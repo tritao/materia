@@ -212,7 +212,7 @@ class ToolingTests {
 				{
 					id: "seat",
 					body: materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40, 30, 20)),
-					origin: materia.casting.InsertOrigin.Fabricated(materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(
+					anchorage:materia.casting.InsertAnchorage.Undeclared,origin: materia.casting.InsertOrigin.Fabricated(materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(
 						materia.casting.InsertMaterial.InsertMaterials.specification(C45Bright))),
 					interfaces:[],
 					holes: TestInsertHoles.through(8,20),
@@ -550,7 +550,12 @@ class ToolingTests {
 		rejects(() -> ToolingCodec.inputFingerprint(invalid.input), "finite tooling number");
 
 		var review = ToolingReview.inspect(fixture());
-		check(review.filter(d -> d.status == "pending").length == 4, "unknown process, geometry, loads and stock remain pending");
+		var pendingRules = [for (diagnostic in review) if (diagnostic.status == "pending") diagnostic.ruleId];
+		for (rule in ["tooling.geometry", "tooling.process", "tooling.loads", "tooling.core-stock"])
+			check(pendingRules.indexOf(rule) >= 0, "unknown qualification remains pending: " + rule);
+		for (insert in fixture().input.inserts)
+			check(pendingRules.indexOf("tooling.insert.anchorage." + insert.id + ".source") >= 0,
+				"undeclared source anchorage remains pending: " + insert.id);
 		var unsupported = fixture();
 		unsupported.setup.features[0].strategy = Unsupported;
 		check(ToolingReview.inspect(unsupported).filter(d -> d.status == "unsupported").length == 1,

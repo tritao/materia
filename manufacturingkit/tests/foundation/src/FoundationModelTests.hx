@@ -227,7 +227,7 @@ class FoundationModelTests {
 			var encoded = InsertBodyCodec.encode(body);
 			check(InsertBodyCodec.encode(InsertBodyCodec.decode(encoded)) == encoded, "strict insert exterior round trip");
 			check(InsertBodyCodec.encode(InsertBodyCodec.snapshot(body)) == encoded, "typed insert exterior snapshot");
-			var spec:materia.casting.InsertSpec = {body: body, holes: [], origin: Fabricated(materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(
+			var spec:materia.casting.InsertSpec = {body: body, holes: [], anchorage:materia.casting.InsertAnchorage.Undeclared,origin: Fabricated(materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(
 				materia.casting.InsertMaterial.InsertMaterials.specification(materia.casting.InsertMaterial.C45Bright))), interfaces: []};
 			var copied = materia.casting.InsertSpec.InsertSpecCodec.snapshot(materia.casting.InsertSpec.InsertSpecCodec.record(spec));
 			check(copied.holes.length == 0 && InsertBodyCodec.encode(copied.body) == encoded, "one insert contract without invented holes");
@@ -244,7 +244,7 @@ class FoundationModelTests {
 		rejects(() -> InsertBodyCodec.record(CrimpedSocket(Cylinder(8, 25), {length:15, width:7, thickness:2.2, wave:1.4, blend:0.5})), "Inconsistent insert crimped tail");
 		rejects(() -> CastingSolidCodec.snapshot({kind: "box", width: 20, depth: 30}), "Unexpected casting record fields");
 		rejects(() -> CastingSolidCodec.snapshot({kind: "cylinder", diameter: "8", height: 40}), "Invalid casting number");
-		rejects(() -> materia.casting.InsertSpec.InsertSpecCodec.snapshot({body: InsertBodyCodec.record(Primitive(box)), holes: null, origin: {kind:"fabricated"}, interfaces: new Array<materia.casting.InterfaceRequirement>()}), "Invalid insert hole list");
+		rejects(() -> materia.casting.InsertSpec.InsertSpecCodec.snapshot({body: InsertBodyCodec.record(Primitive(box)), holes: null, anchorage:{kind:"undeclared"}, origin: {kind:"fabricated"}, interfaces: new Array<materia.casting.InterfaceRequirement>()}), "Invalid insert hole list");
 	}
 
 	static function threadRelief():Void {

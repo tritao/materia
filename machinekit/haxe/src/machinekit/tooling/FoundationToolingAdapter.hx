@@ -12,13 +12,21 @@ class FoundationToolingAdapter {
 	public static function snapshot(foundation:MineralFoundation, id:String, revision:Int,
 			?context:materia.casting.CastingInterfaceContext):CastingToolingInput {
 		foundation.body.finishedCavities();
+		var expected:Array<materia.casting.EmbeddedAnchors.EmbeddedInsertAnchors> = [];
+		for (row in foundation.insertLocations()) {
+			var spec=row.part.insertSpec();
+			switch spec.anchorage {case Bolted(_,_):expected.push({owner:row.id,pose:row.pose,spec:spec});default:}
+		}
+		if (ToolingCodec.canonical(materia.casting.EmbeddedAnchors.records(expected))
+			!=ToolingCodec.canonical(materia.casting.EmbeddedAnchors.records(foundation.body.embeddedAnchors())))
+			throw "Foundation embedded anchor occupancy differs from source inserts";
 		return ToolingCodec.inputSnapshot({
 			id: id,
 			revision: revision,
 			lengthUnit: ToolingLengthUnit.Millimetres,
 			datumScheme: foundation.body.foundationDatumScheme(),
-			interfaces: foundation.body.precisionRequirements(),
 			interfaceContext: context,
+			interfaces: foundation.body.precisionRequirements(),
 			envelope: foundation.body.castingEnvelope(),
 			features: foundation.body.castingFeatures(),
 			inserts: [for (row in foundation.insertLocations()) insert(row)]
@@ -35,6 +43,7 @@ class FoundationToolingAdapter {
 			material: row.part.insertMaterial(),
 			holes: source.holes,
 			origin: source.origin,
+			anchorage:source.anchorage,
 			interfaces: source.interfaces,
 			pose: row.pose,
 			role: cast row.part.parameterToken("role"),

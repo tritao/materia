@@ -52,17 +52,7 @@ class CastingMoldTests {
 				durationSeconds: null,
 				evidence: []
 			},
-			anchorage: [
-				for (i in d.input.inserts)
-					{
-						insertId: i.id,
-						kind: Pending,
-						geometry: [],
-						pulloutN: null,
-						shearN: null,
-						evidence: []
-					}
-			],
+
 			serviceOrientation: materia.assembly.AssemblyFrames.identity(),
 			overlapRule: ReservedThenPriority,
 			liftingEvidence: []
@@ -313,10 +303,11 @@ class CastingMoldTests {
 		p = CastingMoldPlanner.plan(d, o);
 		p.openings.pop();
 		rejects(() -> CastingMoldPlanner.validate(p), "unclassified opening rejected");
-		o.anchorage.pop();
-		rejects(() -> CastingMoldPlanner.plan(d, o), "missing anchorage not silently qualified");
+		var legacyOptions:Dynamic=haxe.Json.parse(ToolingCodec.canonical(o));
+		Reflect.setField(legacyOptions,"anchorage",new Array<Dynamic>());
+		rejects(() -> CastingMoldOptionsCodec.read(legacyOptions),"obsolete duplicate process anchorage rejected");
 		var raw:Dynamic = haxe.Json.parse(s);
-		Reflect.setField(raw, "version", 11);
+		Reflect.setField(raw, "version", 12);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
 		raw = haxe.Json.parse(s);
 		Reflect.setField(raw, "version", 99);

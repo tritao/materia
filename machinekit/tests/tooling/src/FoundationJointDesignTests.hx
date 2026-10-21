@@ -192,7 +192,7 @@ class FoundationJointDesignTests {
 		document.setup.fillHeightMm=40;document.setup.sourceToMold=F.fromRotationMatrix(0,0,40,[1,0,0,0,-1,0,0,0,-1]);
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(input);
 		var options:materia.tooling.casting.CastingMoldPlan.CastingMoldOptions={replicationJigs:[],foundationJointProcesses:[],
-			anchorage:[{insertId:"seat",kind:materia.tooling.casting.CastingMoldPlan.AnchorageKind.Pending,geometry:[],pulloutN:null,shearN:null,evidence:[]}],
+
 			precision:[{insertId:"seat",masterReference:null,jigReference:null,masterFlatnessMm:null,releaseSpec:null,holeProtectionReference:null,evidence:[]}],
 			compaction:{method:materia.tooling.casting.CastingMoldPlan.CompactionMethod.Undeclared,bedInterfaceReference:null,
 				frequencyHz:null,amplitudeMm:null,durationSeconds:null,evidence:[]},

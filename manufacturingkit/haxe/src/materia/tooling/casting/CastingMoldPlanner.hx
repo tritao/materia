@@ -61,7 +61,7 @@ class CastingMoldPlanner {
 		var checks = sourceSupport(d.input);
 		var unsupported = checks.filter(check -> check.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported);
 		if (unsupported.length > 0) {
-			var changes:Array<DesignChangeRequest> = [for (check in unsupported) {
+			var changes:Array<DesignChangeRequest> = [for (check in unsupported) if (d.input.features.filter(feature -> check.affectedIds.indexOf(feature.id)>=0).length>0) {
 				id: materia.tooling.ToolingIds.derive("geometry-", check.affectedIds.join("-")),
 				kind: DesignChangeKind.ReleaseAlternative,
 				sourceIds: check.affectedIds.copy(),
@@ -88,8 +88,8 @@ class CastingMoldPlanner {
 
 	static function build(d:ToolingDocument, o:CastingMoldOptions, geometryChecks:Array<materia.tooling.ToolingValidation>):CastingMoldPlan {
 		var e = envelope(d), r = d.recipe, t = r.panel.measuredThickness, l = r.minimumLigament;
-		if (o.precision.length != d.input.inserts.length || o.anchorage.length != d.input.inserts.length)
-			throw "Every insert needs precision and anchorage records";
+		if (o.precision.length != d.input.inserts.length)
+			throw "Every insert needs a precision process record";
 		var strategies = CastingStrategies.resolve(d);
 		var reusable = strategies.filter(v -> v.strategy == CoreStrategy.ReusableFormer);
 		for (index in 0...reusable.length)
@@ -106,7 +106,7 @@ class CastingMoldPlanner {
 			var b = BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(d.setup.sourceToMold, i.pose));
 			bodies.set(i.id, b);
 			low = Math.min(low, b.z);
-			if (o.precision.filter(p -> p.insertId == i.id).length != 1 || o.anchorage.filter(p -> p.insertId == i.id).length != 1)
+			if (o.precision.filter(p -> p.insertId == i.id).length != 1)
 				throw "Missing or duplicate insert process record";
 		}
 		var b:MoldBox = {
@@ -621,6 +621,7 @@ class CastingMoldPlanner {
 		ReplicationJigs.validate(p.document.input,p.options.replicationJigs,p.options.precision,p.validation);
 		InterfaceQualification.validate(p.document.input,p.validation);
 		InsertQualifications.validateManufacturing(p.document.input.inserts,p.validation);
+		InsertQualifications.validateAnchorage(p.document.input.inserts,p.validation);
 		if (ToolingCodec.canonical(p.fabrication) != ToolingCodec.canonical(materia.tooling.ToolingValidation.ToolingReadiness.evaluate(p.validation)))
 			throw "Stale fabrication readiness";
 		if (Math.abs(p.document.setup.fillHeightMm - p.cavity.z - p.cavity.height) > 1e-7 || p.document.setup.freeboardMm != 0)

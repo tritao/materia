@@ -36,7 +36,7 @@ class InsertStageTests {
 				materia.casting.InsertOrigin.InsertOriginCodec.record(materia.casting.InsertOrigin.Fabricated(manufacturing))));
 		var source=new CastInsert(values),spec=source.insertSpec();
 		var input:materia.tooling.casting.CastingToolingInput.CastingToolingInsert={id:"staged-insert",body:spec.body,holes:spec.holes,
-			origin:spec.origin,interfaces:spec.interfaces,material:source.insertMaterial(),pose:F.identity(),
+			origin:spec.origin,anchorage:spec.anchorage,interfaces:spec.interfaces,material:source.insertMaterial(),pose:F.identity(),
 			role:materia.casting.InsertSpec.InsertRole.GenericMount,label:"stage test",positionTolerance:0.01,
 			finish:materia.casting.InsertSpec.InsertFinish.AsSupplied};
 		var raw=ToolingInsertCad.component(input),service=ToolingInsertCad.serviceComponent(input);
@@ -81,7 +81,7 @@ class InsertStageTests {
 		near(rawStockHoles[0].frame.z-(cast rawStockHoles[0].threadDepth:Float),first.frame.z-(cast first.threadDepth:Float),
 			"extending tapping through stock preserves usable service thread");
 		var stockInput:materia.tooling.casting.CastingToolingInput.CastingToolingInsert={id:input.id,body:finished.insertSpec().body,
-			holes:finished.insertSpec().holes,origin:finished.insertSpec().origin,interfaces:finished.insertSpec().interfaces,
+			holes:finished.insertSpec().holes,origin:finished.insertSpec().origin,anchorage:finished.insertSpec().anchorage,interfaces:finished.insertSpec().interfaces,
 			material:input.material,pose:input.pose,role:input.role,label:input.label,positionTolerance:input.positionTolerance,finish:input.finish};
 		var rawSchedule=false;
 		for (entity in machinekit.tooling.InsertDrawing.review(stockInput).drawing.entities()) switch entity {

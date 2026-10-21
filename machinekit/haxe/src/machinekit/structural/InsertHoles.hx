@@ -58,13 +58,14 @@ class InsertHoles {
 	/** Flat-bottom blind bore (flat-bottom drill or end mill), followed by tapping.
 	 * Cylindrical depth includes the tip gap and bottoming-tap runout; back wall is
 	 * checked against the actual insert thickness before a recipe is emitted. */
-	public static function tappedBlind(choice:ThreadedHoleChoice, thickness:Float):String {
-		var limits = machinekit.design.ThreadedHolePolicy.resolve(choice.thread, C45Bright);
+	public static function tappedBlind(choice:ThreadedHoleChoice, thickness:Float, material:materia.casting.InsertMaterial = C45Bright):String {
+		var limits = machinekit.design.ThreadedHolePolicy.resolve(choice.thread,material);
 		var depth = thickness - limits.minBack;
 		var usable = depth - choice.thread.pitch * machinekit.design.ThreadedHolePolicy.TAP_RUNOUT_PITCHES;
 		if (usable < limits.minEngagement + limits.minTipGap)
 			throw "Blind insert thread needs thicker stock: " + choice.thread.designation;
 		var holes = records(tappedThrough(choice, thickness));
+		holes[0].limits = machinekit.design.ThreadedHolePolicy.neutral(limits);
 		holes[0].extent = Blind;
 		holes[0].depth = depth;
 		holes[0].threadDepth = usable;

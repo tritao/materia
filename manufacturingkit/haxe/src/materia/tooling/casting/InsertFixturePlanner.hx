@@ -59,8 +59,13 @@ typedef InsertPlatePlan = {
 /** Both mold planners use the same source-thread access and axial depth budget. */
 class InsertFixturePlanner {
 	public static function holes(insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert):Array<InsertHole>
-		return materia.casting.InsertStages.holes({body:insert.body,holes:insert.holes,origin:insert.origin,interfaces:insert.interfaces},
+		return materia.casting.InsertStages.holes({body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces},
 			materia.casting.InsertStages.InsertStage.BeforeCasting);
+
+	public static function availableHoles(insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert):Array<InsertHole> {
+		var occupied=materia.casting.InsertAnchorage.InsertAnchorageCodec.occupiedHoleIds(insert.anchorage);
+		return holes(insert).filter(hole -> occupied.indexOf(hole.id)<0);
+	}
 
 	public static function unresolvedFixing(insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert,
 			pose:AssemblyFrame,face:AssemblyFrame,hardware:ToolingHardware):Bool {
@@ -72,7 +77,7 @@ class InsertFixturePlanner {
 					// Test only whether declaring this existing source hole pre-cast
 					// would enable a fixing. Never mutate or emit that hypothetical route.
 					var spec=materia.casting.InsertSpec.InsertSpecCodec.snapshot({body:insert.body,holes:insert.holes,
-						origin:insert.origin,interfaces:insert.interfaces});
+						origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces});
 					switch spec.origin {
 						case Fabricated(plan):plan.holeRoutes.push({holeId:hole.id,
 							route:materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting});
@@ -187,7 +192,7 @@ class InsertFixturePlanner {
 			var insert = matches[0], count = sites.length;
 			validation = validation.concat(protectionValidation(insert));
 			var pose = F.compose(d.setup.sourceToMold, insert.pose);
-			for (hole in holes(insert)) {
+			for (hole in availableHoles(insert)) {
 				var fixing = select(hole, pose, F.translation(0,0,options.contactZ), hardware);
 				if (fixing == null) continue;
 				var thread:InsertThread = cast hole.thread;
@@ -232,7 +237,7 @@ class InsertFixturePlanner {
 					clearanceDiameter:fixing.clearanceDiameter,washerThickness:choice.washerThickness,
 					driverDiameter:choice.driverDiameter,plug:fixing.plug});
 			}
-			for (hole in holes(insert)) {
+			for (hole in availableHoles(insert)) {
 				if (sites.filter(site -> site.insertId == id && site.sourceHoleId == hole.id).length > 0) continue;
 				var maskId = materia.tooling.ToolingIds.derive("mask-",id,"-"+haxe.crypto.Sha256.encode(hole.id).substr(0,12));
 				var entry = F.compose(pose,hole.frame), axis = F.transformVector(entry,0,0,-1);
@@ -291,7 +296,7 @@ class InsertFixturePlanner {
 
 	public static function protectionValidation(insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert):Array<materia.tooling.ToolingValidation> {
 		var result:Array<materia.tooling.ToolingValidation> = [];
-		for (hole in holes(insert)) {
+		for (hole in availableHoles(insert)) {
 			var thread = hole.thread;
 			if (thread == null)
 				continue;

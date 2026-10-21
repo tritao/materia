@@ -19,6 +19,7 @@ enum abstract InsertOperationKind(String) to String {
 	var Deburr = "deburr";
 	var Clean = "clean";
 	var PrepareBondSurface = "prepare-bond-surface";
+	var FitAnchors = "fit-anchors";
 	var Inspect = "inspect";
 	var MachineInterface = "machine-interface";
 	var GrindInterface = "grind-interface";
@@ -115,6 +116,11 @@ class InsertManufacturingPlan {
 		add("deburr",Deburr,InsertOperationStage.BeforeCasting,[insert.id]);
 		add("clean",Clean,InsertOperationStage.BeforeCasting,[insert.id]);
 		add("bond",PrepareBondSurface,InsertOperationStage.BeforeCasting,[insert.id]);
+		switch insert.anchorage {
+			case Bolted(_,anchors):for (anchor in anchors) add("anchor-"+haxe.crypto.Sha256.encode(anchor.id).substr(0,12),
+				FitAnchors,InsertOperationStage.BeforeCasting,[anchor.id,anchor.holeId]);
+			case Undeclared,CatalogueRetention:
+		}
 		add("inspect",Inspect,InsertOperationStage.BeforeCasting,[insert.id]);
 		var finishing=operations.filter(operation -> operation.kind==MachineInterface || operation.kind==GrindInterface
 			|| operation.kind==ReplicateInterface || operation.kind==AdjustInterface);

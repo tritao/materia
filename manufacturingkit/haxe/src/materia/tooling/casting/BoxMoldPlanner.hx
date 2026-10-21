@@ -80,6 +80,10 @@ class BoxMoldPlanner {
 
 	public static function plan(input:ToolingDocument, ?supportOptions:CoreSupportOptions):MoldPlan {
 		var d = ToolingCodec.snapshot(input), r = d.recipe, e = d.input.envelope;
+		for (insert in d.input.inserts) switch insert.anchorage {
+			case Bolted(_,_):throw "Unsupported non-box anchor occupancy: "+insert.id;
+			default:
+		}
 		var options = CoreSupports.options(supportOptions == null ? CoreSupports.defaults(r) : supportOptions);
 		if (e.length != 1 || e[0].profile.length != 4)
 			throw "Box template needs one rectangular envelope";
@@ -169,7 +173,7 @@ class BoxMoldPlanner {
 			|| Math.abs(volume(clipped(ib, b)) - volume(ib)) > 1e-5)
 			throw "Insert mounting face must seat on bed with fixing bore";
 		var fixings:Array<materia.tooling.casting.CastingMoldPlan.InsertFixtureFixing> = [];
-		for (hole in InsertFixturePlanner.holes(insert)) {
+		for (hole in InsertFixturePlanner.availableHoles(insert)) {
 			var selected = InsertFixturePlanner.select(hole, ip, face, r.hardware);
 			if (selected == null)
 				continue;
@@ -209,7 +213,7 @@ class BoxMoldPlanner {
 					mountingFace: face,
 					panelId: bed.id,
 					fixings: fixings,
-					boreMasks: [for (hole in InsertFixturePlanner.holes(insert)) if (fixings.filter(f -> f.sourceHoleId == hole.id).length == 0) {
+					boreMasks: [for (hole in InsertFixturePlanner.availableHoles(insert)) if (fixings.filter(f -> f.sourceHoleId == hole.id).length == 0) {
 						var entry = F.compose(F.compose(d.setup.sourceToMold, insert.pose), hole.frame), axis = F.transformVector(entry, 0, 0, 1);
 						InsertFixturePlanner.mask(hole, materia.tooling.ToolingIds.derive("mask-", hole.id), r.hardware.plugDepth,
 							{x: -axis.x, y: -axis.y, z: -axis.z});
@@ -297,7 +301,7 @@ class BoxMoldPlanner {
 			op = member.panel.operations.filter(o -> o.id == record.operationId)[0];
 		if (record.sealingFace == null || ToolingCodec.canonical(record.sealingFace) != ToolingCodec.canonical(fixture.mountingFace))
 			throw "Insert sealing face differs from fixture";
-		var holes = InsertFixturePlanner.holes(i).filter(h -> h.id == record.sourceHoleId);
+		var holes = InsertFixturePlanner.availableHoles(i).filter(h -> h.id == record.sourceHoleId);
 		if (holes.length != 1)
 			throw "Insert penetration has no unique source hole";
 		var hole = holes[0], plug = record.plug;
@@ -353,6 +357,7 @@ class BoxMoldPlanner {
 		InterfaceQualification.validate(plan.document.input,plan.validation);
 		FoundationJointQualification.validate(plan.document.input,[],plan.validation);
 		InsertQualifications.validateManufacturing(plan.document.input.inserts,plan.validation);
+		InsertQualifications.validateAnchorage(plan.document.input.inserts,plan.validation);
 		for (source in plan.document.input.inserts) {
 			var stock=InterfaceQualification.finishingStock(plan.document.input,source);
 			var checks=plan.validation.filter(check -> check.rule==stock.rule);
@@ -458,16 +463,16 @@ class BoxMoldPlanner {
 			if (fixture.fixings.length==0) InsertFixturePlanner.validateMissingFixing(insert,
 				F.compose(plan.document.setup.sourceToMold,insert.pose),fixture.mountingFace,plan.document.recipe.hardware,
 				plan.validation,plan.changeRequests);
-			if (fixture.fixings.length + fixture.boreMasks.length != InsertFixturePlanner.holes(insert).length)
+			if (fixture.fixings.length + fixture.boreMasks.length != InsertFixturePlanner.availableHoles(insert).length)
 				throw "Every pre-cast source hole needs a fixing screw or bore mask";
-			for (hole in InsertFixturePlanner.holes(insert)) {
+			for (hole in InsertFixturePlanner.availableHoles(insert)) {
 				var fixingCount = fixture.fixings.filter(f -> f.sourceHoleId == hole.id).length;
 				var maskCount = fixture.boreMasks.filter(m -> m.sourceHoleId == hole.id).length;
 				if (fixingCount + maskCount != 1)
 					throw "Source hole protection must be unique";
 			}
 			for (mask in fixture.boreMasks) {
-				var holes = InsertFixturePlanner.holes(insert).filter(h -> h.id == mask.sourceHoleId);
+				var holes = InsertFixturePlanner.availableHoles(insert).filter(h -> h.id == mask.sourceHoleId);
 				if (holes.length != 1)
 					throw "Bore mask requires a unique source hole";
 				var hole = holes[0];
@@ -479,7 +484,7 @@ class BoxMoldPlanner {
 					throw "Bore mask differs from source hole depth budget";
 			}
 			for (fixing in fixture.fixings) {
-				var holes = InsertFixturePlanner.holes(insert).filter(h -> h.id == fixing.sourceHoleId);
+				var holes = InsertFixturePlanner.availableHoles(insert).filter(h -> h.id == fixing.sourceHoleId);
 				if (holes.length != 1 || holes[0].thread == null || seenHoles.exists(fixing.sourceHoleId))
 					throw "Fixing requires a unique source steel thread";
 				seenHoles.set(fixing.sourceHoleId, true);

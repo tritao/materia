@@ -249,7 +249,11 @@ class MillFabricationPreview {
 				records[0].status = "pass";
 				records[0].severity = "error";
 			}, "severity/status consistency");
-			rejectsManifest(m -> m.version = 5, "Unsupported tooling manifest");
+			rejectsManifest(m -> m.version = 6, "Unsupported tooling manifest");
+			rejectsManifest(m -> {
+				var files:Array<Dynamic> = cast m.files;
+				m.files = files.filter(file -> file.path != "insert-anchorage.json");
+			}, "Missing hashed source manufacturing artifact: insert-anchorage.json");
 			ToolingPackageManifest.verify(dir);
 			var unknown = new machinekit.tooling.ToolingBlock();
 			if (ToolingFabricationExport.classify(unknown).classification != UnsupportedHardware)
@@ -288,9 +292,21 @@ class MillFabricationPreview {
 			sys.io.File.saveContent(replicationPath,savedReplication);
 			if (replicationError.indexOf("Replication report differs from source")<0)
 				throw "Writer accepted a replication report inconsistent with source: "+replicationError;
-			var omittedChecks=checks.filter(check -> check.rule.indexOf("fabrication.insert.")!=0);
+			var anchoragePath=dir+"/insert-anchorage.json";
+			var savedAnchorage=sys.io.File.getContent(anchoragePath);
+			var alteredAnchorage:Dynamic=haxe.Json.parse(savedAnchorage);
+			alteredAnchorage.validation=new Array<Dynamic>();
+			sys.io.File.saveContent(anchoragePath,ToolingCodec.canonical(alteredAnchorage));
+			var anchorageError="";
+			try ToolingPackageManifest.write(dir,f,checks) catch (error:Dynamic) anchorageError=Std.string(error);
+			sys.io.File.saveContent(anchoragePath,savedAnchorage);
+			if (anchorageError.indexOf("Insert anchorage source validation omitted or changed")<0)
+				throw "Writer accepted an anchorage report inconsistent with source: "+anchorageError;
+			var omittedChecks=checks.filter(check -> check.rule.indexOf("fabrication.insert.")!=0
+				&& !StringTools.startsWith(check.rule,"tooling.insert.anchorage."));
 			var omittedFabrication=f.validation;
-			f.validation=f.validation.filter(check -> check.rule.indexOf("fabrication.insert.")!=0);
+			f.validation=f.validation.filter(check -> check.rule.indexOf("fabrication.insert.")!=0
+				&& !StringTools.startsWith(check.rule,"tooling.insert.anchorage."));
 			ToolingPackageManifest.write(dir,f,omittedChecks);
 			f.validation=omittedFabrication;
 			var recovered:Dynamic=haxe.Json.parse(sys.io.File.getContent(manifestPath));

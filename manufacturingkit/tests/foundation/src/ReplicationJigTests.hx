@@ -128,7 +128,7 @@ class ReplicationJigTests {
 		var a=source.interfaces[0],b=source.interfaces[1];source.interfaces=[];
 		source.inserts=[for (r in [a,b]) {id:r.id,body:materia.casting.InsertSpec.InsertBody.Primitive(Box(40,30,20)),
 			holes:new Array<materia.casting.InsertHole>(),interfaces:[r],
-			origin:materia.casting.InsertOrigin.Fabricated(materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(material)),
+			anchorage:materia.casting.InsertAnchorage.Undeclared,origin:materia.casting.InsertOrigin.Fabricated(materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(material)),
 			material:material,pose:F.identity(),role:materia.casting.InsertSpec.InsertRole.GuideSeat,label:"synthetic jig selection",
 			positionTolerance:0.01,finish:materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting}];
 		var relation:InterfaceRelationship={id:"rail-planes",kind:Coplanar,

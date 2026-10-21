@@ -8,6 +8,11 @@ import materia.tooling.process.FillAnalysis;
 class CastingBoxSupport {
 	public static function check(input:CastingToolingInput, rule:String):Array<ToolingValidation> {
 		var checks:Array<ToolingValidation> = [];
+		for (insert in input.inserts) switch insert.anchorage {
+			case Bolted(_,_):checks.push(FillAnalysis.check(rule+".anchors."+insert.id,[insert.id],Unsupported,
+				"Unsupported non-box anchor occupancy: "+insert.id+"; use exact native regions, never box substitutes",[]));
+			default:
+		}
 		for (cavity in CastingCavities.derive(input.envelope, input.features))
 			if (!CastingCavities.supportsBoxes(cavity))
 				checks.push(FillAnalysis.check(rule + "." + cavity.featureId, [cavity.featureId], Unsupported,

@@ -155,9 +155,9 @@ class CastingMoldExport {
 	}
 
 	static function scene(dir:String, id:String, a:MachineAssembly, plan:CastingMoldPlan, review:CastingMoldCad.CastingMoldReview):Void {
-		var data=AssemblyPreview.scene(a,id);
-		data.presentation=ToolingPresentation.casting(plan,data,review);
-		sys.io.File.saveBytes(dir+"/"+id+".mtrg",SceneArtifact.encode(data));
+		var sceneData=AssemblyPreview.scene(a,id);
+		sceneData.presentation=ToolingPresentation.casting(plan,sceneData,review);
+		sys.io.File.saveBytes(dir+"/"+id+".mtrg",SceneArtifact.encode(sceneData));
 		var rows:Array<Dynamic> = [], poses = a.solvedPoses();
 		for (row in a.components()) {
 			var mesh = AssemblyPreview.part(row.id, row.id, row.component.geometry(), row.component.materialId),

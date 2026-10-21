@@ -17,6 +17,7 @@ typedef CastingToolingInsert = {
 	var body:materia.casting.InsertSpec.InsertBody;
 	var holes:Array<InsertHole>;
 	var origin:materia.casting.InsertOrigin;
+	var anchorage:materia.casting.InsertAnchorage;
 	var interfaces:Array<materia.casting.InterfaceRequirement>;
 	var material:materia.casting.InsertMaterial.InsertMaterialSpec;
 	var pose:AssemblyFrame;
