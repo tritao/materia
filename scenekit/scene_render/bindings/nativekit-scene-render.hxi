@@ -165,7 +165,7 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		visible_items: u64 @offset(80);
 		culled_items: u64 @offset(88);
 	}
-	struct nkscene_render_view @layout(552, 8) {
+	struct nkscene_render_view @layout(584, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		root: nkscene_node_id @offset(8);
 		include_invisible: u32 @offset(16);
@@ -236,6 +236,13 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		studio_environment_enabled: u32 @offset(516);
 		studio_light_radii: array<f32, 4> @offset(520);
 		studio_environment: array<f32, 4> @offset(536);
+		/**
+		 * Optional edge contrast with a studio environment: CAD edges of parts whose base colour has a linear
+		 * luminance below edges_on_dark.w are drawn edges_on_dark.rgb, others edges_on_light.rgb (display
+		 * colours). Zero luminance keeps one dark edge colour for every part.
+		 */
+		studio_edges_on_light: array<f32, 4> @offset(552);
+		studio_edges_on_dark: array<f32, 4> @offset(568);
 	}
 	struct nkscene_render_visibility_override @layout(16, 8) {
 		node: nkscene_node_id @offset(0);

@@ -76,6 +76,9 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
     const bool has_studio_environment =
         input->struct_size >= offsetof(nkscene_render_view, studio_environment) +
                                   sizeof(input->studio_environment);
+    const bool has_studio_edges =
+        input->struct_size >= offsetof(nkscene_render_view, studio_edges_on_dark) +
+                                  sizeof(input->studio_edges_on_dark);
     if ((has_diagnostic_overrides && input->diagnostic_override_count != 0 && !input->diagnostic_overrides) ||
         (input->visibility_override_count != 0 && !input->visibility_overrides) ||
         (input->material_override_count != 0 && !input->material_overrides) ||
@@ -229,6 +232,19 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
             output.studio_lighting.environment = true;
             output.studio_lighting.reflection = reflection;
             output.studio_lighting.exposure = exposure;
+            if (has_studio_edges) {
+                for (uint32_t axis = 0; axis < 4; ++axis)
+                    if (!std::isfinite(input->studio_edges_on_light[axis]) || input->studio_edges_on_light[axis] < 0.0f ||
+                        input->studio_edges_on_light[axis] > 1.0f || !std::isfinite(input->studio_edges_on_dark[axis]) ||
+                        input->studio_edges_on_dark[axis] < 0.0f || input->studio_edges_on_dark[axis] > 1.0f)
+                        return NKS_ERROR_INVALID_ARGUMENT;
+                if (input->studio_edges_on_dark[3] > 0.0f)
+                    for (uint32_t axis = 0; axis < 3; ++axis) {
+                        output.studio_lighting.edges_on_light[axis] = input->studio_edges_on_light[axis];
+                        output.studio_lighting.edges_on_dark[axis] = input->studio_edges_on_dark[axis];
+                    }
+                output.studio_lighting.edge_contrast_luminance = input->studio_edges_on_dark[3];
+            }
         }
     }
     if (input->struct_size >= offsetof(nkscene_render_view, studio_surface_detail) + sizeof(input->studio_surface_detail)) {

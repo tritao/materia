@@ -147,6 +147,11 @@ typedef struct nkscene_render_view {
     uint32_t studio_environment_enabled NK_BOOL32;
     float studio_light_radii[4];
     float studio_environment[4];
+    /** Optional edge contrast with a studio environment: CAD edges of parts whose base colour has a linear
+        luminance below edges_on_dark.w are drawn edges_on_dark.rgb, others edges_on_light.rgb (display
+        colours). Zero luminance keeps one dark edge colour for every part. */
+    float studio_edges_on_light[4];
+    float studio_edges_on_dark[4];
 } nkscene_render_view;
 
 /* ------------------------------------------------------------------------- */

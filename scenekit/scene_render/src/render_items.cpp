@@ -479,6 +479,11 @@ std::uint64_t view_signature(const SceneView &view) noexcept {
         add(view.studio_lighting.environment ? 1 : 0);
         add(std::hash<float>{}(view.studio_lighting.reflection));
         add(std::hash<float>{}(view.studio_lighting.exposure));
+        for (const auto value : view.studio_lighting.edges_on_light)
+            add(std::hash<float>{}(value));
+        for (const auto value : view.studio_lighting.edges_on_dark)
+            add(std::hash<float>{}(value));
+        add(std::hash<float>{}(view.studio_lighting.edge_contrast_luminance));
     }
     add(view.clip_planes.size());
     for (const auto &plane : view.clip_planes) {

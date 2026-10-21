@@ -1023,7 +1023,21 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
             for (unsigned row = 0; row < 4; ++row)
                 viewport.depth_unprojection[row] = inverse[8 + row];
     }
-    const std::array<float, 4> color{0.035f, 0.045f, 0.055f, 1.0f};
+    // CAD edges contrast with their part: light on dark surfaces, dark on light ones (StudioLighting).
+    const auto &studio = plan.studio_lighting();
+    const auto edge_color = [&studio](const MaterialResource *material) {
+        const auto &light = studio.edges_on_light, &dark = studio.edges_on_dark;
+        if (studio.edge_contrast_luminance > 0.0f && material) {
+            const auto linear = [](float value) {
+                return value <= 0.04045f ? value / 12.92f : std::pow((value + 0.055f) / 1.055f, 2.4f);
+            };
+            const auto &base = material->state->base_color;
+            const auto luminance = 0.2126f * linear(base[0]) + 0.7152f * linear(base[1]) + 0.0722f * linear(base[2]);
+            if (luminance < studio.edge_contrast_luminance)
+                return std::array<float, 4>{dark[0], dark[1], dark[2], 1.0f};
+        }
+        return std::array<float, 4>{light[0], light[1], light[2], 1.0f};
+    };
     const auto clip_data = clip_uniform_data(plan);
     for (const auto &batch : state.batches) {
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
@@ -1034,6 +1048,7 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
         const auto *material = snapshot.find_material(batch.key.material);
         if (material && material_is_invisible(*material->state))
             continue;
+        const auto color = edge_color(material);
         auto result = nkgpu_apply_pipeline(state.renderer, stroke_pipeline);
         if (result == NKGPU_OK)
             result = nkgpu_apply_uniform_data(state.renderer, 1,

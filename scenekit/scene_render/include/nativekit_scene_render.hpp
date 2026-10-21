@@ -164,6 +164,11 @@ struct StudioLighting {
     float reflection = 0.6f;
     /** Exposure before PBR Neutral tone mapping; zero shows clamped colour without tone mapping. */
     float exposure = 0.0f;
+    /** CAD edge colours (display RGB): on light surfaces, and on surfaces whose base colour's linear luminance
+        is below `edge_contrast_luminance`; zero luminance keeps the light-surface colour everywhere. */
+    std::array<float, 3> edges_on_light{0.035f, 0.045f, 0.055f};
+    std::array<float, 3> edges_on_dark{0.035f, 0.045f, 0.055f};
+    float edge_contrast_luminance = 0.0f;
 };
 
 struct WorkplaneGrid {

@@ -123,6 +123,21 @@ class SceneView {
 		return this;
 	}
 
+	/** CAD edge colours with a studio environment (display RGB): `onLight` on most parts, `onDark` on parts whose
+	 *  base colour has a linear luminance below `contrastLuminance`. Call after setStudioEnvironment. */
+	public function setStudioEdges(onLight:Array<Float>, onDark:Array<Float>, contrastLuminance:Float):SceneView {
+		if (onLight.length != 3 || onDark.length != 3) throw "invalid studio edge colours";
+		for (value in onLight.concat(onDark).concat([contrastLuminance]))
+			if (!Math.isFinite(value) || value < 0 || value > 1) throw "invalid studio edge colours";
+		for (index in 0...3) {
+			value.set_studio_edges_on_light(index, onLight[index]);
+			value.set_studio_edges_on_dark(index, onDark[index]);
+		}
+		value.set_studio_edges_on_light(3, 0.0);
+		value.set_studio_edges_on_dark(3, contrastLuminance);
+		return this;
+	}
+
 	/** Display-only depth AO and highlight broadening. Radius uses scene world units; zero strength disables AO. */
 	public function setStudioDetail(radius:Float, strength:Float = 0.6, bias:Float = 0.08, roughnessFloor:Float = 0.4):SceneView {
 		for (parameter in [radius,strength,bias,roughnessFloor])

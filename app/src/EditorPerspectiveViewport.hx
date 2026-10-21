@@ -534,6 +534,7 @@ class EditorPerspectiveViewport implements View {
       }
       view.setStudioLighting(directions, look.sky, look.ground, colors);
       view.setStudioEnvironment([for (light in look.lights) light.radius], look.reflection, look.exposure);
+      view.setStudioEdges(ViewportLook.edgeOnLight(), ViewportLook.edgeOnDark(), ViewportLook.EdgeContrastLuminance);
       view.setStudioDetail(look.occlusionRadius, look.occlusionStrength, look.occlusionBias, look.roughnessFloor);
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
