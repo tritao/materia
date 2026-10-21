@@ -38,9 +38,30 @@ class RecipeContractTests {
 		check(cupBom.lines().length == 2, "Different cup fittings must have different BOM identities");
 		checkRebuild(new SuctionCup(40, 18, 900, 0.2, "CUP-CUSTOM", Thread("G1/8"), "Custom cup"));
 		checkRebuild(new VacuumGenerator(80, "GEN-CUSTOM", PushIn(4), Thread("G1/4"), "Custom generator"));
-		for (type in MachineKitComponents.defaultRegistry().all())
-			check(MachineKitComponents.defaultRegistry().category(type.id) != null && MachineKitComponents.defaultRegistry().kind(type.id) != null,
+		// Only MachineKit's own recipes: applications may register unclassified ones into the default registry.
+		var builtIn = MachineKitComponents.standard();
+		for (type in builtIn.all())
+			check(builtIn.category(type.id) != null && builtIn.kind(type.id) != null,
 				'${type.id}: built-in recipe has no catalogue category (ComponentClassification)');
+		// The preview is drawn inside the clearance envelope collision and layout checks use (COMPONENT_GEOMETRY_PLAN G2).
+		for (type in builtIn.all()) {
+			var component:MachineComponent;
+			try component = type.create(fixtureValues(type)) catch (_:Dynamic) continue;
+			if (!component.hasGeometry()) continue;
+			var preview = component.geometry(Preview), envelope = component.geometry(Envelope);
+			var inner = preview.shape.bounds(), outer = envelope.shape.bounds();
+			// A threaded part's envelope is its thread root, so its crests may enter a mating thread; a thread is
+			// never deeper than its pitch (metric about 0.61 P, trapezoidal about 0.5 P plus clearance).
+			var tolerance = 1e-3;
+			for (thread in preview.shape.threadedFaces())
+				tolerance = Math.max(tolerance, thread.spec.pitch + 1e-3);
+			preview.close();
+			envelope.close();
+			check(inner.get_min().get_x() >= outer.get_min().get_x() - tolerance && inner.get_min().get_y() >= outer.get_min().get_y() - tolerance
+				&& inner.get_min().get_z() >= outer.get_min().get_z() - tolerance && inner.get_max().get_x() <= outer.get_max().get_x() + tolerance
+				&& inner.get_max().get_y() <= outer.get_max().get_y() + tolerance && inner.get_max().get_z() <= outer.get_max().get_z() + tolerance,
+				'${type.id}: preview extends outside its envelope');
+		}
 		for (type in MachineKitComponents.defaultRegistry().all()) {
 			for (parameter in type.parameters())
 				switch parameter.type {

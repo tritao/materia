@@ -69,8 +69,11 @@ class HeatedBed extends MachineComponent {
 		return new ComponentValues().setToken("designation", designation).setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part {
+		// The envelope is the whole slab, heater pad included: the pad below the plate takes up real space.
+		if (detail == Envelope)
+			return Solids.named(Part.box(spec.width, spec.depth, spec.plateThickness + spec.padThickness)
+				.translated(new cadkit.modeling.Vector(0, 0, -spec.plateThickness - spec.padThickness)), "bed-envelope");
 		var plate = Solids.named(Part.box(spec.width, spec.depth, spec.plateThickness).translated(new cadkit.modeling.Vector(0, 0, -spec.plateThickness)), "plate");
-		if (detail == Envelope) return plate;
 		var pad = Solids.named(Part.box(spec.width, spec.depth, spec.padThickness)
 			.translated(new cadkit.modeling.Vector(0, 0, -spec.plateThickness - spec.padThickness)), "heater");
 		return Solids.union([plate, pad]);
