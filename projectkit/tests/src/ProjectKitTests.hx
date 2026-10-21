@@ -1383,6 +1383,7 @@ class ProjectKitTests {
   }
 
   static function main():Void {
+    PresentationTests.run();
     assertions += DrawingProjectionTests.run();
     SceneScrewTests.run();
     SceneScrewFeederTests.run();

@@ -13,6 +13,8 @@ import materia.project.Appearance.Appearances;
 import materia.project.MaterialLibrary;
 import materia.project.MeshMassProperties;
 import materia.units.LengthUnit;
+import materia.presentation.AssemblyPresentation;
+import materia.presentation.PresentationCodec;
 
 typedef SceneArtifactFaceRange = {
 	var faceIndex:Int;
@@ -65,6 +67,8 @@ typedef SceneArtifactData = {
 	/** Geometry definitions are parts; occurrences live in this separate kinematic definition. */
 	@:optional var assemblyDefinition:AssemblyDefinition;
 	@:optional var assemblyState:AssemblyStateRecord;
+	/** Render-only views, display offsets and procedures. */
+	@:optional var presentation:AssemblyPresentation;
 	/** Optional editable source document for generated parts. */
 	@:optional var recipeDocument:String;
 	@:optional var recipeDiagnostics:Array<String>;
@@ -922,7 +926,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 41;
+	public static inline var VERSION:Int = 42;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -939,6 +943,9 @@ class SceneArtifact {
 			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
 		var assemblyState = data.assemblyState == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encodeState(data.assemblyDefinition, data.assemblyState));
+		var presentation = data.presentation == null ? Bytes.alloc(0)
+			: Bytes.ofString(PresentationCodec.encode(data.assemblyDefinition, data.presentation));
+		if (presentation.length > 2000000) throw "Scene artifact presentation is too large";
 		var recipeDocument = data.recipeDocument == null ? Bytes.alloc(0) : Bytes.ofString(data.recipeDocument);
 		var recipeDiagnostics = data.recipeDiagnostics == null ? Bytes.alloc(0)
 			: Bytes.ofString(haxe.Json.stringify(data.recipeDiagnostics));
@@ -966,7 +973,7 @@ class SceneArtifact {
 		if (controllers.length > 100000 || signals.length > 100000) throw "Scene artifact cell wiring is too large";
 		var printing = data.printing == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.printing));
 		if (printing.length > 40000000) throw "Scene artifact print job is too large";
-		var length = 36 + unitText.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
+		var length = 40 + presentation.length + unitText.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
 			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4 + machineMotion.length + 4
 			+ controllers.length + 4 + signals.length + 4 + project.length + 4
 			+ printing.length + 4;
@@ -1068,6 +1075,8 @@ class SceneArtifact {
 		result.blit(offset, assemblyDefinition, 0, assemblyDefinition.length); offset += assemblyDefinition.length;
 		offset = putInt(result, offset, assemblyState.length);
 		result.blit(offset, assemblyState, 0, assemblyState.length); offset += assemblyState.length;
+		offset = putInt(result, offset, presentation.length);
+		result.blit(offset, presentation, 0, presentation.length); offset += presentation.length;
 		offset = putInt(result, offset, recipeDocument.length);
 		result.blit(offset, recipeDocument, 0, recipeDocument.length); offset += recipeDocument.length;
 		offset = putInt(result, offset, recipeDiagnostics.length);
@@ -1415,6 +1424,10 @@ class SceneArtifact {
 		}
 		if (data.assemblyState != null && data.assemblyDefinition == null)
 			throw "Scene artifact assembly state has no definition";
+		if (data.presentation != null) {
+			if (data.assemblyDefinition == null) throw "Scene artifact presentation has no definition";
+			PresentationCodec.validate(data.assemblyDefinition, data.presentation);
+		}
 		var assemblyDefinition = data.assemblyDefinition;
 		if (assemblyDefinition != null) {
 			AssemblyDefinitionCodec.validate(assemblyDefinition);
@@ -3415,6 +3428,13 @@ private class SceneArtifactReader {
 			assemblyState = AssemblyDefinitionCodec.decodeState(assemblyDefinition,
 				readString(stateLength));
 		}
+		var presentation:Null<AssemblyPresentation> = null;
+		var presentationLength = readInt();
+		if (presentationLength < 0 || presentationLength > 2000000) throw "Scene artifact presentation is too large";
+		if (presentationLength > 0) {
+			if (assemblyDefinition == null) throw "Scene artifact presentation has no definition";
+			presentation = PresentationCodec.decode(assemblyDefinition, readString(presentationLength));
+		}
 		var recipeDocument:Null<String> = null;
 		var documentLength = readInt();
 		if (documentLength < 0 || documentLength > 2000000)
@@ -3488,7 +3508,7 @@ private class SceneArtifactReader {
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts,
-			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
+			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, presentation:presentation, recipeDocument: recipeDocument,
 			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, missions: missions,
 			robotTools: robotTools, robotSensors: robotSensors, machineMotion: machineMotion,
 			controllers: controllers, signals: signals, project: project,

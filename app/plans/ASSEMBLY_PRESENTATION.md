@@ -142,6 +142,11 @@ Notes:
 ## Phases
 
 ### AP0 — Data model and validation (projectkit)
+Implementation status: implemented in `projectkit/src/materia/presentation`, with
+coverage in `projectkit/tests/src/PresentationTests.hx`. Scene artifact version 42
+transports the validated optional record. This does not complete AP1–AP7: the
+existing viewer and producers still use their original presentation mechanisms.
+
 `materia.presentation` types, codec, a validator (selectors resolve, view ids
 unique, `defaultView` exists, stages ≥ 1, checked motions carry a fingerprint) and
 the pure `PresentationFrame` evaluator: (definition, solved poses, presentation,
