@@ -1,4 +1,8 @@
 {
+ "display": {
+  "exposure": 1,
+  "toneMapping": "neutral"
+ },
  "components": [
   {
    "id": "machinekit.assembly.carriage",
@@ -191,7 +195,12 @@
     "kg": 0.619275,
     "source": "Computed(Preview)"
    },
-   "model": "assembly-carriage.glb"
+   "model": "assembly-carriage.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.assembly.hzmotion-drawing-component",
@@ -306,7 +315,12 @@
     "kg": 0.79,
     "source": "Declared"
    },
-   "model": "assembly-hzmotion-drawing-component.glb"
+   "model": "assembly-hzmotion-drawing-component.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.assembly.hzmotion-supplier-component",
@@ -525,7 +539,12 @@
     "kg": 0.056018,
     "source": "Computed(Preview)"
    },
-   "model": "assembly-nema-mount-plate.glb"
+   "model": "assembly-nema-mount-plate.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.assembly.rbk-motor-mount",
@@ -635,7 +654,12 @@
     "kg": 0.04666,
     "source": "Computed(Preview)"
    },
-   "model": "assembly-screw-axis-coupling.glb"
+   "model": "assembly-screw-axis-coupling.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.assembly.sfu20-axis-part",
@@ -743,7 +767,12 @@
     "kg": 6.990185,
     "source": "Computed(Preview)"
    },
-   "model": "assembly-sfu20-axis-part.glb"
+   "model": "assembly-sfu20-axis-part.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.assembly.twin-rail-screw-part",
@@ -888,7 +917,12 @@
     "kg": 2.856526,
     "source": "Computed(Preview)"
    },
-   "model": "assembly-twin-rail-screw-part.glb"
+   "model": "assembly-twin-rail-screw-part.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.control.cnc-controller",
@@ -985,7 +1019,12 @@
     "kg": 24.4944,
     "source": "Computed(Preview)"
    },
-   "model": "control-cnc-controller.glb"
+   "model": "control-cnc-controller.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.control.control-cabinet",
@@ -1126,7 +1165,12 @@
     "kg": 35.893591,
     "source": "Computed(Preview)"
    },
-   "model": "control-control-cabinet.glb"
+   "model": "control-control-cabinet.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.control.digital-sensor",
@@ -1209,7 +1253,12 @@
     "kg": 0.002304,
     "source": "Computed(Preview)"
    },
-   "model": "control-digital-sensor.glb"
+   "model": "control-digital-sensor.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.control.emergency-stop-button",
@@ -1310,7 +1359,12 @@
     "kg": 0.380897,
     "source": "Computed(Preview)"
    },
-   "model": "control-emergency-stop-button.glb"
+   "model": "control-emergency-stop-button.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.control.robot-controller",
@@ -1407,7 +1461,12 @@
     "kg": 24.4944,
     "source": "Computed(Preview)"
    },
-   "model": "control-robot-controller.glb"
+   "model": "control-robot-controller.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.control.safety-relay",
@@ -1527,7 +1586,12 @@
     "kg": 4.239,
     "source": "Computed(Preview)"
    },
-   "model": "control-safety-relay.glb"
+   "model": "control-safety-relay.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.control.thermistor-input",
@@ -1641,7 +1705,12 @@
     "kg": 0.00288,
     "source": "Computed(Preview)"
    },
-   "model": "control-thermistor-input.glb"
+   "model": "control-thermistor-input.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.enclosure.cut-panel",
@@ -1738,7 +1807,12 @@
     "kg": 7.379,
     "source": "Declared"
    },
-   "model": "enclosure-cut-panel.glb"
+   "model": "enclosure-cut-panel.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.enclosure.panel",
@@ -1801,7 +1875,12 @@
     "kg": 3.456,
     "source": "Declared"
    },
-   "model": "enclosure-panel.glb"
+   "model": "enclosure-panel.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.enclosure.tray-toe-clamp",
@@ -1885,7 +1964,12 @@
     "kg": 0.055632,
     "source": "Computed(Preview)"
    },
-   "model": "enclosure-tray-toe-clamp.glb"
+   "model": "enclosure-tray-toe-clamp.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.expanding-mandrel",
@@ -2184,7 +2268,12 @@
     "kg": 1.028693,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-expanding-mandrel.glb"
+   "model": "hobbing-expanding-mandrel.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.flexspline-cup-blank",
@@ -2326,7 +2415,12 @@
     "kg": 0.092712,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-flexspline-cup-blank.glb"
+   "model": "hobbing-flexspline-cup-blank.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.floating-radial-bearing",
@@ -2472,7 +2566,12 @@
     "kg": 0.044109,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-floating-radial-bearing.glb"
+   "model": "hobbing-floating-radial-bearing.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.hob",
@@ -2756,7 +2855,12 @@
     "kg": 0.349848,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-hob.glb"
+   "model": "hobbing-hob.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.hob-arbor",
@@ -2939,7 +3043,12 @@
     "kg": 0.196075,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-hob-arbor.glb"
+   "model": "hobbing-hob-arbor.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.hobber-bracket",
@@ -3073,7 +3182,12 @@
     "kg": 6.28,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-hobber-bracket.glb"
+   "model": "hobbing-hobber-bracket.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.mandrel-sleeve",
@@ -3194,7 +3308,12 @@
     "kg": 0.034033,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-mandrel-sleeve.glb"
+   "model": "hobbing-mandrel-sleeve.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.outboard-support",
@@ -3362,7 +3481,12 @@
     "kg": 1.645999,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-outboard-support.glb"
+   "model": "hobbing-outboard-support.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.rotary-clamp",
@@ -3505,7 +3629,12 @@
     "kg": 0.499395,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-rotary-clamp.glb"
+   "model": "hobbing-rotary-clamp.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.saddle",
@@ -3624,7 +3753,12 @@
     "kg": 9.201968,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-saddle.glb"
+   "model": "hobbing-saddle.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.spindle-housing",
@@ -3753,7 +3887,12 @@
     "kg": 1.675831,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-spindle-housing.glb"
+   "model": "hobbing-spindle-housing.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.spindle-part",
@@ -3858,7 +3997,12 @@
     "kg": 0.690351,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-spindle-part.glb"
+   "model": "hobbing-spindle-part.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.swivel-housing",
@@ -3987,7 +4131,12 @@
     "kg": 2.465522,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-swivel-housing.glb"
+   "model": "hobbing-swivel-housing.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.table-housing",
@@ -4130,7 +4279,12 @@
     "kg": 6.941349,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-table-housing.glb"
+   "model": "hobbing-table-housing.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.hobbing.table-platen",
@@ -4287,7 +4441,12 @@
     "kg": 3.045696,
     "source": "Computed(Preview)"
    },
-   "model": "hobbing-table-platen.glb"
+   "model": "hobbing-table-platen.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.ball-nut-bracket",
@@ -4365,7 +4524,12 @@
     "kg": 0.353731,
     "source": "Computed(Preview)"
    },
-   "model": "milling-ball-nut-bracket.glb"
+   "model": "milling-ball-nut-bracket.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.belt-motor-plate",
@@ -4438,7 +4602,12 @@
     "kg": 0.560855,
     "source": "Computed(Preview)"
    },
-   "model": "milling-belt-motor-plate.glb"
+   "model": "milling-belt-motor-plate.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.bt30-cartridge-study",
@@ -4523,7 +4692,12 @@
     "kg": 7.611086,
     "source": "Computed(Preview)"
    },
-   "model": "milling-bt30-cartridge-study.glb"
+   "model": "milling-bt30-cartridge-study.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.bt30-spindle-motor-study",
@@ -4604,7 +4778,12 @@
     "kg": 2.906917,
     "source": "Computed(Preview)"
    },
-   "model": "milling-bt30-spindle-motor-study.glb"
+   "model": "milling-bt30-spindle-motor-study.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.casting",
@@ -4713,7 +4892,12 @@
     "kg": 58.640115,
     "source": "Computed(Preview)"
    },
-   "model": "milling-casting.glb"
+   "model": "milling-casting.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.cross-saddle",
@@ -4911,7 +5095,12 @@
     "kg": 37.105497,
     "source": "Computed(Preview)"
    },
-   "model": "milling-cross-saddle.glb"
+   "model": "milling-cross-saddle.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.cross-table",
@@ -5035,7 +5224,12 @@
     "kg": 29.401118,
     "source": "Computed(Preview)"
    },
-   "model": "milling-cross-table.glb"
+   "model": "milling-cross-table.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.drive-service-hatch",
@@ -5122,7 +5316,12 @@
     "kg": 0.326817,
     "source": "Computed(Preview)"
    },
-   "model": "milling-drive-service-hatch.glb"
+   "model": "milling-drive-service-hatch.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.er20-holder",
@@ -5199,7 +5398,12 @@
     "kg": 0.172631,
     "source": "Computed(Preview)"
    },
-   "model": "milling-er20-holder.glb"
+   "model": "milling-er20-holder.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.fixture-adapter",
@@ -5288,7 +5492,12 @@
     "kg": 5.319406,
     "source": "Computed(Preview)"
    },
-   "model": "milling-fixture-adapter.glb"
+   "model": "milling-fixture-adapter.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.flat-end-mill",
@@ -5382,7 +5591,12 @@
     "kg": 0.006031,
     "source": "Computed(Preview)"
    },
-   "model": "milling-flat-end-mill.glb"
+   "model": "milling-flat-end-mill.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.hzmotion-y-drive-seat",
@@ -5460,7 +5674,12 @@
     "kg": 0.790487,
     "source": "Computed(Preview)"
    },
-   "model": "milling-hzmotion-y-drive-seat.glb"
+   "model": "milling-hzmotion-y-drive-seat.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.motor-cover",
@@ -5554,7 +5773,12 @@
     "kg": 1.346934,
     "source": "Computed(Preview)"
    },
-   "model": "milling-motor-cover.glb"
+   "model": "milling-motor-cover.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.panel",
@@ -5652,7 +5876,12 @@
     "kg": 0.157,
     "source": "Computed(Preview)"
    },
-   "model": "milling-panel.glb"
+   "model": "milling-panel.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.power-drawbar-study-part",
@@ -5735,7 +5964,12 @@
     "kg": 0.151101,
     "source": "Computed(Preview)"
    },
-   "model": "milling-power-drawbar-study-part.glb"
+   "model": "milling-power-drawbar-study-part.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.rke92-reference-part",
@@ -5830,7 +6064,12 @@
     "kg": 10.867791,
     "source": "Computed(Preview)"
    },
-   "model": "milling-rke92-reference-part.glb"
+   "model": "milling-rke92-reference-part.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.screw-pedestal",
@@ -5929,7 +6168,12 @@
     "kg": 0.812147,
     "source": "Computed(Preview)"
    },
-   "model": "milling-screw-pedestal.glb"
+   "model": "milling-screw-pedestal.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.servo-mount",
@@ -6023,7 +6267,12 @@
     "kg": 1.877663,
     "source": "Computed(Preview)"
    },
-   "model": "milling-servo-mount.glb"
+   "model": "milling-servo-mount.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.spindle-belt-guard",
@@ -6101,7 +6350,12 @@
     "kg": 0.355581,
     "source": "Computed(Preview)"
    },
-   "model": "milling-spindle-belt-guard.glb"
+   "model": "milling-spindle-belt-guard.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.spindle-cartridge",
@@ -6186,7 +6440,12 @@
     "kg": 4.641171,
     "source": "Computed(Preview)"
    },
-   "model": "milling-spindle-cartridge.glb"
+   "model": "milling-spindle-cartridge.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.spindle-drive-study-guard",
@@ -6370,7 +6629,12 @@
     "kg": 1.461582,
     "source": "Computed(Preview)"
    },
-   "model": "milling-spindle-drive-study-guard.glb"
+   "model": "milling-spindle-drive-study-guard.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.spindle-drive-study-part",
@@ -6554,7 +6818,12 @@
     "kg": 6.603803,
     "source": "Computed(Preview)"
    },
-   "model": "milling-spindle-drive-study-part.glb"
+   "model": "milling-spindle-drive-study-part.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.spindle-motor",
@@ -6640,7 +6909,12 @@
     "kg": 2.748265,
     "source": "Computed(Preview)"
    },
-   "model": "milling-spindle-motor.glb"
+   "model": "milling-spindle-motor.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.spindle-motor-mount",
@@ -6725,7 +6999,12 @@
     "kg": 1.980079,
     "source": "Computed(Preview)"
    },
-   "model": "milling-spindle-motor-mount.glb"
+   "model": "milling-spindle-motor-mount.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.spindle-motor-support",
@@ -6805,7 +7084,12 @@
     "kg": 0.550128,
     "source": "Computed(Preview)"
    },
-   "model": "milling-spindle-motor-support.glb"
+   "model": "milling-spindle-motor-support.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.support-tray",
@@ -6906,7 +7190,12 @@
     "kg": 13.348014,
     "source": "Computed(Preview)"
    },
-   "model": "milling-support-tray.glb"
+   "model": "milling-support-tray.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.y-nut-bridge",
@@ -6986,7 +7275,12 @@
     "kg": 2.11039,
     "source": "Computed(Preview)"
    },
-   "model": "milling-y-nut-bridge.glb"
+   "model": "milling-y-nut-bridge.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.y-nut-mount",
@@ -7069,7 +7363,12 @@
     "kg": 0.383447,
     "source": "Computed(Preview)"
    },
-   "model": "milling-y-nut-mount.glb"
+   "model": "milling-y-nut-mount.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.z-bearing-plate",
@@ -7236,7 +7535,12 @@
     "kg": 2.744997,
     "source": "Computed(Preview)"
    },
-   "model": "milling-z-bearing-plate.glb"
+   "model": "milling-z-bearing-plate.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.z-carriage",
@@ -7393,7 +7697,12 @@
     "kg": 5.040217,
     "source": "Computed(Preview)"
    },
-   "model": "milling-z-carriage.glb"
+   "model": "milling-z-carriage.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.z-coupling-guard",
@@ -7480,7 +7789,12 @@
     "kg": 0.025406,
     "source": "Computed(Preview)"
    },
-   "model": "milling-z-coupling-guard.glb"
+   "model": "milling-z-coupling-guard.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.z-drive-adapter",
@@ -7595,7 +7909,12 @@
     "kg": 2.393185,
     "source": "Computed(Preview)"
    },
-   "model": "milling-z-drive-adapter.glb"
+   "model": "milling-z-drive-adapter.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.z-head",
@@ -7773,7 +8092,12 @@
     "kg": 15.951851,
     "source": "Computed(Preview)"
    },
-   "model": "milling-z-head.glb"
+   "model": "milling-z-head.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.z-motor-stand",
@@ -7918,7 +8242,12 @@
     "kg": 1.057114,
     "source": "Computed(Preview)"
    },
-   "model": "milling-z-motor-stand.glb"
+   "model": "milling-z-motor-stand.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.milling.zpp-supplier-member",
@@ -8086,7 +8415,12 @@
     "kg": 0.335669,
     "source": "Computed(Preview)"
    },
-   "model": "motion-angular-contact-bearing.glb"
+   "model": "motion-angular-contact-bearing.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.axis-servo-motor",
@@ -8244,7 +8578,12 @@
     "kg": 2.007145,
     "source": "Computed(Preview)"
    },
-   "model": "motion-axis-servo-motor.glb"
+   "model": "motion-axis-servo-motor.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.ball-nut",
@@ -8354,7 +8693,12 @@
     "kg": 0.225543,
     "source": "Computed(Preview)"
    },
-   "model": "motion-ball-nut.glb"
+   "model": "motion-ball-nut.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.ball-screw",
@@ -8454,7 +8798,12 @@
     "kg": 0.579154,
     "source": "Computed(Preview)"
    },
-   "model": "motion-ball-screw.glb"
+   "model": "motion-ball-screw.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.ballscrew-retainer",
@@ -8531,7 +8880,12 @@
     "kg": 0.007233,
     "source": "Computed(Preview)"
    },
-   "model": "motion-ballscrew-retainer.glb"
+   "model": "motion-ballscrew-retainer.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.brake-servo",
@@ -8649,7 +9003,12 @@
     "kg": 1.280345,
     "source": "Computed(Preview)"
    },
-   "model": "motion-brake-servo.glb"
+   "model": "motion-brake-servo.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.cable-chain",
@@ -8776,7 +9135,12 @@
     "kg": 0.696613,
     "source": "Computed(Preview)"
    },
-   "model": "motion-cable-chain.glb"
+   "model": "motion-cable-chain.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.caster-wheel",
@@ -8892,7 +9256,12 @@
     "kg": 1.161549,
     "source": "Computed(Preview)"
    },
-   "model": "motion-caster-wheel.glb"
+   "model": "motion-caster-wheel.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.crossed-roller-bearing",
@@ -9047,7 +9416,12 @@
     "kg": 0.785147,
     "source": "Computed(Preview)"
    },
-   "model": "motion-crossed-roller-bearing.glb"
+   "model": "motion-crossed-roller-bearing.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.drive-wheel",
@@ -9159,7 +9533,12 @@
     "kg": 0.819929,
     "source": "Computed(Preview)"
    },
-   "model": "motion-drive-wheel.glb"
+   "model": "motion-drive-wheel.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.dsg-nut-housing",
@@ -9257,7 +9636,12 @@
     "kg": 0.051424,
     "source": "Computed(Preview)"
    },
-   "model": "motion-dsg-nut-housing.glb"
+   "model": "motion-dsg-nut-housing.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.flange-bearing-housing",
@@ -9683,7 +10067,12 @@
     "kg": 0.094101,
     "source": "Computed(Preview)"
    },
-   "model": "motion-flange-bearing-housing.glb"
+   "model": "motion-flange-bearing-housing.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.gearbox",
@@ -9817,7 +10206,12 @@
     "kg": 0.872031,
     "source": "Declared"
    },
-   "model": "motion-gearbox.glb"
+   "model": "motion-gearbox.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.generic-nema-stepper",
@@ -9931,7 +10325,12 @@
     "kg": 0.664833,
     "source": "Computed(Preview)"
    },
-   "model": "motion-generic-nema-stepper.glb"
+   "model": "motion-generic-nema-stepper.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.hg-block-reference",
@@ -10062,7 +10461,12 @@
     "kg": 0.577641,
     "source": "Computed(Preview)"
    },
-   "model": "motion-hg-rail.glb"
+   "model": "motion-hg-rail.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.hgh15ca-reference",
@@ -10169,7 +10573,12 @@
     "kg": 0.579389,
     "source": "Computed(Preview)"
    },
-   "model": "motion-hzmotion-bk12-screw-end-study.glb"
+   "model": "motion-hzmotion-bk12-screw-end-study.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.lead-screw",
@@ -10299,7 +10708,12 @@
     "kg": 0.039458,
     "source": "Computed(Preview)"
    },
-   "model": "motion-lead-screw.glb"
+   "model": "motion-lead-screw.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.lead-screw-nut",
@@ -10460,7 +10874,12 @@
     "kg": 0.014541,
     "source": "Computed(Preview)"
    },
-   "model": "motion-lead-screw-nut.glb"
+   "model": "motion-lead-screw-nut.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.leadshine-servo",
@@ -10623,7 +11042,12 @@
     "kg": 1.266263,
     "source": "Declared"
    },
-   "model": "motion-leadshine-servo.glb"
+   "model": "motion-leadshine-servo.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.limit-switch",
@@ -10722,7 +11146,12 @@
     "kg": 0.001989,
     "source": "Computed(Preview)"
    },
-   "model": "motion-limit-switch.glb"
+   "model": "motion-limit-switch.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.linear-bearing",
@@ -10877,7 +11306,12 @@
     "kg": 0.023332,
     "source": "Computed(Preview)"
    },
-   "model": "motion-linear-bearing.glb"
+   "model": "motion-linear-bearing.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.linear-rail",
@@ -11049,7 +11483,12 @@
     "kg": 0.07536,
     "source": "Computed(Preview)"
    },
-   "model": "motion-linear-rail.glb"
+   "model": "motion-linear-rail.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.linear-rail-block",
@@ -11218,7 +11657,12 @@
     "kg": 0.036773,
     "source": "Computed(Preview)"
    },
-   "model": "motion-linear-rail-block.glb"
+   "model": "motion-linear-rail-block.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.linear-scale",
@@ -11318,7 +11762,12 @@
     "kg": 0.0162,
     "source": "Computed(Preview)"
    },
-   "model": "motion-linear-scale.glb"
+   "model": "motion-linear-scale.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.motor-driver",
@@ -11472,7 +11921,12 @@
     "kg": 0.010368,
     "source": "Computed(Preview)"
    },
-   "model": "motion-motor-driver.glb"
+   "model": "motion-motor-driver.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.nema-stepper",
@@ -11648,7 +12102,12 @@
     "kg": 0.664833,
     "source": "Computed(Preview)"
    },
-   "model": "motion-nema-stepper.glb"
+   "model": "motion-nema-stepper.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.pillow-block",
@@ -11945,7 +12404,12 @@
     "kg": 0.748481,
     "source": "Computed(Preview)"
    },
-   "model": "motion-pillow-block.glb"
+   "model": "motion-pillow-block.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.planetary-reducer",
@@ -12107,7 +12571,12 @@
     "kg": 1.280615,
     "source": "Computed(Preview)"
    },
-   "model": "motion-planetary-reducer.glb"
+   "model": "motion-planetary-reducer.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.power-supply",
@@ -12228,7 +12697,12 @@
     "kg": 0.5832,
     "source": "Computed(Preview)"
    },
-   "model": "motion-power-supply.glb"
+   "model": "motion-power-supply.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.proximity-switch",
@@ -12339,7 +12813,12 @@
     "kg": 0.011838,
     "source": "Computed(Preview)"
    },
-   "model": "motion-proximity-switch.glb"
+   "model": "motion-proximity-switch.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.purchased-rotary-part",
@@ -13680,7 +14159,12 @@
     "kg": 44,
     "source": "Declared"
    },
-   "model": "motion-purchased-rotary-part.glb"
+   "model": "motion-purchased-rotary-part.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.rotary-encoder-ring",
@@ -13829,7 +14313,12 @@
     "kg": 0.340329,
     "source": "Computed(Preview)"
    },
-   "model": "motion-rotary-encoder-ring.glb"
+   "model": "motion-rotary-encoder-ring.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.screw-support-unit",
@@ -13926,7 +14415,12 @@
     "kg": 0.46809,
     "source": "Computed(Preview)"
    },
-   "model": "motion-screw-support-unit.glb"
+   "model": "motion-screw-support-unit.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.servo-motor",
@@ -14084,7 +14578,12 @@
     "kg": 0.763407,
     "source": "Computed(Preview)"
    },
-   "model": "motion-servo-motor.glb"
+   "model": "motion-servo-motor.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.sfu-drawing-screw",
@@ -14202,7 +14701,12 @@
     "kg": 1.141358,
     "source": "Computed(Preview)"
    },
-   "model": "motion-sfu-drawing-screw.glb"
+   "model": "motion-sfu-drawing-screw.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.sfu-nut",
@@ -14323,7 +14827,12 @@
     "kg": 0.219171,
     "source": "Computed(Preview)"
    },
-   "model": "motion-sfu-nut.glb"
+   "model": "motion-sfu-nut.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.shaft-brake-part",
@@ -14429,7 +14938,12 @@
     "kg": 0.001671,
     "source": "Computed(Preview)"
    },
-   "model": "motion-shaft-brake-part.glb"
+   "model": "motion-shaft-brake-part.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.shaft-coupling",
@@ -14551,7 +15065,12 @@
     "kg": 0.021216,
     "source": "Computed(Preview)"
    },
-   "model": "motion-shaft-coupling.glb"
+   "model": "motion-shaft-coupling.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.shaft-encoder",
@@ -14658,7 +15177,12 @@
     "kg": 0.067366,
     "source": "Computed(Preview)"
    },
-   "model": "motion-shaft-encoder.glb"
+   "model": "motion-shaft-encoder.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.stepped-shaft",
@@ -14760,7 +15284,12 @@
     "kg": 0.061654,
     "source": "Computed(Preview)"
    },
-   "model": "motion-stepped-shaft.glb"
+   "model": "motion-stepped-shaft.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.supplier-hgh-block",
@@ -14871,7 +15400,12 @@
     "kg": 0.290814,
     "source": "Computed(Preview)"
    },
-   "model": "motion-supplier-hgh-block.glb"
+   "model": "motion-supplier-hgh-block.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.supplier-hgr25-rail",
@@ -15004,7 +15538,12 @@
     "kg": 2.223236,
     "source": "Computed(Preview)"
    },
-   "model": "motion-supplier-hgr25-rail.glb"
+   "model": "motion-supplier-hgr25-rail.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.torque-motor",
@@ -15208,7 +15747,12 @@
     "kg": 1.536357,
     "source": "Computed(Preview)"
    },
-   "model": "motion-torque-motor.glb"
+   "model": "motion-torque-motor.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.vallder-bf12-support",
@@ -15321,7 +15865,12 @@
     "kg": 0.219171,
     "source": "Computed(Preview)"
    },
-   "model": "motion-vallder-sfu1605-nut.glb"
+   "model": "motion-vallder-sfu1605-nut.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.motion.vallder-sfu1605-screw",
@@ -15421,7 +15970,12 @@
     "kg": 0.576775,
     "source": "Computed(Preview)"
    },
-   "model": "motion-vallder-sfu1605-screw.glb"
+   "model": "motion-vallder-sfu1605-screw.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.air-supply",
@@ -15501,7 +16055,12 @@
     "kg": 0.648,
     "source": "Computed(Preview)"
    },
-   "model": "pneumatic-air-supply.glb"
+   "model": "pneumatic-air-supply.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.cylinder",
@@ -15616,7 +16175,12 @@
     "kg": 0.202455,
     "source": "Computed(Preview)"
    },
-   "model": "pneumatic-cylinder.glb"
+   "model": "pneumatic-cylinder.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.cylinder-rod",
@@ -15703,7 +16267,12 @@
     "kg": 0.070902,
     "source": "Computed(Preview)"
    },
-   "model": "pneumatic-cylinder-rod.glb"
+   "model": "pneumatic-cylinder-rod.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.manifold",
@@ -15782,7 +16351,12 @@
     "kg": 0.01512,
     "source": "Computed(Preview)"
    },
-   "model": "pneumatic-manifold.glb"
+   "model": "pneumatic-manifold.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.routed-hose",
@@ -15903,7 +16477,12 @@
     "kg": 0.001,
     "source": "Declared"
    },
-   "model": "pneumatic-routed-hose.glb"
+   "model": "pneumatic-routed-hose.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.schmalz-push-in-fitting",
@@ -16004,7 +16583,12 @@
     "kg": 0.015,
     "source": "Declared"
    },
-   "model": "pneumatic-schmalz-push-in-fitting.glb"
+   "model": "pneumatic-schmalz-push-in-fitting.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.schmalz-suction-cup",
@@ -16140,7 +16724,12 @@
     "kg": 0.01188,
     "source": "Declared"
    },
-   "model": "pneumatic-schmalz-suction-cup.glb"
+   "model": "pneumatic-schmalz-suction-cup.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.schmalz-vacuum-generator",
@@ -16244,7 +16833,12 @@
     "kg": 0.0075,
     "source": "Declared"
    },
-   "model": "pneumatic-schmalz-vacuum-generator.glb"
+   "model": "pneumatic-schmalz-vacuum-generator.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.schmalz-vacuum-hose",
@@ -16356,7 +16950,12 @@
     "kg": 0.0011,
     "source": "Declared"
    },
-   "model": "pneumatic-schmalz-vacuum-hose.glb"
+   "model": "pneumatic-schmalz-vacuum-hose.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.solenoid-valve",
@@ -16459,7 +17058,12 @@
     "kg": 0.162,
     "source": "Computed(Preview)"
    },
-   "model": "pneumatic-solenoid-valve.glb"
+   "model": "pneumatic-solenoid-valve.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.suction-cup",
@@ -16600,7 +17204,12 @@
     "kg": 0.024881,
     "source": "Computed(Preview)"
    },
-   "model": "pneumatic-suction-cup.glb"
+   "model": "pneumatic-suction-cup.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.vacuum-control-valve",
@@ -16680,7 +17289,12 @@
     "kg": 0.008986,
     "source": "Computed(Preview)"
    },
-   "model": "pneumatic-vacuum-control-valve.glb"
+   "model": "pneumatic-vacuum-control-valve.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.vacuum-generator",
@@ -16828,7 +17442,12 @@
     "kg": 0.020412,
     "source": "Computed(Preview)"
    },
-   "model": "pneumatic-vacuum-generator.glb"
+   "model": "pneumatic-vacuum-generator.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pneumatic.vacuum-pressure-sensor",
@@ -16908,7 +17527,12 @@
     "kg": 0.009,
     "source": "Computed(Preview)"
    },
-   "model": "pneumatic-vacuum-pressure-sensor.glb"
+   "model": "pneumatic-vacuum-pressure-sensor.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.power.brake-resistor",
@@ -17023,7 +17647,12 @@
     "kg": 3.888,
     "source": "Computed(Preview)"
    },
-   "model": "power-brake-resistor.glb"
+   "model": "power-brake-resistor.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.power.circuit-breaker",
@@ -17144,7 +17773,12 @@
     "kg": 2.861325,
     "source": "Computed(Preview)"
    },
-   "model": "power-circuit-breaker.glb"
+   "model": "power-circuit-breaker.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.power.contactor",
@@ -17265,7 +17899,12 @@
     "kg": 3.1086,
     "source": "Computed(Preview)"
    },
-   "model": "power-contactor.glb"
+   "model": "power-contactor.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.power.three-phase-rectifier",
@@ -17393,7 +18032,12 @@
     "kg": 7.776,
     "source": "Computed(Preview)"
    },
-   "model": "power-three-phase-rectifier.glb"
+   "model": "power-three-phase-rectifier.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.power.vfd",
@@ -17520,7 +18164,12 @@
     "kg": 26.244,
     "source": "Computed(Preview)"
    },
-   "model": "power-vfd.glb"
+   "model": "power-vfd.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pressbrake.gauge-finger",
@@ -17597,7 +18246,12 @@
     "kg": 0.19782,
     "source": "Computed(Preview)"
    },
-   "model": "pressbrake-gauge-finger.glb"
+   "model": "pressbrake-gauge-finger.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pressbrake.hydraulic-cylinder",
@@ -17716,7 +18370,12 @@
     "kg": 26.141192,
     "source": "Computed(Preview)"
    },
-   "model": "pressbrake-hydraulic-cylinder.glb"
+   "model": "pressbrake-hydraulic-cylinder.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pressbrake.hydraulic-cylinder-rod",
@@ -17803,7 +18462,12 @@
     "kg": 11.714214,
     "source": "Computed(Preview)"
    },
-   "model": "pressbrake-hydraulic-cylinder-rod.glb"
+   "model": "pressbrake-hydraulic-cylinder-rod.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pressbrake.hydraulic-manifold",
@@ -17883,7 +18547,12 @@
     "kg": 0.180864,
     "source": "Computed(Preview)"
    },
-   "model": "pressbrake-hydraulic-manifold.glb"
+   "model": "pressbrake-hydraulic-manifold.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pressbrake.hydraulic-supply",
@@ -17963,7 +18632,12 @@
     "kg": 15.7,
     "source": "Computed(Preview)"
    },
-   "model": "pressbrake-hydraulic-supply.glb"
+   "model": "pressbrake-hydraulic-supply.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pressbrake.hydraulic-valve",
@@ -18036,7 +18710,12 @@
     "kg": 3.3912,
     "source": "Computed(Preview)"
    },
-   "model": "pressbrake-hydraulic-valve.glb"
+   "model": "pressbrake-hydraulic-valve.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pressbrake.tool-clamp",
@@ -18143,7 +18822,12 @@
     "kg": 0.942,
     "source": "Computed(Preview)"
    },
-   "model": "pressbrake-tool-clamp.glb"
+   "model": "pressbrake-tool-clamp.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.pressbrake.tool-segment",
@@ -18270,7 +18954,12 @@
     "kg": 1.323513,
     "source": "Computed(Preview)"
    },
-   "model": "pressbrake-tool-segment.glb"
+   "model": "pressbrake-tool-segment.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.printing.extruder",
@@ -18373,7 +19062,12 @@
     "kg": 0.109304,
     "source": "Computed(Preview)"
    },
-   "model": "printing-extruder.glb"
+   "model": "printing-extruder.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.printing.fan",
@@ -18476,7 +19170,12 @@
     "kg": 0.0192,
     "source": "Computed(Preview)"
    },
-   "model": "printing-fan.glb"
+   "model": "printing-fan.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.printing.heated-bed",
@@ -18575,7 +19274,12 @@
     "kg": 0.820091,
     "source": "Computed(Preview)"
    },
-   "model": "printing-heated-bed.glb"
+   "model": "printing-heated-bed.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.printing.heater-cartridge",
@@ -18670,7 +19374,12 @@
     "kg": 0.004439,
     "source": "Computed(Preview)"
    },
-   "model": "printing-heater-cartridge.glb"
+   "model": "printing-heater-cartridge.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.printing.hotend",
@@ -18781,7 +19490,12 @@
     "kg": 0.040727,
     "source": "Computed(Preview)"
    },
-   "model": "printing-hotend.glb"
+   "model": "printing-hotend.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.printing.nozzle",
@@ -18880,7 +19594,12 @@
     "kg": 0.001184,
     "source": "Computed(Preview)"
    },
-   "model": "printing-nozzle.glb"
+   "model": "printing-nozzle.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.printing.thermistor",
@@ -18979,7 +19698,12 @@
     "kg": 0.000118,
     "source": "Computed(Preview)"
    },
-   "model": "printing-thermistor.glb"
+   "model": "printing-thermistor.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.arm-joint",
@@ -19167,7 +19891,12 @@
     "kg": 4.315763,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-arm-joint.glb"
+   "model": "robotics-arm-joint.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.arm-link",
@@ -19299,7 +20028,12 @@
     "kg": 1.103971,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-arm-link.glb"
+   "model": "robotics-arm-link.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.arm-wrist-fork",
@@ -19404,7 +20138,12 @@
     "kg": 0.098496,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-arm-wrist-fork.glb"
+   "model": "robotics-arm-wrist-fork.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.cobot-joint",
@@ -19518,7 +20257,12 @@
     "kg": 2.517019,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-cobot-joint.glb"
+   "model": "robotics-cobot-joint.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.end-effector-plate",
@@ -19747,7 +20491,12 @@
     "kg": 0.132253,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-end-effector-plate.glb"
+   "model": "robotics-end-effector-plate.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.fairino-dual-tool-adapter",
@@ -19794,7 +20543,12 @@
     "kg": 0.029146,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-fairino-dual-tool-adapter.glb"
+   "model": "robotics-fairino-dual-tool-adapter.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.frame-bar",
@@ -19892,7 +20646,12 @@
     "kg": 0.108,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-frame-bar.glb"
+   "model": "robotics-frame-bar.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.geared-arm-joint",
@@ -20097,7 +20856,12 @@
     "kg": 3.489874,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-geared-arm-joint.glb"
+   "model": "robotics-geared-arm-joint.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.offset-gripper-finger",
@@ -20145,7 +20909,12 @@
     "kg": 0.033006,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-offset-gripper-finger.glb"
+   "model": "robotics-offset-gripper-finger.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.parallel-gripper-body",
@@ -20270,7 +21039,12 @@
     "kg": 0.68634,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-parallel-gripper-body.glb"
+   "model": "robotics-parallel-gripper-body.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.parallel-gripper-finger",
@@ -20396,7 +21170,12 @@
     "kg": 0.0264,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-parallel-gripper-finger.glb"
+   "model": "robotics-parallel-gripper-finger.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.parallel-gripper-jaw",
@@ -20516,7 +21295,12 @@
     "kg": 0.080855,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-parallel-gripper-jaw.glb"
+   "model": "robotics-parallel-gripper-jaw.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.pedestal",
@@ -20713,7 +21497,12 @@
     "kg": 4.001932,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-pedestal.glb"
+   "model": "robotics-pedestal.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.robot-flange",
@@ -20819,7 +21608,12 @@
     "kg": 0.199652,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-robot-flange.glb"
+   "model": "robotics-robot-flange.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.schmalz-sxt-master",
@@ -20926,7 +21720,12 @@
     "kg": 1.7,
     "source": "Declared"
    },
-   "model": "robotics-schmalz-sxt-master.glb"
+   "model": "robotics-schmalz-sxt-master.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.schmalz-sxt-tool",
@@ -21032,7 +21831,12 @@
     "kg": 0.55,
     "source": "Declared"
    },
-   "model": "robotics-schmalz-sxt-tool.glb"
+   "model": "robotics-schmalz-sxt-tool.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.tool-changer-master",
@@ -21129,7 +21933,12 @@
     "kg": 0.114511,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-tool-changer-master.glb"
+   "model": "robotics-tool-changer-master.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.tool-changer-tool",
@@ -21226,7 +22035,12 @@
     "kg": 0.091609,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-tool-changer-tool.glb"
+   "model": "robotics-tool-changer-tool.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.robotics.tool-service-module",
@@ -21350,7 +22164,12 @@
     "kg": 0.044494,
     "source": "Computed(Preview)"
    },
-   "model": "robotics-tool-service-module.glb"
+   "model": "robotics-tool-service-module.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.atc-spindle",
@@ -21508,7 +22327,12 @@
     "kg": 10.540966,
     "source": "Computed(Preview)"
    },
-   "model": "routing-atc-spindle.glb"
+   "model": "routing-atc-spindle.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.collet",
@@ -21606,7 +22430,12 @@
     "kg": 0.25278,
     "source": "Computed(Preview)"
    },
-   "model": "routing-collet.glb"
+   "model": "routing-collet.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.dust-shoe",
@@ -21757,7 +22586,12 @@
     "kg": 3.088244,
     "source": "Computed(Preview)"
    },
-   "model": "routing-dust-shoe.glb"
+   "model": "routing-dust-shoe.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.spoilboard",
@@ -21862,7 +22696,12 @@
     "kg": 78,
     "source": "Computed(Preview)"
    },
-   "model": "routing-spoilboard.glb"
+   "model": "routing-spoilboard.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.tool-fork",
@@ -21978,7 +22817,12 @@
     "kg": 0.063478,
     "source": "Computed(Preview)"
    },
-   "model": "routing-tool-fork.glb"
+   "model": "routing-tool-fork.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.tool-holder",
@@ -22115,7 +22959,12 @@
     "kg": 0.546068,
     "source": "Computed(Preview)"
    },
-   "model": "routing-tool-holder.glb"
+   "model": "routing-tool-holder.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.tool-length-setter",
@@ -22220,7 +23069,12 @@
     "kg": 0.591876,
     "source": "Computed(Preview)"
    },
-   "model": "routing-tool-length-setter.glb"
+   "model": "routing-tool-length-setter.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.tool-rack",
@@ -22384,7 +23238,12 @@
     "kg": 11.715968,
     "source": "Computed(Preview)"
    },
-   "model": "routing-tool-rack.glb"
+   "model": "routing-tool-rack.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.vacuum-blower",
@@ -22503,7 +23362,12 @@
     "kg": 169.646003,
     "source": "Computed(Preview)"
    },
-   "model": "routing-vacuum-blower.glb"
+   "model": "routing-vacuum-blower.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.vacuum-table",
@@ -22672,7 +23536,12 @@
     "kg": 340.556337,
     "source": "Computed(Preview)"
    },
-   "model": "routing-vacuum-table.glb"
+   "model": "routing-vacuum-table.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.routing.vacuum-zone-valve",
@@ -22784,7 +23653,12 @@
     "kg": 1.425026,
     "source": "Computed(Preview)"
    },
-   "model": "routing-vacuum-zone-valve.glb"
+   "model": "routing-vacuum-zone-valve.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.bushing",
@@ -22886,7 +23760,12 @@
     "kg": 0.005529,
     "source": "Computed(Preview)"
    },
-   "model": "standard-bushing.glb"
+   "model": "standard-bushing.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.deep-groove-bearing",
@@ -23294,7 +24173,12 @@
     "kg": 0.012052,
     "source": "Computed(Preview)"
    },
-   "model": "standard-deep-groove-bearing.glb"
+   "model": "standard-deep-groove-bearing.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.fine-pitch-nut",
@@ -23399,7 +24283,12 @@
     "kg": 0.011419,
     "source": "Computed(Preview)"
    },
-   "model": "standard-fine-pitch-nut.glb"
+   "model": "standard-fine-pitch-nut.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.flat-washer",
@@ -23585,7 +24474,12 @@
     "kg": 0.000443,
     "source": "Computed(Preview)"
    },
-   "model": "standard-flat-washer.glb"
+   "model": "standard-flat-washer.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.hex-bolt",
@@ -23710,7 +24604,12 @@
     "kg": 0.004606,
     "source": "Computed(Preview)"
    },
-   "model": "standard-hex-bolt.glb"
+   "model": "standard-hex-bolt.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.hex-nut",
@@ -23889,7 +24788,12 @@
     "kg": 0.00132,
     "source": "Computed(Preview)"
    },
-   "model": "standard-hex-nut.glb"
+   "model": "standard-hex-nut.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.parallel-key",
@@ -24039,7 +24943,12 @@
     "kg": 0.000314,
     "source": "Computed(Preview)"
    },
-   "model": "standard-parallel-key.glb"
+   "model": "standard-parallel-key.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.retaining-ring",
@@ -24198,7 +25107,12 @@
     "kg": 0.000399,
     "source": "Computed(Preview)"
    },
-   "model": "standard-retaining-ring.glb"
+   "model": "standard-retaining-ring.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.shaft-collar",
@@ -24356,7 +25270,12 @@
     "kg": 0.013021,
     "source": "Computed(Preview)"
    },
-   "model": "standard-shaft-collar.glb"
+   "model": "standard-shaft-collar.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.socket-head-cap-screw",
@@ -24547,7 +25466,12 @@
     "kg": 0.005038,
     "source": "Computed(Preview)"
    },
-   "model": "standard-socket-head-cap-screw.glb"
+   "model": "standard-socket-head-cap-screw.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.standard.socket-set-screw",
@@ -24594,7 +25518,12 @@
     "kg": 0.000926,
     "source": "Computed(Preview)"
    },
-   "model": "standard-socket-set-screw.glb"
+   "model": "standard-socket-set-screw.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.structural.block-bracket",
@@ -24672,7 +25601,12 @@
     "kg": 0.0027,
     "source": "Computed(Preview)"
    },
-   "model": "structural-block-bracket.glb"
+   "model": "structural-block-bracket.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.structural.cast-in-steel-insert",
@@ -24767,7 +25701,12 @@
     "kg": 0.314,
     "source": "Computed(Preview)"
    },
-   "model": "structural-drawing-profile-member.glb"
+   "model": "structural-drawing-profile-member.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.structural.leveling-foot",
@@ -24857,7 +25796,12 @@
     "kg": 1.47969,
     "source": "Computed(Preview)"
    },
-   "model": "structural-leveling-foot.glb"
+   "model": "structural-leveling-foot.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.structural.mineral-casting",
@@ -24919,6 +25863,21 @@
      "name": "features",
      "type": "text",
      "value": "{\"version\":3,\"features\":[]}"
+    },
+    {
+     "name": "embeddedAnchors",
+     "type": "text",
+     "value": "[]"
+    },
+    {
+     "name": "datumScheme",
+     "type": "text",
+     "value": "null"
+    },
+    {
+     "name": "interfaces",
+     "type": "text",
+     "value": "[]"
     }
    ],
    "connectors": [
@@ -24934,14 +25893,19 @@
    "bom": {
     "description": "Mineral casting (purchase by casting mass, kg)",
     "material": "mineral cast",
-    "partNumber": "machinekit.structural.mineral-casting|width:3:650|depth:3:550|height:3:120|footWidth:1:0|footHeight:1:0|footShoulder:1:0|cornerChamfer:1:0|features:27:{\"version\":3,\"features\":[]}"
+    "partNumber": "machinekit.structural.mineral-casting|width:3:650|depth:3:550|height:3:120|footWidth:1:0|footHeight:1:0|footShoulder:1:0|cornerChamfer:1:0|features:27:{\"version\":3,\"features\":[]}|embeddedAnchors:2:[]|datumScheme:4:null|interfaces:2:[]"
    },
    "material": "mineral-cast",
    "mass": {
     "kg": 102.96,
     "source": "Computed(Preview)"
    },
-   "model": "structural-mineral-casting.glb"
+   "model": "structural-mineral-casting.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.structural.rect-tube-member",
@@ -25046,7 +26010,12 @@
     "kg": 1.3188,
     "source": "Computed(Preview)"
    },
-   "model": "structural-rect-tube-member.glb"
+   "model": "structural-rect-tube-member.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.structural.slide-in-slot-nut",
@@ -25166,7 +26135,12 @@
     "kg": 0.008278,
     "source": "Computed(Preview)"
    },
-   "model": "structural-slide-in-slot-nut.glb"
+   "model": "structural-slide-in-slot-nut.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.structural.tslot-member",
@@ -25278,7 +26252,12 @@
     "kg": 0.671375,
     "source": "Computed(Preview)"
    },
-   "model": "structural-tslot-member.glb"
+   "model": "structural-tslot-member.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.tooling.block",
@@ -25372,7 +26351,12 @@
     "kg": 0.4,
     "source": "Computed(Preview)"
    },
-   "model": "tooling-block.glb"
+   "model": "tooling-block.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.tooling.panel",
@@ -25454,7 +26438,12 @@
     "kg": 0.1224,
     "source": "Computed(Preview)"
    },
-   "model": "tooling-panel.glb"
+   "model": "tooling-panel.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.tooling.plain-pin",
@@ -25508,7 +26497,12 @@
     "kg": 0.008878,
     "source": "Computed(Preview)"
    },
-   "model": "tooling-plain-pin.glb"
+   "model": "tooling-plain-pin.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.tooling.source-casting",
@@ -25592,7 +26586,12 @@
     "kg": 0.0052,
     "source": "Computed(Preview)"
    },
-   "model": "tooling-volume.glb"
+   "model": "tooling-volume.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.transmission.custom-timing-pulley",
@@ -25715,7 +26714,12 @@
     "kg": 0.001518,
     "source": "Computed(Preview)"
    },
-   "model": "transmission-custom-timing-pulley.glb"
+   "model": "transmission-custom-timing-pulley.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.transmission.generic-sprocket",
@@ -25830,7 +26834,12 @@
     "kg": 0.044026,
     "source": "Computed(Preview)"
    },
-   "model": "transmission-generic-sprocket.glb"
+   "model": "transmission-generic-sprocket.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.transmission.helical-pinion",
@@ -25964,7 +26973,12 @@
     "kg": 0.097735,
     "source": "Computed(Preview)"
    },
-   "model": "transmission-helical-pinion.glb"
+   "model": "transmission-helical-pinion.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.transmission.helical-rack",
@@ -26113,7 +27127,12 @@
     "kg": 0.216217,
     "source": "Computed(Preview)"
    },
-   "model": "transmission-helical-rack.glb"
+   "model": "transmission-helical-rack.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.transmission.involute-rack",
@@ -26232,7 +27251,12 @@
     "kg": 0.026537,
     "source": "Computed(Preview)"
    },
-   "model": "transmission-involute-rack.glb"
+   "model": "transmission-involute-rack.glb",
+   "view": {
+    "environment": "/components/environment/studio-72.hdr",
+    "phi": 72,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.transmission.preloaded-pinion-mount",
@@ -26383,7 +27407,12 @@
     "kg": 1.606884,
     "source": "Computed(Preview)"
    },
-   "model": "transmission-preloaded-pinion-mount.glb"
+   "model": "transmission-preloaded-pinion-mount.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.transmission.sprocket",
@@ -26530,7 +27559,12 @@
     "kg": 0.045145,
     "source": "Computed(Preview)"
    },
-   "model": "transmission-sprocket.glb"
+   "model": "transmission-sprocket.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.transmission.spur-gear",
@@ -26657,7 +27691,12 @@
     "kg": 0.096095,
     "source": "Computed(Preview)"
    },
-   "model": "transmission-spur-gear.glb"
+   "model": "transmission-spur-gear.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.transmission.timing-belt",
@@ -26779,7 +27818,12 @@
     "kg": 0.004006,
     "source": "Computed(Preview)"
    },
-   "model": "transmission-timing-belt.glb"
+   "model": "transmission-timing-belt.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   }
   },
   {
    "id": "machinekit.transmission.timing-pulley",
@@ -26894,7 +27938,12 @@
     "kg": 0.001518,
     "source": "Computed(Preview)"
    },
-   "model": "transmission-timing-pulley.glb"
+   "model": "transmission-timing-pulley.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   }
   }
  ]
 }

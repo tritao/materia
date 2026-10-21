@@ -6,6 +6,21 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import GithubSlugger from "github-slugger";
 
+// The viewer settings the thumbnails share (docs/screens/components.py), so a thumbnail is the viewer's first frame.
+const VIEW = JSON.parse(readFileSync(new URL("../src/model-view.json", import.meta.url), "utf8"));
+
+/** A part's <model-viewer> attributes: the shared settings, the export's lighting and the camera angle it chose. */
+export function viewerAttributes(component, display) {
+	const attributes = {
+		...VIEW.attributes,
+		"environment-image": component.view.environment,
+		exposure: String(display.exposure),
+		"tone-mapping": display.toneMapping,
+		"camera-orbit": `${component.view.theta}deg ${component.view.phi}deg auto`,
+	};
+	return Object.entries(attributes).map(([name, value]) => `${name}="${escape(value)}"`).join(" ");
+}
+
 const FAMILIES = {
 	standard: "Standard parts",
 	motion: "Motion",
@@ -40,7 +55,8 @@ const assumed = (component) =>
 
 export function loadComponents(path) {
 	if (!existsSync(path)) return null;
-	const components = JSON.parse(readFileSync(path, "utf8")).components;
+	const exported = JSON.parse(readFileSync(path, "utf8"));
+	const components = exported.components;
 	const families = new Map();
 	for (const component of components) {
 		if (!families.has(component.family)) families.set(component.family, []);
@@ -56,7 +72,7 @@ export function loadComponents(path) {
 		const slugger = new GithubSlugger();
 		for (const component of list) component.anchor = slugger.slug(component.label);
 	}
-	return { components, families: sorted.map((id) => ({ id, label: familyLabel(id), components: families.get(id) })) };
+	return { display: exported.display, components, families: sorted.map((id) => ({ id, label: familyLabel(id), components: families.get(id) })) };
 }
 
 function badges(component) {
@@ -143,7 +159,7 @@ function catalogueRows(component) {
 	return lines;
 }
 
-function familyPage(family) {
+function familyPage(family, display) {
 	const lines = [
 		"---",
 		`title: ${JSON.stringify(family.label)}`,
@@ -157,7 +173,7 @@ function familyPage(family) {
 		lines.push(`## ${component.label}`, "");
 		if (component.model)
 			lines.push(
-				`<model-viewer class="part-model" src="/components/${component.model}" poster="${thumb(component)}" alt="${escape(component.label)} at its default parameters" camera-controls reveal="auto" loading="eager" shadow-intensity="0.6" exposure="1.0"></model-viewer>`,
+				`<model-viewer class="part-model" src="/components/${component.model}" poster="${thumb(component)}" alt="${escape(component.label)} at its default parameters" camera-controls reveal="auto" loading="eager" ${viewerAttributes(component, display)}></model-viewer>`,
 				'<p class="part-hint">Drag to orbit; scroll or pinch to zoom.</p>',
 				"",
 			);
@@ -182,6 +198,6 @@ export function writeComponents(catalogue, out) {
 	const root = join(out, "components");
 	mkdirSync(root, { recursive: true });
 	writeFileSync(join(root, "index.md"), indexPage(catalogue));
-	for (const family of catalogue.families) writeFileSync(join(root, `${family.id}.md`), familyPage(family));
+	for (const family of catalogue.families) writeFileSync(join(root, `${family.id}.md`), familyPage(family, catalogue.display));
 	return 1 + catalogue.families.length;
 }

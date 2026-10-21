@@ -118,9 +118,15 @@ with the tool at its end. The site's accent colour is the logo's blue (`src/styl
 `/components/` is generated from MachineKit's component registry. The `docs-components` workspace
 program (`docs/components/`) builds every recipe at its defaults and writes
 `docs/components/data/components.json` (parameters, catalogue rows and their provenance,
-connectors, mass, BOM line) and a GLB per part into `public/components/`. `docs/screens/components.py`
-renders the thumbnails from those GLBs with the same `<model-viewer>` the pages use. Regenerate
-after changing a component, then rerender:
+connectors, mass, BOM line) and a GLB per part into `public/components/`, with its feature edges
+as lines (CadKit's `MeshFeatureEdges`, the editor's rule). It also writes the lighting from the
+editor's Studio look (`haxeon.editor.ViewportLook`): one environment map per catalogue camera angle
+in `public/components/environment/`, the exposure and tone mapping, and the look's roughness floor
+on the exported materials, so a part reads as it does in the editor
+(see [`app/plans/VIEWPORT_LOOK.md`](../../app/plans/VIEWPORT_LOOK.md)). `docs/screens/components.py`
+renders the thumbnails from those GLBs with the same `<model-viewer>` settings the pages use
+(`src/model-view.json`), so each thumbnail is its viewer's first frame. Regenerate after changing a
+component or the look, then rerender:
 
 ```sh
 DOCS_COMPONENTS_WRITE=1 ./haxeon/scripts/haxeon workspace test --workspace materia.workspace.json --only docs-components --no-test-cache

@@ -10,6 +10,9 @@
 	"dependencies": {
 		"machinekit": {
 			"path": "../../machinekit"
+		},
+		"haxeon-editor": {
+			"path": "../../haxeon/packages/editor"
 		}
 	},
 	"target": "host"

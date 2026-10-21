@@ -1,0 +1,12 @@
+{
+	"comment": "How the component catalogue shows a model: <model-viewer> attributes shared by the 3D viewers on the family pages (scripts/components.mjs) and the thumbnails rendered by docs/screens/components.py, so a thumbnail is the viewer's first frame. The lighting (environment map, exposure, tone mapping) and each part's camera angle come from the export, docs/components/data/components.json, which builds them from the editor's viewport look. The viewer and thumbnail both have the aspect below.",
+	"aspect": [
+		4,
+		3
+	],
+	"attributes": {
+		"shadow-intensity": "1",
+		"shadow-softness": "0.7",
+		"interaction-prompt": "none"
+	}
+}

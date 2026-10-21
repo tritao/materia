@@ -1,5 +1,7 @@
 import haxe.Json;
+import cadkit.MeshFeatureEdges;
 import haxe.io.Bytes;
+import haxeon.editor.ViewportLook;
 import machinekit.catalog.CatalogMetadata;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentParameter;
@@ -22,6 +24,17 @@ import sys.io.File;
 class DocsComponents {
 	static inline var DATA = "data/components.json";
 	static inline var MODELS = "../site/public/components";
+	static inline var ENVIRONMENTS = "../site/public/components/environment";
+
+	/** The catalogue's views: one turn about the vertical, and the angles down from it a part can get (see `view`). */
+	static inline var THETA = 35.0;
+
+	static final PHIS = [50.0, 62.0, 72.0];
+
+	/** The editor's default lighting, which the catalogue reproduces. A function, not a static initialiser, so it
+	 * does not depend on another class's static initialisation order. */
+	static function look():ViewportLook
+		return ViewportLook.preset(ViewportLook.Studio);
 
 	public static function main():Void {
 		var write = Sys.getEnv("DOCS_COMPONENTS_WRITE") == "1";
@@ -42,7 +55,12 @@ class DocsComponents {
 				entries.push({id: type.id, label: type.label(), family: family(type.id), error: Std.string(error)});
 			}
 		}
-		var text = Json.stringify({components: entries}, null, " ") + "\n";
+		for (phi in PHIS)
+			models.set('environment/${environmentName(phi)}', StudioEnvironment.hdr(look(), THETA, phi));
+		// The viewers' display mapping, from the same look (docs/site/src/model-view.json has the rest).
+		var exposure = look().exposure;
+		var display = {exposure: exposure > 0 ? exposure : 1.0, toneMapping: exposure > 0 ? "neutral" : "none"};
+		var text = Json.stringify({display: display, components: entries}, null, " ") + "\n";
 		var stale = 0;
 		if (write) {
 			if (!FileSystem.exists("data")) FileSystem.createDirectory("data");
@@ -54,6 +72,8 @@ class DocsComponents {
 			} else {
 				FileSystem.createDirectory(MODELS);
 			}
+			if (!FileSystem.exists(ENVIRONMENTS))
+				FileSystem.createDirectory(ENVIRONMENTS);
 			for (name => bytes in models)
 				File.saveBytes('$MODELS/$name', bytes);
 		} else {
@@ -99,8 +119,10 @@ class DocsComponents {
 		} catch (_:Dynamic) {}
 		var model:Null<Bytes> = null;
 		if (component.hasGeometry()) {
-			model = glb(component);
+			var exported = glb(component);
+			model = exported.bytes;
 			entry.model = modelName(type.id);
+			entry.view = view(exported);
 		}
 		return {entry: entry, model: model};
 	}
@@ -182,14 +204,41 @@ class DocsComponents {
 	static function modelName(id:String):String
 		return id.split(".").slice(1).join("-") + ".glb";
 
-	/** The default part at preview detail as a binary glTF, in metres, coloured by its material. */
-	static function glb(component:MachineComponent):Bytes {
+	/** The default part at preview detail as a binary glTF, in metres, coloured by its material, with its feature edges. */
+	static function glb(component:MachineComponent):Glb {
 		var part = component.geometry(ComponentDetail.Preview);
 		var mesh = part.shape.tessellateRelative();
+		var features = MeshFeatureEdges.ofMesh(mesh), edges:Array<Float> = [];
+		for (segment in 0...features.length)
+			if (features[segment])
+				for (value in 0...6)
+					edges.push(mesh.edgeSegments.getDouble(segment * 48 + value * 8));
 		var material = MaterialLibrary.require(component.materialId).visual;
-		return Glb.write(mesh.vertices, mesh.normals, mesh.indices, mesh.vertexCount, mesh.indexCount, 0.001,
-			material.baseColor, material.metallic, material.roughness);
+		// Material colours are sRGB, as the editor's shader reads them; glTF factors are linear. The editor's
+		// display roughness floor applies too, so highlights spread the same way.
+		return Glb.write(mesh.vertices, mesh.normals, mesh.indices, mesh.vertexCount, mesh.indexCount, edges, 0.001,
+			[for (channel in material.baseColor) srgbToLinear(channel)], material.metallic,
+			Math.max(material.roughness, look().roughnessFloor));
 	}
+
+	static function srgbToLinear(value:Float):Float {
+		return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+	}
+
+	/**
+	 * The angle the catalogue shows a part from, used by both its thumbnail and its 3D viewer: the camera's turn about
+	 * the vertical and its angle down from the vertical, in degrees. Flat parts are seen from higher up, so a plate
+	 * shows its face rather than its edge; tall ones from closer to level.
+	 */
+	static function view(model:Glb):{theta:Float, phi:Float, environment:String} {
+		var width = model.max[0] - model.min[0], height = model.max[1] - model.min[1], depth = model.max[2] - model.min[2];
+		var footprint = Math.max(width, depth);
+		var phi = height < 0.35 * footprint ? PHIS[0] : height > 2.5 * footprint ? PHIS[2] : PHIS[1];
+		return {theta: THETA, phi: phi, environment: '/components/environment/${environmentName(phi)}'};
+	}
+
+	static function environmentName(phi:Float):String
+		return 'studio-${Std.int(phi)}.hdr';
 
 	/** Six decimals; through `fround` (a Float), since `Math.round` returns an Int that large values overflow. */
 	static function round(value:Float):Float

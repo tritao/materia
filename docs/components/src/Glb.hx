@@ -1,17 +1,22 @@
 import haxe.Json;
 import haxe.io.Bytes;
 
-/** A minimal binary glTF 2.0 writer: one mesh, one primitive, one PBR material. */
+/** A minimal binary glTF 2.0 writer: one mesh of PBR triangles, with its feature edges as unlit lines. */
 class Glb {
+	/** Edge lines: a dark grey that reads on light and metallic parts alike (linear RGB). */
+	static final EDGE_COLOR = [0.02, 0.025, 0.03, 1.0];
+
 	/**
 	 * Writes positions and normals (doubles, `vertexCount` x 3) and triangle indices (32-bit, `indexCount`) as a
 	 * GLB, scaling positions by `scale` (CadKit models in millimetres; glTF is in metres). glTF is Y-up and Materia
-	 * Z-up, so every vector turns -90 degrees about X: (x, y, z) -> (x, z, -y).
+	 * Z-up, so every vector turns -90 degrees about X: (x, y, z) -> (x, z, -y). `edges` holds the feature edges as
+	 * pairs of points, flat, in the positions' units.
 	 */
-	public static function write(positions:Bytes, normals:Bytes, indices:Bytes, vertexCount:Int, indexCount:Int, scale:Float,
-			color:Array<Float>, metallic:Float, roughness:Float):Bytes {
+	public static function write(positions:Bytes, normals:Bytes, indices:Bytes, vertexCount:Int, indexCount:Int, edges:Array<Float>,
+			scale:Float, color:Array<Float>, metallic:Float, roughness:Float):Glb {
 		var normalOffset = vertexCount * 12, indexOffset = normalOffset * 2;
-		var binaryLength = indexOffset + indexCount * 4;
+		var edgeOffset = indexOffset + indexCount * 4, edgeVertices = Std.int(edges.length / 3);
+		var binaryLength = edgeOffset + edgeVertices * 12;
 		var binary = Bytes.alloc(binaryLength);
 		var min = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
 		var max = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
@@ -33,25 +38,49 @@ class Glb {
 		}
 		for (index in 0...indexCount)
 			binary.setInt32(indexOffset + index * 4, indices.getInt32(index * 4));
+		var edgeMin = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+		var edgeMax = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+		for (vertex in 0...edgeVertices) {
+			var p = [edges[vertex * 3] * scale, edges[vertex * 3 + 2] * scale, -edges[vertex * 3 + 1] * scale];
+			for (axis in 0...3) {
+				binary.setFloat(edgeOffset + vertex * 12 + axis * 4, p[axis]);
+				var stored = binary.getFloat(edgeOffset + vertex * 12 + axis * 4);
+				if (stored < edgeMin[axis]) edgeMin[axis] = stored;
+				if (stored > edgeMax[axis]) edgeMax[axis] = stored;
+			}
+		}
 		var accessors:Array<Dynamic> = [
 			{bufferView: 0, componentType: 5126, count: vertexCount, type: "VEC3", min: min, max: max},
 			{bufferView: 1, componentType: 5126, count: vertexCount, type: "VEC3"},
 			{bufferView: 2, componentType: 5125, count: indexCount, type: "SCALAR"}
+		];
+		var primitives:Array<Dynamic> = [{attributes: {POSITION: 0, NORMAL: 1}, indices: 2, material: 0}];
+		var bufferViews:Array<Dynamic> = [
+			{buffer: 0, byteOffset: 0, byteLength: normalOffset, target: 34962},
+			{buffer: 0, byteOffset: normalOffset, byteLength: normalOffset, target: 34962},
+			{buffer: 0, byteOffset: indexOffset, byteLength: indexCount * 4, target: 34963}
+		];
+		// Feature edges, drawn as unlit lines (mode 1) the way the editor outlines CAD parts.
+		if (edgeVertices > 0) {
+			bufferViews.push({buffer: 0, byteOffset: edgeOffset, byteLength: edgeVertices * 12, target: 34962});
+			accessors.push({bufferView: 3, componentType: 5126, count: edgeVertices, type: "VEC3", min: edgeMin, max: edgeMax});
+			primitives.push({attributes: {POSITION: 3}, mode: 1, material: 1});
+		}
+		var materials:Array<Dynamic> = [
+			{pbrMetallicRoughness: {baseColorFactor: [color[0], color[1], color[2], 1.0], metallicFactor: metallic,
+				roughnessFactor: roughness}},
+			{pbrMetallicRoughness: {baseColorFactor: EDGE_COLOR}, extensions: {KHR_materials_unlit: {}}}
 		];
 		var gltf:Dynamic = {
 			asset: {version: "2.0", generator: "Materia docs/components"},
 			scene: 0,
 			scenes: [{nodes: [0]}],
 			nodes: [{mesh: 0}],
-			meshes: [{primitives: [{attributes: {POSITION: 0, NORMAL: 1}, indices: 2, material: 0}]}],
-			materials: [{pbrMetallicRoughness: {baseColorFactor: [color[0], color[1], color[2], 1.0], metallicFactor: metallic,
-				roughnessFactor: roughness}}],
+			meshes: [{primitives: primitives}],
+			materials: materials,
+			extensionsUsed: ["KHR_materials_unlit"],
 			buffers: [{byteLength: binaryLength}],
-			bufferViews: [
-				{buffer: 0, byteOffset: 0, byteLength: normalOffset, target: 34962},
-				{buffer: 0, byteOffset: normalOffset, byteLength: normalOffset, target: 34962},
-				{buffer: 0, byteOffset: indexOffset, byteLength: indexCount * 4, target: 34963}
-			],
+			bufferViews: bufferViews,
 			accessors: accessors
 		};
 		var text = Json.stringify(gltf);
@@ -70,6 +99,20 @@ class Glb {
 		out.setInt32(20 + json.length, binaryLength);
 		out.setInt32(24 + json.length, 0x004E4942); // "BIN\0"
 		out.blit(28 + json.length, binary, 0, binaryLength);
-		return out;
+		return new Glb(out, min, max);
+	}
+
+	/** The file. */
+	public final bytes:Bytes;
+
+	/** The mesh's bounds in glTF axes (Y up), in metres. */
+	public final min:Array<Float>;
+
+	public final max:Array<Float>;
+
+	function new(bytes:Bytes, min:Array<Float>, max:Array<Float>) {
+		this.bytes = bytes;
+		this.min = min;
+		this.max = max;
 	}
 }
