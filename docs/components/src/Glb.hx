@@ -8,12 +8,15 @@ class Glb {
 
 	/**
 	 * Writes positions and normals (doubles, `vertexCount` x 3) and triangle indices (32-bit, `indexCount`) as a
-	 * GLB, scaling positions by `scale` (CadKit models in millimetres; glTF is in metres). glTF is Y-up and Materia
-	 * Z-up, so every vector turns -90 degrees about X: (x, y, z) -> (x, z, -y). `edges` holds the feature edges as
-	 * pairs of points, flat, in the positions' units.
+	 * GLB, scaling positions by `scale` (CadKit models in millimetres; glTF is in metres). `axes` holds the part's
+	 * local directions that become glTF's +X, +Y (up) and +Z (towards the default viewer), as rows of a rotation:
+	 * for a part shown as modelled, Materia's Z-up becomes glTF's Y-up, (x, y, z) -> (x, z, -y). `edges` holds the
+	 * feature edges as pairs of points, flat, in the positions' units.
 	 */
 	public static function write(positions:Bytes, normals:Bytes, indices:Bytes, vertexCount:Int, indexCount:Int, edges:Array<Float>,
-			scale:Float, color:Array<Float>, metallic:Float, roughness:Float):Glb {
+			axes:Array<Array<Float>>, scale:Float, color:Array<Float>, metallic:Float, roughness:Float):Glb {
+		function turn(x:Float, y:Float, z:Float):Array<Float>
+			return [for (row in axes) row[0] * x + row[1] * y + row[2] * z];
 		var normalOffset = vertexCount * 12, indexOffset = normalOffset * 2;
 		var edgeOffset = indexOffset + indexCount * 4, edgeVertices = Std.int(edges.length / 3);
 		var binaryLength = edgeOffset + edgeVertices * 12;
@@ -23,7 +26,7 @@ class Glb {
 		for (vertex in 0...vertexCount) {
 			var x = positions.getDouble(vertex * 24) * scale, y = positions.getDouble(vertex * 24 + 8) * scale,
 				z = positions.getDouble(vertex * 24 + 16) * scale;
-			var p = [x, z, -y];
+			var p = turn(x, y, z);
 			for (axis in 0...3) {
 				binary.setFloat(vertex * 12 + axis * 4, p[axis]);
 				// The bounds must be the stored 32-bit values, so read each one back.
@@ -31,17 +34,16 @@ class Glb {
 				if (stored < min[axis]) min[axis] = stored;
 				if (stored > max[axis]) max[axis] = stored;
 			}
-			var nx = normals.getDouble(vertex * 24), ny = normals.getDouble(vertex * 24 + 8), nz = normals.getDouble(vertex * 24 + 16);
-			binary.setFloat(normalOffset + vertex * 12, nx);
-			binary.setFloat(normalOffset + vertex * 12 + 4, nz);
-			binary.setFloat(normalOffset + vertex * 12 + 8, -ny);
+			var n = turn(normals.getDouble(vertex * 24), normals.getDouble(vertex * 24 + 8), normals.getDouble(vertex * 24 + 16));
+			for (axis in 0...3)
+				binary.setFloat(normalOffset + vertex * 12 + axis * 4, n[axis]);
 		}
 		for (index in 0...indexCount)
 			binary.setInt32(indexOffset + index * 4, indices.getInt32(index * 4));
 		var edgeMin = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
 		var edgeMax = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
 		for (vertex in 0...edgeVertices) {
-			var p = [edges[vertex * 3] * scale, edges[vertex * 3 + 2] * scale, -edges[vertex * 3 + 1] * scale];
+			var p = turn(edges[vertex * 3] * scale, edges[vertex * 3 + 1] * scale, edges[vertex * 3 + 2] * scale);
 			for (axis in 0...3) {
 				binary.setFloat(edgeOffset + vertex * 12 + axis * 4, p[axis]);
 				var stored = binary.getFloat(edgeOffset + vertex * 12 + axis * 4);

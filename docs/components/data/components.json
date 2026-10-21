@@ -839,8 +839,8 @@
    },
    "model": "assembly-sfu20-axis-part.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -4115,8 +4115,8 @@
    },
    "model": "hobbing-spindle-part.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -5737,8 +5737,8 @@
    },
    "model": "milling-flat-end-mill.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -6118,8 +6118,8 @@
    },
    "model": "milling-power-drawbar-study-part.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -6604,8 +6604,8 @@
    },
    "model": "milling-spindle-cartridge.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
     "theta": 35
    }
   },
@@ -9000,8 +9000,8 @@
    },
    "model": "motion-ball-screw.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -9209,8 +9209,8 @@
    },
    "model": "motion-brake-servo.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
     "theta": 35
    }
   },
@@ -10687,8 +10687,8 @@
    },
    "model": "motion-hg-rail.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -10803,8 +10803,8 @@
    },
    "model": "motion-hzmotion-bk12-screw-end-study.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -10940,8 +10940,8 @@
    },
    "model": "motion-lead-screw.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -11725,8 +11725,8 @@
    },
    "model": "motion-linear-rail.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -11901,8 +11901,8 @@
    },
    "model": "motion-linear-rail-block.glb",
    "view": {
-    "environment": "/components/environment/studio-62.hdr",
-    "phi": 62,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -12008,8 +12008,8 @@
    },
    "model": "motion-linear-scale.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -13071,8 +13071,8 @@
    },
    "model": "motion-proximity-switch.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -14969,8 +14969,8 @@
    },
    "model": "motion-sfu-drawing-screw.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -15562,8 +15562,8 @@
    },
    "model": "motion-stepped-shaft.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -15820,8 +15820,8 @@
    },
    "model": "motion-supplier-hgr25-rail.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -16262,8 +16262,8 @@
    },
    "model": "motion-vallder-sfu1605-screw.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -16471,8 +16471,8 @@
    },
    "model": "pneumatic-cylinder.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -16565,8 +16565,8 @@
    },
    "model": "pneumatic-cylinder-rod.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -16779,8 +16779,8 @@
    },
    "model": "pneumatic-routed-hose.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -17141,8 +17141,8 @@
    },
    "model": "pneumatic-schmalz-vacuum-generator.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
     "theta": 35
    }
   },
@@ -17260,8 +17260,8 @@
    },
    "model": "pneumatic-schmalz-vacuum-hose.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -19728,8 +19728,8 @@
    },
    "model": "printing-heater-cartridge.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -20058,8 +20058,8 @@
    },
    "model": "printing-thermistor.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -20392,8 +20392,8 @@
    },
    "model": "robotics-arm-link.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -21020,8 +21020,8 @@
    },
    "model": "robotics-frame-bar.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -22727,8 +22727,8 @@
    },
    "model": "routing-atc-spindle.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
     "theta": 35
    }
   },
@@ -25034,8 +25034,8 @@
    },
    "model": "standard-hex-bolt.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
     "theta": 35
    }
   },
@@ -25377,8 +25377,8 @@
    },
    "model": "standard-parallel-key.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -25906,8 +25906,8 @@
    },
    "model": "standard-socket-head-cap-screw.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -26153,8 +26153,8 @@
    },
    "model": "structural-drawing-profile-member.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -26468,8 +26468,8 @@
    },
    "model": "structural-rect-tube-member.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -26714,8 +26714,8 @@
    },
    "model": "structural-tslot-member.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
     "theta": 35
    }
   },
@@ -26965,8 +26965,8 @@
    },
    "model": "tooling-plain-pin.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -27607,8 +27607,8 @@
    },
    "model": "transmission-helical-rack.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },
@@ -27733,8 +27733,8 @@
    },
    "model": "transmission-involute-rack.glb",
    "view": {
-    "environment": "/components/environment/studio-72.hdr",
-    "phi": 72,
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    }
   },

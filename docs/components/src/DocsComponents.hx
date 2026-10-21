@@ -8,6 +8,7 @@ import machinekit.component.ComponentParameter;
 import machinekit.component.ComponentParameterType;
 import machinekit.component.ComponentRegistry;
 import machinekit.component.ComponentType;
+import machinekit.component.ComponentView;
 import machinekit.component.ComponentValue;
 import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
@@ -218,10 +219,23 @@ class DocsComponents {
 			if (features[segment])
 				for (value in 0...6)
 					edges.push(mesh.edgeSegments.getDouble(segment * 48 + value * 8));
+		// The part turned to its presentation view: declared by the component, or chosen from its bounds.
+		var minimum = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+		var maximum = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+		for (vertex in 0...mesh.vertexCount)
+			for (axis in 0...3) {
+				var value = mesh.vertices.getDouble(vertex * 24 + axis * 8);
+				if (value < minimum[axis]) minimum[axis] = value;
+				if (value > maximum[axis]) maximum[axis] = value;
+			}
+		var view = component.presentationView();
+		if (view == null) view = ComponentView.derive(minimum, maximum);
+		var u = view.up, f = view.front;
+		var axes = [[u[1] * f[2] - u[2] * f[1], u[2] * f[0] - u[0] * f[2], u[0] * f[1] - u[1] * f[0]], u, f];
 		var material = MaterialLibrary.require(component.materialId).visual;
 		// Material colours are sRGB, as the editor's shader reads them; glTF factors are linear. The editor's
 		// display roughness floor applies too, so highlights spread the same way.
-		return Glb.write(mesh.vertices, mesh.normals, mesh.indices, mesh.vertexCount, mesh.indexCount, edges, 0.001,
+		return Glb.write(mesh.vertices, mesh.normals, mesh.indices, mesh.vertexCount, mesh.indexCount, edges, axes, 0.001,
 			[for (channel in material.baseColor) srgbToLinear(channel)], material.metallic,
 			Math.max(material.roughness, look().roughnessFloor));
 	}
