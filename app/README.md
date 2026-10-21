@@ -799,10 +799,15 @@ Both views show the same live simulation and stock; inspecting does not change
 selection, document visibility or history. Scenes without presets can inspect
 the selected part.
 
-Generated scenes may supply `project.inspectionCameras`: unique `id`, `label`,
-occurrence `anchor`, world-aligned `offset` in metres from its displayed centre,
-`span` in metres, `yaw`/`pitch` in radians, and `hiddenPrefixes` of occurrence ids.
-These presets are optional and use the existing scene artifact format.
+Generated scenes supply an `AssemblyPresentation` beside the engineering
+assembly and state. Its named views use typed occurrence selectors, framing,
+visibility rules and section planes. The main viewport, inspection dock and
+picture in picture share these controls, each with its own session cursor.
+**Reset view** restores the generated default. The **Explode** slider and procedure
+**Previous / Next / Restart** controls change display poses only. Movements show
+Checked, Illustrative, Stale or Failed evidence; a failed withdrawal stays visible.
+Simulation disables presentation motion. Authored views and procedures are saved
+in the document; navigation and procedure progress are session state.
 
 
 ## Unified hobber scene
@@ -815,9 +820,9 @@ changing the document. Play drives the selected scenario through measured guard
 feedback. Full-cycle transfers require open/unlocked doors and standstill; the
 actual cut requires closed/locked feedback. Faults never restart a cycle.
 
-The adjacent Visible / Transparent / Hidden controls are presentation only.
-Physical bodies, switches and guard-lock logic remain installed, and the
-inspection camera keeps its own cutaway visibility.
+The assembly view list provides enclosed, transparent and cutaway views.
+Physical bodies, switches and guard-lock logic remain installed. Each viewport
+keeps its own view and section state.
 A CNC job may carry `machining.mission: {id, label}`. This names a finite,
 single-program machining task executed by the existing CNC player. Its Mission
 view follows the player's real state, including feed hold, failure and completion;

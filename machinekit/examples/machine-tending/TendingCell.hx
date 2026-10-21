@@ -11,8 +11,28 @@ class TendingCell {
 		var scene = SceneArtifact.decode(cell.previewArtifact());
 		scene.missions = [{controllerId: TendingMission.ROBOT_CONTROLLER, loop: false,
 			steps: TendingMission.generate(cell)}];
+        var definition=scene.assemblyDefinition;if(definition==null)throw "Tending cell lost its assembly";
+        scene.presentation=presentation(definition);
 		return SceneArtifact.encode(scene);
 	}
+    public static function presentation(definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation {
+        var presentation=materia.presentation.Presentations.assembled(definition,-1.1,0.35,"machine-tending");
+        function view(id:String,label:String,occurrence:String,yaw:Float):Void {
+            presentation.views.push({id:id,label:label,camera:Frame([{occurrence:occurrence,subtree:true}],yaw,0.35,1.3),
+                visibility:[],sections:[],explode:0,source:Generated("machine-tending")});
+        }
+        view("robot","Robot and tool","arm",-1.1);
+        view("machine","Machine interface","mill",-1.1);
+        view("infeed","Infeed workpieces","infeed",-1.1);
+        presentation.procedures=[{id:"cell-review",label:"Review the tending cell",kind:Service,start:Assembled,source:Generated("machine-tending"),steps:[
+            {id:"infeed",title:"Review the infeed",instruction:"Inspect the loaded workpieces and their tray registration.",view:"infeed",highlight:[],action:Note},
+            {id:"robot",title:"Review the robot tool",instruction:"Inspect the wrist tool and approach clearance.",view:"robot",highlight:[],action:Note},
+            {id:"machine",title:"Review the machine interface",instruction:"Inspect the door, workholding and machine access. Use the executable mission to run the tending cycle.",view:"machine",highlight:[],action:Note}
+        ]}];
+        materia.presentation.PresentationCodec.validate(definition,presentation);
+        return presentation;
+    }
+
 }
 
 class TendingMissionChecks {

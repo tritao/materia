@@ -9,6 +9,7 @@ class PressBrakePreview {
 	public static function pressBrake():Bytes {
 		var press = new PressBrake();
 		var scene = AssemblyPreview.scene(press, "press-brake");
+        scene.presentation=presentation(press,scene.assemblyDefinition);
 		var motion = scene.machineMotion;
 		if (motion == null) throw "Press preview lost its machine metadata";
 		motion.digitalProgram = emptyStroke(press);
@@ -19,6 +20,7 @@ class PressBrakePreview {
 	public static function controlledPressBrake():Bytes {
 		var press = new PressBrake(), geometry = PressGeometry.of(press);
 		var scene = AssemblyPreview.scene(press, "press-brake");
+        scene.presentation=presentation(press,scene.assemblyDefinition);
 		var motion = scene.machineMotion;
 		if (motion == null) throw "Press preview lost its machine metadata";
 		var station = press.toolLayout.stations()[0];
@@ -39,6 +41,21 @@ class PressBrakePreview {
 		};
 		return SceneArtifact.encode(scene);
 	}
+
+    public static function presentation(press:PressBrake,definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation {
+        if(definition==null)throw "Press presentation requires its assembly";
+        var result=materia.presentation.Presentations.assembled(definition,-1.1,0.35,"press-brake"),datums=press.pressGeometryDatums();
+        var tools:Array<materia.presentation.AssemblyPresentation.PartSelector> = [];
+        for(station in datums.tools) {tools.push({occurrence:station.punch,subtree:false});tools.push({occurrence:station.die,subtree:false});}
+        result.views.push({id:"tooling",label:"Installed tooling",camera:Frame(tools,-1.4,0.2,1.5),visibility:[],sections:[],explode:0,source:Generated("press-brake")});
+        result.views.push({id:"backgauge",label:"Backgauge registration",camera:Frame([for(id in datums.fingers){occurrence:id,subtree:false}],1.1,0.35,1.5),visibility:[],sections:[],explode:0,source:Generated("press-brake")});
+        result.procedures=[{id:"setup-review",label:"Review the installed setup",kind:Service,start:Assembled,source:Generated("press-brake"),steps:[
+            {id:"tooling",title:"Inspect installed tooling",instruction:"Check the installed punch and die station against the setup plan.",view:"tooling",highlight:tools,action:Note},
+            {id:"registration",title:"Inspect backgauge registration",instruction:"Check the finger spacing and stock registration against the bend setup.",view:"backgauge",highlight:[],action:Note},
+            {id:"cycle",title:"Confirm the process setup",instruction:"Confirm the bend sequence and process checks before running the controller programme.",view:"assembled",highlight:[],action:Note}
+        ]}];
+        materia.presentation.PresentationCodec.validate(definition,result);return result;
+    }
 
 	/** Ideal timing leaves 10 mm tool clearance; a full-travel return seats home before the neutral dwell. */
 	public static function emptyStroke(press:PressBrake):SceneArtifactDigitalProgram {

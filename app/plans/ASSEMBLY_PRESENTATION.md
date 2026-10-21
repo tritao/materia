@@ -265,6 +265,25 @@ not hidden. Changing the plate thickness turns the cached evidence `Stale` until
 the planner runs again. Box mold and casting mold get procedures with no new viewer code.
 
 ### AP7 — Remaining producers
+Implementation status: machine-tending cell and end-effector views, a cell review
+procedure, press tooling/backgauge views and a setup review procedure now use the
+shared format. The executable tending mission and hydraulic/bend controller steps
+remain engineering programmes. The application documentation describes the current
+view and procedure controls. Supplier-fastener axis defaults were migrated in AP1.
+
+Final source grep for `SceneArtifactInspectionCamera`, `InspectionCameraModel`,
+`initialView`, `hiddenPrefixes`, `inspectionCameras` and `exploded:Bool` reports only
+the two decoder lists that explicitly reject removed fields (`SceneArtifact` and
+`SceneCodec`). Inspection-dock widget identities remain current UI, not legacy
+camera-preset data.
+
+The tending package compiles and its real end-effector service view validates.
+The full cell review check is blocked at the existing reach-certificate gate:
+current cell inputs no longer match its stored fingerprint. The gate is preserved;
+no reach evidence was rewritten to bypass it. Press review views validate against
+both real axis configurations, round trip and leave their engineering definitions
+unchanged.
+
 Move remaining project-specific presets (supplier-fasteners axis previews,
 machine-tending, sheet-metal press-brake steps where they are presentation)
 onto views and procedures. Remove any leftover ad-hoc presentation fields from

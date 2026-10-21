@@ -17,7 +17,20 @@ import cadkit.sheetmetal.process.AirBending;
 /** Check the installed press's joint tree, coupled ram and physical tool datums. */
 class PressBrakeChecks {
 	public static function main():Void run();
+    public static function presentationChecks():Void {
+        for(withR in [false,true]) {
+            var press=new PressBrake(withR);
+            var definition=press.definition(),before=materia.assembly.AssemblyDefinitionCodec.encode(definition);
+            var presentation=PressBrakePreview.presentation(press,definition);
+            if(presentation.views.length!=3||presentation.procedures[0].steps.length!=3)throw "Press setup review lost its views or steps";
+            materia.presentation.PresentationCodec.decode(definition,materia.presentation.PresentationCodec.encode(definition,presentation));
+            if(materia.assembly.AssemblyDefinitionCodec.encode(definition)!=before)throw "Setup review changed the engineering press";
+        }
+        Sys.println("Press setup presentation: both axis configurations validated without engineering edits");
+    }
 	public static function run():Void {
+        presentationChecks();
+        if(Sys.args().indexOf("--presentation-only")>=0)return;
 		BendSetupChecks.run();
 		BendRegistrationChecks.run();
 		SingleBendSetupChecks.run();
@@ -63,6 +76,7 @@ class PressBrakeChecks {
 			var withR = variant != 0;
 			var press = new PressBrake(withR, variant == 2 ? tallest : null, null, variant == 3 ? 30 : 300);
 			press.validate();
+
 			var geometry = PressGeometry.of(press), reference = PressGeometry.reference(press.toolLayout, withR, press.fingerHalfSpacing);
 			near(geometry.bedLength, reference.bedLength, "Derived bed length");
 			near(geometry.bedTopHeight, reference.bedTopHeight, "Derived bed top");
