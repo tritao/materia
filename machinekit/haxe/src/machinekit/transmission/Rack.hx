@@ -24,6 +24,10 @@ import machinekit.component.Solids;
  * extruded along local +X for `faceWidth`.
  */
 class Rack extends MachineComponent {
+	/** Lies along its length (+Z) with its teeth (+Y) up. */
+	override public function presentationView():Null<machinekit.component.ComponentView>
+		return machinekit.component.ComponentView.lengthAlongZ();
+
 	/** Assumed power efficiency of a lubricated rack and pinion. */
 	public static inline var DEFAULT_EFFICIENCY:Float = 0.95;
 

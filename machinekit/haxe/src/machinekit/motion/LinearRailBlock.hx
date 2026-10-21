@@ -10,6 +10,7 @@ import materia.project.MaterialLibrary;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
+import machinekit.component.ComponentView;
 import machinekit.component.ConnectorRole;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
@@ -56,6 +57,10 @@ class LinearRailBlock extends MachineComponent {
 				addConnector('mount${index++}', Mount,
 					AssemblyFrames.alongY(x, spec.blockHeight - spec.railHeight, z, 0, 1, 0));
 	}
+
+	/** Riding on its rail: mounting face (+Y) up and the travel (Z) running across the view. */
+	override public function presentationView():Null<ComponentView>
+		return ComponentView.lengthAlongZ();
 
 	override public function hasGeometry():Bool return true;
 

@@ -9,6 +9,10 @@ import materia.assembly.AssemblyFrames as F;
 /** Assumed catalogue-class normal-module helical rack. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class HelicalRack extends AssumedCatalogComponent {
+  /** Lies along its length (+Z) with its teeth (+Y) up. */
+  override public function presentationView():Null<machinekit.component.ComponentView>
+    return machinekit.component.ComponentView.lengthAlongZ();
+
   static var recipe:Null<ComponentType>;
   static function inputs():Array<ComponentParameter> return [
     P.length("normalModule", 1.5),

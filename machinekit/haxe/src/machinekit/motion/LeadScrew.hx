@@ -20,6 +20,10 @@ import machinekit.component.Solids;
  * the flank profile, reliefs and machined ends are not generated.
  */
 class LeadScrew extends MachineComponent {
+	/** A screw lies along its axis (+Z), whatever its length. */
+	override public function presentationView():Null<machinekit.component.ComponentView>
+		return machinekit.component.ComponentView.lengthAlongZ();
+
 	/** The damping of a steel screw drive, as a ratio of critical damping (assumed: a ball screw shaft rings a little). */
 	public static inline var ASSUMED_DAMPING_RATIO:Float = 0.03;
 

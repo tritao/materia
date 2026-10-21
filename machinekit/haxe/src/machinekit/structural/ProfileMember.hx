@@ -14,6 +14,10 @@ import machinekit.structural.FrameAssembly.StructuralProfile;
 
 /** Cut structural stock along local +Z. Hollow sections retain their actual material and mass. */
 class ProfileMember extends MachineComponent {
+	/** Cut stock lies along its length (+Z), whatever the cut. */
+	override public function presentationView():Null<machinekit.component.ComponentView>
+		return machinekit.component.ComponentView.lengthAlongZ();
+
 	public final profile:StructuralProfile;
 	public final length:Float;
 	static var tslotRecipe:Null<ComponentType>;

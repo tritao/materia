@@ -117,6 +117,13 @@ class MachineComponent {
 		return cachedBom;
 	}
 
+	/**
+	 * How this part is best looked at on its own, when its shape alone does not say (see `ComponentView.derive`);
+	 * null leaves the choice to its bounds.
+	 */
+	public function presentationView():Null<ComponentView>
+		return null;
+
 	public function hasGeometry():Bool {
 		try {
 			var part = geometry(Preview);

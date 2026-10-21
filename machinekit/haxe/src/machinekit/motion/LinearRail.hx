@@ -23,6 +23,10 @@ import materia.assembly.AssemblyFrames;
 @:allow(machinekit.motion.HgRail)
 @:allow(machinekit.motion.HiwinHgr25Rail)
 class LinearRail extends MachineComponent {
+	/** Runs along +Z with its top (+Y) up, whatever its cut length. */
+	override public function presentationView():Null<machinekit.component.ComponentView>
+		return machinekit.component.ComponentView.lengthAlongZ();
+
 	public final spec:LinearRailProfileSpec;
 	public final length:Float;
 	public final holePositions:Array<Float>;
