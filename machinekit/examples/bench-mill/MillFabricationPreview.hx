@@ -249,7 +249,7 @@ class MillFabricationPreview {
 				records[0].status = "pass";
 				records[0].severity = "error";
 			}, "severity/status consistency");
-			rejectsManifest(m -> m.version = 6, "Unsupported tooling manifest");
+			rejectsManifest(m -> m.version = 7, "Unsupported tooling manifest");
 			rejectsManifest(m -> {
 				var files:Array<Dynamic> = cast m.files;
 				m.files = files.filter(file -> file.path != "insert-anchorage.json");

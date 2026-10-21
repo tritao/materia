@@ -74,17 +74,18 @@ class InsertFixturePlanner {
 			case Fabricated(manufacturing):
 				for (hole in insert.holes) if (hole.thread!=null
 					&& manufacturing.holeRoutes.filter(route -> route.holeId==hole.id).length==0) {
-					// Test only whether declaring this existing source hole pre-cast
-					// would enable a fixing. Never mutate or emit that hypothetical route.
-					var spec=materia.casting.InsertSpec.InsertSpecCodec.snapshot({body:insert.body,holes:insert.holes,
-						origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces});
-					switch spec.origin {
-						case Fabricated(plan):plan.holeRoutes.push({holeId:hole.id,
-							route:materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting});
-						case Catalogue(_):throw "Fabricated insert expected";
+					var requirements=manufacturing.mountingRequirements.filter(requirement -> requirement.holeId==hole.id);
+					if (requirements.length>0) switch materia.casting.HoleClearanceBudget.HoleClearanceBudgets.choose(
+						requirements[0].budget,requirements[0].permittedRoutes) {
+						case AwaitInputs(_):
+						case UsePreCast(_),UseTransfer(_),ProposeTransfer(_),ChangeDesign(_):continue;
 					}
-					for (candidate in materia.casting.InsertStages.holes(spec,materia.casting.InsertStages.InsertStage.BeforeCasting))
-						if (candidate.id==hole.id && select(candidate,pose,face,hardware)!=null) return true;
+					// Inspect only an existing hole's physical raw-stock geometry.
+					// The source route and clearance budget remain untouched.
+					var spec:materia.casting.InsertSpec={body:insert.body,holes:insert.holes,
+						origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces};
+					for (candidate in materia.casting.InsertStages.rawGeometryForServiceHoles(spec,[hole.id]))
+						if (select(candidate,pose,face,hardware)!=null) return true;
 				}
 		}
 		return false;

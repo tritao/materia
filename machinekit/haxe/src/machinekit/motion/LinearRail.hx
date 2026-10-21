@@ -63,6 +63,27 @@ class LinearRail extends MachineComponent {
 				AssemblyFrames.alongY(0, 0, holePositions[i], 0, 1, 0));
 	}
 
+	/** Published geometry already used by this rail's CAD; absent on nominal
+	 * profiles whose bolt holes have not been declared. No ISO clearance is inferred. */
+	public function mountingHole():Null<{diameter:Float,counterboreDiameter:Float,counterboreDepth:Float,reference:String}> {
+		if (spec.designation!="HGR15" || spec.railWidth!=15 || spec.railHeight!=15) return null;
+		return {diameter:Hgr15RailGeometry.BORE_DIAMETER,counterboreDiameter:Hgr15RailGeometry.COUNTERBORE_DIAMETER,
+			counterboreDepth:Hgr15RailGeometry.COUNTERBORE_DEPTH,reference:Hgr15RailGeometry.HOLE_REFERENCE};
+	}
+
+	public function mountingConnectors():Array<machinekit.component.Connector>
+		return [for (index in 0...holePositions.length) connector('mount${index+1}')];
+
+	public function mountingThread():cadkit.threads.ThreadSpec {
+		var parts=spec.railMountScrew.split("x");
+		// Profile producers declare either a size or a size plus catalogue length.
+		// The placed stack selects the actual length; only its thread is used here.
+		if (parts.length<1 || parts.length>2 || (parts.length==2 && !~/^[0-9]+([.][0-9]+)?$/.match(parts[1])))
+			throw "Invalid rail mounting screw catalogue token: "+spec.railMountScrew;
+		var screw=machinekit.standard.SocketHeadCapScrew.catalog().get(parts[0]);
+		return machinekit.standard.FastenerThreads.metric(screw.diameter,screw.pitch).mating();
+	}
+
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {

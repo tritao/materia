@@ -145,6 +145,8 @@ class MillFrame extends MachineAssembly {
 					baseInserts.push(insert('foot$id', l.wall, l.wall, l.insertThickness, LevelingSeat, "foundation foot seat", [CastingPatterns.face("body.z-min")],
 						down(sx * (l.baseWidth / 2 - l.wall / 2), (sy < 0 ? l.front + l.wall / 2 : l.rear - l.wall / 2) - l.baseCentreY, l.insertThickness)));
 			}
+		if (xyAxis!=null) baseInserts=mountRails(baseInserts,MillRailPlacement.y(xyAxis.guided()),
+			F.translation(0,l.baseCentreY,0),"xyStage",details);
 		baseInserts = anchorInserts(baseInserts, details.anchorRule, body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids));
 		base = new MineralFoundation(body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids), baseInserts);
 		include("base", base, F.translation(0, l.baseCentreY, 0));
@@ -273,6 +275,8 @@ class MillFrame extends MachineAssembly {
 			columnValues.setNumber("footWidth", l.columnFootWidth)
 				.setNumber("footHeight", MillFrameLayout.COLUMN_FOOT_HEIGHT)
 				.setNumber("footShoulder", MillFrameLayout.COLUMN_FOOT_SHOULDER);
+		if (zAxis!=null) columnInserts=mountRails(columnInserts,MillRailPlacement.z(zAxis),
+			F.translation(0,l.columnCentreY,l.railPlane),"zAxis",details);
 		columnInserts = anchorInserts(columnInserts, details.anchorRule, columnValues);
 		column = new MineralFoundation(columnValues, columnInserts, "footLeftFront");
 		for (side in ["Left", "Right"]) {
@@ -319,6 +323,24 @@ class MillFrame extends MachineAssembly {
 
 	static function corner(x:Int, y:Int):String
 		return (x < 0 ? "Left" : "Right") + (y < 0 ? "Front" : "Rear");
+
+	static function mountRails(rows:Array<CastInsertPlacement>,rails:Array<MillRailPlacement.MillPlacedRail>,
+		bodyPose:materia.assembly.AssemblyRecord.AssemblyFrame,namespace:String,details:MillCastingDetails):Array<CastInsertPlacement> {
+		var result=rows.copy();
+		for (placed in rails) {
+			var matches=[for (index in 0...result.length) if (result[index].id==placed.insertId) index];
+			if (matches.length!=1) throw "Placed rail needs one source seat: "+placed.insertId;
+			var index=matches[0],row=result[index],hole=placed.rail.mountingHole();
+			var fingerprint=MillRailPlacement.fingerprint(placed.rail,placed.memberId);
+			var toInsert=F.compose(F.inverse(F.compose(bodyPose,row.pose)),placed.pose);
+			var part=machinekit.structural.InsertMountPattern.derive(row.part,placed.rail,
+				namespace+"/"+placed.memberId,fingerprint,toInsert,[for (connector in placed.rail.mountingConnectors()) connector.name],
+				placed.rail.mountingThread(),hole==null ? null : hole.diameter,hole==null ? null : hole.reference,
+				details.permittedRailHoleRoutes,details.railHoleBudget);
+			result[index]={id:row.id,pose:row.pose,openings:row.openings,part:part};
+		}
+		return result;
+	}
 
 	static function anchorInserts(rows:Array<CastInsertPlacement>,rule:machinekit.structural.InsertAnchorPattern.InsertAnchorPatternRule,
 		castingValues:ComponentValues):Array<CastInsertPlacement> {

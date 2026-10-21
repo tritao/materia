@@ -25,6 +25,24 @@ class InsertStages {
 			case Fabricated(manufacturing):spec.holes.filter(hole -> manufacturing.holeRoutes.filter(choice -> choice.holeId==hole.id
 				&& choice.route==InsertManufacturing.InsertHoleRoute.BeforeCasting).length==1);
 		};
+		return rawGeometry(spec,selected);
+	}
+
+	/** Geometric projection only, with no manufacturing permission implied.
+	 * Fixture feasibility may inspect an existing un-staged service hole without
+	 * inventing a source route or changing its budget-controlled declaration. */
+	public static function rawGeometryForServiceHoles(authored:InsertSpec,ids:Array<String>):Array<InsertHole> {
+		var spec=InsertSpec.InsertSpecCodec.snapshot(InsertSpec.InsertSpecCodec.record(authored));
+		var selected:Array<InsertHole> = [],seen:Map<String,Bool> = [];
+		for (id in ids) {
+			var matches=spec.holes.filter(hole -> hole.id==id);
+			if (seen.exists(id) || matches.length!=1) throw "Unknown or duplicate source hole projection: "+id;
+			seen.set(id,true);selected.push(matches[0]);
+		}
+		return rawGeometry(spec,selected);
+	}
+
+	static function rawGeometry(spec:InsertSpec,selected:Array<InsertHole>):Array<InsertHole> {
 		var steel=switch InsertFinishing.assess(spec.body,spec.interfaces) {
 			case Resolved(steel):steel;
 			case Invalid(_),Unsupported(_):return selected; // Unresolved stock remains an unqualified preview.

@@ -459,7 +459,7 @@ compatibility path for the old encoding.
 | `CastingSetup` | Source-to-mold transform, gravity/fill direction, open face, parting choices, feature overrides, support and finishing datums, compaction, fill height, pour rate and pour points, initial/ambient temperature |
 | `CompactionSpec` | Method (vibration table, external vibrators, internal poker, none), mold-bed interface, declared frequency/amplitude/duration or pending, evidence |
 | `InsertAnchorage` | Insert reference, anchorage kind (bolted anchors, welded studs, undercut, bonded keys), anchor holes and hardware, embedment, bearing area, spacing and cover, declared pull-out/shear capacity or pending, evidence |
-| `InsertManufacturing` | Insert reference, steel grade and blank stock, pre-cast operations (cut, square, drill and tap, anchors, deburr, surface preparation), post-cast operations with their stock, inspection points before casting, thread protection, procurement `Make(process)` |
+| `InsertManufacturing` | Insert reference, steel grade and blank stock, placed-part connector lineage and per-hole clearance budgets/routes, pre-cast operations (cut, square, drill and tap, anchors, deburr, surface preparation), post-cast operations with their stock, inspection points before casting, thread protection, procurement `Make(process)` |
 | `PanelPlan` | Stable ID, exact 2D profile, stock/thickness, mold pose, contact face, joints, operations, label zone, removal motion |
 | `PanelOperation` | Stable ID, kind (outside/inside profile, pocket, rebate, drill), exact line/arc contour or hole centres, machining face, depth, through/blind, setup |
 | `JointPlan` | Paired member/edge references, joint kind, datum role, clearances, reliefs, fastening and assembly direction |
@@ -1456,6 +1456,8 @@ directories; commit source setups, small test fixtures and documentation.
 
 ## Deferred scope
 
+- Mill levelling-foot and column-sole hole radial-wall diagnostics exceed the existing pad stock; resolve the source pad layout separately (rail-seat native checks exposed these pre-existing failures).
+
 - Generic catalogue recipe solid-count qualification: the bought Vallder BK12 assembly has 32 solids; the broad recipe test assumes one, outside casting phases 6–8.
 
 General BREP parting-surface discovery, arbitrary contour nesting, robotic mold
@@ -2036,6 +2038,29 @@ structures and phase 9 physical calibration remain open.
   40 programs / 667 Pass / 323 Pending / 112 Unsupported**; readiness **false**.
   Integrity, omission/tamper, cache-mutation and all independent artifact hashes
   pass. Main casting/tooling targets compile.
+
+- [x] Rail-derived seat holes (RM-D9/RM-D10): the actual Y/Z rail mount connectors
+  author **36** source holes and real class-8.8 service screws. Shared placement
+  declarations prevent a separate tooling pattern; each screw has rail/seat
+  coaxial requirements. Source holes retain connector frames, recipe fingerprints,
+  permissions, worst-case clearance budgets and drilling routes. Missing RM0
+  allocations keep transfer proposals Pending. Pre-cast fixture feasibility uses
+  the existing hole's raw geometry without changing its stage or source frame;
+  failed route choices raise source requests and clear on replan. Drawings use
+  edge/end/back datums; operation sheets name transfer guides and swarf protection.
+  Existing HG reference rails supply their own pinned drilling dimensions.
+  Assembly **23**, source/tooling **14**, box mold **13**, general mold **14**,
+  manifest **8** and insert-manufacturing report **3** reject earlier formats;
+  process remains **7**. Validation: foundation **404**, neutral tooling **1,855**,
+  design **32**, native tooling **678**, casting **54**, frozen foundation CAD **60**,
+  process **34**, mill **260**, socket **110**, production mold **520**, portable
+  coaxial records **2**, rail seats **116**. All frozen symmetric differences,
+  including the sloped-foot cut, are zero. Regenerated records-only kit: **160
+  artifacts / 40 programs / 667 Pass / 339 Pending / 112 Unsupported**, including
+  **14** base rail-hole budget rows. Integrity, source omission/tamper, cache
+  mutation and independent artifact hashes pass; readiness remains **false**.
+  Lifting and the policy-size correction for the existing foot pads follow in
+  the next source slice; this does not declare step 2 complete.
 
 ### Phase 7 records: shared levelling-foot family
 

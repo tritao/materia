@@ -540,6 +540,16 @@ class CastingMoldPlanner {
 			var replication=InterfaceQualification.replicationRequirement(source,seat);
 			if (replication!=null) result.validation.push(replication);
 		}
+		for (insert in d.input.inserts) switch insert.origin {
+			case Fabricated(manufacturing):
+				for (report in InsertManufacturingPlan.mountingHoleReports(manufacturing))
+					if (report.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail) {
+						var rule=InsertManufacturingPlan.mountingRule(insert.id,report.holeId);
+						var finding=result.validation.filter(check -> check.rule==rule)[0];
+						requestDecision(result,"hole-route-"+insert.id+"-"+report.holeId,DesignChangeKind.MountingHoleRoute,finding);
+					}
+			case Catalogue(_):
+		}
 		var missingJoint=FoundationJointQualification.missingSource(d.input);
 		if (missingJoint!=null) requestDecision(result,"foundation-joint-source",DesignChangeKind.FoundationJointDefinition,missingJoint);
 
@@ -610,7 +620,10 @@ class CastingMoldPlanner {
 	static function requestDecision(p:CastingMoldPlan,id:String,kind:DesignChangeKind,check:materia.tooling.ToolingValidation):Void {
 		p.changeRequests.push({id:materia.tooling.ToolingIds.derive("",id),kind:kind,
 			sourceIds:check.affectedIds.copy(),reason:check.message,blockingChecks:[check.rule]});
-		p.validation.push(check);
+		var existing=p.validation.filter(item -> item.rule==check.rule);
+		if (existing.length==0) p.validation.push(check);
+		else if (existing.length!=1 || ToolingCodec.canonical(existing[0])!=ToolingCodec.canonical(check))
+			throw "Conflicting design-change validation: "+check.rule;
 	}
 
 	public static function resinAtFill(document:ToolingDocument, envelope:MoldBox):Array<MoldBox> {

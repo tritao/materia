@@ -52,7 +52,8 @@ class InsertDrawing {
 		function note(text:String):Void
 			entities.push(Label(Text,new Point2(-dimensions.width/2,ymax+5*row++),2.5,text));
 		note(insert.id+" / "+insert.material.grade+" / nominal raw insert / mm / review drawing");
-		note("Local datum: XY centred on body; Z=0 at back face. Circles show pre-cast entries, including hidden entries.");
+		note(dimensions.round ? "Datums: cylinder axis at XY=0; back face Z=0."
+			: "Datums: left edge X=-W/2, end Y=-D/2, back Z=0. Entry offsets below are from these datums.");
 		note("Raw views exclude post-cast or undecided holes; the schedule includes the complete service hole pattern.");
 		var precastHoles=materia.casting.InsertStages.holes(
 			{body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces},
@@ -82,9 +83,13 @@ class InsertDrawing {
 			}
 			var normal=F.transformVector(hole.frame,0,0,1);
 			var routes=manufacturing.holeRoutes.filter(choice -> choice.holeId==hole.id);
-			note(hole.id+" entry XYZ="+hole.frame.x+","+hole.frame.y+","+hole.frame.z
+			var datumX=dimensions.round ? hole.frame.x : hole.frame.x+dimensions.width/2;
+			var datumY=dimensions.round ? hole.frame.y : hole.frame.y+dimensions.depth/2;
+			note(hole.id+" datum offsets XYZ="+datumX+","+datumY+","+hole.frame.z
 				+" axis="+normal.x+","+normal.y+","+normal.z+" / "+(hole.thread==null ? "D"+hole.diameter : hole.thread.designation)
 				+" / depth="+hole.depth+" / "+hole.extent+" / route="+(routes.length==0 ? "undecided" : (routes[0].route:String)));
+			for (requirement in manufacturing.mountingRequirements) if (requirement.holeId==hole.id)
+				note(hole.id+" derived from "+requirement.componentPath+"/"+requirement.connectorId);
 			if (hole.thread!=null) note(hole.id+" tap drill="+hole.tapDrill+" / full-thread endpoint="+hole.threadDepth+" / policy="+hole.limits.policyId);
 			if (hole.counterbore!=null) note(hole.id+" counterbore D"+hole.counterbore.diameter+" x "+hole.counterbore.depth);
 			if (hole.relief!=null) note(hole.id+" bore relief D"+hole.relief.diameter+" from depth="+hole.relief.start);

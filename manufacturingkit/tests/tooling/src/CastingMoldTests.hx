@@ -87,7 +87,51 @@ class CastingMoldTests {
 			"unrealized fragment castability reports its authored parent and preserves known radius metadata");
 	}
 
+	static function mountingRouteRequest():Void {
+		var d=ToolingTests.fixture(),insert=d.input.inserts[0],hole=insert.holes[0];
+		d.recipe.minimumLigament=2;
+		hole.thread={designation:"M10",majorDiameter:10,pitch:1.5,starts:1,hand:Right,
+			internal:true,toleranceClass:"6H",profile:Metric};
+		hole.diameter=8.5;hole.tapDrill=8.5;hole.threadDepth=hole.depth;hole.clearanceDiameter=11;
+		hole.limits.threaded={minEngagement:13,minTipGap:1.5};
+		var manufacturing=switch insert.origin {case Fabricated(plan):plan;default:throw "Fabricated fixture required";};
+		manufacturing.holeRoutes=[];
+		manufacturing.mountingRequirements=[{holeId:hole.id,componentPath:"rail",connectorId:"mount1",
+			componentFingerprint:haxe.crypto.Sha256.encode("test rail"),connectorFrame:F.alongY(0,0,20,0,0,1),
+			clearanceReference:"test clearance reference",permittedRoutes:[],
+			budget:{boltDiameterMm:10,clearanceDiameterMm:11,distanceFromDatumMm:0,
+				placementOffsetMm:0,placementAngleRad:0,assemblyAdjustmentMm:0,cureBowMm:0,
+				machiningErrorMm:0.01,pitchAccumulationMm:0,requiredMarginMm:0.01}}];
+		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
+		var p=CastingMoldPlanner.plan(d,options(d));
+		var rule=materia.tooling.casting.InsertManufacturingPlan.mountingRule(insert.id,hole.id);
+		check(p.changeRequests.filter(request -> request.kind==DesignChangeKind.MountingHoleRoute
+			&& request.sourceIds.indexOf(insert.id)>=0 && request.blockingChecks.indexOf(rule)>=0).length==1,
+			"forbidden mounting routes produce a source request referencing the real failed manufacturing rule");
+		var encoded=CastingMoldCodec.encode(p);
+		check(CastingMoldCodec.encode(CastingMoldCodec.decode(encoded))==encoded,
+			"mounting-route requests and budgets regenerate exactly through the mold codec");
+		manufacturing.mountingRequirements[0].permittedRoutes=[materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting];
+		manufacturing.holeRoutes=[{holeId:hole.id,route:materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting}];
+		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
+		var resolved=CastingMoldPlanner.plan(d,options(d));
+		check(resolved.changeRequests.filter(request -> request.kind==DesignChangeKind.MountingHoleRoute).length==0,
+			"source permission and closed transfer budget clear the mounting-route request on replan");
+		hole.extent=Blind;hole.depth=17.5;hole.threadDepth=15.5;
+		manufacturing.mountingRequirements[0].permittedRoutes=[materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting];
+		manufacturing.mountingRequirements[0].budget.machiningErrorMm=null;
+		manufacturing.holeRoutes=[];
+		var insertPose=F.fromRotationMatrix(0,0,20,[1,0,0,0,-1,0,0,0,-1]);
+		var pending=materia.tooling.casting.InsertFixturePlanner.missingFixing(insert,insertPose,F.identity(),d.recipe.hardware);
+		check(pending.change==null && pending.check.status=="pending"
+			&& pending.check.rule=="tooling.fixture.hole-stage."+insert.id,
+			"permitted pre-cast route awaiting budget inputs blocks the fixture as Pending, without a source-hole request");
+		check(manufacturing.holeRoutes.length==0 && hole.frame.z==20,
+			"fixture feasibility changes neither the source stage nor its single hole frame");
+	}
+
 	public static function run(d:ToolingDocument):Void {
+		mountingRouteRequest();
 		unrealizedGeometry();
 		replicationReservation(d);
 		d = ToolingCodec.snapshot(d);

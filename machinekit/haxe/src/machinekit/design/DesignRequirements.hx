@@ -17,11 +17,14 @@ class DesignRequirements {
 				AccessPath(map(id),anchor,envelopes,pose,selection);
 			case InterfaceAlignment(id,relationship):
 				InterfaceAlignment(map(id),materia.casting.InterfaceRelationship.InterfaceRelationships.remapMembers(relationship,map));
+			case Coaxial(id,first,second,tolerance):
+				first.member=map(first.member);second.member=map(second.member);
+				Coaxial(map(id),first,second,tolerance);
 			case FoundationConnection(id,joint):
 				FoundationConnection(map(id),materia.casting.FoundationJoint.FoundationJoints.remap(joint,map));
 		};
 	}
 	public static function id(r:DesignRequirement):String return switch(r) {
-		case FastenerJoint(id,_,_,_),AccessPath(id,_,_,_,_),InterfaceAlignment(id,_),FoundationConnection(id,_): id;
+		case FastenerJoint(id,_,_,_),AccessPath(id,_,_,_,_),InterfaceAlignment(id,_),FoundationConnection(id,_),Coaxial(id,_,_,_): id;
 	};
 }

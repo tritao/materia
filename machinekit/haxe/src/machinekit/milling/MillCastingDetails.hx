@@ -41,6 +41,15 @@ class MillCastingDetails {
 	public var columnBoltAccessHalfWidth:Float = 20;
 	public var columnBoltAccessDepth:Float = 46;
 	public var zBearingAnchorOffset:Float = 10;
+	/** RM0 accuracy allocations are user inputs, not inferred design-hole limits. */
+	public var railHoleBudget:machinekit.structural.InsertMountPattern.MountHoleErrorAllocation = {
+		placementOffsetMm:null,placementAngleRad:null,assemblyAdjustmentMm:null,cureBowMm:null,
+		machiningErrorMm:null,pitchAccumulationMm:null,requiredMarginMm:null
+	};
+	public var permittedRailHoleRoutes:Array<materia.casting.InsertManufacturing.InsertHoleRoute> = [
+		materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting,
+		materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting
+	];
 	public var columnAnchorThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
 	public var hatchAnchorThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
 

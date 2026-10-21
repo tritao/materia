@@ -39,7 +39,7 @@ class ToolingPackageManifest {
 				jobs.push(job);checks=checks.concat(job.validation);
 				checks.push(InsertDrawing.review(insert).validation);
 		}
-		var expected={format:"materia.tooling.insert-manufacturing",version:2,
+		var expected={format:"materia.tooling.insert-manufacturing",version:3,
 			sourceFingerprint:sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(plan.document.input),jobs:jobs};
 		path=dir+"/insert-manufacturing.json";
 		if (!sys.FileSystem.exists(path)
@@ -127,7 +127,7 @@ class ToolingPackageManifest {
 		records.sort((a, b) -> Reflect.compare(a.path, b.path));
 		var manifest:ToolingManifest = {
 			format: "materia.tooling-manifest",
-			version: 7,
+			version: 8,
 			phase: 5,
 			lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			sourceFingerprint: f.sourceFingerprint,
@@ -199,7 +199,7 @@ class ToolingPackageManifest {
 		for (key in keys)
 			if (!Reflect.hasField(manifest, key))
 				throw "Missing tooling manifest field";
-		if (manifest.format != "materia.tooling-manifest" || manifest.version != 7)
+		if (manifest.format != "materia.tooling-manifest" || manifest.version != 8)
 			throw "Unsupported tooling manifest";
 		if (!Std.isOfType(manifest.files, Array))
 			throw "Invalid tooling manifest files";

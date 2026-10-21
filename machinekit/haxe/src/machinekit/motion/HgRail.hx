@@ -17,6 +17,11 @@ class HgRail extends LinearRail {
   super(HgReferenceData.spec(model),length,true);
   this.model=model;
  }
+ override public function mountingHole():Null<{diameter:Float,counterboreDiameter:Float,counterboreDepth:Float,reference:String}> {
+  var holes=drilling(model);
+  return {diameter:holes[0],counterboreDiameter:holes[1],counterboreDepth:holes[2],
+   reference:"Pinned HG table/CAD "+model+" sha256:"+HgReferenceData.hash(model)};
+ }
  override public function geometry(detail:ComponentDetail=Preview):Part {
   if(detail==Envelope)return super.geometry(detail);
   var edges:Array<Curve> = [],wire:Null<Curve> = null,face:Null<Sketch> = null,result:Null<Part> = null;

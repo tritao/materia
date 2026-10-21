@@ -64,6 +64,7 @@ class MillFramePreview {
 			F.compose(F.inverse(framePoses.get("column/railZLeft")), plate));
 		result.addMemberConnector("zAxis/fixedMount", "frameSeat", F.identity());
 		result.addMate("z-on-column", "fixed", "frame/column/railZLeft", "axisSeat", "zAxis/fixedMount", "frameSeat");
+		machinekit.milling.MillRailFasteners.install(result,frame.column,"frame/column",frame.layout.casting.anchorRule.screwLengthsMm);
 		return result;
 	}
 
@@ -82,6 +83,7 @@ class MillFramePreview {
   result.addMemberConnector("frame/base/casting","stageSeat",F.compose(F.inverse(poses.get("base/casting")),xy.zeroPose("railYLeft")));
   result.addMemberConnector("xyStage/railYLeft","frameSeat",F.identity());
   result.addMate("xy-on-base","fixed","frame/base/casting","stageSeat","xyStage/railYLeft","frameSeat");
+  machinekit.milling.MillRailFasteners.install(result,frame.base,"frame/base",frame.layout.casting.anchorRule.screwLengthsMm);
   return result;
  }
 

@@ -4,6 +4,7 @@ import materia.casting.InsertManufacturing;
 import materia.casting.InsertManufacturing.InsertManufacturingCodec;
 import materia.casting.InsertManufacturing.InsertInspection;
 import materia.casting.InsertManufacturing.InsertHoleRoute;
+import materia.casting.HoleClearanceBudget.HoleClearanceBudgets;
 import materia.casting.InterfaceRequirement.InterfaceRoute;
 import materia.tooling.casting.CastingToolingInput.CastingToolingInsert;
 import materia.tooling.ToolingValidation;
@@ -67,9 +68,23 @@ typedef InsertOperationRecord = {
 	var sourceIds:Array<String>;
 }
 
+typedef InsertMountHoleReport = {
+	var holeId:String;
+	var componentPath:String;
+	var componentFingerprint:String;
+	var connectorId:String;
+	var route:Null<InsertHoleRoute>;
+	var beforeCastingMarginMm:Null<Float>;
+	var transferMarginMm:Null<Float>;
+	var missingInputs:Array<String>;
+	var status:ToolingCheckStatus;
+	var message:String;
+}
+
 typedef InsertManufacturingJob = {
 	var insertId:String;
 	var specification:InsertManufacturing;
+	var holeBudgets:Array<InsertMountHoleReport>;
 	var operations:Array<InsertOperationRecord>;
 	var inspectionRequirements:Array<InsertInspectionRequirement>;
 	var validation:Array<ToolingValidation>;
@@ -135,6 +150,13 @@ class InsertManufacturingPlan {
 		var inspections=inspectionRequirements(spec,insert);
 		for (inspection in inspections) if (!inspection.declared) missing.push("inspection "+inspection.key);
 		var validation:Array<ToolingValidation> = [];
+		var holeBudgets=mountingHoleReports(spec);
+		for (report in holeBudgets) {
+			var rule=mountingRule(insert.id,report.holeId);
+			validation.push(report.status==ToolingCheckStatus.Pending
+				? ToolingReadiness.pending(rule,[insert.id],report.message)
+				: check(rule,insert.id,report.status,report.message));
+		}
 		var fit=materia.casting.InsertBlankFit.assess(insert.body,spec.blank),blankRule="fabrication.insert.blank."+insert.id;
 		switch fit {
 			case Unselected:validation.push(ToolingReadiness.pending(blankRule,[insert.id],"Select the insert's actual blank stock and its part-to-stock frame."));
@@ -156,7 +178,57 @@ class InsertManufacturingPlan {
 			: check(geometryRule,insert.id,ToolingCheckStatus.Pass,
 				"Pre-cast geometry uses only the holes declared before casting; service geometry includes the final hole set."));
 		validation.push(finishGeometry(insert));
-		return {insertId:insert.id,specification:spec,operations:operations,inspectionRequirements:inspections,validation:validation};
+		return {insertId:insert.id,specification:spec,holeBudgets:holeBudgets,operations:operations,inspectionRequirements:inspections,validation:validation};
+	}
+
+	public static function mountingRule(insertId:String,holeId:String):String
+		return "fabrication.insert.mounting-hole."+insertId+"."+holeId;
+
+	public static function mountingHoleReports(spec:InsertManufacturing):Array<InsertMountHoleReport> {
+		var reports:Array<InsertMountHoleReport> = [];
+		for (requirement in spec.mountingRequirements) {
+			var assessed=HoleClearanceBudgets.assess(requirement.budget);
+			var route:Null<InsertHoleRoute> = null;
+			var status:ToolingCheckStatus=ToolingCheckStatus.Pending;
+			var missing:Array<String> = [],message="";
+			switch HoleClearanceBudgets.choose(requirement.budget,requirement.permittedRoutes) {
+				case UsePreCast(margin):
+					route=InsertHoleRoute.BeforeCasting;status=ToolingCheckStatus.Pass;
+					message="Pre-cast drilling closes the nominal bolt-clearance budget with "+margin+" mm remaining margin.";
+				case UseTransfer(margin):
+					route=InsertHoleRoute.TransferAfterCasting;status=ToolingCheckStatus.Pass;
+					message="Transfer drilling through the aligned part closes the nominal budget with "+margin+" mm remaining margin.";
+				case ProposeTransfer(inputs):
+					route=InsertHoleRoute.TransferAfterCasting;missing=inputs;
+					message="Transfer drilling after alignment is proposed; declare "+inputs.join(", ")+" before qualifying its clearance.";
+				case AwaitInputs(inputs):
+					missing=inputs;message="Pre-cast route needs "+inputs.join(", ")+"; transfer drilling is not permitted.";
+				case ChangeDesign(reason):
+					status=ToolingCheckStatus.Fail;message=reason+" for "+requirement.holeId+".";
+			}
+			if (requirement.clearanceReference==null) {
+				missing.push("clearanceReference");
+				if (status==ToolingCheckStatus.Pass) status=ToolingCheckStatus.Pending;
+				message+=" Record the mating part's clearance source.";
+			}
+			reports.push({holeId:requirement.holeId,componentPath:requirement.componentPath,
+				componentFingerprint:requirement.componentFingerprint,connectorId:requirement.connectorId,route:route,
+				beforeCastingMarginMm:assessed.beforeCastingMarginMm,transferMarginMm:assessed.transferMarginMm,
+				missingInputs:missing,status:status,message:message});
+		}
+		return reports;
+	}
+
+	public static function instructions(operation:InsertOperationRecord):Array<String> {
+		if (operation.kind==TransferDrill) return [
+			"Align and clamp the mating part before drilling through its own mounting holes.",
+			"Fit a guide bushing and protect the casting and replication compound from swarf."
+		];
+		if (operation.kind==Tap && operation.stage==InsertOperationStage.AfterCasting) return [
+			"Use a tap guide; keep the aligned mating part located.",
+			"Remove swarf protection and clean before fitting the service screws."
+		];
+		return [];
 	}
 
 	static function finishGeometry(insert:CastingToolingInsert):ToolingValidation {

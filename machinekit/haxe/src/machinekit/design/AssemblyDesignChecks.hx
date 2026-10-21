@@ -60,6 +60,9 @@ class AssemblyDesignChecks {
 			try switch(r) {
 				case InterfaceAlignment(_,relationship): interfaceAlignment(out,id,relationship,members,definition);
 				case FoundationConnection(_,joint): FoundationJointDesignChecks.check(out,id,joint,members,initial);
+				case Coaxial(_,first,second,tolerance):
+					if (!Math.isFinite(tolerance) || tolerance<=0) throw "Invalid nominal coaxial tolerance";
+					nominalCoaxial(out,id,axisPose(first,members,initial),axisPose(second,members,initial),tolerance);
 				case FastenerJoint(_,screw,target,through): fastener(out,id,screw,target,through,members,initial,cache);
 				case AccessPath(_,anchor,envelopes,pose,selection):
 					var state=new AssemblyState(definition);
@@ -102,6 +105,32 @@ class AssemblyDesignChecks {
 		out.warning("design.interface.qualification",id,
 			"Relationship references resolve; geometry, replication jig and measured alignment remain unqualified.");
 	}
+	static function nominalCoaxial(out:Diagnostics,id:String,a:AssemblyFrame,b:AssemblyFrame,tolerance:Float):Void {
+		var u=F.transformVector(a,0,0,1),v=F.transformVector(b,0,0,1);
+		var dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
+		var x=dy*u.z-dz*u.y,y=dz*u.x-dx*u.z,z=dx*u.y-dy*u.x;
+		var offset=Math.sqrt(x*x+y*y+z*z);
+		var ax=u.y*v.z-u.z*v.y,ay=u.z*v.x-u.x*v.z,az=u.x*v.y-u.y*v.x;
+		var angular=Math.sqrt(ax*ax+ay*ay+az*az);
+		// Numerical coincidence of nominal axes, not a physical metrology claim.
+		if (offset>tolerance || angular>1e-9)
+			out.error("design.fastener-axis",id,"Nominal axes differ: offset="+offset+" mm; sin(angle)="+angular);
+	}
+
+	static function axisPose(ref:DesignReference,members:Map<String,MachineComponent>,state:AssemblyState):AssemblyFrame {
+		var member=members.get(ref.member);
+		if (member==null) throw "Unknown coaxial member: "+ref.member;
+		var interfaces=DesignInterfaces.of(member);
+		if (interfaces!=null) for (hole in interfaces.holes)
+			if (hole.id==ref.feature) return F.compose(state.worldPose(ref.member),hole.frame);
+		for (connector in member.connectors()) if (connector.name==ref.feature) {
+			// Component connector +Y is the axis; design-hole +Z enters steel.
+			var axis=F.fromRotationMatrix(0,0,0,[1,0,0,0,0,1,0,-1,0]);
+			return F.compose(state.worldPose(ref.member),F.compose(connector.frame,axis));
+		}
+		throw "Coaxial reference needs a source hole or connector: "+ref.member+"/"+ref.feature;
+	}
+
 	static function facet(ref:DesignReference,members:Map<String,MachineComponent>):DesignInterfaces {
 		var member=members.get(ref.member);if(member==null)throw 'Unknown design member "${ref.member}"';
 		var result=DesignInterfaces.of(member);if(result==null)throw 'No design interfaces on "${ref.member}"';return result;

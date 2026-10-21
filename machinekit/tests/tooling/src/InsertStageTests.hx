@@ -54,7 +54,7 @@ class InsertStageTests {
 				if (cadkit.drawing.Drawing2D.layerName(layer)=="HOLE_ENTRY") {
 					entries++;near(segment.arcCenter().x,-12,"raw drawing entry follows the pre-cast hole position");
 				}
-			case Label(_,_,_,text):if (text.indexOf("post entry XYZ=")==0) serviceNote=true;
+			case Label(_,_,_,text):if (text.indexOf("post datum offsets XYZ=37,20,20 ")==0) serviceNote=true;
 		}
 		check(entries==2 && serviceNote,"raw drawings omit the future bore while retaining its service schedule");
 		var assembly=new machinekit.assembly.MachineAssembly();assembly.addComponent("blank",raw);

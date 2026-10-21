@@ -31,4 +31,6 @@ typedef DesignJointValue = materia.assembly.AssemblyDefinition.AssemblyJointCoor
 	 */
 	@:id(3) InterfaceAlignment(id:String,relationship:materia.casting.InterfaceRelationship);
 	@:id(4) FoundationConnection(id:String,joint:materia.casting.FoundationJoint);
+	/** Nominal hole/connector axes; physical metrology is a separate requirement. */
+	@:id(5) Coaxial(id:String,first:DesignReference,second:DesignReference,toleranceMm:Float);
 }

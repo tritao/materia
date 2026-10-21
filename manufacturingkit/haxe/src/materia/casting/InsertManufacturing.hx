@@ -39,6 +39,7 @@ typedef InsertManufacturing = {
 	var blank:InsertBlank;
 	/** Only declared routes are listed; an unlisted source hole has no decided route. */
 	var holeRoutes:Array<{holeId:String,route:InsertHoleRoute}>;
+	var mountingRequirements:Array<InsertMountHoleRequirement>;
 	var inspections:Array<InsertInspection>;
 	var processReference:Null<String>;
 }
@@ -47,10 +48,10 @@ class InsertManufacturingCodec {
 	/** A complete typed draft with no invented stock, hole route or inspection limit. */
 	public static function draft(material:InsertMaterialSpec):InsertManufacturing
 		return {material:InsertMaterial.InsertMaterials.snapshot(material),blank:Unselected,
-			holeRoutes:[],inspections:[],processReference:null};
+			holeRoutes:[],mountingRequirements:[],inspections:[],processReference:null};
 
 	public static function snapshot(raw:Dynamic):InsertManufacturing {
-		CastingFeatureCodec.fields(raw,["material","blank","holeRoutes","inspections","processReference"]);
+		CastingFeatureCodec.fields(raw,["material","blank","holeRoutes","mountingRequirements","inspections","processReference"]);
 		var blankRaw:Dynamic=Reflect.field(raw,"blank");
 		if (Std.isOfType(blankRaw,InsertBlank)) blankRaw=blankRecord(cast blankRaw);
 		var blank:InsertBlank=switch CastingRecordCodec.string(blankRaw,"kind") {
@@ -105,20 +106,33 @@ class InsertManufacturingCodec {
 		var reference=CastingRecordCodec.optionalString(raw,"processReference");
 		if (reference!=null) validText(reference);
 		return {material:InsertMaterial.InsertMaterials.snapshot(Reflect.field(raw,"material")),blank:blank,
-			holeRoutes:routes,inspections:inspections,processReference:reference};
+			holeRoutes:routes,mountingRequirements:InsertMountHoleRequirement.InsertMountHoleRequirements.snapshot(Reflect.field(raw,"mountingRequirements")),
+			inspections:inspections,processReference:reference};
 	}
 
 	public static function record(plan:InsertManufacturing):Dynamic {
 		if (plan==null) throw "Missing insert manufacturing record";
-		if (plan.inspections==null || plan.holeRoutes==null) throw "Invalid insert manufacturing lists";
+		if (plan.inspections==null || plan.holeRoutes==null || plan.mountingRequirements==null) throw "Invalid insert manufacturing lists";
 		var copy=snapshot({material:plan.material,blank:blankRecord(plan.blank),holeRoutes:plan.holeRoutes,
+			mountingRequirements:plan.mountingRequirements,
 			inspections:[for (inspection in plan.inspections) inspectionRecord(inspection)],processReference:plan.processReference});
-		return {material:copy.material,blank:blankRecord(copy.blank),holeRoutes:copy.holeRoutes,
+		return {material:copy.material,blank:blankRecord(copy.blank),holeRoutes:copy.holeRoutes,mountingRequirements:copy.mountingRequirements,
 			inspections:[for (inspection in copy.inspections) inspectionRecord(inspection)],processReference:copy.processReference};
 	}
 
 	public static function references(plan:InsertManufacturing,holes:Array<InsertHole>,interfaces:Array<InterfaceRequirement>):Void {
 		var holeIds=[for (hole in holes) hole.id],interfaceIds=[for (requirement in interfaces) requirement.id];
+		InsertMountHoleRequirement.InsertMountHoleRequirements.references(plan.mountingRequirements,holes);
+		for (requirement in plan.mountingRequirements) {
+			var expected:Null<InsertHoleRoute> =switch HoleClearanceBudget.HoleClearanceBudgets.choose(requirement.budget,requirement.permittedRoutes) {
+				case UsePreCast(_):InsertHoleRoute.BeforeCasting;
+				case UseTransfer(_),ProposeTransfer(_):InsertHoleRoute.TransferAfterCasting;
+				case AwaitInputs(_),ChangeDesign(_):null;
+			};
+			var choices=plan.holeRoutes.filter(choice -> choice.holeId==requirement.holeId);
+			if (expected==null ? choices.length!=0 : choices.length!=1 || choices[0].route!=expected)
+				throw "Manufacturing hole route differs from clearance budget: "+requirement.holeId;
+		}
 		for (choice in plan.holeRoutes)
 			if (holeIds.indexOf(choice.holeId)<0) throw "Manufacturing route names unknown insert hole: "+choice.holeId;
 		for (inspection in plan.inspections) switch inspection {

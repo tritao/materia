@@ -122,6 +122,7 @@ enum abstract DesignChangeKind(String) to String {
 	var InterfaceAllowance = "interface-allowance";
 	var InsertFixtureHole = "insert-fixture-hole";
 	var FoundationJointDefinition = "foundation-joint";
+	var MountingHoleRoute = "mounting-hole-route";
 }
 
 typedef DesignChangeRequest = {

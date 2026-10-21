@@ -83,7 +83,12 @@ class ToolingFabricationExport {
 	static function insertManufacturing(p:CastingMoldPlan,f:FabricationPlan,dir:String):Array<materia.tooling.ToolingValidation> {
 		var checks:Array<materia.tooling.ToolingValidation> = [];
 		var jobs:Array<materia.tooling.casting.InsertManufacturingPlan.InsertManufacturingJob> = [];
-		var operationRows:Array<Array<String>> = [["insert_id","sequence","operation_id","stage","kind","source_ids","process_reference","machining_holes_json"]];
+		var operationRows:Array<Array<String>> = [["insert_id","sequence","operation_id","stage","kind","source_ids","process_reference","machining_holes_json","method"]];
+		var budgetRows:Array<Array<String>> = [["insert_id","hole_id","component","connector","route","status",
+			"clearance_diameter_mm","bolt_diameter_mm","datum_distance_mm","placement_offset_mm","placement_angle_rad",
+			"assembly_adjustment_mm","cure_bow_mm","machining_error_mm","pitch_accumulation_mm","required_margin_mm",
+			"precast_margin_mm","transfer_margin_mm","missing_inputs","clearance_reference"]];
+		function optional(value:Null<Float>):String return value==null ? "" : Std.string(value);
 		var inspectionRows:Array<Array<String>> = [["insert_id","inspection_kind","source_id","stage","limit_declared","tolerance_mm","execution_status"]];
 		var bomRows:Array<Array<String>> = [["insert_id","part_number","procurement_kind","process","material_grade","quantity"]];
 		for (insert in p.document.input.inserts) switch insert.origin {
@@ -106,16 +111,29 @@ class ToolingFabricationExport {
 						.filter(hole -> operation.sourceIds.indexOf(hole.id)>=0);
 					operationRows.push([insert.id,Std.string(index+1),operation.id,operation.stage,operation.kind,
 						operation.sourceIds.join(";"),job.specification.processReference==null ? "" : job.specification.processReference,
-						haxe.Json.stringify(materia.casting.InsertHole.InsertHoleCodec.snapshot(machiningHoles))]);
+						haxe.Json.stringify(materia.casting.InsertHole.InsertHoleCodec.snapshot(machiningHoles)),
+						materia.tooling.casting.InsertManufacturingPlan.instructions(operation).join(" ")]);
+				}
+				for (report in job.holeBudgets) {
+					var requirement=job.specification.mountingRequirements.filter(row -> row.holeId==report.holeId)[0];
+					var budget=requirement.budget;
+					budgetRows.push([insert.id,report.holeId,report.componentPath,report.connectorId,
+						report.route==null ? "" : report.route,report.status,optional(budget.clearanceDiameterMm),
+						Std.string(budget.boltDiameterMm),Std.string(budget.distanceFromDatumMm),optional(budget.placementOffsetMm),
+						optional(budget.placementAngleRad),optional(budget.assemblyAdjustmentMm),optional(budget.cureBowMm),
+						optional(budget.machiningErrorMm),optional(budget.pitchAccumulationMm),optional(budget.requiredMarginMm),
+						optional(report.beforeCastingMarginMm),optional(report.transferMarginMm),report.missingInputs.join(";"),
+						requirement.clearanceReference==null ? "" : requirement.clearanceReference]);
 				}
 				for (inspection in job.inspectionRequirements) {
 					inspectionRows.push([insert.id,inspection.kind,inspection.sourceIds.join(";"),inspection.stage,Std.string(inspection.declared),
 						inspection.toleranceMm==null ? "" : Std.string(inspection.toleranceMm),"pending"]);
 				}
 		}
-		data(dir,"insert-manufacturing.json",{format:"materia.tooling.insert-manufacturing",version:2,
+		data(dir,"insert-manufacturing.json",{format:"materia.tooling.insert-manufacturing",version:3,
 			sourceFingerprint:f.sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),jobs:jobs});
 		text(dir,"insert-operations.csv",ToolingFabrication.csv(operationRows));
+		text(dir,"insert-hole-budgets.csv",ToolingFabrication.csv(budgetRows));
 		text(dir,"insert-inspections.csv",ToolingFabrication.csv(inspectionRows));
 		text(dir,"insert-make-bom.csv",ToolingFabrication.csv(bomRows));
 		return checks;
@@ -135,7 +153,7 @@ class ToolingFabricationExport {
 		for (record in nativeChecks) checks.push({rule:record.rule,affectedIds:record.affectedIds.copy(),
 			status:record.status,severity:record.severity,message:record.message,evidence:record.evidence.copy()});
 		checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));
-		return {format:"materia.tooling.insert-anchorage",version:1,sourceFingerprint:sourceFingerprint,
+		return {format:"materia.tooling.insert-anchorage",version:2,sourceFingerprint:sourceFingerprint,
 			inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),
 			inserts:[for (insert in p.document.input.inserts) {id:insert.id,pose:materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.identity(),insert.pose),
 				spec:materia.casting.InsertSpec.InsertSpecCodec.record({body:insert.body,holes:insert.holes,

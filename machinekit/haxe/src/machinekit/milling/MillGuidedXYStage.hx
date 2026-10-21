@@ -61,12 +61,12 @@ class MillGuidedXYStage extends AxisBuilder {
   function horizontal(x:Float,y:Float,z:Float,alongX:Bool):AssemblyFrame return alongX?
    orient(x,y,z,[0,0,1],[1,0,0]):orient(x,y,z,[0,0,1],[0,1,0]);
   var yp:Array<AssemblyFrame> =[],xp:Array<AssemblyFrame> =[];
-  for(side in [-1,1]) {
-   var id=side<0?"railYLeft":"railYRight";
-   var pose=horizontal(side*l.yRailSpacing/2,l.yRailStart,l.yRailPlane+g.railHeight,false);
-   if(side<0)place(id,l.yRail,pose);else attach(id,l.yRail,pose,"railYLeft");
-   for(span in [-l.yBlockSpan,l.yBlockSpan])yp.push(horizontal(side*l.yRailSpacing/2,l.centreY+span,l.yRailPlane+g.railHeight,false));
+  for(placed in MillRailPlacement.y(l)) {
+   if(placed.memberId=="railYLeft")place(placed.memberId,placed.rail,placed.pose);
+   else attach(placed.memberId,placed.rail,placed.pose,"railYLeft");
   }
+  for(side in [-1,1])for(span in [-l.yBlockSpan,l.yBlockSpan])
+   yp.push(horizontal(side*l.yRailSpacing/2,l.centreY+span,l.yRailPlane+g.railHeight,false));
   slide({id:"y",lower:-l.yHalfTravel,upper:l.yHalfTravel,initial:0},"railYLeft","blockY0",l.block,yp[0],{x:0,y:-1,z:0},yp.slice(1),l.yOvertravel);
   var mountingSize=g.blockMountScrew.split("x")[0];
   var screw=SocketHeadCapScrew.metric(mountingSize,16),clearance=screw.clearanceDiameter();

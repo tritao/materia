@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-rail-seat-tests"
+  },
+  "entry": "RailSeatTests",
+  "sources": [
+    "src/MillMoldSuite.hx",
+    "../../examples/bench-mill/BenchMill.hx",
+    "../../examples/bench-mill/BenchMillPreview.hx",
+    "../../examples/bench-mill/BearingBlock.hx",
+    "../../examples/bench-mill/BearingBlockJob.hx",
+    "../../examples/bench-mill/../cnc-router/CncRouter.hx",
+    "../../examples/bench-mill/EnclosedBenchMill.hx",
+    "../../examples/bench-mill/MillBasePreview.hx",
+    "../../examples/bench-mill/MillFramePreview.hx",
+    "../../examples/bench-mill/MillMoldSetup.hx",
+    "../../examples/bench-mill/MillMoldPreview.hx",
+    "../../examples/bench-mill/MillMoldChecks.hx",
+    "src/FoundationDesignTests.hx",
+    "src/ProductionAnchorTests.hx",
+    "src/RailSeatTests.hx"
+  ],
+  "sourceRoots": [
+    "src",
+    "../../examples/bench-mill",
+    "../../examples/cnc-router"
+  ],
+  "dependencies": {
+    "robotkit-autonomy": {
+      "path": "../../../robotkit/autonomy"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../"
+    },
+    "manufacturingkit": {
+      "path": "../../../manufacturingkit"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/rail-seat"
+}

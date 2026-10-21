@@ -49,12 +49,8 @@ class MillZAxis extends AxisBuilder {
 		attach("coupling", l.coupling, down(0, l.screwY, l.motorFace-17), "screw");
 
 		var railPose = F.fromRotationMatrix(0, 0, 0, [-1,0,0, 0,-1,0, 0,0,1]);
-		for (side in [-1, 1]) {
-			var name = side < 0 ? "Left" : "Right";
-			var pose = F.compose(F.translation(side * f.zRailSpacing / 2, f.columnFront - l.block.spec.railHeight,
-				f.railPlane + f.zRailStart), railPose);
-			attach('rail$name', l.rail, pose, "fixedMount");
-		}
+		for (placed in MillRailPlacement.z(l))
+			attach(placed.memberId,placed.rail,placed.pose,"fixedMount");
 		carriage = new MillZCarriage(new ComponentValues().setNumber("width", l.carriageWidth).setNumber("height", l.carriageHeight)
 			.setToken("nutModel","SFU2005").setNumber("thickness", l.carriageThickness).setNumber("nutReach", l.screwY - l.carriageBack)
 			.setNumber("nutCentreZ", l.carriageHeight / 2).setNumber("nutPlate", l.nutPlateThickness)

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "package": {
+    "name": "coaxial-record-tests"
+  },
+  "entry": "CoaxialRecordTests",
+  "sources": [
+    "src/CoaxialRecordTests.hx",
+    "../../haxe/src/machinekit/design/DesignRequirement.hx",
+    "../../haxe/src/machinekit/design/DesignRequirements.hx"
+  ],
+  "sourceRoots": [
+    "src",
+    "../../haxe/src"
+  ],
+  "dependencies": {
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "manufacturingkit": {
+      "path": "../../../manufacturingkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/coaxial-record"
+}

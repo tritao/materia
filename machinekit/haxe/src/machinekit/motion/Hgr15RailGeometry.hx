@@ -9,9 +9,13 @@ import cadkit.modeling.Vector;
  * from the pinned Matis-hosted HIWIN reference (see linear-rail-reference/README).
  * This geometry does not qualify the generic catalog's load or material ratings. */
 class Hgr15RailGeometry {
+    public static inline var BORE_DIAMETER:Float = 4.5;
+    public static inline var COUNTERBORE_DIAMETER:Float = 7.5;
+    public static inline var COUNTERBORE_DEPTH:Float = 5.3;
+    public static inline var HOLE_REFERENCE:String = "linear-rail-reference/README: pinned HIWIN HGR15R CAD";
     public static function build(length:Float, holes:Array<Float>):Part {
         if (!Math.isFinite(length) || length <= 0) throw "HGR15 rail needs a finite positive length";
-        for (z in holes) if (!Math.isFinite(z) || z < 3.75 || z > length - 3.75)
+        for (z in holes) if (!Math.isFinite(z) || z < COUNTERBORE_DIAMETER / 2 || z > length - COUNTERBORE_DIAMETER / 2)
             throw "HGR15 counterbore must fit within the cut length";
         var edges:Array<Curve> = [];
         var wire:Null<Curve> = null, face:Null<Sketch> = null, result:Null<Part> = null;
@@ -29,8 +33,8 @@ class Hgr15RailGeometry {
             result = face.extrude(length);
             // HGR15R: 4.5 mm through bore, 7.5 mm counterbore, 5.3 mm deep.
             for (z in holes) {
-                tools.push(Part.cylinderAlongY(2.25, -16, 1, 0, z));
-                tools.push(Part.cylinderAlongY(3.75, -5.3, 1, 0, z));
+                tools.push(Part.cylinderAlongY(BORE_DIAMETER / 2, -16, 1, 0, z));
+                tools.push(Part.cylinderAlongY(COUNTERBORE_DIAMETER / 2, -COUNTERBORE_DEPTH, 1, 0, z));
             }
             if (tools.length > 0) {
                 var drilled = result.subtractAll(tools);

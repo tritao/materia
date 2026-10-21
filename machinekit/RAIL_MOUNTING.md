@@ -182,6 +182,12 @@ push-screw holes with no other edit; a seat hole offset from its rail screw fail
 a placement tolerance that exceeds the bolt clearance switches the route to transfer drilling, and
 with transfer drilling not permitted it raises a design change request.
 
+Phase-7 step 2 owns the connector-derived seat holes and service screws for the mill's Y and Z
+rails: `MillRailPlacement`, `InsertMountPattern` and `MillRailFasteners`. RM2 reuses these helpers.
+Each source hole records its placed rail connector, recipe fingerprint, clearance budget and drilling
+route. Unknown RM0 allocations keep the proposed transfer route pending; they are not assumed zero.
+The broader side-bar, clamp and replication-layer work above remains RM2 scope.
+
 ### RM3 — Bench mill adoption
 
 `MillFrame` uses RM2 for the Y rails and the column's Z rails; the saddle carries the X rails the same
