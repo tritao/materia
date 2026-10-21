@@ -141,6 +141,8 @@ the [concepts](concepts/README.md) and the [roadmap](product/roadmap.md).
 
 </div>
 
+[All documentation](documentation.md) · [What Materia does](product/README.md)
+
 ## Open, and honest about where it is
 
 Materia is open source: the code and machine designs under Apache-2.0, this

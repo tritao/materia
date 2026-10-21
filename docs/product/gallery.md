@@ -26,6 +26,8 @@ are assumptions rather than supplier data, the example's README says so.
 
 ### Gantry picker
 
+<img class="gallery-shot" src="/screens/gantry-picker.webp" width="640" height="400" alt="The gantry picker in the editor" loading="lazy">
+
 A 1500 × 1000 × 500 mm belt-driven Cartesian gantry with a sensed suction
 tool. Press Play: the machine homes its axes (Z first, then the two Y motors
 squared) and moves six cartons from an infeed onto a two-row pallet pattern.
@@ -44,6 +46,8 @@ Concepts: [Transmissions](../concepts/modelling/transmissions.md),
 
 ### Desktop CNC router
 
+<img class="gallery-shot" src="/screens/cnc-router.webp" width="640" height="400" alt="The desktop CNC router in the editor" loading="lazy">
+
 A three-axis gantry router of 44 MachineKit parts (T-slot frame, MGN12 rails,
 lead screws) with a block of aluminium stock on its bed. Press Play: it pockets
 a NEMA 23 motor plate with an end mill, changes to a drill, drills the screw
@@ -60,6 +64,8 @@ Concepts: [Toolpaths](../concepts/process/toolpaths.md),
 ```
 
 ### Full-sheet CNC router
+
+<img class="gallery-shot" src="/screens/sheet-router.webp" width="640" height="400" alt="The full-sheet CNC router in the editor" loading="lazy">
 
 A router for 1600 × 2600 mm sheets on a welded steel frame: servo gantry on
 racks, ball-screw Z, a zoned vacuum bed, an ISO30 tool-changer spindle and an
@@ -124,6 +130,8 @@ Concepts: [Transmissions](../concepts/modelling/transmissions.md),
 
 ### CoreXY 3D printer
 
+<img class="gallery-shot" src="/screens/printer.webp" width="640" height="400" alt="The coreXY 3D printer in the editor" loading="lazy">
+
 A CoreXY FDM printer on a 2020 T-slot frame: MGN12 rails, GT2 belts, a bed on
 three lead screws with a motor each, a geared extruder, heaters and fans, and
 switch and probe homing. The default project prints a small tab from a sliced
@@ -143,6 +151,8 @@ Concepts: [Toolpaths](../concepts/process/toolpaths.md),
 ## Robot arms
 
 ### Six-axis robot arm
+
+<img class="gallery-shot" src="/screens/robot-arm.webp" width="640" height="400" alt="The six-axis robot arm in the editor" loading="lazy">
 
 A serial arm of 20 MachineKit parts on a pedestal, with a shoulder, elbow and
 spherical-wrist layout and a suction tool. Play runs a pick-and-place cycle
@@ -217,6 +227,8 @@ Concepts: [Machine-axis views](../concepts/motion/machine-axes.md),
 
 ### Mobile base
 
+<img class="gallery-shot" src="/screens/mobile-base.webp" width="640" height="400" alt="The mobile base in the editor" loading="lazy">
+
 A differential-drive base: two NEMA 23 steppers driving the wheels directly,
 casters, a battery, an upper deck and a planar lidar. The `cell` entrypoint
 puts it in a room, where it drives a round of the shelves and the dock on its
@@ -278,6 +290,8 @@ Concepts: [Process vs. robot](../concepts/process/process-and-robots.md),
 ```
 
 ### Robot welder
+
+<img class="gallery-shot" src="/screens/robot-welder.webp" width="640" height="400" alt="The robot welder in the editor" loading="lazy">
 
 A fixed MIG cell: the six-axis arm with a robot torch, a wire feeder, a power
 source, a gas cylinder and a welding table with a plate T-joint and a small
@@ -373,6 +387,8 @@ Concepts: [Stock and material removal](../concepts/process/stock.md),
 ```
 
 ### Sheet metal press brake
+
+<img class="gallery-shot" src="/screens/press-brake.webp" width="640" height="400" alt="The sheet metal press brake in the editor" loading="lazy">
 
 A 40 t, 1600 mm hydraulic press brake with ram, tooling, depth stop and
 backgauge as ordinary assembly joints, and hydraulic services in the BOM. The

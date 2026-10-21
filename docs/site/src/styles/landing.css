@@ -59,3 +59,33 @@
 }
 .landing-machines a:hover img { transform: translateY(-2px); border-color: var(--sl-color-accent); }
 .landing-machines span { display: block; margin-top: 0.4rem; }
+
+/* The product overview (docs/product/README.md): one row per stage, picture beside text, alternating sides. */
+.product-stages > section {
+	display: grid;
+	grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+	gap: 1.5rem;
+	align-items: center;
+	margin: 2.5rem 0;
+}
+.product-stages > section:nth-child(even) { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+.product-stages > section:nth-child(even) > img { order: 2; }
+.product-stages img,
+.gallery-shot {
+	display: block;
+	width: 100%;
+	height: auto;
+	aspect-ratio: 16 / 10;
+	object-fit: cover;
+	border-radius: 0.6rem;
+	border: 1px solid var(--sl-color-hairline);
+}
+.product-stages h2 { margin-top: 0; }
+.product-stages > section > div > :first-child { margin-top: 0; }
+@media (max-width: 40rem) {
+	.product-stages > section,
+	.product-stages > section:nth-child(even) { grid-template-columns: 1fr; }
+	.product-stages > section:nth-child(even) > img { order: 0; }
+}
+/* Gallery entries with a screenshot show it at a readable size, not the full column. */
+.gallery-shot { max-width: 30rem; }

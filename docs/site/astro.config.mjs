@@ -41,21 +41,34 @@ export default defineConfig({
 			description: "Design, simulate, plan and run machines, from CAD to the controller.",
 			social: [{ icon: "github", label: "GitHub", href: "https://github.com/tritao/materia" }],
 			plugins: [starlightLinksValidator()],
-			components: { MarkdownContent: "./src/components/MarkdownContent.astro" },
+			components: { Header: "./src/components/Header.astro", MarkdownContent: "./src/components/MarkdownContent.astro" },
+			// Each page shows only its half of this sidebar: the Product group or the rest (src/routeData.ts).
+			routeMiddleware: "./src/routeData.ts",
 			sidebar: [
+				{
+					// The label is PRODUCT_GROUP in src/sections.ts.
+					label: "Product",
+					items: [
+						{ label: "Overview", slug: "product" },
+						{ label: "Features", slug: "product/features" },
+						{ label: "Gallery", slug: "product/gallery" },
+						{ label: "Components", link: "/components/" },
+						{ label: "Roadmap", slug: "product/roadmap" },
+						{ label: "Licensing", slug: "product/licensing" },
+						{ label: "Open core", slug: "open-core" },
+					],
+				},
+				{ label: "Where to start", slug: "documentation" },
 				{
 					label: "Tutorials",
 					items: [{ label: "Your first machine: a gantry picker", slug: "tutorials/gantry-picker" }],
 				},
 				{ label: "Concepts", items: [{ label: "Overview", slug: "concepts" }, ...conceptGroups()] },
 				{ label: "Editor manual", collapsed: true, items: [{ autogenerate: { directory: "manual" } }] },
-				{ label: "Components", link: "/components/" },
 				{ label: "API reference", link: "/reference/" },
-				{ label: "About Materia", collapsed: true, items: [{ autogenerate: { directory: "product" } }] },
 				{
 					label: "Project",
 					items: [
-						{ label: "Open core", slug: "open-core" },
 						{ label: "Documentation plan", slug: "docs-plan" },
 						{ label: "Documentation inventory", slug: "inventory" },
 					],

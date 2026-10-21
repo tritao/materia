@@ -1,0 +1,162 @@
+---
+// Starlight's header (components/Header.astro) with the site menu after the title. Below 72rem the menu folds into
+// a dropdown; below 50rem the documentation's sidebar keeps its own menu button too.
+import config from "virtual:starlight/user-config";
+import Search from "virtual:starlight/components/Search";
+import SiteTitle from "virtual:starlight/components/SiteTitle";
+import SocialIcons from "virtual:starlight/components/SocialIcons";
+import ThemeSelect from "virtual:starlight/components/ThemeSelect";
+import { MENU } from "../sections";
+
+const shouldRenderSearch = config.pagefind || config.components.Search !== "@astrojs/starlight/components/Search.astro";
+const path = Astro.url.pathname;
+const items = MENU.map((item) => ({ ...item, active: item.current.test(path) }));
+---
+
+<div class="header">
+	<div class="title-wrapper sl-flex">
+		<SiteTitle />
+	</div>
+	<nav class="site-menu print:hidden" aria-label="Site">
+		{items.map((item) => <a href={item.href} aria-current={item.active ? "page" : undefined}>{item.label}</a>)}
+	</nav>
+	<div class="sl-flex print:hidden search">
+		{shouldRenderSearch && <Search />}
+		<details class="site-menu-compact">
+			<summary>Menu</summary>
+			<nav aria-label="Site">
+				{items.map((item) => <a href={item.href} aria-current={item.active ? "page" : undefined}>{item.label}</a>)}
+			</nav>
+		</details>
+	</div>
+	<div class="sl-hidden md:sl-flex print:hidden right-group">
+		<div class="sl-flex social-icons">
+			<SocialIcons />
+		</div>
+		<ThemeSelect />
+	</div>
+</div>
+
+<style>
+	.header {
+		display: flex;
+		gap: var(--sl-nav-gap);
+		justify-content: space-between;
+		align-items: center;
+		height: 100%;
+	}
+	.title-wrapper {
+		overflow: clip;
+		padding: 0.25rem;
+		margin: -0.25rem;
+		min-width: 0;
+	}
+	.right-group,
+	.social-icons {
+		gap: 1rem;
+		align-items: center;
+	}
+	.social-icons::after {
+		content: "";
+		height: 2rem;
+		border-inline-end: 1px solid var(--sl-color-gray-5);
+	}
+	.search {
+		gap: 0.75rem;
+		align-items: center;
+	}
+
+	.site-menu {
+		display: none;
+		gap: 0.25rem;
+		align-items: center;
+	}
+	.site-menu a,
+	.site-menu-compact a {
+		padding: 0.35rem 0.65rem;
+		border-radius: 0.4rem;
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-sm);
+		font-weight: 500;
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	.site-menu a:hover,
+	.site-menu-compact a:hover {
+		color: var(--sl-color-white);
+		background: var(--sl-color-gray-6);
+	}
+	.site-menu a[aria-current="page"],
+	.site-menu-compact a[aria-current="page"] {
+		color: var(--sl-color-text-accent);
+		background: var(--sl-color-accent-low);
+	}
+
+	.site-menu-compact {
+		position: relative;
+	}
+	.site-menu-compact summary {
+		list-style: none;
+		cursor: pointer;
+		padding: 0.35rem 0.7rem;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.4rem;
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-sm);
+	}
+	.site-menu-compact summary::-webkit-details-marker {
+		display: none;
+	}
+	.site-menu-compact[open] summary {
+		color: var(--sl-color-white);
+		background: var(--sl-color-gray-6);
+	}
+	.site-menu-compact nav {
+		position: absolute;
+		inset-inline-end: 0;
+		top: calc(100% + 0.4rem);
+		z-index: var(--sl-z-index-menu, 20);
+		display: grid;
+		min-width: 11rem;
+		padding: 0.35rem;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.6rem;
+		background: var(--sl-color-bg-nav);
+		box-shadow: var(--sl-shadow-md);
+	}
+
+	/* Leave room for the documentation sidebar's fixed menu button on phones. */
+	@media (max-width: 49.99rem) {
+		:global(:root[data-has-sidebar]) .search {
+			margin-inline-end: calc(var(--sl-menu-button-size) + 0.5rem);
+		}
+	}
+
+	@media (min-width: 50rem) {
+		:global(:root[data-has-sidebar]) {
+			--__sidebar-pad: calc(2 * var(--sl-nav-pad-x));
+		}
+		:global(:root:not([data-has-toc])) {
+			--__toc-width: 0rem;
+		}
+		.header {
+			--__sidebar-width: max(0rem, var(--sl-content-inline-start, 0rem) - var(--sl-nav-pad-x));
+			display: grid;
+			/* Title (as wide as the sidebar, or itself), menu, search (all free space), the right-hand items. */
+			grid-template-columns: minmax(calc(var(--__sidebar-width) - var(--sl-nav-gap)), auto) auto 1fr auto;
+			align-content: center;
+		}
+		.search {
+			justify-content: flex-end;
+		}
+	}
+
+	@media (min-width: 72rem) {
+		.site-menu {
+			display: flex;
+		}
+		.site-menu-compact {
+			display: none;
+		}
+	}
+</style>
