@@ -31,7 +31,7 @@ typedef CastingMoldAssessment = {
  */
 class CastingMoldPlanner {
 	public static function sourceSupport(input:CastingToolingInput):Array<materia.tooling.ToolingValidation>
-		return CastingBoxSupport.check(input, "tooling.feature.box-geometry").concat(InsertQualifications.check(input.inserts));
+		return CastingBoxSupport.check(input, "tooling.feature.box-geometry", false).concat(InsertQualifications.check(input.inserts));
 	public static function envelope(d:ToolingDocument):MoldBox {
 		var rows = d.input.envelope;
 		if (rows.length != 1 || rows[0].profile.length != 4)
@@ -59,7 +59,10 @@ class CastingMoldPlanner {
 	public static function assess(document:ToolingDocument, authored:CastingMoldOptions):CastingMoldAssessment {
 		var d = ToolingCodec.snapshot(document), options = CastingMoldOptionsCodec.snapshot(authored);
 		var checks = sourceSupport(d.input);
-		var unsupported = checks.filter(check -> check.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported);
+		// Hardware qualifications affect readiness, not whether the source cavity
+		// can be panelled. Exact hardware is realized and checked by the CAD bridge.
+		var unsupported = checks.filter(check -> StringTools.startsWith(check.rule,"tooling.feature.box-geometry")
+			&& check.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported);
 		if (unsupported.length > 0) {
 			var changes:Array<DesignChangeRequest> = [for (check in unsupported) if (d.input.features.filter(feature -> check.affectedIds.indexOf(feature.id)>=0).length>0) {
 				id: materia.tooling.ToolingIds.derive("geometry-", check.affectedIds.join("-")),

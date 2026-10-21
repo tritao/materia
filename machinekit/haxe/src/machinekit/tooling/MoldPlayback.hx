@@ -117,6 +117,8 @@ class MoldPlayback {
 		// Steel is now represented by the single cured resin/steel solid.
 		for (i in p.document.input.inserts)
 			visible.remove(materia.tooling.ToolingIds.derive("insert-", i.id));
+		for (hardware in CastingMoldCad.anchorComponents(p))
+			visible.remove(hardware.id);
 		visible.set("cured-casting", true);
 		for (step in review.demoldingSteps) {
 			var active:Array<String> = [];

@@ -9769,30 +9769,30 @@
   "currentDesign": [
     {
       "id": "mill-base",
-      "sourceFingerprint": "4f87a9e96265d76c0d024b34fdb698a45aaef0dcda33b22e46857bbe5145bb80",
-      "sourceCodecVersion": 9,
-      "volumeMm3": 70011543.99999999,
-      "massKg": 168.0277056,
-      "boxStatus": "pass",
-      "boxReason": "Exact disjoint-box material hulls",
+      "sourceFingerprint": "98af8ac4545c4c32d1a1b873eeabf35fd801052d5eb54d158d200f8d5e18b6c9",
+      "sourceCodecVersion": 13,
+      "volumeMm3": 69970334.53177235,
+      "massKg": 167.92880287625363,
+      "boxStatus": "unsupported",
+      "boxReason": "Non-box anchor occupancy for inserts: columnLeftFront, columnLeftRear, columnRightFront, columnRightRear, driveYFixed, driveYFloating, footLeftFront, footLeftRear, footRightFront, footRightRear, railYLeft, railYRight",
       "unsupportedFeatures": [],
-      "minimumIyMm4": 441059422.4090705
+      "minimumIyMm4": null
     },
     {
       "id": "mill-column",
-      "sourceFingerprint": "b7f9c2d735a5c22b73eb1a13688258b60048b19fb5f102f5da709d8c31ec8bd2",
-      "sourceCodecVersion": 9,
-      "volumeMm3": 41925099.99999999,
-      "massKg": 100.62023999999998,
+      "sourceFingerprint": "f7470a84aeb0fc1bd3306990bcbc3bca87974cf775b1aa7e72482d0c63499046",
+      "sourceCodecVersion": 13,
+      "volumeMm3": 41892937.68146703,
+      "massKg": 100.54305043552087,
       "boxStatus": "unsupported",
-      "boxReason": "Flared or chamfered envelopes require non-box collision decomposition",
+      "boxReason": "Non-box anchor occupancy for inserts: footLeftFront, footLeftRear, footRightFront, footRightRear, hatchRearLeftLower, hatchRearLeftUpper, hatchRearRightLower, hatchRearRightUpper, railZLeft, railZRight",
       "unsupportedFeatures": [],
       "minimumIyMm4": null
     },
     {
       "id": "hobber-bed",
-      "sourceFingerprint": "d244a2e95b47896c0590490dd88e0e3294915a2423514aae17e78874027abd78",
-      "sourceCodecVersion": 9,
+      "sourceFingerprint": "a00e40bdb5182a41e520cbdb0a13bfaeaf5e7faa7bbf7ea4f1b8139046cf5d04",
+      "sourceCodecVersion": 13,
       "volumeMm3": 350008859.82848215,
       "massKg": 840.0212635883572,
       "boxStatus": "unsupported",
@@ -9815,8 +9815,8 @@
     },
     {
       "id": "hobber-column",
-      "sourceFingerprint": "50fa9ced19f5a1d72ae7f61ef365fec8d62680f89cfd912bac6d8c5f94b7bebe",
-      "sourceCodecVersion": 9,
+      "sourceFingerprint": "550a01ca34b730a5671b8b8372c65dc0e08e9c74db97a577bed0634d6d17ec5f",
+      "sourceCodecVersion": 13,
       "volumeMm3": 18059500.00000001,
       "massKg": 43.34280000000003,
       "boxStatus": "pass",
@@ -9825,5 +9825,5 @@
       "minimumIyMm4": 515253226.29969406
     }
   ],
-  "currentDesignBasis": "Exact native volumes; box-only section results are Unsupported for socket recesses, never approximated."
+  "currentDesignBasis": "Exact native volumes; box-only sections are Unsupported for non-box socket recesses and embedded anchor hardware, never approximated."
 }

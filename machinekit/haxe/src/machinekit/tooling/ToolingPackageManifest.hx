@@ -222,15 +222,20 @@ class ToolingPackageManifest {
 		if (!Std.isOfType(manifest.validation, Array))
 			throw "Invalid tooling validation records";
 		var validation = readValidation(manifest.validation);
+		var validationCounts:Map<String,Int> = [];
+		for (record in validation) {
+			var key=ToolingCodec.canonical(record), count=validationCounts.get(key);
+			validationCounts.set(key,count==null ? 1 : count+1);
+		}
 		if (files.filter(file -> file.path == "hardware-validation.json").length != 1)
 			throw "Missing hashed hardware validation";
 		for (record in readValidation(haxe.Json.parse(sys.io.File.getContent(dir + "/hardware-validation.json"))))
-			if (validation.filter(v -> ToolingCodec.canonical(v) == ToolingCodec.canonical(record)).length != 1)
+			if (validationCounts.get(ToolingCodec.canonical(record)) != 1)
 				throw "Hardware validation omitted from readiness";
 		for (name in ["mold-plan.json","insert-manufacturing.json","insert-anchorage.json"])
 			if (files.filter(file -> file.path==name).length!=1) throw "Missing hashed source manufacturing artifact: "+name;
 		for (record in sourceChecks(dir,manifest.sourceFingerprint))
-			if (validation.filter(check -> ToolingCodec.canonical(check)==ToolingCodec.canonical(record)).length!=1)
+			if (validationCounts.get(ToolingCodec.canonical(record))!=1)
 				throw "Source manufacturing validation omitted from readiness";
 		var readiness = ToolingReadiness.evaluate(validation);
 		if (ToolingCodec.canonical(readiness) != ToolingCodec.canonical(manifest.fabrication))

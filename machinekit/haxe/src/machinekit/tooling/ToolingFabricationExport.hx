@@ -32,6 +32,10 @@ typedef HardwareDimensions = {
 
 /** Lists and shop-review drawings from neutral records. No alternative SVG/DXF writers. */
 class ToolingFabricationExport {
+	// Bounded, process-local memoization: source and all resolved mold geometry
+	// are validated by the key. Never cache CAD handles or expose cached arrays.
+	static var anchorReportCache:Null<{key:String,checks:Array<materia.tooling.ToolingValidation>}> = null;
+
 	public static function classify(component:machinekit.component.MachineComponent):HardwareDimensions {
 		if (Std.isOfType(component, ToolingPanel)
 			|| Std.isOfType(component, ToolingVolume)
@@ -118,13 +122,22 @@ class ToolingFabricationExport {
 	}
 
 	public static function insertAnchorageReport(p:CastingMoldPlan,sourceFingerprint:String):Dynamic {
+		var key=sourceFingerprint+":"+materia.tooling.casting.CastingMoldCodec.fingerprint(p);
+		var cached=anchorReportCache;
+		var nativeChecks:Array<materia.tooling.ToolingValidation>;
+		if (cached!=null && key==cached.key) nativeChecks=cached.checks;
+		else {
+			nativeChecks=InsertAnchorGeometry.review(p.document.input).concat(InsertAnchorGeometry.reviewMold(p));
+			anchorReportCache={key:key,checks:nativeChecks};
+		}
 		var checks:Array<materia.tooling.ToolingValidation> = [];
 		for (insert in p.document.input.inserts) checks=checks.concat(materia.tooling.casting.InsertAnchorageChecks.check(insert));
-		checks=checks.concat(InsertAnchorGeometry.review(p.document.input));
+		for (record in nativeChecks) checks.push({rule:record.rule,affectedIds:record.affectedIds.copy(),
+			status:record.status,severity:record.severity,message:record.message,evidence:record.evidence.copy()});
 		checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));
 		return {format:"materia.tooling.insert-anchorage",version:1,sourceFingerprint:sourceFingerprint,
 			inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),
-			inserts:[for (insert in p.document.input.inserts) {id:insert.id,pose:insert.pose,
+			inserts:[for (insert in p.document.input.inserts) {id:insert.id,pose:materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.identity(),insert.pose),
 				spec:materia.casting.InsertSpec.InsertSpecCodec.record({body:insert.body,holes:insert.holes,
 					origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces})}],validation:checks};
 	}

@@ -47,7 +47,7 @@ class InsertAnchorTests {
 		check(input.inserts.length==1
 			&& materia.tooling.ToolingCodec.canonical(input.inserts[0].anchorage)==materia.tooling.ToolingCodec.canonical(spec.anchorage),"adapter copies anchor source, not extra dummy inserts");
 		var native=machinekit.tooling.InsertAnchorGeometry.review(input);
-		check(native.length==4 && native.filter(record -> record.status!=materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==0,
+		check(native.length==6 && native.filter(record -> record.status!=materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==0,
 			"both actual anchor washers bear on resin and have their declared source casting cover");
 		var sourceRules=switch input.inserts[0].anchorage {case Bolted(rules,_):rules;default:throw "Expected bolted source";};
 		sourceRules.minimumCoverMm=50;
@@ -76,15 +76,35 @@ class InsertAnchorTests {
 				frequencyHz:null,amplitudeMm:null,durationSeconds:null,evidence:[]},
 			serviceOrientation:F.identity(),overlapRule:materia.tooling.casting.CastingMoldPlan.OverlapRule.ReservedThenPriority,liftingEvidence:[]};
 		var sourceReview=machinekit.structural.FoundationIntegrity.castingReview(foundation,document);
-		check(sourceReview.validation.filter(record -> record.rule.indexOf(".cad.")>=0 && record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==4,
+		check(sourceReview.validation.filter(record -> record.rule.indexOf(".cad.")>=0 && record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==6,
 			"native anchor source geometry reaches foundation design diagnostics");
 		var assessment=materia.tooling.casting.CastingMoldPlanner.assess(document,options);
-		check(assessment.plan==null && !assessment.fabrication.ready && assessment.changeRequests.length==0,
-			"unimplemented anchor tooling stays Unsupported without a fictional casting change request to remove source anchors");
+		check(assessment.plan!=null && !assessment.fabrication.ready,
+			"panel mold planning retains exact native anchors while non-box fill remains a step-3 requirement");
+		var interference=machinekit.tooling.InsertAnchorGeometry.reviewMold(cast assessment.plan);
+		check(interference.length==2 && interference.filter(record -> record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length==0,
+			"source anchor pairs clear every actual mold member");
+		var processSpec=ProcessTests.spec();processSpec.sections=[];
+		processSpec.recipeFingerprint=materia.tooling.ToolingCodec.recipeFingerprint(document.recipe);
+		var process=materia.tooling.process.CastingProcessAnalysis.analyze(cast assessment.plan,processSpec,9.80665);
+		check(process.fill==null && process.sections==null && process.pour==null && !process.fabrication.ready,
+			"non-box source keeps unavailable process reports explicit without a box substitute or aborting the kit");
+		check(process.validation.filter(record -> record.rule=="process.cure.section-coverage"
+			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length==1,
+			"non-box section coverage cannot become a thermal pass");
 		var restored=machinekit.assembly.MachineAssembly.decode(foundation.encode());
 		check(restored.billOfMaterials().quantity(anchors[0].screw.partNumber)==2,"source assembly round trip preserves actual anchor hardware");
 		var owned:Array<cadkit.modeling.Part> = [];
 		try {
+			var mold:materia.tooling.casting.CastingMoldPlan=cast assessment.plan;
+			var resin=machinekit.tooling.CastingMoldCad.source(mold);owned.push(resin);
+			var reconstructed=machinekit.tooling.CastingMoldCad.reconstructed(mold);owned.push(reconstructed);
+			var missing=resin.subtract(reconstructed);owned.push(missing);
+			var added=reconstructed.subtract(resin);owned.push(added);
+			check(missing.volume()+added.volume()<1e-6,"panel reconstruction includes exact anchor occupancy");
+			var metal=machinekit.tooling.CastingMoldCad.steel(mold,"seat");owned.push(metal);
+			var nominalMass=(resin.volume()*mold.document.recipe.mixDensityKgM3+metal.volume()*mold.document.recipe.steelDensityKgM3)*1e-9;
+			check(Math.abs(nominalMass-mold.handling.castingMassKg)<1e-6,"source anchor moments agree with exact nominal metal/resin mass");
 			var actual=foundation.body.geometry();owned.push(actual);
 			var baseline=new machinekit.structural.MineralCasting(foundation.body.values().copy().setToken("embeddedAnchors","[]")).geometry();
 			owned.push(baseline);

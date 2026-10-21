@@ -222,28 +222,32 @@ class ReviewContractTests {
 		sharedSpec.recipeFingerprint = ToolingCodec.recipeFingerprint(p.document.recipe);
 		sharedSpec.sections = [];
 		var shared = CastingProcessAnalysis.analyze(p, sharedSpec, 9.80665, FabricationTests.spec());
+		if (shared.sections==null) throw "Box fixture requires exact orthogonal sections";
+		var sharedSections:materia.tooling.process.OrthogonalSections.OrthogonalSectionReport=cast shared.sections;
 		var eps = [
 			for (strategy in p.document.setup.features) if (strategy.strategy == materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS)
 				strategy.featureId
 		];
 		sharedSpec.sections = [
-			for (span in shared.sections.spans)
+			for (span in sharedSections.spans)
 				if (span.axis == Z) OrthogonalSections.cureSection(span,
 					boundary(span.lowerSourceIds.filter(id -> eps.indexOf(id) >= 0).length > 0 ? Insulated : Convection),
 					boundary(span.upperSourceIds.filter(id -> eps.indexOf(id) >= 0).length > 0
 						|| Math.abs(span.endMm - p.document.setup.fillHeightMm) < 1e-7 ? Insulated : Convection),
-					["test source-owned boundaries"], shared.sections.geometryFingerprint)
+					["test source-owned boundaries"], sharedSections.geometryFingerprint)
 		];
 		var covered = CastingProcessAnalysis.analyze(p, sharedSpec, 9.80665, FabricationTests.spec());
-		check(covered.thermalCoverage.validation.filter(v -> v.rule == "process.cure.geometric-coverage"
+		if (covered.thermalCoverage==null) throw "Box fixture requires thermal coverage";
+		var coverage:materia.tooling.process.ThermalCoverage.ThermalCoverageReport=cast covered.thermalCoverage;
+		check(coverage.validation.filter(v -> v.rule == "process.cure.geometric-coverage"
 			&& v.status == "pass").length == 1,
 			"source-owned disjoint slabs cover the actual casting");
 		check(covered.cure.validation.filter(v -> v.rule == "process.cure.section-coverage" && v.status == "pass").length == 1,
 			"CureReport and report-level geometric coverage agree on Pass");
-		var duplicate = shared.sections.spans.filter(span -> span.axis == X)[0];
+		var duplicate = sharedSections.spans.filter(span -> span.axis == X)[0];
 		sharedSpec.sections.push(OrthogonalSections.cureSection(duplicate, boundary(Convection), boundary(Convection), [],
-			shared.sections.geometryFingerprint));
-		check(ThermalCoverage.analyze(p.document.input.id, shared.sections, sharedSpec, "process")
+			sharedSections.geometryFingerprint));
+		check(ThermalCoverage.analyze(p.document.input.id, sharedSections, sharedSpec, "process")
 			.validation.filter(v -> v.rule == "process.cure.geometric-coverage" && v.status == "fail")
 			.length == 1,
 			"different-axis sections cannot cover the same volume twice");
@@ -253,7 +257,7 @@ class ReviewContractTests {
 			epsSection.left = boundary(Convection);
 		else
 			epsSection.right = boundary(Convection);
-		check(ThermalCoverage.analyze(p.document.input.id, shared.sections, sharedSpec, "process", p.document)
+		check(ThermalCoverage.analyze(p.document.input.id, sharedSections, sharedSpec, "process", p.document)
 			.validation.filter(v -> v.rule == "process.cure.geometric-coverage" && v.status == "fail")
 			.length == 1,
 			"a cooling boundary cannot be assigned to an EPS or undeclared open face");

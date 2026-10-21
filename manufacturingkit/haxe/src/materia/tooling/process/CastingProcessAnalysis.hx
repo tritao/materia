@@ -13,12 +13,12 @@ typedef CastingProcessReport = {
 	var sourceFingerprint:String;
 	var processFingerprint:String;
 	var spec:CastingProcessSpec;
-	var fill:FillReport;
-	var pour:PourPlanning.PourAssessment;
+	var fill:Null<FillReport>;
+	var pour:Null<PourPlanning.PourAssessment>;
 	var cure:CureReport;
-	var sections:OrthogonalSections.OrthogonalSectionReport;
-	var castability:CastabilityAnalysis.CastabilityReport;
-	var thermalCoverage:ThermalCoverage.ThermalCoverageReport;
+	var sections:Null<OrthogonalSections.OrthogonalSectionReport>;
+	var castability:Null<CastabilityAnalysis.CastabilityReport>;
+	var thermalCoverage:Null<ThermalCoverage.ThermalCoverageReport>;
 	var validation:Array<materia.tooling.ToolingValidation>;
 	var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
 }
@@ -55,8 +55,25 @@ class CastingProcessAnalysis {
 			fabrication: fabrication == null ? null : {resinReference: fabrication.resinReference, adhesiveContainsEPS: fabrication.adhesiveContainsEPS}
 		}));
 		var geometry = materia.tooling.casting.CastingSourceRegions.derive(p.document);
-		if (geometry.regions == null)
-			throw [for (check in geometry.validation) check.message].join("\n");
+		if (geometry.regions == null) {
+			// Exact non-box fill belongs to step 3. Retain the unavailable reports
+			// explicitly; never analyze an anchor-free box substitute or lose the kit.
+			var checks=materia.tooling.casting.CastingSourceRegions.checks(geometry,"process.fill.geometry")
+				.concat(materia.tooling.casting.CastingSourceRegions.checks(geometry,"process.sections.geometry"));
+			validateSectionSources(p.document,spec);
+			var cure=CureAnalysis.analyze(p.document.input.id,sourceFingerprint,fingerprint,spec,p.document.recipe.mixDensityKgM3,
+				p.document.recipe.core.maximumTemperatureC,p.cores.length>0 || fabrication==null || fabrication.adhesiveContainsEPS!=false);
+			cure.validation=cure.validation.filter(check -> check.rule!="process.cure.section-coverage"
+				&& check.rule!="process.cure.geometric-coverage");
+			for (rule in ["process.cure.section-coverage","process.cure.geometric-coverage"])
+				cure.validation.push(FillAnalysis.check(rule,[p.document.input.id],materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,
+					"Exact non-box thermal geometry is unsupported; no box coverage is credited.",[]));
+			checks=checks.concat(cure.validation).concat(p.validation);
+			checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));
+			return {version:ProcessSpecCodec.VERSION,sourceFingerprint:sourceFingerprint,processFingerprint:fingerprint,spec:spec,
+				fill:null,pour:null,cure:cure,sections:null,castability:null,thermalCoverage:null,validation:checks,
+				fabrication:materia.tooling.ToolingValidation.ToolingReadiness.evaluate(checks)};
+		}
 		var projection = FillTooling.project(p);
 		var panels:Array<FillPanel> = [
 			for (member in p.panels.members.concat(p.supportPanels)) {

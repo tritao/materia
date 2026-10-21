@@ -29,6 +29,13 @@ class CastHandling {
 			mx += kg * center.x;
 			my += kg * center.y;
 			mz += kg * center.z;
+			var spec:materia.casting.InsertSpec={body:i.body,holes:i.holes,origin:i.origin,interfaces:i.interfaces,anchorage:i.anchorage};
+			for (exposedOnly in [true,false]) {
+				var hardware=materia.casting.EmbeddedAnchors.moments(spec,exposedOnly);
+				var delta=hardware.volume*(exposedOnly ? -d.recipe.mixDensityKgM3 : d.recipe.steelDensityKgM3)*1e-9;
+				var point=F.transformPoint(F.compose(d.setup.sourceToMold,i.pose),hardware.center.x,hardware.center.y,hardware.center.z);
+				mass+=delta;mx+=delta*point.x;my+=delta*point.y;mz+=delta*point.z;
+			}
 		}
 		if (!Math.isFinite(mass) || !Math.isFinite(mx) || !Math.isFinite(my) || !Math.isFinite(mz) || mass <= 0)
 			throw "Casting handling requires positive mass";

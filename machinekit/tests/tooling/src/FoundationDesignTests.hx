@@ -66,6 +66,35 @@ class FoundationDesignTests {
 		});
 	}
 
+	/** Approved production-anchor correction against the independent pre-anchor STEP.
+	 * Restore the historical 60 mm joint-pad voids, cut the widened pads, then
+	 * subtract actual standard anchor hardware. Other frozen geometry stays fixed. */
+	static function anchorDesignChange(previous:Part,foundation:machinekit.structural.MineralFoundation):Part {
+		return Solids.building([new Part(previous.shape.cloneShape())], parts -> {
+			var restored:Array<Part> =[parts[0]];
+			for (row in foundation.insertLocations())
+				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.ColumnMount) {
+					var box=materia.casting.InsertSpec.InsertBodyCodec.box(row.part.insertSpec().body,row.id);
+					var old=Part.box(box.width,60,box.height);parts.push(old);
+					var placed=PosedParts.moved(old,row.pose);parts.push(placed);restored.push(placed);
+				}
+			var bulk=Solids.union(restored);parts.push(bulk);
+			var cuts:Array<Part> =[];
+			for (row in foundation.insertLocations()) {
+				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.ColumnMount) {
+					var box=materia.casting.InsertSpec.InsertBodyCodec.box(row.part.insertSpec().body,row.id);
+					var local=Part.box(box.width,box.depth,box.height);parts.push(local);
+					var placed=PosedParts.moved(local,row.pose);parts.push(placed);cuts.push(placed);
+				}
+				for (hardware in machinekit.structural.InsertAnchorHardware.parts(row.part.insertSpec())) {
+					var local=hardware.part.geometry();parts.push(local);local.shape.setThreadedFaces([]);
+					var placed=PosedParts.moved(local,F.compose(row.pose,hardware.pose));parts.push(placed);cuts.push(placed);
+				}
+			}
+			return Solids.cut(bulk,cuts);
+		});
+	}
+
 	static function prism(p:materia.casting.CastingPrism):Part {
 		var local = Part.prism([for (v in p.profile) new Vector(v.x, v.y)], 0, p.height);
 		try {
@@ -398,6 +427,11 @@ class FoundationDesignTests {
 					added.close(); removed.close();
 				} catch (error:Dynamic) {corrected.close(); previous.close(); actual.close(); throw error;}
 				corrected.close();
+			} else if (StringTools.startsWith(row.id,"mill-")) {
+				var corrected=anchorDesignChange(previous,row.part);
+				try same(corrected,actual,row.id+" approved 68 mm pads and production anchors")
+				catch (error:Dynamic) {corrected.close();previous.close();actual.close();throw error;}
+				corrected.close();
 			} else same(previous,actual,row.id);
 			var sourceInput = machinekit.tooling.FoundationToolingAdapter.snapshot(row.part,row.id,1);
 			var unsupported = row.part.body.finishedCavities().filter(cavity -> !CastingCavities.supportsBoxes(cavity));
@@ -462,7 +496,7 @@ class FoundationDesignTests {
 		}
 		if (Sys.args().indexOf("--write-baseline-current") >= 0) {
 			Reflect.setField(baseline,"currentDesign",currentRows);
-			Reflect.setField(baseline,"currentDesignBasis","Exact native volumes; box-only section results are Unsupported for socket recesses, never approximated.");
+			Reflect.setField(baseline,"currentDesignBasis","Exact native volumes; box-only sections are Unsupported for non-box socket recesses and embedded anchor hardware, never approximated.");
 			sys.io.File.saveContent(root+"/../../../../examples/flexspline-hobber/BASELINE_FOUNDATIONS.json",haxe.Json.stringify(baseline,null,"  ")+"\n");
 		}
 		slopedFoot();

@@ -2012,6 +2012,31 @@ structures and phase 9 physical calibration remain open.
   readiness **false**. A local scene-record name introduced on main was renamed
   to avoid shadowing the export writer; package export compiles again.
 
+- [x] Production anchorage continuation: one named mill recipe rule derives
+  stations, the smallest supported policy-compliant thread and standard screw
+  lengths, with no per-insert patterns or fallback. All **58 base / 48 column**
+  anchors meet native cover, bearing-area and axial embedment checks. The approved
+  joint-pad correction derives **68 mm**, replacing 60 mm around 46 mm bolt
+  access; thread engagement and geometry checks are not weakened.
+  Both foundations have zero symmetric difference against independent frozen
+  STEP controls after the explicit pad-and-anchor correction. Current-design
+  baseline volumes/fingerprints are regenerated; frozen controls are unchanged.
+  Native mass/CoM, exact reconstruction, rigid insertion groups, full swept
+  graphs and mold interference pass; playback absorbs anchors into the cured
+  solid. Process format **7** rejects format 6 and represents unavailable non-box
+  reports explicitly. Exact non-box fill stays in step 3; capacity and locking
+  evidence remain Pending. Manifest verification indexes canonical records while
+  preserving exact-match and duplicate-rejection checks. A bounded native-check
+  cache uses the validated full mold/source fingerprint and returns defensive
+  copies; mutation and source-omission regressions pass.
+  Validation: foundation **382**, neutral tooling **1,850**, design **32**,
+  native tooling **678** (anchor **61**), casting **54**, foundation CAD **60**,
+  process **34**, mill **260**, socket fixture **110**, production source **344**,
+  complete production mold **520**. Regenerated records-only kit: **159 artifacts /
+  40 programs / 667 Pass / 323 Pending / 112 Unsupported**; readiness **false**.
+  Integrity, omission/tamper, cache-mutation and all independent artifact hashes
+  pass. Main casting/tooling targets compile.
+
 ### Phase 7 records: shared levelling-foot family
 
 - [x] One `structural.LevelingFoot` recipe with strict `LevelingFootSpec` schema

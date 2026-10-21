@@ -108,7 +108,7 @@ class MillFrame extends MachineAssembly {
 
 		// Four independent steel pairs provide a broad column mounting interface.
 		var flared = l.columnFootWidth > l.columnWidth;
-		var footWidth = l.wall, footDepth = l.roof;
+		var footWidth = l.wall, footDepth = Math.max(l.roof, details.minimumColumnPadDepth(l.insertThickness));
 		for (sx in [-1, 1])
 			for (sy in [-1, 1]) {
 				var id = corner(sx, sy),
@@ -145,6 +145,7 @@ class MillFrame extends MachineAssembly {
 					baseInserts.push(insert('foot$id', l.wall, l.wall, l.insertThickness, LevelingSeat, "foundation foot seat", [CastingPatterns.face("body.z-min")],
 						down(sx * (l.baseWidth / 2 - l.wall / 2), (sy < 0 ? l.front + l.wall / 2 : l.rear - l.wall / 2) - l.baseCentreY, l.insertThickness)));
 			}
+		baseInserts = anchorInserts(baseInserts, details.anchorRule, body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids));
 		base = new MineralFoundation(body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids), baseInserts);
 		include("base", base, F.translation(0, l.baseCentreY, 0));
 		if (l.footPockets)
@@ -272,6 +273,7 @@ class MillFrame extends MachineAssembly {
 			columnValues.setNumber("footWidth", l.columnFootWidth)
 				.setNumber("footHeight", MillFrameLayout.COLUMN_FOOT_HEIGHT)
 				.setNumber("footShoulder", MillFrameLayout.COLUMN_FOOT_SHOULDER);
+		columnInserts = anchorInserts(columnInserts, details.anchorRule, columnValues);
 		column = new MineralFoundation(columnValues, columnInserts, "footLeftFront");
 		for (side in ["Left", "Right"]) {
 			var id = 'railZ$side', top = Solids.axial(0, 0, l.insertThickness);
@@ -317,6 +319,16 @@ class MillFrame extends MachineAssembly {
 
 	static function corner(x:Int, y:Int):String
 		return (x < 0 ? "Left" : "Right") + (y < 0 ? "Front" : "Rear");
+
+	static function anchorInserts(rows:Array<CastInsertPlacement>,rule:machinekit.structural.InsertAnchorPattern.InsertAnchorPatternRule,
+		castingValues:ComponentValues):Array<CastInsertPlacement> {
+		var body=new machinekit.structural.MineralCasting(castingValues).geometry();
+		try {
+			var result:Array<CastInsertPlacement> = [for (row in rows) {id:row.id,pose:row.pose,openings:row.openings,
+				part:machinekit.structural.InsertAnchorPattern.derive(row.id,row.part,rule,Casting(body,row.pose))}];
+			body.close();return result;
+		} catch (error:Dynamic) {body.close();throw error;}
+	}
 
 	static function down(x:Float, y:Float, z:Float):materia.assembly.AssemblyRecord.AssemblyFrame
 		return F.fromRotationMatrix(x, y, z, [1, 0, 0, 0, -1, 0, 0, 0, -1]);

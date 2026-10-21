@@ -15,6 +15,22 @@ class ToolingProcessExport {
 			?foundation:machinekit.structural.MineralFoundation):Array<ToolingValidation> {
 		var report = CastingProcessAnalysis.analyze(p, spec, gravityMps2, fabrication);
 		var checks = report.validation.filter(v -> StringTools.startsWith(v.rule, "process."));
+		var fill=report.fill, sections=report.sections, thermalCoverage=report.thermalCoverage, castability=report.castability;
+		if (fill==null || sections==null) {
+			checks.push(FillAnalysis.check("process.fill.cad-volume-agreement",[p.document.input.id],ToolingCheckStatus.Unsupported,
+				"Exact non-box fill has not been implemented; there is no fill region to compare against foundation CAD.",[]));
+			sys.io.File.saveContent(dir+"/casting-process-spec.json",materia.tooling.process.ProcessSpecCodec.encode(report.spec));
+			for (name in ["fill-analysis.json","castability-analysis.json","junction-thickness.json",
+				"thermal-coverage.json","section-geometry.json","fill-foundation-cad-check.json"])
+				sys.io.File.saveContent(dir+"/"+name,"null\n");
+			sys.io.File.saveContent(dir+"/cure-analysis.json",ToolingCodec.canonical(report.cure)+"\n");
+			sys.io.File.saveContent(dir+"/castability-review.md","# Casting design feedback\n\nExact non-box process geometry is Unsupported. See process-diagnostics.json.\n");
+			writePour(report,dir);
+			sys.io.File.saveContent(dir+"/process-diagnostics.json",ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items)+"\n");
+			return checks;
+		}
+		if (thermalCoverage==null || castability==null)
+			throw "Supported process report lacks thermal coverage or castability";
 		if (review == null || foundation == null)
 			checks.push(FillAnalysis.check("process.fill.cad-volume-agreement", [p.document.input.id], ToolingCheckStatus.Pending,
 				"Records-only fill geometry has not been cross-checked against reconstructed/source CAD.", []));
@@ -31,7 +47,7 @@ class ToolingProcessExport {
 				resources.push(local);
 				var actual = machinekit.assembly.PosedParts.moved(local, p.document.setup.sourceToMold);
 				resources.push(actual);
-				if (Math.abs(report.fill.geometricResinVolumeMm3 - actual.volume()) > Math.max(1e-5, actual.volume() * 1e-9))
+				if (Math.abs(fill.geometricResinVolumeMm3 - actual.volume()) > Math.max(1e-5, actual.volume() * 1e-9))
 					throw "Fill geometric resin volume differs from actual foundation CAD volume";
 				var region = CastingMoldCad.source(p);
 				resources.push(region);
@@ -59,10 +75,10 @@ class ToolingProcessExport {
 				[report.sourceFingerprint, "fill-foundation-cad-check.json"]));
 		}
 		sys.io.File.saveContent(dir + "/casting-process-spec.json", materia.tooling.process.ProcessSpecCodec.encode(report.spec));
-		sys.io.File.saveContent(dir + "/fill-analysis.json", ToolingCodec.canonical(report.fill) + "\n");
+		sys.io.File.saveContent(dir + "/fill-analysis.json", ToolingCodec.canonical(fill) + "\n");
 		writePour(report, dir);
 		sys.io.File.saveContent(dir + "/cure-analysis.json", ToolingCodec.canonical(report.cure) + "\n");
-		sys.io.File.saveContent(dir + "/castability-analysis.json", ToolingCodec.canonical(report.castability) + "\n");
+		sys.io.File.saveContent(dir + "/castability-analysis.json", ToolingCodec.canonical(castability) + "\n");
 		var text = [
 			"# Casting design feedback",
 			"",
@@ -71,21 +87,21 @@ class ToolingProcessExport {
 			"All dimensions/points are in mold coordinates (mm).",
 			""
 		];
-		var junction = report.sections.junction;
+		var junction = sections.junction;
 		text.push("Largest inscribed diameter: " + junction.lowerDiameterMm + ".." + junction.upperDiameterMm + " mm; numerical tolerance reached: "
 			+ junction.converged + ". Witness: " + ToolingCodec.canonical(junction.witness) + "; nearby source faces: "
 			+ junction.witnessSourceIds.join(", ") + ".");
 		text.push("Declared slab geometry covers "
-			+ report.thermalCoverage.coveredVolumeMm3
+			+ thermalCoverage.coveredVolumeMm3
 			+ " of "
-			+ report.thermalCoverage.totalVolumeMm3
+			+ thermalCoverage.totalVolumeMm3
 			+ " mm3; "
-			+ report.thermalCoverage.uncoveredVolumeMm3
+			+ thermalCoverage.uncoveredVolumeMm3
 			+ " mm3 remains unbound. Junction heat flow and cure evidence are separate requirements.\n");
-		for (v in report.castability.validation)
+		for (v in castability.validation)
 			text.push("- `" + v.rule + "` (" + v.status + ") [" + v.affectedIds.join(", ") + "]: " + v.message);
 		text.push("\n## Suggested actions\n");
-		for (proposal in report.castability.proposals) {
+		for (proposal in castability.proposals) {
 			text.push("- `" + proposal.id + "` — " + proposal.action + " (" + proposal.owner + "), sources: " + proposal.sourceIds.join(", ")
 				+ "; blocking rule: `" + proposal.rule + "`. " + proposal.instruction);
 			if (proposal.measuredMm != null || proposal.targetMm != null)
@@ -94,15 +110,23 @@ class ToolingProcessExport {
 				text.push("  Candidate point: " + ToolingCodec.canonical(proposal.point) + ".");
 		}
 		sys.io.File.saveContent(dir + "/castability-review.md", text.join("\n") + "\n");
-		sys.io.File.saveContent(dir + "/junction-thickness.json", ToolingCodec.canonical(report.sections.junction) + "\n");
-		sys.io.File.saveContent(dir + "/thermal-coverage.json", ToolingCodec.canonical(report.thermalCoverage) + "\n");
-		sys.io.File.saveContent(dir + "/section-geometry.json", ToolingCodec.canonical(report.sections) + "\n");
+		sys.io.File.saveContent(dir + "/junction-thickness.json", ToolingCodec.canonical(sections.junction) + "\n");
+		sys.io.File.saveContent(dir + "/thermal-coverage.json", ToolingCodec.canonical(thermalCoverage) + "\n");
+		sys.io.File.saveContent(dir + "/section-geometry.json", ToolingCodec.canonical(sections) + "\n");
 		sys.io.File.saveContent(dir + "/process-diagnostics.json", ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items) + "\n");
 		return checks;
 	}
 
 	static function writePour(report:materia.tooling.process.CastingProcessAnalysis.CastingProcessReport, dir:String):Void {
 		var pour = report.pour;
+		if (pour==null) {
+			sys.io.File.saveContent(dir+"/pour-plan.json","null\n");
+			sys.io.File.saveContent(dir+"/pour-quantities.csv","ingredient_id,material_reference,mass_kg\n");
+			sys.io.File.saveContent(dir+"/pour-batches.csv","batch,mass_kg,from_level_mm,to_level_mm,mixing_start_s,pour_start_s,pour_end_s\n");
+			sys.io.File.saveContent(dir+"/pour-batch-quantities.csv","batch,ingredient_id,material_reference,mass_kg\n");
+			sys.io.File.saveContent(dir+"/pour-plan.md","# Pour plan\n\nUnsupported until the exact non-box fill curve is available. No material quantities or batch schedule are credited.\n");
+			return;
+		}
 		sys.io.File.saveContent(dir + "/pour-plan.json", ToolingCodec.canonical(pour) + "\n");
 		var quantities:Array<Array<String>> = [["ingredient_id", "material_reference", "mass_kg"]];
 		for (q in pour.quantities) quantities.push([q.ingredientId, q.materialReference, Std.string(q.massKg)]);

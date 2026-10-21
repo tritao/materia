@@ -14,6 +14,54 @@ import materia.tooling.ToolingDiagnostic.ToolingSeverity;
 /** Native checks of source hardware. Strength, locking evidence and tooling
  * interference remain separate; source shape bounds never substitute for solids. */
 class InsertAnchorGeometry {
+	/** Actual source hardware against every realized tooling member. The insert's
+	 * own threaded engagement and its own screw/washer contact are intentional. */
+	public static function reviewMold(plan:materia.tooling.casting.CastingMoldPlan):Array<ToolingValidation> {
+		var components=CastingMoldCad.anchorComponents(plan);
+		if (components.length==0) return [];
+		var assembly=CastingMoldCad.assembly(plan),poses=assembly.solvedPoses();
+		var parts:Array<Part> = [],placed:Map<String,Part> = [],bounds:Map<String,Array<Float>> = [],checks:Array<ToolingValidation> = [];
+		try {
+			for (member in assembly.components()) {
+				var local=member.component.geometry();parts.push(local);
+				var shape=PosedParts.moved(local,poses.get(member.id));parts.push(shape);
+				shape.shape.setThreadedFaces([]);placed.set(member.id,shape);
+				var box=shape.shape.bounds(),low=box.get_min(),high=box.get_max();
+				bounds.set(member.id,[low.get_x(),low.get_y(),low.get_z(),high.get_x(),high.get_y(),high.get_z()]);
+			}
+			var seen:Map<String,Bool> = [];
+			for (hardware in components) {
+				var key=hardware.insertId+"/"+hardware.anchorId;
+				if (seen.exists(key)) continue;
+				seen.set(key,true);
+				var own=[for (part in components) if (part.insertId==hardware.insertId && part.anchorId==hardware.anchorId) part.id];
+				var conflicts:Array<String> = [];
+				for (member in assembly.components()) {
+					if (own.indexOf(member.id)>=0 || member.id==materia.tooling.ToolingIds.derive("insert-",hardware.insertId)) continue;
+					for (id in own) {
+						var a=bounds.get(id),b=bounds.get(member.id),disjoint=false;
+						for (axis in 0...3)
+							if (Math.min(a[axis+3],b[axis+3])<=Math.max(a[axis],b[axis])) disjoint=true;
+						if (disjoint) continue;
+						var anchor=placed.get(id),other=placed.get(member.id);
+						var common=anchor.intersect(other);
+						var volume:Float;
+						try volume=common.volume() catch (error:Dynamic) {common.close();throw error;}
+						common.close();
+						if (volume>1e-6 && conflicts.indexOf(member.id)<0) conflicts.push(member.id);
+					}
+				}
+				conflicts.sort(Reflect.compare);
+				var finding=check(hardware.insertId,hardware.anchorId,"tooling-interference",conflicts.length==0,
+					conflicts.length==0 ? "Exact source anchor hardware clears all realized mold members."
+					: "Source anchor intersects mold members: "+conflicts.join(", "));
+				finding.affectedIds=finding.affectedIds.concat(conflicts);checks.push(finding);
+			}
+		} catch (error:Dynamic) {for (part in parts) part.close();throw error;}
+		for (part in parts) part.close();
+		checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));return checks;
+	}
+
 	public static function review(input:CastingToolingInput):Array<ToolingValidation> {
 		if (input.inserts.filter(insert -> switch insert.anchorage {case Bolted(_,_):true;default:false;}).length==0) return [];
 		var parts:Array<Part> = [],shapes:Array<cadkit.Shape> = [],result:Array<ToolingValidation> = [];
@@ -55,6 +103,10 @@ class InsertAnchorGeometry {
 						var placedWasher:Part=washer;
 						var point=F.transformPoint(washerPose,0,0,anchor.washer.thicknessMm);
 						var normal=F.transformVector(washerPose,0,0,1);
+						var embedment=axialEmbedment(point,normal,bulk);
+						result.push(check(insert.id,anchor.id,"embedment",embedment+1e-7>=rules.minimumEmbedmentMm,
+							"Axial depth from washer bearing plane to the exposed casting boundary toward the loaded insert face "
+							+embedment+" mm; requires "+rules.minimumEmbedmentMm+" mm."));
 						var origin=cadkit.Geometry.vec3(point.x,point.y,point.z);
 						var direction=cadkit.Geometry.vec3(normal.x,normal.y,normal.z);
 						var face=ownShape(placedWasher.shape.section(origin,direction));
@@ -87,4 +139,33 @@ class InsertAnchorGeometry {
 		return {rule:"tooling.insert.anchorage."+insertId+"."+anchorId+".cad."+suffix,affectedIds:[insertId],
 			status:passed ? ToolingCheckStatus.Pass : ToolingCheckStatus.Fail,
 			severity:passed ? ToolingSeverity.Info : ToolingSeverity.Error,message:message,evidence:[]};
+
+	/** Exact line/face intersections along the source pull direction. Steel
+	 * recesses are included in bulk; an internal steel/resin interface never
+	 * substitutes for the exposed load-side casting boundary. */
+	static function axialEmbedment(point:materia.assembly.AssemblyDefinition.AssemblyVector,
+		direction:materia.assembly.AssemblyDefinition.AssemblyVector,bulk:Part):Float {
+		var bounds=bulk.shape.bounds(),lo=bounds.get_min(),hi=bounds.get_max();
+		var dx=hi.get_x()-lo.get_x(),dy=hi.get_y()-lo.get_y(),dz=hi.get_z()-lo.get_z();
+		var length=2*Math.sqrt(dx*dx+dy*dy+dz*dz);
+		var ray=cadkit.modeling.Curve.line(new cadkit.modeling.Vector(point.x,point.y,point.z),
+			new cadkit.modeling.Vector(point.x+direction.x*length,point.y+direction.y*length,point.z+direction.z*length));
+		var depth=Math.POSITIVE_INFINITY;
+		var intersection:Null<cadkit.Shape> = null;
+		try {
+			intersection=bulk.shape.common(ray.shape);
+			for (vertex in intersection.vertices().all()) {
+				var p=vertex.position();
+				var distance=(p.get_x()-point.x)*direction.x+(p.get_y()-point.y)*direction.y+(p.get_z()-point.z)*direction.z;
+				vertex.close();
+				// The ray starts inside the qualified bulk. Its own start vertex
+				// is not a boundary event; the first other interval end is.
+				if (distance>1e-7) depth=Math.min(depth,distance);
+			}
+		} catch (error:Dynamic) {if (intersection!=null) intersection.close();ray.close();throw error;}
+		intersection.close();
+		ray.close();
+		if (!Math.isFinite(depth)) throw "Anchor axial embedment has no exposed casting boundary";
+		return depth;
+	}
 }

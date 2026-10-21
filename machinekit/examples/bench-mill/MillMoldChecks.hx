@@ -47,6 +47,18 @@ class MillMoldChecks {
 	}
 
 	static function junctionGeometry(frame:MillFrame, p:CastingMoldPlan):Void {
+		var support=materia.tooling.casting.CastingBoxSupport.check(p.document.input,"process.junction.box-geometry");
+		if (support.filter(item -> item.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length>0) {
+			for (insert in p.document.input.inserts)
+				switch insert.anchorage {
+					case Bolted(_,_):check(support.filter(item -> item.affectedIds.indexOf(insert.id)>=0
+						&& item.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length==1,
+						"box-only junction check reports the exact anchor owner: "+insert.id);
+					default:
+				}
+			return;
+		}
+
 		var boundaries:Array<materia.tooling.process.FillAnalysis.FillBoundary> = [
 			for (feature in p.document.input.features)
 				{id: feature.id, box: CastingMoldPlanner.featureBox(p.document, feature)}
@@ -104,7 +116,11 @@ class MillMoldChecks {
 			&& design.metrics.liftingPointCount == p.document.input.inserts.filter(i -> i.role == materia.casting.InsertSpec.InsertRole.LiftingMount).length,
 			"source-level design metrics map into foundation integrity");
 		check(report.symmetricDifferenceMm3 < 1e-3 && !report.fabrication.ready, "review geometry passes without fabricating readiness");
-		check(report.assemblyGroups.length == 2 && report.permanentGroups.length == 2, "two shared row fixtures");
+		var rowGroups=report.assemblyGroups.filter(group -> group.members.filter(id -> p.cores.filter(core -> core.id==id).length==1).length>0);
+		check(rowGroups.length == 2 && report.permanentGroups.length == 2, "two shared row fixtures");
+		var anchored=p.document.input.inserts.filter(insert -> switch insert.anchorage {case Bolted(_,_):true;default:false;});
+		check(report.assemblyGroups.length==rowGroups.length+anchored.length,
+			"each anchored insert has its own rigid insertion group alongside the core rows");
 		check(report.assembly.assemblyOrder[0] == "bed", "bed installed first");
 		check(p.changeRequests.filter(c -> c.kind == "lifting-points").length == 1, "handling lift/flip request");
 		check(p.options.precision.length==p.document.input.inserts.length && p.options.foundationJointProcesses.length==0,

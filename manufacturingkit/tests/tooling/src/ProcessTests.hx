@@ -304,7 +304,7 @@ class ProcessTests {
 		raw.version = 1;
 		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported casting process");
 		raw = haxe.Json.parse(encoded);
-		raw.version = 5;
+		raw.version = 6;
 		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported casting process");
 		raw = haxe.Json.parse(encoded);
 		Reflect.deleteField(raw.spec, "mixer");
@@ -439,8 +439,10 @@ class ProcessTests {
 		s.recipeFingerprint = ToolingCodec.recipeFingerprint(p.document.recipe);
 		s.sections = [];
 		var integrated = CastingProcessAnalysis.analyze(p, s, 9.80665);
-		check(integrated.pour.sourceFingerprint == integrated.sourceFingerprint
-			&& integrated.pour.fillProcessFingerprint == integrated.processFingerprint,
+		if (integrated.pour==null) throw "Box process fixture requires a pour assessment";
+		var integratedPour:materia.tooling.process.PourPlanning.PourAssessment=cast integrated.pour;
+		check(integratedPour.sourceFingerprint == integrated.sourceFingerprint
+			&& integratedPour.fillProcessFingerprint == integrated.processFingerprint,
 			"pour plan consumes the same fingerprinted fill analysis");
 		check(integrated.validation.filter(v -> v.rule == "process.pour.batch-schedule" && v.status == "pending").length == 1,
 			"missing mixer data reaches aggregate readiness");
@@ -452,19 +454,21 @@ class ProcessTests {
 				{id: "hardener", kind: materia.tooling.process.PourPlanning.MixIngredientKind.Hardener, materialReference: "synthetic hardener", massFraction: 0.05},
 				{id: "aggregate", kind: materia.tooling.process.PourPlanning.MixIngredientKind.Aggregate, materialReference: "synthetic aggregate", massFraction: 0.85}
 			]};
-		batchSpec.mixer = {reference: "synthetic equipment", capacityKg: integrated.pour.totalMixMassKg / 3,
+		batchSpec.mixer = {reference: "synthetic equipment", capacityKg: integratedPour.totalMixMassKg / 3,
 			mixingSeconds: 0.001, transferSeconds: 0.001, workingTimeSeconds: 1000, workingTimeReference: "synthetic timing"};
 		var batchEncoded = ProcessSpecCodec.encode(batchSpec);
 		check(ProcessSpecCodec.encode(ProcessSpecCodec.decode(batchEncoded)) == batchEncoded,
 			"mix ingredients, heat denominator and mixer survive strict codec roundtrip");
 		var batched = CastingProcessAnalysis.analyze(p, batchSpec, 9.80665);
-		var batchPlan = batched.pour.schedule;
+		if (batched.pour==null) throw "Box process fixture requires a batch assessment";
+		var batchedPour:materia.tooling.process.PourPlanning.PourAssessment=cast batched.pour;
+		var batchPlan = batchedPour.schedule;
 		check(batchPlan != null && batchPlan.batches.length == 3, "real process pipeline includes the declared batch schedule");
 		check(batched.validation.filter(v -> v.rule == "process.pour.cure-mass-basis" && v.status == "pass").length == 1,
 			"weighed resin and cure heat denominator agree explicitly");
 		check(batched.validation.filter(v -> v.rule == "process.pour.cure-sequence" && v.status == "pending").length == 1,
 			"a uniform cure model cannot silently qualify a new multi-batch history");
-		for (row in batched.pour.validation)
+		for (row in batchedPour.validation)
 			check(batched.validation.filter(v -> v.rule == row.rule && ToolingCodec.canonical(v) == ToolingCodec.canonical(row)).length == 1,
 				"aggregate report retains pour rule " + row.rule);
 		batchSpec.cure.resinMassFraction = 0.2;

@@ -68,13 +68,45 @@ class CastingMoldCad {
 	static function box(b:MoldBox):Part
 		return ToolingBlock.placedBox(b);
 
+	/** Real source resin, including the exact standard anchor occupancy. */
 	public static function source(p:CastingMoldPlan):Part {
-		var pieces:Array<Part> = [box(p.envelope)];
-		return Solids.building(pieces, parts -> {
-			for (f in p.document.input.features)
-				parts.push(box(CastingMoldPlanner.featureBox(p.document, f)));
-			return Solids.cut(parts[0], parts.slice(1));
-		});
+		var local=ToolingSourceCasting.fromInput(p.document.input).geometry();
+		try {
+			var placed=PosedParts.moved(local,p.document.setup.sourceToMold);
+			local.close();return placed;
+		} catch (error:Dynamic) {local.close();throw error;}
+	}
+
+	public static function anchorComponents(p:CastingMoldPlan,?owner:String):Array<{
+		id:String,insertId:String,anchorId:String,part:machinekit.component.MachineComponent,
+		pose:materia.assembly.AssemblyRecord.AssemblyFrame
+	}> {
+		var result=[];
+		for (insert in p.document.input.inserts) {
+			if (owner!=null && owner!=insert.id) continue;
+			var spec:materia.casting.InsertSpec={body:insert.body,holes:insert.holes,origin:insert.origin,
+				interfaces:insert.interfaces,anchorage:insert.anchorage};
+			for (hardware in machinekit.structural.InsertAnchorHardware.parts(spec)) {
+				var prefix="anchor-"+haxe.crypto.Sha256.encode(insert.id+"/"+hardware.anchorId).substr(0,20);
+				result.push({id:prefix+"-"+hardware.kind,insertId:insert.id,anchorId:hardware.anchorId,
+					part:hardware.part,pose:F.compose(p.document.setup.sourceToMold,F.compose(insert.pose,hardware.pose))});
+			}
+		}
+		return result;
+	}
+
+	static function anchorParts(p:CastingMoldPlan,?owner:String):Array<Part> {
+		var result:Array<Part> = [];
+		try for (hardware in anchorComponents(p,owner)) {
+			var local=hardware.part.geometry();
+			try {
+				var placed=PosedParts.moved(local,hardware.pose);
+				// Owned motion/occupancy geometry, not a screw machining interface.
+				placed.shape.setThreadedFaces([]);result.push(placed);
+			} catch (error:Dynamic) {local.close();throw error;}
+			local.close();
+		} catch (error:Dynamic) {for (part in result) part.close();throw error;}
+		return result;
 	}
 
 	public static function reconstructed(p:CastingMoldPlan):Part {
@@ -90,6 +122,7 @@ class CastingMoldCad {
 			// masks are separate members in the assembly and demolding graphs.
 			for (i in p.document.input.inserts)
 				parts.push(box(insertBox(p, i.id)));
+			for (part in anchorParts(p)) parts.push(part);
 			return Solids.cut(parts[0], parts.slice(1));
 		});
 	}
@@ -101,9 +134,14 @@ class CastingMoldCad {
 		try {
 			var out = PosedParts.moved(local, F.compose(p.document.setup.sourceToMold, i.pose));
 			local.close();
-			return out;
+			var anchors=anchorParts(p,id);
+			if (anchors.length==0) return out;
+			// Keep semantic threads on the separate real source components. Their
+			// fused motion solid has intentionally consumed the engaged interfaces.
+			out.shape.setThreadedFaces([]);
+			return Solids.union([out].concat(anchors));
 		} catch (e:Dynamic) {
-			local.close();
+			if (!local.shape.isClosed()) local.close();
 			throw e;
 		}
 	}
@@ -220,6 +258,8 @@ class CastingMoldCad {
 		for(f in p.formers)offsets.set(f.volume.id,{x:f.withdrawal.x*b.width*0.7,y:f.withdrawal.y*b.depth*0.4,z:f.withdrawal.z*b.height*0.7});
 		for(f in p.fixtures)offsets.set(f.datum.id,{x:f.withdrawal.x*b.width,y:0,z:f.withdrawal.z*b.height*1.4});
 		for(i in p.document.input.inserts)offsets.set(materia.tooling.ToolingIds.derive("insert-",i.id),{x:b.width*1.8,y:0,z:0});
+		for(hardware in anchorComponents(p))
+			offsets.set(hardware.id,offsets.get(materia.tooling.ToolingIds.derive("insert-",hardware.insertId)));
 		return ToolingExplode.presentation(definition,"casting-mold",offsets);
 	}
 
@@ -253,6 +293,7 @@ class CastingMoldCad {
 			var part = ToolingInsertCad.component(i);
 			a.addComponent(materia.tooling.ToolingIds.derive("insert-", i.id), part, pose);
 		}
+		for (hardware in anchorComponents(p)) a.addComponent(hardware.id,hardware.part,hardware.pose);
 		for (h in p.hardware) {
 			if (h.kind == SupportHardwareKind.BoreMask) {
 				var mask = ToolingPin.boreMask(boreMaskRecord(p, h.id).hole, boreMaskRecord(p, h.id).protection.plugLength);
@@ -550,8 +591,12 @@ class CastingMoldCad {
 			for (i in p.document.input.inserts) {
 				var shape = steel(p, i.id);
 				parts.push(shape);
+				var insertId=materia.tooling.ToolingIds.derive("insert-",i.id);
+				var attached=[for (hardware in anchorComponents(p,i.id)) hardware.id];
+				var motionId=attached.length==0 ? insertId : materia.tooling.ToolingIds.derive("",insertId,"-anchored");
+				if (attached.length>0) groups.push({id:motionId,members:[insertId].concat(attached)});
 				members.push({
-					id: materia.tooling.ToolingIds.derive("insert-", i.id),
+					id: motionId,
 					part: shape,
 					direction: new Vector(0, 0, 1)
 				});
@@ -595,7 +640,8 @@ class CastingMoldCad {
 						+ name
 						+ " check passed.",
 						[materia.tooling.casting.CastingMoldCodec.fingerprint(p)])
-			]).concat(ReplicationContactCad.review(p.document.input,p.options.replicationJigs)).concat(FoundationJointCad.review(p.document.input));
+			]).concat(ReplicationContactCad.review(p.document.input,p.options.replicationJigs)).concat(FoundationJointCad.review(p.document.input))
+				.concat(InsertAnchorGeometry.review(p.document.input)).concat(InsertAnchorGeometry.reviewMold(p));
 			return {
 				fingerprint: materia.tooling.casting.CastingMoldCodec.fingerprint(p),
 				handling: p.handling,
