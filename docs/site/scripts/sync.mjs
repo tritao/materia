@@ -112,4 +112,9 @@ for (const name of readdirSync(figures).filter((name) => name.endsWith(".json"))
 	writeFileSync(join(publicFigures, name), readFileSync(join(figures, name)));
 
 const referencePages = writeReference(reference, out);
+// The live widgets' runtime, built by docs/runtime/build.sh and committed there.
+const publicRuntime = join(site, "public/runtime");
+mkdirSync(publicRuntime, { recursive: true });
+writeFileSync(join(publicRuntime, "docs-runtime.wasm"), readFileSync(join(docs, "runtime/docs-runtime.wasm")));
+
 console.log(`synced ${count} pages and ${referencePages} reference pages into ${posix.join(...relative(site, out).split("/"))}`);

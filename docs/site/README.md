@@ -78,3 +78,11 @@ API; CI runs `docs/api/generate.py --check` and fails when it is stale:
 ```sh
 docs/api/generate.py
 ```
+
+## Live widgets
+
+`<figure class="materia-figure materia-widget" data-widget="NAME">` runs real kit code in the reader's
+browser through the docs runtime, `docs/runtime` (CncKit and ToolpathKit compiled to Wasm GC by
+`docs/runtime/build.sh`). The figure's Markdown stays the fallback until the runtime loads, which
+happens only when the widget scrolls near the viewport. The runtime is committed with a hash of its
+inputs; CI fails when they change and runs `docs/runtime/check.mjs` against it.

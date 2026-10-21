@@ -70,6 +70,31 @@ and feature that produced it. Errors anywhere downstream point back to it.
   the G-code line and column.
 - **The slicer** and **hobbing jobs** produce printing and gearing operations.
 
+### Try it: G-code into a program
+
+The program below is compiled by CncKit, running in your browser. Edit it:
+the plot shows the moves seen from above (rapids dashed), and a mistake comes
+back as a diagnostic with its line and column. Try `G5 X10` on a new line.
+
+<figure class="materia-figure materia-widget" data-widget="gcode">
+
+```gcode
+G21 G90 G17
+G0 X0 Y0 Z5
+G1 Z-1 F300
+G1 X40 F600
+G3 X60 Y20 I0 J20
+G1 Y40
+G3 X40 Y60 I-20 J0
+G1 X0
+G1 Y0
+G0 Z5
+M30
+```
+
+<figcaption>CncKit compiling LinuxCNC G-code into a toolpath program, live. The figure needs a browser with WebAssembly GC; without it, this is the program as text.</figcaption>
+</figure>
+
 ### Where programs go
 
 - **To motion.** A **machine binding** (`MachineBinding`) says how a program

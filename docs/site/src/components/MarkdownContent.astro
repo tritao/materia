@@ -1,6 +1,6 @@
 ---
 // Starlight's Markdown wrapper, plus figure and diagram styles and the script that renders `<figure data-figure>`
-// elements from computed data.
+// elements from computed data and the live widgets (`<figure data-widget>`).
 import Default from "@astrojs/starlight/components/MarkdownContent.astro";
 import "../styles/figures.css";
 import "../styles/diagrams.css";
@@ -10,7 +10,9 @@ import "../styles/diagrams.css";
 
 <script>
 	import { keepDiagramsReadable, linkEditorExamples, renderFigures } from "../scripts/figures";
+	import { renderWidgets } from "../scripts/widgets";
 	renderFigures();
+	renderWidgets();
 	keepDiagramsReadable();
 	linkEditorExamples();
 </script>

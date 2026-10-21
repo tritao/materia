@@ -146,3 +146,10 @@ place.
   eight delete candidates are listed for the maintainer, not removed.
 - D9 drafted: [product/](product/README.md) has features, the example gallery
   and licensing. The roadmap and release notes wait on release decisions.
+- D6 half done: `docs/runtime` compiles CncKit and ToolpathKit to Wasm GC
+  (690 KB, 234 KB gzipped) and the Toolpaths page has a live G-code widget:
+  edit a program, see its moves and its positioned diagnostics. The runtime is
+  committed with a hash of its inputs, which CI checks, and runs under Node in
+  CI. The transmissions widget is not done: MachineKit depends on CadKit's
+  native core, so it needs either a pure-Haxe slice of the transmission
+  resolver or CadKit in the browser host.

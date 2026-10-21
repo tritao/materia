@@ -66,3 +66,24 @@ a.open-in-materia:not([hidden]) {
 	font-weight: 600;
 	text-decoration: none;
 }
+
+/* Live widgets (scripts/widgets.ts). */
+.materia-widget .widget-gcode { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 40rem) { .materia-widget .widget-gcode { grid-template-columns: minmax(0, 1fr); } }
+.materia-widget .widget-code {
+	width: 100%;
+	font-family: var(--__sl-font-mono);
+	font-size: var(--sl-text-sm);
+	line-height: 1.5;
+	padding: 0.5rem;
+	border: 1px solid var(--sl-color-gray-5);
+	border-radius: 0.25rem;
+	background: var(--sl-color-gray-7, var(--sl-color-black));
+	color: var(--sl-color-white);
+	resize: vertical;
+}
+.materia-widget .widget-report { font-size: var(--sl-text-sm); }
+.materia-widget .widget-report ul { margin-top: 0.25rem; }
+.materia-widget .widget-error strong { color: var(--sl-color-red-high, #c0392b); }
+.materia-widget .widget-warning strong { color: var(--sl-color-orange-high, #b9770e); }
+.materia-widget .widget-note { font-size: var(--sl-text-sm); color: var(--figure-muted); }

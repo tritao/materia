@@ -4,3 +4,4 @@ dist/
 # Generated from docs/ by scripts/sync.mjs
 src/content/docs/
 public/figures/
+public/runtime/
