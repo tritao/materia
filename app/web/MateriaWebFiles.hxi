@@ -37,6 +37,10 @@ interface MateriaWebFiles @target("portable-abi32") @library("materia_web_files"
   extern fn materia_worker_phase(id: i32, data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
   extern fn materia_worker_result(id: i32, data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
   extern fn materia_worker_cancel(id: i32) -> void;
+  /**
+   * The example the page was opened to show (`?example=ID`); -1 when there is none.
+   */
+  extern fn materia_launch_example(data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
   extern fn materia_examples_catalog(data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
   extern fn materia_example_start(id: utf8, paths: utf8) -> i32;
   extern fn materia_example_status(id: i32) -> i32;

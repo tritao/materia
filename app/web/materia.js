@@ -150,6 +150,11 @@ const files = (() => {
     _materia_build_identity: (pointer, sizePointer) => {
       answer(encoder.encode(buildIdentity), pointer, sizePointer); return 0;
     },
+    _materia_launch_example: (pointer, sizePointer) => {
+      const id = new URL(location.href).searchParams.get("example");
+      if (!id || !/^[a-z0-9-]+$/.test(id)) return -1;
+      answer(encoder.encode(id), pointer, sizePointer); return 0;
+    },
     _materia_artifact_name: (pointer, sizePointer) => {
       if (!pendingArtifact) return -1;
       answer(encoder.encode(pendingArtifact.name), pointer, sizePointer); return 0;

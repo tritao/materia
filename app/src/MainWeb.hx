@@ -58,6 +58,11 @@ class MainWeb {
         var host:DesktopUiHostContext = cast context;
         var created = new ReferenceEditorApp(host.fonts, null, darkTheme ? Theme.dark() : Theme.light(), null, host);
         if (created.preferences.showStartPage) created.showStartPage();
+        #if wasm
+        // A page opened as `?example=ID` (the docs' "Open in Materia" links) starts loading that example.
+        var launch = MateriaWebFiles.materia_launch_example();
+        if (launch.status == 0) created.openExampleById(launch.data.toString());
+        #end
         editor = created;
         return created;
       });

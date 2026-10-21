@@ -134,6 +134,11 @@ They cover catalog parity, no eager model downloads, cancel/failure/retry, persi
 reuse with network requests blocked, selected job variants, native animation assets
 and compiled setup examples. Run against both guest targets.
 
+A page opened as `index.html?example=ID` starts loading that published example,
+as if its Start page card had been clicked; the documentation's "Open in
+Materia" links use this. An unknown id is logged and ignored. Check it with
+`./app/web/test.sh --launch`.
+
 ## What works and what does not yet
 
 The editor shell, docking, inspector, console, 3D viewport, primitive editing,

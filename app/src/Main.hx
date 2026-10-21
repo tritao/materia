@@ -1249,6 +1249,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
     invalidateView();
   }
 
+  /** Queues the bundled example `id`, as its Start page card does; false when there is no such example. */
+  public function openExampleById(id:String):Bool {
+    var entry = ExampleCatalog.find(id);
+    if (entry == null) {
+      log('Unknown example "$id"');
+      return false;
+    }
+    requestExample(entry);
+    return true;
+  }
+
   /** Queues a bundled example; the unsaved-change prompt runs first. */
   function requestExample(entry:ExampleEntry):Void {
     startFailure = null;

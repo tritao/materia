@@ -56,6 +56,9 @@ fi
 if [[ "${1:-}" == "--missions" ]]; then
 	driver="$app_dir/web/tools/missions.py"
 fi
+if [[ "${1:-}" == "--launch" ]]; then
+	driver="$app_dir/web/tools/launch.py"
+fi
 if [[ "${1:-}" == "--artifact" ]]; then
 	driver="$app_dir/web/tools/artifact.py"
 fi
