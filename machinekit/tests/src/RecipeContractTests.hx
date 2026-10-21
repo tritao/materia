@@ -38,6 +38,9 @@ class RecipeContractTests {
 		check(cupBom.lines().length == 2, "Different cup fittings must have different BOM identities");
 		checkRebuild(new SuctionCup(40, 18, 900, 0.2, "CUP-CUSTOM", Thread("G1/8"), "Custom cup"));
 		checkRebuild(new VacuumGenerator(80, "GEN-CUSTOM", PushIn(4), Thread("G1/4"), "Custom generator"));
+		for (type in MachineKitComponents.defaultRegistry().all())
+			check(MachineKitComponents.defaultRegistry().category(type.id) != null && MachineKitComponents.defaultRegistry().kind(type.id) != null,
+				'${type.id}: built-in recipe has no catalogue category (ComponentClassification)');
 		for (type in MachineKitComponents.defaultRegistry().all()) {
 			for (parameter in type.parameters())
 				switch parameter.type {

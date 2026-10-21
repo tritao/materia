@@ -40,6 +40,7 @@ class MachineKitComponents {
 		registry.register(machinekit.standard.SocketSetScrew.recipeType());
 		registry.register(machinekit.tooling.ToolingBlock.recipeType());
 		registry.register(machinekit.tooling.ToolingVolume.recipeType());
+		ComponentClassification.apply(registry);
 		return registry;
 	}
 
