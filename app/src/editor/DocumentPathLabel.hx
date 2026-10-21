@@ -75,10 +75,11 @@ class DocumentPathLabel implements View {
             next="…"+document.sliceCodepoints(document.codepointCount-low,document.codepointCount);
           }
         }
-        layout.dispose();cache={value:value,width:available,result:next,fullWidth:fullWidth,font:resolved.textStyle.font,fontSize:resolved.textStyle.fontSize};memo.update(cache);
+        layout.dispose();cache={value:value,width:available,result:next,fullWidth:fullWidth,font:resolved.textStyle.font,fontSize:resolved.textStyle.fontSize};memo.updateQuietly(cache);
       }
       truncated=cache.result!=value;
-      if(displayed.value!=cache.result)displayed.update(cache.result);
+      // The callback settles this same render node below; retained parents already show the new text.
+      if(displayed.value!=cache.result)displayed.updateQuietly(cache.result);
       if(inlineText.layout.text!=cache.result){inlineText.layout.text=cache.result;context.requestLayoutFeedback();}
       var bounds=root.globalBounds(),popupWidth=Math.min(cache.fullWidth+16,Math.max(1,context.environment.width-16));
       var popupX=Math.max(8-bounds.x,Math.min(0,context.environment.width-8-bounds.x-popupWidth));
