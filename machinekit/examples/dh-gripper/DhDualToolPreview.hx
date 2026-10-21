@@ -249,7 +249,7 @@ class DhDualToolPreview {
       var groups:Array<Array<Shape>> = [];
       {
         var group:Array<Shape> = [];
-        for(file in ["pgc-140-50-local.step","electrical-cable-local.step","jaw-left.step","jaw-right.step","cnc-aluminium/finger-left.step","cnc-aluminium/finger-right.step","cable-end-connector-envelope.step","blank-60-local.step"]) {
+        for(file in ["pgc-140-50-local.step","electrical-cable-local.step","jaw-left-with-screws.step","jaw-right-with-screws.step","cnc-aluminium/finger-left.step","cnc-aluminium/finger-right.step","cable-end-connector-envelope.step","blank-60-local.step"]) {
           var s=Shape.importStep(DhGripperPreview.directory()+"/build/"+file);owned.push(s);group.push(s);
         }
         groups=[group,group];

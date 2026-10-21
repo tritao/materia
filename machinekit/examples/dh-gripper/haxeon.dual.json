@@ -6,6 +6,7 @@
   "entry": "DhDualToolPreview",
   "sources": [
     "DhGripperPreview.hx",
+    "DhGripperPresentation.hx",
     "DhGripperJaws.hx",
     "DhCustomFingers.hx",
     "ManufacturingVariantChecks.hx",

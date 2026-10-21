@@ -396,3 +396,31 @@ This produces `vise-tending-pose-audit.json` and `vise-review-summary.json`, wit
 separate `robot-source-vise/` CAD captures. It does not promote the older full-cell
 report to a full-cycle pass. The accepted route joint traces and actual final
 joint configurations are saved in the focused source report.
+
+## Assembly views and finger service
+
+The custom-finger artifact opens assembled. Jaw detail sections the jaw guide;
+Finger service gives an unobstructed close-up. The Explode slider removes screws
+in stage 1 and fingers in stage 2. Change left finger opens the jaws with
+`SetJoints`, then removes the two screws and finger, installs the replacement,
+and reinstalls the screws. These service motions are Illustrative.
+
+| Assembled | Jaw guide section |
+| --- | --- |
+| ![Assembled](images/presentation-assembled.png) | ![Jaw guide](images/presentation-jaw-detail.png) |
+| Explode at 100% | Finger-change procedure |
+| ![Explode](images/presentation-explode.png) | ![Finger change](images/presentation-finger-change.png) |
+
+Capture a procedure step through the editor:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/tests/haxeon.presentation-capture.json -- \
+  --view=assembled --procedure=finger-change --step=1 --distance-scale=1.3 \
+  --project="$PWD/machinekit/examples/dh-gripper/build/pgc-custom-fingers.mtrg" \
+  --capture-dir=/tmp/gripper-service --capture-seconds=2 \
+  --reset-workspace --perspective --width=1800 --height=900
+```
+
+Mounting screws are independent occurrences. `jaw-left-with-screws.step` and
+`jaw-right-with-screws.step` preserve the complete rigid groups used by composed-tool
+clearance checks; the carriage-only STEP files use the ordinary jaw names.

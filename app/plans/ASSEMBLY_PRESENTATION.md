@@ -218,6 +218,14 @@ highlight, the referenced view and animated motion, plus evidence badges. Editor
 authored procedure survives save and reopen.
 
 ### AP5 — Second, non-mould assembly (generality proof)
+Implementation status: the custom-finger gripper emits assembled, sectioned jaw
+and close-up service views, a two-stage screw/finger explode and a seven-step
+finger-change Service procedure. Mounting screws are separate occurrences;
+composed-tool CAD checks retain complete carriage/screw groups. CAD contact,
+driver-access and 11-opening checks pass. The shared artifact suite passes 32
+checks, and all four presentation states were captured and reviewed in its README.
+No gripper-specific branch was added to app.
+
 `dh-gripper` with custom fingers: views (`assembled`, `jaw-detail` with a
 section through the jaw guide), an explode of fingers and screws, and a
 **Service** procedure (remove finger screws → withdraw finger → install

@@ -232,14 +232,28 @@ class DhGripperPreview {
         }
       }
       for(i in 0...2) {
-        var jaw=custom ? (i==0 ? leftOpen : rightOpen).translate(new Vector(i==0 ? 25 : -25,0,0).native()) : (i==0 ? left : right).cloneShape();owned.push(jaw);
+        var jaw=custom ? (i==0 ? jawLeft[0] : jawRight[0]).translate(new Vector(i==0 ? 25 : -25,0,0).native()) : (i==0 ? left : right).cloneShape();owned.push(jaw);
         var shape=jaw.translate(offset.native());owned.push(shape);
         var id=i==0 ? "jaw-left" : "jaw-right";
         parts.push(render(id,i==0 ? "Left supplier jaw" : "Right supplier jaw",shape,[0.68,0.7,0.73]));
         shape.exportStep(directory()+'/build/$id.step');
+        if(custom) {
+          // Existing composed-tool clearance checks consume this rigid group as one B-rep.
+          var group=(i==0?leftOpen:rightOpen).translate(new Vector((i==0?25:-25)+offset.x,offset.y,offset.z).native());owned.push(group);
+          group.exportStep(directory()+'/build/$id-with-screws.step');
+        }
       }
       DhGripperJaws.configure(model);
       if(custom) {
+        // Each screw is a separate occurrence so service instructions can move it independently.
+        for(side in 0...2)for(index in 0...2) {
+          var id="finger-"+(side==0?"left":"right")+"-screw-"+index,jaw=side==0?"jaw-left":"jaw-right";
+          var closed=(side==0?jawLeft[index+1]:jawRight[index+1]).translate(new Vector(side==0?25:-25,0,0).native());owned.push(closed);
+          var screw=closed.translate(offset.native());owned.push(screw);
+          parts.push(render(id,"Supplier finger mounting screw",screw,[0.68,0.7,0.73]));
+          model.add(id);model.connector(jaw,id,materia.assembly.AssemblyFrames.identity());
+          model.connector(id,"mount",materia.assembly.AssemblyFrames.identity());model.mate(id+"-mount","fixed",jaw,id,id,"mount");
+        }
         sys.FileSystem.createDirectory(directory()+"/build/"+variant);
         for(i in 0...2) {
           var id=i==0 ? "finger-left" : "finger-right", jaw=i==0 ? "jaw-left" : "jaw-right";
@@ -268,8 +282,14 @@ class DhGripperPreview {
       DhGripperJaws.check(model,left,right,padLeft,padRight,custom ? 26 : 0);
       var definition=model.definition("dh-pgc-articulated-reference");
       for(component in definition.definitions) component.collisionHulls=[];
-      var result=SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:parts,
-        assemblyDefinition:definition, assemblyState:model.initialState("dh-pgc-articulated-reference").record()});
+      var artifact:materia.project.SceneArtifact.SceneArtifactData={lengthUnit:"mm",metresPerUnit:0.001,parts:parts,
+        assemblyDefinition:definition,assemblyState:model.initialState("dh-pgc-articulated-reference").record()};
+      if(custom) {
+        var bounds=body.bounds(),low=bounds.get_min(),high=bounds.get_max();
+        artifact.presentation=DhGripperPresentation.build(definition,{x:(low.get_x()+high.get_x())/2+offset.x,
+          y:(low.get_y()+high.get_y())/2+offset.y,z:(low.get_z()+high.get_z())/2+offset.z});
+      }
+      var result=SceneArtifact.encode(artifact);
       for(shape in owned) shape.close();
       Sys.println(custom ? 'Retained six supplier carriage/screw solids and both connectors; fitted two custom fingers' : 'Retained ten supplier jaw solids and both connectors');
       return result;
@@ -305,6 +325,10 @@ class DhGripperPreview {
       var state=new cadkit.modeling.AssemblyState(definition);
       state.setJoint(DhGripperJaws.MASTER,(opening-(custom ? 26 : 0))/2);
       scene.assemblyState=state.record();
+      if(custom&&scene.presentation!=null) {
+        var point=scene.presentation.views[1].sections[0].point;
+        scene.presentation=DhGripperPresentation.build(definition,point);
+      }
       sys.io.File.saveBytes(directory()+'/build/$prefix-opening-$opening.mtrg',SceneArtifact.encode(scene));
     }
   }
