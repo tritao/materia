@@ -30,7 +30,9 @@
           "PDF p12 P1=46 confirms rear holes X=+/-23; the old catalog transcription incorrectly used P=50 for all holes.",
           "Motor pilot D50 has a 6 mm nominal recess (raw78.5..84.5); base holes at normalized Z24/64/77.",
           "Normalization rotates 180 degrees about Y and translates (0,25,84.5). No supplier geometry modified.",
-          "Front base holes: STEP D6.6 vs PDF S=7. Both clear the selected M6 screws; the discrepancy remains recorded and is not treated as a precision locating fit."
+          "Front base holes: STEP D6.6 vs PDF S=7. Both clear the selected M6 screws; the discrepancy remains recorded and is not treated as a precision locating fit.",
+          "Base-hole counterbore seats normalized Y24; width and base holes as the v2 drawing (measured 2026-10-21).",
+          "7001A pair seat: bore radius6 at raw Z7..22 inside radius14 seat raw Z6.5..22.5; bearing centre raw Z14.5, normalized Z70 (measured 2026-10-21)."
         ]
       },
       "normalization": {
@@ -50,6 +52,43 @@
           0,
           -1
         ]
+      },
+      "interfaces": {
+        "width": 65,
+        "baseHoles": [
+          {
+            "x": -25,
+            "z": 24,
+            "diameter": 7
+          },
+          {
+            "x": -23,
+            "z": 64,
+            "diameter": 6.6
+          },
+          {
+            "x": -23,
+            "z": 77,
+            "diameter": 6.6
+          },
+          {
+            "x": 25,
+            "z": 24,
+            "diameter": 7
+          },
+          {
+            "x": 23,
+            "z": 64,
+            "diameter": 6.6
+          },
+          {
+            "x": 23,
+            "z": 77,
+            "diameter": 6.6
+          }
+        ],
+        "boltSeatY": 24,
+        "bearingCentreZ": 70
       }
     },
     {
@@ -106,7 +145,8 @@
         "notes": [
           "Raw planar motor face Z=109 and base Y=-28; pilot radius35 from Z103 to108.5.",
           "STEP body width88 versus drawing86. Base holes normalized X=+/-29 at Z42, +/-27 at Z87 and102; drawing rear rows +/-29. STEP recipe uses measured interfaces; drawing recipe unchanged.",
-          "Bearing bore radius7.5 at raw Z7.6..24.4; bearing centre normalized Z93. Motor M6 thread depth remains unqualified."
+          "Bearing bore radius7.5 at raw Z7.6..24.4; bearing centre normalized Z93. Motor M6 thread depth remains unqualified.",
+          "Base-hole counterbore seats at raw Y=4, normalized Y32 (measured 2026-10-21)."
         ]
       },
       "normalization": {
@@ -160,7 +200,9 @@
             "z": 102,
             "diameter": 6.6
           }
-        ]
+        ],
+        "bearingCentreZ": 93,
+        "boltSeatY": 32
       }
     },
     {
@@ -245,7 +287,8 @@
         "status": "verified-reference",
         "notes": [
           "Housing, shaft axis, base mounting holes and bearing interval match nominal drawing interfaces. Bearing grade, tolerances, preload and load qualification are not established by CAD.",
-          "Full STEP retaining clip intersects the current drawing screw by approximately 3.68053 mm3. Raw clip cylindrical inner radius4.65 at Z=-5.8..-5.2 vs drawing groove radius4.8. Clip installed/free-state and groove dimensions require qualification; no automatic drive-stack replacement."
+          "Full STEP retaining clip intersects the current drawing screw by approximately 3.68053 mm3. Raw clip cylindrical inner radius4.65 at Z=-5.8..-5.2 vs drawing groove radius4.8. Clip installed/free-state and groove dimensions require qualification; no automatic drive-stack replacement.",
+          "Base-hole counterbore seats normalized Y31; width and base holes as the v2 drawing (measured 2026-10-21)."
         ]
       },
       "normalization": {
@@ -268,6 +311,22 @@
         "ringThicknessMm": 1,
         "normalizedStartZMm": 14,
         "extraBomLine": false
+      },
+      "interfaces": {
+        "width": 60,
+        "baseHoles": [
+          {
+            "x": -23.0,
+            "z": 10,
+            "diameter": 6.6
+          },
+          {
+            "x": 23.0,
+            "z": 10,
+            "diameter": 6.6
+          }
+        ],
+        "boltSeatY": 31
       }
     },
     {
@@ -294,7 +353,8 @@
       "interfaceReview": {
         "status": "verified-reference",
         "notes": [
-          "Housing, shaft axis, base mounting holes and bearing interval match nominal drawing interfaces. Bearing grade, tolerances, preload and load qualification are not established by CAD."
+          "Housing, shaft axis, base mounting holes and bearing interval match nominal drawing interfaces. Bearing grade, tolerances, preload and load qualification are not established by CAD.",
+          "Base-hole counterbore seats at raw Y=4, normalized Y32; width 70 and holes X=+/-27 at Z10 match the drawing (measured 2026-10-21)."
         ]
       },
       "normalization": {
@@ -303,6 +363,22 @@
           28,
           0
         ]
+      },
+      "interfaces": {
+        "width": 70,
+        "baseHoles": [
+          {
+            "x": -27.0,
+            "z": 10,
+            "diameter": 6.6
+          },
+          {
+            "x": 27.0,
+            "z": 10,
+            "diameter": 6.6
+          }
+        ],
+        "boltSeatY": 32
       }
     }
   ],

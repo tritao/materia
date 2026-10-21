@@ -67,29 +67,29 @@ class MillXYStage extends MillGuidedXYStage {
   return layout.guided();
  }
 
- /** Selected Leadshine/HZMotion Y drive; the X return drive retains its own layout. */
+ /** HZMotion-supported Y drive; the X return drive retains its own layout. */
  function supplierYDrive(shaft:AssemblyFrame):Void {
-  var l=layout;
+  var l=layout,d=l.yDrive;
+  if(d==null)throw "Supplier Y assembly needs a Y screw drive";
+  var mount=d.fixed,support=d.floating;
   attach("fixedPedestalY",new MillYDriveSeat(false),F.translation(0,l.yFixedY,l.yMountPlane),"railYLeft");
   attach("floatingPedestalY",new MillYDriveSeat(true),F.translation(0,l.yFloatingY,l.yMountPlane),"fixedPedestalY");
-  var mountPose=orient(0,l.yMotorFace,l.yScrewZ-25,[0,0,1],[0,-1,0]);
-  var mount=new machinekit.assembly.HzMotionComponent("M60D-BK12-C",null,"unspecified","supplier-step");
+  var mountPose=orient(0,l.yMotorFace,l.yScrewZ-mount.spec.shaftHeight,[0,0,1],[0,-1,0]);
   attach("motorMountY",mount,mountPose,"fixedPedestalY");
   var motorPose=orient(0,l.yMotorFace,l.yScrewZ,[0,0,1],[0,-1,0]);
   attach("motorY",l.yMotor,motorPose,"motorMountY");
   hang("screwY",l.yDriveScrew,shaft,"motorMountY");
   addMateOnAxis("screwY-turn","continuous","motorMountY","to-screwY","screwY","attach-screwY",{x:0,y:-1,z:0});
   attach("motorShaftY",l.yMotor.shaft(),motorPose,"screwY");
-  attach("couplingY",new ShaftCoupling(14,10,25,32,[{z:8,angle:Math.PI/2},{z:24,angle:Math.PI/2}]),F.compose(motorPose,F.translation(0,0,16)),"screwY");
-  var support=new machinekit.assembly.HzMotionComponent("BF12",null,"unspecified","supplier-step","installed-envelope");
-  attach("floatingBearingY",support,orient(0,l.yFloatingY+10,l.yScrewZ-25,[0,0,1],[0,-1,0]),"floatingPedestalY");
+  attach("couplingY",d.coupling,F.compose(motorPose,F.translation(0,0,d.couplingSeat)),"screwY");
+  attach("floatingBearingY",support,orient(0,l.yFloatingY+d.floatingBoltZ,l.yScrewZ-support.spec.shaftHeight,[0,0,1],[0,-1,0]),"floatingPedestalY");
   for(floating in [false,true])for(x in [-42.0,42])attach('seatYAnchor${floating}$x',SocketHeadCapScrew.metric("M6",25),
    F.translation(x,(floating?l.yFloatingY:l.yFixedY)+(floating?0:-10),l.yMountPlane+15),floating?"floatingPedestalY":"fixedPedestalY");
   var i=0;
   for(hole in mount.spec.baseHoles)attach('mountYBolt${++i}',SocketHeadCapScrew.metric("M6",35),
-   F.translation(hole.x,l.yMotorFace-hole.z,l.yScrewZ-1),"motorMountY");
-  for(x in [-23.0,23])attach('bearingBoltYfloating$x',SocketHeadCapScrew.metric("M6",40),
-   F.translation(x,l.yFloatingY,l.yScrewZ+6),"floatingBearingY");
+   F.translation(hole.x,l.yMotorFace-hole.z,l.yScrewZ+(d.fixedBoltSeat-mount.spec.shaftHeight)),"motorMountY");
+  for(x in [-d.floatingBoltX,d.floatingBoltX])attach('bearingBoltYfloating$x',SocketHeadCapScrew.metric("M6",40),
+   F.translation(x,l.yFloatingY,l.yScrewZ+(d.floatingBoltSeat-support.spec.shaftHeight)),"floatingBearingY");
   i=0;
   var mounting:machinekit.motion.ServoMotor.ServoMounting=l.yMotor.mounting();
   for(hole in mounting.holes)attach('motorYBolt${++i}',SocketHeadCapScrew.metric("M5",12),

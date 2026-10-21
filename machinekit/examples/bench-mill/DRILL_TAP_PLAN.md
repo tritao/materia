@@ -288,6 +288,41 @@ Make these layout inputs, defaulting to today's values:
 **Acceptance:** existing mill, Z, XY, spindle, capacity, workholding and machining
 tests pass unchanged; scene and checks outputs for Small and Compact are identical.
 
+**Status (2026-10-21): done, apart from the guided XY drive set.**
+- **`MillScrewDrive`** is one HZMotion-supported screw drive: fixed motor mount,
+  floating support, servo and coupling. It derives every mounting datum from part
+  data instead of literals:
+  - screw-end profile and lengths from the mount's end profile;
+  - floating bearing centre from the journal and the bearing's ISO 15 width;
+  - bolt pattern from the support's base holes;
+  - bearing centre and bolt seats from the STEP review data.
+  The bolt seats (BK12 24, BF12 31, BK15 and BF15 32) were measured on the pinned
+  STEP files and added to `tools/suppliers/hzmotion-cad.json`. Only the coupling is
+  stated.
+  - Z uses `m80eBk15()`, with the SFU2005 nut as a separate input.
+  - The Small mill's supplier Y uses `m60dBk12()`. It replaces the `supplierY` flag
+    and its literal datums (83, 41.5, 34, 20, 7, ±23).
+- **`MillXYDrive`** is the generic X/Y set: 1605 nut, BK12/BF12, ELM2H-0400,
+  coupling.
+- **`MillSpindlePackage`** is the spindle interface: seat, diameter, head height,
+  maximum rpm, and the assembly it installs.
+  - `MillBeltSpindle` is today's belt BT30. Its motor adjustment and drive are
+    package fields.
+  - `MillFramePreview.concept`, `assemble` and `attachSpindle` take a package; their
+    adjustment and drive arguments are gone.
+  - The Z head takes the spindle diameter from the package. The old clearance check
+    used the legacy ER20 cartridge's diameter.
+- **`MillCapacityLayout`** takes options for spindle package, head height, fixture
+  height, minimum nose and tool-change height. The tool-change height extends the Z
+  rails and stroke above the working range and leaves the gauge range unchanged.
+- **Proof of no change:** the assembly recipe and solved poses of Small (bare and with
+  its machining setup), Compact VMC (capacity and with its setup), the motor study
+  and the belt spindle are byte-identical before and after.
+- **Moved to DT3:** a drive set for `MillGuidedXYLayout`. The Compact VMC's guided
+  cross-slide has no drives fitted, so an input now would be unused.
+- **Still open:** `MillSpindleHead`'s legacy no-drive branch (old motor and mount).
+  Removing it is separate cleanup.
+
 ### DT2 — Drill-tap configuration and envelope
 - `DrillTapLayout` built on `MillCapacityLayout` with the DT targets.
 - The `drill-tap` configuration in `materia.project.json`.

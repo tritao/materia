@@ -97,6 +97,20 @@ class HzMotionComponent extends MachineComponent {
   try {var p=raw.placed(new Location(new Plane(new Vector(x,0,z),Vector.X(),Vector.Y())));raw.close();return p;}
   catch(e:Dynamic){raw.close();throw e;}
  }
+ /** Fixed-bearing centre below the motor face, measured on the pinned STEP. */
+ public function bearingCentreZ():Float {
+  var value:Null<Float> = null;
+  if(geometrySource=="supplier-step"){var i=HzMotionCatalog.cadAsset(spec.model).interfaces;if(i!=null)value=i.bearingCentreZ;}
+  if(value==null)throw 'HZMotion ${spec.model} has no measured bearing centre';
+  return value;
+ }
+ /** Base-bolt counterbore seat above the mounting base, measured on the pinned STEP. */
+ public function boltSeatY():Float {
+  var value:Null<Float> = null;
+  if(geometrySource=="supplier-step"){var i=HzMotionCatalog.cadAsset(spec.model).interfaces;if(i!=null)value=i.boltSeatY;}
+  if(value==null)throw 'HZMotion ${spec.model} has no measured bolt seat';
+  return value;
+ }
  override public function geometry(detail:ComponentDetail=Preview):Part {
   if(geometrySource=="supplier-step") {
    var asset=HzMotionCatalog.cadAsset(spec.model),root=Sys.getEnv("MATERIA_ROOT");

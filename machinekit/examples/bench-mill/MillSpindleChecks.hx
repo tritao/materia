@@ -77,7 +77,7 @@ class MillSpindleChecks {
 			near(state.worldPose("spindle/tool").z,(new MillXYStageLayout(f,l.spindleY,BenchMill.RAIL)).tableTop,"lower Z stop preserves original tool-tip/table datum");
 		}
 		for (adjustment in [-MillSpindleMotorLayout.ADJUSTMENT,MillSpindleMotorLayout.ADJUSTMENT]) {
-			var packageStudy=MillFramePreview.concept(reference,frame,adjustment);
+			var packageStudy=MillFramePreview.concept(reference,frame,new MillBeltSpindle(adjustment));
 			MillSpindleIntegrity.checkPayload(packageStudy,l).throwIfErrors(); check(true,"belt adjustment endpoint clears its carrier and guard");
 		}
 		var cache=new PosedParts(), poses:Map<String,AssemblyFrame> =assembly.solvedPoses();

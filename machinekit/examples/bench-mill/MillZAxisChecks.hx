@@ -146,6 +146,19 @@ class MillZAxisChecks {
 		studyState.setJoint("zAxis/z", l.lower); studyState.forwardKinematics();
 		near(studyState.worldPose("spindle/tool").z - upperTool, l.lower, "spindle payload follows real Z joint");
 		near(studyState.worldPose("xyStage/table").z, pose(study.solvedPoses(), "xyStage/table").z, "Z motion leaves XY table stationary");
+		// DT1: drive and spindle selections are layout inputs; defaults reproduce the installed parts.
+		var compact = new MillCapacityLayout(), compactZ = compact.zLayout();
+		check(compactZ.nut.spec.model == "SFU2005" && compactZ.drive.endProfile == "BK15", "default Z drive is the SFU2005 / BK15 set");
+		check(Std.isOfType(compactZ.spindle, MillBeltSpindle), "default spindle package is the belt-driven BT30");
+		near(compact.headBottom - compact.gaugeZ, compact.spindle.seat(), "head sits the package seat above the gauge line");
+		var explicit = new MillCapacityLayout(400, 300, 380, {spindle: new MillBeltSpindle(), fixtureHeight: 100, noseMin: 150});
+		near(explicit.zLayout().screwTop, compactZ.screwTop, "explicit default inputs give the same Z datums");
+		var turret = new MillCapacityLayout(400, 300, 380, {toolChangeHeight: 120}), turretZ = turret.zLayout();
+		near(turretZ.lower, -500, "tool-change height extends the Z stroke above the working range");
+		near(turret.gaugeZ, compact.gaugeZ, "tool-change height leaves the working gauge range unchanged");
+		check(turret.frame.zRailLength >= compact.frame.zRailLength + 120, "Z rails extend over the tool-change height");
+		var turretAxis = new MillZAxis(turretZ);
+		check(turretAxis.components().length > 0, "Z axis builds with the tool-change reserve");
 		Sys.println('Central Z axis: $assertions assertions passed');
 	}
 }

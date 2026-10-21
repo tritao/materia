@@ -13,19 +13,22 @@ class MillXYStageLayout {
 	public static inline var RISER_HEIGHT:Float = 48;
 	public static inline var TABLE_HEIGHT:Float = 40;
 	public final frame:MillFrameLayout;
+ /** HZMotion-supported Y drive; null when Y uses the same BK12 set as X. */
+ public final yDrive:Null<MillScrewDrive>;
  public final supplierY:Bool;
- public final yMotor:ServoMotor;
+ public final yMotor:LeadshineServo;
  public final yDriveScrew:LeadScrew;
  public final yFixedDepth:Float;
  public final yFloatingDepth:Float;
 	public final centreY:Float;
 	public final profile:String;
 	public final block:LinearRailBlock;
-	public final nut = new BallNut();
-	public final fixed = ScrewSupportUnit.bk12();
-	public final floating = ScrewSupportUnit.bf12();
-	public final motor = LeadshineServo.model("ELM2H-0400LA60F");
-	public final coupling = new ShaftCoupling(14, 12, null, 28);
+	public final drive:MillXYDrive;
+	public final nut:BallNut;
+	public final fixed:ScrewSupportUnit;
+	public final floating:ScrewSupportUnit;
+	public final motor:LeadshineServo;
+	public final coupling:ShaftCoupling;
 	public final xScrew = new BallScrew(455);
 	public final yScrew:BallScrew;
 	public final xHalfTravel:Float = 125;
@@ -63,17 +66,21 @@ class MillXYStageLayout {
 
 	public static function stackHeight(profile:String):Float return 2 * LinearRailBlock.metric(profile).spec.blockHeight + SADDLE_HEIGHT + RISER_HEIGHT + TABLE_HEIGHT;
 
-	public function new(frame:MillFrameLayout, centreY:Float, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null,supplierY:Bool=false) {
+	/** `drive` defaults to `MillXYDrive.bk12()`; `yDrive` replaces it on Y with an HZMotion-supported screw. */
+	public function new(frame:MillFrameLayout, centreY:Float, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null,
+		?yDrive:MillScrewDrive, ?drive:MillXYDrive) {
 		if (frame == null || !Math.isFinite(centreY)) throw "XY stage needs finite matching frame datums";
 		this.frame = frame;
+		this.drive = drive ?? MillXYDrive.bk12();
+		nut = this.drive.nut; fixed = this.drive.fixed; floating = this.drive.floating; motor = this.drive.motor; coupling = this.drive.coupling;
 		yHalfTravel = frame.yTravel.halfTravel;
 		tableDepth = frame.yTravel.tableDepth;
 		saddleDepth = frame.yTravel.saddleDepth;
-  this.supplierY=supplierY;
-  var selectedY=LeadshineServo.model("ELM2H-0400LA60F");
-  yMotor=supplierY?selectedY:motor;
-  yFixedDepth=supplierY?83:fixed.length;
-  yFloatingDepth=supplierY?20:floating.length;
+  this.yDrive=yDrive;
+  supplierY=yDrive!=null;
+  yMotor=yDrive==null?motor:yDrive.motor;
+  yFixedDepth=yDrive==null?fixed.length:yDrive.fixed.spec.length;
+  yFloatingDepth=yDrive==null?floating.length:yDrive.floating.spec.length;
 		this.centreY = centreY;
 		this.profile = profile;
 		if (guideBlock != null && guideBlock.spec.designation != profile)
@@ -90,18 +97,26 @@ class MillXYStageLayout {
 		// Put the screw at the saddle underside, between the guides.
 		yScrewZ = saddleBottom;
 		yMountPlane = yScrewZ - 40;
-		yBayTop = yScrewZ + selectedY.spec.connectorHeight + clearance;
+		yBayTop = yScrewZ + yMotor.spec.connectorHeight + clearance;
 		yHatchLowerZ = frame.railPlane + 10; yHatchUpperZ = yBayTop + 10;
 		xMotorZ = saddleBottom + SADDLE_HEIGHT / 2;
 		xScrewZ = xRailPlane + 40;
 		yServiceRear = frame.columnCentreY + frame.columnDepth / 2;
 		// The older fabricated cage retains its 130 mm service bay and bearing datums.
 		yMotorFace = yServiceRear - (supplierY?yMotor.rating.bodyLength:Math.max(130,yMotor.rating.bodyLength)) - clearance;
-		yScrewStart = yMotorFace - (supplierY?34:yMotor.rating.shaftLength);
-		yFixedY = supplierY?yMotorFace-41.5:yScrewStart - BallScrew.INPUT_JOURNAL_LENGTH + fixed.length / 2;
-		yFloatingY = frame.yRailStart + (supplierY?7:BallScrew.JOURNAL_LENGTH / 2);
+		if (yDrive == null) {
+			yScrewStart = yMotorFace - yMotor.rating.shaftLength;
+			yFixedY = yScrewStart - BallScrew.INPUT_JOURNAL_LENGTH + fixed.length / 2;
+			yFloatingY = frame.yRailStart + BallScrew.JOURNAL_LENGTH / 2;
+		} else {
+			var shoulder = yDrive.fixed.spec.shoulderZ;
+			if (shoulder == null) throw "Y drive mount needs a screw shoulder datum";
+			yScrewStart = yMotorFace - (shoulder - yDrive.fixedEnd);
+			yFixedY = yMotorFace - yDrive.fixed.spec.length / 2;
+			yFloatingY = frame.yRailStart + yDrive.floatingEnd;
+		}
 		yScrew = new BallScrew(yScrewStart - frame.yRailStart);
-  yDriveScrew=supplierY?new HzMotionDrawingScrew(yScrew.totalLength):yScrew;
+  yDriveScrew=yDrive==null?yScrew:new HzMotionDrawingScrew(yScrew.totalLength,yDrive.endProfile);
 		if (centreY + yHalfTravel + tableDepth / 2 + clearance > frame.columnFront - block.spec.railHeight)
 			throw "Y travel/table depth exceeds spindle reach: increase column-to-spindle clearance before increasing Y stroke";
 		var xReach = xBlockSpan + block.spec.blockLength / 2 + block.spec.railEndMargin;

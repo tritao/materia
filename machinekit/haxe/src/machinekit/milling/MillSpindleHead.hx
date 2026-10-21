@@ -82,7 +82,7 @@ class MillSpindleHead extends MachineAssembly {
 		addMemberConnector(parent,'to-$id',F.compose(F.inverse(positions.get(parent)),frame));
 		addMemberConnector(id,"seat",F.compose(F.inverse(pose),frame));
 		addMateOnAxis(joint,"continuous",parent,'to-$id',id,"seat",{x:0,y:0,z:1},0,
-			{lower:null,upper:null,velocity:maximumSpeed ?? (8000*2*Math.PI/60),effort:null});
+			{lower:null,upper:null,velocity:maximumSpeed ?? (MillBeltSpindle.MAXIMUM_RPM*2*Math.PI/60),effort:null});
 	}
 
 	function fixed(id:String,part:MachineComponent,pose:AssemblyFrame,parent:String):Void {

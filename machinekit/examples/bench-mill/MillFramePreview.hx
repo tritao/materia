@@ -68,16 +68,17 @@ class MillFramePreview {
 		return result;
 	}
 
-	public static function concept(reference:BenchMill, frame:MillFrame, ?motorAdjustment:Float, ?drive:machinekit.milling.MillSpindleDrivePart):MachineAssembly {
+	/** `spindle` defaults to the one the Z layout was sized for. */
+	public static function concept(reference:BenchMill, frame:MillFrame, ?spindle:machinekit.milling.MillSpindlePackage):MachineAssembly {
   if(frame.xyAxis==null)throw "Full mill concept needs XY steel drive seats";
-  return assemble(reference,frame,new MillXYStage(frame.xyAxis),motorAdjustment,drive);
+  return assemble(reference,frame,new MillXYStage(frame.xyAxis),spindle);
  }
 
  /** Both sizes use the same frame/Z/spindle and guided cross-slide assembly path. */
  public static function assemble(reference:BenchMill,frame:MillFrame,xy:MillGuidedXYStage,
-   ?motorAdjustment:Float,?drive:machinekit.milling.MillSpindleDrivePart):MachineAssembly {
+   ?spindle:machinekit.milling.MillSpindlePackage):MachineAssembly {
   var result=structure(frame);
-  attachSpindle(reference,result,frame.zAxis,motorAdjustment,drive);
+  attachSpindle(reference,result,frame.zAxis,spindle);
   result.include("xyStage",xy);
   var poses:Map<String,AssemblyFrame> =frame.solvedPoses();
   result.addMemberConnector("frame/base/casting","stageSeat",F.compose(F.inverse(poses.get("base/casting")),xy.zeroPose("railYLeft")));
@@ -89,10 +90,10 @@ class MillFramePreview {
 
 	/** Complete shared spindle payload for both machine configurations. */
 	public static function attachSpindle(reference:BenchMill,result:MachineAssembly,spindleLayout:MillZAxisLayout,
-		?motorAdjustment:Float,?drive:machinekit.milling.MillSpindleDrivePart):Void {
-		var spindleParts = new machinekit.milling.MillSpindleHead(spindleLayout,motorAdjustment,
-			drive==null?machinekit.milling.MillSpindleDrivePart.installed(spindleLayout.headHeight):drive);
-		var spindleOrigin = spindleParts.gauge;
+		?selected:machinekit.milling.MillSpindlePackage):Void {
+		var spindle:machinekit.milling.MillSpindlePackage = selected ?? spindleLayout.spindle;
+		var spindleParts = spindle.assembly(spindleLayout);
+		var spindleOrigin = F.translation(0, spindleLayout.spindleY, spindleLayout.headBottom - spindle.seat());
 		var tool = new machinekit.milling.FlatEndMill(new machinekit.component.ComponentValues().setNumber("diameter",reference.tool.diameter)
 			.setNumber("fluteLength",reference.tool.fluteLength).setNumber("stickout",reference.tool.stickout));
 		spindleParts.addComponent("tool",tool,F.translation(0,spindleLayout.spindleY,spindleOrigin.z-35-reference.tool.stickout));

@@ -110,7 +110,7 @@ class MillMotorStudy {
 			var diagnostics:Array<String> =[];
 			if(savedDocument!=null) MachineKitRecipes.reconcileDocument(document,savedDocument,diagnostics);
 			var drive=cast(MachineKitRecipes.component(instance),MillSpindleDrivePart);
-			var assembly=MillFramePreview.concept(c.reference,c.frame,0,drive);
+			var assembly=MillFramePreview.concept(c.reference,c.frame,new MillBeltSpindle(0,drive));
 			var baseline=MillFramePreview.concept(c.reference,c.frame);
 			var study=report(assembly,c.frame,drive,movingMass(baseline));
 			for(item in study.payloadClearanceFindings) diagnostics.push(item.message);
@@ -131,7 +131,7 @@ class MillMotorStudy {
 		for(p in [{id:"1500w",name:"ELM2L-1500LA100FT-H MS1AE",motor:80,spindle:30},
 			{id:"2000w",name:"ELM2M-2000LB130F-H",motor:80,spindle:25},
 			{id:"2900w",name:"ELM2M-2900LD180FT-H",motor:96,spindle:18}]) {
-			var drive=selection(c.frame,p.name,p.motor,p.spindle),assembly=MillFramePreview.concept(c.reference,c.frame,0,drive);
+			var drive=selection(c.frame,p.name,p.motor,p.spindle),assembly=MillFramePreview.concept(c.reference,c.frame,new MillBeltSpindle(0,drive));
 			assembly.validate();
 			var result=report(assembly,c.frame,drive,baselineMass);reports.push(result);
 			sys.io.File.saveContent(directory+"/motor-"+p.id+".json",Json.stringify(result,null,"  "));

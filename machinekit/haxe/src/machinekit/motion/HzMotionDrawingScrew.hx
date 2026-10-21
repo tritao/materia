@@ -17,11 +17,21 @@ class HzMotionDrawingScrew extends LeadScrew {
  public final endProfile:String;
  public final fixedEnd:Float;
  public final floatingEnd:Float;
- public function new(length:Float=400,endProfile:String="BK12") {
+ /** Fixed end, shoulder to the thread run-out, for a profile. */
+ public static function fixedEndFor(endProfile:String):Float return checked(endProfile)=="BK15"?64:FIXED_END;
+ /** Floating journal length from the screw end. */
+ public static function floatingEndFor(endProfile:String):Float return checked(endProfile)=="BK15"?13:FLOAT_END;
+ /** Coupling journal diameter at the fixed end. */
+ public static function couplingDiameterFor(endProfile:String):Float return checked(endProfile)=="BK15"?12.0:10.0;
+ static function checked(endProfile:String):String {
   if(["BK12","BK15"].indexOf(endProfile)<0)throw "Unknown HZMotion screw end";
+  return endProfile;
+ }
+ public function new(length:Float=400,endProfile:String="BK12") {
+  checked(endProfile);
   if(!Math.isFinite(length)||length<150)throw "HZMotion screw must contain machined ends and nut travel";
   super(endProfile=="BK15"?new LeadScrewThread(Ball,20,5,1,RightHand,16):BallScrew.race(),length,'HZMOTION-DRAWING-$endProfile-L${Dimension.format(length)}');
-  this.endProfile=endProfile;fixedEnd=endProfile=="BK15"?64:FIXED_END;floatingEnd=endProfile=="BK15"?13:FLOAT_END;
+  this.endProfile=endProfile;fixedEnd=fixedEndFor(endProfile);floatingEnd=floatingEndFor(endProfile);
   addConnector("fixedShoulder",Mount,Solids.axial(0,0,fixedEnd));
   addConnector("floatingSeat",Axis,Solids.axial(0,0,length-floatingEnd));
  }

@@ -12,6 +12,12 @@ typedef MillZAxisOptions = {
  ?head:ComponentValues;
  ?headBoltLength:Float;
  ?overtravelLimit:Float;
+ /** Mount, floating support, servo and coupling; defaults to `MillScrewDrive.m80eBk15()`. */
+ ?drive:MillScrewDrive;
+ /** Defaults to an SFU2005 nut on a 16 mm race root. */
+ ?nut:SfuNut;
+ /** The spindle the head carries; defaults to the belt-driven BT30 (`MillBeltSpindle`). */
+ ?spindle:MillSpindlePackage;
 }
 
 
@@ -21,10 +27,12 @@ typedef MillZAxisOptions = {
 class MillZAxisLayout {
 	public final frame:MillFrameLayout;
 	public final block:LinearRailBlock;
-	public final nut = new SfuNut("SFU2005",16);
-	public final fixed = new machinekit.assembly.HzMotionComponent("M80E-BK15-C",null,"unspecified","supplier-step");
-	public final floating = new machinekit.assembly.HzMotionComponent("BF15",null,"unspecified","supplier-step","installed-envelope");
-	public final motor = LeadshineServo.model("ELM2H-0750LA80E");
+	public final drive:MillScrewDrive;
+	public final spindle:MillSpindlePackage;
+	public final nut:SfuNut;
+	public final fixed:machinekit.assembly.HzMotionComponent;
+	public final floating:machinekit.assembly.HzMotionComponent;
+	public final motor:LeadshineServo;
 	public final coupling:ShaftCoupling;
 	public final screw:HzMotionDrawingScrew;
 	public final lower:Float;
@@ -69,6 +77,10 @@ class MillZAxisLayout {
 		this.crossDriveZ = crossDriveZ;
 		this.frame = frame; this.headBottom = headBottom; this.headHeight = headHeight;
 		this.spindleY = spindleY; this.lower = lower; this.profile = profile;
+		drive = options.drive ?? MillScrewDrive.m80eBk15();
+		nut = options.nut ?? new SfuNut("SFU2005",16);
+		spindle = options.spindle ?? new MillBeltSpindle();
+		fixed = drive.fixed; floating = drive.floating; motor = drive.motor; coupling = drive.coupling;
 		if (guideBlock != null && guideBlock.spec.designation != profile)
 			throw "Guide block must match the selected rail profile";
 		block = guideBlock == null ? LinearRailBlock.metric(profile) : guideBlock;
@@ -83,10 +95,10 @@ class MillZAxisLayout {
 		carriageBack = frame.columnFront - block.spec.blockHeight;
 		headBack = carriageBack - carriageThickness;
 		headCentre = headBottom + headHeight / 2;
-		headValues = new ComponentValues().setNumber("width",180).setNumber("spindleDiameter",90).setBoolean("bt30Mounts",true)
+		headValues = new ComponentValues().setNumber("width",180).setNumber("spindleDiameter",spindle.diameter()).setBoolean("bt30Mounts",true)
 			.setBoolean("centeredMotor",true).setNumber("height",headHeight).setNumber("rootExtension",headRootExtension)
 			.setNumber("rearWidth",carriageWidth).setNumber("boltX",carriageWidth/2-12)
-			.setNumber("reach",headBack-spindleY+Bt30Cartridge.DIAMETER/2+10).setNumber("spindleReach",headBack-spindleY);
+			.setNumber("reach",headBack-spindleY+spindle.diameter()/2+10).setNumber("spindleReach",headBack-spindleY);
 		if (options.head != null) for (name in options.head.names()) headValues.set(name,options.head.get(name));
 		var resolvedHead=new MillZHead(headValues);
 		if (resolvedHead.parameterNumber("height") != headHeight || resolvedHead.parameterNumber("spindleReach") != headBack-spindleY ||
@@ -104,15 +116,15 @@ class MillZAxisLayout {
 		lowerHeight = frame.zRailStart;
 		floatingZ = frame.railPlane + lowerHeight / 2;
 		motorFace = frame.railPlane + frame.columnHeight + 40;
-		fixedZ = motorFace - 93; // Pinned STEP bearing centre, raw Z=16.
+		fixedZ = motorFace - drive.bearingDrop;
 		upperHeight = 40;
 		var shoulder=fixed.spec.shoulderZ;if(shoulder==null)throw "HZMotion Z mount needs a screw shoulder datum";
-		screwTop = motorFace - (shoulder - 64);
-		screw = new HzMotionDrawingScrew(screwTop-floatingZ+8.5,"BK15");
-		if (crossDriveZ != null && (!Math.isFinite(crossDriveZ) || floatingZ-8.5 <= crossDriveZ+12+clearance))
+		screwTop = motorFace - (shoulder - drive.fixedEnd);
+		screw = new HzMotionDrawingScrew(screwTop-floatingZ+drive.floatingEnd,drive.endProfile);
+		if (screw.thread.screwDiameter != nut.spec.diameter || screw.thread.lead != nut.spec.pitch) throw "Z nut must match the screw race";
+		if (crossDriveZ != null && (!Math.isFinite(crossDriveZ) || floatingZ-drive.floatingEnd <= crossDriveZ+12+clearance))
 			throw "Z screw end enters the crossing Y shaft clearance";
-		var couplingLength=48.0;
-		coupling = new ShaftCoupling(motor.rating.shaftDiameter,12,null,couplingLength);
+		var couplingLength=coupling.length;
 		var railLow = frame.railPlane + frame.zRailStart + block.spec.railEndMargin;
 		var railHigh = upperBottom - block.spec.railEndMargin;
 		var reach = blockSpan + block.spec.blockLength / 2;
@@ -128,7 +140,7 @@ class MillZAxisLayout {
 			couplingLength / 2 < motor.rating.shaftDiameter * 0.75 || overtravel <= 0 ||
 			headCentre + carriageHeight / 2 + clearance >= upperBottom ||
 			headCentre + lower - carriageHeight / 2 <= frame.railPlane + lowerHeight + clearance ||
-			headBack - spindleY <= SpindleCartridge.DIAMETER / 2 + 20 ||
+			headBack - spindleY <= spindle.diameter() / 2 + 20 ||
 			channelBack + frame.wall >= frame.columnCentreY + frame.columnDepth / 2)
 			throw "Z layout cannot fit its carriage, central drive and supported end mounts";
 		// Both ends of the complete nut must remain on the threaded race.

@@ -12,13 +12,13 @@ import materia.project.SceneArtifact;
 class MillProject {
  public static function smallAssembly():MachineAssembly {
   var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=new HiwinHgh15ca();
-  var z=MillFramePreview.zLayout(reference,f,guide),xy=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,true);
+  var z=MillFramePreview.zLayout(reference,f,guide),xy=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,MillScrewDrive.m60dBk12());
   return MillFramePreview.concept(reference,new MillFrame(f,z,xy));
  }
  public static function small():Bytes {
   var reference=new BenchMill(false,false),frame=MillFramePreview.layout(reference);
   var z=MillFramePreview.zLayout(reference,frame,new HiwinHgh15ca());
-  var xy=new MillXYStageLayout(frame,z.spindleY,BenchMill.RAIL,new HiwinHgh15ca(),true);
+  var xy=new MillXYStageLayout(frame,z.spindleY,BenchMill.RAIL,new HiwinHgh15ca(),MillScrewDrive.m60dBk12());
   return new MillMachiningSetup(smallAssembly(),["xyStage/x","xyStage/y","zAxis/z"],"xyStage/table",xy.tableTop)
    .scene("mill-small",["250 x 160 x 250 mm mechanical mill with shared bearing-block mission."]);
  }

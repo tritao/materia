@@ -155,7 +155,7 @@ class MillAxisSizing {
   }
   var variants:Array<Dynamic> = [];
   for(p in [{name:"ELM2L-1500LA100FT-H MS1AE",motor:80,spindle:30},{name:"ELM2M-2000LB130F-H",motor:80,spindle:25},{name:"ELM2M-2900LD180FT-H",motor:96,spindle:18}]) {
-   var drive=MillMotorStudy.selection(c.frame,p.name,p.motor,p.spindle),a=MillFramePreview.concept(c.reference,c.frame,0,drive),m=drive.motor();
+   var drive=MillMotorStudy.selection(c.frame,p.name,p.motor,p.spindle),a=MillFramePreview.concept(c.reference,c.frame,new MillBeltSpindle(0,drive)),m=drive.motor();
    var variantZ=axisReport(a,axes[2]);
    if(variantZ.cadMovingMassKg<=baseReports[2].cadMovingMassKg)throw "Larger spindle arrangement should increase Z mass";
    variants.push({spindleMotor:p.name,zAxis:variantZ,spindle:{targetRpm:8000,targetOutputWatts:2200,
