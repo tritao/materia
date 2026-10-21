@@ -51,21 +51,20 @@ class HelicalPinion extends AssumedCatalogComponent {
     try {
       // A single tooth has a unique root edge. Lofting the complete periodic
       // outline lets OCCT re-index equivalent wire starts and alter the helix.
-      var full = profile(), perTooth=Std.int(full.length/parameterCount("teeth"));
-      var outline=full.slice(0,perTooth);
-      var count = 5;
-      for (i in 0...count) {
-        var z = n("faceWidth") * i /(count - 1), a = handSign() * 2 * z * Math.tan(n("helixAngle")) / pitchDiameter();
-        sections.push(cadkit.modeling.Curve.polyline(
-          [for (p in outline) new Vector(
-            p.x * Math.cos(a) - p.y * Math.sin(a),
-            p.x * Math.sin(a) + p.y * Math.cos(a),
-            z
-          )],
-          true
-        ));
+      // A smooth loft through the twisted sections makes each flank one helical face.
+      var wire = toothOutline().close();
+      var count = 7;
+      try {
+        for (i in 0...count) {
+          var z = n("faceWidth") * i /(count - 1), a = handSign() * 2 * z * Math.tan(n("helixAngle")) / pitchDiameter();
+          sections.push(wire.placed(ToothOutline.at(z, a)));
+        }
+      } catch (error:Dynamic) {
+        wire.close();
+        throw error;
       }
-      var tooth = Part.loft(sections, true);
+      wire.close();
+      var tooth = Part.loft(sections, false);
       for (section in sections) section.close();
       sections = [];
       var body=Solids.building([tooth],owned->{
@@ -117,31 +116,33 @@ class HelicalPinion extends AssumedCatalogComponent {
       - rb * rb) - r * Math.sin(a) + n("normalModule") / Math.sin(a)) /(Math.PI * transverseModule() * Math.cos(a));
   }
   public function contactRatio():Float return transverseContactRatio() + overlapRatio();
-  function profile():Array<Vector> {
+  /**
+   * Tooth 0's transverse outline: spline flanks through the involute, a tip arc on the outside circle, and a
+   * root closed by chords inside the core it is united with.
+   */
+  function toothOutline():ToothOutline {
     var r = pitchDiameter() / 2,
       a = transversePressureAngle(), rb = r * Math.cos(a), rf = rootDiameter() / 2, ra = r + n("normalModule");
-    var start = Math.max(rb,
-      rf), half =(Math.PI * transverseModule() / 2 - n("backlash")) /(2 * r), invPitch = involute(
-        r,
-        rb
-      ), pts:Array<Vector> = [];
-    for (i in 0...parameterCount("teeth")) {
-      var center = 2 * Math.PI * i / parameterCount("teeth");
-      var rootAngle = half + invPitch - involute(start, rb);
-      if (rf < start - 1e-10) pts.push(new Vector(rf * Math.cos(center - rootAngle),
-        rf * Math.sin(center - rootAngle)));
-      for (j in 0...7) {
-        var rr = start +(ra - start) * j / 6, aa = center - half + involute(rr, rb) - invPitch;
-        pts.push(new Vector(rr * Math.cos(aa), rr * Math.sin(aa)));
-      }
-      for (j in 0...7) {
-        var rr = ra -(ra - start) * j / 6, aa = center + half - involute(rr, rb) + invPitch;
-        pts.push(new Vector(rr * Math.cos(aa), rr * Math.sin(aa)));
-      }
-      if (rf < start - 1e-10) pts.push(new Vector(rf * Math.cos(center + rootAngle),
-        rf * Math.sin(center + rootAngle)));
-    }
-    return pts;
+    var start = Math.max(rb, rf), half =(Math.PI * transverseModule() / 2 - n("backlash")) /(2 * r),
+      invPitch = involute(r, rb);
+    var rootAngle = half + invPitch - involute(start, rb);
+    var right = [for (j in 0...7) {
+      var rr = start +(ra - start) * j / 6, aa = -half + involute(rr, rb) - invPitch;
+      new Vector(rr * Math.cos(aa), rr * Math.sin(aa));
+    }];
+    var left = [for (j in 0...7) {
+      var rr = ra -(ra - start) * j / 6, aa = half - involute(rr, rb) + invPitch;
+      new Vector(rr * Math.cos(aa), rr * Math.sin(aa));
+    }];
+    var result = new ToothOutline();
+    if (rf < start - 1e-10) {
+      var rootA = new Vector(rf * Math.cos(-rootAngle), rf * Math.sin(-rootAngle));
+      var rootB = new Vector(rf * Math.cos(rootAngle), rf * Math.sin(rootAngle));
+      result.line(rootA, right[0]).spline(right).arc(right[6], new Vector(ra, 0), left[0]).spline(left)
+        .line(left[6], rootB).line(rootB, rootA);
+    } else
+      result.spline(right).arc(right[6], new Vector(ra, 0), left[0]).spline(left).line(left[6], right[0]);
+    return result;
   }
   static function involute(r:Float, rb:Float):Float {
     var t = Math.sqrt(Math.max(0, r * r /(rb * rb) - 1));

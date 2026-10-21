@@ -80,23 +80,26 @@ class TimingPulley extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Part.prism(profile(), 0, thickness);
+		var body = outline().extrude(0, thickness);
 		return Solids.cut(body, [Part.cylinderSpan(boreDiameter / 2, -0.1, thickness + 0.1)]);
 	}
 
-	function profile():Array<Vector> {
+	/** Nominal grooves: straight flanks, the groove bottom an arc on the groove circle, the lands arcs on the outside circle. */
+	function outline():ToothOutline {
 		var ra = outsideDiameter / 2, rf = grooveDiameter / 2;
 		var angleStep = 2 * Math.PI / teeth;
 		var halfLand = 0.3 * angleStep / 2, halfGroove = 0.15 * angleStep / 2;
-		var points:Array<Vector> = [];
+		inline function polar(r:Float, angle:Float):Vector
+			return new Vector(r * Math.cos(angle), r * Math.sin(angle));
+		var result = new ToothOutline(), first = polar(ra, -halfLand);
 		for (i in 0...teeth) {
 			var center = i * angleStep;
-			points.push(new Vector(ra * Math.cos(center - halfLand), ra * Math.sin(center - halfLand)));
-			points.push(new Vector(rf * Math.cos(center - halfGroove), rf * Math.sin(center - halfGroove)));
-			points.push(new Vector(rf * Math.cos(center + halfGroove), rf * Math.sin(center + halfGroove)));
-			points.push(new Vector(ra * Math.cos(center + halfLand), ra * Math.sin(center + halfLand)));
+			var landEnd = i == 0 ? first : polar(ra, center - halfLand), next = i == teeth - 1 ? first : polar(ra, center + angleStep - halfLand);
+			var grooveStart = polar(rf, center - halfGroove), grooveEnd = polar(rf, center + halfGroove), landStart = polar(ra, center + halfLand);
+			result.line(landEnd, grooveStart).arc(grooveStart, polar(rf, center), grooveEnd).line(grooveEnd, landStart)
+				.arc(landStart, polar(ra, center + angleStep / 2), next);
 		}
-		return points;
+		return result;
 	}
 
 	private static var standardRecipeTypeCache:Null<ComponentType>;

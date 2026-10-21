@@ -54,7 +54,8 @@ class FoldedZRouterCheck {
 		CncRouterChecks.near(directZ.requireVelocity() * 1000, 43.6539272481, "direct Z speed baseline", 1e-6);
 		CncRouterChecks.near(foldedZ.requireVelocity() * 1000, 21.8269636240, "folded Z speed baseline", 1e-6);
 		CncRouterChecks.near(directZ.requireAcceleration() * 1000, 6109.77282022, "direct Z acceleration baseline", 1e-3);
-		CncRouterChecks.near(foldedZ.requireAcceleration() * 1000, 3262.63365726, "folded Z acceleration baseline", 1e-3);
+		// The pulleys' teeth are true arcs, no longer chords, so their inertia is a little higher.
+		CncRouterChecks.near(foldedZ.requireAcceleration() * 1000, 3262.543151338341, "folded Z acceleration baseline", 1e-3);
 		CncRouterChecks.near(foldedZ.requireVelocity() * 2, directZ.requireVelocity(), "the two-to-one belt uses twice the motor rate", 1e-9);
 		if (!(foldedZ.requireAcceleration() > 0 && foldedZ.requireAcceleration() < directZ.requireAcceleration()))
 			throw "The folded motor's inertia must tighten the Z acceleration bound";

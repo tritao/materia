@@ -110,23 +110,26 @@ class Sprocket extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Part.prism(profile(), 0, thickness);
+		var body = outline().extrude(0, thickness);
 		return Solids.cut(body, [Part.cylinderSpan(boreDiameter / 2, -0.1, thickness + 0.1)]);
 	}
 
-	function profile():Array<Vector> {
+	/** Nominal teeth: straight flanks, the tip an arc on the outside circle, the gaps arcs on the root circle. */
+	function outline():ToothOutline {
 		var rf = rootDiameter / 2, ra = outsideDiameter / 2;
 		var angleStep = 2 * Math.PI / teeth;
 		var halfRoot = 0.35 * angleStep / 2, halfTip = 0.2 * angleStep / 2;
-		var points:Array<Vector> = [];
+		inline function polar(r:Float, angle:Float):Vector
+			return new Vector(r * Math.cos(angle), r * Math.sin(angle));
+		var result = new ToothOutline(), first = polar(rf, -halfRoot);
 		for (i in 0...teeth) {
 			var center = i * angleStep;
-			points.push(new Vector(rf * Math.cos(center - halfRoot), rf * Math.sin(center - halfRoot)));
-			points.push(new Vector(ra * Math.cos(center - halfTip), ra * Math.sin(center - halfTip)));
-			points.push(new Vector(ra * Math.cos(center + halfTip), ra * Math.sin(center + halfTip)));
-			points.push(new Vector(rf * Math.cos(center + halfRoot), rf * Math.sin(center + halfRoot)));
+			var rootStart = i == 0 ? first : polar(rf, center - halfRoot), next = i == teeth - 1 ? first : polar(rf, center + angleStep - halfRoot);
+			var tipStart = polar(ra, center - halfTip), tipEnd = polar(ra, center + halfTip), rootEnd = polar(rf, center + halfRoot);
+			result.line(rootStart, tipStart).arc(tipStart, polar(ra, center), tipEnd).line(tipEnd, rootEnd)
+				.arc(rootEnd, polar(rf, center + angleStep / 2), next);
 		}
-		return points;
+		return result;
 	}
 
 	private static var chainRecipeTypeCache:Null<ComponentType>;

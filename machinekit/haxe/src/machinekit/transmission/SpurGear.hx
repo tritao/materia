@@ -30,8 +30,8 @@ class SpurGear extends MachineComponent {
 	public static inline var MIN_PRESSURE_ANGLE:Float = 0.25307274153917777; // 14.5 degrees
 	public static inline var MAX_PRESSURE_ANGLE:Float = 0.4363323129985824; // 25 degrees
 
+	/** Involute points each flank spline passes through. */
 	static inline var FLANK_SAMPLES:Int = 6;
-	static inline var TIP_SAMPLES:Int = 3;
 
 	public final moduleSize:Float;
 	public final teeth:Int;
@@ -161,7 +161,7 @@ class SpurGear extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Part.prism(profile(), 0, faceWidth);
+		var body = outline().extrude(0, faceWidth);
 		if (boreDiameter == 0) return body;
 		return Solids.building([body], owned -> {
 			var bore = Solids.named(Part.cylinderSpan(boreDiameter / 2, -0.1, faceWidth + 0.1), "bore");
@@ -193,44 +193,50 @@ class SpurGear extends MachineComponent {
 		.setNumber("pressureAngle", pressureAngle).setNumber("profileShift", profileShift)
 		.setNumber("backlash", backlash).setNumber("boreDiameter", boreDiameter).setToken("material", materialSpec());
 
-	/** Full-gear outline as one closed loop, one tooth centred on each multiple of 2*pi/teeth. */
-	function profile():Array<Vector> {
+	/**
+	 * Full-gear outline as one closed loop, one tooth centred on each multiple of 2*pi/teeth: each flank a spline
+	 * through its involute, the tip an arc on the outside circle, the space between teeth an arc on the root
+	 * circle (joined to the flanks by radial lines where the root lies inside the base circle).
+	 */
+	function outline():ToothOutline {
 		var rb = baseDiameter / 2, rp = pitchDiameter / 2, ra = outsideDiameter / 2, rf = rootDiameter / 2;
 		var rStart = Math.max(rb, rf);
-		var toothThickness = pitchToothThickness();
-		var halfToothAngle = toothThickness / (2 * rp);
+		var halfToothAngle = pitchToothThickness() / (2 * rp);
 		var tPitch = Math.sqrt(Math.pow(rp / rb, 2) - 1);
 		var involuteAnglePitch = tPitch - Math.atan2(tPitch, 1);
 		var angleStep = 2 * Math.PI / teeth;
-		var points:Array<Vector> = [];
+		inline function polar(r:Float, angle:Float):Vector
+			return new Vector(r * Math.cos(angle), r * Math.sin(angle));
+		function rightFlank(center:Float):Array<Vector>
+			return [
+				for (s in 0...FLANK_SAMPLES) {
+					var r = rStart + (ra - rStart) * s / (FLANK_SAMPLES - 1);
+					polar(r, center - halfToothAngle + (involuteRollAngle(r, rb) - involuteAnglePitch));
+				}
+			];
+		var result = new ToothOutline(), firstStart = rightFlank(0)[0];
 		for (i in 0...teeth) {
 			var center = i * angleStep;
-			var rightTipAngle = 0.0;
-			for (s in 0...FLANK_SAMPLES) {
-				var r = rStart + (ra - rStart) * s / (FLANK_SAMPLES - 1);
-				var angle = center - halfToothAngle + (involuteRollAngle(r, rb) - involuteAnglePitch);
-				if (s == FLANK_SAMPLES - 1) rightTipAngle = angle;
-				points.push(new Vector(r * Math.cos(angle), r * Math.sin(angle)));
-			}
-			var leftTipAngle = 2 * center - rightTipAngle;
-			for (s in 1...TIP_SAMPLES - 1) {
-				var angle = rightTipAngle + (leftTipAngle - rightTipAngle) * s / (TIP_SAMPLES - 1);
-				points.push(new Vector(ra * Math.cos(angle), ra * Math.sin(angle)));
-			}
-			for (s in 0...FLANK_SAMPLES) {
-				var k = FLANK_SAMPLES - 1 - s;
-				var r = rStart + (ra - rStart) * k / (FLANK_SAMPLES - 1);
-				var angle = center + halfToothAngle - (involuteRollAngle(r, rb) - involuteAnglePitch);
-				points.push(new Vector(r * Math.cos(angle), r * Math.sin(angle)));
-			}
+			var right = rightFlank(center);
+			if (i == 0)
+				right[0] = firstStart;
+			var left = [
+				for (s in 0...FLANK_SAMPLES) {
+					var r = rStart + (ra - rStart) * (FLANK_SAMPLES - 1 - s) / (FLANK_SAMPLES - 1);
+					polar(r, center + halfToothAngle - (involuteRollAngle(r, rb) - involuteAnglePitch));
+				}
+			];
+			result.spline(right).arc(right[right.length - 1], polar(ra, center), left[0]).spline(left);
+			var next = i == teeth - 1 ? firstStart : rightFlank(center + angleStep)[0];
+			var gap = center + angleStep / 2;
 			if (rf < rStart) {
-				var leftFlankRootAngle = center + halfToothAngle + involuteAnglePitch;
-				points.push(new Vector(rf * Math.cos(leftFlankRootAngle), rf * Math.sin(leftFlankRootAngle)));
-				var nextRightFlankRootAngle = center + angleStep - halfToothAngle - involuteAnglePitch;
-				points.push(new Vector(rf * Math.cos(nextRightFlankRootAngle), rf * Math.sin(nextRightFlankRootAngle)));
-			}
+				var rootA = polar(rf, center + halfToothAngle + involuteAnglePitch);
+				var rootB = polar(rf, center + angleStep - halfToothAngle - involuteAnglePitch);
+				result.line(left[left.length - 1], rootA).arc(rootA, polar(rf, gap), rootB).line(rootB, next);
+			} else
+				result.arc(left[left.length - 1], polar(rf, gap), next);
 		}
-		return points;
+		return result;
 	}
 
 	/** Involute roll angle (t - atan t) of the point at radius `r` on a circle of base radius `rb`. */
