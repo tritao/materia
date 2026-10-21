@@ -1855,6 +1855,21 @@ general draft/radius/prism/CAM and non-box process geometry (step 3), phase 8
 structures and phase 9 physical calibration remain open.
 
 
+### Phase 7 requirements: delivery slices
+
+- [x] Neutral interface requirements and assembly relationships, source datum
+  schemes with geometric reference validation, six-DOF fixture constraints and
+  metrology budgets. Strict record codecs keep geometric finishing stock separate
+  from finishing-process error allocation. Source integration follows in its own
+  slice; existing document versions and fabrication readiness are unchanged.
+  Focused foundation validation: **172 assertions** (requirements **41**, datum
+  **25**, fixture **26**, existing model **80**).
+  Pre-commit validation: neutral tooling **1,779**; native tooling **430**,
+  casting **54**, foundation CAD **60**, full mill **249**. The additional
+  standalone native process run passes **34**. Regenerated records-only kit:
+  **117 artifacts / 40 programs / 15 Pass / 260 Pending / 15 Unsupported**;
+  manifest integrity/tamper checks pass and readiness remains **false**.
+
 ### Phase 7 records: shared levelling-foot family
 
 - [x] One `structural.LevelingFoot` recipe with strict `LevelingFootSpec` schema

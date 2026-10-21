@@ -3,6 +3,15 @@ package materia.casting;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 class CastingRecordCodec {
+	/** Assembly instance paths qualify local IDs without allowing empty or parent segments. */
+	public static function referencePath(value:String):Void {
+		if (value==null || value.length==0) throw "Invalid casting reference path";
+		for (segment in value.split("/")) {
+			if (segment=="." || segment=="..") throw "Invalid casting reference path";
+			CastingFeatureCodec.identifier(segment);
+		}
+	}
+
 	public static function number(raw:Dynamic, name:String):Float {
 		var v:Dynamic = Reflect.field(raw, name);
 		if (!(Std.isOfType(v, Int) || Std.isOfType(v, Float)))
@@ -36,6 +45,22 @@ class CastingRecordCodec {
 			throw "Invalid casting array: " + name;
 		return cast v;
 	}
+
+	public static function identifiers(row:Dynamic, field:String, maximum:Int = 512):Array<String> {
+		var values:Array<String> = [];
+		var raw = CastingRecordCodec.array(row, field);
+		if (raw.length > maximum) throw "Too many casting references: " + field;
+		for (value in raw) {
+			if (!Std.isOfType(value, String)) throw "Invalid casting reference: " + field;
+			var id:String = cast value;
+			CastingFeatureCodec.identifier(id);
+			if (values.indexOf(id) >= 0) throw "Duplicate casting reference: " + field;
+			values.push(id);
+		}
+		values.sort(Reflect.compare);
+		return values;
+	}
+
 
 	public static function frame(raw:Dynamic):AssemblyFrame {
 		CastingFeatureCodec.fields(raw, ["x", "y", "z", "qx", "qy", "qz", "qw"]);
