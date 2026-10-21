@@ -59,6 +59,7 @@ class MineralFoundation extends MachineAssembly {
 			throw "Unknown foundation root insert";
 		v.setToken("features", CastingPatterns.encode(features));
 		body = new MineralCasting(v);
+		validateDatums();
 		validateHoleExits();
 		addComponent("casting", body);
 		for (row in inserts) {
@@ -76,6 +77,22 @@ class MineralFoundation extends MachineAssembly {
 			exposeConnector("mount", rootInsert, "mount");
 		else
 			exposeConnector("mount", "casting", "mount");
+	}
+
+	function validateDatums():Void {
+		var scheme=body.foundationDatumScheme(),interfaces=body.precisionRequirements();
+		if (scheme==null) {
+			if (interfaces.length>0 || inserts.filter(insert -> insert.part.insertSpec().interfaces.length>0).length>0)
+				diagnostics.warning("casting.datum.missing","casting","Precision interfaces have no source datum scheme.");
+			return;
+		}
+		var unresolved=materia.casting.FoundationDatumScheme.FoundationDatums.validateSource(scheme,body.castingEnvelope(),
+			body.castingFeatures(),[for (insert in inserts) {
+				var specification=insert.part.insertSpec();
+				{id:insert.id,pose:insert.pose,holes:specification.holes,interfaces:specification.interfaces};
+			}],interfaces);
+		for (datum in unresolved)
+			diagnostics.warning("casting.datum.unsupported",datum.datumId,datum.reason+": "+datum.featureId);
 	}
 
 	/** A through thread needs an accessible exit, never a closure buried in resin.

@@ -9,12 +9,16 @@ import machinekit.structural.MineralFoundation.CastInsertPlacement;
 
 /** Detached copy of source design records and the authoritative hole facet. */
 class FoundationToolingAdapter {
-	public static function snapshot(foundation:MineralFoundation, id:String, revision:Int):CastingToolingInput {
+	public static function snapshot(foundation:MineralFoundation, id:String, revision:Int,
+			?context:materia.casting.CastingInterfaceContext):CastingToolingInput {
 		foundation.body.finishedCavities();
 		return ToolingCodec.inputSnapshot({
 			id: id,
 			revision: revision,
 			lengthUnit: ToolingLengthUnit.Millimetres,
+			datumScheme: foundation.body.foundationDatumScheme(),
+			interfaces: foundation.body.precisionRequirements(),
+			interfaceContext: context,
 			envelope: foundation.body.castingEnvelope(),
 			features: foundation.body.castingFeatures(),
 			inserts: [for (row in foundation.insertLocations()) insert(row)]
@@ -29,6 +33,7 @@ class FoundationToolingAdapter {
 			material: row.part.insertMaterial(),
 			holes: source.holes,
 			origin: source.origin,
+			interfaces: source.interfaces,
 			pose: row.pose,
 			role: cast row.part.parameterToken("role"),
 			label: row.part.parameterToken("label"),

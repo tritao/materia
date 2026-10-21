@@ -21,7 +21,9 @@ class MineralCasting extends MachineComponent {
 	public static function parameters():Array<ComponentParameter> return [
 		P.length("width", 650), P.length("depth", 550), P.length("height", 120),
 		P.length("footWidth", 0), P.length("footHeight", 0), P.length("footShoulder", 0), P.length("cornerChamfer", 0),
-		P.text("features", CastingPatterns.encode([]))
+		P.text("features", CastingPatterns.encode([])),
+		P.text("datumScheme", "null"),
+		P.text("interfaces", "[]")
 	];
 
 	public static function recipeType():ComponentType {
@@ -34,6 +36,12 @@ class MineralCasting extends MachineComponent {
 	public function new(?overrides:ComponentValues) {
 		var v = P.resolve(parameters(), overrides), cuts = CastingPatterns.decode(v.token("features"));
 		v.setToken("features", CastingPatterns.encode(cuts));
+		var datumRaw:Dynamic = haxe.Json.parse(v.token("datumScheme"));
+		if (datumRaw != null) datumRaw = materia.casting.FoundationDatumScheme.FoundationDatums.record(
+			materia.casting.FoundationDatumScheme.FoundationDatums.snapshot(datumRaw));
+		v.setToken("datumScheme", haxe.Json.stringify(datumRaw));
+		var interfaces = materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(haxe.Json.parse(v.token("interfaces")));
+		v.setToken("interfaces", haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records(interfaces)));
 		for (name in ["width", "depth", "height"])
 			if (v.number(name) <= 0) throw "Casting dimensions must be positive";
 		if (v.get("material") != null && v.token("material") != "mineral cast")
@@ -61,6 +69,7 @@ class MineralCasting extends MachineComponent {
 				: "Unsupported collision geometry for features: " + [for (cavity in unsupported) cavity.featureId].join(", "));
 		}
 		addFacet(collisionHullQualification);
+		if (interfaces.length > 0) addFacet(new machinekit.design.DesignInterfaces([], [], [], interfaces));
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Mount, Solids.axial(0, 0, v.number("height")));
 	}
@@ -88,6 +97,16 @@ class MineralCasting extends MachineComponent {
 			for (part in parts) part.close();
 			throw error;
 		}
+	}
+
+	public function foundationDatumScheme():Null<materia.casting.FoundationDatumScheme> {
+		var raw:Dynamic = haxe.Json.parse(parameterToken("datumScheme"));
+		return raw == null ? null : materia.casting.FoundationDatumScheme.FoundationDatums.snapshot(raw);
+	}
+
+	public function precisionRequirements():Array<materia.casting.InterfaceRequirement> {
+		var interfaces = machinekit.design.DesignInterfaces.of(this);
+		return interfaces == null ? [] : interfaces.precisionRequirements();
 	}
 
 	public function castingFeatures():Array<CastingFeature> return materia.casting.CastingFeatureCodec.snapshot(features);

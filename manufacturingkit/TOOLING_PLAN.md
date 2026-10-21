@@ -1901,6 +1901,23 @@ structures and phase 9 physical calibration remain open.
   **122 artifacts / 40 programs / 15 Pass / 263 Pending / 15 Unsupported**;
   integrity/tamper and all artifact hashes pass; readiness remains **false**.
 
+- [x] Source interface/datum records and detached assembly context reach the
+  adapter, source fingerprints and both mold planners. Context captures real
+  component occurrences and directed machine joints in foundation coordinates;
+  mismatched source frames/requirements and omitted fields are rejected. The
+  mill setup supplies its actual assembly bindings. Source/tooling format **10**
+  and box/general mold format **9** reject previous versions. Metrology, datum
+  qualification and the remaining fixture/casting tolerance budget stay honest
+  validation records, including unrealized geometry assessments. Focused native
+  context validation: **16 assertions**; neutral tooling **1,795**.
+  Foundation design review recaptures context independently of the mold document;
+  the mill acceptance check rejects a review that omits this source context.
+  Validation: foundation **229**, generic design **30**, native tooling **466**,
+  casting **54**, foundation CAD **60**, standalone native process **34**, full
+  mill **250**. Regenerated records-only kit: **122 artifacts / 40 programs /
+  15 Pass / 264 Pending / 15 Unsupported**, readiness **false**. Integrity/tamper
+  and artifact hashes pass; the kit carries all twelve source insert bindings.
+
 ### Phase 7 records: shared levelling-foot family
 
 - [x] One `structural.LevelingFoot` recipe with strict `LevelingFootSpec` schema

@@ -432,6 +432,7 @@ class FoundationToolingTests {
 	}
 	public static function main():Void {
 		FoundationRelationshipTests.run();
+		FoundationContextTests.run();
 		if (Sys.args().indexOf("socket-carrier") >= 0) {
 			sourcedSocket();
 			Sys.println('SocketCarrierChecks: $assertions assertions passed');

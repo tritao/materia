@@ -21,6 +21,7 @@ class ToolingSourceCasting extends MachineComponent {
 			recipe = new ComponentType("machinekit.tooling.source-casting",parameters(),v -> new ToolingSourceCasting(v),false,false,null,false,
 				new ComponentValues().setToken("source",ToolingCodec.encodeInput({
 					id:"recipe-unit-sample",revision:1,lengthUnit:materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
+					datumScheme:null, interfaces:[], interfaceContext:null,
 					envelope:[{id:"body",height:1,pose:F.identity(),profile:[{x:-0.5,y:-0.5},{x:0.5,y:-0.5},{x:0.5,y:0.5},{x:-0.5,y:0.5}]}],
 					features:[],inserts:[]
 				})));

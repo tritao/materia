@@ -93,7 +93,13 @@ class MillMoldChecks {
 		for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
 			check(report.validation.filter(v -> v.rule == "tooling.cad." + name && v.status == "pass").length == 1,
 				"CAD review owns its " + name + " evidence");
-		var design = machinekit.structural.FoundationIntegrity.castingReview(frame.base, p.document);
+		var missingContext="";
+		try machinekit.structural.FoundationIntegrity.castingReview(frame.base,p.document)
+		catch (error:Dynamic) missingContext=Std.string(error);
+		check(missingContext.indexOf("Foundation casting review source differs from document")>=0,
+			"design review cannot silently trust the mold document's assembly context");
+		var design = machinekit.structural.FoundationIntegrity.castingReview(frame.base, p.document,
+			MillMoldSetup.input(frame).interfaceContext);
 		check(design.validation.length > 0
 			&& design.metrics.liftingPointCount == p.document.input.inserts.filter(i -> i.role == materia.casting.InsertSpec.InsertRole.LiftingMount).length,
 			"source-level design metrics map into foundation integrity");

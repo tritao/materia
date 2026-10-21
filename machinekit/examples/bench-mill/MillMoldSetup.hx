@@ -27,8 +27,11 @@ class MillMoldSetup {
 		return new MillFrame(layout, z, xy);
 	}
 
-	public static function input(frame:MillFrame):CastingToolingInput
-		return FoundationToolingAdapter.snapshot(frame.base, "bench-mill-base", 1);
+	public static function input(frame:MillFrame):CastingToolingInput {
+		var context=machinekit.tooling.FoundationAssemblyContext.snapshot(frame,"base/casting",
+			[for (insert in frame.base.insertLocations()) {id:insert.id,member:"base/"+insert.id}]);
+		return FoundationToolingAdapter.snapshot(frame.base,"bench-mill-base",1,context);
+	}
 
 	public static function document(frame:MillFrame, thickness:Float = 18):ToolingDocument {
 		var input = input(frame),

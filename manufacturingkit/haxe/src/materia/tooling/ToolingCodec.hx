@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 9;
+	public static inline var VERSION = 10;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -91,7 +91,7 @@ class ToolingCodec {
 		return readInput(input);
 
 	static function readInput(raw:Dynamic):CastingToolingInput {
-		object(raw, ["id", "revision", "lengthUnit", "envelope", "features", "inserts"], "input");
+		object(raw, ["id", "revision", "lengthUnit", "envelope", "features", "inserts", "datumScheme", "interfaces", "interfaceContext"], "input");
 		if (string(raw, "lengthUnit") != "mm")
 			throw "Tooling input requires explicit mm units";
 		var envelope:Array<CastingPrism> = [for (p in array(raw, "envelope")) readPrism(p)];
@@ -121,14 +121,57 @@ class ToolingCodec {
 			if (!referenced.exists(i.id))
 				throw 'Missing recess for insert ${i.id}';
 		materia.casting.CastingCavities.derive(envelope, features);
+		var interfaces = materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(Reflect.field(raw, "interfaces"));
+		var datumScheme = Reflect.field(raw, "datumScheme") == null ? null
+			: materia.casting.FoundationDatumScheme.FoundationDatums.snapshot(Reflect.field(raw, "datumScheme"));
+		if (datumScheme != null) {
+			if (datumScheme.foundationId != string(raw, "id")) throw "Foundation datum scheme belongs to a different source";
+			materia.casting.FoundationDatumScheme.FoundationDatums.validateSource(datumScheme,envelope,features,
+				[for (insert in inserts) {id:insert.id,pose:insert.pose,holes:insert.holes,interfaces:insert.interfaces}], interfaces);
+		}
+		var context=Reflect.field(raw,"interfaceContext")==null ? null
+			: materia.casting.CastingInterfaceContext.CastingInterfaceContexts.snapshot(Reflect.field(raw,"interfaceContext"));
+		if (context!=null) {
+			validateInterfaceBindings(context,interfaces,inserts);
+		}
 		return {
 			id: string(raw, "id"),
 			revision: revision(raw),
 			lengthUnit: ToolingLengthUnit.Millimetres,
+			datumScheme: datumScheme,
+			interfaceContext: context,
+			interfaces: interfaces,
 			envelope: envelope,
 			features: features,
 			inserts: inserts
 		};
+	}
+
+	static function validateInterfaceBindings(context:materia.casting.CastingInterfaceContext,
+			interfaces:Array<materia.casting.InterfaceRequirement>,inserts:Array<CastingToolingInsert>):Void {
+		if (context.inserts.length!=inserts.length) throw "Interface context must bind every source insert";
+		validateInterfaceOwner(context,context.bodyMember,materia.assembly.AssemblyFrames.identity(),interfaces);
+		for (insert in inserts) {
+			var bindings=context.inserts.filter(binding -> binding.id==insert.id);
+			if (bindings.length!=1) throw "Missing interface context insert binding: "+insert.id;
+			validateInterfaceOwner(context,bindings[0].member,insert.pose,insert.interfaces);
+		}
+	}
+
+	static function validateInterfaceOwner(context:materia.casting.CastingInterfaceContext,member:String,pose:AssemblyFrame,
+			requirements:Array<materia.casting.InterfaceRequirement>):Void {
+		var count=0;
+		for (source in context.sources) switch source {
+			case Precision(owner,requirement,sourcePose):
+				if (owner!=member) continue;
+				count++;
+				var expected=requirements.filter(expected -> expected.id==requirement.id);
+				if (expected.length!=1 || canonical(materia.casting.InterfaceRequirement.InterfaceRequirements.records(expected))
+					!=canonical(materia.casting.InterfaceRequirement.InterfaceRequirements.records([requirement])) || !sameFrame(pose,sourcePose))
+					throw "Interface context differs from source requirement or pose: "+member+"/"+requirement.id;
+			case Axis(_,_,_):
+		}
+		if (count!=requirements.length) throw "Interface context omits source requirements: "+member;
 	}
 
 	static function readPrism(raw:Dynamic):CastingPrism {
@@ -169,7 +212,7 @@ class ToolingCodec {
 			"id",
 			"body",
 			"holes",
-			"origin",
+			"origin", "interfaces",
 			"pose",
 			"role",
 			"label",
@@ -177,7 +220,7 @@ class ToolingCodec {
 			"finish"
 		], "insert");
 		var source = materia.casting.InsertSpec.InsertSpecCodec.snapshot({
-			body: Reflect.field(raw, "body"), holes: Reflect.field(raw, "holes"), origin: Reflect.field(raw, "origin")
+			body: Reflect.field(raw, "body"), holes: Reflect.field(raw, "holes"), origin: Reflect.field(raw, "origin"), interfaces: Reflect.field(raw,"interfaces")
 		});
 		var body = source.body;
 		var boreWidth = switch InsertBodies.mouth(body) {
@@ -195,6 +238,7 @@ class ToolingCodec {
 			body: body,
 			holes: holes,
 			origin: source.origin,
+			interfaces: source.interfaces,
 			pose: frame(raw, "pose"),
 			role: insertRole(string(raw, "role")),
 			label: string(raw, "label"),
@@ -645,6 +689,18 @@ class ToolingCodec {
 
 	/** Sort object keys as well as named records so field construction order is irrelevant. */
 	public static function canonical(value:Dynamic):String {
+		if (Std.isOfType(value,materia.casting.CastingInterfaceContext.InterfaceContextSource))
+			return canonical(materia.casting.CastingInterfaceContext.CastingInterfaceContexts.sourceRecord(cast value));
+		if (Std.isOfType(value,materia.casting.InterfaceRelationship.InterfaceMember))
+			return canonical(materia.casting.InterfaceRelationship.InterfaceRelationships.memberRecord(cast value));
+		if (Std.isOfType(value,materia.casting.InterfaceRelationship.InterfaceRelationshipKind))
+			return canonical(materia.casting.InterfaceRelationship.InterfaceRelationships.kindRecord(cast value));
+		if (Std.isOfType(value,materia.casting.InterfaceRelationship.RelationshipTolerance))
+			return canonical(materia.casting.InterfaceRelationship.InterfaceRelationships.toleranceRecord(cast value));
+		if (Std.isOfType(value, materia.casting.FoundationDatumScheme.DatumReference))
+			return canonical(materia.casting.FoundationDatumScheme.FoundationDatums.referenceRecord(cast value));
+		if (Std.isOfType(value, materia.casting.InterfaceRequirement.PrecisionGeometry))
+			return canonical(materia.casting.InterfaceRequirement.InterfaceRequirements.geometryRecord(cast value));
 		if (Std.isOfType(value, materia.casting.InsertSpec.InsertBody))
 			return canonical(materia.casting.InsertSpec.InsertBodyCodec.record(cast value));
 		if (Std.isOfType(value, materia.casting.CastingFeature.CastingGeometrySolid))

@@ -198,7 +198,8 @@ class MillDesignStudy {
 			centroid = (depth * 40 * 20 + 2 * 34 * 48 * (-24)) / area;
 		var deckI = depth * Math.pow(40, 3) / 12;
 		var ribbedI = deckI + depth * 40 * Math.pow(20 - centroid, 2) + 2 * (34 * Math.pow(48, 3) / 12 + 34 * 48 * Math.pow(-24 - centroid, 2));
-		var casting = machinekit.structural.FoundationIntegrity.castingReview(frame.base, MillMoldSetup.document(frame));
+		var casting = machinekit.structural.FoundationIntegrity.castingReview(frame.base, MillMoldSetup.document(frame),
+			MillMoldSetup.input(frame).interfaceContext);
 		var report = {
 			castingDesign: {
 				metrics: casting.metrics,

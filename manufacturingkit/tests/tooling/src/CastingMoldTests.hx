@@ -241,7 +241,7 @@ class CastingMoldTests {
 		o.anchorage.pop();
 		rejects(() -> CastingMoldPlanner.plan(d, o), "missing anchorage not silently qualified");
 		var raw:Dynamic = haxe.Json.parse(s);
-		Reflect.setField(raw, "version", 6);
+		Reflect.setField(raw, "version", 8);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
 		raw = haxe.Json.parse(s);
 		Reflect.setField(raw, "version", 99);

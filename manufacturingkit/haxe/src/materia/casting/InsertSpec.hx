@@ -5,16 +5,18 @@ typedef InsertSpec = {
 	var body:InsertBody;
 	var holes:Array<InsertHole>;
 	var origin:InsertOrigin;
+	var interfaces:Array<InterfaceRequirement>;
 }
 
 /** Source and tooling use the same body and holes; document codecs own versions. */
 class InsertSpecCodec {
 	public static function snapshot(raw:Dynamic):InsertSpec {
-		CastingFeatureCodec.fields(raw, ["body", "holes", "origin"]);
+		CastingFeatureCodec.fields(raw, ["body", "holes", "origin", "interfaces"]);
 		var body = InsertBodyCodec.snapshot(Reflect.field(raw, "body"));
 		var holes = InsertHole.InsertHoleCodec.snapshot(Reflect.field(raw, "holes"));
 		return {
 			body: body,
+			interfaces: InterfaceRequirement.InterfaceRequirements.snapshot(Reflect.field(raw,"interfaces")),
 			holes: holes,
 			origin: InsertOrigin.InsertOriginCodec.snapshot(Reflect.field(raw, "origin"), body, holes)
 		};
@@ -25,6 +27,7 @@ class InsertSpecCodec {
 			throw "Missing insert specification";
 		return {
 			body: InsertBodyCodec.record(spec.body),
+			interfaces: InterfaceRequirement.InterfaceRequirements.records(spec.interfaces),
 			holes: InsertHole.InsertHoleCodec.snapshot(spec.holes),
 			origin: InsertOrigin.InsertOriginCodec.record(InsertOrigin.InsertOriginCodec.snapshot(spec.origin, spec.body, spec.holes))
 		};

@@ -95,6 +95,7 @@ class FoundationDesignTests {
 		var cavity = CastingCavities.derive(source.castingEnvelope(), [feature])[0];
 		var input:materia.tooling.casting.CastingToolingInput = {
 			id: "foot-fixture", revision: 1, lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
+			datumScheme:null, interfaces:[], interfaceContext:null,
 			envelope: source.castingEnvelope(), features: [feature], inserts: []
 		};
 		var frame = MillMoldSetup.frame();

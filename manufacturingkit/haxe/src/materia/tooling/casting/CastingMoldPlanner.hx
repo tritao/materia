@@ -68,6 +68,7 @@ class CastingMoldPlanner {
 				reason: check.message + ". Select supported source geometry or implement profile-capable tooling before fabrication.",
 				blockingChecks: [check.rule]
 			}];
+			checks=checks.concat(InterfaceQualification.source(d.input));
 			return {sourceFingerprint: ToolingCodec.documentFingerprint(d), plan: null, validation: checks,
 				changeRequests: changes, fabrication: materia.tooling.ToolingValidation.ToolingReadiness.evaluate(checks)};
 		}
@@ -149,7 +150,7 @@ class CastingMoldPlanner {
 			openings: openings,
 			hardware: [],
 			changeRequests: [],
-			validation: geometryChecks,
+			validation: geometryChecks.concat(InterfaceQualification.source(d.input)),
 			fabrication: {
 				ready: false,
 				blockingRules: []
@@ -638,6 +639,7 @@ class CastingMoldPlanner {
 	}
 
 	public static function validate(p:CastingMoldPlan):Void {
+		InterfaceQualification.validate(p.document.input,p.validation);
 		if (ToolingCodec.canonical(p.fabrication) != ToolingCodec.canonical(materia.tooling.ToolingValidation.ToolingReadiness.evaluate(p.validation)))
 			throw "Stale fabrication readiness";
 		if (Math.abs(p.document.setup.fillHeightMm - p.cavity.z - p.cavity.height) > 1e-7 || p.document.setup.freeboardMm != 0)

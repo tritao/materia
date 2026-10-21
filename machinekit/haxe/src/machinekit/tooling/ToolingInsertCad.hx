@@ -11,6 +11,7 @@ import materia.tooling.casting.CastingToolingInput.CastingToolingInsert;
 class ToolingInsertCad {
 	public static function component(insert:CastingToolingInsert):CastInsert
 		return new CastInsert(new ComponentValues().setToken("body",InsertBodyCodec.encode(insert.body))
+			.setToken("interfaces",haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records(insert.interfaces)))
 			.setToken("origin",haxe.Json.stringify(InsertOriginCodec.record(insert.origin)))
 			.setToken("holes",InsertHoles.fromNeutral(insert.holes)).setToken("stockMaterial",insert.material.grade)
 			.setToken("role",insert.role).setToken("label",insert.label).setToken("finish",insert.finish)

@@ -263,7 +263,7 @@ class BoxMoldPlanner {
 				blockingChecks: ["loads-handling"]
 			});
 		result.validation = result.validation.concat(InsertFixturePlanner.protectionValidation(insert));
-		result.validation = result.validation.concat(InsertQualifications.check(d.input.inserts));
+		result.validation = result.validation.concat(InsertQualifications.check(d.input.inserts)).concat(InterfaceQualification.source(d.input));
 		result.fabrication = materia.tooling.ToolingValidation.ToolingReadiness.evaluate(result.validation);
 		validate(result);
 		return result;
@@ -341,6 +341,7 @@ class BoxMoldPlanner {
 	}
 
 	public static function validate(plan:MoldPlan):Void {
+		InterfaceQualification.validate(plan.document.input,plan.validation);
 		if (ToolingCodec.canonical(plan.fabrication) != ToolingCodec.canonical(materia.tooling.ToolingValidation.ToolingReadiness.evaluate(plan.validation)))
 			throw "Stale fabrication readiness";
 		if (Math.abs(plan.document.setup.fillHeightMm - plan.cavity.z - plan.cavity.height) > 1e-7 || plan.document.setup.freeboardMm != 0)

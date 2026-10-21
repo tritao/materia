@@ -34,8 +34,12 @@ class FoundationIntegrity {
 		return out;
 	}
 
-	/** Source-bound level-1 casting checks enter the same design Diagnostics. */
-	public static function castingReview(foundation:MineralFoundation, document:materia.tooling.ToolingDocument):{
+	/** Source-bound level-1 casting checks enter the same design Diagnostics.
+	 * Capture context independently from the owning assembly, not the document.
+	 * Standalone foundations can omit it.
+	 */
+	public static function castingReview(foundation:MineralFoundation, document:materia.tooling.ToolingDocument,
+			?context:materia.casting.CastingInterfaceContext):{
 		diagnostics:Diagnostics,
 		metrics:materia.tooling.process.CastingLevelOne.CastingDesignMetrics,
 		validation:Array<materia.tooling.ToolingValidation>,
@@ -44,7 +48,7 @@ class FoundationIntegrity {
 		pending:Int,
 		unsupported:Int
 	} {
-		var input = machinekit.tooling.FoundationToolingAdapter.snapshot(foundation, document.input.id, document.input.revision);
+		var input = machinekit.tooling.FoundationToolingAdapter.snapshot(foundation, document.input.id, document.input.revision, context);
 		if (materia.tooling.ToolingCodec.inputFingerprint(input) != materia.tooling.ToolingCodec.inputFingerprint(document.input))
 			throw "Foundation casting review source differs from document";
 		var review = materia.tooling.process.CastingLevelOne.analyze(document);

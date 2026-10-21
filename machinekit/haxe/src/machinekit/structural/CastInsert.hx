@@ -77,6 +77,7 @@ class CastInsert extends MachineComponent {
 		var body = bodySpec(), holes = InsertHoles.copy(machinekit.design.DesignInterfaces.of(this));
 		return {
 			body: body,
+			interfaces: machinekit.design.DesignInterfaces.of(this).precisionRequirements(),
 			holes: holes,
 			origin: materia.casting.InsertOrigin.InsertOriginCodec.snapshot(haxe.Json.parse(parameterToken("origin")), body, holes)
 		};

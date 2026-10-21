@@ -140,6 +140,7 @@ class ToolingTests {
 			id: "sample-foundation",
 			revision: 1,
 			lengthUnit: ToolingLengthUnit.Millimetres,
+			datumScheme:null, interfaces:[], interfaceContext:null,
 			envelope: [
 				{
 					id: "body",
@@ -174,6 +175,7 @@ class ToolingTests {
 					id: "seat",
 					body: materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40, 30, 20)),
 					origin: materia.casting.InsertOrigin.Fabricated,
+					interfaces:[],
 					holes: TestInsertHoles.through(8,20),
 					pose: F.translation(80, 0, 90),
 					role: InsertRole.GuideSeat,
