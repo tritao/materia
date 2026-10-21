@@ -1,7 +1,8 @@
 // Renders the component catalogue from docs/components/data/components.json (written by the docs-components
-// workspace program from MachineKit's registry): /components/ lists every recipe with a thumbnail, search and
-// family filters; /components/FAMILY/ shows each part with an orbitable model, its parameters, catalogue rows and
-// their provenance, connectors, mass and bill-of-materials line.
+// workspace program from MachineKit's registry): /components/ lists every recipe with a thumbnail, grouped by
+// family and category (machinekit ComponentClassification), with search, family and kind filters;
+// /components/FAMILY/ has a section per category and shows each part with an orbitable model, its parameters,
+// catalogue rows and their provenance, connectors, mass and bill-of-materials line.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import GithubSlugger from "github-slugger";
@@ -41,6 +42,14 @@ const FAMILIES = {
 	assembly: "Assembly",
 };
 
+/** Kinds of recipe (machinekit ComponentKind), in filter order; generic recipes carry no badge. */
+const KINDS = {
+	generic: { label: "Generic recipes" },
+	supplier: { label: "Supplier parts", badge: "supplier" },
+	reference: { label: "References and studies", badge: "reference" },
+	"machine-part": { label: "Machine parts", badge: "machine part" },
+};
+
 const familyLabel = (id) => FAMILIES[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
 const thumb = (component) => `/components/thumbs/${component.model.replace(/\.glb$/, ".webp")}`;
 const escape = (text) =>
@@ -58,6 +67,11 @@ export function loadComponents(path) {
 	if (!existsSync(path)) return null;
 	const exported = JSON.parse(readFileSync(path, "utf8"));
 	const components = exported.components;
+	const categoryOrder = exported.categories ?? [];
+	const categoryRank = (category) => {
+		const index = categoryOrder.indexOf(category);
+		return index < 0 ? categoryOrder.length : index;
+	};
 	const families = new Map();
 	for (const component of components) {
 		if (!families.has(component.family)) families.set(component.family, []);
@@ -68,16 +82,33 @@ export function loadComponents(path) {
 		const ia = order.indexOf(a), ib = order.indexOf(b);
 		return (ia < 0 ? order.length : ia) - (ib < 0 ? order.length : ib) || a.localeCompare(b);
 	});
-	// Each part's anchor is its heading's slug on the family page, numbered as Starlight numbers repeated headings.
-	for (const list of families.values()) {
+	// A family page has one section per category, in the registry's order, and its parts by label within it.
+	// Each part's anchor is its heading's slug, numbered as Starlight numbers repeated headings, so the
+	// slugger sees the category and part headings in page order.
+	const result = [];
+	for (const id of sorted) {
+		const list = families.get(id).sort((a, b) =>
+			categoryRank(a.category) - categoryRank(b.category) || a.label.localeCompare(b.label));
+		const categories = [];
+		for (const component of list) {
+			const name = component.category ?? "Other";
+			if (!categories.length || categories.at(-1).name !== name) categories.push({ name, components: [] });
+			categories.at(-1).components.push(component);
+		}
 		const slugger = new GithubSlugger();
-		for (const component of list) component.anchor = slugger.slug(component.label);
+		for (const category of categories) {
+			category.anchor = slugger.slug(category.name);
+			for (const component of category.components) component.anchor = slugger.slug(component.label);
+		}
+		result.push({ id, label: familyLabel(id), components: list, categories });
 	}
-	return { display: exported.display, components, families: sorted.map((id) => ({ id, label: familyLabel(id), components: families.get(id) })) };
+	return { display: exported.display, components, families: result };
 }
 
 function badges(component) {
 	const list = [];
+	const kind = KINDS[component.kind]?.badge;
+	if (kind) list.push(`<span class="part-badge part-badge-kind">${kind}</span>`);
 	if (assumed(component)) list.push(`<span class="part-badge part-badge-warn">assumed</span>`);
 	if (component.catalogs?.length) list.push(`<span class="part-badge">catalogue</span>`);
 	if (component.error) list.push(`<span class="part-badge part-badge-warn">no default part</span>`);
@@ -93,32 +124,48 @@ function indexPage(catalogue) {
 		"tableOfContents: false",
 		"---",
 		"",
-		`Every parametric component MachineKit ships: ${total} recipes, generated from the code. Each model is the`,
-		"part at its default parameters; open one to orbit it, see what you can change, and where its catalogue data",
-		"comes from. Parts marked **assumed** use ratings or envelopes that are not yet from a datasheet.",
+		`Every parametric component MachineKit ships: ${total} recipes, generated from the code, filed by family and`,
+		"category. Each model is the part at its default parameters; open one to orbit it, see what you can change,",
+		"and where its catalogue data comes from. Parts marked **assumed** use ratings or envelopes that are not yet",
+		"from a datasheet; **supplier** parts carry one supplier's data, **reference** models are drawings and",
+		"studies to check against, and **machine parts** were designed for one example machine.",
 		"",
 		'<div class="part-filters">',
 		'<input type="search" placeholder="Search components" aria-label="Search components" data-part-search>',
 		'<select aria-label="Family" data-part-family><option value="">All families</option>' +
 			catalogue.families.map((family) => `<option value="${family.id}">${escape(family.label)} (${family.components.length})</option>`).join("") +
 			"</select>",
+		'<select aria-label="Kind" data-part-kind><option value="">All kinds</option>' +
+			Object.entries(KINDS).map(([id, kind]) => {
+				const count = catalogue.components.filter((component) => component.kind === id).length;
+				return `<option value="${id}">${kind.label} (${count})</option>`;
+			}).join("") +
+			"</select>",
 		"</div>",
 		"",
-		'<div class="part-grid">',
 	];
-	for (const family of catalogue.families)
-		for (const component of family.components) {
-			const image = component.model
-				? `<img src="${thumb(component)}" alt="" width="320" height="240" loading="lazy">`
-				: `<span class="part-noimage">No model</span>`;
-			const search = [component.label, component.designation, component.description, family.label, component.id].join(" ").toLowerCase();
-			lines.push(
-				`<a class="part-card" href="/components/${family.id}/#${component.anchor}" data-family="${family.id}" data-search="${escape(search)}">` +
-					`${image}<span class="part-name">${escape(component.label)}</span>` +
-					`<span class="part-meta">${escape(family.label)} ${badges(component)}</span></a>`,
-			);
+	for (const family of catalogue.families) {
+		lines.push(`<section class="part-family" data-family="${family.id}">`,
+			`<h2 class="part-family-title"><a href="/components/${family.id}/">${escape(family.label)}</a></h2>`);
+		for (const category of family.categories) {
+			lines.push('<div class="part-group">', `<h3 class="part-category">${escape(category.name)}</h3>`, '<div class="part-grid">');
+			for (const component of category.components) {
+				const image = component.model
+					? `<img src="${thumb(component)}" alt="" width="320" height="240" loading="lazy">`
+					: `<span class="part-noimage">No model</span>`;
+				const search = [component.label, component.designation, component.description, family.label, category.name, component.id]
+					.join(" ").toLowerCase();
+				lines.push(
+					`<a class="part-card" href="/components/${family.id}/#${component.anchor}" data-kind="${component.kind ?? ""}" data-search="${escape(search)}">` +
+						`${image}<span class="part-name">${escape(component.label)}</span>` +
+						`<span class="part-meta">${badges(component)}</span></a>`,
+				);
+			}
+			lines.push("</div>", "</div>");
 		}
-	lines.push("</div>", "", '<p class="part-empty" hidden>No component matches.</p>', "");
+		lines.push("</section>");
+	}
+	lines.push("", '<p class="part-empty" hidden>No component matches.</p>', "");
 	return lines.join("\n");
 }
 
@@ -167,29 +214,33 @@ function familyPage(family, display) {
 		`description: ${JSON.stringify(`${family.components.length} ${family.label.toLowerCase()} components in MachineKit.`)}`,
 		"---",
 		"",
-		`[All components](/components/) · ${family.components.length} components`,
+		`[All components](/components/) · ${family.components.length} components in ${family.categories.length} ` +
+			(family.categories.length === 1 ? "category" : "categories"),
 		"",
 	];
-	for (const component of family.components) {
-		lines.push(`## ${component.label}`, "");
-		if (component.model)
-			lines.push(
-				`<model-viewer class="part-model" src="/components/${component.model}" poster="${thumb(component)}" alt="${escape(component.label)} at its default parameters" camera-controls reveal="auto" loading="eager" ${viewerAttributes(component, display)}></model-viewer>`,
-				'<p class="part-hint">Drag to orbit; scroll or pinch to zoom.</p>',
-				"",
-			);
-		const facts = [`\`${component.id}\``];
-		if (component.designation) facts.push(`designation \`${component.designation}\``);
-		if (component.mass) facts.push(`${component.mass.kg} kg, ${component.mass.source.replace(/\((\w+)\)/, " from the $1 geometry").toLowerCase()}`);
-		lines.push(`${facts.join(" · ")} ${badges(component)}`, "");
-		if (component.description) lines.push(escape(component.description), "");
-		if (component.error) lines.push(`The recipe's defaults do not build a part: ${escape(component.error)}`, "");
-		lines.push(...parameterTable(component));
-		lines.push(...catalogueRows(component));
-		if (component.connectors?.length)
-			lines.push(`Connectors: ${component.connectors.map((c) => `\`${c.name}\` (${c.role.toLowerCase()})`).join(", ")}.`, "");
-		if (component.bom)
-			lines.push(`Bill of materials: ${escape(component.bom.description)}${component.bom.material ? ", " + escape(component.bom.material) : ""}; part number \`${component.bom.partNumber.replace(/`/g, "")}\`.`, "");
+	for (const category of family.categories) {
+		lines.push(`## ${category.name}`, "");
+		for (const component of category.components) {
+			lines.push(`### ${component.label}`, "");
+			if (component.model)
+				lines.push(
+					`<model-viewer class="part-model" src="/components/${component.model}" poster="${thumb(component)}" alt="${escape(component.label)} at its default parameters" camera-controls reveal="auto" loading="eager" ${viewerAttributes(component, display)}></model-viewer>`,
+					'<p class="part-hint">Drag to orbit; scroll or pinch to zoom.</p>',
+					"",
+				);
+			const facts = [`\`${component.id}\``];
+			if (component.designation) facts.push(`designation \`${component.designation}\``);
+			if (component.mass) facts.push(`${component.mass.kg} kg, ${component.mass.source.replace(/\((\w+)\)/, " from the $1 geometry").toLowerCase()}`);
+			lines.push(`${facts.join(" · ")} ${badges(component)}`, "");
+			if (component.description) lines.push(escape(component.description), "");
+			if (component.error) lines.push(`The recipe's defaults do not build a part: ${escape(component.error)}`, "");
+			lines.push(...parameterTable(component));
+			lines.push(...catalogueRows(component));
+			if (component.connectors?.length)
+				lines.push(`Connectors: ${component.connectors.map((c) => `\`${c.name}\` (${c.role.toLowerCase()})`).join(", ")}.`, "");
+			if (component.bom)
+				lines.push(`Bill of materials: ${escape(component.bom.description)}${component.bom.material ? ", " + escape(component.bom.material) : ""}; part number \`${component.bom.partNumber.replace(/`/g, "")}\`.`, "");
+		}
 	}
 	return lines.join("\n");
 }

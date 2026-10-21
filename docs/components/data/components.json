@@ -3,11 +3,69 @@
   "exposure": 1,
   "toneMapping": "neutral"
  },
+ "categories": [
+  "Axis modules",
+  "Mounts and couplings",
+  "Controllers and cabinets",
+  "Safety",
+  "Sensors and inputs",
+  "Panels",
+  "Fixings",
+  "Cutting tools",
+  "Workholding",
+  "Spindle and supports",
+  "Rotary table",
+  "Structure",
+  "Workpieces",
+  "Spindle",
+  "Drives and mounts",
+  "Guards and covers",
+  "Tooling and workholding",
+  "Linear guides",
+  "Screws and nuts",
+  "Bearings",
+  "Motors and gearboxes",
+  "Drives and power",
+  "Sensors",
+  "Couplings, shafts and brakes",
+  "Wheels",
+  "Cable management",
+  "Air supply and valves",
+  "Cylinders",
+  "Vacuum",
+  "Hoses and fittings",
+  "Spindle drives",
+  "Switching and protection",
+  "Hydraulics",
+  "Tooling",
+  "Backgauge",
+  "Hotend and extrusion",
+  "Bed and cooling",
+  "Arm modules",
+  "Flanges and adapters",
+  "Grippers",
+  "Tool changers",
+  "Spindle and tool change",
+  "Vacuum workholding",
+  "Dust collection",
+  "Fasteners",
+  "Bearings and bushings",
+  "Shaft retention",
+  "Profiles and tubes",
+  "Brackets and fixings",
+  "Castings",
+  "Casting tooling",
+  "Belts and pulleys",
+  "Gears and racks",
+  "Chains and sprockets"
+ ],
  "components": [
   {
    "id": "machinekit.assembly.carriage",
    "label": "Carriage",
    "family": "assembly",
+   "category": "Axis modules",
+   "kind": "machine-part",
    "designation": "CARRIAGE-D8-70x50-G25-LEADNUT-TR-D8-P2-S1-RH",
    "description": "Lead-screw carriage 70x70x50",
    "parameters": [
@@ -206,6 +264,8 @@
    "id": "machinekit.assembly.hzmotion-drawing-component",
    "label": "Hzmotion drawing component",
    "family": "assembly",
+   "category": "Axis modules",
+   "kind": "reference",
    "designation": "HZMOTION-M60D-BK12-C-hzmotion-pdf-2025-04-09-v2-unspecified",
    "description": "HZMotion M60D-BK12-C — drawing model",
    "parameters": [
@@ -326,12 +386,16 @@
    "id": "machinekit.assembly.hzmotion-supplier-component",
    "label": "Hzmotion supplier component",
    "family": "assembly",
+   "category": "Axis modules",
+   "kind": "supplier",
    "error": "Could not open source file"
   },
   {
    "id": "machinekit.assembly.nema-mount-plate",
    "label": "Nema mount plate",
    "family": "assembly",
+   "category": "Mounts and couplings",
+   "kind": "generic",
    "designation": "PLATE-17HS19-1684S1-6",
    "description": "Motor plate for 17HS19-1684S1",
    "parameters": [
@@ -550,12 +614,16 @@
    "id": "machinekit.assembly.rbk-motor-mount",
    "label": "Rbk motor mount",
    "family": "assembly",
+   "category": "Mounts and couplings",
+   "kind": "machine-part",
    "error": "Missing pinned RBK CAD asset ddd8cd342c35ade3d661dccb62a794b53860e07892c180d6bdcdb877bf034608 in build/suppliers/vallder"
   },
   {
    "id": "machinekit.assembly.screw-axis-coupling",
    "label": "Screw axis coupling",
    "family": "assembly",
+   "category": "Mounts and couplings",
+   "kind": "generic",
    "designation": "COUPLING-6.35x10-25x40",
    "description": "Shaft coupling 6.35 to 10 mm, 25x40",
    "parameters": [
@@ -665,6 +733,8 @@
    "id": "machinekit.assembly.sfu20-axis-part",
    "label": "Sfu20 axis part",
    "family": "assembly",
+   "category": "Axis modules",
+   "kind": "machine-part",
    "designation": "SFU20-base-v1-L600-R450-S180",
    "description": "SFU20 axis base",
    "parameters": [
@@ -778,6 +848,8 @@
    "id": "machinekit.assembly.twin-rail-screw-part",
    "label": "Twin rail screw part",
    "family": "assembly",
+   "category": "Axis modules",
+   "kind": "machine-part",
    "designation": "TWIN-RAIL-SCREW-base-v2-tapped-L400-R300-S134",
    "description": "Twin rail screw axis base",
    "parameters": [
@@ -928,6 +1000,8 @@
    "id": "machinekit.control.cnc-controller",
    "label": "Cnc controller",
    "family": "control",
+   "category": "Controllers and cabinets",
+   "kind": "generic",
    "designation": "CONTROLLER-CNC-4-16-16-8",
    "description": "cnc controller cabinet",
    "parameters": [
@@ -1030,6 +1104,8 @@
    "id": "machinekit.control.control-cabinet",
    "label": "Control cabinet",
    "family": "control",
+   "category": "Controllers and cabinets",
+   "kind": "generic",
    "designation": "CONTROL-CABINET-ASSUMED-2ab8d32294e2",
    "description": "Assumed control cabinet with DIN rows and derived I/O",
    "parameters": [
@@ -1176,6 +1252,8 @@
    "id": "machinekit.control.digital-sensor",
    "label": "Digital sensor",
    "family": "control",
+   "category": "Sensors and inputs",
+   "kind": "generic",
    "designation": "DIGITAL-SENSOR-REED",
    "description": "reed digital sensor",
    "parameters": [
@@ -1264,6 +1342,8 @@
    "id": "machinekit.control.emergency-stop-button",
    "label": "Emergency stop button",
    "family": "control",
+   "category": "Safety",
+   "kind": "generic",
    "designation": "EMERGENCY-STOP-BUTTON-ASSUMED-6e569644bd4e",
    "description": "Assumed latching emergency stop with two NC contacts",
    "parameters": [
@@ -1370,6 +1450,8 @@
    "id": "machinekit.control.robot-controller",
    "label": "Robot controller",
    "family": "control",
+   "category": "Controllers and cabinets",
+   "kind": "generic",
    "designation": "CONTROLLER-ROBOT-6-16-16-4",
    "description": "robot controller cabinet",
    "parameters": [
@@ -1472,6 +1554,8 @@
    "id": "machinekit.control.safety-relay",
    "label": "Safety relay",
    "family": "control",
+   "category": "Safety",
+   "kind": "generic",
    "designation": "SAFETY-RELAY-ASSUMED-092f8b784f7e",
    "description": "Assumed dual-channel safety relay with delayed contacts",
    "parameters": [
@@ -1597,6 +1681,8 @@
    "id": "machinekit.control.thermistor-input",
    "label": "Thermistor input",
    "family": "control",
+   "category": "Sensors and inputs",
+   "kind": "generic",
    "designation": "THERMISTOR-INPUT-2",
    "description": "Controller thermistor ADC front end (assumed ideal reference and envelope)",
    "parameters": [
@@ -1716,6 +1802,8 @@
    "id": "machinekit.enclosure.cut-panel",
    "label": "Cut panel",
    "family": "enclosure",
+   "category": "Panels",
+   "kind": "generic",
    "designation": "ENCLOSURE-PANEL-steel-2-600x800",
    "description": "Enclosure infill panel",
    "parameters": [
@@ -1818,6 +1906,8 @@
    "id": "machinekit.enclosure.panel",
    "label": "Panel",
    "family": "enclosure",
+   "category": "Panels",
+   "kind": "generic",
    "designation": "ENCLOSURE-PANEL-fr-acm-4-600x800",
    "description": "Enclosure infill panel",
    "parameters": [
@@ -1886,6 +1976,8 @@
    "id": "machinekit.enclosure.tray-toe-clamp",
    "label": "Tray toe clamp",
    "family": "enclosure",
+   "category": "Fixings",
+   "kind": "generic",
    "designation": "TRAY-TOE-CLAMP-M6-11",
    "description": "Stepped laminate tray toe clamp, M6 clearance",
    "parameters": [
@@ -1975,6 +2067,8 @@
    "id": "machinekit.hobbing.expanding-mandrel",
    "label": "Expanding mandrel",
    "family": "hobbing",
+   "category": "Workholding",
+   "kind": "reference",
    "designation": "HYDRAULIC-MANDREL-59",
    "description": "Hydraulic expanding mandrel (reference envelope)",
    "parameters": [
@@ -2279,6 +2373,8 @@
    "id": "machinekit.hobbing.flexspline-cup-blank",
    "label": "Flexspline cup blank",
    "family": "hobbing",
+   "category": "Workpieces",
+   "kind": "machine-part",
    "designation": "FLEXSPLINE-CUP-BLANK",
    "description": "One-piece flexspline cup blank (assumed)",
    "parameters": [
@@ -2426,6 +2522,8 @@
    "id": "machinekit.hobbing.floating-radial-bearing",
    "label": "Floating radial bearing",
    "family": "hobbing",
+   "category": "Spindle and supports",
+   "kind": "machine-part",
    "designation": "FLOATING-RADIAL-15-32",
    "description": "Assumed preloaded radial roller support; axially floating +/-1 mm, not a second thrust locator",
    "parameters": [
@@ -2577,6 +2675,8 @@
    "id": "machinekit.hobbing.hob",
    "label": "Hob",
    "family": "hobbing",
+   "category": "Cutting tools",
+   "kind": "generic",
    "designation": "HOB-32-12-1",
    "description": "Conjugate rack hob; optional detailed relieved teeth",
    "parameters": [
@@ -2866,6 +2966,8 @@
    "id": "machinekit.hobbing.hob-arbor",
    "label": "Hob arbor",
    "family": "hobbing",
+   "category": "Cutting tools",
+   "kind": "reference",
    "designation": "HOB-ARBOR-TF20",
    "description": "Hob arbor, assumed taper-and-face interface (reference envelope)",
    "parameters": [
@@ -3054,6 +3156,8 @@
    "id": "machinekit.hobbing.hobber-bracket",
    "label": "Hobber bracket",
    "family": "hobbing",
+   "category": "Structure",
+   "kind": "machine-part",
    "designation": "HOBBER-BRACKET",
    "description": "Steel hobber carriage/support envelope",
    "parameters": [
@@ -3193,6 +3297,8 @@
    "id": "machinekit.hobbing.mandrel-sleeve",
    "label": "Mandrel sleeve",
    "family": "hobbing",
+   "category": "Workholding",
+   "kind": "machine-part",
    "designation": "MANDREL-SLEEVE",
    "description": "Hydraulic mandrel sleeve (assumed)",
    "parameters": [
@@ -3319,6 +3425,8 @@
    "id": "machinekit.hobbing.outboard-support",
    "label": "Outboard support",
    "family": "hobbing",
+   "category": "Spindle and supports",
+   "kind": "reference",
    "designation": "HOB-OUTBOARD-16",
    "description": "Hob outboard support housing (reference envelope)",
    "parameters": [
@@ -3492,6 +3600,8 @@
    "id": "machinekit.hobbing.rotary-clamp",
    "label": "Rotary clamp",
    "family": "hobbing",
+   "category": "Workholding",
+   "kind": "reference",
    "designation": "ROTARY-CLAMP-100NM",
    "description": "Static rotary clamp (reference envelope)",
    "parameters": [
@@ -3640,6 +3750,8 @@
    "id": "machinekit.hobbing.saddle",
    "label": "Saddle",
    "family": "hobbing",
+   "category": "Structure",
+   "kind": "machine-part",
    "designation": "HOBBER-GE-Z-saddle",
    "description": "Designed steel GE-Z-saddle; machined seats, assumed structural adequacy",
    "parameters": [
@@ -3764,6 +3876,8 @@
    "id": "machinekit.hobbing.spindle-housing",
    "label": "Spindle housing",
    "family": "hobbing",
+   "category": "Spindle and supports",
+   "kind": "reference",
    "designation": "HOB-SPINDLE-HOUSING",
    "description": "Hob spindle housing (reference envelope)",
    "parameters": [
@@ -3898,6 +4012,8 @@
    "id": "machinekit.hobbing.spindle-part",
    "label": "Spindle part",
    "family": "hobbing",
+   "category": "Spindle and supports",
+   "kind": "machine-part",
    "designation": "HOB-SPINDLE-shaft",
    "description": "Assumed spindle cartridge shaft",
    "parameters": [
@@ -4008,6 +4124,8 @@
    "id": "machinekit.hobbing.swivel-housing",
    "label": "Swivel housing",
    "family": "hobbing",
+   "category": "Structure",
+   "kind": "reference",
    "designation": "SWIVEL-HOUSING",
    "description": "Swivel-head housing (reference envelope)",
    "parameters": [
@@ -4142,6 +4260,8 @@
    "id": "machinekit.hobbing.table-housing",
    "label": "Table housing",
    "family": "hobbing",
+   "category": "Rotary table",
+   "kind": "reference",
    "designation": "TABLE-HOUSING-180",
    "description": "Rotary table housing (reference envelope)",
    "parameters": [
@@ -4290,6 +4410,8 @@
    "id": "machinekit.hobbing.table-platen",
    "label": "Table platen",
    "family": "hobbing",
+   "category": "Rotary table",
+   "kind": "reference",
    "designation": "TABLE-PLATEN-160",
    "description": "Rotary table platen (reference envelope)",
    "parameters": [
@@ -4452,6 +4574,8 @@
    "id": "machinekit.milling.ball-nut-bracket",
    "label": "Ball nut bracket",
    "family": "milling",
+   "category": "Drives and mounts",
+   "kind": "machine-part",
    "designation": "MILL-BALL-NUT-BRACKET",
    "description": "SFU1605 flange bracket",
    "parameters": [
@@ -4535,6 +4659,8 @@
    "id": "machinekit.milling.belt-motor-plate",
    "label": "Belt motor plate",
    "family": "milling",
+   "category": "Drives and mounts",
+   "kind": "machine-part",
    "designation": "MILL-X-RETURN-MOTOR-PLATE",
    "description": "Recessed Leadshine 60 mm X motor plate",
    "parameters": [
@@ -4613,6 +4739,8 @@
    "id": "machinekit.milling.bt30-cartridge-study",
    "label": "Bt30 cartridge study",
    "family": "milling",
+   "category": "Spindle",
+   "kind": "reference",
    "designation": "BT30-CARTRIDGE-STUDY",
    "description": "BT30 stationary housing — assumed interfaces",
    "parameters": [
@@ -4703,6 +4831,8 @@
    "id": "machinekit.milling.bt30-spindle-motor-study",
    "label": "Bt30 spindle motor study",
    "family": "milling",
+   "category": "Spindle",
+   "kind": "reference",
    "designation": "ASSUMED-BT30-MOTOR-2200W",
    "description": "Servo motor, 5.252 N m peak",
    "parameters": [
@@ -4789,6 +4919,8 @@
    "id": "machinekit.milling.casting",
    "label": "Casting",
    "family": "milling",
+   "category": "Structure",
+   "kind": "machine-part",
    "designation": "MILL-BASE",
    "description": "Bench mill base",
    "parameters": [
@@ -4903,6 +5035,8 @@
    "id": "machinekit.milling.cross-saddle",
    "label": "Cross saddle",
    "family": "milling",
+   "category": "Structure",
+   "kind": "machine-part",
    "designation": "MILL-CROSS-SADDLE",
    "description": "Machined cross saddle",
    "parameters": [
@@ -5106,6 +5240,8 @@
    "id": "machinekit.milling.cross-table",
    "label": "Cross table",
    "family": "milling",
+   "category": "Structure",
+   "kind": "machine-part",
    "designation": "MILL-CROSS-TABLE",
    "description": "Ribbed T-slot table",
    "parameters": [
@@ -5235,6 +5371,8 @@
    "id": "machinekit.milling.drive-service-hatch",
    "label": "Drive service hatch",
    "family": "milling",
+   "category": "Guards and covers",
+   "kind": "machine-part",
    "designation": "MILL-Y-DRIVE-HATCH",
    "description": "Removable Y drive service hatch",
    "parameters": [
@@ -5327,6 +5465,8 @@
    "id": "machinekit.milling.er20-holder",
    "label": "Er20 holder",
    "family": "milling",
+   "category": "Tooling and workholding",
+   "kind": "generic",
    "designation": "HOLDER-ER20-D6",
    "description": "ER20 holder, 6 mm collet (assumed envelope)",
    "parameters": [
@@ -5409,6 +5549,8 @@
    "id": "machinekit.milling.fixture-adapter",
    "label": "Fixture adapter",
    "family": "milling",
+   "category": "Tooling and workholding",
+   "kind": "machine-part",
    "designation": "MILL-FIXTURE-ADAPTER-180x190-82x20",
    "description": "Tapped workholding table adapter",
    "parameters": [
@@ -5503,6 +5645,8 @@
    "id": "machinekit.milling.flat-end-mill",
    "label": "Flat end mill",
    "family": "milling",
+   "category": "Tooling and workholding",
+   "kind": "generic",
    "designation": "FLAT-END-MILL",
    "description": "Flat end mill — nominal visible envelope",
    "parameters": [
@@ -5602,6 +5746,8 @@
    "id": "machinekit.milling.hzmotion-y-drive-seat",
    "label": "Hzmotion y drive seat",
    "family": "milling",
+   "category": "Drives and mounts",
+   "kind": "machine-part",
    "designation": "MILL-Y-BK12-C-SEAT-v1",
    "description": "Machined steel seat for selected HZMotion Y drive",
    "parameters": [
@@ -5685,6 +5831,8 @@
    "id": "machinekit.milling.motor-cover",
    "label": "Motor cover",
    "family": "milling",
+   "category": "Guards and covers",
+   "kind": "machine-part",
    "designation": "MILL-MOTOR-HOOD",
    "description": "Removable motor hood, mounting detail pending",
    "parameters": [
@@ -5784,6 +5932,8 @@
    "id": "machinekit.milling.panel",
    "label": "Panel",
    "family": "milling",
+   "category": "Structure",
+   "kind": "machine-part",
    "designation": "MILL-PANEL-100x2x100-steel",
    "description": "Fabricated mill panel",
    "parameters": [
@@ -5887,6 +6037,8 @@
    "id": "machinekit.milling.power-drawbar-study-part",
    "label": "Power drawbar study part",
    "family": "milling",
+   "category": "Spindle",
+   "kind": "reference",
    "designation": "BT30-STUDY-drawbar",
    "description": "BT30 drawbar — design assumption",
    "parameters": [
@@ -5975,6 +6127,8 @@
    "id": "machinekit.milling.rke92-reference-part",
    "label": "Rke92 reference part",
    "family": "milling",
+   "category": "Structure",
+   "kind": "reference",
    "designation": "RKE92-REFERENCE-body",
    "description": "RKE92 drawing reference: body",
    "parameters": [
@@ -6075,6 +6229,8 @@
    "id": "machinekit.milling.screw-pedestal",
    "label": "Screw pedestal",
    "family": "milling",
+   "category": "Drives and mounts",
+   "kind": "machine-part",
    "designation": "MILL-SCREW-PEDESTAL",
    "description": "Machined bearing and motor mounting pedestal",
    "parameters": [
@@ -6179,6 +6335,8 @@
    "id": "machinekit.milling.servo-mount",
    "label": "Servo mount",
    "family": "milling",
+   "category": "Drives and mounts",
+   "kind": "machine-part",
    "designation": "MILL-SERVO-MOUNT",
    "description": "Two plate direct servo mount",
    "parameters": [
@@ -6278,6 +6436,8 @@
    "id": "machinekit.milling.spindle-belt-guard",
    "label": "Spindle belt guard",
    "family": "milling",
+   "category": "Guards and covers",
+   "kind": "machine-part",
    "designation": "MILL-SPINDLE-BELT-GUARD",
    "description": "Removable spindle belt guard — concept",
    "parameters": [
@@ -6361,6 +6521,8 @@
    "id": "machinekit.milling.spindle-cartridge",
    "label": "Spindle cartridge",
    "family": "milling",
+   "category": "Spindle",
+   "kind": "machine-part",
    "designation": "SPINDLE-ER20-D70",
    "description": "ER20 spindle cartridge (assumed envelope)",
    "parameters": [
@@ -6451,6 +6613,8 @@
    "id": "machinekit.milling.spindle-drive-study-guard",
    "label": "Spindle drive study guard",
    "family": "milling",
+   "category": "Spindle",
+   "kind": "reference",
    "designation": "MILL-SPINDLE-DRIVE-guard",
    "description": "Selectable spindle drive guard",
    "parameters": [
@@ -6640,6 +6804,8 @@
    "id": "machinekit.milling.spindle-drive-study-part",
    "label": "Spindle drive study part",
    "family": "milling",
+   "category": "Spindle",
+   "kind": "reference",
    "designation": "MILL-SPINDLE-DRIVE-carrier",
    "description": "Selectable spindle drive carrier",
    "parameters": [
@@ -6829,6 +6995,8 @@
    "id": "machinekit.milling.spindle-motor",
    "label": "Spindle motor",
    "family": "milling",
+   "category": "Spindle",
+   "kind": "machine-part",
    "designation": "GENERIC-SPINDLE-1100W",
    "description": "Servo motor, 2.626 N m peak",
    "parameters": [
@@ -6920,6 +7088,8 @@
    "id": "machinekit.milling.spindle-motor-mount",
    "label": "Spindle motor mount",
    "family": "milling",
+   "category": "Spindle",
+   "kind": "machine-part",
    "designation": "MILL-SPINDLE-MOTOR-CARRIER",
    "description": "Braced adjustable spindle motor carrier",
    "parameters": [
@@ -7010,6 +7180,8 @@
    "id": "machinekit.milling.spindle-motor-support",
    "label": "Spindle motor support",
    "family": "milling",
+   "category": "Spindle",
+   "kind": "machine-part",
    "designation": "MILL-SPINDLE-MOTOR-SUPPORT",
    "description": "Spindle motor shelf bridge on tapered head",
    "parameters": [
@@ -7095,6 +7267,8 @@
    "id": "machinekit.milling.support-tray",
    "label": "Support tray",
    "family": "milling",
+   "category": "Structure",
+   "kind": "machine-part",
    "designation": "MILL-SUPPORT-TRAY",
    "description": "Mill chip tray with support penetrations",
    "parameters": [
@@ -7201,6 +7375,8 @@
    "id": "machinekit.milling.y-nut-bridge",
    "label": "Y nut bridge",
    "family": "milling",
+   "category": "Drives and mounts",
+   "kind": "machine-part",
    "designation": "MILL-Y-NUT-BRIDGE",
    "description": "Gusseted bridge from lowered Y screw to saddle",
    "parameters": [
@@ -7286,6 +7462,8 @@
    "id": "machinekit.milling.y-nut-mount",
    "label": "Y nut mount",
    "family": "milling",
+   "category": "Drives and mounts",
+   "kind": "machine-part",
    "designation": "MILL-Y-NUT-MOUNT",
    "description": "Compact Y nut saddle mounting plate",
    "parameters": [
@@ -7374,6 +7552,8 @@
    "id": "machinekit.milling.z-bearing-plate",
    "label": "Z bearing plate",
    "family": "milling",
+   "category": "Drives and mounts",
+   "kind": "machine-part",
    "designation": "MILL-Z-BEARING-PLATE",
    "description": "Machined Z screw bearing crossplate",
    "parameters": [
@@ -7546,6 +7726,8 @@
    "id": "machinekit.milling.z-carriage",
    "label": "Z carriage",
    "family": "milling",
+   "category": "Structure",
+   "kind": "machine-part",
    "designation": "MILL-Z-CARRIAGE",
    "description": "Welded Z carriage with central ball-nut shelf",
    "parameters": [
@@ -7708,6 +7890,8 @@
    "id": "machinekit.milling.z-coupling-guard",
    "label": "Z coupling guard",
    "family": "milling",
+   "category": "Guards and covers",
+   "kind": "machine-part",
    "designation": "MILL-Z-COUPLING-GUARD",
    "description": "Removable Z coupling guard",
    "parameters": [
@@ -7800,6 +7984,8 @@
    "id": "machinekit.milling.z-drive-adapter",
    "label": "Z drive adapter",
    "family": "milling",
+   "category": "Drives and mounts",
+   "kind": "machine-part",
    "designation": "MILL-Z-DRIVE-ADAPTER",
    "description": "Flat T adapter for HZMotion M80E-BK15-C",
    "parameters": [
@@ -7920,6 +8106,8 @@
    "id": "machinekit.milling.z-head",
    "label": "Z head",
    "family": "milling",
+   "category": "Structure",
+   "kind": "machine-part",
    "designation": "MILL-Z-RIBBED-HEAD",
    "description": "Ribbed fabricated spindle head",
    "parameters": [
@@ -8103,6 +8291,8 @@
    "id": "machinekit.milling.z-motor-stand",
    "label": "Z motor stand",
    "family": "milling",
+   "category": "Drives and mounts",
+   "kind": "machine-part",
    "designation": "MILL-Z-MOTOR-STAND",
    "description": "Open steel Z motor and brake stand",
    "parameters": [
@@ -8253,12 +8443,16 @@
    "id": "machinekit.milling.zpp-supplier-member",
    "label": "Zpp supplier member",
    "family": "milling",
+   "category": "Structure",
+   "kind": "supplier",
    "error": "Missing ZPP CAD; run python3 tools/suppliers/zppcnc.py --prepare"
   },
   {
    "id": "machinekit.motion.angular-contact-bearing",
    "label": "Angular contact bearing",
    "family": "motion",
+   "category": "Bearings",
+   "kind": "reference",
    "designation": "AC-BEARING-25-62-17",
    "description": "Angular-contact precision bearing (reference envelope)",
    "parameters": [
@@ -8426,6 +8620,8 @@
    "id": "machinekit.motion.axis-servo-motor",
    "label": "Axis servo motor",
    "family": "motion",
+   "category": "Motors and gearboxes",
+   "kind": "generic",
    "designation": "GENERIC-HV-SERVO-750W",
    "description": "Servo motor, 7.162 N m peak",
    "parameters": [
@@ -8589,6 +8785,8 @@
    "id": "machinekit.motion.ball-nut",
    "label": "Ball nut",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "generic",
    "designation": "LEADNUT-BALL-D16-P5-S1-RH-PreloadedBallNut",
    "description": "Lead screw nut, BALL-D16-P5-S1-RH, 5 mm lead",
    "parameters": [
@@ -8704,6 +8902,8 @@
    "id": "machinekit.motion.ball-screw",
    "label": "Ball screw",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "generic",
    "designation": "LEADSCREW-BALL-D16-P5-S1-RH-L400",
    "description": "Lead screw BALL-D16-P5-S1-RH, 400 mm long",
    "parameters": [
@@ -8809,6 +9009,8 @@
    "id": "machinekit.motion.ballscrew-retainer",
    "label": "Ballscrew retainer",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "generic",
    "designation": "BALLSCREW-D12-RETAINER-REFERENCE",
    "description": "12 mm screw retaining nut and washer (assumed)",
    "parameters": [
@@ -8891,6 +9093,8 @@
    "id": "machinekit.motion.brake-servo",
    "label": "Brake servo",
    "family": "motion",
+   "category": "Motors and gearboxes",
+   "kind": "generic",
    "designation": "BRAKE-SERVO-ASSUMED-25dacccdc9db",
    "description": "Assumed AC servo with spring-applied holding brake",
    "parameters": [
@@ -9014,6 +9218,8 @@
    "id": "machinekit.motion.cable-chain",
    "label": "Cable chain",
    "family": "motion",
+   "category": "Cable management",
+   "kind": "generic",
    "designation": "CABLE-CHAIN-ASSUMED-07924203c145",
    "description": "Assumed cable chain",
    "parameters": [
@@ -9146,6 +9352,8 @@
    "id": "machinekit.motion.caster-wheel",
    "label": "Caster wheel",
    "family": "motion",
+   "category": "Wheels",
+   "kind": "generic",
    "designation": "CASTER-D75x25-H110-T30-P60",
    "description": "Swivel caster, 75 mm wheel, 110 mm high",
    "parameters": [
@@ -9267,6 +9475,8 @@
    "id": "machinekit.motion.crossed-roller-bearing",
    "label": "Crossed roller bearing",
    "family": "motion",
+   "category": "Bearings",
+   "kind": "reference",
    "designation": "CROSSED-ROLLER-80-120-16",
    "description": "Crossed-roller precision bearing (reference envelope)",
    "parameters": [
@@ -9427,6 +9637,8 @@
    "id": "machinekit.motion.drive-wheel",
    "label": "Drive wheel",
    "family": "motion",
+   "category": "Wheels",
+   "kind": "generic",
    "designation": "DRIVE-WHEEL-D150-W40-B8-H40x10",
    "description": "Drive wheel, 150 x 40 mm, 8 mm bore",
    "parameters": [
@@ -9544,6 +9756,8 @@
    "id": "machinekit.motion.dsg-nut-housing",
    "label": "Dsg nut housing",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "supplier",
    "designation": "DSG-DSG16H-BD10-FD10",
    "description": "DSG SFU nut housing DSG16H",
    "parameters": [
@@ -9647,6 +9861,8 @@
    "id": "machinekit.motion.flange-bearing-housing",
    "label": "Flange bearing housing",
    "family": "motion",
+   "category": "Bearings",
+   "kind": "generic",
    "designation": "PILLOWBLOCK-608-2Z",
    "description": "Flange bearing housing for 608-2Z",
    "parameters": [
@@ -10078,6 +10294,8 @@
    "id": "machinekit.motion.gearbox",
    "label": "Gearbox",
    "family": "motion",
+   "category": "Motors and gearboxes",
+   "kind": "generic",
    "designation": "GEARBOX-10-0.9-60x40-B8-STATED",
    "description": "Gearbox, 10:1",
    "parameters": [
@@ -10217,6 +10435,8 @@
    "id": "machinekit.motion.generic-nema-stepper",
    "label": "Generic nema stepper",
    "family": "motion",
+   "category": "Motors and gearboxes",
+   "kind": "generic",
    "designation": "GENERIC-NEMA17-L48",
    "description": "GENERIC-NEMA17-L48 NEMA 17 stepper motor",
    "parameters": [
@@ -10336,12 +10556,16 @@
    "id": "machinekit.motion.hg-block-reference",
    "label": "Hg block reference",
    "family": "motion",
+   "category": "Linear guides",
+   "kind": "reference",
    "error": "Missing HG reference; run python3 tools/suppliers/hg.py --prepare build/suppliers/vallder/hg-reference"
   },
   {
    "id": "machinekit.motion.hg-rail",
    "label": "Hg rail",
    "family": "motion",
+   "category": "Linear guides",
+   "kind": "generic",
    "designation": "CUSTOM-HG-HGR15R-RW15-RH15-HP60-EM20-L400",
    "description": "HG HGR15R profile rail, 400 mm long",
    "parameters": [
@@ -10472,12 +10696,16 @@
    "id": "machinekit.motion.hgh15ca-reference",
    "label": "Hgh15ca reference",
    "family": "motion",
+   "category": "Linear guides",
+   "kind": "reference",
    "error": "Missing HGH15CA reference: run python3 machinekit/examples/linear-rail-reference/prepare.py"
   },
   {
    "id": "machinekit.motion.hzmotion-bk12-screw-end-study",
    "label": "Hzmotion bk12 screw end study",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "reference",
    "designation": "HZMOTION-DRAWING-BK12-L400",
    "description": "Lead screw BALL-D16-P5-S1-RH, 400 mm long",
    "parameters": [
@@ -10584,6 +10812,8 @@
    "id": "machinekit.motion.lead-screw",
    "label": "Lead screw",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "generic",
    "designation": "LEADSCREW-TR-D8-P2-S1-RH-L100",
    "description": "Lead screw TR-D8-P2-S1-RH, 100 mm long",
    "parameters": [
@@ -10719,6 +10949,8 @@
    "id": "machinekit.motion.lead-screw-nut",
    "label": "Lead screw nut",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "generic",
    "designation": "LEADNUT-TR-D8-P2-S1-RH",
    "description": "Lead screw nut, TR-D8-P2-S1-RH, 2 mm lead",
    "parameters": [
@@ -10885,6 +11117,8 @@
    "id": "machinekit.motion.leadshine-servo",
    "label": "Leadshine servo",
    "family": "motion",
+   "category": "Motors and gearboxes",
+   "kind": "supplier",
    "designation": "ELM1H-0400MA60F",
    "description": "Servo motor, 3.81 N m peak",
    "parameters": [
@@ -11053,6 +11287,8 @@
    "id": "machinekit.motion.limit-switch",
    "label": "Limit switch",
    "family": "motion",
+   "category": "Sensors",
+   "kind": "generic",
    "designation": "GENERIC-ROLLER-MICROSWITCH",
    "description": "Assumed generic roller micro-switch",
    "parameters": [
@@ -11157,6 +11393,8 @@
    "id": "machinekit.motion.linear-bearing",
    "label": "Linear bearing",
    "family": "motion",
+   "category": "Linear guides",
+   "kind": "generic",
    "designation": "LM8UU",
    "description": "Linear ball bearing LM8UU",
    "parameters": [
@@ -11317,6 +11555,8 @@
    "id": "machinekit.motion.linear-rail",
    "label": "Linear rail",
    "family": "motion",
+   "category": "Linear guides",
+   "kind": "generic",
    "designation": "HIWIN-MGN12C-RAIL-L100",
    "description": "HIWIN MGN12C profile rail, 100 mm long",
    "parameters": [
@@ -11494,6 +11734,8 @@
    "id": "machinekit.motion.linear-rail-block",
    "label": "Linear rail block",
    "family": "motion",
+   "category": "Linear guides",
+   "kind": "generic",
    "designation": "HIWIN-MGN12C-BLOCK",
    "description": "HIWIN MGN12C carriage block",
    "parameters": [
@@ -11668,6 +11910,8 @@
    "id": "machinekit.motion.linear-scale",
    "label": "Linear scale",
    "family": "motion",
+   "category": "Sensors",
+   "kind": "generic",
    "designation": "SCALE-200IZ-300",
    "description": "Linear scale, 200 counts per mm, 300 mm, incremental with reference mark",
    "parameters": [
@@ -11773,6 +12017,8 @@
    "id": "machinekit.motion.motor-driver",
    "label": "Motor driver",
    "family": "motion",
+   "category": "Drives and power",
+   "kind": "generic",
    "designation": "GENERIC-TMC2209-1.68A-M1-WIRED",
    "description": "GENERIC-TMC2209 motor driver, 1.68 A rms",
    "parameters": [
@@ -11932,6 +12178,8 @@
    "id": "machinekit.motion.nema-stepper",
    "label": "Nema stepper",
    "family": "motion",
+   "category": "Motors and gearboxes",
+   "kind": "generic",
    "designation": "17HS19-1684S1",
    "description": "17HS19-1684S1 NEMA 17 stepper motor",
    "parameters": [
@@ -12113,6 +12361,8 @@
    "id": "machinekit.motion.pillow-block",
    "label": "Pillow block",
    "family": "motion",
+   "category": "Bearings",
+   "kind": "generic",
    "designation": "UCP204",
    "description": "KOYO UCP base-mounted pillow block unit",
    "parameters": [
@@ -12415,6 +12665,8 @@
    "id": "machinekit.motion.planetary-reducer",
    "label": "Planetary reducer",
    "family": "motion",
+   "category": "Motors and gearboxes",
+   "kind": "generic",
    "designation": "PLANETARY-REDUCER-ASSUMED-b07ae20bb9cf",
    "description": "Assumed planetary reducer",
    "parameters": [
@@ -12582,6 +12834,8 @@
    "id": "machinekit.motion.power-supply",
    "label": "Power supply",
    "family": "motion",
+   "category": "Drives and power",
+   "kind": "generic",
    "designation": "DC-SUPPLY-24V-10A-120x60x30-1-OUT-0W-SHUNT",
    "description": "DC supply, 24 V, 10 A",
    "parameters": [
@@ -12708,6 +12962,8 @@
    "id": "machinekit.motion.proximity-switch",
    "label": "Proximity switch",
    "family": "motion",
+   "category": "Sensors",
+   "kind": "generic",
    "designation": "GENERIC-INDUCTIVE-M8",
    "description": "Assumed generic inductive proximity switch",
    "parameters": [
@@ -12824,6 +13080,8 @@
    "id": "machinekit.motion.purchased-rotary-part",
    "label": "Purchased rotary part",
    "family": "motion",
+   "category": "Motors and gearboxes",
+   "kind": "supplier",
    "designation": "PURCHASED-DD-200-210",
    "description": "Purchased direct-drive table; specification in STRAIN_WAVE_RESEARCH.md; mounting interface provisional",
    "parameters": [
@@ -14170,6 +14428,8 @@
    "id": "machinekit.motion.rotary-encoder-ring",
    "label": "Rotary encoder ring",
    "family": "motion",
+   "category": "Sensors",
+   "kind": "reference",
    "designation": "RING-ENCODER-23BIT",
    "description": "Rotary ring encoder (reference envelope)",
    "parameters": [
@@ -14324,6 +14584,8 @@
    "id": "machinekit.motion.screw-support-unit",
    "label": "Screw support unit",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "generic",
    "designation": "BK12",
    "description": "Fixed screw support, 12 mm seat (assumed)",
    "parameters": [
@@ -14426,6 +14688,8 @@
    "id": "machinekit.motion.servo-motor",
    "label": "Servo motor",
    "family": "motion",
+   "category": "Motors and gearboxes",
+   "kind": "generic",
    "designation": "GENERIC-SERVO-200W",
    "description": "Servo motor, 1.91 N m peak",
    "parameters": [
@@ -14589,6 +14853,8 @@
    "id": "machinekit.motion.sfu-drawing-screw",
    "label": "Sfu drawing screw",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "reference",
    "designation": "SFU-DRAWING-SFU2005-L500",
    "description": "Lead screw BALL-D20-P5-S1-RH, 500 mm long",
    "parameters": [
@@ -14712,6 +14978,8 @@
    "id": "machinekit.motion.sfu-nut",
    "label": "Sfu nut",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "generic",
    "designation": "LEADNUT-BALL-D16-P5-S1-RH-BallNut",
    "description": "Lead screw nut, BALL-D16-P5-S1-RH, 5 mm lead",
    "parameters": [
@@ -14838,6 +15106,8 @@
    "id": "machinekit.motion.shaft-brake-part",
    "label": "Shaft brake part",
    "family": "motion",
+   "category": "Couplings, shafts and brakes",
+   "kind": "generic",
    "designation": "SHAFT-BRAKE-4NM-19-shell-0",
    "description": "Assumed spring-applied shaft brake shell",
    "parameters": [
@@ -14949,6 +15219,8 @@
    "id": "machinekit.motion.shaft-coupling",
    "label": "Shaft coupling",
    "family": "motion",
+   "category": "Couplings, shafts and brakes",
+   "kind": "generic",
    "designation": "COUPLING-8x8-20x30",
    "description": "Shaft coupling 8 to 8 mm, 20x30",
    "parameters": [
@@ -15076,6 +15348,8 @@
    "id": "machinekit.motion.shaft-encoder",
    "label": "Shaft encoder",
    "family": "motion",
+   "category": "Sensors",
+   "kind": "generic",
    "designation": "ENCODER-4096IZ-38x22",
    "description": "Shaft encoder, 4096 counts per revolution, incremental with index",
    "parameters": [
@@ -15188,6 +15462,8 @@
    "id": "machinekit.motion.stepped-shaft",
    "label": "Stepped shaft",
    "family": "motion",
+   "category": "Couplings, shafts and brakes",
+   "kind": "generic",
    "designation": "SHAFT-10x100",
    "description": "Stepped shaft 10x100",
    "parameters": [
@@ -15295,6 +15571,8 @@
    "id": "machinekit.motion.supplier-hgh-block",
    "label": "Supplier hgh block",
    "family": "motion",
+   "category": "Linear guides",
+   "kind": "supplier",
    "designation": "GENERIC-HG-HGR15-BLOCK-HIWIN-HGH15CA-STEP-3bc285a6e79d-HIWIN-HGH15CA-STEP-3bc285a6e79d",
    "description": "GENERIC-HG HGR15 carriage block",
    "parameters": [
@@ -15411,6 +15689,8 @@
    "id": "machinekit.motion.supplier-hgr25-rail",
    "label": "Supplier hgr25 rail",
    "family": "motion",
+   "category": "Linear guides",
+   "kind": "supplier",
    "designation": "GENERIC-HG-HGR25-RAIL-L680-HIWIN-HGR25R-STEP-a5c25503c681",
    "description": "GENERIC-HG HGR25 profile rail, 680 mm long",
    "parameters": [
@@ -15549,6 +15829,8 @@
    "id": "machinekit.motion.torque-motor",
    "label": "Torque motor",
    "family": "motion",
+   "category": "Motors and gearboxes",
+   "kind": "reference",
    "designation": "TORQUE-MOTOR-10NM",
    "description": "Frameless direct-drive torque motor (reference envelope)",
    "parameters": [
@@ -15758,18 +16040,24 @@
    "id": "machinekit.motion.vallder-bf12-support",
    "label": "Vallder bf12 support",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "supplier",
    "error": "Could not open source file"
   },
   {
    "id": "machinekit.motion.vallder-screw-support",
    "label": "Vallder screw support",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "supplier",
    "error": "Could not open source file"
   },
   {
    "id": "machinekit.motion.vallder-sfu1605-nut",
    "label": "Vallder sfu1605 nut",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "supplier",
    "designation": "LEADNUT-BALL-D16-P5-S1-RH-BallNut",
    "description": "Lead screw nut, BALL-D16-P5-S1-RH, 5 mm lead",
    "parameters": [
@@ -15876,6 +16164,8 @@
    "id": "machinekit.motion.vallder-sfu1605-screw",
    "label": "Vallder sfu1605 screw",
    "family": "motion",
+   "category": "Screws and nuts",
+   "kind": "supplier",
    "designation": "LEADSCREW-BALL-D16-P5-S1-RH-L400",
    "description": "Lead screw BALL-D16-P5-S1-RH, 400 mm long",
    "parameters": [
@@ -15981,6 +16271,8 @@
    "id": "machinekit.pneumatic.air-supply",
    "label": "Air supply",
    "family": "pneumatic",
+   "category": "Air supply and valves",
+   "kind": "generic",
    "designation": "AIR-FRL-600000",
    "description": "Reference regulated air supply",
    "parameters": [
@@ -16066,6 +16358,8 @@
    "id": "machinekit.pneumatic.cylinder",
    "label": "Cylinder",
    "family": "pneumatic",
+   "category": "Cylinders",
+   "kind": "generic",
    "designation": "ISO6432-25x100",
    "description": "Reference double-acting pneumatic cylinder",
    "parameters": [
@@ -16186,6 +16480,8 @@
    "id": "machinekit.pneumatic.cylinder-rod",
    "label": "Cylinder rod",
    "family": "pneumatic",
+   "category": "Cylinders",
+   "kind": "generic",
    "designation": "CYLINDER-ROD-10x115",
    "description": "Reference pneumatic cylinder rod",
    "parameters": [
@@ -16278,6 +16574,8 @@
    "id": "machinekit.pneumatic.manifold",
    "label": "Manifold",
    "family": "pneumatic",
+   "category": "Air supply and valves",
+   "kind": "generic",
    "designation": "MANIFOLD-2",
    "description": "Generic 2-outlet pneumatic manifold",
    "parameters": [
@@ -16362,6 +16660,8 @@
    "id": "machinekit.pneumatic.routed-hose",
    "label": "Routed hose",
    "family": "pneumatic",
+   "category": "Hoses and fittings",
+   "kind": "generic",
    "designation": "HOSE",
    "description": "Routed vacuum hose, 100 mm cut",
    "parameters": [
@@ -16488,6 +16788,8 @@
    "id": "machinekit.pneumatic.schmalz-push-in-fitting",
    "label": "Schmalz push in fitting",
    "family": "pneumatic",
+   "category": "Hoses and fittings",
+   "kind": "supplier",
    "designation": "10.08.02.00203",
    "description": "Schmalz STV-GE G1/4-AG 4 vacuum fitting",
    "parameters": [
@@ -16594,6 +16896,8 @@
    "id": "machinekit.pneumatic.schmalz-suction-cup",
    "label": "Schmalz suction cup",
    "family": "pneumatic",
+   "category": "Vacuum",
+   "kind": "supplier",
    "designation": "10.01.01.11400",
    "description": "Schmalz SAF 30 NBR-45 G1/4-IG suction cup",
    "parameters": [
@@ -16735,6 +17039,8 @@
    "id": "machinekit.pneumatic.schmalz-vacuum-generator",
    "label": "Schmalz vacuum generator",
    "family": "pneumatic",
+   "category": "Vacuum",
+   "kind": "supplier",
    "designation": "10.02.01.00563",
    "description": "Schmalz SBP 05 S01 SDA basic ejector",
    "parameters": [
@@ -16844,6 +17150,8 @@
    "id": "machinekit.pneumatic.schmalz-vacuum-hose",
    "label": "Schmalz vacuum hose",
    "family": "pneumatic",
+   "category": "Hoses and fittings",
+   "kind": "supplier",
    "designation": "10.07.09.00001-L100",
    "description": "Routed vacuum hose, 100 mm cut",
    "parameters": [
@@ -16961,6 +17269,8 @@
    "id": "machinekit.pneumatic.solenoid-valve",
    "label": "Solenoid valve",
    "family": "pneumatic",
+   "category": "Air supply and valves",
+   "kind": "generic",
    "designation": "VALVE-5/2-SINGLE",
    "description": "Reference pneumatic directional valve",
    "parameters": [
@@ -17069,6 +17379,8 @@
    "id": "machinekit.pneumatic.suction-cup",
    "label": "Suction cup",
    "family": "pneumatic",
+   "category": "Vacuum",
+   "kind": "generic",
    "designation": "SUCTION-CUP-40-18",
    "description": "Generic suction cup",
    "parameters": [
@@ -17215,6 +17527,8 @@
    "id": "machinekit.pneumatic.vacuum-control-valve",
    "label": "Vacuum control valve",
    "family": "pneumatic",
+   "category": "Air supply and valves",
+   "kind": "generic",
    "designation": "VACUUM-CONTROL-VALVE-4",
    "description": "Generic normally closed vacuum control valve",
    "parameters": [
@@ -17300,6 +17614,8 @@
    "id": "machinekit.pneumatic.vacuum-generator",
    "label": "Vacuum generator",
    "family": "pneumatic",
+   "category": "Vacuum",
+   "kind": "generic",
    "designation": "VACUUM-GENERATOR",
    "description": "Generic pneumatic vacuum generator",
    "parameters": [
@@ -17453,6 +17769,8 @@
    "id": "machinekit.pneumatic.vacuum-pressure-sensor",
    "label": "Vacuum pressure sensor",
    "family": "pneumatic",
+   "category": "Vacuum",
+   "kind": "generic",
    "designation": "VACUUM-PRESSURE-SENSOR-4",
    "description": "Generic inline vacuum pressure sensor",
    "parameters": [
@@ -17538,6 +17856,8 @@
    "id": "machinekit.power.brake-resistor",
    "label": "Brake resistor",
    "family": "power",
+   "category": "Spindle drives",
+   "kind": "generic",
    "designation": "BRAKE-RESISTOR-ASSUMED-47b155576cfe",
    "description": "Assumed VFD braking resistor",
    "parameters": [
@@ -17658,6 +17978,8 @@
    "id": "machinekit.power.circuit-breaker",
    "label": "Circuit breaker",
    "family": "power",
+   "category": "Switching and protection",
+   "kind": "generic",
    "designation": "CIRCUIT-BREAKER-ASSUMED-ae0588d15da9",
    "description": "Assumed three-pole circuit breaker",
    "parameters": [
@@ -17784,6 +18106,8 @@
    "id": "machinekit.power.contactor",
    "label": "Contactor",
    "family": "power",
+   "category": "Switching and protection",
+   "kind": "generic",
    "designation": "CONTACTOR-ASSUMED-39bfe350b8ad",
    "description": "Assumed power contactor with auxiliary feedback",
    "parameters": [
@@ -17910,6 +18234,8 @@
    "id": "machinekit.power.three-phase-rectifier",
    "label": "Three phase rectifier",
    "family": "power",
+   "category": "Spindle drives",
+   "kind": "generic",
    "designation": "DC-SUPPLY-565.685V-20A-240x120x100-4-OUT-8000W-SHUNT",
    "description": "DC supply, 565.685 V, 20 A",
    "parameters": [
@@ -18043,6 +18369,8 @@
    "id": "machinekit.power.vfd",
    "label": "Vfd",
    "family": "power",
+   "category": "Spindle drives",
+   "kind": "generic",
    "designation": "VFD-ASSUMED-e03bcbfdea2d",
    "description": "Assumed three-phase spindle VFD with STO terminals",
    "parameters": [
@@ -18175,6 +18503,8 @@
    "id": "machinekit.pressbrake.gauge-finger",
    "label": "Gauge finger",
    "family": "pressbrake",
+   "category": "Backgauge",
+   "kind": "generic",
    "designation": "PRESS-GAUGE-FINGER",
    "description": "Assumed gravity-return backgauge contact finger",
    "parameters": [
@@ -18257,6 +18587,8 @@
    "id": "machinekit.pressbrake.hydraulic-cylinder",
    "label": "Hydraulic cylinder",
    "family": "pressbrake",
+   "category": "Hydraulics",
+   "kind": "generic",
    "designation": "HYDRAULIC-160-100x100",
    "description": "Assumed double-acting press-brake cylinder body",
    "parameters": [
@@ -18381,6 +18713,8 @@
    "id": "machinekit.pressbrake.hydraulic-cylinder-rod",
    "label": "Hydraulic cylinder rod",
    "family": "pressbrake",
+   "category": "Hydraulics",
+   "kind": "generic",
    "designation": "HYDRAULIC-ROD-100x190",
    "description": "Assumed press-brake hydraulic rod",
    "parameters": [
@@ -18473,6 +18807,8 @@
    "id": "machinekit.pressbrake.hydraulic-manifold",
    "label": "Hydraulic manifold",
    "family": "pressbrake",
+   "category": "Hydraulics",
+   "kind": "generic",
    "designation": "HYDRAULIC-MANIFOLD-2",
    "description": "Assumed 2-outlet hydraulic distribution block",
    "parameters": [
@@ -18558,6 +18894,8 @@
    "id": "machinekit.pressbrake.hydraulic-supply",
    "label": "Hydraulic supply",
    "family": "pressbrake",
+   "category": "Hydraulics",
+   "kind": "generic",
    "designation": "HYDRAULIC-SUPPLY-0",
    "description": "Assumed regulated hydraulic service",
    "parameters": [
@@ -18643,6 +18981,8 @@
    "id": "machinekit.pressbrake.hydraulic-valve",
    "label": "Hydraulic valve",
    "family": "pressbrake",
+   "category": "Hydraulics",
+   "kind": "generic",
    "designation": "HYDRAULIC-VALVE-CLOSED-CENTRE",
    "description": "Assumed closed-centre hydraulic valve block",
    "parameters": [
@@ -18721,6 +19061,8 @@
    "id": "machinekit.pressbrake.tool-clamp",
    "label": "Tool clamp",
    "family": "pressbrake",
+   "category": "Tooling",
+   "kind": "generic",
    "designation": "TOOL-CLAMP-Manual-50x40x60",
    "description": "Reference press-brake tool clamp",
    "parameters": [
@@ -18833,6 +19175,8 @@
    "id": "machinekit.pressbrake.tool-segment",
    "label": "Tool segment",
    "family": "pressbrake",
+   "category": "Tooling",
+   "kind": "generic",
    "designation": "TOOL-reference-straight-88-r06-100",
    "description": "Reference press-brake tooling segment",
    "parameters": [
@@ -18965,6 +19309,8 @@
    "id": "machinekit.printing.extruder",
    "label": "Extruder",
    "family": "printing",
+   "category": "Hotend and extrusion",
+   "kind": "generic",
    "designation": "GEARED-HOB-7.3",
    "description": "Geared extruder, 7.3 mm hob",
    "parameters": [
@@ -19073,6 +19419,8 @@
    "id": "machinekit.printing.fan",
    "label": "Fan",
    "family": "printing",
+   "category": "Bed and cooling",
+   "kind": "generic",
    "designation": "FAN-4010-24V",
    "description": "Fan, 40 x 10 mm, 24 V",
    "parameters": [
@@ -19181,6 +19529,8 @@
    "id": "machinekit.printing.heated-bed",
    "label": "Heated bed",
    "family": "printing",
+   "category": "Bed and cooling",
+   "kind": "generic",
    "designation": "BED-ALU-235-24V-300W",
    "description": "Heated bed, 235 mm, 24 V, 300 W",
    "parameters": [
@@ -19285,6 +19635,8 @@
    "id": "machinekit.printing.heater-cartridge",
    "label": "Heater cartridge",
    "family": "printing",
+   "category": "Hotend and extrusion",
+   "kind": "generic",
    "designation": "CARTRIDGE-6x20-24V-40W",
    "description": "Heater cartridge, 24 V, 40 W",
    "parameters": [
@@ -19385,6 +19737,8 @@
    "id": "machinekit.printing.hotend",
    "label": "Hotend",
    "family": "printing",
+   "category": "Hotend and extrusion",
+   "kind": "generic",
    "designation": "GENERIC-V6-STYLE",
    "description": "Hotend heatsink and heater block",
    "parameters": [
@@ -19501,6 +19855,8 @@
    "id": "machinekit.printing.nozzle",
    "label": "Nozzle",
    "family": "printing",
+   "category": "Hotend and extrusion",
+   "kind": "generic",
    "designation": "BRASS-M6-0.4",
    "description": "Nozzle, 0.4 mm",
    "parameters": [
@@ -19605,6 +19961,8 @@
    "id": "machinekit.printing.thermistor",
    "label": "Thermistor",
    "family": "printing",
+   "category": "Hotend and extrusion",
+   "kind": "generic",
    "designation": "NTC-100K-B3950",
    "description": "NTC thermistor, 100k beta 3950",
    "parameters": [
@@ -19709,6 +20067,8 @@
    "id": "machinekit.robotics.arm-joint",
    "label": "Arm joint",
    "family": "robotics",
+   "category": "Arm modules",
+   "kind": "generic",
    "designation": "ARM-JOINT-D100x70",
    "description": "Arm joint module, 100x70 mm",
    "parameters": [
@@ -19902,6 +20262,8 @@
    "id": "machinekit.robotics.arm-link",
    "label": "Arm link",
    "family": "robotics",
+   "category": "Arm modules",
+   "kind": "generic",
    "designation": "ARM-LINK-D80x300-W5",
    "description": "Arm link tube, 80x300 mm",
    "parameters": [
@@ -20039,6 +20401,8 @@
    "id": "machinekit.robotics.arm-wrist-fork",
    "label": "Arm wrist fork",
    "family": "robotics",
+   "category": "Arm modules",
+   "kind": "generic",
    "designation": "ARM-WRIST-FORK-60x70-W8-D24",
    "description": "Spherical wrist clevis, assumed dimensions",
    "parameters": [
@@ -20149,6 +20513,8 @@
    "id": "machinekit.robotics.cobot-joint",
    "label": "Cobot joint",
    "family": "robotics",
+   "category": "Arm modules",
+   "kind": "generic",
    "designation": "ARM-JOINT-D110x50-COBOT-SERVO-2-180-P0-POCKET-70x40",
    "description": "Arm joint module, 110x50 mm with COBOT-SERVO-2-180-P0",
    "parameters": [
@@ -20268,6 +20634,8 @@
    "id": "machinekit.robotics.end-effector-plate",
    "label": "End effector plate",
    "family": "robotics",
+   "category": "Flanges and adapters",
+   "kind": "generic",
    "designation": "EOAT-40-12-4xM5-PCD65",
    "description": "End-effector adapter plate for ISO9409-STYLE-40-4-M6, 4xM5 tool bolts on 65 PCD",
    "parameters": [
@@ -20502,6 +20870,8 @@
    "id": "machinekit.robotics.fairino-dual-tool-adapter",
    "label": "Fairino dual tool adapter",
    "family": "robotics",
+   "category": "Flanges and adapters",
+   "kind": "supplier",
    "designation": "ICACX1500GSCSTA",
    "description": "Fairino 2-to-1 end-effector adapter Standard (purchased complete; provisional CAD)",
    "parameters": [
@@ -20554,6 +20924,8 @@
    "id": "machinekit.robotics.frame-bar",
    "label": "Frame bar",
    "family": "robotics",
+   "category": "Flanges and adapters",
+   "kind": "generic",
    "designation": "FRAME-BAR-20-20-100",
    "description": "Generic end-effector frame bar",
    "parameters": [
@@ -20657,6 +21029,8 @@
    "id": "machinekit.robotics.geared-arm-joint",
    "label": "Geared arm joint",
    "family": "robotics",
+   "category": "Arm modules",
+   "kind": "generic",
    "designation": "ARM-JOINT-D100x70-GENERIC-SERVO-200W-POCKET-61x36",
    "description": "Arm joint module, 100x70 mm with GENERIC-SERVO-200W",
    "parameters": [
@@ -20867,6 +21241,8 @@
    "id": "machinekit.robotics.offset-gripper-finger",
    "label": "Offset gripper finger",
    "family": "robotics",
+   "category": "Grippers",
+   "kind": "generic",
    "designation": "OFFSET-FINGER-L-cnc-aluminium",
    "description": "Offset gripper finger, cnc-milling",
    "parameters": [
@@ -20920,6 +21296,8 @@
    "id": "machinekit.robotics.parallel-gripper-body",
    "label": "Parallel gripper body",
    "family": "robotics",
+   "category": "Grippers",
+   "kind": "generic",
    "designation": "GRIPPER-32-60",
    "description": "Reference pneumatic parallel-gripper housing",
    "parameters": [
@@ -21050,6 +21428,8 @@
    "id": "machinekit.robotics.parallel-gripper-finger",
    "label": "Parallel gripper finger",
    "family": "robotics",
+   "category": "Grippers",
+   "kind": "generic",
    "designation": "GRIPPER-32-PAD-8x50x60-SIDE--1",
    "description": "Assumed soft parallel-gripper contact finger",
    "parameters": [
@@ -21181,6 +21561,8 @@
    "id": "machinekit.robotics.parallel-gripper-jaw",
    "label": "Parallel gripper jaw",
    "family": "robotics",
+   "category": "Grippers",
+   "kind": "generic",
    "designation": "GRIPPER-32-JAW--1",
    "description": "Reference gripper jaw carriage",
    "parameters": [
@@ -21306,6 +21688,8 @@
    "id": "machinekit.robotics.pedestal",
    "label": "Pedestal",
    "family": "robotics",
+   "category": "Arm modules",
+   "kind": "generic",
    "designation": "PEDESTAL-40-D60x150-B12-A90-G0x4x4-F0x0-C0",
    "description": "Pedestal for ISO9409-STYLE-40-4-M6, 60 mm column, 150 mm tall, detailed base and services",
    "parameters": [
@@ -21508,6 +21892,8 @@
    "id": "machinekit.robotics.robot-flange",
    "label": "Robot flange",
    "family": "robotics",
+   "category": "Flanges and adapters",
+   "kind": "generic",
    "designation": "ISO9409-STYLE-40-4-M6",
    "description": "Robot flange with ISO 9409-1-40-4-M6 bolt pattern and raised pilot",
    "parameters": [
@@ -21619,6 +22005,8 @@
    "id": "machinekit.robotics.schmalz-sxt-master",
    "label": "Schmalz sxt master",
    "family": "robotics",
+   "category": "Tool changers",
+   "kind": "supplier",
    "designation": "10.07.13.00013",
    "description": "Schmalz SXT-QC-CON-40-F-3 robot-side bayonet",
    "parameters": [
@@ -21731,6 +22119,8 @@
    "id": "machinekit.robotics.schmalz-sxt-tool",
    "label": "Schmalz sxt tool",
    "family": "robotics",
+   "category": "Tool changers",
+   "kind": "supplier",
    "designation": "10.07.13.00018",
    "description": "Schmalz SXT-QC-CON-40-M-3 tool-side bayonet",
    "parameters": [
@@ -21842,6 +22232,8 @@
    "id": "machinekit.robotics.tool-changer-master",
    "label": "Tool changer master",
    "family": "robotics",
+   "category": "Tool changers",
+   "kind": "generic",
    "designation": "CHANGER-MASTER-2-60",
    "description": "Generic 2-channel robot-side tool changer",
    "parameters": [
@@ -21944,6 +22336,8 @@
    "id": "machinekit.robotics.tool-changer-tool",
    "label": "Tool changer tool",
    "family": "robotics",
+   "category": "Tool changers",
+   "kind": "generic",
    "designation": "CHANGER-TOOL-2-60",
    "description": "Generic 2-channel tool-side changer",
    "parameters": [
@@ -22046,6 +22440,8 @@
    "id": "machinekit.robotics.tool-service-module",
    "label": "Tool service module",
    "family": "robotics",
+   "category": "Tool changers",
+   "kind": "generic",
    "designation": "TOOL-SERVICE-provisional-tool-service-v1-24-V-Modbus RTU / RS485-8PIN-5A-2A-1",
    "description": "Provisional wrist power/data socket",
    "parameters": [
@@ -22175,6 +22571,8 @@
    "id": "machinekit.routing.atc-spindle",
    "label": "Atc spindle",
    "family": "routing",
+   "category": "Spindle and tool change",
+   "kind": "generic",
    "designation": "ATC-SPINDLE-ASSUMED-c703afafb1c9",
    "description": "Assumed ISO30 ATC spindle",
    "parameters": [
@@ -22338,6 +22736,8 @@
    "id": "machinekit.routing.collet",
    "label": "Collet",
    "family": "routing",
+   "category": "Spindle and tool change",
+   "kind": "generic",
    "designation": "COLLET-ASSUMED-2f503b8bd36f",
    "description": "Assumed ER32 collet",
    "parameters": [
@@ -22441,6 +22841,8 @@
    "id": "machinekit.routing.dust-shoe",
    "label": "Dust shoe",
    "family": "routing",
+   "category": "Dust collection",
+   "kind": "generic",
    "designation": "DUST-SHOE-ASSUMED-da75ad0372db",
    "description": "Assumed lifting dust shoe",
    "parameters": [
@@ -22597,6 +22999,8 @@
    "id": "machinekit.routing.spoilboard",
    "label": "Spoilboard",
    "family": "routing",
+   "category": "Vacuum workholding",
+   "kind": "generic",
    "designation": "SPOILBOARD-ASSUMED-b108e6753ef2",
    "description": "Assumed bleeder spoilboard",
    "parameters": [
@@ -22707,6 +23111,8 @@
    "id": "machinekit.routing.tool-fork",
    "label": "Tool fork",
    "family": "routing",
+   "category": "Spindle and tool change",
+   "kind": "generic",
    "designation": "TOOL-FORK-ASSUMED-6c7b0864d095",
    "description": "Assumed open ISO30 rack fork",
    "parameters": [
@@ -22828,6 +23234,8 @@
    "id": "machinekit.routing.tool-holder",
    "label": "Tool holder",
    "family": "routing",
+   "category": "Spindle and tool change",
+   "kind": "generic",
    "designation": "TOOL-HOLDER-ASSUMED-55bd612c49e5",
    "description": "Assumed ISO30 ER32 tool holder",
    "parameters": [
@@ -22970,6 +23378,8 @@
    "id": "machinekit.routing.tool-length-setter",
    "label": "Tool length setter",
    "family": "routing",
+   "category": "Spindle and tool change",
+   "kind": "generic",
    "designation": "TOOL-LENGTH-SETTER-ASSUMED-2783a0fe1a6e",
    "description": "Assumed tool length setter",
    "parameters": [
@@ -23080,6 +23490,8 @@
    "id": "machinekit.routing.tool-rack",
    "label": "Tool rack",
    "family": "routing",
+   "category": "Spindle and tool change",
+   "kind": "generic",
    "designation": "TOOL-RACK-ASSUMED-0919e7b58697",
    "description": "Assumed linear covered tool rack",
    "parameters": [
@@ -23249,6 +23661,8 @@
    "id": "machinekit.routing.vacuum-blower",
    "label": "Vacuum blower",
    "family": "routing",
+   "category": "Vacuum workholding",
+   "kind": "generic",
    "designation": "VACUUM-BLOWER-ASSUMED-aabd574e5c0a",
    "description": "Assumed side-channel vacuum blower",
    "parameters": [
@@ -23373,6 +23787,8 @@
    "id": "machinekit.routing.vacuum-table",
    "label": "Vacuum table",
    "family": "routing",
+   "category": "Vacuum workholding",
+   "kind": "generic",
    "designation": "VACUUM-TABLE-ASSUMED-3a1b36203f7d",
    "description": "Assumed zoned vacuum plenum table",
    "parameters": [
@@ -23547,6 +23963,8 @@
    "id": "machinekit.routing.vacuum-zone-valve",
    "label": "Vacuum zone valve",
    "family": "routing",
+   "category": "Vacuum workholding",
+   "kind": "generic",
    "designation": "VACUUM-ZONE-VALVE-ASSUMED-04c0a274cee7",
    "description": "Assumed vacuum zone isolation valve",
    "parameters": [
@@ -23664,6 +24082,8 @@
    "id": "machinekit.standard.bushing",
    "label": "Bushing",
    "family": "standard",
+   "category": "Bearings and bushings",
+   "kind": "generic",
    "designation": "BUSHING-8x12x10",
    "description": "Plain bushing 8x12x10",
    "parameters": [
@@ -23771,6 +24191,8 @@
    "id": "machinekit.standard.deep-groove-bearing",
    "label": "Deep groove bearing",
    "family": "standard",
+   "category": "Bearings and bushings",
+   "kind": "generic",
    "designation": "608-2Z",
    "description": "Deep groove ball bearing 608 shielded 8x22x7",
    "parameters": [
@@ -24184,6 +24606,8 @@
    "id": "machinekit.standard.fine-pitch-nut",
    "label": "Fine pitch nut",
    "family": "standard",
+   "category": "Fasteners",
+   "kind": "generic",
    "designation": "FINE-NUT-M15x1-AF22-H6",
    "description": "Fine-pitch retaining nut (explicit dimensions)",
    "parameters": [
@@ -24294,6 +24718,8 @@
    "id": "machinekit.standard.flat-washer",
    "label": "Flat washer",
    "family": "standard",
+   "category": "Fasteners",
+   "kind": "generic",
    "designation": "ISO7089-M5",
    "description": "Flat washer M5",
    "parameters": [
@@ -24485,6 +24911,8 @@
    "id": "machinekit.standard.hex-bolt",
    "label": "Hex bolt",
    "family": "standard",
+   "category": "Fasteners",
+   "kind": "generic",
    "designation": "ISO4017-M5x20",
    "description": "Hex bolt M5x20",
    "parameters": [
@@ -24615,6 +25043,8 @@
    "id": "machinekit.standard.hex-nut",
    "label": "Hex nut",
    "family": "standard",
+   "category": "Fasteners",
+   "kind": "generic",
    "designation": "ISO4032-M5",
    "description": "Hex nut M5",
    "parameters": [
@@ -24799,6 +25229,8 @@
    "id": "machinekit.standard.parallel-key",
    "label": "Parallel key",
    "family": "standard",
+   "category": "Shaft retention",
+   "kind": "generic",
    "designation": "DIN6885-B-2x2x10",
    "description": "Form B parallel key 2x2, 10 mm long",
    "parameters": [
@@ -24954,6 +25386,8 @@
    "id": "machinekit.standard.retaining-ring",
    "label": "Retaining ring",
    "family": "standard",
+   "category": "Shaft retention",
+   "kind": "generic",
    "designation": "DIN471-8",
    "description": "External retaining ring for 8 mm shaft",
    "parameters": [
@@ -25118,6 +25552,8 @@
    "id": "machinekit.standard.shaft-collar",
    "label": "Shaft collar",
    "family": "standard",
+   "category": "Shaft retention",
+   "kind": "generic",
    "designation": "COLLAR-8",
    "description": "Shaft collar for 8 mm shaft, M4 set screw",
    "parameters": [
@@ -25281,6 +25717,8 @@
    "id": "machinekit.standard.socket-head-cap-screw",
    "label": "Socket head cap screw",
    "family": "standard",
+   "category": "Fasteners",
+   "kind": "generic",
    "designation": "ISO4762-M5x20",
    "description": "Socket head cap screw M5x20",
    "parameters": [
@@ -25477,6 +25915,8 @@
    "id": "machinekit.standard.socket-set-screw",
    "label": "Socket set screw",
    "family": "standard",
+   "category": "Fasteners",
+   "kind": "generic",
    "designation": "ISO4026-M6x5",
    "description": "Flat-point socket set screw; nominal supplier selection",
    "parameters": [
@@ -25529,6 +25969,8 @@
    "id": "machinekit.structural.block-bracket",
    "label": "Block bracket",
    "family": "structural",
+   "category": "Brackets and fixings",
+   "kind": "generic",
    "designation": "BRACKET-BRACKET-0:10,0:10,0:10",
    "description": "bracket",
    "parameters": [
@@ -25612,12 +26054,16 @@
    "id": "machinekit.structural.cast-in-steel-insert",
    "label": "Cast in steel insert",
    "family": "structural",
+   "category": "Castings",
+   "kind": "generic",
    "error": "Missing component parameter \"role\""
   },
   {
    "id": "machinekit.structural.drawing-profile-member",
    "label": "Drawing profile member",
    "family": "structural",
+   "category": "Profiles and tubes",
+   "kind": "reference",
    "designation": "DRAWING-f616a66cc964449b17ea0bb136a74b02c5d380a8962f3a9027a12eb78d6eaa2f-L100",
    "description": "Drawing-derived extrusion; interfaces unqualified",
    "parameters": [
@@ -25712,6 +26158,8 @@
    "id": "machinekit.structural.leveling-foot",
    "label": "Leveling foot",
    "family": "structural",
+   "category": "Brackets and fixings",
+   "kind": "generic",
    "designation": "LEVELING-FOOT-ASSUMED-c9c604bbb38b",
    "description": "Assumed M20 levelling foot, pad D100; capacity unverified",
    "parameters": [
@@ -25807,6 +26255,8 @@
    "id": "machinekit.structural.mineral-casting",
    "label": "Mineral casting",
    "family": "structural",
+   "category": "Castings",
+   "kind": "generic",
    "designation": "MINERAL-CASTING",
    "description": "Mineral casting (purchase by casting mass, kg)",
    "parameters": [
@@ -25911,6 +26361,8 @@
    "id": "machinekit.structural.rect-tube-member",
    "label": "Rect tube member",
    "family": "structural",
+   "category": "Profiles and tubes",
+   "kind": "generic",
    "designation": "RECT-30x30x2-L750",
    "description": "Cut rectangular structural tube",
    "parameters": [
@@ -26021,6 +26473,8 @@
    "id": "machinekit.structural.slide-in-slot-nut",
    "label": "Slide in slot nut",
    "family": "structural",
+   "category": "Brackets and fixings",
+   "kind": "generic",
    "designation": "SLIDE-NUT-M6-15.9x15.5x5.9-R8x1.9",
    "description": "Dimension-driven slide-in slot nut; fit requires review",
    "parameters": [
@@ -26146,6 +26600,8 @@
    "id": "machinekit.structural.tslot-member",
    "label": "Tslot member",
    "family": "structural",
+   "category": "Profiles and tubes",
+   "kind": "generic",
    "designation": "TSLOT-40-SLOT8-40x40-L100",
    "description": "TSLOT-40-SLOT8 aluminium extrusion 40x40",
    "parameters": [
@@ -26263,6 +26719,8 @@
    "id": "machinekit.tooling.block",
    "label": "Block",
    "family": "tooling",
+   "category": "Casting tooling",
+   "kind": "generic",
    "designation": "TOOLING-BLOCK",
    "description": "Tooling stock block",
    "parameters": [
@@ -26362,6 +26820,8 @@
    "id": "machinekit.tooling.panel",
    "label": "Panel",
    "family": "tooling",
+   "category": "Casting tooling",
+   "kind": "generic",
    "designation": "PANEL-panel-cde3a5326631",
    "description": "Tooling panel panel",
    "parameters": [
@@ -26449,6 +26909,8 @@
    "id": "machinekit.tooling.plain-pin",
    "label": "Plain pin",
    "family": "tooling",
+   "category": "Casting tooling",
+   "kind": "generic",
    "designation": "TOOLING-PIN-6x40",
    "description": "Nominal plain locating pin",
    "parameters": [
@@ -26508,12 +26970,16 @@
    "id": "machinekit.tooling.source-casting",
    "label": "Source casting",
    "family": "tooling",
+   "category": "Casting tooling",
+   "kind": "generic",
    "error": "Missing component parameter \"source\""
   },
   {
    "id": "machinekit.tooling.volume",
    "label": "Volume",
    "family": "tooling",
+   "category": "Casting tooling",
+   "kind": "generic",
    "designation": "MOLD-former-dd9343c01859",
    "description": "Tooling former",
    "parameters": [
@@ -26597,6 +27063,8 @@
    "id": "machinekit.transmission.custom-timing-pulley",
    "label": "Custom timing pulley",
    "family": "transmission",
+   "category": "Belts and pulleys",
+   "kind": "generic",
    "designation": "PULLEY-CUSTOM-CUSTOM-P2-PLD0.254-20T",
    "description": "CUSTOM-CUSTOM-P2-PLD0.254 timing pulley, 2 mm pitch, 20 teeth",
    "parameters": [
@@ -26725,6 +27193,8 @@
    "id": "machinekit.transmission.generic-sprocket",
    "label": "Generic sprocket",
    "family": "transmission",
+   "category": "Chains and sprockets",
+   "kind": "generic",
    "designation": "GENERIC-SPROCKET-P6.35-20T",
    "description": "Generic sprocket, 6.35 mm pitch, 20 teeth",
    "parameters": [
@@ -26845,6 +27315,8 @@
    "id": "machinekit.transmission.helical-pinion",
    "label": "Helical pinion",
    "family": "transmission",
+   "category": "Gears and racks",
+   "kind": "generic",
    "designation": "HELICAL-PINION-ASSUMED-25d202a977f7",
    "description": "Assumed normal-module helical pinion",
    "parameters": [
@@ -26984,6 +27456,8 @@
    "id": "machinekit.transmission.helical-rack",
    "label": "Helical rack",
    "family": "transmission",
+   "category": "Gears and racks",
+   "kind": "generic",
    "designation": "HELICAL-RACK-ASSUMED-dcc444fe95ee",
    "description": "Assumed normal-module helical rack",
    "parameters": [
@@ -27138,6 +27612,8 @@
    "id": "machinekit.transmission.involute-rack",
    "label": "Involute rack",
    "family": "transmission",
+   "category": "Gears and racks",
+   "kind": "generic",
    "designation": "RACK-M2-10T",
    "description": "Rack module 2, 10 teeth",
    "parameters": [
@@ -27262,6 +27738,8 @@
    "id": "machinekit.transmission.preloaded-pinion-mount",
    "label": "Preloaded pinion mount",
    "family": "transmission",
+   "category": "Gears and racks",
+   "kind": "generic",
    "designation": "PRELOADED-PINION-MOUNT-ASSUMED-1d01281618ef",
    "description": "Assumed hinged spring-preloaded pinion mount",
    "parameters": [
@@ -27418,6 +27896,8 @@
    "id": "machinekit.transmission.sprocket",
    "label": "Sprocket",
    "family": "transmission",
+   "category": "Chains and sprockets",
+   "kind": "generic",
    "designation": "SPROCKET-ANSI25-20T",
    "description": "ANSI25 sprocket, 20 teeth",
    "parameters": [
@@ -27570,6 +28050,8 @@
    "id": "machinekit.transmission.spur-gear",
    "label": "Spur gear",
    "family": "transmission",
+   "category": "Gears and racks",
+   "kind": "generic",
    "designation": "SPUR-M2-20T",
    "description": "Spur gear module 2, 20 teeth",
    "parameters": [
@@ -27702,6 +28184,8 @@
    "id": "machinekit.transmission.timing-belt",
    "label": "Timing belt",
    "family": "transmission",
+   "category": "Belts and pulleys",
+   "kind": "generic",
    "designation": "BELT-GT2-W6-220T",
    "description": "GT2 timing belt, 2 mm pitch, 220 teeth, 6 mm wide",
    "parameters": [
@@ -27829,6 +28313,8 @@
    "id": "machinekit.transmission.timing-pulley",
    "label": "Timing pulley",
    "family": "transmission",
+   "category": "Belts and pulleys",
+   "kind": "generic",
    "designation": "PULLEY-GT2-20T",
    "description": "GT2 timing pulley, 2 mm pitch, 20 teeth",
    "parameters": [

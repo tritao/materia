@@ -6,6 +6,7 @@ import machinekit.catalog.CatalogMetadata;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentParameter;
 import machinekit.component.ComponentParameterType;
+import machinekit.component.ComponentRegistry;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValue;
 import machinekit.component.MachineComponent;
@@ -39,11 +40,12 @@ class DocsComponents {
 	public static function main():Void {
 		var write = Sys.getEnv("DOCS_COMPONENTS_WRITE") == "1";
 		var entries:Array<Dynamic> = [], models = new Map<String, Bytes>(), modelCount = 0, failures:Array<String> = [];
-		var types = MachineKitComponents.standard().all();
+		var registry = MachineKitComponents.standard();
+		var types = registry.all();
 		types.sort((a, b) -> Reflect.compare(a.id, b.id));
 		for (type in types) {
 			try {
-				var exported = export(type);
+				var exported = export(type, registry);
 				entries.push(exported.entry);
 				if (exported.model != null) {
 					models.set(modelName(type.id), exported.model);
@@ -52,7 +54,8 @@ class DocsComponents {
 			} catch (error:Dynamic) {
 				// A recipe whose defaults cannot be built is listed without a part; the catalogue says so.
 				failures.push('${type.id}: $error');
-				entries.push({id: type.id, label: type.label(), family: family(type.id), error: Std.string(error)});
+				entries.push({id: type.id, label: type.label(), family: family(type.id), category: registry.category(type.id),
+					kind: registry.kind(type.id), error: Std.string(error)});
 			}
 		}
 		for (phi in PHIS)
@@ -60,7 +63,7 @@ class DocsComponents {
 		// The viewers' display mapping, from the same look (docs/site/src/model-view.json has the rest).
 		var exposure = look().exposure;
 		var display = {exposure: exposure > 0 ? exposure : 1.0, toneMapping: exposure > 0 ? "neutral" : "none"};
-		var text = Json.stringify({display: display, components: entries}, null, " ") + "\n";
+		var text = Json.stringify({display: display, categories: registry.categoryNames(), components: entries}, null, " ") + "\n";
 		var stale = 0;
 		if (write) {
 			if (!FileSystem.exists("data")) FileSystem.createDirectory("data");
@@ -96,13 +99,15 @@ class DocsComponents {
 		}
 	}
 
-	static function export(type:ComponentType):{entry:Dynamic, model:Null<Bytes>} {
+	static function export(type:ComponentType, registry:ComponentRegistry):{entry:Dynamic, model:Null<Bytes>} {
 		var component = type.create();
 		var parameters = [for (parameter in type.parameters()) describeParameter(parameter)];
 		var entry:Dynamic = {
 			id: type.id,
 			label: type.label(),
 			family: family(type.id),
+			category: registry.category(type.id),
+			kind: registry.kind(type.id),
 			designation: component.designation,
 			description: component.description,
 			parameters: parameters,

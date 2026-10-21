@@ -9,7 +9,7 @@
 	color: var(--sl-color-white);
 	font: inherit;
 }
-.part-filters select { flex: 0 1 16rem; }
+.part-filters select { flex: 0 1 12rem; }
 .part-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.75rem; }
 .part-grid .part-card {
 	display: flex;
@@ -62,3 +62,20 @@ model-viewer.part-model {
 	--poster-color: transparent;
 }
 .part-hint { margin-top: 0.4rem !important; font-size: var(--sl-text-xs); color: var(--sl-color-gray-3); }
+
+/* The index: one section per family, one group per category. */
+.part-family { margin-top: 2.5rem; }
+.part-family[hidden], .part-group[hidden] { display: none; }
+.part-family-title { margin-bottom: 0.5rem; }
+.part-family-title a { color: inherit; text-decoration: none; }
+.part-family-title a:hover { color: var(--sl-color-text-accent); }
+.part-group { margin-top: 1.25rem; }
+.part-category {
+	margin: 0 0 0.6rem;
+	font-size: var(--sl-text-sm);
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-3);
+}
+.part-badge-kind { background: var(--sl-color-gray-6); color: var(--sl-color-gray-2); }
