@@ -73,6 +73,9 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
     const bool has_workplane_grid =
         input->struct_size >= offsetof(nkscene_render_view, workplane_grid_up) +
                                   sizeof(input->workplane_grid_up);
+    const bool has_studio_environment =
+        input->struct_size >= offsetof(nkscene_render_view, studio_environment) +
+                                  sizeof(input->studio_environment);
     if ((has_diagnostic_overrides && input->diagnostic_override_count != 0 && !input->diagnostic_overrides) ||
         (input->visibility_override_count != 0 && !input->visibility_overrides) ||
         (input->material_override_count != 0 && !input->material_overrides) ||
@@ -211,6 +214,22 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
                 for (uint32_t axis = 0; axis < 4; ++axis)
                     output.studio_lighting.colors[light][axis] =
                         input->studio_light_colors[light * 4 + axis];
+        if (has_studio_environment && input->studio_environment_enabled) {
+            for (uint32_t light = 0; light < 3; ++light) {
+                const auto radius = input->studio_light_radii[light];
+                if (!std::isfinite(radius) || radius < 0.0f || radius > 1.5f)
+                    return NKS_ERROR_INVALID_ARGUMENT;
+                output.studio_lighting.light_radii[light] = radius;
+            }
+            const auto reflection = input->studio_environment[0];
+            const auto exposure = input->studio_environment[1];
+            if (!std::isfinite(reflection) || reflection < 0.0f || reflection > 1.0f ||
+                !std::isfinite(exposure) || exposure < 0.0f || exposure > 16.0f)
+                return NKS_ERROR_INVALID_ARGUMENT;
+            output.studio_lighting.environment = true;
+            output.studio_lighting.reflection = reflection;
+            output.studio_lighting.exposure = exposure;
+        }
     }
     if (input->struct_size >= offsetof(nkscene_render_view, studio_surface_detail) + sizeof(input->studio_surface_detail)) {
         for (uint32_t axis = 0; axis < 4; ++axis) {

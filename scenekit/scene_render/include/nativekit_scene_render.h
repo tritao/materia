@@ -140,6 +140,13 @@ typedef struct nkscene_render_view {
     /** RGB-only diagnostic tint; selection and hover take precedence. Source materials are retained. */
     const nkscene_render_material_override *diagnostic_overrides NK_BORROWED_ARRAY(diagnostic_override_count);
     uint32_t diagnostic_override_count;
+    /** Optional studio environment; zero keeps point lights, a 0.6 room reflection and clamped colour.
+        light_radii xyz: angular radius in radians of each studio light's soft panel, which metal reflects
+        (zero keeps a point light). environment x: room reflection strength [0,1]; y: exposure before PBR
+        Neutral tone mapping, zero for clamped colour without tone mapping. */
+    uint32_t studio_environment_enabled NK_BOOL32;
+    float studio_light_radii[4];
+    float studio_environment[4];
 } nkscene_render_view;
 
 /* ------------------------------------------------------------------------- */

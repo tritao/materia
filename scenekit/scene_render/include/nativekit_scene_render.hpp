@@ -155,6 +155,15 @@ struct StudioLighting {
         {1.0f, 1.0f, 1.0f, 0.0f}}};
     std::array<float, 4> ambient_sky{0.23f, 0.24f, 0.26f, 0.0f};
     std::array<float, 4> ambient_ground{0.16f, 0.16f, 0.17f, 0.0f};
+    /** A studio environment: the room reflected as sky over ground, lights as soft panels, display mapping.
+        Off keeps the earlier shading: point lights, a height-blended room reflection and clamped colour. */
+    bool environment = false;
+    /** Angular radius, in radians, of each light's soft panel; zero is a point light. */
+    std::array<float, 3> light_radii{};
+    /** How strongly surfaces reflect the sky/ground room, in [0, 1]. */
+    float reflection = 0.6f;
+    /** Exposure before PBR Neutral tone mapping; zero shows clamped colour without tone mapping. */
+    float exposure = 0.0f;
 };
 
 struct WorkplaneGrid {

@@ -391,6 +391,39 @@ int main() {
         assert(executor.capture_rgba8(reflection_plan, scene->snapshot(), options.width,
                    options.height, {0.0f, 0.0f, 0.0f, 1.0f}, rough_reflected_pixels) == NKGPU_OK);
         assert(rough_reflected_pixels != reflected_pixels);
+
+        // A studio light with a panel is reflected by metal (and the view signature sees it); exposure
+        // tone-maps the result, and zero exposure leaves the clamped image as it was.
+        const auto brightness = [](const std::vector<std::uint8_t> &pixels) {
+            std::uint64_t sum = 0;
+            for (std::size_t index = 0; index < pixels.size(); index += 4)
+                sum += pixels[index] + pixels[index + 1] + pixels[index + 2];
+            return sum;
+        };
+        auto panel_view = reflection_view;
+        panel_view.studio_lighting.directions[0] = {0.0f, 0.0f, 1.0f, 0.8f};
+        panel_view.studio_lighting.environment = true;
+        panel_view.studio_lighting.light_radii = {0.5f, 0.0f, 0.0f};
+        const auto panel_plan = nkscene::compile(scene->snapshot(), panel_view);
+        assert(panel_plan.view_signature() != reflection_plan.view_signature());
+        std::vector<std::uint8_t> panel_pixels;
+        assert(executor.capture_rgba8(panel_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, panel_pixels) == NKGPU_OK);
+        auto point_view = panel_view;
+        point_view.studio_lighting.light_radii = {0.0f, 0.0f, 0.0f};
+        const auto point_plan = nkscene::compile(scene->snapshot(), point_view);
+        std::vector<std::uint8_t> point_pixels;
+        assert(executor.capture_rgba8(point_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, point_pixels) == NKGPU_OK);
+        assert(brightness(panel_pixels) > brightness(point_pixels));
+        auto exposed_view = panel_view;
+        exposed_view.studio_lighting.exposure = 0.5f;
+        const auto exposed_plan = nkscene::compile(scene->snapshot(), exposed_view);
+        assert(exposed_plan.view_signature() != panel_plan.view_signature());
+        std::vector<std::uint8_t> exposed_pixels;
+        assert(executor.capture_rgba8(exposed_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, exposed_pixels) == NKGPU_OK);
+        assert(brightness(exposed_pixels) < brightness(panel_pixels));
         material_resource.edit_state().metallic = 0.0f;
         material_resource.edit_state().roughness = 0.0f;
         scene->publish();

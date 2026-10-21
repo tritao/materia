@@ -106,6 +106,23 @@ class SceneView {
 		return this;
 	}
 
+	/** Studio environment: each light's soft-panel angular radius in radians (zero keeps a point light), how
+	 *  strongly surfaces reflect the sky/ground room [0,1], and the exposure before PBR Neutral tone mapping
+	 *  (zero shows clamped colour). Without this call studio lights are points, reflection is 0.6, no tone mapping. */
+	public function setStudioEnvironment(radii:Array<Float>, reflection:Float, exposure:Float):SceneView {
+		if (radii.length != 3) throw "invalid studio light radii";
+		for (radius in radii)
+			if (!Math.isFinite(radius) || radius < 0 || radius > 1.5) throw "invalid studio light radius";
+		if (!Math.isFinite(reflection) || reflection < 0 || reflection > 1 || !Math.isFinite(exposure) || exposure < 0
+			|| exposure > 16) throw "invalid studio environment";
+		value.set_studio_environment_enabled(1);
+		for (index in 0...3) value.set_studio_light_radii(index, radii[index]);
+		value.set_studio_light_radii(3, 0.0);
+		value.set_studio_environment(0, reflection);
+		value.set_studio_environment(1, exposure);
+		return this;
+	}
+
 	/** Display-only depth AO and highlight broadening. Radius uses scene world units; zero strength disables AO. */
 	public function setStudioDetail(radius:Float, strength:Float = 0.6, bias:Float = 0.08, roughnessFloor:Float = 0.4):SceneView {
 		for (parameter in [radius,strength,bias,roughnessFloor])

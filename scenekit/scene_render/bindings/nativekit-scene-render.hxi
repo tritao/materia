@@ -163,7 +163,7 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		visible_items: u64 @offset(80);
 		culled_items: u64 @offset(88);
 	}
-	struct nkscene_render_view @layout(520, 8) {
+	struct nkscene_render_view @layout(552, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		root: nkscene_node_id @offset(8);
 		include_invisible: u32 @offset(16);
@@ -220,8 +220,20 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		 * Optional studio detail: AO radius in world units, strength [0,1], angular bias [0,1], roughness floor [0,1].
 		 */
 		studio_surface_detail: array<f32, 4> @offset(484);
+		/**
+		 * RGB-only diagnostic tint; selection and hover take precedence. Source materials are retained.
+		 */
 		diagnostic_overrides: ptr<const<nkscene_render_material_override>> @offset(504) @borrowed @length_field("diagnostic_override_count");
 		diagnostic_override_count: u32 @offset(512);
+		/**
+		 * Optional studio environment; zero keeps point lights, a 0.6 room reflection and clamped colour.
+		 * light_radii xyz: angular radius in radians of each studio light's soft panel, which metal reflects
+		 * (zero keeps a point light). environment x: room reflection strength [0,1]; y: exposure before PBR
+		 * Neutral tone mapping, zero for clamped colour without tone mapping.
+		 */
+		studio_environment_enabled: u32 @offset(516);
+		studio_light_radii: array<f32, 4> @offset(520);
+		studio_environment: array<f32, 4> @offset(536);
 	}
 	struct nkscene_render_visibility_override @layout(16, 8) {
 		node: nkscene_node_id @offset(0);

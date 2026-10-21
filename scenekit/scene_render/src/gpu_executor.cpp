@@ -87,7 +87,10 @@ struct LightingUniformData {
     std::array<std::array<float, 4>, max_lights> light_cones{};
     std::array<float, 4> ambient_sky{0.35f, 0.35f, 0.35f, 0.0f};
     std::array<float, 4> ambient_ground{0.35f, 0.35f, 0.35f, 0.0f};
-    std::array<float, 4> lighting_mode{}; // x = studio shading, y = light count, z = environment reflection
+    // x = studio shading, y = light count, z = room reflection, w = exposure (0: clamp, no tone mapping).
+    // In studio shading light_cones[i].z is light i's soft-panel angular radius (0: point light), and
+    // light_cones[0].w is 1 for a studio environment (StudioLighting::environment).
+    std::array<float, 4> lighting_mode{};
     std::array<float, 4> camera_position{}; // xyz = world-space eye, w = perspective
     std::array<float, 4> camera_view_direction{0.0f, 0.0f, 1.0f, 0.0f};
     std::array<float, 4> ao_params{};
@@ -287,13 +290,16 @@ LightingUniformData lighting_uniform_data(const RenderPlan &plan,
                                           const SceneSnapshot &snapshot) noexcept {
     LightingUniformData result;
     if (plan.studio_lighting().enabled) {
-        result.lighting_mode = {1.0f, 3.0f, 0.6f, 0.0f};
+        const auto &studio = plan.studio_lighting();
+        result.lighting_mode = {1.0f, 3.0f, studio.reflection, studio.exposure};
         for (std::size_t index = 0; index < 3; ++index) {
-            const auto &direction = plan.studio_lighting().directions[index];
-            const auto &color = plan.studio_lighting().colors[index];
+            const auto &direction = studio.directions[index];
+            const auto &color = studio.colors[index];
             result.light_position_type[index] = {direction[0], direction[1], direction[2], 1.0f};
             result.light_color_intensity[index] = {color[0], color[1], color[2], direction[3]};
+            result.light_cones[index] = {0.0f, 0.0f, studio.light_radii[index], 0.0f};
         }
+        result.light_cones[0][3] = studio.environment ? 1.0f : 0.0f;
         result.ao_params = plan.studio_lighting().surface_detail;
         result.ao_params[1] = 0.0f; // enabled only after the capture depth prepass
         result.ambient_sky = plan.studio_lighting().ambient_sky;

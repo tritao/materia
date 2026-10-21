@@ -5,7 +5,8 @@
 #include "scene_internal.hpp"
 
 // Diagnostic capture: run under xvfb-run with an existing output directory.
-// Produces eight orbit-*.ppm images; pass "dark" for the dark material variant.
+// Produces eight orbit-*.ppm images. Options: "dark" for the dark material variant, "metal" for brushed
+// metal, "panels" for the editor's Studio look (haxeon.editor.ViewportLook): soft panels, light room, tone mapping.
 
 #include <array>
 #include <chrono>
@@ -109,7 +110,7 @@ std::array<float,16> view_projection(float yaw, float pitch, float aspect) {
     return result;
 }
 
-void configure_studio(nkscene::SceneView &view, float yaw, float pitch) {
+void configure_studio(nkscene::SceneView &view, float yaw, float pitch, bool panels) {
     const Vec eye{std::cos(pitch)*std::cos(yaw),std::cos(pitch)*std::sin(yaw),
                   std::sin(pitch)};
     const auto forward=scale(eye,-1), right=unit(cross(forward,{0,0,1}));
@@ -125,6 +126,23 @@ void configure_studio(nkscene::SceneView &view, float yaw, float pitch) {
         const auto &l=coin[i];
         const auto world=add(add(scale(right,-l[0]),scale(up,-l[1])),scale(forward,l[2]));
         view.studio_lighting.directions[i]={world[0],world[1],world[2],l[3]};
+    }
+    if (panels) {
+        // haxeon.editor.ViewportLook's Studio preset: its rig, room, panels and exposure.
+        const std::array<std::array<float,4>,3> studio{{
+            {0.60f,-0.60f,-0.53f,0.95f},{-0.65f,-0.15f,-0.74f,0.16f},{-0.45f,0.75f,0.48f,0.30f}}};
+        for (int i=0;i<3;++i) {
+            const auto &l=studio[i];
+            const auto world=add(add(scale(right,-l[0]),scale(up,-l[1])),scale(forward,l[2]));
+            view.studio_lighting.directions[i]={world[0],world[1],world[2],l[3]};
+        }
+        view.studio_lighting.ambient_sky={0.50f,0.53f,0.58f,0};
+        view.studio_lighting.ambient_ground={0.22f,0.23f,0.26f,0};
+        view.studio_lighting.light_radii={0.45f,0.7f,0.35f};
+        view.studio_lighting.environment=true;
+        view.studio_lighting.reflection=1.0f;
+        view.studio_lighting.exposure=1.0f;
+        view.studio_lighting.surface_detail={0.0f,0.0f,0.0f,0.40f};
     }
 }
 
@@ -143,7 +161,15 @@ bool wait_for_surface(nk_surface surface) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2 || argc > 3 || (argc == 3 && std::string(argv[2]) != "dark")) return 2;
+    if (argc < 2) return 2;
+    bool dark=false, metal=false, panels=false;
+    for (int index=2; index<argc; ++index) {
+        const std::string option=argv[index];
+        if (option=="dark") dark=true;
+        else if (option=="metal") metal=true;
+        else if (option=="panels") panels=true;
+        else return 2;
+    }
     nk_init_options init{}; init.struct_size=sizeof(init); init.api_version=NK_API_VERSION;
     if (nk_init(&init)!=NK_OK) return 1;
     nk_window window{}; nk_surface surface{}; nkgpu_renderer renderer{};
@@ -179,10 +205,11 @@ int main(int argc, char **argv) {
         const auto material=scene->reserve_material_id();
         auto &mat=scene->material_store().create(material);
         auto &material_state = mat.edit_state();
-        material_state.base_color = argc == 3 ? std::array<float,4>{0.24f,0.29f,0.35f,1.0f}
-                                               : std::array<float,4>{0.74f,0.77f,0.81f,1.0f};
-        // Match the editor's default broad plastic highlight.
-        material_state.roughness = 0.65f;
+        material_state.base_color = dark ? std::array<float,4>{0.24f,0.29f,0.35f,1.0f}
+                                         : std::array<float,4>{0.74f,0.77f,0.81f,1.0f};
+        // Match the editor's default broad plastic highlight, or MachineKit's machined steel.
+        material_state.roughness = metal ? 0.34f : 0.65f;
+        if (metal) material_state.metallic = 0.8f;
         const auto node=scene->reserve_node_id();
         nkscene::Transaction create(scene); create.add_create(node);
         nkscene::ChangeSet changes;
@@ -204,7 +231,7 @@ int main(int argc, char **argv) {
             view.camera.position={10*std::cos(pitch)*std::cos(yaw),
                                   10*std::cos(pitch)*std::sin(yaw),10*std::sin(pitch)};
             view.camera.view_direction=unit(view.camera.position);
-            configure_studio(view,yaw,pitch);
+            configure_studio(view,yaw,pitch,panels);
             auto plan=nkscene::compile(scene->snapshot(),view);
             std::vector<std::uint8_t> pixels;
             if (executor.capture_rgba8(plan,scene->snapshot(),options.width,options.height,

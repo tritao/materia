@@ -43,6 +43,39 @@ vec3 linear_to_srgb(vec3 value) {
                step(vec3(0.0031308), value));
 }
 
+// Studio light i as a soft panel: a Gaussian lobe of angular radius light_cones[i].z around its direction,
+// widened by the surface's specular spread. Its radiance keeps the panel's energy equal to the directional
+// light's irradiance (pi * intensity), so I / rho^2 at the centre. Zero radius is a point light (no panel).
+vec3 studio_panels(vec3 R, float roughness) {
+    vec3 radiance = vec3(0.0);
+    float spread = 1.2 * roughness * roughness;
+    for (int index = 0; index < 3; ++index) {
+        float radius = light_cones[index].z;
+        if (radius <= 0.0) continue;
+        float rho2 = radius * radius + spread * spread;
+        float angle = acos(clamp(dot(R, normalize(light_position_type[index].xyz)), -1.0, 1.0));
+        radiance += light_color_intensity[index].rgb * light_color_intensity[index].w *
+                    exp(-angle * angle / rho2) / rho2;
+    }
+    return radiance;
+}
+
+// Khronos PBR Neutral tone mapping (also model-viewer's "neutral"), applied after exposure.
+vec3 neutral_tone_map(vec3 color) {
+    const float start_compression = 0.8 - 0.04;
+    const float desaturation = 0.15;
+    float x = min(color.r, min(color.g, color.b));
+    float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+    color -= offset;
+    float peak = max(color.r, max(color.g, color.b));
+    if (peak < start_compression) return color;
+    const float d = 1.0 - start_compression;
+    float new_peak = 1.0 - d * d / (peak + d - start_compression);
+    color *= new_peak / peak;
+    float g = 1.0 - 1.0 / (desaturation * (peak - new_peak) + 1.0);
+    return mix(color, new_peak * vec3(1.0), g);
+}
+
 // Short-range screen-space obscurance of indirect light. Mesh normals keep flat
 // faces flat; world-space range rejection prevents distant silhouettes making halos.
 float screen_occlusion(vec3 N) {
@@ -122,15 +155,26 @@ void main() {
                    albedo * (1.0 - metallic) *
                    texture(occlusion_texture, vertex_texcoord).r;
     vec3 direct = vec3(0.0);
-    if (lighting_mode.z > 0.0) {
+    bool studio = lighting_mode.x > 0.5;
+    // light_cones[0].w marks a studio environment: soft panels, a sky/ground room and display mapping.
+    if (lighting_mode.z > 0.0 || studio) {
         vec3 R = reflect(-V, N);
-        float reflection_height = clamp(0.5 + 0.5 * R.z, 0.0, 1.0);
-        vec3 reflected = mix(ambient_ground.rgb, ambient_sky.rgb, reflection_height);
-        vec3 average_env = 0.5 * (ambient_ground.rgb + ambient_sky.rgb);
-        reflected = mix(average_env, reflected, 1.0 - roughness * roughness);
+        vec3 reflected;
+        if (studio && light_cones[0].w > 0.5) {
+            // The studio room is sky above the horizon and ground below (whose irradiance is the
+            // hemisphere ambient above); a reflection sees that edge blurred by the surface's roughness.
+            float edge = 0.05 + roughness * roughness;
+            reflected = mix(ambient_ground.rgb, ambient_sky.rgb, smoothstep(-edge, edge, R.z)) *
+                            lighting_mode.z + studio_panels(R, roughness);
+        } else {
+            float reflection_height = clamp(0.5 + 0.5 * R.z, 0.0, 1.0);
+            reflected = mix(ambient_ground.rgb, ambient_sky.rgb, reflection_height);
+            vec3 average_env = 0.5 * (ambient_ground.rgb + ambient_sky.rgb);
+            reflected = mix(average_env, reflected, 1.0 - roughness * roughness) * lighting_mode.z;
+        }
         vec3 grazing = max(F0, vec3(1.0 - roughness));
         vec3 env_fresnel = F0 + (grazing - F0) * pow(1.0 - NdotV, 5.0);
-        ambient += reflected * env_fresnel * lighting_mode.z *
+        ambient += reflected * env_fresnel *
                    texture(occlusion_texture, vertex_texcoord).r;
     }
     for (int index = 0; index < 32; ++index) {
@@ -167,7 +211,9 @@ void main() {
         float Gv = NdotV / (NdotV * (1.0 - k) + k);
         float Gl = NdotL / (NdotL * (1.0 - k) + k);
         vec3 F = F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
-        vec3 specular = D * Gv * Gl * F / max(4.0 * NdotV * NdotL, 0.0001);
+        // A studio panel's specular comes from its reflection above, not from a point highlight.
+        vec3 specular = studio && light_cones[index].z > 0.0
+                            ? vec3(0.0) : D * Gv * Gl * F / max(4.0 * NdotV * NdotL, 0.0001);
         vec3 diffuse = (1.0 - F) * (1.0 - metallic) * albedo / 3.14159265;
         direct += light_color_intensity[index].rgb *
                   (intensity * attenuation * NdotL * 3.14159265) *
@@ -183,5 +229,7 @@ void main() {
     // materials (mode 3) keep every fragment and let the blend state fade it.
     if (material_params.w > 1.5 && material_params.w < 2.5 && alpha < material_params.z)
         discard;
+    if (lighting_mode.w > 0.0)
+        color = neutral_tone_map(color * lighting_mode.w);
     fragment_color = vec4(linear_to_srgb(color), alpha);
 }
