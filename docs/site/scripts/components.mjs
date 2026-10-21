@@ -2,9 +2,10 @@
 // workspace program from MachineKit's registry): /components/ lists every recipe with a thumbnail, search and
 // family filters; /components/FAMILY/ shows each part with an orbitable model, its parameters, catalogue rows and
 // their provenance, connectors, mass and bill-of-materials line.
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import GithubSlugger from "github-slugger";
+import { writeOutput } from "./output.mjs";
 
 // The viewer settings the thumbnails share (docs/screens/components.py), so a thumbnail is the viewer's first frame.
 const VIEW = JSON.parse(readFileSync(new URL("../src/model-view.json", import.meta.url), "utf8"));
@@ -196,8 +197,7 @@ function familyPage(family, display) {
 /** Writes the catalogue pages below `out`; returns how many were written. */
 export function writeComponents(catalogue, out) {
 	const root = join(out, "components");
-	mkdirSync(root, { recursive: true });
-	writeFileSync(join(root, "index.md"), indexPage(catalogue));
-	for (const family of catalogue.families) writeFileSync(join(root, `${family.id}.md`), familyPage(family, catalogue.display));
+	writeOutput(join(root, "index.md"), indexPage(catalogue));
+	for (const family of catalogue.families) writeOutput(join(root, `${family.id}.md`), familyPage(family, catalogue.display));
 	return 1 + catalogue.families.length;
 }

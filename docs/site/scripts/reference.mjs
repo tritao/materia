@@ -4,7 +4,8 @@
 //
 // Also builds the index concept pages use to link `TypeName` and `TypeName.member` code spans to the
 // type's entry (see linkTypes).
-import { readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { writeOutput } from "./output.mjs";
 import { join } from "node:path";
 
 const GITHUB = "https://github.com/tritao/materia";
@@ -166,15 +167,13 @@ function indexPage(kits) {
 /** Writes the reference pages below `out` and returns how many were written. */
 export function writeReference(reference, out) {
 	const root = join(out, "reference");
-	mkdirSync(root, { recursive: true });
-	writeFileSync(join(root, "index.md"), indexPage(reference.kits));
+	writeOutput(join(root, "index.md"), indexPage(reference.kits));
 	let pages = 1;
 	for (const kit of reference.kits) {
-		mkdirSync(join(root, kit.kit), { recursive: true });
-		writeFileSync(join(root, kit.kit, "index.md"), kitPage(kit));
+		writeOutput(join(root, kit.kit, "index.md"), kitPage(kit));
 		pages++;
 		for (const pkg of kit.packages) {
-			writeFileSync(join(root, kit.kit, packageSlug(pkg.name) + ".md"), packagePage(kit, pkg));
+			writeOutput(join(root, kit.kit, packageSlug(pkg.name) + ".md"), packagePage(kit, pkg));
 			pages++;
 		}
 	}
