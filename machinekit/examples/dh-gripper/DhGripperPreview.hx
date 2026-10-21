@@ -326,8 +326,9 @@ class DhGripperPreview {
       state.setJoint(DhGripperJaws.MASTER,(opening-(custom ? 26 : 0))/2);
       scene.assemblyState=state.record();
       if(custom&&scene.presentation!=null) {
-        var point=scene.presentation.views[1].sections[0].point;
-        scene.presentation=DhGripperPresentation.build(definition,point);
+        var details=scene.presentation.views.filter(view->view.id=="jaw-detail");
+        if(details.length!=1||details[0].sections.length!=1)throw "Jaw detail requires exactly one guide section";
+        scene.presentation=DhGripperPresentation.build(definition,details[0].sections[0].point);
       }
       sys.io.File.saveBytes(directory()+'/build/$prefix-opening-$opening.mtrg',SceneArtifact.encode(scene));
     }
