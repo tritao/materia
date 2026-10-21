@@ -141,17 +141,24 @@ explode transforms, parent joint motion, plane dragging and mesh replacement.
 these intentional section strokes.
 
 The real editor capture harness accepts `--section-drag=60` alongside a sectioned
-`--view`. It sweeps the first plane by ±2 assembly units, measures 60 **rendered**
-frames after eight warm-up frames, restores the original section and prints
-`section-drag` mean/p95/max frame times. It does not save the modified view. Use a
-capture duration long enough for the full sweep, for example
-`--capture-seconds=20`. See inside and Jaw detail are recaptured in their example
-READMEs with their geometric cut boundaries visible (4× MSAA, 1800×900 window).
-On the shared desktop, the 60-frame drag checks averaged 28.6 ms/frame for the
-socket fixture and 24.2 ms/frame for the gripper (p95 45.6/37.1 ms). Renderer CPU
-preparation averaged 0.57/0.21 ms (p95 0.73/0.29 ms); the geometry preparation and
-mesh-packing counters stayed zero throughout the drag. These are measured local
-frame times, not a hardware-independent performance guarantee.
+`--view`. It sweeps the first plane by ±2 assembly units and measures 60 rendered
+frames after eight warm-up frames, restoring the point without saving edits.
+`--section-mode=none|caps|contours` supplies matched controls with the same camera,
+visibility and view revision work. `caps` disables contour preparation/drawing
+through process-local `NK_SCENE_SECTION_CONTOURS=0`; normal rendering is unchanged.
+Each measured frame prints UI submit, custom paint, native render and total work,
+separately from callback intervals.
+
+`NK_SCENE_GPU_TIMINGS` now records **non-overlapping** GPU intervals for stencil
+clear, parity, cap quads, contours, surface edges, surfaces and MSAA resolve,
+including separate `ao*` intervals. Per-part intervals aggregate under their pass
+name; GPU timers cross `end_pass` to include its resolve. Results are polled on
+later frames without waiting. `gpuMilliseconds` sums these intervals, excluding
+attachment clears, postprocessing, UI composition and desktop presentation.
+Timing queries flush the backend and are diagnostic only. The
+[matched baseline](../../../app/tests/performance/README.md#ap9-matched-section-drag-baseline-2026-10-21)
+runs all three modes both with normal X11 pacing and the existing opt-in
+acknowledgement bypass. Wall frame intervals do not measure section GPU cost.
 
 ## Specular antialiasing
 

@@ -138,6 +138,24 @@ There is no missing cap on the north wall: the plane never intersects it.
 The casting and fixture plates are transparent so they cannot obscure the sockets;
 transparent parts receive no caps. These are display changes only.
 
+The three thin lines below each cut wall end are the **ordinary perimeter edges
+of `socket-fixture-lower` and `socket-fixture-upper`**, the two transparent bed
+plates. They lie at Z=0, 18 and 36 mm; the coincident plate faces share the middle
+level. They disappear with Feature edges off or with both plates hidden. Hiding
+only the lower plate removes the lowest line. They are real edges below the
+walls, which start at Z=36 mm; they are separate from the wall cap contours.
+
+This recapture from below makes the plate perimeters and mounting screws clear:
+
+![See inside from below, showing the two transparent bed plate perimeters](images/socket-fixture-bed-plate-context.png)
+
+It uses the same generated view and visibility, with capture-only camera options
+`--camera-yaw=-1.0 --camera-pitch=-0.4 --distance-scale=1.1`. The named view,
+assembly and renderer geometry are unchanged. To reproduce the source-isolation
+checks, add `--shaded`, or add both
+`--hide-occurrence=socket-fixture-lower --hide-occurrence=socket-fixture-upper`
+to the capture command below.
+
 The captures above use the generated `build/socket-fixture/socket-fixture-assembled.mtrg`.
 Reproduce a named view from the repository root with:
 

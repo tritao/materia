@@ -95,6 +95,9 @@ nkgpu_result draw_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot 
         auto result=nkgpu_apply_scissor(state.renderer,1,cap.scissor[0],cap.scissor[1],cap.scissor[2],cap.scissor[3]);if(result!=NKGPU_OK)return result;
         for(int mode=1;mode<=3;++mode) {
             bool parity=mode==2,clear=mode==1;ClipUniformData clips{};
+            if(state.capture_profiler)state.capture_profiler->pass(for_ao ?
+                (clear?"aoStencilClear":parity?"aoParity":"aoCapQuads") :
+                (clear?"stencilClear":parity?"parity":"capQuads"));
             for(std::size_t p=0;p<plan.clip_planes().size();++p)if((parity&&p==cap.plane)||(!clear&&!parity&&p!=cap.plane))clips.planes[static_cast<int>(clips.count[0]++)]=plan.clip_planes()[p];
             auto pipeline=picking?state.pick_caps[for_ao?1:0][mode-1]:parity&&gpu.indexed?set.indexed_parity:set.caps[mode-1];
             if((result=nkgpu_apply_pipeline(state.renderer,pipeline))!=NKGPU_OK)return result;
@@ -126,5 +129,6 @@ nkgpu_result draw_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot 
         }
         ++cap_index;
     }
+    if(state.capture_profiler)state.capture_profiler->pass(for_ao?"aoSurfaces":"surfaces");
     return nkgpu_apply_scissor(state.renderer,0,0,0,0,0);
 }

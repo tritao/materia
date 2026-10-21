@@ -3,6 +3,8 @@
 template<class StateT>
 bool prepare_contours(StateT &state,const RenderPlan &plan,const SceneSnapshot &snapshot,
                       unsigned samples,GpuExecutionStats &stats) {
+    const auto *diagnostic=std::getenv("NK_SCENE_SECTION_CONTOURS");
+    if(diagnostic && std::string(diagnostic)=="0")return true;
     for(auto it=state.contours.begin();it!=state.contours.end();) {
         if(!snapshot.find_node(NodeId{it->first.first})) {
             if(it->second.buffer.id)(void)nkgpu_buffer_destroy(state.renderer,it->second.buffer);
@@ -49,6 +51,8 @@ bool prepare_contours(StateT &state,const RenderPlan &plan,const SceneSnapshot &
 template<class StateT>
 bool draw_contours(StateT &state,const RenderPlan &plan,const SceneSnapshot &snapshot,
                    unsigned samples,GpuExecutionStats &stats) {
+    const auto *diagnostic=std::getenv("NK_SCENE_SECTION_CONTOURS");
+    if(diagnostic && std::string(diagnostic)=="0")return true;
     if(state.caps.empty())return true;
     std::array<float,16> inverse{};
     if(!invert_matrix(plan.view_projection(),inverse))return true;

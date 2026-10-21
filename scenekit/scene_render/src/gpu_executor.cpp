@@ -2596,6 +2596,7 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
     }
     bool pass_active = false;
     const auto fail_frame = [&](nkgpu_result failure) {
+        if(state.capture_profiler)state.capture_profiler->pause();
         if (pass_active)
             (void)nkgpu_end_pass(state.renderer);
         (void)nkgpu_end_frame(state.renderer);
@@ -2626,6 +2627,7 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
     if (result != NKGPU_OK)
         return fail_frame(result);
     pass_active = true;
+    if(state.capture_profiler)state.capture_profiler->pass("aoSurfaces");
 
     if ((result = nkgpu_apply_viewport(state.renderer, 0, 0, static_cast<std::int32_t>(width),
                                        static_cast<std::int32_t>(height))) != NKGPU_OK)
@@ -2662,13 +2664,16 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
             return fail_frame(result);
     }
     if((result=draw_caps(state,plan,snapshot,LightingUniformData{},1,true,for_ao,stats))!=NKGPU_OK)return fail_frame(result);
+    if(state.capture_profiler)state.capture_profiler->pass("aoResolve");
     if ((result = nkgpu_end_pass(state.renderer)) != NKGPU_OK) {
         pass_active = false;
+        if(state.capture_profiler)state.capture_profiler->pause();
         (void)nkgpu_end_frame(state.renderer);
         state.last_result = result;
         return result;
     }
     pass_active = false;
+    if(state.capture_profiler)state.capture_profiler->pause();
     if ((result = nkgpu_end_frame(state.renderer)) != NKGPU_OK) {
         state.last_result = result;
         return result;
@@ -3061,7 +3066,12 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
 
     auto *profiler = state_->capture_profiler.get();
     render_internal::CaptureProfiler::Sample timing;
-    if (profiler) timing = profiler->start(state_->renderer);
+    if (profiler) {
+        timing = profiler->start(state_->renderer);
+        timing.view_projection=plan.view_projection();
+        timing.clip_plane_count=plan.clip_planes().size();
+    }
+    render_internal::CaptureProfiler::Binding timing_scope(profiler,timing);
     GpuExecutionStats stats;
     if (!synchronize(plan, snapshot, stats))
         return state_->last_result;
@@ -3151,10 +3161,12 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     if ((result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, samples, stats)) !=
         NKGPU_OK)
         return fail_frame(result);
+    if(profiler)profiler->pass("surfaceEdges");
     if (!draw_stroke_batches(*state_, plan, snapshot, samples, stats))
         return fail_frame(stats.result);
+    if(profiler)profiler->pass("contours");
     if(!draw_contours(*state_,plan,snapshot,samples,stats))return fail_frame(stats.result);
-    if (profiler) profiler->end(timing);
+    if(profiler)profiler->pass("resolve");
     if ((result = nkgpu_end_pass(state_->renderer)) != NKGPU_OK) {
         pass_active = false;
         if (profiler) profiler->abort(timing);
@@ -3163,6 +3175,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         return result;
     }
     pass_active = false;
+    if(profiler)profiler->end(timing);
 
     if (apply_post_process) {
         /* Keep the raw scene in capture_color and run image-space effects in

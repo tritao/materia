@@ -8,6 +8,10 @@
 #include <iomanip>
 #include <sstream>
 #include <vector>
+#include <map>
+#include <string>
+#include <utility>
+#include <array>
 
 namespace nkscene::render_internal {
 
@@ -16,10 +20,18 @@ namespace nkscene::render_internal {
 class CaptureProfiler {
     using Clock = std::chrono::steady_clock;
 public:
+    struct Interval {
+        nkgpu_timestamp query{};
+        std::string pass;
+        bool ended = false;
+        double ms = 0;
+    };
     struct Sample {
         nkgpu_renderer renderer{};
-        nkgpu_timestamp query{};
+        std::vector<Interval> intervals;
         std::uint64_t frame = 0;
+        std::array<float,16> view_projection{};
+        std::size_t clip_plane_count=0;
         Clock::time_point started{}, prepared{};
         double wall_seconds = 0.0;
         double prepare_ms = 0.0;
@@ -28,7 +40,7 @@ public:
         double packing_ms = 0.0;
         double submit_ms = 0.0;
         bool active = false;
-        bool query_ended = false;
+        bool gpu_failed = false;
     };
 
     explicit CaptureProfiler(const char *path) : output_(path, std::ios::app) {
@@ -80,53 +92,59 @@ public:
         sample.prepare_ms = milliseconds(sample.prepared - sample.started);
     }
 
-    void begin(Sample &sample) {
-        if (!sample.active) return;
-        // Bound retained query resources even if the GPU stops completing work.
-        if (queries_supported_ && pending_.size() < 8 &&
-            nkgpu_timestamp_begin(sample.renderer, &sample.query) != NKGPU_OK) {
-            sample.query = {};
-            queries_supported_ = false;
+    // Intervals never overlap: GL_TIME_ELAPSED cannot nest. A pass can have
+    // several intervals (per-part parity/quads); aggregate them on collection.
+    class Binding {
+    public:
+        Binding(CaptureProfiler *profiler, Sample &sample) : profiler_(profiler), sample_(sample) {
+            if(profiler_)profiler_->current_=sample.active?&sample:nullptr;
         }
-    }
-
-    void end(Sample &sample) {
-        if (!sample.active) return;
-        if (!sample.query.id || sample.query_ended) return;
-        if (nkgpu_timestamp_end(sample.renderer, sample.query) == NKGPU_OK)
-            sample.query_ended = true;
-        else {
-            (void)nkgpu_timestamp_destroy(sample.renderer, sample.query);
-            sample.query = {};
-            queries_supported_ = false;
-        }
-    }
-
-    void finish(Sample &sample) {
-        if (!sample.active) return;
-        sample.submit_ms = milliseconds(Clock::now() - sample.prepared);
-        if (sample.query.id && sample.query_ended) pending_.push_back(sample);
-        else write(sample, nullptr);
-        sample.query = {};
-    }
-
-    void abort(Sample &sample) {
+        ~Binding() { if(profiler_)profiler_->abort(sample_); }
+        Binding(const Binding &)=delete;
+        Binding &operator=(const Binding &)=delete;
+    private:
+        CaptureProfiler *profiler_;
+        Sample &sample_;
+    };
+    void pass(const char *name) { if(current_) begin(*current_,name); }
+    void pause() { if(current_) end(*current_); }
+    void begin(Sample &sample, const char *name="surfaces") {
         if (!sample.active) return;
         end(sample);
-        if (sample.query.id) (void)nkgpu_timestamp_destroy(sample.renderer, sample.query);
-        sample.query = {};
+        if (!queries_supported_ || pending_.size() >= 8) return;
+        Interval interval;interval.pass=name;
+        if(nkgpu_timestamp_begin(sample.renderer,&interval.query)!=NKGPU_OK) {
+            sample.gpu_failed=true;queries_supported_=false;return;
+        }
+        sample.intervals.push_back(interval);
     }
-
+    void end(Sample &sample) {
+        if(!sample.active || sample.intervals.empty())return;
+        auto &interval=sample.intervals.back();
+        if(interval.ended)return;
+        interval.ended=nkgpu_timestamp_end(sample.renderer,interval.query)==NKGPU_OK;
+        if(!interval.ended){sample.gpu_failed=true;queries_supported_=false;}
+    }
+    void finish(Sample &sample) {
+        if(!sample.active)return;
+        end(sample);current_=nullptr;
+        sample.submit_ms=milliseconds(Clock::now()-sample.prepared);
+        if(!sample.intervals.empty())pending_.push_back(std::move(sample));
+        else write(sample,false);
+        sample.active=false;
+    }
+    void abort(Sample &sample) {
+        if(!sample.active)return;
+        end(sample);current_=nullptr;destroy(sample);sample.active=false;
+    }
     void release() {
         collect();
-        for (const auto &sample : pending_) {
-            write(sample, nullptr);
-            (void)nkgpu_timestamp_destroy(sample.renderer, sample.query);
-        }
+        for(auto &sample:pending_){write(sample,false);destroy(sample);}
         pending_.clear();
     }
 
 private:
+    Sample *current_=nullptr;
     std::ofstream output_;
     std::vector<Sample> pending_;
     std::uint64_t frame_count_ = 0;
@@ -140,19 +158,25 @@ private:
         return std::chrono::duration<double, std::milli>(value).count();
     }
 
+    void destroy(Sample &sample) {
+        for(auto &interval:sample.intervals)(void)nkgpu_timestamp_destroy(sample.renderer,interval.query);
+        sample.intervals.clear();
+    }
     void collect() {
-        for (auto it = pending_.begin(); it != pending_.end();) {
-            nkgpu_timestamp_info info{};
-            info.struct_size = sizeof(info);
-            const auto result = nkgpu_timestamp_query(it->renderer, it->query, &info);
-            if (result == NKGPU_OK && info.state == NKGPU_TIMESTAMP_PENDING) { ++it; continue; }
-            write(*it, result == NKGPU_OK && info.state == NKGPU_TIMESTAMP_READY ? &info : nullptr);
-            (void)nkgpu_timestamp_destroy(it->renderer, it->query);
-            it = pending_.erase(it);
+        for(auto it=pending_.begin();it!=pending_.end();) {
+            bool pending=false,valid=!it->gpu_failed;
+            for(auto &interval:it->intervals) {
+                nkgpu_timestamp_info info{};info.struct_size=sizeof(info);
+                const auto result=nkgpu_timestamp_query(it->renderer,interval.query,&info);
+                if(result==NKGPU_OK && info.state==NKGPU_TIMESTAMP_PENDING)pending=true;
+                else if(result!=NKGPU_OK || info.state!=NKGPU_TIMESTAMP_READY)valid=false;
+                else interval.ms=double(info.nanoseconds)/1000000.0;
+            }
+            if(pending){++it;continue;}
+            write(*it,valid);destroy(*it);it=pending_.erase(it);
         }
     }
-
-    void write(const Sample &sample, const nkgpu_timestamp_info *info) {
+    void write(const Sample &sample, bool valid) {
         std::ostringstream line;
         line << std::setprecision(17) << "{\"frame\":" << sample.frame
              << ",\"startedAtSeconds\":" << sample.wall_seconds
@@ -161,9 +185,15 @@ private:
              << ",\"geometryMilliseconds\":" << sample.geometry_ms
              << ",\"packingMilliseconds\":" << sample.packing_ms
              << ",\"submitMilliseconds\":" << sample.submit_ms << ",\"gpuMilliseconds\":";
-        if (info) line << static_cast<double>(info->nanoseconds) / 1000000.0;
-        else line << "null";
-        line << "}\n";
+        std::map<std::string,double> passes;double total=0;
+        for(const auto &interval:sample.intervals){passes[interval.pass]+=interval.ms;total+=interval.ms;}
+        if(valid)line<<total;else line<<"null";
+        line<<",\"gpuPassMilliseconds\":{";
+        bool first=true;
+        for(const auto &[name,ms]:passes){if(!first)line<<",";first=false;line<<"\""<<name<<"\":";if(valid)line<<ms;else line<<"null";}
+        line << "},\"clipPlaneCount\":"<<sample.clip_plane_count<<",\"viewProjection\":[";
+        for(std::size_t i=0;i<sample.view_projection.size();++i){if(i)line<<",";line<<sample.view_projection[i];}
+        line << "]}\n";
         output_ << line.str();
         output_.flush();
     }

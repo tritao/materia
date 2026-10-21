@@ -360,13 +360,17 @@ captures under desktop load, not a reproducible performance gate.
 
 Set `NK_SCENE_GPU_TIMINGS=/absolute/path/timings.jsonl` to opt into native scene
 capture diagnostics. JSONL records include epoch start time, CPU preparation,
-CPU submission and GPU draw milliseconds. GPU queries are polled on later
-frames, never waited on, and capped at eight pending queries. Unsupported or
-unfinished queries report null. GPU draw timing covers the main scene pass
-between pass begin/end; it excludes target clear, MSAA resolve, optional
-postprocessing, UI composition and desktop presentation. CPU submission includes
-pass completion and optional postprocessing. Logging and query flushes can affect
-timing; keep this environment variable unset for normal use.
+CPU submission and GPU milliseconds. GPU queries are polled on later frames,
+never waited on, and capped at eight pending sampled frames. Unsupported or
+unfinished queries report null. `gpuPassMilliseconds` splits non-overlapping
+intervals into surfaces, stencil clear, parity, cap quads, surface edges,
+contours and MSAA resolve, with separate `ao*` entries for the position prepass.
+A repeated per-part interval is summed under its pass name. `gpuMilliseconds`
+is the sum of these intervals, excluding target clears, optional postprocessing,
+UI composition and desktop presentation. NativeKit permits intervals to cross
+`end_pass`, so resolve is measured rather than inferred from CPU wall time.
+CPU submission includes pass completion and optional postprocessing. Logging and
+query flushes can affect timing; keep this variable unset for normal use.
 
 A separate capture with valid GPU queries measured main-pass GPU draw time
 0.486 ms median (1.642 ms p95, 118 samples), CPU preparation 2.405 ms and
@@ -2028,3 +2032,99 @@ bypass; this is an application throughput measurement, not a scanout measurement
 The GTK regression checks repeated callbacks with the mitigation enabled and
 verifies that idle rendering stops. The Muffin patch still needs controlled
 hardware validation before replacing this local mitigation.
+
+### AP9 matched section drag baseline (2026-10-21)
+
+`section-drag.py` runs See inside and Jaw detail with no section, caps only,
+and caps plus contours, each with normal X11 acknowledgement pacing and with
+`NK_X11_DISABLE_FRAME_SYNC=1`. It changes no desktop settings. Build
+`app/tests/haxeon.presentation-capture.json` to
+`app/tests/presentation/build/host/capture.hl`, then run:
+
+```sh
+DISPLAY=:0 python app/tests/performance/section-drag.py --seconds 8
+```
+
+All cases use the same fixed view camera, visibility, 1800×900 window, 4× MSAA,
+eight warm-up frames and 60 rendered-frame sinusoidal ±2 mm plane updates.
+The no-section control retains the same view-selection revision/invalidation
+work but removes the planes; caps-only disables contour preparation and drawing
+through process-local `NK_SCENE_SECTION_CONTOURS=0`. The harness never saves the
+project. Per-frame UI phase records and GPU query results are matched by epoch
+time and retained in `build/presentation-ap9-baseline`, together with captures
+and `summary.json`. Each measured GPU row includes its view-projection matrix
+and plane count. The runner rejects camera movement during the sweep, a camera
+that differs between controls, or the wrong plane count, and retains rejected
+runs separately. GPU pass timings measure section cost; callback intervals
+measure editor/compositor throughput and must not be substituted for GPU cost.
+
+Measured results (milliseconds, 60 frames per row; `--seconds 8`):
+
+| View / pacing | Mode | Callback mean / p95 | UI work | Scene CPU prepare / submit | GPU mean / p95 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| socket / normal | none | 33.15 / 36.44 | 6.67 | 0.19 / 0.47 | 1.216 / 1.228 |
+| socket / normal | caps | 33.05 / 45.55 | 6.91 | 0.93 / 0.31 | 1.134 / 1.144 |
+| socket / normal | contours | 32.92 / 47.55 | 9.34 | 3.10 / 0.35 | 1.094 / 1.104 |
+| socket / bypass | none | 34.40 / 42.77 | 7.42 | 0.90 / 0.24 | 1.166 / 1.175 |
+| socket / bypass | caps | 32.99 / 45.80 | 8.39 | 1.60 / 0.35 | 1.123 / 1.138 |
+| socket / bypass | contours | 31.99 / 38.19 | 7.44 | 1.12 / 0.52 | 1.093 / 1.106 |
+| gripper / normal | none | 33.45 / 37.13 | 6.87 | 0.37 / 0.15 | 0.697 / 0.707 |
+| gripper / normal | caps | 32.12 / 36.80 | 7.57 | 0.55 / 0.18 | 0.868 / 0.884 |
+| gripper / normal | contours | 31.75 / 48.59 | 8.43 | 1.60 / 0.19 | 0.872 / 0.890 |
+| gripper / bypass | none | 34.10 / 46.44 | 8.76 | 1.74 / 0.17 | 0.728 / 0.735 |
+| gripper / bypass | caps | 33.56 / 44.39 | 7.57 | 0.79 / 0.18 | 0.912 / 0.894 |
+| gripper / bypass | contours | 31.73 / 37.18 | 7.86 | 1.03 / 0.18 | 0.870 / 0.883 |
+
+`UI work` is `UiFrameMetrics.totalSeconds`. Scene prepare/submit overlap custom
+paint and must not be added to UI work. Across these controls, UI submit means
+range 2.67–3.22 ms, custom paint 0.90–4.21 ms and native UI render 2.29–3.28 ms.
+GPU totals include AO and main rendering. Queries flush the backend, so these
+CPU phase durations and callback intervals are diagnostic measurements, not
+uninstrumented production throughput. Normal-pacing median scene prepare times
+(none/caps/contours) are:
+
+- socket: 0.206/0.392/0.745 ms.
+- gripper: 0.174/0.251/0.286 ms.
+
+GPU pass means with caps and contours enabled:
+
+| View / pacing | Stencil clear (main + AO) | Parity (main + AO) | Cap quads (main + AO) | Contours | MSAA resolve | AO pass end |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| socket / normal | 0.060 | 0.068 | 0.213 | 0.0089 | 0.036 | 0.006 |
+| socket / bypass | 0.060 | 0.068 | 0.213 | 0.0091 | 0.036 | 0.006 |
+| gripper / normal | 0.019 | 0.021 | 0.093 | 0.0034 | 0.037 | 0.006 |
+| gripper / bypass | 0.018 | 0.021 | 0.093 | 0.0033 | 0.037 | 0.006 |
+
+The main/AO split under normal pacing is:
+
+- socket: parity 0.0389/0.0291 ms; cap quads 0.1857/0.0278 ms.
+- gripper: parity 0.0088/0.0126 ms; cap quads 0.0821/0.0106 ms.
+
+The remaining GPU work is surfaces and ordinary edges, individually available
+in each JSONL row. Other pass timings vary between runs; the contour interval
+directly measures contour cost rather than subtracting separate captures.
+
+Including stencil clear, parity, cap quads and contours in both the shaded and
+AO passes, section work costs about **0.35 ms for the socket and 0.14 ms for the
+gripper**. Contours account for only 0.009/0.0034 ms respectively. Under normal
+pacing, total GPU time changes from 1.216 to 1.094 ms for the socket (clipping
+removes surface work) and from 0.697 to 0.872 ms for the gripper.
+
+The no-section baseline is equally slow: normal-pacing callback means are
+33.15/33.45 ms for socket/gripper, compared with 32.92/31.75 ms with caps and
+contours. The acknowledgement bypass gives no consistent improvement. These
+controls rule out section GPU work as the explanation for the slow intervals;
+they do not establish the earlier Muffin acknowledgement defect as the cause.
+Intervals also include application work outside UI metrics and scheduling/waits,
+so subtracting GPU or UI time is not a compositor timer. This is an editor/desktop
+pacing follow-up. No rendering optimization is warranted from these data. No
+Muffin patch was installed and desktop settings were unchanged.
+
+An earlier series lacked per-frame camera proof and desktop input was found
+in its saved window state. It is retained under
+`build/presentation-ap9-baseline-unchecked` and excluded from these figures.
+All twelve replacement runs passed constant-camera, cross-control-camera and
+plane-count assertions for all 60 measured frames. All nine renderer suites and
+the NativeKit transfer/timestamp smoke tests pass. The transfer regression ends
+a timestamp after `end_pass`; the real 4× MSAA runs retain valid per-pass queries
+through resolve.

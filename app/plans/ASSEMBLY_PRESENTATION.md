@@ -397,6 +397,40 @@ a 60-rendered-frame ±2 mm section drag: mean frame times 28.6/24.2 ms and p95
 is 0.57/0.21 ms, with zero geometry preparation or mesh repacking during either
 sweep. The capture harness restores the original section and saves no view edits.
 
+AP9 review follow-up (2026-10-21): measured the identical eight-warm-up,
+60-rendered-frame ±2 mm sweep with no section, caps only and caps plus contours,
+under both normal X11 pacing and `NK_X11_DISABLE_FRAME_SYNC=1`. Each measured
+GPU record carries its camera matrix and plane count; all twelve runs pass
+constant-camera, cross-control-camera and section-state assertions. An earlier
+series without that proof was excluded after desktop input was found in its
+saved state. Visibility is fixed across modes. Non-overlapping GPU queries cover
+stencil clear, parity, cap quads, contours and MSAA resolve, including AO;
+UI submit/custom-paint/native-render costs are recorded separately.
+
+| View / pacing | GPU ms: none / caps / contours | Callback mean ms: none / caps / contours |
+| --- | ---: | ---: |
+| socket / normal | 1.216 / 1.134 / 1.094 | 33.15 / 33.05 / 32.92 |
+| socket / bypass | 1.166 / 1.123 / 1.093 | 34.40 / 32.99 / 31.99 |
+| gripper / normal | 0.697 / 0.868 / 0.872 | 33.45 / 32.12 / 31.75 |
+| gripper / bypass | 0.728 / 0.912 / 0.870 | 34.10 / 33.56 / 31.73 |
+
+Section GPU work costs about 0.35/0.14 ms (socket/gripper, including main and AO
+stencil clear, parity, cap quads and contours). Contours alone cost
+0.009/0.0034 ms. Main MSAA resolve costs about 0.036/0.037 ms. The no-section
+baseline is equally slow; no rendering algorithm was changed for performance.
+The bypass provides no consistent improvement, so the earlier Muffin defect
+is not established as the cause. No compositor patch or desktop settings changed.
+All nine renderer suites and NativeKit transfer/timestamp tests pass. Full
+mean/p95, CPU/UI and GPU pass attribution and reproduction instructions are in
+`app/tests/performance/README.md`, AP9 matched section drag baseline.
+
+The fixture's three protruding lines are ordinary edges of the transparent
+`socket-fixture-lower` and `socket-fixture-upper` plates at Z=0/18/36 mm.
+Feature edges off or both plates hidden removes them; hiding only the lower
+plate removes the lowest line. A new underside recapture in the example README
+shows their connected plate perimeters. The main view was also recaptured.
+There is no stray contour or surface-edge remnant to fix.
+
 Caps carry no boundary line. Edge remnants near caps are deliberately suppressed
 (`01113c6eb`). Touching cut parts of similar material, such as a screw in a tapped
 hole, an insert in a casting or a shaft in a bore, merge into one hatched area,
