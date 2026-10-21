@@ -37,6 +37,7 @@ class InspectionCameraPanel {
     if(viewport==null){viewport=new EditorPerspectiveViewport("inspection-camera-view",app.scene,app.hostContext);viewport.setPlacementOptions(false,0,false);viewport.setSimulationOverlays(false);viewport.setCosmeticThreads(false);}
     viewport.setPresentation(app.session.presentation,app.session.projectAssemblyDefinition,app.session.presentationCenters(),app.session.assemblyUnitMetres(),true);
     viewport.solvePresentationJoints=app.session.presentationJointPoses;
+    viewport.presentationGeometryFingerprint=app.session.presentationGeometryFingerprint;
     var frame=app.framePresentation;
     viewport.setSimulationState(app.simulation.isActive(),frame==null?[]:frame.environment,frame==null?0:frame.revision);
     rows.push(new KeyedView("views",PresentationControls.build(viewport,()->app.invalidateView(),"inspection-views")));

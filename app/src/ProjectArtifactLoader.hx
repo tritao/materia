@@ -142,7 +142,7 @@ class ProjectArtifactLoader {
         new RobotMotionTrack("assembly:" + definition.id, 0, motion.loop, motion.keys, motion.joint)];
     }
 
-    return {objects: records, presentation:artifact.presentation, projectVariant:project==null?null:project.variant, projectJob: project == null ? null : project.job, robotMotions: motions,
+    return {objects: records, presentation:artifact.presentation, presentationGeometryFingerprint:materia.presentation.PresentationGeometry.fingerprint(artifact), projectVariant:project==null?null:project.variant, projectJob: project == null ? null : project.job, robotMotions: motions,
       geometryBySnapshot: geometryBySnapshot,
       assemblyDefinition: artifact.assemblyDefinition,
       assemblyState: runtimeState == null ? null : runtimeState.record(),

@@ -49,9 +49,13 @@ class PresentationController {
   public function previous():Void {
     animating=false;cursor.progress=0;cursor.step=Std.int(Math.max(0,cursor.step-1));revision++;
   }
+  public function failedMovement():Bool {
+    var procedure=selectedProcedure();if(procedure==null||cursor.step>=procedure.steps.length)return false;
+    return materia.presentation.StepMotions.failed(procedure.steps[cursor.step].action);
+  }
   public function next(animate:Bool=true):Void {
-    var procedure=selectedProcedure();if(procedure==null||cursor.step>=procedure.steps.length||animating)return;
-    var moving=switch procedure.steps[cursor.step].action {case Remove(_,_)|Install(_,_): true;case _: false;};
+    var procedure=selectedProcedure();if(procedure==null||cursor.step>=procedure.steps.length||animating||failedMovement())return;
+    var moving=materia.presentation.StepMotions.members(procedure.steps[cursor.step].action).length>0;
     if(animate&&moving){animating=true;cursor.progress=0;}else{cursor.step++;cursor.progress=0;}
     revision++;
   }

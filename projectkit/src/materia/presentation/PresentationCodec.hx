@@ -99,9 +99,16 @@ class PresentationCodec {
         if (step.view != null && !views.exists(step.view)) throw "Unknown procedure view";
         selectors(step.highlight);
         if (step.action == null) throw "Missing procedure action";
-        switch step.action {
-          case Remove(select, motion) | Install(select, motion):
-            resolve(flat, select);
+        var moving=StepMotions.members(step.action);
+        switch step.action {case RemoveGroup(items)|InstallGroup(items):if(items==null||items.length==0)throw "Movement group must not be empty";case _:}
+        var moved=new Map<String,Bool>();
+        for(member in moving) {
+            if(member==null)throw "Missing group member";
+            var select=member.select,motion=member.motion;
+            for(id in resolve(flat,select)) {
+              if(moved.exists(id))throw "Movement group contains overlapping selectors";
+              moved.set(id,true);
+            }
             if (motion == null || motion.path == null || motion.path.length < 2 || motion.evidence == null)
               throw "Movement needs a path and evidence";
             for (point in motion.path) vector(point);
@@ -113,6 +120,8 @@ class PresentationCodec {
             }
             if (procedure.source == Authored && motion.evidence != Illustrative)
               throw "Authored movement evidence must be Illustrative";
+        }
+        switch step.action {
           case SetJoints(coordinates):
             if (coordinates == null) throw "Missing joint coordinates";
             var seen = new Map<String, Bool>();
@@ -125,7 +134,7 @@ class PresentationCodec {
                   joint.limits.upper != null && coordinate.value > joint.limits.upper) throw "Procedure coordinate exceeds joint limits";
               seen.set(coordinate.joint, true);
             }
-          case Note:
+          case _:
         }
       }
     }

@@ -123,31 +123,36 @@ class PresentationEvaluator {
         move(offset.select, offset.direction, offset.distance * Math.max(0, Math.min(1, cursor.explode * stages - offset.stage + 1)));
       if (procedure != null) {
         var removed = new Map<String, PresentationMotion>();
-        if (procedure.start == Disassembled) for (step in procedure.steps) switch step.action {
-          case Install(select, motion) | Remove(select, motion): for (id in PresentationCodec.resolve(flat, select)) removed.set(id, motion);
-          case _:
-        }
-        for (index in 0...cursor.step) switch procedure.steps[index].action {
-          case Remove(select, motion): for (id in PresentationCodec.resolve(flat, select)) removed.set(id, motion);
-          case Install(select, _): for (id in PresentationCodec.resolve(flat, select)) removed.remove(id);
-          case SetJoints(coordinates): for (coordinate in coordinates) result.jointOverrides.set(coordinate.joint, coordinate.value);
-          case Note:
-        }
-        for (id in removed.keys()) result.visibility.set(id, Hidden);
-        if (cursor.step < procedure.steps.length) {
-          var step = procedure.steps[cursor.step]; result.activeStep = step;
-          for (select in step.highlight) for (id in PresentationCodec.resolve(flat, select))
-            if (result.highlight.indexOf(id) < 0) result.highlight.push(id);
-          switch step.action {
-            case Remove(select, motion) | Install(select, motion):
-              result.evidence = badge(motion.evidence, fingerprint);
-              var t = switch step.action { case Install(_, _): 1 - cursor.progress; case _: cursor.progress; };
-              var segment = t * (motion.path.length - 1);
-              var index = Std.int(Math.min(motion.path.length - 2, Math.floor(segment)));
-              var a = motion.path[index], b = motion.path[index + 1], blend = segment - index;
-              move(select, {x:a.x + (b.x-a.x)*blend, y:a.y + (b.y-a.y)*blend, z:a.z + (b.z-a.z)*blend}, 1);
-              for (id in PresentationCodec.resolve(flat, select)) result.visibility.set(id, Shown);
+        if (procedure.start == Disassembled) for (step in procedure.steps)
+          for(member in StepMotions.members(step.action))for(id in PresentationCodec.resolve(flat,member.select))removed.set(id,member.motion);
+        for (index in 0...cursor.step) {
+          var action=procedure.steps[index].action;
+          if(!StepMotions.failed(action))for(member in StepMotions.members(action))for(id in PresentationCodec.resolve(flat,member.select)) {
+            if(StepMotions.installing(action))removed.remove(id);else removed.set(id,member.motion);
+          }
+          switch action {
+            case SetJoints(coordinates):for(coordinate in coordinates)result.jointOverrides.set(coordinate.joint,coordinate.value);
             case _:
+          }
+        }
+        for(id in removed.keys())result.visibility.set(id,Hidden);
+        if(cursor.step<procedure.steps.length) {
+          var step=procedure.steps[cursor.step];result.activeStep=step;
+          for(select in step.highlight)for(id in PresentationCodec.resolve(flat,select))
+            if(result.highlight.indexOf(id)<0)result.highlight.push(id);
+          for(member in StepMotions.members(step.action)) {
+            var select=member.select,motion=member.motion;
+            var evidence=badge(motion.evidence,fingerprint);
+            // A group's badge reflects its weakest evidence.
+            if(result.evidence==null||evidence=="Failed"||evidence=="Stale"&&result.evidence!="Failed"||
+                evidence=="Illustrative"&&result.evidence=="Checked")result.evidence=evidence;
+            var t=StepMotions.installing(step.action)?1-cursor.progress:cursor.progress;
+            if(StepMotions.failed(step.action))t=StepMotions.installing(step.action)?1:0;
+            var segment=t*(motion.path.length-1);
+            var index=Std.int(Math.min(motion.path.length-2,Math.floor(segment)));
+            var a=motion.path[index],b=motion.path[index+1],blend=segment-index;
+            move(select,{x:a.x+(b.x-a.x)*blend,y:a.y+(b.y-a.y)*blend,z:a.z+(b.z-a.z)*blend},1);
+            for(id in PresentationCodec.resolve(flat,select))result.visibility.set(id,Shown);
           }
         }
       }

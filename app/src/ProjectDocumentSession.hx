@@ -83,6 +83,7 @@ class ProjectDocumentSession {
   var initialAssemblyState:Null<AssemblyStateRecord> = null;
   /** Source definition bound to the runtime; compiled models own a separate snapshot. */
   var assemblyRuntimeDefinition:Null<AssemblyDefinition> = null;
+  public var presentationGeometryFingerprint(default,null):String = "";
   public var presentation(default,null):Null<AssemblyPresentation> = null;
   var generatedPresentation:Null<AssemblyPresentation>;
   var authoredPresentation:Null<AuthoredPresentation>;
@@ -287,6 +288,7 @@ class ProjectDocumentSession {
       generated.printJob);
     projectVariant = generated.projectVariant;
     projectJob = generated.projectJob;
+    presentationGeometryFingerprint=generated.presentationGeometryFingerprint==null?"":generated.presentationGeometryFingerprint;
     generatedPresentation=generated.presentation;
     var presentationDefinition=generated.assemblyDefinition;
     presentation=presentationDefinition==null?null:PresentationEdits.merge(presentationDefinition,generatedPresentation,authoredPresentation);
@@ -430,6 +432,7 @@ class ProjectDocumentSession {
     projectVariant = generated.projectVariant;
     projectJob = generated.projectJob;
     authoredPresentation=savedPresentation;
+    presentationGeometryFingerprint=generated.presentationGeometryFingerprint==null?"":generated.presentationGeometryFingerprint;
     generatedPresentation=generated.presentation;
     var presentationDefinition=generated.assemblyDefinition;
     presentation=presentationDefinition==null?null:PresentationEdits.merge(presentationDefinition,generatedPresentation,authoredPresentation);
@@ -1152,7 +1155,7 @@ class ProjectDocumentSession {
     projectReference = null;
     projectVariant = null;
     projectJob = null;
-    presentation = null;generatedPresentation=null;authoredPresentation=null;
+    presentation = null;generatedPresentation=null;authoredPresentation=null;presentationGeometryFingerprint="";
     recipeDocument = null;
     projectBaseline = null;
     staleProjectEdits = [];
@@ -1237,6 +1240,7 @@ class ProjectDocumentSession {
     var diagnostics:Array<String> = [];
     var data = materializeProject(generated.objects, saved.record, saved.authored, diagnostics, customMaterials);
     scene.refreshGenerated(data, generated.geometryBySnapshot);
+    presentationGeometryFingerprint=generated.presentationGeometryFingerprint==null?"":generated.presentationGeometryFingerprint;
     generatedPresentation=generated.presentation;presentation=nextPresentation;
     projectBaseline = generated.objects;
     installAssemblyRuntime(generated.assemblyDefinition,

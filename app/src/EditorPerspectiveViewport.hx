@@ -116,6 +116,7 @@ class EditorPerspectiveViewport implements View {
     controller.reset();presentationCameraDirty=true;presentationTarget=null;inspectionZoom=1;orbitPivot=null;
     clearHover();lightingRevision++;host.requestFrame();
   }
+  public var presentationGeometryFingerprint:String = "";
   public var solvePresentationJoints:Null<Map<String,Float>->Map<String,AssemblyFrame>> = null;
   public function selectPresentationProcedure(id:Null<String>):Void {
     if(presentation==null||simulationActive)return;
@@ -174,7 +175,7 @@ class EditorPerspectiveViewport implements View {
   function updatePresentation():Void {
     var controller=presentation;
     if(controller==null){presentationResult=null;presentationPoses=[];presentationPoseById.clear();return;}
-    var key=scene.visualRevision+":"+runtimeRevision+":"+simulationActive+":"+controller.revision;
+    var key=scene.visualRevision+":"+runtimeRevision+":"+simulationActive+":"+controller.revision+":"+presentationGeometryFingerprint;
     if(key==presentationRevision)return;
     var flat=AssemblyDefinitionFlattener.flattenView(controller.definition);
     var solved=new Map<String,AssemblyFrame>();
@@ -192,11 +193,10 @@ class EditorPerspectiveViewport implements View {
       pose.x=position[0]/presentationScale-delta.x;pose.y=position[1]/presentationScale-delta.y;pose.z=position[2]/presentationScale-delta.z;
       solved.set(part.id,pose);
     }
-    // Until a geometry owner supplies a fingerprint, cached checks must remain stale.
-    var result=controller.evaluate(solved,"",simulationActive);
+    var result=controller.evaluate(solved,presentationGeometryFingerprint,simulationActive);
     if(result.jointOverrides.keys().hasNext()) {
       var solve=solvePresentationJoints;if(solve==null)throw "Procedure joint motions require an engineering pose provider";
-      result=controller.evaluate(solve(result.jointOverrides),"",simulationActive);
+      result=controller.evaluate(solve(result.jointOverrides),presentationGeometryFingerprint,simulationActive);
     }
     presentationResult=result;presentationPoses=[];
     presentationPoseById.clear();

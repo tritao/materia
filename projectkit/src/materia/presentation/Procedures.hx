@@ -15,6 +15,8 @@ class Procedures {
       var action:StepAction = switch step.action {
         case Remove(select, motion): Install(select, motion);
         case Install(select, motion): Remove(select, motion);
+        case RemoveGroup(members):InstallGroup(members);
+        case InstallGroup(members):RemoveGroup(members);
         case Note: Note;
         case SetJoints(keys):
           var previous:Array<AssemblyJointCoordinate> = [];
@@ -34,6 +36,8 @@ class Procedures {
         case Remove(select, _):
           title = "Remove " + select.occurrence;
           instruction = "Follow the recorded withdrawal path to remove " + select.occurrence + ".";
+        case InstallGroup(_):title="Install "+step.title;instruction="Install the highlighted rigid group along the recorded path in reverse.";
+        case RemoveGroup(_):title="Remove "+step.title;instruction="Remove the highlighted rigid group along the recorded path.";
         case SetJoints(_): title = "Restore joint coordinates"; instruction = "Restore the recorded joint coordinates.";
         case Note:
       }

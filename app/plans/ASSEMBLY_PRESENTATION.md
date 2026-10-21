@@ -76,7 +76,7 @@ procedures. The viewer supplies the controls.
   id:String; title:String; instruction:String;
   @:optional view:String;       // a reference, never an embedded view
   highlight:Array<PartSelector>;
-  action:StepAction;            // Remove(sel, motion) | Install(sel, motion) | SetJoints(coords) | Note
+  action:StepAction;            // Remove / Install | RemoveGroup / InstallGroup | SetJoints | Note
 }
 @:wire typedef PresentationMotion = {
   path:Array<Vec3>;             // translation polyline in the parent frame, or joint keys for SetJoints
@@ -159,10 +159,10 @@ frames, persisted authored sections, hobber views and camera-field removal are i
 place. Supplier axis defaults moved with the field removal. The presentation native
 suite passes 34 checks and the ported enclosure runtime passes 10,551 checks.
 The native fixture also passes 19 complete STEP/BOM export checks, with fixed
-export metadata and no output-byte normalization. The
-broader viewport-coordinate suite also fails its retained toolbar/status subtree
-identity assertion even though both application revision keys are unchanged; that
-failure remains unresolved and is not suppressed in that suite.
+export metadata and no output-byte normalization. The broader viewport-coordinate
+suite passes all 208 assertions, including the retained toolbar/status identity
+regression. Document-path layout settles its displayed text and measurement cache
+without invalidating the toolbar on the next simulation frame.
 
 Viewer controller, view list and Reset in the main viewport and inspection dock.
 Sections become persisted general planes. Migrate `HobberInspectionViews` and
@@ -235,6 +235,23 @@ If anything in AP0–AP4 needs a gripper-specific branch, fix the model. Don't a
 *Accept:* no gripper-specific code in `app/`, and all invariants pass on both examples.
 
 ### AP6 — Tooling planner adapter
+Implementation status: socket, box-mould and casting-mould adapters emit explicit
+planner-ordered procedures and dependency-staged withdrawal offsets. Checked rigid
+groups use atomic `RemoveGroup` / `InstallGroup` actions with a parent-frame path
+for each member; reversal, validation, authoring and transport share generic movement
+traversal. The cured-casting check solid is represented by a manual note where the
+tooling-only artifact does not contain it. Semantic release and handling steps stay
+manual notes, with assembly instructions rewritten for installation.
+
+Geometry fingerprints exclude presentation data. The socket generator passes 108
+assertions including the measured screws-left-fitted failure and a thickness-change
+staleness check. Failed movement stays visible and cannot advance. Native artifact
+invariants pass 155 checks for the socket, 32 for the gripper and 76 for the box mould;
+the casting suite passes 251 checks plus planner step-order/artifact validation.
+Pure presentation coverage passes 54 checks, including rigid-group failure and
+reversal. Movement reports store each checked member's evidence without repeating
+the whole blocker graph in every motion.
+
 `machinekit.tooling.ToolingPresentation` builds a `Disassembly` (demoulding)
 procedure and an `Assembly` procedure (via `reverse`) from the planner's existing
 roles, `dependsOn`, `removalOrder` and withdrawal directions. Steps that

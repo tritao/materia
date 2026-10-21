@@ -24,6 +24,40 @@ class PresentationTests {
   static function pose(frame:materia.presentation.PresentationEvaluator.PresentationFrame):materia.assembly.AssemblyRecord.AssemblyFrame {
     var value = frame.poses.get("unit/a"); if (value == null) throw "Missing pose"; return value;
   }
+  static function rigidGroups(definition:AssemblyDefinition):Void {
+    var a:PartSelector={occurrence:"unit/a",subtree:false},b:PartSelector={occurrence:"unit/b",subtree:false};
+    var path:PresentationMotion={path:[{x:0,y:0,z:0},{x:0,y:10,z:0}],evidence:Checked("swept-removal",Passed,"geometry","group report")};
+    var members:Array<PartMotion> = [{select:a,motion:path},{select:b,motion:path}];
+    var record=materia.presentation.Presentations.assembled(definition);
+    var procedure:Procedure={id:"group",label:"Rigid group",kind:Disassembly,start:Assembled,source:Generated("test"),
+      steps:[{id:"withdraw",title:"Withdraw group",instruction:"Move together",highlight:[a,b],action:RemoveGroup(members)}]};
+    record.procedures=[procedure];
+    record=PresentationCodec.decode(definition,PresentationCodec.encode(definition,record));
+    check(materia.presentation.StepMotions.members(record.procedures[0].steps[0].action).length==2,"Rigid group survives wire round trip");
+    var poses=new Map<String,materia.assembly.AssemblyRecord.AssemblyFrame>();
+    for(id in ["unit/a","unit/b"])poses.set(id,AssemblyFrames.identity());
+    var cursor=PresentationEvaluator.reset(record);cursor.procedure="group";cursor.progress=0.5;
+    function y(frame:materia.presentation.PresentationEvaluator.PresentationFrame,id:String):Float {var pose=frame.poses.get(id);if(pose==null)throw "Missing group pose";return pose.y;}
+    var frame=PresentationEvaluator.evaluate(definition,poses,record,cursor,"geometry");
+    check(y(frame,"unit/a")==5&&y(frame,"unit/b")==5,"Rigid group moves all members together");
+    cursor.step=1;cursor.progress=0;frame=PresentationEvaluator.evaluate(definition,poses,record,cursor,"geometry");
+    check(frame.visibility.get("unit/a")==Hidden&&frame.visibility.get("unit/b")==Hidden,"Rigid group completes atomically");
+    var reverse=materia.presentation.Procedures.reverse(record.procedures[0],"install","Install group",[]);
+    record.procedures.push(reverse);cursor.procedure="install";cursor.step=0;
+    frame=PresentationEvaluator.evaluate(definition,poses,record,cursor,"geometry");
+    check(y(frame,"unit/a")==10&&y(frame,"unit/b")==10,"Reversed group starts at its withdrawal endpoint");
+    cursor.step=1;frame=PresentationEvaluator.evaluate(definition,poses,record,cursor,"geometry");
+    check(frame.visibility.get("unit/a")==Shown&&frame.visibility.get("unit/b")==Shown,"Reversed group installs all members");
+    procedure.steps[0].action=RemoveGroup([]);record.procedures=[procedure];rejects(()->PresentationCodec.validate(definition,record));
+    procedure.steps[0].action=RemoveGroup([members[0],members[0]]);rejects(()->PresentationCodec.validate(definition,record));
+    members[1]={select:b,motion:{path:path.path,evidence:Checked("checker",Failed,"geometry","blocked")}};
+    procedure.steps[0].action=RemoveGroup(members);cursor.procedure="group";cursor.step=0;cursor.progress=1;
+    frame=PresentationEvaluator.evaluate(definition,poses,record,cursor,"geometry");
+    check(frame.evidence=="Failed"&&y(frame,"unit/a")==0&&y(frame,"unit/b")==0,"One failed member blocks the entire rigid group");
+    cursor.step=1;frame=PresentationEvaluator.evaluate(definition,poses,record,cursor,"geometry");
+    check(frame.visibility.get("unit/a")==Shown&&frame.visibility.get("unit/b")==Shown,"Failed group cannot be hidden by a completed cursor");
+    procedure.source=Authored;rejects(()->PresentationCodec.validate(definition,record));
+  }
   public static function run():Void {
     var definition:AssemblyDefinition = {schemaVersion:AssemblyDefinitionCodec.VERSION, id:"test", definitions:[{id:"part",connectors:[]}],
       occurrences:[{id:"unit/a",definition:"part",initialPose:AssemblyFrames.identity()},
@@ -39,9 +73,17 @@ class PresentationTests {
         {id:"a",title:"Remove A",instruction:"Withdraw A",highlight:[leaf],action:Remove(leaf,motion)},
         {id:"b",title:"Note",instruction:"Inspect",highlight:[],action:Note}]}]};
     nestedComposition(value);
+    rigidGroups(definition);
     var engineering = AssemblyDefinitionCodec.encode(definition);
     var scene = @:privateAccess ProjectKitTests.sceneData();
     scene.assemblyDefinition = definition; scene.presentation = value;
+    var fingerprint=materia.presentation.PresentationGeometry.fingerprint(scene);
+    value.explode[0].distance++;
+    check(materia.presentation.PresentationGeometry.fingerprint(scene)==fingerprint,"Presentation edits do not change the geometry fingerprint");
+    value.explode[0].distance--;
+    var vertex=scene.parts[0].vertices.get(0);scene.parts[0].vertices.set(0,vertex^1);
+    check(materia.presentation.PresentationGeometry.fingerprint(scene)!=fingerprint,"Mesh changes invalidate evidence fingerprints");
+    scene.parts[0].vertices.set(0,vertex);
     var bytes = materia.project.SceneArtifact.encode(scene);
     var decodedScene = materia.project.SceneArtifact.decode(bytes);
     var decodedPresentation = decodedScene.presentation;
@@ -79,6 +121,11 @@ class PresentationTests {
     frame = PresentationEvaluator.evaluate(definition,poses,value,cursor,"geometry");
     check(frame.evidence == "Failed","Negative evidence is visible");
     check(PresentationEvaluator.evaluate(definition,poses,value,cursor,"changed").evidence == "Stale","Changed geometry invalidates evidence");
+    cursor.progress=1;
+    check(pose(PresentationEvaluator.evaluate(definition,poses,value,cursor,"geometry")).y==0,"Failed motion stays at its starting pose");
+    cursor.step=1;
+    check(PresentationEvaluator.evaluate(definition,poses,value,cursor,"geometry").visibility.get("unit/a")==Shown,"Failed withdrawal is never hidden as completed");
+    cursor.step=0;cursor.progress=0;motion.evidence=Checked("checker",Passed,"geometry","report");
     var fresh = signature(PresentationEvaluator.evaluate(definition,poses,value,PresentationEvaluator.reset(value),"geometry"));
     cursor.step = 1;
     check(PresentationEvaluator.evaluate(definition,poses,value,cursor,"geometry").visibility.get("unit/a") == Hidden,"Completed removal");

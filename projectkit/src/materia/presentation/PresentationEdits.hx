@@ -23,11 +23,8 @@ class PresentationEdits {
     for(offset in value.explode)if(offset.source!=Authored)throw "Saved explode offset must be Authored";
     for(procedure in value.procedures) {
       if(procedure.source!=Authored)throw "Saved procedure must be Authored";
-      for(step in procedure.steps)switch step.action {
-        case Remove(_,motion)|Install(_,motion):
-          if(motion.evidence!=Illustrative)throw "Authored motions must be Illustrative";
-        case _:
-      }
+      for(step in procedure.steps)for(member in StepMotions.members(step.action))
+        if(member.motion.evidence!=Illustrative)throw "Authored motions must be Illustrative";
     }
     return value;
   }

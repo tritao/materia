@@ -10,6 +10,7 @@ typedef GeneratedAssemblyScene = {
   @:optional var projectVariant:String;
   /** Legacy source jobs retain their original saved identifier. */
   @:optional var projectJob:String;
+  @:optional var presentationGeometryFingerprint:String;
   @:optional var presentation:materia.presentation.AssemblyPresentation;
   var objects:Array<SceneObjectData>;
   var geometryBySnapshot:Map<String, GeometryData>;

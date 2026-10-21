@@ -2225,6 +2225,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var viewport=perspectiveViewport;if(viewport==null)return;
     viewport.setPresentation(session.presentation,session.projectAssemblyDefinition,session.presentationCenters(),session.assemblyUnitMetres());
     viewport.solvePresentationJoints=session.presentationJointPoses;
+    viewport.presentationGeometryFingerprint=session.presentationGeometryFingerprint;
     viewport.onSectionEdit=planes->saveViewportView(viewport,planes);
   }
   function saveViewportView(viewport:EditorPerspectiveViewport,?sections:Array<materia.presentation.AssemblyPresentation.SectionPlane>):Void {
@@ -2253,10 +2254,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if(procedure.source!=Authored||procedure.id=="") {
       var index=1;while(controller.record.procedures.filter(p->p.id=="procedure-"+index).length>0)index++;
       procedure.id="procedure-"+index;procedure.source=Authored;
-      for(step in procedure.steps)switch step.action {
-        case Remove(_,motion)|Install(_,motion):motion.evidence=Illustrative;
-        case _:
-      }
+      for(step in procedure.steps)for(member in materia.presentation.StepMotions.members(step.action))
+        member.motion.evidence=Illustrative;
     }
     var direction={x:0.0,y:0.0,z:1.0},distance=Math.max(item.width,Math.max(item.height,item.depth))*2/session.assemblyUnitMetres();
     for(offset in controller.record.explode)if(offset.select.occurrence==select.occurrence) {

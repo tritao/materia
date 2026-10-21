@@ -67,6 +67,7 @@ class HobberSocketFixture {
 		check(removal.removal.removalOrder.length == parts.length-plan.document.input.inserts.length-1,
 			"Every removable component belongs to the computed graph");
 		var cache = new PosedParts(), exactPairs = 0;
+		var retainedScrewVolume=0.0;
 		var castingRow = parts.filter(row -> row.id == "cured-casting")[0];
 		var castShape = cache.posed(castingRow.component,poses.get(castingRow.id));
 		try {
@@ -130,6 +131,7 @@ class HobberSocketFixture {
 				check(removal.releaseBeforeTranslation.indexOf(site.id) >= 0,"Source fixing screw must be released before withdrawal");
 			} catch (error:Dynamic) {sweep.close(); throw error;}
 			sweep.close();
+			retainedScrewVolume=heldVolume;
 			check(heldVolume > 1,"Negative control: retained positioning screw heads block plate withdrawal");
 			for (id in ["south-wall","north-wall","west-wall","east-wall"])
 				check(removal.removal.removalOrder.indexOf(id) >= 0,"Wall withdrawal belongs to the exact graph");
@@ -186,6 +188,22 @@ class HobberSocketFixture {
 		check(assembly.encode()==engineering&&haxe.Json.stringify(assembly.billOfMaterials().lines())==bom,
 			"Explode evaluation leaves the engineering recipe and exported BOM unchanged");
 		scene.recipeDiagnostics = ["REVIEW ONLY: nominal catalogue exterior; fixture accuracy, sealing, wall closure and casting process unqualified."];
+		scene.presentation=machinekit.tooling.ToolingPresentation.socket(plan,scene,removal,retainedScrewVolume);
+		var presentation=scene.presentation;if(presentation==null)throw "Missing tooling procedures";
+		check(presentation.procedures[0].steps.map(step->step.id).join("|")==steps.map(step->step.id).join("|"),
+			"Demoulding procedure exactly follows demolding-steps.json");
+		var procedureCursor=materia.presentation.PresentationEvaluator.reset(presentation);procedureCursor.procedure="screws-left-fitted";
+		var fingerprint=materia.presentation.PresentationGeometry.fingerprint(scene);
+		var failed=materia.presentation.PresentationEvaluator.evaluate(scene.assemblyDefinition,poses,presentation,procedureCursor,fingerprint);
+		check(failed.evidence=="Failed"&&failed.visibility.get(plan.assembly.members[1].panel.id)==Shown,
+			"Retained screw heads show a visible Failed plate withdrawal");
+		var thicker=HobberSocketFixtureSetup.document();thicker.recipe.panel.measuredThickness+=0.5;thicker.recipe.revision++;
+		var changedPlan=InsertFixturePlanner.plate(thicker,HobberSocketFixtureSetup.options(thicker,[25,30,35]));
+		var changedAssembly=SocketFixtureCad.assembly(changedPlan,true),changedScene=AssemblyPreview.scene(changedAssembly,"blind-socket-fixture");
+		var changedFingerprint=materia.presentation.PresentationGeometry.fingerprint(changedScene);
+		check(changedFingerprint!=fingerprint,"Changing plate thickness changes the geometry fingerprint");
+		var stale=materia.presentation.PresentationEvaluator.evaluate(changedScene.assemblyDefinition,changedAssembly.solvedPoses(),presentation,procedureCursor,changedFingerprint);
+		check(stale.evidence=="Stale","Changed plate thickness makes cached evidence Stale");
 		var bytes = SceneArtifact.encode(scene);
 		check(SceneArtifact.decode(bytes).parts.length == scene.parts.length,"Scene save/reopen");
 		sys.io.File.saveBytes(out+"/socket-fixture-assembled.mtrg",bytes);

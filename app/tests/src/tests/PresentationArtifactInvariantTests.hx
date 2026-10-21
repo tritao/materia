@@ -16,11 +16,13 @@ class PresentationArtifactInvariantTests {
     var viewport=new app.EditorPerspectiveViewport("artifact-invariants",session.scene,host);
     viewport.setPresentation(record,definition,session.presentationCenters(),session.assemblyUnitMetres());
     viewport.solvePresentationJoints=session.presentationJointPoses;
+    viewport.presentationGeometryFingerprint=session.presentationGeometryFingerprint;
     var controller=viewport.presentation;if(controller==null)throw "Missing artifact controller";
     function frame():String {
       var frame=viewport.presentationFrame();if(frame==null)throw "Missing artifact frame";
       return PresentationRuntimeTests.signature(frame);
     }
+    function evidence():Null<String> {var result=viewport.presentationFrame();if(result==null)throw "Missing evidence frame";return result.evidence;}
     function engineering():String return AssemblyDefinitionCodec.encode(definition)+"|"+
       AssemblyDefinitionCodec.encodeState(definition,state)+"|"+Json.stringify(session.scene.records())+"|"+
       Json.stringify(session.assemblyMates.solve(definition,state).result)+"|"+app.SceneCollision.keyOf(session.scene,session);
@@ -38,8 +40,23 @@ class PresentationArtifactInvariantTests {
         controller.restart();for(_ in 0...step)controller.next(false);
         check(frame()==expected,"Restart reproduces step "+step);
         var ahead=Std.int(Math.min(2,procedure.steps.length-step));
-        for(_ in 0...ahead)controller.next(false);for(_ in 0...ahead)controller.previous();
+        var previousStep=controller.cursor.step;for(_ in 0...ahead)controller.next(false);
+        var advanced=controller.cursor.step-previousStep;for(_ in 0...advanced)controller.previous();
         check(frame()==expected,"Previous reproduces step "+step);
+      }
+      for(procedure in record.procedures)for(index in 0...procedure.steps.length)for(member in materia.presentation.StepMotions.members(procedure.steps[index].action))switch member.motion.evidence {
+          case Checked(_,Failed,_,_):
+            viewport.selectPresentationProcedure(procedure.id);
+            for(_ in 0...index)controller.next(false);
+            var blocked=frame(),blockedStep=controller.cursor.step;
+            check(evidence()=="Failed","Negative control displays Failed");
+            controller.next();controller.advance(1);
+            check(controller.cursor.step==blockedStep&&frame()==blocked,"Failed withdrawal cannot animate or advance");
+            var fingerprint=viewport.presentationGeometryFingerprint;
+            viewport.presentationGeometryFingerprint="changed-geometry";
+            check(evidence()=="Stale","Changed geometry displays cached failure as Stale");
+            viewport.presentationGeometryFingerprint=fingerprint;
+          case _:
       }
       viewport.resetPresentation();check(frame()==fresh,"Reset returns to the fresh-open frame");
       check(session.document.history.undoCount==0,"Presentation transport creates no document edits");

@@ -11,6 +11,7 @@ import materia.tooling.casting.InsertFixturePlanner.InsertPlatePlan;
 typedef InsertFixtureReview = {
 	var removal:SweptRemoval.RemovalReport;
 	var releaseBeforeTranslation:Array<String>;
+	var directions:Array<{id:String,x:Float,y:Float,z:Float}>;
 }
 
 /** Shared CAD realization of a source-hole carrier: all steel comes from the source input. */
@@ -122,7 +123,11 @@ class InsertFixtureCad {
 		}
 		for (part in owned) part.close(); cache.close();
 		release.sort(Reflect.compare);
-		return {removal:report,releaseBeforeTranslation:release};
+		var ids=[for(id in directions.keys())id];ids.sort(Reflect.compare);
+		return {removal:report,releaseBeforeTranslation:release,directions:[for(id in ids) {
+			var direction=directions.get(id);if(direction==null)throw "Missing fixture withdrawal direction";
+			{id:id,x:direction.x,y:direction.y,z:direction.z};
+		}]};
 	}
 
 	/** Explicit fastener release precedes the translation checks; the insert stays in the casting. */

@@ -25,6 +25,7 @@ import machinekit.tooling.SweptRemoval.RemovalReport;
 typedef BoxMoldReview = {
 	var assembly:RemovalReport;
 	var demolding:RemovalReport;
+	var demoldingMotions:Array<{id:String,x:Float,y:Float,z:Float}>;
 	var symmetricDifferenceMm3:Float;
 	var validation:Array<materia.tooling.ToolingValidation>;
 	var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
@@ -406,6 +407,7 @@ class BoxMoldCad {
 			var direction = core.support.kind == CoreSupportKind.BedSocket ? -1.0 : 1.0;
 			members.push({id: core.id, part: covered, direction: new Vector(0, 0, direction)});
 			members.push({id: "cured-casting", part: cured, direction: new Vector(0, 0, 1)});
+			var demoldingMotions=[for(member in members){id:member.id,x:member.direction.x,y:member.direction.y,z:member.direction.z}];
 			var demolding = SweptRemoval.analyze(members);
 			members.pop();
 			var assemblyGroups:Array<{
@@ -448,6 +450,7 @@ class BoxMoldCad {
 			return {
 				assembly: assemblyReport,
 				demolding: demolding,
+				demoldingMotions:demoldingMotions,
 				symmetricDifferenceMm3: difference,
 				validation: p.validation.copy(),
 				fabrication: p.fabrication,

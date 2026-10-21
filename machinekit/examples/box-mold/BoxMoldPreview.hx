@@ -121,7 +121,7 @@ class BoxMoldPreview {
 		meshes(assembled, dir, "assembled");
 		sys.io.File.saveContent(dir + "/mold.assembly.json", saved);
 		var scene=AssemblyPreview.scene(assembled,"box-mold");
-		scene.presentation=BoxMoldCad.presentation(p,scene.assemblyDefinition);
+		scene.presentation=machinekit.tooling.ToolingPresentation.box(p,scene,report);
 		sys.io.File.saveBytes(dir+"/mold.mtrg",SceneArtifact.encode(scene));
 		sys.io.File.saveContent(dir
 			+ "/procedure.md",

@@ -58,11 +58,18 @@ import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
   @:id(1) var path:Array<AssemblyVector>;
   @:id(2) var evidence:MotionEvidence;
 }
+/** A rigid checked group may span unrelated occurrences with different parent frames. */
+@:wire typedef PartMotion = {
+  @:id(1) var select:PartSelector;
+  @:id(2) var motion:PresentationMotion;
+}
 @:wire enum StepAction {
   @:id(1) Remove(select:PartSelector, motion:PresentationMotion);
   @:id(2) Install(select:PartSelector, motion:PresentationMotion);
   @:id(3) SetJoints(coordinates:Array<AssemblyJointCoordinate>);
   @:id(4) Note;
+  @:id(5) RemoveGroup(members:Array<PartMotion>);
+  @:id(6) InstallGroup(members:Array<PartMotion>);
 }
 @:wire typedef ProcedureStep = {
   @:id(1) var id:String;

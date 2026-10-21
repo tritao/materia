@@ -52,7 +52,7 @@ class PresentationControls {
           button.enabled=viewport.presentationControlsEnabled()&&enabled;transport.push(new KeyedView(id,button));
         }
         action("previous","Previous",controller.cursor.step>0||controller.animating,viewport.previousPresentationStep);
-        action("next","Next",controller.cursor.step<procedure.steps.length&&!controller.animating,viewport.nextPresentationStep);
+        action("next","Next",controller.cursor.step<procedure.steps.length&&!controller.animating&&!controller.failedMovement(),viewport.nextPresentationStep);
         action("restart","Restart",controller.cursor.step>0||controller.animating,viewport.restartPresentationProcedure);
         rows.push(new KeyedView("transport",new Row(key+"-transport",transport)));
         var frame=viewport.presentationFrame();

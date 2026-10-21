@@ -123,7 +123,7 @@ class CastingMoldExport {
 		if (restored.encode() != saved)
 			throw "Assembly recipe did not restore exactly";
 		text(dir + "/mold.assembly.json", saved);
-		scene(dir, "mold", assembled, p);
+		scene(dir, "mold", assembled, p, review);
 		var coreList = [
 			for (c in p.cores)
 				c.id + ": " + c.foamLayers.length + " layers, carrier " + c.carrierId + ", shared " + c.bridgeId
@@ -154,9 +154,9 @@ class CastingMoldExport {
 			"7. Lift/flip only with qualified points/equipment. Replicate the designated rail/bearing seats against qualified masters; grout the column joint using its approved gap, jacking and cure-before-torque process. These allowances and processes are pending, and source geometry was not altered.\n");
 	}
 
-	static function scene(dir:String, id:String, a:MachineAssembly, plan:CastingMoldPlan):Void {
+	static function scene(dir:String, id:String, a:MachineAssembly, plan:CastingMoldPlan, review:CastingMoldCad.CastingMoldReview):Void {
 		var data=AssemblyPreview.scene(a,id);
-		data.presentation=CastingMoldCad.presentation(plan,data.assemblyDefinition);
+		data.presentation=ToolingPresentation.casting(plan,data,review);
 		sys.io.File.saveBytes(dir+"/"+id+".mtrg",SceneArtifact.encode(data));
 		var rows:Array<Dynamic> = [], poses = a.solvedPoses();
 		for (row in a.components()) {
