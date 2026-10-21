@@ -141,6 +141,7 @@ class DocsComponents {
 			model = exported.bytes();
 			entry.model = modelName(type.id);
 			entry.view = view(exported);
+			entry.fidelity = component.geometryFidelity();
 		}
 		return {entry: entry, model: model};
 	}

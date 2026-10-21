@@ -105,10 +105,23 @@ export function loadComponents(path) {
 	return { display: exported.display, components, families: result };
 }
 
+/** machinekit MassSource as text: Computed(Preview), Declared, EffectiveDensity(900). */
+function massSource(source) {
+	const computed = /^Computed\((\w+)\)$/.exec(source);
+	if (computed) return `computed from the ${computed[1].toLowerCase()} geometry`;
+	const effective = /^EffectiveDensity\(([\d.]+)\)$/.exec(source);
+	if (effective) return `assumed from its envelope at ${effective[1]} kg/m³`;
+	return source.toLowerCase();
+}
+
 function badges(component) {
 	const list = [];
 	const kind = KINDS[component.kind]?.badge;
 	if (kind) list.push(`<span class="part-badge part-badge-kind">${kind}</span>`);
+	// machinekit GeometryFidelity: an envelope preview is a placeholder shape; nominal needs no badge.
+	if (component.fidelity === "envelope") list.push(`<span class="part-badge part-badge-warn">envelope shape</span>`);
+	else if (component.fidelity === "datasheet" || component.fidelity === "supplier")
+		list.push(`<span class="part-badge">${component.fidelity} geometry</span>`);
 	if (assumed(component)) list.push(`<span class="part-badge part-badge-warn">assumed</span>`);
 	if (component.catalogs?.length) list.push(`<span class="part-badge">catalogue</span>`);
 	if (component.error) list.push(`<span class="part-badge part-badge-warn">no default part</span>`);
@@ -128,7 +141,9 @@ function indexPage(catalogue) {
 		"category. Each model is the part at its default parameters; open one to orbit it, see what you can change,",
 		"and where its catalogue data comes from. Parts marked **assumed** use ratings or envelopes that are not yet",
 		"from a datasheet; **supplier** parts carry one supplier's data, **reference** models are drawings and",
-		"studies to check against, and **machine parts** were designed for one example machine.",
+		"studies to check against, and **machine parts** were designed for one example machine. An **envelope shape**",
+		"is still a placeholder of the part's outer size; the plan to replace them is in",
+		"[the component geometry plan](https://github.com/tritao/materia/blob/main/machinekit/COMPONENT_GEOMETRY_PLAN.md).",
 		"",
 		'<div class="part-filters">',
 		'<input type="search" placeholder="Search components" aria-label="Search components" data-part-search>',
@@ -230,7 +245,7 @@ function familyPage(family, display) {
 				);
 			const facts = [`\`${component.id}\``];
 			if (component.designation) facts.push(`designation \`${component.designation}\``);
-			if (component.mass) facts.push(`${component.mass.kg} kg, ${component.mass.source.replace(/\((\w+)\)/, " from the $1 geometry").toLowerCase()}`);
+			if (component.mass) facts.push(`${component.mass.kg} kg, ${massSource(component.mass.source)}`);
 			lines.push(`${facts.join(" · ")} ${badges(component)}`, "");
 			if (component.description) lines.push(escape(component.description), "");
 			if (component.error) lines.push(`The recipe's defaults do not build a part: ${escape(component.error)}`, "");

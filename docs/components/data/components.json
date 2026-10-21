@@ -197,6 +197,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -258,7 +260,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.assembly.hzmotion-drawing-component",
@@ -380,7 +383,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.assembly.hzmotion-supplier-component",
@@ -476,6 +480,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -608,7 +614,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.assembly.rbk-motor-mount",
@@ -654,6 +661,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -727,7 +736,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.assembly.sfu20-axis-part",
@@ -798,6 +808,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -842,7 +854,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.assembly.twin-rail-screw-part",
@@ -921,6 +934,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -994,7 +1009,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.control.cnc-controller",
@@ -1032,7 +1048,7 @@
     {
      "name": "material",
      "type": "choice",
-     "value": "aluminium 6061",
+     "value": "device housing",
      "options": [
       "unspecified",
       "painted steel",
@@ -1049,6 +1065,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -1085,20 +1103,21 @@
    ],
    "bom": {
     "description": "cnc controller cabinet",
-    "material": "aluminium 6061",
+    "material": "device housing",
     "partNumber": "machinekit.control.cnc-controller|axes:1:4|inputs:2:16|outputs:2:16|valves:1:8"
    },
-   "material": "aluminium",
+   "material": "device-housing",
    "mass": {
-    "kg": 24.4944,
-    "source": "Computed(Preview)"
+    "kg": 3.1752,
+    "source": "EffectiveDensity(350)"
    },
    "model": "control-cnc-controller.glb",
    "view": {
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.control.control-cabinet",
@@ -1181,6 +1200,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -1246,7 +1267,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.control.digital-sensor",
@@ -1287,6 +1309,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -1336,7 +1360,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.control.emergency-stop-button",
@@ -1395,6 +1420,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -1444,7 +1471,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.control.robot-controller",
@@ -1482,7 +1510,7 @@
     {
      "name": "material",
      "type": "choice",
-     "value": "aluminium 6061",
+     "value": "device housing",
      "options": [
       "unspecified",
       "painted steel",
@@ -1499,6 +1527,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -1535,20 +1565,21 @@
    ],
    "bom": {
     "description": "robot controller cabinet",
-    "material": "aluminium 6061",
+    "material": "device housing",
     "partNumber": "machinekit.control.robot-controller|axes:1:6|inputs:2:16|outputs:2:16|valves:1:4"
    },
-   "material": "aluminium",
+   "material": "device-housing",
    "mass": {
-    "kg": 24.4944,
-    "source": "Computed(Preview)"
+    "kg": 3.1752,
+    "source": "EffectiveDensity(350)"
    },
    "model": "control-robot-controller.glb",
    "view": {
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.control.safety-relay",
@@ -1556,7 +1587,7 @@
    "family": "control",
    "category": "Safety",
    "kind": "generic",
-   "designation": "SAFETY-RELAY-ASSUMED-092f8b784f7e",
+   "designation": "SAFETY-RELAY-ASSUMED-6c512e28b410",
    "description": "Assumed dual-channel safety relay with delayed contacts",
    "parameters": [
     {
@@ -1609,7 +1640,7 @@
     {
      "name": "material",
      "type": "choice",
-     "value": "steel",
+     "value": "device housing",
      "options": [
       "unspecified",
       "painted steel",
@@ -1626,6 +1657,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -1662,20 +1695,21 @@
    ],
    "bom": {
     "description": "Assumed dual-channel safety relay with delayed contacts",
-    "material": "steel",
+    "material": "device housing",
     "partNumber": "machinekit.control.safety-relay|supplyVoltage:2:24|stopDelay:1:2|immediateContacts:1:2|delayedContacts:1:2|width:2:45|depth:3:120|height:3:100"
    },
-   "material": "machined-steel",
+   "material": "device-housing",
    "mass": {
-    "kg": 4.239,
-    "source": "Computed(Preview)"
+    "kg": 0.378,
+    "source": "EffectiveDensity(700)"
    },
    "model": "control-safety-relay.glb",
    "view": {
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.control.thermistor-input",
@@ -1747,6 +1781,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -1796,7 +1832,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.enclosure.cut-panel",
@@ -1900,7 +1937,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.enclosure.panel",
@@ -1970,7 +2008,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.enclosure.tray-toe-clamp",
@@ -2008,6 +2047,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -2061,7 +2102,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.hobbing.expanding-mandrel",
@@ -2306,6 +2348,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -2367,7 +2411,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.hobbing.flexspline-cup-blank",
@@ -2467,6 +2512,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -2516,7 +2563,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.hobbing.floating-radial-bearing",
@@ -2616,6 +2664,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -2669,7 +2719,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.hobbing.hob",
@@ -2899,6 +2950,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -2960,7 +3013,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.hobbing.hob-arbor",
@@ -3081,6 +3135,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -3150,7 +3206,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.hobbing.hobber-bracket",
@@ -3234,6 +3291,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -3291,7 +3350,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.hobbing.mandrel-sleeve",
@@ -3370,6 +3430,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -3419,7 +3481,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.hobbing.outboard-support",
@@ -3533,6 +3596,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -3594,7 +3659,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.hobbing.rotary-clamp",
@@ -3687,6 +3753,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -3744,7 +3812,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.hobbing.saddle",
@@ -3821,6 +3890,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -3870,7 +3941,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.hobbing.spindle-housing",
@@ -3949,6 +4021,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -4006,7 +4080,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.hobbing.spindle-part",
@@ -4069,6 +4144,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -4118,7 +4195,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.hobbing.swivel-housing",
@@ -4197,6 +4275,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -4254,7 +4334,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.hobbing.table-housing",
@@ -4347,6 +4428,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -4404,7 +4487,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.hobbing.table-platen",
@@ -4511,6 +4595,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -4568,7 +4654,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.milling.ball-nut-bracket",
@@ -4604,6 +4691,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -4653,7 +4742,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.belt-motor-plate",
@@ -4684,6 +4774,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -4733,7 +4825,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.bt30-cartridge-study",
@@ -4764,6 +4857,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -4825,7 +4920,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.bt30-spindle-motor-study",
@@ -4856,6 +4952,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -4913,7 +5011,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.casting",
@@ -4956,6 +5055,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -5029,7 +5130,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.cross-saddle",
@@ -5181,6 +5283,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -5234,7 +5338,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.cross-table",
@@ -5312,6 +5417,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -5365,7 +5472,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.drive-service-hatch",
@@ -5410,6 +5518,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -5459,7 +5569,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.er20-holder",
@@ -5490,6 +5601,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -5543,7 +5656,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.milling.fixture-adapter",
@@ -5590,6 +5704,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -5639,7 +5755,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.flat-end-mill",
@@ -5691,6 +5808,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -5740,7 +5859,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.hzmotion-y-drive-seat",
@@ -5776,6 +5896,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -5825,7 +5947,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.motor-cover",
@@ -5877,6 +6000,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -5926,7 +6051,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.panel",
@@ -5978,6 +6104,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -6031,7 +6159,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.milling.power-drawbar-study-part",
@@ -6072,6 +6201,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -6121,7 +6252,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.rke92-reference-part",
@@ -6174,6 +6306,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -6223,7 +6357,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.screw-pedestal",
@@ -6280,6 +6415,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -6329,7 +6466,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.servo-mount",
@@ -6381,6 +6519,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -6430,7 +6570,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.spindle-belt-guard",
@@ -6466,6 +6607,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -6515,7 +6658,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.spindle-cartridge",
@@ -6546,6 +6690,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -6607,7 +6753,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.spindle-drive-study-guard",
@@ -6749,6 +6896,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -6798,7 +6947,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.spindle-drive-study-part",
@@ -6940,6 +7090,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -6989,7 +7141,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.spindle-motor",
@@ -7025,6 +7178,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -7082,7 +7237,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.milling.spindle-motor-mount",
@@ -7125,6 +7281,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -7174,7 +7332,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.spindle-motor-support",
@@ -7212,6 +7371,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -7261,7 +7422,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.support-tray",
@@ -7325,6 +7487,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -7369,7 +7533,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.y-nut-bridge",
@@ -7407,6 +7572,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -7456,7 +7623,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.y-nut-mount",
@@ -7497,6 +7665,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -7546,7 +7716,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.z-bearing-plate",
@@ -7671,6 +7842,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -7720,7 +7893,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.z-carriage",
@@ -7835,6 +8009,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -7884,7 +8060,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.z-coupling-guard",
@@ -7929,6 +8106,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -7978,7 +8157,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.z-drive-adapter",
@@ -8051,6 +8231,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -8100,7 +8282,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.z-head",
@@ -8232,6 +8415,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -8285,7 +8470,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.z-motor-stand",
@@ -8384,6 +8570,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -8437,7 +8625,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.zpp-supplier-member",
@@ -8557,6 +8746,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -8614,7 +8805,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.axis-servo-motor",
@@ -8722,6 +8914,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -8779,7 +8973,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.ball-nut",
@@ -8815,6 +9010,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -8896,7 +9093,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.ball-screw",
@@ -8946,6 +9144,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -9003,7 +9203,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.ballscrew-retainer",
@@ -9034,6 +9235,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -9087,7 +9290,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.brake-servo",
@@ -9155,6 +9359,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -9212,7 +9418,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.cable-chain",
@@ -9293,6 +9500,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -9346,7 +9555,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.caster-wheel",
@@ -9412,6 +9622,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -9469,7 +9681,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.crossed-roller-bearing",
@@ -9574,6 +9787,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -9631,7 +9846,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.drive-wheel",
@@ -9697,6 +9913,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -9750,7 +9968,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.dsg-nut-housing",
@@ -9855,7 +10074,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.flange-bearing-housing",
@@ -9930,6 +10150,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -10288,7 +10510,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.gearbox",
@@ -10376,6 +10599,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -10429,7 +10654,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.generic-nema-stepper",
@@ -10477,6 +10703,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -10550,7 +10778,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.hg-block-reference",
@@ -10609,6 +10838,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -10690,7 +10921,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.hgh15ca-reference",
@@ -10745,6 +10977,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -10806,7 +11040,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.lead-screw",
@@ -10890,6 +11125,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -10943,7 +11180,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.lead-screw-nut",
@@ -11042,6 +11280,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -11111,7 +11351,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.leadshine-servo",
@@ -11204,6 +11445,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -11281,7 +11524,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.limit-switch",
@@ -11320,6 +11564,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -11387,7 +11633,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.linear-bearing",
@@ -11430,6 +11677,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -11549,7 +11798,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.linear-rail",
@@ -11600,6 +11850,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -11728,7 +11980,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.linear-rail-block",
@@ -11772,6 +12025,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -11904,7 +12159,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.linear-scale",
@@ -11958,6 +12214,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -12011,7 +12269,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.motor-driver",
@@ -12080,6 +12339,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -12172,7 +12433,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.nema-stepper",
@@ -12215,6 +12477,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -12355,7 +12619,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.pillow-block",
@@ -12403,6 +12668,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -12659,7 +12926,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.planetary-reducer",
@@ -12775,6 +13043,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -12828,7 +13098,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.power-supply",
@@ -12907,6 +13178,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -12948,15 +13221,16 @@
    },
    "material": "aluminium",
    "mass": {
-    "kg": 0.5832,
-    "source": "Computed(Preview)"
+    "kg": 0.216,
+    "source": "EffectiveDensity(1000)"
    },
    "model": "motion-power-supply.glb",
    "view": {
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.proximity-switch",
@@ -12996,6 +13270,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -13074,7 +13350,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.purchased-rotary-part",
@@ -14353,6 +14630,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -14422,7 +14701,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.rotary-encoder-ring",
@@ -14521,6 +14801,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -14578,7 +14860,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.screw-support-unit",
@@ -14621,6 +14904,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -14682,7 +14967,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.servo-motor",
@@ -14790,6 +15076,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -14847,7 +15135,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.sfu-drawing-screw",
@@ -14903,6 +15192,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -14972,7 +15263,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.sfu-nut",
@@ -15023,6 +15315,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -15100,7 +15394,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.shaft-brake-part",
@@ -15156,6 +15451,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -15213,7 +15510,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.shaft-coupling",
@@ -15277,6 +15575,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -15342,7 +15642,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.shaft-encoder",
@@ -15403,6 +15704,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -15456,7 +15759,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.stepped-shaft",
@@ -15512,6 +15816,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -15565,7 +15871,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.supplier-hgh-block",
@@ -15610,6 +15917,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -15683,7 +15992,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.supplier-hgr25-rail",
@@ -15726,6 +16036,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -15823,7 +16135,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.torque-motor",
@@ -15977,6 +16290,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -16034,7 +16349,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.motion.vallder-bf12-support",
@@ -16081,6 +16397,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -16158,7 +16476,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.vallder-sfu1605-screw",
@@ -16196,6 +16515,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -16265,7 +16586,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pneumatic.air-supply",
@@ -16303,6 +16625,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -16352,7 +16676,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.cylinder",
@@ -16413,6 +16738,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -16474,7 +16801,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pneumatic.cylinder-rod",
@@ -16519,6 +16847,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -16568,7 +16898,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.manifold",
@@ -16605,6 +16936,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -16654,7 +16987,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.routed-hose",
@@ -16725,6 +17059,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -16782,7 +17118,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.schmalz-push-in-fitting",
@@ -16821,6 +17158,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -16890,7 +17229,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.schmalz-suction-cup",
@@ -16931,6 +17271,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -17033,7 +17375,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.schmalz-vacuum-generator",
@@ -17072,6 +17415,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -17144,7 +17489,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.schmalz-vacuum-hose",
@@ -17188,6 +17534,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -17263,7 +17611,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.solenoid-valve",
@@ -17312,6 +17661,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -17373,7 +17724,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.suction-cup",
@@ -17468,6 +17820,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -17521,7 +17875,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.vacuum-control-valve",
@@ -17559,6 +17914,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -17608,7 +17965,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.vacuum-generator",
@@ -17714,6 +18072,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -17763,7 +18123,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pneumatic.vacuum-pressure-sensor",
@@ -17801,6 +18162,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -17850,7 +18213,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.power.brake-resistor",
@@ -17923,6 +18287,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -17964,15 +18330,16 @@
    },
    "material": "aluminium",
    "mass": {
-    "kg": 3.888,
-    "source": "Computed(Preview)"
+    "kg": 2.592,
+    "source": "EffectiveDensity(1800)"
    },
    "model": "power-brake-resistor.glb",
    "view": {
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.power.circuit-breaker",
@@ -17980,7 +18347,7 @@
    "family": "power",
    "category": "Switching and protection",
    "kind": "generic",
-   "designation": "CIRCUIT-BREAKER-ASSUMED-ae0588d15da9",
+   "designation": "CIRCUIT-BREAKER-ASSUMED-4cecae2a9d45",
    "description": "Assumed three-pole circuit breaker",
    "parameters": [
     {
@@ -18034,7 +18401,7 @@
     {
      "name": "material",
      "type": "choice",
-     "value": "steel",
+     "value": "device housing",
      "options": [
       "unspecified",
       "painted steel",
@@ -18051,6 +18418,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -18087,20 +18456,21 @@
    ],
    "bom": {
     "description": "Assumed three-pole circuit breaker",
-    "material": "steel",
+    "material": "device housing",
     "partNumber": "machinekit.power.circuit-breaker|ratedCurrent:2:32|ratedVoltage:3:400|breakingCapacity:4:6000|poles:1:3|poleWidth:2:18|depth:2:75|height:2:90"
    },
-   "material": "machined-steel",
+   "material": "device-housing",
    "mass": {
-    "kg": 2.861325,
-    "source": "Computed(Preview)"
+    "kg": 0.4374,
+    "source": "EffectiveDensity(1200)"
    },
    "model": "power-circuit-breaker.glb",
    "view": {
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.power.contactor",
@@ -18108,7 +18478,7 @@
    "family": "power",
    "category": "Switching and protection",
    "kind": "generic",
-   "designation": "CONTACTOR-ASSUMED-39bfe350b8ad",
+   "designation": "CONTACTOR-ASSUMED-7da61d075818",
    "description": "Assumed power contactor with auxiliary feedback",
    "parameters": [
     {
@@ -18162,7 +18532,7 @@
     {
      "name": "material",
      "type": "choice",
-     "value": "steel",
+     "value": "device housing",
      "options": [
       "unspecified",
       "painted steel",
@@ -18179,6 +18549,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -18215,20 +18587,21 @@
    ],
    "bom": {
     "description": "Assumed power contactor with auxiliary feedback",
-    "material": "steel",
+    "material": "device housing",
     "partNumber": "machinekit.power.contactor|ratedCurrent:2:32|ratedVoltage:3:400|coilVoltage:2:24|poles:1:3|width:2:55|depth:2:80|height:2:90"
    },
-   "material": "machined-steel",
+   "material": "device-housing",
    "mass": {
-    "kg": 3.1086,
-    "source": "Computed(Preview)"
+    "kg": 0.4752,
+    "source": "EffectiveDensity(1200)"
    },
    "model": "power-contactor.glb",
    "view": {
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.power.three-phase-rectifier",
@@ -18314,6 +18687,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -18355,15 +18730,16 @@
    },
    "material": "aluminium",
    "mass": {
-    "kg": 7.776,
-    "source": "Computed(Preview)"
+    "kg": 2.88,
+    "source": "EffectiveDensity(1000)"
    },
    "model": "power-three-phase-rectifier.glb",
    "view": {
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.power.vfd",
@@ -18371,7 +18747,7 @@
    "family": "power",
    "category": "Spindle drives",
    "kind": "generic",
-   "designation": "VFD-ASSUMED-e03bcbfdea2d",
+   "designation": "VFD-ASSUMED-6fea8f43be98",
    "description": "Assumed three-phase spindle VFD with STO terminals",
    "parameters": [
     {
@@ -18431,7 +18807,7 @@
     {
      "name": "material",
      "type": "choice",
-     "value": "aluminium 6061",
+     "value": "device housing dark",
      "options": [
       "unspecified",
       "painted steel",
@@ -18448,6 +18824,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -18484,20 +18862,21 @@
    ],
    "bom": {
     "description": "Assumed three-phase spindle VFD with STO terminals",
-    "material": "aluminium 6061",
+    "material": "device housing dark",
     "partNumber": "machinekit.power.vfd|power:4:7500|inputVoltage:3:400|outputCurrent:2:18|maxFrequency:3:400|width:3:180|depth:3:180|height:3:300|sto:4:true"
    },
-   "material": "aluminium",
+   "material": "device-housing-dark",
    "mass": {
-    "kg": 26.244,
-    "source": "Computed(Preview)"
+    "kg": 6.318,
+    "source": "EffectiveDensity(650)"
    },
    "model": "power-vfd.glb",
    "view": {
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pressbrake.gauge-finger",
@@ -18528,6 +18907,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -18581,7 +18962,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pressbrake.hydraulic-cylinder",
@@ -18654,6 +19036,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -18707,7 +19091,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pressbrake.hydraulic-cylinder-rod",
@@ -18752,6 +19137,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -18801,7 +19188,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pressbrake.hydraulic-manifold",
@@ -18839,6 +19227,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -18888,7 +19278,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pressbrake.hydraulic-supply",
@@ -18926,6 +19317,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -18975,7 +19368,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pressbrake.hydraulic-valve",
@@ -19006,6 +19400,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -19055,7 +19451,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pressbrake.tool-clamp",
@@ -19116,6 +19513,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -19169,7 +19568,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.pressbrake.tool-segment",
@@ -19250,6 +19650,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -19303,7 +19705,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.printing.extruder",
@@ -19342,6 +19745,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -19413,7 +19818,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.printing.fan",
@@ -19453,6 +19859,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -19523,7 +19931,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.printing.heated-bed",
@@ -19562,6 +19971,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -19629,7 +20040,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.printing.heater-cartridge",
@@ -19668,6 +20080,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -19731,7 +20145,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.printing.hotend",
@@ -19770,6 +20185,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -19849,7 +20266,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.printing.nozzle",
@@ -19888,6 +20306,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -19955,7 +20375,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.printing.thermistor",
@@ -19994,6 +20415,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -20061,7 +20484,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.robotics.arm-joint",
@@ -20203,6 +20627,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -20256,7 +20682,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.robotics.arm-link",
@@ -20342,6 +20769,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -20395,7 +20824,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.robotics.arm-wrist-fork",
@@ -20454,6 +20884,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -20507,7 +20939,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.robotics.cobot-joint",
@@ -20567,6 +21000,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -20628,7 +21063,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.robotics.end-effector-plate",
@@ -20707,6 +21143,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -20864,7 +21302,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.robotics.fairino-dual-tool-adapter",
@@ -20918,7 +21357,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.robotics.frame-bar",
@@ -20970,6 +21410,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -21023,7 +21465,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.robotics.geared-arm-joint",
@@ -21178,6 +21621,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -21235,7 +21680,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.robotics.offset-gripper-finger",
@@ -21290,7 +21736,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.robotics.parallel-gripper-body",
@@ -21353,6 +21800,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -21422,7 +21871,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.robotics.parallel-gripper-finger",
@@ -21506,6 +21956,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -21555,7 +22007,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.robotics.parallel-gripper-jaw",
@@ -21621,6 +22074,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -21682,7 +22137,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.robotics.pedestal",
@@ -21801,6 +22257,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -21886,7 +22344,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.robotics.robot-flange",
@@ -21930,6 +22389,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -21999,7 +22460,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.robotics.schmalz-sxt-master",
@@ -22038,6 +22500,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -22113,7 +22577,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.robotics.schmalz-sxt-tool",
@@ -22152,6 +22617,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -22226,7 +22693,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.robotics.tool-changer-master",
@@ -22277,6 +22745,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -22330,7 +22800,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.robotics.tool-changer-tool",
@@ -22381,6 +22852,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -22434,7 +22907,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.robotics.tool-service-module",
@@ -22508,6 +22982,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -22565,7 +23041,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.routing.atc-spindle",
@@ -22673,6 +23150,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -22730,7 +23209,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.routing.collet",
@@ -22782,6 +23262,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -22835,7 +23317,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.routing.dust-shoe",
@@ -22936,6 +23419,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -22993,7 +23478,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.routing.spoilboard",
@@ -23052,6 +23538,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -23105,7 +23593,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.routing.tool-fork",
@@ -23171,6 +23660,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -23228,7 +23719,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.routing.tool-holder",
@@ -23315,6 +23807,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -23372,7 +23866,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.routing.tool-length-setter",
@@ -23431,6 +23926,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -23484,7 +23981,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.routing.tool-rack",
@@ -23570,6 +24068,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -23655,7 +24155,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.routing.vacuum-blower",
@@ -23728,6 +24229,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -23781,7 +24284,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.routing.vacuum-table",
@@ -23880,6 +24384,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -23957,7 +24463,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.routing.vacuum-zone-valve",
@@ -24023,6 +24530,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -24076,7 +24585,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.standard.bushing",
@@ -24128,6 +24638,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -24185,7 +24697,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.standard.deep-groove-bearing",
@@ -24250,6 +24763,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -24600,7 +25115,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "datasheet"
   },
   {
    "id": "machinekit.standard.fine-pitch-nut",
@@ -24659,6 +25175,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -24712,7 +25230,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.standard.flat-washer",
@@ -24757,6 +25276,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -24905,7 +25426,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "datasheet"
   },
   {
    "id": "machinekit.standard.hex-bolt",
@@ -25037,7 +25559,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "datasheet"
   },
   {
    "id": "machinekit.standard.hex-nut",
@@ -25082,6 +25605,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -25223,7 +25748,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "datasheet"
   },
   {
    "id": "machinekit.standard.parallel-key",
@@ -25275,6 +25801,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -25380,7 +25908,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "datasheet"
   },
   {
    "id": "machinekit.standard.retaining-ring",
@@ -25427,6 +25956,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -25546,7 +26077,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "datasheet"
   },
   {
    "id": "machinekit.standard.shaft-collar",
@@ -25593,6 +26125,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -25711,7 +26245,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.standard.socket-head-cap-screw",
@@ -25909,7 +26444,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "datasheet"
   },
   {
    "id": "machinekit.standard.socket-set-screw",
@@ -25967,7 +26503,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "datasheet"
   },
   {
    "id": "machinekit.structural.block-bracket",
@@ -26008,6 +26545,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -26052,7 +26591,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.structural.cast-in-steel-insert",
@@ -26103,6 +26643,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -26156,7 +26698,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.structural.leveling-foot",
@@ -26192,6 +26735,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -26253,7 +26798,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.structural.mineral-casting",
@@ -26359,7 +26905,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.structural.rect-tube-member",
@@ -26418,6 +26965,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -26471,7 +27020,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.structural.slide-in-slot-nut",
@@ -26549,6 +27099,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -26598,7 +27150,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.structural.tslot-member",
@@ -26664,6 +27217,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -26717,7 +27272,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.tooling.block",
@@ -26769,6 +27325,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -26818,7 +27376,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.tooling.panel",
@@ -26854,6 +27413,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -26907,7 +27468,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.tooling.plain-pin",
@@ -26968,7 +27530,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.tooling.source-casting",
@@ -27012,6 +27575,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -27061,7 +27626,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "envelope"
   },
   {
    "id": "machinekit.transmission.custom-timing-pulley",
@@ -27134,6 +27700,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -27191,7 +27759,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.transmission.generic-sprocket",
@@ -27256,6 +27825,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -27313,7 +27884,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.transmission.helical-pinion",
@@ -27401,6 +27973,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -27454,7 +28028,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.transmission.helical-rack",
@@ -27557,6 +28132,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -27610,7 +28187,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.transmission.involute-rack",
@@ -27683,6 +28261,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -27736,7 +28316,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.transmission.preloaded-pinion-mount",
@@ -27837,6 +28418,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -27894,7 +28477,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.transmission.sprocket",
@@ -27956,6 +28540,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -28048,7 +28634,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.transmission.spur-gear",
@@ -28129,6 +28716,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -28182,7 +28771,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.transmission.timing-belt",
@@ -28267,6 +28857,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -28311,7 +28903,8 @@
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.transmission.timing-pulley",
@@ -28376,6 +28969,8 @@
       "nitrile rubber NBR",
       "PA12 nylon",
       "plastic",
+      "device housing",
+      "device housing dark",
       "polycarbonate",
       "polyurethane PU",
       "birch plywood",
@@ -28433,7 +29028,8 @@
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
     "theta": 35
-   }
+   },
+   "fidelity": "nominal"
   }
  ]
 }
