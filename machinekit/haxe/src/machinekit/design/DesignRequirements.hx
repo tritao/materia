@@ -15,7 +15,11 @@ class DesignRequirements {
 				anchor.member=map(anchor.member);for(j in pose)j.joint=map(j.joint);
 				var selection=switch(obstacles) {case WholeAssembly:WholeAssembly;case InstalledMembers(m):InstalledMembers(m.map(map));};
 				AccessPath(map(id),anchor,envelopes,pose,selection);
+			case InterfaceAlignment(id,relationship):
+				InterfaceAlignment(map(id),materia.casting.InterfaceRelationship.InterfaceRelationships.remapMembers(relationship,map));
 		};
 	}
-	public static function id(r:DesignRequirement):String return switch(r) {case FastenerJoint(id,_,_,_):id;case AccessPath(id,_,_,_,_):id;};
+	public static function id(r:DesignRequirement):String return switch(r) {
+		case FastenerJoint(id,_,_,_),AccessPath(id,_,_,_,_),InterfaceAlignment(id,_): id;
+	};
 }

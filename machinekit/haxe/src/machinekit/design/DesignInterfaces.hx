@@ -35,9 +35,15 @@ class DesignInterfaces implements ComponentFacet {
 	public final holes:Array<HoleInterface>;
 	public final datums:Array<DesignDatum>;
 	public final material:Array<DesignEnvelope>;
-	public function new(holes:Array<HoleInterface>,datums:Array<DesignDatum>,material:Array<DesignEnvelope>) {
+	final precision:Array<materia.casting.InterfaceRequirement>;
+	public function new(holes:Array<HoleInterface>,datums:Array<DesignDatum>,material:Array<DesignEnvelope>,
+			?precision:Array<materia.casting.InterfaceRequirement>) {
 		this.holes=holes; this.datums=datums; this.material=material;
+		var declarations:Array<materia.casting.InterfaceRequirement> = precision == null ? [] : precision;
+		this.precision=materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(declarations);
 	}
+	public function precisionRequirements():Array<materia.casting.InterfaceRequirement>
+		return materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(precision);
 	public static function of(component:MachineComponent):Null<DesignInterfaces> {
 		for(facet in component.facets()) if(Std.isOfType(facet,DesignInterfaces)) return cast facet;
 		return null;
@@ -67,6 +73,10 @@ class DesignInterfaces implements ComponentFacet {
 		}
 		for(d in datums) {name(d.id,ids);validFrame(d.frame);}
 		for(e in material) {name(e.id,ids);validFrame(e.frame); var shape=DesignGeometry.envelope(e);shape.close();}
+		for (requirement in precision) {
+			name(requirement.id,ids);
+			validFrame(materia.casting.InterfaceRequirement.InterfaceRequirements.geometryFrame(requirement.geometry));
+		}
 	}
 	static function name(id:String,ids:Map<String,Bool>):Void {if(id==null || id.length==0 || ids.exists(id)) throw "Duplicate/empty design interface";ids.set(id,true);}
 	static function positive(v:Float):Void {if(!Math.isFinite(v) || v<=0) throw "Design interface needs finite positive dimensions";}
@@ -74,6 +84,8 @@ class DesignInterfaces implements ComponentFacet {
 	public function frame(id:String):AssemblyFrame {
 		for(h in holes) if(h.id==id) return h.frame;
 		for(d in datums) if(d.id==id) return d.frame;
+		for (requirement in precision) if (requirement.id == id)
+			return materia.casting.InterfaceRequirement.InterfaceRequirements.geometryFrame(requirement.geometry);
 		throw 'Unknown design interface "$id"';
 	}
 	public function hole(id:String):HoleInterface {for(h in holes) if(h.id==id) return h; throw 'Unknown hole "$id"';}

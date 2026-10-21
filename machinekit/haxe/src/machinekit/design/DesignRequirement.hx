@@ -29,4 +29,8 @@ typedef DesignJointValue = materia.assembly.AssemblyDefinition.AssemblyJointCoor
 @:wire enum DesignRequirement {
 	@:id(1) FastenerJoint(id:String,screw:String,target:DesignReference,through:Array<DesignReference>);
 	@:id(2) AccessPath(id:String,anchor:DesignReference,envelopes:Array<DesignEnvelope>,pose:Array<DesignJointValue>,obstacles:DesignObstacles);
+	/** id identifies this assembly occurrence; relationship.id identifies the
+	 * design relationship referenced by the source interfaces, across occurrences.
+	 */
+	@:id(3) InterfaceAlignment(id:String,relationship:materia.casting.InterfaceRelationship);
 }

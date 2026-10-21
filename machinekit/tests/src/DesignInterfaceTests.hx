@@ -72,9 +72,23 @@ class DesignInterfaceTests {
 		var badPose=fixture([{joint:"guard-slide",value:0}]);check(AssemblyDesignChecks.check(badPose).hasErrors(),"closed service cover blocks port");
 		var invalidPose=fixture([{joint:"not-a-joint",value:100}]);check(AssemblyDesignChecks.check(invalidPose).hasErrors(),"unknown service joint rejected");
 		var old=new MachineAssembly();old.addComponent("housing",new DesignFixturePart());
-		var legacy=old.describe();legacy.machine.designRequirements=null;
-		var loadedLegacy=MachineAssembly.decode(haxeon.wire.JsonWire.encode(legacy),registry);
-		check(loadedLegacy.designRequirements().length==0,"description without optional requirements still loads");
+		var legacy=old.describe();legacy.schemaVersion=19;
+		var rejected=false;
+		try MachineAssembly.fromDescription(legacy,registry) catch(error:Dynamic)
+			rejected=Std.string(error).indexOf("unsupported")>=0;
+		check(rejected,"previous assembly schema is rejected");
+		var malformed=old.describe();malformed.machine.designRequirements=null;
+		rejected=false;
+		try MachineAssembly.fromDescription(malformed,registry) catch(error:Dynamic)
+			rejected=Std.string(error).indexOf("Missing machine design requirements")>=0;
+		check(rejected,"current schema requires design requirements even when empty");
+		var emptyText=old.encode();
+		var nullRequirements=StringTools.replace(emptyText, '["14:designRequirements",[]]', '["14:designRequirements",null]');
+		check(nullRequirements!=emptyText,"negative wire fixture changes only the required array");
+		var wireError="";
+		try MachineAssembly.decode(nullRequirements,registry) catch(error:Dynamic) wireError=Std.string(error);
+		check(wireError.indexOf("Expected JSON wire container")>=0,
+			"wire input cannot replace the required requirements array with null: "+wireError);
 		var refs=rebuilt.designRequirements();refs.pop();check(rebuilt.designRequirements().length==2,"requirements accessor is a defensive copy");
 		return assertions;
 	}

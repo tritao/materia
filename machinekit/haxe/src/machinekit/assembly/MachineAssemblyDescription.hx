@@ -180,7 +180,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 	/** Switches, at-speed and presence sensors. */
 	@:id(12) var sensors:Array<materia.assembly.AssemblyDefinition.AssemblySensor>;
 	@:id(13) var switches:Array<materia.assembly.AssemblyDefinition.AssemblySwitch>;
-	@:id(14) @:optional var designRequirements:Array<machinekit.design.DesignRequirement>;
+	@:id(14) var designRequirements:Array<machinekit.design.DesignRequirement>;
 }
 
 /** One subassembly: its path from the root, its entry in the mechanical table, and its facts. */

@@ -37,9 +37,28 @@ class AssemblyDesignChecks {
 		var model=new AssemblyModel("mm");a.addTo(model,"");
 		var definition=model.definition("assembly-design"), initial=new AssemblyState(definition);
 		initial.forwardKinematics();
-		for(r in a.designRequirements()) {
+		var requirements=a.designRequirements();
+		for (member in a.components()) {
+			var interfaces=DesignInterfaces.of(member.component);
+			if (interfaces==null) continue;
+			for (source in interfaces.precisionRequirements()) for (definitionId in source.relationshipIds) {
+				var found=false;
+				for (requirement in requirements) switch requirement {
+					case InterfaceAlignment(_,relationship):
+						if (relationship.id==definitionId) for (reference in relationship.members) switch reference {
+							case ComponentInterface(part,face): if (part==member.id && face==source.id) found=true;
+							case MachineAxis(_):
+						}
+					default:
+				}
+				if (!found) out.error("design.interface.relationship-reference",member.id+"/"+source.id,
+					"Source interface references an unknown or unrelated relationship: "+definitionId);
+			}
+		}
+		for(r in requirements) {
 			var id=DesignRequirements.id(r);
 			try switch(r) {
+				case InterfaceAlignment(_,relationship): interfaceAlignment(out,id,relationship,members,definition);
 				case FastenerJoint(_,screw,target,through): fastener(out,id,screw,target,through,members,initial,cache);
 				case AccessPath(_,anchor,envelopes,pose,selection):
 					var state=new AssemblyState(definition);
@@ -66,6 +85,21 @@ class AssemblyDesignChecks {
 					for(p in obstacles)p.part.close();
 			} catch(error:Dynamic) out.error("design.invalid-requirement",id,Std.string(error));
 		}
+	}
+
+	static function interfaceAlignment(out:Diagnostics,id:String,authored:materia.casting.InterfaceRelationship,
+			members:Map<String,MachineComponent>,definition:materia.assembly.AssemblyDefinition):Void {
+		var relationship=materia.casting.InterfaceRelationship.InterfaceRelationships.snapshot([authored])[0];
+		for (member in relationship.members) switch member {
+			case ComponentInterface(partId,interfaceId):
+				InterfaceSourceSupport.precision(members,partId,interfaceId,relationship.id);
+			case MachineAxis(axisId): InterfaceSourceSupport.axis(definition,axisId);
+		}
+		var margin=materia.casting.InterfaceRelationship.InterfaceRelationships.uncertaintyMargin(relationship);
+		if (margin==null || margin<0 || relationship.metrology.instrumentReference==null)
+			out.warning("design.interface.metrology",id,"Relationship metrology is absent or its uncertainty exceeds the design tolerance.");
+		out.warning("design.interface.qualification",id,
+			"Relationship references resolve; geometry, replication jig and measured alignment remain unqualified.");
 	}
 	static function facet(ref:DesignReference,members:Map<String,MachineComponent>):DesignInterfaces {
 		var member=members.get(ref.member);if(member==null)throw 'Unknown design member "${ref.member}"';

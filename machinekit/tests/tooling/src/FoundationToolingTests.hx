@@ -431,6 +431,7 @@ class FoundationToolingTests {
 		return values.copy().setToken("features", CastingPatterns.encode(features));
 	}
 	public static function main():Void {
+		FoundationRelationshipTests.run();
 		if (Sys.args().indexOf("socket-carrier") >= 0) {
 			sourcedSocket();
 			Sys.println('SocketCarrierChecks: $assertions assertions passed');

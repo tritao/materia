@@ -1456,6 +1456,8 @@ directories; commit source setups, small test fixtures and documentation.
 
 ## Deferred scope
 
+- Generic catalogue recipe solid-count qualification: the bought Vallder BK12 assembly has 32 solids; the broad recipe test assumes one, outside casting phases 6–8.
+
 General BREP parting-surface discovery, arbitrary contour nesting, robotic mold
 assembly, wiring core cutting definitions into `FoamJob` (after foam-cutter lands
 on main), CNC posts beyond CamKit's LinuxCNC writer, CAM for the steel inserts
@@ -1882,6 +1884,22 @@ structures and phase 9 physical calibration remain open.
   native process **34**, full mill **249**. Regenerated records-only kit:
   **122 artifacts / 40 programs / 15 Pass / 263 Pending / 15 Unsupported**;
   manifest integrity/tamper and all artifact hashes pass; readiness is **false**.
+
+- [x] Native source precision-interface facets and `InterfaceAlignment`, assembly
+  schema **20** with no old-version reader. Nested occurrences remap component
+  and machine-axis references while retaining source relationship IDs. Source
+  reference errors are diagnostics; absent or excessive metrology remains
+  unqualified. Required design-requirement arrays reject null, including direct
+  typed reconstruction. Focused relationship validation: **20 assertions**.
+  Neutral adapter/context integration and the source foundation joint remain
+  subsequent slices; this does not declare step 2 complete.
+  Validation: generic design interfaces **30**, foundation **229**, neutral
+  tooling **1,794**, native tooling **450**, casting **54**, foundation CAD
+  **60**, standalone native process **34**, full mill **249**. The broader
+  assembly suite reaches the unchanged Vallder BK12 recipe's 32-solid failure;
+  its catalogue contract is deferred above. Regenerated records-only kit:
+  **122 artifacts / 40 programs / 15 Pass / 263 Pending / 15 Unsupported**;
+  integrity/tamper and all artifact hashes pass; readiness remains **false**.
 
 ### Phase 7 records: shared levelling-foot family
 

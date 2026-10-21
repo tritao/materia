@@ -16,6 +16,7 @@ class CastInsert extends MachineComponent {
 		return [
 			P.choice("stockMaterial", materia.casting.InsertMaterial.InsertMaterials.tokens(), materia.casting.InsertMaterial.C45Bright),
 			P.text("holes", InsertHoles.fromNeutral([])),
+			P.text("interfaces", "[]"),
 			P.text("body", InsertBodyCodec.encode(Primitive(Box(35, 400, 20)))),
 			P.text("origin", haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(Fabricated))),
 			P.length("positionTolerance", 0.01),
@@ -37,6 +38,8 @@ class CastInsert extends MachineComponent {
 		var holes = InsertHoles.records(v.token("holes"));
 		v.setToken("body", InsertBodyCodec.encode(body));
 		v.setToken("holes", InsertHoles.fromNeutral(holes));
+		var precision = materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(haxe.Json.parse(v.token("interfaces")));
+		v.setToken("interfaces", haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records(precision)));
 		var origin = materia.casting.InsertOrigin.InsertOriginCodec.snapshot(haxe.Json.parse(v.token("origin")), body, holes);
 		v.setToken("origin", haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(origin)));
 		if (v.number("positionTolerance") <= 0)
@@ -52,7 +55,8 @@ class CastInsert extends MachineComponent {
 			case Box(width, depth, height): {width: width, depth: depth, height: height};
 			case Cylinder(diameter, height): {width: diameter, depth: diameter, height: materia.casting.InsertSpec.InsertBodyCodec.height(body)};
 		};
-		addFacet(InsertHoles.facet(holes, stock.width, stock.depth, stock.height));
+		var sourceHoles = InsertHoles.facet(holes, stock.width, stock.depth, stock.height);
+		addFacet(new machinekit.design.DesignInterfaces(sourceHoles.holes, sourceHoles.datums, sourceHoles.material, precision));
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("top", Mount, Solids.axial(0, 0, stock.height));
 	}

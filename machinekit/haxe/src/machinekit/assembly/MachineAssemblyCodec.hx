@@ -335,6 +335,8 @@ class MachineAssemblyCodec {
 
 	static function readLevel(target:MachineAssembly, path:String, level:LevelMechanical, machine:MachineLevelRecord,
 			table:Map<String, AssemblySubdefinition>, records:Map<String, SubassemblyRecord>, registry:ComponentRegistry):Void {
+		if (machine == null || machine.designRequirements == null)
+			throw "Missing machine design requirements: " + path;
 		var sources = new Map<String, MemberRecord>();
 		for (member in machine.members) {
 			if (sources.exists(member.occurrence)) throw 'Duplicate member source "${member.occurrence}"';
@@ -395,7 +397,7 @@ class MachineAssemblyCodec {
 		for (coupling in level.couplings)
 			target.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset,
 				coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions, coupling.dampingRatio, coupling.stiffnessLaw, coupling.calibration);
-		if(machine.designRequirements!=null) for(r in machine.designRequirements) target.addDesignRequirement(r);
+		for(r in machine.designRequirements) target.addDesignRequirement(r);
 		for (path in machine.beltPaths) target.addBeltPath(path);
 		// A transmission whose coupling is gone goes too. The rest take their ratios from their parts as
 		// they are now, not as they were saved; a change is reported.
