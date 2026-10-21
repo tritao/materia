@@ -156,9 +156,9 @@ class SceneEditingTests {
       appearance: Appearances.machinedSteel(), vertexCount: 4, indexCount: 12,
       vertices: vertices, normals: normals, indices: indices, faceRanges: []
     }]});
-    var part = SceneArtifact.decode(encoded).parts[0];
+    var part = SceneArtifact.decode(encoded).parts[0], steel = Appearances.machinedSteel();
     check(part.appearance != null && part.appearance.finish == "machined-steel" &&
-      nearValue(part.appearance.metallic, 0.8) && nearValue(part.appearance.roughness, 0.34),
+      nearValue(part.appearance.metallic, steel.metallic) && nearValue(part.appearance.roughness, steel.roughness),
       "generated artifact retains surface finish");
   }
   static function componentFinishReset():Void {

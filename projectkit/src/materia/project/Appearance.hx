@@ -26,11 +26,12 @@ class Appearances {
 		case "rubber": rubber();
 		default: null;
 	}
-	public static function neutral():Appearance return {finish: "neutral", metallic: 0.0, roughness: 0.65};
-	public static function painted():Appearance return {finish: "painted", metallic: 0.0, roughness: 0.48};
-	public static function machinedSteel():Appearance return {finish: "machined-steel", metallic: 0.8, roughness: 0.34};
-	public static function blackOxide():Appearance return {finish: "black-oxide", metallic: 0.55, roughness: 0.52};
-	public static function bearingSteel():Appearance return {finish: "bearing-steel", metallic: 0.78, roughness: 0.3};
-	public static function aluminium():Appearance return {finish: "aluminium", metallic: 0.72, roughness: 0.42};
-	public static function rubber():Appearance return {finish: "rubber", metallic: 0.0, roughness: 0.9};
+	// Finishes are the material library's visuals, so a finish and its material never disagree.
+	public static function neutral():Appearance return MaterialLibrary.appearance("neutral");
+	public static function painted():Appearance return MaterialLibrary.appearance("painted");
+	public static function machinedSteel():Appearance return MaterialLibrary.appearance("machined-steel");
+	public static function blackOxide():Appearance return MaterialLibrary.appearance("black-oxide");
+	public static function bearingSteel():Appearance return MaterialLibrary.appearance("bearing-steel");
+	public static function aluminium():Appearance return MaterialLibrary.appearance("aluminium");
+	public static function rubber():Appearance return MaterialLibrary.appearance("rubber");
 }

@@ -3,7 +3,14 @@ package materia.project;
 import materia.project.MaterialDef;
 import materia.project.Appearance;
 
-/** Built-in material definitions shared by generators, the BOM, and the editor. */
+/**
+ * Built-in material definitions shared by generators, the BOM, and the editor.
+ *
+ * Visuals are metallic-roughness PBR, as SceneKit and glTF read them: `baseColor` is sRGB. A bare metal has
+ * metallic 1 and its base colour is its reflectance at normal incidence (steel about 0.56 linear, sRGB 0.78;
+ * aluminium about 0.91 linear), so metal reads as metal under the viewport look's studio room. Coatings that
+ * hide the metal (black oxide, paint) are dark or dielectric instead.
+ */
 class MaterialLibrary {
   static function material(id:String, name:String, color:Array<Float>, metallic:Float,
       roughness:Float, density:Float, spec:String):MaterialDef return {
@@ -15,16 +22,16 @@ class MaterialLibrary {
   public static function all():Array<MaterialDef> return [
     material("neutral", "Neutral", [0.7, 0.7, 0.7], 0.0, 0.65, 1000, "unspecified"),
     material("painted", "Painted steel", [0.24, 0.34, 0.43], 0.0, 0.48, 7850, "painted steel"),
-    material("machined-steel", "Machined steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "steel"),
-    material("steel-c45", "C45 steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "steel C45"),
-    material("steel-8", "Class 8 steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "steel 8"),
-    material("steel-8-8", "Class 8.8 steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "steel 8.8"),
-    material("steel-10-9", "Class 10.9 steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "steel 10.9"),
-    material("stainless-a2-70", "A2-70 stainless steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7900, "stainless A2-70"),
+    material("machined-steel", "Machined steel", [0.77, 0.78, 0.79], 1.0, 0.34, 7850, "steel"),
+    material("steel-c45", "C45 steel", [0.77, 0.78, 0.79], 1.0, 0.34, 7850, "steel C45"),
+    material("steel-8", "Class 8 steel", [0.77, 0.78, 0.79], 1.0, 0.34, 7850, "steel 8"),
+    material("steel-8-8", "Class 8.8 steel", [0.77, 0.78, 0.79], 1.0, 0.34, 7850, "steel 8.8"),
+    material("steel-10-9", "Class 10.9 steel", [0.77, 0.78, 0.79], 1.0, 0.34, 7850, "steel 10.9"),
+    material("stainless-a2-70", "A2-70 stainless steel", [0.79, 0.79, 0.78], 1.0, 0.32, 7900, "stainless A2-70"),
     material("steel-12-9", "Class 12.9 steel", [0.18, 0.19, 0.20], 0.55, 0.52, 7850, "steel 12.9"),
     material("black-oxide", "Black oxide steel", [0.18, 0.19, 0.20], 0.55, 0.52, 7850, "steel 12.9"),
-    material("bearing-steel", "Bearing steel", [0.58, 0.61, 0.64], 0.78, 0.30, 7810, "bearing steel"),
-    material("aluminium", "Anodized aluminium 6061", [0.68, 0.70, 0.72], 0.72, 0.42, 2700, "aluminium 6061"),
+    material("bearing-steel", "Bearing steel", [0.79, 0.80, 0.81], 1.0, 0.30, 7810, "bearing steel"),
+    material("aluminium", "Anodized aluminium 6061", [0.86, 0.87, 0.88], 1.0, 0.42, 2700, "aluminium 6061"),
     material("rubber", "Rubber", [0.10, 0.10, 0.11], 0.0, 0.90, 1100, "rubber"),
     material("nitrile-rubber", "Nitrile rubber", [0.10, 0.10, 0.11], 0.0, 0.90, 1100, "nitrile rubber NBR"),
     // Nominal planning density; print-lot properties must be supplied for production validation.
@@ -39,11 +46,11 @@ class MaterialLibrary {
     toolingEPS(),
     toolingBoard(),
     mineralCast(),
-    material("carbide", "Cemented carbide", [0.45, 0.46, 0.47], 0.7, 0.35, 14500, "carbide"),
-    material("cast-iron", "Cast iron", [0.35, 0.37, 0.39], 0.60, 0.55, 7200, "cast iron"),
-    material("bronze", "Bronze", [0.55, 0.38, 0.20], 0.70, 0.38, 8800, "bronze"),
-    material("brass", "Brass", [0.69, 0.55, 0.29], 0.75, 0.34, 8500, "brass"),
-    material("spring-steel", "Spring steel", [0.56, 0.58, 0.60], 0.75, 0.38, 7850, "spring steel"),
+    material("carbide", "Cemented carbide", [0.70, 0.71, 0.72], 1.0, 0.35, 14500, "carbide"),
+    material("cast-iron", "Cast iron", [0.58, 0.59, 0.60], 1.0, 0.55, 7200, "cast iron"),
+    material("bronze", "Bronze", [0.80, 0.60, 0.38], 1.0, 0.38, 8800, "bronze"),
+    material("brass", "Brass", [0.92, 0.82, 0.55], 1.0, 0.34, 8500, "brass"),
+    material("spring-steel", "Spring steel", [0.72, 0.73, 0.75], 1.0, 0.38, 7850, "spring steel"),
     sheetSteel(), sheetAluminium(),
     enclosureMaterial("compact-laminate", "Compact laminate", 1400),
     enclosureMaterial("grp", "Glass reinforced plastic", 1800),
@@ -104,7 +111,7 @@ class MaterialLibrary {
 
   /** Plan material A. Mechanical values and development defaults are assumed, not lot certificates. */
   static function sheetSteel():MaterialDef {
-    var result = material("mild-steel", "Mild steel sheet", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "mild steel sheet");
+    var result = material("mild-steel", "Mild steel sheet", [0.77, 0.78, 0.79], 1.0, 0.34, 7850, "mild steel sheet");
     result.mechanical = {uts: 400, yield: 250, youngs: 205000};
     result.sheet = {kFactorTable: [{ratio: 0, k: 0.30}, {ratio: 1, k: 0.38}, {ratio: 3, k: 0.45}],
       defaultRadiusRatio: 1, minRadiusRatio: 0.5, grain: true};
@@ -113,7 +120,7 @@ class MaterialLibrary {
 
   /** Plan material B. Mechanical values and development defaults are assumed, not lot certificates. */
   static function sheetAluminium():MaterialDef {
-    var result = material("aluminium-5052-h32", "5052-H32 aluminium sheet", [0.68, 0.70, 0.72], 0.72, 0.42, 2680, "aluminium 5052-H32 sheet");
+    var result = material("aluminium-5052-h32", "5052-H32 aluminium sheet", [0.88, 0.89, 0.90], 1.0, 0.38, 2680, "aluminium 5052-H32 sheet");
     result.mechanical = {uts: 228, yield: 193, youngs: 70000};
     result.sheet = {kFactorTable: [{ratio: 0, k: 0.33}, {ratio: 1, k: 0.40}, {ratio: 3, k: 0.45}],
       defaultRadiusRatio: 1, minRadiusRatio: 1, grain: true};
