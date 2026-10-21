@@ -68,7 +68,7 @@ class CastingMoldPlanner {
 				reason: check.message + ". Select supported source geometry or implement profile-capable tooling before fabrication.",
 				blockingChecks: [check.rule]
 			}];
-			checks=checks.concat(InterfaceQualification.source(d.input));
+			checks=checks.concat(InterfaceQualification.source(d.input)).concat(InsertQualifications.manufacturing(d.input.inserts));
 			return {sourceFingerprint: ToolingCodec.documentFingerprint(d), plan: null, validation: checks,
 				changeRequests: changes, fabrication: materia.tooling.ToolingValidation.ToolingReadiness.evaluate(checks)};
 		}
@@ -150,7 +150,7 @@ class CastingMoldPlanner {
 			openings: openings,
 			hardware: [],
 			changeRequests: [],
-			validation: geometryChecks.concat(InterfaceQualification.source(d.input)),
+			validation: geometryChecks.concat(InterfaceQualification.source(d.input)).concat(InsertQualifications.manufacturing(d.input.inserts)),
 			fabrication: {
 				ready: false,
 				blockingRules: []
@@ -531,21 +531,11 @@ class CastingMoldPlanner {
 				"Provide verified lifting/flip equipment and source lifting points or a qualified external cradle.", "tooling.handling.flip");
 		for (seat in o.precision) {
 			var source = d.input.inserts.filter(i -> i.id == seat.insertId)[0];
-			if (seat.route != PrecisionRoute.AsCast)
-				request(result, "allowance-" + seat.insertId, InterfaceAllowance, [seat.insertId],
-					"Finishing stock is not applied by this planner. Revise the source to include and identify the required finishing allowance before this route can be released.",
-					"tooling.precision.allowance." + seat.insertId);
-			if (seat.route == PrecisionRoute.Replicated
-				&& (seat.masterReference == null
-					|| StringTools.trim(seat.masterReference).length == 0
-					|| seat.releaseSpec == null
-					|| StringTools.trim(seat.releaseSpec).length == 0))
-				result.validation.push(materia.tooling.ToolingValidation.ToolingReadiness.pending("tooling.precision.replication." + seat.insertId,
-					[seat.insertId], "Replication requires an identified master and release specification."));
-			if (seat.route != sourceRoute(source.finish))
-				request(result, "finish-" + seat.insertId, InterfaceAllowance, [seat.insertId],
-					"Selected finish route differs from source finish intent; approve a source finish revision.",
-					"tooling.precision.source-finish." + seat.insertId);
+			var stock=InterfaceQualification.finishingStock(d.input,source);
+			if (stock.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass) result.validation.push(stock);
+			else requestDecision(result,"allowance-"+seat.insertId,InterfaceAllowance,stock);
+			var replication=InterfaceQualification.replicationRequirement(source,seat);
+			if (replication!=null) result.validation.push(replication);
 		}
 		for (j in o.groutedJoints)
 			if (j.gapMm == null)
@@ -582,15 +572,6 @@ class CastingMoldPlanner {
 		return ordered;
 	}
 
-	public static function sourceRoute(finish:materia.casting.InsertSpec.InsertFinish):PrecisionRoute
-		return switch finish {
-			case AsSupplied: PrecisionRoute.AsSupplied;
-			case GroundAfterCasting, MachinedAfterCasting: PrecisionRoute.Machined;
-			case ReplicatedAfterCasting: PrecisionRoute.Replicated;
-			case SourceAsCast: PrecisionRoute.AsCast;
-			default: throw "Unsupported source precision finish";
-		};
-
 	public static function coreUnits(input:CastingToolingInput, cores:Array<CastingMoldCore>):Array<CastingCoreUnit> {
 		var groups = new Map<String, CastingCoreUnit>();
 		for (core in cores) {
@@ -617,18 +598,17 @@ class CastingMoldPlanner {
 
 	static function request(p:CastingMoldPlan, id:String, kind:DesignChangeKind, ids:Array<String>, message:String, rule:String,
 			unsupported:Bool = false):Void {
-		p.changeRequests.push({
-			id: materia.tooling.ToolingIds.derive("", id),
-			kind: kind,
-			sourceIds: ids.copy(),
-			reason: message,
-			blockingChecks: [rule]
-		});
 		var check = materia.tooling.ToolingValidation.ToolingReadiness.pending(rule, ids, message);
 		if (unsupported) {
 			check.status = materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported;
 			check.severity = materia.tooling.ToolingDiagnostic.ToolingSeverity.Error;
 		}
+		requestDecision(p,id,kind,check);
+	}
+
+	static function requestDecision(p:CastingMoldPlan,id:String,kind:DesignChangeKind,check:materia.tooling.ToolingValidation):Void {
+		p.changeRequests.push({id:materia.tooling.ToolingIds.derive("",id),kind:kind,
+			sourceIds:check.affectedIds.copy(),reason:check.message,blockingChecks:[check.rule]});
 		p.validation.push(check);
 	}
 
@@ -640,6 +620,7 @@ class CastingMoldPlanner {
 
 	public static function validate(p:CastingMoldPlan):Void {
 		InterfaceQualification.validate(p.document.input,p.validation);
+		InsertQualifications.validateManufacturing(p.document.input.inserts,p.validation);
 		if (ToolingCodec.canonical(p.fabrication) != ToolingCodec.canonical(materia.tooling.ToolingValidation.ToolingReadiness.evaluate(p.validation)))
 			throw "Stale fabrication readiness";
 		if (Math.abs(p.document.setup.fillHeightMm - p.cavity.z - p.cavity.height) > 1e-7 || p.document.setup.freeboardMm != 0)
@@ -692,17 +673,19 @@ class CastingMoldPlanner {
 				throw "Zero-draft bed-backing former needs a release validation";
 		for (seat in p.options.precision) {
 			var source = p.document.input.inserts.filter(i -> i.id == seat.insertId)[0];
-			if (seat.route == PrecisionRoute.Replicated
-				&& (seat.masterReference == null
-					|| StringTools.trim(seat.masterReference).length == 0
-					|| seat.releaseSpec == null
-					|| StringTools.trim(seat.releaseSpec).length == 0)
-				&& ruleIds.indexOf("tooling.precision.replication." + seat.insertId) < 0)
-				throw "Replication requires a master/release validation";
-			if (seat.route != sourceRoute(source.finish) && ruleIds.indexOf("tooling.precision.source-finish." + seat.insertId) < 0)
-				throw "Finish route differs from source without a change request";
-			if (seat.route != PrecisionRoute.AsCast && ruleIds.indexOf("tooling.precision.allowance." + seat.insertId) < 0)
-				throw "Finishing allowance needs a validation decision";
+			var replication=InterfaceQualification.replicationRequirement(source,seat);
+			var replicationChecks=p.validation.filter(check -> check.rule=="tooling.precision.replication."+source.id);
+			if (replication==null ? replicationChecks.length!=0 : replicationChecks.length!=1
+				|| ToolingCodec.canonical(replicationChecks[0])!=ToolingCodec.canonical(replication))
+				throw "Replication requirement differs from source interfaces and process choices";
+			var stock=InterfaceQualification.finishingStock(p.document.input,source);
+			var decisions=p.validation.filter(decision -> decision.rule==stock.rule);
+			if (decisions.length!=1 || ToolingCodec.canonical(decisions[0])!=ToolingCodec.canonical(stock))
+				throw "Finishing stock decision differs from source geometry";
+			var requests=p.changeRequests.filter(request -> request.id=="allowance-"+seat.insertId);
+			if (stock.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass ? requests.length!=0
+				: requests.length!=1 || requests[0].blockingChecks.indexOf(stock.rule)<0)
+				throw "Finishing stock change request differs from source decision";
 		}
 		for (request in p.changeRequests)
 			for (rule in request.blockingChecks)

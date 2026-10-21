@@ -151,12 +151,16 @@ class InsertFixtureCad {
 			var washer = machinekit.standard.FlatWasher.metric(site.thread.designation);
 			if (Math.abs(washer.thickness-site.washerThickness) > 1e-7)
 				throw "Fixture washer differs from selected source-thread hardware";
+			var stock=plan.options.screwStock.filter(choice -> materia.tooling.ToolingCodec.canonical(choice.thread)==materia.tooling.ToolingCodec.canonical(site.thread))[0];
+			var nominal=machinekit.standard.SocketHeadCapScrew.catalog().get(site.thread.designation);
+			if (Math.abs(Math.min(site.screwLength,stock.threadedLength)-Math.min(site.screwLength,nominal.threadLength))>1e-7)
+				throw "Fixture screw threaded span differs from selected source hardware: "+site.id;
 			var head = F.compose(site.entry,F.fromRotationMatrix(0,0,-thickness,[1,0,0,0,-1,0,0,0,-1]));
-			ToolingHardwareCad.fixtureScrew(assembly,site.id,site.thread.designation,site.screwLength-site.washerThickness,head);
+			var source=plan.document.input.inserts.filter(row -> row.id==site.insertId)[0];
+			var hole=materia.tooling.casting.InsertFixturePlanner.holes(source).filter(row -> row.id==site.sourceHoleId)[0];
+			ToolingHardwareCad.fixtureScrew(assembly,site.id,hole,site.screwLength-site.washerThickness,head,site.entry);
 			if (site.plug != null) {
 				var plug = site.plug;
-				var source = plan.document.input.inserts.filter(row -> row.id == site.insertId)[0];
-				var hole = source.holes.filter(row -> row.id == site.sourceHoleId)[0];
 				add(assembly,root,ToolingIds.derive("",site.id,"-far-end"),
 					machinekit.standard.SocketSetScrew.forThread(machinekit.structural.InsertHoles.threadSpec(site.thread).mating(),plug.length),
 					F.compose(site.entry,F.translation(0,0,hole.depth-plug.length)));

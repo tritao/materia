@@ -146,10 +146,10 @@ class BoxMoldCad {
 				f = fixture.mountingFace,
 				t = p.document.recipe.panel.measuredThickness;
 			for (fixing in fixture.fixings) {
-				var hole = i.holes.filter(h -> h.id == fixing.sourceHoleId)[0];
+				var hole = materia.tooling.casting.InsertFixturePlanner.holes(i).filter(h -> h.id == fixing.sourceHoleId)[0];
 				var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
-				ToolingHardwareCad.fixtureScrew(a, fixing.hardwareId, fixing.threadSpec, t + fixing.engagement,
-					F.fromRotationMatrix(fixing.entry.x, fixing.entry.y, b.z - t, [1, 0, 0, 0, -1, 0, 0, 0, -1]));
+				ToolingHardwareCad.fixtureScrew(a, fixing.hardwareId, hole, t + materia.tooling.casting.InsertFixturePlanner.minimumInsertion(hole),
+					F.fromRotationMatrix(fixing.entry.x, fixing.entry.y, b.z - t, [1, 0, 0, 0, -1, 0, 0, 0, -1]),fixing.entry);
 				var penetration = p.penetrations.filter(v -> v.sourceHoleId == hole.id && v.insertId == i.id)[0];
 				var plug = penetration.plug;
 				if (plug != null) {
@@ -161,7 +161,7 @@ class BoxMoldCad {
 				}
 			}
 			for (mask in fixture.boreMasks) {
-				var hole = i.holes.filter(h -> h.id == mask.sourceHoleId)[0];
+				var hole = materia.tooling.casting.InsertFixturePlanner.holes(i).filter(h -> h.id == mask.sourceHoleId)[0];
 				a.addComponent(mask.hardwareId, ToolingPin.boreMask(hole, mask.plugLength), F.compose(pose, hole.frame));
 				if (mask.farEndId != null)
 					a.addComponent(mask.farEndId, ToolingPin.boreMask(hole, mask.plugLength),

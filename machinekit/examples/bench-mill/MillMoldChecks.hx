@@ -107,9 +107,8 @@ class MillMoldChecks {
 		check(report.assemblyGroups.length == 2 && report.permanentGroups.length == 2, "two shared row fixtures");
 		check(report.assembly.assemblyOrder[0] == "bed", "bed installed first");
 		check(p.changeRequests.filter(c -> c.kind == "lifting-points").length == 1, "handling lift/flip request");
-		check(p.options.precision.filter(s -> s.route != CastingMoldPlanner.sourceRoute(p.document.input.inserts.filter(i -> i.id == s.insertId)[0].finish))
-			.length == 0 && p.options.groutedJoints.length == 1,
-			"finishing routes follow typed source intent");
+		check(p.options.precision.length==p.document.input.inserts.length && p.options.groutedJoints.length==1,
+			"process choices cover source inserts without duplicating finishing routes");
 		equivalent(frame, p);
 		junctionGeometry(frame, p);
 		for (c in p.cores) {

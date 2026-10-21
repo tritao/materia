@@ -179,7 +179,7 @@ class CastingMoldCad {
 			for (protection in fixture.boreMasks)
 				if (protection.hardwareId == id) {
 					var insert = p.document.input.inserts.filter(source -> source.id == fixture.insertId)[0];
-					var holes = insert.holes.filter(hole -> hole.id == protection.sourceHoleId);
+					var holes = materia.tooling.casting.InsertFixturePlanner.holes(insert).filter(hole -> hole.id == protection.sourceHoleId);
 					if (holes.length != 1)
 						throw "Bore mask has no unique source hole: " + id;
 					return {protection: protection, hole: holes[0]};
@@ -281,7 +281,7 @@ class CastingMoldCad {
 					if (protections.length != 1)
 						throw "Resin-side plug has no unique source hole: " + h.id;
 					var source = p.document.input.inserts.filter(i -> i.id == protections[0].insertId)[0];
-					var hole = source.holes.filter(hole -> hole.id == protections[0].holeId)[0];
+					var hole = materia.tooling.casting.InsertFixturePlanner.holes(source).filter(hole -> hole.id == protections[0].holeId)[0];
 					a.addComponent(h.id, machinekit.standard.SocketSetScrew.forThread(
 						machinekit.structural.InsertHoles.threadSpec(hole.thread).mating(), h.length), h.pose);
 				}
@@ -290,10 +290,13 @@ class CastingMoldCad {
 					a.addComponent(h.id, new ToolingPin(new ComponentValues().setNumber("diameter", h.diameter).setNumber("length", h.length)), h.pose);
 				else if (h.kind == SupportHardwareKind.FixtureScrew) {
 					var fixings = [for (fixture in p.fixtures) for (fixing in fixture.fixings)
-						if (fixing.hardwareId == h.id) fixing];
+						if (fixing.hardwareId == h.id) {sourceId:fixture.insertId,fixing:fixing}];
 					if (fixings.length != 1)
 						throw "Fixture screw has no unique source thread: " + h.id;
-					ToolingHardwareCad.fixtureScrew(a, h.id, fixings[0].threadSpec, h.length, h.pose);
+					var source=p.document.input.inserts.filter(insert -> insert.id==fixings[0].sourceId)[0];
+					var fixing=fixings[0].fixing;
+					var hole=materia.tooling.casting.InsertFixturePlanner.holes(source).filter(hole -> hole.id==fixing.sourceHoleId)[0];
+					ToolingHardwareCad.fixtureScrew(a,h.id,hole,h.length,h.pose,fixing.entry);
 				}
 				else {
 					ToolingHardwareCad.throughBolt(a, h.id, h.diameter, h.length, h.pose);

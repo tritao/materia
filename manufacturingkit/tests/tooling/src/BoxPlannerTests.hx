@@ -48,12 +48,28 @@ class BoxPlannerTests {
 		recess.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Insert(d.input.inserts[0].body);
 		recess.geometry.pose.z = 85;
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
+		var withDatums=ToolingCodec.snapshot(d);
+		withDatums.input.datumScheme={id:"fixture-datums",foundationId:d.input.id,
+			primary:{id:"primary",reference:materia.casting.FoundationDatumScheme.DatumReference.BodyFace("body.z-max"),frame:F.translation(0,0,100)},
+			secondary:{id:"secondary",reference:materia.casting.FoundationDatumScheme.DatumReference.BodyFace("body.x-min"),
+				frame:F.fromRotationMatrix(-100,0,50,[0,0,-1,0,1,0,1,0,0])},
+			tertiary:{id:"tertiary",reference:materia.casting.FoundationDatumScheme.DatumReference.BodyFace("body.y-min"),
+				frame:F.fromRotationMatrix(0,-90,50,[1,0,0,0,0,-1,0,1,0])}};
+		withDatums.setup.sourceFingerprint=ToolingCodec.inputFingerprint(withDatums.input);
+		var datumPlan=BoxMoldPlanner.plan(withDatums);
+		check(datumPlan.validation.filter(v -> v.rule=="tooling.datum.contacts."+d.input.id
+			&& v.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending).length==1,
+			"box planner preserves datum contact qualification gate");
+		var datumSaved=BoxMoldCodec.encode(datumPlan);
+		check(BoxMoldCodec.encode(BoxMoldCodec.decode(datumSaved))==datumSaved,
+			"mold codec regenerates from source-owned datum metadata");
 		var pattern = ToolingCodec.snapshot(d);
 		var second = materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
 		pattern.input.inserts[0].holes[0].frame.x = -8;
 		second.id = "second";
 		second.frame.x = 8;
 		pattern.input.inserts[0].holes.push(second);
+		TestInsertHoles.beforeCasting(pattern.input.inserts[0]);
 		pattern.setup.sourceFingerprint = ToolingCodec.inputFingerprint(pattern.input);
 		var patterned = BoxMoldPlanner.plan(pattern);
 		check(patterned.fixtures[0].fixings.length == 2, "both source threads produce independent fixings");
@@ -69,6 +85,14 @@ class BoxPlannerTests {
 			"multi-hole fixing regeneration");
 		patterned.fixtures[0].fixings[0].engagement = 0.001;
 		rejects(() -> BoxMoldPlanner.validate(patterned), "engagement must match the numeric source policy");
+		var counterbored=ToolingCodec.snapshot(d);
+		counterbored.input.inserts[0].holes[0].counterbore={diameter:9,depth:2};
+		counterbored.setup.sourceFingerprint=ToolingCodec.inputFingerprint(counterbored.input);
+		var counterboredPlan=BoxMoldPlanner.plan(counterbored);
+		var selected=materia.tooling.casting.InsertFixturePlanner.select(counterbored.input.inserts[0].holes[0],
+			F.compose(counterbored.setup.sourceToMold,counterbored.input.inserts[0].pose),counterboredPlan.fixtures[0].mountingFace,counterbored.recipe.hardware);
+		check(selected!=null && selected.engagement==6 && selected.insertion==8,
+			"source fixing selection separates full-thread engagement from insertion through a counterbore");
 		var noThread = ToolingCodec.snapshot(d);
 		noThread.input.inserts[0].holes[0].thread = null;
 		noThread.input.inserts[0].holes[0].tapDrill = null;
@@ -78,12 +102,81 @@ class BoxPlannerTests {
 		var blocked = BoxMoldPlanner.plan(noThread);
 		check(blocked.fixtures[0].fixings.length == 0 && blocked.changeRequests.filter(r -> r.kind == "insert-fixture-hole").length == 1
 			&& !blocked.fabrication.ready, "plain bore never becomes an invented thread");
+		var late=ToolingCodec.snapshot(d);
+		switch late.input.inserts[0].origin {
+			case Fabricated(manufacturing):manufacturing.holeRoutes[0].route=materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting;
+			case Catalogue(_):throw "Fabricated fixture expected";
+		}
+		late.setup.sourceFingerprint=ToolingCodec.inputFingerprint(late.input);
+		var latePlan=BoxMoldPlanner.plan(late);
+		check(latePlan.fixtures[0].fixings.length==0 && latePlan.fixtures[0].boreMasks.length==0,
+			"post-cast thread supplies neither a pour-time fixing nor a fictitious bore mask");
+		check(latePlan.changeRequests.filter(r -> r.kind=="insert-fixture-hole").length==1,
+			"a fixture needs a usable pre-cast source hole when its only service thread is late");
+		var forgedSeal=BoxMoldPlanner.plan(d);
+		var sourcePenetration=forgedSeal.penetrations.filter(pen -> pen.sourceHoleId==d.input.inserts[0].holes[0].id)[0];
+		switch forgedSeal.document.input.inserts[0].origin {
+			case Fabricated(manufacturing):manufacturing.holeRoutes[0].route=materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting;
+			case Catalogue(_):throw "Fabricated fixture expected";
+		}
+		var stageSealError="";
+		try BoxMoldPlanner.validateInsertSeal(forgedSeal,sourcePenetration) catch (error:Dynamic) stageSealError=Std.string(error);
+		check(stageSealError.indexOf("Insert penetration has no unique source hole")>=0,
+			"a service-only thread cannot qualify a pre-cast insert-sealed penetration");
+		var undecided=ToolingCodec.snapshot(d);
+		switch undecided.input.inserts[0].origin {
+			case Fabricated(manufacturing):manufacturing.holeRoutes=[];
+			case Catalogue(_):throw "Fabricated fixture expected";
+		}
+		undecided.setup.sourceFingerprint=ToolingCodec.inputFingerprint(undecided.input);
+		var undecidedPlan=BoxMoldPlanner.plan(undecided);
+		check(undecidedPlan.fixtures[0].fixings.length==0 && undecidedPlan.fixtures[0].boreMasks.length==0
+			&& undecidedPlan.validation.filter(v -> v.rule=="tooling.fixture.hole-stage."+d.input.inserts[0].id
+				&& v.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending).length==1,
+			"undecided manufacturing stage cannot become an existing fixture thread");
+		check(undecidedPlan.changeRequests.filter(r -> r.kind=="insert-fixture-hole").length==0,
+			"an undecided source hole route requests manufacturing planning rather than a casting change");
 		var p = BoxMoldPlanner.plan(d), encoded = BoxMoldCodec.encode(p);
+		var staleManufacturing=BoxMoldCodec.decode(encoded);
+		staleManufacturing.validation.filter(v -> v.rule=="fabrication.insert.inspection."+d.input.inserts[0].id)[0].status
+			=materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass;
+		var manufacturingError="";
+		try BoxMoldPlanner.validate(staleManufacturing) catch (error:Dynamic) manufacturingError=Std.string(error);
+		check(manufacturingError.indexOf("Insert manufacturing validation differs from source")>=0,
+			"a planned inspection cannot be forged into physical inspection evidence");
+		var stockRule="tooling.precision.allowance."+d.input.inserts[0].id;
+		check(p.validation.filter(v -> v.rule==stockRule && v.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending).length==1
+			&& p.changeRequests.filter(r -> r.id=="allowance-"+d.input.inserts[0].id).length==1,
+			"single-pocket mold keeps an undeclared source finishing layer pending");
+		var stocked=ToolingCodec.snapshot(d);
+		stocked.input.inserts[0].interfaces=[{
+			id:"ground-top",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,14)),
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:null,
+			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],
+			positionToleranceMm:0.01,datumReference:"primary",relationshipIds:[]
+		}];
+		stocked.input.inserts[0].holes[0].frame.z=14;
+		stocked.input.inserts[0].holes[0].depth=14;
+		stocked.input.inserts[0].holes[0].threadDepth=14;
+		stocked.setup.sourceFingerprint=ToolingCodec.inputFingerprint(stocked.input);
+		var reserved=BoxMoldPlanner.plan(stocked);
+		check(reserved.validation.filter(v -> v.rule==stockRule && v.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1
+			&& reserved.changeRequests.filter(r -> r.id=="allowance-"+stocked.input.inserts[0].id).length==0,
+			"single-pocket mold uses the same source finishing-geometry decision");
 		check(BoxMoldCodec.encode(BoxMoldCodec.decode(encoded)) == encoded, "mold canonical persistence");
+		check(p.fixtures[0].location.report.rank==3,"direct bed contact leaves three insert freedoms");
+		check(p.validation.filter(check -> check.rule=="tooling.fixture.location."+p.fixtures[0].insertId
+			&& check.status=="pending" && check.message.indexOf("translation-x")>=0).length==1,
+			"box fixture names its unconstrained lateral direction");
+		var forged=BoxMoldCodec.decode(encoded),locationError="";
+		forged.fixtures[0].location.report.rank=6;
+		try BoxMoldPlanner.validate(forged) catch(error:Dynamic) locationError=Std.string(error);
+		check(locationError.indexOf("Box fixture location differs from source geometry")>=0,
+			"a forged fully constrained box fixture is rejected");
 		check(p.panels.members.length == 5 && p.penetrations.length == 9, "all sockets/lands and fixing hole classified");
 		check(p.documentFingerprint == ToolingCodec.documentFingerprint(d), "mold provenance");
 		var raw:Dynamic = Json.parse(encoded);
-		Reflect.setField(raw, "version", 8);
+		Reflect.setField(raw, "version", 9);
 		rejects(() -> BoxMoldCodec.decode(Json.stringify(raw)), "previous mold schema rejected");
 		raw = Json.parse(encoded);
 		Reflect.setField(raw, "version", 99);

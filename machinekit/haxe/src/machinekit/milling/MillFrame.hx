@@ -117,8 +117,8 @@ class MillFrame extends MachineAssembly {
 				baseInserts.push({
 					id: 'column$id',
 					openings: [CastingPatterns.face("body.z-max")],
-					part: new CastInsert(CastInsert.boxValues(footWidth, footDepth, details.columnAnchorThickness)
-						.setToken("holes", flared ? InsertHoles.tappedBlind(details.columnAnchorThread, details.columnAnchorThickness) : InsertHoles.fromNeutral([]))
+					part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(footWidth, footDepth, details.columnAnchorThickness),
+						flared ? InsertHoles.tappedBlind(details.columnAnchorThread, details.columnAnchorThickness) : InsertHoles.fromNeutral([]))
 						.setToken("role", InsertRole.ColumnMount)
 						.setToken("label", "column mounting anchor")),
 					pose: F.translation(x, y - l.baseCentreY, l.railPlane - details.columnAnchorThickness)
@@ -135,8 +135,8 @@ class MillFrame extends MachineAssembly {
 					baseInserts.push({
 						id: 'foot$id',
 						openings: [CastingPatterns.feature('foot-access-$id'), CastingPatterns.feature('foot-stem-$id')],
-						part: new CastInsert(CastInsert.boxValues(l.wall, l.wall, l.insertThickness)
-							.setToken("holes", InsertHoles.through(details.levelingClearanceDiameter, l.insertThickness))
+						part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(l.wall, l.wall, l.insertThickness),
+							InsertHoles.through(details.levelingClearanceDiameter, l.insertThickness))
 							.setToken("role", InsertRole.LevelingSeat)
 							.setToken("label", "leveling screw seat")),
 						pose: F.translation(fx, fy, details.footAccessFloor - l.insertThickness)
@@ -193,8 +193,8 @@ class MillFrame extends MachineAssembly {
 					columnInserts.push({
 						id: 'hatchRear${sx < 0 ? "Left" : "Right"}${z == a.yHatchLowerZ ? "Lower" : "Upper"}',
 						openings: [CastingPatterns.face(flared ? "foot.y-max" : "body.y-max")].concat(z == a.yHatchLowerZ ? [CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")] : []),
-						part: new CastInsert(CastInsert.boxValues(details.hatchAnchorWidth, details.hatchAnchorDepth, details.hatchAnchorThickness)
-							.setToken("holes", InsertHoles.tappedBlind(details.hatchAnchorThread, details.hatchAnchorThickness))
+						part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(details.hatchAnchorWidth, details.hatchAnchorDepth, details.hatchAnchorThickness),
+							InsertHoles.tappedBlind(details.hatchAnchorThread, details.hatchAnchorThickness))
 							.setToken("role", InsertRole.HatchMount)
 							.setToken("label", "rear motor hatch anchor")),
 						pose: F.fromRotationMatrix(sx * details.hatchAnchorSideOffset, a.yServiceRear - details.hatchAnchorRearInset - l.columnCentreY, z - l.railPlane, [1, 0, 0, 0, 0, 1, 0, -1, 0])
@@ -260,8 +260,8 @@ class MillFrame extends MachineAssembly {
 						id: row.id,
 						openings: row.openings,
 						pose: row.pose,
-						part: new CastInsert(CastInsert.boxValues(footWidth, footDepth, l.insertThickness)
-							.setToken("holes", InsertHoles.through(details.columnAnchorThread.clearanceDiameter, l.insertThickness))
+						part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(footWidth, footDepth, l.insertThickness),
+							InsertHoles.through(details.columnAnchorThread.clearanceDiameter, l.insertThickness))
 							.setToken("role", InsertRole.ColumnMount)
 							.setToken("label", "column sole clamping pad"))
 					} : row

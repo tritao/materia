@@ -35,8 +35,7 @@ class CastingMoldTests {
 				for (i in d.input.inserts)
 					{
 						insertId: i.id,
-						route: Replicated,
-						allowance: null,
+						jigReference: null,
 						masterReference: null,
 						masterFlatnessMm: null,
 						releaseSpec: null,
@@ -99,8 +98,22 @@ class CastingMoldTests {
 
 	public static function run(d:ToolingDocument):Void {
 		unrealizedGeometry();
+		replicationReservation(d);
 		d = ToolingCodec.snapshot(d);
 		d.recipe.minimumLigament = 2;
+		var late=ToolingCodec.snapshot(d);
+		switch late.input.inserts[0].origin {
+			case Fabricated(manufacturing):manufacturing.holeRoutes[0].route=materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting;
+			case Catalogue(_):throw "Fabricated fixture expected";
+		}
+		late.setup.sourceFingerprint=ToolingCodec.inputFingerprint(late.input);
+		var earlyPlan=CastingMoldPlanner.plan(d,options(d)),latePlan=CastingMoldPlanner.plan(late,options(late));
+		var lateHole=late.input.inserts[0].holes[0];
+		var steelAdded=Math.PI*lateHole.diameter*lateHole.diameter/4*lateHole.depth*d.recipe.steelDensityKgM3*1e-9;
+		check(Math.abs(latePlan.handling.castingMassKg-earlyPlan.handling.castingMassKg-steelAdded)<1e-9,
+			"handling uses solid pre-cast steel where a through bore is drilled later");
+		check(latePlan.fixtures[0].boreMasks.length==0 && earlyPlan.fixtures[0].boreMasks.length==1,
+			"generic mold protection follows the same manufacturing stage as handling");
 		var o = options(d),
 			p = CastingMoldPlanner.plan(d, o),
 			s = CastingMoldCodec.encode(p);
@@ -132,9 +145,54 @@ class CastingMoldTests {
 		unused.frame = F.translation(10, 0, 0);
 		threads.push(unused);
 		sourceThreads.input.inserts[0].holes = threads;
+		TestInsertHoles.beforeCasting(sourceThreads.input.inserts[0]);
 		sourceThreads.setup.sourceFingerprint = ToolingCodec.inputFingerprint(sourceThreads.input);
 		var fixed = CastingMoldPlanner.plan(sourceThreads, options(sourceThreads));
 		check(fixed.fixtures[0].fixings.length == 2, "datum selects both accessible source steel threads");
+		var fixtureLocation=fixed.fixtures[0].location;
+		check(fixtureLocation.unsupportedReasons.length==0 && fixtureLocation.report.rank==3,
+			"flat insert support locates three DOFs, independently of datum-to-bed pins");
+		var freeCoordinates:Array<String> = [];
+		for (motion in fixtureLocation.report.freeMotions) for (coordinate in motion.affectedCoordinates)
+			if (freeCoordinates.indexOf(coordinate)<0) freeCoordinates.push(coordinate);
+		freeCoordinates.sort(Reflect.compare);
+		check(freeCoordinates.join(",")=="rotation-z,translation-x,translation-y",
+			"real insert fixture exposes its two lateral translations and yaw");
+		check(fixtureLocation.report.preloadIds.length==2 && fixtureLocation.report.redundantLocations.length==0,
+			"both source-thread screws clamp without becoming lateral locators");
+		check(fixed.validation.filter(v -> v.rule=="tooling.fixture.location."+fixed.fixtures[0].insertId
+			&& v.status==Pending && v.message.indexOf("translation-x")>=0).length==1,
+			"under-constrained real fixture blocks readiness with named free directions");
+		var encodedFixture=CastingMoldCodec.encode(fixed);
+		check(CastingMoldCodec.decode(encodedFixture).fixtures[0].location.report.rank==3,
+			"fixture contact witnesses and rank survive exact regeneration");
+		fixed.fixtures[0].location.report.rank=6;
+		rejects(() -> CastingMoldPlanner.validate(fixed),"forged six-DOF fixture report is rejected");
+		fixed.fixtures[0].location.report.rank=3;
+		var reordered=ToolingCodec.snapshot(sourceThreads).input.inserts[0];
+		reordered.holes.reverse();
+		var datum=fixed.fixtures[0],reversedCuts=materia.tooling.casting.MoldVolumeCodec.snapshot(datum.datum);
+		reversedCuts.cuts.reverse();reversedCuts.pieces.reverse();
+		var permuted=materia.tooling.casting.DatumFixtureLocation.plan(reordered,sourceThreads.setup.sourceToMold,
+			{mountingFace:datum.mountingFace,datum:reversedCuts,fixings:datum.fixings});
+		check(ToolingCodec.canonical(permuted)==ToolingCodec.canonical(fixtureLocation),
+			"fixture contact report is independent of source hole and support order");
+		var clearContacts=true;
+		for (contact in fixtureLocation.contacts) if (contact.role==materia.casting.FixtureConstraints.FixtureConstraintRole.Location)
+			for (hole in sourceThreads.input.inserts[0].holes) {
+				var entry=F.compose(F.compose(sourceThreads.setup.sourceToMold,sourceThreads.input.inserts[0].pose),hole.frame);
+				var dx=contact.point.x-entry.x,dy=contact.point.y-entry.y;
+				if (dx*dx+dy*dy<=9) clearContacts=false;
+			}
+		check(clearContacts,"support witnesses lie outside every source thread footprint");
+		var missingSupport=materia.tooling.casting.MoldVolumeCodec.snapshot(datum.datum);
+		missingSupport.pieces=[];
+		var unsupportedLocation=materia.tooling.casting.DatumFixtureLocation.plan(reordered,sourceThreads.setup.sourceToMold,
+			{mountingFace:datum.mountingFace,datum:missingSupport,fixings:datum.fixings});
+		check(unsupportedLocation.report.rank==0 && unsupportedLocation.unsupportedReasons.length==1
+			&& materia.tooling.casting.DatumFixtureLocation.validation(datum.insertId,unsupportedLocation).status
+				==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,
+			"screws alone cannot stand in for a missing support contact model");
 		check(fixed.fixtures[0].boreMasks.length == 1 && fixed.fixtures[0].boreMasks[0].sourceHoleId == "unused",
 			"only the non-fixing hole receives a bore mask");
 		var unusedMask = fixed.fixtures[0].boreMasks[0];
@@ -241,7 +299,7 @@ class CastingMoldTests {
 		o.anchorage.pop();
 		rejects(() -> CastingMoldPlanner.plan(d, o), "missing anchorage not silently qualified");
 		var raw:Dynamic = haxe.Json.parse(s);
-		Reflect.setField(raw, "version", 8);
+		Reflect.setField(raw, "version", 9);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
 		raw = haxe.Json.parse(s);
 		Reflect.setField(raw, "version", 99);
@@ -407,17 +465,62 @@ class CastingMoldTests {
 		var allocated = CastingMoldPlanner.plan(assigned, options(assigned));
 		check(allocated.features.filter(f -> f.featureId == "pocket")[0].memberIds.indexOf("former-overlap-detail-0") >= 0,
 			"partial overlaps include every shaping former, not only the newly allocated remainder");
-		var machining = options(d);
-		machining.precision[0].route = Machined;
-		check(CastingMoldPlanner.plan(d, machining).changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 1,
-			"machining requires an allowance decision");
-		machining.precision[0].allowance = 1;
-		rejects(() -> CastingMoldPlanner.plan(d, machining), "unimplemented finishing stock is rejected");
+		var machiningSource=ToolingCodec.snapshot(d);
+		machiningSource.input.inserts[0].finish=materia.casting.InsertSpec.InsertFinish.MachinedAfterCasting;
+		machiningSource.setup.sourceFingerprint=ToolingCodec.inputFingerprint(machiningSource.input);
+		var machining=options(machiningSource);
+		check(CastingMoldPlanner.plan(machiningSource,machining).changeRequests.filter(c -> c.id == "allowance-" + d.input.inserts[0].id).length == 1,
+			"source machining requires an allowance decision");
+		var oldPrecision:Dynamic=haxe.Json.parse(ToolingCodec.canonical(machining));
+		var oldPrecisionRows:Array<Dynamic> = cast Reflect.field(oldPrecision,"precision");
+		Reflect.setField(oldPrecisionRows[0],"allowance",1);
+		rejects(() -> CastingMoldOptionsCodec.read(oldPrecision),"mold options cannot carry source finishing allowances");
+		var stockSource=ToolingCodec.snapshot(d),stockInsert=stockSource.input.inserts[0];
+		stockInsert.finish=materia.casting.InsertSpec.InsertFinish.GroundAfterCasting;
+		stockInsert.interfaces=[{
+			id:"finished-top",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(
+				materia.assembly.AssemblyFrames.translation(0,0,19)),
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:null,
+			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],
+			positionToleranceMm:0.01,datumReference:"primary",relationshipIds:[]
+		}];
+		stockInsert.holes[0].frame.z=19;stockInsert.holes[0].depth=19;
+		stockSource.setup.sourceFingerprint=ToolingCodec.inputFingerprint(stockSource.input);
+		var stockOptions=options(stockSource);
+		var stockPlan=CastingMoldPlanner.plan(stockSource,stockOptions);
+		var stockRule="tooling.precision.allowance."+stockInsert.id;
+		check(stockPlan.validation.filter(v -> v.rule==stockRule && v.status==Pass).length==1
+			&& stockPlan.changeRequests.filter(c -> c.id=="allowance-"+stockInsert.id).length==0,
+			"source finishing layer clears the allowance request");
+		stockInsert.interfaces[0].allowanceMm=2;
+		stockInsert.holes[0].frame.z=20;stockInsert.holes[0].depth=20;
+		stockSource.setup.sourceFingerprint=ToolingCodec.inputFingerprint(stockSource.input);
+		var badStock=CastingMoldPlanner.plan(stockSource,stockOptions);
+		check(badStock.validation.filter(v -> v.rule==stockRule && v.status==Fail).length==1
+			&& badStock.changeRequests.filter(c -> c.id=="allowance-"+stockInsert.id).length==1,
+			"allowance request returns when modeled stock no longer matches");
+		switch stockSource.input.inserts[0].origin {
+			case Fabricated(manufacturing):
+				manufacturing.holeRoutes=[{holeId:stockSource.input.inserts[0].holes[0].id,
+					route:materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting}];
+			case Catalogue(_):throw "Fabricated source expected";
+		}
+		stockSource.setup.sourceFingerprint=ToolingCodec.inputFingerprint(stockSource.input);
+		var manufacturingReview=CastingMoldPlanner.assess(stockSource,stockOptions);
+		check(manufacturingReview.plan!=null && manufacturingReview.validation.filter(v ->
+			v.rule=="fabrication.insert.hole-geometry."+stockSource.input.inserts[0].id
+			&& v.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
+			"resolved post-cast holes preserve nominal mold review with distinct pre-cast geometry");
+		check(manufacturingReview.changeRequests.filter(request -> request.blockingChecks.indexOf(
+			"fabrication.insert.hole-geometry."+stockSource.input.inserts[0].id)>=0).length==0,
+			"manufacturing work is not turned into a casting geometry change request");
 		var finishing = ToolingCodec.snapshot(d);
 		finishing.input.inserts[0].finish = materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting;
 		finishing.setup.sourceFingerprint = ToolingCodec.inputFingerprint(finishing.input);
-		check(CastingMoldPlanner.plan(finishing, options(finishing)).changeRequests.filter(c -> StringTools.startsWith(c.id, "finish-")).length == 0,
-			"replication route matches a replicated source finish");
+		var sourceReplication=CastingMoldPlanner.plan(finishing,options(finishing));
+		check(sourceReplication.validation.filter(check -> check.rule=="tooling.precision.replication."+finishing.input.inserts[0].id
+			&& check.status==Pending).length==1,
+			"source replication requires its master and release without an options route");
 		var invalidEvidence:Dynamic = haxe.Json.parse(s);
 		Reflect.setField(Reflect.field(invalidEvidence, "options"), "liftingEvidence", ["nonempty string is not qualification"]);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(invalidEvidence)), "lifting requires a typed qualification record");
@@ -427,5 +530,43 @@ class CastingMoldTests {
 		ReviewContractTests.run(CastingMoldCodec.decode(s));
 		ProcessTests.run(CastingMoldCodec.decode(s));
 		Sys.println('CastingMoldTests: $assertions assertions passed');
+	}
+
+	static function replicationReservation(document:ToolingDocument):Void {
+		var d=ToolingCodec.snapshot(document),insert=d.input.inserts[0];
+		insert.body=materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40,30,14));
+		insert.pose=F.translation(80,0,85);
+		insert.holes=[];
+		TestInsertHoles.beforeCasting(insert);
+		insert.finish=materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting;
+		insert.interfaces=[{
+			id:"replication-face",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,15)),
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Replicated,allowanceMm:1,finishingProcessErrorMm:null,
+			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.JigMaster],
+			positionToleranceMm:0.01,datumReference:"primary",relationshipIds:[]
+		}];
+		var recess=d.input.features.filter(f -> f.owner==insert.id)[0];
+		recess.geometry={solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(insert.body),pose:insert.pose};
+		recess.openings=[materia.casting.CastingPatterns.face("body.x-max")];
+		var occupied=materia.tooling.casting.InterfaceQualification.finishingStock(d.input,insert);
+		check(occupied.status==Fail && occupied.affectedIds.join(",")==insert.id
+			&& occupied.message.indexOf("replication-face")>=0 && occupied.message.indexOf("casting material")>=0,
+			"a nominal replication gap fails when it is still occupied by source casting material");
+		var gap=materia.casting.CastingFeatureCodec.snapshot([recess])[0];
+		gap.id="replication-gap";gap.kind=materia.casting.CastingFeature.CastingFeatureKind.InterfaceRecess;
+		gap.geometry={solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(40,30,1)),
+			pose:F.translation(80,0,99)};
+		gap.openings=[materia.casting.CastingPatterns.face("body.x-max"),materia.casting.CastingPatterns.face("body.z-max")];
+		d.input.features.push(gap);
+		var reserved=materia.tooling.casting.InterfaceQualification.finishingStock(d.input,insert);
+		check(reserved.status==Pass,"explicit source gap clears the nominal allowance decision");
+		var obstruction=materia.tooling.ToolingCodec.snapshot(document).input.inserts[0];
+		obstruction.id="gap-obstruction";obstruction.holes=[];TestInsertHoles.beforeCasting(obstruction);
+		obstruction.body=materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(2,2,1));
+		obstruction.pose=F.translation(80,0,99);
+		d.input.inserts.push(obstruction);
+		var blocked=materia.tooling.casting.InterfaceQualification.finishingStock(d.input,insert);
+		check(blocked.status==Fail && blocked.message.indexOf("gap-obstruction")>=0,
+			"a second insert cannot occupy the reserved replication gap");
 	}
 }

@@ -41,28 +41,17 @@ class CastingMoldOptionsCodec {
 		for (p in arr(o, "precision")) {
 			obj(p, [
 				"insertId",
-				"route",
-				"allowance",
 				"masterReference",
+				"jigReference",
 				"masterFlatnessMm",
 				"releaseSpec",
 				"holeProtectionReference",
 				"evidence"
 			]);
-			var route:PrecisionRoute = switch text(p, "route") {
-				case "as-supplied": AsSupplied;
-				case "replicated": Replicated;
-				case "machined": Machined;
-				case "as-cast": AsCast;
-				default: throw "Invalid precision route";
-			};
-			if (Reflect.field(p, "allowance") != null)
-				throw "Finishing allowance is not implemented; non-null values are rejected";
 			precision.push({
 				insertId: text(p, "insertId"),
-				route: route,
-				allowance: nullableNumber(p, "allowance"),
 				masterReference: nullableText(p, "masterReference"),
+				jigReference: nullableText(p, "jigReference"),
 				masterFlatnessMm: nullableNumber(p, "masterFlatnessMm"),
 				releaseSpec: nullableText(p, "releaseSpec"),
 				holeProtectionReference: nullableText(p, "holeProtectionReference"),

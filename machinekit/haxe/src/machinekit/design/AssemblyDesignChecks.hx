@@ -157,11 +157,16 @@ class AssemblyDesignChecks {
 		if(shaft.x*into.x+shaft.y*into.y+shaft.z*into.z<0.999999)out.error("design.fastener-direction",id,"Screw points away from tapped hole");
 		var grip=(tap.x-head.x)*shaft.x+(tap.y-head.y)*shaft.y+(tap.z-head.z)*shaft.z;
 		if(grip<=0)throw "Fastener has no positive grip stack";
+		var threadStart=h.counterbore==null ? 0.0 : h.counterbore.depth;
+		var threadedGrip=grip+threadStart,usable=t.usableDepth-threadStart;
 		if (h.through == true)
-			DesignChecks.minimum(out,id+" thread engagement",Math.min(screw.shankLength()-grip,t.usableDepth),t.minEngagement);
+			DesignChecks.minimum(out,id+" thread engagement",Math.min(screw.shankLength()-threadedGrip,usable),t.minEngagement);
 		else
-			DesignChecks.blindFastener(out,id,screw.shankLength(),grip,t.usableDepth,t.cylindricalDepth,t.point,t.stock,t.minEngagement,t.minTipGap,t.minBack,h.relief == null ? null : h.relief.start);
-		if(screw.shankLength()-screw.threadedLength()>grip+1e-6)out.error("design.unthreaded-shank",id,"Unthreaded shank enters tapped hole");
+			DesignChecks.blindFastener(out,id,screw.shankLength(),threadedGrip,usable,
+				t.cylindricalDepth-threadStart,t.point,t.stock-threadStart,t.minEngagement,t.minTipGap,t.minBack,
+				h.relief == null ? null : h.relief.start-threadStart);
+		if(screw.shankLength()-screw.threadedLength()>threadedGrip+1e-6)
+			out.error("design.unthreaded-shank",id,"Unthreaded shank enters tapped hole");
 		var intervals:Array<{start:Float,end:Float}> = [];
 		for(ref in through) {
 			var clearance=facet(ref,members).hole(ref.feature), face=featurePose(ref,members,state);

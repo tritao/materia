@@ -134,8 +134,7 @@ class MillMoldSetup {
 				for (i in input.inserts)
 					{
 						insertId: i.id,
-						route: materia.tooling.casting.CastingMoldPlanner.sourceRoute(i.finish),
-						allowance: null,
+						jigReference: null,
 						masterReference: null,
 						masterFlatnessMm: null,
 						releaseSpec: null,

@@ -76,12 +76,54 @@ class ToolingFabricationExport {
 		return result;
 	}
 
+	static function insertManufacturing(p:CastingMoldPlan,f:FabricationPlan,dir:String):Array<materia.tooling.ToolingValidation> {
+		var checks:Array<materia.tooling.ToolingValidation> = [];
+		var jobs:Array<materia.tooling.casting.InsertManufacturingPlan.InsertManufacturingJob> = [];
+		var operationRows:Array<Array<String>> = [["insert_id","sequence","operation_id","stage","kind","source_ids","process_reference","machining_holes_json"]];
+		var inspectionRows:Array<Array<String>> = [["insert_id","inspection_kind","source_id","stage","limit_declared","tolerance_mm","execution_status"]];
+		var bomRows:Array<Array<String>> = [["insert_id","part_number","procurement_kind","process","material_grade","quantity"]];
+		for (insert in p.document.input.inserts) switch insert.origin {
+			case Catalogue(_):
+			case Fabricated(_):
+				var job=materia.tooling.casting.InsertManufacturingPlan.build(insert);
+				jobs.push(job);
+				var sheet=InsertDrawing.review(insert);
+				drawing(dir,materia.tooling.ToolingIds.derive("insert-",insert.id),sheet.drawing);
+				checks.push(sheet.validation);
+				var part=ToolingInsertCad.serviceComponent(insert),item=part.bom;
+				if (item.manufacturingProcess==null) throw "Made insert BOM lacks its manufacturing process: "+insert.id;
+				bomRows.push([insert.id,item.partNumber,"Make",item.manufacturingProcess,job.specification.material.grade,"1"]);
+				for (index in 0...job.operations.length) {
+					var operation=job.operations[index];
+					var stage=operation.stage==materia.tooling.casting.InsertManufacturingPlan.InsertOperationStage.BeforeCasting
+						? materia.casting.InsertStages.InsertStage.BeforeCasting : materia.casting.InsertStages.InsertStage.Service;
+					var machiningHoles=materia.casting.InsertStages.holes(
+						{body:insert.body,holes:insert.holes,origin:insert.origin,interfaces:insert.interfaces},stage)
+						.filter(hole -> operation.sourceIds.indexOf(hole.id)>=0);
+					operationRows.push([insert.id,Std.string(index+1),operation.id,operation.stage,operation.kind,
+						operation.sourceIds.join(";"),job.specification.processReference==null ? "" : job.specification.processReference,
+						haxe.Json.stringify(materia.casting.InsertHole.InsertHoleCodec.snapshot(machiningHoles))]);
+				}
+				for (inspection in job.inspectionRequirements) {
+					inspectionRows.push([insert.id,inspection.kind,inspection.sourceIds.join(";"),inspection.stage,Std.string(inspection.declared),
+						inspection.toleranceMm==null ? "" : Std.string(inspection.toleranceMm),"pending"]);
+				}
+		}
+		data(dir,"insert-manufacturing.json",{format:"materia.tooling.insert-manufacturing",version:1,
+			sourceFingerprint:f.sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),jobs:jobs});
+		text(dir,"insert-operations.csv",ToolingFabrication.csv(operationRows));
+		text(dir,"insert-inspections.csv",ToolingFabrication.csv(inspectionRows));
+		text(dir,"insert-make-bom.csv",ToolingFabrication.csv(bomRows));
+		return checks;
+	}
+
 	public static function write(p:CastingMoldPlan, f:FabricationPlan, dir:String):Array<materia.tooling.ToolingValidation> {
 		var classificationChecks:Array<materia.tooling.ToolingValidation> = [];
 		var unknown:Array<{memberId:String, typeId:Null<String>}> = [];
 		if (f.sourceFingerprint != materia.tooling.casting.CastingMoldCodec.fingerprint(p))
 			throw "Stale fabrication plan";
 		sys.FileSystem.createDirectory(dir);
+		classificationChecks=classificationChecks.concat(insertManufacturing(p,f,dir));
 		data(dir, "fabrication-plan.json", f);
 		text(dir, "fabrication-spec.json", FabricationSpecCodec.encode(f.spec));
 		data(dir, "load-estimates.json", f.loads);

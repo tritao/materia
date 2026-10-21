@@ -58,6 +58,31 @@ class ToolingTests {
 			"deep relief never contributes thread engagement");
 	}
 
+	static function unresolvedStockFixing():Void {
+		var d=fixture(),insert=d.input.inserts[0],hole=insert.holes[0];
+		insert.body=materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40,30,21));
+		insert.interfaces=[{id:"finished-top",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,20)),
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:null,
+			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],positionToleranceMm:0.01,
+			datumReference:"primary",relationshipIds:[]}];
+		hole.frame=F.fromRotationMatrix(0,0,20,[1,0,0,0,-1,0,0,0,-1]);
+		hole.diameter=5;hole.depth=12;hole.extent=Blind;hole.threadDepth=9;hole.tapDrill=5;hole.clearanceDiameter=6.6;
+		hole.thread={designation:"M6",majorDiameter:6,pitch:1,starts:1,hand:Right,internal:true,toleranceClass:"6H",profile:Metric};
+		hole.limits.threaded={minEngagement:6,minTipGap:1};
+		switch insert.origin {case Fabricated(manufacturing):manufacturing.holeRoutes=[];case Catalogue(_):throw "Fabricated fixture expected";}
+		var pose=F.fromRotationMatrix(0,0,21,[1,0,0,0,-1,0,0,0,-1]);
+		var face=F.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1]);
+		var decision=materia.tooling.casting.InsertFixturePlanner.missingFixing(insert,pose,face,d.recipe.hardware);
+		check(decision.change==null && decision.check.rule=="tooling.fixture.hole-stage.seat",
+			"unknown hole timing through finishing stock needs a route, not a new source thread");
+		check(materia.tooling.casting.InsertFixturePlanner.holes(insert).length==0,
+			"hypothetical route evaluation does not create a physical hole");
+		TestInsertHoles.beforeCasting(insert);
+		var precast=materia.tooling.casting.InsertFixturePlanner.holes(insert);
+		check(precast.length==1 && materia.tooling.casting.InsertFixturePlanner.select(precast[0],pose,face,d.recipe.hardware)!=null,
+			"declaring the source hole pre-cast clears the route blocker with its raw-stock entry");
+	}
+
 	static function sharedFixturePlate():Void {
 		var d = fixture(), hole = d.input.inserts[0].holes[0];
 		d.input.inserts[0].pose.z = 80;
@@ -69,7 +94,7 @@ class ToolingTests {
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
 		var options:materia.tooling.casting.InsertFixturePlanner.InsertPlateOptions = {
 			id:"test-carrier",insertIds:["seat"],contactZ:0,edgeMargin:50,locatorEndInset:40,locatorSideInset:20,
-			screwStock:[{thread:cast hole.thread,lengths:[25,30,35],washerThickness:1.6,driverDiameter:16,driverToolDiameter:6}]
+			screwStock:[{thread:cast hole.thread,lengths:[25,30,35],threadedLength:28,washerThickness:1.6,driverDiameter:16,driverToolDiameter:6}]
 		};
 		var plan = materia.tooling.casting.InsertFixturePlanner.plate(d,options);
 		check(plan.sites.length == 1 && plan.sites[0].sourceHoleId == hole.id && plan.sites[0].screwLength == 30,
@@ -81,6 +106,17 @@ class ToolingTests {
 			"shared plate thickness and placement derive from measured stock");
 		check(!materia.tooling.ToolingValidation.ToolingReadiness.evaluate(plan.validation).ready,
 			"nominal fixture geometry does not qualify seal and accuracy");
+		var counterbored=ToolingCodec.snapshot(d);
+		counterbored.input.inserts[0].holes[0].counterbore={diameter:12,depth:4};
+		counterbored.input.inserts[0].holes[0].threadDepth=14;
+		counterbored.setup.sourceFingerprint=ToolingCodec.inputFingerprint(counterbored.input);
+		options.screwStock[0].lengths=[30,32];
+		var bored=materia.tooling.casting.InsertFixturePlanner.plate(counterbored,options);
+		check(bored.sites[0].screwLength==32 && bored.sites[0].insertion>=12,
+			"carrier screw selection reaches full engagement beyond the source counterbore");
+		options.screwStock[0].lengths=[30];options.screwStock[0].threadedLength=4;
+		rejects(() -> materia.tooling.casting.InsertFixturePlanner.plate(d,options),"No stock fixture screw satisfies");
+		options.screwStock[0].threadedLength=28;
 		options.screwStock[0].lengths = [25,35];
 		materia.tooling.casting.InsertFixturePlanner.validatePlate(plan);
 		check(plan.options.screwStock[0].lengths.length == 3,"fixture keeps a detached copy of declared stock choices");
@@ -97,11 +133,13 @@ class ToolingTests {
 		side.frame = F.fromRotationMatrix(20,0,10,[0,0,-1,0,1,0,1,0,0]);
 		side.depth = 12; side.threadDepth = 10;
 		d.input.inserts[0].holes.push(side);
+		TestInsertHoles.beforeCasting(d.input.inserts[0]);
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
 		var withMask = materia.tooling.casting.InsertFixturePlanner.plate(d,options);
 		check(withMask.sites.length == 1 && withMask.masks.length == 1 && withMask.masks[0].protection.sourceHoleId == side.id,
 			"unused source hole retains protection, including a valid derived ID for a dotted hole ID");
 		d.input.inserts[0].holes = [];
+		TestInsertHoles.beforeCasting(d.input.inserts[0]);
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
 		var absent = materia.tooling.casting.InsertFixturePlanner.plate(d,options);
 		check(absent.sites.length == 0 && absent.changeRequests.length == 1 && absent.validation.filter(row -> row.rule == "tooling.fixture.source-hole.seat").length == 1,
@@ -174,7 +212,8 @@ class ToolingTests {
 				{
 					id: "seat",
 					body: materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40, 30, 20)),
-					origin: materia.casting.InsertOrigin.Fabricated,
+					origin: materia.casting.InsertOrigin.Fabricated(materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(
+						materia.casting.InsertMaterial.InsertMaterials.specification(C45Bright))),
 					interfaces:[],
 					holes: TestInsertHoles.through(8,20),
 					pose: F.translation(80, 0, 90),
@@ -186,6 +225,7 @@ class ToolingTests {
 				}
 			]
 		};
+		TestInsertHoles.beforeCasting(input.inserts[0]);
 		var recipe:ToolingRecipe = {
 			featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
 			id: "eps-panel-study",
@@ -299,6 +339,7 @@ class ToolingTests {
 		withdrawalTie();
 		relievedFixing();
 		sharedFixturePlate();
+		unresolvedStockFixing();
 		nominalProduct();
 		var original = fixture(),
 			encoded = ToolingCodec.encode(original),
@@ -318,6 +359,11 @@ class ToolingTests {
 		rejects(() -> ToolingCodec.decode(Json.stringify(stored)), "Unknown insert field: width");
 		var stock = fixture();
 		stock.input.inserts[0].material = materia.casting.InsertMaterial.InsertMaterials.specification(C45Ground);
+		rejects(() -> ToolingCodec.inputSnapshot(stock.input),"Insert manufacturing grade differs from source stock");
+		switch stock.input.inserts[0].origin {
+			case Fabricated(manufacturing):manufacturing.material=stock.input.inserts[0].material;
+			case Catalogue(_):throw "Fabricated fixture expected";
+		}
 		check(ToolingCodec.inputFingerprint(stock.input) != ToolingCodec.inputFingerprint(original.input),
 			"insert stock condition enters the source fingerprint");
 		var boreRules = decoded.input.inserts[0].holes[0].limits;

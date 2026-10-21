@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 10;
+	public static inline var VERSION = 11;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -223,6 +223,12 @@ class ToolingCodec {
 			body: Reflect.field(raw, "body"), holes: Reflect.field(raw, "holes"), origin: Reflect.field(raw, "origin"), interfaces: Reflect.field(raw,"interfaces")
 		});
 		var body = source.body;
+		var material=materia.casting.InsertMaterial.InsertMaterials.snapshot(Reflect.field(raw,"material"));
+		switch source.origin {
+			case Fabricated(manufacturing):
+				if (manufacturing.material.grade!=material.grade) throw "Insert manufacturing grade differs from source stock";
+			case Catalogue(_):
+		}
 		var boreWidth = switch InsertBodies.mouth(body) {
 			case Box(w, d, _): Math.min(w, d);
 			case Cylinder(diameter, _): diameter;
@@ -243,7 +249,7 @@ class ToolingCodec {
 			role: insertRole(string(raw, "role")),
 			label: string(raw, "label"),
 			positionTolerance: positive(raw, "positionTolerance"),
-			material: materia.casting.InsertMaterial.InsertMaterials.snapshot(Reflect.field(raw, "material")),
+			material: material,
 			finish: insertFinish(string(raw, "finish"))
 		};
 	}
@@ -689,6 +695,10 @@ class ToolingCodec {
 
 	/** Sort object keys as well as named records so field construction order is irrelevant. */
 	public static function canonical(value:Dynamic):String {
+		if (Std.isOfType(value,materia.casting.InsertManufacturing.InsertBlank))
+			return canonical(materia.casting.InsertManufacturing.InsertManufacturingCodec.blankRecord(cast value));
+		if (Std.isOfType(value,materia.casting.InsertManufacturing.InsertInspection))
+			return canonical(materia.casting.InsertManufacturing.InsertManufacturingCodec.inspectionRecord(cast value));
 		if (Std.isOfType(value,materia.casting.CastingInterfaceContext.InterfaceContextSource))
 			return canonical(materia.casting.CastingInterfaceContext.CastingInterfaceContexts.sourceRecord(cast value));
 		if (Std.isOfType(value,materia.casting.InterfaceRelationship.InterfaceMember))

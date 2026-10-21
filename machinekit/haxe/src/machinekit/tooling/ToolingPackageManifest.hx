@@ -23,6 +23,31 @@ class ToolingPackageManifest {
 		}));
 	}
 
+	/** Rebuild made-insert jobs and drawing checks from the hashed source plan. */
+	static function sourceChecks(dir:String,sourceFingerprint:String):Array<ToolingValidation> {
+		var path=dir+"/mold-plan.json";
+		if (!sys.FileSystem.exists(path)) throw "Missing source mold plan";
+		var plan=materia.tooling.casting.CastingMoldCodec.decode(sys.io.File.getContent(path));
+		if (materia.tooling.casting.CastingMoldCodec.fingerprint(plan)!=sourceFingerprint)
+			throw "Source mold plan differs from fabrication source";
+		var jobs:Array<materia.tooling.casting.InsertManufacturingPlan.InsertManufacturingJob> = [];
+		var checks:Array<ToolingValidation> = [];
+		for (insert in plan.document.input.inserts) switch insert.origin {
+			case Catalogue(_):
+			case Fabricated(_):
+				var job=materia.tooling.casting.InsertManufacturingPlan.build(insert);
+				jobs.push(job);checks=checks.concat(job.validation);
+				checks.push(InsertDrawing.review(insert).validation);
+		}
+		var expected={format:"materia.tooling.insert-manufacturing",version:1,
+			sourceFingerprint:sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(plan.document.input),jobs:jobs};
+		path=dir+"/insert-manufacturing.json";
+		if (!sys.FileSystem.exists(path)
+			|| ToolingCodec.canonical(haxe.Json.parse(sys.io.File.getContent(path)))!=ToolingCodec.canonical(expected))
+			throw "Insert manufacturing report differs from source";
+		return checks;
+	}
+
 	static function digest(bytes:haxe.io.Bytes):String {
 		var value = haxe.crypto.Sha256.make(bytes), hex = new StringBuf();
 		for (i in 0...value.length)
@@ -60,6 +85,12 @@ class ToolingPackageManifest {
 			else if (existing.length != 1 || ToolingCodec.canonical(existing[0]) != ToolingCodec.canonical(row))
 				throw "Conflicting hardware validation";
 		}
+		for (row in sourceChecks(dir,f.sourceFingerprint)) {
+			var existing=all.filter(check -> check.rule==row.rule);
+			if (existing.length==0) all.push(row);
+			else if (existing.length!=1 || ToolingCodec.canonical(existing[0])!=ToolingCodec.canonical(row))
+				throw "Conflicting source manufacturing validation";
+		}
 		all.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		var seen = new Map<String, Bool>();
 		for (check in all) {
@@ -75,7 +106,7 @@ class ToolingPackageManifest {
 		records.sort((a, b) -> Reflect.compare(a.path, b.path));
 		var manifest:ToolingManifest = {
 			format: "materia.tooling-manifest",
-			version: 3,
+			version: 4,
 			phase: 5,
 			lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			sourceFingerprint: f.sourceFingerprint,
@@ -147,7 +178,7 @@ class ToolingPackageManifest {
 		for (key in keys)
 			if (!Reflect.hasField(manifest, key))
 				throw "Missing tooling manifest field";
-		if (manifest.format != "materia.tooling-manifest" || manifest.version != 3)
+		if (manifest.format != "materia.tooling-manifest" || manifest.version != 4)
 			throw "Unsupported tooling manifest";
 		if (!Std.isOfType(manifest.files, Array))
 			throw "Invalid tooling manifest files";
@@ -175,6 +206,11 @@ class ToolingPackageManifest {
 		for (record in readValidation(haxe.Json.parse(sys.io.File.getContent(dir + "/hardware-validation.json"))))
 			if (validation.filter(v -> ToolingCodec.canonical(v) == ToolingCodec.canonical(record)).length != 1)
 				throw "Hardware validation omitted from readiness";
+		for (name in ["mold-plan.json","insert-manufacturing.json"])
+			if (files.filter(file -> file.path==name).length!=1) throw "Missing hashed source manufacturing artifact: "+name;
+		for (record in sourceChecks(dir,manifest.sourceFingerprint))
+			if (validation.filter(check -> ToolingCodec.canonical(check)==ToolingCodec.canonical(record)).length!=1)
+				throw "Source manufacturing validation omitted from readiness";
 		var readiness = ToolingReadiness.evaluate(validation);
 		if (ToolingCodec.canonical(readiness) != ToolingCodec.canonical(manifest.fabrication))
 			throw "Tooling readiness differs from validation";

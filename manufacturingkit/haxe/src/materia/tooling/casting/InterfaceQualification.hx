@@ -11,6 +11,70 @@ import materia.tooling.ToolingDiagnostic.ToolingSeverity;
  * instrument acceptance. Passing this rule does not qualify a precision interface.
  */
 class InterfaceQualification {
+	/** Geometry-only decision. A pass does not qualify hole finishing, the selected
+	 * machining process, bonding, a replication dam or physical inspection.
+	 */
+	public static function finishingStock(input:CastingToolingInput,insert:CastingToolingInput.CastingToolingInsert):ToolingValidation {
+		var rule="tooling.precision.allowance."+insert.id;
+		if (insert.interfaces.length==0) {
+			if (insert.finish==materia.casting.InsertSpec.InsertFinish.AsSupplied
+				|| insert.finish==materia.casting.InsertSpec.InsertFinish.SourceAsCast)
+				return stockCheck(rule,insert.id,ToolingCheckStatus.Pass,"The source finish declares no added or removed finishing layer.");
+			return ToolingReadiness.pending(rule,[insert.id],"Declare source interface requirements and include their finishing stock or replication gap in source geometry.");
+		}
+		var failures:Array<String> = [],unsupported:Array<String> = [];
+		var layers:Array<{interfaceId:String,region:materia.casting.Box3}> = [];
+		switch materia.casting.InsertFinishing.assess(insert.body,insert.interfaces) {
+			case Invalid(issues):for (issue in issues) failures.push(issue.interfaceIds.join(", ")+": "+issue.message);
+			case Unsupported(issues):for (issue in issues) unsupported.push(issue.interfaceIds.join(", ")+": "+issue.message);
+			case Resolved(steel):layers=steel.replicatedLayers;
+		}
+		for (entry in layers) {
+			var layer=entry.region,requirementId=entry.interfaceId;
+			var support=CastingBoxSupport.check(input,"tooling.precision.gap-geometry");
+			var unavailable=support.filter(check -> check.status==ToolingCheckStatus.Unsupported);
+			if (unavailable.length>0) {
+				unsupported.push(requirementId+": "+[for (check in unavailable) check.message].join("; "));
+				continue;
+			}
+			var region=materia.casting.CastingBounds.box({
+				solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(layer.width,layer.depth,layer.height)),
+				pose:materia.assembly.AssemblyFrames.compose(insert.pose,materia.assembly.AssemblyFrames.translation(
+					layer.x+layer.width/2,layer.y+layer.depth/2,layer.z))
+			});
+			var material=materia.casting.BoxAlgebra.material(input.envelope,input.features);
+			if (material.filter(box -> materia.casting.BoxAlgebra.intersection(box,region)!=null).length>0)
+				failures.push(requirementId+": replication gap is occupied by casting material; reserve it in the source geometry");
+			for (other in input.inserts) if (other.id!=insert.id) {
+				var bounds=materia.casting.CastingBounds.box({
+					solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(other.body),pose:other.pose});
+				if (materia.casting.BoxAlgebra.intersection(bounds,region)!=null) {
+					if (InsertFixturePlanner.holes(other).length==0) failures.push(requirementId+": replication gap is occupied by insert "+other.id);
+					else unsupported.push(requirementId+": exact replication-gap contact with perforated insert "+other.id+" requires native qualification");
+				}
+			}
+		}
+		if (failures.length>0) return stockCheck(rule,insert.id,ToolingCheckStatus.Fail,failures.join("; "));
+		if (unsupported.length>0) return stockCheck(rule,insert.id,ToolingCheckStatus.Unsupported,unsupported.join("; "));
+		return stockCheck(rule,insert.id,ToolingCheckStatus.Pass,
+			"Declared nominal finishing layers match the insert geometry and replication gaps are reserved; process, hole-route and inspection qualification are separate.");
+	}
+
+	/** Process prerequisites follow the source interface routes. An identified
+	 * master/release does not establish material, metrology or physical evidence.
+	 */
+	public static function replicationRequirement(source:CastingToolingInput.CastingToolingInsert,
+		process:CastingMoldPlan.PrecisionInterface):Null<ToolingValidation> {
+		var required=source.interfaces.length==0
+			? source.finish==materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting
+			: source.interfaces.filter(requirement -> requirement.route==materia.casting.InterfaceRequirement.InterfaceRoute.Replicated).length>0;
+		if (!required) return null;
+		if (process.masterReference!=null && StringTools.trim(process.masterReference).length>0
+			&& process.releaseSpec!=null && StringTools.trim(process.releaseSpec).length>0) return null;
+		return ToolingReadiness.pending("tooling.precision.replication."+source.id,[source.id],
+			"The source replication route requires an identified master and release specification.");
+	}
+
 	static function stockCheck(rule:String,id:String,status:ToolingCheckStatus,message:String):ToolingValidation
 		return {rule:rule,affectedIds:[id],status:status,
 			severity:status==ToolingCheckStatus.Pass ? ToolingSeverity.Info : ToolingSeverity.Error,message:message,evidence:[]};

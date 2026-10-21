@@ -153,7 +153,9 @@ class FoundationToolingTests {
 		document.recipe.hardware.sealMargin = 0.5;
 		var plate = materia.tooling.casting.InsertFixturePlanner.plate(document, {
 			id:"socket-carrier",insertIds:["socket"],contactZ:0,edgeMargin:50,locatorEndInset:40,locatorSideInset:20,
-			screwStock:[{thread:cast hole.thread,lengths:[25,30,35],washerThickness:1.6,driverDiameter:14,driverToolDiameter:6}]
+			screwStock:[{thread:cast hole.thread,lengths:[25,30,35],
+				threadedLength:machinekit.standard.SocketHeadCapScrew.catalog().get(
+					machinekit.structural.InsertHoles.threadSpec(cast hole.thread).designation).threadLength,washerThickness:1.6,driverDiameter:14,driverToolDiameter:6}]
 		});
 		check(plate.sites.length == 1 && plate.sites[0].screwLength == 30 && plate.masks.length == 0,
 			"shared plate uses the catalogue source hole and no mask on its fixing screw");
@@ -433,6 +435,8 @@ class FoundationToolingTests {
 	public static function main():Void {
 		FoundationRelationshipTests.run();
 		FoundationContextTests.run();
+		InsertStageTests.run();
+		ToolingFastenerFitTests.run();
 		if (Sys.args().indexOf("socket-carrier") >= 0) {
 			sourcedSocket();
 			Sys.println('SocketCarrierChecks: $assertions assertions passed');

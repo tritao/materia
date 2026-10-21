@@ -39,6 +39,7 @@ class DatumFixtures {
 	public static function add(p:CastingMoldPlan, i:CastingToolingInsert, face:materia.assembly.AssemblyRecord.AssemblyFrame, datum:MoldVolume,
 			withdrawal:{x:Float, y:Float, z:Float}, bed:PanelPlacement, pocketId:Null<String>):Void {
 		var dimensions = InsertBodies.box(i.body, i.id);
+		var precastHoles=InsertFixturePlanner.holes(i);
 		p.validation = p.validation.concat(InsertFixturePlanner.protectionValidation(i));
 		var r = p.document.recipe,
 			h = r.hardware,
@@ -64,7 +65,7 @@ class DatumFixtures {
 		var primary = ToolingIds.derive("", id, "-primary-pin"),
 			secondary = ToolingIds.derive("", id, "-secondary-pin");
 		var pinSpacing = h.fixturePinSpacing, pinAlongY = false;
-		for (hole in i.holes) {
+		for (hole in precastHoles) {
 			var fixing = InsertFixturePlanner.select(hole, F.compose(p.document.setup.sourceToMold, i.pose), face, h);
 			if (fixing != null)
 				pinSpacing = Math.max(pinSpacing, fixing.clearanceDiameter + d + h.secondaryPinTravel + 2 * r.minimumLigament);
@@ -128,7 +129,7 @@ class DatumFixtures {
 		}
 		var fixings:Array<InsertFixtureFixing> = [];
 		var sourceCandidates = 0;
-		for (hole in i.holes) {
+		for (hole in precastHoles) {
 			var selected = InsertFixturePlanner.select(hole, F.compose(p.document.setup.sourceToMold, i.pose), face, h);
 			if (selected == null)
 				continue;
@@ -172,24 +173,21 @@ class DatumFixtures {
 				datum.cuts.push({operation: receiver, pose: F.translation(0, 0, floor)});
 			}
 			p.hardware.push({id: fixingId, kind: FixtureScrew, diameter: thread.majorDiameter,
-				length: entry.z - bed.pose.z + engagement,
+				length: entry.z - bed.pose.z + selected.insertion,
 				pose: F.fromRotationMatrix(entry.x, entry.y, bed.pose.z, [1, 0, 0, 0, -1, 0, 0, 0, -1])});
 			fixings.push({sourceHoleId: hole.id, hardwareId: fixingId, panelId: bed.panel.id,
 				operationId: fixingId, entry: entry, engagement: engagement, threadSpec: thread.designation});
 		}
 		if (fixings.length == 0 && sourceCandidates == 0) {
-			var rule = "tooling.fixture.source-hole." + i.id;
-			p.changeRequests.push({id: ToolingIds.derive("fixture-hole-", i.id), kind: InsertFixtureHole,
-				sourceIds: [i.id], reason: "Declare an accessible steel threaded hole facing the bed for insert clamping.",
-				blockingChecks: [rule]});
-			p.validation.push(materia.tooling.ToolingValidation.ToolingReadiness.pending(rule, [i.id],
-				"Fixture blocked: no usable source threaded hole; tooling cannot invent one."));
+			var decision=InsertFixturePlanner.missingFixing(i,F.compose(p.document.setup.sourceToMold,i.pose),face,h),change=decision.change;
+			if (change!=null) p.changeRequests.push(change);
+			p.validation.push(decision.check);
 		}
 		if (fixings.length == 0 && sourceCandidates > 0)
 			p.validation.push(materia.tooling.ToolingValidation.ToolingReadiness.pending("tooling.fixture.clearance." + i.id, [i.id, datum.id],
 				"Source threads exist, but the support/locator layout leaves no clear screw path; revise the tooling fixture."));
 		var masks:Array<BoreMaskProtection> = [];
-		for (hole in i.holes) {
+		for (hole in precastHoles) {
 			if (fixings.filter(f -> f.sourceHoleId == hole.id).length > 0)
 				continue;
 			if (h.plugMaterial != "steel")
@@ -210,8 +208,11 @@ class DatumFixtures {
 				p.hardware.push({id: protection.farEndId, kind: BorePlug, diameter: mask.diameter, length: mask.length,
 					pose: F.compose(entry, F.translation(0, 0, hole.depth - mask.length))});
 		}
+		var location=DatumFixtureLocation.plan(i,p.document.setup.sourceToMold,{mountingFace:face,datum:datum,fixings:fixings});
+		p.validation.push(DatumFixtureLocation.validation(i.id,location));
 		p.fixtures.push({
 			insertId: i.id,
+			location:location,
 			datums: BoxMoldPlanner.datums(face, dimensions.width, dimensions.depth),
 			datum: datum,
 			mountingFace: face,
@@ -261,14 +262,26 @@ class DatumFixtures {
 					throw "Fixture sealing footprint does not cover bed penetration";
 			}
 			var source = p.document.input.inserts.filter(i -> i.id == f.insertId)[0];
-			if (f.fixings.length == 0 && p.validation.filter(v -> v.rule == "tooling.fixture.clearance." + source.id).length == 0
-				&& p.changeRequests.filter(request -> request.kind == InsertFixtureHole
-				&& request.sourceIds.indexOf(source.id) >= 0
-				&& request.blockingChecks.indexOf("tooling.fixture.source-hole." + source.id) >= 0).length != 1)
-				throw "Fixture without source fixing needs a design change request";
-			if (f.boreMasks.length + f.fixings.length != source.holes.length)
-				throw "Every source hole needs a fixing screw or explicit release mask";
-			for (hole in source.holes) {
+			var precastHoles=InsertFixturePlanner.holes(source);
+			var location=DatumFixtureLocation.plan(source,p.document.setup.sourceToMold,
+				{mountingFace:f.mountingFace,datum:f.datum,fixings:f.fixings});
+			if (ToolingCodec.canonical(location)!=ToolingCodec.canonical(f.location))
+				throw "Insert fixture location differs from source geometry: "+source.id;
+			var locationCheck=DatumFixtureLocation.validation(source.id,location);
+			var locationChecks=p.validation.filter(check -> check.rule==locationCheck.rule);
+			if (locationChecks.length!=1 || ToolingCodec.canonical(locationChecks[0])!=ToolingCodec.canonical(locationCheck))
+				throw "Insert fixture location validation differs from source geometry: "+source.id;
+			if (f.fixings.length==0) {
+				var pose=F.compose(p.document.setup.sourceToMold,source.pose);
+				var candidates=precastHoles.filter(hole -> InsertFixturePlanner.select(hole,pose,f.mountingFace,p.document.recipe.hardware)!=null);
+				if (candidates.length==0)
+					InsertFixturePlanner.validateMissingFixing(source,pose,f.mountingFace,p.document.recipe.hardware,p.validation,p.changeRequests);
+				else if (p.validation.filter(v -> v.rule=="tooling.fixture.clearance."+source.id).length!=1)
+					throw "Fixture without clear source screw path needs a tooling clearance decision";
+			}
+			if (f.boreMasks.length + f.fixings.length != precastHoles.length)
+				throw "Every pre-cast source hole needs a fixing screw or explicit release mask";
+			for (hole in precastHoles) {
 				var fixings = f.fixings.filter(fixing -> fixing.sourceHoleId == hole.id);
 				if (fixings.length > 0) {
 					var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
@@ -296,7 +309,7 @@ class DatumFixtures {
 						throw "Datum fixing receiver must be a source-sized clearance bore";
 					if (fixings.length != 1 || hole.thread == null || screws.length != 1
 						|| screws[0].kind != FixtureScrew || screws[0].diameter != thread.majorDiameter
-						|| Math.abs(screws[0].length - (entry.z - screws[0].pose.z + materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minEngagement)) > 1e-7
+						|| Math.abs(screws[0].length - (entry.z - screws[0].pose.z + InsertFixturePlanner.minimumInsertion(hole))) > 1e-7
 						|| Math.abs(screws[0].pose.x - entry.x) + Math.abs(screws[0].pose.y - entry.y) > 1e-7
 						|| f.penetrations.filter(pen -> pen.sourceHoleId == hole.id && pen.operationId == fixing.operationId).length != 1
 						|| fixing.engagement != materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minEngagement

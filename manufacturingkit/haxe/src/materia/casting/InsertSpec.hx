@@ -14,11 +14,17 @@ class InsertSpecCodec {
 		CastingFeatureCodec.fields(raw, ["body", "holes", "origin", "interfaces"]);
 		var body = InsertBodyCodec.snapshot(Reflect.field(raw, "body"));
 		var holes = InsertHole.InsertHoleCodec.snapshot(Reflect.field(raw, "holes"));
+		var origin=InsertOrigin.InsertOriginCodec.snapshot(Reflect.field(raw,"origin"),body,holes);
+		var interfaces=InterfaceRequirement.InterfaceRequirements.snapshot(Reflect.field(raw,"interfaces"));
+		switch origin {
+			case Fabricated(manufacturing):InsertManufacturing.InsertManufacturingCodec.references(manufacturing,holes,interfaces);
+			case Catalogue(_):
+		}
 		return {
 			body: body,
-			interfaces: InterfaceRequirement.InterfaceRequirements.snapshot(Reflect.field(raw,"interfaces")),
+			interfaces: interfaces,
 			holes: holes,
-			origin: InsertOrigin.InsertOriginCodec.snapshot(Reflect.field(raw, "origin"), body, holes)
+			origin: origin
 		};
 	}
 

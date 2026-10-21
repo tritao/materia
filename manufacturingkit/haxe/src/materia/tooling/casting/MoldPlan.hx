@@ -68,13 +68,13 @@ typedef InsertDatums = {
 
 typedef InsertFixturePlan = {
 	var insertId:String;
+	var location:DatumFixtureLocation.DatumLocationPlan;
 	var body:MoldBox;
 	var mountingFace:AssemblyFrame;
 	var panelId:String;
 	var fixings:Array<materia.tooling.casting.CastingMoldPlan.InsertFixtureFixing>;
 	var boreMasks:Array<materia.tooling.casting.CastingMoldPlan.BoreMaskProtection>;
 	var threadProtection:FixtureThreadProtection;
-	var finishingAllowance:Null<Float>;
 	var datumEvidence:Array<String>;
 	var datums:InsertDatums;
 	var precision:materia.tooling.casting.CastingMoldPlan.PrecisionInterface;

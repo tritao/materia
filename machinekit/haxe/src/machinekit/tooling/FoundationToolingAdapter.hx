@@ -26,6 +26,8 @@ class FoundationToolingAdapter {
 	}
 
 	static function insert(row:CastInsertPlacement):CastingToolingInsert {
+		if (row.part.buildStage()!=materia.casting.InsertStages.InsertStage.Service)
+			throw "Foundation design requires a service-stage insert: "+row.id;
 		var source = row.part.insertSpec();
 		return {
 			id: row.id,

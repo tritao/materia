@@ -23,6 +23,13 @@ class DesignInterfaceTests {
 		AssemblyDesignChecks.check(physical).throwIfErrors();check(true,"logical components do not obstruct service tools");
 		var hexPump=fixture();hexPump.replaceComponent("clamp",machinekit.standard.HexBolt.metric("M6",16));
 		AssemblyDesignChecks.check(hexPump).throwIfErrors();check(true,"hex bolt uses same generic fastener binding");
+		var counterbored=fixture();
+		counterbored.replaceComponent("housing",new DesignFixturePart(new ComponentValues().setBoolean("counterbored",true)));
+		check(!AssemblyDesignChecks.check(counterbored).hasErrors(),"counterbore leaves sufficient full-thread engagement for the declared screw");
+		counterbored.replaceComponent("clamp",SocketHeadCapScrew.metric("M6",12));
+		var shortCounterbore=AssemblyDesignChecks.check(counterbored);
+		check(shortCounterbore.items.filter(item -> item.message.indexOf("thread engagement")>=0).length>0,
+			"counterbore depth cannot count as full-thread engagement");
 		var rebuilt=MachineAssembly.decode(pump.encode(),registry);
 		check(rebuilt.designRequirements().length==pump.designRequirements().length,"requirements survive recipe roundtrip");
 		AssemblyDesignChecks.check(rebuilt).throwIfErrors();check(true,"rebuilt pump passes same checks");
@@ -108,13 +115,13 @@ class DesignInterfaceTests {
 
 private class DesignFixturePart extends MachineComponent {
 	static var recipe:Null<ComponentType>;
-	static function parameters():Array<ComponentParameter> return [P.flag("plate",false),P.flag("thin",false),P.flag("undrilled",false)];
+	static function parameters():Array<ComponentParameter> return [P.flag("plate",false),P.flag("thin",false),P.flag("undrilled",false),P.flag("counterbored",false)];
 	public static function recipeType():ComponentType {if(recipe==null)recipe=new ComponentType("test.design.pump-part",parameters(),v->new DesignFixturePart(v));return recipe;}
 	public function new(?v:ComponentValues) {
 		v=P.resolve(parameters(),v);super("PUMP-PART","Pump bearing housing/cover","steel",false,v);
 		addConnector("mount",Mount,F.identity());
 		var plate=v.boolean("plate"), thread:Null<BlindThreadInterface> = plate?null:{spec:machinekit.standard.FastenerThreads.coarse(6).mating(),tapDrill:5,usableDepth:14,cylindricalDepth:15,point:1.5,stock:20,minEngagement:6,minTipGap:1,minBack:3};
-		addFacet(new DesignInterfaces([{id:plate?"clearance":"fixing",frame:F.identity(),radius:plate?3.3:2.5,depth:plate?4:16.5,minWall:4,minClearance:0.4,thread:thread,counterbore:null,approach:null}],plate?[]:[{id:"lubrication",frame:F.translation(12,0,20),kind:LubricationPort}],[]));
+		addFacet(new DesignInterfaces([{id:plate?"clearance":"fixing",frame:F.identity(),radius:plate?3.3:2.5,depth:plate?4:16.5,minWall:4,minClearance:0.4,thread:thread,counterbore:v.boolean("counterbored") ? {radius:6,depth:4,bearingDepth:4} : null,approach:null}],plate?[]:[{id:"lubrication",frame:F.translation(12,0,20),kind:LubricationPort}],[]));
 	}
 	override public function componentType():Null<ComponentType> return recipeType();
 	override public function hasGeometry():Bool return true;

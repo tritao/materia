@@ -46,14 +46,48 @@ class ReviewContractTests {
 
 	public static function run(p:CastingMoldPlan):Void {
 		var o = CastingMoldOptionsCodec.snapshot(p.options);
-		o.precision[0].route = Replicated;
+		var source=ToolingCodec.snapshot(p.document);
+		source.input.inserts[0].finish=materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting;
+		source.setup.sourceFingerprint=ToolingCodec.inputFingerprint(source.input);
 		o.precision[0].masterReference = null;
-		check(CastingMoldPlanner.plan(p.document, o)
+		check(CastingMoldPlanner.plan(source, o)
 			.validation.filter(v -> v.rule == "tooling.precision.replication." + o.precision[0].insertId && v.status == "pending")
 			.length == 1,
 			"missing replication master has its explicit validation rule");
-		o.precision[0].allowance = 1;
-		rejects(() -> CastingMoldOptionsCodec.snapshot(o), "non-null values are rejected");
+		var missing=CastingMoldPlanner.plan(source,o);
+		missing.validation=missing.validation.filter(v -> v.rule!="tooling.precision.replication."+o.precision[0].insertId);
+		missing.fabrication=ToolingReadiness.evaluate(missing.validation);
+		rejects(() -> CastingMoldPlanner.validate(missing),"Replication requirement differs from source interfaces and process choices");
+		var oldOptions:Dynamic=haxe.Json.parse(ToolingCodec.canonical(o));
+		var oldPrecision:Array<Dynamic> = cast Reflect.field(oldOptions,"precision");
+		Reflect.setField(oldPrecision[0],"allowance",null);
+		rejects(() -> CastingMoldOptionsCodec.read(oldOptions),"Invalid mold process record");
+		Reflect.deleteField(oldPrecision[0],"allowance");
+		Reflect.setField(oldPrecision[0],"route","replicated");
+		rejects(() -> CastingMoldOptionsCodec.read(oldOptions),"Invalid mold process record");
+		Reflect.deleteField(oldPrecision[0],"route");
+		Reflect.deleteField(oldPrecision[0],"jigReference");
+		rejects(() -> CastingMoldOptionsCodec.read(oldOptions),"Invalid mold process record");
+		o.precision[0].jigReference="synthetic-jig";
+		check(CastingMoldOptionsCodec.snapshot(o).precision[0].jigReference=="synthetic-jig",
+			"jig reference is an explicit process choice");
+		o.precision[0].masterReference="synthetic-master";o.precision[0].releaseSpec="synthetic-release";
+		check(CastingMoldPlanner.plan(source,o).validation.filter(v ->
+			v.rule=="tooling.precision.replication."+o.precision[0].insertId).length==0,
+			"identified master and release clear only the replication prerequisites");
+		source.input.inserts[0].finish=materia.casting.InsertSpec.InsertFinish.AsSupplied;
+		source.setup.sourceFingerprint=ToolingCodec.inputFingerprint(source.input);
+		o.precision[0].masterReference=null;o.precision[0].releaseSpec=null;
+		check(CastingMoldPlanner.plan(source,o).validation.filter(v ->
+			v.rule=="tooling.precision.replication."+o.precision[0].insertId).length==0,
+			"process options cannot introduce replication into an as-supplied source");
+		var sourceInsert=source.input.inserts[0];
+		sourceInsert.interfaces=[{id:"replicated-plane",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(
+			materia.assembly.AssemblyFrames.translation(0,0,21)),route:materia.casting.InterfaceRequirement.InterfaceRoute.Replicated,
+			allowanceMm:1,finishingProcessErrorMm:null,permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.JigMaster],
+			positionToleranceMm:0.01,datumReference:"primary",relationshipIds:[]}];
+		check(materia.tooling.casting.InterfaceQualification.replicationRequirement(sourceInsert,o.precision[0])!=null,
+			"explicit source interfaces require replication independently of the aggregate finish label");
 		var raw = ToolingCodec.encode(p.document);
 		check(raw.indexOf('"label"') >= 0 && raw.indexOf('"sourceRole"') < 0, "source labels are separate from required typed roles");
 		var changed = ToolingCodec.snapshot(p.document);

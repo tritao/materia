@@ -33,6 +33,9 @@ typedef InsertHoleLimits = {
 	var overrides:Array<{name:String, value:Float}>;
 }
 
+/** Source entry frame and depths refer to finished steel. Raw manufacturing
+ * states derive extensions through finishing stock without moving service holes.
+ */
 typedef InsertHole = {
 	var id:String;
 	var frame:AssemblyFrame;
@@ -41,7 +44,8 @@ typedef InsertHole = {
 	var extent:HoleExtent;
 	var thread:Null<InsertThread>;
 	var tapDrill:Null<Float>;
-	/** Full usable thread excludes the tapping runout of a blind hole. */
+	/** Full-thread endpoint measured from the entry face, excluding blind-tap
+	 * runout. A counterbore removes the beginning of that threaded interval. */
 	var threadDepth:Null<Float>;
 	/** ISO 273 medium bolt-clearance diameter, resolved by the source design. */
 	var clearanceDiameter:Float;
@@ -79,45 +83,7 @@ class InsertHoleCodec {
 			]);
 			var t:Dynamic = Reflect.field(row, "thread"),
 				cb:Dynamic = Reflect.field(row, "counterbore");
-			var thread:Null<InsertThread> = null;
-			if (t != null) {
-				CastingFeatureCodec.fields(t, [
-					"designation",
-					"majorDiameter",
-					"pitch",
-					"starts",
-					"hand",
-					"internal",
-					"toleranceClass",
-					"profile"
-				]);
-				var hand = switch CastingRecordCodec.string(t, "hand") {
-					case "right": Right;
-					case "left": Left;
-					default: throw "Invalid thread hand";
-				};
-				var profile = switch CastingRecordCodec.string(t, "profile") {
-					case "metric": Metric;
-					case "trapezoidal": Trapezoidal;
-					case "acme": Acme;
-					case "ball": Ball;
-					default: throw "Invalid thread profile";
-				};
-				var starts = CastingRecordCodec.number(t, "starts"),
-					internal:Dynamic = Reflect.field(t, "internal");
-				if (starts != Math.floor(starts) || !Std.isOfType(internal, Bool))
-					throw "Invalid thread specification";
-				thread = {
-					designation: CastingRecordCodec.string(t, "designation"),
-					majorDiameter: CastingRecordCodec.number(t, "majorDiameter"),
-					pitch: CastingRecordCodec.number(t, "pitch"),
-					starts: Std.int(starts),
-					hand: hand,
-					internal: cast internal,
-					toleranceClass: CastingRecordCodec.string(t, "toleranceClass"),
-					profile: profile
-				};
-			}
+			var thread:Null<InsertThread> = t==null ? null : InsertThreadCodec.snapshot(t);
 			var counterbore:Null<InsertCounterbore> = null;
 			if (cb != null) {
 				CastingFeatureCodec.fields(cb, ["diameter", "depth"]);
@@ -166,7 +132,9 @@ class InsertHoleCodec {
 					throw "Invalid insert thread";
 				if (h.threadDepth == null || h.threadDepth <= 0 || h.threadDepth > h.depth)
 					throw "Invalid usable insert thread depth: " + h.id;
-				if (threadLimits(h).minEngagement > (cast h.threadDepth:Float) + 1e-8)
+				var counterbore=h.counterbore;
+				var threadStart=counterbore==null ? 0.0 : counterbore.depth;
+				if (threadLimits(h).minEngagement > (cast h.threadDepth:Float)-threadStart+1e-8)
 					throw "Insert thread cannot meet engagement rule: " + h.id;
 				if (!thread.internal
 					|| h.tapDrill == null

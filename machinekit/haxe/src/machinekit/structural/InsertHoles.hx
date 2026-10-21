@@ -75,7 +75,7 @@ class InsertHoles {
 		if (!Math.isFinite(diameter + depth) || diameter <= 0 || depth <= 0)
 			throw "Insert drilling dimensions must be finite and positive";
 		return haxe.Json.stringify({
-			version: 4,
+			version: 5,
 			holes: [
 				{
 					id: "fixing",
@@ -98,12 +98,12 @@ class InsertHoles {
 	}
 
 	public static function fromNeutral(holes:Array<InsertHole>):String
-		return haxe.Json.stringify({version: 4, holes: InsertHoleCodec.snapshot(holes)});
+		return haxe.Json.stringify({version: 5, holes: InsertHoleCodec.snapshot(holes)});
 
 	public static function records(text:String):Array<InsertHole> {
 		var raw:Dynamic = haxe.Json.parse(text);
 		materia.casting.CastingFeatureCodec.fields(raw, ["version", "holes"]);
-		if (raw.version != 4 || !Std.isOfType(raw.holes, Array))
+		if (raw.version != 5 || !Std.isOfType(raw.holes, Array))
 			throw "Unsupported insert hole recipe";
 		var holes:Array<Dynamic> = cast raw.holes;
 		return InsertHoleCodec.snapshot(cast holes);
@@ -128,7 +128,7 @@ class InsertHoles {
 					usableDepth: cast h.threadDepth,
 					cylindricalDepth: h.depth,
 					point: 0,
-					stock: height,
+					stock: [width,depth,height][materia.casting.InsertHoleGeometry.axis(h)],
 					minEngagement: InsertHoleCodec.threadLimits(h).minEngagement,
 					minTipGap: InsertHoleCodec.threadLimits(h).minTipGap,
 					minBack: limits.minBack

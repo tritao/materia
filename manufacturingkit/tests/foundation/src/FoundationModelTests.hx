@@ -36,6 +36,8 @@ class FoundationModelTests {
 	public static function main():Void {
 		FoundationRequirementTests.main();
 		PourPlanningTests.run();
+		InterfaceStockTests.run();
+		InsertManufacturingTests.run();
 		insertBodies();
 		threadRelief();
 		solidFeatures();
@@ -222,7 +224,8 @@ class FoundationModelTests {
 			var encoded = InsertBodyCodec.encode(body);
 			check(InsertBodyCodec.encode(InsertBodyCodec.decode(encoded)) == encoded, "strict insert exterior round trip");
 			check(InsertBodyCodec.encode(InsertBodyCodec.snapshot(body)) == encoded, "typed insert exterior snapshot");
-			var spec:materia.casting.InsertSpec = {body: body, holes: [], origin: Fabricated, interfaces: []};
+			var spec:materia.casting.InsertSpec = {body: body, holes: [], origin: Fabricated(materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(
+				materia.casting.InsertMaterial.InsertMaterials.specification(materia.casting.InsertMaterial.C45Bright))), interfaces: []};
 			var copied = materia.casting.InsertSpec.InsertSpecCodec.snapshot(materia.casting.InsertSpec.InsertSpecCodec.record(spec));
 			check(copied.holes.length == 0 && InsertBodyCodec.encode(copied.body) == encoded, "one insert contract without invented holes");
 		}
@@ -290,7 +293,8 @@ class FoundationModelTests {
 		var origin = Catalogue(product);
 		var nominal = InsertOriginCodec.snapshot(origin, body, holes);
 		check(switch nominal {case Catalogue(p): p.geometryBasis == NominalStudy; default:false;}, "catalogue origin is explicitly nominal");
-		check(switch InsertOriginCodec.snapshot(Fabricated, body, holes) {case Fabricated:true; default:false;}, "fabricated origin is explicit");
+		check(switch InsertOriginCodec.snapshot(Fabricated(materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(
+			materia.casting.InsertMaterial.InsertMaterials.specification(materia.casting.InsertMaterial.C45Bright))), body, holes) {case Fabricated(_):true; default:false;}, "fabricated origin is explicit");
 		rejects(() -> InsertOriginCodec.snapshot(null, body, holes), "Missing insert origin");
 		product.evidence = [{reference:"fixture-measurements", sha256:haxe.crypto.Sha256.encode("synthetic test evidence")}];
 		rejects(() -> InsertOriginCodec.snapshot(origin, body, holes), "Nominal insert geometry cannot claim verified geometry evidence");

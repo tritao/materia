@@ -8,7 +8,7 @@ enum abstract InsertGeometryBasis(String) to String {
 
 /** Product identity is separate from its display label and geometry evidence. */
 enum InsertOrigin {
-	Fabricated;
+	Fabricated(manufacturing:InsertManufacturing);
 	Catalogue(product:CatalogueInsert);
 }
 
@@ -36,8 +36,8 @@ class InsertOriginCodec {
 		if (Std.isOfType(raw, InsertOrigin)) raw = record(cast raw);
 		var kind = CastingRecordCodec.string(raw, "kind");
 		if (kind == "fabricated") {
-			CastingFeatureCodec.fields(raw, ["kind"]);
-			return Fabricated;
+			CastingFeatureCodec.fields(raw, ["kind","manufacturing"]);
+			return Fabricated(InsertManufacturing.InsertManufacturingCodec.snapshot(Reflect.field(raw,"manufacturing")));
 		}
 		if (kind != "catalogue") throw "Unknown insert origin";
 		CastingFeatureCodec.fields(raw, ["kind", "product"]);
@@ -73,7 +73,7 @@ class InsertOriginCodec {
 	public static function record(origin:InsertOrigin):Dynamic {
 		if (origin == null) throw "Missing insert origin";
 		return switch origin {
-			case Fabricated: {kind: "fabricated"};
+			case Fabricated(manufacturing): {kind: "fabricated",manufacturing:InsertManufacturing.InsertManufacturingCodec.record(manufacturing)};
 			case Catalogue(product): {kind: "catalogue", product: {
 				manufacturer: product.manufacturer, reference: product.reference, revision: product.revision,
 				holePolicyId: product.holePolicyId, document: product.document, geometryBasis: (product.geometryBasis:String),

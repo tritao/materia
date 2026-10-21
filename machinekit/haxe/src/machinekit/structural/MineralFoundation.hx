@@ -101,8 +101,12 @@ class MineralFoundation extends MachineAssembly {
 	 */
 	function validateHoleExits():Void {
 		var cavities = body.finishedCavities();
-		for (row in inserts)
-			for (hole in InsertHoles.records(row.part.parameterToken("holes"))) {
+		for (row in inserts) {
+			var specification=row.part.insertSpec();
+			var before=materia.casting.InsertStages.holes(specification,materia.casting.InsertStages.InsertStage.BeforeCasting);
+			for (source in specification.holes) {
+				var physical=before.filter(hole -> hole.id==source.id);
+				var hole=physical.length==1 ? physical[0] : source;
 				if (hole.extent != Through || hole.thread == null)
 					continue;
 				var frame = F.compose(row.pose, hole.frame);
@@ -112,6 +116,7 @@ class MineralFoundation extends MachineAssembly {
 					body.castingFeatures(), exit, thread.majorDiameter / 2, row.id))
 					throw "Through insert thread exits into casting material: " + row.id + "/" + hole.id;
 			}
+		}
 	}
 
 	public function insertLocations():Array<CastInsertPlacement>

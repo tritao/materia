@@ -1918,6 +1918,32 @@ structures and phase 9 physical calibration remain open.
   15 Pass / 264 Pending / 15 Unsupported**, readiness **false**. Integrity/tamper
   and artifact hashes pass; the kit carries all twelve source insert bindings.
 
+- [x] Insert manufacturing, hole staging and finishing-stock realization.
+  Fabricated inserts carry stock, process, hole-route and inspection choices;
+  their Make BOM, nominal drawings and operation/inspection sheets enter the
+  package. Pre-cast geometry, fixtures, masks and handling use only declared
+  pre-cast holes; service geometry retains the complete source pattern. Raw
+  machining dimensions extend through finishing stock while retaining the
+  finished hole bottom and thread endpoint. Geometric stock/layer thickness
+  and finishing-process error allocation remain separate source fields, as
+  confirmed. Source finishing intent replaces duplicated mold-option routes.
+  Finite contact constraints report remaining fixture freedoms without claiming
+  that a clearance screw locates an insert. Actual standard screw/nut threaded
+  spans and counterbores determine engagement. Source/tooling format **11**,
+  box/general mold **10**, insert-hole encoding **5** and package manifest **4**
+  reject previous versions. Manifest writing and verification recompute source
+  manufacturing checks, including omitted-check and altered-report regressions.
+  Validation: foundation **281**, neutral tooling **1,843**, generic design
+  **32**, native tooling **509** (insert stages **22**, fastener fit **21**),
+  casting **54**, foundation CAD **60**, standalone native process **34**, full
+  mill **250**, socket fixture **79**. Frozen foundation symmetric differences
+  remain zero. Regenerated records-only kit: **150 artifacts / 40 programs /
+  27 Pass / 336 Pending / 15 Unsupported**; integrity/tamper checks and artifact
+  hashes pass. Blank selection, shop process/inspection evidence, finishing
+  budgets and remaining planned fixture work stay unqualified; readiness is
+  **false**. Jigs/joint, bolted anchorage, rail-derived holes and lifting remain
+  subsequent step-2 slices.
+
 ### Phase 7 records: shared levelling-foot family
 
 - [x] One `structural.LevelingFoot` recipe with strict `LevelingFootSpec` schema

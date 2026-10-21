@@ -11,14 +11,18 @@ import materia.casting.InsertSpec.InsertBodyCodec;
 /** Cast-in steel design envelope; local +Z is the finished mounting-plane normal. */
 class CastInsert extends MachineComponent {
 	static var recipe:Null<ComponentType>;
+	final sourceDesign:machinekit.design.DesignInterfaces;
 
 	public static function parameters():Array<ComponentParameter>
 		return [
+			P.choice("buildStage",materia.casting.InsertStages.tokens(),materia.casting.InsertStages.InsertStage.Service),
 			P.choice("stockMaterial", materia.casting.InsertMaterial.InsertMaterials.tokens(), materia.casting.InsertMaterial.C45Bright),
 			P.text("holes", InsertHoles.fromNeutral([])),
 			P.text("interfaces", "[]"),
 			P.text("body", InsertBodyCodec.encode(Primitive(Box(35, 400, 20)))),
-			P.text("origin", haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(Fabricated))),
+			P.text("origin", haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(Fabricated(
+				materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(
+					materia.casting.InsertMaterial.InsertMaterials.specification(materia.casting.InsertMaterial.C45Bright)))))),
 			P.length("positionTolerance", 0.01),
 			P.requiredChoice("role", materia.casting.InsertSpec.InsertRoles.tokens()),
 			P.text("label", "rail seat"),
@@ -38,9 +42,16 @@ class CastInsert extends MachineComponent {
 		var holes = InsertHoles.records(v.token("holes"));
 		v.setToken("body", InsertBodyCodec.encode(body));
 		v.setToken("holes", InsertHoles.fromNeutral(holes));
-		var precision = materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(haxe.Json.parse(v.token("interfaces")));
-		v.setToken("interfaces", haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records(precision)));
+		v.setToken("interfaces", haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records(
+			materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(haxe.Json.parse(v.token("interfaces"))))));
 		var origin = materia.casting.InsertOrigin.InsertOriginCodec.snapshot(haxe.Json.parse(v.token("origin")), body, holes);
+		switch origin {
+			case Fabricated(manufacturing):
+				if (manufacturing.material.grade!=v.token("stockMaterial")) throw "Insert manufacturing grade differs from source stock";
+				materia.casting.InsertManufacturing.InsertManufacturingCodec.references(manufacturing,holes,
+					materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(haxe.Json.parse(v.token("interfaces"))));
+			case Catalogue(_):
+		}
 		v.setToken("origin", haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(origin)));
 		if (v.number("positionTolerance") <= 0)
 			throw "Insert tolerance must be positive";
@@ -55,14 +66,62 @@ class CastInsert extends MachineComponent {
 			case Box(width, depth, height): {width: width, depth: depth, height: height};
 			case Cylinder(diameter, height): {width: diameter, depth: diameter, height: materia.casting.InsertSpec.InsertBodyCodec.height(body)};
 		};
-		var sourceHoles = InsertHoles.facet(holes, stock.width, stock.depth, stock.height);
-		addFacet(new machinekit.design.DesignInterfaces(sourceHoles.holes, sourceHoles.datums, sourceHoles.material, precision));
+		var interfaces=materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(haxe.Json.parse(v.token("interfaces")));
+		var finished=switch materia.casting.InsertFinishing.assess(body,interfaces) {
+			case Resolved(steel):steel;
+			case Invalid(_),Unsupported(_):null;
+		};
+		var serviceStock=finished==null ? null : materia.casting.InsertFinishing.box(finished);
+		if (serviceStock!=null && finished!=null && finished.removedSteel.length>0) for (hole in holes)
+			materia.casting.InsertStages.validateServiceHole(hole,serviceStock);
+		var holeInterfaces = serviceStock==null ? InsertHoles.facet(holes,stock.width,stock.depth,stock.height)
+			: InsertHoles.facet(holes,serviceStock.width,serviceStock.depth,serviceStock.height);
+		sourceDesign=new machinekit.design.DesignInterfaces(holeInterfaces.holes,holeInterfaces.datums,holeInterfaces.material,
+			materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(haxe.Json.parse(v.token("interfaces"))));
+		if (buildStage()==materia.casting.InsertStages.InsertStage.Service) addFacet(sourceDesign);
+		else {
+			sourceDesign.check(this);
+			var selected=materia.casting.InsertStages.holes(
+				{body:body,holes:holes,origin:origin,interfaces:sourceDesign.precisionRequirements()},buildStage());
+			var physical=InsertHoles.facet(selected,stock.width,stock.depth,stock.height);
+			addFacet(physical);
+		}
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
-		addConnector("top", Mount, Solids.axial(0, 0, stock.height));
+		if (buildStage()==materia.casting.InsertStages.InsertStage.Service && serviceStock!=null)
+			addConnector("top",Mount,Solids.axial(serviceStock.x+serviceStock.width/2,
+				serviceStock.y+serviceStock.depth/2,serviceStock.z+serviceStock.height));
+		else addConnector("top", Mount, Solids.axial(0, 0, stock.height));
 	}
 
 	public static function boxValues(width:Float, depth:Float, height:Float):ComponentValues
-		return new ComponentValues().setToken("body", InsertBodyCodec.encode(Primitive(Box(width, depth, height))));
+		return manufacturedValues(materia.casting.InsertMaterial.C45Bright)
+			.setToken("body", InsertBodyCodec.encode(Primitive(Box(width, depth, height))));
+
+	/** Grade and the attached manufacturing choices are authored together, so a
+	 * recipe rebuild never depends on whether defaults were resolved beforehand.
+	 */
+	public static function manufacturedValues(material:materia.casting.InsertMaterial):ComponentValues
+		return new ComponentValues().setToken("stockMaterial",material).setToken("origin",
+			haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(Fabricated(
+				materia.casting.InsertManufacturing.InsertManufacturingCodec.draft(
+					materia.casting.InsertMaterial.InsertMaterials.specification(material))))));
+
+	/** Explicit source authoring for holes which must exist during the pour.
+	 * Bought-part mounting holes use their separate connector/clearance-budget route.
+	 */
+	public static function precastHoles(values:ComponentValues,encodedHoles:String):ComponentValues {
+		var result=values.copy(),holes=InsertHoles.records(encodedHoles);
+		var origin=materia.casting.InsertOrigin.InsertOriginCodec.snapshot(haxe.Json.parse(result.token("origin")),
+			InsertBodyCodec.decode(result.token("body")),holes);
+		switch origin {
+			case Fabricated(manufacturing):
+				manufacturing.holeRoutes=[for (hole in holes) {holeId:hole.id,
+					route:materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting}];
+			case Catalogue(_):throw "Catalogue holes are supplied by the product, not a made-insert hole route";
+		}
+		return result.setToken("holes",InsertHoles.fromNeutral(holes)).setToken("origin",
+			haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(origin)));
+	}
 
 	public function bodySpec():InsertBody
 		return InsertBodyCodec.decode(parameterToken("body"));
@@ -73,14 +132,27 @@ class CastInsert extends MachineComponent {
 	public function insertMaterial():materia.casting.InsertMaterial.InsertMaterialSpec
 		return materia.casting.InsertMaterial.InsertMaterials.specification(cast parameterToken("stockMaterial"));
 
+	public function buildStage():materia.casting.InsertStages.InsertStage
+		return cast parameterToken("buildStage");
+
+	/** Complete source design; the published physical facet follows buildStage. */
 	public function insertSpec():materia.casting.InsertSpec {
-		var body = bodySpec(), holes = InsertHoles.copy(machinekit.design.DesignInterfaces.of(this));
+		var body = bodySpec(), holes = InsertHoles.copy(sourceDesign);
 		return {
 			body: body,
-			interfaces: machinekit.design.DesignInterfaces.of(this).precisionRequirements(),
 			holes: holes,
-			origin: materia.casting.InsertOrigin.InsertOriginCodec.snapshot(haxe.Json.parse(parameterToken("origin")), body, holes)
+			origin: materia.casting.InsertOrigin.InsertOriginCodec.snapshot(haxe.Json.parse(parameterToken("origin")), body, holes),
+			interfaces:sourceDesign.precisionRequirements()
 		};
+	}
+
+	override function get_bom():BomItem {
+		var item=super.get_bom();
+		switch insertSpec().origin {
+			case Fabricated(_):item.manufacturingProcess=materia.casting.InsertManufacturing.InsertMakeProcess.MachinedSteel;
+			case Catalogue(_):
+		}
+		return item;
 	}
 
 	static function stockMaterialId(material:materia.casting.InsertMaterial):String {
@@ -97,15 +169,8 @@ class CastInsert extends MachineComponent {
 	override public function hasGeometry():Bool
 		return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Solids.named(InsertBodies.part(insertSpec().body), "insert");
-		return Solids.building([body], owned -> {
-			var tools = machinekit.design.DesignInterfaces.of(this).drillingTools();
-			for (tool in tools)
-				owned.push(tool);
-			return tools.length == 0 ? body : Solids.cut(body, tools);
-		});
-	}
+	override public function geometry(detail:ComponentDetail = Preview):Part
+		return InsertGeometry.part(insertSpec(),buildStage());
 
 	override public function setMaterial(spec:String):Void {
 		if (materia.project.MaterialLibrary.fromSpec(spec) != stockMaterialId(cast parameterToken("stockMaterial")))

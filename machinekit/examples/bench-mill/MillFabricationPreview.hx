@@ -268,6 +268,37 @@ class MillFabricationPreview {
 			sys.io.File.saveContent(hardwarePath, originalHardware);
 			ToolingPackageManifest.write(dir, f, checks);
 			ToolingPackageManifest.verify(dir);
+			var manufacturingPath=dir+"/insert-manufacturing.json";
+			var savedManufacturing=sys.io.File.getContent(manufacturingPath);
+			var alteredManufacturing:Dynamic=haxe.Json.parse(savedManufacturing);
+			alteredManufacturing.jobs=new Array<Dynamic>();
+			sys.io.File.saveContent(manufacturingPath,ToolingCodec.canonical(alteredManufacturing));
+			var manufacturingError="";
+			try ToolingPackageManifest.write(dir,f,checks) catch (error:Dynamic) manufacturingError=Std.string(error);
+			sys.io.File.saveContent(manufacturingPath,savedManufacturing);
+			if (manufacturingError.indexOf("Insert manufacturing report differs from source")<0)
+				throw "Writer accepted a manufacturing report inconsistent with source: "+manufacturingError;
+			var omittedChecks=checks.filter(check -> check.rule.indexOf("fabrication.insert.")!=0);
+			var omittedFabrication=f.validation;
+			f.validation=f.validation.filter(check -> check.rule.indexOf("fabrication.insert.")!=0);
+			ToolingPackageManifest.write(dir,f,omittedChecks);
+			f.validation=omittedFabrication;
+			var recovered:Dynamic=haxe.Json.parse(sys.io.File.getContent(manifestPath));
+			var recoveredChecks:Array<Dynamic> =cast recovered.validation;
+			var drawingCount=0,madeCount=0;
+			for (record in recoveredChecks) {
+				var rule:String=record.rule;
+				if (StringTools.startsWith(rule,"fabrication.insert.drawing.")) drawingCount++;
+			}
+			for (insert in p.document.input.inserts) switch insert.origin {
+				case Fabricated(_):madeCount++;
+				case Catalogue(_):
+			}
+			if (drawingCount!=madeCount)
+				throw "Writer dropped source manufacturing checks omitted by caller";
+			ToolingPackageManifest.verify(dir);
+			ToolingPackageManifest.write(dir,f,checks);
+			ToolingPackageManifest.verify(dir);
 			Sys.println("Fabrication manifest integrity/tamper checks passed");
 		}
 

@@ -9,7 +9,7 @@ class InsertQualifications {
 	public static function check(inserts:Array<CastingToolingInsert>):Array<ToolingValidation> {
 		var result:Array<ToolingValidation> = [];
 		for (insert in inserts) {
-			var origin = switch insert.origin {case Fabricated: continue; case Catalogue(product): product;};
+			var origin = switch insert.origin {case Fabricated(_):continue;case Catalogue(product):product;};
 			var rule = "tooling.insert.geometry." + insert.id;
 			if (origin.geometryBasis == NominalStudy)
 				result.push(ToolingReadiness.pending(rule, [insert.id],
@@ -21,5 +21,22 @@ class InsertQualifications {
 					evidence: [for (evidence in origin.evidence) evidence.reference + " sha256:" + evidence.sha256]});
 		}
 		return result;
+	}
+
+	public static function manufacturing(inserts:Array<CastingToolingInsert>):Array<ToolingValidation> {
+		var result:Array<ToolingValidation> = [];
+		for (insert in inserts) switch insert.origin {
+			case Fabricated(_):result=result.concat(InsertManufacturingPlan.build(insert).validation);
+			case Catalogue(_):
+		}
+		return result;
+	}
+
+	public static function validateManufacturing(inserts:Array<CastingToolingInsert>,validation:Array<ToolingValidation>):Void {
+		for (expected in manufacturing(inserts)) {
+			var found=validation.filter(check -> check.rule==expected.rule);
+			if (found.length!=1 || materia.tooling.ToolingCodec.canonical(found[0])!=materia.tooling.ToolingCodec.canonical(expected))
+				throw "Insert manufacturing validation differs from source: "+expected.rule;
+		}
 	}
 }

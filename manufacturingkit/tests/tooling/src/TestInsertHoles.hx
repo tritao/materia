@@ -1,5 +1,13 @@
 import materia.casting.InsertHole;
 class TestInsertHoles {
+	public static function beforeCasting(insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert):Void {
+		switch insert.origin {
+			case Fabricated(manufacturing):manufacturing.holeRoutes=[for (hole in insert.holes) {holeId:hole.id,
+				route:materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting}];
+			case Catalogue(_):throw "Fabricated test insert expected";
+		}
+	}
+
 	public static function through(diameter:Float, depth:Float):Array<InsertHole> {
 		if (!Math.isFinite(diameter + depth) || diameter <= 0 || depth <= 0)
 			throw "Test hole pattern requires positive drilling dimensions";

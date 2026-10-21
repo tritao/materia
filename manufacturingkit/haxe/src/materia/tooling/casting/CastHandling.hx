@@ -22,7 +22,7 @@ class CastHandling {
 		}
 		for (i in d.input.inserts) {
 			var dimensions = InsertBodies.box(i.body, i.id);
-			var steel = materia.casting.InsertHoleGeometry.massProperties(dimensions.width, dimensions.depth, dimensions.height, i.holes);
+			var steel = materia.casting.InsertHoleGeometry.massProperties(dimensions.width, dimensions.depth, dimensions.height, InsertFixturePlanner.holes(i));
 			var kg = steel.volume * d.recipe.steelDensityKgM3 * 1e-9;
 			var center = F.transformPoint(F.compose(d.setup.sourceToMold, i.pose), steel.center.x, steel.center.y, steel.center.z);
 			mass += kg;

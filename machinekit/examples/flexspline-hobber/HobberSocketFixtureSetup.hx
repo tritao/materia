@@ -53,7 +53,8 @@ class HobberSocketFixtureSetup {
 		var thread = hole.thread;
 		return {id:"socket-fixture",insertIds:[for (insert in document.input.inserts) insert.id],contactZ:36,
 			edgeMargin:50,locatorEndInset:80,locatorSideInset:20,
-			screwStock:[{thread:thread,lengths:lengths,washerThickness:machinekit.standard.FlatWasher.metric(thread.designation).thickness,
+			screwStock:[{thread:thread,lengths:lengths,
+				threadedLength:machinekit.standard.SocketHeadCapScrew.catalog().get(thread.designation).threadLength,washerThickness:machinekit.standard.FlatWasher.metric(thread.designation).thickness,
 				driverDiameter:14,driverToolDiameter:6}]};
 	}
 

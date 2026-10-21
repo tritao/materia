@@ -89,17 +89,9 @@ typedef MoldOpening = {
 	var sealSpec:String;
 }
 
-enum abstract PrecisionRoute(String) to String {
-	var AsSupplied = "as-supplied";
-	var Replicated = "replicated";
-	var Machined = "machined";
-	var AsCast = "as-cast";
-}
-
 typedef PrecisionInterface = {
 	var insertId:String;
-	var route:PrecisionRoute;
-	var allowance:Null<Float>;
+	var jigReference:Null<String>;
 	var masterReference:Null<String>;
 	var masterFlatnessMm:Null<Float>;
 	var releaseSpec:Null<String>;
@@ -221,6 +213,7 @@ typedef InsertFixtureFixing = {
 
 typedef MoldInsertFixture = {
 	var insertId:String;
+	var location:DatumFixtureLocation.DatumLocationPlan;
 	var datums:materia.tooling.casting.MoldPlan.InsertDatums;
 	var datum:MoldVolume;
 	var mountingFace:AssemblyFrame;
