@@ -1,5 +1,9 @@
 package app;
 
+import materia.presentation.AssemblyPresentation;
+import materia.presentation.PresentationEdits;
+import materia.presentation.PresentationEdits.AuthoredPresentation;
+
 import haxeon.ui.Path;
 
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -79,8 +83,9 @@ class ProjectDocumentSession {
   var initialAssemblyState:Null<AssemblyStateRecord> = null;
   /** Source definition bound to the runtime; compiled models own a separate snapshot. */
   var assemblyRuntimeDefinition:Null<AssemblyDefinition> = null;
-  public var inspectionCameras(default,null):Array<materia.project.SceneArtifact.SceneArtifactInspectionCamera> = [];
-  public var initialView(default,null):Null<materia.project.SceneArtifact.SceneArtifactView> = null;
+  public var presentation(default,null):Null<AssemblyPresentation> = null;
+  var generatedPresentation:Null<AssemblyPresentation>;
+  var authoredPresentation:Null<AuthoredPresentation>;
   public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
   public var projectPhysical(default,null):Null<AssemblyPhysicalData> = null;
@@ -282,8 +287,9 @@ class ProjectDocumentSession {
       generated.printJob);
     projectVariant = generated.projectVariant;
     projectJob = generated.projectJob;
-    initialView = generated.initialView;
-    inspectionCameras=generated.inspectionCameras==null?[]:generated.inspectionCameras.copy();
+    generatedPresentation=generated.presentation;
+    var presentationDefinition=generated.assemblyDefinition;
+    presentation=presentationDefinition==null?null:PresentationEdits.merge(presentationDefinition,generatedPresentation,authoredPresentation);
   }
 
   /** Open generated geometry while retaining its source manifest. */
@@ -377,6 +383,9 @@ class ProjectDocumentSession {
     // Null means no saved choice (derive from the definition); an empty list is an explicit choice of none.
     var dependentJoints = project.assemblyDependentJoints == null ? null : project.assemblyDependentJoints.copy();
     if (dependentJoints != null) validateAssemblyDependentJoints(generated.assemblyDefinition, dependentJoints);
+    var savedPresentation=project.presentation==null?null:PresentationEdits.decode(project.presentation);
+    if(savedPresentation!=null&&generated.assemblyDefinition==null)throw "Authored presentation has no assembly";
+    if(generated.assemblyDefinition!=null)PresentationEdits.merge(generated.assemblyDefinition,generated.presentation,savedPresentation);
     var stateRecord = generated.assemblyState;
     if (project.assemblyState != null) {
       if (generated.assemblyDefinition == null)
@@ -420,8 +429,10 @@ class ProjectDocumentSession {
     projectBaseline = baseline;
     projectVariant = generated.projectVariant;
     projectJob = generated.projectJob;
-    initialView = generated.initialView;
-    inspectionCameras=generated.inspectionCameras==null?[]:generated.inspectionCameras.copy();
+    authoredPresentation=savedPresentation;
+    generatedPresentation=generated.presentation;
+    var presentationDefinition=generated.assemblyDefinition;
+    presentation=presentationDefinition==null?null:PresentationEdits.merge(presentationDefinition,generatedPresentation,authoredPresentation);
     staleProjectEdits = diagnostics;
     staleProjectRecord = diagnostics.length == 0 ? null : project;
     installAssemblyRuntime(generated.assemblyDefinition, runtime,
@@ -847,8 +858,25 @@ class ProjectDocumentSession {
 
   public function assemblyJointIsDependent(jointId:String):Bool return assemblyDependentJoints.exists(jointId);
 
+  /** Save or update an authored view as one undoable display-only edit. */
+  public function savePresentationView(view:PresentationView):Void {
+    var definition=projectAssemblyDefinition;if(definition==null)throw "View authoring requires a generated assembly";
+    var prior=authoredPresentation;
+    var next:AuthoredPresentation=prior==null?PresentationEdits.empty(definition.id):PresentationEdits.decode(PresentationEdits.encode(prior));
+    var copy:PresentationView=JsonWire.decode(JsonWire.encode(view));copy.source=Authored;
+    var found=false;
+    for(index in 0...next.views.length)if(next.views[index].id==copy.id){next.views[index]=copy;found=true;}
+    if(!found)next.views.push(copy);
+    var merged=PresentationEdits.merge(definition,generatedPresentation,next);
+    var previous=presentation;
+    document.apply(new EditOperation("Save presentation view "+copy.label,
+      function(){authoredPresentation=next;presentation=merged;},
+      function(){authoredPresentation=prior;presentation=previous;}));
+  }
+
   /** Metres in one unit of the project's assembly. */
   public function assemblyUnitMetres():Float return assemblyMetresPerUnit;
+  public function presentationCenters():Null<Map<String,Array<Float>>> return assemblyLocalCentersByDefinition;
 
   /**
    * Shows the assembly with these joints (by id, in the assembly's units) set, without recording history: a mirror of a
@@ -1099,7 +1127,7 @@ class ProjectDocumentSession {
     projectReference = null;
     projectVariant = null;
     projectJob = null;
-    initialView = null;inspectionCameras=[];
+    presentation = null;generatedPresentation=null;authoredPresentation=null;
     recipeDocument = null;
     projectBaseline = null;
     staleProjectEdits = [];
@@ -1180,9 +1208,11 @@ class ProjectDocumentSession {
       stateRecord = AssemblyDefinitionCodec.decodeState(generated.assemblyDefinition, saved.record.assemblyState);
     if (stateRecord != null && generated.assemblyDefinition != null)
       generated = MateriaProjectRunner.evaluateAssemblyState(generated, stateRecord);
+    var nextPresentation=generated.assemblyDefinition==null?null:PresentationEdits.merge(generated.assemblyDefinition,generated.presentation,authoredPresentation);
     var diagnostics:Array<String> = [];
     var data = materializeProject(generated.objects, saved.record, saved.authored, diagnostics, customMaterials);
     scene.refreshGenerated(data, generated.geometryBySnapshot);
+    generatedPresentation=generated.presentation;presentation=nextPresentation;
     projectBaseline = generated.objects;
     installAssemblyRuntime(generated.assemblyDefinition,
       generated.assemblyDefinition == null ? null : new AssemblyState(generated.assemblyDefinition, stateRecord),
@@ -1241,6 +1271,7 @@ class ProjectDocumentSession {
     if(projectVariant!=null)record.variantId=projectVariant;
     else if (projectJob != null) record.jobId = projectJob;
     if (!assemblyMates.isEmpty()) record.assemblyMates = assemblyMates.encode();
+    if(authoredPresentation!=null)record.presentation=PresentationEdits.encode(authoredPresentation);
     return {record: record, authored: authored};
   }
 

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "presentation-tests"
+  },
+  "entry": "tests.PresentationRuntimeTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "presentation/build"
+}

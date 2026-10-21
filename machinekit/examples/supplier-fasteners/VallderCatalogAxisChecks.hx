@@ -61,7 +61,7 @@ class VallderCatalogAxisChecks {
   var scene=AssemblyPreview.scene(loaded,"vallder-catalog-axis"),definition=scene.assemblyDefinition;
   if(definition==null)throw "Missing axis definition";
   for(joint in definition.joints)if(joint.id=="travel")joint.driven=true;
-  scene.project={dynamicParts:[],motions:[],initialView:{yaw:Math.PI-0.9652516631899266,pitch:0.5639426413606289}};
+  scene.presentation=materia.presentation.Presentations.assembled(scene.assemblyDefinition,Math.PI-0.9652516631899266,0.5639426413606289,"supplier-fasteners");
   sys.io.File.saveBytes(output+"vallder-catalog.mtrg",SceneArtifact.encode(scene));
   trace(checks+" catalog recipe, saved axis, sourcing and installation checks passed");
  }

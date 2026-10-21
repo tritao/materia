@@ -69,7 +69,7 @@ class SupportedSfu20AxisChecks {
   check(bom(loaded)==bom(axis),"Sourcing preserves engineering BOM");
   var scene=AssemblyPreview.scene(loaded,"SFU2005-BK15-BF15-DSG20-HGR20-axis"),definition=scene.assemblyDefinition;
   if(definition==null)throw "Missing preview definition";for(j in definition.joints)if(j.id=="travel")j.driven=true;
-  scene.project={dynamicParts:[],motions:[],initialView:{yaw:Math.PI-0.9652516631899266,pitch:0.5639426413606289}};
+  scene.presentation=materia.presentation.Presentations.assembled(scene.assemblyDefinition,Math.PI-0.9652516631899266,0.5639426413606289,"supplier-fasteners");
   sys.io.File.saveBytes(output+"sfu20-axis.mtrg",SceneArtifact.encode(scene));
   sys.io.File.saveContent(output+"sfu20-axis.assembly.json",saved);
   sys.io.File.saveContent(output+"sfu20-axis.bom.json",haxe.Json.stringify(loaded.billOfMaterials().lines(),null,"  "));

@@ -1,5 +1,13 @@
 package app;
 
+import materia.presentation.AssemblyPresentation;
+import materia.presentation.PresentationEvaluator.PresentationFrame;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinitionFlattener;
+import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+import app.editor.PresentationController;
+
 import haxeon.editor.ViewportLook;
 import haxeon.platform.GraphicsImageRef;
 import haxeon.ui.Canvas;
@@ -69,91 +77,179 @@ class EditorPerspectiveViewport implements View {
   var lastRenderSeconds:Float = 0.0;
   var totalRenderSeconds:Float = 0.0;
   final camera:PerspectiveCamera = new PerspectiveCamera();
-  var inspection:Null<materia.project.SceneArtifact.SceneArtifactInspectionCamera>;
-  var enclosureIds:Array<String> = [];
-  var enclosureMode="visible";
+  public var presentation(default,null):Null<PresentationController>;
+  var presentationCenters:Null<Map<String,Array<Float>>>;
+  var presentationScale=1.0;
+  var presentationResult:Null<PresentationFrame>;
+  var presentationRevision="";
+  var presentationPoses:Array<SimulationPoseVisual> = [];
+  var presentationPoseById:Map<String,SimulationPoseVisual> = [];
+  var presentationCameraDirty=true;
+  var presentationTarget:Null<Array<Float>>;
+  var readOnly=false;
   var inspectionZoom:Float=1;
-  var inspectionTarget:Null<Array<Float>>;
   public var onInspectionZoom:Null<Float->Void> = null;
-  /** A camera-only view: no selection edits, independent visibility, steady world orientation. */
-  public function setInspectionCamera(preset:materia.project.SceneArtifact.SceneArtifactInspectionCamera,zoom:Float=1):Void {
-    var previous=inspection;
-    if(previous==null||previous.id!=preset.id||previous.anchor!=preset.anchor||previous.yaw!=preset.yaw||previous.pitch!=preset.pitch)
-      {camera.setAngle(preset.yaw,preset.pitch);inspectionTarget=null;}
-    if(previous==null||previous.id!=preset.id||previous.anchor!=preset.anchor||previous.span!=preset.span||
-      previous.offset.join(",")!=preset.offset.join(",")||previous.hiddenPrefixes.join(",")!=preset.hiddenPrefixes.join(",")||inspectionZoom!=zoom)lightingRevision++;
-    inspection=preset;inspectionZoom=zoom;
+  /** Section edits go through the document owner so a general plane can survive save/reopen. */
+  public var onSectionEdit:Null<Array<SectionPlane>->Void> = null;
+
+  public function setPresentation(record:Null<AssemblyPresentation>,definition:Null<AssemblyDefinition>,
+      centers:Null<Map<String,Array<Float>>>,scale:Float,readOnly:Bool=false):Void {
+    this.readOnly=readOnly;
+    var current=presentation;
+    if(current==null&&(record==null||definition==null))return;
+    if(current!=null&&current.record==record&&current.definition==definition)return;
+    var next=record==null||definition==null?null:new PresentationController(definition,record);
+    if(next!=null&&current!=null&&current.definition==definition)next.retainCursor(current);
+    presentation=next;
+    presentationCenters=centers;presentationScale=scale;presentationRevision="";
+    presentationResult=null;presentationCameraDirty=true;presentationTarget=null;
+    lightingRevision++;host.requestFrame();
   }
-  public function resetInspectionCamera():Void {
-    var preset=inspection;if(preset==null)return;
-    camera.setAngle(preset.yaw,preset.pitch);inspectionTarget=null;orbitPivot=null;
-    host.requestFrame();
+  public function selectPresentationView(id:String):Void {
+    var controller=presentation;if(controller==null)return;
+    controller.selectView(id);presentationCameraDirty=true;presentationTarget=null;inspectionZoom=1;
+    clearHover();lightingRevision++;host.requestFrame();
   }
-  function inspectionLensScale():Float {
-    if(inspection==null)return 1;
-    var fov=Math.max(5,Math.min(110,PerspectiveCamera.FOV_Y*inspectionZoom));
-    return Math.tan(fov*Math.PI/360)/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360);
+  public function resetPresentation():Void {
+    var controller=presentation;
+    if(controller==null){resetView();return;}
+    controller.reset();presentationCameraDirty=true;presentationTarget=null;inspectionZoom=1;orbitPivot=null;
+    clearHover();lightingRevision++;host.requestFrame();
   }
-  /** Lens zoom is a policy of the shared navigation handler for an inspection view. */
-  function inspectionScroll(event:UiEvent):Void {
-    var preset=inspection;
-    if(preset!=null&&Math.isFinite(event.deltaY)&&event.deltaY!=0) {
-      var next=Math.max(0.2,Math.min(8,inspectionZoom*Math.pow(2,event.deltaY*0.002)));
-      if(next!=inspectionZoom) {
-        setInspectionCamera(preset,next);
-        if(onInspectionZoom!=null)onInspectionZoom(next);
-        host.requestFrame();
-      }
+  public function presentationZoom():Float return inspectionZoom;
+  public function setPresentationZoom(zoom:Float):Void {
+    var next=Math.max(0.2,Math.min(8,zoom));
+    if(next!=inspectionZoom){inspectionZoom=next;lightingRevision++;host.requestFrame();}
+  }
+  public function capturePresentationView(id:String,label:String):PresentationView {
+    updatePresentationCamera();
+    var controller=presentation,frame=presentationResult;
+    if(controller==null||frame==null)throw "No assembly presentation to save";
+    var selected=controller.record.views.filter(v->v.id==controller.cursor.view)[0];
+    var flat=AssemblyDefinitionFlattener.flattenView(controller.definition);var anchor=flat.occurrences[0].id;
+    var item=scene.object("project:"+anchor);if(item==null)item=scene.object(anchor);if(item==null)throw "Missing view anchor";
+    var pose=presentationPoseById.get(item.id);var center=pose==null?[item.x,item.y,item.z]:pose.position;
+    var factor=0.5/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360)*1.15*Math.max(1,1/aspect());
+    var value:PresentationView={id:id,label:label,source:Authored,explode:controller.cursor.explode,
+      camera:Anchored({occurrence:anchor,subtree:false},{x:(camera.targetX-center[0])/presentationScale,
+        y:(camera.targetY-center[1])/presentationScale,z:(camera.targetZ-center[2])/presentationScale},
+        camera.distance/factor/presentationScale,camera.yaw,camera.pitch),
+      visibility:selected.visibility,sections:frame.sections};
+    return haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(value));
+  }
+  public function presentationFrame():Null<PresentationFrame> {
+    updatePresentation();return presentationResult;
+  }
+  function occurrenceId(id:String):String return StringTools.startsWith(id,"project:")?id.substr(8):id;
+  function updatePresentation():Void {
+    var controller=presentation;
+    if(controller==null){presentationResult=null;presentationPoses=[];presentationPoseById.clear();return;}
+    var key=scene.visualRevision+":"+runtimeRevision+":"+simulationActive+":"+controller.revision;
+    if(key==presentationRevision)return;
+    var flat=AssemblyDefinitionFlattener.flattenView(controller.definition);
+    var solved=new Map<String,AssemblyFrame>();
+    for(part in flat.occurrences) {
+      var item=scene.object("project:"+part.id);if(item==null)item=scene.object(part.id);
+      if(item==null)throw 'Missing presentation scene occurrence "${part.id}"';
+      var runtime=simulationActive?simulationPoseById.get(item.id):null;
+      var position=runtime==null?[item.x,item.y,item.z]:runtime.position;
+      var rotation=runtime==null?item.rotation:runtime.rotation;
+      if(rotation==null)rotation=[0,0,0,1];
+      var pose:AssemblyFrame={x:0,y:0,z:0,qx:rotation[0],qy:rotation[1],qz:rotation[2],qw:rotation[3]};
+      var center=presentationCenters==null?null:presentationCenters.get(part.definition);
+      if(center==null)center=[0,0,0];
+      var delta=AssemblyFrames.transformPoint(pose,center[0],center[1],center[2]);
+      pose.x=position[0]/presentationScale-delta.x;pose.y=position[1]/presentationScale-delta.y;pose.z=position[2]/presentationScale-delta.z;
+      solved.set(part.id,pose);
     }
-    event.preventDefault();event.stopPropagation();
+    // Until a geometry owner supplies a fingerprint, cached checks must remain stale.
+    var result=controller.evaluate(solved,"",simulationActive);
+    presentationResult=result;presentationPoses=[];
+    presentationPoseById.clear();
+    for(part in flat.occurrences) {
+      var pose=result.poses.get(part.id);if(pose==null)continue;
+      var center=presentationCenters==null?null:presentationCenters.get(part.definition);if(center==null)center=[0,0,0];
+      var world=AssemblyFrames.transformPoint(pose,center[0],center[1],center[2]);
+      var item=scene.object("project:"+part.id);if(item==null)item=scene.object(part.id);if(item==null)continue;
+      var visual:SimulationPoseVisual={id:item.id,position:[world.x*presentationScale,world.y*presentationScale,world.z*presentationScale],rotation:[pose.qx,pose.qy,pose.qz,pose.qw]};
+      presentationPoseById.set(item.id,visual);
+      // Presentation owns the generated occurrence's final transform in this view.
+      presentationPoses.push(visual);
+    }
+    if(simulationActive)for(live in simulationPoses)if(!presentationPoseById.exists(live.id)) {
+      presentationPoseById.set(live.id,live);presentationPoses.push(live);
+    }
+    simulationTransforms.clear();simulationTransformCount=0;presentationRevision=key;
   }
-  public function setEnclosurePresentation(ids:Array<String>,mode:String):Void {
-    if(["visible","transparent","hidden"].indexOf(mode)<0)throw "Unknown enclosure presentation";
-    if(enclosureMode==mode&&enclosureIds.join("|")==ids.join("|"))return;
-    enclosureIds=ids.copy();enclosureMode=mode;lightingRevision++;host.requestFrame();
+  function displayPoses():Null<Array<SimulationPoseVisual>> {
+    updatePresentation();return presentation==null?(simulationActive?simulationPoses:null):presentationPoses;
   }
-  function enclosureView(view:SceneView):Void {
-    if(inspection!=null||enclosureMode=="visible")return;
-    for(id in enclosureIds) {
-      var item=scene.object("project:"+id);if(item==null)continue;
+  function presentationHidden(id:String):Bool {
+    var frame=presentationResult;
+    return frame!=null&&frame.visibility.get(occurrenceId(id))==Hidden;
+  }
+  function applyPresentation(view:SceneView):Void {
+    updatePresentation();var frame=presentationResult;if(frame==null)return;
+    if(readOnly){view.clearSelectionOverrides();view.clearHoverOverrides();}
+    for(item in scene.items()) {
+      var mode=frame.visibility.get(occurrenceId(item.id));
+      if(mode==null||mode==Shown)continue;
       var nodes=[scene.info(item.id).node()].concat(scene.runtimePartNodes(item.id));
-      for(node in nodes)if(enclosureMode=="hidden")view.setVisibility(node,false);else view.setMaterial(node,scene.translucentViewMaterial());
+      for(node in nodes)if(mode==Hidden)view.setVisibility(node,false);else view.setMaterial(node,scene.translucentViewMaterial());
     }
   }
-  function inspectionHidden(id:String):Bool {
-    var preset=inspection;if(preset==null)return false;
-    for(prefix in preset.hiddenPrefixes)if(StringTools.startsWith(id,"project:"+prefix)||StringTools.startsWith(id,prefix))return true;
-    return false;
-  }
-  function inspectionView(view:SceneView):Void {
-    if(inspection==null)return;
-    view.clearSelectionOverrides();view.clearHoverOverrides();
-    for(item in scene.items())if(inspectionHidden(item.id)) {
-      view.setVisibility(scene.info(item.id).node(),false);
-      for(node in scene.runtimePartNodes(item.id))view.setVisibility(node,false);
+  function updatePresentationCamera():Void {
+    updatePresentation();var frame=presentationResult;if(frame==null)return;
+    var point:Array<Float>,span=0.0,yaw:Float,pitch:Float;
+    switch frame.camera {
+      case Anchored(anchor,offset,size,y,p):
+        var item=scene.object("project:"+anchor.occurrence);if(item==null)item=scene.object(anchor.occurrence);if(item==null)return;
+        var pose=presentationPoseById.get(item.id);
+        var center=pose==null?[item.x,item.y,item.z]:pose.position;
+        point=[center[0]+offset.x*presentationScale,center[1]+offset.y*presentationScale,center[2]+offset.z*presentationScale];
+        span=size*presentationScale;yaw=y;pitch=p;
+      case Frame(select,y,p,margin):
+        var bounds:Null<Array<Float>> = null;
+        var controller=presentation;if(controller==null)return;
+        var flat=AssemblyDefinitionFlattener.flattenView(controller.definition);
+        for(selector in select)for(id in materia.presentation.PresentationCodec.resolve(flat,selector)) {
+          var item=scene.object("project:"+id);if(item==null)item=scene.object(id);
+          if(item==null||!scene.isVisible(item.id)||presentationHidden(item.id))continue;
+          var next=transformedBounds(displayTransform(item),item.width,item.height,item.depth);
+          if(bounds==null)bounds=next;else for(axis in 0...3){bounds[axis]=Math.min(bounds[axis],next[axis]);bounds[axis+3]=Math.max(bounds[axis+3],next[axis+3]);}
+        }
+        if(bounds==null)return;
+        point=[(bounds[0]+bounds[3])/2,(bounds[1]+bounds[4])/2,(bounds[2]+bounds[5])/2];
+        span=Math.max(bounds[3]-bounds[0],Math.max(bounds[4]-bounds[1],bounds[5]-bounds[2]))*margin;yaw=y;pitch=p;
     }
-  }
-  function updateInspectionCamera():Void {
-    var preset=inspection;if(preset==null)return;
-    var item=scene.object("project:"+preset.anchor);if(item==null)item=scene.object(preset.anchor);
-    if(item==null)return;
-    var pose=simulationActive?simulationPoseById.get(item.id):null;
-    var point=app.editor.InspectionCameraModel.target(preset,pose==null?[item.x,item.y,item.z]:pose.position);
-    var distance=preset.span*0.5/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360)*1.15*Math.max(1,1/aspect());
-    var previous=inspectionTarget;
-    if(previous==null)camera.setTarget(point[0],point[1],point[2],Math.max(0.0001,distance));
-    else {
+    var previous=presentationTarget;
+    if(presentationCameraDirty||previous==null) {
+      camera.setAngle(yaw,pitch);
+      camera.setTarget(point[0],point[1],point[2],Math.max(0.0001,span*0.5/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360)*1.15*Math.max(1,1/aspect())));
+      presentationCameraDirty=false;
+    } else {
       var dx=point[0]-previous[0],dy=point[1]-previous[1],dz=point[2]-previous[2];
       camera.setTarget(camera.targetX+dx,camera.targetY+dy,camera.targetZ+dz,camera.distance);
       if(orbitPivot!=null){orbitPivot[0]+=dx;orbitPivot[1]+=dy;orbitPivot[2]+=dz;}
     }
-    inspectionTarget=point;
+    presentationTarget=point;
+  }
+  function inspectionLensScale():Float {
+    if(!readOnly)return 1;
+    var fov=Math.max(5,Math.min(110,PerspectiveCamera.FOV_Y*inspectionZoom));
+    return Math.tan(fov*Math.PI/360)/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360);
+  }
+  function inspectionScroll(event:UiEvent):Void {
+    if(Math.isFinite(event.deltaY)&&event.deltaY!=0) {
+      var next=Math.max(0.2,Math.min(8,inspectionZoom*Math.pow(2,event.deltaY*0.002)));
+      if(next!=inspectionZoom){setPresentationZoom(next);if(onInspectionZoom!=null)onInspectionZoom(next);}
+    }
+    event.preventDefault();event.stopPropagation();
   }
   var navigationPointer:Null<Int> = null;
   var navigationMode:Int = 0;
   /** Last surface pivot, retained for empty-space drags and fixed during each gesture. */
   var orbitPivot:Null<Array<Float>> = null;
-  var sectionPlane:Null<Array<Float>> = null;
   final flyKeys:Map<Int, Bool> = new Map();
   var flyFast:Bool = false;
   var sketchDragRevision:Int = 0;
@@ -242,7 +338,7 @@ class EditorPerspectiveViewport implements View {
   public function presentationKey():String
     return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision + ":" + sketchDragRevision + ":" +
       assemblyDragRevision + ":" + matePickRevision + ":" +
-      hoverRevision + ":orbit:" + orbiting() + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested + ":" + collisionRevision;
+      (presentation==null?0:presentation.revision) + ":" + hoverRevision + ":orbit:" + orbiting() + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested + ":" + collisionRevision;
 
   public function setLightingPreset(preset:Int):Void {
     if (preset < 0 || preset > 2 || preset == lightingPreset) return;
@@ -258,7 +354,8 @@ class EditorPerspectiveViewport implements View {
       node.focusable = true;
       node.semantics = new Semantics(AccessibilityRole.Image,
         "Scene perspective GPU view");
-      node.onPaint(paint, "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" +
+      updatePresentation();
+      node.onPaint(paint, "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" + (presentation==null?0:presentation.revision) + ":" +
         sketchDragRevision + ":" + assemblyDragRevision + ":hover:" + hoverRevision + ":" + camera.revision +
         ":orbit:" + orbiting() +
         ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" +
@@ -276,11 +373,11 @@ class EditorPerspectiveViewport implements View {
 
   function paint(canvas:Canvas, geometry:ResolvedLayoutItem):Void {
     updateViewportSize(geometry.width, geometry.height);
-    updateInspectionCamera();
+    updatePresentationCamera();
     ensureRenderer();
     var width = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.width))));
     var height = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.height))));
-    var displayRevision=scene.visualRevision+":"+runtimeRevision;
+    var displayRevision=scene.visualRevision+":"+runtimeRevision+":"+presentationRevision;
     if (renderer != null && (surface == null || renderedRevision != displayRevision ||
         renderedCameraRevision != camera.revision ||
         renderedLightingRevision != lightingRevision ||
@@ -292,10 +389,10 @@ class EditorPerspectiveViewport implements View {
       var started = Sys.time();
       fitCameraClipRange();
       var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect(), -1, -1,
-        inspection == null ? 0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom))),
-        simulationActive ? simulationPoses : null, hoveredObjectId, hoveredFaceIndex,
+        !readOnly ? 0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom))),
+        displayPoses(), hoveredObjectId, hoveredFaceIndex,
         collisionPairs, cosmeticThreadsVisible));
-      inspectionView(view);
+
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
       if (gridVisible && gridStep > 0.0) {
         var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
@@ -427,40 +524,39 @@ class EditorPerspectiveViewport implements View {
     lastRenderMilliseconds: lastRenderSeconds * 1000.0,
     averageRenderMilliseconds: renderCount == 0 ? 0.0 : totalRenderSeconds * 1000.0 / renderCount,
     orbitPivot: orbitPivot,
-    sectionPlane: sectionPlane,
+    sections: presentationResult==null?[]:presentationResult.sections,
     camera: {targetX: camera.targetX, targetY: camera.targetY, targetZ: camera.targetZ,
       yaw: camera.yaw, pitch: camera.pitch, distance: camera.distance}
   };
 
-  public function sectionActive():Bool return sectionPlane != null;
-
-  /** A view-only inspection plane; the document, meshes and joint limits stay intact. */
+  public function sectionActive():Bool {
+    var frame=presentationFrame();return frame!=null&&frame.sections.length>0;
+  }
   public function inspectObject(id:String):Void {
+    updatePresentationCamera();
     var item=scene.object(id);if(item==null)throw "No displayed part for this axis";
     var bounds=transformedBounds(displayTransform(item),item.width,item.height,item.depth);
     var x=(bounds[0]+bounds[3])/2,y=(bounds[1]+bounds[4])/2,z=(bounds[2]+bounds[5])/2;
-    var backward=camera.viewDirection(),length=Math.sqrt(backward[0]*backward[0]+backward[1]*backward[1]);
-    var nx=-backward[0]/length,ny=-backward[1]/length;
-    sectionPlane=[nx,ny,0,-nx*x-ny*y];
-    camera.frame(x,y,z,Math.max(0.08,bounds[3]-bounds[0]),Math.max(0.08,bounds[4]-bounds[1]),
-      Math.max(0.08,bounds[5]-bounds[2]),aspect());
-    orbitPivot=null;lightingRevision++;clearHover();host.requestFrame();
+    var normal=camera.viewDirection();
+    camera.frame(x,y,z,Math.max(0.08,bounds[3]-bounds[0]),Math.max(0.08,bounds[4]-bounds[1]),Math.max(0.08,bounds[5]-bounds[2]),aspect());
+    if(onSectionEdit==null)throw "Section authoring requires a project document";
+    onSectionEdit([{occurrence:null,point:{x:x/presentationScale,y:y/presentationScale,z:z/presentationScale},
+      normal:{x:-normal[0],y:-normal[1],z:-normal[2]}}]);
+    host.requestFrame();
   }
-
-  public function clearSection():Void {
-    if(sectionPlane==null)return;
-    sectionPlane=null;lightingRevision++;clearHover();host.requestFrame();
-  }
-
+  public function clearSection():Void {if(onSectionEdit!=null)onSectionEdit([]);}
   public function flipSection():Void {
-    var plane=sectionPlane;if(plane==null)return;
-    sectionPlane=[for(value in plane)-value];lightingRevision++;clearHover();host.requestFrame();
+    var frame=presentationFrame();if(frame==null||onSectionEdit==null)return;
+    onSectionEdit([for(plane in frame.sections){occurrence:null,point:plane.point,
+      normal:{x:-plane.normal.x,y:-plane.normal.y,z:-plane.normal.z}}]);
   }
-
   function sectionView(view:SceneView):SceneView {
-    enclosureView(view);
-    var plane=sectionPlane;
-    if(plane!=null)view.addClipPlane(plane[0],plane[1],plane[2],plane[3]);
+    applyPresentation(view);
+    var frame=presentationResult;
+    if(frame!=null)for(plane in frame.sections) {
+      var n=plane.normal,p=plane.point;
+      view.addClipPlane(n.x,n.y,n.z,-presentationScale*(n.x*p.x+n.y*p.y+n.z*p.z));
+    }
     return view;
   }
 
@@ -494,7 +590,7 @@ class EditorPerspectiveViewport implements View {
     var minX = 1000000000.0, minY = 1000000000.0, minZ = 1000000000.0;
     var maxX = -1000000000.0, maxY = -1000000000.0, maxZ = -1000000000.0;
     for (item in items) {
-      if (!scene.isVisible(item.id)||inspectionHidden(item.id)||inspection==null&&enclosureMode=="hidden"&&enclosureIds.indexOf(item.id.substr(8))>=0) continue;
+      if (!scene.isVisible(item.id)||presentationHidden(item.id)) continue;
       var transform = displayTransform(item);
       var bounds=transformedBounds(transform,item.width,item.height,item.depth);
       minX=Math.min(minX,bounds[0]);minY=Math.min(minY,bounds[1]);minZ=Math.min(minZ,bounds[2]);
@@ -507,6 +603,7 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function resetView():Void {
+    if(presentation!=null){resetPresentation();return;}
     orbitPivot = null;
     camera.reset();
     host.requestFrame();
@@ -579,7 +676,7 @@ class EditorPerspectiveViewport implements View {
     }
   }
   public function setMissionOverlay(overlay:Null<MissionOverlay>):Void missionOverlay.set(overlay);
-  public function editingEnabled():Bool return inspection==null&&!simulationActive;
+  public function editingEnabled():Bool return !readOnly&&!simulationActive;
 
   public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null || assemblyDrag != null ||
     matePick != null || sketchPointDragging;
@@ -709,7 +806,7 @@ class EditorPerspectiveViewport implements View {
     fitCameraClipRange();
     var ray=camera.screenRay(localX,localY,viewportWidth,viewportHeight);
     var view=sectionView(scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),
-      simulationActive?simulationPoses:null, null, -1, null, cosmeticThreadsVisible));
+      displayPoses(), null, -1, null, cosmeticThreadsVisible));
     return scene.pickRayWithView(view,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
   }
@@ -719,14 +816,14 @@ class EditorPerspectiveViewport implements View {
   public function hoveredFace():Int return hoveredFaceIndex;
 
   function updateHover(localX:Float, localY:Float):Void {
-    if(inspection!=null)return;
+    if(readOnly)return;
     fitCameraClipRange();
     var ray = camera.screenRay(localX, localY, viewportWidth,
       viewportHeight);
     // A running simulation poses the scene, so hover must test the posed geometry, as picking does.
-    var hit = simulationActive || sectionPlane != null
+    var hit = simulationActive || presentation != null
       ? scene.hoverHitRayWithView(sectionView(scene.configureRenderView(new SceneView(),
-          camera.viewProjection(aspect()), simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible)),
+          camera.viewProjection(aspect()), displayPoses(), null, -1, null, cosmeticThreadsVisible)),
           ray.originX, ray.originY, ray.originZ, ray.directionX, ray.directionY, ray.directionZ)
       : scene.hoverHitRay(ray.originX, ray.originY, ray.originZ,
           ray.directionX, ray.directionY, ray.directionZ);
@@ -799,17 +896,18 @@ class EditorPerspectiveViewport implements View {
   }
 
   function fitCameraClipRange():Void {
+    updatePresentation();
     clipBounds.resize(0);
     for (item in scene.items()) {
-      if (!scene.isVisible(item.id)||inspectionHidden(item.id)||inspection==null&&enclosureMode=="hidden"&&enclosureIds.indexOf(item.id.substr(8))>=0) continue;
-      if (simulationActive) {
+      if (!scene.isVisible(item.id)||presentationHidden(item.id)) continue;
+      if (simulationActive || presentation != null) {
         var index = clipBounds.length;
         if (index == clipBoundsScratch.length) clipBoundsScratch.push([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
         // Bounds only need the pose's numbers. Building a native transform and
         // reading its matrix back for every object adds thousands of FFI calls per frame.
-        var pose = simulationPoseById.get(item.id);
+        var pose = presentation==null?simulationPoseById.get(item.id):presentationPoseById.get(item.id);
         var position = pose == null ? [item.x, item.y, item.z] : pose.position;
-        var rotation = pose == null ? [0.0, 0.0, 0.0, 1.0] : pose.rotation;
+        var rotation = pose == null ? (item.rotation==null?[0.0,0.0,0.0,1.0]:item.rotation) : pose.rotation;
         var x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
         var hx = Math.abs(item.width) / 2, hy = Math.abs(item.height) / 2, hz = Math.abs(item.depth) / 2;
         var ex = Math.abs(1 - 2 * (y*y + z*z)) * hx + Math.abs(2 * (x*y - z*w)) * hy + Math.abs(2 * (x*z + y*w)) * hz;
@@ -830,10 +928,11 @@ class EditorPerspectiveViewport implements View {
   }
 
   function displayTransform(item:EditorSceneObject):Transform {
-    if (simulationActive) {
+    updatePresentation();
+    if (simulationActive || presentation != null) {
       var cached = simulationTransforms.get(item.id);
       if (cached != null) return cached;
-      var pose = simulationPoseById.get(item.id);
+      var pose = presentation==null?simulationPoseById.get(item.id):presentationPoseById.get(item.id);
       if (pose != null) {
         if (simulationTransformCount == simulationTransformScratch.length)
           simulationTransformScratch.push(Transform.identity());
@@ -843,7 +942,7 @@ class EditorPerspectiveViewport implements View {
         return transform;
       }
     }
-    return Transform.identity().translated(item.x,item.y,item.z);
+    return poseTransform([item.x,item.y,item.z],item.rotation==null?[0,0,0,1]:item.rotation);
   }
 
   static function poseTransform(position:Array<Float>,rotation:Array<Float>, ?target:Transform):Transform {
@@ -1142,11 +1241,11 @@ class EditorPerspectiveViewport implements View {
   function aspect():Float return viewportWidth / viewportHeight;
 
   function chooseOrbitPivot(localX:Float, localY:Float):Void {
-    if(inspection!=null){orbitPivot=[camera.targetX,camera.targetY,camera.targetZ];return;}
+    if(readOnly){orbitPivot=[camera.targetX,camera.targetY,camera.targetZ];return;}
     fitCameraClipRange();
     var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
     var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
-      simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible));
+      displayPoses(), null, -1, null, cosmeticThreadsVisible));
     var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
       ray.directionX, ray.directionY, ray.directionZ);
     if (hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z))
@@ -1158,7 +1257,7 @@ class EditorPerspectiveViewport implements View {
     node.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (navigationPointer != null) return;
       if (event.button == 1) {
-        if(inspection!=null){event.preventDefault();event.stopPropagation();return;}
+        if(readOnly){event.preventDefault();event.stopPropagation();return;}
         clearFlyKeys();
         flyFast = (event.modifiers & UiModifier.Shift) != 0;
         navigationPointer = event.pointerId;
@@ -1180,7 +1279,7 @@ class EditorPerspectiveViewport implements View {
         event.capturePointer(); event.preventDefault(); event.stopPropagation();
         return;
       }
-      if(inspection!=null){event.preventDefault();event.stopPropagation();return;}
+      if(readOnly){event.preventDefault();event.stopPropagation();return;}
       updateHover(event.localX, event.localY);
       if (event.button == 0 && matePick != null) {
         pickMateFace(hoveredObjectId, hoveredFaceIndex);
@@ -1316,11 +1415,11 @@ class EditorPerspectiveViewport implements View {
     node.on(UiEventKind.PointerUp, finish);
     node.on(UiEventKind.PointerCancel, finish);
     node.on(UiEventKind.Scroll, function(event:UiEvent) {
-      if(inspection!=null){if(navigationPointer==null)inspectionScroll(event);else{event.preventDefault();event.stopPropagation();}return;}
+      if(readOnly){if(navigationPointer==null)inspectionScroll(event);else{event.preventDefault();event.stopPropagation();}return;}
       if (navigationPointer != null) { event.preventDefault(); event.stopPropagation(); return; }
       var ray = camera.screenRay(event.localX, event.localY, viewportWidth, viewportHeight);
       var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
-        simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible));
+        displayPoses(), null, -1, null, cosmeticThreadsVisible));
       var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
         ray.directionX, ray.directionY, ray.directionZ);
       var anchor = hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z)

@@ -275,7 +275,7 @@ class MachineControlTests {
         var inspectionHistory=session.document.history.undoCount;
         editor.ui.pointerDown(bx,by,0);editor.ui.pointerUp(bx,by,0);
         check(viewport.sectionActive(),"axis Inspect opens a live section: "+test.id);
-        check(session.document.history.undoCount==inspectionHistory,"Inspect does not change machine history");
+        check(session.document.history.undoCount==inspectionHistory+1,"Inspect stores one undoable authored section view");
         var before=[for(part in test.parts)nativePose(session.scene,"spindle/"+part)];
         var visual=session.scene.visualRevision,history=session.document.history.undoCount;
         var root=editor.ui.submit(panel.build(editor),frame),control=findControl(root,test.label);

@@ -625,7 +625,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final machineControlPanel = new app.editor.MachineControlPanel();
   final inspectionCamera = new app.editor.InspectionCameraPanel();
   var inspectionCameraRequested=false;
-  public var enclosurePresentation(default,null)="visible";
   static inline var MAX_LOG_LINES:Int = 1000;
   final logLines:Array<String>;
   // The console view edits nothing: it is a read-only text area over this document, so its text is
@@ -823,11 +822,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       perspectiveViewport.selectionTree=treeModel;
       perspectiveViewport.setSampleCount(antialiasing);
       perspectiveViewport.setLightingPreset(lightingPreset);
-      var preferredView = session.initialView;
-      if (preferredView != null) {
-        perspectiveViewport.setViewAngle(preferredView.yaw, preferredView.pitch);
-        perspectiveViewport.fitAll();
-      }
+      configurePresentationViewport();
     }
     telemetry = new TelemetryPanel(demo);
     logLines = [];
@@ -1735,7 +1730,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ":error=" + (simulation.error == null ? "" : simulation.error) +
       ":world=" + Std.string(world.status()) + ":presentation=" + presentationRevision +
       ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled +
-      ":scenario=" + session.hobbingScenario + ":enclosure=" + enclosurePresentation + ":mode=" + mode.id + ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
+      ":scenario=" + session.hobbingScenario + ":mode=" + mode.id + ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
       ":viewport=" + viewportWidth + "x" + viewportHeight + ":view=" + viewRevision +
       ":mates=" + Std.string(session.assemblyMateStatus());
   }
@@ -2124,6 +2119,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ];
     var missionState = missionController.snapshot(),variantState=projectVariants.snapshot();
     var sceneControls:Array<KeyedView> = [];
+    if(perspectiveViewport!=null&&perspectiveViewport.presentation!=null)
+      sceneControls.push(new KeyedView("presentation",app.editor.PresentationControls.build(perspectiveViewport,
+        ()->invalidateView(),"main-presentation",()->saveViewportView(perspectiveViewport))));
     if(variantState.variants.length>0||variantState.error!=null)
       sceneControls.push(new KeyedView("project",app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"viewport-project")));
     if(missionState.hasWork)
@@ -2208,13 +2206,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     inspectionCameraRequested=true;
     if(mode==EditorMode.Simulate)openInspectionCamera();
   }
-  public function setEnclosurePresentation(mode:String):Void {
-    if(["visible","transparent","hidden"].indexOf(mode)<0)throw "Unknown enclosure presentation";
-    enclosurePresentation=mode;
-    var motion=session.machineMotion,guard=motion==null?null:motion.enclosureGuard;
-    if(perspectiveViewport!=null)perspectiveViewport.setEnclosurePresentation(guard==null||guard.enclosureParts==null?[]:guard.enclosureParts,mode);
-    invalidateView();
-  }
   public function openInspectionCamera():Void {
     if(mode!=EditorMode.Simulate)return;
     inspectionCameraRequested=false;
@@ -2226,8 +2217,27 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspace.activate("inspection-camera");invalidateView();
   }
 
+  function configurePresentationViewport():Void {
+    var viewport=perspectiveViewport;if(viewport==null)return;
+    viewport.setPresentation(session.presentation,session.projectAssemblyDefinition,session.presentationCenters(),session.assemblyUnitMetres());
+    viewport.onSectionEdit=planes->saveViewportView(viewport,planes);
+  }
+  function saveViewportView(viewport:EditorPerspectiveViewport,?sections:Array<materia.presentation.AssemblyPresentation.SectionPlane>):Void {
+    var controller=viewport.presentation;if(controller==null)return;
+    var id=controller.cursor.view,existing=controller.record.views.filter(v->v.id==id)[0];
+    if(sections==null||existing.source!=materia.presentation.AssemblyPresentation.PresentationSource.Authored) {
+      var index=1;while(controller.record.views.filter(v->v.id=="view-"+index).length>0)index++;
+      id="view-"+index;
+    }
+    var view=viewport.capturePresentationView(id,sections==null?"Saved view "+id:"Section view");
+    if(sections!=null)view.sections=sections;
+    session.savePresentationView(view);configurePresentationViewport();viewport.selectPresentationView(id);
+    commands.refresh();invalidateView();
+  }
+
   function perspectivePanel(availableWidth:Float = 0.0):View {
     if (perspectiveViewport != null) {
+      configurePresentationViewport();
       perspectiveViewport.setPlacementOptions(gridSnapEnabled, gridSpacing, gridVisible);
       var frame = framePresentation;
       perspectiveViewport.setSimulationState(simulation.isActive(),frame == null ? [] : frame.environment,
@@ -2371,7 +2381,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       treeModel.canChangeVisibility = function() return !documents.blocked();
       treeModel.onVisibilityChanged = function() {commands.refresh();invalidateView();};
       treeModel.setFilter(hierarchySearch);
-      enclosurePresentation="visible";
       inspectionCamera.dispose();
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :
@@ -2380,11 +2389,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         perspectiveViewport.selectionTree=treeModel;
         perspectiveViewport.setSampleCount(antialiasing);
         perspectiveViewport.setLightingPreset(lightingPreset);
-        var preferredView = session.initialView;
-        if (preferredView != null) {
-          perspectiveViewport.setViewAngle(preferredView.yaw, preferredView.pitch);
-          perspectiveViewport.fitAll();
-        }
+        configurePresentationViewport();
       }
       sceneInspector = null;
     }

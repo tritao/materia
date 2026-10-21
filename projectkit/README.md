@@ -120,3 +120,15 @@ staged and nested composition under parent rotation, section and visibility rule
 procedure determinism, reset, engineering input isolation and evidence invalidation.
 Viewer integration and producer migrations are tracked separately in
 [the assembly presentation plan](../app/plans/ASSEMBLY_PRESENTATION.md).
+
+The editor now consumes this record in the main viewport, the inspection dock and
+picture-in-picture, each with its own `PresentationController` cursor. View rules,
+section planes and final display poses are shared by rendering and picking. The
+hobber emits its close-up and enclosure views through this mechanism; supplier axis
+previews use a generated default view. Removed camera fields are rejected on load.
+
+`PresentationEdits.AuthoredPresentation` stores only authored views, offsets and
+procedures in the generated project's `.materia` record. The source's generated
+entries are merged and validated again on reopen. Save current view duplicates a
+generated view into an authored entry; section edits are undoable view edits. Reopen
+uses the generated default view and never restores a session cursor.

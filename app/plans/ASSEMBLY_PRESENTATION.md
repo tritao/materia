@@ -144,8 +144,7 @@ Notes:
 ### AP0 — Data model and validation (projectkit)
 Implementation status: implemented in `projectkit/src/materia/presentation`, with
 coverage in `projectkit/tests/src/PresentationTests.hx`. Scene artifact version 42
-transports the validated optional record. This does not complete AP1–AP7: the
-existing viewer and producers still use their original presentation mechanisms.
+transports the validated optional record. The remaining phases are tracked below.
 
 `materia.presentation` types, codec, a validator (selectors resolve, view ids
 unique, `defaultView` exists, stages ≥ 1, checked motions carry a fingerprint) and
@@ -155,6 +154,15 @@ cursor) → frame. No UI.
 plus the determinism invariant.
 
 ### AP1 — Views replace inspection cameras
+Implementation status: the controller, shared viewport controls, typed render/pick
+frames, persisted authored sections, hobber views and camera-field removal are in
+place. Supplier axis defaults moved with the field removal. The presentation native
+suite passes 20 checks and the ported enclosure runtime passes 10,551 checks.
+Acceptance is still pending the explicit BOM/STEP export isolation checks. The
+broader viewport-coordinate suite also fails its retained toolbar/status subtree
+identity assertion even though both application revision keys are unchanged; that
+failure remains unresolved and is not suppressed in that suite.
+
 Viewer controller, view list and Reset in the main viewport and inspection dock.
 Sections become persisted general planes. Migrate `HobberInspectionViews` and
 the hobber enclosure modes to views. **Delete** `SceneArtifactInspectionCamera`,

@@ -54,6 +54,7 @@ class MachineControlPanel {
   static function number(value:Float):String return Std.string(Math.fround(value*1000)/1000);
 
   public function build(app:ReferenceEditorApp):View {
+    app.configurePresentationViewport();
     if (generation != app.session.generation) {cancelGesture();generation=app.session.generation;drafts.clear();error=null;}
     var axes = MachineControlModel.axes(app.session);
     var editable = !app.simulation.isActive() && app.session.scriptOwnership == null && !app.documents.blocked();

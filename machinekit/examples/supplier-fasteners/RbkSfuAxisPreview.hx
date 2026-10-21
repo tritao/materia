@@ -28,15 +28,19 @@ class RbkSfuAxisPreview {
         }
         scene.assemblyState=new cadkit.modeling.AssemblyState(definition).record();
         // Look from the component side (+Y), rather than through the base plate.
-        scene.project={dynamicParts:[],motions:[],initialView:{yaw:Math.PI-0.9652516631899266,pitch:0.5639426413606289}};
+        scene.presentation=materia.presentation.Presentations.assembled(scene.assemblyDefinition,Math.PI-0.9652516631899266,0.5639426413606289,"supplier-fasteners");
         var output=directory+"rbk-sfu1605-axis.mtrg";
         var bytes=SceneArtifact.encode(scene);
         var restored=SceneArtifact.decode(bytes);
-        var project=restored.project;
-        if(project==null || project.initialView==null) throw "Axis preview lost its preferred view";
-        var view=project.initialView;
-        if(Math.abs(view.yaw-(Math.PI-0.9652516631899266))>1e-10 || Math.abs(view.pitch-0.5639426413606289)>1e-10)
-            throw "Axis preview changed its preferred view";
+        var project=restored.presentation;
+        if(project==null || project.views.length==0) throw "Axis preview lost its preferred view";
+        var view=project.views[0];
+        switch view.camera {
+          case Frame(_,yaw,pitch,_):
+            if(Math.abs(yaw-(Math.PI-0.9652516631899266))>1e-10 || Math.abs(pitch-0.5639426413606289)>1e-10)
+              throw "Axis preview changed its preferred view";
+          case _: throw "Axis preview lost its framing camera";
+        }
         sys.io.File.saveBytes(output,bytes);
         Sys.println("Exported Materia assembly: "+output);
     }

@@ -24,13 +24,6 @@ class HobberScenePanel {
       button.enabled=!app.simulation.isRunning()&&!app.documents.blocked();
       cells.push(new KeyedView(id,button));
     }
-    cells.push(new KeyedView("enclosure",new Text("Enclosure:")));
-    for(choice in [{id:"visible",label:"Visible"},{id:"transparent",label:"Transparent"},{id:"hidden",label:"Hidden"}]) {
-      var id=choice.id;
-      var button=new Button(choice.label,null,()->app.setEnclosurePresentation(id),"hobber-enclosure-"+id);
-      button.selected=app.enclosurePresentation==id;
-      cells.push(new KeyedView(id,button));
-    }
     var player=app.simulation.hobbingPlayer();
     cells.push(new KeyedView("state",new Text(player==null?"Select, then Play (changes reset the run)":player.scenarioLabel())));
     return new Row("hobber-scene-controls",cells,style);

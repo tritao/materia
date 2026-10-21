@@ -37,13 +37,27 @@ class ViewportCoordinatesTests {
       red:0.5,green:0.5,blue:0.5,visible:true}]);
     var host=new UiHostContext(null,new NativeKitEvents(),function(){},function(){});
     var viewport=new EditorPerspectiveViewport("section-test",scene,host,fill()),ui=new UiContext();
+    var definition:materia.assembly.AssemblyDefinition={schemaVersion:materia.assembly.AssemblyDefinitionCodec.VERSION,id:"section-test",
+      definitions:[{id:"part",connectors:[]}],occurrences:[{id:"part",definition:"part",initialPose:materia.assembly.AssemblyFrames.identity()}],joints:[]};
+    var record=materia.presentation.Presentations.assembled(definition);
+    viewport.setPresentation(record,definition,null,1);
+    viewport.onSectionEdit=planes->{
+      var next:materia.presentation.AssemblyPresentation=haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(record));
+      next.views[0].sections=planes;record=next;viewport.setPresentation(record,definition,null,1);
+    };
+    function section():Array<Float> {
+      var frame=viewport.presentationFrame();if(frame==null||frame.sections.length==0)throw "Missing section plane";
+      var plane=frame.sections[0],n=plane.normal,p=plane.point;
+      return [n.x,n.y,n.z,-n.x*p.x-n.y*p.y-n.z*p.z];
+    }
+
     try {
       ui.submit(viewport,new LayoutFrame(800,600));
       var revision=scene.revision,key=viewport.presentationKey();
       viewport.inspectObject("part");
       check(viewport.sectionActive(),"inspection opens a section plane");
       check(viewport.presentationKey()!=key,"inspection invalidates retained viewport");
-      var plane=viewport.sectionPlane;if(plane==null)throw "Missing section plane";
+      var plane=section();
       check(viewport.sectionView(new SceneView()).clipPlaneCount()==1,"section plane reaches rendering and picking views");
       var ray=viewport.camera.screenRay(400,300,800,600);
       var view=viewport.sectionView(scene.configureRenderView(new SceneView(),viewport.camera.viewProjection(800/600)));
@@ -52,7 +66,7 @@ class ViewportCoordinatesTests {
       check(plane[0]*hit.x+plane[1]*hit.y+plane[2]*hit.z+plane[3]>=-1e-6,"section picking excludes clipped front faces");
       viewport.updateHover(400,300);check(viewport.hoveredId()=="part","section hover follows the clipped view");
       key=viewport.presentationKey();viewport.flipSection();
-      var flipped=viewport.sectionPlane;if(flipped==null)throw "Missing flipped section";
+      var flipped=section();
       for(i in 0...4)near(flipped[i],-plane[i],"flip reverses the section side");
       check(viewport.presentationKey()!=key,"flip invalidates retained viewport");
       viewport.clearSection();check(!viewport.sectionActive(),"close section restores the complete view");

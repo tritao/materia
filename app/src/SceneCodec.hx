@@ -113,6 +113,10 @@ class SceneCodec {
     if(variantId!=null&&version!=2)throw "Project variant selection requires record version 2";
     if(variantId!=null&&jobId!=null)throw "A project selection cannot contain both variantId and jobId";
     if (jobId != null && (jobId.length == 0 || jobId.length > 500)) throw "Invalid project job ID";
+    for(name in ["initialView","inspectionCameras","hiddenPrefixes"])
+      if(Reflect.hasField(value,name))throw 'Removed project presentation field "$name"';
+    var presentation=optionalText(value,"presentation");
+    if(presentation!=null){if(presentation.length>2000000)throw "Authored presentation is too large";materia.presentation.PresentationEdits.decode(presentation);}
     var assemblyState = optionalText(value, "assemblyState");
     if (assemblyState != null && assemblyState.length > 2000000)
       throw "Generated project assembly state is too large";
@@ -178,6 +182,7 @@ class SceneCodec {
     if(variantId!=null)record.variantId=variantId;
     if (jobId != null) record.jobId = jobId;
     if (assemblyMates != null) record.assemblyMates = assemblyMates;
+    if(presentation!=null)record.presentation=presentation;
     return record;
   }
 

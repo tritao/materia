@@ -40,15 +40,14 @@ class EnclosureRuntimeTests {
     try {cadbridge.AssemblySimulationBridge.toRobotModel(badMountDefinition,physical);}
     catch(e:Dynamic){badMountRejected=Std.string(e).indexOf("Inconsistent rigid assembly closure")>=0;}
     check(badMountRejected,"Inconsistent mounts inside one rigid body are rejected before physics");
-    var cameraProject=artifact.project;
-    check(cameraProject!=null&&cameraProject.inspectionCameras!=null&&cameraProject.inspectionCameras.length==3,"Inspection presets survive artifact roundtrip");
+    var cameraProject=artifact.presentation;
+    check(cameraProject!=null&&cameraProject.views.length==6,"Presentation views survive artifact roundtrip");
     var badCamera=SceneArtifact.decode(SceneArtifact.encode(data));
-    var badProject:materia.project.SceneArtifact.SceneArtifactProject=badCamera.project;
-    badProject.inspectionCameras[0].anchor="missing-camera-target";
+    var badProject=badCamera.presentation;if(badProject==null)throw "Missing presentation";
+    badProject.views[1].camera=Anchored({occurrence:"missing-camera-target",subtree:false},{x:0,y:0,z:0},40,0,0);
     var cameraRejected=false;try{SceneArtifact.encode(badCamera);}catch(_:Dynamic){cameraRejected=true;}
     check(cameraRejected,"Artifact rejects missing camera anchors");
-    badCamera=SceneArtifact.decode(SceneArtifact.encode(data));badProject=badCamera.project;
-    badProject.inspectionCameras[0].span=-1;
+    badProject.views[1].camera=Anchored({occurrence:"machine/blank",subtree:false},{x:0,y:0,z:0},-1,0,0);
     cameraRejected=false;try{SceneArtifact.encode(badCamera);}catch(_:Dynamic){cameraRejected=true;}
     check(cameraRejected,"Artifact rejects invalid camera scale");
     check(artifact.machineMotion!=null&&artifact.machineMotion.enclosureGuard!=null,"Guard policy survives artifact roundtrip");
@@ -127,7 +126,8 @@ class EnclosureRuntimeTests {
       var tree=editor.ui.submit(panel,new haxeon.ui.LayoutFrame(900,600));
       check(has(tree,"Open door")&&has(tree,"Close door")&&has(tree,"Start cut")&&has(tree,"Reset guard"),"Operator panel contains door and cutting actions");
       editor.session.openGeneratedProject(loaded,"door-design-preview");
-      check(editor.session.inspectionCameras.length==3,"Project installation retains camera presets");
+      var installedPresentation=editor.session.presentation;
+      check(installedPresentation!=null&&installedPresentation.views.length==6,"Project installation retains presentation views");
       editor.switchMode(app.EditorMode.Design);editor.resetWorkspace();
       editor.openInspectionCamera();
       check(!editor.workspace.isOpen("inspection-camera"),"Inspection camera cannot open in Design mode");
@@ -145,26 +145,34 @@ class EnclosureRuntimeTests {
       check(editor.workspace.isOpen("inspection-camera")&&belowPanel(editor.workspace.root,"sensors","inspection-camera"),"Returning to Simulate restores the inspection dock");
       editor.switchMode(app.EditorMode.Design);
       var cameraHost=new haxeon.ui.host.UiHostContext(fonts,new haxeon.platform.NativeKitEvents(),function(){},function(){});
-      var closeup=new app.EditorPerspectiveViewport("inspection-test",editor.session.scene,cameraHost),preset=editor.session.inspectionCameras[0];
-      closeup.setInspectionCamera(preset);
+      var closeup=new app.EditorPerspectiveViewport("inspection-test",editor.session.scene,cameraHost);
+      var editorPresentation=editor.session.presentation;if(editorPresentation==null)throw "Missing editor presentation";
+      var preset=editorPresentation.views[1];
+      closeup.setPresentation(editor.session.presentation,editor.session.projectAssemblyDefinition,editor.session.presentationCenters(),editor.session.assemblyUnitMetres(),true);
+      closeup.selectPresentationView("cutting");
       var beforeVisibility=editor.session.scene.records().map(r->r.visible).join(","),beforeHistory=editor.session.document.history.undoCount;
-      var filtered=new nativekit.scene.SceneView();@:privateAccess closeup.inspectionView(filtered);
+      var filtered=new nativekit.scene.SceneView();@:privateAccess closeup.applyPresentation(filtered);
       check(filtered.visibilityOverrideCount()>0,"Inspection camera applies its own enclosure visibility overrides");
       check(new nativekit.scene.SceneView().visibilityOverrideCount()==0,"Another camera inherits no inspection visibility overrides");
       check(beforeVisibility==editor.session.scene.records().map(r->r.visible).join(",")&&editor.session.document.history.undoCount==beforeHistory,"Inspection visibility does not edit the scene or history");
-      var sceneId="project:"+preset.anchor;
+      var anchor="",offset:Array<Float> = [],yaw=0.0,pitch=0.0;
+      switch preset.camera {
+        case Anchored(select,delta,_,y,p): anchor=select.occurrence;offset=[delta.x*data.metresPerUnit,delta.y*data.metresPerUnit,delta.z*data.metresPerUnit];yaw=y;pitch=p;
+        case _:throw "Expected anchored cutting view";
+      }
+      var sceneId="project:"+anchor;
       closeup.setSimulationState(true,[{id:sceneId,position:[0.1,0.2,1.0],rotation:[0,0,0,1]}],1);
-      @:privateAccess closeup.updateInspectionCamera();
+      @:privateAccess closeup.updatePresentationCamera();
       var camera=@:privateAccess closeup.camera;
       var target=[camera.targetX,camera.targetY,camera.targetZ],angle=[camera.yaw,camera.pitch];
       closeup.setSimulationState(true,[{id:sceneId,position:[0.1,0.2,1.0],rotation:[0,0,1,0]}],2);
-      @:privateAccess closeup.updateInspectionCamera();
+      @:privateAccess closeup.updatePresentationCamera();
       check(camera.targetX==target[0]&&camera.targetY==target[1]&&camera.targetZ==target[2]&&camera.yaw==angle[0]&&camera.pitch==angle[1],"Rotating the workpiece never spins or moves the inspection camera");
       closeup.setSimulationState(true,[{id:sceneId,position:[0.15,0.2,1.02],rotation:[0,0,1,0]}],3);
-      @:privateAccess closeup.updateInspectionCamera();
+      @:privateAccess closeup.updatePresentationCamera();
       check(Math.abs(camera.targetX-target[0]-0.05)<1e-9&&Math.abs(camera.targetZ-target[2]-0.02)<1e-9,"Inspection target follows live translation");
-      var distance=camera.distance;closeup.setInspectionCamera(preset,0.5);
-      @:privateAccess closeup.updateInspectionCamera();
+      var distance=camera.distance;closeup.setPresentationZoom(0.5);
+      @:privateAccess closeup.updatePresentationCamera();
       check(camera.distance==distance,"Optical zoom keeps the camera outside the cutter instead of moving it into the geometry");
       var wheelRoot=editor.ui.submit(closeup,new haxeon.ui.LayoutFrame(400,300));
       var imageNode=find(wheelRoot,"Scene perspective GPU view");if(imageNode==null)throw "Missing inspection image";
@@ -179,7 +187,7 @@ class EnclosureRuntimeTests {
       wheel(1000000);check(lens==8,"Wheel zoom out respects the button limit");
       scroll=wheel(1000000);check(scroll.defaultPrevented&&scroll.propagationStopped,"Wheel is consumed even at the zoom limit");
       wheel(-1000000);check(lens==0.2,"Wheel zoom in respects the button limit");
-      @:privateAccess closeup.updateInspectionCamera();
+      @:privateAccess closeup.updatePresentationCamera();
       check(camera.distance==distance&&camera.yaw==angle[0]&&camera.pitch==angle[1],"Wheel zoom preserves camera position and orientation");
       function pointer(kind:String,x:Float,y:Float,modifiers:Int=0,button:Int=2):haxeon.ui.core.UiEvent {
         var event=new haxeon.ui.core.UiEvent(kind,imageNode.id,x,y,0,0,button,0,modifiers);
@@ -188,36 +196,48 @@ class EnclosureRuntimeTests {
       var oldYaw=camera.yaw;
       pointer(haxeon.ui.core.UiEventKind.PointerDown,200,150);pointer(haxeon.ui.core.UiEventKind.PointerMove,240,170);pointer(haxeon.ui.core.UiEventKind.PointerUp,240,170);
       check(camera.yaw!=oldYaw,"Inspection uses regular viewport orbit navigation");
-      var orbited=camera.yaw;closeup.setInspectionCamera(preset,0.2);
-      @:privateAccess closeup.updateInspectionCamera();
+      var orbited=camera.yaw;closeup.setPresentationZoom(0.2);
+      @:privateAccess closeup.updatePresentationCamera();
       check(camera.yaw==orbited,"Rebuilding the inspection pane preserves a user orbit");
       var beforePan=[camera.targetX,camera.targetY,camera.targetZ];
       pointer(haxeon.ui.core.UiEventKind.PointerDown,200,150,haxeon.ui.core.UiModifier.Shift);pointer(haxeon.ui.core.UiEventKind.PointerMove,240,170,haxeon.ui.core.UiModifier.Shift);pointer(haxeon.ui.core.UiEventKind.PointerUp,240,170,haxeon.ui.core.UiModifier.Shift);
       check(camera.targetX!=beforePan[0]||camera.targetY!=beforePan[1]||camera.targetZ!=beforePan[2],"Inspection uses regular viewport pan navigation");
       var panned=[camera.targetX,camera.targetY,camera.targetZ];
       closeup.setSimulationState(true,[{id:sceneId,position:[0.25,0.2,1.02],rotation:[0,0,0,1]}],4);
-      @:privateAccess closeup.updateInspectionCamera();
+      @:privateAccess closeup.updatePresentationCamera();
       check(Math.abs(camera.targetX-panned[0]-0.1)<1e-9&&camera.yaw==orbited,"Live target motion preserves the user's pan and orbit");
       var selection=editor.session.scene.selectedId;
       pointer(haxeon.ui.core.UiEventKind.PointerDown,200,150,0,0);pointer(haxeon.ui.core.UiEventKind.PointerMove,240,170,0,0);pointer(haxeon.ui.core.UiEventKind.PointerUp,240,170,0,0);
       check(selection==editor.session.scene.selectedId&&beforeHistory==editor.session.document.history.undoCount,"Inspection navigation cannot select or edit the scene");
-      closeup.resetInspectionCamera();@:privateAccess closeup.updateInspectionCamera();
-      check(camera.yaw==preset.yaw&&camera.pitch==preset.pitch&&Math.abs(camera.targetX-0.25-preset.offset[0])<1e-9,"Reset restores preset framing at the current target position");
+      closeup.resetPresentation();@:privateAccess closeup.updatePresentationCamera();
+      var closeupController=closeup.presentation;if(closeupController==null)throw "Missing controller";
+      check(closeupController.cursor.view=="assembled"&&closeupController.cursor.procedure==null,"Reset restores the default view and cursor");
+      closeup.selectPresentationView("cutting");@:privateAccess closeup.updatePresentationCamera();
+      check(camera.yaw==yaw&&camera.pitch==pitch&&Math.abs(camera.targetX-0.25-offset[0])<1e-9,"Selecting a view restores framing at the current target position");
       closeup.dispose();
-      var loadedMotion=loaded.machineMotion;
-      var enclosure=loadedMotion==null?null:loadedMotion.enclosureGuard;
-      if(enclosure==null||enclosure.enclosureParts==null)throw "Missing enclosure presentation group";
-      var enclosureParts:Array<String> = enclosure.enclosureParts;
+      var enclosureParts=[for(rule in editorPresentation.views.filter(v->v.id=="enclosure-hidden")[0].visibility)
+        if(StringTools.startsWith(rule.select.occurrence,"enclosure/"))rule.select.occurrence];
+      var externalIds=[for(rule in editorPresentation.views[0].visibility)rule.select.occurrence];
+      function nodeCount(ids:Array<String>):Int {
+        var nodes=new Map<String,Bool>();
+        for(id in ids) {
+          var root=editor.session.scene.info("project:"+id).node();nodes.set(Std.string(root.stableValue()),true);
+          for(node in editor.session.scene.runtimePartNodes("project:"+id))nodes.set(Std.string(node.stableValue()),true);
+        }
+        return [for(id in nodes.keys())id].length;
+      }
+      var externalCount=nodeCount(externalIds),enclosureCount=nodeCount(enclosureParts);
       var mainCamera=new app.EditorPerspectiveViewport("main-presentation-test",editor.session.scene,cameraHost);
-      mainCamera.setEnclosurePresentation(enclosureParts,"hidden");
-      var hiddenView=new nativekit.scene.SceneView();@:privateAccess mainCamera.enclosureView(hiddenView);
-      check(hiddenView.visibilityOverrideCount()==enclosureParts.length,"Enclosure hiding applies only view overrides for authored enclosure parts");
-      mainCamera.setEnclosurePresentation(enclosureParts,"transparent");
-      var ghostView=new nativekit.scene.SceneView();@:privateAccess mainCamera.enclosureView(ghostView);
-      check(ghostView.materialOverrideCount()==enclosureParts.length&&ghostView.visibilityOverrideCount()==0,"Transparent enclosure keeps every part in the view with translucent material overrides");
-      mainCamera.setEnclosurePresentation(enclosureParts,"visible");
-      var restoredView=new nativekit.scene.SceneView();@:privateAccess mainCamera.enclosureView(restoredView);
-      check(restoredView.materialOverrideCount()==0&&restoredView.visibilityOverrideCount()==0,"Visible restores authored presentation without document edits");
+      mainCamera.setPresentation(editor.session.presentation,editor.session.projectAssemblyDefinition,editor.session.presentationCenters(),editor.session.assemblyUnitMetres());
+      mainCamera.selectPresentationView("enclosure-hidden");
+      var hiddenView=new nativekit.scene.SceneView();@:privateAccess mainCamera.applyPresentation(hiddenView);
+      check(hiddenView.visibilityOverrideCount()==enclosureCount+externalCount,"Enclosure hiding applies only view overrides for authored enclosure parts");
+      mainCamera.selectPresentationView("enclosure-transparent");
+      var ghostView=new nativekit.scene.SceneView();@:privateAccess mainCamera.applyPresentation(ghostView);
+      check(ghostView.materialOverrideCount()==enclosureCount&&ghostView.visibilityOverrideCount()==externalCount,"Transparent enclosure keeps every part in the view with translucent material overrides");
+      mainCamera.selectPresentationView("assembled");
+      var restoredView=new nativekit.scene.SceneView();@:privateAccess mainCamera.applyPresentation(restoredView);
+      check(restoredView.materialOverrideCount()==0&&restoredView.visibilityOverrideCount()==externalCount,"Visible restores authored presentation without document edits");
       check(beforeVisibility==editor.session.scene.records().map(r->r.visible).join(",")&&beforeHistory==editor.session.document.history.undoCount,"Enclosure presentation never changes document visibility or history");
       mainCamera.dispose();
       var machinePanel=new app.editor.MachineControlPanel(),frame=new haxeon.ui.LayoutFrame(900,1600);

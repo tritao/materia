@@ -86,14 +86,8 @@ class HobberEnclosurePreview {
       evidence:"X/Y/Z endpoints, A one-degree grid with radius*half-step padding; B/C descendants bounded by rotation-centred spheres",
       assumptions:"75 mm clearance; 400 mm opening; opposed belt-coupled leaves; OD140 side-jaw reservation; 100 mm mist opening; 60 C process and oil-mist rule assessment assumed. Robot, seals, retention and flow not qualified."}};
   }
-  /** Hide the complete external electrical rack in default views while retaining its geometry. */
-  public static function defaultView(scene:materia.project.SceneArtifact.SceneArtifactData):materia.project.SceneArtifact.SceneArtifactData {
-    if(scene.assemblyDefinition!=null)for(o in scene.assemblyDefinition.occurrences)
-      if(StringTools.startsWith(o.id,"machine/")&&external(o.id.substr("machine/".length)))o.visible=false;
-    return scene;
-  }
   public static function runtimeScene(assembly:MachineAssembly,machine:FlexsplineHobber,stroke:Float,scenarios:Bool=false):materia.project.SceneArtifact.SceneArtifactData {
-    var scene=defaultView(AssemblyPreview.scene(assembly,"hobber-enclosed"));
+    var scene=AssemblyPreview.scene(assembly,"hobber-enclosed");
     if(scene.machineMotion==null)scene.machineMotion={belts:[]};
     var axes=["machine/X","machine/Y","machine/Z","machine/swivel/A","machine/spindle/B","machine/table/C"];
     scene.machineMotion.hobbing={module:machine.spec.module,teeth:machine.spec.teeth,width:machine.spec.faceWidth,pressureAngle:machine.spec.pressureAngle,
@@ -102,9 +96,7 @@ class HobberEnclosurePreview {
     scene.machineMotion.enclosureGuard={doorJoint:"enclosure/door/slide",closedSensor:"enclosure/door/closed",openSensor:"enclosure/door/open",
       spindleJoints:[axes[4],axes[5]],axisJoints:axes.slice(0,4),stroke:stroke*0.001,setupSpeedLimit:0.025,
       timeoutSeconds:10,lockTravelSeconds:0.05,linearStandstillTolerance:1e-5,rotaryStandstillTolerance:1e-4,standstillConfirmationSeconds:0.25};
-    var guard:materia.project.SceneArtifact.SceneArtifactEnclosureGuard=scene.machineMotion.enclosureGuard;
     var definition=scene.assemblyDefinition;if(definition==null)throw "Unified scene needs its assembly";
-    guard.enclosureParts=[for(o in definition.occurrences)if(StringTools.startsWith(o.id,"enclosure"))o.id];
     if(scenarios) {
       var config:materia.project.SceneArtifact.SceneArtifactHobbing=scene.machineMotion.hobbing;
       config.scenario="cutting";

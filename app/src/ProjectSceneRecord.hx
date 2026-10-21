@@ -12,6 +12,8 @@ typedef ProjectSceneRecord = {
   var instances:Array<ProjectSceneInstance>;
   /** Encoded AssemblyStateRecord for the generated assembly configuration. */
   @:optional var assemblyState:String;
+  /** Encoded authored presentation entries. The session cursor is never saved. */
+  @:optional var presentation:String;
   /** Tree-joint IDs treated as dependent coordinates in this project. */
   @:optional var assemblyDependentJoints:Array<String>;
   /** Encoded `AssemblyMateOverlayRecord`: mates authored over the generated assembly (see `ProjectAssemblyMates`). */

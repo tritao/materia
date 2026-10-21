@@ -102,7 +102,7 @@ class ConfigurableAxisChecks {
         var scene=AssemblyPreview.scene(loaded,"extended-300-axis"),definition=scene.assemblyDefinition;
         if(definition==null)throw "Missing assembly definition";
         for(joint in definition.joints)if(joint.id=="travel")joint.driven=true;
-        scene.project={dynamicParts:[],motions:[],initialView:{yaw:Math.PI-0.9652516631899266,pitch:0.5639426413606289}};
+        scene.presentation=materia.presentation.Presentations.assembled(scene.assemblyDefinition,Math.PI-0.9652516631899266,0.5639426413606289,"supplier-fasteners");
         sys.io.File.saveBytes(output+"extended-300.mtrg",SceneArtifact.encode(scene));
         sys.io.File.saveContent(output+"stepperonline-300.assembly.json",secondSaved);
         sys.io.File.saveContent(output+"stepperonline-300.bom.json",haxe.Json.stringify(candidate.billOfMaterials().lines(),null,"  "));
@@ -110,7 +110,7 @@ class ConfigurableAxisChecks {
         var secondScene=AssemblyPreview.scene(secondLoaded,"stepperonline-300-axis"),secondDefinition=secondScene.assemblyDefinition;
         if(secondDefinition==null)throw "Missing second assembly definition";
         for(joint in secondDefinition.joints)if(joint.id=="travel")joint.driven=true;
-        secondScene.project={dynamicParts:[],motions:[],initialView:{yaw:Math.PI-0.9652516631899266,pitch:0.5639426413606289}};
+        secondScene.presentation=materia.presentation.Presentations.assembled(secondScene.assemblyDefinition,Math.PI-0.9652516631899266,0.5639426413606289,"supplier-fasteners");
         sys.io.File.saveBytes(output+"stepperonline-300.mtrg",SceneArtifact.encode(secondScene));
         var exportState=new AssemblyState(secondLoaded.definition()),exportPoses=secondLoaded.solvedPoses(exportState),cache=new PosedParts();
         var placed:Array<cadkit.modeling.Part> = [],shapes:Array<cadkit.Shape> = [];
