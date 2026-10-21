@@ -188,10 +188,10 @@ class ServoMotor extends MachineComponent implements MotorDrive {
     }
 
     /** Pilot and fastener clearances from the declared interface, in the mounting face. */
-    public function mountingCutout(depth:Float):Part {
+    public function mountingCutout(depth:Float,pilotClearance:Float=0.2):Part {
         var face=mounting();
         if(face==null || !Math.isFinite(depth)||depth<=0)throw "Servo needs declared mounting data and positive cutout depth";
-        var tools=[Solids.named(Part.cylinderSpan((face.pilotDiameter+0.2)/2,0,depth),"pilot")];
+        var tools=[Solids.named(Part.cylinderSpan((face.pilotDiameter+pilotClearance)/2,0,depth),"pilot")];
         return Solids.building(tools,parts->{
             var i=0;
             for(hole in face.holes)parts.push(Solids.named(Part.cylinderSpan(face.holeDiameter/2,0,depth,hole.x,hole.y),"bolt"+(++i)));

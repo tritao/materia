@@ -202,7 +202,7 @@ class LeadshineServo extends ServoMotor {
 	}
 
 	/** Tool for a plate ahead of z=0. Hole diameters follow the motor drawing. */
-	public function mountingCutout(thickness:Float, pilotClearance:Float = 0.2):Part {
+	override public function mountingCutout(thickness:Float, pilotClearance:Float = 0.2):Part {
 		if (!Math.isFinite(thickness) || thickness <= 0 || !Math.isFinite(pilotClearance) || pilotClearance < 0)
 			throw "Servo mounting cutout needs positive thickness and nonnegative pilot clearance";
 		var owned:Array<Part> = [];
