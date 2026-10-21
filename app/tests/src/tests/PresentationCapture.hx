@@ -8,10 +8,11 @@ class PresentationCapture {
   public static function main():Int {
     var args=Sys.args(),id:Null<String> = null;
     var launch:Array<String> = [];
-    var explode=0.0;
+    var explode=0.0,distanceScale=1.0;
     for(arg in args) {
       if(StringTools.startsWith(arg,"--view="))id=arg.substr(7);
       else if(StringTools.startsWith(arg,"--explode="))explode=Std.parseFloat(arg.substr(10));
+      else if(StringTools.startsWith(arg,"--distance-scale="))distanceScale=Std.parseFloat(arg.substr(17));
       else launch.push(arg);
     }
     if(id==null)throw "PresentationCapture requires --view=ID and editor launch arguments";
@@ -22,7 +23,9 @@ class PresentationCapture {
         var viewport=editor.perspectiveViewport;
         if(viewport!=null&&viewport.presentation!=null) {
           viewport.selectPresentationView(id);viewport.setPresentationExplode(explode);
-          viewport.presentationCameraDirty=true;editor.invalidateView();selected=true;
+          viewport.presentationCameraDirty=true;viewport.updatePresentationCamera();
+          viewport.camera.setTarget(viewport.camera.targetX,viewport.camera.targetY,viewport.camera.targetZ,viewport.camera.distance*distanceScale);
+          editor.invalidateView();selected=true;
         }
       }
     }

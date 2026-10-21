@@ -191,7 +191,8 @@ correct parent frame. Box, casting, panel and socket exports use one scene.
 Socket endpoint/BOM checks pass (104 assertions), native display/pick/isolation
 checks pass (24 checks), and the panel and box suites pass 144 and 157 assertions.
 Rotated joint-parent and nested-scope conversion checks pass. The mill exporter
-compiles. Visual endpoint review and the outstanding AP1 STEP check remain.
+compiles. Socket, box and panel slider endpoints were captured and reviewed;
+the socket matches the former scene. The outstanding AP1 STEP check remains.
 
 The slider, staged composition, and display offsets in picking. Producers emit
 `ExplodeOffset`s. **Delete** `exploded:Bool` from `PanelKit`, `BoxMoldCad`,

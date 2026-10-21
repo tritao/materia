@@ -68,3 +68,7 @@ Focused checks:
 ./haxeon/scripts/haxeon run --project=machinekit/tests/tooling/haxeon.json
 ./haxeon/scripts/haxeon run --project=cadkit/haxe/tests/haxeon-drawing.json
 ```
+
+The Explode slider at 100% (captured through the editor):
+
+![Assembly separated with presentation offsets](images/panel-joinery-explode.png)

@@ -11,6 +11,7 @@ import haxeon.ui.widgets.controls.Slider;
 import haxeon.ui.widgets.controls.SelectOption;
 import haxeon.ui.widgets.layout.Row;
 import haxeon.ui.widgets.layout.Column;
+import haxeon.ui.widgets.text.Text;
 
 /** Shared controls for the main viewport, dock and picture-in-picture. */
 class PresentationControls {
@@ -28,6 +29,7 @@ class PresentationControls {
       rows.push(new KeyedView("views",select));
       select.enabled=viewport.presentationControlsEnabled();
       if(controller.record.explode.length>0) {
+        rows.push(new KeyedView("explode-label",new Text("Explode · "+Std.int(controller.cursor.explode*100)+"%")));
         var slider=new Slider(key+"-explode","Explode",controller.cursor.explode,0,1,0.01,
           value->{viewport.setPresentationExplode(value);changed();});
         slider.enabled=viewport.presentationControlsEnabled();

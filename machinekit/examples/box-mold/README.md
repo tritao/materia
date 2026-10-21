@@ -90,3 +90,7 @@ both support modes, invalid support choices/cutting definitions, unclassified ho
 trapped walls. Resin compatibility, cure temperature, compaction, core restraint,
 insert anchorage, panel/closure strength and handling remain pending. This package
 is for review and is not fabrication-ready; those checks belong to later phases.
+
+The Explode slider at 100% (captured through the editor):
+
+![Assembly separated with presentation offsets](images/mold-explode.png)

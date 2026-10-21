@@ -136,3 +136,7 @@ Reproduce a named view from the repository root with:
   --capture-dir=/tmp/socket-fixture-see-inside --capture-seconds=2 \
   --reset-workspace --perspective --width=1400 --height=900
 ```
+
+The Explode slider at 100% (captured through the editor):
+
+![Assembly separated with presentation offsets](images/socket-fixture-explode.png)
