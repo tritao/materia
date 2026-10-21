@@ -1130,6 +1130,15 @@ This is layout acceptance; actual retained-link cutting, inventory execution and
   guard, squaring, a forced skew fault.
 - The ATC sensors and valve on a test rig with the spindle's release cylinder (or the spindle
   itself before mounting): sequence, timeouts, the zero-speed interlock.
+- LinuxCNC reference controller (optional): a Mesa step/dir + encoder card and a PREEMPT_RT PC
+  on the same drives and connectors, so the machine can be switched between our board and
+  LinuxCNC. Its INI/HAL configuration is generated from the machine model (axes, limits,
+  homing, I/O), not hand-written. It is the commissioning fallback if SR15–SR18 slip, and the
+  baseline for the SR24 comparison.
+- Operator response latency, measured on the bench against simulation:
+  - feed hold: braking starts within 10 ms of the request;
+  - feed override: the new feed takes effect within 50 ms;
+  - LinuxCNC's servo-thread response (about 1 ms) is recorded alongside for comparison.
 - Tests:
   - measured following error at 40 m/min equivalent within the stated bound;
   - home repeatability over 20 cycles;
@@ -1156,6 +1165,8 @@ This is layout acceptance; actual retained-link cutting, inventory execution and
 - Mount the gantry, X and Z. Wire the cabinet. Check the safety chain function by function
   first. Then: directions, electronic gear, servo gain tuning, homing, squaring, soft limits,
   following-error bounds.
+- If our board is not ready, commission on the LinuxCNC reference controller (SR18) and switch
+  over later; the safety chain is the same for both.
 - Tests: safety function checks recorded; homing repeatability; following error at the rated
   speeds against the simulation's prediction.
 
@@ -1176,6 +1187,9 @@ This is layout acceptance; actual retained-link cutting, inventory execution and
 - Rack pitch error tables; squareness from the calibration plate; scale.
 - Run the nested cabinet sheet for real. Measure the parts, cycle time and following error.
 - Report against the SR14 simulation, with every remaining assumed value listed.
+- If the LinuxCNC reference controller was fitted: cut the same contour panel with both
+  controllers, the same tools and feeds, and report measured contour error and cycle time side
+  by side. Feed-hold and override latency are rechecked on the machine against the SR18 targets.
 - Tests: acceptance targets met or the limiting element named; real cycle time within a stated
   margin of the simulated one; every freed small part held as predicted.
 
