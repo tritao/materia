@@ -87,41 +87,7 @@ class CamToolingPanels {
 			margin:Float = 0):CamContour {
 		if (!Math.isFinite(tolerance) || tolerance <= 0)
 			throw "Panel CAM needs positive chord tolerance";
-		var points:Array<Point3> = [];
-		var exact:Array<cadkit.sheetmetal.Segment> = [];
-		function map(p:materia.casting.CastingPrism.CastingPoint2):cadkit.sheetmetal.Point2 {
-			var x = p.x - minX;
-			return new cadkit.sheetmetal.Point2((mirrorX ? widthMm - x : x) * 0.001 + margin, (p.y - minY) * 0.001 + margin);
-		}
-		for (s in PanelContours.operation(op)) {
-			var a = map(s.start), b = map(s.end);
-			if (s.center == null)
-				exact.push(cadkit.sheetmetal.Segment.line(a, b));
-			else {
-				var center = map(s.center);
-				exact.push(cadkit.sheetmetal.Segment.arc(center, PanelContours.distance(s.center, s.start) * 0.001,
-					Math.atan2(a.y - center.y, a.x - center.x), s.sweep * (mirrorX ? -1 : 1)));
-			}
-			var count = 1;
-			if (s.center != null) {
-				var radius = PanelContours.distance(s.center, s.start) * 0.001;
-				var angle = 2 * Math.acos(Math.max(-1, Math.min(1, 1 - tolerance / radius)));
-				if (angle <= 0)
-					throw "Panel CAM chord tolerance is below numeric resolution";
-				count = Std.int(Math.ceil(Math.abs(s.sweep) / Math.min(Math.PI / 2, angle)));
-			}
-			if (count > 10000 || points.length + count > 50000)
-				throw "Panel CAM contour exceeds sampling limit";
-			for (i in 0...count) {
-				var p = PanelContours.point(s, i / count);
-				var x = p.x - minX;
-				points.push(new Point3((mirrorX ? widthMm - x : x) * 0.001 + margin, (p.y - minY) * 0.001 + margin, 0));
-			}
-		}
-		var result = new CamContour(points);
-		result.exactBoundary = exact;
-		result.chordTolerance = tolerance;
-		return result;
+		return CamCastingContours.fromProfile(PanelContours.operation(op),tolerance,mirrorX,minX,minY,widthMm,margin,0,"Panel CAM");
 	}
 
 	/** Extend only outside the finished panel; neutral operation geometry is untouched. */

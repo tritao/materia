@@ -72,7 +72,11 @@ class ToolingSectionDrawing {
 				for (segment in CastingProfiles.placed(contour.contour,0,offset-minX,-minY))
 					entities.push(Curve(layer,PanelCad.segment(segment)));
 			}
-			entities.push(Label(Text,new Point2(offset,maxY-minY+8),2.5,id+" / section "+level+" mm"));
+			// Round annotation text only; stored planes and exact contours stay unchanged.
+			var scaled=level*1e6;
+			var display=Math.isFinite(scaled) ? Math.fround(scaled)/1e6 : level;
+			entities.push(Label(Text,new Point2(offset,maxY-minY+8),2.5,
+				id+" / section "+(display==0 ? 0.0 : display)+" mm"));
 			if (contours.length==0) entities.push(Label(Text,new Point2(offset,0),2.5,"No material section"));
 			offset+=Math.max(40,maxX-minX)+25;
 		}

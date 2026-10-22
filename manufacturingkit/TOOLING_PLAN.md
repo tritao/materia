@@ -2259,6 +2259,20 @@ by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
   All four CadKit CTest suites pass. The box and mill packages regenerate; the
   mill manifest and every artifact hash are byte-identical to the preceding
   generation: **265** artifacts, **40** programs, readiness **false**.
+- [x] Shared neutral-profile CAM conversion: `CamCastingContours` accepts the
+  exact line/arc contours used by tooling sections, preserving their arcs,
+  declared work-plane height, units and reflection. Existing operation
+  provenance remains with `CamJob`. The panel bridge delegates to the converter; cutter compensation remains in `CamJob`. Focused
+  **169** assertions and full CamKit **12,555** (panel **293**) pass. Native
+  sections **24** and EPS integration **36** pass. Section labels now suppress
+  floating-point noise; stored planes and contours remain exact. The triangular
+  EPS sheet was visually checked with readable 0 / 29.85 / 59.7 mm labels.
+  Final native **724** and all four CadKit CTest suites pass. Both packages
+  regenerate; all **40** program hashes and neutral mold/section/cutting records
+  remain unchanged. The independently verified kit has **265** artifacts,
+  **5,153,140** bytes, **889 Pass / 402 Pending / 123 Unsupported / 74 Fail**;
+  readiness stays **false**. Former blank decomposition remains the pending
+  setup choice; the common conversion supports either declared route.
 - [ ] Non-box envelope support and former CAM remain unfinished. These
   slices do not complete step 3.
 - [x] Draft source convention confirmed: authored dimensions belong to the
