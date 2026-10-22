@@ -1,3 +1,4 @@
+import materia.casting.CastingInput;
 import machinekit.structural.MountHoleDerivation;
 import machinekit.structural.InsertMountPattern.MountHoleErrorAllocation;
 import machinekit.motion.LinearRail;
@@ -9,8 +10,8 @@ class LinearMountTests {
  static var count=0;
  static function check(ok:Bool,message:String):Void {count++;if(!ok)throw message;}
  static function rejected(work:()->Void,message:String):Void {var fails=false;try work() catch(_:Dynamic)fails=true;check(fails,message);}
- static function allocation():MountHoleErrorAllocation return {placementOffsetMm:null,placementAngleRad:null,
-  assemblyAdjustmentMm:null,cureBowMm:null,machiningErrorMm:null,pitchAccumulationMm:null,requiredMarginMm:null};
+ static function allocation():MountHoleErrorAllocation return {placementOffsetMm:Unresolved("placementOffsetMm"),placementAngleRad:Unresolved("placementAngleRad"),
+  assemblyAdjustmentMm:Unresolved("assemblyAdjustmentMm"),cureBowMm:Unresolved("cureBowMm"),machiningErrorMm:Unresolved("machiningErrorMm"),pitchAccumulationMm:Unresolved("pitchAccumulationMm"),requiredMarginMm:Unresolved("requiredMarginMm")};
  public static function main():Void {
   var rail=LinearRail.metric("HGH25CA",400,LinearRail.NOMINAL);
   var pose=AxisBuilder.orient(0,-200,35,[0.0,0,1],[0.0,1,0]);
@@ -23,7 +24,7 @@ class LinearMountTests {
    var h=result.holes[i],r=result.requirements[i];
    check(Math.abs(h.frame.z-20)<1e-8,"thread starts on receiver steel, not rail or compound");
    check(r.connectorId==rail.mountingConnectors()[i].name,"connector identity retained");
-   check(r.budget.placementOffsetMm==null,"unknown budget remains pending");
+   check(switch r.budget.placementOffsetMm {case Unresolved(_):true;default:false;},"unknown budget remains pending");
    check(result.routes[i].route==TransferAfterCasting,"pending budget selects permitted transfer proposal");
   }
   var rack=GearRack.catalogue("29-15-055");

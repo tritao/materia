@@ -114,9 +114,9 @@ class InsertManufacturingCodec {
 		if (plan==null) throw "Missing insert manufacturing record";
 		if (plan.inspections==null || plan.holeRoutes==null || plan.mountingRequirements==null) throw "Invalid insert manufacturing lists";
 		var copy=snapshot({material:plan.material,blank:blankRecord(plan.blank),holeRoutes:plan.holeRoutes,
-			mountingRequirements:plan.mountingRequirements,
+			mountingRequirements:InsertMountHoleRequirement.InsertMountHoleRequirements.records(plan.mountingRequirements),
 			inspections:[for (inspection in plan.inspections) inspectionRecord(inspection)],processReference:plan.processReference});
-		return {material:copy.material,blank:blankRecord(copy.blank),holeRoutes:copy.holeRoutes,mountingRequirements:copy.mountingRequirements,
+		return {material:copy.material,blank:blankRecord(copy.blank),holeRoutes:copy.holeRoutes,mountingRequirements:InsertMountHoleRequirement.InsertMountHoleRequirements.records(copy.mountingRequirements),
 			inspections:[for (inspection in copy.inspections) inspectionRecord(inspection)],processReference:copy.processReference};
 	}
 

@@ -279,7 +279,7 @@ class InsertAnchorTests {
 		copy=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));
 		copy.interfaces=[{id:"back-stock",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(
 			F.fromRotationMatrix(0,0,1,[1,0,0,0,-1,0,0,0,-1])),route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,
-			allowanceMm:1,finishingProcessErrorMm:null,permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],
+			allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],
 			positionToleranceMm:0.01,datumReference:"primary",relationshipIds:[]}];
 		for (hole in copy.holes) {
 			hole.depth-=1;if (hole.threadDepth!=null) hole.threadDepth=hole.threadDepth-1;

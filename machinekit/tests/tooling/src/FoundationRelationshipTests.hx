@@ -15,11 +15,11 @@ class FoundationRelationshipTests {
 	}
 	static function relationship():InterfaceRelationship return {
 		id:"pair-plane",kind:Coplanar,members:[ComponentInterface("left","mounting-plane"),ComponentInterface("right","mounting-plane")],
-		tolerance:Linear(0.005),metrology:{method:IndicatorReversal,instrumentReference:"synthetic-instrument",uncertaintyMm:0.002}
+		tolerance:Linear(0.005),metrology:{method:IndicatorReversal,instrumentReference:materia.casting.CastingInput.CastingTextInput.Known("synthetic-instrument"),uncertaintyMm:materia.casting.CastingInput.Known(0.002)}
 	};
 	static function fixture(relationship:InterfaceRelationship):MachineAssembly {
 		var requirements:Array<InterfaceRequirement> = [{
-			id:"mounting-plane",geometry:Plane(F.translation(0,0,20)),route:InterfaceRoute.AsSupplied,allowanceMm:0,finishingProcessErrorMm:null,
+			id:"mounting-plane",geometry:Plane(F.translation(0,0,20)),route:InterfaceRoute.AsSupplied,allowanceMm:0,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 			permittedFinishes:[InterfaceFinish.AsSupplied],positionToleranceMm:0.01,datumReference:"primary",relationshipIds:["pair-plane"]
 		}];
 		var values=CastInsert.boxValues(40,30,20).setToken("role",materia.casting.InsertSpec.InsertRole.GuideSeat)
@@ -40,7 +40,7 @@ class FoundationRelationshipTests {
 		switch requirements[0] {
 			case InterfaceAlignment(id,relationship):
 				check(id=="plane-instance" && relationship.id=="pair-plane","assembly occurrence and source definition IDs remain distinct");
-				relationship.metrology.uncertaintyMm=1;
+				relationship.metrology.uncertaintyMm=materia.casting.CastingInput.Known(1);
 			default: throw "Expected relationship requirement";
 		}
 		check(restored.encode()==saved,"returned relationship evidence is a defensive copy");
@@ -63,7 +63,7 @@ class FoundationRelationshipTests {
 		check(!diagnostics.hasErrors(),"nested source references resolve independently of shared part definitions");
 		check(diagnostics.items.filter(item -> item.code=="design.interface.qualification").length==2,
 			"resolved metadata does not qualify actual alignment or replication jigs");
-		var excessive=relationship();excessive.metrology.uncertaintyMm=0.006;
+		var excessive=relationship();excessive.metrology.uncertaintyMm=materia.casting.CastingInput.Known(0.006);
 		diagnostics=AssemblyDesignChecks.check(fixture(excessive));
 		check(diagnostics.items.filter(item -> item.code=="design.interface.metrology").length==1,
 			"uncertainty above tolerance remains a metrology warning");

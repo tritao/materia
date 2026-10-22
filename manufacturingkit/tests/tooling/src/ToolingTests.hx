@@ -62,7 +62,7 @@ class ToolingTests {
 		var d=fixture(),insert=d.input.inserts[0],hole=insert.holes[0];
 		insert.body=materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40,30,21));
 		insert.interfaces=[{id:"finished-top",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,20)),
-			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:null,
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],positionToleranceMm:0.01,
 			datumReference:"primary",relationshipIds:[]}];
 		hole.frame=F.fromRotationMatrix(0,0,20,[1,0,0,0,-1,0,0,0,-1]);
@@ -346,7 +346,45 @@ class ToolingTests {
 			"generic strategy rules contain no machine-specific ownership priorities");
 	}
 
+	static function vocabularyRoundTrips():Void {
+		var d=fixture();
+		for (role in materia.casting.InsertSpec.InsertRoles.values()) {
+			d.input.inserts[0].role=role;
+			check(ToolingCodec.decodeInput(ToolingCodec.encodeInput(d.input)).inserts[0].role==role,
+				"Every insert role token survives the source codec");
+		}
+		for (finish in materia.casting.InsertSpec.InsertFinishes.values()) {
+			d.input.inserts[0].finish=finish;
+			check(ToolingCodec.decodeInput(ToolingCodec.encodeInput(d.input)).inserts[0].finish==finish,
+				"Every insert finish token survives the source codec");
+		}
+		for (grade in materia.casting.InsertMaterial.InsertMaterials.values()) {
+			var material=materia.casting.InsertMaterial.InsertMaterials.specification(grade);
+			check(materia.casting.InsertMaterial.InsertMaterials.snapshot(haxe.Json.parse(haxe.Json.stringify(material))).grade==grade,
+				"Every stock token survives its codec");
+		}
+		for (kind in materia.casting.CastingFeature.CastingFeatureKinds.values()) {
+			var feature=materia.casting.CastingPatterns.box("vocabulary",kind,[],10,10,10,0,0,0,null,
+				materia.casting.CastingFeature.CastingDimensions.values());
+			if (kind==CastingFeatureKind.InsertRecess)
+				feature.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Insert(
+					materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(10,10,10)));
+			var round=materia.casting.CastingFeatureCodec.decode(materia.casting.CastingFeatureCodec.encode([feature]))[0];
+			check(round.kind==kind && round.adjustable.length==materia.casting.CastingFeature.CastingDimensions.values().length,
+				"Feature kinds and adjustable dimension tokens survive the source codec");
+		}
+		for (opening in materia.tooling.casting.CastingStrategies.StrategyOpenings.values())
+			for (axis in materia.tooling.casting.CastingStrategies.WithdrawalAxes.values())
+				for (strategy in materia.tooling.casting.CastingSetup.CoreStrategies.values()) {
+					var round=materia.tooling.casting.CastingStrategies.snapshotRules([{kind:"lightening",opening:(opening:String),
+						strategy:(strategy:String),priority:0,preferredAxis:(axis:String)}])[0];
+					check(round.opening==opening && round.preferredAxis==axis && round.strategy==strategy,
+						"Every strategy, opening and withdrawal token survives its codec");
+				}
+	}
+
 	public static function main():Void {
+		vocabularyRoundTrips();
 		if (Sys.getEnv("TOOLING_ONLY") == "anchors") {AnchorCapacityTests.run(fixture());return;}
 		if (Sys.getEnv("TOOLING_ONLY") == "castability") {
 			var document = fixture();

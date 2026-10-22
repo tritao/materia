@@ -94,9 +94,15 @@ typedef InsertManufacturingJob = {
  * drilling operation; neither geometry nor a fixture screw decides its route.
  */
 class InsertManufacturingPlan {
+	public static function record(job:InsertManufacturingJob):Dynamic return {
+		insertId:job.insertId,specification:InsertManufacturingCodec.record(job.specification),
+		holeBudgets:job.holeBudgets,operations:job.operations,
+		inspectionRequirements:job.inspectionRequirements,validation:job.validation
+	};
+
 	public static function build(insert:CastingToolingInsert):InsertManufacturingJob {
 		var spec=switch insert.origin {
-			case Fabricated(manufacturing):InsertManufacturingCodec.snapshot(manufacturing);
+			case Fabricated(manufacturing):InsertManufacturingCodec.snapshot(InsertManufacturingCodec.record(manufacturing));
 			case Catalogue(_):throw "A catalogue insert is not a fabricated manufacturing job: "+insert.id;
 		};
 		InsertManufacturingCodec.references(spec,insert.holes,insert.interfaces);

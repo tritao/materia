@@ -11,7 +11,7 @@ class ReplicationRelationshipTests {
 	static var assertions=0;
 	static function check(ok:Bool,message:String):Void {assertions++;if (!ok) throw message;}
 	static function requirement(id:String,x:Float):InterfaceRequirement return {
-		id:id,geometry:Plane(F.translation(x,0,0)),route:InterfaceRoute.Replicated,allowanceMm:1,finishingProcessErrorMm:null,
+		id:id,geometry:Plane(F.translation(x,0,0)),route:InterfaceRoute.Replicated,allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 		permittedFinishes:[InterfaceFinish.JigMaster],positionToleranceMm:0.01,datumReference:"primary",relationshipIds:["pair"]};
 	static function master(id:String,x:Float):ReplicationMaster return {
 		id:id,kind:ReplicationMasterKind.GroundPlate,body:materia.casting.CastingSolid.Box(40,20,4),pose:F.translation(x,0,0),reference:F.identity(),
@@ -19,7 +19,7 @@ class ReplicationRelationshipTests {
 	public static function run():Void {
 		var a=requirement("a",0),b=requirement("b",50);
 		var r:InterfaceRelationship={id:"pair",kind:Coplanar,members:[ComponentInterface("casting","a"),ComponentInterface("casting","b")],
-			tolerance:Linear(0.01),metrology:{method:MetrologyMethod.IndicatorReversal,instrumentReference:null,uncertaintyMm:null}};
+			tolerance:Linear(0.01),metrology:{method:MetrologyMethod.IndicatorReversal,instrumentReference:materia.casting.CastingInput.CastingTextInput.Unresolved("Metrology instrument"),uncertaintyMm:materia.casting.CastingInput.Unresolved("Measurement uncertainty")}};
 		var context:CastingInterfaceContext={foundationJoints:new Array<materia.casting.FoundationJointSources.FoundationJointOccurrence>(),jointSources:materia.casting.FoundationJointSources.FoundationJointSourceCodec.empty(),bodyMember:"casting",inserts:[],relationships:[{id:"instance",relationship:r}],
 			sources:[Precision("casting",a,F.identity()),Precision("casting",b,F.identity())]};
 		var j:ReplicationJig={id:"frame",datumSchemeId:"datums",frameReference:"synthetic-frame",pose:F.identity(),masters:[master("a",0),master("b",50)]};

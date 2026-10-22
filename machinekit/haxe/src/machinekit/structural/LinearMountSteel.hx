@@ -39,7 +39,7 @@ class LinearMountSteel extends MachineComponent {
 		var box={x:-width/2,y:-length/2,z:0.0,width:width,depth:length,height:thickness};
 		for(hole in drilling)materia.casting.InsertStages.validateServiceHole(hole,box);
 		v.setToken("holes",InsertHoles.fromNeutral(drilling));
-		v.setToken("mountingRequirements",haxe.Json.stringify(lineage));
+		v.setToken("mountingRequirements",haxe.Json.stringify(InsertMountHoleRequirements.records(lineage)));
 		super("LINEAR-MOUNT-STEEL","C45 linear-mount "+v.token("role"),"steel C45",false,v);
 		lockManufacturingMaterial("steel C45");
 		addFacet(InsertHoles.facet(drilling,width,length,thickness));
@@ -53,10 +53,10 @@ class LinearMountSteel extends MachineComponent {
 		derived:MountHoleDerivation.DerivedMountHoles):LinearMountSteel
 		return new LinearMountSteel(new ComponentValues().setNumber("width",width).setNumber("length",length)
 			.setNumber("thickness",thickness).setToken("holes",InsertHoles.fromNeutral(derived.holes))
-			.setToken("mountingRequirements",haxe.Json.stringify(derived.requirements)));
+			.setToken("mountingRequirements",haxe.Json.stringify(InsertMountHoleRequirements.records(derived.requirements))));
 
 	public function mountingRequirements():Array<InsertMountHoleRequirement>
-		return InsertMountHoleRequirements.snapshot(lineage);
+		return InsertMountHoleRequirements.copy(lineage);
 
 	override public function componentType():Null<ComponentType> return recipeType();
 	override public function hasGeometry():Bool return true;

@@ -5,13 +5,13 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.casting.InsertManufacturing.InsertHoleRoute;
 
 typedef MountHoleErrorAllocation = {
-	var placementOffsetMm:Null<Float>;
-	var placementAngleRad:Null<Float>;
-	var assemblyAdjustmentMm:Null<Float>;
-	var cureBowMm:Null<Float>;
-	var machiningErrorMm:Null<Float>;
-	var pitchAccumulationMm:Null<Float>;
-	var requiredMarginMm:Null<Float>;
+	var placementOffsetMm:materia.casting.CastingInput;
+	var placementAngleRad:materia.casting.CastingInput;
+	var assemblyAdjustmentMm:materia.casting.CastingInput;
+	var cureBowMm:materia.casting.CastingInput;
+	var machiningErrorMm:materia.casting.CastingInput;
+	var pitchAccumulationMm:materia.casting.CastingInput;
+	var requiredMarginMm:materia.casting.CastingInput;
 }
 
 /** Source authoring only. Mounting positions come from placed component

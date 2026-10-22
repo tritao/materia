@@ -1,3 +1,4 @@
+import materia.casting.CastingInput;
 import cadkit.modeling.Part;
 import machinekit.assembly.PosedParts;
 import machinekit.component.ComponentValues;
@@ -21,8 +22,8 @@ class LinearMountContactTests {
   var pose=F.fromRotationMatrix(holeHeight,-rack.spec.lengthMm/2,height+washer.thickness+rack.spec.faceWidthMm,
    [0,-1,0,0,0,1,-1,0,0]);
   var stock={x:-width/2,y:-length/2,z:0.0,width:width,depth:length,height:height};
-  var allocation:MountHoleErrorAllocation={placementOffsetMm:null,placementAngleRad:null,
-   assemblyAdjustmentMm:null,cureBowMm:null,machiningErrorMm:null,pitchAccumulationMm:null,requiredMarginMm:null};
+  var allocation:MountHoleErrorAllocation={placementOffsetMm:Unresolved("placementOffsetMm"),placementAngleRad:Unresolved("placementAngleRad"),
+   assemblyAdjustmentMm:Unresolved("assemblyAdjustmentMm"),cureBowMm:Unresolved("cureBowMm"),machiningErrorMm:Unresolved("machiningErrorMm"),pitchAccumulationMm:Unresolved("pitchAccumulationMm"),requiredMarginMm:Unresolved("requiredMarginMm")};
   var derived=MountHoleDerivation.derive(stock,C45Bright,rack,"rack",element.fingerprint("rack"),pose,
    element.connectors.map(c->c.name),element.thread,element.bore.diameter,element.bore.reference,
    [TransferAfterCasting],allocation);

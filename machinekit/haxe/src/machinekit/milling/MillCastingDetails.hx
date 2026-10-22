@@ -1,5 +1,7 @@
 package machinekit.milling;
 
+import materia.casting.CastingInput;
+
 /** Explicit mill casting intent, in mm; no Boolean extension margins. */
 class MillCastingDetails {
 	/** Source design rule, shared by all base and column inserts. A minimum
@@ -48,8 +50,8 @@ class MillCastingDetails {
 	public var zBearingAnchorOffset:Float = 10;
 	/** RM0 accuracy allocations are user inputs, not inferred design-hole limits. */
 	public var railHoleBudget:machinekit.structural.InsertMountPattern.MountHoleErrorAllocation = {
-		placementOffsetMm:null,placementAngleRad:null,assemblyAdjustmentMm:null,cureBowMm:null,
-		machiningErrorMm:null,pitchAccumulationMm:null,requiredMarginMm:null
+		placementOffsetMm:Unresolved("RM0 insert placement offset"),placementAngleRad:Unresolved("RM0 insert angular placement"),assemblyAdjustmentMm:Unresolved("RM0 assembly lateral adjustment"),cureBowMm:Unresolved("RM0 cure bow"),
+		machiningErrorMm:Unresolved("RM0 drill and guide accuracy"),pitchAccumulationMm:Unresolved("RM0 mounting pitch accumulation"),requiredMarginMm:Unresolved("RM0 required clearance margin")
 	};
 	public var permittedRailHoleRoutes:Array<materia.casting.InsertManufacturing.InsertHoleRoute> = [
 		materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting,

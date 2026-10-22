@@ -56,6 +56,6 @@ class FoundationJointSourceSupport {
 				screw(anchor.screw);insert(anchor.target.member);for (hole in anchor.through) insert(hole.member);
 			}
 		}
-		var snapshot=FoundationJointSourceCodec.snapshot(result);FoundationJointAnalysis.validate(snapshot,instances);return snapshot;
+		var snapshot=FoundationJointSourceCodec.copy(result);FoundationJointAnalysis.validate(snapshot,instances);return snapshot;
 	}
 }

@@ -17,7 +17,7 @@ class FoundationRequirementTests {
 		check(error.indexOf(expected) >= 0, 'Expected "$expected", got "$error"');
 	}
 	static function requirement():InterfaceRequirement return {
-		id: "rail-plane", geometry: Plane(F.translation(0,0,20)), route: Replicated, allowanceMm: 1,finishingProcessErrorMm:null,
+		id: "rail-plane", geometry: Plane(F.translation(0,0,20)), route: Replicated, allowanceMm: 1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 		permittedFinishes: [JigMaster,SurfacePlateMaster], positionToleranceMm: 0.01,
 		datumReference: "primary", relationshipIds: ["rail-coplanarity"]
 	};
@@ -25,49 +25,49 @@ class FoundationRequirementTests {
 		id: "rail-coplanarity", kind: Coplanar,
 		members: [ComponentInterface("base/railLeft","rail-plane"),ComponentInterface("base/railRight","rail-plane")],
 		tolerance: Linear(0.005),
-		metrology: {method: IndicatorReversal,instrumentReference: "synthetic-instrument",uncertaintyMm: 0.002}
+		metrology: {method: IndicatorReversal,instrumentReference: materia.casting.CastingInput.CastingTextInput.Known("synthetic-instrument"),uncertaintyMm: materia.casting.CastingInput.Known(0.002)}
 	};
 	public static function main():Void {
 		var r = requirement();
 		check(InterfaceRequirements.fixtureBudgetMm(r)==null,"undeclared finishing allocation has no invented budget");
-		r.finishingProcessErrorMm=0.003;
+		r.finishingProcessErrorMm=materia.casting.CastingInput.Known(0.003);
 		var firstBudget=InterfaceRequirements.fixtureBudgetMm(r);
 		check(firstBudget!=null && Math.abs(firstBudget-0.007)<1e-12,"error share subtracts from tolerance");
 		var frameBefore=InterfaceRequirements.geometryFrame(r.geometry);
-		r.finishingProcessErrorMm=0.004;
+		r.finishingProcessErrorMm=materia.casting.CastingInput.Known(0.004);
 		check(InterfaceRequirements.geometryFrame(r.geometry).z==frameBefore.z && r.allowanceMm==1,
 			"error share changes neither source geometry nor finishing stock");
 		r.allowanceMm=2;
 		var secondBudget=InterfaceRequirements.fixtureBudgetMm(r);
 		check(secondBudget!=null && Math.abs(secondBudget-0.006)<1e-12,"geometric layer never consumes error budget");
-		r.finishingProcessErrorMm=0.01;
-		r.finishingProcessErrorMm=-1;
-		rejects(() -> InterfaceRequirements.snapshot([r]),"Invalid finishing process error allocation");
+		r.finishingProcessErrorMm=materia.casting.CastingInput.Known(0.01);
+		r.finishingProcessErrorMm=materia.casting.CastingInput.Known(-1);
+		rejects(() -> InterfaceRequirements.copy([r]),"Invalid finishing process error allocation");
 		r=requirement();
 		var record = InterfaceRequirements.records([r]);
 		var encoded = haxe.Json.stringify(record);
 		check(haxe.Json.stringify(InterfaceRequirements.records(InterfaceRequirements.snapshot(haxe.Json.parse(encoded)))) == encoded,
 			"requirement round trip");
-		var copy = InterfaceRequirements.snapshot([r])[0];
+		var copy = InterfaceRequirements.copy([r])[0];
 		copy.permittedFinishes.pop();copy.relationshipIds.push("other");
 		check(r.permittedFinishes.length == 2 && r.relationshipIds.length == 1,"source lists are defensive copies");
 		switch copy.geometry {case Plane(frame): frame.z=99; default: throw "plane expected";}
 		check(InterfaceRequirements.geometryFrame(r.geometry).z == 20,"source frame is a defensive copy");
 		r.allowanceMm=0;
-		check(InterfaceRequirements.lacksDeclaredAllowance(InterfaceRequirements.snapshot([r])[0]),"absent layer remains an unsatisfied design input");
+		check(InterfaceRequirements.lacksDeclaredAllowance(InterfaceRequirements.copy([r])[0]),"absent layer remains an unsatisfied design input");
 		r.allowanceMm=1;
 		check(!InterfaceRequirements.lacksDeclaredAllowance(r),"declared layer is represented numerically");
-		rejects(() -> InterfaceRequirements.snapshot([r,r]),"Duplicate interface requirement");
+		rejects(() -> InterfaceRequirements.copy([r,r]),"Duplicate interface requirement");
 		r.permittedFinishes=[];
-		rejects(() -> InterfaceRequirements.snapshot([r]),"requires permitted finishes");
+		rejects(() -> InterfaceRequirements.copy([r]),"requires permitted finishes");
 		r.permittedFinishes=[InterfaceFinish.Ground];
-		rejects(() -> InterfaceRequirements.snapshot([r]),"conflicts with its route");
+		rejects(() -> InterfaceRequirements.copy([r]),"conflicts with its route");
 		r=requirement();r.positionToleranceMm=0;
-		rejects(() -> InterfaceRequirements.snapshot([r]),"allowance or tolerance");
+		rejects(() -> InterfaceRequirements.copy([r]),"allowance or tolerance");
 		r=requirement();r.geometry=Line(F.identity());
-		rejects(() -> InterfaceRequirements.snapshot([r]),"assembly adjustment route");
+		rejects(() -> InterfaceRequirements.copy([r]),"assembly adjustment route");
 		r.route=AdjustedAtAssembly;r.allowanceMm=0;r.permittedFinishes=[PushScrews,TaperedGib,ReplicatedEdge];
-		check(InterfaceRequirements.snapshot([r]).length==1,"in-plane adjustment has an explicit permitted finish list");
+		check(InterfaceRequirements.copy([r]).length==1,"in-plane adjustment has an explicit permitted finish list");
 		var bad:Array<Dynamic> = cast haxe.Json.parse(encoded);Reflect.setField(bad[0],"compat",true);
 		rejects(() -> InterfaceRequirements.snapshot(bad),"Unexpected casting record fields");
 
@@ -80,13 +80,13 @@ class FoundationRequirementTests {
 		if (margin == null) throw "Expected a declared uncertainty margin";
 		var numericMargin:Float = margin;
 		check(Math.abs(numericMargin-0.003)<1e-12,"measurement budget margin");
-		rel.metrology.uncertaintyMm=0.006;
+		rel.metrology.uncertaintyMm=materia.casting.CastingInput.Known(0.006);
 		var excessMargin = InterfaceRelationships.uncertaintyMargin(rel);
 		check(excessMargin != null && excessMargin < 0,"excess measurement uncertainty has negative budget margin");
-		rel.metrology.uncertaintyMm=null;
+		rel.metrology.uncertaintyMm=materia.casting.CastingInput.Unresolved("Measurement uncertainty");
 		check(InterfaceRelationships.uncertaintyMargin(rel)==null,"missing evidence has no invented margin");
-		rel=relationship();rel.metrology.uncertaintyMm=0;
-		rejects(() -> InterfaceRelationships.snapshot([rel]),"uncertainty must be positive");
+		rel=relationship();rel.metrology.uncertaintyMm=materia.casting.CastingInput.Known(0);
+		rejects(() -> InterfaceRelationships.copy([rel]),"uncertainty must be positive");
 		rel=relationship();rel.members=[MachineAxis("C"),ComponentInterface("column/railLeft","rail-plane")];
 		rel.kind=Parallel;rel.tolerance=PerLength(0.005,300);
 		var axisRecords=InterfaceRelationships.records([rel]);
@@ -97,21 +97,21 @@ class FoundationRequirementTests {
 			default:false;
 		}).length==1,"nesting remaps physical axis paths while preserving the source relationship definition");
 		var badPath=relationship();badPath.members[0]=ComponentInterface("../left","rail-plane");
-		rejects(() -> InterfaceRelationships.snapshot([badPath]),"Invalid casting reference path");
+		rejects(() -> InterfaceRelationships.copy([badPath]),"Invalid casting reference path");
 		rel.tolerance=Linear(0.005);
-		rejects(() -> InterfaceRelationships.snapshot([rel]),"linear/angular basis");
+		rejects(() -> InterfaceRelationships.copy([rel]),"linear/angular basis");
 		rel.tolerance=PerLength(0.005,0);
-		rejects(() -> InterfaceRelationships.snapshot([rel]),"span must be positive");
+		rejects(() -> InterfaceRelationships.copy([rel]),"span must be positive");
 		rel=relationship();rel.members=[rel.members[0],rel.members[0]];
-		rejects(() -> InterfaceRelationships.snapshot([rel]),"Duplicate relationship member");
+		rejects(() -> InterfaceRelationships.copy([rel]),"Duplicate relationship member");
 		rel=relationship();rel.kind=Straightness;
-		rejects(() -> InterfaceRelationships.snapshot([rel]),"member count");
+		rejects(() -> InterfaceRelationships.copy([rel]),"member count");
 		rel.members=[ComponentInterface("base/casting","master-edge")];
-		check(InterfaceRelationships.snapshot([rel]).length==1,"single reference straightness declaration");
+		check(InterfaceRelationships.copy([rel]).length==1,"single reference straightness declaration");
 		rel=relationship();rel.kind=Distance(-1);
-		rejects(() -> InterfaceRelationships.snapshot([rel]),"separation cannot be negative");
+		rejects(() -> InterfaceRelationships.copy([rel]),"separation cannot be negative");
 		rel=relationship();rel.kind=Distance(5);
-		check(InterfaceRelationships.snapshot([rel]).length==1,"distance carries an explicit target");
+		check(InterfaceRelationships.copy([rel]).length==1,"distance carries an explicit target");
 		rel=relationship();
 		var sources:Array<materia.casting.InterfaceRelationship.ScopedInterfaceRequirement> = [
 			{member: rel.members[0], requirement: requirement()},

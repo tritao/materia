@@ -32,7 +32,7 @@ class FoundationDatumTests {
 		var sources:FoundationDatumSources={bodyFaces:["body.z-min"],featureFaces:["register"=>["side-0"]],
 			insertInterfaces:["seat"=>["edge"]],insertHoles:["seat"=>["pin"]],unsupportedFeatures:[]};
 		var requirement:InterfaceRequirement={id:"seat-edge",geometry:Line(F.identity()),route:AdjustedAtAssembly,
-			allowanceMm:0,finishingProcessErrorMm:null,permittedFinishes:[PushScrews],positionToleranceMm:0.01,datumReference:"x-secondary",relationshipIds:[]};
+			allowanceMm:0,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),permittedFinishes:[PushScrews],positionToleranceMm:0.01,datumReference:"x-secondary",relationshipIds:[]};
 		FoundationDatums.validateReferences(s,sources,[requirement]);
 		check(true,"all source and interface datum references resolve");
 		s.tertiary.reference=DatumReference.InsertHole("seat","pin");
@@ -56,7 +56,7 @@ class FoundationDatumTests {
 		s.secondary.frame=F.fromRotationMatrix(-10,0,10,[0,0,1,0,1,0,-1,0,0]);
 		requirement.datumReference="x-secondary";
 		var edge:InterfaceRequirement = {id:"edge",geometry:Line(F.identity()),route:AdjustedAtAssembly,
-			allowanceMm:0,finishingProcessErrorMm:null,permittedFinishes:[PushScrews],positionToleranceMm:0.01,datumReference:"z-primary",relationshipIds:[]};
+			allowanceMm:0,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),permittedFinishes:[PushScrews],positionToleranceMm:0.01,datumReference:"z-primary",relationshipIds:[]};
 		var inserts:Array<materia.casting.FoundationDatumScheme.FoundationDatumInsert> = [
 			{id:"seat",pose:F.identity(),holes:TestInsertHoles.through(5,20),interfaces:[edge]},
 			{id:"other-seat",pose:F.identity(),holes:[],interfaces:[edge]}

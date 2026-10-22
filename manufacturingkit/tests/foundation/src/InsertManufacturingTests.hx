@@ -85,7 +85,7 @@ class InsertManufacturingTests {
 			&& row.stage==InsertInspectionStage.AfterCasting && row.declared && row.toleranceMm==0.05).length==1,
 			"inspection schedule follows the declared hole route and tolerance");
 		insert.interfaces=[{id:"ground-face",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,19)),
-			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:null,
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],positionToleranceMm:0.01,
 			datumReference:"primary",relationshipIds:[]}];
 		holes[0].frame.z=19;holes[0].depth=19;

@@ -44,11 +44,11 @@ enum abstract MetrologyMethod(String) to String {
 
 @:wire typedef InterfaceMetrology = {
 	@:id(1) var method:MetrologyMethod;
-	@:id(2) var instrumentReference:Null<String>;
+	@:id(2) var instrumentReference:CastingInput.CastingTextInput;
 	/** Physical measurement uncertainty, in mm at the tolerance's declared span.
-	 * Null means missing evidence, never an unbounded design tolerance.
+	 * Unresolved means missing evidence, never an unbounded design tolerance.
 	 */
-	@:id(3) var uncertaintyMm:Null<Float>;
+	@:id(3) var uncertaintyMm:CastingInput;
 }
 
 @:wire typedef InterfaceRelationship = {
@@ -74,7 +74,7 @@ class InterfaceRelationships {
 			interfaces:Array<ScopedInterfaceRequirement>, axisIds:Array<String>):Void {
 		var sources:Map<String, InterfaceRequirement> = [];
 		for (source in interfaces) {
-			var requirement = InterfaceRequirement.InterfaceRequirements.snapshot([source.requirement])[0];
+			var requirement = InterfaceRequirement.InterfaceRequirements.copy([source.requirement])[0];
 			var interfaceId = switch source.member {
 				case ComponentInterface(_, id): id;
 				case MachineAxis(_): throw "Machine axis cannot own an interface requirement";
@@ -91,7 +91,7 @@ class InterfaceRelationships {
 			axes.set(axis, true);
 		}
 		var resolved:Map<String, InterfaceRelationship> = [];
-		for (relationship in snapshot(relationships)) {
+		for (relationship in copy(relationships)) {
 			resolved.set(relationship.id, relationship);
 			for (member in relationship.members) switch member {
 				case MachineAxis(axis):
@@ -159,11 +159,9 @@ class InterfaceRelationships {
 			if (angular != perLength) throw "Relationship tolerance needs the correct linear/angular basis: " + id;
 			var m = Reflect.field(row, "metrology");
 			CastingFeatureCodec.fields(m, ["method", "instrumentReference", "uncertaintyMm"]);
-			var instrument = CastingRecordCodec.optionalString(m, "instrumentReference");
-			if (instrument != null && (StringTools.trim(instrument).length == 0 || materia.assembly.AssemblyCodec.containsNul(instrument)))
-				throw "Invalid metrology instrument reference: " + id;
-			var uncertainty:Null<Float> = Reflect.field(m, "uncertaintyMm") == null ? null : CastingRecordCodec.number(m, "uncertaintyMm");
-			if (uncertainty != null && uncertainty <= 0) throw "Measurement uncertainty must be positive: " + id;
+			var instrument=CastingInput.CastingInputs.text(Reflect.field(m,"instrumentReference"));
+			var uncertainty=CastingInput.CastingInputs.number(Reflect.field(m,"uncertaintyMm"));
+			switch uncertainty {case Known(value):if (value<=0) throw "Measurement uncertainty must be positive: "+id;case Unresolved(_):}
 			result.push({id: id, kind: kind, members: members, tolerance: tolerance,
 				metrology: {method: readMethod(CastingRecordCodec.string(m, "method")), instrumentReference: instrument,
 					uncertaintyMm: uncertainty}});
@@ -174,21 +172,30 @@ class InterfaceRelationships {
 
 	public static function records(relationships:Array<InterfaceRelationship>):Array<Dynamic> {
 		var result:Array<Dynamic> = [];
-		for (r in snapshot(relationships)) result.push({id: r.id, kind: kindRecord(r.kind),
-			members: [for (m in r.members) memberRecord(m)], tolerance: toleranceRecord(r.tolerance),
-			metrology: {method: (r.metrology.method:String), instrumentReference: r.metrology.instrumentReference,
-				uncertaintyMm: r.metrology.uncertaintyMm}});
+		var ordered=relationships.copy();
+		ordered.sort((a,b)->Reflect.compare(a.id,b.id));
+		for (r in ordered) {
+			var members=r.members.copy();
+			members.sort((a,b)->Reflect.compare(memberKey(a),memberKey(b)));
+			result.push({id: r.id, kind: kindRecord(r.kind),
+			members: [for (m in members) memberRecord(m)], tolerance: toleranceRecord(r.tolerance),
+			metrology: {method: (r.metrology.method:String), instrumentReference: CastingInput.CastingInputs.textRecord(r.metrology.instrumentReference),
+				uncertaintyMm: CastingInput.CastingInputs.record(r.metrology.uncertaintyMm)}});
+		}
 		return result;
 	}
 
+	public static function copy(rows:Array<InterfaceRelationship>):Array<InterfaceRelationship>
+		return snapshot(records(rows));
+
 	/** Definition ID remains stable in source requirements; only physical member paths move. */
 	public static function remapMembers(relationship:InterfaceRelationship,map:String->String):InterfaceRelationship {
-		var result=snapshot([relationship])[0];
+		var result=copy([relationship])[0];
 		result.members=[for (member in result.members) switch member {
 			case ComponentInterface(part,face): ComponentInterface(map(part),face);
 			case MachineAxis(axis): MachineAxis(map(axis));
 		}];
-		return snapshot([result])[0];
+		return copy([result])[0];
 	}
 
 	public static function maxDeviation(t:RelationshipTolerance):Float return switch t {
@@ -198,7 +205,7 @@ class InterfaceRelationships {
 	/** Null is missing physical evidence; a negative value cannot qualify the relationship. */
 	public static function uncertaintyMargin(r:InterfaceRelationship):Null<Float> {
 		var uncertainty = r.metrology.uncertaintyMm;
-		return uncertainty == null ? null : maxDeviation(r.tolerance) - uncertainty;
+		return switch uncertainty {case Known(value):maxDeviation(r.tolerance)-value;case Unresolved(_):null;};
 	}
 
 	public static function memberKey(member:InterfaceMember):String

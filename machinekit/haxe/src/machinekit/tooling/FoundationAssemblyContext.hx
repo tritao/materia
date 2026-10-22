@@ -56,7 +56,7 @@ class FoundationAssemblyContext {
 					case MachineAxis(_):
 				}
 				if (!relevant) continue;
-				var copy=InterfaceRelationships.snapshot([relationship])[0];
+				var copy=InterfaceRelationships.copy([relationship])[0];
 				relationships.push({id:id,relationship:copy});
 				for (member in copy.members) {
 					var source:InterfaceContextSource=switch member {
@@ -73,7 +73,7 @@ class FoundationAssemblyContext {
 			default:
 		}
 		var jointSources=machinekit.design.FoundationJointSourceSupport.capture(joints,parts,state,worldToFoundation);
-		return CastingInterfaceContexts.snapshot({bodyMember:bodyMember,inserts:inserts,relationships:relationships,
+		return CastingInterfaceContexts.copy({bodyMember:bodyMember,inserts:inserts,relationships:relationships,
 			foundationJoints:joints,jointSources:jointSources,
 			sources:[for (source in sources) source]});
 	}

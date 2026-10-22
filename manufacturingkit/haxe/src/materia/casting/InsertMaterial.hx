@@ -15,6 +15,11 @@ typedef InsertMaterialSpec = {
 
 class InsertMaterials {
 	public static function values():Array<InsertMaterial> return [C45Bright, C45Ground, Stainless14571];
+	public static function read(token:String):InsertMaterial {
+		for (value in values()) if ((value:String)==token) return value;
+		throw "Unknown insert material: "+token;
+	}
+
 	public static function tokens():Array<String> return [for (value in values()) (value:String)];
 
 	/** Procurement minimum for C45 +C flat bar, also required of ground stock.
@@ -42,7 +47,7 @@ class InsertMaterials {
 
 	public static function snapshot(raw:Dynamic):InsertMaterialSpec {
 		CastingFeatureCodec.fields(raw, ["grade", "minimumTensileStrengthMPa"]);
-		var grade:InsertMaterial = cast CastingRecordCodec.string(raw, "grade");
+		var grade=read(CastingRecordCodec.string(raw,"grade"));
 		var expected = specification(grade);
 		var strength = CastingRecordCodec.number(raw, "minimumTensileStrengthMPa");
 		if (strength != expected.minimumTensileStrengthMPa)

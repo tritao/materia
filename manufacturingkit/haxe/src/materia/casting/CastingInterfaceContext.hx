@@ -92,8 +92,11 @@ class CastingInterfaceContexts {
 		return result;
 	}
 
+	public static function copy(context:CastingInterfaceContext):CastingInterfaceContext
+		return snapshot(record(context));
+
 	public static function record(context:CastingInterfaceContext):Dynamic {
-		var c=snapshot(context);
+		var c=context;
 		return {bodyMember:c.bodyMember,inserts:c.inserts,foundationJoints:c.foundationJoints,
 			jointSources:FoundationJointSources.FoundationJointSourceCodec.record(c.jointSources),
 			relationships:[for (instance in c.relationships) {id:instance.id,relationship:InterfaceRelationships.records([instance.relationship])[0]}],

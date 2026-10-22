@@ -39,8 +39,8 @@ class ToolingPackageManifest {
 				jobs.push(job);checks=checks.concat(job.validation);
 				checks.push(InsertDrawing.review(insert).validation);
 		}
-		var expected={format:"materia.tooling.insert-manufacturing",version:3,
-			sourceFingerprint:sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(plan.document.input),jobs:jobs};
+		var expected={format:"materia.tooling.insert-manufacturing",version:4,
+			sourceFingerprint:sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(plan.document.input),jobs:[for (job in jobs) materia.tooling.casting.InsertManufacturingPlan.record(job)]};
 		path=dir+"/insert-manufacturing.json";
 		if (!sys.FileSystem.exists(path)
 			|| ToolingCodec.canonical(haxe.Json.parse(sys.io.File.getContent(path)))!=ToolingCodec.canonical(expected))

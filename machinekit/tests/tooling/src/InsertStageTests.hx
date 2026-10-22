@@ -67,7 +67,7 @@ class InsertStageTests {
 		var stockValues=values.copy().setToken("body",InsertBodyCodec.encode(Primitive(Box(50,40,21))))
 			.setToken("interfaces",haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records([{
 				id:"finished-top",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,20)),
-				route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:null,
+				route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 				permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],positionToleranceMm:0.01,
 				datumReference:"primary",relationshipIds:[]}])));
 		var finished=new CastInsert(stockValues);

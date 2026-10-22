@@ -93,6 +93,10 @@ class ToolingFabricationExport {
 			"assembly_adjustment_mm","cure_bow_mm","machining_error_mm","pitch_accumulation_mm","required_margin_mm",
 			"precast_margin_mm","transfer_margin_mm","missing_inputs","clearance_reference"]];
 		function optional(value:Null<Float>):String return value==null ? "" : Std.string(value);
+		function input(value:materia.casting.CastingInput):String return switch value {
+			case Known(number):Std.string(number);
+			case Unresolved(_):"";
+		};
 		var inspectionRows:Array<Array<String>> = [["insert_id","inspection_kind","source_id","stage","limit_declared","tolerance_mm","execution_status"]];
 		var bomRows:Array<Array<String>> = [["insert_id","part_number","procurement_kind","process","material_grade","quantity"]];
 		for (insert in p.document.input.inserts) switch insert.origin {
@@ -122,10 +126,10 @@ class ToolingFabricationExport {
 					var requirement=job.specification.mountingRequirements.filter(row -> row.holeId==report.holeId)[0];
 					var budget=requirement.budget;
 					budgetRows.push([insert.id,report.holeId,report.componentPath,report.connectorId,
-						report.route==null ? "" : report.route,report.status,optional(budget.clearanceDiameterMm),
-						Std.string(budget.boltDiameterMm),Std.string(budget.distanceFromDatumMm),optional(budget.placementOffsetMm),
-						optional(budget.placementAngleRad),optional(budget.assemblyAdjustmentMm),optional(budget.cureBowMm),
-						optional(budget.machiningErrorMm),optional(budget.pitchAccumulationMm),optional(budget.requiredMarginMm),
+						report.route==null ? "" : report.route,report.status,input(budget.clearanceDiameterMm),
+						Std.string(budget.boltDiameterMm),Std.string(budget.distanceFromDatumMm),input(budget.placementOffsetMm),
+						input(budget.placementAngleRad),input(budget.assemblyAdjustmentMm),input(budget.cureBowMm),
+						input(budget.machiningErrorMm),input(budget.pitchAccumulationMm),input(budget.requiredMarginMm),
 						optional(report.beforeCastingMarginMm),optional(report.transferMarginMm),report.missingInputs.join(";"),
 						requirement.clearanceReference==null ? "" : requirement.clearanceReference]);
 				}
@@ -134,8 +138,8 @@ class ToolingFabricationExport {
 						inspection.toleranceMm==null ? "" : Std.string(inspection.toleranceMm),"pending"]);
 				}
 		}
-		data(dir,"insert-manufacturing.json",{format:"materia.tooling.insert-manufacturing",version:3,
-			sourceFingerprint:f.sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),jobs:jobs});
+		data(dir,"insert-manufacturing.json",{format:"materia.tooling.insert-manufacturing",version:4,
+			sourceFingerprint:f.sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),jobs:[for (job in jobs) materia.tooling.casting.InsertManufacturingPlan.record(job)]});
 		text(dir,"insert-operations.csv",ToolingFabrication.csv(operationRows));
 		text(dir,"insert-hole-budgets.csv",ToolingFabrication.csv(budgetRows));
 		text(dir,"insert-inspections.csv",ToolingFabrication.csv(inspectionRows));
@@ -237,7 +241,9 @@ class ToolingFabricationExport {
 				var checks=jigChecks.filter(check -> check.rule==rule);
 				if (checks.length!=1) continue;
 				geometryRows.push([jig.id,instance.id,instance.relationship.id,rule,(checks[0].status:String),checks[0].message,"pending"]);
-				var instrument=instance.relationship.metrology.instrumentReference;
+				var instrument:Null<String>=switch instance.relationship.metrology.instrumentReference {
+					case Known(value):value;case Unresolved(_):null;
+				};
 				if (instrument!=null && !instruments.exists(instrument)) {
 					instruments.set(instrument,true);
 					inventory.push([jig.id,"","metrology-instrument","instrument-"+haxe.crypto.Sha256.encode(instrument),instrument,"1","pending"]);

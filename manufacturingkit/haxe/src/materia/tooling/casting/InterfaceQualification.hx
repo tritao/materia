@@ -151,12 +151,12 @@ class InterfaceQualification {
 	}
 
 	public static function metrologyBudget(relationship:InterfaceRelationship, affectedIds:Array<String>):ToolingValidation {
-		var r = InterfaceRelationships.snapshot([relationship])[0];
+		var r = InterfaceRelationships.copy([relationship])[0];
 		if (affectedIds == null || affectedIds.length == 0) throw "Metrology check requires affected source IDs";
 		for (id in affectedIds) materia.tooling.ToolingIds.validate(id);
 		var margin = InterfaceRelationships.uncertaintyMargin(r);
-		var fitsBudget = margin != null && margin >= 0 && r.metrology.instrumentReference != null;
-		var message = if (r.metrology.instrumentReference == null)
+		var fitsBudget = margin != null && margin >= 0 && materia.casting.CastingInput.CastingInputs.textIsKnown(r.metrology.instrumentReference);
+		var message = if (!materia.casting.CastingInput.CastingInputs.textIsKnown(r.metrology.instrumentReference))
 			"Select the relationship's measurement instrument; uncertainty budget remains pending."
 		else if (margin == null)
 			"The instrument's measurement uncertainty has not been declared."

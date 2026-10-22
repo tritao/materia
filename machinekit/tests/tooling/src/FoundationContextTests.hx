@@ -36,13 +36,13 @@ class FoundationContextTests {
 
 	public static function run():Void {
 		var requirements:Array<InterfaceRequirement> = [{id:"seat-plane",geometry:Plane(F.translation(0,0,20)),
-			route:InterfaceRoute.AsSupplied,allowanceMm:0,finishingProcessErrorMm:null,permittedFinishes:[InterfaceFinish.AsSupplied],
+			route:InterfaceRoute.AsSupplied,allowanceMm:0,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),permittedFinishes:[InterfaceFinish.AsSupplied],
 			positionToleranceMm:0.01,datumReference:"primary",relationshipIds:["seat-pair"]}];
 		var values=CastInsert.boxValues(40,30,20).setToken("role",materia.casting.InsertSpec.InsertRole.GuideSeat)
 			.setToken("finish",materia.casting.InsertSpec.InsertFinish.AsSupplied)
 			.setToken("interfaces",haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records(requirements)));
 		var placements:Array<CastInsertPlacement> = [for (side in [-1,1]) {
-			var declared=materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(requirements);
+			var declared=materia.casting.InterfaceRequirement.InterfaceRequirements.copy(requirements);
 			declared[0].relationshipIds.push(side<0 ? "seat-axis-left" : "seat-axis-right");
 			{id:side<0 ? "left" : "right",part:new CastInsert(values.copy().setToken("interfaces",
 				haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records(declared)))),pose:F.translation(side*25,0,40),
@@ -57,11 +57,11 @@ class FoundationContextTests {
 			"base/casting","mount","axisWitness","mount",{x:0,y:1,z:0});
 		var relationship:InterfaceRelationship={id:"seat-pair",kind:Parallel,
 			members:[ComponentInterface("base/left","seat-plane"),ComponentInterface("base/right","seat-plane")],
-			tolerance:PerLength(0.005,300),metrology:{method:IndicatorReversal,instrumentReference:"synthetic-instrument",uncertaintyMm:0.006}};
+			tolerance:PerLength(0.005,300),metrology:{method:IndicatorReversal,instrumentReference:materia.casting.CastingInput.CastingTextInput.Known("synthetic-instrument"),uncertaintyMm:materia.casting.CastingInput.Known(0.006)}};
 		assembly.addDesignRequirement(machinekit.design.DesignRequirement.InterfaceAlignment("seat-alignment",relationship));
 		for (side in ["left","right"]) assembly.addDesignRequirement(machinekit.design.DesignRequirement.InterfaceAlignment("seat-axis-"+side+"-alignment",{
 			id:"seat-axis-"+side,kind:Perpendicular,members:[ComponentInterface("base/"+side,"seat-plane"),MachineAxis("C")],
-			tolerance:PerLength(0.005,300),metrology:{method:AxisMasterIndicator,instrumentReference:"synthetic-instrument",uncertaintyMm:0.006}}));
+			tolerance:PerLength(0.005,300),metrology:{method:AxisMasterIndicator,instrumentReference:materia.casting.CastingInput.CastingTextInput.Known("synthetic-instrument"),uncertaintyMm:materia.casting.CastingInput.Known(0.006)}}));
 		var bindings=[{id:"left",member:"base/left"},{id:"right",member:"base/right"}];
 		var context=FoundationAssemblyContext.snapshot(assembly,"base/casting",bindings);
 		check(context.relationships.length==3 && context.sources.length==3,"source assembly supplies seat parallelism and both plane-axis squareness relationships");
@@ -100,9 +100,9 @@ class FoundationContextTests {
 		rejects(() -> ToolingCodec.decodeInput(haxe.Json.stringify(missing)),"Missing input field: datumScheme");
 		var budgeted=ToolingCodec.inputSnapshot(input);budgeted.interfaceContext=null;
 		var budgetFingerprint=ToolingCodec.inputFingerprint(budgeted);
-		budgeted.inserts[0].interfaces[0].finishingProcessErrorMm=0.002;
+		budgeted.inserts[0].interfaces[0].finishingProcessErrorMm=materia.casting.CastingInput.Known(0.002);
 		check(ToolingCodec.inputFingerprint(budgeted)!=budgetFingerprint,"source error allocations enter the fingerprint");
-		context.relationships[0].relationship.metrology.uncertaintyMm=0.001;
+		context.relationships[0].relationship.metrology.uncertaintyMm=materia.casting.CastingInput.Known(0.001);
 		check(ToolingCodec.encodeInput(input)==encoded,"context snapshots cannot be mutated through the caller's records");
 		var nested=new MachineAssembly();nested.include("station",MachineAssembly.decode(assembly.encode()),F.translation(100,100,100));
 		var nestedContext=FoundationAssemblyContext.snapshot(nested,"station/base/casting",

@@ -22,7 +22,7 @@ class FoundationJointDesignTests {
 			through:[{member:"upper/seat",feature:"fixing"}]}],cureBeforeTorque:true
 	};
 	static function seat(width:Float,holes:String):CastInsert {
-		var requirement:InterfaceRequirement={id:"seat",geometry:Plane(F.translation(0,0,20)),route:InterfaceRoute.AsSupplied,allowanceMm:0,finishingProcessErrorMm:null,
+		var requirement:InterfaceRequirement={id:"seat",geometry:Plane(F.translation(0,0,20)),route:InterfaceRoute.AsSupplied,allowanceMm:0,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 			permittedFinishes:[InterfaceFinish.AsSupplied],positionToleranceMm:0.01,datumReference:"primary",relationshipIds:[]};
 		return new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(width,40,20),holes)
 			.setToken("role",materia.casting.InsertSpec.InsertRole.ColumnMount)
@@ -127,15 +127,15 @@ class FoundationJointDesignTests {
 			&& sequence.indexOf("pending")>=0,"joint process sequence retains cure-before-final-torque without claiming physical evidence");
 	}
 	static function threadLimits(source:materia.casting.FoundationJointSources,definition:FoundationJoint):Void {
-		var original=materia.casting.FoundationJointSources.FoundationJointSourceCodec.snapshot(source);
-		var facts=materia.casting.FoundationJointSources.FoundationJointSourceCodec.snapshot(original),anchor=definition.anchors[0],jack=definition.jacks[0];
+		var original=materia.casting.FoundationJointSources.FoundationJointSourceCodec.copy(source);
+		var facts=materia.casting.FoundationJointSources.FoundationJointSourceCodec.copy(original),anchor=definition.anchors[0],jack=definition.jacks[0];
 		function measure(receiver:Bool=false):Array<materia.casting.FoundationJointAnalysis.FoundationJointFinding> {
 			var subject=receiver ? "jack-"+jack.id : "anchor-"+anchor.id;
 			return materia.casting.FoundationJointAnalysis.check(facts,definition).filter(f -> f.subject==subject);
 		}
 		function passes(code:String,receiver:Bool=false):Bool
 			return measure(receiver).filter(f -> f.code==code && f.passed).length==1;
-		function reset():Void facts=materia.casting.FoundationJointSources.FoundationJointSourceCodec.snapshot(original);
+		function reset():Void facts=materia.casting.FoundationJointSources.FoundationJointSourceCodec.copy(original);
 		function screw():materia.casting.FoundationJointSources.FoundationJointScrew
 			return materia.casting.FoundationJointAnalysis.screw(facts,anchor.screw);
 		function hole():materia.casting.InsertHole return materia.casting.FoundationJointAnalysis.hole(facts,anchor.target);

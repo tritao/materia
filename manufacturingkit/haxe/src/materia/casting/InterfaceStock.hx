@@ -22,7 +22,7 @@ class InterfaceStocks {
 
 	public static function assess(body:InsertBody,authored:InterfaceRequirement):InterfaceStockResult {
 		InsertSpec.InsertBodyCodec.validate(body);
-		var requirement=InterfaceRequirements.snapshot([authored])[0];
+		var requirement=InterfaceRequirements.copy([authored])[0];
 		var frame=switch requirement.geometry {
 			case Plane(frame): frame;
 			case Line(_):

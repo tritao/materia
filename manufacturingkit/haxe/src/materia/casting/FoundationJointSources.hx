@@ -77,8 +77,11 @@ class FoundationJointSourceCodec {
 		result.inserts.sort((a,b) -> Reflect.compare(a.member,b.member));
 		result.screws.sort((a,b) -> Reflect.compare(a.member,b.member));return result;
 	}
+	public static function copy(source:FoundationJointSources):FoundationJointSources
+		return snapshot(record(source));
+
 	public static function record(source:FoundationJointSources):Dynamic {
-		var s=snapshot(source);
+		var s=source;
 		return {bodies:[for (body in s.bodies) {
 			member:body.member,pose:body.pose,interfaces:InterfaceRequirements.records(body.interfaces),insertMembers:body.insertMembers
 		}],inserts:[for (insert in s.inserts) {

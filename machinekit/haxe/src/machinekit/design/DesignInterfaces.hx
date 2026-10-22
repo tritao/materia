@@ -40,10 +40,10 @@ class DesignInterfaces implements ComponentFacet {
 			?precision:Array<materia.casting.InterfaceRequirement>) {
 		this.holes=holes; this.datums=datums; this.material=material;
 		var declarations:Array<materia.casting.InterfaceRequirement> = precision == null ? [] : precision;
-		this.precision=materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(declarations);
+		this.precision=materia.casting.InterfaceRequirement.InterfaceRequirements.copy(declarations);
 	}
 	public function precisionRequirements():Array<materia.casting.InterfaceRequirement>
-		return materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot(precision);
+		return materia.casting.InterfaceRequirement.InterfaceRequirements.copy(precision);
 	public static function of(component:MachineComponent):Null<DesignInterfaces> {
 		for(facet in component.facets()) if(Std.isOfType(facet,DesignInterfaces)) return cast facet;
 		return null;

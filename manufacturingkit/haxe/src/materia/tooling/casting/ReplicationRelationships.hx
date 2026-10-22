@@ -24,7 +24,7 @@ class ReplicationRelationships {
 		return "tooling.replication.relationship-geometry."+haxe.crypto.Sha256.encode(instanceId+"/"+jigId);
 	public static function check(jig:ReplicationJig,instanceId:String,authored:InterfaceRelationship,
 		context:CastingInterfaceContext):ToolingValidation {
-		var relationship=R.snapshot([authored])[0];
+		var relationship=R.copy([authored])[0];
 		var rule=ruleId(instanceId,jig.id);
 		var ids=[jig.id],references:Array<MasterReference> = [];
 		for (member in relationship.members) {

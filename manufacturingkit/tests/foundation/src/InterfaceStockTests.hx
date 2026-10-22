@@ -10,7 +10,7 @@ class InterfaceStockTests {
 		if (!ok) throw message;
 	}
 	static function requirement():InterfaceRequirement return {
-		id:"stock-face",geometry:Plane(F.translation(0,0,20)),route:InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:null,
+		id:"stock-face",geometry:Plane(F.translation(0,0,20)),route:InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 		permittedFinishes:[InterfaceFinish.Ground],positionToleranceMm:0.01,
 		datumReference:"primary",relationshipIds:[]
 	};

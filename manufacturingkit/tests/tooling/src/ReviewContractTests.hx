@@ -84,7 +84,7 @@ class ReviewContractTests {
 		var sourceInsert=source.input.inserts[0];
 		sourceInsert.interfaces=[{id:"replicated-plane",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(
 			materia.assembly.AssemblyFrames.translation(0,0,21)),route:materia.casting.InterfaceRequirement.InterfaceRoute.Replicated,
-			allowanceMm:1,finishingProcessErrorMm:null,permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.JigMaster],
+			allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.JigMaster],
 			positionToleranceMm:0.01,datumReference:"primary",relationshipIds:[]}];
 		check(materia.tooling.casting.InterfaceQualification.replicationRequirement(sourceInsert,o.precision[0])!=null,
 			"explicit source interfaces require replication independently of the aggregate finish label");

@@ -14,6 +14,11 @@ enum abstract InsertStage(String) to String {
 }
 
 class InsertStages {
+	public static function read(token:String):InsertStage {
+		for (value in [InsertStage.BeforeCasting,InsertStage.Service]) if ((value:String)==token) return value;
+		throw "Unknown insert manufacturing stage: "+token;
+	}
+
 	public static function tokens():Array<String> return [InsertStage.BeforeCasting,InsertStage.Service];
 
 	public static function holes(authored:InsertSpec,stage:InsertStage):Array<InsertHole> {

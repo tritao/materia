@@ -93,14 +93,14 @@ class AssemblyDesignChecks {
 
 	static function interfaceAlignment(out:Diagnostics,id:String,authored:materia.casting.InterfaceRelationship,
 			members:Map<String,MachineComponent>,definition:materia.assembly.AssemblyDefinition):Void {
-		var relationship=materia.casting.InterfaceRelationship.InterfaceRelationships.snapshot([authored])[0];
+		var relationship=materia.casting.InterfaceRelationship.InterfaceRelationships.copy([authored])[0];
 		for (member in relationship.members) switch member {
 			case ComponentInterface(partId,interfaceId):
 				InterfaceSourceSupport.precision(members,partId,interfaceId,relationship.id);
 			case MachineAxis(axisId): InterfaceSourceSupport.axis(definition,axisId);
 		}
 		var margin=materia.casting.InterfaceRelationship.InterfaceRelationships.uncertaintyMargin(relationship);
-		if (margin==null || margin<0 || relationship.metrology.instrumentReference==null)
+		if (margin==null || margin<0 || !materia.casting.CastingInput.CastingInputs.textIsKnown(relationship.metrology.instrumentReference))
 			out.warning("design.interface.metrology",id,"Relationship metrology is absent or its uncertainty exceeds the design tolerance.");
 		out.warning("design.interface.qualification",id,
 			"Relationship references resolve; geometry, replication jig and measured alignment remain unqualified.");

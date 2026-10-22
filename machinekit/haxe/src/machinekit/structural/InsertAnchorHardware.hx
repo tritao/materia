@@ -106,7 +106,7 @@ class InsertAnchorHardware {
 	}
 
 	public static function parts(spec:InsertSpec):Array<InsertAnchorComponent> {
-		var source=InsertSpecCodec.snapshot(spec),result:Array<InsertAnchorComponent> = [];
+		var source=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec)),result:Array<InsertAnchorComponent> = [];
 		checkHoleClearance(source);
 		var holes=materia.casting.InsertStages.holes(source,materia.casting.InsertStages.InsertStage.BeforeCasting);
 		switch source.anchorage {

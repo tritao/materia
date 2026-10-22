@@ -263,8 +263,9 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   anchors, connector-derived rail holes and lifting declarations are integrated.
   Step 3 supplies exact drafted/radiused line-arc features through CAD and
   planning, native critical-level fill, source-bound section drawings and EPS
-  cutting records. Former CAM remains unfinished in step 3; stepped/flared
-  mold-shell allocation follows in phase 8. Detailed acceptance evidence and
+  cutting records. Former CAM is implemented with source-dependent cutter-fit findings left
+  visible; cleanup and the core comparison remain. Stepped/flared mold-shell
+  allocation follows in phase 8. Detailed acceptance evidence and
   current validation counts are recorded below. Production budgets, materials,
   equipment and physical evidence remain open; no fabrication-ready claim.
 - [ ] Phase 8: mill column and independent hobber plinth.
@@ -1413,12 +1414,12 @@ lists each deleted module with the check or record that still covers it.
    `Null<Float>` found by reflecting over field-name strings
    (`HoleClearanceBudget` and the other nullable inputs in `materia.casting`).
    Missing-input lists come from the type, not from field names.
-2. Enum tokens decode through a checked function that rejects unknown tokens;
+2. [x] Enum tokens decode through a checked function that rejects unknown tokens;
    no `cast parameterToken(...)`.
 3. Each codec `snapshot` takes raw records only. It has no
    `Std.isOfType(raw, …)` branch that also accepts an already-typed value, and
    callers copy typed values explicitly.
-4. A test checks that every vocabulary `values()` list matches its codec tokens.
+4. [x] A test checks that every vocabulary `values()` list matches its codec tokens.
 5. This plan keeps design, decisions and status. Per-slice validation counts
    and progress logs move to commit messages, and the progress sections shrink
    to one status line per phase.
@@ -2508,3 +2509,8 @@ Former source-dependent work parked (2026-10-22): cutter-fit rejects square inte
 Former CAM datum decision (2026-10-22): all former stock heights use the declared machine spoilboard plane and fixed work datum, including thicker boards. Only through bands receive breakthrough; tapered finishing offsets its contact height by that breakthrough. Program headers state the spoilboard and stock-top Z.
 Former load decision (2026-10-22): hollow-former boards enter the existing peak-pressure and plate-support checks as wetted walls; finished clipping and coupled corner loads retain the existing Unsupported plate-model gap per board, without credit from nominal rectangular blanks. Gross former restraint checks remain unchanged.
 Former registration decision (2026-10-22): neck and flange sheets register against the mold wall and use its external closure; the hollow body uses internal pocket screws. Capture, grip and the complete restraint remain pending shop qualification.
+
+Cleanup decision: missing casting inputs use `Known(value)` or `Unresolved(reason)`; derived uncomputed results and inapplicable thread fields remain distinct optional results. Hole-policy limits remain mandatory numbers. Raw encoders explicitly record input states; no implicit typed/raw decoder is added.
+
+Cleanup input status: numeric clearance/finishing budgets and metrology inputs are typed. Optional shop-process and clearance references follow with the boundary cleanup; the conditional anchor locking reference follows with anchor consolidation. These remaining references keep item 1 open.
+Cleanup wire decision: numeric and text input enums are concrete types, because the current assembly wire profile rejects generic enums; both encode the same known/unresolved states.

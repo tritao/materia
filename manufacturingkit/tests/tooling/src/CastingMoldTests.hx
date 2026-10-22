@@ -1,3 +1,4 @@
+import materia.casting.CastingInput;
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.CastingFeature.CastingDimension;
@@ -99,9 +100,9 @@ class CastingMoldTests {
 		manufacturing.mountingRequirements=[{holeId:hole.id,componentPath:"rail",connectorId:"mount1",
 			componentFingerprint:haxe.crypto.Sha256.encode("test rail"),connectorFrame:F.alongY(0,0,20,0,0,1),
 			clearanceReference:"test clearance reference",permittedRoutes:[],
-			budget:{boltDiameterMm:10,clearanceDiameterMm:11,distanceFromDatumMm:0,
-				placementOffsetMm:0,placementAngleRad:0,assemblyAdjustmentMm:0,cureBowMm:0,
-				machiningErrorMm:0.01,pitchAccumulationMm:0,requiredMarginMm:0.01}}];
+			budget:{boltDiameterMm:10,clearanceDiameterMm:Known(11),distanceFromDatumMm:0,
+				placementOffsetMm:Known(0),placementAngleRad:Known(0),assemblyAdjustmentMm:Known(0),cureBowMm:Known(0),
+				machiningErrorMm:Known(0.01),pitchAccumulationMm:Known(0),requiredMarginMm:Known(0.01)}}];
 		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
 		var p=CastingMoldPlanner.plan(d,options(d));
 		var rule=materia.tooling.casting.InsertManufacturingPlan.mountingRule(insert.id,hole.id);
@@ -119,7 +120,7 @@ class CastingMoldTests {
 			"source permission and closed transfer budget clear the mounting-route request on replan");
 		hole.extent=Blind;hole.depth=17.5;hole.threadDepth=15.5;
 		manufacturing.mountingRequirements[0].permittedRoutes=[materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting];
-		manufacturing.mountingRequirements[0].budget.machiningErrorMm=null;
+		manufacturing.mountingRequirements[0].budget.machiningErrorMm=Unresolved("machiningErrorMm");
 		manufacturing.holeRoutes=[];
 		var insertPose=F.fromRotationMatrix(0,0,20,[1,0,0,0,-1,0,0,0,-1]);
 		var pending=materia.tooling.casting.InsertFixturePlanner.missingFixing(insert,insertPose,F.identity(),d.recipe.hardware);
@@ -627,7 +628,7 @@ class CastingMoldTests {
 		stockInsert.interfaces=[{
 			id:"finished-top",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(
 				materia.assembly.AssemblyFrames.translation(0,0,19)),
-			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:null,
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],
 			positionToleranceMm:0.01,datumReference:"primary",relationshipIds:[]
 		}];
@@ -688,7 +689,7 @@ class CastingMoldTests {
 		insert.finish=materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting;
 		insert.interfaces=[{
 			id:"replication-face",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,15)),
-			route:materia.casting.InterfaceRequirement.InterfaceRoute.Replicated,allowanceMm:1,finishingProcessErrorMm:null,
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Replicated,allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.JigMaster],
 			positionToleranceMm:0.01,datumReference:"primary",relationshipIds:[]
 		}];

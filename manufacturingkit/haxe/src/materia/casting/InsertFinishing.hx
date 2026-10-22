@@ -32,7 +32,7 @@ class InsertFinishing {
 
 	public static function assess(body:InsertBody,authored:Array<InterfaceRequirement>):InsertFinishResult {
 		InsertSpec.InsertBodyCodec.validate(body);
-		var requirements=InterfaceRequirements.snapshot(authored),invalid:Array<InsertFinishIssue> = [],unsupported:Array<InsertFinishIssue> = [];
+		var requirements=InterfaceRequirements.copy(authored),invalid:Array<InsertFinishIssue> = [],unsupported:Array<InsertFinishIssue> = [];
 		var raw:Null<Box3> = switch body {
 			case Primitive(solid):switch solid {
 				case Box(w,d,h):{x:-w/2,y:-d/2,z:0,width:w,depth:d,height:h};
@@ -83,7 +83,7 @@ class InsertFinishing {
 		}
 		if (invalid.length>0) return Invalid(invalid);
 		for (requirement in requirements) if (requirement.route==InterfaceRoute.Replicated) {
-			var local=InterfaceRequirements.snapshot([requirement])[0];
+			var local=InterfaceRequirements.copy([requirement])[0];
 			local.geometry=switch local.geometry {
 				case Plane(frame):Plane(F.compose(F.inverse(result.pose),frame));
 				case Line(frame):Line(F.compose(F.inverse(result.pose),frame));

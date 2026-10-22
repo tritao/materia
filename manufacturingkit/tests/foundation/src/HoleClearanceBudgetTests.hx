@@ -1,3 +1,4 @@
+import materia.casting.CastingInput;
 import materia.casting.HoleClearanceBudget;
 import materia.casting.HoleClearanceBudget.HoleClearanceBudgets;
 import materia.casting.InsertManufacturing.InsertHoleRoute;
@@ -16,9 +17,9 @@ class HoleClearanceBudgetTests {
 	}
 
 	static function budget():HoleClearanceBudget
-		return {boltDiameterMm: 4, clearanceDiameterMm: 4.5, distanceFromDatumMm: 200,
-			placementOffsetMm: 0.02, placementAngleRad: 0, assemblyAdjustmentMm: 0.02,
-			cureBowMm: 0.03, machiningErrorMm: 0.03, pitchAccumulationMm: 0.01, requiredMarginMm: 0.02};
+		return {boltDiameterMm: 4, clearanceDiameterMm: Known(4.5), distanceFromDatumMm: 200,
+			placementOffsetMm: Known(0.02), placementAngleRad: Known(0), assemblyAdjustmentMm: Known(0.02),
+			cureBowMm: Known(0.03), machiningErrorMm: Known(0.03), pitchAccumulationMm: Known(0.01), requiredMarginMm: Known(0.02)};
 
 	public static function run():Void {
 		var both = [InsertHoleRoute.BeforeCasting, InsertHoleRoute.TransferAfterCasting];
@@ -27,7 +28,7 @@ class HoleClearanceBudgetTests {
 			case UsePreCast(margin): Math.abs(margin - 0.12) < 1e-12;
 			default: false;
 		}, "closed worst-case budget selects pre-cast drilling");
-		source.placementAngleRad = 0.001;
+		source.placementAngleRad = Known(0.001);
 		check(switch HoleClearanceBudgets.choose(source, both) {
 			case UseTransfer(margin): Math.abs(margin - 0.2) < 1e-12;
 			default: false;
@@ -37,7 +38,7 @@ class HoleClearanceBudgetTests {
 			default: false;
 		}, "a forbidden transfer route cannot silently rescue pre-cast drilling");
 		source = budget();
-		source.placementOffsetMm = null;
+		source.placementOffsetMm = Unresolved("placementOffsetMm");
 		check(switch HoleClearanceBudgets.choose(source, both) {
 			case UseTransfer(_): true;
 			default: false;
@@ -46,12 +47,12 @@ class HoleClearanceBudgetTests {
 			case AwaitInputs(missing): missing.indexOf("placementOffsetMm") >= 0;
 			default: false;
 		}, "unknown pre-cast error stays pending when transfer is forbidden");
-		source.machiningErrorMm = null;
+		source.machiningErrorMm = Unresolved("machiningErrorMm");
 		check(switch HoleClearanceBudgets.choose(source, both) {
 			case ProposeTransfer(missing): missing.join(",") == "machiningErrorMm";
 			default: false;
 		}, "proposed transfer still requires its guide and machining budget");
-		source.machiningErrorMm = 0.3;
+		source.machiningErrorMm = Known(0.3);
 		check(switch HoleClearanceBudgets.choose(source, both) {
 			case ChangeDesign(_): true;
 			default: false;
@@ -61,7 +62,7 @@ class HoleClearanceBudgetTests {
 			default: false;
 		}, "no route permission requires a source design change");
 		var error = "";
-		source = budget(); source.cureBowMm = -0.1;
+		source = budget(); source.cureBowMm = Known(-0.1);
 		try HoleClearanceBudgets.assess(source) catch (e:Dynamic) error = Std.string(e);
 		check(error.indexOf("cureBowMm") >= 0, "negative error bounds are rejected by field name");
 		error = "";
@@ -74,7 +75,7 @@ class HoleClearanceBudgetTests {
 			connectorFrame: F.alongY(0, 200, 35, 0, 0, 1), clearanceReference: "test reference",
 			permittedRoutes: both, budget: budget()
 		};
-		var copied = InsertMountHoleRequirements.snapshot([requirement]);
+		var copied = InsertMountHoleRequirements.copy([requirement]);
 		check(copied[0].componentPath == requirement.componentPath && copied[0].connectorFrame.z == 35,
 			"placed component and connector lineage survive the strict codec");
 		var hole:InsertHole = {
@@ -97,9 +98,9 @@ class HoleClearanceBudgetTests {
 		try InsertMountHoleRequirements.references(copied, holes) catch (e:Dynamic) error = Std.string(e);
 		check(error.indexOf("axis differs") >= 0, "a rotated hole breaks connector lineage independently");
 		error = "";
-		try InsertMountHoleRequirements.snapshot([requirement, requirement]) catch (e:Dynamic) error = Std.string(e);
+		try InsertMountHoleRequirements.snapshot(InsertMountHoleRequirements.records([requirement, requirement])) catch (e:Dynamic) error = Std.string(e);
 		check(error.indexOf("Duplicate mounting-hole") >= 0, "one requirement per source hole");
-		var changed:Dynamic = haxe.Json.parse(haxe.Json.stringify(requirement));
+		var changed:Dynamic = haxe.Json.parse(haxe.Json.stringify(InsertMountHoleRequirements.records([requirement])[0]));
 		Reflect.setField(changed, "future", true); error = "";
 		try InsertMountHoleRequirements.snapshot([changed]) catch (e:Dynamic) error = Std.string(e);
 		check(error.length > 0, "unknown mounting requirement fields are rejected");
@@ -117,8 +118,8 @@ class HoleClearanceBudgetTests {
 		var job=materia.tooling.casting.InsertManufacturingPlan.build(insert);
 		check(job.holeBudgets.length==1 && job.holeBudgets[0].status=="pass"
 			&& job.holeBudgets[0].route==InsertHoleRoute.BeforeCasting,"source budget drives the manufacturing report");
-		manufacturing.mountingRequirements[0].budget.machiningErrorMm=null;
-		manufacturing.mountingRequirements[0].budget.requiredMarginMm=null;
+		manufacturing.mountingRequirements[0].budget.machiningErrorMm=Unresolved("machiningErrorMm");
+		manufacturing.mountingRequirements[0].budget.requiredMarginMm=Unresolved("requiredMarginMm");
 		error="";
 		try materia.casting.InsertManufacturing.InsertManufacturingCodec.references(manufacturing,holes,[])
 		catch (e:Dynamic) error=Std.string(e);

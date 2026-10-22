@@ -27,12 +27,12 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 17;
+	public static inline var VERSION = 18;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
 	public static function encode(document:ToolingDocument):String {
-		var text = canonical({format: FORMAT, version: VERSION, document: snapshot(document)}) + "\n";
+		var text = canonical({format: FORMAT, version: VERSION, document: documentRecord(snapshot(document))}) + "\n";
 		checkSize(text);
 		return text;
 	}
@@ -48,7 +48,7 @@ class ToolingCodec {
 
 	/** Persist source geometry once when a native source component needs no mold setup. */
 	public static function encodeInput(input:CastingToolingInput):String {
-		var text = canonical({format:FORMAT+"-source",version:VERSION,input:inputSnapshot(input)})+"\n";
+		var text = canonical({format:FORMAT+"-source",version:VERSION,input:inputRecord(inputSnapshot(input))})+"\n";
 		checkSize(text);
 		return text;
 	}
@@ -64,7 +64,7 @@ class ToolingCodec {
 
 	/** Accepts typed records through exactly the same validation as decoded JSON. */
 	public static function snapshot(document:ToolingDocument):ToolingDocument
-		return readDocument(document);
+		return readDocument(documentRecord(document));
 
 	static function readDocument(raw:Dynamic):ToolingDocument {
 		object(raw, ["input", "setup", "recipe"], "document");
@@ -79,7 +79,7 @@ class ToolingCodec {
 	}
 
 	public static function inputFingerprint(input:CastingToolingInput):String
-		return Sha256.encode(canonical(inputSnapshot(input)));
+		return Sha256.encode(canonical(inputRecord(inputSnapshot(input))));
 
 	public static function recipeFingerprint(recipe:ToolingRecipe):String
 		return Sha256.encode(canonical(recipeSnapshot(recipe)));
@@ -88,7 +88,22 @@ class ToolingCodec {
 		return Sha256.encode(encode(document));
 
 	public static function inputSnapshot(input:CastingToolingInput):CastingToolingInput
-		return readInput(input);
+		return readInput(inputRecord(input));
+
+	public static function inputRecord(input:CastingToolingInput):Dynamic {
+		return Json.parse(canonical({id:input.id,revision:input.revision,lengthUnit:input.lengthUnit,
+			envelope:input.envelope,features:input.features,datumScheme:input.datumScheme,
+			interfaces:materia.casting.InterfaceRequirement.InterfaceRequirements.records(input.interfaces),
+			interfaceContext:input.interfaceContext==null ? null : materia.casting.CastingInterfaceContext.CastingInterfaceContexts.record(input.interfaceContext),
+			inserts:[for (i in input.inserts) {
+				var spec=materia.casting.InsertSpec.InsertSpecCodec.record({body:i.body,holes:i.holes,origin:i.origin,anchorage:i.anchorage,interfaces:i.interfaces});
+				{id:i.id,body:spec.body,holes:spec.holes,origin:spec.origin,anchorage:spec.anchorage,interfaces:spec.interfaces,
+					pose:i.pose,role:i.role,label:i.label,positionTolerance:i.positionTolerance,material:i.material,finish:i.finish};
+			}]}));
+	}
+
+	public static function documentRecord(document:ToolingDocument):Dynamic
+		return Json.parse(canonical({input:inputRecord(document.input),setup:document.setup,recipe:document.recipe}));
 
 	static function readInput(raw:Dynamic):CastingToolingInput {
 		object(raw, ["id", "revision", "lengthUnit", "envelope", "features", "inserts", "datumScheme", "interfaces", "interfaceContext"], "input");
@@ -733,6 +748,10 @@ class ToolingCodec {
 
 	/** Sort object keys as well as named records so field construction order is irrelevant. */
 	public static function canonical(value:Dynamic):String {
+		if (Std.isOfType(value,materia.casting.CastingInput))
+			return canonical(materia.casting.CastingInput.CastingInputs.record(cast value));
+		if (Std.isOfType(value,materia.casting.CastingInput.CastingTextInput))
+			return canonical(materia.casting.CastingInput.CastingInputs.textRecord(cast value));
 		if (Std.isOfType(value,materia.tooling.casting.FormerConstruction.FormerBuild))
 			return canonical(materia.tooling.casting.FormerConstruction.buildRecord(cast value));
 		if (Std.isOfType(value,materia.casting.CastingRegion))

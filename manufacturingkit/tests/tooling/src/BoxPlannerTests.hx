@@ -153,7 +153,7 @@ class BoxPlannerTests {
 		var stocked=ToolingCodec.snapshot(d);
 		stocked.input.inserts[0].interfaces=[{
 			id:"ground-top",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,14)),
-			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:null,
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],
 			positionToleranceMm:0.01,datumReference:"primary",relationshipIds:[]
 		}];

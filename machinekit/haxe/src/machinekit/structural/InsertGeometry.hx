@@ -9,7 +9,7 @@ import materia.casting.InsertStages.InsertStage;
  * component role, material or label to reconstruct contact geometry. */
 class InsertGeometry {
 	public static function part(authored:InsertSpec,stage:InsertStage):Part {
-		var spec=InsertSpecCodec.snapshot(authored);
+		var spec=InsertSpecCodec.snapshot(InsertSpecCodec.record(authored));
 		var size=switch InsertBodyCodec.mouth(spec.body) {
 			case Box(w,d,h):{width:w,depth:d,height:h};
 			case Cylinder(d,h):{width:d,depth:d,height:InsertBodyCodec.height(spec.body)};

@@ -22,6 +22,18 @@ typedef InsertMountHoleRequirement = {
 }
 
 class InsertMountHoleRequirements {
+	public static function records(rows:Array<InsertMountHoleRequirement>):Array<Dynamic> {
+		return [for (row in rows) {
+			holeId:row.holeId, componentPath:row.componentPath,
+			componentFingerprint:row.componentFingerprint, connectorId:row.connectorId,
+			connectorFrame:row.connectorFrame, clearanceReference:row.clearanceReference,
+			permittedRoutes:row.permittedRoutes.copy(), budget:HoleClearanceBudgets.record(row.budget)
+		}];
+	}
+
+	public static function copy(rows:Array<InsertMountHoleRequirement>):Array<InsertMountHoleRequirement>
+		return snapshot(records(rows));
+
 	public static function snapshot(raw:Dynamic):Array<InsertMountHoleRequirement> {
 		if (!Std.isOfType(raw, Array)) throw "Invalid mounting-hole requirements";
 		var rows:Array<Dynamic> = cast raw;

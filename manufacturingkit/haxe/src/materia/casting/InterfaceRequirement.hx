@@ -43,9 +43,9 @@ typedef InterfaceRequirement = {
 	 * planning must report the unsatisfied stock/layer requirement, never invent it.
 	 */
 	var allowanceMm:Float;
-	/** Declared finishing error share, independent of geometric stock. Null means
+	/** Declared finishing error share, independent of geometric stock. Unresolved means
 	 * the source accuracy budget is unresolved; it never supplies a default. */
-	var finishingProcessErrorMm:Null<Float>;
+	var finishingProcessErrorMm:CastingInput;
 	var permittedFinishes:Array<InterfaceFinish>;
 	var positionToleranceMm:Float;
 	var datumReference:String;
@@ -70,7 +70,6 @@ class InterfaceRequirements {
 			if (seen.exists(id)) throw "Duplicate interface requirement: " + id;
 			seen.set(id, true);
 			var g = Reflect.field(row, "geometry");
-			if (Std.isOfType(g, PrecisionGeometry)) g = geometryRecord(cast g);
 			CastingFeatureCodec.fields(g, ["kind", "frame"]);
 			var frame = CastingRecordCodec.frame(Reflect.field(g, "frame"));
 			var geometry:PrecisionGeometry = switch CastingRecordCodec.string(g, "kind") {
@@ -92,9 +91,8 @@ class InterfaceRequirements {
 			var allowance = CastingRecordCodec.number(row, "allowanceMm");
 			var tolerance = CastingRecordCodec.number(row, "positionToleranceMm");
 			if (!Reflect.hasField(row,"finishingProcessErrorMm")) throw "Missing finishing process error allocation: " + id;
-			var error:Null<Float> = Reflect.field(row,"finishingProcessErrorMm") == null
-				? null : CastingRecordCodec.number(row,"finishingProcessErrorMm");
-			if (error != null && error < 0) throw "Invalid finishing process error allocation: " + id;
+			var error=CastingInput.CastingInputs.number(Reflect.field(row,"finishingProcessErrorMm"));
+			switch error {case Known(value):if (value<0) throw "Invalid finishing process error allocation: "+id;case Unresolved(_):}
 			if (allowance < 0 || tolerance <= 0) throw "Invalid interface allowance or tolerance: " + id;
 			if ((route == InterfaceRoute.AsCast || route == InterfaceRoute.AsSupplied) && allowance != 0)
 				throw "Interface route cannot carry finishing stock: " + id;
@@ -117,15 +115,21 @@ class InterfaceRequirements {
 
 	public static function records(requirements:Array<InterfaceRequirement>):Array<Dynamic> {
 		var result:Array<Dynamic> = [];
-		for (r in snapshot(requirements)) result.push({id: r.id, geometry: geometryRecord(r.geometry), route: (r.route:String),
-			allowanceMm: r.allowanceMm, finishingProcessErrorMm: r.finishingProcessErrorMm, permittedFinishes: [for (f in r.permittedFinishes) (f:String)],
+		for (r in requirements) result.push({id: r.id, geometry: geometryRecord(r.geometry), route: (r.route:String),
+			allowanceMm: r.allowanceMm, finishingProcessErrorMm: CastingInput.CastingInputs.record(r.finishingProcessErrorMm), permittedFinishes: [for (f in r.permittedFinishes) (f:String)],
 			positionToleranceMm: r.positionToleranceMm, datumReference: r.datumReference, relationshipIds: r.relationshipIds});
 		return result;
 	}
 
+	public static function copy(rows:Array<InterfaceRequirement>):Array<InterfaceRequirement>
+		return snapshot(records(rows));
+
 	/** Remaining combined fixture/casting/metrology budget; no geometric use. */
 	public static function fixtureBudgetMm(r:InterfaceRequirement):Null<Float>
-		return r.finishingProcessErrorMm == null ? null : r.positionToleranceMm - r.finishingProcessErrorMm;
+		return switch r.finishingProcessErrorMm {
+			case Known(value):r.positionToleranceMm-value;
+			case Unresolved(_):null;
+		};
 
 	public static function lacksDeclaredAllowance(r:InterfaceRequirement):Bool
 		return r.allowanceMm == 0 && (r.route == InterfaceRoute.Machined || r.route == InterfaceRoute.Ground || r.route == InterfaceRoute.Replicated);

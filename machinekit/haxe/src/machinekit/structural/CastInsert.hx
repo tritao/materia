@@ -135,10 +135,10 @@ class CastInsert extends MachineComponent {
 		return InsertBodyCodec.box(bodySpec(), id);
 
 	public function insertMaterial():materia.casting.InsertMaterial.InsertMaterialSpec
-		return materia.casting.InsertMaterial.InsertMaterials.specification(cast parameterToken("stockMaterial"));
+		return materia.casting.InsertMaterial.InsertMaterials.specification(materia.casting.InsertMaterial.InsertMaterials.read(parameterToken("stockMaterial")));
 
 	public function buildStage():materia.casting.InsertStages.InsertStage
-		return cast parameterToken("buildStage");
+		return materia.casting.InsertStages.read(parameterToken("buildStage"));
 
 	/** Complete source design; the published physical facet follows buildStage. */
 	public function insertSpec():materia.casting.InsertSpec {
@@ -179,7 +179,7 @@ class CastInsert extends MachineComponent {
 		return InsertGeometry.part(insertSpec(),buildStage());
 
 	override public function setMaterial(spec:String):Void {
-		if (materia.project.MaterialLibrary.fromSpec(spec) != stockMaterialId(cast parameterToken("stockMaterial")))
+		if (materia.project.MaterialLibrary.fromSpec(spec) != stockMaterialId(materia.casting.InsertMaterial.InsertMaterials.read(parameterToken("stockMaterial"))))
 			throw "Cast insert material differs from its declared stock grade";
 		super.setMaterial(spec);
 	}

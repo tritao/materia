@@ -102,7 +102,7 @@ class FoundationDatums {
 			CastingRecordCodec.frame(insert.pose);
 			if (result.insertHoles.exists(insert.id)) throw "Duplicate datum source insert: " + insert.id;
 			result.insertHoles.set(insert.id, [for (hole in InsertHole.InsertHoleCodec.snapshot(insert.holes)) hole.id]);
-			result.insertInterfaces.set(insert.id, [for (requirement in InterfaceRequirements.snapshot(insert.interfaces)) requirement.id]);
+			result.insertInterfaces.set(insert.id, [for (requirement in InterfaceRequirements.copy(insert.interfaces)) requirement.id]);
 		}
 		result.bodyFaces.sort(Reflect.compare);
 		return result;
@@ -142,7 +142,7 @@ class FoundationDatums {
 
 	static function validateRequirementReferences(scheme:FoundationDatumScheme, requirements:Array<InterfaceRequirement>):Void {
 		var ids = [for (datum in ordered(scheme)) datum.id];
-		for (requirement in InterfaceRequirements.snapshot(requirements))
+		for (requirement in InterfaceRequirements.copy(requirements))
 			if (ids.indexOf(requirement.datumReference) < 0)
 				throw "Interface refers to an undeclared foundation datum: " + requirement.id;
 	}

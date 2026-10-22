@@ -48,7 +48,7 @@ class MountHoleDerivation {
 			hole.frame=F.compose(connector,drill);
 			hole.frame.z=stock.z+stock.height;
 			materia.casting.InsertStages.validateServiceHole(hole,stock);
-			var budget:HoleClearanceBudget={boltDiameterMm:thread.majorDiameter,clearanceDiameterMm:clearance,
+			var budget:HoleClearanceBudget={boltDiameterMm:thread.majorDiameter,clearanceDiameterMm:clearance==null ? materia.casting.CastingInput.Unresolved("Bought-part bolt clearance") : materia.casting.CastingInput.Known(clearance),
 				distanceFromDatumMm:Math.sqrt(hole.frame.x*hole.frame.x+hole.frame.y*hole.frame.y),
 				placementOffsetMm:allocation.placementOffsetMm,placementAngleRad:allocation.placementAngleRad,
 				assemblyAdjustmentMm:allocation.assemblyAdjustmentMm,cureBowMm:allocation.cureBowMm,
@@ -65,7 +65,7 @@ class MountHoleDerivation {
 			result.holes.push(hole);
 		}
 		// Apply the same lineage/budget schema on cast and welded receivers.
-		materia.casting.InsertMountHoleRequirement.InsertMountHoleRequirements.snapshot(result.requirements);
+		materia.casting.InsertMountHoleRequirement.InsertMountHoleRequirements.copy(result.requirements);
 		return result;
 	}
 }

@@ -27,7 +27,7 @@ class ReplicationContactTests {
 	static function replicatedLayer():Void {
 		var requirement:materia.casting.InterfaceRequirement={id:"finished-plane",
 			geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,21)),
-			route:materia.casting.InterfaceRequirement.InterfaceRoute.Replicated,allowanceMm:1,finishingProcessErrorMm:null,
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Replicated,allowanceMm:1,finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
 			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.JigMaster],positionToleranceMm:0.01,
 			datumReference:"primary",relationshipIds:[]};
 		var values=machinekit.structural.CastInsert.boxValues(40,30,20)
@@ -71,7 +71,7 @@ class ReplicationContactTests {
 		}
 		check(ReplicationContactCad.review(input,jigs)[0].status==ToolingCheckStatus.Pass,
 			"a hole drilled after replication does not remove the as-replicated contact footprint");
-		var ground=materia.casting.InterfaceRequirement.InterfaceRequirements.snapshot([requirement])[0];
+		var ground=materia.casting.InterfaceRequirement.InterfaceRequirements.copy([requirement])[0];
 		ground.geometry=materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,19));
 		ground.route=materia.casting.InterfaceRequirement.InterfaceRoute.Ground;
 		ground.permittedFinishes=[materia.casting.InterfaceRequirement.InterfaceFinish.Ground];

@@ -98,7 +98,7 @@ class InsertDrawing {
 			var frame=materia.casting.InterfaceRequirement.InterfaceRequirements.geometryFrame(requirement.geometry);
 			note(requirement.id+" finished reference XYZ="+frame.x+","+frame.y+","+frame.z+" / "+requirement.route
 				+" / stock or layer="+requirement.allowanceMm+" / finishing error allocation="
-				+(requirement.finishingProcessErrorMm==null ? "pending" : Std.string(requirement.finishingProcessErrorMm))
+				+(switch requirement.finishingProcessErrorMm { case Known(value):Std.string(value); case Unresolved(_):"pending"; })
 				+" / foundation datum="+requirement.datumReference);
 		}
 		if (unsupported.length>0) note("Oblique entry projections not rendered: "+unsupported.join(", "));
