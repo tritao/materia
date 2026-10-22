@@ -4,6 +4,7 @@
   "toneMapping": "neutral"
  },
  "categories": [
+  "Precision mounts",
   "Axis modules",
   "Mounts and couplings",
   "Controllers and cabinets",
@@ -264,139 +265,8 @@
    "fidelity": "nominal"
   },
   {
-   "id": "machinekit.assembly.hzmotion-drawing-component",
-   "label": "Hzmotion drawing component",
-   "family": "assembly",
-   "category": "Axis modules",
-   "kind": "reference",
-   "designation": "HZMOTION-M60D-BK12-C-hzmotion-pdf-2025-04-09-v2-unspecified",
-   "description": "HZMotion M60D-BK12-C — drawing model",
-   "parameters": [
-    {
-     "name": "model",
-     "type": "choice",
-     "value": "M60D-BK12-C",
-     "options": [
-      "M60D-BK12-C",
-      "M60D-EK12-C",
-      "M60D-FK12-A",
-      "KK86-FK10L",
-      "KK86-80EP-adapter",
-      "M80E-BK15-C",
-      "BF12",
-      "BF15",
-      "FK12",
-      "EF12"
-     ]
-    },
-    {
-     "name": "revision",
-     "type": "choice",
-     "value": "hzmotion-pdf-2025-04-09-v2",
-     "options": [
-      "hzmotion-pdf-2025-04-09-v2",
-      "hzmotion-pdf-2025-04-09-v1"
-     ]
-    },
-    {
-     "name": "bearingGrade",
-     "type": "choice",
-     "value": "unspecified",
-     "options": [
-      "unspecified",
-      "C3",
-      "C4",
-      "C5"
-     ]
-    }
-   ],
-   "connectors": [
-    {
-     "name": "motor",
-     "role": "Mount"
-    },
-    {
-     "name": "motorBolt1",
-     "role": "Face"
-    },
-    {
-     "name": "motorBolt2",
-     "role": "Face"
-    },
-    {
-     "name": "motorBolt3",
-     "role": "Face"
-    },
-    {
-     "name": "motorBolt4",
-     "role": "Face"
-    },
-    {
-     "name": "shaftAxis",
-     "role": "Axis"
-    },
-    {
-     "name": "base",
-     "role": "Mount"
-    },
-    {
-     "name": "baseBolt1",
-     "role": "Face"
-    },
-    {
-     "name": "baseBolt2",
-     "role": "Face"
-    },
-    {
-     "name": "baseBolt3",
-     "role": "Face"
-    },
-    {
-     "name": "baseBolt4",
-     "role": "Face"
-    },
-    {
-     "name": "baseBolt5",
-     "role": "Face"
-    },
-    {
-     "name": "baseBolt6",
-     "role": "Face"
-    },
-    {
-     "name": "screwShoulder",
-     "role": "Axis"
-    }
-   ],
-   "bom": {
-    "description": "HZMotion M60D-BK12-C — drawing model",
-    "material": "unspecified",
-    "partNumber": "HZMOTION-M60D-BK12-C-hzmotion-pdf-2025-04-09-v2-unspecified"
-   },
-   "material": "neutral",
-   "mass": {
-    "kg": 0.79,
-    "source": "Declared"
-   },
-   "model": "assembly-hzmotion-drawing-component.glb",
-   "view": {
-    "environment": "/components/environment/studio-62.hdr",
-    "phi": 62,
-    "theta": 35
-   },
-   "fidelity": "nominal"
-  },
-  {
-   "id": "machinekit.assembly.hzmotion-supplier-component",
-   "label": "Hzmotion supplier component",
-   "family": "assembly",
-   "category": "Axis modules",
-   "kind": "supplier",
-   "error": "Could not open source file"
-  },
-  {
-   "id": "machinekit.assembly.nema-mount-plate",
-   "label": "Nema mount plate",
+   "id": "machinekit.assembly.motor-plate",
+   "label": "Motor plate",
    "family": "assembly",
    "category": "Mounts and couplings",
    "kind": "generic",
@@ -404,15 +274,70 @@
    "description": "Motor plate for 17HS19-1684S1",
    "parameters": [
     {
-     "name": "model",
-     "type": "catalogue",
+     "name": "motor",
+     "type": "choice",
      "value": "17HS19-1684S1",
      "options": [
       "17HS19-1684S1",
       "23HS22-2804S",
       "OPENBUILDS-NEMA23-56",
       "34HS31-5504S",
-      "17HS08-1004S"
+      "17HS08-1004S",
+      "ELM1H-0050MA40F",
+      "ELM1H-0050MA40E",
+      "ELM1H-0100MA40F",
+      "ELM1H-0100MA40E",
+      "ELM1H-0200MA60F",
+      "ELM1H-0200MA60E",
+      "ELM1H-0400MA60F",
+      "ELM1H-0400MA60E",
+      "ELM1H-0750MA80F",
+      "ELM1H-0750MA80E",
+      "ELM1H-1000MA80F",
+      "ELM1H-1000MA80E",
+      "ELM2H-0050LA40F",
+      "ELM2H-0050LA40E",
+      "ELM2H-0100LA40F",
+      "ELM2H-0100LA40E",
+      "ELM2H-0200LA60F",
+      "ELM2H-0200LA60E",
+      "ELM2H-0400LA60F",
+      "ELM2H-0400LA60E",
+      "ELM2H-0750LA80F",
+      "ELM2H-0750LA80E",
+      "ELM2H-1000LA80F",
+      "ELM2H-1000LA80E",
+      "ELM2H-0850LD130F-HD",
+      "ELM2H-0850LD130E-HD",
+      "ELM2H-1300LD130F-HD",
+      "ELM2H-1300LD130E-HD",
+      "ELM2H-1800LD130F-HD",
+      "ELM2H-1800LD130E-HD",
+      "ELM2M-1000LB130F-H",
+      "ELM2M-1000LB130E-H",
+      "ELM2M-1500LB130F-H",
+      "ELM2M-1500LB130E-H",
+      "ELM2M-2000LB130F-H",
+      "ELM2M-2000LB130E-H",
+      "ELM2L-1000LA100FT-H",
+      "ELM2L-1000LA100ET-H",
+      "ELM2L-1500LA100FT-H",
+      "ELM2L-1500LA100ET-H",
+      "ELM2H-0850LD130FT-H",
+      "ELM2H-0850LD130ET-H",
+      "ELM2H-1300LD130FT-H",
+      "ELM2H-1300LD130ET-H",
+      "ELM2H-1800LD130FT-H",
+      "ELM2H-1800LD130ET-H",
+      "ELM2M-2900LD180FT-H",
+      "ELM2M-2900LD180ET-H",
+      "ELM2M-4400LD180FT-H",
+      "ELM2M-4400LD180ET-H",
+      "ELM2M-5500LD180FT-H",
+      "ELM2M-5500LD180ET-H",
+      "ELM2M-7500LD180FT-H",
+      "ELM2M-7500LD180ET-H",
+      "ELM2L-1500LA100FT-H MS1AE"
      ]
     },
     {
@@ -535,95 +460,20 @@
    "bom": {
     "description": "Motor plate for 17HS19-1684S1",
     "material": "aluminium 6061",
-    "partNumber": "machinekit.assembly.nema-mount-plate|model:13:17HS19-1684S1|thickness:1:6|margin:2:10|profileSystem:4:None|railSpacing:1:0|alongPitch:1:0|profileHoleDiameter:1:0"
+    "partNumber": "machinekit.assembly.motor-plate|motor:13:17HS19-1684S1|thickness:1:6|margin:2:10|profileSystem:4:None|railSpacing:1:0|alongPitch:1:0|profileHoleDiameter:1:0"
    },
    "material": "aluminium",
-   "catalogs": [
-    {
-     "parameter": "model",
-     "rows": [
-      {
-       "designation": "17HS19-1684S1",
-       "source": "https://www.omc-stepperonline.com/nema-17-bipolar-1-8deg-45ncm-64oz-in-1-68a-2-8v-42x42x48mm-4-wires-17hs19-1684s1",
-       "dimensions": "Unverified",
-       "conformance": "NominalEnvelope",
-       "verified": [
-        "bodyFace",
-        "bodyLength",
-        "shaftDiameter",
-        "shaftLength"
-       ]
-      },
-      {
-       "designation": "23HS22-2804S",
-       "source": "https://www.omc-stepperonline.com/nema-23-bipolar-1-8deg-1-26nm-178-4oz-in-2-8a-2-5v-57x57x56mm-4-wires-23hs22-2804s",
-       "dimensions": "Mixed",
-       "conformance": "NominalEnvelope",
-       "verified": [
-        "bodyFace",
-        "bodyLength",
-        "shaftDiameter",
-        "shaftLength"
-       ]
-      },
-      {
-       "designation": "OPENBUILDS-NEMA23-56",
-       "source": "https://github.com/gumyr/bd_warehouse/blob/e6ae6e7bae74cb3a50cbde395930ba24a1051f88/src/bd_warehouse/open_builds.py",
-       "dimensions": "Unverified",
-       "conformance": "NominalEnvelope",
-       "verified": [
-        "bodyFace",
-        "bodyLength",
-        "shaftDiameter",
-        "shaftLength"
-       ]
-      },
-      {
-       "designation": "34HS31-5504S",
-       "source": "https://www.omc-stepperonline.com/nema-34-cnc-stepper-motor-4-5nm-637-25oz-in-5-5a-86x86x80mm-key-way-shaft-34hs31-5504s",
-       "dimensions": "Unverified",
-       "conformance": "NominalEnvelope",
-       "verified": [
-        "bodyFace",
-        "bodyLength",
-        "shaftDiameter",
-        "shaftLength"
-       ]
-      },
-      {
-       "designation": "17HS08-1004S",
-       "source": "https://www.omc-stepperonline.com/nema-17-bipolar-1-8deg-13ncm-18-4oz-in-1a-4-2v-42x42x20mm-4-wires-17hs08-1004s",
-       "dimensions": "Unverified",
-       "conformance": "NominalEnvelope",
-       "verified": [
-        "bodyFace",
-        "bodyLength",
-        "shaftDiameter",
-        "shaftLength"
-       ]
-      }
-     ]
-    }
-   ],
    "mass": {
     "kg": 0.056018,
     "source": "Computed(Preview)"
    },
-   "model": "assembly-nema-mount-plate.glb",
+   "model": "assembly-motor-plate.glb",
    "view": {
     "environment": "/components/environment/studio-50.hdr",
     "phi": 50,
     "theta": 35
    },
    "fidelity": "nominal"
-  },
-  {
-   "id": "machinekit.assembly.rbk-motor-mount",
-   "label": "Rbk motor mount",
-   "family": "assembly",
-   "category": "Mounts and couplings",
-   "kind": "machine-part",
-   "error": "Missing pinned RBK CAD asset ddd8cd342c35ade3d661dccb62a794b53860e07892c180d6bdcdb877bf034608 in build/suppliers/vallder"
   },
   {
    "id": "machinekit.assembly.screw-axis-coupling",
@@ -4751,9 +4601,71 @@
    "family": "milling",
    "category": "Drives and mounts",
    "kind": "machine-part",
-   "designation": "MILL-X-RETURN-MOTOR-PLATE",
-   "description": "Recessed Leadshine 60 mm X motor plate",
+   "designation": "MILL-X-RETURN-MOTOR-PLATE-ELM2H-0400LA60F",
+   "description": "Recessed X motor plate for ELM2H-0400LA60F",
    "parameters": [
+    {
+     "name": "motor",
+     "type": "choice",
+     "value": "ELM2H-0400LA60F",
+     "options": [
+      "ELM1H-0050MA40F",
+      "ELM1H-0050MA40E",
+      "ELM1H-0100MA40F",
+      "ELM1H-0100MA40E",
+      "ELM1H-0200MA60F",
+      "ELM1H-0200MA60E",
+      "ELM1H-0400MA60F",
+      "ELM1H-0400MA60E",
+      "ELM1H-0750MA80F",
+      "ELM1H-0750MA80E",
+      "ELM1H-1000MA80F",
+      "ELM1H-1000MA80E",
+      "ELM2H-0050LA40F",
+      "ELM2H-0050LA40E",
+      "ELM2H-0100LA40F",
+      "ELM2H-0100LA40E",
+      "ELM2H-0200LA60F",
+      "ELM2H-0200LA60E",
+      "ELM2H-0400LA60F",
+      "ELM2H-0400LA60E",
+      "ELM2H-0750LA80F",
+      "ELM2H-0750LA80E",
+      "ELM2H-1000LA80F",
+      "ELM2H-1000LA80E",
+      "ELM2H-0850LD130F-HD",
+      "ELM2H-0850LD130E-HD",
+      "ELM2H-1300LD130F-HD",
+      "ELM2H-1300LD130E-HD",
+      "ELM2H-1800LD130F-HD",
+      "ELM2H-1800LD130E-HD",
+      "ELM2M-1000LB130F-H",
+      "ELM2M-1000LB130E-H",
+      "ELM2M-1500LB130F-H",
+      "ELM2M-1500LB130E-H",
+      "ELM2M-2000LB130F-H",
+      "ELM2M-2000LB130E-H",
+      "ELM2L-1000LA100FT-H",
+      "ELM2L-1000LA100ET-H",
+      "ELM2L-1500LA100FT-H",
+      "ELM2L-1500LA100ET-H",
+      "ELM2H-0850LD130FT-H",
+      "ELM2H-0850LD130ET-H",
+      "ELM2H-1300LD130FT-H",
+      "ELM2H-1300LD130ET-H",
+      "ELM2H-1800LD130FT-H",
+      "ELM2H-1800LD130ET-H",
+      "ELM2M-2900LD180FT-H",
+      "ELM2M-2900LD180ET-H",
+      "ELM2M-4400LD180FT-H",
+      "ELM2M-4400LD180ET-H",
+      "ELM2M-5500LD180FT-H",
+      "ELM2M-5500LD180ET-H",
+      "ELM2M-7500LD180FT-H",
+      "ELM2M-7500LD180ET-H",
+      "ELM2L-1500LA100FT-H MS1AE"
+     ]
+    },
     {
      "name": "material",
      "type": "choice",
@@ -4811,9 +4723,9 @@
     }
    ],
    "bom": {
-    "description": "Recessed Leadshine 60 mm X motor plate",
+    "description": "Recessed X motor plate for ELM2H-0400LA60F",
     "material": "steel",
-    "partNumber": "machinekit.milling.belt-motor-plate|"
+    "partNumber": "machinekit.milling.belt-motor-plate|motor:15:ELM2H-0400LA60F"
    },
    "material": "machined-steel",
    "mass": {
@@ -12744,6 +12656,121 @@
    "fidelity": "nominal"
   },
   {
+   "id": "machinekit.motion.motor-adapter-plate",
+   "label": "Motor adapter plate",
+   "family": "motion",
+   "category": "Mounts and couplings",
+   "kind": "supplier",
+   "designation": "HZMOTION-KK86-80EP-adapter",
+   "description": "HZMotion KK86-80EP-adapter motor adapter plate",
+   "parameters": [
+    {
+     "name": "model",
+     "type": "choice",
+     "value": "KK86-80EP-adapter",
+     "options": [
+      "KK86-80EP-adapter"
+     ]
+    },
+    {
+     "name": "material",
+     "type": "choice",
+     "value": "aluminium 6061",
+     "options": [
+      "unspecified",
+      "painted steel",
+      "steel",
+      "steel C45",
+      "steel 8",
+      "steel 8.8",
+      "steel 10.9",
+      "stainless A2-70",
+      "steel 12.9",
+      "bearing steel",
+      "aluminium 6061",
+      "rubber",
+      "nitrile rubber NBR",
+      "PA12 nylon",
+      "plastic",
+      "device housing",
+      "device housing dark",
+      "polycarbonate",
+      "polyurethane PU",
+      "birch plywood",
+      "MDF",
+      "PMMA acrylic",
+      "EPS tooling",
+      "coated particleboard",
+      "mineral cast",
+      "carbide",
+      "cast iron",
+      "bronze",
+      "brass",
+      "spring steel",
+      "mild steel sheet",
+      "aluminium 5052-H32 sheet",
+      "Compact laminate",
+      "Glass reinforced plastic",
+      "Polypropylene",
+      "HDPE",
+      "UHMW polyethylene",
+      "FR aluminium composite panel",
+      "Aluminium honeycomb panel",
+      "Insulated sandwich panel",
+      "Stainless sheet",
+      "Panel adhesive"
+     ]
+    }
+   ],
+   "connectors": [
+    {
+     "name": "motor",
+     "role": "Mount"
+    },
+    {
+     "name": "shaftAxis",
+     "role": "Axis"
+    },
+    {
+     "name": "body",
+     "role": "Mount"
+    },
+    {
+     "name": "motorBolt1",
+     "role": "Face"
+    },
+    {
+     "name": "motorBolt2",
+     "role": "Face"
+    },
+    {
+     "name": "motorBolt3",
+     "role": "Face"
+    },
+    {
+     "name": "motorBolt4",
+     "role": "Face"
+    }
+   ],
+   "bom": {
+    "description": "HZMotion KK86-80EP-adapter motor adapter plate",
+    "material": "aluminium 6061",
+    "partNumber": "HZMOTION-KK86-80EP-adapter"
+   },
+   "material": "aluminium",
+   "mass": {
+    "kg": 0.119147,
+    "source": "Computed(Preview)"
+   },
+   "model": "motion-motor-adapter-plate.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
+    "theta": 35
+   },
+   "fidelity": "nominal"
+  },
+  {
    "id": "machinekit.motion.motor-driver",
    "label": "Motor driver",
    "family": "motion",
@@ -12900,6 +12927,139 @@
     "source": "Modelled"
    },
    "model": "motion-motor-driver.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   },
+   "fidelity": "nominal"
+  },
+  {
+   "id": "machinekit.motion.motor-mount",
+   "label": "Motor mount",
+   "family": "motion",
+   "category": "Mounts and couplings",
+   "kind": "supplier",
+   "designation": "HZMOTION-M60D-BK12-C",
+   "description": "HZMotion M60D-BK12-C motor mount",
+   "parameters": [
+    {
+     "name": "model",
+     "type": "choice",
+     "value": "M60D-BK12-C",
+     "options": [
+      "M60D-BK12-C",
+      "M60D-EK12-C",
+      "M60D-FK12-A",
+      "KK86-FK10L",
+      "M80E-BK15-C",
+      "RBK12-57",
+      "RBK15-57",
+      "RBK15-86",
+      "RBK17-86"
+     ]
+    },
+    {
+     "name": "revision",
+     "type": "choice",
+     "value": "hzmotion-pdf-2025-04-09-v2",
+     "options": [
+      "hzmotion-pdf-2025-04-09-v2",
+      "hzmotion-pdf-2025-04-09-v1",
+      "vallder-rbk-v1"
+     ]
+    },
+    {
+     "name": "bearingGrade",
+     "type": "choice",
+     "value": "unspecified",
+     "options": [
+      "unspecified",
+      "C3",
+      "C4",
+      "C5"
+     ]
+    },
+    {
+     "name": "geometry",
+     "type": "choice",
+     "value": "nominal",
+     "options": [
+      "nominal",
+      "hzmotion",
+      "vallder"
+     ]
+    }
+   ],
+   "connectors": [
+    {
+     "name": "base",
+     "role": "Mount"
+    },
+    {
+     "name": "motor",
+     "role": "Mount"
+    },
+    {
+     "name": "shaftAxis",
+     "role": "Axis"
+    },
+    {
+     "name": "motorBolt1",
+     "role": "Face"
+    },
+    {
+     "name": "motorBolt2",
+     "role": "Face"
+    },
+    {
+     "name": "motorBolt3",
+     "role": "Face"
+    },
+    {
+     "name": "motorBolt4",
+     "role": "Face"
+    },
+    {
+     "name": "baseBolt1",
+     "role": "Face"
+    },
+    {
+     "name": "baseBolt2",
+     "role": "Face"
+    },
+    {
+     "name": "baseBolt3",
+     "role": "Face"
+    },
+    {
+     "name": "baseBolt4",
+     "role": "Face"
+    },
+    {
+     "name": "baseBolt5",
+     "role": "Face"
+    },
+    {
+     "name": "baseBolt6",
+     "role": "Face"
+    },
+    {
+     "name": "screwShoulder",
+     "role": "Axis"
+    }
+   ],
+   "bom": {
+    "description": "HZMotion M60D-BK12-C motor mount",
+    "material": "unspecified",
+    "partNumber": "HZMOTION-M60D-BK12-C"
+   },
+   "material": "neutral",
+   "mass": {
+    "kg": 0.79,
+    "source": "Declared"
+   },
+   "model": "motion-motor-mount.glb",
    "view": {
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
@@ -15339,21 +15499,47 @@
    "label": "Screw support unit",
    "family": "motion",
    "category": "Screws and nuts",
-   "kind": "generic",
+   "kind": "supplier",
    "designation": "BK12",
-   "description": "Fixed screw support, 12 mm seat (assumed)",
+   "description": "Fixed screw support BK12, 12 mm journal, 7001AC",
    "parameters": [
     {
-     "name": "fixed",
-     "type": "yes/no",
-     "value": true
+     "name": "model",
+     "type": "choice",
+     "value": "BK12",
+     "options": [
+      "BK10",
+      "BK12",
+      "BK15",
+      "BK17",
+      "BK20",
+      "BK25",
+      "BF10",
+      "BF12",
+      "BF15",
+      "BF17",
+      "BF20",
+      "BF25",
+      "FK10",
+      "FK12",
+      "FK15",
+      "FK20",
+      "FF10",
+      "FF12",
+      "FF15",
+      "FF20",
+      "EF12"
+     ]
     },
     {
-     "name": "boreDiameter",
-     "type": "length",
-     "value": 12,
-     "unit": "mm",
-     "minimum": 0
+     "name": "geometry",
+     "type": "choice",
+     "value": "nominal",
+     "options": [
+      "nominal",
+      "vallder",
+      "hzmotion"
+     ]
     },
     {
      "name": "material",
@@ -15411,6 +15597,14 @@
      "role": "Axis"
     },
     {
+     "name": "shaft",
+     "role": "Axis"
+    },
+    {
+     "name": "base",
+     "role": "Mount"
+    },
+    {
      "name": "mount",
      "role": "Mount"
     },
@@ -15421,17 +15615,25 @@
     {
      "name": "mount2",
      "role": "Mount"
+    },
+    {
+     "name": "mount3",
+     "role": "Mount"
+    },
+    {
+     "name": "mount4",
+     "role": "Mount"
     }
    ],
    "bom": {
-    "description": "Fixed screw support, 12 mm seat (assumed)",
+    "description": "Fixed screw support BK12, 12 mm journal, 7001AC",
     "material": "steel",
-    "partNumber": "machinekit.motion.screw-support-unit|fixed:4:true|boreDiameter:2:12"
+    "partNumber": "BK12"
    },
    "material": "machined-steel",
    "mass": {
-    "kg": 0.46809,
-    "source": "Computed(Preview)"
+    "kg": 0.41,
+    "source": "Declared"
    },
    "model": "motion-screw-support-unit.glb",
    "view": {
@@ -16560,22 +16762,6 @@
    "fidelity": "nominal"
   },
   {
-   "id": "machinekit.motion.vallder-bf12-support",
-   "label": "Vallder bf12 support",
-   "family": "motion",
-   "category": "Screws and nuts",
-   "kind": "supplier",
-   "error": "Could not open source file"
-  },
-  {
-   "id": "machinekit.motion.vallder-screw-support",
-   "label": "Vallder screw support",
-   "family": "motion",
-   "category": "Screws and nuts",
-   "kind": "supplier",
-   "error": "Could not open source file"
-  },
-  {
    "id": "machinekit.motion.vallder-sfu1605-nut",
    "label": "Vallder sfu1605 nut",
    "family": "motion",
@@ -16876,7 +17062,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 0.648,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "pneumatic-air-supply.glb",
    "view": {
@@ -16884,7 +17070,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pneumatic.cylinder",
@@ -17098,7 +17284,7 @@
    "material": "machined-steel",
    "mass": {
     "kg": 0.070902,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "pneumatic-cylinder-rod.glb",
    "view": {
@@ -17106,7 +17292,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pneumatic.manifold",
@@ -17187,7 +17373,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 0.01512,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "pneumatic-manifold.glb",
    "view": {
@@ -17195,7 +17381,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pneumatic.routed-hose",
@@ -17924,7 +18110,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 0.162,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "pneumatic-solenoid-valve.glb",
    "view": {
@@ -17932,7 +18118,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pneumatic.suction-cup",
@@ -18075,7 +18261,7 @@
    "material": "rubber",
    "mass": {
     "kg": 0.024881,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "pneumatic-suction-cup.glb",
    "view": {
@@ -18083,7 +18269,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pneumatic.vacuum-control-valve",
@@ -18165,7 +18351,7 @@
    "material": "plastic",
    "mass": {
     "kg": 0.008986,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "pneumatic-vacuum-control-valve.glb",
    "view": {
@@ -18173,7 +18359,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pneumatic.vacuum-generator",
@@ -18323,7 +18509,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 0.020412,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "pneumatic-vacuum-generator.glb",
    "view": {
@@ -18331,7 +18517,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pneumatic.vacuum-pressure-sensor",
@@ -18413,7 +18599,7 @@
    "material": "plastic",
    "mass": {
     "kg": 0.009,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "pneumatic-vacuum-pressure-sensor.glb",
    "view": {
@@ -18421,7 +18607,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.power.brake-resistor",
@@ -25770,6 +25956,207 @@
    "fidelity": "datasheet"
   },
   {
+   "id": "machinekit.standard.hex-flange-bolt",
+   "label": "Hex flange bolt",
+   "family": "standard",
+   "category": null,
+   "kind": null,
+   "designation": "ISO4162-F-full-head-M6x20-8.8",
+   "description": "Full-form hex flange bolt M6x20",
+   "parameters": [
+    {
+     "name": "size",
+     "type": "catalogue",
+     "value": "M6",
+     "options": [
+      "M5",
+      "M6",
+      "M8",
+      "M10",
+      "M12",
+      "M14",
+      "M16"
+     ]
+    },
+    {
+     "name": "length",
+     "type": "length",
+     "value": 20,
+     "unit": "mm",
+     "minimum": 0
+    },
+    {
+     "name": "propertyClass",
+     "type": "choice",
+     "value": "8.8",
+     "options": [
+      "8.8",
+      "10.9"
+     ]
+    }
+   ],
+   "connectors": [
+    {
+     "name": "head",
+     "role": "Face"
+    },
+    {
+     "name": "tip",
+     "role": "Face"
+    }
+   ],
+   "bom": {
+    "description": "Full-form hex flange bolt M6x20",
+    "material": "steel 8.8",
+    "partNumber": "ISO4162-F-full-head-M6x20-8.8"
+   },
+   "material": "steel-8-8",
+   "catalogs": [
+    {
+     "parameter": "size",
+     "rows": [
+      {
+       "designation": "M5",
+       "source": "https://www.victoryfasteners.com/hexagon-head/hexagon-head-flange-bolt-iso-4162/",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "standard": "ISO 4162",
+       "verified": [
+        "diameter",
+        "pitch",
+        "acrossFlats",
+        "headHeight",
+        "flangeDiameter",
+        "flangeThickness",
+        "bearingInnerDiameter",
+        "bearingOuterDiameter",
+        "threadLength"
+       ]
+      },
+      {
+       "designation": "M6",
+       "source": "https://www.victoryfasteners.com/hexagon-head/hexagon-head-flange-bolt-iso-4162/",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "standard": "ISO 4162",
+       "verified": [
+        "diameter",
+        "pitch",
+        "acrossFlats",
+        "headHeight",
+        "flangeDiameter",
+        "flangeThickness",
+        "bearingInnerDiameter",
+        "bearingOuterDiameter",
+        "threadLength"
+       ]
+      },
+      {
+       "designation": "M8",
+       "source": "https://www.victoryfasteners.com/hexagon-head/hexagon-head-flange-bolt-iso-4162/",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "standard": "ISO 4162",
+       "verified": [
+        "diameter",
+        "pitch",
+        "acrossFlats",
+        "headHeight",
+        "flangeDiameter",
+        "flangeThickness",
+        "bearingInnerDiameter",
+        "bearingOuterDiameter",
+        "threadLength"
+       ]
+      },
+      {
+       "designation": "M10",
+       "source": "https://www.victoryfasteners.com/hexagon-head/hexagon-head-flange-bolt-iso-4162/",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "standard": "ISO 4162",
+       "verified": [
+        "diameter",
+        "pitch",
+        "acrossFlats",
+        "headHeight",
+        "flangeDiameter",
+        "flangeThickness",
+        "bearingInnerDiameter",
+        "bearingOuterDiameter",
+        "threadLength"
+       ]
+      },
+      {
+       "designation": "M12",
+       "source": "https://www.victoryfasteners.com/hexagon-head/hexagon-head-flange-bolt-iso-4162/",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "standard": "ISO 4162",
+       "verified": [
+        "diameter",
+        "pitch",
+        "acrossFlats",
+        "headHeight",
+        "flangeDiameter",
+        "flangeThickness",
+        "bearingInnerDiameter",
+        "bearingOuterDiameter",
+        "threadLength"
+       ]
+      },
+      {
+       "designation": "M14",
+       "source": "https://www.victoryfasteners.com/hexagon-head/hexagon-head-flange-bolt-iso-4162/",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "standard": "ISO 4162",
+       "verified": [
+        "diameter",
+        "pitch",
+        "acrossFlats",
+        "headHeight",
+        "flangeDiameter",
+        "flangeThickness",
+        "bearingInnerDiameter",
+        "bearingOuterDiameter",
+        "threadLength"
+       ]
+      },
+      {
+       "designation": "M16",
+       "source": "https://www.victoryfasteners.com/hexagon-head/hexagon-head-flange-bolt-iso-4162/",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "standard": "ISO 4162",
+       "verified": [
+        "diameter",
+        "pitch",
+        "acrossFlats",
+        "headHeight",
+        "flangeDiameter",
+        "flangeThickness",
+        "bearingInnerDiameter",
+        "bearingOuterDiameter",
+        "threadLength"
+       ]
+      }
+     ]
+    }
+   ],
+   "mass": {
+    "kg": 0.008173,
+    "source": "Computed(Preview)"
+   },
+   "model": "standard-hex-flange-bolt.glb",
+   "view": {
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
+    "theta": 35
+   },
+   "fidelity": "datasheet"
+  },
+  {
    "id": "machinekit.standard.hex-nut",
    "label": "Hex nut",
    "family": "standard",
@@ -27004,6 +27391,90 @@
    "view": {
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
+    "theta": 35
+   },
+   "fidelity": "envelope"
+  },
+  {
+   "id": "machinekit.structural.linear-mount-steel",
+   "label": "Linear mount steel",
+   "family": "structural",
+   "category": "Precision mounts",
+   "kind": "machine-part",
+   "designation": "LINEAR-MOUNT-STEEL",
+   "description": "C45 linear-mount receiver",
+   "parameters": [
+    {
+     "name": "width",
+     "type": "length",
+     "value": 28,
+     "unit": "mm",
+     "minimum": 0
+    },
+    {
+     "name": "length",
+     "type": "length",
+     "value": 500,
+     "unit": "mm",
+     "minimum": 0
+    },
+    {
+     "name": "thickness",
+     "type": "length",
+     "value": 20,
+     "unit": "mm",
+     "minimum": 0
+    },
+    {
+     "name": "role",
+     "type": "choice",
+     "value": "receiver",
+     "options": [
+      "receiver",
+      "adjustment-bar",
+      "carrier"
+     ]
+    },
+    {
+     "name": "holes",
+     "type": "text",
+     "value": "{\"version\":5,\"holes\":[]}"
+    },
+    {
+     "name": "mountingRequirements",
+     "type": "text",
+     "value": "[]"
+    },
+    {
+     "name": "compliance",
+     "type": "text",
+     "value": "null"
+    }
+   ],
+   "connectors": [
+    {
+     "name": "mount",
+     "role": "Mount"
+    },
+    {
+     "name": "top",
+     "role": "Mount"
+    }
+   ],
+   "bom": {
+    "description": "C45 linear-mount receiver",
+    "material": "steel C45",
+    "partNumber": "machinekit.structural.linear-mount-steel|width:2:28|length:3:500|thickness:2:20|role:8:receiver|holes:24:{\"version\":5,\"holes\":[]}|mountingRequirements:2:[]|compliance:4:null"
+   },
+   "material": "steel-c45",
+   "mass": {
+    "kg": 2.198,
+    "source": "Computed(Preview)"
+   },
+   "model": "structural-linear-mount-steel.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    },
    "fidelity": "envelope"
