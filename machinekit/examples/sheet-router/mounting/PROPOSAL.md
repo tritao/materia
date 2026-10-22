@@ -1,8 +1,10 @@
 # Shared-mount/router candidate — 2026-10-22
 
 **Review candidate; frozen CAD unchanged.** The shared source/fastener core and first rebuildable C45 receiver member
-(`LinearMountSteel`) are implemented. The physical RM2 factory, complete support brackets, automatic FE
-compliance export and full supported-router qualification are not complete.
+(`LinearMountSteel`) are implemented. The physical RM2 factory, complete support brackets, geometry-derived FE
+compliance and full supported-router qualification are not complete. Explicit
+translational compliance records now round-trip and export automatically; the
+complete mount still needs to generate and qualify those records.
 Do not treat this document or the local contact fixture as fabrication release.
 
 ## Proposed load path
@@ -47,14 +49,15 @@ layout. Washer thickness is the catalogue recipe's **1.6 mm**. Counterbores star
 at rack x=0 and their bearing plane is x=7 mm; receiver steel lies beyond the
 opposite rack face. The common fastener selector chooses **M6×25, class 8.8**.
 
-The fixture passes **26 native assertions**, including **1.10 mm** minimum
+The expanded fixture passes **54 native assertions**, including **1.10 mm** minimum
 clearance. It tests actual rack/washer/receiver contacts and a conservative
 20-tooth, 20 mm wide, left-hand pinion envelope at nine stations. This is a local
 contact/clearance test, not a native check of the complete drive, host brackets,
 adjusters, joint gauge, motor plate or a fatigue result. The receiver recipe and assembly round trip, material lock and automatic
 FEM mass/inertia export also pass. Full source and STEP witnesses are retained
-with the [mounting evidence](validation.json). Automatic joint compliance
-export is still open.
+with the [mounting evidence](validation.json). The additional assertions cover explicit translational compliance export,
+missing-member rejection and a thin through-bolted rail backing. They do not
+qualify the complete mount. See [current validation](compliance-validation.json).
 
 The receiver's gross stock mass is **4.396 kg/m** before drilling. At the old
 3350/3900 mm Y and 2050 mm X rack envelopes, receiver stock alone is respectively
@@ -97,11 +100,15 @@ to fill the frozen X envelope.
 
 The existing DIY packet's 8 mm backing cannot acquire the blind M6 thread used
 by the C45 policy. Its minimum stock for that route is 12.3 mm (7.8 engagement,
-1 tip gap, 2 tap runout and 1.5 back wall). The preferred datum-preserving rail
-route is a separately checked through-bolt/captive-nut arrangement. Do not apply
+1 tip gap, 2 tap runout and 1.5 back wall). The datum-preserving through-bolt route now has a local native fixture:
+`MountThroughBolts` selects class-8.8 screws, real ISO 7089 washers and ISO 4032
+class-8 nuts, with full nut engagement, no plain shank in the nut and at least
+two pitches projecting. The 8 mm clearance-drilled backing retains the rail
+datum; native contacts pass at all seven fixture holes. Nut capture and the
+complete host cavity/access arrangement remain open. Do not apply
 the blind C45 policy to an S235 welded strip, or silently thicken the strip and
 move the rail. Nut capture, access, frame-wall openings, bearing and bolt length
-need physical modelling and checks before choosing that route.
+need physical modelling and checks before releasing that route.
 
 Production compound minimum/maximum thickness, cure distortion and sustained-load
 behaviour remain inputs. The shared interval is
@@ -131,3 +138,17 @@ The required-mount API remains a separate tested patch; it must distinguish the
 mesh/back frame from the actual side-bolt support face. Do not land a gate which
 only accepts back-supported racks and thereby rejects a valid side-mounted one.
 Current Gantry changes from another session are left untouched.
+
+## Compliance export boundary
+
+The rebuildable receiver may own an explicit `LinearMountCompliance` record.
+FEM export resolves its host, element and contributing members, poses the local
+frame and exports the series stiffness in N/m. Missing members, zero/unknown
+flexibility directions and absent provenance fail. Model terms retain their
+assumed flag; helpers provide SI axial and simply-supported-bar flexibility.
+The fixture's compliance values are deliberate test inputs, **not router values**.
+These records carry no extra mass. Existing body mass/inertia remains the source
+of truth, while mount ownership includes extra carriers/cleats/washers/nuts once.
+Full geometry-derived terms, rotations, joint preload/slip and consumption by the
+router solver remain unqualified. No new router stiffness, mode or motion result
+is claimed by this change.

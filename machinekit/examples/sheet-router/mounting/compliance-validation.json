@@ -1,0 +1,145 @@
+{
+  "status": "Interface export and local through-bolt fixture pass; complete mount and router rerun pending",
+  "archive": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/shared-mount-compliance.tar.gz",
+  "sha256": "5cda562eef537abd1a8f464d511d3b1bfe1e410933e2a0b59f12ca10abd95f0d",
+  "bytes": 321649,
+  "checks": {
+    "sharedAssertions": 65,
+    "nativeAssertions": 54,
+    "minimumPinionClearanceMm": 1.1000000000000014,
+    "railThroughBoltStations": 7
+  },
+  "limits": [
+    "Compliance fixture values are test inputs, not qualified router stiffness",
+    "Translational series only; rotational response unqualified",
+    "No complete carrier/cleat/adjuster/replication or host cavity/access qualification",
+    "No new router structural, dynamic or fatigue result"
+  ],
+  "verifiedFiles": [
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/LinearMountCompliance.hx",
+      "bytes": 5463,
+      "sha256": "7e669b48dfa8d2e49afd9afc96935253dfab61ea4817d60d950cf4b78562ddbf"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/MountThroughBolts.hx",
+      "bytes": 2863,
+      "sha256": "00f481d7a8834f6be022e00a3c34db5e049347ab83e6bf2ec9b8a7cd223ae7fa"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/LinearMountDatum.hx",
+      "bytes": 6701,
+      "sha256": "261d7e0026508c482d936aa4359004e4ca15b5025093682a0e8feec6fa3c5767"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/LinearMountSteel.hx",
+      "bytes": 3567,
+      "sha256": "ff4bf8477afe5fef357f6c77f98ce002b5a629d197305ba51cc7bc1f32da47e1"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/fem/AssemblyFemExport.hx",
+      "bytes": 6547,
+      "sha256": "0e1efce9716161945329621b981bf59614460bd03498b59ecab77e36e20efe0d"
+    },
+    {
+      "path": "machinekit/tests/mounting/src/LinearMountTests.hx",
+      "bytes": 11494,
+      "sha256": "59063b8f97d7e95d627d894607bc6870004a45861555bedf91fe0819d378aa02"
+    },
+    {
+      "path": "machinekit/tests/mounting/src/LinearMountContactTests.hx",
+      "bytes": 11405,
+      "sha256": "85d53a4cbab1fec419fa752856d4aa3f09a87ed3bce7cdf12ad4d55e258a3d40"
+    },
+    {
+      "path": "machinekit/tests/mounting/haxeon.json",
+      "bytes": 275,
+      "sha256": "55fbad9133b718735e76e5527c62a98ce993e7094af1ff82ae993b61783692cd"
+    },
+    {
+      "path": "machinekit/tests/mounting/haxeon.contact.json",
+      "bytes": 320,
+      "sha256": "27eb447b067b977084030a17da8d6389288c6229d0652a44536a136cb31fbb35"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/compliance-tests.log",
+      "bytes": 6455,
+      "sha256": "cce92673507e2ed13e06280e267e97ada94719f611b90eb91b0b7af51488ffc1"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/compliance-contact.log",
+      "bytes": 13933,
+      "sha256": "6d6a157e07d4f8fc03bbd6166314a679d964e9c21221372e8f7e680b9069172a"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/bolt3.step",
+      "bytes": 32465,
+      "sha256": "ff7c5f17945031820ed7d13254a6c7dc9f8d74dd58e944b34fb551a8e4cc1b68"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/rack.step",
+      "bytes": 1777277,
+      "sha256": "d94b1526e9b95d62db470be173ee608aad12f9e0e586c6dd514de364d70534e7"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/bolt1.step",
+      "bytes": 32482,
+      "sha256": "feeac7c16e1c98f10510d6c517bbcd98171ff793dcb4a68a04dc26ab8bedf2d5"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/washer3.step",
+      "bytes": 9192,
+      "sha256": "0f5e8810eda2d08d818c4f3237cce0877bcfd84f009e0c5a2350da15665b3dda"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/washer1.step",
+      "bytes": 9220,
+      "sha256": "4696bdb8a8539d3bba1398d1070065d623aeebd7064b45811a00eadf133bfe0b"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/washer4.step",
+      "bytes": 9206,
+      "sha256": "662bf2ea3ab3e6dc0cb01057a904ba63e80b1ffab7cb13d0cec846856316a599"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/contact.json",
+      "bytes": 2313,
+      "sha256": "a56d83caa1bbda6f75ec3ba380b404a3f77e175ac90b8815b6ccd1fb0a59fcd2"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/bolt2.step",
+      "bytes": 32480,
+      "sha256": "0613671b5ad1558a4b8abc08d372f9bd1abd6d4ecd565fb0d3c8b7e763d9b717"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/fem-mass.json",
+      "bytes": 1396,
+      "sha256": "487e4710cb3bd188c69a89daf216c79caec0b50ebfc549eadf409d4b71e2d30f"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/pinion-envelope.step",
+      "bytes": 5739,
+      "sha256": "ec9335d068a90c970cfddee1ab7697f9757be25a8da1b04e992b70894ae5d225"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/bolt4.step",
+      "bytes": 32480,
+      "sha256": "d95c8a73866ad11539d43340b507d4fa4fae8aeb160a56bbb3918aa02d1ebb68"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/fem-compliance.json",
+      "bytes": 4451,
+      "sha256": "f7da7ade99b300fbb0baec82bf689d6678e031fa0b8a0e3356b39abd7e834909"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/receiver.step",
+      "bytes": 33129,
+      "sha256": "2fa830abff85e1eefc27643d8914e0ad29532ad912712478e46efc5fb477a17d"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/contact-v3/washer2.step",
+      "bytes": 9206,
+      "sha256": "14ab9c790a48229b87a29a742dbd81a8faee10c28428b402f14ab8c94e803e1d"
+    }
+  ]
+}

@@ -108,6 +108,28 @@ class LinearMountTests {
    "same physical receiver recipe retains rail lineage as well as rack lineage");
   rejected(()->{new machinekit.structural.LinearMountSteel(sharedReceiver.values().setNumber("thickness",8));},
    "a thinner receiver cannot retain deep service holes from the previous design");
+  assembly.addComponent("washer",machinekit.standard.FlatWasher.metric("M6"));
+  var ownedDatum=new machinekit.structural.LinearMountDatum(RelievedWeldedPad("pad","fixture relief"),F.identity(),
+   "receiver","receiver","layer",["push"],["lock"],inputs,["washer","receiver"]);
+  check(Math.abs(ownedDatum.addedMassKg(assembly)-datum.addedMassKg(assembly)
+   -machinekit.standard.FlatWasher.metric("M6").massProperties().mass)<1e-12,"other hardware included once, overlapping receiver not duplicated");
+  rejected(()->{new machinekit.structural.LinearMountDatum(RelievedWeldedPad("pad","fixture"),F.identity(),
+   "receiver","receiver","layer",["push"],["lock"],inputs,["pad"]).validateMembers(assembly);},"shared host cannot become added mount mass");
+  var axial=machinekit.structural.LinearMountCompliance.axialMPerN(4,900,4e9);
+  check(Math.abs(axial-1.111111111111111e-9)<1e-20,"layer axial flexibility uses SI units");
+  check(Math.abs(machinekit.structural.LinearMountCompliance.axialMPerN(4,900,4e9,2)-axial/2)<1e-20,"parallel pads add stiffness");
+  var bar=machinekit.structural.LinearMountCompliance.barMPerN(100,28,20,210e9);
+  check(Math.abs(machinekit.structural.LinearMountCompliance.barMPerN(200,28,20,210e9)/bar-8)<1e-12,"bar bending follows span cubed");
+  var record:machinekit.structural.LinearMountCompliance.MountComplianceRecord={schema:1,host:"pad",element:"rail",frame:F.identity(),terms:[
+   {name:"compound",members:["layer"],xMPerN:axial,yMPerN:axial,zMPerN:axial,reference:"fixture E=4 GPa assumed",assumed:true},
+   {name:"receiver",members:["receiver"],xMPerN:bar,yMPerN:bar,zMPerN:bar,reference:"simply supported fixture; assumed support",assumed:true}]};
+  var compliance=new machinekit.structural.LinearMountCompliance(record);
+  check(Math.abs(compliance.stiffnessNPerM().x-1/(axial+bar))<1e-6,"series flexibility is summed before inversion");
+  record.terms[0].xMPerN=0;
+  rejected(()->{new machinekit.structural.LinearMountCompliance(record);},"unknown or rigid default direction fails");
+  check(compliance.snapshot().terms[0].xMPerN==axial,"facet owns a snapshot of its inputs");
+  rejected(()->{machinekit.structural.LinearMountCompliance.axialMPerN(4,900,Math.NaN);},"nonfinite mechanics input fails");
+  check(machinekit.structural.LinearMountCompliance.decode("null")==null,"legacy member has no invented compliance");
   Sys.println('LinearMountTests: $count assertions passed');
  }
 }

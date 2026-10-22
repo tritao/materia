@@ -53,6 +53,36 @@ class LinearMountContactTests {
    check(fem.parts.length==1 && Math.abs(fem.totalMassKg-member.massProperties().mass)<1e-12,
     "shared receiver mass and inertia enter existing FEM export exactly once");
    if(output!=null)sys.io.File.saveContent(output+'/fem-mass.json',haxe.Json.stringify(fem,null,"  "));
+   var model:machinekit.structural.LinearMountCompliance.MountComplianceRecord={schema:1,host:"pad",element:"rack",
+    frame:F.translation(0,0,10),terms:[{name:"receiver-bending",members:["receiver"],xMPerN:1e-8,yMPerN:2e-8,zMPerN:3e-8,
+     reference:"deliberate test values; not router design inputs",assumed:true}]};
+   var supported=new machinekit.assembly.MachineAssembly();
+   var compliant=new machinekit.structural.LinearMountSteel(member.values().setToken("compliance",haxe.Json.stringify(model)));
+   supported.addComponent("receiver",compliant,F.translation(10,20,30));
+   supported.addComponent("pad",new machinekit.structural.LinearMountSteel(new ComponentValues()
+    .setNumber("width",width).setNumber("length",length).setNumber("thickness",8)),F.translation(10,20,22));
+   supported.addComponent("rack",rack,F.compose(F.translation(10,20,30),pose));
+   var saved=machinekit.assembly.MachineAssembly.decode(supported.encode());
+   check(saved.encode()==supported.encode(),"compliance recipe survives saved assembly round trip");
+   var supportedFem=machinekit.structural.fem.AssemblyFemExport.bodies(saved,
+    new cadkit.modeling.AssemblyState(saved.definition()),".",_ -> false);
+   check(supportedFem.mounts.length==1 && supportedFem.mounts[0].hostId=="pad"
+    && supportedFem.mounts[0].elementId=="rack","FEM discovers mount interface and resolves its real bodies automatically");
+   check(Math.abs(supportedFem.mounts[0].frameMm.z-40)<1e-9,"exported mount frame follows receiver pose");
+   check(Math.abs(supportedFem.mounts[0].stiffnessNPerMLocal.y-5e7)<1e-6,"export preserves directional flexibility in SI");
+   var bodyMass=0.0;for(body in supportedFem.parts)bodyMass+=body.massKg;
+   check(Math.abs(supportedFem.totalMassKg-bodyMass)<1e-12 && supportedFem.parts.length==3,
+    "compliance export creates neither duplicate bodies nor additional lumped mass");
+   model.terms[0].members=["missing"];
+   var broken=new machinekit.assembly.MachineAssembly();
+   broken.addComponent("receiver",new machinekit.structural.LinearMountSteel(member.values()
+    .setToken("compliance",haxe.Json.stringify(model))));
+   broken.addComponent("pad",member);broken.addComponent("rack",rack,pose);
+   var refused=false;try machinekit.structural.fem.AssemblyFemExport.bodies(broken,
+    new cadkit.modeling.AssemblyState(broken.definition()),".",_ -> false) catch(_:Dynamic)refused=true;
+   check(refused,"FEM rejects a missing load-path member instead of exporting a hidden rigid support");
+   if(output!=null)sys.io.File.saveContent(output+'/fem-compliance.json',haxe.Json.stringify(supportedFem,null,"  "));
+
    var raw=own(rack.geometry()),placed=own(PosedParts.moved(raw,pose));
    check(receiver.valid() && placed.valid(),"receiver and supplier rack are valid native solids");
    check(Math.abs(placed.distance(receiver)-washer.thickness)<1e-6,"rack stand-off equals actual washer thickness");
@@ -87,6 +117,26 @@ class LinearMountContactTests {
     check(gap>=0.5,"pinion conservative envelope clears receiver and support hardware");
     minimumClearance=Math.min(minimumClearance,gap);
     if(output!=null && i==4)gear.shape.exportStep(output+'/pinion-envelope.step');
+   }
+   // Thin backing route: real through clearance, washer and nut; no blind tap.
+   var rail=machinekit.motion.LinearRail.metric("HGH25CA",400,machinekit.motion.LinearRail.NOMINAL);
+   var railElement=MountedElement.of(rail),backingThickness=8.0;
+   var railPose=machinekit.assembly.AxisBuilder.orient(0,-200,backingThickness+rail.spec.railHeight,[0.0,0,1],[0.0,1,0]);
+   var backing=new machinekit.structural.SeatedPlate(40,440,backingThickness,"thin backing fixture",[
+    {name:"rail",frame:F.identity(),holes:rail.mountingConnectors().map(c->{
+     var p=F.compose(railPose,c.frame);return {x:p.x,y:p.y,diameter:7.0};})}],null,"steel");
+   var backingBody=own(backing.geometry()),railBody=own(PosedParts.moved(own(rail.geometry()),railPose));
+   check(backingBody.distance(railBody)<1e-6,"thin backing retains the rail datum and real base contact");
+   for(c in railElement.connectors) {
+    var railSeat=F.compose(railPose,F.compose(c.frame,F.translation(0,-railElement.bore.counterboreDepth,0)));
+    var stack=machinekit.structural.MountThroughBolts.select(c.name,railElement,railSeat,
+     machinekit.component.Solids.axial(railSeat.x,railSeat.y,0),[20,25,30,35,40]);
+    var w=own(PosedParts.moved(own(stack.washer.geometry()),stack.washerPose));
+    var n=own(PosedParts.moved(own(stack.nut.geometry()),stack.nutPose));
+    check(w.distance(backingBody)<1e-6 && w.distance(n)<1e-6,"nut and washer close the backing load path");
+    check(stack.projectionMm>=2*stack.screw.thread.pitch-1e-6,"two pitches project beyond the fully engaged nut");
+    check(stack.screw.length-stack.screw.threadLength<=stack.gripMm+stack.washer.thickness+1e-6,
+     "unthreaded shank stays outside the nut");
    }
    if(output!=null) {
     receiver.shape.exportStep(output+'/receiver.step');placed.shape.exportStep(output+'/rack.step');

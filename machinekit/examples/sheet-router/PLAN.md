@@ -1838,3 +1838,21 @@ once in the existing FEM export. Clearance remains 1.10 mm. This does not close
 RM2's carrier/cleats/adjustment-bar/replication or automatic joint-compliance
 export, and does not supply new whole-router structural or dynamic results.
 Frozen geometry and release gates remain unchanged.
+
+
+RM2 compliance/through-bolt checkpoint (2026-10-22): shared checks pass 65
+assertions and the expanded native fixture passes 54 (rack clearance 1.10 mm).
+The receiver's optional explicit translational compliance facet survives saved
+assembly reload and is discovered by FEM export with resolved member identities,
+posed frames, SI stiffness and assumed/source labels. Missing load-path members
+fail; no duplicate lumped mount mass is introduced. Mount-owned additional
+hardware is counted once. The thin 8 mm rail backing fixture closes its load
+path through real washers and nuts without moving the rail datum or applying a
+blind C45 thread policy to the pad. Nut capture, wrench access, host openings
+and bearing/pull-through strength remain open. See [validation](mounting/compliance-validation.json).
+This closes interface export plumbing, not the full RM2 factory, geometry-derived
+compliance, rotational model or router FE consumption. Complete cast/welded
+mount geometry and the supported-router rerun remain pending. Frozen CAD and
+release gates remain unchanged. Builds stopped at the 8 GB root-space floor;
+retained archives were hash-verified and relocated to DEV (DATA1 is full), with
+current references updated and a [relocation inventory](mounting/evidence-relocation.json).

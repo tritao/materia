@@ -22,10 +22,35 @@ class AssemblyFemExport {
 	}
 
     public static function bodies(assembly:MachineAssembly,state:AssemblyState,folder:String,
-        exportSolid:String->Bool):{parts:Array<Dynamic>,materials:Array<Dynamic>,totalMassKg:Float,solidMassKg:Float} {
+        exportSolid:String->Bool):{parts:Array<Dynamic>,materials:Array<Dynamic>,totalMassKg:Float,solidMassKg:Float,mounts:Array<Dynamic>} {
         var poses=assembly.solvedPoses(state),parts:Array<Dynamic> = [],materials:Array<Dynamic> = [],materialIds:Array<String> = [];
         var members=assembly.components(),parents=assembly.mateParents();
         members.sort((a,b)->Reflect.compare(a.id,b.id));
+        var mounts:Array<Dynamic>=[],memberIds:Map<String,Bool>=[];
+        for(member in members)memberIds.set(member.id,true);
+        // Resolve interfaces before expensive CAD work. Mass remains owned by bodies;
+        // these records add flexibility only, never a second lumped mount mass.
+        for(member in members) {
+            var facet=machinekit.structural.LinearMountCompliance.of(member.component);
+            if(facet==null)continue;
+            var record=facet.snapshot(),index=member.id.lastIndexOf("/");
+            var prefix=index<0?"":member.id.substr(0,index+1);
+            function resolve(id:String):String {
+                var path=prefix+id;
+                if(!memberIds.exists(path))throw "Missing FEM mount load-path member: "+path;
+                return path;
+            }
+            var host=resolve(record.host),element=resolve(record.element);
+            var terms:Array<Dynamic>=[];
+            for(term in record.terms)terms.push({name:term.name,members:term.members.map(resolve),
+                flexibilityMPerN:{x:term.xMPerN,y:term.yMPerN,z:term.zMPerN},
+                reference:term.reference,assumed:term.assumed});
+            var pose=poses.get(member.id);
+            if(pose==null)throw "Missing FEM mount pose: "+member.id;
+            mounts.push({receiverId:member.id,hostId:host,elementId:element,
+                frameMm:F.compose(pose,record.frame),stiffnessNPerMLocal:facet.stiffnessNPerM(),
+                terms:terms,model:"translational series; rotational compliance unqualified",massSource:"parts only"});
+        }
         var totalMass=0.0,solidMass=0.0;
         PosedParts.scope(cache -> {
 			for (member in members) {
@@ -81,6 +106,6 @@ class AssemblyFemExport {
 			}
         });
         materials.sort((a,b)->Reflect.compare(a.id,b.id));
-        return {parts:parts,materials:materials,totalMassKg:totalMass,solidMassKg:solidMass};
+        return {parts:parts,materials:materials,totalMassKg:totalMass,solidMassKg:solidMass,mounts:mounts};
     }
 }

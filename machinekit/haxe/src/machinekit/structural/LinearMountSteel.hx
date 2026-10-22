@@ -21,7 +21,7 @@ class LinearMountSteel extends MachineComponent {
 
 	static function inputs():Array<ComponentParameter> return [P.length("width",28),P.length("length",500),
 		P.length("thickness",20),P.choice("role",["receiver","adjustment-bar","carrier"],"receiver"),
-		P.text("holes",InsertHoles.fromNeutral([])),P.text("mountingRequirements","[]")];
+		P.text("holes",InsertHoles.fromNeutral([])),P.text("mountingRequirements","[]"),P.text("compliance","null")];
 
 	public static function recipeType():ComponentType {
 		if(recipe==null)recipe=new ComponentType("machinekit.structural.linear-mount-steel",inputs(),
@@ -43,6 +43,8 @@ class LinearMountSteel extends MachineComponent {
 		super("LINEAR-MOUNT-STEEL","C45 linear-mount "+v.token("role"),"steel C45",false,v);
 		lockManufacturingMaterial("steel C45");
 		addFacet(InsertHoles.facet(drilling,width,length,thickness));
+		var compliance=LinearMountCompliance.decode(v.token("compliance"));
+		if(compliance!=null)addFacet(compliance);
 		addConnector("mount",Mount,Solids.axial(0,0,0));
 		addConnector("top",Mount,Solids.axial(0,0,thickness));
 	}

@@ -40,14 +40,17 @@ class LinearMountDatum {
 	public final pushes:Array<String>;
 	public final locks:Array<String>;
 	public final layerInputs:ReplicationLayerInputs;
+	/** Cleats, carrier, washers and nuts owned by this mount, excluding the host. */
+	public final otherMembers:Array<String>;
 
 	public function new(host:LinearMountHost, plane:AssemblyFrame, sideBar:String,
-		receiver:String, layer:String, pushes:Array<String>, locks:Array<String>, inputs:ReplicationLayerInputs) {
+		receiver:String, layer:String, pushes:Array<String>, locks:Array<String>, inputs:ReplicationLayerInputs, ?otherMembers:Array<String>) {
 		machinekit.design.DesignGeometry.validateFrame(plane);
 		this.host=host;
 		this.plane=materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.identity(),plane);
 		this.sideBar=sideBar;this.receiver=receiver;this.layer=layer;
 		this.pushes=pushes.copy();this.locks=locks.copy();
+		this.otherMembers=otherMembers==null?[]:otherMembers.copy();
 		this.layerInputs={compoundReference:inputs.compoundReference,minimumMm:inputs.minimumMm,maximumMm:inputs.maximumMm,
 			fixtureErrorMm:inputs.fixtureErrorMm,cureDistortionMm:inputs.cureDistortionMm};
 		if (StringTools.trim(sideBar)=="" || StringTools.trim(receiver)=="" || StringTools.trim(layer)==""
@@ -103,6 +106,10 @@ class LinearMountDatum {
 			if (material.physical.density<7000 || c.materialSpec().toLowerCase().indexOf("steel")<0)
 				throw "Linear-mount clamp/load path must engage steel: "+id;
 		}
+		for(id in otherMembers) {
+			if(id==null || StringTools.trim(id)=="" || id==hostMember()) throw "Invalid mount-owned member: "+id;
+			require(id);
+		}
 		require(layer);
 		if (layer==hostMember() || layer==receiver || layer==sideBar) throw "Replication compound cannot stand in for clamp steel";
 		var seen:Map<String,Bool>=[];
@@ -121,7 +128,7 @@ class LinearMountDatum {
 	 */
 	public function addedMassKg(assembly:MachineAssembly):Float {
 		validateMembers(assembly);
-		var owned=[sideBar,receiver,layer].concat(pushes).concat(locks),seen:Map<String,Bool>=[];
+		var owned=[sideBar,receiver,layer].concat(pushes).concat(locks).concat(otherMembers),seen:Map<String,Bool>=[];
 		var mass=0.0;
 		for(id in owned) if(id!=hostMember() && !seen.exists(id)) {
 			seen.set(id,true);
