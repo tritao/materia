@@ -16,8 +16,8 @@ class SfuFamilyChecks {
   var rows:Array<Dynamic> = [],assembly=new MachineAssembly(),registry=MachineKitComponents.standard();
   rejects(()->new SfuNut("SFU2005"),"Require explicit root");
   rejects(()->new DsgNutHousing("DSG20H"),"Require explicit thread depths");
-  rejects(()->new VallderScrewSupport("FK17"),"Quarantine FK17 flange discrepancy");
-  rejects(()->new VallderScrewSupport("FF17"),"Quarantine FF17 flange discrepancy");
+  rejects(()->ScrewSupportUnit.model("FK17",ScrewSupportUnit.SUPPLIER),"Quarantine FK17 flange discrepancy");
+  rejects(()->ScrewSupportUnit.model("FF17",ScrewSupportUnit.SUPPLIER),"Quarantine FF17 flange discrepancy");
   for(model in SfuFamilyData.nutModels()) {
    var s=SfuFamilyData.nut(model),root=s.diameter-4,nut=new SfuNut(model,root),housingModel="DSG"+Std.int(s.diameter)+"H",housing=new DsgNutHousing(housingModel,10,10);
    var body=nut.geometry(),holder=housing.geometry();
@@ -51,7 +51,7 @@ class SfuFamilyChecks {
    check(screw.axialComplianceBetween(0,500)>0 && Math.abs(screw.axialStiffness()*screw.axialComplianceBetween(0,500)-1)<1e-9,"Piecewise shaft compliance "+model);
    check(screw.fixedEnd==(large ? 76 : 60) && screw.journalDiameter==(large ? 17 : 15) && screw.journalStart==(large ? 40 : 32),"Drawing screw ends "+model);
    for(prefix in ["BK","BF"]) {
-    var support=new VallderScrewSupport(prefix+(large ? "17" : "15")),body=support.geometry();
+    var support=ScrewSupportUnit.model(prefix+(large ? "17" : "15"),ScrewSupportUnit.SUPPLIER),body=support.geometry();
     check(support.spec.bore==screw.journalDiameter,"Journal/support diameter "+model);
     var journal=Part.cylinderSpan(screw.journalDiameter/2-0.03,-0.5,0.5),common=body.intersect(journal);
     check(common.volume()<0.001,"Journal/support centre "+model);common.close();journal.close();body.close();

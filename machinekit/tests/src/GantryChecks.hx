@@ -141,7 +141,8 @@ class GantryChecks {
 				var screw:machinekit.motion.LeadScrew = cast gantry.component(id);
 				var support:machinekit.motion.ScrewSupportUnit = cast gantry.component(id + "Fixed");
 				var nut:machinekit.motion.LeadScrewNut = cast gantry.component(id + "Nut");
-				near(support.boreDiameter, screw.thread.screwDiameter, "fixed bearing fits the actual generic shaft");
+				check(support.designation == machinekit.motion.ScrewSupportUnit.forScrew(screw.thread.screwDiameter, true).designation,
+					"fixed bearing is the catalogue BK unit for the screw size");
 				check(support.fixed && nut.axialStiffness() != null, "ball screw has a bearing and a ball nut");
 				var rebuilt:machinekit.motion.ScrewSupportUnit = cast support.componentType().create(support.values());
 				near(rebuilt.boreDiameter, support.boreDiameter, "bearing bore survives the component recipe");

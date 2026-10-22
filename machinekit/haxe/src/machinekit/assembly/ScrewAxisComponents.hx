@@ -12,7 +12,7 @@ class ScrewAxisComponents {
     public final motor:NemaStepper;
     public final screw:LeadScrew;
     public final nut:LeadScrewNut;
-    public final support:VallderBf12Support;
+    public final support:ScrewSupportUnit;
     public final rail:LinearRail;
     public final block:LinearRailBlock;
     /** The carriage's tapped mounting depth from its table, NaN when the table gives none. */
@@ -20,7 +20,7 @@ class ScrewAxisComponents {
     /** Optional ISO7089 M4 washers; the selected motor must clear their 9 mm outside diameter. */
     public final motorWasher:Bool;
     public function new(mount:RbkMotorMount,motor:NemaStepper,screw:LeadScrew,nut:LeadScrewNut,
-        support:VallderBf12Support,rail:LinearRail,block:LinearRailBlock,motorWasher:Bool=true) {
+        support:ScrewSupportUnit,rail:LinearRail,block:LinearRailBlock,motorWasher:Bool=true) {
         this.mount=mount;this.motor=motor;this.screw=screw;this.nut=nut;this.support=support;
         this.rail=rail;this.block=block;var depth=block.mountThreadDepth();this.blockThreadDepth=depth==null ? Math.NaN : depth;this.motorWasher=motorWasher;
     }

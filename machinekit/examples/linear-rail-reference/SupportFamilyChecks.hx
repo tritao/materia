@@ -8,7 +8,7 @@ class SupportFamilyChecks {
   for(model in VallderSupportData.models().concat(["FK17","FF17"])) {
    var s=VallderSupportData.get(model),path=RbkMotorMount.assetDirectory()+"/cad/assets/"+s.sha256+".step";
    if(machinekit.catalog.PinnedCad.sha256(path)!=s.sha256)throw "Unreviewed support: "+model;
-   var part=(model=="FK17" || model=="FF17") ? new Part(cadkit.Shape.importStep(path)) : new VallderScrewSupport(model).geometry(),holes:Array<Dynamic> = [];
+   var part=(model=="FK17" || model=="FF17") ? new Part(cadkit.Shape.importStep(path)) : ScrewSupportUnit.model(model,ScrewSupportUnit.SUPPLIER).geometry(),holes:Array<Dynamic> = [];
    var positions:Array<Vector> = [];
    if(s.base) {
     for(x in [-s.pitch/2,s.pitch/2])for(z in (s.longitudinalPitch==0 ? [0.0] : [-s.longitudinalPitch/2,s.longitudinalPitch/2]))positions.push(new Vector(x,0,z));

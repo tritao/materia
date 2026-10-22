@@ -33,7 +33,7 @@ def build(catalog, assets):
     if len(rows) != 1 or len(rows[0]) != 19 or rows[0][6:16] != ['28', '27.8', '48', '38', '5.5', '46', '10', '10', 'M6', '40']:
         raise ValueError('SFU1605 nut drawing/table dimensions changed')
     for parent_id, sku, type_id, source in [(3061, rows[0][-1], 'machinekit.motion.vallder-sfu1605-nut', 'generator'),
-                                           (2378, '1013002', 'machinekit.motion.vallder-bf12-support', 'supplier_cad')]:
+                                           (2378, '1013002', 'machinekit.motion.screw-support-unit', 'supplier_cad')]:
         variants = [v for v in catalog['variants'] if v['parent_id'] == parent_id and v['sku'] == sku]
         if len(variants) != 1:
             raise ValueError('Ambiguous SFU nut/BF12 SKU')
@@ -45,7 +45,8 @@ def build(catalog, assets):
             if len(table_rows) != 1 or table_rows[0][2] != '10' or table_rows[0][7] != '25':
                 raise ValueError('BF12 bore/shaft height evidence changed')
         recipes.append({'supplier_id': 'vallder', 'sku': sku, 'supplier_product_id': v['supplier_product_id'],
-            'parent_id': parent_id, 'type_id': type_id, 'values': {}, 'required_inputs': [],
+            'parent_id': parent_id, 'type_id': type_id,
+            'values': {'model': 'BF12', 'geometry': 'supplier'} if parent_id == 2378 else {}, 'required_inputs': [],
             'geometry_source': source, 'compatibility': 'supplier_assumed', 'source_url': parents[parent_id]['url']})
     return {'schema_version': 1, 'recipes': recipes, 'compatibility_basis': 'supplier_intended_SFU16_RBK12_BF12',
         'custom_end_machining': False,

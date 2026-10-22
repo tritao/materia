@@ -18,7 +18,6 @@ class MotionComponents {
 		registry.register(PurchasedRotaryPart.recipeType());
 		registry.register(LinearRail.recipeType());
 		registry.register(LinearRailBlock.recipeType());
-        registry.register(VallderScrewSupport.referenceRecipeType());
         registry.register(SfuNut.familyRecipeType());
         registry.register(SfuDrawingScrew.drawingRecipeType());
         registry.register(DsgNutHousing.familyRecipeType());
@@ -40,7 +39,6 @@ class MotionComponents {
 		registry.register(VallderSfu1605Screw.drawingRecipeType());
 		registry.register(HzMotionDrawingScrew.recipeType());
 		registry.register(VallderSfu1605Nut.drawingRecipeType());
-		registry.register(VallderBf12Support.drawingRecipeType());
 		registry.register(ScrewSupportUnit.recipeType());
 		registry.register(LeadScrewNut.recipeType());
 		registry.register(DriveWheel.recipeType());

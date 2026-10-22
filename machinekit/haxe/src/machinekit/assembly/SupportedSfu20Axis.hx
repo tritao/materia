@@ -15,8 +15,8 @@ class SupportedSfu20Axis extends MachineAssembly {
  public final screw:SfuDrawingScrew;
  public final nut:SfuNut;
  public final housing:DsgNutHousing;
- public final fixed:VallderScrewSupport;
- public final floating:VallderScrewSupport;
+ public final fixed:ScrewSupportUnit;
+ public final floating:ScrewSupportUnit;
  public final rail:LinearRail;
  public final block:LinearRailBlock;
  public final hardware:Array<{id:String,host:String,grip:Float,engagement:Float,depth:Float}> = [];
@@ -25,7 +25,7 @@ class SupportedSfu20Axis extends MachineAssembly {
   super();if(layout==null)layout=new Sfu20AxisLayout();this.layout=layout;
   var l=layout;
   screw=new SfuDrawingScrew("SFU2005",l.screwLength,16);nut=new SfuNut("SFU2005",16);
-  housing=new DsgNutHousing("DSG20H",12,10);fixed=new VallderScrewSupport("BK15");floating=new VallderScrewSupport("BF15");
+  housing=new DsgNutHousing("DSG20H",12,10);fixed=ScrewSupportUnit.model("BK15",ScrewSupportUnit.SUPPLIER);floating=ScrewSupportUnit.model("BF15",ScrewSupportUnit.SUPPLIER);
   rail=LinearRail.metric("HGH20CA",l.railLength,LinearRail.MEASURED);block=LinearRailBlock.metric("HGH20CA",LinearRailBlock.SUPPLIER);
   addComponent("base",new Sfu20AxisPart("base",l));
   attach("fixed",fixed,"base",{x:0,y:28,z:l.fixedCentreZ(),qx:0,qy:1,qz:0,qw:0});

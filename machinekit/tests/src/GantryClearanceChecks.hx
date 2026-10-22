@@ -46,6 +46,10 @@ class GantryClearanceChecks {
 				if (rack != null) { allow(pinion, rack); rackMeshes.push({pinion: pinion, rack: rack});pinions.set(pinion,gantry.component(pinion)); }
 			case _: throw "Unexpected drive in the translational gantry";
 		}
+		// A fixed support's bearing is fitted on its screw's journal; the generic screw is drawn without that turned
+		// journal, so the seat is a declared fit like a nut on its screw.
+		for (member in gantry.components()) if (Std.isOfType(member.component, machinekit.motion.ScrewSupportUnit)
+			&& StringTools.endsWith(member.id, "Fixed")) allow(member.id.substr(0, member.id.length - "Fixed".length), member.id);
 		var paths = description.beltPaths;
 		if (paths != null) for (path in paths) {
 			var clamp = path.clamp;

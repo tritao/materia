@@ -665,7 +665,7 @@ class Gantry extends AxisBuilder {
 			case Screw(thread):
                 var driveMargin=axis.id=="z"&&spec.frontGuides!=null?95.0:railMargin;
 				var ball = thread.family == machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball;
-				var unit = ball ? new ScrewSupportUnit(true, thread.screwDiameter) : null;
+				var unit = ball ? ScrewSupportUnit.forScrew(thread.screwDiameter, true) : null;
 				var coupling = new ShaftCoupling(selectedMotor.shaftDiameter, thread.screwDiameter);
 				// Short-shaft motors cannot bury a long sleeve inside their pilot or mounting plate.
 				if (ball) {
@@ -692,8 +692,8 @@ class Gantry extends AxisBuilder {
 				driveScrew(axis, screwId, motorId, new LeadScrew(thread, axis.upper + 2 * driveMargin + endRoom),
 					AxisBuilder.orient(start[0], start[1], start[2], transverse, direction), direction, true, addDriver, coupling,reducer);
 				if (unit != null) {
-					// Generic screws retain their nominal cylindrical end, unlike the SFU1605's 12 mm journal.
-					// A fixed bearing fits that actual shaft; its foot is carried back to the motor mounting plate.
+					// The catalogue BK support for the screw size; the generic screw is drawn without the journal it
+					// sits on (a declared fit in the clearance check). Its foot is carried back to the motor mounting plate.
 					var bearing = point(-driveMargin - endRoom + grip + unit.length / 2);
 					var bearingPose = AxisBuilder.orient(bearing[0], bearing[1], bearing[2], transverse, direction);
 					var motorPlate:GantryPlate = cast component(motorId + "Plate");

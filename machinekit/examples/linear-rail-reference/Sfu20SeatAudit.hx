@@ -5,7 +5,7 @@ class Sfu20SeatAudit {
  static function main():Void {
   var rows:Array<Dynamic> = [];
   for(model in ["BK15","BF15"]) {
-   var component=new VallderScrewSupport(model),part=component.geometry(),s=part.shape,solids:Array<Dynamic> = [];
+   var component=ScrewSupportUnit.model(model,ScrewSupportUnit.SUPPLIER),part=component.geometry(),s=part.shape,solids:Array<Dynamic> = [];
    for(i in 0...s.subshapeCount(CadKit.ShapeKind.Solid)) {
     var solid=s.subshape(CadKit.ShapeKind.Solid,i),b=solid.bounds();
     solids.push({index:i,volume:solid.volume(),min:[b.get_min().get_x(),b.get_min().get_y(),b.get_min().get_z()],max:[b.get_max().get_x(),b.get_max().get_y(),b.get_max().get_z()]});solid.close();

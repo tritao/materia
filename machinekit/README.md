@@ -485,7 +485,7 @@ var layout = new ScrewAxisLayout(300, 500, 400, 160); // travel, screw, rail, sp
 var selected = new ScrewAxisComponents(
     new RbkMotorMount("RBK12-57"), NemaStepper.model("OPENBUILDS-NEMA23-56"),
     new VallderSfu1605Screw(layout.screwLength), new VallderSfu1605Nut(),
-    new VallderBf12Support(), LinearRail.metric("HGH15CA", layout.railLength),
+    ScrewSupportUnit.model("BF12", ScrewSupportUnit.SUPPLIER), LinearRail.metric("HGH15CA", layout.railLength),
     LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER));
 var axis = new TwinRailScrewAxis(layout, selected);
 axis.validateInstallation();
