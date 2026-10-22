@@ -54,6 +54,10 @@ class DraftGeometryTests {
 			var squareVolume=60*(1200-70*offset+4*offset*offset/3);
 			var expected=squareVolume-(4-Math.PI)*60*(16-4*offset+offset*offset/3);
 			check(rounded.valid() && Math.abs(rounded.volume()-expected)<1e-5,"rounded draft loft retains exact changing corner radii");
+			var swept=scope.own(machinekit.tooling.SweptRemoval.sweep(rounded,new Vector(0,0,100)));
+			var openingArea=1200-(4-Math.PI)*16;
+			check(Math.abs(swept.volume()-expected-100*openingArea)<1e-4,
+				"rounded draft uses an exact conical sweep with the analytic nested-section volume");
 			return rounded;
 		}).close();
 		Scope.run(scope -> {

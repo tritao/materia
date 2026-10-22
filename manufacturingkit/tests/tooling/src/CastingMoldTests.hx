@@ -411,7 +411,7 @@ class CastingMoldTests {
 		Reflect.setField(legacyOptions,"anchorage",new Array<Dynamic>());
 		rejects(() -> CastingMoldOptionsCodec.read(legacyOptions),"obsolete duplicate process anchorage rejected");
 		var raw:Dynamic = haxe.Json.parse(s);
-		Reflect.setField(raw, "version", 15);
+		Reflect.setField(raw, "version", 16);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
 		raw = haxe.Json.parse(s);
 		Reflect.setField(raw, "version", 12);

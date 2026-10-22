@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-native-mold-kernel-tests"
+  },
+  "entry": "NativeMoldKernelTests",
+  "sourceRoots": [
+    "src",
+    "../../examples/box-mold"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/native-mold-kernel",
+  "sources": [
+    "src/NativeMoldKernelTests.hx",
+    "../../examples/box-mold/SinglePocketSetup.hx"
+  ]
+}

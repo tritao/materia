@@ -41,7 +41,7 @@ class CastingMoldExport {
 			throw "Stale casting mold review";
 		sys.FileSystem.createDirectory(dir);
 		var encoded = CastingMoldCodec.encode(p);
-		CastingMoldCodec.decode(encoded);
+		CastingMoldCad.decode(encoded);
 		text(dir + "/mold-plan.json", encoded);
 		data(dir + "/review.json", {
 			phase: 4,

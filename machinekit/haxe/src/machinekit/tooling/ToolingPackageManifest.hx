@@ -27,7 +27,7 @@ class ToolingPackageManifest {
 	static function sourceChecks(dir:String,sourceFingerprint:String):Array<ToolingValidation> {
 		var path=dir+"/mold-plan.json";
 		if (!sys.FileSystem.exists(path)) throw "Missing source mold plan";
-		var plan=materia.tooling.casting.CastingMoldCodec.decode(sys.io.File.getContent(path));
+		var plan=CastingMoldCad.decode(sys.io.File.getContent(path));
 		if (materia.tooling.casting.CastingMoldCodec.fingerprint(plan)!=sourceFingerprint)
 			throw "Source mold plan differs from fabrication source";
 		var jobs:Array<materia.tooling.casting.InsertManufacturingPlan.InsertManufacturingJob> = [];

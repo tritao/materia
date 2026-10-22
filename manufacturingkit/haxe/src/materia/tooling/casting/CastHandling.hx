@@ -8,12 +8,25 @@ import materia.tooling.ToolingDocument;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.MoldPlan.MoldBox;
 
-/** Exact orthogonal resin moments and analytic through-bore steel moments, in mm/kg. */
+/** Exact box moments retain their algebraic path. Non-box source geometry
+ * uses the application kernel, with results expressed in mm/kg. */
 class CastHandling {
 	/** Existing source mass calculation shared by handling and lifting proposals. */
 	public static function moments(d:ToolingDocument,envelope:MoldBox):{
 		massKg:Float,centerOfMassMoldMm:{x:Float,y:Float,z:Float}
 	} {
+		var unsupported=CastingBoxSupport.check(d.input,"tooling.handling.geometry",false)
+			.filter(check -> check.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported);
+		if (unsupported.length>0) {
+			var kernel=CastingMoldPlanner.geometry;
+			if (kernel==null)
+				throw "Unsupported exact handling geometry: "+[for (check in unsupported) check.affectedIds.join(", ")].join("; ");
+			var exact=kernel.castingMass(d),center=exact.centerOfMassMoldMm;
+			for (value in [exact.massKg,center.x,center.y,center.z])
+				if (!Math.isFinite(value)) throw "Nonfinite exact casting mass: "+d.input.id;
+			if (exact.massKg<=0) throw "Casting handling requires positive mass";
+			return exact;
+		}
 		var resin = BoxAlgebra.subtract([envelope], [for (f in d.input.features) CastingMoldPlanner.featureBox(d, f)]);
 		var mass = 0.0, mx = 0.0, my = 0.0, mz = 0.0;
 		for (b in resin) {

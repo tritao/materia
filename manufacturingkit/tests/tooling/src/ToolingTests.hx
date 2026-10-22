@@ -577,5 +577,6 @@ class ToolingTests {
 		PanelTests.run();
 		BoxPlannerTests.run(fixture());
 		CastingMoldTests.run(fixture());
+		MoldRegionMathTests.run();
 	}
 }

@@ -55,7 +55,19 @@ class CastingDraftSectionTests {
 		sections=materia.casting.CastingDraftSections.derive(body,feature);
 		near(sections.depth,60,"side withdrawal respects source-coordinate axis");
 		near(G.area(sections.opening),900,"side former uses transverse dimensions");
+		check(materia.casting.CastingDraftSections.unsupportedReason(body,feature)==null,
+			"a realized side draft is available independently of the selected mold template");
+		feature.draft.degrees=30;
+		check(materia.casting.CastingDraftSections.unsupportedReason(body,feature)==null,
+			"a collapsing section is a design error rather than a missing geometry capability");
+		rejects(() -> materia.casting.CastingDraftSections.derive(body,feature),"edge collapses");
+		feature.draft.degrees=2;
+		feature.draft.axis={x:0.6,y:0,z:0.8};
+		check(materia.casting.CastingDraftSections.unsupportedReason(body,feature).indexOf("oblique")>=0,
+			"an unrealized oblique draft has an explicit capability reason");
 		feature.draft.axis={x:0,y:0,z:1};
+		check(materia.casting.CastingDraftSections.unsupportedReason(body,feature).indexOf("declared planar withdrawal opening")>=0,
+			"an unavailable withdrawal plane stays explicitly unsupported");
 		rejects(() -> materia.casting.CastingDraftSections.derive(body,feature),"Casting feature side-former");
 		Sys.println("CastingDraftSectionTests: "+assertions+" assertions passed");
 	}

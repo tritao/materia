@@ -65,6 +65,24 @@ typedef CastingMoldReview = {
 
 /** CAD bridge for neutral multi-core box plans. Frames and exact operations remain authoritative. */
 class CastingMoldCad {
+	/** Native planning entry point; pure ManufacturingKit callers can retain
+	 * the exact box algebra or supply a different exact kernel explicitly.
+	 */
+	public static function plan(document:materia.tooling.ToolingDocument,options:CastingMoldOptions):CastingMoldPlan {
+		enableGeometry();
+		return CastingMoldPlanner.plan(document,options);
+	}
+
+	static function enableGeometry():Void {
+		if (CastingMoldPlanner.geometry==null) CastingMoldPlanner.setGeometry(new NativeCastingMoldKernel());
+	}
+
+	/** Restore non-box plans without relying on a preceding planning call. */
+	public static function decode(encoded:String):CastingMoldPlan {
+		enableGeometry();
+		return CastingMoldCodec.decode(encoded);
+	}
+
 	static function box(b:MoldBox):Part
 		return ToolingBlock.placedBox(b);
 
@@ -268,6 +286,7 @@ class CastingMoldCad {
 	}
 
 	public static function assembly(p:CastingMoldPlan):MachineAssembly {
+		enableGeometry();
 		CastingMoldPlanner.validate(p);
 		var a = PanelKit.assembly(p.panels, "coated particleboard"), b = p.cavity;
 		for (i in 0...p.supportPanels.length) {
@@ -426,6 +445,7 @@ class CastingMoldCad {
 	}
 
 	public static function review(p:CastingMoldPlan):CastingMoldReview {
+		enableGeometry();
 		CastingMoldPlanner.validate(p);
 		var references:Array<Part> = [], difference = 0.0, ov = 0.0, rv = 0.0;
 		try {

@@ -30,6 +30,12 @@ typedef CastingMoldAssessment = {
  * All casting dimensions come from the source document. It never adds design cuts.
  */
 class CastingMoldPlanner {
+	/** Application-owned exact kernel. A pure box-only process leaves it unset. */
+	public static var geometry(default,null):Null<CastingMoldKernel>;
+
+	public static function setGeometry(kernel:Null<CastingMoldKernel>):Void
+		geometry=kernel;
+
 	public static function sourceSupport(input:CastingToolingInput):Array<materia.tooling.ToolingValidation>
 		return CastingBoxSupport.check(input, "tooling.feature.box-geometry", false).concat(InsertQualifications.check(input.inserts));
 	public static function envelope(d:ToolingDocument):MoldBox {
@@ -63,6 +69,14 @@ class CastingMoldPlanner {
 		// can be panelled. Exact hardware is realized and checked by the CAD bridge.
 		var unsupported = checks.filter(check -> StringTools.startsWith(check.rule,"tooling.feature.box-geometry")
 			&& check.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported);
+		var regionFormers=unsupported.length>0 && canPlanRegionFormers(d);
+		if (regionFormers) {
+			checks=checks.filter(check -> unsupported.indexOf(check)<0);
+			checks.push(materia.tooling.process.FillAnalysis.check("tooling.feature.box-geometry",
+				[for (feature in d.input.features) feature.id],Pass,
+				"Rectangular panel shell with exact source-region formers and registered CAD geometry.",[]));
+			unsupported=[];
+		}
 		if (unsupported.length > 0) {
 			var changes:Array<DesignChangeRequest> = [for (check in unsupported) if (d.input.features.filter(feature -> check.affectedIds.indexOf(feature.id)>=0).length>0) {
 				id: materia.tooling.ToolingIds.derive("geometry-", check.affectedIds.join("-")),
@@ -89,37 +103,46 @@ class CastingMoldPlanner {
 		return cast assessment.plan;
 	}
 
-	static function build(d:ToolingDocument, o:CastingMoldOptions, geometryChecks:Array<materia.tooling.ToolingValidation>):CastingMoldPlan {
-		var e = envelope(d), r = d.recipe, t = r.panel.measuredThickness, l = r.minimumLigament;
-		if (o.precision.length != d.input.inserts.length)
-			throw "Every insert needs a precision process record";
-		var strategies = CastingStrategies.resolve(d);
-		var reusable = strategies.filter(v -> v.strategy == CoreStrategy.ReusableFormer);
-		for (index in 0...reusable.length)
-			for (other in index + 1...reusable.length) {
-				var a = reusable[index], b = reusable[other];
-				if (a.priority == b.priority
-					&& BoxAlgebra.intersection(featureBox(d, d.input.features.filter(f -> f.id == a.featureId)[0]),
-						featureBox(d, d.input.features.filter(f -> f.id == b.featureId)[0])) != null)
-					throw "Overlapping reusable formers require distinct priorities: " + a.featureId + ", " + b.featureId;
-			}
-		var bodies = new Map<String, MoldBox>(), low = e.z;
-		for (i in d.input.inserts) {
-			var dimensions = InsertBodies.box(i.body, i.id);
-			var b = BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(d.setup.sourceToMold, i.pose));
-			bodies.set(i.id, b);
-			low = Math.min(low, b.z);
-			if (o.precision.filter(p -> p.insertId == i.id).length != 1)
-				throw "Missing or duplicate insert process record";
+	static function canPlanRegionFormers(d:ToolingDocument):Bool {
+		if (geometry==null) return false;
+		var strategies=CastingStrategies.resolve(d);
+		try envelope(d) catch (error:Dynamic) {
+			var message=Std.string(error);
+			if (message=="Multi-core box template needs one rectangular envelope"
+				|| message=="Nonrectangular envelope unsupported by box template"
+				|| message.indexOf("axis-aligned")>=0) return false;
+			throw error;
 		}
-		var b:MoldBox = {
-			x: e.x,
-			y: e.y,
-			z: low,
-			width: e.width,
-			depth: e.depth,
-			height: e.z + e.height - low
-		};
+		for (insert in d.input.inserts) switch insert.body {
+			case Primitive(materia.casting.CastingSolid.Box(_,_,_)):
+			default:return false;
+		}
+		for (feature in d.input.features) {
+			if (feature.draft.degrees>0 && materia.casting.CastingDraftSections.unsupportedReason(d.input.envelope,feature)!=null)
+				return false;
+			var region=MoldRegions.feature(d,feature.id);
+			if (MoldRegions.boxes(region)==null) {
+				var selected=strategies.filter(strategy -> strategy.featureId==feature.id);
+				if (selected.length!=1 || selected[0].strategy!=CoreStrategy.ReusableFormer
+					|| selected[0].withdrawal==null || Math.abs(selected[0].withdrawal.z)<1-1e-8) return false;
+			}
+		}
+		return true;
+	}
+
+	static function nonBoxFeatures(d:ToolingDocument):Bool
+		return materia.casting.CastingCavities.derive(d.input.envelope,d.input.features)
+			.filter(cavity -> !materia.casting.CastingCavities.supportsBoxes(cavity)).length>0;
+
+	/** Interior allocation uses authoritative cavities; panel sealing profiles
+	 * extend outward from the source boundary and have no source interior.
+	 */
+	static function formerRegion(former:MoldFormer):materia.casting.CastingRegion
+		return materia.casting.CastingRegion.Union([for (piece in former.volume.pieces) MoldRegions.box(piece)].concat(former.volume.regions));
+
+	static function seed(d:ToolingDocument,o:CastingMoldOptions,e:MoldBox,b:MoldBox,
+			geometryChecks:Array<materia.tooling.ToolingValidation>):CastingMoldPlan {
+		var r=d.recipe;
 		var shell = MoldPanels.box(b, r, RaisedWalls.EastWest),
 			panels = shell.panels,
 			bed = panels.members[0];
@@ -133,7 +156,7 @@ class CastingMoldPlanner {
 					sealSpec: p.sealMaterial
 				}
 		];
-		var result:CastingMoldPlan = {
+		return {
 			handling: CastHandling.plan(d, o, e),
 			id: materia.tooling.ToolingIds.derive("", d.input.id, "-mold"),
 			document: d,
@@ -159,6 +182,109 @@ class CastingMoldPlanner {
 				blockingRules: []
 			}
 		};
+	}
+
+	static function finish(result:CastingMoldPlan,
+			strategies:Array<materia.tooling.casting.CastingSetup.CastingFeatureStrategy>):CastingMoldPlan {
+		var d=result.document,o=result.options;
+		for (strategy in strategies) if (strategy.strategy==CoreStrategy.ReusableFormer) {
+			var feature=d.input.features.filter(feature -> feature.id==strategy.featureId)[0];
+			var axis=F.transformVector(d.setup.sourceToMold,feature.draft.axis.x,feature.draft.axis.y,feature.draft.axis.z);
+			var direction=strategy.withdrawal;
+			var aligned=direction!=null && axis.x*direction.x+axis.y*direction.y+axis.z*direction.z>1-1e-8;
+			if (feature.draft.degrees==0 || !aligned)
+				request(result,"draft-"+feature.id,ReleaseAlternative,[feature.id],
+					"Rigid former needs positive source draft aligned with its withdrawal, or a declared sacrificial alternative.",
+					"tooling.former.draft."+feature.id);
+			else result.validation.push(materia.tooling.process.FillAnalysis.check("tooling.former.draft."+feature.id,
+				[feature.id],Pass,"Positive source draft is aligned with the declared withdrawal; CAD verifies the complete removal sweep.",[]));
+		}
+		for (former in result.formers)
+			if (former.featureIds.length == 0 && former.draftDegrees == 0)
+				request(result, "draft-" + former.volume.id, ReleaseAlternative, [former.volume.id],
+					"Bed-backing zero-draft rigid former needs a source/release change; drafted and split formers are unsupported.",
+					"tooling.former.draft." + former.volume.id);
+		var handlingQualified=CastHandling.qualified(d,o,result.handling);
+		if (result.handling.requiresFlip && !CastHandling.sourceDeclared(d) && !handlingQualified)
+			request(result,"handling-source-points",LiftingPoints,[d.input.id],
+				"Declare lifting inserts with unoccupied pre-cast threads, or a qualified external cradle.",
+				"tooling.handling.lifting-points");
+		else result.validation.push(materia.tooling.process.FillAnalysis.check("tooling.handling.lifting-points",
+			[d.input.id].concat(CastHandling.liftingIds(d)),Pass,
+			"Source lifting connections are declared, a cradle is qualified, or this setup needs no flip.",[]));
+		result.validation.push(materia.tooling.process.FillAnalysis.check("tooling.handling.flip",[d.input.id],
+			!result.handling.requiresFlip || handlingQualified ? Pass : Pending,
+			"Equipment capacity, measured mass/CoM and the flip procedure require separate handling evidence.",[]));
+		for (seat in o.precision) {
+			var source = d.input.inserts.filter(i -> i.id == seat.insertId)[0];
+			var stock=InterfaceQualification.finishingStock(d.input,source);
+			if (stock.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass) result.validation.push(stock);
+			else requestDecision(result,"allowance-"+seat.insertId,InterfaceAllowance,stock);
+			var replication=InterfaceQualification.replicationRequirement(source,seat);
+			if (replication!=null) result.validation.push(replication);
+		}
+		for (insert in d.input.inserts) switch insert.origin {
+			case Fabricated(manufacturing):
+				for (report in InsertManufacturingPlan.mountingHoleReports(manufacturing))
+					if (report.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail) {
+						var rule=InsertManufacturingPlan.mountingRule(insert.id,report.holeId);
+						var finding=result.validation.filter(check -> check.rule==rule)[0];
+						requestDecision(result,"hole-route-"+insert.id+"-"+report.holeId,DesignChangeKind.MountingHoleRoute,finding);
+					}
+			case Catalogue(_):
+		}
+		var missingJoint=FoundationJointQualification.missingSource(d.input);
+		if (missingJoint!=null) requestDecision(result,"foundation-joint-source",DesignChangeKind.FoundationJointDefinition,missingJoint);
+
+		result.validation = result.validation.concat([
+			materia.tooling.ToolingValidation.ToolingReadiness.pending("closure-loads", [d.input.id],
+				"Wall/pad clamps, braces and uplift capacity require qualification"),
+			materia.tooling.ToolingValidation.ToolingReadiness.pending("materials-process", [d.recipe.id],
+				"Adhesive, covering, release and cure compatibility require qualification"),
+			materia.tooling.ToolingValidation.ToolingReadiness.pending("precision-interfaces", [d.input.id],
+				"Replication and grout interfaces require evidence"),
+			materia.tooling.ToolingValidation.ToolingReadiness.pending("anchorage-compaction", [d.input.id], "Anchorage and compaction loads require evidence")
+		]);
+		if (d.input.inserts.length>0)
+			result.validation.push(materia.tooling.ToolingValidation.ToolingReadiness.pending("insert-fixtures",
+				[for (i in d.input.inserts) i.id],"Attachment, datum accuracy and thread protection require evidence"));
+		result.fabrication = materia.tooling.ToolingValidation.ToolingReadiness.evaluate(result.validation);
+		validate(result);
+		return result;
+	}
+
+	static function build(d:ToolingDocument, o:CastingMoldOptions, geometryChecks:Array<materia.tooling.ToolingValidation>):CastingMoldPlan {
+		var e = envelope(d), r = d.recipe, t = r.panel.measuredThickness, l = r.minimumLigament;
+		var exactRegions=nonBoxFeatures(d);
+		if (o.precision.length != d.input.inserts.length)
+			throw "Every insert needs a precision process record";
+		var strategies = CastingStrategies.resolve(d);
+		var reusable = strategies.filter(v -> v.strategy == CoreStrategy.ReusableFormer);
+		for (index in 0...reusable.length)
+			for (other in index + 1...reusable.length) {
+				var a = reusable[index], b = reusable[other];
+				if (a.priority == b.priority
+					&& MoldRegions.overlaps(MoldRegions.feature(d,a.featureId),MoldRegions.feature(d,b.featureId),1e-7,a.featureId))
+					throw "Overlapping reusable formers require distinct priorities: " + a.featureId + ", " + b.featureId;
+			}
+		var bodies = new Map<String, MoldBox>(), low = e.z;
+		for (i in d.input.inserts) {
+			var dimensions = InsertBodies.box(i.body, i.id);
+			var b = BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(d.setup.sourceToMold, i.pose));
+			bodies.set(i.id, b);
+			low = Math.min(low, b.z);
+			if (o.precision.filter(p -> p.insertId == i.id).length != 1)
+				throw "Missing or duplicate insert process record";
+		}
+		var b:MoldBox = {
+			x: e.x,
+			y: e.y,
+			z: low,
+			width: e.width,
+			depth: e.depth,
+			height: e.z + e.height - low
+		};
+		var result=seed(d,o,e,b,geometryChecks),panels=result.panels,bed=panels.members[0];
 		var epsBoxes:Array<MoldBox> = [], insertBoxes:Array<MoldBox> = [];
 		for (i in d.input.inserts) {
 			var ib = bodies.get(i.id);
@@ -168,11 +294,9 @@ class CastingMoldPlanner {
 		}
 		for (f in d.input.features)
 			if (f.kind != CastingFeatureKind.InsertRecess) {
-				var s = strategies.filter(s -> s.featureId == f.id)[0],
-					cb = featureBox(d, f);
-				if (cb == null)
-					throw "Feature misses envelope: " + f.id;
+				var s = strategies.filter(s -> s.featureId == f.id)[0];
 				if (s.strategy == CoreStrategy.SacrificialEPS) {
+					var cb=featureBox(d,f);
 					if (Math.abs(cb.z + cb.height - b.z - b.height) > 1e-7
 						|| cb.x <= e.x
 						|| cb.x + cb.width >= e.x + e.width
@@ -266,7 +390,7 @@ class CastingMoldPlanner {
 					&& s.strategy == CoreStrategy.ReusableFormer
 					&& s.withdrawal != null
 					&& Math.abs(s.withdrawal.x) > 0.9)
-					.length == 1 && BoxAlgebra.intersection(featureBox(d, f), pad) != null);
+					.length == 1 && MoldRegions.overlaps(MoldRegions.feature(d,f.id),MoldRegions.box(pad),1e-7,f.id));
 			if (access.length > 0) {
 				var dir = strategies.filter(s -> s.featureId == access[0].id)[0].withdrawal;
 				if (dir == null)
@@ -387,11 +511,28 @@ class CastingMoldPlanner {
 				}
 			});
 		}
+		var previousRegions:Array<materia.casting.CastingRegion> =[];
 		for (f in ordered)
 			if (f.kind != CastingFeatureKind.InsertRecess) {
 				var s = strategies.filter(s -> s.featureId == f.id)[0];
-				if (s.strategy != CoreStrategy.ReusableFormer || f.draft.degrees > 0)
+				if (s.strategy != CoreStrategy.ReusableFormer) continue;
+				var sourceRegion=MoldRegions.feature(d,f.id);
+				if (MoldRegions.boxes(sourceRegion)==null) {
+					if (s.withdrawal==null || Math.abs(s.withdrawal.z)<1-1e-8)
+						throw "Non-box former needs a supported withdrawal: "+f.id;
+					var allocated=materia.casting.CastingRegion.Difference(sourceRegion,
+						[for (box in occupied) MoldRegions.box(box)].concat(previousRegions));
+					var ids:Array<String> =[];
+					if (MoldRegions.volume(allocated,f.id)>1e-7) {
+						var id=materia.tooling.ToolingIds.derive("former-",f.id,"-0");
+						result.formers.push({volume:{id:id,material:FormerStock,pieces:[],profiles:[],cuts:[],regions:[allocated]},
+							featureIds:[f.id],withdrawal:s.withdrawal,draftDegrees:f.draft.degrees});
+						ids.push(id);
+					}
+					result.features.push({featureId:f.id,kind:FormerFeature,memberIds:ids});
+					previousRegions.push(sourceRegion);
 					continue;
+				}
 				var cb = featureBox(d, f);
 				if (cb == null)
 					throw "Missing former intersection";
@@ -451,6 +592,9 @@ class CastingMoldPlanner {
 				if (profiles.length > 0 && groups.length != 1)
 					throw "Access former needs an explicit split for its sealing profile: " + f.id;
 				for (index in 0...groups.length) {
+					var remaining=exactRegions ? materia.casting.CastingRegion.Difference(
+						materia.casting.CastingRegion.Union([for (piece in groups[index]) MoldRegions.box(piece)]),previousRegions.copy()) : null;
+					if (remaining!=null && MoldRegions.volume(remaining,f.id)<=1e-7) continue;
 					var id = materia.tooling.ToolingIds.derive("former-", f.id, "-" + index);
 					ids.push(id);
 					result.formers.push({
@@ -458,9 +602,9 @@ class CastingMoldPlanner {
 							id: id,
 							material: FormerStock,
 							cuts: [],
-							regions: [],
+							regions: remaining==null ? [] : [remaining],
 							profiles: profiles,
-							pieces: groups[index]
+							pieces: remaining==null ? groups[index] : []
 						},
 						draftDegrees: f.draft.degrees,
 						featureIds: [f.id],
@@ -482,6 +626,7 @@ class CastingMoldPlanner {
 				result.features.push({featureId: f.id, kind: FormerFeature, memberIds: ids});
 				for (p in pieces)
 					previous.push(p);
+				previousRegions.push(sourceRegion);
 				for (open in result.openings)
 					if (open.operationId == materia.tooling.ToolingIds.derive("access-", f.id)) {
 						open.sealingIds = ids.copy();
@@ -495,24 +640,22 @@ class CastingMoldPlanner {
 		for (feature in result.features)
 			if (feature.kind == FormerFeature) {
 				var source = d.input.features.filter(f -> f.id == feature.featureId)[0],
-					cb = featureBox(d, source);
-				if (cb == null)
-					throw "Missing cavity in ownership allocation";
+					cavity=MoldRegions.feature(d,source.id);
 				feature.memberIds = [];
 				for (former in result.formers)
-					if (former.volume.pieces.filter(v -> BoxAlgebra.intersection(v, cb) != null).length > 0) {
+					if (MoldRegions.overlaps(formerRegion(former),cavity,1e-7,source.id)) {
 						feature.memberIds.push(former.volume.id);
 						if (former.featureIds.indexOf(source.id) < 0)
 							former.featureIds.push(source.id);
 					}
 				for (core in result.cores)
-					if (BoxAlgebra.intersection(core.cavity, cb) != null)
+					if (MoldRegions.overlaps(MoldRegions.box(core.cavity),cavity,1e-7,source.id))
 						feature.memberIds.push(core.id);
 				for (fixture in result.fixtures)
-					if (fixture.datum.pieces.filter(v -> BoxAlgebra.intersection(v, cb) != null).length > 0)
+					if (fixture.datum.pieces.filter(v -> MoldRegions.overlaps(MoldRegions.box(v),cavity,1e-7,source.id)).length>0)
 						feature.memberIds.push(fixture.datum.id);
 				for (insert in d.input.inserts)
-					if (BoxAlgebra.intersection(bodies.get(insert.id), cb) != null)
+					if (MoldRegions.overlaps(MoldRegions.box(bodies.get(insert.id)),cavity,1e-7,source.id))
 						feature.memberIds.push(materia.tooling.ToolingIds.derive("insert-", insert.id));
 				feature.memberIds.sort(Reflect.compare);
 				if (feature.memberIds.length == 0) {
@@ -521,62 +664,7 @@ class CastingMoldPlanner {
 						"Feature has no supported physical tooling owner; choose an explicit alternative.", "tooling.feature.unsupported." + source.id, true);
 				}
 			}
-		for (strategy in strategies)
-			if (strategy.strategy == CoreStrategy.ReusableFormer && d.input.features.filter(feature -> feature.id == strategy.featureId)[0].draft.degrees == 0)
-				request(result, "draft-" + strategy.featureId, ReleaseAlternative, [strategy.featureId],
-					"Zero-draft rigid former has no qualified physical release. Only supported EPS or a source change to supported release geometry clears this rule; drafted/split formers are not implemented.",
-					"tooling.former.draft." + strategy.featureId);
-		for (former in result.formers)
-			if (former.featureIds.length == 0 && former.draftDegrees == 0)
-				request(result, "draft-" + former.volume.id, ReleaseAlternative, [former.volume.id],
-					"Bed-backing zero-draft rigid former needs a source/release change; drafted and split formers are unsupported.",
-					"tooling.former.draft." + former.volume.id);
-		var handlingQualified=CastHandling.qualified(d,o,result.handling);
-		if (result.handling.requiresFlip && !CastHandling.sourceDeclared(d) && !handlingQualified)
-			request(result,"handling-source-points",LiftingPoints,[d.input.id],
-				"Declare lifting inserts with unoccupied pre-cast threads, or a qualified external cradle.",
-				"tooling.handling.lifting-points");
-		else result.validation.push(materia.tooling.process.FillAnalysis.check("tooling.handling.lifting-points",
-			[d.input.id].concat(CastHandling.liftingIds(d)),Pass,
-			"Source lifting connections are declared, a cradle is qualified, or this setup needs no flip.",[]));
-		result.validation.push(materia.tooling.process.FillAnalysis.check("tooling.handling.flip",[d.input.id],
-			!result.handling.requiresFlip || handlingQualified ? Pass : Pending,
-			"Equipment capacity, measured mass/CoM and the flip procedure require separate handling evidence.",[]));
-		for (seat in o.precision) {
-			var source = d.input.inserts.filter(i -> i.id == seat.insertId)[0];
-			var stock=InterfaceQualification.finishingStock(d.input,source);
-			if (stock.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass) result.validation.push(stock);
-			else requestDecision(result,"allowance-"+seat.insertId,InterfaceAllowance,stock);
-			var replication=InterfaceQualification.replicationRequirement(source,seat);
-			if (replication!=null) result.validation.push(replication);
-		}
-		for (insert in d.input.inserts) switch insert.origin {
-			case Fabricated(manufacturing):
-				for (report in InsertManufacturingPlan.mountingHoleReports(manufacturing))
-					if (report.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail) {
-						var rule=InsertManufacturingPlan.mountingRule(insert.id,report.holeId);
-						var finding=result.validation.filter(check -> check.rule==rule)[0];
-						requestDecision(result,"hole-route-"+insert.id+"-"+report.holeId,DesignChangeKind.MountingHoleRoute,finding);
-					}
-			case Catalogue(_):
-		}
-		var missingJoint=FoundationJointQualification.missingSource(d.input);
-		if (missingJoint!=null) requestDecision(result,"foundation-joint-source",DesignChangeKind.FoundationJointDefinition,missingJoint);
-
-		result.validation = result.validation.concat([
-			materia.tooling.ToolingValidation.ToolingReadiness.pending("closure-loads", [d.input.id],
-				"Wall/pad clamps, braces and uplift capacity require qualification"),
-			materia.tooling.ToolingValidation.ToolingReadiness.pending("insert-fixtures", [for (i in d.input.inserts) i.id],
-				"Attachment, datum accuracy and thread protection require evidence"),
-			materia.tooling.ToolingValidation.ToolingReadiness.pending("materials-process", [d.recipe.id],
-				"Adhesive, covering, release and cure compatibility require qualification"),
-			materia.tooling.ToolingValidation.ToolingReadiness.pending("precision-interfaces", [d.input.id],
-				"Replication and grout interfaces require evidence"),
-			materia.tooling.ToolingValidation.ToolingReadiness.pending("anchorage-compaction", [d.input.id], "Anchorage and compaction loads require evidence")
-		]);
-		result.fabrication = materia.tooling.ToolingValidation.ToolingReadiness.evaluate(result.validation);
-		validate(result);
-		return result;
+		return finish(result,strategies);
 	}
 
 	/** Ownership ordering accepts raw caller order, before codec canonicalisation. */
@@ -766,11 +854,18 @@ class CastingMoldPlanner {
 					throw "Former sealing profile differs from panel operation";
 			}
 		}
-		var resin = resinAtFill(p.document, p.envelope);
+		var exactResin=nonBoxFeatures(p.document);
+		var resin = p.fixtures.length==0 || exactResin ? [] : resinAtFill(p.document, p.envelope);
 		for (fixture in p.fixtures) {
 			MoldVolumeCodec.snapshot(fixture.datum);
 			if (fixture.datum.profiles.length > 0 || fixture.datum.regions.length > 0)
 				throw "Neutral datum/resin validation does not support datum profiles or regions";
+			if (exactResin) {
+				if (geometry==null) throw "Exact tooling geometry kernel required: "+fixture.datum.id;
+				var region=materia.casting.CastingRegion.Union([for (piece in fixture.datum.pieces) MoldRegions.box(piece)]);
+				if (geometry.resinIntersection(p.document,region)>1e-7)
+					throw "Datum fixture intersects resin: "+fixture.datum.id;
+			}
 			for (piece in fixture.datum.pieces)
 				for (resinPiece in resin)
 					if (BoxAlgebra.intersection(piece, resinPiece) != null)

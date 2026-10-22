@@ -24,7 +24,7 @@ typedef RemovalReport = {
 }
 
 /** Exact straight-translation sweeps. Inputs remain borrowed; every temporary is closed.
- * Planar and cylindrical panel boundary faces are supported. Other surfaces fail explicitly.
+ * Planar/cylindrical faces and axial conical withdrawals are supported. Other surfaces fail explicitly.
  */
 class SweptRemoval {
 	static function prism(face:Shape, delta:Vector, pieces:Array<Part>):Void {
@@ -48,6 +48,13 @@ class SweptRemoval {
 					if (face.surfaceKind() == CadKit.SurfaceKind.Plane) {
 						if (Math.abs(Vector.fromNative(face.faceNormal()).dot(delta.normalized())) > 1e-10)
 							prism(face, delta, pieces);
+					} else if (face.surfaceKind() == CadKit.SurfaceKind.Cone) {
+						var axis=Vector.fromNative(face.faceAxis().get_direction()).normalized();
+						if (axis.cross(delta.normalized()).length()>1e-10)
+							throw "Unsupported removal boundary surface";
+						// Along its axis a genuine cone projects one-to-one to its
+						// annular sector; the boundary extrusion cannot fold back.
+						prism(face,delta,pieces);
 					} else if (face.surfaceKind() == CadKit.SurfaceKind.Cylinder) {
 						var axis = face.faceAxis(),
 							d = Vector.fromNative(axis.get_direction()).normalized();

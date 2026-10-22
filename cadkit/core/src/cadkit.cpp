@@ -9,6 +9,7 @@
 #include <GeomConvert.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_TrimmedCurve.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
 #include <NCollection_Array2.hxx>
 #include <Geom2dConvert.hxx>
 #include <Geom2d_BSplineCurve.hxx>
@@ -606,6 +607,12 @@ bool planar_bilinear_surface(const Handle(Geom_BSplineSurface)& surface) {
 cad_surface_kind surface_kind_from_occt(const Handle(Geom_Surface)& surface) {
     if (surface.IsNull()) {
         return CAD_SURFACE_UNKNOWN;
+    }
+    // Ruled circular sections retain an analytic cone/cylinder under a UV
+    // trimming wrapper. The wrapper changes bounds, not the supporting surface.
+    if (surface->IsKind(STANDARD_TYPE(Geom_RectangularTrimmedSurface))) {
+        const auto trimmed = Handle(Geom_RectangularTrimmedSurface)::DownCast(surface);
+        return surface_kind_from_occt(trimmed->BasisSurface());
     }
     if (surface->IsKind(STANDARD_TYPE(Geom_Plane))) {
         return CAD_SURFACE_PLANE;

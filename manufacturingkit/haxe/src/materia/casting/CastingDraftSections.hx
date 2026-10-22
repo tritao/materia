@@ -34,6 +34,30 @@ class CastingDraftSections {
 		catch (error:Dynamic) throw "Casting feature "+featureId+": "+Std.string(error);
 	}
 
+	/** Capability only: invalid reached depths and collapsing offsets remain
+	 * design errors, while these unrealized axes/openings stay Unsupported.
+	 */
+	public static function unsupportedReason(body:Array<CastingPrism>,feature:CastingFeature):Null<String> {
+		var axis=feature.draft.axis,local=F.transformVector(F.inverse(feature.geometry.pose),axis.x,axis.y,axis.z);
+		var components=[local.x,local.y,local.z],dimension=-1;
+		for (index in 0...3) if (Math.abs(Math.abs(components[index])-1)<EPS) dimension=index;
+		if (dimension<0) return "Unsupported draft axis oblique to the feature extrusion";
+		switch feature.geometry.solid {
+			case Cut(CastingSolid.Box(_,_,_)):
+			default:if (dimension!=2) return "Unsupported draft axis transverse to a profile prism";
+		}
+		var faces=CastingCavities.boundary(body),planes:Array<Float> =[];
+		for (opening in feature.openings) if (opening.kind==CastingOpeningKind.BodyFace) {
+			var normal=CastingCavities.bodyFaceNormal(body,opening.target);
+			if (normal.x*axis.x+normal.y*axis.y+normal.z*axis.z<1-EPS) continue;
+			var point=faces.filter(face -> face.id==opening.target)[0].points[0];
+			planes.push(point.x*axis.x+point.y*axis.y+point.z*axis.z);
+		}
+		if (planes.length==0) return "Unsupported draft without a declared planar withdrawal opening";
+		for (plane in planes) if (Math.abs(plane-planes[0])>EPS) return "Unsupported draft across multiple withdrawal planes";
+		return null;
+	}
+
 	static function build(body:Array<CastingPrism>,feature:CastingFeature):DraftedCastingSections {
 		var axis=feature.draft.axis,local=F.transformVector(F.inverse(feature.geometry.pose),axis.x,axis.y,axis.z);
 		var components=[local.x,local.y,local.z],dimension=-1;

@@ -2157,13 +2157,27 @@ by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
   **110**, production mold **672** and all four CadKit CTest suites pass.
   Regeneration retains **168** hash-verified artifacts and **40** programs;
   readiness stays **false**, with the existing **74** trapped-air failures.
-- [ ] Profile-capable mold planning, drafted former walls and source/former
-  drawings/CAM remain unfinished. These slices do not complete step 3.
+- [x] Shared drafted-former planner: the same
+  allocation path combines exact source regions, source-thread datum fixtures
+  and orthogonal EPS. Complete CAD reconstruction, coverage and both removal
+  graphs pass for the mixed fixture and for rounded drafted walls. Positive
+  aligned source draft clears its release request; removing/reversing draft
+  restores it. Native restoration initializes exact geometry independently of
+  an earlier planning call. General mold **17** rejects **16**. Focused foundation
+  **460**, tooling **1,895**, kernel **20**, drafted mold **16** and geometry
+  **102** pass. Full native **690**, casting **54**, CAD equivalence **60**
+  (all five symmetric differences zero), design **32**, CamKit **12,386**, mill
+  **313**, rail seats **116**, lifting **457**, sockets **110**, production mold
+  **672** and all four CadKit suites pass. Regenerated kit: **168** independently
+  hash-verified artifacts and **40** programs, **847 Pass / 402 Pending /
+  123 Unsupported / 74 Fail**, readiness **false**. The trapped-air failures are
+  preserved. Non-box side withdrawal and EPS remain explicitly Unsupported.
+- [ ] Non-box side access, EPS/envelope support and source/former drawings/CAM
+  remain unfinished. These slices do not complete step 3.
 - [x] Draft source convention confirmed: authored dimensions belong to the
   withdrawal opening; walls taper inward along the declared source-coordinate
   withdrawal axis. Finishing stock and process error budgets remain separate.
-  Source draft realization is implemented; the drafted-mold release fixture
-  remains in the next geometry slice.
+  Source draft realization and its exact release fixtures are implemented.
 
 ### Phase 7 records: shared levelling-foot family
 

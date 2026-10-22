@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-region-mold-tests"
+  },
+  "entry": "RegionMoldPlannerTests",
+  "sourceRoots": [
+    "src",
+    "../../examples/box-mold"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/region-mold",
+  "sources": [
+    "src/RegionMoldPlannerTests.hx",
+    "../../examples/box-mold/SinglePocketSetup.hx"
+  ]
+}
