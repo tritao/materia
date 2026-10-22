@@ -13,6 +13,12 @@ enum MassSource {
 	 * (`EffectiveDensities`), not its drawn housing. An authored value, like `Declared`.
 	 */
 	EffectiveDensity(kgPerCubicMetre:Float);
+
+	/**
+	 * Computed from a simplified solid that stands in for the part's mass (`MachineComponent.massGeometry`), at its
+	 * material's density, so drawing detail does not move it. An authored model, like `Declared`.
+	 */
+	Modelled;
 }
 
 /** Mass in kg, centre in mm, and centroidal inertia in kg mm² in the component frame. */

@@ -171,29 +171,44 @@ class MachineComponent {
 	function effectiveDensity():Null<Float>
 		return null;
 
+	/**
+	 * A simplified solid standing in for the part's mass, at its material's density, when the drawn preview should
+	 * not decide it (a motor drawn in detail keeps the mass of its body); null uses the preview. The caller owns the
+	 * returned part.
+	 */
+	public function massGeometry():Null<Part>
+		return null;
+
 	/** The preview shape supplies volume and centroid; its density is kg/m³. */
 	public function massProperties():MassProperties {
 		if (declaredMass != null) return declaredMass;
 		if (cachedMass != null && cachedMassMaterialId == materialId) return cachedMass;
 		var effective = effectiveDensity();
 		var basis:ComponentDetail = effective == null ? Preview : Envelope;
-		var recipe = type, shareKey = recipe == null ? null : geometryKey(basis);
+		var modelled = effective == null ? massGeometry() : null;
+		var recipe = type, shareKey = recipe == null ? null : geometryKey(basis) + (modelled == null ? "" : "|mass-model");
 		if (shareKey != null) {
 			var known = recipe.knownMass(shareKey);
 			if (known != null) {
+				if (modelled != null) modelled.close();
 				cachedMass = known;
 				cachedMassMaterialId = materialId;
 				return known;
 			}
 		}
 		var part:Part;
-		try part = geometry(basis) catch (_:NoGeometry)
-			throw 'Component "$designation" has no geometry or declared mass';
+		if (modelled != null) {
+			part = modelled;
+		} else {
+			try part = geometry(basis) catch (_:NoGeometry)
+				throw 'Component "$designation" has no geometry or declared mass';
+		}
 		try {
 			var physical = part.massProperties();
 			var density = effective == null ? MaterialLibrary.require(materialId).physical.density : effective;
 			var mass = physical.volume * 1e-9 * density;
-			cachedMass = new MassProperties(mass, physical.centerOfMass, effective == null ? Computed(Preview) : EffectiveDensity(effective),
+			cachedMass = new MassProperties(mass, physical.centerOfMass,
+				effective != null ? EffectiveDensity(effective) : modelled != null ? Modelled : Computed(Preview),
 				physical.inertiaAtDensity(density * 1e-9));
 			cachedMassMaterialId = materialId;
 		} catch (error:Dynamic) {
