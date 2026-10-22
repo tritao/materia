@@ -15,6 +15,24 @@
       "retained": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/system.tar.gz",
       "sha256": "6f1d5f9262ecb7094a44874d85e63b838040d0c49df2998e4b0db1e3ff1a13bb",
       "bytes": 109698850
+    },
+    {
+      "original": "/home/joao/dev/materia/build/sheet-router-evidence/sr6-qualified.tar.gz",
+      "retained": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr6-qualified.tar.gz",
+      "sha256": "e5e741330b35b35b1dffde7dc9eef04de28b776d036fc7ec10bf2c03b20c07bf",
+      "bytes": 308963111
+    },
+    {
+      "original": "/home/joao/dev/materia/build/sheet-router-evidence/stiffness.tar.gz",
+      "retained": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/stiffness.tar.gz",
+      "sha256": "6f347f9d1a762dcaa410a427f2b8a56d56c7113af12b4f5e42abccd01f0ed7db",
+      "bytes": 105853949
+    },
+    {
+      "original": "/home/joao/dev/materia/build/sheet-router-evidence/sr6-diy.tar.gz",
+      "retained": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr6-diy.tar.gz",
+      "sha256": "ab97b59bd5121f3e18ed30474af3a644d7df40ee6797cf0ad2868246fcd8af50",
+      "bytes": 77293179
     }
   ],
   "reason": "DATA1 has 38 MB free; verified archives moved to separate DEV filesystem to maintain the required root reserve"

@@ -66,7 +66,7 @@ The native wrench fixture, seven effective-length/life regressions, 33 mill
 plus seven router exporter assertions, and fresh two-bed CAD exports pass.
 
 Reproduction uses existing CCX and the retained planner sampler, without an
-OCCT rebuild. Extract `build/sheet-router-evidence/sr6-qualified.tar.gz` under
+OCCT rebuild. Extract `/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr6-qualified.tar.gz` under
 `build/sheet-router-evidence/unpacked/`, then from the repository root:
 
 ```sh
@@ -753,7 +753,7 @@ spring values do not qualify a physical preloaded/dowelled joint. Hardware mass
 was held unchanged in this interface-only screen.
 
 All twelve comparisons: [diy-feet-results.json](diy-feet-results.json). Full decks
-and results: `build/sheet-router-evidence/sr6-diy.tar.gz`, extracted under
+and results: `/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr6-diy.tar.gz`, extracted under
 `build/sheet-router-evidence/unpacked/sr6-diy/`. The same archive retains prepared
 frame STEP files and native service checks; their local weld qualification is
 separate from the frozen beam-centreline model.

@@ -236,7 +236,7 @@
   ],
   "scope": "Focused anchored-floor joint-model recheck at the two previously governing dynamic poses; 50 mm mesh, 40 modes; 0.5/1% damping, 250 us time step. Unchanged structural geometry and moving cutting mass; fixed ATC masses/positions updated.",
   "baselineCommit": "4869f1f49",
-  "baselineArchive": "build/sheet-router-evidence/sr6-qualified.tar.gz",
+  "baselineArchive": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr6-qualified.tar.gz",
   "baselineArchiveSha256": "e5e741330b35b35b1dffde7dc9eef04de28b776d036fc7ec10bf2c03b20c07bf",
   "sourceSha256": {
     "machinekit/examples/sheet-router/SheetRouter.hx": "7c8eb8a1bd84ea3ce290f756db9598f2527011408f19356973189e1727a5e282",

@@ -99,7 +99,7 @@
   "effectiveLengthAndLifeRegressions": 7,
   "assemblyAssertions": 426,
   "assemblyNote": "Historical full assembly sweep before lowering only the external stand bar from Z250 to Z75; final prepared geometry subsequently passed 185 native service/access probes per bed. The new native cover/setter sweep is recorded separately under SR7.",
-  "evidenceArchive": "build/sheet-router-evidence/sr6-qualified.tar.gz",
+  "evidenceArchive": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr6-qualified.tar.gz",
   "sourceHashes": {
     "machinekit/examples/sheet-router/SheetRouter.hx": "9ab201cf7661bf8489da05b87f9d10484594acbd422ed7609134f6634d266ff7",
     "machinekit/examples/sheet-router/SheetRouterSpec.hx": "e9bd8a9ea938fc77e67469086a3689412777b749ef6d6454901bb324bb578ca3",

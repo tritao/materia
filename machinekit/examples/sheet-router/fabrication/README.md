@@ -123,6 +123,6 @@ seat/alignment and SR6-C modal measurements are later build witnesses. Never
 replace those measurements with simulated sign-offs.
 
 Condensed check results and source identities: [validation.json](validation.json).
-The earlier DIY draft remains in `build/sheet-router-evidence/sr6-diy.tar.gz`.
+The earlier DIY draft remains in `/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr6-diy.tar.gz`.
 The reaction-qualified native STEP, solver and run-log evidence is retained in
-`build/sheet-router-evidence/sr6-qualified.tar.gz` (extracts as `sr6-qualified/`).
+`/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr6-qualified.tar.gz` (extracts as `sr6-qualified/`).
