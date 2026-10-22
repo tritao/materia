@@ -39,7 +39,7 @@ Those still need the physical mount factory and its native checks. The test
 compound ranges, plastic layer stand-in and fixture dimensions are **not**
 production geometry or supplier limits.
 
-Validation on 2026-10-22: `LinearMountTests` **53 assertions**; existing
+Validation on 2026-10-22: `LinearMountTests` **55 assertions**; existing
 `RailSeatTests` **116 assertions / 36 service screws**; `GearRackChecks` passes
 all four catalogue recipes, transformed geometry, ratings and reload. Logs and
 source hashes are retained by the router's shared-mount work record. No frozen
@@ -47,8 +47,17 @@ router geometry or FE mode has changed. RM2 remains in progress, not complete.
 
 The separate `haxeon.contact.json` target runs a review-only native side-mount
 fixture. It uses the same hole and fastener derivation, a 20×28 mm C45 receiver,
-one real 500 mm rack and ISO 7089 M6 washers. **19 assertions** pass, including
+one real 500 mm rack and ISO 7089 M6 washers. **26 assertions** pass, including
 contact on both sides of each washer and **1.10 mm** minimum clearance to the
 conservative pinion envelope at nine stations. Set `LINEAR_MOUNT_EXPORT` to an
 output directory to retain STEP witnesses and `contact.json`. This is not a
 production component recipe, full-axis mounting model, stiffness or fatigue pass.
+
+`LinearMountSteel` is the first rebuildable physical RM2 member. Both rails and
+racks use its C45 receiver stock and the same neutral drilling; a welded host's
+receiver is not a cast insert. Its recipe retains source identities/budgets,
+locks the C45 material used by the thread policy, rejects stale holes after stock
+shrinking, and is registered/classified for saved assemblies. Native checks
+verify assembly reload plus computed mass/inertia exported exactly once by the
+existing `AssemblyFemExport`. This verifies mass export, **not** a complete joint
+compliance law or full mounting-factory acceptance.

@@ -179,10 +179,15 @@ family serves rails, racks and linear scales. The first source slice is implemen
 Existing mill source holes/fasteners delegate to the shared core. The cast/welded
 host contract preserves explicit replication inputs and requires steel adjustment
 members; it does not yet generate or qualify physical carrier/bar/bracket geometry.
-Checks: 53 shared assertions, the existing 116 rail-seat assertions (36 service
-screws), and catalogue rack regressions. A separate 19-assertion local contact
+Checks: 55 shared assertions, the existing 116 rail-seat assertions (36 service
+screws), and catalogue rack regressions. A separate 26-assertion local contact
 fixture checks a side-bolted rack candidate with real washers and pinion envelope;
-it does not qualify a whole mount or automatic FE compliance. See
+it does not qualify a whole mount or automatic FE compliance. `LinearMountSteel`
+is the first rebuildable physical member, shared by rail/rack receivers and
+adjustment steel. Its C45 policy/material lock, saved-assembly reload and existing
+FEM mass/inertia export pass. It is a bolted mounting member, not a cast insert;
+carrier, bar/cleat construction, replication geometry and joint-compliance export
+are not declared complete. See
 [router candidate](examples/sheet-router/mounting/PROPOSAL.md). Production compound
 limits, actual through-bolt/nut rail backing and full native/FE acceptance remain
 open. Today's generic tape scale has no mounting bores and is rejected by the

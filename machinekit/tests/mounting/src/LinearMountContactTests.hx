@@ -27,6 +27,7 @@ class LinearMountContactTests {
    element.connectors.map(c->c.name),element.thread,element.bore.diameter,element.bore.reference,
    [TransferAfterCasting],allocation);
   var facet=machinekit.structural.InsertHoles.facet(derived.holes,width,length,height);
+  var member=machinekit.structural.LinearMountSteel.receiver(width,length,height,derived);
   var parts:Array<Part>=[];
   function own(p:Part):Part {parts.push(p);return p;}
   var output=Sys.getEnv("LINEAR_MOUNT_EXPORT");
@@ -34,7 +35,24 @@ class LinearMountContactTests {
   var bolts:Array<Dynamic>=[],contacts:Array<Dynamic>=[];
   var minimumClearance=1e30;
   try {
-   var receiver=own(Solids.cut(Part.box(width,length,height),facet.drillingTools()));
+   var receiver=own(member.geometry());
+   var registry=machinekit.component.MachineKitComponents.standard();
+   var recipe=machinekit.structural.LinearMountSteel.recipeType();
+   var rebuilt=registry.byId(recipe.id).create(member.values());
+   check(registry.category(recipe.id)!=null && registry.kind(recipe.id)!=null,"shared receiver recipe is classified");
+   check(recipe.key(rebuilt.values())==recipe.key(member.values()),"shared receiver recipe round trips its source drilling");
+   check(Math.abs(rebuilt.massProperties().mass-member.massProperties().mass)<1e-12,"rebuild preserves computed steel mass");
+   check(!Std.isOfType(member,machinekit.structural.CastInsert),"welded-host receiver is not a cast-in insert");
+   var changed=false;try member.setMaterial("steel") catch(_:Dynamic)changed=true;
+   check(changed,"C45 thread policy cannot be retained after switching material");
+   var assembly=new machinekit.assembly.MachineAssembly();assembly.addComponent("receiver",member,F.identity());
+   var restored=machinekit.assembly.MachineAssembly.decode(assembly.encode());
+   check(restored.encode()==assembly.encode(),"receiver and source drilling round trip through assembly encoding");
+   var state=new cadkit.modeling.AssemblyState(assembly.definition());
+   var fem=machinekit.structural.fem.AssemblyFemExport.bodies(assembly,state,".",_ -> false);
+   check(fem.parts.length==1 && Math.abs(fem.totalMassKg-member.massProperties().mass)<1e-12,
+    "shared receiver mass and inertia enter existing FEM export exactly once");
+   if(output!=null)sys.io.File.saveContent(output+'/fem-mass.json',haxe.Json.stringify(fem,null,"  "));
    var raw=own(rack.geometry()),placed=own(PosedParts.moved(raw,pose));
    check(receiver.valid() && placed.valid(),"receiver and supplier rack are valid native solids");
    check(Math.abs(placed.distance(receiver)-washer.thickness)<1e-6,"rack stand-off equals actual washer thickness");

@@ -34,6 +34,7 @@ class MachineKitComponents {
 		registry.register(machinekit.structural.SlideInSlotNut.recipeType());
 		registry.register(machinekit.structural.MineralCasting.recipeType());
 		registry.register(machinekit.structural.CastInsert.recipeType());
+		machinekit.structural.LinearMountComponents.register(registry);
 		registry.register(machinekit.tooling.ToolingPanel.recipeType());
 		registry.register(machinekit.tooling.ToolingSourceCasting.recipeType());
 		registry.register(machinekit.tooling.ToolingPin.recipeType());

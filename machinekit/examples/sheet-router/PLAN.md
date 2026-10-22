@@ -1828,3 +1828,13 @@ all existing SR-D3/SR6 release gates. The required-mount API must cover actual
 side-face support independently of the mesh/back datum; its earlier patch is
 not production acceptance. Review the complete passing candidate before frozen
 adoption. Cable-chain visuals stay queued.
+
+RM2 receiver milestone (2026-10-22): the shared `LinearMountSteel` recipe now
+retains connector-derived drilling and source budgets for rails and racks. It
+is distinct from a cast insert and locks the C45 material required by its thread
+policy. Shared source checks now pass 55 assertions; the local side-mount fixture
+passes 26 including recipe/assembly reload and mass/inertia appearing exactly
+once in the existing FEM export. Clearance remains 1.10 mm. This does not close
+RM2's carrier/cleats/adjustment-bar/replication or automatic joint-compliance
+export, and does not supply new whole-router structural or dynamic results.
+Frozen geometry and release gates remain unchanged.

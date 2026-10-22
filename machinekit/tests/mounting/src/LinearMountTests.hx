@@ -103,6 +103,11 @@ class LinearMountTests {
   var badSteel={x:-20.0,y:-220.0,z:0.0,width:40.0,depth:Math.NaN,height:20.0};
   rejected(()->{MountHoleDerivation.derive(badSteel,C45Bright,rail,"rail",haxe.crypto.Sha256.encode("fixture"),pose,
    ["mount1"],rail.mountingThread(),7,"fixture",[TransferAfterCasting],allocation());},"nonfinite receiver geometry fails");
+  var sharedReceiver=machinekit.structural.LinearMountSteel.receiver(40,440,20,result);
+  check(sharedReceiver.mountingRequirements().length==rail.mountingConnectors().length,
+   "same physical receiver recipe retains rail lineage as well as rack lineage");
+  rejected(()->{new machinekit.structural.LinearMountSteel(sharedReceiver.values().setNumber("thickness",8));},
+   "a thinner receiver cannot retain deep service holes from the previous design");
   Sys.println('LinearMountTests: $count assertions passed');
  }
 }

@@ -1,19 +1,26 @@
 {
-  "status": "RM2 shared source core and local contact fixture; physical family/automatic FE compliance/full-router acceptance still open",
+  "status": "Shared source and rebuildable receiver pass; complete mounting factory, joint-compliance export and router rerun remain open",
   "coreCommit": "b4905d034",
   "rackConnectorFixCommit": "a2336dacf",
-  "validationWorkingHead": "b4905d034465f5400671302abbf3bccc679eabc8",
-  "archive": "build/sheet-router-evidence/shared-mount-core.tar.gz",
-  "archiveSha256": "ae4f928b31b26380ecfc15ad767177299ef949ad09af76bce3fd24b2726e015a",
-  "bytes": 328758,
-  "verifiedRegularFiles": 32,
+  "priorFixtureCommit": "98e217b1a",
+  "archive": "build/sheet-router-evidence/shared-mount-receiver.tar.gz",
+  "archiveSha256": "fcba852652b4aa9f2bb84666c220094d2a154997da0cf1c2a13444a5544ee3d8",
+  "bytes": 629066,
+  "verifiedRegularFiles": 49,
   "checks": {
-    "sharedAssertions": 53,
+    "sharedAssertions": 55,
     "existingRailAssertions": 116,
     "existingRailServiceScrews": 36,
     "rackRecipes": 4,
-    "localNativeAssertions": 19,
-    "minimumPinionReceiverClearanceMm": 1.1000000000000014
+    "localNativeAssertions": 26,
+    "minimumPinionReceiverClearanceMm": 1.1000000000000014,
+    "receiverMassKg": 2.3624340551720606
+  },
+  "previousCoreArchive": {
+    "archive": "build/sheet-router-evidence/shared-mount-core.tar.gz",
+    "archiveSha256": "ae4f928b31b26380ecfc15ad767177299ef949ad09af76bce3fd24b2726e015a",
+    "bytes": 328758,
+    "verifiedRegularFiles": 32
   },
   "inventory": [
     {
@@ -82,6 +89,71 @@
       "sha256": "5ec3ffcb8310b4663f7f1d193cf4548b71463b1f5186def4878ab802d142fde8"
     },
     {
+      "path": "evidence/contact-v2/bolt1.step",
+      "bytes": 32482,
+      "sha256": "293a9a91c1c16229c5f7f62d89416c291e974fb3bdd0cb5558d7b7c804f7fc69"
+    },
+    {
+      "path": "evidence/contact-v2/bolt2.step",
+      "bytes": 32480,
+      "sha256": "5b96972854c2c0885d6f33d73477781b8551406b3bdbed377322e4b1146c98f2"
+    },
+    {
+      "path": "evidence/contact-v2/bolt3.step",
+      "bytes": 32465,
+      "sha256": "f68906b3439d81ccaa9c051a659976f392f20e4fefc743e833d5322686ac5686"
+    },
+    {
+      "path": "evidence/contact-v2/bolt4.step",
+      "bytes": 32480,
+      "sha256": "8374dc99fc50f02cb06d1eaa4769f0a273fd542ac5b0919a33d427af23485594"
+    },
+    {
+      "path": "evidence/contact-v2/contact.json",
+      "bytes": 2313,
+      "sha256": "a56d83caa1bbda6f75ec3ba380b404a3f77e175ac90b8815b6ccd1fb0a59fcd2"
+    },
+    {
+      "path": "evidence/contact-v2/fem-mass.json",
+      "bytes": 1380,
+      "sha256": "231e05830a440ae04c3f185774ef9a9ba95888ac83835cfde7082d7f1b4c37ce"
+    },
+    {
+      "path": "evidence/contact-v2/pinion-envelope.step",
+      "bytes": 5739,
+      "sha256": "c110f04c7565756c51d69c24876ea664f55a7047461217969cab11ea89ee9737"
+    },
+    {
+      "path": "evidence/contact-v2/rack.step",
+      "bytes": 1777277,
+      "sha256": "7ff52fe7174708afb7ce0ee3b0ce6adbf1116bf866dbb22a0c739b4f3c8163b2"
+    },
+    {
+      "path": "evidence/contact-v2/receiver.step",
+      "bytes": 33129,
+      "sha256": "3f9eb34f987680772bcfa94886a3b6a62e74a8a357e5f0010154c383965ecaf0"
+    },
+    {
+      "path": "evidence/contact-v2/washer1.step",
+      "bytes": 9220,
+      "sha256": "749eaf5b32a6279edf8be1cbda2ce7e645e33aa0c9cd0f89516c27d4ba3055ab"
+    },
+    {
+      "path": "evidence/contact-v2/washer2.step",
+      "bytes": 9206,
+      "sha256": "4d925c16dee21fdb0380325001018d72c0d2b36b44ecce244d87d56fe2599ca1"
+    },
+    {
+      "path": "evidence/contact-v2/washer3.step",
+      "bytes": 9192,
+      "sha256": "45e25eaaafae1956e2bc5207c390ad3a3bfc1bebf5bd72cdc566eecaf33e4471"
+    },
+    {
+      "path": "evidence/contact-v2/washer4.step",
+      "bytes": 9206,
+      "sha256": "abf072608824cc851b25d9a727f88bcceca9d5789d235c845752912b0de09ab7"
+    },
+    {
       "path": "evidence/contact.log",
       "bytes": 13983,
       "sha256": "f5b1d2a8ad388362bf6527bb07b3923dc90696514a198650023605c2656ef1e1"
@@ -95,6 +167,16 @@
       "path": "evidence/rail-regression.log",
       "bytes": 19368,
       "sha256": "b8c05709c384a73b73c34300d35f2f92c1c82bd4a117c9cf86c1f6b60dba0875"
+    },
+    {
+      "path": "evidence/receiver.log",
+      "bytes": 14019,
+      "sha256": "97719f6701b6bf152fc44891dafbb15c295deb1bad7fb6fd36980e36e1277d77"
+    },
+    {
+      "path": "evidence/shared-recipe.log",
+      "bytes": 6952,
+      "sha256": "0535b0cb052baa39450d7d388965d870f9c45faf86f01785e11138a0be187836"
     },
     {
       "path": "evidence/validation.json",
@@ -113,8 +195,8 @@
     },
     {
       "path": "tests/README.md",
-      "bytes": 3274,
-      "sha256": "a48c984f0f529b3dacb5a6523a122fbcdd12dd4b4936aca406e8b54ebd792922"
+      "bytes": 3883,
+      "sha256": "00b7944eed40013559e0bbb80f3a5cd8c062b8613c2a68131180b148b08d5b98"
     },
     {
       "path": "tests/haxeon.contact.json",
@@ -128,13 +210,13 @@
     },
     {
       "path": "tests/src/LinearMountContactTests.hx",
-      "bytes": 5433,
-      "sha256": "a1a1c7dad4fe1de875f448150814b2b0345615ee385061fb985145c22bb7de94"
+      "bytes": 7081,
+      "sha256": "2090b3689635503e6c924c00274b2f8ed8a977fe144d90115e38cc65ef668c25"
     },
     {
       "path": "tests/src/LinearMountTests.hx",
-      "bytes": 8679,
-      "sha256": "dc3e2da17debfa64c91070258da756f96abb5fb19b4d6fc128de3260f8659b18"
+      "bytes": 9133,
+      "sha256": "7238c56350058a3144214f13298fb808af145c0f84190d1bc7d8522ac84d62f3"
     },
     {
       "path": "source/InsertMountPattern.hx",
@@ -162,6 +244,21 @@
       "sha256": "7a20664fb1260c4213f5142bb75734bfd0c49e4657834c65475841949bd96dd2"
     },
     {
+      "path": "source/LinearMountComponents.hx",
+      "bytes": 472,
+      "sha256": "da4abcd877f562f14389120838f3542a90fb3c7bc167a4038d2f5320450e40be"
+    },
+    {
+      "path": "source/LinearMountSteel.hx",
+      "bytes": 3425,
+      "sha256": "4021d7e973d612b8c439f10a9d871b14dfaa6d3cd673794293f20621c061626b"
+    },
+    {
+      "path": "source/MachineKitComponents.hx",
+      "bytes": 2955,
+      "sha256": "dd286ee590bdc159797930c4f0e376d0e2917c4bba46cb78ab1c249443a4240f"
+    },
+    {
       "path": "source/MillRailFasteners.hx",
       "bytes": 3434,
       "sha256": "1686d5db8670eaf7ced9746c68553dca49ac94edfdbda63d1e0459e19b5b6c63"
@@ -170,11 +267,6 @@
       "path": "source/GearRack.hx",
       "bytes": 5808,
       "sha256": "375f7154f0f66af11aeb5a9babd1958c4d824d12f5cf58abe0c51c7e39da3ec0"
-    },
-    {
-      "path": "source/PROPOSAL.md",
-      "bytes": 7607,
-      "sha256": "8058e0e8cc5a195114d6b9495bec52002ebe7b0242cde73a97e2ae3b3d951c75"
     }
   ]
 }

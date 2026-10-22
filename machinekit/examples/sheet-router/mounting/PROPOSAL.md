@@ -1,7 +1,7 @@
 # Shared-mount/router candidate — 2026-10-22
 
-**Review candidate; frozen CAD unchanged.** The shared source/fastener core is
-implemented. The physical RM2 factory, complete support brackets, automatic FE
+**Review candidate; frozen CAD unchanged.** The shared source/fastener core and first rebuildable C45 receiver member
+(`LinearMountSteel`) are implemented. The physical RM2 factory, complete support brackets, automatic FE
 compliance export and full supported-router qualification are not complete.
 Do not treat this document or the local contact fixture as fabrication release.
 
@@ -47,12 +47,14 @@ layout. Washer thickness is the catalogue recipe's **1.6 mm**. Counterbores star
 at rack x=0 and their bearing plane is x=7 mm; receiver steel lies beyond the
 opposite rack face. The common fastener selector chooses **M6×25, class 8.8**.
 
-The fixture passes **19 native assertions**, including **1.10 mm** minimum
+The fixture passes **26 native assertions**, including **1.10 mm** minimum
 clearance. It tests actual rack/washer/receiver contacts and a conservative
 20-tooth, 20 mm wide, left-hand pinion envelope at nine stations. This is a local
 contact/clearance test, not a native check of the complete drive, host brackets,
-adjusters, joint gauge, motor plate or a fatigue result. Full source and STEP
-witnesses are retained with the mounting evidence.
+adjusters, joint gauge, motor plate or a fatigue result. The receiver recipe and assembly round trip, material lock and automatic
+FEM mass/inertia export also pass. Full source and STEP witnesses are retained
+with the [mounting evidence](validation.json). Automatic joint compliance
+export is still open.
 
 The receiver's gross stock mass is **4.396 kg/m** before drilling. At the old
 3350/3900 mm Y and 2050 mm X rack envelopes, receiver stock alone is respectively
