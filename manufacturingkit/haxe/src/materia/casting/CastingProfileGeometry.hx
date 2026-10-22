@@ -8,6 +8,35 @@ import materia.casting.CastingProfile.CastingCurveKind;
 class CastingProfileGeometry {
 	public static inline var TOL = 1e-7;
 
+	/** Oriented derivative at a line/arc endpoint; magnitude is immaterial. */
+	public static function tangent(segment:CastingSegment, atEnd:Bool):CastingPoint2 {
+		var center = segment.center;
+		if (center == null)
+			return {x: segment.end.x - segment.start.x, y: segment.end.y - segment.start.y};
+		var point = atEnd ? segment.end : segment.start, sign = segment.sweep > 0 ? 1.0 : -1.0;
+		return {x: -(point.y - center.y) * sign, y: (point.x - center.x) * sign};
+	}
+
+	/** Smallest internal stock-corner radius of a CCW removed region.
+	 * Tangent authored arcs retain their real radius; a sharp inward corner is
+	 * zero, and a re-entrant corner is not an internal stock corner.
+	 */
+	public static function minimumInternalRadius(profile:Array<CastingSegment>):Float {
+		validate(profile);
+		var minimum = Math.POSITIVE_INFINITY;
+		for (index in 0...profile.length) {
+			var segment = profile[index], next = profile[(index + 1) % profile.length];
+			if (segment.center != null && segment.sweep > 0)
+				minimum = Math.min(minimum, CastingProfiles.distance(segment.center, segment.start));
+			var a = tangent(segment, true), b = tangent(next, false);
+			var turn = a.x * b.y - a.y * b.x;
+			var tolerance = 1e-8 * Math.sqrt((a.x * a.x + a.y * a.y) * (b.x * b.x + b.y * b.y));
+			if (turn > tolerance || Math.abs(turn) <= tolerance && a.x * b.x + a.y * b.y < 0) return 0;
+		}
+		if (!Math.isFinite(minimum)) throw "Profile has no internal curvature";
+		return minimum;
+	}
+
 	static function cross(ax:Float, ay:Float, bx:Float, by:Float):Float
 		return ax * by - ay * bx;
 

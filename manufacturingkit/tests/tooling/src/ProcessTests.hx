@@ -317,7 +317,7 @@ class ProcessTests {
 		raw.version = 1;
 		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported casting process");
 		raw = haxe.Json.parse(encoded);
-		raw.version = 8;
+		raw.version = ProcessSpecCodec.VERSION - 1;
 		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported casting process");
 		raw = haxe.Json.parse(encoded);
 		Reflect.deleteField(raw.spec, "mixer");

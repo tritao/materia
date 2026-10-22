@@ -91,32 +91,27 @@ class MillMoldStudy {
 			text.push(r.decidingReason + ": " + ToolingCodec.canonical(r.rankMetrics));
 			if (r.planningFailure != null)
 				text.push("Planning failed: " + r.planningFailure);
-			if (r.fill == null || r.cure == null || r.sections == null || r.castability == null || r.thermalCoverage == null || r.handling == null) {
-				text.push("Process analysis unsupported or failed; see validation records.");
-				continue;
-			}
-
-			text.push("Casting mass: "
-				+ r.handling.castingMassKg
-				+ " kg. Lumped peak estimate: "
-				+ r.cure.lumpedPeakEstimateC
-				+ " C (null means unknown).");
+			if (r.handling != null && r.cure != null)
+				text.push("Casting mass: " + r.handling.castingMassKg + " kg. Lumped peak estimate: "
+					+ r.cure.lumpedPeakEstimateC + " C (null means unknown).");
+			else text.push("Handling/cure analysis unavailable; see validation records.");
 			if (r.effort != null) {
 				var e = r.effort;
 				text.push("Panels: " + e.panels + " (" + e.uniquePanels + " unique); rigid formers: " + e.formers + "; EPS cores: " + e.epsCores
 					+ "; production blank sheets: " + e.sheetCount + "; logical hardware stacks: " + e.logicalHardwareStacks + ".");
 			}
-			text.push("Castability: minimum opposing-face span " + r.castability.minimumOpposingFaceSpanMm + " mm; " + r.castability.proposals.length
-				+ " review suggestions (not applied).");
-			text.push("Inscribed diameter: "
-				+ r.sections.junction.lowerDiameterMm
-				+ ".."
-				+ r.sections.junction.upperDiameterMm
-				+ " mm (geometry tolerance reached: "
-				+ r.sections.junction.converged
-				+ "). Unbound thermal volume: "
-				+ r.thermalCoverage.uncoveredVolumeMm3
-				+ " mm3; geometry bounds do not establish a junction thermal model.");
+			if (r.castability != null) {
+				var span = r.castability.minimumOpposingFaceSpanMm;
+				text.push("Castability: minimum opposing-face span " + (span == null ? "Unsupported" : span + " mm")
+					+ "; " + r.castability.proposals.length + " review suggestions (not applied).");
+			}
+			if (r.sections != null)
+				text.push("Inscribed diameter: " + r.sections.junction.lowerDiameterMm + ".." + r.sections.junction.upperDiameterMm
+					+ " mm (geometry tolerance reached: " + r.sections.junction.converged + ").");
+			else text.push("Orthogonal section and junction geometry are Unsupported.");
+			if (r.thermalCoverage != null)
+				text.push("Unbound thermal volume: " + r.thermalCoverage.uncoveredVolumeMm3
+					+ " mm3; geometry bounds do not establish a junction thermal model.");
 			for (v in r.validation)
 				if (v.status != ToolingCheckStatus.Pass)
 					text.push("- `" + v.rule + "` (" + v.status + "): " + v.message);

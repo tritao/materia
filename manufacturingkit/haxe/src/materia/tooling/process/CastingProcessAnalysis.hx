@@ -21,7 +21,7 @@ typedef CastingProcessReport = {
 	var pour:Null<PourPlanning.PourAssessment>;
 	var cure:CureReport;
 	var sections:Null<OrthogonalSections.OrthogonalSectionReport>;
-	var castability:Null<CastabilityAnalysis.CastabilityReport>;
+	var castability:CastabilityAnalysis.CastabilityReport;
 	var thermalCoverage:Null<ThermalCoverage.ThermalCoverageReport>;
 	var validation:Array<materia.tooling.ToolingValidation>;
 	var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
@@ -77,6 +77,7 @@ class CastingProcessAnalysis {
 			var fill=assessment==null ? null : assessment.report;
 			var checks=(assessment==null ? materia.tooling.casting.CastingSourceRegions.checks(geometry,"process.fill.geometry")
 				: assessment.validation.copy()).concat(materia.tooling.casting.CastingSourceRegions.checks(geometry,"process.sections.geometry"));
+			var castability=CastabilityAnalysis.analyze(p.document,spec,fill,null,sourceFingerprint,fingerprint,p.validation);
 			var pour=fill==null ? null : planPour(p,spec,fill);
 			validateSectionSources(p.document,spec);
 			var cure=CureAnalysis.analyze(p.document.input.id,sourceFingerprint,fingerprint,spec,p.document.recipe.mixDensityKgM3,
@@ -92,7 +93,7 @@ class CastingProcessAnalysis {
 				for (check in pour.validation)
 					if (check.rule=="process.pour.cure-mass-basis" || check.rule=="process.pour.cure-sequence") cure.validation.push(check);
 			}
-			checks=checks.concat(cure.validation).concat(p.validation);
+			checks=checks.concat(cure.validation).concat(p.validation).concat(castability.validation);
 			var unique=new Map<String,materia.tooling.ToolingValidation>();
 			for (check in checks) {
 				if (unique.exists(check.rule) && ToolingCodec.canonical(unique.get(check.rule))!=ToolingCodec.canonical(check))
@@ -102,7 +103,7 @@ class CastingProcessAnalysis {
 			checks=[for (check in unique) check];
 			checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));
 			return {version:ProcessSpecCodec.VERSION,sourceFingerprint:sourceFingerprint,processFingerprint:fingerprint,spec:spec,
-				fill:fill,pour:pour,cure:cure,sections:null,castability:null,thermalCoverage:null,validation:checks,
+				fill:fill,pour:pour,cure:cure,sections:null,castability:castability,thermalCoverage:null,validation:checks,
 				fabrication:materia.tooling.ToolingValidation.ToolingReadiness.evaluate(checks)};
 		}
 		var fillAssessment=FillAnalysis.assessRegions(geometry,p.document.setup.fillHeightMm,fillSettings);

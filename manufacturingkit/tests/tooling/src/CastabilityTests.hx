@@ -1,3 +1,5 @@
+import materia.casting.CastingProfiles as Profiles;
+import materia.casting.CastingFeature.CastingGeometrySolid;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingDocument;
 import materia.tooling.casting.CastingMoldPlan;
@@ -72,8 +74,131 @@ class CastabilityTests {
 		rejects(() -> materia.tooling.process.CastingLevelOne.apply(d,shifted[0]),"Unmapped or stale source proposal");
 	}
 
+	static function authoredProfileCorners():Void {
+		var semicircle = [Profiles.arc(0, 0, 40, -Math.PI / 2, Math.PI),
+			Profiles.line({x: 0, y: 40}, {x: 0, y: -40})];
+		var cases = [
+			{solid: Cut(materia.casting.CastingSolid.Box(100, 80, 61)), rounding: 6.0, measured: 6.0},
+			{solid: Prism(Profiles.roundedRectangle(-50, -40, 100, 80, 6), 61), rounding: 0.0, measured: 6.0},
+			{solid: Prism(Profiles.roundedRectangle(-50, -40, 100, 80, 2), 61), rounding: 0.0, measured: 2.0},
+			{solid: Prism(Profiles.rectangle(-50, -40, 100, 80), 61), rounding: 0.0, measured: 0.0},
+			{solid: Cut(materia.casting.CastingSolid.Cylinder(20, 61)), rounding: 0.0, measured: 10.0},
+			{solid: Prism(semicircle, 61), rounding: 0.0, measured: 0.0}
+		];
+		for (sample in cases) {
+			var document = ToolingTests.fixture();
+			document.recipe.designReview.minimumCornerRadiusMm = 4;
+			var feature = document.input.features.filter(feature -> feature.id == "pocket")[0];
+			feature.geometry.solid = sample.solid;
+			feature.cornerRadius = sample.rounding;
+			document.setup.sourceFingerprint = ToolingCodec.inputFingerprint(document.input);
+			var report = materia.tooling.process.CastingLevelOne.analyze(document);
+			var radius = report.metrics.minimumCornerRadiusMm;
+			check(radius != null && Math.abs(radius - sample.measured) < 1e-7,
+				"source screening measures authored line/arc corners rather than the optional implicit-filleting parameter");
+			var rows = report.validation.filter(row -> row.rule == "process.level1.corner-radius.pocket");
+			check(rows.length == 1 && rows[0].status == (sample.measured >= 4 ? "pass" : "fail"),
+				"the existing corner-radius rule tests actual curvature and detects sharp arc-to-line joints");
+		}
+	}
+
+	static function nonBoxReports():Void {
+		var document = ToolingTests.fixture();
+		document.recipe.designReview.minimumLiftingPoints = 4;
+		document.recipe.designReview.minimumInsertEdgeMm = 0;
+		document.recipe.designReview.minimumInsertCoverMm = 1;
+		document.recipe.designReview.minimumFixingAccessMm = 1;
+		var baseline = materia.tooling.process.CastingLevelOne.analyze(document);
+		var feature = document.input.features.filter(feature -> feature.id == "pocket")[0];
+		feature.cornerRadius = 4;
+		feature.derivedFrom = "authored-pocket";
+		document.setup.sourceFingerprint = ToolingCodec.inputFingerprint(document.input);
+		var before = ToolingCodec.canonical(document);
+		var spec = ProcessTests.spec();
+		spec.recipeFingerprint = ToolingCodec.recipeFingerprint(document.recipe);
+		spec.castability.maximumAggregateSizeMm = 4;
+		spec.castability.minimumPassageAggregateRatio = 3;
+		spec.castability.maximumSectionThicknessMm = 30;
+		var source = ToolingCodec.documentFingerprint(document), process = "partial-process";
+		var fill = FillAnalysis.analyze(document.input.id, source, process,
+			[box(0, 0, 2, 2, 10), box(2, 0, 2, 2, 2), box(4, 0, 4, 2, 6)],
+			[{id: "authored-pocket", box: box(4, 6, 4, 2, 4)}], [], 10, 2400, 10, null, 100);
+		var report = CastabilityAnalysis.analyze(document, spec, fill, null, source, process);
+		check(report.minimumOpposingFaceSpanMm == null && report.maximumInscribedThicknessMm == null
+			&& report.maximumDiameterLowerMm == null && report.maximumDiameterUpperMm == null
+			&& report.heatRemovingInterval == null, "missing section geometry supplies no invented scalar measurements");
+		for (rule in ["process.castability.minimum-passage", "process.castability.maximum-section"]) {
+			check(status(report, rule) == "unsupported", "a declared limit does not qualify missing geometry: " + rule);
+			var row = report.validation.filter(row -> row.rule == rule)[0];
+			check(row.affectedIds.length == 1 && row.affectedIds[0] == "authored-pocket",
+				"unsupported measurements name the authored feature rather than a fragment or body bound");
+		}
+		check(status(report, "process.level1.lifting-points") == "fail",
+			"a non-box cavity cannot hide missing typed lifting connections");
+		for (name in ["insert-edge", "insert-cover", "fixing-access"])
+			check(status(report, "process.level1." + name + ".seat") == "pass",
+				"a curved pocket does not suppress independent exact insert checks: " + name);
+		check(report.designMetrics.minimumInsertEdgeMm == baseline.metrics.minimumInsertEdgeMm
+			&& report.designMetrics.minimumEmbeddedDepthMm == baseline.metrics.minimumEmbeddedDepthMm
+			&& report.designMetrics.minimumFixingAccessLandMm == baseline.metrics.minimumFixingAccessLandMm,
+			"independent box-stock measurements are unchanged by an unrelated curved cavity");
+		var vent = report.proposals.filter(proposal -> proposal.action == RouteVent);
+		check(vent.length == 1 && vent[0].point != null, "partial fill keeps its vent position");
+		var ventPoint:{x:Float,y:Float,z:Float} = cast vent[0].point;
+		check(vent[0].sourceIds[0] == "authored-pocket" && ventPoint.z == 6,
+			"exact fill evidence retains its owned vent proposal without orthogonal sections");
+		check(report.validation.filter(row -> row.rule == vent[0].rule && row.status == "fail").length == 1,
+			"retaining a vent suggestion never clears the actual trapped-air failure");
+		var sourceOnly = CastabilityAnalysis.analyze(document, spec, null, null, source, process);
+		check(sourceOnly.sourceFingerprint == source && sourceOnly.processFingerprint == process
+			&& sourceOnly.proposals.filter(proposal -> proposal.action == RouteVent).length == 0,
+			"an unavailable fill report keeps source checks without inventing pockets or vent locations");
+		check(ToolingCodec.canonical(document) == before, "partial geometry screening leaves authored source facts unchanged");
+		document.input.features.reverse();
+		document.setup.features.reverse();
+		check(ToolingCodec.canonical(CastabilityAnalysis.analyze(document, spec, fill, null, source, process))
+			== ToolingCodec.canonical(report), "partial reports and proposal IDs do not depend on feature order");
+		rejects(() -> CastabilityAnalysis.analyze(document, spec, fill, null, source, "stale"),
+			"Mismatched castability fill process");
+		var fragments = ToolingCodec.snapshot(document);
+		var sibling = materia.casting.CastingFeatureCodec.snapshot(fragments.input.features.filter(feature -> feature.id == "pocket"))[0];
+		sibling.id = "pocket-second";
+		fragments.input.features.push(sibling);
+		fragments.setup.sourceFingerprint = ToolingCodec.inputFingerprint(fragments.input);
+		var grouped = materia.tooling.process.CastingLevelOne.analyze(fragments);
+		var geometryRows = grouped.validation.filter(row -> row.rule == "process.level1.geometry.authored-pocket");
+		check(geometryRows.length == 1 && geometryRows[0].message.indexOf("pocket-second") >= 0
+			&& geometryRows[0].message.indexOf("pocket") >= 0,
+			"non-box fragments retain their reasons in one finding for the authored parent");
+		fragments.input.features.reverse();
+		check(ToolingCodec.canonical(materia.tooling.process.CastingLevelOne.analyze(fragments)) == ToolingCodec.canonical(grouped),
+			"grouped geometry findings and messages are independent of fragment order");
+		var curvedBody = ToolingCodec.snapshot(document);
+		curvedBody.input.envelope = materia.casting.CastingEnvelope.build(200, 180, 100, 10);
+		curvedBody.setup.sourceFingerprint = ToolingCodec.inputFingerprint(curvedBody.input);
+		var sourceChecks = materia.tooling.process.CastingLevelOne.analyze(curvedBody);
+		for (name in ["insert-edge", "insert-cover"])
+			check(sourceChecks.validation.filter(row -> row.rule == "process.level1." + name + ".seat"
+				&& row.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length == 1,
+				"a chamfered body does not receive a bounding-box insert measurement: " + name);
+		check(sourceChecks.metrics.minimumInsertEdgeMm == null && sourceChecks.metrics.minimumEmbeddedDepthMm == null
+			&& sourceChecks.metrics.minimumFixingAccessLandMm == baseline.metrics.minimumFixingAccessLandMm,
+			"unsupported body measurements stay null while the actual insert's fixing land stays measured");
+		check(sourceChecks.validation.filter(row -> row.rule == "process.level1.lifting-points"
+			&& row.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length == 1,
+			"non-rectangular bodies retain their typed lifting-point rule");
+		var old:Dynamic = haxe.Json.parse(ProcessSpecCodec.encode(spec));
+		Reflect.setField(old, "version", 9);
+		rejects(() -> ProcessSpecCodec.decode(haxe.Json.stringify(old)), "Unsupported casting process");
+		fill.sourceFingerprint = "stale";
+		rejects(() -> CastabilityAnalysis.analyze(document, spec, fill, null, source, process),
+			"Mismatched castability section/fill source");
+	}
+
 	public static function run(p:CastingMoldPlan, raw:CastingProcessSpec):Void {
 		liftingLocations();
+		authoredProfileCorners();
+		nonBoxReports();
 		var d = ToolingCodec.snapshot(p.document),
 			s = ProcessSpecCodec.snapshot(raw);
 		s.recipeFingerprint = ToolingCodec.recipeFingerprint(d.recipe);

@@ -58,12 +58,33 @@ class RegionCorePlannerTests {
 				"curved carriers clear their bounding-box neighbours in complete "+rule);
 	}
 
-	static function packageEvidence(plan:CastingMoldPlan):Void {
+	static function packageEvidence(plan:CastingMoldPlan,process:materia.tooling.process.CastingProcessAnalysis.CastingProcessReport):Void {
 		var fabrication=materia.tooling.export.ToolingFabrication.plan(plan,FabricationTests.spec());
 		var directory=Sys.getCwd()+"/build/tooling/nonbox-core-"+fabrication.fingerprint.substr(0,12);
 		machinekit.tooling.ToolingFiles.directory(directory);
 		sys.io.File.saveContent(directory+"/mold-plan.json",materia.tooling.casting.CastingMoldCodec.encode(plan));
 		var checks=machinekit.tooling.ToolingFabricationExport.write(plan,fabrication,directory);
+		checks=checks.concat(machinekit.tooling.ToolingProcessExport.write(plan,process.spec,9.80665,directory,
+			null,null,null,process));
+		var castability:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/castability-analysis.json"));
+		check(castability!=null && Reflect.field(castability,"version")==materia.tooling.process.CastabilityAnalysis.VERSION,
+			"native process export retains the real castability report without orthogonal section support");
+		check(Reflect.field(castability,"sourceFingerprint")==process.sourceFingerprint
+			&& Reflect.field(castability,"processFingerprint")==process.processFingerprint,
+			"exported castability remains bound to its actual source and process");
+		check(Reflect.field(castability,"minimumOpposingFaceSpanMm")==null
+			&& Reflect.field(castability,"maximumDiameterUpperMm")==null,
+			"exported unsupported section measurements remain null");
+		var version=process.castability.version;
+		try {
+			process.castability.version=version-1;
+			rejects(() -> machinekit.tooling.ToolingProcessExport.write(plan,process.spec,9.80665,directory,
+				null,null,null,process),"Stale process export report");
+		} catch (error:Dynamic) {process.castability.version=version;throw error;}
+		process.castability.version=version;
+		var markdown=sys.io.File.getContent(directory+"/castability-review.md");
+		check(markdown.indexOf("process.castability.release.")>=0 && markdown.indexOf("process.level1.lifting-points")>=0,
+			"human review includes available release and source findings rather than only an Unsupported note");
 		machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks);
 		machinekit.tooling.ToolingPackageManifest.verify(directory);
 		var core=plan.cores[0],name=MoldCores.layerId(core,0)+".cutting.json";
@@ -153,6 +174,15 @@ class RegionCorePlannerTests {
 		var uplift=level.cores.filter(row -> row.id==core.id)[0];
 		check(Math.abs(uplift.submergedVolumeMm3-192000)<1e-5,
 			"native uplift displaces the gross cavity, rather than foam tiles or stock blanks");
+		check(process.castability.sourceFingerprint==process.sourceFingerprint
+			&& process.castability.processFingerprint==process.processFingerprint,
+			"native non-box processing preserves source-bound castability");
+		check(process.castability.validation.filter(row -> row.rule=="process.castability.release.pocket"
+			&& row.status==Status.Pending).length==1,
+			"non-box EPS keeps its physical breakout qualification alongside exact fill evidence");
+		check(process.castability.validation.filter(row -> row.rule=="process.castability.minimum-passage"
+			&& row.status==Status.Unsupported).length==1,
+			"native fill does not turn unsupported section measurements into a pass");
 		check(process.sections==null && process.validation.filter(row -> row.status==Status.Unsupported
 			&& StringTools.startsWith(row.rule,"process.sections.geometry")).length>0,
 			"non-box orthogonal sections stay explicitly Unsupported");
@@ -164,7 +194,7 @@ class RegionCorePlannerTests {
 		check(Math.abs(R.volume(ringCore.foamEnvelope,ringCore.id)-expectedRing)<1e-5,
 			"lining shrinks the outside and grows retained-material openings by their true normal thickness");
 		variants(document,options,plan);
-		packageEvidence(plan);
+		packageEvidence(plan,process);
 		Sys.println("RegionCorePlannerTests: "+assertions+" assertions passed");
 	}
 }

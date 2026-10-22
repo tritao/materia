@@ -254,14 +254,7 @@ class PanelCodec {
 	 * Rebate corners on/outside the blank are open approach boundaries.
 	 */
 	static function cutterFit(op:PanelOperation, outline:Array<CastingSegment>):Void {
-		function tangent(seg:CastingSegment, atEnd:Bool):CastingPoint2 {
-			var c = seg.center;
-			if (c == null)
-				return {x: seg.end.x - seg.start.x, y: seg.end.y - seg.start.y};
-			var p = atEnd ? seg.end : seg.start,
-				sign = seg.sweep > 0 ? 1.0 : -1.0;
-			return {x: -(p.y - c.y) * sign, y: (p.x - c.x) * sign};
-		}
+
 		var bounds = CastingProfileGeometry.bounds(op.contour);
 		if (Math.min(bounds.width, bounds.height) + 1e-7 < op.toolDiameter)
 			throw "Cutter does not fit slot: " + op.id;
@@ -269,7 +262,7 @@ class PanelCodec {
 			var seg = op.contour[i], next = op.contour[(i + 1) % op.contour.length], c = seg.center;
 			if (c != null && seg.sweep > 0 && 2 * PanelContours.distance(c, seg.start) + 1e-7 < op.toolDiameter)
 				throw "Cutter exceeds internal radius: " + op.id;
-			var a = tangent(seg, true), b = tangent(next, false);
+			var a = CastingProfileGeometry.tangent(seg, true), b = CastingProfileGeometry.tangent(next, false);
 			var cross = a.x * b.y - a.y * b.x;
 			if (cross <= 1e-8 * Math.sqrt((a.x * a.x + a.y * a.y) * (b.x * b.x + b.y * b.y)))
 				continue;

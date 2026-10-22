@@ -53,12 +53,12 @@ typedef CastabilityReport = {
 	var version:Int;
 	var sourceFingerprint:String;
 	var processFingerprint:String;
-	var minimumOpposingFaceSpanMm:Float;
+	var minimumOpposingFaceSpanMm:Null<Float>;
 	var designMetrics:CastingLevelOne.CastingDesignMetrics;
 	var heatRemovingInterval:Null<JunctionThickness.JunctionThicknessReport>;
 	var maximumInscribedThicknessMm:Null<Float>;
-	var maximumDiameterLowerMm:Float;
-	var maximumDiameterUpperMm:Float;
+	var maximumDiameterLowerMm:Null<Float>;
+	var maximumDiameterUpperMm:Null<Float>;
 	var validation:Array<ToolingValidation>;
 	var proposals:Array<CastabilityProposal>;
 }
@@ -67,6 +67,7 @@ typedef CastabilityReport = {
  * geometry edits or duplicate sweep solver.
  */
 class CastabilityAnalysis {
+	public static inline final VERSION = 4;
 	static function sources(ids:Array<String>):Array<String> {
 		var out:Array<String> = [];
 		for (id in ids)
@@ -101,17 +102,16 @@ class CastabilityAnalysis {
 		return record;
 		}
 
-	public static function analyze(document:ToolingDocument, raw:CastingProcessSpec, fill:FillReport, sections:OrthogonalSectionReport,
+	public static function analyze(document:ToolingDocument, raw:CastingProcessSpec, fill:Null<FillReport>, sections:Null<OrthogonalSectionReport>,
 			expectedSourceFingerprint:String, expectedProcessFingerprint:String, ?plannerChecks:Array<ToolingValidation>):CastabilityReport {
 		var d = ToolingCodec.snapshot(document),
 			spec = ProcessSpecCodec.snapshot(raw);
 		if (spec.recipeFingerprint != ToolingCodec.recipeFingerprint(d.recipe))
 			throw "Stale castability recipe";
-		if (sections.sourceFingerprint != expectedSourceFingerprint
-			|| fill.sourceFingerprint != expectedSourceFingerprint
-			|| sections.spans.length == 0)
+		if (sections != null && (fill == null || sections.sourceFingerprint != expectedSourceFingerprint || sections.spans.length == 0)
+			|| fill != null && fill.sourceFingerprint != expectedSourceFingerprint)
 			throw "Mismatched castability section/fill source";
-		if (fill.processFingerprint != expectedProcessFingerprint)
+		if (fill != null && fill.processFingerprint != expectedProcessFingerprint)
 			throw "Mismatched castability fill process";
 		var checks:Array<ToolingValidation> = [],
 			proposals:Array<CastabilityProposal> = [];
@@ -119,82 +119,102 @@ class CastabilityAnalysis {
 		var levelOne = CastingLevelOne.analyze(d);
 		checks = checks.concat(levelOne.validation);
 		proposals = proposals.concat(levelOne.proposals);
-		var thermalInterval = ThermalFaces.interval(d, sections, spec);
-		var spans = sections.spans.copy();
-		spans.sort((a, b) -> a.thicknessMm != b.thicknessMm ? Reflect.compare(a.thicknessMm, b.thicknessMm) : Reflect.compare(a.id, b.id));
-		var minimum = spans[0].thicknessMm;
-		var minimumSpan = spans[0];
-		var minimumOwners = sources(minimumSpan.lowerSourceIds.concat(minimumSpan.upperSourceIds));
-		var minimumRule = "process.castability.minimum-passage";
-		if (limits.maximumAggregateSizeMm == null || limits.minimumPassageAggregateRatio == null) {
-			checks.push(FillAnalysis.check(minimumRule, minimumOwners, Pending,
-				"Declare maximum aggregate size and minimum passage/aggregate ratio; narrowest opposing-face span is " + minimum + " mm.", limits.evidence));
-			proposals.push(proposal(minimumRule, minimumOwners, DeclareLimit, ProcessReview,
-				"Supply the mix grading and recipe passage ratio, then rerun the section screen.", minimum, null, minimumSpan.axis, minimumSpan.strips[0]));
+		var minimum:Null<Float> = null, maximum:Null<Float> = null;
+		var thermalInterval:Null<JunctionThickness.JunctionThicknessReport> = null;
+		if (sections == null) {
+			var geometry = materia.tooling.casting.CastingSourceRegions.derive(d);
+			var ids:Array<String> = [];
+			for (check in geometry.validation) if (check.status == Unsupported)
+				for (id in check.affectedIds) {
+					var features = d.input.features.filter(feature -> feature.id == id);
+					ids.push(features.length == 1 && features[0].derivedFrom != null ? features[0].derivedFrom : id);
+				}
+			ids = sources(ids);
+			if (ids.length == 0) ids = [root];
+			for (rule in ["process.castability.minimum-passage", "process.castability.maximum-section"])
+				checks.push(FillAnalysis.check(rule, ids, Unsupported,
+					"No exact section interval is available for this geometry; no box or scalar substitute is credited.", []));
 		} else {
-			var required = limits.maximumAggregateSizeMm * limits.minimumPassageAggregateRatio;
-			var narrow = spans.filter(s -> s.thicknessMm < required - 1e-7);
-			var ids = sources([for (s in narrow) for (id in s.lowerSourceIds.concat(s.upperSourceIds)) id]);
-			checks.push(FillAnalysis.check(minimumRule, ids.length == 0 ? [root] : ids, narrow.length == 0 ? Pass : Fail,
-				"Opposing-face passage screen: minimum "
-				+ minimum
-				+ " mm; declared aggregate-based minimum "
-				+ required
-				+ " mm. This is a geometry screen, not a prediction of paste flow or compaction.",
-				limits.evidence));
-			for (s in narrow)
-				proposals.push(proposal(minimumRule, s.lowerSourceIds.concat(s.upperSourceIds), WidenPassage, DesignReview,
-					"Increase separation of these source faces to at least the target, or select a finer qualified aggregate mix. Recheck stiffness and tooling.",
-					s.thicknessMm, required, s.axis, s.strips[0]));
-		}
-		var maximumRule = "process.castability.maximum-section",
-			maximum = sections.maximumInscribedThicknessMm;
-		if (limits.maximumSectionThicknessMm == null) {
-			checks.push(FillAnalysis.check(maximumRule, [root], Pending, "No recipe maximum section thickness declared; cure checks remain independent.",
-				limits.evidence));
-			proposals.push(proposal(maximumRule, [root], DeclareLimit, ProcessReview,
-				"Declare a section screening limit with material/thermal evidence; a limit alone does not qualify cure."));
-		} else {
-			var bound = thermalInterval;
-			if (bound == null) {
-				checks.push(FillAnalysis.check(maximumRule, [root], Unsupported, "No heat-removing face is available for a thermal section interval.", []));
+			thermalInterval = ThermalFaces.interval(d, sections, spec);
+			var spans = sections.spans.copy();
+			spans.sort((a, b) -> a.thicknessMm != b.thicknessMm ? Reflect.compare(a.thicknessMm, b.thicknessMm) : Reflect.compare(a.id, b.id));
+			minimum = spans[0].thicknessMm;
+			var minimumSpan = spans[0];
+			var minimumOwners = sources(minimumSpan.lowerSourceIds.concat(minimumSpan.upperSourceIds));
+			var minimumRule = "process.castability.minimum-passage";
+			if (limits.maximumAggregateSizeMm == null || limits.minimumPassageAggregateRatio == null) {
+				checks.push(FillAnalysis.check(minimumRule, minimumOwners, Pending,
+					"Declare maximum aggregate size and minimum passage/aggregate ratio; narrowest opposing-face span is " + minimum + " mm.", limits.evidence));
+				proposals.push(proposal(minimumRule, minimumOwners, DeclareLimit, ProcessReview,
+					"Supply the mix grading and recipe passage ratio, then rerun the section screen.", minimum, null, minimumSpan.axis, minimumSpan.strips[0]));
 			} else {
-				var threshold:Float = cast limits.maximumSectionThicknessMm;
-				var fails = bound.lowerDiameterMm > threshold + 1e-7;
-				var passes = bound.upperDiameterMm <= threshold + 1e-7;
-				checks.push(FillAnalysis.check(maximumRule, bound.witnessSourceIds, fails ? Fail : passes ? Pass : Pending,
-					"Heat-removing-face diameter is bounded by "
-					+ bound.lowerDiameterMm
-					+ ".."
-					+ bound.upperDiameterMm
-					+ " mm against declared limit "
-					+ limits.maximumSectionThicknessMm
-					+ " mm. Geometry does not replace cure analysis.",
+				var required = limits.maximumAggregateSizeMm * limits.minimumPassageAggregateRatio;
+				var narrow = spans.filter(s -> s.thicknessMm < required - 1e-7);
+				var ids = sources([for (s in narrow) for (id in s.lowerSourceIds.concat(s.upperSourceIds)) id]);
+				checks.push(FillAnalysis.check(minimumRule, ids.length == 0 ? [root] : ids, narrow.length == 0 ? Pass : Fail,
+					"Opposing-face passage screen: minimum "
+					+ minimum
+					+ " mm; declared aggregate-based minimum "
+					+ required
+					+ " mm. This is a geometry screen, not a prediction of paste flow or compaction.",
 					limits.evidence));
-				if (fails)
-					proposals.push(proposal(maximumRule, bound.witnessSourceIds, ReduceSection, DesignReview,
-						"Add or enlarge a pocket near this witness to reduce the section, or qualify a different cure process. Recheck structural performance.",
-						bound.lowerDiameterMm, limits.maximumSectionThicknessMm, null, null, bound.witness));
-				else if (!passes)
-					proposals.push(proposal(maximumRule, bound.witnessSourceIds, AnalyzeJunction, ProcessReview,
-						"Refine the inscribed-diameter interval until it resolves this limit; no midpoint acceptance.", null,
-						limits.maximumSectionThicknessMm, null, null, bound.witness));
+				for (s in narrow)
+					proposals.push(proposal(minimumRule, s.lowerSourceIds.concat(s.upperSourceIds), WidenPassage, DesignReview,
+						"Increase separation of these source faces to at least the target, or select a finer qualified aggregate mix. Recheck stiffness and tooling.",
+						s.thicknessMm, required, s.axis, s.strips[0]));
+			}
+			var maximumRule = "process.castability.maximum-section";
+			maximum = sections.maximumInscribedThicknessMm;
+			if (limits.maximumSectionThicknessMm == null) {
+				checks.push(FillAnalysis.check(maximumRule, [root], Pending, "No recipe maximum section thickness declared; cure checks remain independent.",
+					limits.evidence));
+				proposals.push(proposal(maximumRule, [root], DeclareLimit, ProcessReview,
+					"Declare a section screening limit with material/thermal evidence; a limit alone does not qualify cure."));
+			} else {
+				var bound = thermalInterval;
+				if (bound == null) {
+					checks.push(FillAnalysis.check(maximumRule, [root], Unsupported, "No heat-removing face is available for a thermal section interval.", []));
+				} else {
+					var threshold:Float = cast limits.maximumSectionThicknessMm;
+					var fails = bound.lowerDiameterMm > threshold + 1e-7;
+					var passes = bound.upperDiameterMm <= threshold + 1e-7;
+					checks.push(FillAnalysis.check(maximumRule, bound.witnessSourceIds, fails ? Fail : passes ? Pass : Pending,
+						"Heat-removing-face diameter is bounded by "
+						+ bound.lowerDiameterMm
+						+ ".."
+						+ bound.upperDiameterMm
+						+ " mm against declared limit "
+						+ limits.maximumSectionThicknessMm
+						+ " mm. Geometry does not replace cure analysis.",
+						limits.evidence));
+					if (fails)
+						proposals.push(proposal(maximumRule, bound.witnessSourceIds, ReduceSection, DesignReview,
+							"Add or enlarge a pocket near this witness to reduce the section, or qualify a different cure process. Recheck structural performance.",
+							bound.lowerDiameterMm, limits.maximumSectionThicknessMm, null, null, bound.witness));
+					else if (!passes)
+						proposals.push(proposal(maximumRule, bound.witnessSourceIds, AnalyzeJunction, ProcessReview,
+							"Refine the inscribed-diameter interval until it resolves this limit; no midpoint acceptance.", null,
+							limits.maximumSectionThicknessMm, null, null, bound.witness));
+				}
 			}
 		}
-		// Keep the exact fill rule/status/ownership: suggestions do not clear it.
-		for (check in fill.validation) {
-			checks.push(check);
-			if (check.rule == "process.fill.air-escape-width" && check.status != Pass)
-				proposals.push(proposal(check.rule, check.affectedIds, check.status == Pending ? DeclareLimit : ReviewCeiling,
-					check.status == Pending ? ProcessReview : ToolingReview,
-					check.status == Pending ? "Declare the recipe ceiling air-escape-width limit and rerun filling checks." : "Evaluate another setup or design a vent route for these ceilings; verify its access and seal before replanning."));
+		if (fill != null) {
+			// Keep the exact fill rule/status/ownership: suggestions do not clear it.
+			for (check in fill.validation) {
+				checks.push(check);
+				if (check.rule == "process.fill.air-escape-width" && check.status != Pass)
+					proposals.push(proposal(check.rule, check.affectedIds, check.status == Pending ? DeclareLimit : ReviewCeiling,
+						check.status == Pending ? ProcessReview : ToolingReview,
+						check.status == Pending ? "Declare the recipe ceiling air-escape-width limit and rerun filling checks."
+							: "Evaluate another setup or design a vent route for these ceilings; verify its access and seal before replanning."));
+			}
+			for (pocket in fill.trappedPockets)
+				proposals.push(proposal("process.fill.trap." + pocket.id, pocket.sourceIds, RouteVent, ToolingReview,
+					"Route a continuous vent from this candidate ceiling point to atmosphere, with a sealing/plug plan; if it crosses casting material, request a source change. Rerun topology and CAD.",
+					null, null, null, null, pocket.proposedVentPoint));
 		}
-		for (pocket in fill.trappedPockets)
-			proposals.push(proposal("process.fill.trap." + pocket.id, pocket.sourceIds, RouteVent, ToolingReview,
-				"Route a continuous vent from this candidate ceiling point to atmosphere, with a sealing/plug plan; if it crosses casting material, request a source change. Rerun topology and CAD.",
-				null, null, null, null, pocket.proposedVentPoint));
-		if (maximum == null && limits.maximumSectionThicknessMm == null)
-			proposals.push(proposal(maximumRule, [root], AnalyzeJunction, ProcessReview,
+		if (sections != null && maximum == null && limits.maximumSectionThicknessMm == null)
+			proposals.push(proposal("process.castability.maximum-section", [root], AnalyzeJunction, ProcessReview,
 				"Junction diameter bounds are available. Resolve junction heat flow and thermal coverage before accepting section/cure limits."));
 		var strategies = materia.tooling.casting.CastingStrategies.resolve(d);
 		strategies.sort((a, b) -> Reflect.compare(a.featureId, b.featureId));
@@ -234,7 +254,7 @@ class CastabilityAnalysis {
 						"Run the real planner and exact swept removal checks for rigid-former extraction; adhesion needs physical evidence.", []));
 				if (actual.length == 0 || actual.filter(v -> v.status != Pass).length > 0)
 					proposals.push(proposal(rule, [parent], SplitOrSacrificial, DesignReview,
-						"This planner cannot realize drafted or split formers. Only supported fill-open EPS or a source change to supported release geometry clears this request; rerun planning and exact CAD checks."));
+						"Declare supported positive source draft aligned with withdrawal, or a supported sacrificial alternative; rerun planning and complete CAD removal checks."));
 			} else {
 				checks.push(FillAnalysis.check(rule, [parent], Unsupported, "Feature has no supported tooling strategy.", []));
 				proposals.push(proposal(rule, [parent], SplitOrSacrificial, ToolingReview,
@@ -244,15 +264,15 @@ class CastabilityAnalysis {
 		checks.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		proposals.sort((a, b) -> Reflect.compare(a.id, b.id));
 		return {
-			version: 3,
-			sourceFingerprint: fill.sourceFingerprint,
-			processFingerprint: fill.processFingerprint,
+			version: VERSION,
+			sourceFingerprint: expectedSourceFingerprint,
+			processFingerprint: expectedProcessFingerprint,
 			minimumOpposingFaceSpanMm: minimum,
 			heatRemovingInterval: thermalInterval,
 			designMetrics: levelOne.metrics,
 			maximumInscribedThicknessMm: maximum,
-			maximumDiameterLowerMm: sections.junction.lowerDiameterMm,
-			maximumDiameterUpperMm: sections.junction.upperDiameterMm,
+			maximumDiameterLowerMm: sections == null ? null : sections.junction.lowerDiameterMm,
+			maximumDiameterUpperMm: sections == null ? null : sections.junction.upperDiameterMm,
 			validation: checks,
 			proposals: proposals
 		};

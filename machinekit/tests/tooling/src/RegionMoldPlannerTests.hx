@@ -96,6 +96,16 @@ class RegionMoldPlannerTests {
 				check(review.validation.filter(record -> record.rule=="tooling.cad."+name
 					&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
 					"drafted mold passes exact "+name);
+			var processSpec=ProcessTests.spec();
+			processSpec.recipeFingerprint=ToolingCodec.recipeFingerprint(d.recipe);
+			var castability=materia.tooling.process.CastabilityAnalysis.analyze(d,processSpec,null,null,
+				CastingMoldCodec.fingerprint(plan),"draft-release-fixture",plan.validation);
+			check(castability.validation.filter(row -> row.rule=="tooling.former.draft.pocket"
+				&& row.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
+				"a real drafted former retains its passing source-release finding without orthogonal sections");
+			check(castability.proposals.filter(proposal -> proposal.action==materia.tooling.process.CastabilityAnalysis.CastabilityAction.SplitOrSacrificial
+				&& proposal.sourceIds.indexOf("pocket")>=0).length==0,
+				"a natively verified drafted former does not receive an obsolete unsupported-draft suggestion");
 			var rounded=ToolingCodec.snapshot(d);
 			rounded.input.features[0].cornerRadius=8;
 			rounded.setup.sourceFingerprint=ToolingCodec.inputFingerprint(rounded.input);

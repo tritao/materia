@@ -263,8 +263,8 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   anchors, connector-derived rail holes and lifting declarations are integrated.
   Step 3 supplies exact drafted/radiused line-arc features through CAD and
   planning, native critical-level fill, source-bound section drawings and EPS
-  cutting records. Former CAM and non-box mold-shell allocation remain
-  unfinished; step 3 precedes column work. Detailed acceptance evidence and
+  cutting records. Former CAM remains unfinished in step 3; stepped/flared
+  mold-shell allocation follows in phase 8. Detailed acceptance evidence and
   current validation counts are recorded below. Production budgets, materials,
   equipment and physical evidence remain open; no fabrication-ready claim.
 - [ ] Phase 8: mill column and independent hobber plinth.
@@ -2280,8 +2280,34 @@ by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
   123 Unsupported / 74 Fail**; readiness stays **false**. The common
   capability does not select the unresolved former blank decomposition or
   complete former CAM.
-- [ ] Non-box envelope support and former CAM remain unfinished. These
-  slices do not complete step 3.
+- [x] Native-process castability feedback: keep available source, exact fill
+  and planner-release findings when orthogonal sections are Unsupported. Process
+  schema **10** rejects schema 9; castability report **4** records unavailable
+  section measurements as null. The native path must export a bound report and
+  review actions rather than replacing them with `null`. Source-only checks keep
+  independent insert measurements and typed lifting counts; their corner rule
+  measures authored line/arc geometry, including sharp arc-to-line joints. This
+  repairs existing rule families, without extending casting qualification scope.
+  Focused validation passes: castability **109**, native non-box core **44**,
+  drafted core **25**, region mold/release **36**, anchor/process **78**. Native export and its manifest
+  retain source/process fingerprints, reject a stale nested report version and
+  preserve available findings alongside null section measurements. Full neutral
+  **1,952**, CamKit **12,589** (panel **263**), native **727** and
+  all four CadKit CTest suites pass. Both packages regenerate, including mill
+  CAM/source/manifest tamper checks. The kit has **265** artifacts and
+  **5,825,911** verified bytes, **890 Pass / 486 Pending /
+  141 Unsupported / 74 Fail**; readiness remains **false**. Its castability
+  report now includes **192** bound findings and **153** review proposals. All
+  **40** programs, neutral mold geometry, section drawings and EPS cutting
+  records are unchanged; only process artifacts and manifest validation change.
+  The full run exposed duplicate geometry findings for an anchored insert.
+  Source screening now queries geometry capability independently of anchorage
+  qualification and groups non-box fragments under their authored parent,
+  preserving all reasons deterministically. Exact box-plus-anchor source moments
+  still supply lifting review positions without a native fill kernel.
+- [ ] Former CAM remains unfinished in step 3. The pending blank-route choice
+  is not selected by these shared geometry/process changes. Stepped/flared
+  non-box mold-shell allocation belongs to phase 8, after step 3 acceptance.
 - [x] Draft source convention confirmed: authored dimensions belong to the
   withdrawal opening; walls taper inward along the declared source-coordinate
   withdrawal axis. Finishing stock and process error budgets remain separate.

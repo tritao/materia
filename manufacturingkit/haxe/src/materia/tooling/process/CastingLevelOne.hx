@@ -31,7 +31,7 @@ typedef CastingDesignReport = {
 	var metrics:CastingDesignMetrics;
 }
 
-/** Source-only screening. No mold planning, CAD, inferred capacities or source mutation. */
+/** Source-only screening. No mold planning, CAD imports, inferred capacities or source mutation. */
 class CastingLevelOne {
 	public static function analyze(document:ToolingDocument):CastingDesignReport {
 		var d = ToolingCodec.snapshot(document),
@@ -47,6 +47,11 @@ class CastingLevelOne {
 			checkedRemovalDirections: 0,
 			blockedRemovalDirections: 0
 		};
+		function report():CastingDesignReport {
+			checks.sort((a, b) -> Reflect.compare(a.rule, b.rule));
+			proposals.sort((a, b) -> Reflect.compare(a.id, b.id));
+			return {validation: checks, proposals: proposals, metrics: metrics};
+		}
 		function finding(rule:String, id:String, measured:Float, threshold:Null<Float>, message:String, ?parameter:String, ?value:Float,
 				minimum:Bool = true):Void {
 			var status = threshold == null ? Pending : (minimum ? measured + 1e-7 >= threshold : measured <= threshold + 1e-7) ? Pass : Fail;
@@ -75,8 +80,10 @@ class CastingLevelOne {
 		for (feature in d.input.features)
 			if (feature.kind != InsertRecess) {
 				var parent = feature.derivedFrom == null ? feature.id : feature.derivedFrom;
+				var radius = materia.casting.CastingProfileGeometry.minimumInternalRadius(
+					materia.casting.CastingFeatureContours.contour(feature));
 				var previous = radiusByParent.get(parent);
-				radiusByParent.set(parent, previous == null ? feature.cornerRadius : Math.min(previous, feature.cornerRadius));
+				radiusByParent.set(parent, previous == null ? radius : Math.min(previous, radius));
 			}
 		for (radius in radiusByParent)
 			metrics.minimumCornerRadiusMm = metrics.minimumCornerRadiusMm == null ? radius : Math.min(metrics.minimumCornerRadiusMm, radius);
@@ -84,37 +91,83 @@ class CastingLevelOne {
 		parents.sort(Reflect.compare);
 		for (parent in parents)
 			finding("process.level1.corner-radius." + parent, parent, radiusByParent.get(parent), limits.minimumCornerRadiusMm,
-				"Source corner radius needs the declared minimum; any change requires design acceptance and replanning.", null,
+				"Authored source wall-profile radius needs the recipe minimum; any change requires design acceptance and replanning.", null,
 				limits.minimumCornerRadiusMm);
-		var support = CastingMoldPlanner.sourceSupport(d.input);
+		var liftCount = materia.tooling.casting.CastHandling.liftingIds(d).length;
+		finding("process.level1.lifting-points", d.input.id, liftCount, limits.minimumLiftingPoints == null ? null : 1.0 * limits.minimumLiftingPoints,
+			"Typed lifting-point count versus recipe requirement; load capacity, CoM and a qualified cradle remain separate evidence.", null, null);
+		// Geometry capability is separate from anchor bearing/capacity evidence.
+		// Multiple non-box fragments still produce one owned source finding.
+		var support = materia.tooling.casting.CastingBoxSupport.check(d.input, "process.level1.geometry");
 		var unsupported = support.filter(check -> check.status == Unsupported);
-		if (unsupported.length > 0) {
-			for (check in unsupported) {
-				var parents:Array<String> = [];
-				for (id in check.affectedIds) {
-					var sources = d.input.features.filter(feature -> feature.id == id);
-					var parent = sources.length == 0 || sources[0].derivedFrom == null ? id : sources[0].derivedFrom;
-					if (parents.indexOf(parent) < 0) parents.push(parent);
-				}
-				parents.sort(Reflect.compare);
-				checks.push(FillAnalysis.check("process.level1.geometry." + parents.join("-"),
-					parents, Unsupported, check.message, []));
+		var geometryOwners = new Map<String, Array<String>>(), geometryMessages = new Map<String, Array<String>>();
+		for (check in unsupported) {
+			var parents:Array<String> = [];
+			for (id in check.affectedIds) {
+				var sources = d.input.features.filter(feature -> feature.id == id);
+				var parent = sources.length == 0 || sources[0].derivedFrom == null ? id : sources[0].derivedFrom;
+				if (parents.indexOf(parent) < 0) parents.push(parent);
 			}
-			return {validation: checks, proposals: proposals, metrics: metrics};
+			parents.sort(Reflect.compare);
+			var key = ToolingCodec.canonical(parents);
+			geometryOwners.set(key, parents);
+			var messages = geometryMessages.exists(key) ? geometryMessages.get(key) : [];
+			if (messages.indexOf(check.message) < 0) messages.push(check.message);
+			geometryMessages.set(key, messages);
+		}
+		for (key in geometryOwners.keys()) {
+			var parents = geometryOwners.get(key), messages = geometryMessages.get(key);
+			messages.sort(Reflect.compare);
+			var suffix = parents.length == 1 ? parents[0] : "group." + haxe.crypto.Sha256.encode(key).substr(0, 20);
+			checks.push(FillAnalysis.check("process.level1.geometry." + suffix, parents, Unsupported, messages.join(" "), []));
 		}
 
-		var envelope:MoldBox;
+		var envelope:Null<MoldBox> = null;
 		try
 			envelope = CastingMoldPlanner.envelope(d)
 		catch (error:Dynamic) {
-			checks.push(FillAnalysis.check("process.level1.geometry", [d.input.id], Unsupported,
-				"Source-only box screening cannot represent this envelope: " + Std.string(error), []));
-			return {validation: checks, proposals: proposals, metrics: metrics};
+			if (unsupported.length == 0)
+				checks.push(FillAnalysis.check("process.level1.geometry", [d.input.id], Unsupported,
+					"Source-only box screening cannot represent this envelope: " + Std.string(error), []));
 		}
 
 		for (insert in d.input.inserts) {
-			var dimensions = InsertBodies.box(insert.body, insert.id);
-			var box = BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(d.setup.sourceToMold, insert.pose));
+			var dimensions = switch insert.body {
+				case Primitive(materia.casting.CastingSolid.Box(width, depth, height)):
+					{width: width, depth: depth, height: height};
+				case _: null;
+			};
+			if (dimensions == null) {
+				for (name in ["insert-edge", "insert-cover", "fixing-access"])
+					checks.push(FillAnalysis.check("process.level1." + name + "." + insert.id, [insert.id], Unsupported,
+						"This source-only insert screen requires exact box stock; no cylindrical stock bound is substituted.", []));
+				continue;
+			}
+			if (insert.holes.length > 0) {
+				var lands = [for (hole in insert.holes) materia.casting.InsertHoleGeometry.radialWall(dimensions.width, dimensions.depth, dimensions.height, hole)];
+				lands.sort(Reflect.compare);
+				var land = lands[0];
+				metrics.minimumFixingAccessLandMm = metrics.minimumFixingAccessLandMm == null ? land : Math.min(metrics.minimumFixingAccessLandMm, land);
+				finding("process.level1.fixing-access."
+					+ insert.id, insert.id, land,
+					limits.minimumFixingAccessMm,
+					"Declared bore-to-edge access land compared with recipe minimum; tool/fixture accessibility remains a separate check.",
+					"input.inserts."
+					+ insert.id
+					+ ".holes", null);
+			} else
+				checks.push(FillAnalysis.check("process.level1.fixing-access." + insert.id, [insert.id], Pending,
+					"No source bore specifies fixing access; qualify an external attachment or revise the source interface.", []));
+			var insertToMold = F.compose(d.setup.sourceToMold, insert.pose);
+			var axial = [F.transformVector(insertToMold, 1, 0, 0), F.transformVector(insertToMold, 0, 1, 0),
+				F.transformVector(insertToMold, 0, 0, 1)].filter(axis -> materia.casting.CastingBounds.axis(axis) == null).length == 0;
+			if (envelope == null || !axial) {
+				for (name in ["insert-edge", "insert-cover"])
+					checks.push(FillAnalysis.check("process.level1." + name + "." + insert.id, [insert.id], Unsupported,
+						"This source-only distance/embedded-depth screen requires exact axis-aligned body and insert boxes.", []));
+				continue;
+			}
+			var box = BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, insertToMold);
 			var edge = Math.min(Math.min(box.x - envelope.x, envelope.x + envelope.width - box.x - box.width),
 				Math.min(box.y - envelope.y, envelope.y + envelope.depth - box.y - box.depth));
 			var wet = BoxAlgebra.intersection(box, envelope);
@@ -162,33 +215,29 @@ class CastingLevelOne {
 				"input.inserts."
 				+ insert.id
 				+ ".body.solid.height", null);
-			if (insert.holes.length > 0) {
-				var lands = [for (hole in insert.holes) materia.casting.InsertHoleGeometry.radialWall(dimensions.width, dimensions.depth, dimensions.height, hole)];
-				lands.sort(Reflect.compare);
-				var land = lands[0];
-				metrics.minimumFixingAccessLandMm = metrics.minimumFixingAccessLandMm == null ? land : Math.min(metrics.minimumFixingAccessLandMm, land);
-				finding("process.level1.fixing-access."
-					+ insert.id, insert.id, land,
-					limits.minimumFixingAccessMm,
-					"Declared bore-to-edge access land compared with recipe minimum; tool/fixture accessibility remains a separate check.",
-					"input.inserts."
-					+ insert.id
-					+ ".holes", null);
-			} else
-				checks.push(FillAnalysis.check("process.level1.fixing-access." + insert.id, [insert.id], Pending,
-					"No source bore specifies fixing access; qualify an external attachment or revise the source interface.", []));
+
 		}
-		var liftCount = materia.tooling.casting.CastHandling.liftingIds(d).length;
-		finding("process.level1.lifting-points", d.input.id, liftCount, limits.minimumLiftingPoints == null ? null : 1.0 * limits.minimumLiftingPoints,
-			"Typed lifting-point count versus recipe requirement; load capacity, CoM and a qualified cradle remain separate evidence.", null, null);
-		if (limits.minimumLiftingPoints!=null && liftCount<limits.minimumLiftingPoints)
-			proposals=proposals.concat(liftingCandidates(d,envelope,limits.minimumLiftingPoints));
-		var resin = BoxAlgebra.subtract([envelope], [for (feature in d.input.features) CastingMoldPlanner.featureBox(d, feature)]);
+		if (limits.minimumLiftingPoints!=null && liftCount<limits.minimumLiftingPoints && envelope!=null) {
+			var requiredLifts:Int = cast limits.minimumLiftingPoints;
+			// Embedded-anchor moments have their own exact analytic mass path;
+			// needing native fill does not itself prevent a source mass estimate.
+			var massNeedsKernel = materia.tooling.casting.CastingBoxSupport.check(d.input, "tooling.handling.geometry", false)
+				.filter(check -> check.status == Unsupported).length > 0;
+			if (!massNeedsKernel || CastingMoldPlanner.geometry!=null)
+				proposals=proposals.concat(liftingCandidates(d,envelope,requiredLifts));
+		}
+		var resin = envelope==null || unsupported.length>0 ? null
+			: BoxAlgebra.subtract([envelope], [for (feature in d.input.features) CastingMoldPlanner.featureBox(d, feature)]);
 		for (strategy in materia.tooling.casting.CastingStrategies.resolve(d)) {
 			var rule = "process.level1.removal-direction." + strategy.featureId;
 			if (strategy.strategy != ReusableFormer || strategy.withdrawal == null || limits.removalClearanceMm == null) {
 				checks.push(FillAnalysis.check(rule, [strategy.featureId], Pending,
 					"Declare a rigid withdrawal and recipe clearance, or qualify sacrificial breakout.", []));
+				continue;
+			}
+			if (envelope == null || resin == null) {
+				checks.push(FillAnalysis.check(rule, [strategy.featureId], Unsupported,
+					"The source-only box sweep cannot represent this resin geometry; complete native removal checks remain required.", []));
 				continue;
 			}
 			var direction = strategy.withdrawal;
@@ -228,9 +277,7 @@ class CastingLevelOne {
 			checks.push(FillAnalysis.check(rule, [strategy.featureId], blocked ? Fail : Pass,
 				"Exact orthogonal source-resin sweep in the declared direction; tooling-to-tooling blocking is a later CAD check.", []));
 		}
-		checks.sort((a, b) -> Reflect.compare(a.rule, b.rule));
-		proposals.sort((a, b) -> Reflect.compare(a.id, b.id));
-		return {validation: checks, proposals: proposals, metrics: metrics};
+		return report();
 	}
 
 	/** Review locations only: creating a source insert is not a scalar edit.

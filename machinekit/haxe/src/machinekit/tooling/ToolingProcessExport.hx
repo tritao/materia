@@ -18,11 +18,16 @@ class ToolingProcessExport {
 		var report=existing==null ? CastingProcessAnalysis.analyze(p,spec,gravityMps2,fabrication,CastingFillAnalysis.fromPlan) : existing;
 		if (report.version!=materia.tooling.process.ProcessSpecCodec.VERSION
 			|| report.sourceFingerprint!=materia.tooling.casting.CastingMoldCodec.fingerprint(p)
-			|| report.processFingerprint!=CastingProcessAnalysis.fingerprint(p,spec,gravityMps2,fabrication))
+			|| report.processFingerprint!=CastingProcessAnalysis.fingerprint(p,spec,gravityMps2,fabrication)
+			|| report.castability==null
+			|| report.castability.version!=materia.tooling.process.CastabilityAnalysis.VERSION
+			|| report.castability.sourceFingerprint!=report.sourceFingerprint
+			|| report.castability.processFingerprint!=report.processFingerprint)
 			throw "Stale process export report";
 		var checks = report.validation.filter(v -> StringTools.startsWith(v.rule, "process."));
 		var fill=report.fill, sections=report.sections, thermalCoverage=report.thermalCoverage, castability=report.castability;
 		if (fill!=null) checks=checks.concat(cadVolume(p,fill,report.sourceFingerprint,dir,review,foundation,interfaceContext));
+		writeCastability(castability,sections,thermalCoverage,fill,dir);
 		if (fill==null || sections==null) {
 			if (fill==null) {
 				checks.push(FillAnalysis.check("process.fill.cad-volume-agreement",[p.document.input.id],ToolingCheckStatus.Unsupported,
@@ -31,25 +36,32 @@ class ToolingProcessExport {
 			}
 			sys.io.File.saveContent(dir+"/fill-analysis.json",ToolingCodec.canonical(fill)+"\n");
 			sys.io.File.saveContent(dir+"/casting-process-spec.json",materia.tooling.process.ProcessSpecCodec.encode(report.spec));
-			for (name in ["castability-analysis.json","junction-thickness.json",
+			for (name in ["junction-thickness.json",
 				"thermal-coverage.json","section-geometry.json"])
 				sys.io.File.saveContent(dir+"/"+name,"null\n");
 			sys.io.File.saveContent(dir+"/cure-analysis.json",ToolingCodec.canonical(report.cure)+"\n");
-			var geometryNote=fill==null ? "Exact fill geometry is Unsupported."
-				: "Exact fill is available. Orthogonal section, junction and thermal-coverage geometry remain Unsupported.";
-			sys.io.File.saveContent(dir+"/castability-review.md",
-				"# Casting design feedback\n\n"+geometryNote+" See process-diagnostics.json.\n");
 			writePour(report,dir);
 			sys.io.File.saveContent(dir+"/process-diagnostics.json",ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items)+"\n");
 			return checks;
 		}
-		if (thermalCoverage==null || castability==null)
-			throw "Supported process report lacks thermal coverage or castability";
+		if (thermalCoverage==null)
+			throw "Supported process report lacks thermal coverage";
 
 		sys.io.File.saveContent(dir + "/casting-process-spec.json", materia.tooling.process.ProcessSpecCodec.encode(report.spec));
 		sys.io.File.saveContent(dir + "/fill-analysis.json", ToolingCodec.canonical(fill) + "\n");
 		writePour(report, dir);
 		sys.io.File.saveContent(dir + "/cure-analysis.json", ToolingCodec.canonical(report.cure) + "\n");
+		sys.io.File.saveContent(dir + "/junction-thickness.json", ToolingCodec.canonical(sections.junction) + "\n");
+		sys.io.File.saveContent(dir + "/thermal-coverage.json", ToolingCodec.canonical(thermalCoverage) + "\n");
+		sys.io.File.saveContent(dir + "/section-geometry.json", ToolingCodec.canonical(sections) + "\n");
+		sys.io.File.saveContent(dir + "/process-diagnostics.json", ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items) + "\n");
+		return checks;
+	}
+
+	static function writeCastability(castability:materia.tooling.process.CastabilityAnalysis.CastabilityReport,
+			sections:Null<materia.tooling.process.OrthogonalSections.OrthogonalSectionReport>,
+			thermalCoverage:Null<materia.tooling.process.ThermalCoverage.ThermalCoverageReport>,
+			fill:Null<materia.tooling.process.FillAnalysis.FillReport>,dir:String):Void {
 		sys.io.File.saveContent(dir + "/castability-analysis.json", ToolingCodec.canonical(castability) + "\n");
 		var text = [
 			"# Casting design feedback",
@@ -59,11 +71,14 @@ class ToolingProcessExport {
 			"All dimensions/points are in mold coordinates (mm).",
 			""
 		];
-		var junction = sections.junction;
-		text.push("Largest inscribed diameter: " + junction.lowerDiameterMm + ".." + junction.upperDiameterMm + " mm; numerical tolerance reached: "
-			+ junction.converged + ". Witness: " + ToolingCodec.canonical(junction.witness) + "; nearby source faces: "
-			+ junction.witnessSourceIds.join(", ") + ".");
-		text.push("Declared slab geometry covers "
+		if (sections != null) {
+			var junction = sections.junction;
+			text.push("Largest inscribed diameter: " + junction.lowerDiameterMm + ".." + junction.upperDiameterMm + " mm; numerical tolerance reached: "
+				+ junction.converged + ". Witness: " + ToolingCodec.canonical(junction.witness) + "; nearby source faces: "
+				+ junction.witnessSourceIds.join(", ") + ".");
+		} else text.push("Orthogonal section and junction measurements are Unsupported; available source, fill and release findings follow.\n");
+		if (fill == null) text.push("Exact fill geometry is Unsupported; no air-pocket or vent locations are inferred.\n");
+		if (thermalCoverage != null) text.push("Declared slab geometry covers "
 			+ thermalCoverage.coveredVolumeMm3
 			+ " of "
 			+ thermalCoverage.totalVolumeMm3
@@ -82,11 +97,6 @@ class ToolingProcessExport {
 				text.push("  Candidate point: " + ToolingCodec.canonical(proposal.point) + ".");
 		}
 		sys.io.File.saveContent(dir + "/castability-review.md", text.join("\n") + "\n");
-		sys.io.File.saveContent(dir + "/junction-thickness.json", ToolingCodec.canonical(sections.junction) + "\n");
-		sys.io.File.saveContent(dir + "/thermal-coverage.json", ToolingCodec.canonical(thermalCoverage) + "\n");
-		sys.io.File.saveContent(dir + "/section-geometry.json", ToolingCodec.canonical(sections) + "\n");
-		sys.io.File.saveContent(dir + "/process-diagnostics.json", ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items) + "\n");
-		return checks;
 	}
 
 	static function cadVolume(p:CastingMoldPlan,fill:FillReport,sourceFingerprint:String,dir:String,

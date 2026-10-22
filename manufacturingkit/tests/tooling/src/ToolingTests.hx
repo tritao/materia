@@ -336,6 +336,13 @@ class ToolingTests {
 	}
 
 	public static function main():Void {
+		if (Sys.getEnv("TOOLING_ONLY") == "castability") {
+			var document = fixture();
+			document.recipe.minimumLigament = 2; // Same mold fixture as CastingMoldTests.run.
+			var plan = materia.tooling.casting.CastingMoldPlanner.plan(document, CastingMoldTests.options(document));
+			CastabilityTests.run(plan, ProcessTests.spec());
+			return;
+		}
 		withdrawalTie();
 		relievedFixing();
 		sharedFixturePlate();

@@ -1,4 +1,5 @@
 import materia.assembly.AssemblyFrames as F;
+import materia.tooling.process.CastabilityAnalysis.CastabilityAction;
 import materia.casting.InsertSpec;
 import materia.casting.InsertAnchorage;
 import materia.casting.InsertAnchorage.InsertAnchorageCodec as C;
@@ -79,6 +80,25 @@ class InsertAnchorTests {
 		var sourceReview=machinekit.structural.FoundationIntegrity.castingReview(foundation,document,context);
 		check(sourceReview.validation.filter(record -> record.rule.indexOf(".cad.")>=0 && record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==6,
 			"native anchor source geometry reaches foundation design diagnostics");
+		var capability=sourceReview.validation.filter(record -> record.rule=="process.level1.geometry.seat");
+		check(capability.length==1 && capability[0].status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,
+			"one source geometry capability finding covers anchor occupancy without duplicating bearing/capacity qualifications");
+		var sourceOnly=materia.tooling.ToolingCodec.snapshot(document);
+		sourceOnly.recipe.designReview.minimumLiftingPoints=4;
+		var previous=materia.tooling.casting.CastingMoldPlanner.geometry;
+		materia.tooling.casting.CastingMoldPlanner.setGeometry(null);
+		try {
+			var screening=materia.tooling.process.CastingLevelOne.analyze(sourceOnly);
+			check(screening.proposals.filter(proposal -> proposal.action==CastabilityAction.DeclareLiftingPoint).length==4,
+				"box-plus-anchor source moments still produce lifting review positions without a native fill kernel");
+			check(screening.validation.filter(record -> record.rule=="process.level1.geometry.seat"
+				&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length==1,
+				"exact source moments do not falsely qualify unsupported box-only anchor filling or sweeps");
+		} catch (error:Dynamic) {
+			materia.tooling.casting.CastingMoldPlanner.setGeometry(previous);
+			throw error;
+		}
+		materia.tooling.casting.CastingMoldPlanner.setGeometry(previous);
 		var assessment=materia.tooling.casting.CastingMoldPlanner.assess(document,options);
 		check(assessment.plan!=null && !assessment.fabrication.ready,
 			"panel mold planning retains exact native anchors while non-box fill remains a step-3 requirement");

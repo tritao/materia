@@ -6,7 +6,7 @@ import materia.tooling.process.CastingProcessSpec;
 
 /** Strict process format; old encodings are rejected, never filled with new defaults. */
 class ProcessSpecCodec {
-	public static inline final VERSION = 9;
+	public static inline final VERSION = 10;
 	static function object(v:Dynamic, keys:Array<String>):Void {
 		if (v == null || !Reflect.isObject(v) || Std.isOfType(v, Array) || Std.isOfType(v, String))
 			throw "Invalid casting process object";
