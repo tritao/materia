@@ -4,7 +4,7 @@ import machinekit.motion.PrecisionErrors;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
-/** Angular-contact precision bearing. Reference row is Assumed; dimensions are simplified envelopes. */
+/** Angular-contact precision bearing. Reference row is Assumed: its outside, bore and height are not a product's. */
 class AngularContactBearing extends MachineComponent {
   public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
     P.quantity("outside",62,"mm"),
@@ -44,6 +44,8 @@ class AngularContactBearing extends MachineComponent {
   function get_momentStiffness():Float return parameterNumber("momentStiffness");
 
   override public function hasGeometry():Bool return true;
+  /** Chamfered rings and shields (`RingParts.bearing`). Envelope detail is the annulus, which also sets the mass. */
   override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
-    return ComponentEnvelopes.annular(values());
+    return detail==Envelope ? ComponentEnvelopes.annular(values()) : RingParts.bearing(parameterNumber("outside"),parameterNumber("bore"),parameterNumber("height"));
+  override public function massGeometry():Null<cadkit.modeling.Part> return ComponentEnvelopes.annular(values());
 }

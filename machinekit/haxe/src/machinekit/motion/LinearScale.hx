@@ -66,7 +66,18 @@ class LinearScale extends MachineComponent implements EncoderPart {
 
   override public function hasGeometry():Bool return true;
 
+  /** The tape: chamfered top edges and a 4 mm graduation track recessed 0.1 mm along its middle. Envelope detail is its box, which also sets the mass. */
   override public function geometry(detail:ComponentDetail = Preview):Part {
+    if (detail == Envelope) return strip();
+    var half = WIDTH / 2, thick = THICKNESS / 2, c = 0.4, track = 2.0, depth = 0.1;
+    return Solids.named(Part.prism([new Vector(-half, -thick), new Vector(half, -thick), new Vector(half, thick - c),
+      new Vector(half - c, thick), new Vector(track, thick), new Vector(track, thick - depth), new Vector(-track, thick - depth),
+      new Vector(-track, thick), new Vector(-half + c, thick), new Vector(-half, thick - c)], 0, length), "strip");
+  }
+
+  override public function massGeometry():Null<Part> return strip();
+
+  function strip():Part {
     var half = WIDTH / 2, thick = THICKNESS / 2;
     return Solids.named(Part.prism([new Vector(-half, -thick), new Vector(half, -thick), new Vector(half, thick),
       new Vector(-half, thick)], 0, length), "strip");

@@ -8798,7 +8798,7 @@
    "material": "bearing-steel",
    "mass": {
     "kg": 0.335669,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-angular-contact-bearing.glb",
    "view": {
@@ -8806,7 +8806,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.axis-servo-motor",
@@ -9839,7 +9839,7 @@
    "material": "bearing-steel",
    "mass": {
     "kg": 0.785147,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-crossed-roller-bearing.glb",
    "view": {
@@ -9847,7 +9847,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.drive-wheel",
@@ -11794,10 +11794,16 @@
         "blockWidth",
         "blockHeight",
         "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
         "blockMountThread",
+        "blockMountThreadDepth",
         "railHolePitch",
-        "railEndMargin",
-        "railMountScrew"
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
        ]
       },
       {
@@ -11805,14 +11811,46 @@
        "source": "HIWIN MGN/MGW catalogue: https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf",
        "dimensions": "Nominal",
        "conformance": "NominalEnvelope",
-       "verified": []
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "blockMountThreadDepth",
+        "railHolePitch",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
       },
       {
        "designation": "MGN9C",
        "source": "HIWIN MGN/MGW catalogue: https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf",
        "dimensions": "Nominal",
        "conformance": "NominalEnvelope",
-       "verified": []
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "blockMountThreadDepth",
+        "railHolePitch",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
       },
       {
        "designation": "HGH15CA",
@@ -12246,10 +12284,16 @@
         "blockWidth",
         "blockHeight",
         "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
         "blockMountThread",
+        "blockMountThreadDepth",
         "railHolePitch",
-        "railEndMargin",
-        "railMountScrew"
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
        ]
       },
       {
@@ -12257,14 +12301,46 @@
        "source": "HIWIN MGN/MGW catalogue: https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf",
        "dimensions": "Nominal",
        "conformance": "NominalEnvelope",
-       "verified": []
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "blockMountThreadDepth",
+        "railHolePitch",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
       },
       {
        "designation": "MGN9C",
        "source": "HIWIN MGN/MGW catalogue: https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf",
        "dimensions": "Nominal",
        "conformance": "NominalEnvelope",
-       "verified": []
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "blockMountThreadDepth",
+        "railHolePitch",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
       },
       {
        "designation": "HGH15CA",
@@ -12546,7 +12622,7 @@
     }
    ],
    "mass": {
-    "kg": 0.034,
+    "kg": 0.03,
     "source": "Declared"
    },
    "model": "motion-linear-rail-block.glb",
@@ -12657,7 +12733,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 0.0162,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-linear-scale.glb",
    "view": {
@@ -12665,7 +12741,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.motor-driver",
@@ -15248,7 +15324,7 @@
    "material": "machined-steel",
    "mass": {
     "kg": 0.340329,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-rotary-encoder-ring.glb",
    "view": {
@@ -15256,7 +15332,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.screw-support-unit",
@@ -16473,7 +16549,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 1.536357,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-torque-motor.glb",
    "view": {
@@ -16481,7 +16557,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.vallder-bf12-support",

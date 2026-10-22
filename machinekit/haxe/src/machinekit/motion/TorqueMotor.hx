@@ -4,7 +4,7 @@ import machinekit.motion.PrecisionErrors;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
-/** Frameless direct-drive torque motor. Reference row is Assumed; dimensions are simplified envelopes. */
+/** Frameless direct-drive torque motor. Reference row is Assumed: its outside, bore and height are not a product's. */
 class TorqueMotor extends MachineComponent implements machinekit.motion.MotorDrive {
   public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
     P.quantity("outside",150,"mm"),
@@ -72,6 +72,8 @@ class TorqueMotor extends MachineComponent implements machinekit.motion.MotorDri
       assumed:ratingsBasis==Assumed?["torque motor ratings"]:null};
   }
   override public function hasGeometry():Bool return true;
+  /** Stator and rotor across the air gap (`RingParts.framelessMotor`). Envelope detail is the annulus, which also sets the mass. */
   override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
-    return ComponentEnvelopes.annular(values());
+    return detail==Envelope ? ComponentEnvelopes.annular(values()) : RingParts.framelessMotor(parameterNumber("outside"),parameterNumber("bore"),parameterNumber("height"));
+  override public function massGeometry():Null<cadkit.modeling.Part> return ComponentEnvelopes.annular(values());
 }

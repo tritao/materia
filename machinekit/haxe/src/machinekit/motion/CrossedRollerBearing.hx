@@ -4,7 +4,7 @@ import machinekit.motion.PrecisionErrors;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
-/** Crossed-roller precision bearing. Reference row is Assumed; dimensions are simplified envelopes. */
+/** Crossed-roller precision bearing. Reference row is Assumed: its outside, bore and height are not a product's. */
 class CrossedRollerBearing extends MachineComponent {
   public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
     P.quantity("outside",120,"mm"),
@@ -42,6 +42,8 @@ class CrossedRollerBearing extends MachineComponent {
   function get_momentStiffness():Float return parameterNumber("momentStiffness");
 
   override public function hasGeometry():Bool return true;
+  /** Chamfered rings and shields with eight mounting holes through each ring, as RU-type units (`RingParts.bearing`). Envelope detail is the annulus, which also sets the mass. */
   override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
-    return ComponentEnvelopes.annular(values());
+    return detail==Envelope ? ComponentEnvelopes.annular(values()) : RingParts.bearing(parameterNumber("outside"),parameterNumber("bore"),parameterNumber("height"),8);
+  override public function massGeometry():Null<cadkit.modeling.Part> return ComponentEnvelopes.annular(values());
 }

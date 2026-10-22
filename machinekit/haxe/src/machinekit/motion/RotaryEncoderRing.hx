@@ -4,7 +4,7 @@ import machinekit.motion.PrecisionErrors;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
-/** Rotary ring encoder. Reference row is Assumed; dimensions are simplified envelopes. */
+/** Rotary ring encoder. Reference row is Assumed: its outside, bore and height are not a product's. */
 class RotaryEncoderRing extends MachineComponent implements machinekit.motion.EncoderPart {
   public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
     P.quantity("outside",130,"mm"),
@@ -41,6 +41,8 @@ class RotaryEncoderRing extends MachineComponent implements machinekit.motion.En
     return {id:id,joint:joint,kind:"absolute",counts:parameterCount("countsPerRevolution")};
   public function quantum():Float return 2*Math.PI/parameterCount("countsPerRevolution");
   override public function hasGeometry():Bool return true;
+  /** Hub and graduated scale band (`RingParts.encoder`). Envelope detail is the annulus, which also sets the mass. */
   override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
-    return ComponentEnvelopes.annular(values());
+    return detail==Envelope ? ComponentEnvelopes.annular(values()) : RingParts.encoder(parameterNumber("outside"),parameterNumber("bore"),parameterNumber("height"));
+  override public function massGeometry():Null<cadkit.modeling.Part> return ComponentEnvelopes.annular(values());
 }

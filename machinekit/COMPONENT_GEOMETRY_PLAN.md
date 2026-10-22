@@ -88,6 +88,17 @@ parts of one machine. 137 compute their mass from the preview geometry, 10 decla
 | G9 | **Missing models.** Give the cast-in insert and source casting representative defaults; decide per supplier reference whether its prepared CAD can be used at export (licence) or a datasheet preview replaces it. |
 | G10 | **Machine-owned envelopes.** Hobber and bench-mill reference envelopes and machine parts move to their machines' plans; the catalogue can hide machine parts by default once the generic set is complete. |
 
+## Status (2026-10-22)
+
+- G0–G3 done. Generators in use: `MotorBody`, `ProfileRailShapes`, `RoundHousing`, `DinRailDevice`, and `RingParts`
+  (bearings, ring encoders, frameless motors), which replaced the planned `BearingRings`.
+- G4 done. Linear rails and carriages became one recipe each: rows keyed by carriage designation (MGN, HGH, HGW),
+  drawn nominal, measured or from the pinned supplier CAD, with datasheet masses and load ratings by source
+  (`LinearRailSystem`). The MGN rows were checked against HIWIN's 2023 MG catalogue. Bearings, the ring encoder,
+  the torque motor and the linear scale keep their annulus or strip as the mass model. The read head is not drawn yet.
+- Next: G5 (electrical), then G6–G8; Vallder screw supports and HZMotion parts should follow the rail pattern
+  (one recipe per family, drawing as a variant, sourced masses).
+
 Each batch regenerates the docs catalogue and is reviewed on a contact sheet of before and after thumbnails,
 alongside the editor.
 
