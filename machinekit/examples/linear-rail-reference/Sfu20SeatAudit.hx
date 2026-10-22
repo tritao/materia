@@ -5,7 +5,7 @@ class Sfu20SeatAudit {
  static function main():Void {
   var rows:Array<Dynamic> = [];
   for(model in ["BK15","BF15"]) {
-   var component=ScrewSupportUnit.model(model,ScrewSupportUnit.SUPPLIER),part=component.geometry(),s=part.shape,solids:Array<Dynamic> = [];
+   var component=ScrewSupportUnit.model(model,"vallder"),part=component.geometry(),s=part.shape,solids:Array<Dynamic> = [];
    for(i in 0...s.subshapeCount(CadKit.ShapeKind.Solid)) {
     var solid=s.subshape(CadKit.ShapeKind.Solid,i),b=solid.bounds();
     solids.push({index:i,volume:solid.volume(),min:[b.get_min().get_x(),b.get_min().get_y(),b.get_min().get_z()],max:[b.get_max().get_x(),b.get_max().get_y(),b.get_max().get_z()]});solid.close();
@@ -16,7 +16,7 @@ class Sfu20SeatAudit {
     if(Math.abs(b.get_min().get_z()-e.lo)>1e-6 || Math.abs(b.get_max().get_z()-e.hi)>1e-6)throw "Support seating changed: "+model;
     solid.close();
    }
-   rows.push({model:model,sha256:component.spec.sha256,solids:solids});part.close();
+   rows.push({model:model,sha256:component.sourceOf("Vallder").cadSha256,solids:solids});part.close();
   }
   sys.io.File.saveContent(Sys.getEnv("MATERIA_ROOT")+"/build/suppliers/vallder/sfu20-seat-audit.json",haxe.Json.stringify(rows,null,"  "));
  }

@@ -11,12 +11,12 @@ import cadkit.modeling.AssemblyState;
  * HZMotion screw-end profile; the existing Vallder screw is not modified.
  */
 class HzMotionAxis extends MachineAssembly {
- public final mount=new HzMotionComponent("M60D-BK12-C",null,"unspecified","supplier-step");
+ public final mount=MotorMount.of("M60D-BK12-C",null,"hzmotion");
  public final motor=LeadshineServo.model("ELM2H-0400LA60F");
  public final screw=new HzMotionDrawingScrew(400);
  public final nut=new VallderSfu1605Nut();
  public final coupling=new ShaftCoupling(14,10,25,32);
- public function new(supplierFloating:Bool=true,clipState:String="installed-envelope") {
+ public function new(supplierFloating:Bool=true) {
   super();
   addComponent("mount",mount);
   addComponent("motor",motor);addMate("motor-seat","fixed","mount","motor","motor","mountFace");
@@ -27,8 +27,12 @@ class HzMotionAxis extends MachineAssembly {
   attach("motorShaft",motor.shaft(),F.translation(0,25,0),"screw");
   attach("coupling",coupling,F.translation(0,25,16),"screw");
   var floating=tip+screw.totalLength-11;
-  // BF12's 6000 bearing is 8 mm wide, centered in its 20 mm housing.
-  attach("floating",new HzMotionComponent("BF12",null,"unspecified",supplierFloating?"supplier-step":"drawing",supplierFloating?clipState:"as-supplied"),F.translation(0,0,floating-6),"mount");
+  // BF12's 6000 bearing is 8 mm wide, centered in its 20 mm housing; its DIN 471 ring holds it on the journal.
+  var support=ScrewSupportUnit.model("BF12",supplierFloating?"hzmotion":ScrewSupportUnit.NOMINAL);
+  var supportPose=F.compose(F.translation(0,0,floating-6),support.supportInFootFrame());
+  attach("floating",support,supportPose,"mount");
+  var seat=support.ringSeatZ();if(seat==null)throw "BF12 has no reviewed ring seat";
+  attach("floatingRing",machinekit.standard.RetainingRing.forShaft(support.boreDiameter),F.compose(supportPose,F.translation(0,0,seat)),"floating");
   addComponent("nut",nut,F.translation(0,25,120));
   addMemberConnector("mount","nutTravel",F.translation(0,25,120));
   addMemberConnector("nut","travelSeat",F.identity());
@@ -53,7 +57,7 @@ class HzMotionAxis extends MachineAssembly {
   var poses:Map<String,AssemblyFrame> = axis.solvedPoses();
   var cache=new PosedParts();
   var pairs=[["mount","motor"],["mount","motorShaft"],["mount","coupling"],["mount","screw"],
-   ["screw","coupling"],["motorShaft","coupling"],["motor","motorShaft"],["floating","screw"]];
+   ["screw","coupling"],["motorShaft","coupling"],["motor","motorShaft"],["floating","screw"],["floatingRing","screw"]];
   for(pair in pairs) {
    var a=axis.components().filter(m->m.id==pair[0])[0],b=axis.components().filter(m->m.id==pair[1])[0];
    var v=cache.overlap(a.component,poses.get(a.id),b.component,poses.get(b.id));
@@ -96,6 +100,6 @@ class HzMotionAxis extends MachineAssembly {
    catalog:catalogRows,driveClearances:report,travelChecksMm:[0,100,200],shaftEndGapMm:4,motorEngagementMm:14,screwEngagementMm:14,
    screwRequiredProfile:{source:"Motor_Bracket.pdf p10",fixedEndMm:51,bearingJournalMm:12,couplingSeatMm:10,couplingSeatLengthMm:15,lockThread:"M12x1",threadLengthMm:12},
    vallderCompatibility:{dropIn:false,fixedEndMm:54,reason:"Different prescribed end stack; no Vallder model was changed"},
-   unresolved:["Supplier BK12-C/BF12 geometry; BF12 free-state ring replaced by explicitly identified nominal DIN471 installed envelope", "Webs, bearing internals, pilot recess and external fillets are simplified", "M5 engagement is nominal 5.4 mm; bracket effective thread depth is unpublished", "Coupling D25 L32 14/10 is a custom reference geometry, not a selected supplier SKU", "Supplier locknut/collars and bearing preload are included metadata, not independently articulated parts", "First Y stack has no mill frame attachment or guide/carriage structure", "BF12 mass and adapter masses are unknown; no axis sizing result uses guessed masses"]},null,"  "));
+   unresolved:["Supplier BK12-C/BF12 geometry; BF12 housing and bearing from the STEP, its DIN 471 ring a separate installed part", "Webs, bearing internals, pilot recess and external fillets are simplified", "M5 engagement is nominal 5.4 mm; bracket effective thread depth is unpublished", "Coupling D25 L32 14/10 is a custom reference geometry, not a selected supplier SKU", "Supplier locknut/collars and bearing preload are included metadata, not independently articulated parts", "First Y stack has no mill frame attachment or guide/carriage structure", "BF12 mass and adapter masses are unknown; no axis sizing result uses guessed masses"]},null,"  "));
  }
 }

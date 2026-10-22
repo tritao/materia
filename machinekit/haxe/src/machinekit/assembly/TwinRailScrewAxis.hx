@@ -1,7 +1,6 @@
 package machinekit.assembly;
 
 import machinekit.assembly.MachineAssembly;
-import machinekit.assembly.RbkMotorMount;
 import machinekit.component.*;
 import machinekit.motion.*;
 import machinekit.standard.*;
@@ -35,7 +34,7 @@ typedef AxisHardware = {
 class TwinRailScrewAxis extends MachineAssembly {
     public final screw:LeadScrew;
     public final nut:LeadScrewNut;
-    public final mount:RbkMotorMount;
+    public final mount:MotorMount;
     public final hardware:Array<AxisHardware> = [];
     public final layout:ScrewAxisLayout;
     public final selected:ScrewAxisComponents;
@@ -77,10 +76,11 @@ class TwinRailScrewAxis extends MachineAssembly {
         addCoupling("lead","travel","screwTurn",2*Math.PI/nut.thread.signedLead());
         // All fasteners have installed geometry and independent BOM entries. Threaded-host
         // penetration is intentional; no preload or load rating is inferred.
-        var meta:Dynamic=mount.interfaceMetadata(),baseHoles:Array<Dynamic> = meta.base_holes;
+        var baseHoles=mount.spec.baseHoles;
         for(i in 0...baseHoles.length) {
-            var h=baseHoles[i],recess:Float=h.counterbore_depth_mm==null ? 0 : h.counterbore_depth_mm;
-            var grip:Float=h.top_y_mm-recess;
+            var h=baseHoles[i],recess:Float=h.counterboreDepth==null ? 0 : h.counterboreDepth,top=h.topY;
+            if(top==null)throw "Mount base hole has no measured seat height";
+            var grip:Float=top-recess;
             tappedBolt("rbkBolt"+i,"M6",h.z==40 ? 40 : 45,"base",F.alongY(h.x,grip,h.z,0,1,0),
                 grip,12,"rbk/base",h.z==40);
         }

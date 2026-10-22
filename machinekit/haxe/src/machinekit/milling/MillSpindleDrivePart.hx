@@ -60,7 +60,7 @@ class MillSpindleDrivePart extends MachineComponent {
 	public function spindleTeeth():Int return parameterCount("spindleTeeth");
 	public function speedRatio():Float return motorTeeth()/spindleTeeth();
 	public function face():Float return parameterNumber("faceZ");
-	function mounting():ServoMotor.ServoMounting {
+	function mounting():machinekit.motion.MotorFlange {
 		var m=motor(),mount=m.mounting();
 		if(mount==null)throw 'Motor ${m.designation} has no mounting dimensions';
 		return mount;

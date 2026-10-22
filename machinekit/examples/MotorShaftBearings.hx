@@ -7,7 +7,7 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.motion.NemaStepper;
-import machinekit.assembly.NemaMountPlate;
+import machinekit.assembly.MotorPlate;
 import machinekit.motion.SteppedShaft;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.ParallelKey;
@@ -24,7 +24,7 @@ class MotorShaftBearings {
 	public static inline var COLLAR_LENGTH:Float = 51.5;
 
 	public final motor = NemaStepper.frame(17);
-	public final plate:NemaMountPlate;
+	public final plate:MotorPlate;
 	public final screw:SocketHeadCapScrew;
 	public final bearing = DeepGrooveBearing.metric("608");
 	public final key = ParallelKey.forShaft(6, 6);
@@ -32,7 +32,7 @@ class MotorShaftBearings {
 	public final shaft:SteppedShaft;
 
 	public function new() {
-		plate = new NemaMountPlate(motor, PLATE_THICKNESS);
+		plate = new MotorPlate(motor, PLATE_THICKNESS);
 		screw = plate.mountScrew();
 		shaft = new SteppedShaft(
 			[{diameter: bearing.bore, length: COLLAR_LENGTH}, {diameter: 6, length: SHAFT_LENGTH - COLLAR_LENGTH}],

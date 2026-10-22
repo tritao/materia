@@ -336,7 +336,19 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 	public function mountScrew(length:Float):SocketHeadCapScrew
 		return SocketHeadCapScrew.metric(variant.mountScrew, length);
 
-	override public function axisMotor():Null<AxisMotor> return new AxisMotor(this,spec.face,variant.shaftDiameter,
+	/** The NEMA flange: tapped motor holes on the bolt square, or clearance holes where this variant has them. */
+	public function flange():MotorFlange {
+		var flange:MotorFlange = {face: spec.face, flangeThickness: variant.mountHoleDepth, pilotDiameter: spec.pilotDiameter,
+			pilotHeight: variant.pilotHeight, holeDiameter: variant.tappedMount ? 0 : (variant.mountHoleDiameter ?? 0), holes: boltPattern(),
+			screw: variant.mountScrew};
+		if (variant.tappedMount) {
+			flange.thread = variant.mountScrew;
+			flange.threadDepth = variant.mountHoleDepth;
+		}
+		return flange;
+	}
+
+	override public function axisMotor():Null<AxisMotor> return new AxisMotor(this,flange(),variant.shaftDiameter,
         variant.shaftLength, depth->mountingCutout(depth));
 
 	/** Cutting tool for a plate in front of the face (z=0..thickness): pilot and bolt clearances. */

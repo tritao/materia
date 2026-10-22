@@ -18,7 +18,7 @@ class ConfigurableAxisChecks {
     }
     static function main():Void {
         var root=Sys.getEnv("MATERIA_ROOT");if(root==null)throw "Set MATERIA_ROOT";
-        var directory=root+"/build/suppliers/vallder/";RbkMotorMount.setSupplierDirectory(directory);
+        var directory=root+"/build/suppliers/vallder/";machinekit.catalog.SupplierLibraries.setVallderDirectory(directory);
         var original=MachineAssembly.decode(sys.io.File.getContent(directory+"rbk-sfu1605-axis.assembly.json"),RbkSfuAxis.registry());
         var baseline=new RbkSfuAxis();baseline.validate();
         Sys.println("Baseline assembled and validated");
@@ -47,8 +47,8 @@ class ConfigurableAxisChecks {
         rejects(() -> new ScrewAxisLayout(200,400,300,100),"Reject insufficient rail spacing");
         rejects(() -> new ScrewAxisLayout(Math.NaN),"Reject nonfinite layout");
         rejects(() -> RbkSfuAxis.componentsFor(defaults,"34HS31-5504S").check(defaults),"Reject incompatible motor interface");
-        var wrongNut=new ScrewAxisComponents(new RbkMotorMount(),NemaStepper.model("OPENBUILDS-NEMA23-56"),
-            new VallderSfu1605Screw(),new BallNut(),ScrewSupportUnit.model("BF12",ScrewSupportUnit.SUPPLIER),LinearRail.metric("HGH15CA",300),LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER));
+        var wrongNut=new ScrewAxisComponents(MotorMount.of("RBK12-57",null,"vallder"),NemaStepper.model("OPENBUILDS-NEMA23-56"),
+            new VallderSfu1605Screw(),new BallNut(),ScrewSupportUnit.model("BF12","vallder"),LinearRail.metric("HGH15CA",300),LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER));
         rejects(() -> wrongNut.check(defaults),"Reject nominal SFU nut with a different flange/length");
         var layout=new ScrewAxisLayout(300,500,400,160);
         var selected=RbkSfuAxis.componentsFor(layout);

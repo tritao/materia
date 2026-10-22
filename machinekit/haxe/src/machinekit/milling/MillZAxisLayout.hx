@@ -30,8 +30,8 @@ class MillZAxisLayout {
 	public final drive:MillScrewDrive;
 	public final spindle:MillSpindlePackage;
 	public final nut:SfuNut;
-	public final fixed:machinekit.assembly.HzMotionComponent;
-	public final floating:machinekit.assembly.HzMotionComponent;
+	public final fixed:machinekit.motion.MotorMount;
+	public final floating:machinekit.motion.ScrewSupportUnit;
 	public final motor:LeadshineServo;
 	public final coupling:ShaftCoupling;
 	public final screw:HzMotionDrawingScrew;

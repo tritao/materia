@@ -4,7 +4,7 @@ import cadkit.InertiaTensor;
 import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
-import machinekit.assembly.RbkMotorMount;
+import machinekit.catalog.SupplierLibraries;
 import machinekit.component.SupplierCadComponent;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentRecipeSupport;
@@ -12,23 +12,24 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
-import machinekit.motion.VallderSupportData.ScrewSupportReference;
+import machinekit.motion.ScrewSupportCatalog.ScrewSupportRow;
+import machinekit.motion.ScrewSupportCatalog.ScrewSupportSource;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyFrames;
 
 /**
- * A ball-screw end support from the BK/BF (foot-mounted) and FK/FF (flange-mounted) tables, with its bearing and
- * hardware: fixed (BK, FK, preloaded angular-contact pair) or floating (BF, FF). One recipe for every size, drawn
- * `nominal` (from the table) or `supplier` (the pinned Vallder CAD); the drawing changes neither the part number nor
- * the table's weight, which is its mass. Frame: the shaft runs along +Z through the origin; foot supports stand on
- * their base at y = -shaftHeight and are centred on z = 0; flange supports have their mounting flange from z = 0 to
- * its thickness.
+ * A ball-screw end support with its bearing and hardware: fixed (BK, FK, a preloaded angular-contact pair) or
+ * floating (BF, EF, FF). One recipe for every designation in `ScrewSupportCatalog`, whose rows list the makers that
+ * publish it (Vallder, HZMotion). It is drawn `nominal` (from the row) or from one maker's pinned CAD (`vallder`,
+ * `hzmotion`); the drawing changes neither the part number nor the mass, which is the first published weight. Frame:
+ * the shaft runs along +Z through the origin; foot supports stand on their base at y = -shaftHeight, centred on
+ * z = 0; flange supports have their mounting flange from z = 0 to its thickness.
  */
 class ScrewSupportUnit extends MachineComponent {
 	public static inline var NOMINAL = "nominal";
-	public static inline var SUPPLIER = "supplier";
 
-	public final spec:ScrewSupportReference;
-	/** `NOMINAL` or `SUPPLIER`. */
+	public final spec:ScrewSupportRow;
+	/** `NOMINAL` or a maker whose CAD draws it, lower case. */
 	public final drawing:String;
 	public final fixed:Bool;
 	public final boreDiameter:Float;
@@ -36,6 +37,7 @@ class ScrewSupportUnit extends MachineComponent {
 	public final width:Float;
 	public final height:Float;
 	public final length:Float;
+	public final bearing:String;
 
 	public static function model(model:String, drawing:String = NOMINAL):ScrewSupportUnit
 		return new ScrewSupportUnit(model, drawing);
@@ -59,12 +61,15 @@ class ScrewSupportUnit extends MachineComponent {
 		return model((fixed ? "BK" : "BF") + size, drawing);
 	}
 
+	/** The drawings a row offers: nominal, and each maker with pinned CAD. */
+	public static function drawings(model:String):Array<String>
+		return [NOMINAL].concat([for (source in ScrewSupportCatalog.get(model).sources) if (source.cadSha256 != null) source.maker.toLowerCase()]);
+
 	function new(model:String, drawing:String) {
-		if (VallderSupportData.models().indexOf(model) < 0) throw "Support needs interface review: " + model;
-		if (drawing != NOMINAL && drawing != SUPPLIER) throw 'Unknown screw support drawing "$drawing"';
-		var s = VallderSupportData.get(model);
+		var s = ScrewSupportCatalog.get(model);
+		if (drawings(model).indexOf(drawing) < 0) throw 'No "$drawing" drawing of screw support $model';
 		fixed = StringTools.startsWith(model, "BK") || StringTools.startsWith(model, "FK");
-		super(model, '${fixed ? "Fixed" : "Floating"} screw support $model, ${machinekit.component.Dimension.format(s.bore)} mm journal, with bearing',
+		super(model, '${fixed ? "Fixed" : "Floating"} screw support $model, ${machinekit.component.Dimension.format(s.bore)} mm journal, ${s.bearing}',
 			"steel");
 		spec = s;
 		this.drawing = drawing;
@@ -73,9 +78,11 @@ class ScrewSupportUnit extends MachineComponent {
 		width = s.width;
 		height = s.height;
 		length = s.length;
+		bearing = s.bearing;
 		addConnector("axis", Axis, Solids.axial(0, 0, 0));
 		addConnector("shaft", Axis, Solids.axial(0, 0, 0));
-		for (datum in Vallder15SupportSeats.datums(model, s.sha256)) addConnector(datum.name, Axis, Solids.axial(0, 0, datum.z));
+		var vallder = sourceOf("Vallder");
+		if (vallder != null) for (datum in Vallder15SupportSeats.datums(model, vallder.cadSha256)) addConnector(datum.name, Axis, Solids.axial(0, 0, datum.z));
 		if (s.base) {
 			addConnector("base", Mount, AssemblyFrames.translation(0, -s.shaftHeight, 0));
 			// The face it bolts down by: +Y (a connector's axis) down out of the foot.
@@ -87,10 +94,54 @@ class ScrewSupportUnit extends MachineComponent {
 		var index = 1;
 		for (p in mountingPositions())
 			addConnector('mount${index++}', Mount, s.base ? AssemblyFrames.alongY(p.x, -s.shaftHeight, p.z, 0, 1, 0) : Solids.axial(p.x, p.y, s.height));
-		var box = envelopeBox();
-		var dx = box.max.x - box.min.x, dy = box.max.y - box.min.y, dz = box.max.z - box.min.z, kg = s.massKg;
-		declareMass(kg, new Vector((box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2, (box.min.z + box.max.z) / 2),
-			new InertiaTensor(kg * (dy * dy + dz * dz) / 12, 0, 0, kg * (dx * dx + dz * dz) / 12, 0, kg * (dx * dx + dy * dy) / 12));
+		var weighed = [for (source in s.sources) if (source.massKg != null) source];
+		if (weighed.length > 0) {
+			var box = envelopeBox(), kg:Float = weighed[0].massKg ?? 0;
+			var dx = box.max.x - box.min.x, dy = box.max.y - box.min.y, dz = box.max.z - box.min.z;
+			declareMass(kg, new Vector((box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2, (box.min.z + box.max.z) / 2),
+				new InertiaTensor(kg * (dy * dy + dz * dz) / 12, 0, 0, kg * (dx * dx + dz * dz) / 12, 0, kg * (dx * dx + dy * dy) / 12));
+		}
+	}
+
+	/** No maker publishes a weight: its nominal drawing in steel stands in. */
+	override public function massGeometry():Null<Part> return spec.base ? footDrawing() : flangeDrawing();
+
+	public function sourceOf(maker:String):Null<ScrewSupportSource> {
+		for (source in spec.sources) if (source.maker == maker) return source;
+		return null;
+	}
+
+	/** The source this instance is drawn from, or the purchase source for the nominal drawing. */
+	function drawingSource():ScrewSupportSource {
+		for (source in spec.sources) if (source.maker.toLowerCase() == drawing) return source;
+		return spec.sources[0];
+	}
+
+	/**
+	 * The support frame's pose in the foot frame some drawings use (base at y = 0, front face at z = 0): compose a
+	 * foot-frame placement with it to place this part.
+	 */
+	public function supportInFootFrame():AssemblyFrame
+		return spec.base ? AssemblyFrames.translation(0, spec.shaftHeight, spec.length / 2) : AssemblyFrames.identity();
+
+	/** Bolt axes in the foot frame (base at y = 0, front face at z = 0). */
+	public function footHoles():Array<{x:Float, z:Float, diameter:Float}>
+		return [for (p in mountingPositions()) {x: p.x, z: p.z + spec.length / 2, diameter: drawingSource().holeDiameter}];
+
+	/** Height of the bolt counterbore seats above the base: measured on the drawn maker's CAD where reviewed. */
+	public function boltSeatY():Float {
+		var drawn = drawingSource();
+		if (drawn.boltSeat != null) return drawn.boltSeat;
+		for (source in spec.sources) if (source.boltSeat != null) return source.boltSeat;
+		return spec.shaftHeight * 0.55 * 0.55;
+	}
+
+	/** Where a DIN 471 retaining ring holds the bearing on the journal (support frame z), where reviewed. */
+	public function ringSeatZ():Null<Float> {
+		var drawn = drawingSource();
+		if (drawn.ringSeatZ != null) return drawn.ringSeatZ;
+		for (source in spec.sources) if (source.ringSeatZ != null) return source.ringSeatZ;
+		return null;
 	}
 
 	/** Bolt axes: on the foot (x across, z along) or round the flange's pitch circle. */
@@ -108,7 +159,7 @@ class ScrewSupportUnit extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		if (drawing == SUPPLIER) {
+		if (drawing != NOMINAL) {
 			var exterior = supplierCad();
 			if (detail != Envelope) return exterior;
 			var b = exterior.shape.bounds(), lo = b.get_min(), hi = b.get_max();
@@ -144,7 +195,7 @@ class ScrewSupportUnit extends MachineComponent {
 			]);
 			var tools = [keep(Part.cylinderSpan(s.bore / 2, -s.length / 2 - 0.1, s.length / 2 + 0.1), "bore")];
 			for (p in mountingPositions()) {
-				tools.push(keep(Part.cylinderAlongY(s.clearance / 2, -s.shaftHeight - 0.1, -s.shaftHeight + foot + 0.1, p.x, p.z), "bolt-hole"));
+				tools.push(keep(Part.cylinderAlongY(s.sources[0].holeDiameter / 2, -s.shaftHeight - 0.1, -s.shaftHeight + foot + 0.1, p.x, p.z), "bolt-hole"));
 				tools.push(keep(Part.cylinderAlongY(Math.min(s.counterbore, s.length * 0.45) / 2, -s.shaftHeight + foot * 0.55, -s.shaftHeight + foot + 0.1,
 					p.x, p.z), "counterbore"));
 			}
@@ -154,7 +205,7 @@ class ScrewSupportUnit extends MachineComponent {
 
 	/** A flange support: the square flange with chamfered corners and its bolt holes, a round boss behind, the bore. */
 	function flangeDrawing():Part {
-		var s = spec, half = s.width / 2, c = half * 0.25, boss = Math.min(s.width * 0.8, s.pitch - s.clearance) / 2;
+		var s = spec, half = s.width / 2, c = half * 0.25, boss = Math.min(s.width * 0.8, s.pitch - s.sources[0].holeDiameter) / 2;
 		return Solids.building([], owned -> {
 			function keep(part:Part, tag:String):Part {
 				var named = Solids.named(part, tag);
@@ -168,19 +219,33 @@ class ScrewSupportUnit extends MachineComponent {
 			]);
 			var tools = [keep(Part.cylinderSpan(s.bore / 2, -0.1, s.length + 0.1), "bore")];
 			for (p in mountingPositions())
-				tools.push(keep(Part.cylinderSpan(s.clearance / 2, -0.1, s.height + 0.1, p.x, p.y), "bolt-hole"));
+				tools.push(keep(Part.cylinderSpan(s.sources[0].holeDiameter / 2, -0.1, s.height + 0.1, p.x, p.y), "bolt-hole"));
 			return Solids.cut(body, tools);
 		});
 	}
 
-	/** The pinned Vallder CAD, checked against its digest. The caller owns it. */
+	/** The drawn maker's pinned CAD, checked against its digest and placed in the support frame. The caller owns it. */
 	function supplierCad():Part {
-		var imported = new SupplierCadComponent(RbkMotorMount.assetDirectory() + "/cad/assets/" + spec.sha256 + ".step", spec.sha256, designation,
-			description);
+		var source = drawingSource(), library = source.cadLibrary == "hzmotion" ? SupplierLibraries.hzmotion() : SupplierLibraries.vallder();
+		var imported = new SupplierCadComponent(SupplierLibraries.asset(library, source.cadSha256), source.cadSha256, designation, description);
 		try {
-			var result = imported.geometry();
+			var raw = imported.geometry();
 			imported.close();
-			return result;
+			var unitSolids:Int = source.unitSolids ?? 0;
+			if (unitSolids > 0) {
+				var whole = raw;
+				try {
+					if (whole.solidCount() != unitSolids + 1) throw 'Pinned ${spec.model} CAD solid layout changed';
+					raw = Solids.union([for (i in 0...unitSolids) new Part(whole.shape.subshape(CadKit.ShapeKind.Solid, i))]);
+					whole.close();
+				} catch (e:Dynamic) {
+					whole.close();
+					throw e;
+				}
+			}
+			var placed = machinekit.assembly.PosedParts.moved(raw, source.cadPose);
+			raw.close();
+			return placed;
 		} catch (e:Dynamic) {
 			imported.close();
 			throw e;
@@ -194,7 +259,7 @@ class ScrewSupportUnit extends MachineComponent {
 
 	public static function recipeType():ComponentType {
 		if (supportRecipe == null) supportRecipe = new ComponentType("machinekit.motion.screw-support-unit",
-			[ComponentRecipeSupport.choice("model", VallderSupportData.models(), "BK12"), ComponentRecipeSupport.choice("geometry", [NOMINAL, SUPPLIER], NOMINAL)],
+			[ComponentRecipeSupport.choice("model", ScrewSupportCatalog.models(), "BK12"), ComponentRecipeSupport.choice("geometry", [NOMINAL, "vallder", "hzmotion"], NOMINAL)],
 			v -> new ScrewSupportUnit(v.token("model"), v.token("geometry")), true, false, ["geometry"]);
 		return supportRecipe;
 	}

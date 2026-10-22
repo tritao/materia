@@ -62,8 +62,8 @@ and three-state installation clearance report are exported alongside it.
 ```haxe
 var rail = machinekit.motion.LinearRail.metric("HGH20CA", 500);  // measured HGR20R section
 var carriage = machinekit.motion.LinearRailBlock.metric("HGH20CA", machinekit.motion.LinearRailBlock.SUPPLIER);
-var fixed = machinekit.motion.ScrewSupportUnit.model("BK15", machinekit.motion.ScrewSupportUnit.SUPPLIER);
-var floating = machinekit.motion.ScrewSupportUnit.model("BF15", machinekit.motion.ScrewSupportUnit.SUPPLIER);
+var fixed = machinekit.motion.ScrewSupportUnit.model("BK15", machinekit.motion."vallder");
+var floating = machinekit.motion.ScrewSupportUnit.model("BF15", machinekit.motion."vallder");
 // Root/depth inputs here are explicit engineering assumptions, not supplier measurements.
 var screw = new machinekit.motion.SfuDrawingScrew("SFU2005", 500, 16);
 var nut = new machinekit.motion.SfuNut("SFU2005", 16);

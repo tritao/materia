@@ -36,7 +36,7 @@ class MillProject {
   var parts:Array<materia.project.SceneArtifact.SceneArtifactPart> = [];
   for(row in assembly.components()) {
    var geometry=row.component.geometry(),mass:MassProperties;
-   if(Std.isOfType(row.component,HzMotionComponent)&&cast(row.component,HzMotionComponent).spec.massKg==null) {
+   if(Std.isOfType(row.component,MotorMount)&&cast(row.component,MotorMount).spec.massKg==null) {
     var props=geometry.massProperties();
     mass=new MassProperties(props.volume*1e-9*7850,props.centerOfMass,machinekit.component.MassProperties.MassSource.Computed(Preview));
    } else mass=row.component.massProperties();

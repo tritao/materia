@@ -20,7 +20,7 @@ class Bt30SpindleMotor extends ServoMotor {
 	}
 	override public function componentType():Null<ComponentType> return recipeType();
 	override public function values():ComponentValues return new ComponentValues().setToken("material",materialSpec());
-	override public function mounting():ServoMotor.ServoMounting return {
+	override public function mounting():machinekit.motion.MotorFlange return {
 		face:110,flangeThickness:10,pilotDiameter:40,pilotHeight:2,holeDiameter:5.5,
 		holes:[{x:-30,y:-30},{x:30,y:-30},{x:30,y:30},{x:-30,y:30}]};
 	/** Continuous axial envelope, retaining the narrower body above its flange. */

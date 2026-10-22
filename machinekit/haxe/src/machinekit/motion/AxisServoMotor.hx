@@ -2,7 +2,6 @@ package machinekit.motion;
 
 import cadkit.modeling.Part;
 import machinekit.component.*;
-import machinekit.motion.ServoMotor.ServoMounting;
 import machinekit.component.ComponentRecipeSupport as P;
 
 /** Servo housing with its declared mounting flange and pilot. Existing generic
@@ -16,7 +15,7 @@ class AxisServoMotor extends ServoMotor {
         if(selected.mounting()==null)throw 'Axis servo needs a declared flange: '+designation;
         super(selected.rating,selected.ratingsBasis);source=selected;
     }
-    override public function mounting():Null<ServoMounting> return source.mounting();
+    override public function mounting():Null<MotorFlange> return source.mounting();
     override public function geometry(detail:ComponentDetail=Preview):Part return withInterface(source.geometry(detail));
 
     /** Mass of the base motor's body with this flange and pilot, as before the body was drawn in detail. */

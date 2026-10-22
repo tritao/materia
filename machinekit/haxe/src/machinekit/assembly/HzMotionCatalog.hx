@@ -1,6 +1,5 @@
 package machinekit.assembly;
 
-import machinekit.motion.ServoMotor;
 
 /** Reviewed drawing data, mm/kg. These are interface records, not verified offers. */
 typedef HzMotionHole = {var x:Float;var z:Float;var diameter:Float;}
@@ -34,22 +33,5 @@ class HzMotionCatalog {
  public static function sourceUrl(model:String):String {
   var p=get(model);
   return 'https://www.hzmotion.com/pdf/${p.source=="motor"?"Motor_Bracket":"Ballscrew_support_unit"}.pdf#page=${p.page}';
- }
- /** Nominal receiving interface only. This does not qualify shaft reach or fasteners. */
- public static function motorFindings(model:String,motor:ServoMotor):Array<String> {
-  var p=get(model),m=motor.mounting(),out:Array<String> = [];
-  if(p.kind!="mount"&&p.kind!="adapter")return ["Component has no motor receiving interface"];
-  if(m==null)return ["Motor mounting dimensions are unspecified"];
-  if(Math.abs(m.pilotDiameter-p.pilot)>0.001)out.push("Motor pilot diameter differs");
-  if(p.pilotDepth==null)out.push("Motor pilot recess depth is unspecified");
-  else if(m.pilotHeight>p.pilotDepth)out.push("Motor pilot bottoms before face seats");
-  var h=p.pcd/(2*Math.sqrt(2));
-  if(m.holes.length!=4)out.push("Mount expects four motor holes");
-  for(hole in m.holes)if(Math.abs(Math.abs(hole.x)-h)>0.001||Math.abs(Math.abs(hole.y)-h)>0.001)out.push("Motor bolt pattern differs");
-  var diameter=Std.parseFloat(p.thread.substr(1));
-  if(m.holeDiameter<diameter)out.push("Mount thread exceeds motor clearance hole");
-  if(p.threadDepth==null)out.push("Motor thread depth is not published; screw engagement unqualified");
-  if(p.model=="KK86-80EP-adapter")out.push("M5 motor fasteners in 6.5 mm motor holes need washer, bearing-stress and joint qualification");
-  return out;
  }
 }

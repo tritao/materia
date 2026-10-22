@@ -1,5 +1,5 @@
 import machinekit.assembly.MachineAssembly;
-import machinekit.assembly.RbkMotorMount;
+import machinekit.motion.MotorMount;
 import machinekit.motion.*;
 import machinekit.component.*;
 import cadkit.Shape;
@@ -22,7 +22,7 @@ class RbkSfuAxisChecks {
     }
     static function main():Void {
         var root=Sys.getEnv("MATERIA_ROOT");if(root==null) root=Sys.getCwd();var dir=root+"/build/suppliers/vallder/";
-        RbkMotorMount.setSupplierDirectory(dir);
+        machinekit.catalog.SupplierLibraries.setVallderDirectory(dir);
         var axis=new RbkSfuAxis(),registry=RbkSfuAxis.registry();
         check(new BallNut().overallLength==45,"Legacy generic nut dimensions retained");
         check(axis.nut.overallLength==46 && axis.nut.flangeOffset==10 && axis.nut.flangeThickness==10,

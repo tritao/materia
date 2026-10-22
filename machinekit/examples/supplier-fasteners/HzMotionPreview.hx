@@ -5,6 +5,7 @@ import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.TypedProperty;
 import machinekit.assembly.*;
 import machinekit.component.*;
+import machinekit.motion.*;
 import machinekit.component.MassProperties.MassSource;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
@@ -24,8 +25,8 @@ class HzMotionPreview {
    "Catalog/preview is not a manufacturing release or verified motor/drive selection."];
   for(m in assembly.components()) {
    var geometry=m.component.geometry(),mass:MassProperties;
-   if(Std.isOfType(m.component,HzMotionComponent)) {
-    var supplier=cast(m.component,HzMotionComponent);
+   if(Std.isOfType(m.component,MotorMount)) {
+    var supplier=cast(m.component,MotorMount);
     if(supplier.spec.massKg==null) {
      var physical=geometry.massProperties();
      mass=new MassProperties(physical.volume*1e-9*7850,physical.centerOfMass,Computed(Preview));
@@ -41,7 +42,7 @@ class HzMotionPreview {
   try {
    var assembly=new MachineAssembly(),i=0;
    for(name in HzMotionCatalog.models()) {
-    var component=new HzMotionComponent(name,null,"unspecified",HzMotionCatalog.cadModels().indexOf(name)>=0?"supplier-step":"drawing");
+    var component=HzMotionParts.of(name,true);
     var values=component.values();
     var definition=MachineKitDocuments.define(document,component.componentType(),values);
     var instance=document.createInstance('catalog$i',definition);
@@ -64,7 +65,7 @@ class HzMotionPreview {
  }
  public static function axisPreview():Bytes {
   var result=scene(new HzMotionAxis(),"hzmotion-y-drive");
-  result.recipeDiagnostics.push("BF12 uses supplier housing/bearing with a nominal installed DIN471 ring envelope. The unmodified supplier clip remains available as a separate state and intersects the groove; elasticity and exact installed form are unqualified.");
+  result.recipeDiagnostics.push("BF12 uses the supplier housing and bearing; its DIN 471 ring is its own part, installed in the groove.");
   result.recipeDiagnostics.push("Requires the HZMotion 51 mm screw-end profile; existing Vallder 54 mm end is not substituted.");
   result.recipeDiagnostics.push("Coupling is a reference geometry. Thread engagement, bearing preload, guides and actual mill placement remain unqualified.");
   return SceneArtifact.encode(result);

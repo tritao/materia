@@ -1,6 +1,6 @@
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.AssemblyPreview;
-import machinekit.assembly.RbkMotorMount;
+import machinekit.motion.MotorMount;
 import materia.project.SceneArtifact;
 
 /** Openable Materia artifact retaining the worked axis's components and joints. */
@@ -8,7 +8,7 @@ class RbkSfuAxisPreview {
     public static function main():Void {
         var root=Sys.getEnv("MATERIA_ROOT");if(root==null) root=Sys.getCwd();
         var directory=root+"/build/suppliers/vallder/";
-        RbkMotorMount.setSupplierDirectory(directory);
+        machinekit.catalog.SupplierLibraries.setVallderDirectory(directory);
         var assembly=MachineAssembly.decode(sys.io.File.getContent(directory+"rbk-sfu1605-axis.assembly.json"),RbkSfuAxis.registry());
         var scene=AssemblyPreview.scene(assembly,"vallder-rbk-sfu1605-axis");
         var definition=scene.assemblyDefinition;

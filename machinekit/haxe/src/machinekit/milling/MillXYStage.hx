@@ -82,7 +82,9 @@ class MillXYStage extends MillGuidedXYStage {
   addMateOnAxis("screwY-turn","continuous","motorMountY","to-screwY","screwY","attach-screwY",{x:0,y:-1,z:0});
   attach("motorShaftY",l.yMotor.shaft(),motorPose,"screwY");
   attach("couplingY",d.coupling,F.compose(motorPose,F.translation(0,0,d.couplingSeat)),"screwY");
-  attach("floatingBearingY",support,orient(0,l.yFloatingY+d.floatingBoltZ,l.yScrewZ-support.spec.shaftHeight,[0,0,1],[0,-1,0]),"floatingPedestalY");
+  var floatingPose=F.compose(orient(0,l.yFloatingY+d.floatingBoltZ,l.yScrewZ-support.spec.shaftHeight,[0,0,1],[0,-1,0]),support.supportInFootFrame());
+  attach("floatingBearingY",support,floatingPose,"floatingPedestalY");
+  attach("floatingRingY",d.ring,F.compose(floatingPose,F.translation(0,0,d.ringSeatZ)),"floatingBearingY");
   for(floating in [false,true])for(x in [-42.0,42])attach('seatYAnchor${floating}$x',SocketHeadCapScrew.metric("M6",25),
    F.translation(x,(floating?l.yFloatingY:l.yFixedY)+(floating?0:-10),l.yMountPlane+15),floating?"floatingPedestalY":"fixedPedestalY");
   var i=0;
@@ -91,7 +93,7 @@ class MillXYStage extends MillGuidedXYStage {
   for(x in [-d.floatingBoltX,d.floatingBoltX])attach('bearingBoltYfloating$x',SocketHeadCapScrew.metric("M6",40),
    F.translation(x,l.yFloatingY,l.yScrewZ+(d.floatingBoltSeat-support.spec.shaftHeight)),"floatingBearingY");
   i=0;
-  var mounting:machinekit.motion.ServoMotor.ServoMounting=l.yMotor.mounting();
+  var mounting:machinekit.motion.MotorFlange=l.yMotor.mounting();
   for(hole in mounting.holes)attach('motorYBolt${++i}',SocketHeadCapScrew.metric("M5",12),
    F.compose(motorPose,F.fromRotationMatrix(hole.x,hole.y,-mounting.flangeThickness,[1,0,0,0,-1,0,0,0,-1])),"motorMountY");
  }
@@ -106,7 +108,7 @@ class MillXYStage extends MillGuidedXYStage {
 				F.fromRotationMatrix(x, l.centreY, l.xRailPlane, [0,-1,0, 1,0,0, 0,0,1]), "saddle");
 			attach('${end}BearingX', bearing, orient(x, l.centreY, l.xScrewZ, [0,0,1], [1,0,0]), '${end}PedestalX');
 		}
-		attach("motorMountX", new MillBeltMotorPlate(), F.fromRotationMatrix(MillXYStageLayout.X_MOTOR_FACE-6, l.centreY, l.saddleBottom,
+		attach("motorMountX", new MillBeltMotorPlate(l.motor.rating.designation), F.fromRotationMatrix(MillXYStageLayout.X_MOTOR_FACE-6, l.centreY, l.saddleBottom,
 			[0,-1,0, 1,0,0, 0,0,1]), "saddle");
 		var motor = orient(MillXYStageLayout.X_MOTOR_FACE, l.centreY, l.xMotorZ, [0,-1,0], [-1,0,0]);
 		attach("motorX", l.motor, motor, "motorMountX");

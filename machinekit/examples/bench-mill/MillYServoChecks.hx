@@ -66,7 +66,7 @@ class MillYServoChecks {
   for(m in stage.components())if(StringTools.startsWith(m.id,"mountYBolt")||StringTools.startsWith(m.id,"bearingBoltYfloating")||StringTools.startsWith(m.id,"seatYAnchor")){
    var p:AssemblyFrame=poses.get(m.id);access.push({id:m.id,part:Part.cylinderSpan(3.0,p.z+6.1,p.z+36.1,p.x,p.y)});
   }
-  var mounting:machinekit.motion.ServoMotor.ServoMounting=l.yMotor.mounting();
+  var mounting:machinekit.motion.MotorFlange=l.yMotor.mounting();
   for(hole in mounting.holes)access.push({id:"motor key "+hole.x+"/"+hole.y,part:Part.cylinderAlong(2.5,
    new Vector(hole.x,l.yMotorFace+mounting.flangeThickness+5.1,l.yScrewZ+hole.y),Vector.Y(),30)});
   for(tool in access){

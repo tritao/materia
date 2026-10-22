@@ -25,8 +25,8 @@ class VallderCatalogAxisChecks {
   // All 20 support sizes, BF12 included, bind to the one screw-support recipe.
   check(bound==44,"Expected 44 supplier bindings");
   var layout=new ScrewAxisLayout(250,500,400,160);
-  var selected=new ScrewAxisComponents(new RbkMotorMount(),NemaStepper.model("23HS22-2804S"),new VallderSfu1605Screw(500),
-   new SfuNut("SFU1605",13),ScrewSupportUnit.model("BF12",ScrewSupportUnit.SUPPLIER),LinearRail.metric("HGH15CA",400,LinearRail.MEASURED),LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER),false);
+  var selected=new ScrewAxisComponents(MotorMount.of("RBK12-57",null,"vallder"),NemaStepper.model("23HS22-2804S"),new VallderSfu1605Screw(500),
+   new SfuNut("SFU1605",13),ScrewSupportUnit.model("BF12","vallder"),LinearRail.metric("HGH15CA",400,LinearRail.MEASURED),LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER),false);
   var axis=new TwinRailScrewAxis(layout,selected);axis.validate();
   var saved=axis.encode(),loaded=MachineAssembly.decode(saved,registry),before=bom(axis);
   check(before==bom(loaded),"Catalog axis BOM survives persistence");

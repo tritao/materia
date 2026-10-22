@@ -32,7 +32,7 @@ class MotorMountTests(unittest.TestCase):
         bindings = motor_mounts.bind_rbk(catalog, assets)
         reference = {'sku': 'first', 'model': 'RBK12-57', 'revision': 'test-v1', 'asset_sha256': 'one'}
         recipes = motor_mounts.attach_interfaces(bindings, [reference])
-        self.assertEqual(recipes[0]['values'], {'model': 'RBK12-57', 'revision': 'test-v1'})
+        self.assertEqual(recipes[0]['values'], {'model': 'RBK12-57', 'revision': 'test-v1', 'geometry': 'vallder'})
         self.assertEqual(recipes[0]['geometry_source'], 'supplier_cad')
         self.assertFalse(bindings[0]['compatibility_verified'])
         bindings = motor_mounts.bind_rbk(catalog, assets)

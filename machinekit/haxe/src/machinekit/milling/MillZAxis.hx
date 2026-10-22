@@ -30,7 +30,10 @@ class MillZAxis extends AxisBuilder {
 			.setNumber("bearingZ", l.lowerHeight / 2).setNumber("anchorZ", 10).setNumber("anchorSpacing", f.zRailSpacing));
 		attach("floatingMount", lower, F.translation(0, f.columnFront - l.mountThickness / 2, f.railPlane), "fixedMount");
 		attach("motorMount", l.fixed, down(0,f.columnFront,l.motorFace),"fixedMount");
-		attach("floatingBearing", l.floating, down(0,f.columnFront,l.floatingZ+l.drive.floatingBoltZ),"floatingMount");
+		// Its foot sits where the drawing's foot frame would; the ring holds the bearing on the journal.
+		var floatingPose = F.compose(down(0,f.columnFront,l.floatingZ+l.drive.floatingBoltZ), l.floating.supportInFootFrame());
+		attach("floatingBearing", l.floating, floatingPose,"floatingMount");
+		attach("floatingRing", l.drive.ring, F.compose(floatingPose, F.translation(0, 0, l.drive.ringSeatZ)), "floatingBearing");
 		for(side in [-1,1]) {
 			attach('floatingBolt$side',SocketHeadCapScrew.metric("M6",45),F.fromRotationMatrix(side*l.drive.floatingBoltX,f.columnFront+l.drive.floatingBoltSeat,l.floatingZ,[1,0,0,0,0,1,0,-1,0]),"floatingMount");
 		}

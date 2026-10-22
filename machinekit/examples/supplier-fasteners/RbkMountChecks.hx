@@ -1,4 +1,5 @@
-import machinekit.assembly.RbkMotorMount;
+import machinekit.motion.MotorMount;
+import machinekit.motion.MotorMount.MotorMountSpec;
 import machinekit.assembly.MachineAssembly;
 import machinekit.motion.NemaStepper;
 import machinekit.component.MachineKitComponents;
@@ -26,13 +27,13 @@ class RbkMountChecks {
     static function main():Void {
         var root=Sys.getEnv("MATERIA_ROOT");if(root==null) root=Sys.getCwd();
         var dir=root+"/build/suppliers/vallder/";
-        RbkMotorMount.setSupplierDirectory(dir);
+        machinekit.catalog.SupplierLibraries.setVallderDirectory(dir);
         var registry=MachineKitComponents.defaultRegistry();
         var persistenceOnly=Sys.args().indexOf("--persistence-only")>=0;
-        check(registry.has(RbkMotorMount.recipeType().id),"RBK recipe is registered");
+        check(registry.has(MotorMount.recipeType().id),"Motor-mount recipe is registered");
         var report:Array<Dynamic> = [],assembly=new MachineAssembly(),failures=0,index=0;
-        for(model in RbkMotorMount.models()) {
-            var mount=new RbkMotorMount(model),meta:Dynamic=mount.interfaceMetadata();
+        for(model in MotorMount.rbkModels()) {
+            var mount=MotorMount.of(model,null,"vallder"),meta=mount.spec;
             if(persistenceOnly) {
                 var normalized=mount.geometry();
                 check(shaftAxisMatches(normalized,meta),"Shaft datum matches the CAD bearing bore axis");normalized.close();
@@ -67,26 +68,26 @@ class RbkMountChecks {
             }
             check(motorFace && baseFace,"Connector datum planes match CAD faces");
             check(Math.abs(bounds.get_min().get_y()+mount.underhang)<0.001,"Flange underhang is explicit");
-            var holes:Array<Dynamic> = meta.base_holes;
+            var holes=meta.baseHoles;
             for(i in 0...holes.length) {
                 var hole=holes[i],volume=overlap(shape,vertical(hole.diameter/2-0.15,hole.x,hole.z,bounds.get_max().get_y()+1));
                 check(circleAt(verticalCircles,hole.x,hole.z,hole.diameter/2),"Base datum matches an actual CAD bore edge");
-                if(hole.counterbore_diameter!=null)
-                    check(circleAt(verticalCircles,hole.x,hole.z,hole.counterbore_diameter/2),"Counterbore diameter matches CAD");
+                if(hole.counterboreDiameter!=null)
+                    check(circleAt(verticalCircles,hole.x,hole.z,hole.counterboreDiameter/2),"Counterbore diameter matches CAD");
                 report.push({model:model,feature:"baseBolt"+(i+1),intersection_mm3:volume,x:hole.x,z:hole.z});
                 if(volume>0.0001) failures++;
             }
-            var extra:Array<Dynamic> = meta.auxiliary_holes;
+            var extra=meta.auxiliaryHoles;
             for(i in 0...extra.length) {
                 var h=extra[i],volume=overlap(shape,vertical(h.diameter/2-0.15,h.x,h.z,bounds.get_max().get_y()+1));
                 check(circleAt(verticalCircles,h.x,h.z,h.diameter/2),"Auxiliary datum matches an actual CAD bore edge");
                 report.push({model:model,feature:"baseAux"+(i+1),intersection_mm3:volume,x:h.x,z:h.z});
                 if(volume>0.0001) failures++;
             }
-            var positions:Array<Array<Float>> = meta.motor_bolts_xy;
+            var positions=meta.motorBolts;
             for(i in 0...positions.length) {
                 var p=positions[i];
-                var bore=Part.cylinderSpan(meta.motor_thread_root_radius_mm-0.1,0.1,Math.min(8,meta.motor_flange_thickness_mm-0.1),p[0],p[1]);
+                var bore=Part.cylinderSpan((meta.threadRootRadius ?? 0)-0.1,0.1,Math.min(8,meta.flange-0.1),p.x,meta.shaftHeight+p.y);
                 var volume=overlap(shape,bore);
                 report.push({model:model,feature:"motorBolt"+(i+1),intersection_mm3:volume});
                 if(volume>0.0001) failures++;
@@ -98,13 +99,13 @@ class RbkMountChecks {
             var rawMotor=motor.geometry(),placedMotor=rawMotor.translated(new Vector(0,mount.shaftHeight,0));rawMotor.close();
             var motorVolume=overlap(shape,placedMotor);report.push({model:model,feature:"motor-envelope",intersection_mm3:motorVolume});
             if(motorVolume>0.001) failures++;
-            var rawBase=Part.box(120,6,130),base=rawBase.translated(new Vector(0,-3,meta.motor_flange_thickness_mm+1));rawBase.close();
+            var rawBase=Part.box(120,6,130),base=rawBase.translated(new Vector(0,-3,meta.flange+1));rawBase.close();
             var baseVolume=overlap(shape,base);report.push({model:model,feature:"relieved-base",intersection_mm3:baseVolume});
             if(baseVolume>0.001) failures++;
             assembly.addComponent("mount-"+model,mount,AssemblyFrames.translation(index*180,0,0));
             assembly.addComponent("motor-"+model,motor);
             assembly.addMate("motor-mate-"+model,"fixed","mount-"+model,"motor","motor-"+model,"mountFace");
-            var geometry=shape.volume(),roundtrip=registry.byId(RbkMotorMount.recipeType().id).create(mount.values()).geometry();
+            var geometry=shape.volume(),roundtrip=registry.byId(MotorMount.recipeType().id).create(mount.values()).geometry();
             check(roundtrip.valid() && Math.abs(roundtrip.volume()-geometry)<0.001,"Pinned recipe recreates normalized geometry");
             roundtrip.close();shape.close();index++;
             sys.io.File.saveContent(dir+"rbk-interface-checks.json",haxe.Json.stringify({schema_version:1,checks:report,failures:failures},null,"  "));
@@ -113,17 +114,17 @@ class RbkMountChecks {
         if(!persistenceOnly) sys.io.File.saveContent(dir+"rbk-interface-checks.json",haxe.Json.stringify({schema_version:1,checks:report,failures:failures},null,"  "));
         check(failures==0,"RBK hole/pilot/motor/base checks need review; see rbk-interface-checks.json");
         var saved=assembly.encode(),loaded=MachineAssembly.decode(saved),poses=loaded.solvedPoses();
-        for(model in RbkMotorMount.models()) {
+        for(model in MotorMount.rbkModels()) {
             var mountPose=poses.get("mount-"+model),motorPose=poses.get("motor-"+model);
             check(mountPose!=null && motorPose!=null && Math.abs(motorPose.z-mountPose.z)<0.000001 &&
-                Math.abs(motorPose.y-mountPose.y-new RbkMotorMount(model).shaftHeight)<0.000001,
+                Math.abs(motorPose.y-mountPose.y-MotorMount.of(model).shaftHeight)<0.000001,
                 "Named motor connector solves at the face plane and correct shaft height");
         }
         for(entry in loaded.components()) if(StringTools.startsWith(entry.id,"mount-"))
             check(entry.component.connectors().length==13,"All mounting datums survive assembly reload");
         check(saved.indexOf(dir)<0,"Saved RBK recipe has no absolute cache path");
-        var document=new Document(),original=new RbkMotorMount();
-        var instance=document.createInstance("RBK",MachineKitDocuments.define(document,RbkMotorMount.recipeType(),original.values()));
+        var document=new Document(),original=MotorMount.of("RBK12-57",null,"vallder");
+        var instance=document.createInstance("RBK",MachineKitDocuments.define(document,MotorMount.recipeType(),original.values()));
         var volume=instance.shape().volume(),reloaded=DocumentCodec.decode(DocumentCodec.encode(document));
         var editable:cadkit.parametric.InstanceElement=cast reloaded.element(instance.id);
         check(Math.abs(editable.shape().volume()-volume)<0.001,"RBK document reload preserves geometry");
@@ -139,15 +140,15 @@ class RbkMountChecks {
         for(edge in edges) if(Math.abs(edge.x-x)<0.001 && Math.abs(edge.z-z)<0.001 && Math.abs(edge.radius-radius)<0.001) return true;
         return false;
     }
-    static function shaftAxisMatches(part:Part,meta:Dynamic):Bool {
+    static function shaftAxisMatches(part:Part,meta:MotorMountSpec):Bool {
         var matched=false;
         for(i in 0...part.shape.subshapeCount(CadKit.ShapeKind.Face)) {
             var face=part.shape.subshape(CadKit.ShapeKind.Face,i);
             if(face.surfaceKind()==CadKit.SurfaceKind.Cylinder) {
                 var axis=face.faceAxis(),origin=axis.get_origin();
-                if(Math.abs(axis.get_radius()-meta.shaft_diameter_mm/2)<0.001 &&
+                if(Math.abs(axis.get_radius()-meta.shaftBore/2)<0.001 &&
                     Math.abs(axis.get_direction().get_z())>0.999 && Math.abs(origin.get_x())<0.001 &&
-                    Math.abs(origin.get_y()-meta.shaft_height_mm)<0.001) matched=true;
+                    Math.abs(origin.get_y()-meta.shaftHeight)<0.001) matched=true;
             }
             face.close();
         }

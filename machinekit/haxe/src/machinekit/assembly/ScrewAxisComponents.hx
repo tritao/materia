@@ -8,7 +8,7 @@ import machinekit.component.MachineComponent;
  * treat all products called BF12 or NEMA23 as interchangeable.
  */
 class ScrewAxisComponents {
-    public final mount:RbkMotorMount;
+    public final mount:MotorMount;
     public final motor:NemaStepper;
     public final screw:LeadScrew;
     public final nut:LeadScrewNut;
@@ -19,7 +19,7 @@ class ScrewAxisComponents {
     public final blockThreadDepth:Float;
     /** Optional ISO7089 M4 washers; the selected motor must clear their 9 mm outside diameter. */
     public final motorWasher:Bool;
-    public function new(mount:RbkMotorMount,motor:NemaStepper,screw:LeadScrew,nut:LeadScrewNut,
+    public function new(mount:MotorMount,motor:NemaStepper,screw:LeadScrew,nut:LeadScrewNut,
         support:ScrewSupportUnit,rail:LinearRail,block:LinearRailBlock,motorWasher:Bool=true) {
         this.mount=mount;this.motor=motor;this.screw=screw;this.nut=nut;this.support=support;
         this.rail=rail;this.block=block;var depth=block.mountThreadDepth();this.blockThreadDepth=depth==null ? Math.NaN : depth;this.motorWasher=motorWasher;

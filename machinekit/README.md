@@ -10,7 +10,7 @@ to 7.5 kW with published mounting dimensions, brake-dependent envelopes and keye
 shafts. See the [servo gallery](examples/leadshine-servos/README.md) for the
 Materia preview, STEP export, catalog provenance and approximation limits.
 
-Motor mounts consume `ServoMotor.mounting()`, a shared `ServoMounting` record
+Motor mounts consume a motor's `MotorFlange` (`ServoMotor.mounting()`, `NemaStepper.flange()`, `AxisMotor.flange`), a shared record
 with flange face size, thickness, pilot dimensions, hole diameter and hole coordinates
 in the Z=0 mounting face (mm). Leadshine supplies catalog dimensions; the assumed
 BT30 motor supplies its study dimensions. Motors without defined mounting data return
@@ -485,7 +485,7 @@ var layout = new ScrewAxisLayout(300, 500, 400, 160); // travel, screw, rail, sp
 var selected = new ScrewAxisComponents(
     new RbkMotorMount("RBK12-57"), NemaStepper.model("OPENBUILDS-NEMA23-56"),
     new VallderSfu1605Screw(layout.screwLength), new VallderSfu1605Nut(),
-    ScrewSupportUnit.model("BF12", ScrewSupportUnit.SUPPLIER), LinearRail.metric("HGH15CA", layout.railLength),
+    ScrewSupportUnit.model("BF12", "vallder"), LinearRail.metric("HGH15CA", layout.railLength),
     LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER));
 var axis = new TwinRailScrewAxis(layout, selected);
 axis.validateInstallation();

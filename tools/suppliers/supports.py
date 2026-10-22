@@ -39,7 +39,7 @@ def build(catalog,library):
         assets=[a for a in library if a['sha256']==m['sha256'] and a['product_id']==m['parent_id'] and m['variant_id'] in a['variant_ids'] and a['usable_geometry']]
         if not assets:continue
         recipes.append(dict(supplier_id='vallder',sku=m['sku'],supplier_product_id=m['variant_id'],parent_id=m['parent_id'],
-            type_id='machinekit.motion.screw-support-unit',values={'model':m['model'],'geometry':'supplier'},required_inputs=[],geometry_source='supplier_cad',interface_status='cad_mounting_axes_checked',
+            type_id='machinekit.motion.screw-support-unit',values={'model':m['model'],'geometry':'vallder'},required_inputs=[],geometry_source='supplier_cad',interface_status='cad_mounting_axes_checked',
             compatibility='supplier_assumed',source_url=parent['url'],reference_sha256=m['sha256'],
             limits=['Bearing/hardware already included in CAD and BOM item',
                     'Raw CAD shaft-axis frame; mounting faces and bolt axes follow published table',

@@ -124,11 +124,13 @@ are not substituted for those supplier parts.
 
 ### Motor mounts
 
-`machinekit.assembly.nema-mount-plate` makes the existing `NemaMountPlate`
-saveable in assemblies and editable documents. It retains the motor pilot and
-bolt-pattern cutout, bolt connectors and existing screw-engagement checks.
-Choose a named motor model, plate thickness and margin. Custom motor interfaces
-remain code-only, so they cannot reload with silently changed dimensions.
+`machinekit.assembly.motor-plate` (`MotorPlate`) is a flat plate for any motor
+with a declared `MotorFlange`: NEMA steppers (tapped flange: clearance holes,
+screws into the motor) and Leadshine servos (drilled flange: tapped plate,
+screws through the flange). It keeps the pilot and bolt-pattern cutout, bolt
+connectors and screw-engagement checks. Choose a named motor, plate thickness
+and margin. Custom motor interfaces remain code-only, so they cannot reload
+with silently changed dimensions.
 
 An optional profile-side pattern adds four through holes, two on each of two
 parallel rails running along local Y on the plate's +Z face. `profileSystem`
@@ -142,7 +144,7 @@ do not qualify supplier slots, nuts, screw engagement, driver access or loads.
 For a plain plate use `profileSystem=None` and zero profile-hole dimensions.
 
 ```haxe
-var plate = new machinekit.assembly.NemaMountPlate(
+var plate = new machinekit.assembly.MotorPlate(
     machinekit.motion.NemaStepper.frame(23), 8, 30,
     {systemId:"TSLOT-40-SLOT8", railSpacing:80, alongPitch:40, holeDiameter:6.6});
 ```
@@ -151,7 +153,7 @@ var plate = new machinekit.assembly.NemaMountPlate(
 by exact model, SKU and download columns in Vallder's transposed table. The
 validated asset hashes and paths are available through `cad/library.json` and
 the motor-mount bindings. The four reviewed revisions also bind to the saveable
-`machinekit.assembly.rbk-motor-mount` recipe described below. Cube and
+`machinekit.motion.motor-mount` recipe (geometry `vallder`), described below. Cube and
 other motor holders stay separate from custom square plates. DB57's listed
 38 mm opening is smaller than our 38.1 mm NEMA 23 pilot; DB86 has zero nominal
 pilot clearance. Both need tolerance review. Generic plates receive no inferred
@@ -490,12 +492,11 @@ attempts remain recorded in the drawing reference. Run
 cache, or add `--offline` to verify it. Missing files prompt for credentials;
 credentials and session cookies are never saved. The downloader checks the STEP
 header, byte count and SHA-256 and rejects changed content. The cache is under
-`build/suppliers/hzmotion/cad/assets`. BK12-C/BF12/BF15 have passed the interface checks below and now have a separate
-`machinekit.assembly.hzmotion-supplier-component` recipe. Their files remain
-unchanged; the component applies the recorded translation to its usual datums.
-Set `MATERIA_HZMOTION_ROOT` to relocate the supplier cache. Saved supplier recipes
-retain a distinct designation containing the pinned STEP hash. Existing drawing
-recipes remain available. No KK body/adapter CAD link was listed on the
+`build/suppliers/hzmotion/cad/assets`. BK12-C/BF12/BF15 have passed the interface checks below. HZMotion's products
+belong to the product-kind recipes: its brackets are rows of `machinekit.motion.motor-mount`, its BF/FK/EF supports
+sources on `machinekit.motion.screw-support-unit` rows, its adapter `machinekit.motion.motor-adapter-plate`. A reviewed
+STEP is the `hzmotion` drawing; its measured interfaces apply whichever drawing is shown, and the drawing does not
+change the part number. Set `MATERIA_HZMOTION_ROOT` to relocate the supplier cache. No KK body/adapter CAD link was listed on the
 public KK page, and EF12 has not yet been downloaded.
 
 Open `machinekit/examples/supplier-fasteners/materia.hzmotion.project.json` in

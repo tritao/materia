@@ -1,4 +1,4 @@
-import machinekit.assembly.NemaMountPlate;
+import machinekit.assembly.MotorPlate;
 import machinekit.assembly.MachineAssembly;
 import machinekit.motion.NemaStepper;
 import machinekit.component.ComponentValues;
@@ -9,7 +9,7 @@ import cadkit.parametric.DocumentCodec;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
 import materia.assembly.AssemblyFrames;
-import machinekit.assembly.RbkMotorMount;
+import machinekit.motion.MotorMount;
 import machinekit.component.SupplierRecipeLibrary;
 import machinekit.component.SourcingPlan;
 
@@ -17,11 +17,11 @@ class MotorMountChecks {
     static function check(ok:Bool,message:String):Void {if(!ok) throw message;}
     static function rejected(fn:Void->Void):Bool {try fn() catch(_:Dynamic) return true;return false;}
     static function main():Void {
-        var registry=MachineKitComponents.defaultRegistry(),type=NemaMountPlate.recipeType();
+        var registry=MachineKitComponents.defaultRegistry(),type=MotorPlate.recipeType();
         check(registry.has(type.id),"Motor plate registered by default");
         var assembly=new MachineAssembly();
         for(frame in [17,23,34]) {
-            var motor=NemaStepper.frame(frame),plate=new NemaMountPlate(motor,6);
+            var motor=NemaStepper.frame(frame),plate=new MotorPlate(motor,6);
             var part=plate.geometry(),holeRadius=motor.mountScrew(10).clearanceDiameter(Medium)/2;
             var expected=(plate.size*plate.size-Math.PI*(Math.pow((motor.spec.pilotDiameter+0.2)/2,2)+4*holeRadius*holeRadius))*6;
             check(part.valid() && part.solidCount()==1 && Math.abs(part.volume()-expected)<0.001,"Legacy plate keeps exact pilot/bolt geometry");
@@ -31,8 +31,8 @@ class MotorMountChecks {
         var motor=NemaStepper.frame(23);
         for(system in ["TSLOT-30-SLOT8","TSLOT-40-SLOT8"]) {
             var spacing=system=="TSLOT-30-SLOT8" ? 90.0 : 80.0;
-            var plate=new NemaMountPlate(motor,8,30,{systemId:system,railSpacing:spacing,alongPitch:40,holeDiameter:6.6});
-            var part=plate.geometry(),plain=new NemaMountPlate(motor,8,30).geometry();
+            var plate=new MotorPlate(motor,8,30,{systemId:system,railSpacing:spacing,alongPitch:40,holeDiameter:6.6});
+            var part=plate.geometry(),plain=new MotorPlate(motor,8,30).geometry();
             check(part.valid() && part.solidCount()==1,"Profile plate is one valid solid");
             check(Math.abs(plain.volume()-part.volume()-4*Math.PI*3.3*3.3*8)<0.001,"Four profile bores remove the specified volume");
             check(plate.profileHolePositions().length==4 && plate.connector("profileBolt4").frame.z==8,"Four explicit profile-side connector frames");
@@ -58,14 +58,14 @@ class MotorMountChecks {
             check(sb.valid() && Math.abs(sa.volume()-sb.volume())<0.001,"Reload reconstructs matching mount geometry");
             sa.close();sb.close();
         }
-        check(rejected(() -> new NemaMountPlate(motor,8,30,{systemId:"TSLOT-40-SLOT8",railSpacing:81,alongPitch:40,holeDiameter:6.6})),"Off-grid rail spacing rejected");
-        check(rejected(() -> new NemaMountPlate(motor,8,10,{systemId:"TSLOT-40-SLOT8",railSpacing:80,alongPitch:40,holeDiameter:6.6})),"Insufficient plate edge rejected");
-        check(rejected(() -> new NemaMountPlate(motor,8,30,{systemId:"TSLOT-40-SLOT8",railSpacing:40,alongPitch:40,holeDiameter:6.6})),"Obstructed pilot passage rejected");
+        check(rejected(() -> new MotorPlate(motor,8,30,{systemId:"TSLOT-40-SLOT8",railSpacing:81,alongPitch:40,holeDiameter:6.6})),"Off-grid rail spacing rejected");
+        check(rejected(() -> new MotorPlate(motor,8,10,{systemId:"TSLOT-40-SLOT8",railSpacing:80,alongPitch:40,holeDiameter:6.6})),"Insufficient plate edge rejected");
+        check(rejected(() -> new MotorPlate(motor,8,30,{systemId:"TSLOT-40-SLOT8",railSpacing:40,alongPitch:40,holeDiameter:6.6})),"Obstructed pilot passage rejected");
         check(rejected(() -> type.create(new ComponentValues().setNumber("railSpacing",80))),"Inactive hole parameters cannot silently change identity");
-        check(new NemaMountPlate(NemaStepper.frame(17,55),6).componentType()==null,"Custom motor interfaces cannot silently rebuild as named motors");
+        check(new MotorPlate(NemaStepper.frame(17,55),6).componentType()==null,"Custom motor interfaces cannot silently rebuild as named motors");
         check(new machinekit.screwdriving.NemaMotorMount().fastenings().require().length==4,
             "Existing NEMA 17 plate assembly retains four valid screw connections");
-        var document=new Document(),plate=new NemaMountPlate(NemaStepper.frame(17),6);
+        var document=new Document(),plate=new MotorPlate(NemaStepper.frame(17),6);
         var instance=document.createInstance("Mount",MachineKitDocuments.define(document,type,plate.values()));
         var volume=instance.shape().volume();
         var restored=DocumentCodec.decode(DocumentCodec.encode(document));
@@ -88,7 +88,7 @@ class MotorMountChecks {
         var catalog:Dynamic=haxe.Json.parse(sys.io.File.getContent(dir+"catalog.json"));
         var bindings:Array<Dynamic> = report.bindings,variants:Array<Dynamic> = catalog.variants;
         var assembly=new MachineAssembly(),plan=new SourcingPlan(),count=0;
-        RbkMotorMount.setSupplierDirectory(dir);
+        machinekit.catalog.SupplierLibraries.setVallderDirectory(dir);
         var library=new SupplierRecipeLibrary(sys.io.File.getContent(dir+"recipes.json"),MachineKitComponents.defaultRegistry());
         for(binding in bindings) if(binding.geometry_kind=="supplier_cad") {
             var assets:Array<Dynamic> = binding.cad;

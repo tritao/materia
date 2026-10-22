@@ -28,17 +28,6 @@ typedef ServoRating = {
 	var electrical:ServoElectricalRating;
 }
 
-/** Mounting face at Z=0; hole coordinates are in that face, dimensions in mm.
- * Null mounting data means the interface has not been specified.
- */
-typedef ServoMounting = {
-	var face:Float;
-	var flangeThickness:Float;
-	var pilotDiameter:Float;
-	var pilotHeight:Float;
-	var holeDiameter:Float;
-	var holes:Array<{x:Float,y:Float}>;
-}
 
 /**
  * A servo motor: rated and peak torque, rated and maximum speed, rotor inertia and the encoder counts
@@ -180,12 +169,12 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 				{quantity: "inertia", label: "servo ratings"}, {quantity: "speed limit", label: "servo ratings"}] : null};
 
 	/** Supplier or explicitly assumed mounting dimensions; never infer them from body size. */
-	public function mounting():Null<ServoMounting> return null;
+	public function mounting():Null<MotorFlange> return null;
 
     override public function axisMotor():Null<AxisMotor> {
         var face=mounting();
         if(face==null)return null;
-        return new AxisMotor(this,face.face,rating.shaftDiameter,rating.shaftLength,depth->mountingCutout(depth));
+        return new AxisMotor(this,face,rating.shaftDiameter,rating.shaftLength,depth->mountingCutout(depth));
     }
 
     /** Pilot and fastener clearances from the declared interface, in the mounting face. */
@@ -201,7 +190,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
     }
 
     /** Explicit, unverified flange rows for the generic motor families. */
-    public static function assumedMounting(designation:String):ServoMounting {
+    public static function assumedMounting(designation:String):MotorFlange {
         var face=0.0,pilot=0.0,pitch=0.0,hole=0.0;
         if(StringTools.endsWith(designation,"50W")&&!StringTools.endsWith(designation,"750W") || StringTools.endsWith(designation,"100W")) {face=40;pilot=30;pitch=31;hole=3.5;}
         else if(StringTools.endsWith(designation,"200W")||StringTools.endsWith(designation,"400W")) {face=60;pilot=50;pitch=50;hole=5.5;}
@@ -254,7 +243,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
  */
 private class CatalogServoMotor extends ServoMotor {
 	public function new(rating:ServoRating) super(rating, Assumed);
-    override public function mounting():Null<ServoMounting> return ServoMotor.assumedMounting(rating.designation);
+    override public function mounting():Null<MotorFlange> return ServoMotor.assumedMounting(rating.designation);
 	override public function componentType():Null<machinekit.component.ComponentType> return ServoMotor.namedRecipeType();
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues()
 		.setToken("designation", rating.designation).setToken("material", materialSpec());

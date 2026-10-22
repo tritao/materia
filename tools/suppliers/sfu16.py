@@ -46,7 +46,7 @@ def build(catalog, assets):
                 raise ValueError('BF12 bore/shaft height evidence changed')
         recipes.append({'supplier_id': 'vallder', 'sku': sku, 'supplier_product_id': v['supplier_product_id'],
             'parent_id': parent_id, 'type_id': type_id,
-            'values': {'model': 'BF12', 'geometry': 'supplier'} if parent_id == 2378 else {}, 'required_inputs': [],
+            'values': {'model': 'BF12', 'geometry': 'vallder'} if parent_id == 2378 else {}, 'required_inputs': [],
             'geometry_source': source, 'compatibility': 'supplier_assumed', 'source_url': parents[parent_id]['url']})
     return {'schema_version': 1, 'recipes': recipes, 'compatibility_basis': 'supplier_intended_SFU16_RBK12_BF12',
         'custom_end_machining': False,

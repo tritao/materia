@@ -1,14 +1,14 @@
 import cadkit.modeling.*;
 import machinekit.motion.*;
 import machinekit.component.*;
-import machinekit.assembly.RbkMotorMount;
+import machinekit.motion.MotorMount;
 class SupportFamilyChecks {
  static function main():Void {
   var rows:Array<Dynamic> = [];
   for(model in VallderSupportData.models().concat(["FK17","FF17"])) {
-   var s=VallderSupportData.get(model),path=RbkMotorMount.assetDirectory()+"/cad/assets/"+s.sha256+".step";
+   var s=VallderSupportData.get(model),path=machinekit.catalog.SupplierLibraries.vallder()+"/cad/assets/"+s.sha256+".step";
    if(machinekit.catalog.PinnedCad.sha256(path)!=s.sha256)throw "Unreviewed support: "+model;
-   var part=(model=="FK17" || model=="FF17") ? new Part(cadkit.Shape.importStep(path)) : ScrewSupportUnit.model(model,ScrewSupportUnit.SUPPLIER).geometry(),holes:Array<Dynamic> = [];
+   var part=(model=="FK17" || model=="FF17") ? new Part(cadkit.Shape.importStep(path)) : ScrewSupportUnit.model(model,"vallder").geometry(),holes:Array<Dynamic> = [];
    var positions:Array<Vector> = [];
    if(s.base) {
     for(x in [-s.pitch/2,s.pitch/2])for(z in (s.longitudinalPitch==0 ? [0.0] : [-s.longitudinalPitch/2,s.longitudinalPitch/2]))positions.push(new Vector(x,0,z));
@@ -29,7 +29,7 @@ class SupportFamilyChecks {
    if(failed!=(model=="FK17" || model=="FF17") || shaft>0.001)throw "Unexpected support probe result: "+model;
    rows.push({model:model,sha256:s.sha256,boreProbeMm3:shaft,holes:holes});part.close();
   }
-  sys.io.File.saveContent(RbkMotorMount.assetDirectory()+"/support-bore-checks.json",haxe.Json.stringify(rows,null,"  "));
+  sys.io.File.saveContent(machinekit.catalog.SupplierLibraries.vallder()+"/support-bore-checks.json",haxe.Json.stringify(rows,null,"  "));
   trace("Support bore probe report written");
  }
 }
