@@ -161,12 +161,15 @@ class ReviewContractTests {
 		var wider = CastingMoldCodec.decode(CastingMoldCodec.encode(p)).cores[0];
 		wider.id = "wide-core";
 		wider.carrierId = "wide-carrier";
-		var cy = wider.cavity.y + wider.cavity.depth / 2;
-		wider.cavity.depth = 200;
-		wider.cavity.y = cy - 100;
+		var cavity=materia.tooling.casting.MoldCores.singleBox(wider.cavity,wider.id);
+		var cy = cavity.y + cavity.depth / 2;
+		cavity.depth = 200;
+		cavity.y = cy - 100;
+		wider.cavity=materia.tooling.casting.MoldRegions.box(cavity);
 		bridges.cores.push(wider);
 		materia.tooling.casting.CoreSupports.sharedBridges(bridges.cavity, bridges.document.recipe, bridges.cores, [], []);
-		var foam = bridges.cores[0].foamLayers[0];
+		var foam = materia.tooling.casting.MoldCores.singleBox(
+			materia.tooling.casting.MoldCores.layerRegion(bridges.cores[0].layers[0]),bridges.cores[0].id);
 		check(Math.abs(bridges.cores[0].bridgeBondAreaMm2 - foam.width * foam.depth) < 1e-7,
 			"a wider row beam never credits bond area beyond the smaller foam pad");
 		var spec = ProcessTests.spec();

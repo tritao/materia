@@ -24,6 +24,13 @@ class ToolingSectionReview {
 	public static function build(plan:CastingMoldPlan):ToolingSectionReviewResult {
 		var items=[for (former in plan.formers) {volume:former.volume,direction:former.withdrawal,ids:[former.volume.id].concat(former.featureIds)}];
 		for (fixture in plan.fixtures) items.push({volume:fixture.datum,direction:fixture.withdrawal,ids:[fixture.datum.id,fixture.insertId]});
+		var cuttingFiles=new Map<String,String>();
+		for (core in plan.cores) for (index in 0...core.layers.length) {
+			var id=materia.tooling.casting.MoldCores.layerId(core,index),cutting=core.layers[index];
+			items.push({volume:ToolingVolume.fromCoreCutting(id,cutting).volume,
+				direction:cutting.wireDirection,ids:[id,core.id,core.featureId]});
+			cuttingFiles.set(id,id+".cutting.json");
+		}
 		items.sort((a,b) -> Reflect.compare(a.volume.id,b.volume.id));
 		var result:ToolingSectionReviewResult={records:[],sheets:[],validation:[]};
 		for (item in items) {
@@ -44,6 +51,7 @@ class ToolingSectionReview {
 			for (source in item.ids) if (ids.indexOf(source)<0) ids.push(source);
 			ids.sort(Reflect.compare);
 			var evidence=status==Pass ? [filename(id)+".svg",filename(id)+".dxf"] : [];
+			if (cuttingFiles.exists(id)) evidence.push(cuttingFiles.get(id));
 			var check=materia.tooling.process.FillAnalysis.check(rule,ids,status,message,evidence);
 			result.validation.push(check);
 			result.records.push({id:id,geometryFingerprint:haxe.crypto.Sha256.encode(MoldVolumeCodec.encode(item.volume)),

@@ -192,7 +192,7 @@ class ProcessTests {
 
 		var region = [box(0, 0, 2, 10), box(2, 0, 2, 2), box(4, 0, 4, 6)];
 		var boundaries = [{id: "ceiling-feature", box: box(4, 6, 4, 4)}];
-		var cores = [{id: "foam", boxes: [box(10, 1, 2, 3)]}];
+		var cores = [{id: "foam", geometry: materia.tooling.casting.MoldRegions.box(box(10, 1, 2, 3))}];
 		function fill(cells:Array<MoldBox>, ?extra:Array<Float>):FillReport
 			return FillAnalysis.analyze("body", "source", "process", cells, boundaries, cores, 10, 2400, 10, 2, null, extra);
 		var trapped = fill(region);
@@ -307,7 +307,8 @@ class ProcessTests {
 		var combinedCeiling = FillAnalysis.analyze("body", "s", "p", ceilingFragments, [], [], 10, 2400, 10, null, 2.5);
 		check(combinedCeiling.validation.filter(v -> v.rule == "process.fill.air-escape-width" && v.status == "fail").length == 1,
 			"artificial cell fragments cannot make a wide connected ceiling pass");
-		var overlapCore = FillAnalysis.analyze("body", "s", "p", region, boundaries, [{id: "overlap", boxes: [box(10, 1, 2, 3), box(10, 2, 2, 2)]}], 10, 2400,
+		var overlapCore = FillAnalysis.analyze("body", "s", "p", region, boundaries, [{id: "overlap", geometry: materia.casting.CastingRegion.Union([
+			materia.tooling.casting.MoldRegions.box(box(10, 1, 2, 3)),materia.tooling.casting.MoldRegions.box(box(10, 2, 2, 2))])}], 10, 2400,
 			10, null, null);
 		near(overlapCore.levels[overlapCore.levels.length - 1].cores[0].submergedVolumeMm3, 12, 1e-10, "overlapping core displacement counted once");
 		var s = spec(), encoded = ProcessSpecCodec.encode(s);

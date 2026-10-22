@@ -67,7 +67,7 @@ class CastingProcessAnalysis {
 		];
 		var fillSettings:FillSourceSettings = {
 			sourceFingerprint: sourceFingerprint, processFingerprint: fingerprint,
-			cores: [for (c in p.cores) {id: c.id, boxes: [c.cavity]}], densityKgM3: p.document.recipe.mixDensityKgM3,
+			cores: [for (c in p.cores) {id: c.id, geometry: c.cavity}], densityKgM3: p.document.recipe.mixDensityKgM3,
 			gravityMps2: gravityMps2, pourRateMm3PerSecond: spec.pourRateMm3PerSecond,
 			maximumAirEscapeWidthMm: spec.maximumAirEscapeWidthMm, extraLevels: [], fillObstructions: projection.blockers, panels: panels
 		};

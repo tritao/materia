@@ -36,6 +36,57 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 		return result;
 	}
 
+	public function section(region:CastingRegion,plane:materia.assembly.AssemblyRecord.AssemblyFrame,
+			affectedId:String):Array<materia.casting.CastingSection.CastingSectionContour> {
+		var source=machinekit.structural.CastingRegionCad.part(region);
+		try {
+			var result=CastingSectionContours.section(source,plane,affectedId);
+			source.close();return result;
+		} catch (error:Dynamic) {source.close();throw error;}
+	}
+
+	public function prismaticSection(region:CastingRegion,direction:{x:Float,y:Float,z:Float},
+			toleranceMm3:Float,affectedId:String):Null<materia.casting.CastingSection.CastingPrismSection> {
+		if (!Math.isFinite(toleranceMm3) || toleranceMm3<0) throw "Invalid prism tolerance: "+affectedId;
+		var frame=CastingSectionContours.normalFrame(direction,affectedId),scope=new Scope();
+		try {
+			var source=scope.own(machinekit.structural.CastingRegionCad.part(region));
+			if (source.isEmpty()) {scope.close();return null;}
+			var local=scope.own(machinekit.assembly.PosedParts.moved(source,F.inverse(frame)));
+			var geometry=new CastingFillGeometry(affectedId,local),interval:Array<Float>;
+			try interval=geometry.heightInterval() catch (error:Dynamic) {geometry.close();throw error;}
+			geometry.close();
+			var depth=interval[1]-interval[0];
+			if (depth<=0) {scope.close();return null;}
+			var contours:Array<materia.casting.CastingSection.CastingSectionContour>;
+			try contours=CastingSectionContours.section(local,F.translation(0,0,(interval[0]+interval[1])/2),affectedId)
+			catch (error:Dynamic) {
+				var message=Std.string(error);
+				if (message.indexOf("Unsupported section curve")<0 && message.indexOf("Ambiguous section junction")<0) throw error;
+				scope.close();return null;
+			}
+			if (contours.length==0) {scope.close();return null;}
+			var pose=F.compose(frame,F.translation(0,0,interval[0]));
+			function prism(contour:Array<materia.casting.CastingProfile.CastingSegment>):CastingRegion
+				return CastingRegion.Placed({solid:Prism(contour,depth),pose:pose});
+			var pieces:Array<CastingRegion> =[];
+			for (outer in contours) if (outer.depth%2==0) {
+				var holes:Array<CastingRegion> =[];
+				for (hole in contours) if (hole.depth==outer.depth+1
+					&& materia.casting.CastingProfileGeometry.inside(outer.contour,hole.contour[0].start.x,hole.contour[0].start.y))
+					holes.push(prism(hole.contour));
+				pieces.push(CastingRegion.Difference(prism(outer.contour),holes));
+			}
+			var candidate=scope.own(machinekit.structural.CastingRegionCad.part(CastingRegion.Union(pieces)));
+			var missing=scope.own(source.subtractAll([candidate])),excess=scope.own(candidate.subtractAll([source]));
+			var difference=missing.volume()+excess.volume();
+			if (!Math.isFinite(difference)) throw "Nonfinite prism difference: "+affectedId;
+			var result:materia.casting.CastingSection.CastingPrismSection={pose:pose,depth:depth,contours:contours};
+			scope.close();
+			return difference<=toleranceMm3 ? result : null;
+		} catch (error:Dynamic) {scope.close();throw error;}
+	}
+
 	static function copy(value:CastingRegionMoments):CastingRegionMoments
 		return {volumeMm3:value.volumeMm3,firstMomentMm4:{x:value.firstMomentMm4.x,y:value.firstMomentMm4.y,z:value.firstMomentMm4.z}};
 

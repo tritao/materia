@@ -111,13 +111,12 @@ class BoxMoldCad {
 			a.addComponent(m.panel.id, ToolingPanel.fromPlan(m.panel), pose);
 		}
 		for (c in p.cores) {
-			var block = c.cutting.block,
-				pose = F.compose(F.identity(), c.cutting.stockToMold);
+			var pose = F.compose(F.identity(), c.cutting.stockToMold);
 			var foot = c.support.foot;
 			if (foot != null) {
-				var fb = foot.cutting.block,
-					fp = F.compose(F.identity(), foot.cutting.stockToMold);
-				a.addComponent(materia.tooling.ToolingIds.derive("", c.id, "-foot"), ToolingBlock.fromBox(fb, "EPS tooling"), fp);
+				var fp = F.compose(F.identity(), foot.cutting.stockToMold);
+				var id = materia.tooling.ToolingIds.derive("", c.id, "-foot");
+				a.addComponent(id, ToolingVolume.fromCoreCutting(id, foot.cutting), fp);
 			}
 			for (h in c.support.hardware) {
 				if (h.kind == SupportHardwareKind.LocatingPin) {
@@ -126,7 +125,7 @@ class BoxMoldCad {
 					ToolingHardwareCad.throughBolt(a, h.id, h.diameter, h.length, h.pose);
 				}
 			}
-			a.addComponent(c.id, ToolingBlock.fromBox(block, "EPS tooling"), pose);
+			a.addComponent(c.id, ToolingVolume.fromCoreCutting(c.id, c.cutting), pose);
 		}
 		var i = p.document.input.inserts[0],
 			pose = F.compose(p.document.setup.sourceToMold, i.pose);

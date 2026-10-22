@@ -381,8 +381,8 @@ class ToolingFabricationExport {
 			]
 		];
 		for (c in p.cores)
-			for (index in 0...c.foamLayers.length) {
-				var b = c.foamLayers[index];
+			for (index in 0...c.layers.length) {
+				var b = c.layers[index].block;
 				coreRows.push([
 					c.id,
 					c.featureId,
@@ -395,6 +395,9 @@ class ToolingFabricationExport {
 					"per-casting"
 				]);
 			}
+		for (core in p.cores) for (index in 0...core.layers.length)
+			data(dir,materia.tooling.casting.MoldCores.layerId(core,index)+".cutting.json",
+				materia.tooling.casting.MoldCores.cuttingRecord(core,index));
 		text(dir, "eps-layers.csv", ToolingFabrication.csv(coreRows));
 		var volumeRows = [
 			[

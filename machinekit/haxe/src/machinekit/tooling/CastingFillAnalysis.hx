@@ -65,9 +65,9 @@ class CastingFillAnalysis {
 					blockers.push({id:member.id,part:world});
 			}
 			// Gross displacement is the finished, lined/glued core, not the foam
-			// stock pieces with their fabrication gaps. These cavities are exact
-			// boxes in the current planner, rather than bounding approximations.
-			for (core in plan.cores) cores.push({id:core.id,part:own(resources,ToolingBlock.placedBox(core.cavity))});
+			// stock pieces with their fabrication gaps. The authoritative cavity
+			// region remains exact for box and non-box geometry alike.
+			for (core in plan.cores) cores.push({id:core.id,part:own(resources,machinekit.structural.CastingRegionCad.part(core.cavity))});
 			var report=analyze(plan.document.input.id,source,plan.document.setup.fillHeightMm,settings,boundaries,blockers,cores);
 			for (resource in resources) resource.close();
 			return {report:report,validation:report.validation.copy()};
@@ -159,8 +159,7 @@ class CastingFillAnalysis {
 			var fluidGeometry=new CastingFillGeometry(sourceId,fluid);geometries.push(fluidGeometry);
 			var actualCores=coreParts==null ? [] : coreParts.copy();
 			if (coreParts==null) for (core in settings.cores) {
-				var pieces=[for (box in core.boxes) own(resources,ToolingBlock.placedBox(box))];
-				actualCores.push({id:core.id,part:own(resources,Part.fuseAll(pieces))});
+				actualCores.push({id:core.id,part:own(resources,machinekit.structural.CastingRegionCad.part(core.geometry))});
 			}
 			actualCores.sort((a,b) -> Reflect.compare(a.id,b.id));
 			var coreGeometries:Array<{id:String,geometry:CastingFillGeometry}> = [];

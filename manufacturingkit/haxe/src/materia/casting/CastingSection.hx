@@ -14,3 +14,10 @@ typedef CastingSection = {
 	var plane:AssemblyFrame;
 	var contours:Array<CastingSectionContour>;
 }
+
+/** Whole-solid prism proven by the geometry backend, including holes/islands. */
+typedef CastingPrismSection = {
+	var pose:AssemblyFrame;
+	var depth:Float;
+	var contours:Array<CastingSectionContour>;
+}

@@ -53,13 +53,9 @@ class CastingMoldPlanner {
 	}
 
 	public static function featureBox(d:ToolingDocument, f:materia.casting.CastingFeature):MoldBox {
-		var cavities = materia.casting.CastingCavities.derive(d.input.envelope, d.input.features);
-		var cavity = cavities.filter(c -> c.featureId == f.id)[0];
-		var boxes = materia.casting.CastingCavities.boxes(cavity);
-		if (boxes.length != 1) throw "Unsupported non-box finished cavity: " + f.id;
-		var box = boxes[0];
-		return BoxMoldPlanner.box(box.width, box.depth, box.height,
-			F.compose(d.setup.sourceToMold, F.translation(box.x + box.width / 2, box.y + box.depth / 2, box.z)));
+		var boxes=MoldRegions.boxes(MoldRegions.feature(d,f.id));
+		if (boxes==null || boxes.length!=1) throw "Unsupported non-box finished cavity: "+f.id;
+		return boxes[0];
 	}
 
 	public static function assess(document:ToolingDocument, authored:CastingMoldOptions):CastingMoldAssessment {
@@ -69,12 +65,12 @@ class CastingMoldPlanner {
 		// can be panelled. Exact hardware is realized and checked by the CAD bridge.
 		var unsupported = checks.filter(check -> StringTools.startsWith(check.rule,"tooling.feature.box-geometry")
 			&& check.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported);
-		var regionFormers=unsupported.length>0 && canPlanRegionFormers(d);
-		if (regionFormers) {
+		var regionTooling=unsupported.length>0 && canPlanRegions(d);
+		if (regionTooling) {
 			checks=checks.filter(check -> unsupported.indexOf(check)<0);
 			checks.push(materia.tooling.process.FillAnalysis.check("tooling.feature.box-geometry",
 				[for (feature in d.input.features) feature.id],Pass,
-				"Rectangular panel shell with exact source-region formers and registered CAD geometry.",[]));
+				"Rectangular panel shell with exact source-region tooling and registered CAD geometry.",[]));
 			unsupported=[];
 		}
 		if (unsupported.length > 0) {
@@ -103,7 +99,7 @@ class CastingMoldPlanner {
 		return cast assessment.plan;
 	}
 
-	static function canPlanRegionFormers(d:ToolingDocument):Bool {
+	static function canPlanRegions(d:ToolingDocument):Bool {
 		if (geometry==null) return false;
 		var strategies=CastingStrategies.resolve(d);
 		try envelope(d) catch (error:Dynamic) {
@@ -123,7 +119,10 @@ class CastingMoldPlanner {
 			var region=MoldRegions.feature(d,feature.id);
 			if (MoldRegions.boxes(region)==null) {
 				var selected=strategies.filter(strategy -> strategy.featureId==feature.id);
-				if (selected.length!=1 || selected[0].strategy!=CoreStrategy.ReusableFormer
+				if (selected.length!=1) return false;
+				if (selected[0].strategy==CoreStrategy.SacrificialEPS) {
+					if (!MoldCoreLayers.supported(region,feature.id)) return false;
+				} else if (selected[0].strategy!=CoreStrategy.ReusableFormer
 					|| selected[0].withdrawal==null || !MoldFormerAccess.supported(d,feature,selected[0].withdrawal)) return false;
 			}
 		}
@@ -202,7 +201,7 @@ class CastingMoldPlanner {
 		for (former in result.formers)
 			if (former.featureIds.length == 0 && former.draftDegrees == 0)
 				request(result, "draft-" + former.volume.id, ReleaseAlternative, [former.volume.id],
-					"Bed-backing zero-draft rigid former needs a source/release change; drafted and split formers are unsupported.",
+					"Bed-backing zero-draft rigid former needs a source/setup or supported sacrificial-tooling change; draft on a different feature does not qualify this part.",
 					"tooling.former.draft." + former.volume.id);
 		var handlingQualified=CastHandling.qualified(d,o,result.handling);
 		if (result.handling.requiresFlip && !CastHandling.sourceDeclared(d) && !handlingQualified)
@@ -286,6 +285,7 @@ class CastingMoldPlanner {
 		};
 		var result=seed(d,o,e,b,geometryChecks),panels=result.panels,bed=panels.members[0];
 		var epsBoxes:Array<MoldBox> = [], insertBoxes:Array<MoldBox> = [];
+		var epsRegions:Array<materia.casting.CastingRegion> = [];
 		for (i in d.input.inserts) {
 			var ib = bodies.get(i.id);
 			if (ib == null)
@@ -296,6 +296,21 @@ class CastingMoldPlanner {
 			if (f.kind != CastingFeatureKind.InsertRecess) {
 				var s = strategies.filter(s -> s.featureId == f.id)[0];
 				if (s.strategy == CoreStrategy.SacrificialEPS) {
+					var cavity=MoldRegions.feature(d,f.id),boxes=MoldRegions.boxes(cavity);
+					if (boxes==null || boxes.length!=1) {
+						var bounds=MoldCores.stockBounds(cavity,f.id);
+						if (Math.abs(bounds.z+bounds.height-b.z-b.height)>1e-7 || bounds.x<=e.x
+							|| bounds.x+bounds.width>=e.x+e.width || bounds.y<=e.y || bounds.y+bounds.depth>=e.y+e.depth)
+							throw "Shared bridge needs internal fill-open EPS pocket: "+f.id;
+						for (reserved in [for (box in insertBoxes) MoldRegions.box(box)].concat(epsRegions))
+							if (MoldRegions.overlaps(cavity,reserved,1e-7,f.id))
+								throw "Intersecting EPS/insert cavities need an explicit allocation: "+f.id;
+						var cores=MoldCoreLayers.build(cavity,f.id,r);
+						for (core in cores) result.cores.push(core);
+						result.features.push({featureId:f.id,kind:EPSFeature,memberIds:[for (core in cores) core.id]});
+						epsRegions.push(cavity);
+						continue;
+					}
 					var cb=featureBox(d,f);
 					if (Math.abs(cb.z + cb.height - b.z - b.height) > 1e-7
 						|| cb.x <= e.x
@@ -337,8 +352,9 @@ class CastingMoldPlanner {
 					result.cores.push({
 						id: id,
 						featureId: f.id,
-						cavity: cb,
-						foamLayers: layers,
+						cavity: MoldRegions.box(cb),
+						foamEnvelope: MoldRegions.box(foam),
+						layers: [for (layer in layers) CoreSupports.cutting(layer,r.coreWireAxis)],
 						coveringThickness: cover,
 						adhesiveThickness: g,
 						carrierId: materia.tooling.ToolingIds.derive("", id, "-carrier"),
@@ -348,10 +364,11 @@ class CastingMoldPlanner {
 					});
 					result.features.push({featureId: f.id, kind: EPSFeature, memberIds: [id]});
 					epsBoxes.push(cb);
+					epsRegions.push(cavity);
 				} else if (s.strategy == CoreStrategy.Unsupported) {
 					result.features.push({featureId: f.id, kind: UnsupportedFeature, memberIds: []});
 					request(result, "unsupported-" + f.id, ReleaseAlternative, [f.id],
-						"This planner supports only orthogonal zero-draft rigid formers or fill-open EPS. Drafted/split formers are unsupported; choose supported EPS or revise the source to a supported geometry.",
+						"No supported tooling route is declared for this feature. Select an available exact source-region former or supported ruled EPS, or revise the source.",
 						"tooling.feature.unsupported." + f.id, true);
 				}
 			}
@@ -490,6 +507,7 @@ class CastingMoldPlanner {
 				fixtures.push(p);
 		var occupied = insertBoxes.concat(epsBoxes).concat(fixtures),
 			previous:Array<MoldBox> = [];
+		var occupiedRegions=[for (box in insertBoxes.concat(fixtures)) MoldRegions.box(box)].concat(epsRegions);
 		var backing = BoxAlgebra.subtract([b], [e].concat(occupied));
 		for (group in BoxAlgebra.groups(backing)) {
 			var id = "bed-backing-" + result.formers.length;
@@ -529,13 +547,13 @@ class CastingMoldPlanner {
 					if (s.withdrawal==null || !MoldFormerAccess.supported(d,f,s.withdrawal))
 						throw "Non-box former needs a supported withdrawal: "+f.id;
 					var allocated=materia.casting.CastingRegion.Difference(sourceRegion,
-						[for (box in occupied) MoldRegions.box(box)].concat(previousRegions));
+						occupiedRegions.concat(previousRegions));
 					var ids:Array<String> =[],blank=sourceRegion;
 					if (MoldRegions.volume(allocated,f.id)>1e-7) {
 						var id=materia.tooling.ToolingIds.derive("former-",f.id,"-0");
 						var volume:MoldVolume={id:id,material:FormerStock,pieces:[],profiles:[],cuts:[],regions:[allocated]};
 						var extension=MoldFormerAccess.add(result,f,s.withdrawal,volume,
-							[for (piece in occupied) MoldRegions.box(piece)].concat(previousRegions));
+							occupiedRegions.concat(previousRegions));
 						blank=materia.casting.CastingRegion.Union([sourceRegion].concat(extension));
 						claim(f.id,s.priority,blank);
 						result.formers.push({volume:volume,featureIds:[f.id],withdrawal:s.withdrawal,draftDegrees:f.draft.degrees});
@@ -586,7 +604,7 @@ class CastingMoldPlanner {
 						contour: op.contour,
 						pose: wall.pose,
 						depth: t,
-						subtract: [for (piece in occupied.concat(previous)) MoldRegions.box(piece)]
+						subtract: occupiedRegions.concat([for (piece in previous) MoldRegions.box(piece)])
 					});
 					wall.panel.operations.push(op);
 					wall.panel.contactOpenings = [for (id in wall.panel.contactOpenings) id].concat([op.id]);
@@ -608,7 +626,7 @@ class CastingMoldPlanner {
 					throw "Access former needs an explicit split for its sealing profile: " + f.id;
 				for (index in 0...groups.length) {
 					var remaining=exactRegions ? materia.casting.CastingRegion.Difference(
-						materia.casting.CastingRegion.Union([for (piece in groups[index]) MoldRegions.box(piece)]),previousRegions.copy()) : null;
+						materia.casting.CastingRegion.Union([for (piece in groups[index]) MoldRegions.box(piece)]),epsRegions.concat(previousRegions)) : null;
 					if (remaining!=null && MoldRegions.volume(remaining,f.id)<=1e-7) continue;
 					var id = materia.tooling.ToolingIds.derive("former-", f.id, "-" + index);
 					ids.push(id);
@@ -664,7 +682,7 @@ class CastingMoldPlanner {
 							former.featureIds.push(source.id);
 					}
 				for (core in result.cores)
-					if (MoldRegions.overlaps(MoldRegions.box(core.cavity),cavity,1e-7,source.id))
+					if (MoldRegions.overlaps(core.cavity,cavity,1e-7,source.id))
 						feature.memberIds.push(core.id);
 				for (fixture in result.fixtures)
 					if (fixture.datum.pieces.filter(v -> MoldRegions.overlaps(MoldRegions.box(v),cavity,1e-7,source.id)).length>0)
@@ -779,7 +797,7 @@ class CastingMoldPlanner {
 			member(m.panel.id);
 		for (c in p.cores) {
 			member(c.id);
-			if (c.foamLayers.length == 0 || c.foamLayers.length > 32)
+			if (c.layers.length == 0 || c.layers.length > 32)
 				throw "Invalid EPS layers";
 		}
 		if (ToolingCodec.canonical(p.coreUnits) != ToolingCodec.canonical(coreUnits(p.document.input, p.cores)))

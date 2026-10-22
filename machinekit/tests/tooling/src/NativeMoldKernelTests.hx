@@ -21,6 +21,34 @@ class NativeMoldKernelTests {
 		var empty=kernel.moments(CastingRegion.Difference(block,[block]));
 		check(empty.volumeMm3==0 && empty.firstMomentMm4.x==0 && empty.firstMomentMm4.y==0 && empty.firstMomentMm4.z==0,
 			"empty material has zero moments rather than an invented centroid");
+		var section=kernel.prismaticSection(block,{x:0,y:0,z:1},1e-7,"box-prism");
+		check(section!=null && section.contours.length==1,"whole box is a proven prism, not only a matching middle slice");
+		if (section==null) throw "Missing proven box prism";
+		near(section.depth,40,"prism depth comes from exact material extrema");
+		var ring=CastingRegion.Difference(
+			CastingRegion.Placed({solid:Cut(materia.casting.CastingSolid.Cylinder(40,40)),pose:F.identity()}),
+			[CastingRegion.Placed({solid:Cut(materia.casting.CastingSolid.Cylinder(20,40)),pose:F.identity()})]);
+		var annulus=kernel.prismaticSection(ring,{x:0,y:0,z:1},1e-7,"annular-prism");
+		check(annulus!=null && annulus.contours.length==2 && annulus.contours[1].depth==1,
+			"proven prism retains exact circular holes");
+		var nested=CastingRegion.Union([ring,
+			CastingRegion.Placed({solid:Cut(materia.casting.CastingSolid.Cylinder(10,40)),pose:F.identity()})]);
+		var island=kernel.prismaticSection(nested,{x:0,y:0,z:1},1e-7,"nested-material");
+		check(island!=null && island.contours.length==3 && island.contours[2].depth==2,
+			"whole-solid reconstruction preserves a material island inside a circular hole");
+		var removed=CastingRegion.Placed({solid:Cut(materia.casting.CastingSolid.Box(4,5,10)),pose:F.translation(18,20,35)});
+		var added=CastingRegion.Placed({solid:Cut(materia.casting.CastingSolid.Box(4,5,10)),pose:F.translation(22,20,55)});
+		var deceptive=CastingRegion.Union([CastingRegion.Difference(block,[removed]),added]);
+		near(kernel.moments(deceptive).volumeMm3,24000,"counterexample preserves volume and both end/middle sections");
+		check(kernel.prismaticSection(deceptive,{x:0,y:0,z:1},1e-7,"concealed-step")==null,
+			"full symmetric difference catches material changes outside all three reference sections");
+		var obliquePose=F.fromRotationMatrix(5,7,11,[0,0,1,1,0,0,0,1,0]);
+		var obliquePrism=CastingRegion.Placed({solid:Prism(materia.casting.CastingProfiles.polygon(
+			[{x:0,y:0},{x:20,y:0},{x:0,y:20}]),40),pose:obliquePose});
+		var transverse=kernel.prismaticSection(obliquePrism,{x:1,y:0,z:0},1e-7,"posed-triangle");
+		check(transverse!=null && transverse.contours.length==1,"prism proof follows a placed extrusion axis");
+		if (transverse==null) throw "Missing proven placed prism";
+		near(transverse.depth,40,"placed prism keeps its extrusion length");
 		var document=SinglePocketSetup.document();
 		document.input.inserts=[];
 		document.input.envelope=[{id:"body",profile:[{x:-60.0,y:-50.0},{x:60.0,y:-50.0},{x:60.0,y:50.0},{x:-60.0,y:50.0}],
@@ -32,9 +60,9 @@ class NativeMoldKernelTests {
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
 		document.setup.sourceToMold=F.fromRotationMatrix(5,-7,100,[1,0,0,0,-1,0,0,0,-1]);
 		var offset=60*Math.tan(2*Math.PI/180);
-		var removed=60*(1200-70*offset+4*offset*offset/3);
-		var removedZ=80*removed-3600*(600-140*offset/3+offset*offset);
-		var resin=960000-removed,sourceCenter=(38400000-removedZ)/resin;
+		var removedVolume=60*(1200-70*offset+4*offset*offset/3);
+		var removedZ=80*removedVolume-3600*(600-140*offset/3+offset*offset);
+		var resin=960000-removedVolume,sourceCenter=(38400000-removedZ)/resin;
 		var mass=kernel.castingMass(document);
 		near(mass.massKg,resin*document.recipe.mixDensityKgM3*1e-9,"drafted casting mass uses actual resin material");
 		near(mass.centerOfMassMoldMm.x,5,"casting center follows source-to-mold X placement");
@@ -47,7 +75,7 @@ class NativeMoldKernelTests {
 		materia.tooling.casting.CastingMoldPlanner.setGeometry(kernel);
 		try {
 			var cavity=materia.tooling.casting.MoldRegions.feature(document,"drafted-pocket");
-			near(materia.tooling.casting.MoldRegions.volume(cavity,"drafted-pocket"),removed,
+			near(materia.tooling.casting.MoldRegions.volume(cavity,"drafted-pocket"),removedVolume,
 				"planner region uses the same derived source cavity in mold coordinates");
 			near(kernel.resinIntersection(document,cavity),0,"source cavity contains no resin for datum collision checks");
 			var candidate=materia.tooling.casting.MoldRegions.box({x:45,y:0,z:40,width:5,depth:5,height:20});

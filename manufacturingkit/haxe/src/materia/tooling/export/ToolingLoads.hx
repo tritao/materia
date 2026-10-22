@@ -108,15 +108,16 @@ class ToolingLoads {
 		var demands = new Map<String, LoadEstimate>();
 		var cores = p.cores.copy();
 		cores.sort((a, b) -> Reflect.compare(a.id, b.id));
-		var occupied:Array<materia.tooling.casting.MoldPlan.MoldBox> = [];
+		var occupied:Array<materia.casting.CastingRegion> = [];
 		var coreVolumes = new Map<String, Float>(),
 			coreForces = new Map<String, Float>();
 		for (c in cores) {
-			var volume = BoxAlgebra.volume(BoxAlgebra.subtract([c.cavity], occupied));
+			var volume = materia.tooling.casting.MoldRegions.volume(materia.casting.CastingRegion.Difference(c.cavity,occupied.copy()),c.id);
+			var footprint=materia.tooling.casting.MoldCores.stockBounds(c.cavity,c.id);
 			occupied.push(c.cavity);
 			coreVolumes.set(c.id, volume);
 			coreForces.set(c.id,
-				(p.document.recipe.mixDensityKgM3 * s.gravityMps2 * volume * 1e-9 + extra * c.cavity.width * c.cavity.depth * 1e-6) * s.loadFactor);
+				(p.document.recipe.mixDensityKgM3 * s.gravityMps2 * volume * 1e-9 + extra * footprint.width * footprint.depth * 1e-6) * s.loadFactor);
 		}
 		for (m in p.panels.members.concat(p.supportPanels)) {
 			var b = CastingProfileGeometry.bounds(PanelContours.outside(m.panel));

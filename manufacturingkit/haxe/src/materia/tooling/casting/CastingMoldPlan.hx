@@ -52,8 +52,10 @@ typedef FeatureTooling = {
 typedef CastingMoldCore = {
 	var id:String;
 	var featureId:String;
-	var cavity:MoldBox;
-	var foamLayers:Array<MoldBox>;
+	var cavity:materia.casting.CastingRegion;
+	/** Lined foam envelope, including the declared inter-piece adhesive gaps. */
+	var foamEnvelope:materia.casting.CastingRegion;
+	var layers:Array<materia.tooling.casting.CoreSupport.CoreCutting>;
 	var coveringThickness:Float;
 	var adhesiveThickness:Float;
 	var carrierId:String;

@@ -2196,6 +2196,31 @@ by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
   402 Pending / 123 Unsupported / 74 Fail**, readiness **false**. All **30**
   former/fixture drawing reports pass; each report and its SVG/DXF enter the
   verified manifest. Existing trapped-air failures remain explicit.
+- [x] EPS prism migration is implemented and verified on main. Cutting records retain finished material separately
+  from stock, with all three wire axes; box CAD consumes the actual solid.
+  Box schema **15** rejects **14**; general mold **19** rejects **18**. Core records
+  retain authoritative cavities, lined/glued foam envelopes and stock-coordinate
+  cutting layers. Whole-solid prism proof rejects equal-volume changes hidden
+  from end/middle sections and preserves holes/islands. Focused planning **61**,
+  box/core **161**, native kernel **28**, filled sections **24** and pure tooling
+  **1,903** pass. Registered region tests pass **36** EPS and **34** drafted/side
+  mold assertions: triangular/curved cores, thin-stock tiling, lining/glue,
+  actual carrier footprints and bonds, stock changes, real core-order reversal,
+  intersecting former ownership, exact reconstruction/coverage and both graphs.
+  EPS SVG/DXF and cutting records are rebuilt from the source during manifest
+  verification; changed or unlisted definitions are rejected. Native fill uses
+  the analytic **192,000 mm3** gross triangular cavity; orthogonal sections stay
+  Unsupported. Main regressions pass foundation **463**, tooling **1,903**,
+  native **700**, casting **54**, design **32**, CamKit **12,386**, CAD **60**
+  (all five symmetric differences zero), geometry **104**, kernel **28**, region
+  **36 + 34**, sections **24**, drawing/package **70**, mill **313**, rails
+  **116**, lifting **457**, sockets **110** and production mold **672**. All
+  four CadKit CTest suites pass; the box package regenerates. The triangular
+  EPS layer SVG was visually checked and retains actual profiles instead of
+  rectangular stock. Regenerated mill records kit: **265** independently
+  hash-verified artifacts, **40** programs, **5,154,775** bytes;
+  **889 Pass / 402 Pending / 123 Unsupported / 74 Fail**, readiness **false**.
+  Existing trapped-air failures and physical evidence requirements remain explicit.
 - [ ] Non-box EPS/envelope support and former CAM remain unfinished. These
   slices do not complete step 3.
 - [x] Draft source convention confirmed: authored dimensions belong to the

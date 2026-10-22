@@ -90,6 +90,7 @@ class CoreSupports {
 				throw "Invalid core wire axis";
 		};
 		return {
+			solid: MoldRegions.box({x: 0, y: 0, z: 0, width: b.width, depth: b.depth, height: b.height}),
 			block: {
 				x: 0,
 				y: 0,
@@ -117,6 +118,38 @@ class CoreSupports {
 				normal: {x: v.x, y: v.y, z: v.z}
 			}
 		};
+	}
+
+	/** A line/arc prism is ruled exactly along its extrusion. Orient that axis
+	 * onto the declared stock wire axis; bounds describe only the blank. The
+	 * caller selects stock and layers, without applying kerf compensation.
+	 */
+	public static function prismCutting(profile:Array<materia.casting.CastingProfile.CastingSegment>,depth:Float,
+			coreToMold:materia.assembly.AssemblyRecord.AssemblyFrame,axis:materia.tooling.ToolingRecipe.CoreWireAxis)
+			:materia.tooling.casting.CoreSupport.CoreCutting {
+		if (!Math.isFinite(depth) || depth<=0) throw "Invalid core cutting depth";
+		profile=materia.casting.CastingProfile.CastingProfileCodec.snapshot(profile);
+		coreToMold=materia.casting.CastingRecordCodec.frame(coreToMold);
+		var bounds=materia.casting.CastingProfileGeometry.bounds(profile);
+		var dimensions:Array<Float>,rotation:Array<Float>;
+		switch axis {
+			case X:
+				dimensions=[depth,bounds.width,bounds.height];
+				rotation=[0,1,0,0,0,1,1,0,0];
+			case Y:
+				dimensions=[bounds.height,depth,bounds.width];
+				rotation=[0,0,1,1,0,0,0,1,0];
+			case Z:
+				dimensions=[bounds.width,bounds.height,depth];
+				rotation=[1,0,0,0,1,0,0,0,1];
+			default:throw "Invalid core wire axis";
+		}
+		var stockToCore=F.fromRotationMatrix(bounds.x,bounds.y,0,rotation);
+		var result=cutting({x:0,y:0,z:0,width:dimensions[0],depth:dimensions[1],height:dimensions[2]},axis);
+		result.stockToMold=F.compose(coreToMold,stockToCore);
+		result.solid=materia.casting.CastingRegion.Placed({
+			solid:materia.casting.CastingFeature.CastingGeometrySolid.Prism(profile,depth),pose:F.inverse(stockToCore)});
+		return result;
 	}
 
 	public static function validateCutting(actual:materia.tooling.casting.CoreSupport.CoreCutting, b:MoldBox, r:ToolingRecipe):Void {
@@ -300,7 +333,8 @@ class CoreSupports {
 			pad = r.hardware.padDepth;
 		var rows:Array<Float> = [];
 		for (c in cores) {
-			var y = c.cavity.y + c.cavity.depth / 2;
+			var bounds=MoldCores.stockBounds(c.cavity,c.id);
+			var y = bounds.y + bounds.depth / 2;
 			if (rows.filter(v -> Math.abs(v - y) < 1e-7).length == 0)
 				rows.push(y);
 		}
@@ -335,9 +369,11 @@ class CoreSupports {
 		}
 		for (index in 0...rows.length) {
 			var y = rows[index], width = 0.0;
-			for (core in cores)
-				if (Math.abs(core.cavity.y + core.cavity.depth / 2 - y) < 1e-7)
-					width = Math.max(width, core.cavity.depth / 2);
+			for (core in cores) {
+				var bounds=MoldCores.stockBounds(core.cavity,core.id);
+				if (Math.abs(bounds.y + bounds.depth / 2 - y) < 1e-7)
+					width = Math.max(width,bounds.depth / 2);
+			}
 			if (width < r.hardware.minimumBridgeWidth)
 				throw "Core row cannot provide the minimum bridge width";
 			var id = "core-bridge-" + index,
@@ -371,13 +407,21 @@ class CoreSupports {
 					+ b.height, r);
 			}
 			place(beam, bx, by, b.z + b.height + t);
-			for (c in cores)
-				if (Math.abs(c.cavity.y + c.cavity.depth / 2 - y) < 1e-7) {
+			for (c in cores) {
+				var bounds=MoldCores.stockBounds(c.cavity,c.id);
+				if (Math.abs(bounds.y + bounds.depth / 2 - y) < 1e-7) {
 					c.bridgeId = id;
-					var f = c.foamLayers[0];
-					c.bridgeBondAreaMm2 = f.width * Math.max(0, Math.min(y + width / 2, f.y + f.depth) - Math.max(y - width / 2, f.y));
-					place(PanelJoints.blank(c.carrierId, f.width, f.depth, r.panel, r.routerDiameter, l), f.x, f.y, b.z + b.height);
+					var foam=MoldCores.foam(c),f=MoldCores.stockBounds(c.foamEnvelope,c.id);
+					var contactZ=b.z+b.height-c.adhesiveThickness;
+					c.bondAreaMm2=MoldCores.area(MoldCores.section(foam,contactZ,c.id));
+					// Intersect the actual foam with the beam band, then measure its
+					// exact contact section; a curved pad never gets its blank's area.
+					var band=MoldRegions.box({x:f.x,y:by,z:f.z,width:f.width,depth:width,height:f.height});
+					c.bridgeBondAreaMm2=MoldCores.area(MoldCores.section(
+						materia.casting.CastingRegion.Intersection([foam,band]),contactZ,c.id));
+					panels.push(MoldCores.carrier(c,r,b.z+b.height));
 				}
+			}
 		}
 		for (rail in rails)
 			place(rail.panel, rail.x, rail.y, b.z + b.height);

@@ -9,7 +9,7 @@ import materia.casting.BoxAlgebra;
 import materia.tooling.casting.MoldPlan.MoldBox;
 
 typedef FillBoundary = {var id:String; var box:MoldBox;}
-typedef FillCore = {var id:String; var boxes:Array<MoldBox>;}
+typedef FillCore = {var id:String; var geometry:materia.casting.CastingRegion;}
 typedef FillPanel = {var id:String; var bottomMm:Float;}
 typedef FillCeiling = {var sourceIds:Array<String>; var box:MoldBox;}
 
@@ -110,6 +110,9 @@ typedef FillAssessment = {var report:Null<FillReport>; var validation:Array<Tool
  * Positive-area faces connect cells; edge/point contacts never vent a pocket.
  */
 class FillAnalysis {
+	public static function coreBoxes(core:FillCore):Array<MoldBox>
+		return materia.tooling.casting.MoldCores.boxes(core.geometry,core.id);
+
 	public static function sourceSupport(input:materia.tooling.casting.CastingToolingInput):Array<ToolingValidation>
 		return materia.tooling.casting.CastingBoxSupport.check(input, "process.fill.geometry");
 	public static function assessSource(document:materia.tooling.ToolingDocument, settings:FillSourceSettings):FillAssessment
@@ -250,7 +253,7 @@ class FillAnalysis {
 		for (boundary in boundaries)
 			geometry.push(boundary.box);
 		for (core in cores)
-			for (box in core.boxes)
+			for (box in coreBoxes(core))
 				geometry.push(box);
 		for (b in geometry) {
 			for (n in [b.x, b.y, b.z, b.width, b.depth, b.height])
@@ -400,7 +403,7 @@ class FillAnalysis {
 		// Additional output levels never participate in pocket detection or IDs.
 		var outputLevels = critical.copy();
 		for (c in cores)
-			for (b in c.boxes) {
+			for (b in coreBoxes(c)) {
 				outputLevels.push(b.z);
 				outputLevels.push(b.z + b.height);
 			}
@@ -441,7 +444,7 @@ class FillAnalysis {
 					],
 					cores: [
 						for (c in cores) {
-							var displacement = submerged(BoxAlgebra.subtract(sorted(c.boxes), []), h);
+							var displacement = submerged(BoxAlgebra.subtract(sorted(coreBoxes(c)), []), h);
 							{id: c.id, submergedVolumeMm3: displacement, grossUpliftN: displacement * densityKgM3 * gravityMps2 * 1e-9};
 						}
 					]

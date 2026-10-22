@@ -68,40 +68,14 @@ class CastingMoldExport {
 			step(dir + "/" + m.panel.id + ".step", part);
 		}
 		for (c in p.cores)
-			for (index in 0...c.foamLayers.length) {
-				var b = c.foamLayers[index],
-					id = materia.tooling.ToolingIds.derive("", c.id, "-layer-" + index),
-					cutting = CoreSupports.cutting(b, p.document.recipe.coreWireAxis);
-				data(dir + "/" + id + ".cutting.json", {
-					featureId: c.featureId,
-					coreId: c.id,
-					cutting: cutting,
-					adhesiveThickness: c.adhesiveThickness,
-					coveringThickness: c.coveringThickness
-				});
-				var local = cutting.block, part = ToolingVolume.geometryOf({
-					id: id,
-					material: EPSStock,
-					cuts: [],
-					regions: [],
-					profiles: [],
-					pieces: [local]
-				});
+			for (index in 0...c.layers.length) {
+				var cutting = c.layers[index],id = materia.tooling.casting.MoldCores.layerId(c,index);
+				data(dir + "/" + id + ".cutting.json",materia.tooling.casting.MoldCores.cuttingRecord(c,index));
+				var part = ToolingVolume.fromCoreCutting(id,cutting).geometry();
 				step(dir + "/" + id + ".step", part);
 
-				var direction = cutting.wireDirection;
-				var profileWidth = direction.x > 0.5 ? b.depth : b.width;
-				var profileHeight = direction.z > 0.5 ? b.depth : b.height;
-				var span = direction.x > 0.5 ? b.width : direction.y > 0.5 ? b.depth : b.height;
-				var axis = direction.x > 0.5 ? "+X" : direction.y > 0.5 ? "+Y" : "+Z";
-				var drawing = new Drawing2D([
-					Curve(Outline, Segment.line(new Point2(0, 0), new Point2(profileWidth, 0))),
-					Curve(Outline, Segment.line(new Point2(profileWidth, 0), new Point2(profileWidth, profileHeight))),
-					Curve(Outline, Segment.line(new Point2(profileWidth, profileHeight), new Point2(0, profileHeight))),
-					Curve(Outline, Segment.line(new Point2(0, profileHeight), new Point2(0, 0))),
-					Label(Text, new Point2(0, profileHeight + 8), 3, id + " wire " + axis + "; span " + span + " mm; no kerf compensation"),
-					Label(Text, new Point2(0, -8), 3, "REVIEW ONLY: EPS grade and adhesive unqualified")
-				]);
+				var volume=ToolingVolume.fromCoreCutting(id,cutting).volume;
+				var drawing=ToolingSectionDrawing.byDirection(volume,cutting.wireDirection).drawing;
 				text(dir + "/" + id + ".svg", Svg.write(drawing));
 				text(dir + "/" + id + ".dxf", Dxf.write(drawing));
 			}
@@ -127,7 +101,7 @@ class CastingMoldExport {
 		scene(dir, "mold", assembled, p, review);
 		var coreList = [
 			for (c in p.cores)
-				c.id + ": " + c.foamLayers.length + " layers, carrier " + c.carrierId + ", shared " + c.bridgeId
+				c.id + ": " + c.layers.length + " layers, carrier " + c.carrierId + ", shared " + c.bridgeId
 		];
 		text(dir
 			+ "/procedure.md",

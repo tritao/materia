@@ -131,7 +131,7 @@ class CastingMoldCad {
 		var pieces:Array<Part> = [box(p.cavity)];
 		return Solids.building(pieces, parts -> {
 			for (c in p.cores)
-				parts.push(box(c.cavity));
+				parts.push(machinekit.structural.CastingRegionCad.part(c.cavity));
 			for (f in p.formers)
 				parts.push(ToolingVolume.geometryOf(f.volume));
 			// Fixture receivers are enclosed by the bed and sealed insert faces.
@@ -299,9 +299,9 @@ class CastingMoldCad {
 				id: c.id,
 				material: EPSStock,
 				cuts: [],
-				regions: [],
+				regions: [materia.tooling.casting.MoldCores.foam(c)],
 				profiles: [],
-				pieces: c.foamLayers
+				pieces: []
 			}), pose);
 		}
 		for (f in p.formers) {
@@ -553,7 +553,7 @@ class CastingMoldCad {
 				});
 			}
 			for (c in p.cores) {
-				var shape = box(c.cavity);
+				var shape = machinekit.structural.CastingRegionCad.part(c.cavity);
 				parts.push(shape);
 				members.push({id: c.id, part: shape, direction: new Vector(0, 0, 1)});
 			}

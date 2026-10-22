@@ -118,7 +118,7 @@ class FabricationTests {
 			"fabrication cannot invent an assessed cure peak without a CureReport");
 		var core = p.cores[0],
 			load = f.loads.estimates.filter(v -> v.id == core.id)[0];
-		var expected = core.cavity.width * core.cavity.depth * core.cavity.height * 1e-9 * p.document.recipe.mixDensityKgM3 * s.gravityMps2 * s.loadFactor;
+		var expected = materia.tooling.casting.MoldRegions.volume(core.cavity,core.id) * 1e-9 * p.document.recipe.mixDensityKgM3 * s.gravityMps2 * s.loadFactor;
 		check(Math.abs(load.forceN - expected) < 1e-7, "core gross buoyancy uses actual displaced volume and recipe density");
 		s = spec();
 		s.coreRestraints = [

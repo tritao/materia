@@ -127,8 +127,8 @@ class InsertAnchorTests {
 		// This synthetic bridge fits the 80 mm pocket; the library minimum is not weakened.
 		layeredDocument.recipe.hardware.minimumBridgeWidth=40;
 		var layered=materia.tooling.casting.CastingMoldPlanner.plan(layeredDocument,options),core=layered.cores[0];
-		check(core.foamLayers.length>1 && materia.casting.BoxAlgebra.volume(core.foamLayers)
-			< materia.casting.BoxAlgebra.volume([core.cavity]),"uplift fixture really has lined and glued stock layers");
+		check(core.layers.length>1 && materia.tooling.casting.MoldRegions.volume(materia.tooling.casting.MoldCores.foam(core),core.id)
+			< materia.tooling.casting.MoldRegions.volume(core.cavity,core.id),"uplift fixture really has lined and glued stock layers");
 		var layeredSettings:materia.tooling.process.FillAnalysis.FillSourceSettings={
 			sourceFingerprint:materia.tooling.casting.CastingMoldCodec.fingerprint(layered),processFingerprint:"layered-core",
 			cores:[],densityKgM3:2400,gravityMps2:9.80665,pourRateMm3PerSecond:null,maximumAirEscapeWidthMm:null,
@@ -137,7 +137,7 @@ class InsertAnchorTests {
 		check(layeredFill!=null,"layered core fill has an exact native report");
 		var layeredReport:materia.tooling.process.FillAnalysis.FillReport=cast layeredFill;
 		var finalLevel=layeredReport.levels[layeredReport.levels.length-1],coreLift=finalLevel.cores.filter(row -> row.id==core.id)[0];
-		check(Math.abs(coreLift.submergedVolumeMm3-materia.casting.BoxAlgebra.volume([core.cavity]))<1e-5,
+		check(Math.abs(coreLift.submergedVolumeMm3-materia.tooling.casting.MoldRegions.volume(core.cavity,core.id))<1e-5,
 			"native gross uplift includes lining and adhesive instead of only the separated foam stock");
 		var restored=machinekit.assembly.MachineAssembly.decode(foundation.encode());
 		check(restored.billOfMaterials().quantity(anchors[0].screw.partNumber)==2,"source assembly round trip preserves actual anchor hardware");

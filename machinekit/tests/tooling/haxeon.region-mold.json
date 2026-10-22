@@ -6,7 +6,8 @@
   "entry": "RegionMoldPlannerTests",
   "sourceRoots": [
     "src",
-    "../../examples/box-mold"
+    "../../examples/box-mold",
+    "../../../manufacturingkit/tests/tooling/src"
   ],
   "dependencies": {
     "machinekit": {
@@ -17,6 +18,7 @@
   "outputDir": "build/region-mold",
   "sources": [
     "src/RegionMoldPlannerTests.hx",
-    "../../examples/box-mold/SinglePocketSetup.hx"
+    "../../examples/box-mold/SinglePocketSetup.hx",
+    "src/RegionCorePlannerTests.hx"
   ]
 }

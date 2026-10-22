@@ -137,11 +137,12 @@ class MillMoldChecks {
 		equivalent(frame, p);
 		junctionGeometry(frame, p);
 		for (c in p.cores) {
-			check(c.foamLayers.length == 2, "EPS layers fit 100 mm stock");
-			var first = c.foamLayers[0],
-				last = c.foamLayers[c.foamLayers.length - 1];
-			check(Math.abs(last.z + last.height + c.adhesiveThickness - c.cavity.z - c.cavity.height) < 1e-7, "glue line included in foam height");
-			check(Math.abs(c.foamLayers[1].z - first.z - first.height - c.adhesiveThickness) < 1e-7, "interlayer glue line included");
+			check(c.layers.length == 2, "EPS layers fit 100 mm stock");
+			var first = materia.tooling.casting.MoldCores.singleBox(materia.tooling.casting.MoldCores.layerRegion(c.layers[0]),c.id);
+			var last = materia.tooling.casting.MoldCores.singleBox(materia.tooling.casting.MoldCores.layerRegion(c.layers[c.layers.length-1]),c.id);
+			var cavity = materia.tooling.casting.MoldCores.singleBox(c.cavity,c.id);
+			check(Math.abs(last.z + last.height + c.adhesiveThickness - cavity.z - cavity.height) < 1e-7, "glue line included in foam height");
+			check(Math.abs(last.z - first.z - first.height - c.adhesiveThickness) < 1e-7, "interlayer glue line included");
 		}
 		for (f in p.formers) {
 			var solid = ToolingVolume.geometryOf(f.volume);
@@ -252,7 +253,9 @@ class MillMoldChecks {
 		restored.openings.pop();
 		rejects(() -> CastingMoldPlanner.validate(restored), "unclassified contact opening");
 		restored = CastingMoldCodec.decode(encoded);
-		restored.cores[0].cavity.height -= 2;
+		var smaller=materia.tooling.casting.MoldCores.singleBox(restored.cores[0].cavity,restored.cores[0].id);
+		smaller.height -= 2;
+		restored.cores[0].cavity=materia.tooling.casting.MoldRegions.box(smaller);
 		rejects(() -> CastingMoldCad.review(restored), "missing pocket geometry");
 		restored = CastingMoldCodec.decode(encoded);
 		restored.fixtures[0].datum.pieces[0].z += 30;

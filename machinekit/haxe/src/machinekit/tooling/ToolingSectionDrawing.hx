@@ -6,7 +6,6 @@ import cadkit.drawing.DrawingLayer;
 import cadkit.sheetmetal.Point2;
 import cadkit.modeling.Scope;
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.casting.CastingProfiles;
@@ -38,11 +37,7 @@ class ToolingSectionDrawing {
 	 * not bounding-box faces, determine the end sections.
 	 */
 	public static function byDirection(volume:MoldVolume,direction:{x:Float,y:Float,z:Float}):ToolingSectionSheet {
-		var z=new Vector(direction.x,direction.y,direction.z);
-		if (!Math.isFinite(z.length()) || Math.abs(z.length()-1)>1e-7) throw "Invalid drawing direction: "+volume.id;
-		var reference=Math.abs(z.z)<0.9 ? Vector.Z() : Vector.Y();
-		var x=reference.cross(z).normalized(),y=z.cross(x).normalized();
-		var frame=F.fromRotationMatrix(0,0,0,[x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z]);
+		var frame=CastingSectionContours.normalFrame(direction,volume.id);
 		var scope=new Scope();
 		try {
 			var part=scope.own(ToolingVolume.geometryOf(volume));

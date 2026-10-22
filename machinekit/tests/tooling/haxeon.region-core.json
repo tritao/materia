@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-region-core-tests"
+  },
+  "entry": "RegionCorePlannerTests",
+  "sourceRoots": [
+    "src",
+    "../../examples/box-mold",
+    "../../../manufacturingkit/tests/tooling/src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/region-core"
+}

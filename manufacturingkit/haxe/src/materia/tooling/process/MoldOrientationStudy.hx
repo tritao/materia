@@ -153,7 +153,7 @@ class MoldOrientationStudy {
 		for (placement in layout)
 			sheets = Std.int(Math.max(sheets, placement.sheet));
 		for (c in p.cores)
-			eps += BoxAlgebra.volume(c.foamLayers);
+			for (layer in c.layers) eps += layer.block.width*layer.block.depth*layer.block.height;
 		var mix = BoxAlgebra.subtract([p.envelope], [
 			for (c in p.document.input.features)
 				CastingMoldPlanner.featureBox(p.document, c)

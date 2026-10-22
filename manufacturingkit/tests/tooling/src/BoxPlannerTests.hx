@@ -29,6 +29,8 @@ class BoxPlannerTests {
 		check(caught, label);
 	}
 
+	public static function main():Void run(ToolingTests.fixture());
+
 	public static function run(d:ToolingDocument):Void {
 		d = ToolingCodec.snapshot(d);
 		d.recipe.minimumLigament = 2;
@@ -176,7 +178,7 @@ class BoxPlannerTests {
 		check(p.panels.members.length == 5 && p.penetrations.length == 9, "all sockets/lands and fixing hole classified");
 		check(p.documentFingerprint == ToolingCodec.documentFingerprint(d), "mold provenance");
 		var raw:Dynamic = Json.parse(encoded);
-		Reflect.setField(raw, "version", 11);
+		Reflect.setField(raw, "version", 14);
 		rejects(() -> BoxMoldCodec.decode(Json.stringify(raw)), "previous mold schema rejected");
 		raw = Json.parse(encoded);
 		Reflect.setField(raw, "version", 99);
@@ -184,6 +186,18 @@ class BoxPlannerTests {
 		raw = Json.parse(encoded);
 		Reflect.setField(Reflect.field(raw, "resolved"), "id", "corrupt");
 		rejects(() -> BoxMoldCodec.decode(Json.stringify(raw)), "generated records cannot be edited behind source");
+		var forgedSolid=BoxMoldCodec.decode(encoded),solidError="";
+		forgedSolid.cores[0].cutting.solid=materia.tooling.casting.MoldRegions.box({x:0,y:0,z:0,width:1,depth:1,height:1});
+		try BoxMoldPlanner.validate(forgedSolid) catch (error:Dynamic) solidError=Std.string(error);
+		check(solidError.indexOf("Invalid ruled core cutting definition")>=0,
+			"finished cutting solid cannot change behind its source foam geometry");
+		var missingSolid:Dynamic=Json.parse(encoded);
+		var coreRecords:Array<Dynamic> = cast Reflect.field(Reflect.field(missingSolid,"resolved"),"cores");
+		Reflect.deleteField(Reflect.field(coreRecords[0],"cutting"),"solid");
+		var missingError="";
+		try BoxMoldCodec.decode(Json.stringify(missingSolid)) catch (error:Dynamic) missingError=Std.string(error);
+		check(missingError.indexOf("Mold records differ from template regeneration")>=0,
+			"a current-version cutting record without its finished solid is rejected");
 		p.cores[0].cutting.wireDirection = {x: 1, y: 1, z: 0};
 		rejects(() -> BoxMoldPlanner.validate(p), "unsupported wire direction rejected");
 		p = BoxMoldPlanner.plan(d);
@@ -253,6 +267,19 @@ class BoxPlannerTests {
 			check(cut.wireDirection.x * cut.wireDirection.x + cut.wireDirection.y * cut.wireDirection.y + cut.wireDirection.z * cut.wireDirection.z == 1,
 				"declared wire axis and faces");
 		}
+		var circular=materia.casting.CastingProfiles.circle(7,-3,8);
+		var prism=CoreSupports.prismCutting(circular,20,F.translation(3,4,5),materia.tooling.ToolingRecipe.CoreWireAxis.X);
+		check(prism.block.width==20 && prism.block.depth==16 && prism.block.height==16 && prism.wireDirection.x==1,
+			"a curved prism aligns its extrusion with the declared stock wire axis");
+		check(materia.tooling.casting.MoldRegions.boxes(prism.solid)==null,
+			"the rectangular blank never substitutes for curved foam material");
+		var before=ToolingCodec.canonical(prism);
+		circular[0].start.x+=1;
+		check(ToolingCodec.canonical(prism)==before,"cutting records own their finished profiles");
+		var depthError="";
+		try CoreSupports.prismCutting(materia.casting.CastingProfiles.circle(0,0,8),0,F.identity(),
+			materia.tooling.ToolingRecipe.CoreWireAxis.Z) catch (error:Dynamic) depthError=Std.string(error);
+		check(depthError.indexOf("Invalid core cutting depth")>=0,"zero-depth prism stock is rejected before CAD");
 		var packed:Dynamic = Json.parse(encoded);
 		check(!Reflect.hasField(Reflect.field(packed, "resolved"), "document"), "source document stored once");
 		check(!p.fabrication.ready && p.validation.length > 0, "readiness separate from successful planning");

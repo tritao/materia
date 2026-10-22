@@ -81,6 +81,13 @@ class ToolingPackageManifest {
 					throw "Tooling drawing artifact differs from source: "+name+file.extension;
 			}
 		}
+		for (core in plan.cores) for (index in 0...core.layers.length) {
+			var id=materia.tooling.casting.MoldCores.layerId(core,index);
+			path=dir+"/"+id+".cutting.json";
+			if (!sys.FileSystem.exists(path) || ToolingCodec.canonical(haxe.Json.parse(sys.io.File.getContent(path)))
+				!=ToolingCodec.canonical(materia.tooling.casting.MoldCores.cuttingRecord(core,index)))
+				throw "Core cutting artifact differs from source: "+id;
+		}
 		return checks.concat(drawings.validation);
 	}
 
@@ -252,8 +259,7 @@ class ToolingPackageManifest {
 		for (record in sourceChecks(dir,manifest.sourceFingerprint)) {
 			if (validationCounts.get(ToolingCodec.canonical(record))!=1)
 				throw "Source manufacturing validation omitted from readiness";
-			if (StringTools.startsWith(record.rule,"fabrication.tooling-drawing.")
-				&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass)
+			if (StringTools.startsWith(record.rule,"fabrication.tooling-drawing."))
 				for (artifact in record.evidence)
 					if (files.filter(file -> file.path==artifact).length!=1)
 						throw "Missing hashed tooling drawing: "+artifact;

@@ -4,7 +4,7 @@ import materia.casting.CastingPrism.CastingPoint2;
 import materia.casting.CastingProfile.CastingSegment;
 import materia.casting.CastingProfile.CastingCurveKind;
 
-/** Parallel wall sections for draft. This changes finished geometry; it is not
+/** Parallel wall sections for draft and core covering. This changes finished geometry; it is not
  * router compensation. A positive distance moves the contour into its interior.
  * Topology changes (vanishing arcs, reversed edges, crossing walls) are errors.
  */
@@ -12,8 +12,18 @@ class CastingProfileOffsets {
 	static inline var EPS=1e-7;
 
 	public static function inward(profile:Array<CastingSegment>,distance:Float):Array<CastingSegment> {
-		var source=CastingProfile.CastingProfileCodec.snapshot(profile);
 		if (!Math.isFinite(distance) || distance<0) throw "Invalid draft section offset";
+		return parallel(profile,distance);
+	}
+
+	/** Grow an internal foam opening to preserve lining around retained material. */
+	public static function outward(profile:Array<CastingSegment>,distance:Float):Array<CastingSegment> {
+		if (!Math.isFinite(distance) || distance<0) throw "Invalid outward section offset";
+		return parallel(profile,-distance);
+	}
+
+	static function parallel(profile:Array<CastingSegment>,distance:Float):Array<CastingSegment> {
+		var source=CastingProfile.CastingProfileCodec.snapshot(profile);
 		if (distance==0) return source;
 		var orientation=CastingProfileGeometry.area(source)>0 ? 1.0 : -1.0;
 		var shifted=[for (segment in source) shift(segment,distance*orientation)];
@@ -49,7 +59,8 @@ class CastingProfileOffsets {
 		}
 		CastingProfileGeometry.validate(result);
 		if (CastingProfileGeometry.area(result)*orientation<=EPS
-			|| Math.abs(CastingProfileGeometry.area(result))>=Math.abs(CastingProfileGeometry.area(source)))
+			|| (distance>0 ? Math.abs(CastingProfileGeometry.area(result))>=Math.abs(CastingProfileGeometry.area(source))
+				: Math.abs(CastingProfileGeometry.area(result))<=Math.abs(CastingProfileGeometry.area(source))))
 			throw "Draft section collapses";
 		return result;
 	}

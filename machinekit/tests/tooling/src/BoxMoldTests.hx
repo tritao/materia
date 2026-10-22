@@ -32,7 +32,42 @@ class BoxMoldTests {
 		check(caught, label);
 	}
 
+	public static function main():Void run();
+
+	static function finishedCore():Void {
+		var cutting=CoreSupports.cutting({x:-17,y:12,z:4,width:40,depth:30,height:20},
+			materia.tooling.ToolingRecipe.CoreWireAxis.Z);
+		cutting.solid=materia.casting.CastingRegion.Placed({
+			solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(16,20)),
+			pose:F.translation(20,15,0)});
+		var scope=new cadkit.modeling.Scope();
+		try {
+			var actual=scope.own(machinekit.tooling.ToolingVolume.fromCoreCutting("circular-core",cutting).geometry());
+			var world=scope.own(PosedParts.moved(actual,cutting.stockToMold));
+			var cylinder=scope.own(cadkit.modeling.Part.cylinder(8,20));
+			var expected=scope.own(cylinder.translated(new cadkit.modeling.Vector(3,27,4)));
+			var missing=scope.own(expected.subtractAll([world]));
+			var excess=scope.own(world.subtractAll([expected]));
+			check(missing.volume()+excess.volume()<1e-7,
+				"finished circular foam follows its stock frame and never becomes its rectangular cutting blank");
+			var sourcePose=F.fromRotationMatrix(3,27,4,[0,0,1,1,0,0,0,1,0]);
+			var posedCylinder=scope.own(PosedParts.moved(cylinder,sourcePose));
+			for (axis in [materia.tooling.ToolingRecipe.CoreWireAxis.X,
+				materia.tooling.ToolingRecipe.CoreWireAxis.Y,materia.tooling.ToolingRecipe.CoreWireAxis.Z]) {
+				var record=CoreSupports.prismCutting(materia.casting.CastingProfiles.circle(0,0,8),20,sourcePose,axis);
+				var local=scope.own(machinekit.tooling.ToolingVolume.fromCoreCutting("posed-circular-core",record).geometry());
+				var posed=scope.own(PosedParts.moved(local,record.stockToMold));
+				var absent=scope.own(posedCylinder.subtractAll([posed]));
+				var added=scope.own(posed.subtractAll([posedCylinder]));
+				check(absent.volume()+added.volume()<1e-7,
+					"exact curved core geometry is invariant under stock wire-axis selection: "+axis);
+			}
+			scope.close();
+		} catch (error:Dynamic) {scope.close();throw error;}
+	}
+
 	public static function run():Void {
+		finishedCore();
 		var hole = SinglePocketSetup.document().input.inserts[0].holes[0];
 		var protection = machinekit.tooling.ToolingPin.boreMask(hole, 5);
 		check(Std.isOfType(protection, machinekit.standard.SocketSetScrew), "tapped-hole protection is standard threaded hardware");

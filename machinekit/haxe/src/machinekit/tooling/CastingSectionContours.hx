@@ -20,6 +20,16 @@ import materia.casting.CastingProfiles as P;
 class CastingSectionContours {
 	static inline var EPS=1e-7;
 
+	/** Right-handed section frame with local Z along a declared unit normal. */
+	public static function normalFrame(direction:{x:Float,y:Float,z:Float},sourceId:String):AssemblyFrame {
+		if (direction==null) throw "Missing section direction: "+sourceId;
+		var z=new Vector(direction.x,direction.y,direction.z);
+		if (!Math.isFinite(z.length()) || Math.abs(z.length()-1)>EPS) throw "Invalid section direction: "+sourceId;
+		var reference=Math.abs(z.z)<0.9 ? Vector.Z() : Vector.Y();
+		var x=reference.cross(z).normalized(),y=z.cross(x).normalized();
+		return F.fromRotationMatrix(0,0,0,[x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z]);
+	}
+
 	public static function section(part:Part,plane:AssemblyFrame,sourceId:String):Array<CastingSectionContour> {
 		var scope=new Scope();
 		try {

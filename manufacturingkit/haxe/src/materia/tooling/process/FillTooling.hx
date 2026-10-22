@@ -122,8 +122,14 @@ class FillTooling {
 				}
 			}
 		}
-		for (core in p.cores)
-			add(core.cavity);
+		for (core in p.cores) {
+			var exact=materia.tooling.casting.MoldRegions.boxes(core.cavity);
+			if (exact!=null) for (box in exact) add(box);
+			else {
+				var bounds=materia.tooling.casting.MoldCores.stockBounds(core.cavity,core.id);
+				if (bounds.z+bounds.height>=fill) unsupportedIds.push(core.id);
+			}
+		}
 		for (insert in p.document.input.inserts) {
 			var dimensions = InsertBodies.box(insert.body, insert.id);
 			add(BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(p.document.setup.sourceToMold, insert.pose)));

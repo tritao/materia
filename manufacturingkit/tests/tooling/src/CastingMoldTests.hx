@@ -332,14 +332,16 @@ class CastingMoldTests {
 		check(materia.tooling.casting.CastHandling.plan(d, handlingOptions, p.envelope).requiresFlip, "changing vertical requires handling/flip");
 		var bridgePlan = CastingMoldCodec.decode(s);
 		var extraCore = CastingMoldCodec.decode(s).cores[0];
-		extraCore.cavity.y -= 20;
-		extraCore.cavity.depth += 40;
+		var extraCavity=materia.tooling.casting.MoldCores.singleBox(extraCore.cavity,extraCore.id);
+		extraCavity.y -= 20;
+		extraCavity.depth += 40;
+		extraCore.cavity=materia.tooling.casting.MoldRegions.box(extraCavity);
 		bridgePlan.cores.push(extraCore);
 		var bridgePanels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement> = [];
 		materia.tooling.casting.CoreSupports.sharedBridges(bridgePlan.cavity, bridgePlan.document.recipe, bridgePlan.cores, bridgePanels, []);
 		var bridgeBounds = materia.casting.CastingProfileGeometry.bounds(materia.tooling.panel.PanelContours.outside(bridgePanels.filter(v ->
 			v.panel.id == "core-bridge-0")[0].panel));
-		check(Math.abs(bridgeBounds.height - extraCore.cavity.depth / 2) < 1e-8, "row bridge uses the largest depth including a later core");
+		check(Math.abs(bridgeBounds.height - extraCavity.depth / 2) < 1e-8, "row bridge uses the largest depth including a later core");
 		var narrowBridge = ToolingCodec.snapshot(d);
 		narrowBridge.recipe.hardware.minimumBridgeWidth = 1000;
 		rejects(() -> CastingMoldPlanner.plan(narrowBridge, options(narrowBridge)), "undersized bridge row rejected");
@@ -384,7 +386,7 @@ class CastingMoldTests {
 		fragmented.setup.features.push({featureId: children[0].id, strategy: ReusableFormer, priority: 10, withdrawal: {x: 0, y: 0, z: 1}});
 		rejects(() -> ToolingCodec.snapshot(fragmented), "one authored core unit cannot mix incompatible tooling strategies");
 		var cuts = [for (f in d.input.features) CastingMoldPlanner.featureBox(d, f)],
-			negative = [p.cores[0].cavity];
+			negative = materia.tooling.casting.MoldCores.boxes(p.cores[0].cavity,p.cores[0].id);
 		for (f in p.formers)
 			for (b in f.volume.pieces)
 				negative.push(b);
@@ -411,7 +413,7 @@ class CastingMoldTests {
 		Reflect.setField(legacyOptions,"anchorage",new Array<Dynamic>());
 		rejects(() -> CastingMoldOptionsCodec.read(legacyOptions),"obsolete duplicate process anchorage rejected");
 		var raw:Dynamic = haxe.Json.parse(s);
-		Reflect.setField(raw, "version", 17);
+		Reflect.setField(raw, "version", 18);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
 		raw = haxe.Json.parse(s);
 		Reflect.setField(raw, "version", 12);
@@ -508,7 +510,8 @@ class CastingMoldTests {
 		var rotated = ToolingCodec.snapshot(d);
 		rotated.setup.sourceToMold = materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 100, [0, -1, 0, -1, 0, 0, 0, 0, -1]);
 		var rotatedPlan = CastingMoldPlanner.plan(rotated, options(rotated));
-		var rotatedNegative = [for (c in rotatedPlan.cores) c.cavity];
+		var rotatedNegative:Array<materia.casting.Box3> = [];
+		for (c in rotatedPlan.cores) rotatedNegative=rotatedNegative.concat(materia.tooling.casting.MoldCores.boxes(c.cavity,c.id));
 		for (f in rotatedPlan.formers)
 			for (b in f.volume.pieces)
 				rotatedNegative.push(b);

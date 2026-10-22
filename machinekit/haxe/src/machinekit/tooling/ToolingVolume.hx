@@ -46,6 +46,13 @@ class ToolingVolume extends MachineComponent {
 	public static function fromVolume(v:MoldVolume):ToolingVolume
 		return new ToolingVolume(new ComponentValues().setToken("volume", MoldVolumeCodec.encode(v)));
 
+	/** Realize finished foam, never the rectangular cutting blank. Placement is
+	 * the record's stockToMold frame, supplied by the assembly caller.
+	 */
+	public static function fromCoreCutting(id:String,cutting:materia.tooling.casting.CoreSupport.CoreCutting):ToolingVolume
+		return fromVolume({id:id,material:EPSStock,pieces:[],profiles:[],cuts:[],
+			regions:[materia.casting.CastingRegion.CastingRegionCodec.snapshot(cutting.solid)]});
+
 	public function new(?input:ComponentValues) {
 		var v = P.resolve(parameters(), input),
 			record = MoldVolumeCodec.decode(v.token("volume"));

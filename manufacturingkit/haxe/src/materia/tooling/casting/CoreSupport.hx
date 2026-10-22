@@ -31,6 +31,8 @@ typedef CoreSupportOptions = {
 }
 
 typedef CoreCutting = {
+	/** Finished foam in stock coordinates; the block is only its cutting blank. */
+	var solid:materia.casting.CastingRegion;
 	var block:MoldBox;
 	var stockToMold:AssemblyFrame;
 	var wireDirection:{x:Float, y:Float, z:Float};
