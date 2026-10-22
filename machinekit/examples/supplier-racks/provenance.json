@@ -1,0 +1,64 @@
+{
+  "manufacturer": "ATLANTA",
+  "document": "Servo Drive Systems catalogue",
+  "source": "https://www.motiontech.com.au/wp-content/uploads/2026/01/Atlanta-Servo-Drive-Systems.pdf",
+  "manufacturerUrl": "https://www.atlantadrives.com/pdf/atlanta.pdf",
+  "retrieved": "2026-10-22",
+  "sha256": "b0666c07fd2f0d0ec97c4541138a997e31de71a6871fbc53b117fc7b5cbcae4e",
+  "retainedPdf": "build/sheet-router-work/rack-catalogue/atlanta.pdf",
+  "dimensionPage": "C-16 (PDF page 76)",
+  "ratingPages": [
+    "C-44 (PDF page 101)",
+    "C-45 (PDF page 102)"
+  ],
+  "mountingPages": [
+    "C-93 (PDF page 148)",
+    "C-95 (PDF page 150)"
+  ],
+  "reviewedDesignations": [
+    "29-15-055",
+    "29-15-105",
+    "29-20-055",
+    "29-20-105"
+  ],
+  "fieldSources": {
+    "C-16": [
+      "normalModule",
+      "lengthMm",
+      "teeth",
+      "faceWidthMm",
+      "overallHeightMm",
+      "pitchHeightMm",
+      "holeHeightMm",
+      "holePitchMm",
+      "holeEndMm",
+      "holeCount",
+      "boreMm",
+      "counterboreMm",
+      "counterboreDepthMm",
+      "pinEndMm",
+      "pinPilotMm",
+      "massKg",
+      "sectionForceFactor",
+      "faceWidthPlusToleranceMm"
+    ],
+    "C-44/C-45": [
+      "force15N",
+      "force20N",
+      "rating operating conditions"
+    ],
+    "C-95": [
+      "M6 mounting screw"
+    ],
+    "derived": [
+      "helixAngle from normal module and length/teeth",
+      "nominal envelope inertia from declared mass"
+    ],
+    "assumedNotCatalogue": [
+      "tooth backlash",
+      "mesh stiffness",
+      "efficiency",
+      "nominal involute drawing/root form"
+    ]
+  }
+}

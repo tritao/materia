@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "package": {
+    "name": "gear-rack-checks"
+  },
+  "entry": "GearRackChecks",
+  "sourceRoots": [
+    "../../tests/src",
+    ".",
+    "../press-brake",
+    ".."
+  ],
+  "dependencies": {
+    "collisionkit-native": {
+      "path": "../../../collisionkit/native"
+    },
+    "motionkit-robot": {
+      "path": "../../../motionkit/robot"
+    },
+    "processkit": {
+      "path": "../../../processkit"
+    },
+    "machinekit-process": {
+      "path": "../../process"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "manufacturingkit": {
+      "path": "../../../manufacturingkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../.."
+    },
+    "machinekit-robot": {
+      "path": "../../robot"
+    },
+    "machinekit-picking-station-example": {
+      "path": "../picking-station"
+    },
+    "robotkit": {
+      "path": "../../../robotkit"
+    },
+    "cadbridge": {
+      "path": "../../../robotkit/cadbridge"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    },
+    "toolpathkit-motion": {
+      "path": "../../../toolpathkit/motion"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/sheet-router-work/rack-proposal-build"
+}

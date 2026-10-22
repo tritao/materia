@@ -16,6 +16,10 @@ class RackGeometry {
         throw new TransmissionDesignError('Rack drive needs a straight or helical pinion');
     }
     public static function rack(part:MachineComponent):{length:Float,width:Float,teeth:Int,helix:Float,hand:Int} {
+        if(Std.isOfType(part,GearRack)) {
+            var r:GearRack=cast part;
+            return {length:r.spec.lengthMm,width:r.spec.faceWidthMm,teeth:r.spec.teeth,helix:r.helixAngle(),hand:1};
+        }
         if(Std.isOfType(part,Rack)) {
             var r:Rack=cast part;return {length:r.length,width:r.faceWidth,teeth:r.teethCount,helix:0.0,hand:0};
         }
@@ -26,6 +30,7 @@ class RackGeometry {
         throw new TransmissionDesignError('Rack drive needs a straight or helical rack');
     }
     public static function relation(pinion:MachineComponent,rack:Null<MachineComponent>,alignment:Float):TransmissionRelation {
+        if(Std.isOfType(rack,GearRack))return relation(pinion,cast(rack,GearRack).nominalRack(),alignment);
         if(Std.isOfType(pinion,SpurGear)) {
             if(rack!=null&&!Std.isOfType(rack,Rack))throw new TransmissionDesignError('Straight pinion needs a straight rack');
             return Rack.relation(cast pinion,cast rack,alignment);

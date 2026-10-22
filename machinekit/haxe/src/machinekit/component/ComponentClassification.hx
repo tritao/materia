@@ -223,6 +223,7 @@ class ComponentClassification {
 		file(registry, "machinekit.tooling.plain-pin", "Casting tooling", ComponentKind.Generic);
 		file(registry, "machinekit.tooling.source-casting", "Casting tooling", ComponentKind.Generic);
 		// transmission
+		file(registry, "machinekit.transmission.gear-rack", "Gears and racks", ComponentKind.Supplier);
 		file(registry, "machinekit.transmission.timing-belt", "Belts and pulleys", ComponentKind.Generic);
 		file(registry, "machinekit.transmission.timing-pulley", "Belts and pulleys", ComponentKind.Generic);
 		file(registry, "machinekit.transmission.custom-timing-pulley", "Belts and pulleys", ComponentKind.Generic);
