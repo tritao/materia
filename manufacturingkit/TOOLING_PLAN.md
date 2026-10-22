@@ -1369,6 +1369,19 @@ a corner radius below the router radius fails with its ID. Fill analysis agrees
 with CAD booleans on a sloped-ceiling fixture, and box-feature results are
 unchanged. Castability proposals change only adjustable dimensions.
 
+**Core strategy comparison (after step 3, before the cleanup slice).** Run
+the mill base in two variants from the same source:
+- the current recipe, with lightening pockets as sacrificial EPS;
+- a recipe variant whose rule makes lightening pockets that open to a body
+  face into drafted melamine formers, with their draft as an adjustable source
+  dimension proposed by the castability rules.
+
+Enclosed voids stay EPS in both. Compare release and withdrawal checks, effort
+metrics, panel and core counts, router time, core uplift and restraint, panel
+head pressure, and the source changes the draft needs. Report both kits
+side by side. This adds no new core type and no library code beyond the recipe
+rule and fixtures. The user picks the production recipe from the results.
+
 **Cleanup slice (after step 3, before phase 8).** These are defects in work
 already landed, so the scope freeze allows them:
 
@@ -1468,6 +1481,7 @@ directories; commit source setups, small test fixtures and documentation.
 
 ## Deferred scope
 
+- Collapsible (knock-down) melamine cores for undrafted pockets that open to a face: a segmented box released by removing a key panel first, with joinery, bracing and take-apart sequence. This is a new core strategy, considered only after the core strategy comparison.
 - Structured recipe parameters: MachineKit components store structured records as JSON strings inside recipe tokens (`MineralCasting` `embeddedAnchors`, `datumScheme`, `interfaces`; `CastInsert` `origin`). This affects every component, so it needs its own MachineKit plan rather than a casting slice.
 - Generic catalogue recipe solid-count qualification: the bought Vallder BK12 assembly has 32 solids; the broad recipe test assumes one, outside casting phases 6–8.
 
