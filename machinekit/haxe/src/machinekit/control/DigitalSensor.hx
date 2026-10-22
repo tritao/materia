@@ -35,6 +35,11 @@ class DigitalSensor extends MachineComponent {
 	override public function values():ComponentValues
 		return new ComponentValues().setToken("kind", kind).setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
+	/** A chamfered head on its mounting plate, its connector terminals at one end (`DeviceHousing.panelModule`). */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(BODY_WIDTH, BODY_DEPTH, BODY_HEIGHT), "sensor-head");
+		return detail == Envelope ? envelope() : machinekit.power.DeviceHousing.panelModule(BODY_WIDTH, BODY_DEPTH, BODY_HEIGHT, {terminals: 3});
+
+	override public function massGeometry():Null<Part> return envelope();
+
+	function envelope():Part return Solids.named(Part.box(BODY_WIDTH, BODY_DEPTH, BODY_HEIGHT), "sensor-head");
 }

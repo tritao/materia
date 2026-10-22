@@ -75,6 +75,10 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
 	override function effectiveDensity():Null<Float>
 		return machinekit.component.EffectiveDensities.PowerSupply;
 
+	/** A vented cover with the screw-terminal strip along its top (`DeviceHousing.panelModule`). */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(width, height, depth), "body");
+		return detail == Envelope ? Solids.named(Part.box(width, height, depth), "body")
+			: machinekit.power.DeviceHousing.panelModule(width, height, depth, {vents: true, terminals: Std.int(Math.min(12, 3 + 2 * outlets))});
+
+	override public function presentationView():Null<machinekit.component.ComponentView> return machinekit.power.DeviceHousing.panelView();
 }

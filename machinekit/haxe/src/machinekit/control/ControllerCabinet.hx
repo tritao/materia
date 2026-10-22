@@ -39,6 +39,8 @@ class ControllerCabinet extends MachineComponent {
 	override function effectiveDensity():Null<Float>
 		return machinekit.component.EffectiveDensities.ControlCabinet;
 
+	/** A door with its seam and handle, and louvred sides (`DeviceHousing.enclosure`). */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(180, 180, 280), "controller-module");
+		return detail == Envelope ? Solids.named(Part.box(180, 180, 280), "controller-module")
+			: machinekit.power.DeviceHousing.enclosure(180, 180, 280, {door: true, louvres: true});
 }

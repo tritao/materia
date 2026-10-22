@@ -55,8 +55,8 @@
   "Brackets and fixings",
   "Castings",
   "Casting tooling",
-  "Belts and pulleys",
   "Gears and racks",
+  "Belts and pulleys",
   "Chains and sprockets"
  ],
  "components": [
@@ -1117,7 +1117,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.control.control-cabinet",
@@ -1353,7 +1353,7 @@
    "material": "plastic",
    "mass": {
     "kg": 0.002304,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "control-digital-sensor.glb",
    "view": {
@@ -1361,7 +1361,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.control.emergency-stop-button",
@@ -1579,7 +1579,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.control.safety-relay",
@@ -1825,7 +1825,7 @@
    "material": "plastic",
    "mass": {
     "kg": 0.00288,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "control-thermistor-input.glb",
    "view": {
@@ -1833,7 +1833,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.enclosure.cut-panel",
@@ -12897,7 +12897,7 @@
    ],
    "mass": {
     "kg": 0.010368,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-motor-driver.glb",
    "view": {
@@ -12905,7 +12905,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.nema-stepper",
@@ -13697,11 +13697,11 @@
    },
    "model": "motion-power-supply.glb",
    "view": {
-    "environment": "/components/environment/studio-50.hdr",
-    "phi": 50,
+    "environment": "/components/environment/studio-62.hdr",
+    "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.proximity-switch",
@@ -18546,7 +18546,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.power.circuit-breaker",
@@ -18946,7 +18946,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.power.vfd",
@@ -19083,7 +19083,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.pressbrake.gauge-finger",
@@ -27965,6 +27965,152 @@
    "view": {
     "environment": "/components/environment/studio-62.hdr",
     "phi": 62,
+    "theta": 35
+   },
+   "fidelity": "nominal"
+  },
+  {
+   "id": "machinekit.transmission.gear-rack",
+   "label": "Gear rack",
+   "family": "transmission",
+   "category": "Gears and racks",
+   "kind": "supplier",
+   "designation": "ATLANTA-29-15-105",
+   "description": "ATLANTA HPR helical rack 29-15-105",
+   "parameters": [
+    {
+     "name": "designation",
+     "type": "choice",
+     "value": "29-15-105",
+     "options": [
+      "29-15-055",
+      "29-15-105",
+      "29-20-055",
+      "29-20-105"
+     ]
+    },
+    {
+     "name": "material",
+     "type": "choice",
+     "value": "steel",
+     "options": [
+      "unspecified",
+      "painted steel",
+      "steel",
+      "steel C45",
+      "steel 8",
+      "steel 8.8",
+      "steel 10.9",
+      "stainless A2-70",
+      "steel 12.9",
+      "bearing steel",
+      "aluminium 6061",
+      "rubber",
+      "nitrile rubber NBR",
+      "PA12 nylon",
+      "plastic",
+      "device housing",
+      "device housing dark",
+      "polycarbonate",
+      "polyurethane PU",
+      "birch plywood",
+      "MDF",
+      "PMMA acrylic",
+      "EPS tooling",
+      "coated particleboard",
+      "mineral cast",
+      "carbide",
+      "cast iron",
+      "bronze",
+      "brass",
+      "spring steel",
+      "mild steel sheet",
+      "aluminium 5052-H32 sheet",
+      "Compact laminate",
+      "Glass reinforced plastic",
+      "Polypropylene",
+      "HDPE",
+      "UHMW polyethylene",
+      "FR aluminium composite panel",
+      "Aluminium honeycomb panel",
+      "Insulated sandwich panel",
+      "Stainless sheet",
+      "Panel adhesive"
+     ]
+    }
+   ],
+   "connectors": [
+    {
+     "name": "mount1",
+     "role": "Mount"
+    },
+    {
+     "name": "mount2",
+     "role": "Mount"
+    },
+    {
+     "name": "mount3",
+     "role": "Mount"
+    },
+    {
+     "name": "mount4",
+     "role": "Mount"
+    },
+    {
+     "name": "mount5",
+     "role": "Mount"
+    },
+    {
+     "name": "mount6",
+     "role": "Mount"
+    },
+    {
+     "name": "mount7",
+     "role": "Mount"
+    },
+    {
+     "name": "mount8",
+     "role": "Mount"
+    },
+    {
+     "name": "pinPilot1",
+     "role": "Mount"
+    },
+    {
+     "name": "pinPilot2",
+     "role": "Mount"
+    },
+    {
+     "name": "back",
+     "role": "Mount"
+    },
+    {
+     "name": "referenceSide",
+     "role": "Mount"
+    },
+    {
+     "name": "pitch",
+     "role": "Pitch"
+    },
+    {
+     "name": "end",
+     "role": "Mount"
+    }
+   ],
+   "bom": {
+    "description": "ATLANTA HPR helical rack 29-15-105",
+    "material": "steel",
+    "partNumber": "ATLANTA-29-15-105"
+   },
+   "material": "machined-steel",
+   "mass": {
+    "kg": 2.6,
+    "source": "Declared"
+   },
+   "model": "transmission-gear-rack.glb",
+   "view": {
+    "environment": "/components/environment/studio-50.hdr",
+    "phi": 50,
     "theta": 35
    },
    "fidelity": "nominal"

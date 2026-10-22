@@ -38,8 +38,10 @@ class BrakeResistor extends AssumedCatalogComponent {
   override function effectiveDensity():Null<Float>
     return machinekit.component.EffectiveDensities.BrakeResistor;
 
+  /** A finned aluminium extrusion on slotted mounting tabs (`DeviceHousing.finnedResistor`). */
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    return Solids.named(Part.box(n("width"), n("length"), n("height")), "resistor-envelope");
+    return detail == Envelope ? Solids.named(Part.box(n("width"), n("length"), n("height")), "resistor-envelope")
+      : DeviceHousing.finnedResistor(n("width"), n("length"), n("height"));
   }
 
 }

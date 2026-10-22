@@ -48,8 +48,10 @@ class Vfd extends AssumedCatalogComponent {
   override function effectiveDensity():Null<Float>
     return machinekit.component.EffectiveDensities.Drive;
 
+  /** Keypad and display on its front, louvred sides and a finned heat sink behind (`DeviceHousing.enclosure`). */
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    return Solids.named(Part.box(n("width"), n("depth"), n("height")), "vfd-envelope");
+    return detail == Envelope ? Solids.named(Part.box(n("width"), n("depth"), n("height")), "vfd-envelope")
+      : DeviceHousing.enclosure(n("width"), n("depth"), n("height"), {keypad: true, louvres: true, fins: 9});
   }
   override public function io():MachineIo return {
     inputs:["at_speed", "zero_speed", "alarm"],

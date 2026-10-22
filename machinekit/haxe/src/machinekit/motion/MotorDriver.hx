@@ -123,6 +123,13 @@ class MotorDriver extends MachineComponent {
 		.setBoolean("wiredSupply", statedVoltage == null).setNumber("voltage", statedVoltage == null ? 24 : statedVoltage.volts())
 		.setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
+	/** A finned heat-sink body with its screw terminals along the top (`DeviceHousing.panelModule`); the envelope box sets the mass. */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(rating.width, rating.height, rating.depth), "body");
+		return detail == Envelope ? envelope() : machinekit.power.DeviceHousing.panelModule(rating.width, rating.height, rating.depth, {fins: 7, terminals: 6});
+
+	override public function massGeometry():Null<Part> return envelope();
+
+	override public function presentationView():Null<machinekit.component.ComponentView> return machinekit.power.DeviceHousing.panelView();
+
+	function envelope():Part return Solids.named(Part.box(rating.width, rating.height, rating.depth), "body");
 }

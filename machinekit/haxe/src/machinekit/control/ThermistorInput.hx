@@ -64,5 +64,9 @@ class ThermistorInput extends MachineComponent {
 		.setNumber("referenceVolts",reference.volts()).setInteger("channels",channels).setNumber("width",width)
 		.setNumber("depth",depth).setNumber("height",height).setToken("material",materialSpec());
 	override public function hasGeometry():Bool return true;
-	override public function geometry(detail:ComponentDetail=Preview):Part return Solids.named(Part.box(width,depth,height),"thermistor-front-end");
+	/** A module with two screw terminals per channel along one end (`DeviceHousing.panelModule`). */
+	override public function geometry(detail:ComponentDetail=Preview):Part
+		return detail==Envelope ? envelope() : machinekit.power.DeviceHousing.panelModule(width,depth,height,{vents:true,terminals:Std.int(Math.min(16,2*channels))});
+	override public function massGeometry():Null<Part> return envelope();
+	function envelope():Part return Solids.named(Part.box(width,depth,height),"thermistor-front-end");
 }
