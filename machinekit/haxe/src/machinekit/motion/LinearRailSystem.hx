@@ -25,6 +25,10 @@ class LinearRailSystem {
 		"blockHoleSpacingAcross", "blockMountThread", "railHolePitch", "railEndMargin", "railMountScrew", "railBore", "blockMassKg",
 		"railMassKgPerMetre", "ratings"];
 
+	static final MG_TABLE_FIELDS = ["railWidth", "railHeight", "blockWidth", "blockHeight", "blockLength", "blockHoleSpacingAlong",
+		"blockHoleSpacingAcross", "blockMountThread", "blockMountThreadDepth", "railHolePitch", "railMountScrew", "railBore", "blockMassKg",
+		"railMassKgPerMetre", "ratings"];
+
 	public final spec:LinearRailProfileSpec;
 	public final rail:LinearRail;
 	public final blocks:Array<LinearRailBlock>;
@@ -34,30 +38,31 @@ class LinearRailSystem {
 	public final travelMax:Float;
 	public final stroke:Float;
 
-	static function hiwinMg(c:Float, c0:Float):LinearRailRating
-		return {source: "HIWIN MG catalogue 2023", reference: HIWIN_MG, dynamicLoad: c, staticLoad: c0, lifeBasisKm: 50, original: true};
+	static function hiwinMg(c:Float, c0:Float, roll:Float, pitch:Float, yaw:Float):LinearRailRating
+		return {source: "HIWIN MG catalogue 2023", reference: HIWIN_MG, dynamicLoad: c, staticLoad: c0, lifeBasisKm: 50,
+			rollMoment: roll, pitchMoment: pitch, yawMoment: yaw, original: true};
 
-	/** HIWIN's MGN miniature guides: dimensions, masses and ratings from the 2023 MG catalogue. */
+	/** HIWIN's MGN miniature guides: dimensions, masses and ratings from the 2023 MG catalogue (tables 3.78, 3.79, rails p. 99). */
 	static function miniature():Array<LinearRailProfileSpec> {
 		var mgnr12 = {through: 3.5, counterbore: 6.0, depth: 4.5}, mgnr9 = {through: 3.5, counterbore: 6.0, depth: 3.5};
 		return [{
 			designation: "MGN12C", rail: "MGNR12R", family: "HIWIN",
 			railWidth: 12, railHeight: 8, blockWidth: 27, blockHeight: 13, blockLength: 34.7,
 			blockHoleSpacingAlong: 15, blockHoleSpacingAcross: 20, blockMountThread: "M3", blockMountThreadDepth: 3.5,
-			railHolePitch: 25, railEndMargin: 10, railMountScrew: "M3x8", railBore: mgnr12,
-			blockMassKg: 0.034, railMassKgPerMetre: 0.65, ratings: [hiwinMg(2840, 3920)]
+			railHolePitch: 25, railEndMargin: 10, railMountScrew: "M3x10", railBore: mgnr12,
+			blockMassKg: 0.030, railMassKgPerMetre: 0.65, ratings: [hiwinMg(2840, 3920, 25.5, 13.7, 13.7)]
 		}, {
 			designation: "MGN12H", rail: "MGNR12R", family: "HIWIN",
 			railWidth: 12, railHeight: 8, blockWidth: 27, blockHeight: 13, blockLength: 45.4,
 			blockHoleSpacingAlong: 20, blockHoleSpacingAcross: 20, blockMountThread: "M3", blockMountThreadDepth: 3.5,
-			railHolePitch: 25, railEndMargin: 10, railMountScrew: "M3x8", railBore: mgnr12,
-			blockMassKg: 0.054, railMassKgPerMetre: 0.65, ratings: [hiwinMg(3720, 5880)]
+			railHolePitch: 25, railEndMargin: 10, railMountScrew: "M3x10", railBore: mgnr12,
+			blockMassKg: 0.050, railMassKgPerMetre: 0.65, ratings: [hiwinMg(3720, 5880, 38.2, 36.3, 36.3)]
 		}, {
 			designation: "MGN9C", rail: "MGNR9R", family: "HIWIN",
 			railWidth: 9, railHeight: 6.5, blockWidth: 20, blockHeight: 10, blockLength: 28.9,
 			blockHoleSpacingAlong: 10, blockHoleSpacingAcross: 15, blockMountThread: "M3", blockMountThreadDepth: 3,
-			railHolePitch: 20, railEndMargin: 7.5, railMountScrew: "M3x6", railBore: mgnr9,
-			blockMassKg: 0.016, railMassKgPerMetre: 0.38, ratings: [hiwinMg(1860, 2550)]
+			railHolePitch: 20, railEndMargin: 7.5, railMountScrew: "M3x10", railBore: mgnr9,
+			blockMassKg: 0.020, railMassKgPerMetre: 0.38, ratings: [hiwinMg(1860, 2550, 11.8, 7.4, 7.4)]
 		}];
 	}
 
@@ -95,9 +100,8 @@ class LinearRailSystem {
 			table = new Catalog("linear rail profile", spec -> spec.designation, rows(), spec -> StringTools.startsWith(spec.designation, "MGN") ? ({
 				source: "HIWIN MGN/MGW catalogue: " + HIWIN_MG, standard: null, standardEdition: null, dimensionKind: Nominal,
 				conformance: NominalEnvelope,
-				// Checked against the catalogue for MGN12C only; the other miniature rows await the same review.
-				verifiedFields: spec.designation == "MGN12C" ? ["railWidth", "railHeight", "blockWidth", "blockHeight", "blockLength",
-					"blockMountThread", "railHolePitch", "railEndMargin", "railMountScrew"] : []
+				// Every field checked against the 2023 catalogue on 2026-10-22.
+				verifiedFields: MG_TABLE_FIELDS
 			}) : ({
 				source: "Vallder HG tables (" + spec.ratings[0].reference + ", https://vallder.com/product/hgr-linear-guideways/)",
 				sources: ["Pinned HIWIN reference CAD (tools/suppliers/hg-reference.json)"],

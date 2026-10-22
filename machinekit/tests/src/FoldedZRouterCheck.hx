@@ -54,10 +54,10 @@ class FoldedZRouterCheck {
 		CncRouterChecks.near(directZ.requireVelocity() * 1000, 43.6539272481, "direct Z speed baseline", 1e-6);
 		CncRouterChecks.near(foldedZ.requireVelocity() * 1000, 21.8269636240, "folded Z speed baseline", 1e-6);
 		// Rails and carriages carry their HIWIN datasheet masses, not their drawn steel volume.
-		CncRouterChecks.near(directZ.requireAcceleration() * 1000, 6110.032458631647, "direct Z acceleration baseline", 1e-3);
+		CncRouterChecks.near(directZ.requireAcceleration() * 1000, 6110.406977098953, "direct Z acceleration baseline", 1e-3);
 		// The pulleys' teeth are true arcs, no longer chords, so their inertia is a little higher; rails and
 		// carriages carry datasheet masses.
-		CncRouterChecks.near(foldedZ.requireAcceleration() * 1000, 3262.5813120299563, "folded Z acceleration baseline", 1e-3);
+		CncRouterChecks.near(foldedZ.requireAcceleration() * 1000, 3262.6363532267314, "folded Z acceleration baseline", 1e-3);
 		CncRouterChecks.near(foldedZ.requireVelocity() * 2, directZ.requireVelocity(), "the two-to-one belt uses twice the motor rate", 1e-9);
 		if (!(foldedZ.requireAcceleration() > 0 && foldedZ.requireAcceleration() < directZ.requireAcceleration()))
 			throw "The folded motor's inertia must tighten the Z acceleration bound";
@@ -72,8 +72,8 @@ class FoldedZRouterCheck {
 		// mounting plates were.
 		// Its power supply and controller weigh as housings at sourced effective densities, no longer as solid blocks,
 		// and its MGN rails and carriages at their HIWIN datasheet masses.
-		CncRouterChecks.near(new CncRouter().massProperties().mass, 35.85613311045447, "direct router mass baseline", 1e-6);
-		CncRouterChecks.near(folded.massProperties().mass, 35.99859870203175, "folded router mass baseline", 1e-6);
+		CncRouterChecks.near(new CncRouter().massProperties().mass, 35.832133110454485, "direct router mass baseline", 1e-6);
+		CncRouterChecks.near(folded.massProperties().mass, 35.97459870203175, "folded router mass baseline", 1e-6);
 		if (CncRouter.FoldedZMotorPlate.TENSION_TRAVEL < 4.0)
 			throw "Folded Z motor plate needs at least 4 mm of slot adjustment";
 		var centre = belt.wraps()[1].x - belt.wraps()[0].x;
