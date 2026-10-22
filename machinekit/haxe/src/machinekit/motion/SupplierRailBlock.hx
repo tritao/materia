@@ -35,6 +35,9 @@ class SupplierRailBlock extends LinearRailBlock {
   }
   return source;
  }
+ /** Drawn from its own CAD, whose shape sets its mass. */
+ override public function massGeometry():Null<cadkit.modeling.Part> return null;
+
  override public function geometry(detail:ComponentDetail=Preview):Part {
   var s=load();if(detail!=Envelope)return new Part(s.cloneShape());
   var b=s.bounds(),lo=b.get_min(),hi=b.get_max();return Part.prism([new Vector(lo.get_x(),lo.get_y()),new Vector(hi.get_x(),lo.get_y()),new Vector(hi.get_x(),hi.get_y()),new Vector(lo.get_x(),hi.get_y())],lo.get_z(),hi.get_z());

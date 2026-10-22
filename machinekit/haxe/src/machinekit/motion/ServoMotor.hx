@@ -1,5 +1,6 @@
 package machinekit.motion;
 
+import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
@@ -230,8 +231,22 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 
 	override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.cylinderSpan(rating.bodyDiameter / 2, -rating.bodyLength, 0), "body");
+	/**
+	 * The envelope is the box behind the mounting face, square to the flange; the preview the motor body
+	 * (`MotorBody`), with bolt holes only where the mounting interface is declared.
+	 */
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var face = rating.bodyDiameter, length = rating.bodyLength;
+		if (detail == Envelope)
+			return Solids.named(Part.box(face, face, length, Center, Center, Max), "body");
+		var declared = mounting();
+		return Solids.named(MotorBody.part(face, length, declared == null ? Math.max(6, face * 0.1) : declared.flangeThickness,
+			declared == null ? 0 : declared.holeDiameter, declared == null ? [] : declared.holes), "body");
+	}
+
+	/** The motor's mass is that of its body as a solid cylinder of the flange's width (the drawn body does not set it). */
+	override public function massGeometry():Null<Part>
+		return Part.cylinderSpan(rating.bodyDiameter / 2, -rating.bodyLength, 0);
 }
 
 /** A catalogue servo keeps its source designation in saved assemblies. Explicit rating objects

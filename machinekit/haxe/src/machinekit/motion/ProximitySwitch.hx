@@ -62,6 +62,29 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
   override public function values():ComponentValues
     return new ComponentValues().setToken("designation", designation).setToken("material", materialSpec());
   override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part
-    return Solids.named(Part.cylinderSpan(spec.diameter / 2, 0, spec.length), "body");
+  /**
+   * The envelope is the barrel's cylinder. The preview has a connector end at the mount (z = 0), a fine-pitch
+   * metric threaded barrel (a cosmetic thread, M8x1 or M12x1) and the sensing cap at the face (z = length).
+   */
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    if (detail == Envelope) return envelope();
+    var d = spec.diameter, l = spec.length, connector = l * 0.22, cap = l * 0.08;
+    return Solids.building([], owned -> {
+      var plug = Solids.named(Part.cylinderSpan(d * 0.4, 0, connector * 0.6), "connector");
+      var collar = Solids.named(Part.cylinderSpan(d * 0.46, connector * 0.6, connector), "collar");
+      var barrel = Solids.named(Part.cylinderSpan(d / 2, connector, l - cap), "barrel");
+      var face = Solids.named(Part.cylinderSpan(d * 0.45, l - cap, l), "sensing-face");
+      for (part in [plug, collar, barrel, face]) owned.push(part);
+      var threaded = new Part(cadkit.threads.Threads.attach(barrel.shape, "barrel:cyl.side",
+        machinekit.standard.FastenerThreads.metric(d, 1), cadkit.threads.ThreadedFace.ThreadStart.AxisMinimum, l - cap - connector));
+      barrel.close();
+      owned.push(threaded);
+      return Solids.union([plug, collar, threaded, face]);
+    });
+  }
+
+  /** Its mass is that of the plain barrel cylinder (the drawn connector and cap do not set it). */
+  override public function massGeometry():Null<Part> return envelope();
+
+  function envelope():Part return Solids.named(Part.cylinderSpan(spec.diameter / 2, 0, spec.length), "body");
 }

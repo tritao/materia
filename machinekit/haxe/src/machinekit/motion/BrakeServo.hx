@@ -31,9 +31,14 @@ class BrakeServo extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
-  override public function geometry(detail:ComponentDetail = Preview):Part {
+  override public function geometry(detail:ComponentDetail = Preview):Part return withBrake(motor.geometry(detail));
+
+  /** Mass of the motor's body with the brake, as before the body was drawn in detail. */
+  override public function massGeometry():Null<Part> return withBrake(motor.massGeometry());
+
+  function withBrake(base:Part):Part {
     return Solids.union([
-      Solids.named(motor.geometry(detail), "motor"),
+      Solids.named(base, "motor"),
       Solids.named(
         Part.cylinderSpan(
           motor.rating.bodyDiameter / 2,

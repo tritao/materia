@@ -32,9 +32,15 @@ class Bt30SpindleMotor extends ServoMotor {
 		if (includeShaft) parts.push(Part.cylinderSpan(rating.shaftDiameter/2,minOffset,rating.shaftLength+maxOffset));
 		return Solids.union(parts);
 	}
-	override public function geometry(detail:ComponentDetail = Preview):Part {
+
+	override public function geometry(detail:ComponentDetail = Preview):Part return withFlange(super.geometry(detail));
+
+	/** Mass of the base motor's body with this flange and pilot, as before the body was drawn in detail. */
+	override public function massGeometry():Null<Part> return withFlange(super.massGeometry());
+
+	function withFlange(base:Part):Part {
 		var tools=[]; for (x in [-30.0,30.0]) for (y in [-30.0,30.0]) tools.push(Part.cylinderSpan(2.1,-8,1,x,y));
-		return Solids.cut(Solids.union([super.geometry(detail),Part.box(110,110,10).translated(new Vector(0,0,-10)),
+		return Solids.cut(Solids.union([base,Part.box(110,110,10).translated(new Vector(0,0,-10)),
 			Solids.cut(Part.cylinderSpan(20,0,2),[Part.cylinderSpan(10.5,-1,3)])]),tools);
 	}
 }

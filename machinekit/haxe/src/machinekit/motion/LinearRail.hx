@@ -87,15 +87,30 @@ class LinearRail extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		if (detail == Preview && spec.designation == "HGR15" && spec.railWidth == 15 && spec.railHeight == 15)
+		if (detail == Envelope)
+			return section();
+		if (measuredSection())
 			return Hgr15RailGeometry.build(length, holePositions);
+		return ProfileRailShapes.rail(spec, length, holePositions);
+	}
+
+	/**
+	 * A nominal profile's mass is that of its full rectangular section (its drawn grooves and holes do not set it);
+	 * the measured HGR15 section sets its own.
+	 */
+	override public function massGeometry():Null<Part>
+		return measuredSection() ? null : section();
+
+	function measuredSection():Bool
+		return spec.designation == "HGR15" && spec.railWidth == 15 && spec.railHeight == 15;
+
+	function section():Part
 		return Part.prism([
 			new Vector(-spec.railWidth / 2, -spec.railHeight),
 			new Vector(spec.railWidth / 2, -spec.railHeight),
 			new Vector(spec.railWidth / 2, 0),
 			new Vector(-spec.railWidth / 2, 0),
 		], 0, length);
-	}
 
 	private static var recipeTypeCache:Null<ComponentType>;
 

@@ -76,7 +76,23 @@ class Gearbox extends MachineComponent {
 		.setNumber("bore", bore).setToken("basis", assumed ? "assumed" : "stated").setNumber("inputInertia", inputInertia)
 		.setToken("inertiaBasis", inertiaAssumed ? "assumed" : "stated").setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
-	override public function geometry(detail:ComponentDetail = Preview):Part
+	/**
+	 * The envelope is the bored cylinder. The preview has a bolted output flange at z = 0, the gear housing and an
+	 * input adapter at the far end, around the bore.
+	 */
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		if (detail == Envelope) return envelope();
+		var flange = length * 0.14, adapter = length * 0.22;
+		return Solids.named(RoundHousing.part([
+			{z0: 0, z1: flange, diameter: diameter}, {z0: flange, z1: length - adapter, diameter: diameter * 0.88},
+			{z0: length - adapter, z1: length, diameter: diameter * 0.95}
+		], bore, 0, 4, diameter * 0.8, Math.max(2.5, diameter * 0.06)), "body");
+	}
+
+	/** Its mass is that of the plain bored cylinder (the drawn steps and holes do not set it). */
+	override public function massGeometry():Null<Part> return envelope();
+
+	function envelope():Part
 		return Solids.cut(Solids.named(Part.cylinderSpan(diameter / 2, 0, length), "body"),
 			[Solids.named(Part.cylinderSpan(bore / 2, -1, length + 1), "bore")]);
 }

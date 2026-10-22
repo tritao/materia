@@ -27,6 +27,9 @@ class HgBlock extends LinearRailBlock {
   if(HiwinHgh15ca.fileDigest(path)!=HgReferenceData.hash(model))throw "Unreviewed HG reference: "+model;
   return Shape.importStep(path);
  }
+ /** Drawn from its own CAD, whose shape sets its mass. */
+ override public function massGeometry():Null<cadkit.modeling.Part> return null;
+
  override public function geometry(detail:ComponentDetail=Preview):Part {
   var shape=load(model);
   try {

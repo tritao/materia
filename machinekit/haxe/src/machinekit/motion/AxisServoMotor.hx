@@ -17,11 +17,16 @@ class AxisServoMotor extends ServoMotor {
         super(selected.rating,selected.ratingsBasis);source=selected;
     }
     override public function mounting():Null<ServoMounting> return source.mounting();
-    override public function geometry(detail:ComponentDetail=Preview):Part {
+    override public function geometry(detail:ComponentDetail=Preview):Part return withInterface(source.geometry(detail));
+
+    /** Mass of the base motor's body with this flange and pilot, as before the body was drawn in detail. */
+    override public function massGeometry():Null<Part> return withInterface(source.massGeometry());
+
+    function withInterface(base:Part):Part {
         var face=source.mounting();
-        if(face==null)throw 'Axis servo lost its mounting interface';
+        if(face==null){base.close();throw 'Axis servo lost its mounting interface';}
         return Solids.building([],parts->{
-            parts.push(source.geometry(detail));
+            parts.push(base);
             var blank=Part.box(face.face,face.face,face.flangeThickness);
             var flange=blank.translated(new cadkit.modeling.Vector(0,0,-face.flangeThickness));blank.close();
             var holes=[for(hole in face.holes)Solids.named(Part.cylinderSpan(face.holeDiameter/2,-face.flangeThickness-1,1,hole.x,hole.y),"mount-bolt")];

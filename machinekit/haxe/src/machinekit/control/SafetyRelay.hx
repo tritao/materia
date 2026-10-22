@@ -70,8 +70,11 @@ class SafetyRelay extends AssumedCatalogComponent {
   override function effectiveDensity():Null<Float>
     return machinekit.component.EffectiveDensities.DinRailElectronics;
 
+  override public function presentationView():Null<machinekit.component.ComponentView> return machinekit.power.DinRailDevice.view();
+
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    return Solids.named(Part.box(n("width"), n("depth"), n("height")), "relay-envelope");
+    if (detail == Envelope) return Solids.named(Part.box(n("width"), n("depth"), n("height")), "relay-envelope");
+    return Solids.named(machinekit.power.DinRailDevice.part(n("width"), n("depth"), n("height")), "relay");
   }
   override public function io():MachineIo return {inputs:["healthy"], outputs:[], analogOutputs:[]};
 

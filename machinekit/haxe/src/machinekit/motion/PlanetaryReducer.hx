@@ -52,7 +52,22 @@ class PlanetaryReducer extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /**
+   * The envelope is the bored housing cylinder. The preview has an input adapter at z = 0, the planetary housing
+   * and a bolted output flange at the far end, around the bore.
+   */
   override public function geometry(detail:ComponentDetail = Preview):Part {
+    if (detail == Envelope) return envelope();
+    var d = n("diameter"), l = n("length"), adapter = l * 0.25, flange = l * 0.12;
+    return Solids.named(RoundHousing.part([
+      {z0: 0, z1: adapter, diameter: d * 0.96}, {z0: adapter, z1: l - flange, diameter: d * 0.86}, {z0: l - flange, z1: l, diameter: d}
+    ], n("bore"), 2, 4, d * 0.8, Math.max(3, d * 0.07)), "housing");
+  }
+
+  /** Its mass is that of the plain bored housing (the drawn steps and holes do not set it). */
+  override public function massGeometry():Null<Part> return envelope();
+
+  function envelope():Part {
     return Solids.cut(
       Solids.named(Part.cylinder(n("diameter") / 2, n("length")), "housing"),
       [Solids.named(

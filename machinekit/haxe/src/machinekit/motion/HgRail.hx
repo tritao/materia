@@ -22,6 +22,9 @@ class HgRail extends LinearRail {
   return {diameter:holes[0],counterboreDiameter:holes[1],counterboreDepth:holes[2],
    reference:"Pinned HG table/CAD "+model+" sha256:"+HgReferenceData.hash(model)};
  }
+ /** Drawn from its own profile, whose shape sets its mass. */
+ override public function massGeometry():Null<cadkit.modeling.Part> return null;
+
  override public function geometry(detail:ComponentDetail=Preview):Part {
   if(detail==Envelope)return super.geometry(detail);
   var edges:Array<Curve> = [],wire:Null<Curve> = null,face:Null<Sketch> = null,result:Null<Part> = null;

@@ -18,6 +18,9 @@ class HiwinHgr25Rail extends LinearRail {
  }
  override public function componentType():Null<ComponentType> return supplierRecipeType();
  override public function values():ComponentValues return new ComponentValues().setNumber("length",length).setToken("cadSha256",SupplierRailAssets.digest("HGR25R")).setToken("material",materialSpec());
+ /** Drawn from its own profile, whose shape sets its mass. */
+ override public function massGeometry():Null<cadkit.modeling.Part> return null;
+
  override public function geometry(detail:ComponentDetail=Preview):Part return detail==Envelope?super.geometry(detail):profile(length,holePositions);
  public static function profile(length:Float,holes:Array<Float>):Part {
   var s=Shape.importStep(SupplierRailAssets.path("HGR25R")),b=s.bounds();

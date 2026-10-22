@@ -48,6 +48,9 @@ class HiwinHgh15ca extends LinearRailBlock {
  }
  override public function componentType():Null<ComponentType> return persisted ? referenceRecipeType() : null;
  override public function values():ComponentValues return persisted ? new ComponentValues() : super.values();
+ /** Drawn from its own CAD, whose shape sets its mass. */
+ override public function massGeometry():Null<cadkit.modeling.Part> return null;
+
  override public function geometry(detail:ComponentDetail=Preview):Part {
   if(closed)throw "HGH15CA reference is closed";
   // Saved recipes retain no native CAD owner; explicit-path callers keep the original owned API.

@@ -68,6 +68,20 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
 
   override public function hasGeometry():Bool return true;
 
-  override public function geometry(detail:ComponentDetail = Preview):Part
-    return Solids.named(Part.cylinderSpan(bodyDiameter / 2, 0, bodyLength), "body");
+  /**
+   * The envelope is the housing cylinder. The preview has a clamping flange at the mount, the housing, a rear
+   * cover and the hollow bore it rides the shaft on.
+   */
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    if (detail == Envelope) return envelope();
+    var d = bodyDiameter, l = bodyLength, flange = Math.min(2.5, l * 0.15), cover = Math.min(3, l * 0.15);
+    return Solids.named(RoundHousing.part([
+      {z0: 0, z1: flange, diameter: d}, {z0: flange, z1: l - cover, diameter: d * 0.94}, {z0: l - cover, z1: l, diameter: d * 0.88}
+    ], d * 0.16, 0, 3, d * 0.82, Math.max(2, d * 0.07)), "body");
+  }
+
+  /** Its mass is that of the plain housing cylinder (the drawn flange, cover and bore do not set it). */
+  override public function massGeometry():Null<Part> return envelope();
+
+  function envelope():Part return Solids.named(Part.cylinderSpan(bodyDiameter / 2, 0, bodyLength), "body");
 }

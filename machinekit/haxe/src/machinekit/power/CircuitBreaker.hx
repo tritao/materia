@@ -49,9 +49,12 @@ class CircuitBreaker extends AssumedCatalogComponent {
   override function effectiveDensity():Null<Float>
     return machinekit.component.EffectiveDensities.DinRailSwitchgear;
 
+  override public function presentationView():Null<machinekit.component.ComponentView> return DinRailDevice.view();
+
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    return Solids.named(Part.box(n("poleWidth") * parameterCount("poles"),
-      n("depth"), n("height")), "breaker-envelope");
+    var width = n("poleWidth") * parameterCount("poles");
+    if (detail == Envelope) return Solids.named(Part.box(width, n("depth"), n("height")), "breaker-envelope");
+    return Solids.named(DinRailDevice.part(width, n("depth"), n("height")), "breaker");
   }
 
 }
