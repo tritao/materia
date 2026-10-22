@@ -23,7 +23,73 @@ class FillGeometryNativeTests {
 			for (box in boxes) owned.push(ToolingBlock.placedBox(box));
 			return Part.fuseAll(owned);
 		});
+	/** The washer is against the anchor's head, not clamped against the insert.
+	 * Its clearance bore is open below; the real head closes its upper end. */
+	static function anchorWasherPocket():Void {
+		var scope=new cadkit.modeling.Scope();
+		try {
+			var screw=machinekit.standard.SocketHeadCapScrew.metric("M3",12,machinekit.standard.PropertyClass.Steel88);
+			var washer=machinekit.standard.FlatWasher.metric("M3");
+			var boltLocal=scope.own(screw.geometry()),washerLocal=scope.own(washer.geometry());
+			var bolt=scope.own(boltLocal.translated(new Vector(0,0,8)));
+			var washerPart=scope.own(machinekit.assembly.PosedParts.moved(washerLocal,
+				{x:0,y:0,z:8,qx:1,qy:0,qz:0,qw:0}));
+			bolt.shape.setThreadedFaces([]);
+			var body=scope.own(Part.box(20,20,14));
+			var resin=scope.own(body.subtractAll([bolt,washerPart]));
+			var nearMiss=scope.own(Part.cylinderSpan(1.49,7.5,8));
+			var boundaries:Array<machinekit.tooling.CastingFillAnalysis.NativeFillPart> = [
+				{id:"anchor-A-bolt",sourceIds:["seat-A","back-anchor"],part:bolt},
+				{id:"anchor-A-washer",sourceIds:["seat-A","back-anchor"],part:washerPart},
+				{id:"near-miss",part:nearMiss}
+			];
+			var s=settings(),report=CastingFillAnalysis.analyze("washer-fixture",resin,14,s,boundaries);
+			check(report.trappedPockets.length==1,"a resin-accessible under-head washer clearance remains a real trap");
+			var pocket=report.trappedPockets[0];
+			near(pocket.volumeMm3,Math.PI*(1.6*1.6-1.5*1.5)*0.5,"trap is the exact M3 washer/shank clearance annulus");
+			near(pocket.sealedAtMm,7.5,"washer mouth seals at its actual lower face");
+			near(pocket.proposedVentPoint.z,8,"screw head is the actual pocket ceiling");
+			check(pocket.sourceIds.join(",")=="anchor-A-bolt,anchor-A-washer,back-anchor,seat-A",
+				"touching boundary faces name both hardware members, the source anchor and insert; a near miss contributes nothing");
+			var geometry=new CastingFillGeometry("washer-fixture",resin);
+			try {
+				var before=geometry.airComponents(7.49);
+				check(before.length==1,"washer bore actually connects to the resin domain before the mouth seals");
+				for (part in before) part.close();
+				switch pocket.geometry {
+					case CadAirAbove(height,key):
+						var regions=geometry.airComponents(height);
+						var outer=scope.own(Part.cylinderSpan(1.6,7.5,8)),inner=scope.own(Part.cylinderSpan(1.5,7.5,8));
+						var annulus=scope.own(outer.subtract(inner));
+						var matches=0;
+						for (region in regions) {
+							if (CastingFillGeometry.componentKey(region)==key) {
+								matches++;
+								var missing=scope.own(region.subtract(annulus)),extra=scope.own(annulus.subtract(region));
+								near(missing.volume()+extra.volume(),0,"componentKey resolves to exactly the washer annulus by symmetric difference");
+							}
+							region.close();
+						}
+						check(matches==1,"recorded hardware pocket has one exact source region");
+					case Rectilinear(_,_):throw "Expected native washer pocket";
+				}
+				geometry.close();
+			} catch (error:Dynamic) {geometry.close();throw error;}
+			boundaries.reverse();
+			var reordered=CastingFillAnalysis.analyze("washer-fixture",resin,14,s,boundaries);
+			check(materia.tooling.ToolingCodec.canonical(reordered.trappedPockets)==materia.tooling.ToolingCodec.canonical(report.trappedPockets),
+				"hardware boundary order cannot change pocket IDs or attribution");
+			var flipped=scope.own(machinekit.assembly.PosedParts.moved(resin,
+				{x:0,y:0,z:14,qx:1,qy:0,qz:0,qw:0}));
+			var inverted=CastingFillAnalysis.analyze("washer-fixture",flipped,14,s);
+			check(inverted.trappedPockets.length==1,"inverting the real screw vents the washer but exposes its downward-open hex socket");
+			near(inverted.trappedPockets[0].volumeMm3,Math.sqrt(3)/2*screw.spec.socketSize*screw.spec.socketSize*screw.spec.socketDepth,
+				"only the actual hex socket traps air after inversion; the annulus is genuinely vented");
+			scope.close();
+		} catch (error:Dynamic) {scope.close();throw error;}
+	}
 	public static function run():Void {
+		anchorWasherPocket();
 		var distantA=ToolingBlock.placedBox({x:10000,y:10000,z:10000,width:10,depth:10,height:10});
 		var distantB=ToolingBlock.placedBox({x:20000,y:20000,z:20000,width:10,depth:10,height:10});
 		check(CastingFillGeometry.componentKey(distantA)!=CastingFillGeometry.componentKey(distantB),

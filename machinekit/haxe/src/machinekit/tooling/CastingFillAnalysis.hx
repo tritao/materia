@@ -8,7 +8,9 @@ import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingIds;
 import materia.tooling.ToolingCodec;
 
-typedef NativeFillPart = {var id:String; var part:Part;}
+/** Boundary owners supplement the globally unique member ID. Anchor IDs are
+ * local to their insert, so both source IDs accompany the hardware member. */
+typedef NativeFillPart = {var id:String; var part:Part; var ?sourceIds:Array<String>;}
 
 /** The native BREP backend of the shared flat-free-surface process model.
  * Input parts are borrowed. Pocket geometry names an exact source component,
@@ -38,6 +40,45 @@ class CastingFillAnalysis {
 		return result;
 	}
 
+	/** Solid/solid common deliberately discards a touching face. Attribution
+	 * needs the common of the boundary faces instead, without expanding either
+	 * shape or treating a near miss as contact. Input parts remain borrowed. */
+	static function boundaryArea(a:Model,b:Model):Float {
+		// Bounds reject disjoint candidates only. A global surface-distance
+		// minimization is unnecessary: the face Boolean below decides contact.
+		var leftBounds=a.shape.bounds(),rightBounds=b.shape.bounds();
+		var lo=leftBounds.get_min(),hi=leftBounds.get_max();
+		var otherLo=rightBounds.get_min(),otherHi=rightBounds.get_max();
+		if (hi.get_x()<otherLo.get_x() || otherHi.get_x()<lo.get_x()
+			|| hi.get_y()<otherLo.get_y() || otherHi.get_y()<lo.get_y()
+			|| hi.get_z()<otherLo.get_z() || otherHi.get_z()<lo.get_z()) return 0;
+		var scope=new cadkit.modeling.Scope();
+		try {
+			function faces(part:Model):Model {
+				var shapes:Array<cadkit.Shape> = [];
+				for (index in 0...part.shape.subshapeCount(CadKit.ShapeKind.Face))
+					shapes.push(scope.own(new Model(part.shape.subshape(CadKit.ShapeKind.Face,index))).shape);
+				return scope.own(new Model(cadkit.Shape.compound(shapes)));
+			}
+			var left=faces(a),right=faces(b);
+			var common=scope.own(new Model(left.shape.common(right.shape))),area=common.shape.area();
+			scope.close();return area;
+		} catch (error:Dynamic) {scope.close();throw error;}
+	}
+
+	static function boundaryIds(part:Model,boundaries:Null<Array<NativeFillPart>>,sourceId:String):Array<String> {
+		var ids:Array<String> = [];
+		if (boundaries!=null) for (boundary in boundaries) if (boundaryArea(part,boundary.part)>EPS) {
+			var owners=boundary.sourceIds==null ? [] : boundary.sourceIds;
+			for (id in [boundary.id].concat(owners)) {
+				ToolingIds.validate(id);
+				if (ids.indexOf(id)<0) ids.push(id);
+			}
+		}
+		if (ids.length==0) ids.push(sourceId);
+		ids.sort(Reflect.compare);return ids;
+	}
+
 	/** Bridge actual source and actual mold members into the one process pipeline. */
 	public static function fromPlan(plan:materia.tooling.casting.CastingMoldPlan,settings:FillSourceSettings):FillAssessment {
 		materia.tooling.casting.CastingMoldPlanner.validate(plan);
@@ -50,14 +91,14 @@ class CastingFillAnalysis {
 				var local=own(resources,machinekit.structural.CastingCavityCad.part(cavity));
 				boundaries.push({id:cavity.parentId,part:own(resources,machinekit.assembly.PosedParts.moved(local,plan.document.setup.sourceToMold))});
 			}
-			var owners=new Map<String,String>();
-			for (anchor in CastingMoldCad.anchorComponents(plan)) owners.set(anchor.id,anchor.insertId);
+			var owners=new Map<String,Array<String>>();
+			for (anchor in CastingMoldCad.anchorComponents(plan)) owners.set(anchor.id,[anchor.insertId,anchor.anchorId]);
 			var assembly=CastingMoldCad.assembly(plan),poses=assembly.solvedPoses();
 			for (member in assembly.components()) if (member.component.hasGeometry()) {
 				var local=own(resources,member.component.geometry());
 				var world=own(resources,machinekit.assembly.PosedParts.moved(local,poses.get(member.id)));
 				world.shape.setThreadedFaces([]);
-				if (owners.exists(member.id)) boundaries.push({id:owners.get(member.id),part:world});
+				if (owners.exists(member.id)) boundaries.push({id:member.id,sourceIds:owners.get(member.id),part:world});
 				var box=world.shape.bounds(),a=box.get_min(),b=box.get_max();
 				if (b.get_z()>=plan.document.setup.fillHeightMm-EPS
 					&& b.get_x()>lo.get_x()-EPS && a.get_x()<hi.get_x()+EPS
@@ -143,11 +184,7 @@ class CastingFillAnalysis {
 						resources.remove(part);part.close();continue;
 					}
 					var ceiling=new CastingFillGeometry(sourceId,part);geometries.push(ceiling);
-					var point=ceiling.highestPoint(),ids:Array<String> = [];
-					if (boundaries!=null) for (boundary in boundaries)
-						if (commonMeasure(part,boundary.part,false)>EPS && ids.indexOf(boundary.id)<0) ids.push(boundary.id);
-					if (ids.length==0) ids.push(sourceId);
-					ids.sort(Reflect.compare);
+					var point=ceiling.highestPoint(),ids=boundaryIds(part,boundaries,sourceId);
 					pockets.push({id:"air-"+haxe.crypto.Sha256.encode(ToolingCodec.canonical({heightMm:height,componentKey:key})).substr(0,16),
 						sealedAtMm:height,volumeMm3:part.volume(),geometry:CadAirAbove(height,key),sourceIds:ids,
 						proposedVentPoint:{x:point.x,y:point.y,z:point.z}});
@@ -204,10 +241,7 @@ class CastingFillAnalysis {
 					var ceilings=geometry.ceilingWidths(open),offending:Array<String> = [];
 					for (ceiling in ceilings) own(resources,ceiling.face);
 					for (ceiling in ceilings) if (ceiling.widthMm>widthLimit+1e-6) {
-						var ids:Array<String> = [];
-						if (boundaries!=null) for (boundary in boundaries)
-							if (commonMeasure(ceiling.face,boundary.part,false)>EPS && ids.indexOf(boundary.id)<0) ids.push(boundary.id);
-						if (ids.length==0) ids.push(sourceId);
+						var ids=boundaryIds(ceiling.face,boundaries,sourceId);
 						for (id in ids) if (offending.indexOf(id)<0) offending.push(id);
 					}
 					offending.sort(Reflect.compare);

@@ -117,6 +117,22 @@ class InsertAnchorTests {
 			machinekit.tooling.CastingFillAnalysis.fromPlan);
 		check(nativeProcess.fill!=null && nativeProcess.pour!=null && nativeProcess.sections==null,
 			"native fill enters the shared process and pour pipeline while orthogonal sections remain unsupported");
+		var anchorFill:materia.tooling.process.FillAnalysis.FillReport=cast nativeProcess.fill;
+		check(anchorFill.trappedPockets.length==anchors.length,"each downward-open anchor washer retains its real air trap");
+		for (anchor in anchors) {
+			var members=machinekit.tooling.CastingMoldCad.anchorComponents(cast assessment.plan,"seat")
+				.filter(member -> member.anchorId==anchor.id);
+			var pockets=anchorFill.trappedPockets.filter(pocket -> pocket.sourceIds.indexOf("seat")>=0
+				&& pocket.sourceIds.indexOf(anchor.id)>=0);
+			check(pockets.length==1 && members.length==2
+				&& members.filter(member -> pockets[0].sourceIds.indexOf(member.id)>=0).length==2,
+				"planned fill names the insert, its source anchor and both bounding hardware members");
+			var proposals=nativeProcess.castability.proposals.filter(proposal -> proposal.rule=="process.fill.trap."+pockets[0].id);
+			check(proposals.length==1 && proposals[0].action==CastabilityAction.RouteVent
+				&& proposals[0].sourceIds.join(",")==pockets[0].sourceIds.join(",")
+				&& proposals[0].instruction.indexOf("pre-pour fill/seal")>=0,
+				"actual anchor and insert IDs reach the vent or explicitly modelled seal proposal");
+		}
 		check(nativeProcess.validation.filter(record -> record.rule=="process.fill.geometry"
 			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
 			"native source geometry replaces the unavailable fill projection");

@@ -2388,3 +2388,31 @@ although the accepted blind-thread design uses a 30 mm anchor. Its later direct
 insert-dimension accesses also predate the body-record migration. That other
 session's check was not edited or weakened. The dedicated installed-foot tests
 and current mold/frozen-geometry checks pass independently.
+
+- [x] Anchor-washer fill findings: diagnose the 74 base traps without changing
+  the resin domain or hiding small regions. The recorded component
+  `region-537a567194a8f2ac264c83b1` at Z **37.6–38.1 mm** is exactly the
+  **1.5–1.6 mm radius** washer-bore annulus on
+  `columnLeftRear / back-anchor-1-0` (CAD symmetric difference **0 mm³**).
+  Its hardware members are `anchor-2506ebc2d947f084bb27-bolt` and
+  `anchor-2506ebc2d947f084bb27-washer`. The M3 washer sits against the screw
+  head, spaced from the insert: resin reaches the washer bore from below, while
+  the head caps it above. Each **0.4869468613 mm³** pocket is a real air trap,
+  not thread engagement or an inaccessible clamped interface. Keep all failures.
+  Solid/solid Boolean common drops shared faces; attribution now intersects
+  boundary faces and names the insert, its local anchor ID and both actual
+  hardware member IDs. Bounds only reject disjoint owner candidates; the exact
+  face Boolean decides contact, without a global surface-distance solve. Existing vent proposals also identify an explicitly
+  specified pre-pour fill/seal as an alternative; no seal is assumed or added
+  to geometry. Native fixtures check exact annular symmetric difference, the
+  open resin connection, boundary-order independence, a non-contacting near
+  miss and inversion (washer vents; the inverted screw socket traps instead).
+  Validation: focused fill **78**, anchor integration **83**; full neutral
+  **1,952**, native **732**, additional exact-fill/core/former **183**,
+  and all four CadKit CTest suites pass. Both packages regenerate, including
+  mill source/manifest tamper checks. All **74** pocket IDs, component keys,
+  exact volumes, event levels, fill quantities and **40** programs are unchanged.
+  Each pocket has its own source insert/anchor and both hardware IDs in the
+  fill report, validation and castability proposal. The **265**-artifact kit has
+  **6,034,663** verified bytes; readiness remains **false** with
+  **890 Pass / 486 Pending / 141 Unsupported / 74 Fail**.

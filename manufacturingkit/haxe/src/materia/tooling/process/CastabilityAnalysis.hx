@@ -210,7 +210,7 @@ class CastabilityAnalysis {
 			}
 			for (pocket in fill.trappedPockets)
 				proposals.push(proposal("process.fill.trap." + pocket.id, pocket.sourceIds, RouteVent, ToolingReview,
-					"Route a continuous vent from this candidate ceiling point to atmosphere, with a sealing/plug plan; if it crosses casting material, request a source change. Rerun topology and CAD.",
+					"Route a continuous vent from this candidate ceiling point to atmosphere, with a sealing/plug plan; if it crosses casting material, request a source change. For a hardware-bounded recess, an explicitly specified pre-pour fill/seal is an alternative: model its actual occupied volume before treating the recess as closed. Rerun topology and CAD.",
 					null, null, null, null, pocket.proposedVentPoint));
 		}
 		if (sections != null && maximum == null && limits.maximumSectionThicknessMm == null)
