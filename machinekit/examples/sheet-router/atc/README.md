@@ -104,7 +104,7 @@ and reports PASS only after both changes. For the focused mass/modal/weld rechec
 `y2600.json` and `y3150.json` SR6 manifests. The sampler is launched without the host
 LD_LIBRARY_PATH to prevent loading an incompatible MotionKit ABI.
 
-`build/sheet-router-evidence/sr7-atc.tar.gz` retains reports, native logs,
+`/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr7-atc.tar.gz` retains reports, native logs,
 planner/runtime dependencies, mass exports, the focused joint-model structural
 recheck and source inputs. Its member manifest and archive index record hashes.
 The earlier SR6 archive remains immutable evidence for the released weld model;

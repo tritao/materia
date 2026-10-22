@@ -93,4 +93,4 @@ Run `bash machinekit/examples/sheet-router/vacuum/check.sh` from the repository
 root. It builds only Haxe code against existing StockKit/CAD native providers,
 then runs the core component tests and both-bed vacuum tests under heavy-run.
 `validation.json` retains the native report. The archive
-`build/sheet-router-evidence/sr8-vacuum.tar.gz` retains source inputs and logs.
+`/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr8-vacuum.tar.gz` retains source inputs and logs.

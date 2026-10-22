@@ -58,5 +58,5 @@ Primary format references: Autodesk's [SPLINE groups](https://help.autodesk.com/
 [VERTEX bulge definition](https://help.autodesk.com/cloudhelp/2024/ENU/AutoCAD-DXF/files/GUID-0741E831-599E-4CBF-91E1-8ADBCFD6556D.htm), and
 [INSERT groups](https://help.autodesk.com/cloudhelp/2017/ENU/AutoCAD-DXF/files/GUID-28FA4CFB-9D5E-4880-9F11-36C97578252F.htm).
 
-Retained packet: `build/sheet-router-evidence/sr10-dxf.tar.gz`, SHA-256
+Retained packet: `/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr10-dxf.tar.gz`, SHA-256
 `0fb5d9a3f6e23b606f641c8120fa29d4135ec94b49efe2e98f37cc60ba905ca8`; regular-file member hashes verified.

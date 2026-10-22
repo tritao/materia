@@ -7,7 +7,7 @@ router_sampler=${SHEET_ROUTER_PLANNER_SAMPLE:-"$router_output/planner-sample"}
 mkdir -p "$router_output"
 if [[ ! -x "$router_sampler" ]]; then
   [[ ! -e "$router_sampler" && ! -L "$router_sampler" ]] || { echo "Refusing to overwrite planner sampler" >&2; exit 2; }
-  "$router_heavy" --mem 3G --need 1G --label router-atc-sampler python3 - "$router_repo/build/sheet-router-evidence/sr7-atc.tar.gz" "$router_output" <<'PYTOOL'
+  "$router_heavy" --mem 3G --need 1G --label router-atc-sampler python3 - "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr7-atc.tar.gz" "$router_output" <<'PYTOOL'
 import os,sys,tarfile,pathlib
 root=pathlib.Path(sys.argv[2]);(root/'native').mkdir(exist_ok=True)
 with tarfile.open(sys.argv[1],'r:gz') as archive:

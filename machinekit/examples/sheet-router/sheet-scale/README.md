@@ -83,6 +83,6 @@ rays conservatively invalidates intersecting rows/columns, so the worker may reb
 more chunks than the direct cut, while still avoiding a full rebuild in the fixture.
 Host and browser preparation share the target-body filter.
 
-Retained run packet: `build/sheet-router-evidence/sr9-sheet-scale.tar.gz`
+Retained run packet: `/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr9-sheet-scale.tar.gz`
 (SHA-256 `cee05548db25268f7015b04b43f1ece7a6915f6d9d6ef18bcfd490b99e1ec29d`). It contains regular files only and a verified member
 manifest. Re-running the checks updates working logs under `build/sheet-router-work/sr9`.

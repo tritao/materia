@@ -112,5 +112,5 @@ until a qualified CNC execution/output mapping exists; allocation and preview wo
 without consuming stock. SR13/commissioning, physical tool reach and MotionKit
 OM-R1/SR16 acceptance gates stay in force. No router structure was changed.
 
-Retained packet: `build/sheet-router-evidence/sr12-nesting.tar.gz`, SHA-256
+Retained packet: `/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr12-nesting.tar.gz`, SHA-256
 `a808f053601f7b93854bf6e97014f412f9dd95ae726296c3164c9b6b2114e57e`; regular-file member hashes verified.

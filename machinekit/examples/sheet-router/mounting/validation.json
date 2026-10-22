@@ -3,7 +3,7 @@
   "coreCommit": "b4905d034",
   "rackConnectorFixCommit": "a2336dacf",
   "priorFixtureCommit": "98e217b1a",
-  "archive": "build/sheet-router-evidence/shared-mount-receiver.tar.gz",
+  "archive": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/shared-mount-receiver.tar.gz",
   "archiveSha256": "fcba852652b4aa9f2bb84666c220094d2a154997da0cf1c2a13444a5544ee3d8",
   "bytes": 629066,
   "verifiedRegularFiles": 49,
@@ -17,7 +17,7 @@
     "receiverMassKg": 2.3624340551720606
   },
   "previousCoreArchive": {
-    "archive": "build/sheet-router-evidence/shared-mount-core.tar.gz",
+    "archive": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/shared-mount-core.tar.gz",
     "archiveSha256": "ae4f928b31b26380ecfc15ad767177299ef949ad09af76bce3fd24b2726e015a",
     "bytes": 328758,
     "verifiedRegularFiles": 32

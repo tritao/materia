@@ -92,5 +92,5 @@ SR13/SR16 remain held for MotionKit OM-R1 and cutting/commissioning acceptance.
 Direction convention follows the existing CamKit convention and [Autodesk's
 climb/conventional reference](https://help.autodesk.com/cloudhelp/ENU/Fusion-CAM/files/GUID3DCDDEC0-95C8-4444-8DC4-74E1B20F9413.htm).
 
-Retained packet: `build/sheet-router-evidence/sr11-sheet-operations.tar.gz`,
+Retained packet: `/media/joao/DEV/materia-fem-runs/sheet-router-evidence/sr11-sheet-operations.tar.gz`,
 SHA-256 `36df6f76160ac5e97e710ee3029d69b606596f6ac8b85b5fee8fa8f31a8029e4`; regular-file member hashes verified.
