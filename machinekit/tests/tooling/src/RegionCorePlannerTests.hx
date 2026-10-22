@@ -88,6 +88,11 @@ class RegionCorePlannerTests {
 		check(!fabrication.fabrication.ready,"geometric cutting evidence never grants physical fabrication readiness");
 	}
 
+	public static function options(document:materia.tooling.ToolingDocument):CastingMoldOptions
+		return {foundationJointProcesses:[],replicationJigs:[],precision:[],
+			compaction:{method:Undeclared,bedInterfaceReference:null,frequencyHz:null,amplitudeMm:null,durationSeconds:null,evidence:[]},
+			serviceOrientation:document.setup.sourceToMold,overlapRule:ReservedThenPriority,liftingEvidence:[]};
+
 	public static function main():Void run();
 	public static function run():Void {
 		var document=SinglePocketSetup.document(),feature=document.input.features.filter(row -> row.id=="pocket")[0];
@@ -97,9 +102,7 @@ class RegionCorePlannerTests {
 		document.recipe.core.height=16;
 		document.recipe.hardware.minimumBridgeWidth=40;
 		document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
-		var options:CastingMoldOptions={foundationJointProcesses:[],replicationJigs:[],precision:[],
-			compaction:{method:Undeclared,bedInterfaceReference:null,frequencyHz:null,amplitudeMm:null,durationSeconds:null,evidence:[]},
-			serviceOrientation:document.setup.sourceToMold,overlapRule:ReservedThenPriority,liftingEvidence:[]};
+		var options=RegionCorePlannerTests.options(document);
 		var plan=machinekit.tooling.CastingMoldCad.plan(document,options);
 		check(plan.cores.length==1 && plan.formers.length==0,"a triangular source cavity uses one exact EPS core");
 		var core=plan.cores[0];

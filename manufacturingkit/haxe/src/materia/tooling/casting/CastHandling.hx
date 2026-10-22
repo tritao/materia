@@ -11,6 +11,23 @@ import materia.tooling.casting.MoldPlan.MoldBox;
 /** Exact box moments retain their algebraic path. Non-box source geometry
  * uses the application kernel, with results expressed in mm/kg. */
 class CastHandling {
+	/** Resin quantity of the complete source casting. Cavities retain their exact
+	 * regions; anchor hardware outside the steel blank displaces mix as well.
+	 * Stock/layout bounds never enter this material calculation.
+	 */
+	public static function resinVolume(d:ToolingDocument):Float {
+		var region=materia.casting.CastingRegion.Difference(MoldRegions.envelope(d),
+			[for (feature in d.input.features) MoldRegions.feature(d,feature.id)]);
+		var volume=MoldRegions.volume(region,d.input.id);
+		for (insert in d.input.inserts) {
+			var spec:materia.casting.InsertSpec={body:insert.body,holes:insert.holes,origin:insert.origin,
+				interfaces:insert.interfaces,anchorage:insert.anchorage};
+			volume-=materia.casting.EmbeddedAnchors.moments(spec,true).volume;
+		}
+		if (!Math.isFinite(volume) || volume<=0) throw "Casting requires positive resin volume: "+d.input.id;
+		return volume;
+	}
+
 	/** Existing source mass calculation shared by handling and lifting proposals. */
 	public static function moments(d:ToolingDocument,envelope:MoldBox):{
 		massKg:Float,centerOfMassMoldMm:{x:Float,y:Float,z:Float}

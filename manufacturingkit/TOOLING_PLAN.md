@@ -2221,7 +2221,31 @@ by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
   hash-verified artifacts, **40** programs, **5,154,775** bytes;
   **889 Pass / 402 Pending / 123 Unsupported / 74 Fail**, readiness **false**.
   Existing trapped-air failures and physical evidence requirements remain explicit.
-- [ ] Non-box EPS/envelope support and former CAM remain unfinished. These
+- [x] Drafted EPS is implemented and verified. The authored opening
+  stays fixed while the exact walls taper inward. Normal lining offsets retain
+  the draft; wire-normal stock layers retain the ruled shape. Cross-profile
+  splitting that would lose this construction is rejected with the feature ID.
+  Focused drafted-core **25** assertions pass, covering analytic rounded-frustum
+  volume, lining/glue, exact drawings, strict regeneration, reconstruction, both
+  swept graphs and native fill uplift. Registered combined regressions pass
+  **36** prism-core, **25** drafted-core and **34** mixed-mold assertions. Final
+  full validation is recorded below.
+- [x] Orientation effort migration: a native drafted-EPS regression reproduced
+  the remaining box-only `featureBox` call in effort metrics. Metrics now use the
+  shared exact source cavity expression and subtract exposed anchor hardware.
+  The full drafted orientation passes actual CAD/graph evidence and analytic
+  resin mass within **25** drafted assertions. Anchor **75** assertions verify
+  mix quantities against actual foundation CAD; pure tooling **1,903** stays
+  green. Final native **702**, casting **54**, CAD **60** (all five symmetric
+  differences zero), geometry **104**, kernel **28**, region **36 + 25 + 34**,
+  sections **24**, drawing/package **70**, mill **313**, rails **116**, lifting
+  **457**, sockets **110** and production mold **672** pass. Foundation **463**,
+  design **32**, CamKit **12,386** and all four CadKit CTest suites remain
+  verified. Both example packages regenerate. The mill kit has **265**
+  independently hash-verified artifacts, **40** programs and **5,154,782**
+  bytes: **889 Pass / 402 Pending / 123 Unsupported / 74 Fail**; readiness
+  stays **false**, with trapped-air failures and physical requirements explicit.
+- [ ] Non-box envelope support and former CAM remain unfinished. These
   slices do not complete step 3.
 - [x] Draft source convention confirmed: authored dimensions belong to the
   withdrawal opening; walls taper inward along the declared source-coordinate

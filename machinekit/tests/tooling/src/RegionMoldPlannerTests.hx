@@ -55,6 +55,7 @@ class RegionMoldPlannerTests {
 
 	public static function main():Void {
 		RegionCorePlannerTests.run();
+		DraftedCorePlannerTests.run();
 		var d=SinglePocketSetup.document(18,false,true);
 		d.input.inserts=[];
 		d.input.features=d.input.features.filter(feature -> feature.id=="pocket");

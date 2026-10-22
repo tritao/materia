@@ -145,6 +145,11 @@ class InsertAnchorTests {
 		try {
 			var mold:materia.tooling.casting.CastingMoldPlan=cast assessment.plan;
 			var resin=machinekit.tooling.CastingMoldCad.source(mold);owned.push(resin);
+			check(Math.abs(materia.tooling.casting.CastHandling.resinVolume(mold.document)-resin.volume())<1e-6,
+				"effort resin volume subtracts real exposed anchors from the shared source cavities");
+			var effort=materia.tooling.process.MoldOrientationStudy.metrics(mold,FabricationTests.spec());
+			check(Math.abs(effort.mixMassKg-resin.volume()*mold.document.recipe.mixDensityKgM3*1e-9)<1e-6,
+				"anchored orientation mix mass agrees with actual foundation CAD");
 			var reconstructed=machinekit.tooling.CastingMoldCad.reconstructed(mold);owned.push(reconstructed);
 			var missing=resin.subtract(reconstructed);owned.push(missing);
 			var added=reconstructed.subtract(resin);owned.push(added);

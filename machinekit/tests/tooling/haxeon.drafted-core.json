@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-drafted-core-tests"},
+  "entry": "DraftedCorePlannerTests",
+  "sourceRoots": ["src", "../../examples/box-mold", "../../../manufacturingkit/tests/tooling/src"],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/drafted-core"
+}
