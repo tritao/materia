@@ -42,6 +42,9 @@ class PneumaticManifold extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
+	/** A bar with its outlets drilled into the front (`PneumaticBodies.manifold`). The envelope box is also the mass model. */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.box(20, 10, 12 + 8 * outlets);
+		return detail == Envelope ? Part.box(20, 10, 12 + 8 * outlets) : PneumaticBodies.manifold(20, 10, 12 + 8 * outlets, outlets);
+
+	override public function massGeometry():Null<Part> return Part.box(20, 10, 12 + 8 * outlets);
 }

@@ -66,6 +66,9 @@ class VacuumGenerator extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
+	/** Venturi body with its ports and the silencer on top (`PneumaticBodies.vacuumGenerator`). The envelope box is also the mass model. */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.box(18, 14, 30);
+		return detail == Envelope ? Part.box(18, 14, 30) : PneumaticBodies.vacuumGenerator(18, 14, 30);
+
+	override public function massGeometry():Null<Part> return Part.box(18, 14, 30);
 }

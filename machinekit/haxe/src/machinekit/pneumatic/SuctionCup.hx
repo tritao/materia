@@ -89,6 +89,9 @@ class SuctionCup extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
+	/** Stem at the mount, flaring to the sealing lip at the contact face (`PneumaticBodies.suctionCup`). The envelope box is also the mass model. */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.cylinderSpan(diameter / 2, 0, height);
+		return detail == Envelope ? Part.cylinderSpan(diameter / 2, 0, height) : PneumaticBodies.suctionCup(diameter, height);
+
+	override public function massGeometry():Null<Part> return Part.cylinderSpan(diameter / 2, 0, height);
 }

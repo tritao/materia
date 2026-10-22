@@ -45,6 +45,9 @@ class VacuumControlValve extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
+	/** A valve body with its solenoid coil (`PneumaticBodies.valve`). The envelope box is also the mass model. */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.box(18, 16, 26);
+		return detail == Envelope ? Part.box(18, 16, 26) : PneumaticBodies.valve(18, 16, 26, 11, 1, []);
+
+	override public function massGeometry():Null<Part> return Part.box(18, 16, 26);
 }

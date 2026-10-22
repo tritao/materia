@@ -378,8 +378,10 @@ class EndEffectorComponentTests {
 			var properties = component.massProperties();
 			if (properties.mass <= 0 || properties.inertia == null)
 				throw 'Missing geometry-derived mass for ${component.designation}';
+			// From the drawing, or from the simplified solid that stands in for it (`massGeometry`).
 			switch properties.source {
 				case Computed(Preview):
+				case Modelled:
 				case _: throw 'Mass is not computed from geometry for ${component.designation}';
 			}
 		}

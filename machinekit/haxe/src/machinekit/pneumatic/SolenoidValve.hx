@@ -44,8 +44,11 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
 	public function controlSpec():machinekit.fluid.ValveControlSpec return PressureEffort(doubleSolenoid, normallyToA);
 	override public function valveSpec():Null<ValveSpec> return this;
 	override public function hasGeometry():Bool return true;
+	/** Spool body, solenoid coils and its P, A and B ports at their connectors (`PneumaticBodies.valve`). The envelope box is also the mass model. */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(bodyWidth, bodyDepth, bodyHeight), "valve");
+		return detail == Envelope ? Solids.named(Part.box(bodyWidth, bodyDepth, bodyHeight), "valve") : PneumaticBodies.valve(bodyWidth, bodyDepth, bodyHeight, 60, bodyWidth > 80 ? 2 : 1, [-25.0, 0.0, 25.0]);
+
+	override public function massGeometry():Null<Part> return Solids.named(Part.box(bodyWidth, bodyDepth, bodyHeight), "valve");
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.pneumatic.solenoid-valve", [
 			ComponentRecipeSupport.choice("solenoids", ["single", "double"], "single"),
