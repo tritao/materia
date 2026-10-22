@@ -2172,8 +2172,32 @@ by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
   hash-verified artifacts and **40** programs, **847 Pass / 402 Pending /
   123 Unsupported / 74 Fail**, readiness **false**. The trapped-air failures are
   preserved. Non-box side withdrawal and EPS remain explicitly Unsupported.
-- [ ] Non-box side access, EPS/envelope support and source/former drawings/CAM
-  remain unfinished. These slices do not complete step 3.
+- [x] Non-box side access uses the exact source section for the wall operation,
+  sealing neck and former flange; full reconstruction and continuous sweeps
+  cover all four side directions. Pure transverse conical sweeps use exact
+  tangent-generator subdivisions. General mold **18** and mold volume **5**
+  reject their previous encodings; tooling subtraction keeps exact regions.
+- [x] Finished former/fixture drawings emit neutral filled section records for
+  the planned CAM bridge. SVG/DXF use CadKit drawing exporters and retain exact arcs,
+  holes and islands; unsupported curves name the source member. Manifest **10**
+  hashes the report and drawings, rebuilds them from the mold and rejects
+  changed or omitted evidence. Reference end planes use exact shape distance,
+  never padded stock bounds. Native degree-one two-pole spline/Bezier edges
+  are recognized as lines by their control representation, not sampling.
+  Validation: foundation **463**, neutral tooling **1,897**, geometry **104**,
+  native kernel **20**, mixed molds **34**, filled sections **24** and drawing/
+  package integrity **70** pass. Full native **696**, casting **54**, design
+  **32**, CamKit **12,386** and mill **313** pass. CAD equivalence passes **60**
+  assertions with all five symmetric differences zero. Rail seats **116**,
+  lifting **457**, sockets **110**, production mold **672** and all four CadKit
+  suites pass. The datum section SVG was visually checked: blind locating cuts
+  appear only at their actual depths. Regenerated records kit: **229** independently
+  hash-verified artifacts, **40** programs, **5,033,091** bytes; **877 Pass /
+  402 Pending / 123 Unsupported / 74 Fail**, readiness **false**. All **30**
+  former/fixture drawing reports pass; each report and its SVG/DXF enter the
+  verified manifest. Existing trapped-air failures remain explicit.
+- [ ] Non-box EPS/envelope support and former CAM remain unfinished. These
+  slices do not complete step 3.
 - [x] Draft source convention confirmed: authored dimensions belong to the
   withdrawal opening; walls taper inward along the declared source-coordinate
   withdrawal axis. Finishing stock and process error budgets remain separate.

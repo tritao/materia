@@ -58,6 +58,16 @@ class DraftGeometryTests {
 			var openingArea=1200-(4-Math.PI)*16;
 			check(Math.abs(swept.volume()-expected-100*openingArea)<1e-4,
 				"rounded draft uses an exact conical sweep with the analytic nested-section volume");
+			var transverse=scope.own(machinekit.tooling.SweptRemoval.sweep(rounded,new Vector(100,0,0)));
+			var projectedArea=60*(30-offset);
+			check(transverse.valid() && Math.abs(transverse.volume()-expected-100*projectedArea)<1e-4,
+				"transverse conical sweep matches the analytic convex projection volume");
+			var failure="";
+			try {
+				var oblique=machinekit.tooling.SweptRemoval.sweep(rounded,new Vector(100,0,100));
+				oblique.close();
+			} catch (error:Dynamic) failure=Std.string(error);
+			check(failure=="Unsupported removal boundary surface","unimplemented oblique cone sweeps remain explicit");
 			return rounded;
 		}).close();
 		Scope.run(scope -> {

@@ -57,6 +57,46 @@ class FoundationJointDesignTests {
 		var message="";try fn() catch (error:Dynamic) message=Std.string(error);
 		check(message.indexOf(expected)>=0,'Expected "$expected", got "$message"');
 	}
+	static function drawingIntegrity(directory:String,fabrication:materia.tooling.export.ToolingFabrication.FabricationPlan,
+			checks:Array<materia.tooling.ToolingValidation>):Void {
+		var manifestPath=directory+"/manifest.json",manifestText=sys.io.File.getContent(manifestPath);
+		var manifest:Dynamic=haxe.Json.parse(manifestText);
+		check(manifest.version==10,"the section-drawing manifest has one new strict version");
+		try {
+			manifest.version=9;sys.io.File.saveContent(manifestPath,haxe.Json.stringify(manifest));
+			rejects(() -> machinekit.tooling.ToolingPackageManifest.verify(directory),"Unsupported tooling manifest");
+		} catch (error:Dynamic) {sys.io.File.saveContent(manifestPath,manifestText);throw error;}
+		sys.io.File.saveContent(manifestPath,manifestText);
+		var reportPath=directory+"/tooling-section-drawings.json",reportText=sys.io.File.getContent(reportPath);
+		var report:Dynamic=haxe.Json.parse(reportText),records:Array<Dynamic> =cast report.drawings;
+		var rendered=records.filter(record -> record.validation.status=="pass");
+		check(rendered.length>0,"the package includes finished tooling section evidence");
+		var name=machinekit.tooling.ToolingSectionReview.filename(rendered[0].id)+".svg";
+		var svgPath=directory+"/"+name,svg=sys.io.File.getContent(svgPath);
+		try {
+			sys.io.File.saveContent(svgPath,svg+"<!-- changed -->\n");
+			rejects(() -> machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks),
+				"Tooling drawing artifact differs from source");
+		} catch (error:Dynamic) {sys.io.File.saveContent(svgPath,svg);throw error;}
+		sys.io.File.saveContent(svgPath,svg);
+		try {
+			Reflect.setField(records[0],"sections",new Array<Dynamic>());
+			sys.io.File.saveContent(reportPath,materia.tooling.ToolingCodec.canonical(report));
+			rejects(() -> machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks),
+				"Tooling section drawings differ from finished source geometry");
+		} catch (error:Dynamic) {sys.io.File.saveContent(reportPath,reportText);throw error;}
+		sys.io.File.saveContent(reportPath,reportText);
+		try {
+			manifest=haxe.Json.parse(manifestText);
+			var files:Array<Dynamic> =cast manifest.files;
+			Reflect.setField(manifest,"files",files.filter(file -> file.path!=name));
+			sys.io.File.saveContent(manifestPath,materia.tooling.ToolingCodec.canonical(manifest));
+			rejects(() -> machinekit.tooling.ToolingPackageManifest.verify(directory),"Missing hashed tooling drawing");
+		} catch (error:Dynamic) {sys.io.File.saveContent(manifestPath,manifestText);throw error;}
+		sys.io.File.saveContent(manifestPath,manifestText);
+		machinekit.tooling.ToolingPackageManifest.verify(directory);
+	}
+
 	static function exportJoint(plan:materia.tooling.casting.CastingMoldPlan):Void {
 		var fabrication=materia.tooling.export.ToolingFabrication.plan(plan,FoundationContextTests.fabricationSpec());
 		var directory=Sys.getCwd()+"/build/tooling/synthetic-foundation-joint-"+fabrication.fingerprint.substr(0,12);
@@ -66,6 +106,7 @@ class FoundationJointDesignTests {
 		fabrication.validation=full.filter(c -> !StringTools.startsWith(c.rule,"tooling.foundation-joint."));
 		machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks);
 		fabrication.validation=full;machinekit.tooling.ToolingPackageManifest.verify(directory);
+		drawingIntegrity(directory,fabrication,checks);
 		var manifest:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/manifest.json"));
 		var rows:Array<Dynamic> = cast manifest.validation;
 		check(rows.filter(r -> StringTools.startsWith(Std.string(r.rule),"tooling.foundation-joint.")).length==18,

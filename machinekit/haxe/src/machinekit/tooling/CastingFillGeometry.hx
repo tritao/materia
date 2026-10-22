@@ -38,6 +38,20 @@ class CastingFillGeometry {
 		if (closed) throw "Closed fill geometry: "+sourceId;
 	}
 
+	/** Exact global height interval. Bounds only place enclosing planes; native
+	 * shape distance determines the actual extrema, including curved edges.
+	 */
+	public function heightInterval():Array<Float> {
+		ensureOpen();
+		var scope=new Scope();
+		try {
+			var lower=low.z-padding,upper=high.z+padding;
+			var bottom=scope.own(plane(lower)),top=scope.own(plane(upper));
+			var result=[lower+source.shape.distance(bottom.shape),upper-source.shape.distance(top.shape)];
+			scope.close();return result;
+		} catch (error:Dynamic) {scope.close();throw error;}
+	}
+
 	/** The complete height extrema of each conic/straight boundary edge, plus
 	 * its vertices. Finite planes enclose the whole XY projection, so exact
 	 * shape distance measures height rather than a distance to a plane edge.
@@ -62,7 +76,7 @@ class CastingFillGeometry {
 				if (kind!=CadKit.CurveKind.Line && kind!=CadKit.CurveKind.Circle
 					&& kind!=CadKit.CurveKind.Ellipse && kind!=CadKit.CurveKind.Parabola
 					&& kind!=CadKit.CurveKind.Hyperbola)
-					throw "Unsupported fill critical-height curve: "+sourceId;
+					throw "Unsupported fill critical-height curve: "+sourceId+" (kind "+kind+")";
 				heights.push(lower+edge.shape.distance(bottom.shape));
 				heights.push(upper-edge.shape.distance(top.shape));
 			}

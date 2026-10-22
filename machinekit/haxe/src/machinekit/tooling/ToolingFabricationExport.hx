@@ -250,6 +250,10 @@ class ToolingFabricationExport {
 		sys.FileSystem.createDirectory(dir);
 		classificationChecks=classificationChecks.concat(insertManufacturing(p,f,dir)).concat(replication(p,f,dir))
 			.concat(FoundationJointCad.review(p.document.input));
+		var sectionReview=ToolingSectionReview.build(p);
+		for (entry in sectionReview.sheets) drawing(dir,ToolingSectionReview.filename(entry.id),entry.sheet.drawing);
+		data(dir,"tooling-section-drawings.json",ToolingSectionReview.record(sectionReview,f.sourceFingerprint));
+		classificationChecks=classificationChecks.concat(sectionReview.validation);
 		foundationJoints(p,f,dir);
 		data(dir,"insert-anchorage.json",insertAnchorageReport(p,f.sourceFingerprint));
 		data(dir, "fabrication-plan.json", f);

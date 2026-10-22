@@ -21,7 +21,7 @@ class CastingMoldCodec {
 				Reflect.setField(resolved,key,key=="options" ? CastingMoldOptionsCodec.record(p.options) : Reflect.field(p,key));
 		return ToolingCodec.canonical({
 			format: "materia.casting-mold",
-			version: 17,
+			version: 18,
 			source: haxe.Json.parse(ToolingCodec.encode(p.document)),
 			options: CastingMoldOptionsCodec.record(p.options),
 			plan: resolved
@@ -32,7 +32,7 @@ class CastingMoldCodec {
 		if (s == null || haxe.io.Bytes.ofString(s).length > 4194304)
 			throw "Casting mold exceeds size limit";
 		var r:Dynamic = haxe.Json.parse(s);
-		if (r == null || Reflect.field(r, "format") != "materia.casting-mold" || Reflect.field(r, "version") != 17)
+		if (r == null || Reflect.field(r, "format") != "materia.casting-mold" || Reflect.field(r, "version") != 18)
 			throw "Unsupported casting mold format/version";
 		var d = ToolingCodec.decode(haxe.Json.stringify(Reflect.field(r, "source"))),
 			o = CastingMoldOptionsCodec.read(Reflect.field(r, "options")),

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-section-contour-tests"},
+  "entry": "SectionContourTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/section-contours",
+  "sources": ["src/SectionContourTests.hx"]
+}

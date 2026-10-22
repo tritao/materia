@@ -66,7 +66,22 @@ class ToolingPackageManifest {
 			throw "Insert anchorage source validation omitted or changed";
 		var anchorChecks:Array<ToolingValidation> =cast anchorReport.validation;
 		checks=checks.concat(anchorChecks);
-		return checks;
+		var drawings=ToolingSectionReview.build(plan);
+		path=dir+"/tooling-section-drawings.json";
+		if (!sys.FileSystem.exists(path)
+			|| ToolingCodec.canonical(haxe.Json.parse(sys.io.File.getContent(path)))
+				!=ToolingCodec.canonical(ToolingSectionReview.record(drawings,sourceFingerprint)))
+			throw "Tooling section drawings differ from finished source geometry";
+		for (entry in drawings.sheets) {
+			var name=ToolingSectionReview.filename(entry.id),drawing=entry.sheet.drawing;
+			for (file in [{extension:".svg",content:cadkit.drawing.Svg.write(drawing)},
+				{extension:".dxf",content:cadkit.drawing.Dxf.write(drawing)}]) {
+				path=dir+"/"+name+file.extension;
+				if (!sys.FileSystem.exists(path) || sys.io.File.getContent(path)!=file.content)
+					throw "Tooling drawing artifact differs from source: "+name+file.extension;
+			}
+		}
+		return checks.concat(drawings.validation);
 	}
 
 	static function digest(bytes:haxe.io.Bytes):String {
@@ -127,7 +142,7 @@ class ToolingPackageManifest {
 		records.sort((a, b) -> Reflect.compare(a.path, b.path));
 		var manifest:ToolingManifest = {
 			format: "materia.tooling-manifest",
-			version: 9,
+			version: 10,
 			phase: 5,
 			lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			sourceFingerprint: f.sourceFingerprint,
@@ -199,7 +214,7 @@ class ToolingPackageManifest {
 		for (key in keys)
 			if (!Reflect.hasField(manifest, key))
 				throw "Missing tooling manifest field";
-		if (manifest.format != "materia.tooling-manifest" || manifest.version != 9)
+		if (manifest.format != "materia.tooling-manifest" || manifest.version != 10)
 			throw "Unsupported tooling manifest";
 		if (!Std.isOfType(manifest.files, Array))
 			throw "Invalid tooling manifest files";
@@ -232,11 +247,17 @@ class ToolingPackageManifest {
 		for (record in readValidation(haxe.Json.parse(sys.io.File.getContent(dir + "/hardware-validation.json"))))
 			if (validationCounts.get(ToolingCodec.canonical(record)) != 1)
 				throw "Hardware validation omitted from readiness";
-		for (name in ["mold-plan.json","insert-manufacturing.json","insert-anchorage.json"])
+		for (name in ["mold-plan.json","insert-manufacturing.json","insert-anchorage.json","tooling-section-drawings.json"])
 			if (files.filter(file -> file.path==name).length!=1) throw "Missing hashed source manufacturing artifact: "+name;
-		for (record in sourceChecks(dir,manifest.sourceFingerprint))
+		for (record in sourceChecks(dir,manifest.sourceFingerprint)) {
 			if (validationCounts.get(ToolingCodec.canonical(record))!=1)
 				throw "Source manufacturing validation omitted from readiness";
+			if (StringTools.startsWith(record.rule,"fabrication.tooling-drawing.")
+				&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass)
+				for (artifact in record.evidence)
+					if (files.filter(file -> file.path==artifact).length!=1)
+						throw "Missing hashed tooling drawing: "+artifact;
+		}
 		var readiness = ToolingReadiness.evaluate(validation);
 		if (ToolingCodec.canonical(readiness) != ToolingCodec.canonical(manifest.fabrication))
 			throw "Tooling readiness differs from validation";

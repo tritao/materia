@@ -7,6 +7,52 @@ import materia.assembly.AssemblyFrames as F;
 class RegionMoldPlannerTests {
 	static var assertions=0;
 	static function check(value:Bool,message:String):Void {assertions++;if (!value) throw message;}
+	static function sideFormers(options:CastingMoldOptions):Void {
+		for (quarterTurn in [false,true]) {
+			var document=SinglePocketSetup.document(18,quarterTurn,true);
+			document.input.inserts=[];
+			var feature=materia.casting.CastingPatterns.box("side-window",
+				materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
+				[materia.casting.CastingPatterns.face("body.x-max")],81,40,40,80.5,0,30);
+			feature.cornerRadius=8;
+			feature.draft={degrees:2,axis:{x:1,y:0,z:0}};
+			document.input.features=[feature];
+			var direction=F.transformVector(document.setup.sourceToMold,1,0,0);
+			document.setup.features=[{featureId:feature.id,strategy:materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
+				priority:0,withdrawal:direction}];
+			document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
+			var authored=materia.tooling.casting.CastingMoldOptionsCodec.snapshot(options);
+			authored.serviceOrientation=document.setup.sourceToMold;
+			var plan=machinekit.tooling.CastingMoldCad.plan(document,authored),former=plan.formers[0];
+			check(former.volume.profiles.length==1,"side former carries one panel-operation sealing profile");
+			var profile=former.volume.profiles[0],wall=plan.panels.members.filter(member -> member.panel.id==profile.panelId)[0];
+			var operation=wall.panel.operations.filter(op -> op.id==profile.operationId)[0];
+			check(ToolingCodec.canonical(profile.contour)==ToolingCodec.canonical(operation.contour),
+				"side access CAD and panel drawings/CAM use the same exact operation contour");
+			check(Math.abs(materia.casting.CastingProfileGeometry.area(operation.contour)-(1600-(4-Math.PI)*64))<1e-7,
+				"side access preserves the authored rounded opening area under setup rotation");
+			var review=machinekit.tooling.CastingMoldCad.review(plan);
+			check(review.symmetricDifferenceMm3<1e-5,"side former reconstructs the exact tapered source cavity");
+			for (rule in ["assembly-graph","demolding-graph"])
+				check(review.validation.filter(record -> record.rule=="tooling.cad."+rule
+					&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
+					"side former passes complete "+rule+" sweeps under either setup orientation");
+			feature.draft.degrees=0;
+			document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
+			check(P.assess(document,authored).plan==null,
+				"a transverse zero-draft rounded box is not replaced by a reoriented corner profile");
+			var failure="";
+			feature.cornerRadius=2;
+			feature.draft.degrees=2;
+			feature.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(41,40,40));
+			feature.geometry.pose.x=100.5;
+			document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
+			try machinekit.tooling.CastingMoldCad.plan(document,authored) catch (error:Dynamic) failure=Std.string(error);
+			check(failure.indexOf("side-window")>=0 && failure.indexOf("Cutter exceeds internal radius")>=0,
+				"uncuttable side opening fails with its source feature ID");
+		}
+	}
+
 	public static function main():Void {
 		var d=SinglePocketSetup.document(18,false,true);
 		d.input.inserts=[];
@@ -30,6 +76,14 @@ class RegionMoldPlannerTests {
 				"positive aligned draft clears its release change request");
 			check(plan.validation.filter(record -> record.rule=="tooling.former.draft.pocket"
 				&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,"source draft has an explicit passing rule");
+			var sections=machinekit.tooling.ToolingSectionReview.build(plan);
+			check(sections.records.length==plan.formers.length+plan.fixtures.length
+				&& sections.validation.filter(record -> record.status!=materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==0,
+				"every finished tooling member has exact source-bound section drawing evidence: "+ToolingCodec.canonical(sections.validation));
+			check(ToolingCodec.canonical(machinekit.tooling.ToolingSectionReview.record(sections,plan.sourceFingerprint))
+				==ToolingCodec.canonical(machinekit.tooling.ToolingSectionReview.record(
+					machinekit.tooling.ToolingSectionReview.build(plan),plan.sourceFingerprint)),
+				"rebuilding a drawing report preserves its exact records and fingerprint");
 			var encoded=CastingMoldCodec.encode(plan);
 			check(CastingMoldCodec.encode(CastingMoldCodec.decode(encoded))==encoded,"native region plan regenerates through the strict codec");
 			P.setGeometry(null);
@@ -69,6 +123,7 @@ class RegionMoldPlannerTests {
 			check(mixedReview.validation.filter(record -> record.rule=="tooling.cad.demolding-graph"
 				&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
 				"mixed drafted formers and fixtures pass complete demolding sweeps");
+			sideFormers(options);
 			var oblique=ToolingCodec.snapshot(d);
 			oblique.input.features[0].draft.axis={x:0.6,y:0,z:0.8};
 			oblique.setup.sourceFingerprint=ToolingCodec.inputFingerprint(oblique.input);

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-drawing-package-tests"},
+  "entry": "FoundationJointDesignTests",
+  "sourceRoots": ["src", "../../examples/box-mold"],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/drawing-package",
+  "sources": ["src/FoundationJointDesignTests.hx"]
+}

@@ -12,7 +12,7 @@ import materia.tooling.casting.MoldPlan.MoldBox;
 /** Exact boxes and operation-derived sealing profiles; no tessellation or compensation. */
 class MoldVolumeCodec {
 	public static function encode(v:MoldVolume):String {
-		var s = ToolingCodec.canonical({format: "materia.mold-volume", version: 4, volume: snapshot(v)});
+		var s = ToolingCodec.canonical({format: "materia.mold-volume", version: 5, volume: snapshot(v)});
 		if (haxe.io.Bytes.ofString(s).length > 524288)
 			throw "Mold volume exceeds limit";
 		return s;
@@ -23,7 +23,7 @@ class MoldVolumeCodec {
 			throw "Mold volume exceeds limit";
 		var r:Dynamic = haxe.Json.parse(s);
 		object(r, ["format", "version", "volume"]);
-		if (Reflect.field(r, "format") != "materia.mold-volume" || Reflect.field(r, "version") != 4)
+		if (Reflect.field(r, "format") != "materia.mold-volume" || Reflect.field(r, "version") != 5)
 			throw "Unsupported mold volume format";
 		return read(Reflect.field(r, "volume"));
 	}
@@ -146,13 +146,15 @@ class MoldVolumeCodec {
 			var depth = number(p, "depth");
 			if (depth <= 0)
 				throw "Invalid mold profile depth";
+			var subtract=[for (region in array(p,"subtract",128)) materia.casting.CastingRegion.CastingRegionCodec.snapshot(region)];
+			subtract.sort((a,b) -> Reflect.compare(ToolingCodec.canonical(a),ToolingCodec.canonical(b)));
 			profiles.push({
 				panelId: text(p, "panelId"),
 				operationId: text(p, "operationId"),
 				contour: PanelCodec.contourSnapshot(Reflect.field(p, "contour")),
 				pose: pose,
 				depth: depth,
-				subtract: boxes(array(p, "subtract", 2048))
+				subtract: subtract
 			});
 		}
 		var regions=[for (region in array(r,"regions",128)) materia.casting.CastingRegion.CastingRegionCodec.snapshot(region)];

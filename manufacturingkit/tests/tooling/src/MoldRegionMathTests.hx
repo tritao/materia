@@ -36,6 +36,13 @@ class MoldRegionMathTests {
 		try R.volume(triangle,"triangle-feature") catch (error:Dynamic) failure=Std.string(error);
 		check(failure.indexOf("Exact tooling geometry kernel required: triangle-feature")>=0,
 			"missing native geometry identifies the affected feature");
+		var volume:materia.tooling.casting.CastingMoldPlan.MoldVolume={id:"profile-stock",material:FormerStock,
+			pieces:[],regions:[],cuts:[],profiles:[{panelId:"wall",operationId:"access",pose:F.identity(),depth:10,
+				contour:materia.casting.CastingProfiles.rectangle(0,0,20,20),
+				subtract:[R.box({x:7.5,y:7.5,z:0,width:5,depth:5,height:10})]}]};
+		near(R.volume(R.tooling(volume),volume.id),3750,"the shared tooling expression retains exact sealing-profile exclusions");
+		volume.regions.push(R.box({x:7.5,y:7.5,z:0,width:5,depth:5,height:10}));
+		near(R.volume(R.tooling(volume),volume.id),4000,"profile and independent solid terms form a union without double counting");
 		Sys.println("MoldRegionMathTests: "+assertions+" assertions passed");
 	}
 }

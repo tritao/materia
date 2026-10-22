@@ -1,13 +1,11 @@
 package machinekit.tooling;
 
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentRecipeSupport as P;
-import machinekit.component.Solids;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.casting.CastingMoldPlan.MoldVolume;
 import materia.tooling.casting.MoldVolumeCodec;
@@ -74,44 +72,6 @@ class ToolingVolume extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return geometryOf(volume);
 
-	public static function geometryOf(v:MoldVolume):Part {
-		var pieces:Array<Part> = [];
-		return Solids.building(pieces, parts -> {
-			for (region in v.regions)
-				parts.push(machinekit.structural.CastingRegionCad.part(region));
-			for (b in v.pieces) {
-				parts.push(ToolingBlock.placedBox(b));
-			}
-			for (profile in v.profiles) {
-				var temporary:Array<Part> = [];
-				var solid = Solids.building(temporary, owned -> {
-					var local = PanelCad.contourPrism(profile.contour, 0, profile.depth);
-					owned.push(local);
-					var world = machinekit.assembly.PosedParts.moved(local, profile.pose);
-					owned.push(world);
-					local.close();
-					var cuts:Array<Part> = [];
-					for (b in profile.subtract) {
-						var cut = ToolingBlock.placedBox(b);
-						owned.push(cut);
-						cuts.push(cut);
-					}
-					return Solids.cut(world, cuts);
-				});
-				parts.push(solid);
-			}
-			var result = Solids.union(parts);
-			parts.push(result);
-			var cuts:Array<Part> = [];
-			for (c in v.cuts) {
-				var local = PanelCad.prism(c.operation, 0, c.operation.depth);
-				parts.push(local);
-				var world = machinekit.assembly.PosedParts.moved(local, c.pose);
-				parts.push(world);
-				local.close();
-				cuts.push(world);
-			}
-			return Solids.cut(result, cuts);
-		});
-	}
+	public static function geometryOf(v:MoldVolume):Part
+		return machinekit.structural.CastingRegionCad.part(materia.tooling.casting.MoldRegions.tooling(v));
 }

@@ -24,7 +24,7 @@ typedef RemovalReport = {
 }
 
 /** Exact straight-translation sweeps. Inputs remain borrowed; every temporary is closed.
- * Planar/cylindrical faces and axial conical withdrawals are supported. Other surfaces fail explicitly.
+ * Planar/cylindrical faces and axial or transverse conical withdrawals are supported. Other surfaces fail explicitly.
  */
 class SweptRemoval {
 	static function prism(face:Shape, delta:Vector, pieces:Array<Part>):Void {
@@ -33,6 +33,69 @@ class SweptRemoval {
 		pieces.push(part);
 		if (!part.valid())
 			throw "Invalid boundary-face sweep";
+	}
+
+	/** Exact half-space split; each resulting face projects without folds. */
+	static function radialSweep(face:Shape,delta:Vector,pieces:Array<Part>):Void {
+		var axis = face.faceAxis(),
+			d = Vector.fromNative(axis.get_direction()).normalized();
+		var projected = delta.subtract(d.scale(delta.dot(d)));
+		if (projected.length() > 1e-8) {
+			// Split at exact tangent generators of a cylinder, or a cone
+			// under purely transverse translation, before extrusion.
+			// This prevents a >180-degree face prism from folding over itself.
+			var u = projected.normalized(),
+				w = u.cross(d).normalized(),
+				origin = Vector.fromNative(axis.get_origin());
+			var bb = face.bounds(),
+				lo = Vector.fromNative(bb.get_min()),
+				hi = Vector.fromNative(bb.get_max());
+			var length = 2 * (hi.subtract(lo).length() + lo.subtract(origin).length() + 1);
+			for (sign in [-1.0, 1.0]) {
+				var pose = F.fromRotationMatrix(origin.x, origin.y, origin.z, [u.x, d.x, w.x, u.y, d.y, w.y, u.z, d.z, w.z]);
+				var box = Part.box(length, 2 * length, 2 * length);
+				var local:Part;
+				try
+					local = box.translated(new Vector(sign * length / 2, 0, -length))
+				catch (e:Dynamic) {
+					box.close();
+					throw e;
+				}
+				box.close();
+				var clip:Part;
+				try
+					clip = PosedParts.moved(local, pose)
+				catch (e:Dynamic) {
+					local.close();
+					throw e;
+				}
+				local.close();
+				var half:Shape;
+				try
+					half = face.common(clip.shape)
+				catch (e:Dynamic) {
+					clip.close();
+					throw e;
+				}
+				clip.close();
+				try {
+					for (j in 0...half.subshapeCount(CadKit.ShapeKind.Face)) {
+						var sub = half.subshape(CadKit.ShapeKind.Face, j);
+						try {
+							prism(sub, delta, pieces);
+							sub.close();
+						} catch (e:Dynamic) {
+							sub.close();
+							throw e;
+						}
+					}
+					half.close();
+				} catch (e:Dynamic) {
+					half.close();
+					throw e;
+				}
+			}
+		}
 	}
 
 	public static function sweep(part:Part, delta:Vector):Part {
@@ -50,70 +113,13 @@ class SweptRemoval {
 							prism(face, delta, pieces);
 					} else if (face.surfaceKind() == CadKit.SurfaceKind.Cone) {
 						var axis=Vector.fromNative(face.faceAxis().get_direction()).normalized();
-						if (axis.cross(delta.normalized()).length()>1e-10)
-							throw "Unsupported removal boundary surface";
-						// Along its axis a genuine cone projects one-to-one to its
-						// annular sector; the boundary extrusion cannot fold back.
-						prism(face,delta,pieces);
+						if (axis.cross(delta.normalized()).length()<=1e-10)
+							prism(face,delta,pieces);
+						else if (Math.abs(axis.dot(delta.normalized()))<=1e-10)
+							radialSweep(face,delta,pieces);
+						else throw "Unsupported removal boundary surface";
 					} else if (face.surfaceKind() == CadKit.SurfaceKind.Cylinder) {
-						var axis = face.faceAxis(),
-							d = Vector.fromNative(axis.get_direction()).normalized();
-						var projected = delta.subtract(d.scale(delta.dot(d)));
-						if (projected.length() > 1e-8) {
-							// Split at the cylinder's tangent generators before extrusion.
-							// This prevents a >180-degree face prism from folding over itself.
-							var u = projected.normalized(),
-								w = u.cross(d).normalized(),
-								origin = Vector.fromNative(axis.get_origin());
-							var bb = face.bounds(),
-								lo = Vector.fromNative(bb.get_min()),
-								hi = Vector.fromNative(bb.get_max());
-							var length = 2 * (hi.subtract(lo).length() + lo.subtract(origin).length() + 1);
-							for (sign in [-1.0, 1.0]) {
-								var pose = F.fromRotationMatrix(origin.x, origin.y, origin.z, [u.x, d.x, w.x, u.y, d.y, w.y, u.z, d.z, w.z]);
-								var box = Part.box(length, 2 * length, 2 * length);
-								var local:Part;
-								try
-									local = box.translated(new Vector(sign * length / 2, 0, -length))
-								catch (e:Dynamic) {
-									box.close();
-									throw e;
-								}
-								box.close();
-								var clip:Part;
-								try
-									clip = PosedParts.moved(local, pose)
-								catch (e:Dynamic) {
-									local.close();
-									throw e;
-								}
-								local.close();
-								var half:Shape;
-								try
-									half = face.common(clip.shape)
-								catch (e:Dynamic) {
-									clip.close();
-									throw e;
-								}
-								clip.close();
-								try {
-									for (j in 0...half.subshapeCount(CadKit.ShapeKind.Face)) {
-										var sub = half.subshape(CadKit.ShapeKind.Face, j);
-										try {
-											prism(sub, delta, pieces);
-											sub.close();
-										} catch (e:Dynamic) {
-											sub.close();
-											throw e;
-										}
-									}
-									half.close();
-								} catch (e:Dynamic) {
-									half.close();
-									throw e;
-								}
-							}
-						}
+						radialSweep(face,delta,pieces);
 					} else
 						throw "Unsupported removal boundary surface";
 					face.close();

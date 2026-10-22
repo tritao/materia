@@ -93,6 +93,7 @@
 #include <gp_Vec.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom_BezierSurface.hxx>
+#include <Geom_BezierCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <GeomAbs_CurveType.hxx>
 #include <GeomAbs_SurfaceType.hxx>
@@ -639,6 +640,21 @@ cad_surface_kind surface_kind_from_occt(const Handle(Geom_Surface)& surface) {
         return CAD_SURFACE_BSPLINE;
     }
     return CAD_SURFACE_UNKNOWN;
+}
+
+// A non-periodic degree-one curve with two distinct poles is exactly a line
+// segment. Positive rational weights change only its parameterization. Do not
+// infer straightness from sampled points or endpoints of higher-degree curves.
+template<typename Curve>
+bool linear_two_pole_curve(const Curve& curve) {
+    if (curve.IsNull() || curve->Degree() != 1 || curve->NbPoles() != 2 || curve->IsPeriodic()) return false;
+    for (int index = 1; index <= 2; ++index) {
+        const auto pole = curve->Pole(index);
+        if (!std::isfinite(pole.X()) || !std::isfinite(pole.Y()) || !std::isfinite(pole.Z())
+            || !std::isfinite(curve->Weight(index)) || !(curve->Weight(index) > 0)) return false;
+    }
+    const auto length = curve->Pole(1).Distance(curve->Pole(2));
+    return std::isfinite(length) && length > 0;
 }
 
 cad_curve_kind curve_kind_from_occt(GeomAbs_CurveType kind) {
@@ -3314,6 +3330,10 @@ extern "C" CADKIT_API cad_result cad_edge_curve_kind(
     try {
         const BRepAdaptor_Curve curve(TopoDS::Edge(source));
         *out_kind = curve_kind_from_occt(curve.GetType());
+        if ((curve.GetType() == GeomAbs_BSplineCurve && linear_two_pole_curve(curve.BSpline()))
+            || (curve.GetType() == GeomAbs_BezierCurve && linear_two_pole_curve(curve.Bezier()))) {
+            *out_kind = CAD_CURVE_LINE;
+        }
         return CAD_OK;
     } catch (const Standard_Failure& error) {
         return fail_occt(CAD_ERROR_OPERATION_FAILED, error);

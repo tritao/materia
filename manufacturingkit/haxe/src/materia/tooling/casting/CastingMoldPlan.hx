@@ -19,7 +19,7 @@ typedef MoldVolumeProfile = {
 	var contour:Array<materia.casting.CastingProfile.CastingSegment>;
 	var pose:materia.assembly.AssemblyRecord.AssemblyFrame;
 	var depth:Float;
-	var subtract:Array<MoldBox>;
+	var subtract:Array<materia.casting.CastingRegion>;
 }
 
 typedef MoldVolumeCut = {

@@ -243,12 +243,14 @@ class CastingProfileGeometry {
 
 	public static function inside(p:Array<CastingSegment>, x:Float, y:Float):Bool {
 		var query = {x: x, y: y}, hits = 0;
-		for (s in p) {
+		for (index in 0...p.length) {
+			var s=p[index],end=p[(index+1)%p.length].start;
+			if (CastingProfiles.distance(s.end,end)>TOL) throw "Profile contour is not closed";
 			if (on(s, query))
 				return true;
 			var c = s.center;
 			if (c == null) {
-				if ((s.start.y > y) != (s.end.y > y) && x < (s.end.x - s.start.x) * (y - s.start.y) / (s.end.y - s.start.y) + s.start.x)
+				if ((s.start.y > y) != (end.y > y) && x < (end.x - s.start.x) * (y - s.start.y) / (end.y - s.start.y) + s.start.x)
 					hits++;
 			} else {
 				// Split at exact Y extrema, then apply the same half-open crossing rule.
@@ -263,8 +265,11 @@ class CastingProfileGeometry {
 				}
 				fractions.sort(Reflect.compare);
 				for (i in 0...fractions.length - 1) {
-					var u = CastingProfiles.point(s, fractions[i]),
-						v = CastingProfiles.point(s, fractions[i + 1]);
+					// Adjacent edges share one logical vertex. Re-evaluating its
+					// sine at 2pi can put the same endpoint on opposite sides of
+					// a ray, changing parity despite a closed line/arc contour.
+					var u = fractions[i]==0 ? s.start : CastingProfiles.point(s, fractions[i]),
+						v = fractions[i+1]==1 ? end : CastingProfiles.point(s, fractions[i + 1]);
 					if ((u.y > y) != (v.y > y)) {
 						var mid = CastingProfiles.point(s, (fractions[i] + fractions[i + 1]) / 2),
 							dx = Math.sqrt(Math.max(0, r * r - (y - c.y) * (y - c.y)));

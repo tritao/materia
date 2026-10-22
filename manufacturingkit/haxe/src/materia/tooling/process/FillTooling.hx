@@ -110,9 +110,10 @@ class FillTooling {
 			for (box in material)
 				add(box);
 			for (profile in volume.profiles) {
-				if (orthogonal(profile.contour))
-					for (box in BoxAlgebra.subtract(prism(profile.contour, profile.depth, profile.pose), profile.subtract))
-						add(box);
+				var exact=materia.tooling.casting.MoldRegions.boxes(materia.casting.CastingRegion.Difference(
+					materia.casting.CastingRegion.Placed({solid:materia.casting.CastingFeature.CastingGeometrySolid.Prism(profile.contour,profile.depth),
+						pose:profile.pose}),profile.subtract));
+				if (exact!=null) for (box in exact) add(box);
 				else {
 					var bounds = CastingProfileGeometry.bounds(profile.contour);
 					if (add(BoxMoldPlanner.box(bounds.width, bounds.height, profile.depth,

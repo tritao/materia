@@ -30,6 +30,21 @@ class MoldRegions {
 	public static function envelope(document:materia.tooling.ToolingDocument):CastingRegion
 		return moved(materia.casting.CastingCavities.envelopeRegion(document.input.envelope),document.setup.sourceToMold);
 
+	/** Single finished tooling expression from the same operation profiles used
+	 * by panel CAD, drawings and CAM. Exact cuts are never replaced by bounds.
+	 */
+	public static function tooling(volume:CastingMoldPlan.MoldVolume):CastingRegion {
+		var v=MoldVolumeCodec.snapshot(volume);
+		var terms=[for (piece in v.pieces) box(piece)].concat(v.regions);
+		for (part in v.profiles) terms.push(CastingRegion.Difference(profile(part),part.subtract));
+		var body=CastingRegion.Union(terms);
+		return CastingRegion.Difference(body,[for (cut in v.cuts) CastingRegion.Placed({
+			solid:CastingGeometrySolid.Prism(materia.tooling.panel.PanelContours.operation(cut.operation),cut.operation.depth),pose:cut.pose})]);
+	}
+
+	public static function profile(part:CastingMoldPlan.MoldVolumeProfile):CastingRegion
+		return CastingRegion.Placed({solid:CastingGeometrySolid.Prism(part.contour,part.depth),pose:part.pose});
+
 	public static function moved(region:CastingRegion,pose:AssemblyFrame):CastingRegion return switch region {
 		case Placed(geometry): CastingRegion.Placed({solid:geometry.solid,pose:F.compose(pose,geometry.pose)});
 		case Drafted(id,opening,frame,depth,degrees): CastingRegion.Drafted(id,opening,F.compose(pose,frame),depth,degrees);

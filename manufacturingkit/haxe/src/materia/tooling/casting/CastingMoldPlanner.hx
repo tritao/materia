@@ -124,7 +124,7 @@ class CastingMoldPlanner {
 			if (MoldRegions.boxes(region)==null) {
 				var selected=strategies.filter(strategy -> strategy.featureId==feature.id);
 				if (selected.length!=1 || selected[0].strategy!=CoreStrategy.ReusableFormer
-					|| selected[0].withdrawal==null || Math.abs(selected[0].withdrawal.z)<1-1e-8) return false;
+					|| selected[0].withdrawal==null || !MoldFormerAccess.supported(d,feature,selected[0].withdrawal)) return false;
 			}
 		}
 		return true;
@@ -512,25 +512,37 @@ class CastingMoldPlanner {
 			});
 		}
 		var previousRegions:Array<materia.casting.CastingRegion> =[];
+		var claims:Array<{id:String,priority:Int,region:materia.casting.CastingRegion}> =[];
+		function claim(id:String,priority:Int,region:materia.casting.CastingRegion):Void {
+			if (exactRegions) for (earlier in claims)
+				if (earlier.priority==priority && MoldRegions.overlaps(earlier.region,region,1e-7,id))
+					throw "Overlapping reusable formers require distinct priorities: "+earlier.id+", "+id;
+			claims.push({id:id,priority:priority,region:region});
+		}
+
 		for (f in ordered)
 			if (f.kind != CastingFeatureKind.InsertRecess) {
 				var s = strategies.filter(s -> s.featureId == f.id)[0];
 				if (s.strategy != CoreStrategy.ReusableFormer) continue;
 				var sourceRegion=MoldRegions.feature(d,f.id);
 				if (MoldRegions.boxes(sourceRegion)==null) {
-					if (s.withdrawal==null || Math.abs(s.withdrawal.z)<1-1e-8)
+					if (s.withdrawal==null || !MoldFormerAccess.supported(d,f,s.withdrawal))
 						throw "Non-box former needs a supported withdrawal: "+f.id;
 					var allocated=materia.casting.CastingRegion.Difference(sourceRegion,
 						[for (box in occupied) MoldRegions.box(box)].concat(previousRegions));
-					var ids:Array<String> =[];
+					var ids:Array<String> =[],blank=sourceRegion;
 					if (MoldRegions.volume(allocated,f.id)>1e-7) {
 						var id=materia.tooling.ToolingIds.derive("former-",f.id,"-0");
-						result.formers.push({volume:{id:id,material:FormerStock,pieces:[],profiles:[],cuts:[],regions:[allocated]},
-							featureIds:[f.id],withdrawal:s.withdrawal,draftDegrees:f.draft.degrees});
+						var volume:MoldVolume={id:id,material:FormerStock,pieces:[],profiles:[],cuts:[],regions:[allocated]};
+						var extension=MoldFormerAccess.add(result,f,s.withdrawal,volume,
+							[for (piece in occupied) MoldRegions.box(piece)].concat(previousRegions));
+						blank=materia.casting.CastingRegion.Union([sourceRegion].concat(extension));
+						claim(f.id,s.priority,blank);
+						result.formers.push({volume:volume,featureIds:[f.id],withdrawal:s.withdrawal,draftDegrees:f.draft.degrees});
 						ids.push(id);
 					}
 					result.features.push({featureId:f.id,kind:FormerFeature,memberIds:ids});
-					previousRegions.push(sourceRegion);
+					previousRegions.push(blank);
 					continue;
 				}
 				var cb = featureBox(d, f);
@@ -574,7 +586,7 @@ class CastingMoldPlanner {
 						contour: op.contour,
 						pose: wall.pose,
 						depth: t,
-						subtract: occupied.concat(previous)
+						subtract: [for (piece in occupied.concat(previous)) MoldRegions.box(piece)]
 					});
 					wall.panel.operations.push(op);
 					wall.panel.contactOpenings = [for (id in wall.panel.contactOpenings) id].concat([op.id]);
@@ -586,6 +598,9 @@ class CastingMoldPlanner {
 						sealSpec: r.hardware.sealMaterial
 					});
 				}
+				var blank=materia.casting.CastingRegion.Union([for (piece in add) MoldRegions.box(piece)]
+					.concat([for (profile in profiles) MoldRegions.profile(profile)]));
+				claim(f.id,s.priority,blank);
 				var pieces = BoxAlgebra.subtract(add, occupied.concat(previous)),
 					ids:Array<String> = [],
 					groups = BoxAlgebra.groups(pieces);
@@ -626,7 +641,7 @@ class CastingMoldPlanner {
 				result.features.push({featureId: f.id, kind: FormerFeature, memberIds: ids});
 				for (p in pieces)
 					previous.push(p);
-				previousRegions.push(sourceRegion);
+				previousRegions.push(blank);
 				for (open in result.openings)
 					if (open.operationId == materia.tooling.ToolingIds.derive("access-", f.id)) {
 						open.sealingIds = ids.copy();

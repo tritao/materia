@@ -411,7 +411,7 @@ class CastingMoldTests {
 		Reflect.setField(legacyOptions,"anchorage",new Array<Dynamic>());
 		rejects(() -> CastingMoldOptionsCodec.read(legacyOptions),"obsolete duplicate process anchorage rejected");
 		var raw:Dynamic = haxe.Json.parse(s);
-		Reflect.setField(raw, "version", 16);
+		Reflect.setField(raw, "version", 17);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
 		raw = haxe.Json.parse(s);
 		Reflect.setField(raw, "version", 12);
@@ -442,7 +442,7 @@ class CastingMoldTests {
 		var encoded = MoldVolumeCodec.encode(volume);
 		check(MoldVolumeCodec.encode(MoldVolumeCodec.decode(encoded)) == encoded, "volume recipe canonical");
 		raw=haxe.Json.parse(encoded);
-		Reflect.setField(raw,"version",3);
+		Reflect.setField(raw,"version",4);
 		rejects(() -> MoldVolumeCodec.decode(haxe.Json.stringify(raw)),"previous volume schema rejected");
 		raw=haxe.Json.parse(encoded);
 		Reflect.deleteField(Reflect.field(raw,"volume"),"regions");

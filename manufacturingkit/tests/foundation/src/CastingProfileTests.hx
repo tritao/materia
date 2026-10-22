@@ -22,6 +22,15 @@ class CastingProfileTests {
 		check(Math.abs(G.area(profile)-(1200-(4-Math.PI)*16))<1e-9,"rounded profile has analytic line/arc area");
 		check(profile.filter(segment -> segment.kind==Arc).length==4,"rounded corners remain four exact arcs");
 		check(Math.abs(G.area(P.circle(3,-2,5))-25*Math.PI)<1e-9,"two exact half arcs enclose a circle");
+		var clockwise=[P.arc(0,0,20,0,-Math.PI),P.arc(0,0,20,-Math.PI,-Math.PI)];
+		var reversed=[for (index in 0...clockwise.length) {
+			var segment=clockwise[clockwise.length-1-index];
+			{kind:segment.kind,start:segment.end,end:segment.start,center:segment.center,sweep:-segment.sweep};
+		}];
+		G.validate(reversed);
+		check(G.inside(reversed,10,0) && G.inside(reversed,-10,0),"reversed circular parameters preserve interior at the seam height");
+		check(!G.inside(reversed,-30,0),"a seam-height ray cannot turn an exterior point into material");
+		check(G.inside(reversed.slice(1).concat(reversed.slice(0,1)),10,0),"cyclic contour order preserves the seam crossing parity");
 		var filleted=P.roundedPolygon([{x:-20,y:-15},{x:20,y:-15},{x:20,y:15},{x:-20,y:15}],4);
 		check(Math.abs(G.area(filleted)-G.area(profile))<1e-9,"parametric corner fillets and explicit arcs describe the same area");
 		var circle=P.roundedPolygon([{x:0,y:0},{x:20,y:0},{x:20,y:20},{x:0,y:20}],10);

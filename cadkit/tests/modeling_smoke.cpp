@@ -119,6 +119,11 @@ int main() {
     check(cad_arc({0,0,0},{1,0,0},{2,0,0},&bad)!=CAD_OK && bad==0);
     cad_vec3 spline_points[]={{0,0,0},{1,1,0},{2,0,0}};
     cad_shape spline=0; ok(cad_spline(spline_points,3,&spline)); keep(spline); valid(spline);
+    cad_curve_kind spline_kind=CAD_CURVE_UNKNOWN;
+    ok(cad_edge_curve_kind(spline,&spline_kind)); check(spline_kind==CAD_CURVE_BSPLINE);
+    cad_vec3 straight_points[]={{0,0,0},{2,0,0}};
+    cad_shape straight_spline=0; ok(cad_spline(straight_points,2,&straight_spline)); keep(straight_spline);
+    ok(cad_edge_curve_kind(straight_spline,&spline_kind)); check(spline_kind==CAD_CURVE_LINE);
     cad_shape_ref loft_wires[]={{circle(0,0,0,2)},{circle(0,0,5,2)}};
     cad_shape loft=0; ok(cad_loft(loft_wires,2,1,0,&loft)); keep(loft); valid(loft);
     ok(cad_shape_volume(loft,&volume)); near(volume,20*std::acos(-1));
