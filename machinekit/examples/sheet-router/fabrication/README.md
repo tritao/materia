@@ -5,6 +5,15 @@ retained, including sixteen braces and the Y1575 extra leg pair. The governing
 fabrication and alignment procedure is [DIY_ROUTE.md](DIY_ROUTE.md). No large
 machine tool is required for the complete base.
 
+**2026-10-22 qualification extension:** the populated-ATC, full-history J4
+brace study finds a baseline dynamic range of **13.03 MPa** at the long-bed
+lower-stringer/middle-leg joint (W066, `lower1-p0` / `post13-p0`, h=50 mm),
+above the unchanged **12.669 MPa** cut-off. The historical reaction qualification
+below covers its recorded load histories; it does not qualify this expanded
+planner envelope. Keep fabrication release gated while the joint rack-support
+rerun and planner-history fatigue qualification are resolved. No reduced-brace
+geometry is adopted. See the [brace study](../fem/BRACE_STUDY.md).
+
 ## Prepared geometry and seams
 
 `SheetRouterFramePreparation.hx` partitions the forty actual fixed-frame tube

@@ -552,7 +552,7 @@ only as sources in docs. Standards (ISO30 / ISO 7388, ER collets, EN 60204-1, IS
 | Servos | Y 2 × 750 W, X 750 W, Z 750 W + brake | revised SR4; catalogue-class assumptions |
 | Pulse resolution | 5000 pulses/rev: Y 4 µm / 167 kHz; X 2.667 µm / 250 kHz at 40 m/min | derived; board rate qualification pending |
 | Z screw | Ø16 × 10 mm, 13 mm assumed race root, 390 mm fixed/free shaft | revised SR4 selection at 10 m/min |
-| Beam | RHS 200 × 100 × 6.3 steel retained as baseline | frozen after full revised SR-D3 model pass; OM-R1 and commissioning required |
+| Beam | RHS 200 × 100 × 6.3 steel retained as baseline | geometry frozen; expanded J4/rack-support qualification and commissioning remain open |
 | Static tool-tip stiffness | ≥ 2 N/µm X and Y at full Z | full raised-datum + extra-leg run: worst X 2.109, Y 2.044; both beds pass |
 | Motion-induced error | ≤ 0.05 mm contour and rapid residual | full new-mode worst tested 0.01926/0.01232 mm; OM-R1 and measured-mode commissioning required |
 | First gantry mode | Reported; no frequency gate | short/long global 27.001/24.239 Hz; gantry 27.434/26.986 Hz; reported |
@@ -836,6 +836,25 @@ fallback is below 0.00151/0.000131 mm for 36.45/37.06 ms per move. Full assembly
 clearance passes 426 assertions. See [rerun evidence](fem/sr-d3-results.json).
 This freezes overall layout/sections for SR6; supplier assumptions, actual
 OM-R1 execution, measured-mode commissioning and cutting acceptance remain open.
+
+**Qualification extension, 2026-10-22: brace study; frozen CAD unchanged.**
+The populated SR7 mass (+30.72 kg fixed) and all nine poses are now replayed
+against the pinned J4 contour/override/hold histories, including rapid-entry
+modal history. Static stiffness still clears 2 N/µm. The finer-mesh observed
+contour peaks are 0.06320 mm (2600, X0/Y1300, 3× override) and 0.04397 mm
+(3150, X0/Y0, 3× hold/resume). The short bed exceeds SR-D3's 0.05 mm budget;
+both miss the requested 0.04 mm study reserve. These histories and poses extend
+the older freeze and focused SR7 evidence; the fixed J4 policies are not a
+full-envelope cutting acceptance. The long-bed baseline also reaches 13.03 MPa
+in the simultaneous-vector dynamic weld screen against the 12.67 MPa
+100-million-reversal cut-off. Life and detail categories are unchanged.
+
+No screened brace reduction qualifies for adoption. Retain the existing layout
+while rack seats/bolts are added to the drive load-path model and the joint
+rerun and planner-policy qualification are completed. Do not treat the old
+focused passes as covering the expanded histories. See
+[brace study, modes, group stresses and access comparison](fem/BRACE_STUDY.md).
+SR-D3 remains unchanged; measured-mode commissioning is still required.
 
 **SR6-C. Structural commissioning before cutting acceptance (SR-D3).**
 - Tap/impact or sine-sweep the built frame and gantry at the governing poses.
@@ -1260,9 +1279,9 @@ SR15 ── SR16 ── SR17 ── SR18 ─────────────
 | SR2 | done: shared servo/reducer/steel builders; 59 focused assertions, existing gantry/router checks, 292 catalogue assertions | this commit |
 | SR3 | complete: both beds, project load/hold/homing and focused regressions pass | see SR3 notes |
 | SR4 | revised two-bed drive/rack/screw screen complete; 82 sizing/planner assertions pass | see guide-first revision |
-| SR5 | complete: 36-case raised-datum/extra-leg rerun and new-mode motion check pass; structure frozen | see FEM diagnosis |
+| SR5 | geometry frozen after the historical 36-case pass; expanded all-pose J4 study finds contour/reserve exceedances; joint rack-support rerun remains open | [brace study](fem/BRACE_STUDY.md) |
 | SR6-C | planned: measured modes/damping and shaper tuning before cutting acceptance | SR13/SR16 gate |
-| SR6 | reaction qualification passes 132/132 weld groups per bed at 100 million reversals; geometry/service checks pass and metrology method is documented; fabrication release blocked on the named WPS, material/relief, epoxy and whole-unit machining acceptances | [fabrication packet](fabrication/README.md) |
+| SR6 | historical reaction envelope passes 132/132 groups per bed at 100 million reversals; expanded J4 dynamic envelope needs requalification (13.03 > 12.67 MPa); fabrication remains gated on this and the named shop acceptances | [fabrication packet](fabrication/README.md), [brace study](fem/BRACE_STUDY.md) |
 | SR7 | native checks pass: 42 policy assertions, 83 static poses/bed, four complete exchanges and focused SR-D3 recheck; app/SR16 dispatch and purchased hardware acceptance remain gated | [ATC packet](atc/README.md) |
 | SR8 | planning screen passes: 16 core + 30 router assertions; measured vacuum/friction, actual forces/web strength and physical overcut datum remain cutting-acceptance gates | [vacuum packet](vacuum/README.md) |
 | SR9 | complete | Compact/dense equivalence; both 0.5 mm full-sheet backends under 300 MB; 20 MB sidecar; 388 ProjectKit + 8 worker + 5 artifact/app assertions. [Evidence](sheet-scale/README.md). |

@@ -750,3 +750,18 @@ and results: `build/sheet-router-evidence/sr6-diy.tar.gz`, extracted under
 `build/sheet-router-evidence/unpacked/sr6-diy/`. The same archive retains prepared
 frame STEP files and native service checks; their local weld qualification is
 separate from the frozen beam-centreline model.
+
+
+## Brace removal and full-history J4 screen, 2026-10-22
+
+The frozen CAD is unchanged. The [brace study](BRACE_STUDY.md) compares lower-plane
+removal, both uniform vertical-diagonal slopes, their combinations, a front-open
+layout, and balanced diagonal orientations. It retains the populated ATC mass,
+anchored feet, modal history through rapid entry and five planner histories.
+Static stiffness passes, but no reduced layout meets the motion reserve and
+weld-fatigue screen. The broader baseline itself needs planner-envelope
+requalification: the finer-mesh short-bed contour reaches 0.06320 mm, and a
+long-bed dynamic weld range reaches 13.03 MPa against 12.669 MPa. The report
+separates the frozen macro model, prepared weld model and numerical solver
+rejections. Rack seats/bolt compliance remain the next joint rerun; this screen
+does not approve brace removal or release fabrication.

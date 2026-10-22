@@ -1,0 +1,389 @@
+{
+  "headAtRecord": "9e061022b902867854fb4622194009c5814ed781",
+  "date": "2026-10-22T14:08:14+01:00",
+  "sources": {
+    "machinekit/examples/sheet-router/fem/qualify_welds.py": "d411defc1a955c10b9e2734d2ad93c8e1dc1479ec875d943286e431a7b9c5354",
+    "machinekit/examples/sheet-router/fem/report.py": "ca58ce9e7b65f2676313dc8865f35de92c23c78a318aa64ee78abda837e33220",
+    "machinekit/examples/sheet-router/fem/brace_study.py": "8f9b9d6d85cc5cced1b899f7d2876015e3afc399357a2f79d415207319466684",
+    "machinekit/examples/sheet-router/fem/modes.py": "1bb03d226040ad4142267c3acb77866b9d46f3832f8b55cf01c494be49181a23",
+    "machinekit/examples/sheet-router/fem/weld_qualification.py": "3278f393fc4303ca61bcfa73877443b6aa34b61101ffb7b3f6511fd0b6a94688",
+    "machinekit/examples/sheet-router/fem/weld_effective.py": "1692dbaf7d306f3bab9a7ed447d320d2f2b47bca5ad517563f0992d57dd6779d",
+    "machinekit/examples/sheet-router/fem/weld_report.py": "c04b2cd101b02d95255b8fbfa664e24b43701a19c537a1602f0c77c4a5212944",
+    "machinekit/examples/sheet-router/fem/dynamic_error.py": "47ad38d2be3d5b51307b7366f2295123f4c9ab83514c471dafcb0b8dd608f2ed",
+    "machinekit/examples/sheet-router/fem/acceptance.py": "31c373d8c2a395a892392e0102ce365f9c49fa9eca125b862aebd66ea0f57233",
+    "machinekit/examples/sheet-router/fem/study.py": "069642aa57b4ed203d6f5959cfb6fe1a82e494e7cf72a7189a257404eaf64ef1",
+    "machinekit/examples/sheet-router/fem/diy_feet.py": "d049195668f454ae4608d5b74f99c5bf0e4a73a64d173e9323096e732770289f",
+    "machinekit/examples/sheet-router/fem/brace_report.py": "ed6f0b310b82fe11fb36ad6a9f5bb7ff387e6aa3263fc1edc6951d69728ca68c",
+    "machinekit/examples/sheet-router/fem/weld_model.py": "98cd794f7a7966468439f10f784cecbd043015bd259932b12b59253eb2d8d8d1",
+    "machinekit/examples/sheet-router/fem/brace_macro.py": "7aac510034de0b8f0f787a7a770a2ba16b43895cb5c9c7d396b6d05ebe88d606",
+    "machinekit/examples/sheet-router/fem/verify_dynamic.py": "0ba26ac2f039aa7625b56c24dadf73d6d65b381dc2b1c2b22514b88a9c5575b9",
+    "machinekit/examples/sheet-router/fem/front_guides.py": "5dac4f765e6ae209e5729eb4521c36b4d45d924ac2bb2086b594da5e832a9134",
+    "machinekit/examples/sheet-router/fem/compare.py": "c97446d9e4fcba5387ca9d1071494e9bac9a56bb1bab1bf4c85b85bb2d2955a7",
+    "machinekit/examples/sheet-router/fem/brace_checks.py": "2add101776481e9d85546f9e8b6ffb5c94f0538f3600d69b07e0725f69a9a46b",
+    "machinekit/examples/sheet-router/fem/sensitivity.py": "75cf8ed55819538212fe47df43194fed34cb344c3d26554f563a184c48833b0d",
+    "machinekit/examples/sheet-router/fem/weld_convergence.py": "172ef191d2388a8236281e5ab5627cde524146a317a46594d2122091718c5cd6",
+    "machinekit/examples/sheet-router/fem/plot_dynamic.py": "f5c7e7ebaa87f305a49ebded83dada5a3c3ac5c21222c7bdd075b261fff2cfd0",
+    "machinekit/examples/sheet-router/fem/weld_dynamics.py": "3b297aff01b4c4adf3ccb622990d8dd3a82763a38f618bcd63d0924dc71ee98e",
+    "machinekit/examples/sheet-router/fem/brace_motion.py": "c204e5b47862fd78e10bd3368f0391b2233a6a10ea7aad79334a1d650650639b",
+    "machinekit/examples/sheet-router/fem/diagnose.py": "622b078af2c99013c448d22ea8e7b783c87b4f91d24858594107eac141287665",
+    "machinekit/examples/sheet-router/fem/architecture.py": "0d5371fe3ddd621f7215811dde51b2aecd23bc6488494a2b22cd63c296d8c198",
+    "machinekit/examples/sheet-router/fem/verify.py": "3b9fd7eaeb5803ac7a227d1ca837de0415078b4a28cecb4632376a52d909f699",
+    "machinekit/examples/sheet-router/fem/weld_motion_checks.py": "ac921811f53ac82024802e0d1b6e65df87a60551920f85dc986688116cce2766",
+    "machinekit/examples/sheet-router/fem/weld_checks.py": "cd3b25dfdfa0b5c2d69b61ddd1c21f178eaa9b2e809501f131ae212469ce3b34",
+    "machinekit/examples/sheet-router/fem/extended_modes.py": "7a6d780aead2ec9eacfee9e660a755c7ba9d93928968c99c823b002fe88501d9",
+    "machinekit/examples/bench-mill/fem/leveling_fixture.py": "2c2202982917daee2a1abcd98abe18f7ee6198b34fa02c71b94d135ca7eedaa7",
+    "machinekit/examples/bench-mill/fem/test_resource_guard.py": "4e5e963ab97b3e97349d72da96d120e39e9e2d7300bd488485f3e12b9f372f23",
+    "machinekit/examples/bench-mill/fem/modal_fixture.py": "f6c0f8acc7620126c34d18212424855283c0dc89082c06dab18c66851f5e1c69",
+    "machinekit/examples/bench-mill/fem/mesh_pilot.py": "7119b70c3d96dd343e5791e80783e63bca5d23a60f1dfe03f6fe577db2c25597",
+    "machinekit/examples/bench-mill/fem/frame_mesh.py": "cc48afa80cebd97f1341b3655b2107e25525954f795e34e08d2e9f86889281d2",
+    "machinekit/examples/bench-mill/fem/test_modal_mass.py": "f19607e5240fcdea82e0ecca444dbddd49c688cb6f49a682cface637e1001510",
+    "machinekit/examples/bench-mill/fem/pose_sweep.py": "38a761c64fe1d507ed6bc04738ffd2fcce19d82f3d6f11a1a1a6e032589819ea",
+    "machinekit/examples/bench-mill/fem/test_compliance.py": "49200294f2a21879d7f289af9557f0d06d6a24e19677141b4aad2f73ab93d52a",
+    "machinekit/examples/bench-mill/fem/test_pose_sweep.py": "4bd03f6963ca11083e1a1845c95775d5068c25a23cc422049b7ee2686520bce6",
+    "machinekit/examples/bench-mill/fem/excitation_context.py": "5c2fcd00ec8f0e6de20357e1705489022a157f59024d7eb71c3e78351c73b1fd",
+    "machinekit/examples/bench-mill/fem/resource_guard.py": "f3fb477b23e330ca38989e452340fa355b14ace68010bc481bc4640d4d2f0bcb",
+    "machinekit/examples/bench-mill/fem/modal_solid_fixture.py": "af6d00f44451d818705ed94a13ae1844508afd38b1f345baa33f2a4ffa413557",
+    "machinekit/examples/bench-mill/fem/independent_static.py": "f29384049c9c900ef8e9082135fa1a8a43aaa6e4cdc38f8afe8aff016e2548de",
+    "machinekit/examples/bench-mill/fem/test_mesh_cache.py": "63782c870e92241bafbff85f887483aebc9add640c9581fa82d75a9c50811cdf",
+    "machinekit/examples/bench-mill/fem/leveling.py": "e2568c6d976be77e44e203848a9618b05012dfc1bb02a985be0f4da05035a1f0",
+    "machinekit/examples/bench-mill/fem/mesh_resolution.py": "554098390d3d7e523457a5352a3eddfbe3f179ff94a2d01eba47cd7c983ed049",
+    "machinekit/examples/bench-mill/fem/tool_cases.py": "8a7f5a795de2777ffe47d58df9eacf585341a2ed9c001640b62be63d68bb8aaa",
+    "machinekit/examples/bench-mill/fem/solver_fixtures.py": "2adc533f6fb04ace3d317c57beb9ac1d75e6b21feda85f728e0e1493a3245121",
+    "machinekit/examples/bench-mill/fem/modal_mass.py": "f22ae3ae4c804757953335c39fedd778d7f5137159ef5dd112075dca22d7cdb5",
+    "machinekit/examples/bench-mill/fem/packet.py": "d6e7f8b441bf15465907d1768024e342c443fca0215e53c62cc09f146263fd96",
+    "machinekit/examples/bench-mill/fem/test_independent_static.py": "1a3e25eebd4384ef84a95dad7804c3ab3a6b758c5acc52e888ff43b4d1561732",
+    "machinekit/examples/bench-mill/fem/test_tool_cases.py": "22246cd2a98a6d85fd1c18295fcb387a3d223003c993c79e4dc62bdc90d2af40",
+    "machinekit/examples/bench-mill/fem/test_fem.py": "bb9736a9214b7817b3dd7f5e6da218f233542d64b62ce0e49a1509438965be53",
+    "machinekit/examples/bench-mill/fem/provenance.py": "4eff3bd846a4e0874c0a8658725d3e9fabfeba06c684e7b1bbb99a141e3430bd",
+    "machinekit/examples/bench-mill/fem/modal_study.py": "0d3f8bc6dfd1205314d9cad5e8620551e32f2d4899c132b2d6435b813af11425",
+    "machinekit/examples/bench-mill/fem/tet_fixture.py": "db5665d50b1aa0ff7def788d7306fe42c93001ac5b484c3e54b04eeac6556d8d",
+    "machinekit/examples/bench-mill/fem/spring_fixture.py": "8f97fdfc581e858f214b3b11ed4e55c83b3e9505f83c51a3715559876b5d2b8f",
+    "machinekit/examples/bench-mill/fem/test_modal_motion.py": "1d5957a27c29dc42d898d3b983998c7397c91c377d6093ff39907cc43e5bbdae",
+    "machinekit/examples/bench-mill/fem/test_leveling.py": "f0a6a45602d6e33040a7ab16ad26b888dac1cc46a8a0f1a7360bd6d07f0744fc",
+    "machinekit/examples/bench-mill/fem/mesh_cache.py": "47e2ecd6c10b95fe31912368e8ae7001e4b3ce0fcd0d701e50b0032719dc82ff",
+    "machinekit/examples/bench-mill/fem/compliance.py": "4e25b65415df5851b5502b6d34f372ecb73cd64afb73ebb5882c39e0cb9c5884",
+    "machinekit/examples/bench-mill/fem/static_study.py": "3879b0753bb8f37b61a6e78fd8e072edbfa1f55e74858eeac9b07ef7adc2ead2",
+    "machinekit/examples/bench-mill/fem/frame_solver.py": "d4facf76391946014b452c94f18790a8cd5df34a5d40e2cca8290a5c397cf596",
+    "machinekit/examples/bench-mill/fem/sweep_report.py": "829c8d408d08f15cbd63549cf490fbf6c1538590b107c6e1ee90c13c212ab655",
+    "machinekit/examples/bench-mill/fem/modal_motion.py": "1461d61ad81cc71c43a20bbfc17d0f48cbee2bedcfc76be38415791fc612a37c",
+    "machinekit/examples/bench-mill/fem/ccx_deck.py": "a5fc21e0dd0c51a252f8965e139401ed344e5d0137b974e101ace6f154cb6840",
+    "machinekit/examples/bench-mill/fem/compliance_budget.py": "1ce8a4003a48a41219ec113d6c1f16493ddf9f577bfc67daaa07403bda345377"
+  },
+  "solver": {
+    "path": "/media/joao/DEV/materia-fem-runs/bench-mill-20261019/tools/calculix/usr/bin/ccx",
+    "sha256": "6adaabf5bf0382fc2bfd692b984320ed375dba777f7dc8297562f818043faa1b",
+    "threads": 1
+  },
+  "environment": {
+    "python": "3.12.3 (main, Feb  4 2025, 14:48:35) [GCC 13.3.0]",
+    "numpy": "1.26.4",
+    "scipy": "1.11.4",
+    "gmsh": "4.12.2"
+  },
+  "inputs": {
+    "inputs/current/fabrication/y2600/weld-stitches.csv": "6c5bb23aa719558930d7a414690d428fb70915a3b94ebd92d84bfd5417064648",
+    "inputs/current/fabrication/y2600/native.json": "81cb133104cb8bfe7270ea4047bd78768ab276575feaa93c9c7ea7e99a049d42",
+    "inputs/current/fabrication/y3150/weld-stitches.csv": "7dd7c68196e47ded72a61c7c30acc1c3530f06a60ba10460d2860b19544c8bed",
+    "inputs/current/fabrication/y3150/native.json": "6203f41c32ab6281b8b931017133ac0278833ce6d6642c639316c0b5cb6914f5",
+    "inputs/current/packets/y2600/manifest.json": "c4b0c4d674788a41ebfe5fa6febede29992aa9b34f316150b18c7c43dfffd0ec",
+    "inputs/current/packets/y3150/manifest.json": "eb1a8771a39b174fec586b53c021fcb56f3169d546f8378df4a10dd1eb5565de"
+  },
+  "acceptance": {
+    "staticNPerUm": 2,
+    "motionReserveMm": 0.04,
+    "motionBudgetMm": 0.05,
+    "fatigueReversals": 100000000
+  },
+  "geometryAdopted": false,
+  "macroCases": 180,
+  "preparedStaticCases": 164,
+  "frozenControlCases": 3,
+  "warning": "Rejection screen; no rack-seat/bolt compliance yet; no geometry release.",
+  "archive": {
+    "archive": "build/sheet-router-evidence/brace-reduction.tar.gz",
+    "bytes": 2453967692,
+    "sha256": "116f6b8b9b31d7d7d427749328979ab3bcecc841ba0001a1882f97f4f1983c22",
+    "verifiedRegularFiles": 2208,
+    "allMemberHashesVerified": true
+  },
+  "coverage": {
+    "beds": 2,
+    "variantsPerBed": 9,
+    "macroPosesPerVariant": 9,
+    "preparedStaticPosesPerVariant": 9,
+    "fullHistoryCasesPerPose": 5,
+    "primaryMotionPoseCases": 162,
+    "staticTargetPass": true,
+    "qualifiedBraceReductions": 0,
+    "nativeDeckHashesVerified": true,
+    "modalEnergyPartitionsVerified": true
+  },
+  "j4ProvenanceSha256": "84257972c0775a272b9d4c0efbc3dac6f106805110445268199c88615e5e2c14",
+  "j4ReplayVerification": {
+    "status": "PASS",
+    "comparisons": 30,
+    "records": [
+      {
+        "bed": 2600,
+        "history": "nominal",
+        "corner": "worstContour",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "afeccb394afebfc7413855271d580bc4fbd2e7e7514a52e6f10d33ab6929787a"
+      },
+      {
+        "bed": 2600,
+        "history": "nominal",
+        "corner": "worstResidual",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "afeccb394afebfc7413855271d580bc4fbd2e7e7514a52e6f10d33ab6929787a"
+      },
+      {
+        "bed": 2600,
+        "history": "nominal",
+        "corner": "worstHandover",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "afeccb394afebfc7413855271d580bc4fbd2e7e7514a52e6f10d33ab6929787a"
+      },
+      {
+        "bed": 2600,
+        "history": "override-1p5",
+        "corner": "worstContour",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "f8d92eab851a2b2fdc7cc444c1e76763f463137601e0eb7b6a257868cae5e160"
+      },
+      {
+        "bed": 2600,
+        "history": "override-1p5",
+        "corner": "worstResidual",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "f8d92eab851a2b2fdc7cc444c1e76763f463137601e0eb7b6a257868cae5e160"
+      },
+      {
+        "bed": 2600,
+        "history": "override-1p5",
+        "corner": "worstHandover",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "f8d92eab851a2b2fdc7cc444c1e76763f463137601e0eb7b6a257868cae5e160"
+      },
+      {
+        "bed": 2600,
+        "history": "hold-resume-1p5",
+        "corner": "worstContour",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "88ed049a6cb731e4b523dbc9aef3ca8e559d852bd09f6ea71b6052cf91235dea"
+      },
+      {
+        "bed": 2600,
+        "history": "hold-resume-1p5",
+        "corner": "worstResidual",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "88ed049a6cb731e4b523dbc9aef3ca8e559d852bd09f6ea71b6052cf91235dea"
+      },
+      {
+        "bed": 2600,
+        "history": "hold-resume-1p5",
+        "corner": "worstHandover",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "88ed049a6cb731e4b523dbc9aef3ca8e559d852bd09f6ea71b6052cf91235dea"
+      },
+      {
+        "bed": 2600,
+        "history": "override-3",
+        "corner": "worstContour",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "326dff390f4762b2f68e16ee713e55f59dd419d47551dda4c6b3064f0e04b8c8"
+      },
+      {
+        "bed": 2600,
+        "history": "override-3",
+        "corner": "worstResidual",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "326dff390f4762b2f68e16ee713e55f59dd419d47551dda4c6b3064f0e04b8c8"
+      },
+      {
+        "bed": 2600,
+        "history": "override-3",
+        "corner": "worstHandover",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "326dff390f4762b2f68e16ee713e55f59dd419d47551dda4c6b3064f0e04b8c8"
+      },
+      {
+        "bed": 2600,
+        "history": "hold-resume-3",
+        "corner": "worstContour",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "b2091759efc9cf2810ca09037edee719451284abaf7746dcd5677ef402437b09"
+      },
+      {
+        "bed": 2600,
+        "history": "hold-resume-3",
+        "corner": "worstResidual",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "b2091759efc9cf2810ca09037edee719451284abaf7746dcd5677ef402437b09"
+      },
+      {
+        "bed": 2600,
+        "history": "hold-resume-3",
+        "corner": "worstHandover",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "b2091759efc9cf2810ca09037edee719451284abaf7746dcd5677ef402437b09"
+      },
+      {
+        "bed": 3150,
+        "history": "nominal",
+        "corner": "worstContour",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "03319f0a99afac4993f960e710b11a2c0448e074166bac6bbbd84229d536ba51"
+      },
+      {
+        "bed": 3150,
+        "history": "nominal",
+        "corner": "worstResidual",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "03319f0a99afac4993f960e710b11a2c0448e074166bac6bbbd84229d536ba51"
+      },
+      {
+        "bed": 3150,
+        "history": "nominal",
+        "corner": "worstHandover",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "03319f0a99afac4993f960e710b11a2c0448e074166bac6bbbd84229d536ba51"
+      },
+      {
+        "bed": 3150,
+        "history": "override-1p5",
+        "corner": "worstContour",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "eb5532de30345ca58b8a5ddbbdbc380e297be16f3b7adc94efaaecb703196ccd"
+      },
+      {
+        "bed": 3150,
+        "history": "override-1p5",
+        "corner": "worstResidual",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "eb5532de30345ca58b8a5ddbbdbc380e297be16f3b7adc94efaaecb703196ccd"
+      },
+      {
+        "bed": 3150,
+        "history": "override-1p5",
+        "corner": "worstHandover",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "eb5532de30345ca58b8a5ddbbdbc380e297be16f3b7adc94efaaecb703196ccd"
+      },
+      {
+        "bed": 3150,
+        "history": "hold-resume-1p5",
+        "corner": "worstContour",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "b8a8248a99bed3bd19f73ff0032a60a2afdadd2298b6a7e48cb07017c178be77"
+      },
+      {
+        "bed": 3150,
+        "history": "hold-resume-1p5",
+        "corner": "worstResidual",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "b8a8248a99bed3bd19f73ff0032a60a2afdadd2298b6a7e48cb07017c178be77"
+      },
+      {
+        "bed": 3150,
+        "history": "hold-resume-1p5",
+        "corner": "worstHandover",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "b8a8248a99bed3bd19f73ff0032a60a2afdadd2298b6a7e48cb07017c178be77"
+      },
+      {
+        "bed": 3150,
+        "history": "override-3",
+        "corner": "worstContour",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "074821d1156e2d4403ab49af611abc57dc9158f7b85227ed2b768a2ee9fcaed4"
+      },
+      {
+        "bed": 3150,
+        "history": "override-3",
+        "corner": "worstResidual",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "074821d1156e2d4403ab49af611abc57dc9158f7b85227ed2b768a2ee9fcaed4"
+      },
+      {
+        "bed": 3150,
+        "history": "override-3",
+        "corner": "worstHandover",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "074821d1156e2d4403ab49af611abc57dc9158f7b85227ed2b768a2ee9fcaed4"
+      },
+      {
+        "bed": 3150,
+        "history": "hold-resume-3",
+        "corner": "worstContour",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "a2436cd07bbe23361ba54bb87c2ee817bbda7a56ee7e373d8740965226c40e91"
+      },
+      {
+        "bed": 3150,
+        "history": "hold-resume-3",
+        "corner": "worstResidual",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "a2436cd07bbe23361ba54bb87c2ee817bbda7a56ee7e373d8740965226c40e91"
+      },
+      {
+        "bed": 3150,
+        "history": "hold-resume-3",
+        "corner": "worstHandover",
+        "maxReplayDifferenceMm": 0.0,
+        "referenceSha256": "a2436cd07bbe23361ba54bb87c2ee817bbda7a56ee7e373d8740965226c40e91"
+      }
+    ]
+  },
+  "modalStressAudit": [
+    {
+      "variant": "baseline",
+      "modeCount": 20,
+      "history": "hold-resume-3",
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "maxRangeMPa": 13.060011367702273,
+      "group": "W066"
+    },
+    {
+      "variant": "baseline",
+      "modeCount": 40,
+      "history": "hold-resume-3",
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "maxRangeMPa": 13.02755138946272,
+      "group": "W066"
+    },
+    {
+      "variant": "no-plan",
+      "modeCount": 20,
+      "history": "override-1p5",
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "maxRangeMPa": 16.29119161932615,
+      "group": "W052"
+    },
+    {
+      "variant": "no-plan",
+      "modeCount": 40,
+      "history": "override-1p5",
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "maxRangeMPa": 16.37005181514473,
+      "group": "W064"
+    }
+  ],
+  "committedOutputFormat": "CSV rows normalized to LF; archived rows are CRLF. Parsed tables are identical. The committed report writer differs only in its explicit LF line terminator.",
+  "committedDriverSha256": {
+    "machinekit/examples/sheet-router/fem/brace_study.py": "8f9b9d6d85cc5cced1b899f7d2876015e3afc399357a2f79d415207319466684",
+    "machinekit/examples/sheet-router/fem/brace_report.py": "a25e6a2ce87e09a18b16f9c8eb1d71aa5ce7630bcadb09a4eaac722a16ccfab4",
+    "machinekit/examples/sheet-router/fem/brace_macro.py": "7aac510034de0b8f0f787a7a770a2ba16b43895cb5c9c7d396b6d05ebe88d606",
+    "machinekit/examples/sheet-router/fem/brace_checks.py": "2add101776481e9d85546f9e8b6ffb5c94f0538f3600d69b07e0725f69a9a46b",
+    "machinekit/examples/sheet-router/fem/brace_motion.py": "c204e5b47862fd78e10bd3368f0391b2233a6a10ea7aad79334a1d650650639b"
+  },
+  "committedTableSha256": {
+    "variants.csv": "6a6db4008debb05f0c5f4744be766bedfeadb6ed9c86216637cfeab64da5061c",
+    "weld-group-envelopes.csv": "74e6661137e726802b750c112a5ed997da373b8ec81e4311bff46fa0a257727c",
+    "governing-lowest-six.csv": "6a1d083dd5ac0841d958f22721bbee98f4e000d747b169cf3029a65664d7d702"
+  }
+}
