@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-proposal-replan-tests"},
+  "entry": "ProposalReplanTests",
+  "sourceRoots": ["src", "../../examples/box-mold", "../../../manufacturingkit/tests/tooling/src"],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/proposal-replan"
+}

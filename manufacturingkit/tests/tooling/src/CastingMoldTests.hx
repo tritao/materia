@@ -145,6 +145,10 @@ class CastingMoldTests {
 			"source lifting inserts clear the source design request independently of equipment");
 		check(p.validation.filter(check -> check.rule=="tooling.handling.flip" && check.status=="pending").length==1,
 			"source declarations do not qualify rigging, capacity or the flip procedure");
+		var levelOne=materia.tooling.process.CastingLevelOne.analyze(d);
+		check(levelOne.validation.filter(row -> row.rule=="process.level1.lifting-points" && row.status=="pass"
+			&& row.affectedIds.length==1 && row.affectedIds[0]==d.input.id).length==1,
+			"the source-only lifting rule passes with the actual declared source ID");
 		var manufacturing=switch insert.origin {case Fabricated(plan):plan;default:throw "Fabricated lifting insert required";};
 		manufacturing.holeRoutes=[{holeId:hole.id,route:materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting}];
 		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);

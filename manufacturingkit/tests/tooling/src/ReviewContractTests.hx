@@ -124,16 +124,38 @@ class ReviewContractTests {
 		limits.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;
 		limits.setup.features[0].withdrawal = {x: 0, y: 0, z: -1};
 		var levelOne = CastingLevelOne.analyze(limits);
-		for (rule in [
-			"corner-radius.pocket",
-			"insert-cover.seat",
-			"insert-edge.seat",
-			"fixing-access.seat",
-			"lifting-points",
-			"removal-direction.pocket"
-		])
-			check(levelOne.validation.filter(v -> v.rule == "process.level1." + rule && v.status == "fail").length == 1,
-				"source-only declared-threshold rule is exercised: " + rule);
+		function sourceFinding(report:materia.tooling.process.CastingLevelOne.CastingDesignReport,
+				rule:String,id:String,status:String):Void {
+			var rows=report.validation.filter(row -> row.rule=="process.level1."+rule);
+			check(rows.length==1 && rows[0].status==status && rows[0].affectedIds.length==1 && rows[0].affectedIds[0]==id,
+				"source-only "+rule+" reports "+status+" with its actual source ID");
+		}
+		for (row in [
+			{rule:"corner-radius.pocket",id:"pocket"},
+			{rule:"insert-cover.seat",id:"seat"},
+			{rule:"insert-edge.seat",id:"seat"},
+			{rule:"fixing-access.seat",id:"seat"},
+			{rule:"lifting-points",id:limits.input.id},
+			{rule:"removal-direction.pocket",id:"pocket"}
+		]) sourceFinding(levelOne,row.rule,row.id,"fail");
+		var passing=ToolingCodec.snapshot(accepted);
+		passing.recipe.designReview.minimumInsertCoverMm=9;
+		passing.recipe.designReview.minimumFixingAccessMm=10;
+		passing.recipe.designReview.removalClearanceMm=0;
+		passing.setup.features[0].strategy=materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;
+		passing.setup.features[0].withdrawal={x:0,y:0,z:1};
+		var positive=CastingLevelOne.analyze(passing);
+		for (row in [
+			{rule:"insert-cover.seat",id:"seat"},
+			{rule:"insert-edge.seat",id:"seat"},
+			{rule:"fixing-access.seat",id:"seat"},
+			{rule:"removal-direction.pocket",id:"pocket"}
+		]) sourceFinding(positive,row.rule,row.id,"pass");
+		var rounded=ToolingCodec.snapshot(passing);
+		rounded.input.features.filter(feature -> feature.id=="pocket")[0].cornerRadius=3;
+		rounded.recipe.designReview.minimumCornerRadiusMm=2;
+		rounded.setup.sourceFingerprint=ToolingCodec.inputFingerprint(rounded.input);
+		sourceFinding(CastingLevelOne.analyze(rounded),"corner-radius.pocket","pocket","pass");
 		var s = FabricationTests.spec();
 		s.plates = [
 			{

@@ -2245,6 +2245,20 @@ by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
   independently hash-verified artifacts, **40** programs and **5,154,782**
   bytes: **889 Pass / 402 Pending / 123 Unsupported / 74 Fail**; readiness
   stays **false**, with trapped-air failures and physical requirements explicit.
+- [x] Phase 6 proposal acceptance: `ProposalReplanTests` explicitly authors source
+  lifting inserts at the actual CoM-based proposal locations, transforms them
+  back through the setup frame, increments the source/setup revision, and replans.
+  The lifting request clears and returns when one accepted point is removed.
+  Native reconstruction and both full sweep graphs pass; source HoleInterfaces
+  provide the mold fixings while equipment qualification remains Pending.
+  Focused **22** assertions pass. Paired passing/failing fixtures now check the
+  source IDs for all six source-level rules: corner radius, insert cover/edge,
+  fixing access, lifting points and removal direction. Pure tooling **1,909**
+  passes (review contracts **42**, mold contracts **106**); full native **724**
+  passes. No production policy, automatic insertion or schema change is introduced.
+  All four CadKit CTest suites pass. The box and mill packages regenerate; the
+  mill manifest and every artifact hash are byte-identical to the preceding
+  generation: **265** artifacts, **40** programs, readiness **false**.
 - [ ] Non-box envelope support and former CAM remain unfinished. These
   slices do not complete step 3.
 - [x] Draft source convention confirmed: authored dimensions belong to the
