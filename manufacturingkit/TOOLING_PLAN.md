@@ -1406,6 +1406,15 @@ already landed, so the scope freeze allows them:
    check per package. Remove layers that re-verify what another layer already
    proves. List each removal with the check that still covers it. Delete
    unneeded layers rather than disabling them behind flags.
+7. Make anchor selection fast. `InsertAnchorPattern` now takes about 92 s per
+   mill build because it runs native OCCT cover and containment checks on
+   every enumerated candidate. Inserts, holes, anchors and the cavity faces
+   they meet are boxes, cylinders and discs. Screen candidates with exact
+   analytic distances on those primitives, in the selector's existing order,
+   and run the native check only on the chosen pattern as confirmation. A
+   native rejection of a screened pattern is a defect in the screen, not a
+   fallback to the next candidate. The selected patterns, and the kits, stay
+   identical. Report selection time before and after.
 
 ### 8. Column and independent structure
 
