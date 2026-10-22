@@ -1709,7 +1709,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.control.thermistor-input",
@@ -5004,7 +5004,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 2.906917,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "milling-bt30-spindle-motor-study.glb",
    "view": {
@@ -7230,7 +7230,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 2.748265,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "milling-spindle-motor.glb",
    "view": {
@@ -7238,7 +7238,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.milling.spindle-motor-mount",
@@ -8966,7 +8966,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 2.007145,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-axis-servo-motor.glb",
    "view": {
@@ -9411,7 +9411,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 1.280345,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-brake-servo.glb",
    "view": {
@@ -10655,7 +10655,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.generic-nema-stepper",
@@ -11973,7 +11973,7 @@
    ],
    "mass": {
     "kg": 0.07536,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-linear-rail.glb",
    "view": {
@@ -11981,7 +11981,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.linear-rail-block",
@@ -12152,7 +12152,7 @@
    ],
    "mass": {
     "kg": 0.036773,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-linear-rail-block.glb",
    "view": {
@@ -12160,7 +12160,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.linear-scale",
@@ -13091,7 +13091,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 1.280615,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-planetary-reducer.glb",
    "view": {
@@ -13099,7 +13099,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.power-supply",
@@ -13343,7 +13343,7 @@
    ],
    "mass": {
     "kg": 0.011838,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-proximity-switch.glb",
    "view": {
@@ -13351,7 +13351,7 @@
     "phi": 50,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.purchased-rotary-part",
@@ -15128,7 +15128,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 0.763407,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-servo-motor.glb",
    "view": {
@@ -15136,7 +15136,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.sfu-drawing-screw",
@@ -15752,7 +15752,7 @@
    "material": "aluminium",
    "mass": {
     "kg": 0.067366,
-    "source": "Computed(Preview)"
+    "source": "Modelled"
    },
    "model": "motion-shaft-encoder.glb",
    "view": {
@@ -15760,7 +15760,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.stepped-shaft",
@@ -18470,7 +18470,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.power.contactor",
@@ -18601,7 +18601,7 @@
     "phi": 62,
     "theta": 35
    },
-   "fidelity": "envelope"
+   "fidelity": "nominal"
   },
   {
    "id": "machinekit.power.three-phase-rectifier",
@@ -26862,7 +26862,7 @@
     {
      "name": "features",
      "type": "text",
-     "value": "{\"version\":3,\"features\":[]}"
+     "value": "{\"version\":4,\"features\":[]}"
     },
     {
      "name": "embeddedAnchors",
@@ -26893,7 +26893,7 @@
    "bom": {
     "description": "Mineral casting (purchase by casting mass, kg)",
     "material": "mineral cast",
-    "partNumber": "machinekit.structural.mineral-casting|width:3:650|depth:3:550|height:3:120|footWidth:1:0|footHeight:1:0|footShoulder:1:0|cornerChamfer:1:0|features:27:{\"version\":3,\"features\":[]}|embeddedAnchors:2:[]|datumScheme:4:null|interfaces:2:[]"
+    "partNumber": "machinekit.structural.mineral-casting|width:3:650|depth:3:550|height:3:120|footWidth:1:0|footHeight:1:0|footShoulder:1:0|cornerChamfer:1:0|features:27:{\"version\":4,\"features\":[]}|embeddedAnchors:2:[]|datumScheme:4:null|interfaces:2:[]"
    },
    "material": "mineral-cast",
    "mass": {
