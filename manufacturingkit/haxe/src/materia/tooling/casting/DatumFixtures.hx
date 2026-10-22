@@ -70,16 +70,33 @@ class DatumFixtures {
 			if (fixing != null)
 				pinSpacing = Math.max(pinSpacing, fixing.clearanceDiameter + d + h.secondaryPinTravel + 2 * r.minimumLigament);
 		}
-		if (pinSpacing > h.fixturePinSpacing) {
-			var feet = datum.pieces.filter(piece -> Math.abs(piece.z - floor) < 1e-7);
-			var requiredSpan = pinSpacing + d + h.secondaryPinTravel + 2 * r.minimumLigament;
-			var alongX = feet.filter(piece -> piece.width >= requiredSpan).length > 0;
-			var alongY = feet.filter(piece -> piece.depth >= requiredSpan).length > 0;
-			pinAlongY = !alongX && alongY;
-			// A support too small for the required baseline remains blocked by the
-			// normal bore/ligament checks; no source hole or support is invented.
-			if (!alongX && !alongY)
-				pinSpacing = h.fixturePinSpacing;
+		var feet=datum.pieces.filter(piece -> Math.abs(piece.z-floor)<1e-7);
+		var requiredSpan=pinSpacing+d+h.secondaryPinTravel+2*r.minimumLigament;
+		var alongX=feet.filter(piece -> piece.width>=requiredSpan).length>0;
+		var alongY=feet.filter(piece -> piece.depth>=requiredSpan).length>0;
+		function clearFixings(alongY:Bool):Int {
+			var count=0;
+			for (hole in precastHoles) {
+				var fixing=InsertFixturePlanner.select(hole,F.compose(p.document.setup.sourceToMold,i.pose),face,h);
+				if (fixing==null) continue;
+				var bore=PanelContours.circle(fixing.entry.x,fixing.entry.y,fixing.clearanceDiameter/2),clear=true;
+				for (index in 0...2) {
+					var offset=index==0 ? -pinSpacing/2 : pinSpacing/2;
+					var x=cx+(alongY ? 0 : offset),y=cy+(alongY ? offset : 0);
+					var locator=index==0 ? PanelContours.circle(x,y,d/2)
+						: PanelContours.obround(x,y,d+(alongY ? 0 : h.secondaryPinTravel),d+(alongY ? h.secondaryPinTravel : 0));
+					if (materia.casting.CastingProfileGeometry.distanceBetween(bore,locator)<r.minimumLigament-1e-7)
+						clear=false;
+				}
+				if (clear) count++;
+			}
+			return count;
+		}
+		if (!alongX && !alongY) {
+			// An undersized support remains blocked by the bore/ligament checks.
+			pinSpacing=h.fixturePinSpacing;
+		} else if (alongY && (!alongX || clearFixings(true)>clearFixings(false))) {
+			pinAlongY=true;
 		}
 		var penetrations:Array<PenetrationPlan> = [];
 		for (index in 0...2) {

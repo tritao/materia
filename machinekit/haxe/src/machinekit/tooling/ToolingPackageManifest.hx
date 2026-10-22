@@ -59,7 +59,8 @@ class ToolingPackageManifest {
 			throw "Foundation joint source or process validation omitted or changed";
 		var jointChecks:Array<ToolingValidation> =cast jointReport.validation;
 		checks=checks.concat(jointChecks);
-		var anchorReport=ToolingFabricationExport.insertAnchorageReport(plan,sourceFingerprint);
+		var anchorSpec=materia.tooling.export.FabricationSpecCodec.decode(sys.io.File.getContent(dir+"/fabrication-spec.json"));
+		var anchorReport=ToolingFabricationExport.insertAnchorageReport(plan,sourceFingerprint,anchorSpec);
 		path=dir+"/insert-anchorage.json";
 		if (!sys.FileSystem.exists(path)
 			|| ToolingCodec.canonical(haxe.Json.parse(sys.io.File.getContent(path)))!=ToolingCodec.canonical(anchorReport))

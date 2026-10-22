@@ -45,6 +45,10 @@ class ToolingFabricationExport {
 			var screw:machinekit.standard.SocketHeadCapScrew = cast component;
 			return {classification: SupportedHardware, lengthMm: screw.length, diameterMm: screw.diameter};
 		}
+		if (Std.isOfType(component,machinekit.standard.HexFlangeBolt)) {
+			var bolt:machinekit.standard.HexFlangeBolt=cast component;
+			return {classification:SupportedHardware,lengthMm:bolt.length,diameterMm:bolt.thread.majorDiameter};
+		}
 		if (Std.isOfType(component, machinekit.standard.FlatWasher)) {
 			var washer:machinekit.standard.FlatWasher = cast component;
 			return {classification: SupportedHardware, lengthMm: washer.thickness, diameterMm: washer.outerDiameter};
@@ -139,13 +143,15 @@ class ToolingFabricationExport {
 		return checks;
 	}
 
-	public static function insertAnchorageReport(p:CastingMoldPlan,sourceFingerprint:String):Dynamic {
-		var key=sourceFingerprint+":"+materia.tooling.casting.CastingMoldCodec.fingerprint(p);
+	public static function insertAnchorageReport(p:CastingMoldPlan,sourceFingerprint:String,spec:materia.tooling.export.FabricationSpec):Dynamic {
+		var key=sourceFingerprint+":"+materia.tooling.casting.CastingMoldCodec.fingerprint(p)+":"
+			+ToolingCodec.canonical({bearing:spec.mixBearingStressMPa,tensile:spec.mixTensileStrengthMPa});
 		var cached=anchorReportCache;
 		var nativeChecks:Array<materia.tooling.ToolingValidation>;
 		if (cached!=null && key==cached.key) nativeChecks=cached.checks;
 		else {
-			nativeChecks=InsertAnchorGeometry.review(p.document.input).concat(InsertAnchorGeometry.reviewMold(p));
+			nativeChecks=InsertAnchorGeometry.review(p.document.input,spec.mixBearingStressMPa,spec.mixTensileStrengthMPa)
+				.concat(InsertAnchorGeometry.reviewMold(p));
 			anchorReportCache={key:key,checks:nativeChecks};
 		}
 		var checks:Array<materia.tooling.ToolingValidation> = [];
@@ -153,7 +159,8 @@ class ToolingFabricationExport {
 		for (record in nativeChecks) checks.push({rule:record.rule,affectedIds:record.affectedIds.copy(),
 			status:record.status,severity:record.severity,message:record.message,evidence:record.evidence.copy()});
 		checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));
-		return {format:"materia.tooling.insert-anchorage",version:2,sourceFingerprint:sourceFingerprint,
+		return {format:"materia.tooling.insert-anchorage",version:3,sourceFingerprint:sourceFingerprint,
+			materialInputs:{mixBearingStressMPa:spec.mixBearingStressMPa,mixTensileStrengthMPa:spec.mixTensileStrengthMPa},
 			inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),
 			inserts:[for (insert in p.document.input.inserts) {id:insert.id,pose:materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.identity(),insert.pose),
 				spec:materia.casting.InsertSpec.InsertSpecCodec.record({body:insert.body,holes:insert.holes,
@@ -255,7 +262,7 @@ class ToolingFabricationExport {
 		data(dir,"tooling-section-drawings.json",ToolingSectionReview.record(sectionReview,f.sourceFingerprint));
 		classificationChecks=classificationChecks.concat(sectionReview.validation);
 		foundationJoints(p,f,dir);
-		data(dir,"insert-anchorage.json",insertAnchorageReport(p,f.sourceFingerprint));
+		data(dir,"insert-anchorage.json",insertAnchorageReport(p,f.sourceFingerprint,f.spec));
 		data(dir, "fabrication-plan.json", f);
 		text(dir, "fabrication-spec.json", FabricationSpecCodec.encode(f.spec));
 		data(dir, "load-estimates.json", f.loads);

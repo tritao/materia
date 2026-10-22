@@ -108,7 +108,7 @@ class MillFrame extends MachineAssembly {
 
 		// Four independent steel pairs provide a broad column mounting interface.
 		var flared = l.columnFootWidth > l.columnWidth;
-		var footWidth = flared ? Math.max(l.wall,details.minimumClearancePadSide(details.columnAnchorThread.clearanceDiameter)) : l.wall,
+		var footWidth = flared ? Math.max(l.wall,details.minimumClearancePadSide(details.columnAnchorThread.clearanceDiameter,details.columnAnchorThickness)) : l.wall,
 			footDepth = Math.max(l.roof, details.minimumColumnPadDepth(l.insertThickness));
 		for (sx in [-1, 1])
 			for (sy in [-1, 1]) {
@@ -136,8 +136,8 @@ class MillFrame extends MachineAssembly {
 					baseInserts.push({
 						id: 'foot$id',
 						openings: [CastingPatterns.feature('foot-access-$id'), CastingPatterns.feature('foot-stem-$id')],
-						part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(Math.max(l.wall,details.minimumClearancePadSide(details.levelingClearanceDiameter)),
-							Math.max(l.wall,details.minimumClearancePadSide(details.levelingClearanceDiameter)),l.insertThickness),
+						part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(Math.max(l.wall,details.minimumClearancePadSide(details.levelingClearanceDiameter,l.insertThickness)),
+							Math.max(l.wall,details.minimumClearancePadSide(details.levelingClearanceDiameter,l.insertThickness)),l.insertThickness),
 							InsertHoles.through(details.levelingClearanceDiameter, l.insertThickness))
 							.setToken("role", InsertRole.LevelingSeat)
 							.setToken("label", "leveling screw seat")),
@@ -194,17 +194,38 @@ class MillFrame extends MachineAssembly {
 				- l.railPlane, 0,
 				(bayFront + a.yServiceRear + details.rearBayDesignClearance) / 2
 				- l.columnCentreY, 0));
-			for (sx in [-1, 1])
+			var hatchWall=details.hatchAnchorThread.thread.majorDiameter/2
+				+machinekit.design.ThreadedHolePolicy.resolve(details.hatchAnchorThread.thread,C45Bright).minWall;
+			var maximumHatchOffset=details.hatchAnchorSideOffset+details.hatchAnchorWidth/2-hatchWall;
+			for (sx in [-1, 1]) {
+				var offset=Math.max(details.hatchAnchorSideOffset,a.yBayWidth/2+details.hatchAnchorWidth/2);
+				var part:CastInsert=null,settled=false,lastFailure="";
+				while (offset<=maximumHatchOffset+1e-8) {
+					var holes=InsertHoles.records(InsertHoles.tappedBlind(details.hatchAnchorThread,details.hatchAnchorThickness));
+					holes[0].frame.x=sx*(details.hatchAnchorSideOffset-offset);
+					part=new CastInsert(CastInsert.precastHoles(
+						CastInsert.boxValues(details.hatchAnchorWidth,details.hatchAnchorDepth,details.hatchAnchorThickness),
+						InsertHoles.fromNeutral(holes)).setToken("role",InsertRole.HatchMount)
+						.setToken("label","rear motor hatch anchor"));
+					var land:Float;
+					try land=machinekit.structural.InsertAnchorPattern.minimumOuterLand("hatch-layout",part,details.anchorRule,0).x
+					catch (error:Dynamic) {lastFailure=Std.string(error);offset+=1;continue;}
+					var needed=Math.max(details.hatchAnchorSideOffset,a.yBayWidth/2+details.hatchAnchorWidth/2+land);
+					if (needed<=offset+1e-8) {settled=true;break;}
+					offset=needed;
+				}
+				if (!settled) throw "No hatch footprint placement retains its fixed service hole and policy wall: "+lastFailure;
 				for (z in [a.yHatchLowerZ, a.yHatchUpperZ])
 					columnInserts.push({
 						id: 'hatchRear${sx < 0 ? "Left" : "Right"}${z == a.yHatchLowerZ ? "Lower" : "Upper"}',
-						openings: [CastingPatterns.face(flared ? "foot.y-max" : "body.y-max")].concat(z == a.yHatchLowerZ ? [CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")] : []),
-						part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(details.hatchAnchorWidth, details.hatchAnchorDepth, details.hatchAnchorThickness),
-							InsertHoles.tappedBlind(details.hatchAnchorThread, details.hatchAnchorThickness))
-							.setToken("role", InsertRole.HatchMount)
-							.setToken("label", "rear motor hatch anchor")),
-						pose: F.fromRotationMatrix(sx * details.hatchAnchorSideOffset, a.yServiceRear - details.hatchAnchorRearInset - l.columnCentreY, z - l.railPlane, [1, 0, 0, 0, 0, 1, 0, -1, 0])
+						openings: [CastingPatterns.face(flared ? "foot.y-max" : "body.y-max")]
+							.concat(z == a.yHatchLowerZ ? [CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")] : []),
+						part: new CastInsert(part.values()),
+						pose: F.fromRotationMatrix(sx*offset,
+							a.yServiceRear+details.hatchAnchorServiceFaceOffset-details.hatchAnchorThickness-l.columnCentreY,
+							z-l.railPlane,[1,0,0,0,0,1,0,-1,0])
 					});
+			}
 		}
 		var chamberHeight = (l.columnHeight - 2 * l.roof - l.wall) / 2;
 		var rearChambers:Array<CastingFeature> = [];
@@ -350,9 +371,31 @@ class MillFrame extends MachineAssembly {
 		castingValues:ComponentValues):Array<CastInsertPlacement> {
 		var body=new machinekit.structural.MineralCasting(castingValues).geometry();
 		try {
-			var result:Array<CastInsertPlacement> = [for (row in rows) {id:row.id,pose:row.pose,openings:row.openings,
-				part:machinekit.structural.InsertAnchorPattern.derive(row.id,row.part,rule,Casting(body,row.pose))}];
-			body.close();return result;
+			var lifting=rows.filter(row -> row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LiftingMount);
+			function share(placed:Array<CastInsertPlacement>):Float {
+				if (lifting.length==0) return 0;
+				var mass=MillLiftingPattern.asCastMass(new MineralFoundation(castingValues,placed));
+				if (mass.unaccounted.length>0 || !Math.isFinite(mass.mass) || mass.mass<=0)
+					throw "Anchor lifting demand requires the actual source casting mass";
+				return mass.mass*rule.gravityMps2/Math.min(rule.liftingLoadPaths,lifting.length);
+			}
+			var liftingShare=share(rows);
+			// Only lifting demand depends on the resolved casting mass. Other
+			// patterns and their exact containment are unchanged across this loop.
+			var fixed:Map<String,CastInsert> = [];
+			for (row in rows) if (row.part.parameterToken("role")!=InsertRole.LiftingMount)
+				fixed.set(row.id,machinekit.structural.InsertAnchorPattern.derive(row.id,row.part,rule,Casting(body,row.pose),0));
+			// Hardware changes the casting mass. Resolve that known design coupling
+			// without borrowing workshop strength values or dropping hardware mass.
+			for (pass in 0...8) {
+				var result:Array<CastInsertPlacement> = [for (row in rows) {id:row.id,pose:row.pose,openings:row.openings,
+					part:fixed.exists(row.id) ? fixed.get(row.id)
+						: machinekit.structural.InsertAnchorPattern.derive(row.id,row.part,rule,Casting(body,row.pose),liftingShare)}];
+				var resolved=share(result);
+				if (Math.abs(resolved-liftingShare)<1e-6) {body.close();return result;}
+				liftingShare=resolved;
+			}
+			throw "Anchor/lifting mass sizing did not converge for "+[for (row in lifting) row.id].join(", ");
 		} catch (error:Dynamic) {body.close();throw error;}
 	}
 

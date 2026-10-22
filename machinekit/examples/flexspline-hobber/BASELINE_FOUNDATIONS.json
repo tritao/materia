@@ -9769,10 +9769,10 @@
   "currentDesign": [
     {
       "id": "mill-base",
-      "sourceFingerprint": "b672145dad27078588771f16debdd77b08a4e0ed3418191550446588550714d9",
-      "sourceCodecVersion": 15,
-      "volumeMm3": 69619331.09226151,
-      "massKg": 167.08639462142762,
+      "sourceFingerprint": "def73086133837990831c2246aab99caddaf2d0bdcfd15c35bbd5ce6d1906e90",
+      "sourceCodecVersion": 16,
+      "volumeMm3": 69282648.80908884,
+      "massKg": 166.27835714181322,
       "boxStatus": "unsupported",
       "boxReason": "Non-box anchor occupancy for inserts: columnLeftFront, columnLeftRear, columnRightFront, columnRightRear, driveYFixed, driveYFloating, footLeftFront, footLeftRear, footRightFront, footRightRear, liftLeftFront, liftLeftRear, liftRightFront, liftRightRear, railYLeft, railYRight",
       "unsupportedFeatures": [],
@@ -9780,10 +9780,10 @@
     },
     {
       "id": "mill-column",
-      "sourceFingerprint": "300c126d8e2ba729cbefc0f399e0001fdb4c8ea1a79083d84ec89e08533fbe1f",
-      "sourceCodecVersion": 15,
-      "volumeMm3": 41648030.241955966,
-      "massKg": 99.95527258069433,
+      "sourceFingerprint": "ca2b3805e810da0a73a2e05e26c94c90fb1518945146afb5248624cc20a38245",
+      "sourceCodecVersion": 16,
+      "volumeMm3": 41315101.88527599,
+      "massKg": 99.15624452466238,
       "boxStatus": "unsupported",
       "boxReason": "Non-box anchor occupancy for inserts: footLeftFront, footLeftRear, footRightFront, footRightRear, hatchRearLeftLower, hatchRearLeftUpper, hatchRearRightLower, hatchRearRightUpper, liftLeftFront, liftLeftRear, liftRightFront, liftRightRear, railZLeft, railZRight",
       "unsupportedFeatures": [],
@@ -9792,7 +9792,7 @@
     {
       "id": "hobber-bed",
       "sourceFingerprint": "83a9eef8451cf41e12534ea6bf0079fc0ddeb38741af804966a5dcab668e3e32",
-      "sourceCodecVersion": 15,
+      "sourceCodecVersion": 16,
       "volumeMm3": 350008859.82848215,
       "massKg": 840.0212635883572,
       "boxStatus": "unsupported",
@@ -9816,7 +9816,7 @@
     {
       "id": "hobber-column",
       "sourceFingerprint": "b675d5f64cec0e52b8348c936b751d8c13af5c1ec23bc8e7d9d7c37f8fce812e",
-      "sourceCodecVersion": 15,
+      "sourceCodecVersion": 16,
       "volumeMm3": 18059500.00000001,
       "massKg": 43.34280000000003,
       "boxStatus": "pass",

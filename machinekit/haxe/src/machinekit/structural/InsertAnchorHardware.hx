@@ -1,7 +1,6 @@
 package machinekit.structural;
 
-import machinekit.standard.SocketHeadCapScrew;
-import machinekit.standard.FlatWasher;
+import machinekit.standard.HexFlangeBolt;
 import machinekit.standard.PropertyClass;
 import machinekit.component.MachineComponent;
 import materia.casting.InsertAnchorage;
@@ -31,7 +30,6 @@ typedef InsertBackAnchorChoice = {
 
 enum abstract InsertAnchorComponentKind(String) to String {
 	var Bolt = "bolt";
-	var Washer = "washer";
 }
 
 typedef InsertAnchorComponent = {
@@ -80,6 +78,19 @@ class InsertAnchorHardware {
 		return new CastInsert(values);
 	}
 
+	public static function demand(spec:InsertSpec,ruleId:String,factor:Float,liftingShareN:Float,anchorHoleIds:Array<String>):InsertAnchorDemand {
+		var occupied=C.occupiedHoleIds(spec.anchorage).concat(anchorHoleIds);
+		var loads:Array<{holeId:String,preloadN:Float}> = [];
+		for (hole in spec.holes) {
+			var thread=hole.thread;
+			if (thread!=null && occupied.indexOf(hole.id)<0)
+				loads.push({holeId:hole.id,preloadN:machinekit.design.ThreadedHolePolicy.assemblyPreloadN(InsertHoles.threadSpec(thread))});
+		}
+		loads.sort((a,b) -> Reflect.compare(a.holeId,b.holeId));
+		return {ruleId:ruleId,factor:factor,servicePreloads:loads,liftingShareN:liftingShareN,
+			servicePreloadReference:machinekit.design.ThreadedHolePolicy.ASSEMBLY_PRELOAD_REFERENCE};
+	}
+
 	public static function choose(spec:InsertSpec,rules:InsertAnchorRules,choices:Array<InsertAnchorChoice>):InsertAnchorage {
 		var anchors:Array<InsertBoltAnchor> = [];
 		for (choice in choices) {
@@ -87,9 +98,9 @@ class InsertAnchorHardware {
 			if (holes.length!=1 || holes[0].thread==null) throw "Anchor choice requires a declared source tap: "+choice.id;
 			var thread=holes[0].thread;
 			if (thread==null) throw "Missing source anchor thread";
-			var screw=SocketHeadCapScrew.metric(thread.designation,choice.lengthMm,Steel88),washer=FlatWasher.metric(thread.designation);
+			var screw=HexFlangeBolt.metric(thread.designation,choice.lengthMm,Steel88);
 			anchors.push({id:choice.id,holeId:choice.holeId,insertionMm:choice.insertionMm,
-				screw:screwRecord(screw),washer:washerRecord(washer),locking:choice.locking,lockingReference:choice.lockingReference});
+				screw:screwRecord(screw),locking:choice.locking,lockingReference:choice.lockingReference});
 		}
 		var result=C.snapshot(Bolted(rules,anchors));C.references(result,spec.body,spec.holes,spec.origin,spec.interfaces);return result;
 	}
@@ -105,13 +116,12 @@ class InsertAnchorHardware {
 					var matches=holes.filter(hole -> hole.id==anchor.holeId);
 					if (matches.length!=1) throw "Missing physical pre-cast anchor hole: "+anchor.id;
 					var hole=matches[0],service=source.holes.filter(h -> h.id==anchor.holeId)[0],bearing=C.bearingFrame(service,anchor);
-					var screw=SocketHeadCapScrew.metric(anchor.screw.thread.designation,anchor.screw.lengthMm,Steel88);
-					var washer=FlatWasher.metric(anchor.screw.thread.designation);
-					if (!sameScrew(screwRecord(screw),anchor.screw) || !sameWasher(washerRecord(washer),anchor.washer))
+					var screw=HexFlangeBolt.metric(anchor.screw.thread.designation,anchor.screw.lengthMm,Steel88);
+					if (!sameScrew(screwRecord(screw),anchor.screw))
 						throw "Anchor hardware differs from selected standard components: "+anchor.id;
 					var headInRaw=F.compose(F.inverse(hole.frame),bearing);
-					if (headInRaw.z+anchor.washer.thicknessMm>1e-8)
-						throw "Anchor washer intersects pre-cast steel: "+anchor.id;
+					if (headInRaw.z>1e-8)
+						throw "Anchor flange intersects pre-cast steel: "+anchor.id;
 					var failures=materia.casting.ThreadedFastenerFit.checkIntervals(service,service.frame,
 						{shankLength:anchor.screw.lengthMm,threadedLength:anchor.screw.threadedLengthMm,bearingFrame:bearing},anchor.id)
 						.concat(materia.casting.ThreadedFastenerFit.checkIntervals(hole,hole.frame,
@@ -119,10 +129,16 @@ class InsertAnchorHardware {
 						.filter(finding -> !finding.passed);
 					if (failures.length>0) throw "Anchor source thread fit fails: "+anchor.id+": "+[for (f in failures) f.message].join("; ");
 					result.push({anchorId:anchor.id,kind:InsertAnchorComponentKind.Bolt,part:screw,pose:F.compose(bearing,F.inverse(screw.bearingFrame()))});
-					result.push({anchorId:anchor.id,kind:InsertAnchorComponentKind.Washer,part:washer,pose:bearing});
 				}
 		}
 		return result;
+	}
+
+	/** Both holes must retain their declared material wall. Screw diametral
+	 * clearance alone cannot protect the steel between intersecting bore spans. */
+	public static function requiredHoleLigament(a:materia.casting.InsertHole,b:materia.casting.InsertHole):Float {
+		return Math.max(Math.max(a.limits.minWall,b.limits.minWall),
+			Math.max(a.limits.minClearance,b.limits.minClearance));
 	}
 
 	/** Exact separation of the declared bore/major-thread design envelopes, in
@@ -149,8 +165,18 @@ class InsertAnchorHardware {
 			for (id in occupied) {
 				var hole=spec.holes.filter(candidate -> candidate.id==id)[0];
 				for (other in spec.holes) if (other.id!=id) {
-					var minimum=Math.max(hole.limits.minClearance,other.limits.minClearance);
-					var measured=envelope(hole).distance(envelope(other));
+					var minimum=requiredHoleLigament(hole,other);
+					var first=envelope(hole),second=envelope(other);
+					var firstBounds=first.shape.bounds(),secondBounds=second.shape.bounds();
+					var a=firstBounds.get_min(),b=firstBounds.get_max();
+					var c=secondBounds.get_min(),d=secondBounds.get_max();
+					var dx=Math.max(0,Math.max(a.get_x()-d.get_x(),c.get_x()-b.get_x()));
+					var dy=Math.max(0,Math.max(a.get_y()-d.get_y(),c.get_y()-b.get_y()));
+					var dz=Math.max(0,Math.max(a.get_z()-d.get_z(),c.get_z()-b.get_z()));
+					// Box distance is a lower bound: only definitely separated holes
+					// bypass the exact solid distance, including rotated bore spans.
+					if (Math.sqrt(dx*dx+dy*dy+dz*dz)>=minimum) continue;
+					var measured=first.distance(second);
 					if (measured+1e-7<minimum)
 						throw "Anchor "+id+": source hole "+other.id+" clearance "+measured+" mm; requires "+minimum+" mm";
 				}
@@ -162,19 +188,48 @@ class InsertAnchorHardware {
 	static function sameScrew(a:InsertAnchorScrew,b:InsertAnchorScrew):Bool {
 		var x=a.thread,y=b.thread;
 		return a.partNumber==b.partNumber && a.lengthMm==b.lengthMm && a.threadedLengthMm==b.threadedLengthMm
-			&& a.headDiameterMm==b.headDiameterMm && a.headHeightMm==b.headHeightMm
-			&& a.socketSizeMm==b.socketSizeMm && a.socketDepthMm==b.socketDepthMm
+			&& a.headHeightMm==b.headHeightMm && a.headAcrossFlatsMm==b.headAcrossFlatsMm
+			&& a.flangeDiameterMm==b.flangeDiameterMm && a.flangeThicknessMm==b.flangeThicknessMm
+			&& a.bearingInnerDiameterMm==b.bearingInnerDiameterMm && a.bearingOuterDiameterMm==b.bearingOuterDiameterMm
+			&& a.assemblyPreloadN==b.assemblyPreloadN && a.preloadReference==b.preloadReference
 			&& x.designation==y.designation && x.majorDiameter==y.majorDiameter && x.pitch==y.pitch
-			&& x.starts==y.starts && x.internal==y.internal && x.toleranceClass==y.toleranceClass && x.hand==y.hand && x.profile==y.profile;
+			&& x.starts==y.starts && x.internal==y.internal && x.toleranceClass==y.toleranceClass
+			&& x.hand==y.hand && x.profile==y.profile;
 	}
-	static function sameWasher(a:InsertAnchorWasher,b:InsertAnchorWasher):Bool
-		return a.partNumber==b.partNumber && a.innerDiameterMm==b.innerDiameterMm
-			&& a.outerDiameterMm==b.outerDiameterMm && a.thicknessMm==b.thicknessMm;
 
-	static function screwRecord(part:SocketHeadCapScrew):InsertAnchorScrew
+	static function screwRecord(part:HexFlangeBolt):InsertAnchorScrew
 		return {partNumber:part.bom.partNumber,thread:InsertHoles.threadRecord(part.threadSpec()),lengthMm:part.shankLength(),
-			threadedLengthMm:part.threadedLength(),headDiameterMm:part.spec.headDiameter,headHeightMm:part.spec.headHeight,
-			socketSizeMm:part.spec.socketSize,socketDepthMm:part.spec.socketDepth};
-	static function washerRecord(part:FlatWasher):InsertAnchorWasher
-		return {partNumber:part.bom.partNumber,innerDiameterMm:part.innerDiameter,outerDiameterMm:part.outerDiameter,thicknessMm:part.thickness};
+			threadedLengthMm:part.threadedLength(),headHeightMm:part.spec.headHeight,headAcrossFlatsMm:part.spec.acrossFlats,
+			flangeDiameterMm:part.spec.flangeDiameter,flangeThicknessMm:part.spec.flangeThickness,
+			bearingInnerDiameterMm:part.spec.bearingInnerDiameter,bearingOuterDiameterMm:part.spec.bearingOuterDiameter,
+			assemblyPreloadN:machinekit.design.ThreadedHolePolicy.assemblyPreloadN(part.threadSpec()),
+			preloadReference:machinekit.design.ThreadedHolePolicy.ASSEMBLY_PRELOAD_REFERENCE};
+	/** Exact ray exit to the exposed composite-casting boundary. Steel/resin
+	 * interfaces do not substitute for that surface. Used by source sizing and
+	 * its independent tooling review; source geometry is borrowed. */
+	public static function axialEmbedment(point:materia.assembly.AssemblyDefinition.AssemblyVector,
+		direction:materia.assembly.AssemblyDefinition.AssemblyVector,bulk:cadkit.modeling.Part):Float {
+		var bounds=bulk.shape.bounds(),lo=bounds.get_min(),hi=bounds.get_max();
+		var dx=hi.get_x()-lo.get_x(),dy=hi.get_y()-lo.get_y(),dz=hi.get_z()-lo.get_z();
+		var length=2*Math.sqrt(dx*dx+dy*dy+dz*dz);
+		var ray=cadkit.modeling.Curve.line(new cadkit.modeling.Vector(point.x,point.y,point.z),
+			new cadkit.modeling.Vector(point.x+direction.x*length,point.y+direction.y*length,point.z+direction.z*length));
+		var depth=Math.POSITIVE_INFINITY;
+		var intersection:Null<cadkit.Shape> = null;
+		try {
+			intersection=bulk.shape.common(ray.shape);
+			for (vertex in intersection.vertices().all()) {
+				var p=vertex.position();
+				var distance=(p.get_x()-point.x)*direction.x+(p.get_y()-point.y)*direction.y+(p.get_z()-point.z)*direction.z;
+				vertex.close();
+				// The ray starts inside the qualified bulk. Its own start vertex
+				// is not a boundary event; the first other interval end is.
+				if (distance>1e-7) depth=Math.min(depth,distance);
+			}
+		} catch (error:Dynamic) {if (intersection!=null) intersection.close();ray.close();throw error;}
+		intersection.close();
+		ray.close();
+		if (!Math.isFinite(depth)) throw "Anchor axial embedment has no exposed casting boundary";
+		return depth;
+	}
 }

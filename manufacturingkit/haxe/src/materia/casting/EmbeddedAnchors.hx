@@ -11,7 +11,7 @@ typedef EmbeddedInsertAnchors = {
 /** Derived source occupancy, copied from the owning inserts when a foundation
  * is built. It is never a second independent anchor layout or a box substitute. */
 class EmbeddedAnchors {
-	/** Exact nominal cylinder/hex-socket moments of the declared hardware.
+	/** Exact nominal cylinder/external-hex moments of the declared hardware.
 	 * exposedOnly removes the shank portion inside the rectangular steel blank;
 	 * otherwise returns the metal added to the steel union (thread-envelope
 	 * overlap is counted once). Callers qualify containment with source CAD. */
@@ -26,16 +26,14 @@ class EmbeddedAnchors {
 			case Bolted(_,anchors):for (anchor in anchors) {
 				var hole=spec.holes.filter(h -> h.id==anchor.holeId)[0];
 				var frame=InsertAnchorage.InsertAnchorageCodec.bearingFrame(hole,anchor);
-				var screw=anchor.screw,washer=anchor.washer;
+				var screw=anchor.screw;
 				var shankLength=exposedOnly ? -frame.z : screw.lengthMm;
 				if (shankLength<0 || shankLength>screw.lengthMm) throw "Invalid anchor exposure: "+anchor.id;
 				add(Math.PI*Math.pow(screw.thread.majorDiameter/2,2)*shankLength,frame,shankLength/2);
-				add(Math.PI*Math.pow(screw.headDiameterMm/2,2)*screw.headHeightMm,frame,-screw.headHeightMm/2);
-				// A regular hexagon's area is sqrt(3)/2 times across-flats squared.
-				add(-Math.sqrt(3)/2*screw.socketSizeMm*screw.socketSizeMm*screw.socketDepthMm,
-					frame,-screw.headHeightMm+screw.socketDepthMm/2);
-				add(Math.PI*(washer.outerDiameterMm*washer.outerDiameterMm-washer.innerDiameterMm*washer.innerDiameterMm)
-					/4*washer.thicknessMm,frame,washer.thicknessMm/2);
+				add(Math.PI*Math.pow(screw.flangeDiameterMm/2,2)*screw.flangeThicknessMm,frame,-screw.flangeThicknessMm/2);
+				var hexHeight=screw.headHeightMm-screw.flangeThicknessMm;
+				add(Math.sqrt(3)/2*screw.headAcrossFlatsMm*screw.headAcrossFlatsMm*hexHeight,
+					frame,-screw.flangeThicknessMm-hexHeight/2);
 				if (!exposedOnly) {
 					var raw=InsertStages.holes(spec,InsertStages.InsertStage.BeforeCasting).filter(h -> h.id==hole.id)[0];
 					var end=hole.frame.z+anchor.insertionMm;

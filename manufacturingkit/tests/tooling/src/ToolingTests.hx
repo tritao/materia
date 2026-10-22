@@ -336,6 +336,7 @@ class ToolingTests {
 	}
 
 	public static function main():Void {
+		if (Sys.getEnv("TOOLING_ONLY") == "anchors") {AnchorCapacityTests.run(fixture());return;}
 		if (Sys.getEnv("TOOLING_ONLY") == "castability") {
 			var document = fixture();
 			document.recipe.minimumLigament = 2; // Same mold fixture as CastingMoldTests.run.
@@ -585,5 +586,6 @@ class ToolingTests {
 		BoxPlannerTests.run(fixture());
 		CastingMoldTests.run(fixture());
 		MoldRegionMathTests.run();
+		AnchorCapacityTests.run(fixture());
 	}
 }

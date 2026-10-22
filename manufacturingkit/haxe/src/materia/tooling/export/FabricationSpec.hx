@@ -62,6 +62,10 @@ typedef FabricationSpec = {
 	var adhesiveContainsEPS:Null<Bool>;
 
 	var resinReference:String;
+	/** Allowable cured-composite bearing stress and tensile strength, MPa.
+	 * These are mix inputs, not neat-resin properties or guessed capacities. */
+	var mixBearingStressMPa:Null<Float>;
+	var mixTensileStrengthMPa:Null<Float>;
 
 	var compatibilityEvidence:Array<String>;
 	var gravityMps2:Float;

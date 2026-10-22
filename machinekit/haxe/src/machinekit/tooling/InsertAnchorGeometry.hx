@@ -6,6 +6,7 @@ import machinekit.structural.InsertAnchorHardware;
 import machinekit.structural.CastingCavityCad;
 import machinekit.structural.InsertAnchorHardware.InsertAnchorComponentKind;
 import materia.assembly.AssemblyFrames as F;
+import materia.casting.InsertAnchorage.InsertAnchorageCodec as C;
 import materia.tooling.casting.CastingToolingInput;
 import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
@@ -15,7 +16,7 @@ import materia.tooling.ToolingDiagnostic.ToolingSeverity;
  * interference remain separate; source shape bounds never substitute for solids. */
 class InsertAnchorGeometry {
 	/** Actual source hardware against every realized tooling member. The insert's
-	 * own threaded engagement and its own screw/washer contact are intentional. */
+	 * own threaded engagement and its own flange bearing geometry are intentional. */
 	public static function reviewMold(plan:materia.tooling.casting.CastingMoldPlan):Array<ToolingValidation> {
 		var components=CastingMoldCad.anchorComponents(plan);
 		if (components.length==0) return [];
@@ -62,7 +63,7 @@ class InsertAnchorGeometry {
 		checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));return checks;
 	}
 
-	public static function review(input:CastingToolingInput):Array<ToolingValidation> {
+	public static function review(input:CastingToolingInput,?bearingStrengthMPa:Float,?tensileStrengthMPa:Float):Array<ToolingValidation> {
 		if (input.inserts.filter(insert -> switch insert.anchorage {case Bolted(_,_):true;default:false;}).length==0) return [];
 		var parts:Array<Part> = [],shapes:Array<cadkit.Shape> = [],result:Array<ToolingValidation> = [];
 		function own(part:Part):Part {parts.push(part);return part;}
@@ -81,17 +82,19 @@ class InsertAnchorGeometry {
 			for (insert in input.inserts) switch insert.anchorage {
 				case Undeclared,CatalogueRetention:
 				case Bolted(rules,anchors):
+					var capacityGeometry:Array<{anchorId:String,bearingAreaMm2:Float,embedmentMm:Float}> = [];
 					var spec:materia.casting.InsertSpec={body:insert.body,holes:insert.holes,origin:insert.origin,
 						anchorage:insert.anchorage,interfaces:insert.interfaces};
 					var exterior=own(PosedParts.moved(own(machinekit.structural.InsertBodies.part(insert.body)),insert.pose));
 					var hardware=InsertAnchorHardware.parts(spec);
 					for (anchor in anchors) {
-						var metal:Array<Part> = [],washer:Null<Part> = null;
-						var washerPose=F.identity();
+						var metal:Array<Part> = [],bolt:Null<Part> = null;
+						var bearingPose=F.identity();
 						for (component in hardware) if (component.anchorId==anchor.id) {
 							var pose=F.compose(insert.pose,component.pose);
 							var placed=own(PosedParts.moved(own(component.part.geometry()),pose));metal.push(placed);
-							if (component.kind==InsertAnchorComponentKind.Washer) {washer=placed;washerPose=pose;}
+							if (component.kind==InsertAnchorComponentKind.Bolt) {bolt=placed;
+								bearingPose=F.compose(insert.pose,C.bearingFrame(spec.holes.filter(h -> h.id==anchor.holeId)[0],anchor));}
 						}
 						var exposed=own(own(Part.fuseAll(metal)).subtractAll([exterior]));
 						var outside=own(exposed.subtractAll([bulk]));
@@ -99,23 +102,26 @@ class InsertAnchorGeometry {
 						result.push(check(insert.id,anchor.id,"cover",contained && cover+1e-7>=rules.minimumCoverMm,
 							contained ? "Minimum exposed-casting boundary cover "+cover+" mm; requires "+rules.minimumCoverMm+" mm."
 							: "Anchor hardware outside its steel insert extends into a source cavity or outside the casting."));
-						if (washer==null) throw "Missing source anchor washer: "+insert.id+"/"+anchor.id;
-						var placedWasher:Part=washer;
-						var point=F.transformPoint(washerPose,0,0,anchor.washer.thicknessMm);
-						var normal=F.transformVector(washerPose,0,0,1);
-						var embedment=axialEmbedment(point,normal,bulk);
+						if (bolt==null) throw "Missing source flange anchor: "+insert.id+"/"+anchor.id;
+						var placedBolt:Part=bolt;
+						var point=F.transformPoint(bearingPose,0,0,0);
+						var normal=F.transformVector(bearingPose,0,0,1);
+						var embedment=InsertAnchorHardware.axialEmbedment(point,normal,bulk);
 						result.push(check(insert.id,anchor.id,"embedment",embedment+1e-7>=rules.minimumEmbedmentMm,
-							"Axial depth from washer bearing plane to the exposed casting boundary toward the loaded insert face "
+							"Axial depth from flange bearing plane to the exposed casting boundary toward the loaded insert face "
 							+embedment+" mm; requires "+rules.minimumEmbedmentMm+" mm."));
 						var origin=cadkit.Geometry.vec3(point.x,point.y,point.z);
 						var direction=cadkit.Geometry.vec3(normal.x,normal.y,normal.z);
-						var face=ownShape(placedWasher.shape.section(origin,direction));
+						var face=ownShape(placedBolt.shape.section(origin,direction));
 						var resinFace=ownShape(resin.shape.section(origin,direction));
 						var contact=ownShape(face.planarCommon(resinFace)),area=contact.area();
 						result.push(check(insert.id,anchor.id,"bearing-area",area+1e-7>=rules.minimumBearingAreaMm2,
-							"Actual washer face bearing on nominal source resin "+area+" mm2; requires "+rules.minimumBearingAreaMm2
+							"Actual flange face bearing on nominal source resin "+area+" mm2; requires "+rules.minimumBearingAreaMm2
 							+" mm2. Tooling interference and physical capacity are not qualified by this source-only check."));
+						capacityGeometry.push({anchorId:anchor.id,bearingAreaMm2:area,embedmentMm:embedment});
 					}
+					result=result.concat(materia.tooling.casting.InsertAnchorageChecks.materialChecks(insert,
+						capacityGeometry,bearingStrengthMPa,tensileStrengthMPa));
 			}
 		} catch (error:Dynamic) {for (shape in shapes) shape.close();for (part in parts) part.close();throw error;}
 		for (shape in shapes) shape.close();
@@ -140,32 +146,4 @@ class InsertAnchorGeometry {
 			status:passed ? ToolingCheckStatus.Pass : ToolingCheckStatus.Fail,
 			severity:passed ? ToolingSeverity.Info : ToolingSeverity.Error,message:message,evidence:[]};
 
-	/** Exact line/face intersections along the source pull direction. Steel
-	 * recesses are included in bulk; an internal steel/resin interface never
-	 * substitutes for the exposed load-side casting boundary. */
-	static function axialEmbedment(point:materia.assembly.AssemblyDefinition.AssemblyVector,
-		direction:materia.assembly.AssemblyDefinition.AssemblyVector,bulk:Part):Float {
-		var bounds=bulk.shape.bounds(),lo=bounds.get_min(),hi=bounds.get_max();
-		var dx=hi.get_x()-lo.get_x(),dy=hi.get_y()-lo.get_y(),dz=hi.get_z()-lo.get_z();
-		var length=2*Math.sqrt(dx*dx+dy*dy+dz*dz);
-		var ray=cadkit.modeling.Curve.line(new cadkit.modeling.Vector(point.x,point.y,point.z),
-			new cadkit.modeling.Vector(point.x+direction.x*length,point.y+direction.y*length,point.z+direction.z*length));
-		var depth=Math.POSITIVE_INFINITY;
-		var intersection:Null<cadkit.Shape> = null;
-		try {
-			intersection=bulk.shape.common(ray.shape);
-			for (vertex in intersection.vertices().all()) {
-				var p=vertex.position();
-				var distance=(p.get_x()-point.x)*direction.x+(p.get_y()-point.y)*direction.y+(p.get_z()-point.z)*direction.z;
-				vertex.close();
-				// The ray starts inside the qualified bulk. Its own start vertex
-				// is not a boundary event; the first other interval end is.
-				if (distance>1e-7) depth=Math.min(depth,distance);
-			}
-		} catch (error:Dynamic) {if (intersection!=null) intersection.close();ray.close();throw error;}
-		intersection.close();
-		ray.close();
-		if (!Math.isFinite(depth)) throw "Anchor axial embedment has no exposed casting boundary";
-		return depth;
-	}
 }

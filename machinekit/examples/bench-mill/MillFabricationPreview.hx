@@ -292,14 +292,14 @@ class MillFabricationPreview {
 			sys.io.File.saveContent(replicationPath,savedReplication);
 			if (replicationError.indexOf("Replication report differs from source")<0)
 				throw "Writer accepted a replication report inconsistent with source: "+replicationError;
-			var cachedAnchorage=ToolingFabricationExport.insertAnchorageReport(p,f.sourceFingerprint);
+			var cachedAnchorage=ToolingFabricationExport.insertAnchorageReport(p,f.sourceFingerprint,f.spec);
 			var expectedAnchorage=ToolingCodec.canonical(cachedAnchorage);
 			var cachedChecks:Array<ToolingValidation> =cast cachedAnchorage.validation;
 			var nativeChecks=cachedChecks.filter(check -> check.rule.indexOf(".cad.")>=0);
 			if (nativeChecks.length==0) throw "Production anchor cache test needs native evidence";
 			nativeChecks[0].message="Caller mutation";
 			nativeChecks[0].affectedIds.push("cache-probe");
-			if (ToolingCodec.canonical(ToolingFabricationExport.insertAnchorageReport(p,f.sourceFingerprint))!=expectedAnchorage)
+			if (ToolingCodec.canonical(ToolingFabricationExport.insertAnchorageReport(p,f.sourceFingerprint,f.spec))!=expectedAnchorage)
 				throw "Caller mutation poisoned cached anchor evidence";
 			var anchoragePath=dir+"/insert-anchorage.json";
 			var savedAnchorage=sys.io.File.getContent(anchoragePath);

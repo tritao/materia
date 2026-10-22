@@ -248,6 +248,21 @@ class CastingMoldTests {
 		sourceThreads.setup.sourceFingerprint = ToolingCodec.inputFingerprint(sourceThreads.input);
 		var fixed = CastingMoldPlanner.plan(sourceThreads, options(sourceThreads));
 		check(fixed.fixtures[0].fixings.length == 2, "datum selects both accessible source steel threads");
+		var offsetThread=ToolingCodec.snapshot(sourceThreads),offsetInsert=offsetThread.input.inserts[0];
+		offsetInsert.body=materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(71,45,20));
+		offsetInsert.pose=F.translation(65,0,90);
+		var offsetHole=materia.casting.InsertHole.InsertHoleCodec.snapshot(threads)[0];
+		offsetHole.frame.x=17.5;offsetHole.frame.y=0;
+		offsetInsert.holes=[offsetHole];TestInsertHoles.beforeCasting(offsetInsert);
+		var recess=offsetThread.input.features.filter(feature -> feature.owner==offsetInsert.id)[0];
+		recess.geometry={solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(offsetInsert.body),pose:offsetInsert.pose};
+		offsetThread.setup.sourceFingerprint=ToolingCodec.inputFingerprint(offsetThread.input);
+		var offsetPlan=CastingMoldPlanner.plan(offsetThread,options(offsetThread));
+		check(offsetPlan.fixtures[0].fixings.length==1,"an offset source thread stays accessible between datum locators");
+		var locatorPins=offsetPlan.hardware.filter(item -> item.kind==materia.tooling.casting.CoreSupport.SupportHardwareKind.FixturePin);
+		check(locatorPins.length==2 && Math.abs(locatorPins[0].pose.x-locatorPins[1].pose.x)<1e-7
+			&& Math.abs(locatorPins[0].pose.y-locatorPins[1].pose.y)>1,
+			"datum locators use the clear orthogonal baseline rather than blocking the offset fixing bore");
 		var fixtureLocation=fixed.fixtures[0].location;
 		check(fixtureLocation.unsupportedReasons.length==0 && fixtureLocation.report.rank==3,
 			"flat insert support locates three DOFs, independently of datum-to-bed pins");

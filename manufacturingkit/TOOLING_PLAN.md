@@ -450,7 +450,7 @@ compatibility path for the old encoding.
 | `CastingToolingInput` | Source ID/revision/hash, supported envelope, typed `materia.casting` features, inserts with holes and interface requirements, datum scheme, foundation joints (phase 7) |
 | `CastingSetup` | Source-to-mold transform, gravity/fill direction, open face, parting choices, feature overrides, support and finishing datums, compaction, fill height, pour rate and pour points, initial/ambient temperature |
 | `CompactionSpec` | Method (vibration table, external vibrators, internal poker, none), mold-bed interface, declared frequency/amplitude/duration or pending, evidence |
-| `InsertAnchorage` | Insert reference, anchorage kind (bolted anchors, welded studs, undercut, bonded keys), anchor holes and hardware, embedment, bearing area, spacing and cover, declared pull-out/shear capacity or pending, evidence |
+| `InsertAnchorage` | Insert reference, anchorage kind (bolted anchors, welded studs, undercut, bonded keys), anchor holes and hardware, resolved preload/lifting demand and recipe factor, embedment, flange bearing and projected-cone areas, spacing and cover, material capacity or pending, evidence |
 | `InsertManufacturing` | Insert reference, steel grade and blank stock, placed-part connector lineage and per-hole clearance budgets/routes, pre-cast operations (cut, square, drill and tap, anchors, deburr, surface preparation), post-cast operations with their stock, inspection points before casting, thread protection, procurement `Make(process)` |
 | `PanelPlan` | Stable ID, exact 2D profile, stock/thickness, mold pose, contact face, joints, operations, label zone, removal motion |
 | `PanelOperation` | Stable ID, kind (outside/inside profile, pocket, rebate, drill), exact line/arc contour or hole centres, machining face, depth, through/blind, setup |
@@ -638,19 +638,39 @@ pose stored in a JSON text parameter.
   each recorded with its reference. Back wall, radial wall and tip gap are named
   in-house rules with their reasoning stated, not presented as standards. Fixture
   screws use the same limits as service screws.
-- Anchorage is insert geometry and feeds `InsertAnchorage`; its capacity stays
-  pending evidence until a pull-out coupon is recorded. The default kind is
-  **bolted anchors**: blind tapped holes in the insert's back face, from
-  `InsertHoles` and the `ThreadedHolePolicy`, with standard bolts (or threaded rod
-  with nut) and washers screwed in before the pour. The heads and washers are the
-  bearing anchors, and no welding heat reaches the precision faces. The fasteners
-  are real standard components placed in the insert, so they appear in the BOM,
-  in overlap checks against cores, formers and fixtures, and in the fill analysis
-  (air under heads and washers). Design rules check back wall to the mounting
-  face, clearance to the front mounting holes, embedment, head bearing area,
-  spacing and cover to the casting surface. Each bolt is torqued to a shoulder or
-  set with retaining threadlocker so the thread has no play. Welded studs,
-  undercuts and bonded keys remain other kinds; none is assumed.
+- Anchorage is insert geometry and feeds `InsertAnchorage`. Use **ISO 4162
+  Type F, non-serrated, full-form (non-indented) hex flange bolts, class 8.8**, in blind back-face taps
+  from `InsertHoles` and `ThreadedHolePolicy`. A continuous flange replaces the
+  washer and an external hex replaces the socket, so neither recess is present
+  in the resin domain. The standard components appear in the BOM, overlap and
+  exact fill checks. Keep the unchanged trap check and the vent/pre-pour-seal
+  proposal for any remaining real trap; no volume threshold or assumed seal.
+- One named recipe rule sizes anchor patterns from the source service screws'
+  assembly preloads plus a lifting share, multiplied by a named design factor.
+  The default mill rule uses a **1.5** reserve and **two** design lifting load
+  paths; its lifting share includes the final as-cast hardware mass. Admit
+  patterns against the class-8.8 assembly-preload limits and the hole policy,
+  footprint, mounting-hole clearance, embedment, cover and tooling geometry.
+  Prefer the fewest admitted anchors, then the smallest standard thread. No
+  first-smallest-thread fallback; an unsatisfied insert fails with its ID.
+  VDI 2230 supplies the C45 engagement basis; the existing published Optimas
+  preload rows supply the assembly-preload numbers at mu=0.125. Keep both
+  references explicit rather than mislabelling the preload table as a VDI joint
+  calculation.
+- The lean material screen specified by the anchor review (2026-10-22) is the
+  source of two in-house formulas only: **bearing = guaranteed flat flange area
+  x allowable cured-mix bearing stress**, and **breakout = projected cone area
+  x cured-mix tensile strength**. The cone half-angle is **45 degrees**. Exact
+  projected-circle union removes double-counted overlap; each anchor receives
+  no more than its own projection or an equal share of that union. No further
+  edge/group coefficient or full EN 1992-4 method is implied. Both cured-mix
+  strengths are explicit fabrication inputs, Pending until supplied. The
+  numerical checks pass only with adequate supplied values; physical coupons
+  remain the phase 9 release evidence, not a new qualification record family.
+  Back wall, mounting-hole clearance, embedment, flange bearing, spacing and
+  exposed casting cover still have their existing geometric checks. Retaining
+  compound or a realized shoulder controls thread play; no clamp against the
+  insert is assumed.
 - Each insert is a made part with an `InsertManufacturing` record derived from the
   insert, its holes, anchorage and interface requirement. It holds the steel
   grade and blank, the pre-cast operations (cut and square, drill and tap, fit
@@ -2425,3 +2445,8 @@ and current mold/frozen-geometry checks pass independently.
   fill report, validation and castability proposal. The **265**-artifact kit has
   **6,034,663** verified bytes; readiness remains **false** with
   **890 Pass / 486 Pending / 141 Unsupported / 74 Fail**.
+
+- [x] Demand-sized ISO 4162 anchors: source walls, cover, neighbours, exact mold
+  reconstruction and packages pass; service holes stay fixed. Source-selected
+  lifting/hatch stock and per-insert anchor/cover results are in TOOLING_README.md.
+  The regenerated kit has zero traps and zero Fail records; capacity stays Pending.

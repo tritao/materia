@@ -4,24 +4,29 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.InsertHole;
 
-/** Nominal hardware facts copied from the selected standard components. These
- * dimensions identify geometry, never pull-out/shear capacity in the compound. */
+/** ISO 4162 Type F class 8.8 hardware facts copied from the standard component.
+ * The assembly preload is a steel-side sizing limit, never mix capacity. */
 typedef InsertAnchorScrew = {
 	var partNumber:String;
 	var thread:InsertThread;
 	var lengthMm:Float;
 	var threadedLengthMm:Float;
-	var headDiameterMm:Float;
 	var headHeightMm:Float;
-	var socketSizeMm:Float;
-	var socketDepthMm:Float;
+	var headAcrossFlatsMm:Float;
+	var flangeDiameterMm:Float;
+	var flangeThicknessMm:Float;
+	var bearingInnerDiameterMm:Float;
+	var bearingOuterDiameterMm:Float;
+	var assemblyPreloadN:Float;
+	var preloadReference:String;
 }
 
-typedef InsertAnchorWasher = {
-	var partNumber:String;
-	var innerDiameterMm:Float;
-	var outerDiameterMm:Float;
-	var thicknessMm:Float;
+typedef InsertAnchorDemand = {
+	var ruleId:String;
+	var factor:Float;
+	var servicePreloads:Array<{holeId:String,preloadN:Float}>;
+	var servicePreloadReference:String;
+	var liftingShareN:Float;
 }
 
 enum abstract InsertAnchorLock(String) to String {
@@ -34,6 +39,7 @@ enum abstract InsertAnchorLock(String) to String {
  * must be qualified with that geometry, not estimated from the insert thickness.
  */
 typedef InsertAnchorRules = {
+	var demand:InsertAnchorDemand;
 	var minimumEmbedmentMm:Float;
 	var minimumBearingAreaMm2:Float;
 	var minimumSpacingMm:Float;
@@ -47,7 +53,6 @@ typedef InsertBoltAnchor = {
 	 * Finishing stock never counts toward permanent thread engagement. */
 	var insertionMm:Float;
 	var screw:InsertAnchorScrew;
-	var washer:InsertAnchorWasher;
 	var locking:InsertAnchorLock;
 	/** Process reference; a name alone does not establish cure/torque evidence. */
 	var lockingReference:Null<String>;
@@ -68,31 +73,47 @@ class InsertAnchorageCodec {
 			case "bolted":
 				CastingFeatureCodec.fields(raw,["kind","rules","anchors"]);
 				var r=Reflect.field(raw,"rules");
-				CastingFeatureCodec.fields(r,["minimumEmbedmentMm","minimumBearingAreaMm2","minimumSpacingMm","minimumCoverMm"]);
-				var rules:InsertAnchorRules={minimumEmbedmentMm:positive(r,"minimumEmbedmentMm"),
+				CastingFeatureCodec.fields(r,["demand","minimumEmbedmentMm","minimumBearingAreaMm2","minimumSpacingMm","minimumCoverMm"]);
+				var d=Reflect.field(r,"demand");
+				CastingFeatureCodec.fields(d,["ruleId","factor","servicePreloads","servicePreloadReference","liftingShareN"]);
+				var loads:Array<{holeId:String,preloadN:Float}> = [],loadIds:Map<String,Bool> = [];
+				for (load in CastingRecordCodec.array(d,"servicePreloads")) {
+					CastingFeatureCodec.fields(load,["holeId","preloadN"]);
+					var holeId=CastingRecordCodec.string(load,"holeId");CastingFeatureCodec.identifier(holeId);
+					if (loadIds.exists(holeId)) throw "Duplicate anchor service preload: "+holeId;
+					loadIds.set(holeId,true);loads.push({holeId:holeId,preloadN:positive(load,"preloadN")});
+				}
+				loads.sort((a,b) -> Reflect.compare(a.holeId,b.holeId));
+				var lifting=CastingRecordCodec.number(d,"liftingShareN"),factor=positive(d,"factor");
+				if (lifting<0 || factor<1) throw "Invalid anchor design demand";
+				var demand:InsertAnchorDemand={ruleId:text(d,"ruleId"),factor:factor,servicePreloads:loads,
+					servicePreloadReference:text(d,"servicePreloadReference"),liftingShareN:lifting};
+				var rules:InsertAnchorRules={demand:demand,minimumEmbedmentMm:positive(r,"minimumEmbedmentMm"),
 					minimumBearingAreaMm2:positive(r,"minimumBearingAreaMm2"),minimumSpacingMm:positive(r,"minimumSpacingMm"),
 					minimumCoverMm:positive(r,"minimumCoverMm")};
 				var anchors:Array<InsertBoltAnchor> = [],ids:Map<String,Bool> = [],holes:Map<String,Bool> = [];
 				for (a in CastingRecordCodec.array(raw,"anchors")) {
-					CastingFeatureCodec.fields(a,["id","holeId","insertionMm","screw","washer","locking","lockingReference"]);
+					CastingFeatureCodec.fields(a,["id","holeId","insertionMm","screw","locking","lockingReference"]);
 					var id=CastingRecordCodec.string(a,"id"),holeId=CastingRecordCodec.string(a,"holeId");
 					CastingFeatureCodec.identifier(id);CastingFeatureCodec.identifier(holeId);
 					if (ids.exists(id) || holes.exists(holeId)) throw "Duplicate anchor ID or source hole: "+id;
 					ids.set(id,true);holes.set(holeId,true);
-					var s=Reflect.field(a,"screw"),w=Reflect.field(a,"washer");
-					CastingFeatureCodec.fields(s,["partNumber","thread","lengthMm","threadedLengthMm","headDiameterMm","headHeightMm","socketSizeMm","socketDepthMm"]);
-					CastingFeatureCodec.fields(w,["partNumber","innerDiameterMm","outerDiameterMm","thicknessMm"]);
+					var s=Reflect.field(a,"screw");
+					CastingFeatureCodec.fields(s,["partNumber","thread","lengthMm","threadedLengthMm","headHeightMm","headAcrossFlatsMm",
+						"flangeDiameterMm","flangeThicknessMm","bearingInnerDiameterMm","bearingOuterDiameterMm","assemblyPreloadN","preloadReference"]);
 					var thread=InsertThreadCodec.snapshot(Reflect.field(s,"thread"));
-					if (thread.internal || thread.profile!=InsertThreadProfile.Metric) throw "Anchor requires an external metric ISO 4762 screw: "+id;
+					if (thread.internal || thread.profile!=InsertThreadProfile.Metric) throw "Anchor requires an external metric ISO 4162 class 8.8 bolt: "+id;
 					var screw:InsertAnchorScrew={partNumber:text(s,"partNumber"),thread:thread,lengthMm:positive(s,"lengthMm"),
-						threadedLengthMm:positive(s,"threadedLengthMm"),headDiameterMm:positive(s,"headDiameterMm"),headHeightMm:positive(s,"headHeightMm"),
-						socketSizeMm:positive(s,"socketSizeMm"),socketDepthMm:positive(s,"socketDepthMm")};
-					var washer:InsertAnchorWasher={partNumber:text(w,"partNumber"),innerDiameterMm:positive(w,"innerDiameterMm"),
-						outerDiameterMm:positive(w,"outerDiameterMm"),thicknessMm:positive(w,"thicknessMm")};
-					if (screw.socketDepthMm>=screw.headHeightMm || screw.socketSizeMm>=screw.headDiameterMm
-						|| screw.threadedLengthMm>screw.lengthMm || screw.headDiameterMm<=thread.majorDiameter
-						|| washer.innerDiameterMm<=thread.majorDiameter || washer.outerDiameterMm<=washer.innerDiameterMm
-						|| screw.headDiameterMm<=washer.innerDiameterMm) throw "Inconsistent anchor hardware: "+id;
+						threadedLengthMm:positive(s,"threadedLengthMm"),headHeightMm:positive(s,"headHeightMm"),
+						headAcrossFlatsMm:positive(s,"headAcrossFlatsMm"),flangeDiameterMm:positive(s,"flangeDiameterMm"),
+						flangeThicknessMm:positive(s,"flangeThicknessMm"),bearingInnerDiameterMm:positive(s,"bearingInnerDiameterMm"),
+						bearingOuterDiameterMm:positive(s,"bearingOuterDiameterMm"),assemblyPreloadN:positive(s,"assemblyPreloadN"),
+						preloadReference:text(s,"preloadReference")};
+					if (screw.flangeThicknessMm>=screw.headHeightMm || screw.headAcrossFlatsMm<=thread.majorDiameter
+						|| screw.threadedLengthMm>screw.lengthMm || screw.bearingInnerDiameterMm<thread.majorDiameter
+						|| screw.bearingOuterDiameterMm<=screw.bearingInnerDiameterMm
+						|| screw.flangeDiameterMm<screw.bearingOuterDiameterMm
+						|| screw.flangeDiameterMm<screw.headAcrossFlatsMm/Math.cos(Math.PI/6)) throw "Inconsistent anchor hardware: "+id;
 					var locking:InsertAnchorLock=switch CastingRecordCodec.string(a,"locking") {
 						case "shoulder":InsertAnchorLock.Shoulder;
 						case "retaining-compound":InsertAnchorLock.RetainingCompound;
@@ -100,8 +121,8 @@ class InsertAnchorageCodec {
 					};
 					var reference=Reflect.field(a,"lockingReference")==null ? null : text(a,"lockingReference");
 					var insertion=positive(a,"insertionMm");
-					if (insertion+washer.thicknessMm>screw.lengthMm+1e-8) throw "Anchor washer intersects the insert entry: "+id;
-					anchors.push({id:id,holeId:holeId,insertionMm:insertion,screw:screw,washer:washer,locking:locking,lockingReference:reference});
+					if (insertion>=screw.lengthMm) throw "Anchor flange must remain outside the insert entry: "+id;
+					anchors.push({id:id,holeId:holeId,insertionMm:insertion,screw:screw,locking:locking,lockingReference:reference});
 				}
 				if (anchors.length==0 || anchors.length>256) throw "Bolted anchorage requires 1..256 anchors";
 				anchors.sort((a,b) -> Reflect.compare(a.id,b.id));Bolted(rules,anchors);
@@ -121,7 +142,7 @@ class InsertAnchorageCodec {
 			case CatalogueRetention:
 				switch origin {case Catalogue(_):default:throw "Catalogue retention requires a catalogue insert";}
 				switch body {case CrimpedSocket(_,_):default:throw "Catalogue retention requires declared product retention geometry";}
-			case Bolted(_,anchors):
+			case Bolted(rules,anchors):
 				var back:Null<Float> = null,stock:Null<Box3> = null;
 				switch InsertFinishing.assess(body,interfaces) {
 					case Resolved(steel):back=steel.pose.z;stock=InsertFinishing.box(steel);
@@ -151,6 +172,14 @@ class InsertAnchorageCodec {
 						case Catalogue(_):
 					}
 				}
+				var occupied=[for (anchor in anchors) anchor.holeId];
+				for (load in rules.demand.servicePreloads) {
+					var service=holes.filter(h -> h.id==load.holeId && h.thread!=null);
+					if (service.length!=1 || occupied.indexOf(load.holeId)>=0) throw "Unknown anchor service preload hole: "+load.holeId;
+				}
+				for (hole in holes) if (hole.thread!=null && occupied.indexOf(hole.id)<0
+					&& rules.demand.servicePreloads.filter(load -> load.holeId==hole.id).length!=1)
+					throw "Missing anchor service preload: "+hole.id;
 		}
 	}
 
@@ -161,6 +190,15 @@ class InsertAnchorageCodec {
 
 	public static function bearingFrame(hole:InsertHole,anchor:InsertBoltAnchor):AssemblyFrame
 		return F.compose(hole.frame,F.translation(0,0,anchor.insertionMm-anchor.screw.lengthMm));
+
+	public static function demandN(rules:InsertAnchorRules):Float {
+		var result=rules.demand.liftingShareN;
+		for (load in rules.demand.servicePreloads) result+=load.preloadN;
+		return result*rules.demand.factor;
+	}
+	public static function bearingArea(screw:InsertAnchorScrew):Float
+		return Math.PI/4*(screw.bearingOuterDiameterMm*screw.bearingOuterDiameterMm
+			-screw.bearingInnerDiameterMm*screw.bearingInnerDiameterMm);
 
 	static function positive(raw:Dynamic,name:String):Float {
 		var n=CastingRecordCodec.number(raw,name);if (n<=0) throw "Invalid anchor dimension: "+name;return n;

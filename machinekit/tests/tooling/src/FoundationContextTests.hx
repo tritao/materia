@@ -29,6 +29,7 @@ class FoundationContextTests {
 	public static function fabricationSpec():materia.tooling.export.FabricationSpec return {revision:1,sheetMaterialId:"tooling-coated-board",
 			solvent:materia.tooling.export.FabricationSpec.ResinSolvent.Unknown,adhesiveContainsEPS:null,
 			resinReference:"synthetic-context-binder",compatibilityEvidence:[],gravityMps2:9.80665,loadFactor:1.5,
+			mixBearingStressMPa:null,mixTensileStrengthMPa:null,
 			compactionPressurePa:null,compactionEvidence:[],plates:[],braces:[],fasteners:[],coreRestraints:[],rigidRestraints:[],
 			blankMarginMm:12,blankKerfMm:3.2,couponClearancesMm:[0.1,0.2,0.3]};
 

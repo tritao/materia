@@ -30,8 +30,19 @@ class LiftingSourceTests {
 			var diagnostics=machinekit.design.AssemblyDesignChecks.check(foundation);
 			check(!diagnostics.hasErrors(),"source foundation interfaces: "+diagnostics.items.map(item -> item.message).join("; "));
 			var input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,"lifting-source",1);
-			for (finding in machinekit.tooling.InsertAnchorGeometry.review(input))
-				check(finding.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass,finding.rule+": "+finding.message);
+			var anchorCount=0,capacityCount=0;
+			for (insert in input.inserts) switch insert.anchorage {
+				case Bolted(_,anchors):anchorCount+=anchors.length;
+				default:throw "Production insert has no source anchors: "+insert.id;
+			}
+			for (finding in machinekit.tooling.InsertAnchorGeometry.review(input)) {
+				var material=StringTools.endsWith(finding.rule,".capacity.bearing")
+					|| StringTools.endsWith(finding.rule,".capacity.cone");
+				if (material) capacityCount++;
+				check(finding.status==(material ? materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending
+					: materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass),finding.rule+": "+finding.message);
+			}
+			check(capacityCount==2*anchorCount,"each anchor retains both unresolved mix-strength checks");
 		}
 		var p=materia.tooling.casting.CastingMoldPlanner.plan(MillMoldSetup.document(frame),MillMoldSetup.options(frame));
 		var bed=p.panels.members.filter(member -> member.panel.id=="bed")[0];

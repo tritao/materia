@@ -1,6 +1,6 @@
 # Base casting mold review
 
-This is phase 4 of `manufacturingkit/TOOLING_PLAN.md`. It generates the mold for
+This follows `manufacturingkit/TOOLING_PLAN.md` and generates the mold for
 the same complete frame instantiated by `MillFramePreview`: both XY and Z
 interfaces are present. `MillMoldSetup` adapts `frame.base`; it does not repeat
 casting dimensions or generate its own joints.
@@ -19,8 +19,8 @@ The renderer uses NumPy and Matplotlib; it plots actual exported CAD triangles.
 `mold-cutaway.png` explicitly hides the south and west walls for inspection.
 The `.mtrg` scenes retain all components.
 
-The current source has 31 features and 12 inserts. Every feature retains its
-source ID in `feature-inventory.json`. The kit includes:
+Every source feature and insert retains its ID in `feature-inventory.json`.
+The kit includes:
 
 - Five measured-thickness panels from the shared `MoldPanels` generator.
 - Six underside EPS cores on two shared transverse bridges. Each EPS core is
@@ -31,12 +31,12 @@ source ID in `feature-inventory.json`. The kit includes:
 - Two longitudinal support rails with blind wall-top locating sockets, round/slot
   positioning and separate M6 clamp bolts. The rails themselves need qualified
   external clamps to the walls; their attachment capacity is not established.
-- Fourteen connected detail/backing formers for shallow guide/drive recesses,
+- Connected detail/backing formers for shallow guide/drive recesses,
   side-withdrawing foot-access openings and separate fill-side stem pieces.
   Overlapping cuts are allocated deterministically into disjoint tooling solids;
   insert envelopes and datum fixtures are subtracted, preserving the intended
   intersection between foot-access and stem openings around the steel seats.
-- Twelve nominal steel datum supports at the actual insert heights. Bed-facing
+- Nominal steel datum supports at the actual insert heights. Bed-facing
   supports seat in blind board sockets; elevated foot supports have external
   columns and withdraw sideways. Each has round/slot locating receivers and a
   clearance-only path for screws entering declared steel insert threads.
@@ -50,7 +50,7 @@ source ID in `feature-inventory.json`. The kit includes:
   openings; setup overrides name only specific features. Draft belongs to the
   source feature. Unknown kinds or override IDs fail. Zero-draft rigid features
   need a release alternative; unsupported strategies block readiness.
-  Positive draft cannot silently taper the current box-only source geometry.
+  Draft is never added implicitly by the mold setup.
 - Retained beams and backing split authored features through the shared box
   algebra. Stable fragments retain their parent through `derivedFrom`;
   `core-units.json` groups the foam pieces by their authored core intent.
@@ -415,3 +415,55 @@ checks. Its 837 hashed artifacts include 40 review programs. Validation reports
 14 Pass, 250 Pending and 15 Unsupported, with zero foundation symmetric difference.
 
 **Not fabrication-ready; no coupon trial recorded.**
+
+## Demand-sized insert anchors
+
+The source uses ISO 4162 Type F full-head flange bolts, class 8.8, without separate washers or socket recesses. One recipe rule sizes each pattern from service-screw assembly preload and the lifting share. Mix bearing and tensile strengths, locking evidence and physical qualification remain pending.
+
+Lifting blanks are selected against the existing casting cavities, full thread-envelope steel walls and anchor cover. The base and rear column use 71 × 45 × 30 mm; the front column uses 40 × 100 × 30 mm where its rail recesses limit width. The 70 mm compact blank fails the demand/wall regression; 71 mm passes. Hatch blanks are 44 × 20 × 12 mm. Every service-hole position is unchanged. Clearance-bore pads retain the full central-bore wall beside the back taps: 57 mm square at base feet and 48 mm wide at the column joint.
+
+Cover below is the minimum exposed-anchor cover to the casting boundaries for that insert, in millimetres. It is a geometry check, not an anchorage-capacity qualification.
+
+### Base
+
+| Insert | Raw steel, mm | Anchors | Minimum cover, mm |
+|---|---:|---:|---:|
+| `railYLeft` | 40 × 410 × 20 | 4 × M8 | 15.582 |
+| `railYRight` | 40 × 410 × 20 | 4 × M8 | 15.582 |
+| `driveYFixed` | 100 × 25 × 20 | 2 × M5 | 20.000 |
+| `driveYFloating` | 100 × 20 × 20 | 2 × M5 | 19.948 |
+| `columnLeftFront` | 48 × 82.4 × 30 | 4 × M8 | 26.000 |
+| `footLeftFront` | 57 × 57 × 20 | 2 × M5 | 9.751 |
+| `columnLeftRear` | 48 × 82.4 × 30 | 4 × M8 | 26.000 |
+| `footLeftRear` | 57 × 57 × 20 | 2 × M5 | 9.751 |
+| `columnRightFront` | 48 × 82.4 × 30 | 4 × M8 | 26.000 |
+| `footRightFront` | 57 × 57 × 20 | 2 × M5 | 9.751 |
+| `columnRightRear` | 48 × 82.4 × 30 | 4 × M8 | 26.000 |
+| `footRightRear` | 57 × 57 × 20 | 2 × M5 | 9.751 |
+| `liftLeftFront` | 71 × 45 × 30 | 4 × M8 | 8.000 |
+| `liftLeftRear` | 71 × 45 × 30 | 4 × M8 | 8.000 |
+| `liftRightFront` | 71 × 45 × 30 | 4 × M8 | 8.000 |
+| `liftRightRear` | 71 × 45 × 30 | 4 × M8 | 8.000 |
+
+### Column
+
+| Insert | Raw steel, mm | Anchors | Minimum cover, mm |
+|---|---:|---:|---:|
+| `hatchRearLeftLower` | 44 × 20 × 12 | 2 × M5 | 6.800 |
+| `hatchRearLeftUpper` | 44 × 20 × 12 | 2 × M5 | 10.000 |
+| `hatchRearRightLower` | 44 × 20 × 12 | 2 × M5 | 6.800 |
+| `hatchRearRightUpper` | 44 × 20 × 12 | 2 × M5 | 10.000 |
+| `railZLeft` | 40 × 833 × 20 | 8 × M6 | 6.000 |
+| `railZRight` | 40 × 833 × 20 | 8 × M6 | 6.000 |
+| `footLeftFront` | 48 × 82.4 × 20 | 2 × M5 | 5.000 |
+| `footLeftRear` | 48 × 82.4 × 20 | 2 × M5 | 5.000 |
+| `footRightFront` | 48 × 82.4 × 20 | 2 × M5 | 5.000 |
+| `footRightRear` | 48 × 82.4 × 20 | 2 × M5 | 5.000 |
+| `liftLeftFront` | 40 × 100 × 30 | 7 × M6 | 9.600 |
+| `liftLeftRear` | 71 × 45 × 30 | 4 × M8 | 8.000 |
+| `liftRightFront` | 40 × 100 × 30 | 7 × M6 | 9.600 |
+| `liftRightRear` | 71 × 45 × 30 | 4 × M8 | 8.000 |
+
+The base has 52 anchors and the column 54. The focused native run measured 92.1 seconds across the selector calls for both foundations, including unsuccessful calls; complete frame construction took 105.4 seconds. These are observed wall times on the shared development machine. Temporary selector timing instrumentation was removed.
+
+The regenerated records kit has zero trapped pockets (previously 74), with the fill check unchanged. Its 265 artifacts include 40 review programs; validation is 626 Pass, 568 Pending, 119 Unsupported and 0 Fail. Fabrication readiness remains false: the recorded material strengths, workshop inputs and physical evidence are still unresolved.

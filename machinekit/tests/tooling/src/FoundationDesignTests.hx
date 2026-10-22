@@ -86,12 +86,33 @@ class FoundationDesignTests {
 					var old=Part.box(40,40,box.height);parts.push(old);
 					var placed=PosedParts.moved(old,row.pose);parts.push(placed);restored.push(placed);
 				}
+			// Approved flange-anchor migration enlarges only the hatch blank;
+			// its service thread remains at the historical mounting datum.
+			var hatches=foundation.insertLocations().filter(row -> row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.HatchMount);
+			var envelope:Part=null;
+			if (hatches.length>0) {
+				var envelopeParts=[for (prism in foundation.body.castingEnvelope()) machinekit.structural.CastingCavityCad.prism(prism)];
+				for (part in envelopeParts) parts.push(part);
+				envelope=Part.fuseAll(envelopeParts);parts.push(envelope);
+			}
+			for (row in hatches) {
+					var spec=row.part.insertSpec();
+					var occupied=switch spec.anchorage {case Bolted(_,anchors):[for (anchor in anchors) anchor.holeId];default:[];};
+					var hole=spec.holes.filter(h -> occupied.indexOf(h.id)<0)[0];
+					var old=Part.box(20,20,10);parts.push(old);
+					var pose=F.compose(row.pose,F.translation(hole.frame.x,hole.frame.y,hole.frame.z-10));
+					var placed=PosedParts.moved(old,pose);parts.push(placed);
+					// Historical steel protrudes beyond the rear opening; only
+					// restore the cavity inside the unchanged casting envelope.
+					var cavity=placed.intersect(envelope);parts.push(cavity);restored.push(cavity);
+			}
 			var bulk=Solids.union(restored);parts.push(bulk);
 			var cuts:Array<Part> =[];
 			for (row in foundation.insertLocations()) {
 				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.ColumnMount
 					|| row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LiftingMount
-					|| row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LevelingSeat) {
+					|| row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LevelingSeat
+					|| row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.HatchMount) {
 					var box=materia.casting.InsertSpec.InsertBodyCodec.box(row.part.insertSpec().body,row.id);
 					var local=Part.box(box.width,box.depth,box.height);parts.push(local);
 					var placed=PosedParts.moved(local,row.pose);parts.push(placed);cuts.push(placed);

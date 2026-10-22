@@ -17,6 +17,7 @@ class MillFabricationSetup {
 			compatibilityEvidence: [],
 			gravityMps2: 9.80665,
 			loadFactor: 1.5,
+			mixBearingStressMPa:null,mixTensileStrengthMPa:null,
 			compactionPressurePa: null,
 			compactionEvidence: [],
 			plates: [],

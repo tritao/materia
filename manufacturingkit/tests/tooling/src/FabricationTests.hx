@@ -34,6 +34,7 @@ class FabricationTests {
 			compatibilityEvidence: [],
 			gravityMps2: 9.80665,
 			loadFactor: 1.5,
+			mixBearingStressMPa:null,mixTensileStrengthMPa:null,
 			compactionPressurePa: null,
 			compactionEvidence: [],
 			plates: [],
@@ -104,7 +105,19 @@ class FabricationTests {
 		check(ToolingCodec.canonical(f) == ToolingCodec.canonical(ToolingFabrication.plan(p, s)), "fabrication generation is deterministic");
 		var encoded = FabricationSpecCodec.encode(s);
 		check(FabricationSpecCodec.encode(FabricationSpecCodec.decode(encoded)) == encoded, "fabrication spec versioned round-trip");
+		var strengths=FabricationSpecCodec.snapshot(s);
+		strengths.mixBearingStressMPa=80;strengths.mixTensileStrengthMPa=6;
+		var strengthEncoding=FabricationSpecCodec.encode(strengths),strengthCopy=FabricationSpecCodec.decode(strengthEncoding);
+		check(strengthCopy.mixBearingStressMPa==80 && strengthCopy.mixTensileStrengthMPa==6
+			&& strengthEncoding!=encoded && s.mixBearingStressMPa==null && s.mixTensileStrengthMPa==null,
+			"resolved cured-mix strengths survive the strict format without changing unresolved source inputs");
+		strengths.mixBearingStressMPa=0;
+		rejects(() -> FabricationSpecCodec.encode(strengths),"Mix anchor strength must be positive");
+		strengths.mixBearingStressMPa=80;strengths.mixTensileStrengthMPa=-1;
+		rejects(() -> FabricationSpecCodec.encode(strengths),"Mix anchor strength must be positive");
 		var raw:Dynamic = haxe.Json.parse(encoded);
+		raw.version = 3;
+		rejects(() -> FabricationSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported fabrication spec");
 		raw.version = 99;
 		rejects(() -> FabricationSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported fabrication spec");
 		raw = haxe.Json.parse(encoded);

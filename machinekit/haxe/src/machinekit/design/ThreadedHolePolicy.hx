@@ -32,7 +32,13 @@ typedef ResolvedHoleLimits = {
 /** Design minima, independent of anchorage or coupon evidence. Distances are mm. */
 class ThreadedHolePolicy {
 	public static inline var CLEARANCE_POLICY_ID = "c45-clearance-hole-v2";
-	public static inline var STEEL_POLICY_ID = "c45-iso4762-8.8-vdi2230-v2";
+	public static inline var STEEL_POLICY_ID = "c45-class8.8-vdi2230-v3";
+	/** Existing published maximum assembly preload, class 8.8, mu=0.125.
+	 * This is the demand/sizing reference, not measured tightening evidence.
+	 * The table source is Optimas; VDI 2230 is the engagement basis below. */
+	public static inline var ASSEMBLY_PRELOAD_REFERENCE = machinekit.standard.FastenerTightening.STEEL_SOURCE;
+	public static function assemblyPreloadN(thread:ThreadSpec):Float
+		return machinekit.standard.FastenerTightening.forThread(thread,machinekit.standard.PropertyClass.Steel88).preloadN;
 	/** VDI 2230 Part 1 theoretical 1.3D for Rm >500 MPa / class 8.8,
 	 * conservatively using that strength band for C45 bright Rm >=580 MPa.
 	 * Bossard, Length of engaged thread, 01-2025, bracketed VDI values:

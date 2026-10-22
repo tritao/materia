@@ -83,6 +83,8 @@ class FabricationSpecCodec {
 			"solvent",
 			"adhesiveContainsEPS",
 			"resinReference",
+			"mixBearingStressMPa",
+			"mixTensileStrengthMPa",
 			"compatibilityEvidence",
 			"gravityMps2",
 			"loadFactor",
@@ -98,6 +100,10 @@ class FabricationSpecCodec {
 			"couponClearancesMm"
 		]);
 		strings([v.resinReference]);
+		for (k in ["mixBearingStressMPa", "mixTensileStrengthMPa"]) {
+			var strength:Dynamic=Reflect.field(v,k);
+			if (strength!=null) {number(strength);if (strength<=0) throw "Mix anchor strength must be positive or unresolved";}
+		}
 		if (!Std.isOfType(v.revision, Int) || v.revision < 1)
 			throw "Invalid fabrication revision";
 		if (v.solvent != "unknown" && v.solvent != "styrene-bearing" && v.solvent != "styrene-free")
@@ -149,6 +155,8 @@ class FabricationSpecCodec {
 			solvent: cast v.solvent,
 			adhesiveContainsEPS: v.adhesiveContainsEPS,
 			resinReference: cast v.resinReference,
+			mixBearingStressMPa: v.mixBearingStressMPa,
+			mixTensileStrengthMPa: v.mixTensileStrengthMPa,
 			compatibilityEvidence: texts(v.compatibilityEvidence),
 			gravityMps2: v.gravityMps2,
 			loadFactor: v.loadFactor,
@@ -226,14 +234,14 @@ class FabricationSpecCodec {
 	}
 
 	public static function encode(v:FabricationSpec):String
-		return ToolingCodec.canonical({format: "materia.fabrication-spec", version: 3, spec: snapshot(v)});
+		return ToolingCodec.canonical({format: "materia.fabrication-spec", version: 4, spec: snapshot(v)});
 
 	public static function decode(s:String):FabricationSpec {
 		if (s == null || haxe.io.Bytes.ofString(s).length > 1048576)
 			throw "Fabrication spec exceeds limit";
 		var v:Dynamic = haxe.Json.parse(s);
 		object(v, ["format", "version", "spec"]);
-		if (v.format != "materia.fabrication-spec" || v.version != 3)
+		if (v.format != "materia.fabrication-spec" || v.version != 4)
 			throw "Unsupported fabrication spec version";
 		return snapshot(v.spec);
 	}
