@@ -44,3 +44,11 @@ Validation on 2026-10-22: `LinearMountTests` **53 assertions**; existing
 all four catalogue recipes, transformed geometry, ratings and reload. Logs and
 source hashes are retained by the router's shared-mount work record. No frozen
 router geometry or FE mode has changed. RM2 remains in progress, not complete.
+
+The separate `haxeon.contact.json` target runs a review-only native side-mount
+fixture. It uses the same hole and fastener derivation, a 20×28 mm C45 receiver,
+one real 500 mm rack and ISO 7089 M6 washers. **19 assertions** pass, including
+contact on both sides of each washer and **1.10 mm** minimum clearance to the
+conservative pinion envelope at nine stations. Set `LINEAR_MOUNT_EXPORT` to an
+output directory to retain STEP witnesses and `contact.json`. This is not a
+production component recipe, full-axis mounting model, stiffness or fatigue pass.

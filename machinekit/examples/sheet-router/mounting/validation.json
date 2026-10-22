@@ -1,0 +1,180 @@
+{
+  "status": "RM2 shared source core and local contact fixture; physical family/automatic FE compliance/full-router acceptance still open",
+  "coreCommit": "b4905d034",
+  "rackConnectorFixCommit": "a2336dacf",
+  "validationWorkingHead": "b4905d034465f5400671302abbf3bccc679eabc8",
+  "archive": "build/sheet-router-evidence/shared-mount-core.tar.gz",
+  "archiveSha256": "ae4f928b31b26380ecfc15ad767177299ef949ad09af76bce3fd24b2726e015a",
+  "bytes": 328758,
+  "verifiedRegularFiles": 32,
+  "checks": {
+    "sharedAssertions": 53,
+    "existingRailAssertions": 116,
+    "existingRailServiceScrews": 36,
+    "rackRecipes": 4,
+    "localNativeAssertions": 19,
+    "minimumPinionReceiverClearanceMm": 1.1000000000000014
+  },
+  "inventory": [
+    {
+      "path": "evidence/checks.log",
+      "bytes": 6951,
+      "sha256": "8dcbfbfefa1424bf8ed5cacf29b774931052e6351e0d60a803a7eaa4f0d573d3"
+    },
+    {
+      "path": "evidence/contact/bolt1.step",
+      "bytes": 32482,
+      "sha256": "bc43dd165da63e0280ec4a567a505adc1bd6096cd19f3213f42b41a478feff69"
+    },
+    {
+      "path": "evidence/contact/bolt2.step",
+      "bytes": 32480,
+      "sha256": "9efc837d914c123c9de0092bc202668fdd4d4f12f85111956234e654ee6b2e94"
+    },
+    {
+      "path": "evidence/contact/bolt3.step",
+      "bytes": 32465,
+      "sha256": "05283929bdef402867df5b8af3df25e97ecf61511f03fed7e58e47846bd994ca"
+    },
+    {
+      "path": "evidence/contact/bolt4.step",
+      "bytes": 32480,
+      "sha256": "c0280fd02a2010846bd05a5962c850ea2097cf06dec1c671a96576525f68c2e8"
+    },
+    {
+      "path": "evidence/contact/contact.json",
+      "bytes": 2313,
+      "sha256": "a56d83caa1bbda6f75ec3ba380b404a3f77e175ac90b8815b6ccd1fb0a59fcd2"
+    },
+    {
+      "path": "evidence/contact/pinion-envelope.step",
+      "bytes": 5739,
+      "sha256": "6dc4846856421e49a87c20545e10906b3b894a88f37f3236ca00b6dbc30ccc8e"
+    },
+    {
+      "path": "evidence/contact/rack.step",
+      "bytes": 1777277,
+      "sha256": "d5aad2fb0c5668389090d4b8df7e4e415753b7584ea7aa62eb50ebee2cb09024"
+    },
+    {
+      "path": "evidence/contact/receiver.step",
+      "bytes": 33129,
+      "sha256": "cc9d3db2ed71e2a5366ba9f97cd7b6f74f08386fe827cdaaedc0f4ebcde66337"
+    },
+    {
+      "path": "evidence/contact/washer1.step",
+      "bytes": 9220,
+      "sha256": "4503587c978cf5b6c0d41815b4a5f5a40330016bd50016c44617197ed0c4726d"
+    },
+    {
+      "path": "evidence/contact/washer2.step",
+      "bytes": 9206,
+      "sha256": "89a40269bc352fbef5257f166f4da20c445a67bec3c887bb655ea3eb26f44b91"
+    },
+    {
+      "path": "evidence/contact/washer3.step",
+      "bytes": 9192,
+      "sha256": "f2447675fbe9fae79cb5ffc5ee115a338cd526d7bfec1aa3d9edeaf5b7dfa114"
+    },
+    {
+      "path": "evidence/contact/washer4.step",
+      "bytes": 9206,
+      "sha256": "5ec3ffcb8310b4663f7f1d193cf4548b71463b1f5186def4878ab802d142fde8"
+    },
+    {
+      "path": "evidence/contact.log",
+      "bytes": 13983,
+      "sha256": "f5b1d2a8ad388362bf6527bb07b3923dc90696514a198650023605c2656ef1e1"
+    },
+    {
+      "path": "evidence/rack-regression.log",
+      "bytes": 6936,
+      "sha256": "fbf154658286dc1ccd87e362f427d5ba7558c4aebfc482b0ccf5aa10553aed86"
+    },
+    {
+      "path": "evidence/rail-regression.log",
+      "bytes": 19368,
+      "sha256": "b8c05709c384a73b73c34300d35f2f92c1c82bd4a117c9cf86c1f6b60dba0875"
+    },
+    {
+      "path": "evidence/validation.json",
+      "bytes": 1903,
+      "sha256": "daabb39eada69bdf40494db8b61aa37eb6fd8d5bd79a58c60f7f76b24b5aa420"
+    },
+    {
+      "path": "tests/.rack-regression.json",
+      "bytes": 315,
+      "sha256": "8c3f42bfb2d3f79ffd7f9f6849039e2dfbb573e111c1043c3a9b55dce9fea391"
+    },
+    {
+      "path": "tests/.rail-regression.json",
+      "bytes": 1602,
+      "sha256": "402459fddb731a2be475ba7fba88f0c9eeab25fc90bdcad5d35b6a9ef19c674c"
+    },
+    {
+      "path": "tests/README.md",
+      "bytes": 3274,
+      "sha256": "a48c984f0f529b3dacb5a6523a122fbcdd12dd4b4936aca406e8b54ebd792922"
+    },
+    {
+      "path": "tests/haxeon.contact.json",
+      "bytes": 320,
+      "sha256": "27eb447b067b977084030a17da8d6389288c6229d0652a44536a136cb31fbb35"
+    },
+    {
+      "path": "tests/haxeon.json",
+      "bytes": 275,
+      "sha256": "55fbad9133b718735e76e5527c62a98ce993e7094af1ff82ae993b61783692cd"
+    },
+    {
+      "path": "tests/src/LinearMountContactTests.hx",
+      "bytes": 5433,
+      "sha256": "a1a1c7dad4fe1de875f448150814b2b0345615ee385061fb985145c22bb7de94"
+    },
+    {
+      "path": "tests/src/LinearMountTests.hx",
+      "bytes": 8679,
+      "sha256": "dc3e2da17debfa64c91070258da756f96abb5fb19b4d6fc128de3260f8659b18"
+    },
+    {
+      "path": "source/InsertMountPattern.hx",
+      "bytes": 2420,
+      "sha256": "680616563e790792de0ebfd5c2882f3fd714f3ccb8bcc43b8b54ebcfb63a7017"
+    },
+    {
+      "path": "source/MountedElement.hx",
+      "bytes": 2866,
+      "sha256": "129e9b906c42b293b3fb246543054dfbaaa79b6b8ac5e4814079c0d8d185f858"
+    },
+    {
+      "path": "source/MountHoleDerivation.hx",
+      "bytes": 4009,
+      "sha256": "ede931566fb1c6d646dbb4b30574ad27fc167b3cd9d9837635d5349b38d9cf31"
+    },
+    {
+      "path": "source/MountServiceScrews.hx",
+      "bytes": 2369,
+      "sha256": "4d345940348f7418ed7a216a937ac7a056b4a27b462a1487fd0162af45120269"
+    },
+    {
+      "path": "source/LinearMountDatum.hx",
+      "bytes": 6310,
+      "sha256": "7a20664fb1260c4213f5142bb75734bfd0c49e4657834c65475841949bd96dd2"
+    },
+    {
+      "path": "source/MillRailFasteners.hx",
+      "bytes": 3434,
+      "sha256": "1686d5db8670eaf7ced9746c68553dca49ac94edfdbda63d1e0459e19b5b6c63"
+    },
+    {
+      "path": "source/GearRack.hx",
+      "bytes": 5808,
+      "sha256": "375f7154f0f66af11aeb5a9babd1958c4d824d12f5cf58abe0c51c7e39da3ec0"
+    },
+    {
+      "path": "source/PROPOSAL.md",
+      "bytes": 7607,
+      "sha256": "8058e0e8cc5a195114d6b9495bec52002ebe7b0242cde73a97e2ae3b3d951c75"
+    }
+  ]
+}

@@ -5,7 +5,9 @@ enough to finish them. It applies to every machine with rails: the bench mill, t
 flexspline hobber and the lathe. Purchasing options for the instruments and compounds are in
 [METROLOGY_SOURCING.md](METROLOGY_SOURCING.md).
 
-Status: planned 2026-10-20. Nothing below is implemented.
+Status: RM2 shared source/fastener core implemented 2026-10-22; the physical
+mount family and automatic compliance export remain planned. This is not an
+RM2 completion or production mount release.
 
 ## What exists
 
@@ -15,7 +17,7 @@ Status: planned 2026-10-20. Nothing below is implemented.
   master. Both rails of one axis share one pour. The sheet router (SR-D2 in
   `examples/sheet-router/PLAN.md`) follows the same route on a welded frame and names a wire or laser
   for straightness.
-- **Tooling model (planned).** `manufacturingkit/TOOLING_PLAN.md` phase 7 plans
+- **Tooling source model (landed).** `manufacturingkit/TOOLING_PLAN.md` phase 7 step 2 provides
   `InterfaceRequirement` (route, allowance, permitted finishes), `InterfaceRelationship` (coplanar,
   parallel, perpendicular, distance, with axis members), replication jigs and metrology with a stated
   uncertainty. `CastInsert` already offers the finish `replicated-after-casting`, and
@@ -171,8 +173,22 @@ assumed; the bench mill's 16 M4 × 16 block screws are checked against the recor
 
 ### RM2 — Shared mount family for rails, racks and linear scales
 
-**Planned; implementation follows TOOLING_PLAN phase 7 step 2 landing.** One mount
-family serves rails, racks and linear scales. The host supplies a mounting datum:
+**In progress; TOOLING_PLAN phase 7 step 2 has landed.** One mount
+family serves rails, racks and linear scales. The first source slice is implemented:
+`MountedElement`, `MountHoleDerivation`, `MountServiceScrews` and `LinearMountDatum`.
+Existing mill source holes/fasteners delegate to the shared core. The cast/welded
+host contract preserves explicit replication inputs and requires steel adjustment
+members; it does not yet generate or qualify physical carrier/bar/bracket geometry.
+Checks: 53 shared assertions, the existing 116 rail-seat assertions (36 service
+screws), and catalogue rack regressions. A separate 19-assertion local contact
+fixture checks a side-bolted rack candidate with real washers and pinion envelope;
+it does not qualify a whole mount or automatic FE compliance. See
+[router candidate](examples/sheet-router/mounting/PROPOSAL.md). Production compound
+limits, actual through-bolt/nut rail backing and full native/FE acceptance remain
+open. Today's generic tape scale has no mounting bores and is rejected by the
+adapter rather than receiving invented holes.
+
+The host supplies a mounting datum:
 a replicated plane plus a steel side bar with push screws for assembly adjustment,
 then locking under RM-D1. A fixed precision lip is not the primary reference.
 The host abstraction distinguishes a retained insert in a casting from a welded

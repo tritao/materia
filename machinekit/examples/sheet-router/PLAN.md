@@ -1807,3 +1807,24 @@ and final J5 histories before release. Catalogue rack recipe is committed;
 required-mount API is tested in isolation and held for the RM2/frozen-router
 sequencing decision because it deliberately rejects today's unsupported racks.
 Cable-chain visuals remain queued after this load-path work.
+
+RM2 source milestone (2026-10-22): `b4905d034` shares connector-derived holes,
+clearance budgets and service-screw selection across rail/rack receiver steel;
+the existing mill delegates to it. The cast/welded datum contract keeps unknown
+layer inputs pending and counts owned parts once. Shared checks: 53; existing
+rail-seat regression: 116 assertions / 36 screws; all four rack recipes pass.
+`a2336dacf` fixes rack connectors to the actual screw-entry/counterbore face.
+
+The [side-mounted receiver candidate](mounting/PROPOSAL.md) has a local native
+fixture (19 assertions, minimum conservative pinion/hardware clearance 1.10 mm).
+It supplies STEP/contact evidence, not an all-machine stiffness/fatigue pass.
+No unsupported rack is repaired in frozen CAD yet. The next physical RM2 work
+must include carrier/cleats, adjusted bar, real rail backing, complete mass and
+automatic compliance export before the supported-router rerun. Blind M6 into
+the historical 8 mm backing fails the existing C45 policy; do not silently move
+the rail datum or weaken the policy. Production compound thickness/cure/creep
+inputs and the through-bolt/captive-nut route remain open. Keep all braces and
+all existing SR-D3/SR6 release gates. The required-mount API must cover actual
+side-face support independently of the mesh/back datum; its earlier patch is
+not production acceptance. Review the complete passing candidate before frozen
+adoption. Cable-chain visuals stay queued.
