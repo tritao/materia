@@ -14,6 +14,14 @@ planner envelope. Keep fabrication release gated while the joint rack-support
 rerun and planner-history fatigue qualification are resolved. No reduced-brace
 geometry is adopted. See the [brace study](../fem/BRACE_STUDY.md).
 
+**Rack/motion gate, 2026-10-22:** the completed [joint study](../fem/RACK_JOINT_STUDY.md)
+rejects the assumed seat: fine-mesh static stiffness and nominal dynamic error
+fail. Shared RM2 physical mounts, approved frozen adoption and final J5 histories
+must precede requalification. Proposed W066/W064 gussets or an inspected full-
+penetration detail require actual geometry/reaction checks; no fatigue-category,
+life or load reduction is credited. Lower-jerk policy candidates do not release
+fabrication. The required-mount API patch is tested but held for sequencing.
+
 ## Prepared geometry and seams
 
 `SheetRouterFramePreparation.hx` partitions the forty actual fixed-frame tube

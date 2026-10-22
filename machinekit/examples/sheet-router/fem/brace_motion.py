@@ -92,8 +92,8 @@ def sweep(detail,j4,points,half=False,tags=None):
     return cases
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--structural',type=Path,required=True);p.add_argument('--j4',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--frequency-points',type=int,default=3);p.add_argument('--names',nargs='+');p.add_argument('--beds',nargs='+',type=int,default=[2600,3150]);p.add_argument('--poses',nargs='+',help='Optional x:y pose subset');p.add_argument('--tags',nargs='+');p.add_argument('--all-poses',action='store_true');p.add_argument('--half',action='store_true');p.add_argument('--fatigue',action='store_true');a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
-    sys.path.insert(0,str(a.j4/'source'));records=[];driver_sha=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    p=argparse.ArgumentParser();p.add_argument('--structural',type=Path,required=True);p.add_argument('--j4',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--source',type=Path,help='Pinned replay modules when exports and source are stored separately');p.add_argument('--frequency-points',type=int,default=3);p.add_argument('--names',nargs='+');p.add_argument('--beds',nargs='+',type=int,default=[2600,3150]);p.add_argument('--poses',nargs='+',help='Optional x:y pose subset');p.add_argument('--tags',nargs='+');p.add_argument('--all-poses',action='store_true');p.add_argument('--half',action='store_true');p.add_argument('--fatigue',action='store_true');a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
+    source=a.source or a.j4/'source';sys.path.insert(0,str(source));records=[];driver_sha=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     for bed in a.beds:
         for root in sorted((a.structural/f'y{bed}').iterdir()):
             if not root.is_dir() or a.names and root.name not in a.names:continue
@@ -106,7 +106,7 @@ def main():
                 name=f'y{bed}-{root.name}-x{detail["pose"]["x"]:g}-y{detail["pose"]["y"]:g}-h{detail["meshMm"]:g}'
                 if a.half:name+='-half'
                 target=a.output/(name+'.json')
-                signature=dict(structuralSha256=hashlib.sha256(path.read_bytes()).hexdigest(),frequencyPoints=a.frequency_points,half=a.half,fatigue=a.fatigue,tags=a.tags,driverSha256=driver_sha)
+                signature=dict(structuralSha256=hashlib.sha256(path.read_bytes()).hexdigest(),frequencyPoints=a.frequency_points,half=a.half,fatigue=a.fatigue,tags=a.tags,driverSha256=driver_sha,replaySourceSha256={n:hashlib.sha256((source/n).read_bytes()).hexdigest() for n in ['dynamic_error.py','modal_response.py','contour_response.py','curved_error.py']})
                 if target.exists() and json.loads(target.read_text()).get('signature')==signature:
                     cached=json.loads(target.read_text());worst=max(v['value'] for h in cached['histories'] for v in h['worst'].values());records.append(dict(path=target.name,bed=bed,variant=root.name,pose=detail['pose'],worstMm=worst));continue
                 start=time.time();report=sweep(detail,a.j4/str(bed),a.frequency_points,a.half,a.tags)

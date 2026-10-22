@@ -1781,3 +1781,29 @@ rack recipe owns holes/pins/datum faces; shared derivation owns seat holes. Rack
 parallelism, section-joint pitch and adjustable motor-plate centre distance/backlash
 are RM4 assembly relationships. Shared mount mass/compliance must enter FE exports.
 The frozen router rebuild and right-rack correction still require user approval.
+
+Joint rack/motion study (2026-10-22): [report](fem/RACK_JOINT_STUDY.md),
+[results](fem/rack-results/summary.json), [retention manifest](fem/rack-results/provenance.json).
+The draft is rejected; all sixteen braces and frozen CAD stay unchanged. Both
+beds, both meshes and all nine poses were rerun with forty modes and separate
+seat/bolt springs. Fine-mesh worst X/Y stiffness is 2.03284/1.98085 N/µm short,
+1.98448/1.97582 long. Nominal J4 timing reaches 0.064781 mm short; the prepared
+long-bed diagnostic reaches 0.056012 mm. These failures remain even after old
+J4 controlled histories are excluded from J5 acceptance. Assumed seat mass and
+compliance are study inputs only; archived draft source was removed from main.
+
+Nominal-only policy candidates: short ZVD with half X/Y jerk gives 0.027828 mm
+(+1.091114 s per representative contour); long half jerk gives 0.030030 mm in
+the prepared diagnostic (+0.864532 s). These are finite-grid screens, not SR-D3
+release. Await dense uncertainty checks, J5 ready-stop/filtered-clock and raised-
+feed replan exports, then SR6-C measured-mode/damping commissioning. Stiffness-
+only drive bounds do not pass the unchanged policy. RM2 must address both X/Y
+mount compliance; physical design and frozen adoption still require approval.
+
+SR6 fabrication release remains gated. Keep 100 million full-load reversals and
+the FAT36 cut-off 12.669282 MPa. Propose a reaction-checked gusset/detail upgrade
+at W066 and W064, not a reduction of loads or life. Requalify actual shared mount
+and final J5 histories before release. Catalogue rack recipe is committed;
+required-mount API is tested in isolation and held for the RM2/frozen-router
+sequencing decision because it deliberately rejects today's unsupported racks.
+Cable-chain visuals remain queued after this load-path work.

@@ -1,5 +1,16 @@
 # SR5 structural screen
 
+## Current rack/motion gate (2026-10-22)
+
+The [joint study](RACK_JOINT_STUDY.md) supersedes the earlier release interpretation.
+The review-only rack mass and finite seat compliance fail the fine-mesh static
+target on both beds; nominal motion also fails the 0.05 mm budget. No draft seat
+components or frozen CAD changes are adopted. All braces remain. Lower-jerk/ZVD
+policies are promising finite-grid screens, pending J5 exports, shared RM2 mount
+design and measured-mode commissioning. Historical runs below retain their own
+load histories and model scope. See [condensed evidence](rack-results/summary.json)
+and [archive inventory](rack-results/provenance.json).
+
 ## Evidence retention (2026-10-20)
 
 Cited historical runs are compressed under `build/sheet-router-evidence/`;
@@ -770,5 +781,5 @@ weld-fatigue screen. The broader baseline itself needs planner-envelope
 requalification: the finer-mesh short-bed contour reaches 0.06320 mm, and a
 long-bed dynamic weld range reaches 13.03 MPa against 12.669 MPa. The report
 separates the frozen macro model, prepared weld model and numerical solver
-rejections. Rack seats/bolt compliance remain the next joint rerun; this screen
-does not approve brace removal or release fabrication.
+rejections. The completed [rack joint rerun](RACK_JOINT_STUDY.md) includes seat/bolt compliance;
+neither screen approves brace removal or fabrication release.
