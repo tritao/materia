@@ -24,12 +24,22 @@ class HobberSocketFixtureSetup {
 		var stock = materia.tooling.panel.PanelJoints.stock(18);
 		stock.materialSpec = "melamine-faced particleboard; supplier and sealing qualification pending";
 		stock.thicknessVariation = 0.1;
+		var formerStocks=[stock];
+		if (stock.measuredThickness<25) {
+			var thicker=materia.tooling.ToolingCodec.stockSnapshot(stock);
+			thicker.nominalThickness=25;thicker.measuredThickness=25;
+			formerStocks.push(thicker);
+		}
 		return {
 			input:input,
 			setup:{id:"mouths-on-carrier",revision:1,sourceFingerprint:ToolingCodec.inputFingerprint(input),
 				fillHeightMm:106,freeboardMm:0,sourceToMold:F.fromRotationMatrix(250,170,106,[1,0,0,0,-1,0,0,0,-1]),features:[]},
 			recipe:{
-				id:"socket-coupon-study",revision:1,featureRules:materia.tooling.casting.CastingStrategies.standardRules(),panel:stock,
+				id:"socket-coupon-study",revision:1,former:{pocketScrew:{diameterMm:4,lengthMm:30,jigAngleDegrees:15,edgeDistanceMm:20,maximumPitchMm:100},stocks:formerStocks,finishingStockMm:0.5,toleranceMm:0.1,cutters:[
+					{id:"former-straight-6",tipDiameterMm:6,taperDegrees:0,fluteLengthMm:30,stickOutMm:35},
+					{id:"former-taper-3deg-6",tipDiameterMm:6,taperDegrees:3,fluteLengthMm:30,stickOutMm:35}
+				]},
+				featureRules:materia.tooling.casting.CastingStrategies.standardRules(),panel:stock,
 				core:{materialSpec:"no EPS in this coupon",width:1000,depth:500,height:100,densityKgM3:null,
 					compressionStrengthPa:null,compressionStrainFraction:null,maximumTemperatureC:null,evidence:[]},
 				jointClearance:0.3,jointLiningAllowance:0,jointMachiningAllowance:0.05,

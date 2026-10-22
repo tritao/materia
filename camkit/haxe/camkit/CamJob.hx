@@ -156,15 +156,29 @@ class CamJob {
 
 	/** Offset closed profile; `outside` and `inside` use the cutter radius. */
 	public function profile(contour:CamContour, tool:Tool, depth:Float, feed:Float, ?side:String = "outside", ?stepDown:Float = 0.002,
-			?plungeFeed:Null<Float>, ?featureRef:String, ?startDepth:Float):CamJob {
+			?plungeFeed:Null<Float>, ?featureRef:String, ?startDepth:Float, ?contactHeight:Float):CamJob {
 		require(contour, tool, depth, feed);
+		var radius=tool.diameter*0.5;
+		if (contactHeight!=null) {
+			if (!Math.isFinite(contactHeight) || contactHeight<0 || contactHeight>tool.profile().fluteLength())
+				throw "Profile contact height must lie on the declared cutter";
+			if (contactHeight>0) radius=tool.profile().below(contactHeight).topRadius();
+			else {
+				// A drafted edge references the exact flat tip of its declared
+				// tapered cutter, rather than the maximum flute diameter.
+				radius=switch tool.profile().segments[0] {
+					case Line(_,z0,r,z1,zone) if (z0==0 && z1==0 && zone==Cutting):r;
+					default:throw "Zero-height profile contact needs a flat cutting tip";
+				};
+			}
+		}
 		var entryFeed = checkedEntryFeed(feed, plungeFeed);
 		if (side != "outside" && side != "inside" && side != "on")
 			throw 'Unknown CAM profile side "$side"';
 		var levels = depthLevels(startDepth == null ? contour.z : startDepth, depth, stepDown);
 		if (side != "on")
-			offsetPath(contour, tool.diameter * 0.5, levels[0], side == "outside");
-		var reliefs = side == "on" ? new Array<Point3>() : CamExactBoundary.reliefCenters(contour, tool.diameter * 0.5, side == "outside");
+			offsetPath(contour, radius, levels[0], side == "outside");
+		var reliefs = side == "on" ? new Array<Point3>() : CamExactBoundary.reliefCenters(contour, radius, side == "outside");
 		var span = nextSpan(featureRef);
 		selectTool(tool, span);
 		for (index in 0...levels.length) {
@@ -174,7 +188,7 @@ class CamJob {
 			if (side == "on")
 				cutLoop(contour, level, feed, entryFeed, span, prior);
 			else
-				cutOffset(contour, tool.diameter * 0.5, level, feed, entryFeed, span, side == "outside", prior);
+				cutOffset(contour, radius, level, feed, entryFeed, span, side == "outside", prior);
 		}
 		return this;
 	}

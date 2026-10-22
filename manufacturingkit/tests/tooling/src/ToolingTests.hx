@@ -226,11 +226,7 @@ class ToolingTests {
 			]
 		};
 		TestInsertHoles.beforeCasting(input.inserts[0]);
-		var recipe:ToolingRecipe = {
-			featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
-			id: "eps-panel-study",
-			revision: 1,
-			panel: {
+		var stock:materia.tooling.panel.PanelStockSpec = {
 				materialSpec: "melamine-faced particleboard, study",
 				nominalThickness: 18,
 				measuredThickness: 17.8,
@@ -240,7 +236,22 @@ class ToolingTests {
 				coatedFace: CoatedFace.Both,
 				allowedRotations: [0, 90],
 				directionConstraint: StockDirection.Free
-			},
+			};
+		var formerStocks=[stock];
+		if (stock.measuredThickness<25) {
+			var thicker=materia.tooling.ToolingCodec.stockSnapshot(stock);
+			thicker.nominalThickness=25;thicker.measuredThickness=25;
+			formerStocks.push(thicker);
+		}
+		var recipe:ToolingRecipe = {
+			former:{pocketScrew:{diameterMm:4,lengthMm:30,jigAngleDegrees:15,edgeDistanceMm:20,maximumPitchMm:100},stocks:formerStocks,finishingStockMm:0.5,toleranceMm:0.1,cutters:[
+					{id:"former-straight-6",tipDiameterMm:6,taperDegrees:0,fluteLengthMm:30,stickOutMm:35},
+					{id:"former-taper-3deg-6",tipDiameterMm:6,taperDegrees:3,fluteLengthMm:30,stickOutMm:35}
+				]},
+				featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
+			id: "eps-panel-study",
+			revision: 1,
+			panel: stock,
 			core: {
 				materialSpec: "EPS grade unselected",
 				width: 1000,
@@ -587,5 +598,6 @@ class ToolingTests {
 		CastingMoldTests.run(fixture());
 		MoldRegionMathTests.run();
 		AnchorCapacityTests.run(fixture());
+		FormerConstructionTests.run(fixture().recipe);
 	}
 }

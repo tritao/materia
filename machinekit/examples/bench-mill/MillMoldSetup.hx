@@ -38,6 +38,12 @@ class MillMoldSetup {
 			height = frame.layout.railPlane,
 			stock = PanelJoints.stock(thickness);
 		stock.materialSpec = "coated particleboard";
+		var formerStocks=[stock];
+		if (stock.measuredThickness<25) {
+			var thicker=materia.tooling.ToolingCodec.stockSnapshot(stock);
+			thicker.nominalThickness=25;thicker.measuredThickness=25;
+			formerStocks.push(thicker);
+		}
 		return {
 			input: input,
 			setup: {
@@ -54,6 +60,10 @@ class MillMoldSetup {
 				}]
 			},
 			recipe: {
+				former:{pocketScrew:{diameterMm:4,lengthMm:30,jigAngleDegrees:15,edgeDistanceMm:20,maximumPitchMm:100},stocks:formerStocks,finishingStockMm:0.5,toleranceMm:0.1,cutters:[
+					{id:"former-straight-6",tipDiameterMm:6,taperDegrees:0,fluteLengthMm:30,stickOutMm:35},
+					{id:"former-taper-3deg-6",tipDiameterMm:6,taperDegrees:3,fluteLengthMm:30,stickOutMm:35}
+				]},
 				featureRules: featureRules(),
 				id: "mill-base-panel-eps-review",
 				revision: 1,

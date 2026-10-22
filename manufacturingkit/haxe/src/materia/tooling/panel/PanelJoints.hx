@@ -20,6 +20,7 @@ enum abstract PanelJointKind(String) to String {
 enum abstract PanelClosure(String) to String {
 	var ExternalClamps = "external-clamps";
 	var ThroughBolt = "through-bolt";
+	var InternalPocketScrews = "internal-pocket-screws";
 }
 
 typedef PanelMatingFit = {

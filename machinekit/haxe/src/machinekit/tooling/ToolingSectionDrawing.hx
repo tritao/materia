@@ -52,7 +52,7 @@ class ToolingSectionDrawing {
 		} catch (error:Dynamic) {scope.close();throw error;}
 	}
 
-	static function draw(part:Part,id:String,frame:AssemblyFrame,levels:Array<Float>):ToolingSectionSheet {
+	public static function draw(part:Part,id:String,frame:AssemblyFrame,levels:Array<Float>):ToolingSectionSheet {
 		var sections:Array<CastingSection> =[];
 		var entities:Array<DrawingEntity> =[],offset=0.0;
 		for (level in levels) {

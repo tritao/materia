@@ -2419,9 +2419,10 @@ by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
   qualification and groups non-box fragments under their authored parent,
   preserving all reasons deterministically. Exact box-plus-anchor source moments
   still supply lifting review positions without a native fill kernel.
-- [ ] Former CAM remains unfinished in step 3. The pending blank-route choice
-  is not selected by these shared geometry/process changes. Stepped/flared
-  non-box mold-shell allocation belongs to phase 8, after step 3 acceptance.
+- [x] Former CAM implementation: one declared board (faced when
+  needed), or a removable open panel box with dry-side pocket screws. Drafted
+  built-up walls remain explicitly Unsupported. Stepped/flared non-box mold
+  shells belong to phase 8.
 - [x] Draft source convention confirmed: authored dimensions belong to the
   withdrawal opening; walls taper inward along the declared source-coordinate
   withdrawal axis. Finishing stock and process error budgets remain separate.
@@ -2496,3 +2497,14 @@ and current mold/frozen-geometry checks pass independently.
   reconstruction and packages pass; service holes stay fixed. Source-selected
   lifting/hatch stock and per-insert anchor/cover results are in TOOLING_README.md.
   The regenerated kit has zero traps and zero Fail records; capacity stays Pending.
+
+Former construction decision (2026-10-22): hollow formers use internal pocket screws, with screw heads and access entirely in the dry cavity; board/grip trial remains Pending. No through-bolts or resin-side counterbores. Neck and flange sheets remain removable board parts, with no glued blank route.
+Former hardware study decision (2026-10-22): recipe-declared 4 × 30 mm pocket screws, 15° jig, 20 mm end distance and at most 100 mm pitch; these are shop-study choices, with board/grip and jig trial Pending.
+Former shop decision (2026-10-22): dry-side pocket drilling uses a manual angled drilling jig after contour machining; jig setup and board grip stay Pending, and the shop record lists joint IDs, screw quantities and sites.
+Former spacing decision (2026-10-22): a short rebate gets one centred pocket screw when two screws cannot retain the declared end distance and two-diameter separation; longer rebates use evenly spaced screws within the declared maximum pitch.
+Former assembly decision (2026-10-22): the portable assembly uses one deterministically selected parent joint per board; all rebate contacts and closure sites remain in the validated panel plan and shop records.
+Former tolerance decision (2026-10-22): on drafted faces, radial contour and reference-mesh deflection are limited to one twentieth of the declared tolerance multiplied by tan(draft), so shallow walls do not amplify discretisation beyond the vertical tolerance.
+Former source-dependent work parked (2026-10-22): cutter-fit rejects square internal corners in bed backing, the front bearing and rear drive seat formers, and the four foot-access neck/flange pairs. No source casting geometry or cutter-fit check was changed. These findings remain in the kit; selecting a geometry change waits for review while independent cleanup proceeds.
+Former CAM datum decision (2026-10-22): all former stock heights use the declared machine spoilboard plane and fixed work datum, including thicker boards. Only through bands receive breakthrough; tapered finishing offsets its contact height by that breakthrough. Program headers state the spoilboard and stock-top Z.
+Former load decision (2026-10-22): hollow-former boards enter the existing peak-pressure and plate-support checks as wetted walls; finished clipping and coupled corner loads retain the existing Unsupported plate-model gap per board, without credit from nominal rectangular blanks. Gross former restraint checks remain unchanged.
+Former registration decision (2026-10-22): neck and flange sheets register against the mold wall and use its external closure; the hollow body uses internal pocket screws. Capture, grip and the complete restraint remain pending shop qualification.

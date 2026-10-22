@@ -80,9 +80,34 @@ class MillFabricationPreview {
 			checks.push(ToolingLoads.check("fabrication.geometry-and-sequence", [p.document.input.id], ToolingCheckStatus.Pending,
 				"Records-only export did not run CAD/sequence validation.", []));
 		}
-		checks = checks.concat(ToolingFabricationExport.write(p, f, dir));
 		var panels = ToolingFabricationExport.panels(p, f),
 			settings = MillFabricationSetup.cam(panels);
+		var formerShop=machinekit.tooling.FormerShopExport.build(p);
+		for (former in formerShop.formers) for (board in former.boards) {
+			var machining=board.machining;
+			if (machining==null) continue;
+			try {
+				for (setup in camkit.CamToolingFormers.build(machining,settings)) {
+					var file=setup.id+".ngc";
+					var plane=settings.spoilboardPlane;
+					if (plane==null) throw "Former CAM has no declared spoilboard plane";
+					var code=CncWriter.write(setup.program,new CncController(cnckit.CncDialect.LinuxCnc,setup.program.tools),
+						settings.travelSpace==MachineCoordinates ? settings.travel : null);
+					sys.io.File.saveContent(dir+"/"+file,"(REVIEW ONLY - former stock, machine, workholding and sealing qualification pending)\n"
+						+"(G54 uses the declared fixed work datum; spoilboard Z "+(plane*1000)+" mm; stock top Z "
+						+((plane+board.stock.measuredThickness*0.001)*1000)+" mm)\n"+code);
+					board.programs.push(file);
+				}
+			} catch (error:Dynamic) {
+				var message="Former "+board.id+" CAM rejected: "+Std.string(error);
+				board.reasons.push(message);
+				var validation=formerShop.validation.filter(row -> row.rule=="fabrication.former-machining."+former.id)[0];
+				validation.message=validation.status==Fail ? validation.message+"; "+message : message;
+				validation.status=Fail;validation.severity=materia.tooling.ToolingDiagnostic.ToolingSeverity.Error;
+				if (validation.affectedIds.indexOf(board.id)<0) validation.affectedIds.push(board.id);
+			}
+		}
+		checks = checks.concat(ToolingFabricationExport.write(p, f, dir,formerShop));
 		if (Math.abs(settings.blankMargin * 1000 - f.spec.blankMarginMm) > 1e-7)
 			throw "CAM margin differs from blank requirements";
 		data(dir, "cam-settings.json", {
@@ -197,7 +222,9 @@ class MillFabricationPreview {
 			settings.workholdingReference == null ? [] : [settings.workholdingReference]));
 		data(dir, "cam-programs.json", programs);
 		sys.io.File.saveContent(dir + "/machining-instructions.md",
-			"# Panel machining review\n\nPrograms are LinuxCNC review outputs in mm. Settings originate in metres and m/s. Do not substitute relief cutters without regenerating the plan.\n\nEach program uses G54 with Z0 at the face being machined. XY starts at the raw blank lower left; the finished bounding profile is offset by the declared blank margin. Negative-Z setups reflect X about the finished profile midline: flip about local Y and re-establish the origin. Operation order clears named access pockets first and releases the outside profile last, after other faces. CAM checks supplied stock, fixtures and travel; an empty fixture list does not qualify workholding.\n\nRetain the part for the final contour with a qualified fixture/spoilboard or tabs specified by a revised operation plan. Through cuts include the declared breakthrough allowance into the declared spoilboard. Execute split single-tool programs in the cam-programs.json order, preserving access pockets and outside-last. Final outside cuts use the declared onion skin followed by its separate removal pass, or an evidenced vacuum area/holding-force assessment. G49 single-tool programs require touching off Z with that tool; no length offset applies. Fit-coupon programs and locator-coupon programs use the same settings. Resolve every blocking fabrication-validation.json record before fabrication release.\n");
+			"# Panel machining review\n\nPrograms are LinuxCNC review outputs in mm. Settings originate in metres and m/s. Do not substitute relief cutters without regenerating the plan.\n\nEach program uses G54 with Z0 at the face being machined. XY starts at the raw blank lower left; the finished bounding profile is offset by the declared blank margin. Negative-Z setups reflect X about the finished profile midline: flip about local Y and re-establish the origin. Operation order clears named access pockets first and releases the outside profile last, after other faces. CAM checks supplied stock, fixtures and travel; an empty fixture list does not qualify workholding.\n\nRetain the part for the final contour with a qualified fixture/spoilboard or tabs specified by a revised operation plan. Through cuts include the declared breakthrough allowance into the declared spoilboard. Execute split single-tool programs in the cam-programs.json order, preserving access pockets and outside-last. Final outside cuts use the declared onion skin followed by its separate removal pass, or an evidenced vacuum area/holding-force assessment. G49 single-tool programs require touching off Z with that tool; no length offset applies. Fit-coupon programs and locator-coupon programs use the same settings. Resolve every blocking fabrication-validation.json record before fabrication release.\n"
+			+"\n## Former boards\n\nUse former-board-stock.csv for each single-board or hollow-box part, former-pocket-screws.csv for dry-side jig drilling and closure, and former-manufacturing.json for sealing faces and each board's program order. The per-former assembly files show the removable board construction. Neck and flange sheets register against the wall and use its external closure; hollow-body joints use internal pocket screws.\n"
+			+"\nFormer programs retain the declared fixed G54 work datum and spoilboard plane; each header states its actual stock-top Z. Thicker blanks therefore use a different top Z, not a different assumed datum. Machine and seal all listed contact surfaces; pocket-screw heads and access stay inside the dry cavity. Board/grip, jig, workholding and machine qualification remain pending.\n");
 		checks = checks.concat(machinekit.tooling.ToolingProcessExport.write(p, process, f.spec.gravityMps2, dir, geometricReview, f.spec, frame.base,processReport,MillMoldSetup.input(frame).interfaceContext));
 		MillMoldStudy.write(MillMoldStudy.study(frame, geometricReview, !recordsOnly, process), dir);
 		ToolingPackageManifest.write(dir, f, checks);
@@ -339,10 +366,12 @@ class MillFabricationPreview {
 
 		removeGenerated(destination);
 		sys.FileSystem.rename(dir, destination);
+		var formerProgramCount=0;
+		for (former in formerShop.formers) for (board in former.boards) formerProgramCount+=board.programs.length;
 		Sys.println("Fabrication review package: "
 			+ destination
 			+ "; "
-			+ programs.length
-			+ " review programs; readiness remains separately reported in manifest.json");
+			+ (programs.length+formerProgramCount)
+			+ " review programs ("+programs.length+" panel, "+formerProgramCount+" former); readiness remains separately reported in manifest.json");
 	}
 }

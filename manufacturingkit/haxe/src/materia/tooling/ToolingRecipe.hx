@@ -44,6 +44,7 @@ typedef CastingReviewLimits = {
 }
 
 typedef ToolingRecipe = {
+	var former:materia.tooling.casting.FormerConstruction.FormerRecipe;
 	var featureRules:Array<materia.tooling.casting.CastingStrategies.CastingStrategyRule>;
 	var designReview:CastingReviewLimits;
 	var id:String;

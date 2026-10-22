@@ -1,5 +1,9 @@
 # Base casting mold review
 
+**Not fabrication-ready; no coupon trial recorded.** Former CAM now uses single
+boards or removable panel boxes. Seven former assemblies retain explicit cutter-fit
+failures at sharp source corners; their geometry has not been changed.
+
 This follows `manufacturingkit/TOOLING_PLAN.md` and generates the mold for
 the same complete frame instantiated by `MillFramePreview`: both XY and Z
 interfaces are present. `MillMoldSetup` adapts `frame.base`; it does not repeat
@@ -466,4 +470,44 @@ Cover below is the minimum exposed-anchor cover to the casting boundaries for th
 
 The base has 52 anchors and the column 54. The focused native run measured 92.1 seconds across the selector calls for both foundations, including unsuccessful calls; complete frame construction took 105.4 seconds. These are observed wall times on the shared development machine. Temporary selector timing instrumentation was removed.
 
-The regenerated records kit has zero trapped pockets (previously 74), with the fill check unchanged. Its 265 artifacts include 40 review programs; validation is 626 Pass, 568 Pending, 119 Unsupported and 0 Fail. Fabrication readiness remains false: the recorded material strengths, workshop inputs and physical evidence are still unresolved.
+The anchor-revision baseline has zero trapped pockets (previously 74), with the fill check unchanged. Its 265 artifacts include 40 panel review programs; validation was 626 Pass, 568 Pending, 119 Unsupported and 0 Fail. Fabrication readiness remains false: the recorded material strengths, workshop inputs and physical evidence are still unresolved.
+
+
+## Former board construction and CAM
+
+The 14 former envelopes use 10 single-board blanks and four open panel boxes.
+Stock is the recipe's declared 18 or 25 mm board family. A thicker blank is faced
+to height; drafted solid edges use the declared tapered cutter. A drafted panel
+box remains Unsupported because leaning walls are not implemented. There are no
+glued-sheet blanks or 3D finishing route.
+
+The four foot-access bodies each use five rebated panels, plus separate neck and
+flange sheets. Their board material, declared dry interior and seam seal reproduce
+the functional former exactly. The neck/flange sheets register against the wall's
+external closure. Hollow-body joints use internal 4 × 30 mm pocket screws, a 15°
+jig, 20 mm end distance and at most 100 mm pitch; short joints use one centred
+screw when two will not fit. Heads and access stay in the dry cavity. Board/grip,
+jig, sealing, restraint and machine qualification remain pending.
+
+The kit describes 38 board jobs. CAM accepts 27, with 11 sharp-corner rejections
+across bed backing, the bearing/drive seats and the four neck/flange pairs.
+These findings stay blocking. The 20 hollow-body boards also enter the existing
+pressure checks; their finished clipping and coupled corner loads retain an
+explicit Unsupported plate-model gap.
+
+Use `former-board-stock.csv`, `former-pocket-screws.csv`, and
+`former-manufacturing.json` for stock, closure sites, sealing faces and program
+order. The four former assembly files show the removable pieces. Former programs
+retain the declared fixed G54 datum and spoilboard plane; headers state each
+blank's actual top Z. Only through bands include breakthrough.
+
+The earlier totals changed from 889/402/123/74 to 626/568/119/0 (Pass/Pending/
+Unsupported/Fail) because fewer anchors and no separate washers removed repeated
+geometry checks, unqualified mix capacities became Pending, hardware gaps were
+resolved, and the 74 real washer-annulus traps were removed geometrically.
+
+The regenerated kit contains 375 artifacts and 67 review programs (40 panel,
+27 former), with 626 Pass, 561 Pending, 139 Unsupported and 7 Fail. The seven
+Fail records preserve the 11 uncuttable source corners; the 20 added Unsupported
+records expose the hollow-wall structural-model gaps. Trapped pockets remain
+zero. No casting geometry was changed.

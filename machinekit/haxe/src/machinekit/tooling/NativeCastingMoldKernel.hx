@@ -22,6 +22,24 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 
 	public function new() {}
 
+	public function bounds(region:CastingRegion,affectedId:String):materia.casting.Box3 {
+		var scope=new Scope();
+		try {
+			var source=scope.own(machinekit.structural.CastingRegionCad.part(region));
+			var intervals:Array<Array<Float>>=[];
+			for (axis in 0...3) {
+				var frame=CastingSectionContours.normalFrame({x:axis==0?1:0,y:axis==1?1:0,z:axis==2?1:0},affectedId);
+				var local=scope.own(machinekit.assembly.PosedParts.moved(source,F.inverse(frame)));
+				var geometry=new CastingFillGeometry(affectedId,local);
+				try intervals.push(geometry.heightInterval()) catch (error:Dynamic) {geometry.close();throw error;}
+				geometry.close();
+			}
+			var result={x:intervals[0][0],y:intervals[1][0],z:intervals[2][0],
+				width:intervals[0][1]-intervals[0][0],depth:intervals[1][1]-intervals[1][0],height:intervals[2][1]-intervals[2][0]};
+			scope.close();return result;
+		} catch (error:Dynamic) {scope.close();throw error;}
+	}
+
 	public function moments(region:CastingRegion):CastingRegionMoments {
 		var key=haxe.crypto.Sha256.encode(ToolingCodec.canonical(region));
 		var cached=regionCache.get(key);
@@ -67,17 +85,8 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 			}
 			if (contours.length==0) {scope.close();return null;}
 			var pose=F.compose(frame,F.translation(0,0,interval[0]));
-			function prism(contour:Array<materia.casting.CastingProfile.CastingSegment>):CastingRegion
-				return CastingRegion.Placed({solid:Prism(contour,depth),pose:pose});
-			var pieces:Array<CastingRegion> =[];
-			for (outer in contours) if (outer.depth%2==0) {
-				var holes:Array<CastingRegion> =[];
-				for (hole in contours) if (hole.depth==outer.depth+1
-					&& materia.casting.CastingProfileGeometry.inside(outer.contour,hole.contour[0].start.x,hole.contour[0].start.y))
-					holes.push(prism(hole.contour));
-				pieces.push(CastingRegion.Difference(prism(outer.contour),holes));
-			}
-			var candidate=scope.own(machinekit.structural.CastingRegionCad.part(CastingRegion.Union(pieces)));
+			var candidate=scope.own(machinekit.structural.CastingRegionCad.part(
+				materia.tooling.casting.MoldRegions.section(contours,pose,depth)));
 			var missing=scope.own(source.subtractAll([candidate])),excess=scope.own(candidate.subtractAll([source]));
 			var difference=missing.volume()+excess.volume();
 			if (!Math.isFinite(difference)) throw "Nonfinite prism difference: "+affectedId;

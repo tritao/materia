@@ -90,7 +90,10 @@ class ToolingLoads {
 		return {deflectionMm: 5 * q * Math.pow(span, 4) / (384 * e * i) * 1000, stressPa: q * span * span * depth / (16 * i)};
 	}
 
-	public static function report(p:CastingMoldPlan, s:FabricationSpec):LoadReport {
+	public static function report(p:CastingMoldPlan, s:FabricationSpec,
+			?formerPanels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement>):LoadReport {
+		var extraWalls:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement> = formerPanels==null ? [] : formerPanels;
+		var walls=p.panels.members.concat(extraWalls);
 		positive(s.gravityMps2);
 		positive(s.loadFactor);
 		if (s.loadFactor < 1)
@@ -119,7 +122,7 @@ class ToolingLoads {
 			coreForces.set(c.id,
 				(p.document.recipe.mixDensityKgM3 * s.gravityMps2 * volume * 1e-9 + extra * footprint.width * footprint.depth * 1e-6) * s.loadFactor);
 		}
-		for (m in p.panels.members.concat(p.supportPanels)) {
+		for (m in walls.concat(p.supportPanels)) {
 			var b = CastingProfileGeometry.bounds(PanelContours.outside(m.panel));
 			var zmin = 1e30, zmax = -1e30;
 			for (x in [b.x, b.x + b.width])
@@ -131,7 +134,7 @@ class ToolingLoads {
 			var head = Math.max(0, p.document.setup.fillHeightMm - Math.max(p.cavity.z, zmin)) * 0.001;
 			var pressure = p.document.recipe.mixDensityKgM3 * s.gravityMps2 * head;
 			// Bounding face area and maximum pressure are conservative; external supports have zero fluid contact.
-			var isWall = p.panels.members.indexOf(m) >= 0;
+			var isWall = walls.indexOf(m) >= 0;
 			if (!isWall)
 				pressure = 0;
 			var design = (pressure + (isWall ? extra : 0)) * s.loadFactor;
@@ -161,11 +164,13 @@ class ToolingLoads {
 				&& outline.length == 4
 				&& outline.filter(e -> e.center != null).length == 0
 				&& outline.filter(e -> Math.abs(e.end.x - e.start.x) > 1e-7 && Math.abs(e.end.y - e.start.y) > 1e-7).length == 0;
-			if (!plain || !isWall) {
+			var isFormer=extraWalls.indexOf(m)>=0;
+			if (!plain || !isWall || isFormer) {
 				if (s.plates.filter(v -> v.panelId == m.panel.id).length > 0)
 					throw "Plate support supplied for panel without structural model: " + m.panel.id;
 				r.validation.push(check("fabrication.plate." + m.panel.id, [m.panel.id], Unsupported,
-					"This panel has rebates/holes/tabs, a nonrectangular boundary or local support loads. No structural model for its actual geometry is implemented; rectangular plate capacity is not credited.",
+					isFormer ? "Hollow-former wall: finished clipping and coupled corner loads are outside the rectangular plate model; no capacity is credited."
+						: "This panel has rebates/holes/tabs, a nonrectangular boundary or local support loads. No structural model for its actual geometry is implemented; rectangular plate capacity is not credited.",
 					[]));
 				continue;
 			}
@@ -314,7 +319,7 @@ class ToolingLoads {
 			if (v.panelIds.length == 0)
 				throw "Brace needs panel references";
 			for (id in v.panelIds) {
-				if (!demands.exists(id) || p.panels.members.concat(p.supportPanels).filter(m -> m.panel.id == id).length != 1)
+				if (!demands.exists(id) || walls.concat(p.supportPanels).filter(m -> m.panel.id == id).length != 1)
 					throw "Unknown brace panel";
 				pressure = Math.max(pressure, demands.get(id).pressurePa);
 			}

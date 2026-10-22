@@ -45,6 +45,21 @@ class MoldRegions {
 	public static function profile(part:CastingMoldPlan.MoldVolumeProfile):CastingRegion
 		return CastingRegion.Placed({solid:CastingGeometrySolid.Prism(part.contour,part.depth),pose:part.pose});
 
+	public static function section(contours:Array<materia.casting.CastingSection.CastingSectionContour>,
+			pose:AssemblyFrame,depth:Float):CastingRegion {
+		function prism(contour:Array<materia.casting.CastingProfile.CastingSegment>):CastingRegion
+			return Placed({solid:Prism(contour,depth),pose:pose});
+		var pieces:Array<CastingRegion>=[];
+		for (outer in contours) if (outer.depth%2==0) {
+			var holes:Array<CastingRegion>=[];
+			for (hole in contours) if (hole.depth==outer.depth+1
+				&& materia.casting.CastingProfileGeometry.inside(outer.contour,hole.contour[0].start.x,hole.contour[0].start.y))
+				holes.push(prism(hole.contour));
+			pieces.push(Difference(prism(outer.contour),holes));
+		}
+		return Union(pieces);
+	}
+
 	public static function moved(region:CastingRegion,pose:AssemblyFrame):CastingRegion return switch region {
 		case Placed(geometry): CastingRegion.Placed({solid:geometry.solid,pose:F.compose(pose,geometry.pose)});
 		case Drafted(id,opening,frame,depth,degrees): CastingRegion.Drafted(id,opening,F.compose(pose,frame),depth,degrees);
@@ -59,6 +74,22 @@ class MoldRegions {
 
 	public static function boxes(region:CastingRegion):Null<Array<Box3>>
 		return orthogonal(CastingRegionCodec.snapshot(region));
+
+	public static function exactBounds(region:CastingRegion,id:String):Box3 {
+		var pieces=boxes(region);
+		if (pieces==null) {
+			if (CastingMoldPlanner.geometry==null) throw "Exact manufacturing bounds kernel required: "+id;
+			return CastingMoldPlanner.geometry.bounds(region,id);
+		}
+		if (pieces.length==0) throw "Empty tooling manufacturing volume: "+id;
+		var low=[Math.POSITIVE_INFINITY,Math.POSITIVE_INFINITY,Math.POSITIVE_INFINITY];
+		var high=[Math.NEGATIVE_INFINITY,Math.NEGATIVE_INFINITY,Math.NEGATIVE_INFINITY];
+		for (piece in pieces) {
+			var a=[piece.x,piece.y,piece.z],b=[piece.x+piece.width,piece.y+piece.depth,piece.z+piece.height];
+			for (axis in 0...3) {low[axis]=Math.min(low[axis],a[axis]);high[axis]=Math.max(high[axis],b[axis]);}
+		}
+		return {x:low[0],y:low[1],z:low[2],width:high[0]-low[0],depth:high[1]-low[1],height:high[2]-low[2]};
+	}
 
 	public static function moments(region:CastingRegion,affectedId:String):CastingRegionMoments {
 		var normalized=CastingRegionCodec.snapshot(region),pieces=orthogonal(normalized);

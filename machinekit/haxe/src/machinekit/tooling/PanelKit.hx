@@ -33,12 +33,30 @@ class PanelKit {
 		return ToolingExplode.presentation(definition,"panel-tooling",offsets);
 	}
 
-	public static function assembly(plan:PanelAssemblyRecord, material:String = "birch plywood"):MachineAssembly {
+	public static function assembly(plan:PanelAssemblyRecord, material:String = "birch plywood",
+			?finishedComponents:Map<String,machinekit.component.MachineComponent>):MachineAssembly {
 		PanelAssemblyPlan.validate(plan);
 		var assembly = new MachineAssembly();
-		for (m in plan.members)
-			assembly.addComponent(m.panel.id, ToolingPanel.fromPlan(m.panel, material), m.pose);
-		for (j in plan.joints) {
+		if (finishedComponents!=null) {
+			for (id in finishedComponents.keys()) if (plan.members.filter(member -> member.panel.id==id).length!=1)
+				throw "Unknown finished panel component: "+id;
+		}
+		for (m in plan.members) {
+			var component:machinekit.component.MachineComponent;
+			if (finishedComponents==null) component=ToolingPanel.fromPlan(m.panel,material);
+			else {
+				component=finishedComponents.get(m.panel.id);
+				if (component==null) throw "Missing finished panel component: "+m.panel.id;
+			}
+			assembly.addComponent(m.panel.id, component, m.pose);
+		}
+		// The portable assembly is a placement tree; all physical contact joints
+		// remain in the validated neutral panel plan and shop records.
+		var parented=new Map<String,Bool>();
+		var joints=plan.joints.copy();joints.sort((a,b) -> Reflect.compare(a.id,b.id));
+		for (j in joints) {
+			if (parented.exists(j.movingId)) continue;
+			parented.set(j.movingId,true);
 			assembly.addMemberConnector(j.fixedId, materia.tooling.ToolingIds.derive("", j.id, "-fixed"), j.fixedFrame);
 			assembly.addMemberConnector(j.movingId, materia.tooling.ToolingIds.derive("", j.id, "-moving"), j.movingFrame);
 			assembly.addMate(j.id, "fixed", j.fixedId, materia.tooling.ToolingIds.derive("", j.id, "-fixed"), j.movingId,

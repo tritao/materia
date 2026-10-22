@@ -253,18 +253,19 @@ class PanelCodec {
 	/** Positive curvature is an internal stock corner for a CCW removed region.
 	 * Rebate corners on/outside the blank are open approach boundaries.
 	 */
-	static function cutterFit(op:PanelOperation, outline:Array<CastingSegment>):Void {
+	public static function cutterFit(op:PanelOperation, outline:Array<CastingSegment>):Void {
 
 		var bounds = CastingProfileGeometry.bounds(op.contour);
-		if (Math.min(bounds.width, bounds.height) + 1e-7 < op.toolDiameter)
+		var sign=op.kind==OutsideProfile ? -1 : 1;
+		if (op.kind!=OutsideProfile && Math.min(bounds.width, bounds.height) + 1e-7 < op.toolDiameter)
 			throw "Cutter does not fit slot: " + op.id;
 		for (i in 0...op.contour.length) {
 			var seg = op.contour[i], next = op.contour[(i + 1) % op.contour.length], c = seg.center;
-			if (c != null && seg.sweep > 0 && 2 * PanelContours.distance(c, seg.start) + 1e-7 < op.toolDiameter)
+			if (c != null && seg.sweep*sign > 0 && 2 * PanelContours.distance(c, seg.start) + 1e-7 < op.toolDiameter)
 				throw "Cutter exceeds internal radius: " + op.id;
 			var a = CastingProfileGeometry.tangent(seg, true), b = CastingProfileGeometry.tangent(next, false);
 			var cross = a.x * b.y - a.y * b.x;
-			if (cross <= 1e-8 * Math.sqrt((a.x * a.x + a.y * a.y) * (b.x * b.x + b.y * b.y)))
+			if (cross*sign <= 1e-8 * Math.sqrt((a.x * a.x + a.y * a.y) * (b.x * b.x + b.y * b.y)))
 				continue;
 			var open = false;
 			if (op.kind == Rebate) {

@@ -22,6 +22,8 @@ typedef CastingMassProperties = {
  */
 interface CastingMoldKernel {
 	public function moments(region:CastingRegion):CastingRegionMoments;
+	/** Actual extrema for manufacturing stock selection, after all subtractions. */
+	public function bounds(region:CastingRegion,affectedId:String):materia.casting.Box3;
 	public function section(region:CastingRegion,plane:materia.assembly.AssemblyRecord.AssemblyFrame,
 		affectedId:String):Array<materia.casting.CastingSection.CastingSectionContour>;
 

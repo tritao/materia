@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 16;
+	public static inline var VERSION = 17;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -358,12 +358,54 @@ class ToolingCodec {
 		};
 	}
 
+	public static function stockSnapshot(p:Dynamic):materia.tooling.panel.PanelStockSpec {
+		object(p, [
+			"materialSpec",
+			"nominalThickness",
+			"measuredThickness",
+			"thicknessVariation",
+			"width",
+			"height",
+			"coatedFace",
+			"allowedRotations",
+			"directionConstraint"
+		], "panel stock");
+		var thickness = positive(p, "measuredThickness"),
+			variation = nonnegative(p, "thicknessVariation");
+		if (variation >= thickness)
+			throw "Panel thickness variation consumes stock";
+		var face = coatedFace(string(p, "coatedFace"));
+		var rotations:Array<Int> = [];
+		for (value in array(p, "allowedRotations", 2)) {
+			var rotation = integer({value: value}, "value");
+			if ((rotation != 0 && rotation != 90) || rotations.indexOf(rotation) >= 0)
+			throw "Invalid or duplicate panel stock rotation";
+			rotations.push(rotation);
+		}
+		rotations.sort(Reflect.compare);
+		var direction = stockDirection(string(p, "directionConstraint"));
+		if (rotations.length == 0 || (direction == "width-aligned" && rotations.indexOf(90) >= 0))
+			throw "Invalid panel direction constraint";
+		return {
+			materialSpec: string(p, "materialSpec"),
+			nominalThickness: positive(p, "nominalThickness"),
+			measuredThickness: thickness,
+			thicknessVariation: variation,
+			width: positive(p, "width"),
+			height: positive(p, "height"),
+			coatedFace: face,
+			allowedRotations: rotations,
+			directionConstraint: direction
+		};
+	}
+
 	public static function recipeSnapshot(recipe:ToolingRecipe):ToolingRecipe
 		return readRecipe(recipe);
 
 	static function readRecipe(raw:Dynamic):ToolingRecipe {
 		object(raw, [
 			"featureRules",
+			"former",
 			"id",
 			"revision",
 			"panel",
@@ -446,17 +488,6 @@ class ToolingCodec {
 		};
 			if (hardware.supportClearanceDiameter <= hardware.supportScrewDiameter)
 			throw "Hardware clearance must exceed screw diameter";
-		object(p, [
-			"materialSpec",
-			"nominalThickness",
-			"measuredThickness",
-			"thicknessVariation",
-			"width",
-			"height",
-			"coatedFace",
-			"allowedRotations",
-			"directionConstraint"
-		], "panel stock");
 		object(c, [
 			"materialSpec",
 			"width",
@@ -468,22 +499,7 @@ class ToolingCodec {
 			"maximumTemperatureC",
 			"evidence"
 		], "core stock");
-		var thickness = positive(p, "measuredThickness"),
-			variation = nonnegative(p, "thicknessVariation");
-		if (variation >= thickness)
-			throw "Panel thickness variation consumes stock";
-		var face = coatedFace(string(p, "coatedFace"));
-		var rotations:Array<Int> = [];
-		for (value in array(p, "allowedRotations", 2)) {
-			var rotation = integer({value: value}, "value");
-			if ((rotation != 0 && rotation != 90) || rotations.indexOf(rotation) >= 0)
-				throw "Invalid or duplicate panel stock rotation";
-			rotations.push(rotation);
-		}
-		rotations.sort(Reflect.compare);
-		var direction = stockDirection(string(p, "directionConstraint"));
-		if (rotations.length == 0 || (direction == "width-aligned" && rotations.indexOf(90) >= 0))
-			throw "Invalid panel direction constraint";
+		var panel=stockSnapshot(p),variation=panel.thicknessVariation;
 		if (nonnegative(raw, "jointClearance") + 1e-8 < variation + nonnegative(raw, "jointLiningAllowance") + nonnegative(raw, "jointMachiningAllowance"))
 			throw "Joint clearance below stock variation and allowances";
 		if (positive(raw, "handlingLoadFactor") < 1)
@@ -494,19 +510,10 @@ class ToolingCodec {
 			throw "Compression strength requires a strain fraction between zero and one";
 		return {
 			featureRules: materia.tooling.casting.CastingStrategies.snapshotRules(Reflect.field(raw, "featureRules")),
+			former: materia.tooling.casting.FormerConstruction.recipeSnapshot(Reflect.field(raw,"former")),
 			id: string(raw, "id"),
 			revision: revision(raw),
-			panel: {
-				materialSpec: string(p, "materialSpec"),
-				nominalThickness: positive(p, "nominalThickness"),
-				measuredThickness: thickness,
-				thicknessVariation: variation,
-				width: positive(p, "width"),
-				height: positive(p, "height"),
-				coatedFace: face,
-				allowedRotations: rotations,
-				directionConstraint: direction
-			},
+			panel: panel,
 			core: {
 				materialSpec: string(c, "materialSpec"),
 				width: positive(c, "width"),
@@ -726,6 +733,8 @@ class ToolingCodec {
 
 	/** Sort object keys as well as named records so field construction order is irrelevant. */
 	public static function canonical(value:Dynamic):String {
+		if (Std.isOfType(value,materia.tooling.casting.FormerConstruction.FormerBuild))
+			return canonical(materia.tooling.casting.FormerConstruction.buildRecord(cast value));
 		if (Std.isOfType(value,materia.casting.CastingRegion))
 			return canonical(materia.casting.CastingRegion.CastingRegionCodec.record(cast value));
 		if (Std.isOfType(value,materia.tooling.process.FillAnalysis.FillPocketGeometry))

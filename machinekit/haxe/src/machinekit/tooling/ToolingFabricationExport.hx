@@ -249,12 +249,16 @@ class ToolingFabricationExport {
 		return cadChecks;
 	}
 
-	public static function write(p:CastingMoldPlan, f:FabricationPlan, dir:String):Array<materia.tooling.ToolingValidation> {
+	public static function write(p:CastingMoldPlan, f:FabricationPlan, dir:String,
+			?formerReport:FormerShopExport.FormerShopReport):Array<materia.tooling.ToolingValidation> {
 		var classificationChecks:Array<materia.tooling.ToolingValidation> = [];
 		var unknown:Array<{memberId:String, typeId:Null<String>}> = [];
 		if (f.sourceFingerprint != materia.tooling.casting.CastingMoldCodec.fingerprint(p))
 			throw "Stale fabrication plan";
 		sys.FileSystem.createDirectory(dir);
+		var formerShop=formerReport==null ? FormerShopExport.build(p) : formerReport;
+		FormerShopExport.applyValidation(formerShop,f,p);
+		FormerShopExport.write(formerShop,dir);
 		classificationChecks=classificationChecks.concat(insertManufacturing(p,f,dir)).concat(replication(p,f,dir))
 			.concat(FoundationJointCad.review(p.document.input));
 		var sectionReview=ToolingSectionReview.build(p);

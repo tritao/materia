@@ -305,6 +305,23 @@ class FoundationToolingTests {
 	static function equivalent(foundation:MineralFoundation, label:String):CastingToolingInput {
 		var input = FoundationToolingAdapter.snapshot(foundation, label, 1);
 		// Exercise the complete public JSON boundary, including source/setup binding.
+		var stock:materia.tooling.panel.PanelStockSpec = {
+					materialSpec: "test board",
+					nominalThickness: 18,
+					measuredThickness: 18,
+					thicknessVariation: 0,
+					width: 2440,
+					height: 1220,
+					coatedFace: CoatedFace.Both,
+					allowedRotations: [0, 90],
+					directionConstraint: StockDirection.Free
+				};
+		var formerStocks=[stock];
+		if (stock.measuredThickness<25) {
+			var thicker=materia.tooling.ToolingCodec.stockSnapshot(stock);
+			thicker.nominalThickness=25;thicker.measuredThickness=25;
+			formerStocks.push(thicker);
+		}
 		var document:ToolingDocument = {
 			input: input,
 			setup: {
@@ -325,20 +342,14 @@ class FoundationToolingTests {
 				]
 			},
 			recipe: {
+				former:{pocketScrew:{diameterMm:4,lengthMm:30,jigAngleDegrees:15,edgeDistanceMm:20,maximumPitchMm:100},stocks:formerStocks,finishingStockMm:0.5,toleranceMm:0.1,cutters:[
+					{id:"former-straight-6",tipDiameterMm:6,taperDegrees:0,fluteLengthMm:30,stickOutMm:35},
+					{id:"former-taper-3deg-6",tipDiameterMm:6,taperDegrees:3,fluteLengthMm:30,stickOutMm:35}
+				]},
 				featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
 				id: "test-only-recipe",
 				revision: 1,
-				panel: {
-					materialSpec: "test board",
-					nominalThickness: 18,
-					measuredThickness: 18,
-					thicknessVariation: 0,
-					width: 2440,
-					height: 1220,
-					coatedFace: CoatedFace.Both,
-					allowedRotations: [0, 90],
-					directionConstraint: StockDirection.Free
-				},
+				panel: stock,
 				core: {
 					materialSpec: "test EPS",
 					width: 1000,
