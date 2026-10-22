@@ -100,7 +100,7 @@
   "frozenControlCases": 3,
   "warning": "Rejection screen; no rack-seat/bolt compliance yet; no geometry release.",
   "archive": {
-    "archive": "build/sheet-router-evidence/brace-reduction-compact.tar.gz",
+    "archive": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/brace-reduction-compact.tar.gz",
     "bytes": 333518073,
     "sha256": "ae9c1c67d973d58038bf0e226326caad49e2031ed0c1cda79b7bc16c644ab88b",
     "verifiedRegularFiles": 1872,
@@ -108,7 +108,8 @@
     "originalArchiveSha256": "116f6b8b9b31d7d7d427749328979ab3bcecc841ba0001a1882f97f4f1983c22",
     "omittedRawDatFiles": 337,
     "omittedRawDatBytes": 2112119740,
-    "retentionManifest": "brace-reduction/retention.json"
+    "retentionManifest": "brace-reduction/retention.json",
+    "relocationReason": "DATA1 has only 38 MB free; DEV is a separate filesystem. Root must stay above 8 GB."
   },
   "coverage": {
     "beds": 2,

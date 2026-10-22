@@ -211,7 +211,7 @@ The user accepted retaining all braces.
 
 ## Evidence and reproduction
 
-The retained packet is `build/sheet-router-evidence/brace-reduction-compact.tar.gz`,
+The retained packet is `/media/joao/DEV/materia-fem-runs/sheet-router-evidence/brace-reduction-compact.tar.gz`,
 with its SHA256 in the adjacent `.sha256` file and
 [provenance.json](brace-results/provenance.json). It contains pinned SR7 mass
 packets, qualified SR6 native/preparation/stitch data, J4 CSV/manifests/source,

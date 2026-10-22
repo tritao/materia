@@ -2,7 +2,11 @@
 
 ## Evidence retention (2026-10-20)
 
-Cited historical runs are compressed under `build/sheet-router-evidence/`.
+Cited historical runs are compressed under `build/sheet-router-evidence/`;
+`modal.tar.gz` and `system.tar.gz` are retained on the separate DEV filesystem at
+`/media/joao/DEV/materia-fem-runs/sheet-router-evidence/` because DATA1 is full.
+The brace archive is also there. Verified hashes are recorded in the relocation
+record and brace provenance.
 The freeze archive was moved, byte-for-byte verified, to
 `/media/joao/DATA1/materia-router-evidence/freeze.tar.gz` on 2026-10-22 to keep
 root above 8 GB free; see [relocation hash](brace-results/evidence-relocation.json).

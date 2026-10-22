@@ -2,5 +2,20 @@
   "original": "/home/joao/dev/materia/build/sheet-router-evidence/freeze.tar.gz",
   "retained": "/media/joao/DATA1/materia-router-evidence/freeze.tar.gz",
   "sha256": "f9239d49967ab75b5f23163c7f01f6d1b4e9e993e4a51a0537e20be13f528b49",
-  "bytes": 239452746
+  "bytes": 239452746,
+  "additionalMoves": [
+    {
+      "original": "/home/joao/dev/materia/build/sheet-router-evidence/modal.tar.gz",
+      "retained": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/modal.tar.gz",
+      "sha256": "90339d47f67e1408464dcafeaa091cb2b3c6bdf90f30ac71a370891dc58aedea",
+      "bytes": 264988672
+    },
+    {
+      "original": "/home/joao/dev/materia/build/sheet-router-evidence/system.tar.gz",
+      "retained": "/media/joao/DEV/materia-fem-runs/sheet-router-evidence/system.tar.gz",
+      "sha256": "6f1d5f9262ecb7094a44874d85e63b838040d0c49df2998e4b0db1e3ff1a13bb",
+      "bytes": 109698850
+    }
+  ],
+  "reason": "DATA1 has 38 MB free; verified archives moved to separate DEV filesystem to maintain the required root reserve"
 }
