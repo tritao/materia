@@ -64,7 +64,8 @@ class RingParts {
 
 	/**
 	 * A frameless motor: the stator, its outer 40 % of the section with recessed end turns on both faces, and the
-	 * rotor, the inner 40 % with a stepped hub, across a 0.5 mm air gap. They are separate solids, as delivered.
+	 * rotor, the inner 40 % with a stepped hub, across a 0.5 mm air gap held by the shipping sleeve frameless kits
+	 * arrive with, at the lower face, so the part is one solid.
 	 */
 	public static function framelessMotor(outside:Float, bore:Float, height:Float):Part {
 		var outer = outside / 2, inner = bore / 2, section = outer - inner;
@@ -84,7 +85,9 @@ class RingParts {
 			]);
 			var rotorBody = keep(Part.revolve([{r: inner, z: 0}, {r: inner + (rotor - inner) * 0.5, z: 0}, {r: inner + (rotor - inner) * 0.5, z: step},
 				{r: rotor, z: step}, {r: rotor, z: height - step}, {r: inner, z: height - step}]), "rotor");
-			return Solids.union([statorBody, rotorBody]);
+			var sleeve = keep(Part.revolve([{r: rotor - 0.01, z: step}, {r: rotor + gap + 0.01, z: step}, {r: rotor + gap + 0.01, z: turns},
+				{r: rotor - 0.01, z: turns}]), "shipping-sleeve");
+			return Solids.union([statorBody, rotorBody, sleeve]);
 		});
 	}
 
