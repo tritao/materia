@@ -1389,7 +1389,7 @@ a corner radius below the router radius fails with its ID. Fill analysis agrees
 with CAD booleans on a sloped-ceiling fixture, and box-feature results are
 unchanged. Castability proposals change only adjustable dimensions.
 
-**Core strategy comparison (after step 3, before the cleanup slice).** Run
+**Core strategy comparison (after the cleanup slice, before phase 8).** Run
 the mill base in two variants from the same source:
 - the current recipe, with lightening pockets as sacrificial EPS;
 - a recipe variant whose rule makes lightening pockets that open to a body
@@ -1402,8 +1402,12 @@ head pressure, and the source changes the draft needs. Report both kits
 side by side. This adds no new core type and no library code beyond the recipe
 rule and fixtures. The user picks the production recipe from the results.
 
-**Cleanup slice (after step 3, before phase 8).** These are defects in work
-already landed, so the scope freeze allows them:
+**Cleanup slice (after step 3, before the core comparison and phase 8).**
+These are defects or excess weight in work already landed, so the scope freeze
+allows them. Phase 8 carries this machinery to the column and the hobber, so it
+is trimmed first. Items 8–14 are deletions and merges with no new capability:
+kits stay identical except where an item says otherwise, and the slice report
+lists each deleted module with the check or record that still covers it.
 
 1. Unresolved inputs are a typed value (known, or unresolved with a reason), not
    `Null<Float>` found by reflecting over field-name strings
@@ -1435,6 +1439,48 @@ already landed, so the scope freeze allows them:
    native rejection of a screened pattern is a defect in the screen, not a
    fallback to the next candidate. The selected patterns, and the kits, stay
    identical. Report selection time before and after.
+8. Delete the cure and thermal solvers (`CureAnalysis`, `ThermalCoverage`,
+   `ThermalFaces`). Their kinetic inputs do not exist for any compound we can
+   buy, so they can only report Pending. Replace them with one datasheet rule
+   on the declared compound: maximum section or layer thickness and maximum
+   mass per lift, checked against the pour plan. The rule's values stay
+   Pending until the compound is declared.
+9. One mold planner. `BoxMoldPlanner` becomes a case of `CastingMoldPlanner`
+   (a casting whose features are one box pocket), sharing its allocation,
+   panels and records. Delete the separate planner, its codec and its options.
+   Box-template kits stay identical.
+10. One castability pass. Fold the source screening in `CastingLevelOne` into
+    `CastabilityAnalysis` and delete what they duplicate. Record the result of
+    `MoldOrientationStudy` as a decision in this plan (the chosen orientation
+    and why) and delete the study code and its configuration.
+11. Strict formats only at the boundaries: source casting features in, and the
+    delivered package out (drawings, CAM, cut lists, shop and fixture records,
+    the validation report, one manifest). Intermediate plans (mold plan, mold
+    volumes, process, fabrication spec, castability and similar) stay in memory
+    and lose their codecs and schema versions, unless the package delivers them
+    as a shop document; then they are part of the package format. Exact
+    reconstruction compares the native CAD with the in-memory plan and the
+    frozen CAD fixtures. Do this together with item 6.
+12. Report Pending by missing input. Each unresolved input appears once, with
+    the checks and artifacts it blocks. The per-instance records stay in the
+    detailed report, and readiness is unchanged. The kit status (README and
+    START-HERE) leads with this list.
+13. Mill-specific casting data belongs to the example, not the library.
+    `MillCastingDetails`, `MillLiftingPattern` and the casting parts of
+    `MillFrame` move out of `machinekit.milling` into the bench-mill example's
+    tooling setup. `machinekit.milling` keeps machine parts and their source
+    geometry. In the bench-mill directory, merge build configs that only differ
+    by entry point into one project with named entries where haxeon supports
+    it, and delete configs no suite or document uses.
+14. Consolidate anchors and insert stages. Anchor demand, pattern selection,
+    hardware and checks are spread over about eight files in three packages
+    (`InsertAnchorage`, `EmbeddedAnchors`, `InsertAnchorPattern`,
+    `InsertAnchorHardware`, `InsertAnchorGeometry`, `InsertAnchorageChecks`,
+    and others). Leave one neutral module for rules and selection and one native
+    module for geometry. Do the same review for the insert stage model
+    (`InsertManufacturing`, `InsertManufacturingPlan`, `InsertStages`,
+    `InsertFinishing`, `InsertBlankFit`): keep what the fixtures and shop records
+    consume, and delete the rest.
 
 ### 8. Column and independent structure
 
