@@ -1771,3 +1771,13 @@ times in seconds, not override multipliers. The user accepted keeping all braces
 Old offline J4 control histories are diagnostic, pending replacement by J5 ready
 stops and executor-clock exports. See [motion envelope audit](fem/MOTION_ENVELOPE.md).
 No frozen CAD change is authorised by the brace study. Keep root above 8 GB free.
+
+Rack-mount route decision (2026-10-22): retain draft seat geometry only as FEM
+mass/compliance input; do not land RackSeat/RackMountPattern/RackSeatHoles as
+components. Adopt the shared [RM2 mount family](../../RAIL_MOUNTING.md) after
+tooling phase-7 step 2, with welded pads plus replication and a side bar adjusted
+with push screws. Y rail and rack may share one datum and replication. The sourced
+rack recipe owns holes/pins/datum faces; shared derivation owns seat holes. Rack
+parallelism, section-joint pitch and adjustable motor-plate centre distance/backlash
+are RM4 assembly relationships. Shared mount mass/compliance must enter FE exports.
+The frozen router rebuild and right-rack correction still require user approval.

@@ -1,6 +1,6 @@
-# Rail mounting plan
+# Rails, racks and linear scales: shared mounting plan
 
-How profile rails are mounted accurately on our own castings and frames without a machine large
+How profile rails, gear racks and linear scales are mounted accurately on our castings and welded frames without a machine large
 enough to finish them. It applies to every machine with rails: the bench mill, the sheet router, the
 flexspline hobber and the lathe. Purchasing options for the instruments and compounds are in
 [METROLOGY_SOURCING.md](METROLOGY_SOURCING.md).
@@ -52,8 +52,9 @@ Status: planned 2026-10-20. Nothing below is implemented.
   shoulder would fix squareness at pour time, would need a vertical master inside a dam, and would put
   clamp load into a thin epoxy lip. Adjusting at assembly takes insert placement error and cure
   distortion out of the result and can be repeated if a rail is ever re-seated.
-- **RM-D2. Steel side bar with push screws.** Each rail gets a steel side bar cast in beside its seat,
-  on the rail's non-reference side, from the same insert family as the seat. Push screws in the bar,
+- **RM-D2. Steel side bar with push screws.** Each element gets a steel side bar beside its seat,
+  on the non-reference side, from the shared mount family. Cast hosts use a retained
+  steel insert; welded hosts use a welded steel pad, relieved before replication. Push screws in the bar,
   at the rail-bolt pitch, press the rail edge (HIWIN's "retaining screw" method). The bar needs only
   coarse placement from the mold fixture. A tapered-gib slot is an alternative clamp where speed of
   assembly matters. Clamp loads go into steel, never into casting or compound.
@@ -83,7 +84,9 @@ Status: planned 2026-10-20. Nothing below is implemented.
   found (2026-10-20); a Chinese compound may be trialled only beside Moglice in the coupon. Rail seats
   are static, so a sliding (MoS2) grade is not required; ask Diamant for their static load-bearing
   replication grade.
-- **RM-D9. Rail bolt holes come from the rail.** The rail owns its hole pattern (`LinearRail`
+- **RM-D9. Mounting holes come from the mounted element.** Rails, racks and linear scales
+  own their catalogue hole patterns and mount connectors; shared seats derive their holes
+  from these, never from a machine-specific pattern. For rails: The rail owns its hole pattern (`LinearRail`
   `holePositions` and its `mount1…mountN` connectors, from pitch and end margin). The rail mount
   derives the seat insert's tapped holes from the placed rail: each hole frame is the rail's mount
   connector expressed in insert coordinates, with the thread from `railMountScrew` and depth and
@@ -166,27 +169,45 @@ data with source or as assumptions.
 Acceptance: every profile in `LinearRailSystem` either carries sourced values or is labelled
 assumed; the bench mill's 16 M4 × 16 block screws are checked against the recorded thread depth.
 
-### RM2 — Shared rail-mount family
+### RM2 — Shared mount family for rails, racks and linear scales
 
-A rail mount built once and used by every machine: a seat insert with a replication allowance
-(derived from compound minimum layer + fixture height error + cure distortion), a steel side bar on
-the non-reference side, and an edge clamp chosen from push screws, tapered gib or replicated edge.
-Rail and side-bar holes go through `InsertHoles`/`DesignInterfaces`, derived from the rail's mount
-connectors (RM-D9), with the drilling route chosen by the clearance budget (RM-D10). The mount
-declares its `InterfaceRequirement` and the relationships it takes part in.
+**Planned; implementation follows TOOLING_PLAN phase 7 step 2 landing.** One mount
+family serves rails, racks and linear scales. The host supplies a mounting datum:
+a replicated plane plus a steel side bar with push screws for assembly adjustment,
+then locking under RM-D1. A fixed precision lip is not the primary reference.
+The host abstraction distinguishes a retained insert in a casting from a welded
+steel pad on a stress-relieved frame. Both share datum, allowance, clamp and
+measurement contracts; a welded pad is not represented as a cast insert.
 
-Acceptance: a pair of rails on a test foundation builds with seats, side bars and clamps; the
-allowance appears in the casting geometry; clamp screws engage steel only; a missing side bar or a
-clamp bearing on casting is rejected. Changing rail length, pitch or end margin moves the seat and
-push-screw holes with no other edit; a seat hole offset from its rail screw fails the coaxial check;
-a placement tolerance that exceeds the bolt clearance switches the route to transfer drilling, and
-with transfer drilling not permitted it raises a design change request.
+Replication allowance derives from the compound's minimum/maximum layer thickness,
+fixture height error and cure distortion (RM-D8); individual machines must not invent
+a second riser/epoxy allowance calculation. The router Y rail and rack can share one
+host datum so one replication establishes both mounting planes.
 
-Phase-7 step 2 owns the connector-derived seat holes and service screws for the mill's Y and Z
-rails: `MillRailPlacement`, `InsertMountPattern` and `MillRailFasteners`. RM2 reuses these helpers.
-Each source hole records its placed rail connector, recipe fingerprint, clearance budget and drilling
-route. Unknown RM0 allocations keep the proposed transfer route pending; they are not assumed zero.
-The broader side-bar, clamp and replication-layer work above remains RM2 scope.
+The mounted element owns its catalogue section lengths, datum faces and mounting
+holes/pins. Seat and side-bar holes derive from the placed element's mount1…N
+connectors (RM-D9), with its thread and `ThreadedHolePolicy`. Reuse phase-7 step 2's
+`MillRailPlacement`, `InsertMountPattern` and `MillRailFasteners` derivation through
+a general placed-element contract; do not duplicate it as rack-specific hole code.
+Every hole retains connector identity, recipe fingerprint, clearance budget and
+selected drilling route. Unknown allocations remain pending, not zero.
+RM-D10's clearance/transfer-drilling rules apply to all three element types.
+
+The family reports its steel, fastener and replication mass, centres/inertia,
+and load-direction bolt, pad, bar-bending and replication compliance. Structural
+exports consume these automatically, including series compliance in rack drives;
+no rigid hidden seat or hand-entered duplicate mass is permitted. Material and
+joint assumptions remain labelled until measured or sourced.
+
+Acceptance: rail pair, joined rack sections and linear scale on cast and welded
+host fixtures build with the shared plane/bar/clamps; clamp screws engage steel
+only. Missing support, missing side bar or clamp load into compound/casting fails.
+Changing element length or catalogue hole pitch moves seat/push-screw holes without
+another edit; non-coaxial screws fail. A clearance budget that cannot close chooses
+permitted transfer drilling or requests a design change. Both host routes emit the
+allowance and mount mass/compliance; FE export includes them exactly once.
+The catalogue rack recipe owns holes; its joint gauge and motor-plate adjustment
+remain RM4 relationships, not dimensions baked into a rack seat.
 
 ### RM3 — Bench mill adoption
 
@@ -204,8 +225,17 @@ In-plane `InterfaceRelationship` kinds (straightness of a master edge, paralleli
 squareness between axes in the rail plane) with route "adjusted at assembly", instrument, method and
 uncertainty. Coordinated with TOOLING_PLAN phase 7 step 2, which owns the relationship records.
 
-Acceptance: the bench mill declares all its rail relationships; one with uncertainty above tolerance
-stays pending.
+Rack additions are `InterfaceRelationship` records with route **adjusted at assembly**:
+
+- Rack parallel to the master rail: indicator on a carriage traverses the rack datum side.
+- Pitch continuity across section joints: set and verify with the supplier's rack-joint gauge.
+- Pinion centre distance and backlash: adjust and lock the motor plate, independently of the seat.
+
+Each names its instrument or gauge, procedure, tolerance, uncertainty and evidence.
+Linear-scale alignment follows the scale supplier's datum and measurement requirements.
+
+Acceptance: the bench mill declares its rail relationships and the router declares
+these rack relationships; uncertainty above tolerance keeps any relationship pending.
 
 ### RM5 — Alignment assistant
 
