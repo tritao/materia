@@ -1398,6 +1398,14 @@ already landed, so the scope freeze allows them:
 5. This plan keeps design, decisions and status. Per-slice validation counts
    and progress logs move to commit messages, and the progress sections shrink
    to one status line per phase.
+6. Simplify the verification layers. Keep the checks that prevent a bad casting:
+   fill and traps, release and withdrawal, insert location, hole and anchor
+   sizing, and exact reconstruction. Review the package machinery (manifest
+   recomputation, omission and tamper checks, native-check caches, per-artifact
+   report recomputation, duplicate verification paths) and keep one integrity
+   check per package. Remove layers that re-verify what another layer already
+   proves. List each removal with the check that still covers it. Delete
+   unneeded layers rather than disabling them behind flags.
 
 ### 8. Column and independent structure
 
