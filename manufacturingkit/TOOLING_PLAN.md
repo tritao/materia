@@ -1369,6 +1369,23 @@ a corner radius below the router radius fails with its ID. Fill analysis agrees
 with CAD booleans on a sloped-ceiling fixture, and box-feature results are
 unchanged. Castability proposals change only adjustable dimensions.
 
+**Cleanup slice (after step 3, before phase 8).** These are defects in work
+already landed, so the scope freeze allows them:
+
+1. Unresolved inputs are a typed value (known, or unresolved with a reason), not
+   `Null<Float>` found by reflecting over field-name strings
+   (`HoleClearanceBudget` and the other nullable inputs in `materia.casting`).
+   Missing-input lists come from the type, not from field names.
+2. Enum tokens decode through a checked function that rejects unknown tokens;
+   no `cast parameterToken(...)`.
+3. Each codec `snapshot` takes raw records only. It has no
+   `Std.isOfType(raw, …)` branch that also accepts an already-typed value, and
+   callers copy typed values explicitly.
+4. A test checks that every vocabulary `values()` list matches its codec tokens.
+5. This plan keeps design, decisions and status. Per-slice validation counts
+   and progress logs move to commit messages, and the progress sections shrink
+   to one status line per phase.
+
 ### 8. Column and independent structure
 
 Add the column setup, stepped/flared envelope support, intersecting channels and
@@ -1451,7 +1468,7 @@ directories; commit source setups, small test fixtures and documentation.
 
 ## Deferred scope
 
-
+- Structured recipe parameters: MachineKit components store structured records as JSON strings inside recipe tokens (`MineralCasting` `embeddedAnchors`, `datumScheme`, `interfaces`; `CastInsert` `origin`). This affects every component, so it needs its own MachineKit plan rather than a casting slice.
 - Generic catalogue recipe solid-count qualification: the bought Vallder BK12 assembly has 32 solids; the broad recipe test assumes one, outside casting phases 6–8.
 
 General BREP parting-surface discovery, arbitrary contour nesting, robotic mold
