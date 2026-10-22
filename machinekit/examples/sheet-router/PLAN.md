@@ -1090,6 +1090,16 @@ This is layout acceptance; actual retained-link cutting, inventory execution and
 **SR16. RKD6 first hardware release.**
 - Depends on OM-R1 jerk-limited contour execution with optional ZV/ZVD and SR6-C
   measured-mode motion-error acceptance; report modal frequencies without a 40 Hz gate.
+- Execution-model decision, before the freeze:
+  - What the device executes: degree-5 polynomials on the integer nanosecond clock (current), or
+    the time law and geometry evaluated on the device at its servo rate.
+  - Admission tolerances: the physical rule (acceleration steps judged by modal response
+    Δa/ω², bounded by the coefficient resolution the device actually executes) becomes the
+    general clock-admission rule, with strict V/A/J limits kept for spans longer than a few ticks.
+  - Device-side hold: a ready jerk-limited stop per published window (TR3 already requires one).
+    Device-side feed override ≤ 100% by time scaling (v·k, a·k², j·k³) with k jerk-filtered.
+    Overrides above 100% replan from the next window.
+  - Record the chosen model with its measured hold and override latency (targets 10 ms / 50 ms).
 - Wire additions: encoder counts in `State6`, drive enable, alarm and ready, a following-error
   bound per axis, analog spindle output, safety-relay state input. Then the version freezes, as
   `DEVICE_PROTOCOL.md` requires.
