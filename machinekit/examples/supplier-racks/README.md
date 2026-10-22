@@ -38,7 +38,10 @@ Published capacity remains separate from assumed mesh stiffness.
 
 CAD axes match the generic helical rack. `back` and `referenceSide` identify
 datums. `mount1…N` expose the eight/four supplier bores (7 mm through, 11 mm
-counterbore, 7 mm deep) at 62.5 mm end margin and 125 mm pitch. `pinPilot1/2`
+counterbore, 7 mm deep) at 62.5 mm end margin and 125 mm pitch. Like the rail,
+a mount connector is on the screw-entry face (rack x=0), pointing outwards;
+the head bearing plane is 7 mm into that face, not 7 mm past the opposite
+support face. The separate back datum sets mesh height. `pinPilot1/2`
 identify the published 5.7 mm pilots at 31.7 mm from the ends; these are not
 invented finished 6 mm dowel bores. Final reaming/locking follows the assembly
 procedure. Host seat holes derive from these connectors using the shared

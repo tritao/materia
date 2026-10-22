@@ -19,7 +19,7 @@ class GearRackChecks {
             check(rack.mountingConnectors().length==s.holeCount,"supplier hole count");
             for(i in 0...s.holeCount) {
                 var c=rack.connector('mount${i+1}').frame,n=F.transformVector(c,0,1,0);
-                near(c.z,62.5+125*i,"supplier pitch and end margin");near(c.x,s.faceWidthMm,"support face");near(n.x,-1,"mount normal into rack");
+                near(c.z,62.5+125*i,"supplier pitch and end margin");near(c.x,0,"counterbore entry face");near(n.x,-1,"mount normal out of screw-entry face");
             }
             near(rack.connector("pinPilot1").frame.z,31.7,"supplier first pin pilot");
             near(rack.connector("pinPilot2").frame.z,s.lengthMm-31.7,"supplier last pin pilot");

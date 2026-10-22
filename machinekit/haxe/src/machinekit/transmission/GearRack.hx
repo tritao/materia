@@ -22,10 +22,13 @@ class GearRack extends MachineComponent {
     public function new(?values:ComponentValues) {
         var v=P.resolve(inputs(),values),s=GearRackCatalog.catalog().get(v.token("designation"));
         super("ATLANTA-"+s.designation,"ATLANTA HPR helical rack "+s.designation,"steel",true,v);spec=s;
+        // Like LinearRail, mount connectors lie on the screw-entry face and
+        // point out of the part. Counterbores start at x=0; receiver steel is
+        // beyond x=faceWidth. Do not seat heads from the support-side face.
         for(i in 0...spec.holeCount)addConnector('mount${i+1}',Mount,
-            AxisBuilder.orient(spec.faceWidthMm,-spec.pitchHeightMm+spec.holeHeightMm,spec.holeEndMm+i*spec.holePitchMm,[-1.0,0,0],[0.0,0,1]));
+            AxisBuilder.orient(0,-spec.pitchHeightMm+spec.holeHeightMm,spec.holeEndMm+i*spec.holePitchMm,[-1.0,0,0],[0.0,0,1]));
         for(i in 0...2)addConnector('pinPilot${i+1}',Mount,
-            AxisBuilder.orient(spec.faceWidthMm,-spec.pitchHeightMm+spec.holeHeightMm,i==0?spec.pinEndMm:spec.lengthMm-spec.pinEndMm,[-1.0,0,0],[0.0,0,1]));
+            AxisBuilder.orient(0,-spec.pitchHeightMm+spec.holeHeightMm,i==0?spec.pinEndMm:spec.lengthMm-spec.pinEndMm,[-1.0,0,0],[0.0,0,1]));
         addConnector("back",Mount,F.translation(0,-spec.pitchHeightMm,0));
         addConnector("referenceSide",Mount,AxisBuilder.orient(spec.faceWidthMm,0,0,[-1.0,0,0],[0.0,0,1]));
         addConnector("pitch",Pitch,Solids.axial(spec.faceWidthMm/2,0,0));
