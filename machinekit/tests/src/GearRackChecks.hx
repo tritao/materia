@@ -1,4 +1,7 @@
 import machinekit.transmission.GearRack;
+import machinekit.transmission.HelicalPinion;
+import machinekit.component.ComponentValues;
+import machinekit.transmission.ValueBasis;
 import machinekit.transmission.GearRackSpec.GearRackCatalog;
 import machinekit.transmission.RackGeometry;
 import machinekit.component.MachineKitComponents;
@@ -32,6 +35,14 @@ class GearRackChecks {
         near(GearRack.catalogue("29-15-105").publishedFeedForceN(20),6000,"C-44 HPR rating");
         near(GearRack.catalogue("29-15-055").publishedFeedForceN(20),3000,"500 mm mounting derating");
         near(GearRack.catalogue("29-20-105").publishedFeedForceN(15),8000,"C-45 HPR standard steel column, not case-hardened column");
+        var physical=GearRack.catalogue("29-15-105");
+        var pinion=new HelicalPinion(new ComponentValues().setToken("hand","left"));
+        var relation=RackGeometry.relation(pinion,physical,1);
+        near(relation.ratio,2*Math.PI/100,"100 mm/turn for reviewed module-1.5 geometry");
+        check(relation.basis("stiffness")==ValueBasis.Assumed,"published capacity is not a mesh stiffness");
+        var wrongHand=false;
+        try RackGeometry.relation(new HelicalPinion(),physical,1) catch(_:Dynamic)wrongHand=true;
+        check(wrongHand,"matching hands refused");
         var refused=false;try GearRack.catalogue("29-15-105").publishedFeedForceN(19) catch(_:Dynamic)refused=true;
         check(refused,"unreviewed rating row refused");
         Sys.println('PASS: $count catalogue rack recipes, connectors, declared mass, ratings, geometry and reload');

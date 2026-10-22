@@ -32,6 +32,10 @@ The supplier's 19 mm face does not justify assigning its rating or mass to the
 frozen router's assumed 20 mm rack. Selecting it for the router changes geometry
 and remains subject to the user's approval and the shared RM2 mount.
 
+The reviewed racks are right-handed and need a left-handed pinion. The generic
+pinion default is right-handed; the relation rejects that incompatible pairing.
+Published capacity remains separate from assumed mesh stiffness.
+
 CAD axes match the generic helical rack. `back` and `referenceSide` identify
 datums. `mount1…N` expose the eight/four supplier bores (7 mm through, 11 mm
 counterbore, 7 mm deep) at 62.5 mm end margin and 125 mm pitch. `pinPilot1/2`
